@@ -153,7 +153,7 @@ export function WorkspaceOverview() {
   )
 }
 
-function migrateStockLayoutOnce(): void {
+export function schedulePersonalLayoutMigration(): void {
   const current = Number(readKey(PERSONAL_LAYOUT_VERSION_KEY) ?? 0)
 
   if (Number.isFinite(current) && current >= PERSONAL_LAYOUT_VERSION) {
@@ -172,7 +172,7 @@ function migrateStockLayoutOnce(): void {
 }
 
 export function registerWorkspaceOverviewPane(): () => void {
-  const dispose = registry.register({
+  return registry.register({
     id: WORKSPACE_OVERVIEW_PANE_ID,
     area: 'panes',
     source: 'core',
@@ -188,8 +188,4 @@ export function registerWorkspaceOverviewPane(): () => void {
     },
     render: () => <WorkspaceOverview />
   })
-
-  migrateStockLayoutOnce()
-
-  return dispose
 }
