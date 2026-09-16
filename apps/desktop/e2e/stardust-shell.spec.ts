@@ -45,6 +45,7 @@ test.describe('Stardust Codex desktop shell', () => {
     await expect(taskHeader).toContainText('New thread')
     await expect(page.getByText('Project workspace', { exact: true })).toBeVisible()
     await expect(page.getByText('What should we change?', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-slot="composer-rich-input"]')).toHaveAttribute('data-placeholder', 'What are we building?')
     await expect(page.locator('[data-tree-group="grp-review"]')).toBeVisible()
 
     const review = page.locator('aside[aria-label="Review"]')
