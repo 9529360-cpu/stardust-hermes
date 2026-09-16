@@ -59,3 +59,13 @@ def test_security_reports_belong_to_stardust() -> None:
         assert "9529360-cpu/stardust-hermes/security/advisories/new" in source
         assert "NousResearch/hermes-agent/security/advisories/new" not in source
         assert "security@nousresearch.com" not in source
+
+
+def test_public_readmes_install_stardust_not_upstream() -> None:
+    readmes = ("README.md", "README.zh-CN.md", "README.es.md", "README.ur-pk.md")
+    for path in readmes:
+        source = _read(path)
+        assert "raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust" in source
+        assert "hermes-agent.nousresearch.com/install.sh" not in source
+        assert "hermes-agent.nousresearch.com/install.ps1" not in source
+        assert "raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install" not in source
