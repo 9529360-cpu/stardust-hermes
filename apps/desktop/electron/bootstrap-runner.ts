@@ -165,7 +165,7 @@ function installRefForStamp(installStamp) {
 // ---------------------------------------------------------------------------
 
 function installScriptName() {
-  return process.platform === 'win32' ? 'install.ps1' : 'install.sh'
+  return process.platform === 'win32' ? 'install-stardust.ps1' : 'install-stardust.sh'
 }
 
 function installScriptKind() {
