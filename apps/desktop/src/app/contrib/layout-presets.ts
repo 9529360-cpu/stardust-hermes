@@ -8,33 +8,31 @@ import {
   WORKSPACE_OVERVIEW_PANE_ID
 } from './workspace-overview'
 
-// Private-product default: conversations on the left, the active chat as the
-// dominant surface, and one calm context rail on the right. Files and Review
-// live as tabs in that context rail and stay hidden until the user asks for
-// them; the always-available overview keeps the rail useful when no tool pane
-// is open. Terminal is intentionally absent from the first view and appears on
-// demand.
+// Stardust's default shell has three permanent product regions only:
+// task rail / task workspace / context inspector. Files, Review and Terminal
+// remain real tools, but they are summoned on demand instead of creating IDE
+// tabs in the first frame.
 export const DEFAULT_TREE = split(
   'row',
   [
     group(['sessions'], { id: 'grp-sessions' }),
     group(['workspace'], { id: 'grp-main' }),
-    group([WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'], { id: 'grp-context' })
+    group([WORKSPACE_OVERVIEW_PANE_ID], { id: 'grp-context' })
   ],
-  [1, 3.5, 1.2],
+  [1.05, 4.15, 1.45],
   'spl-root'
 )
 
 const FOCUS_TREE = split(
   'row',
-  [group(['sessions']), group(['workspace', WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review', 'terminal'])],
-  [1, 4.6]
+  [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
+  [0.9, 5.2, 1.25]
 )
 
 const BASIC_TREE = split(
   'row',
   [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
-  [1, 3.8, 1.05]
+  [1, 4.6, 1.25]
 )
 
 const TERMINAL_TREE = split(
@@ -42,26 +40,24 @@ const TERMINAL_TREE = split(
   [
     split(
       'row',
-      [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review'])],
-      [1, 3.2, 1.2]
+      [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
+      [1.05, 4, 1.4]
     ),
     group(['terminal'])
   ],
-  [3, 1]
+  [3.4, 1]
 )
 
 const QUAD_TREE = split(
   'column',
   [
-    split('row', [group(['sessions', 'files']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])], [1, 3, 1.1]),
-    split('row', [group(['terminal']), group(['review'])], [1.4, 1])
+    split('row', [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])], [1, 3.8, 1.35]),
+    split('row', [group(['terminal']), group(['review', 'files'])], [1.8, 1])
   ],
-  [3, 1]
+  [3.2, 1]
 )
 
 export function registerLayoutPresets() {
-  // The overview is product chrome, not an optional plugin: it must exist
-  // whenever a preset references it.
   registerWorkspaceOverviewPane()
 
   const dispose = registry.registerMany([
