@@ -1,0 +1,180 @@
+name: Stardust authority patch once
+
+on:
+  push:
+    branches:
+      - feat/stardust-release-authority
+    paths:
+      - .github/workflows/stardust-authority-patch-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.repository == '9529360-cpu/stardust-hermes'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: feat/stardust-release-authority
+          fetch-depth: 0
+      - name: Apply exact authority substitutions
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}\n--- needle ---\n{old}")
+              p.write_text(text.replace(old, new), encoding="utf-8")
+
+          banner = "hermes_cli/banner.py"
+          replace_once(
+              banner,
+              '_UPSTREAM_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"\n_OFFICIAL_REPO_CANONICAL = "github.com/nousresearch/hermes-agent"',
+              '_UPSTREAM_REPO_URL = "https://github.com/9529360-cpu/stardust-hermes.git"\n_OFFICIAL_REPO_CANONICAL = "github.com/9529360-cpu/stardust-hermes"',
+          )
+          replace_once(
+              banner,
+              'url = f"https://api.github.com/repos/nousresearch/hermes-agent/compare/{current_rev}...{target_rev}"',
+              'url = f"https://api.github.com/repos/9529360-cpu/stardust-hermes/compare/{current_rev}...{target_rev}"',
+          )
+          replace_once(
+              banner,
+              '''    # Probe the origin URL under the config-isolated env: a global url.<https>.insteadOf rewrite
+    # otherwise makes an SSH origin masquerade as HTTPS (#104591).
+    origin_url = _git_stdout(["remote", "get-url", "origin"], cwd=repo_dir, network=True)
+    head_rev = _git_stdout(["rev-parse", "HEAD"], cwd=repo_dir)
+    if not head_rev:
+        return None
+    canonical = _canonical_github_remote(origin_url)
+    if canonical.startswith("github.com/"):
+        target_rev = _github_branch_tip(canonical.removeprefix("github.com/"), "main")
+    else:
+        # Non-GitHub origin: one ls-remote for the tip (ref advertisement only, no pack transfer).
+        result = _git_run(["ls-remote", "origin", "refs/heads/main"], cwd=repo_dir, timeout=10, network=True)
+        target_rev = result.stdout.split()[0] if result is not None and result.returncode == 0 and result.stdout else None
+''',
+              '''    # Stardust is the product authority. Passive checks deliberately ignore any
+    # configured origin/upstream remote so a legacy Hermes origin or a developer fork cannot
+    # redirect an installed product's update probe.
+    head_rev = _git_stdout(["rev-parse", "HEAD"], cwd=repo_dir)
+    if not head_rev:
+        return None
+    target_rev = _upstream_main_sha()
+''',
+          )
+          replace_once(
+              banner,
+              '_RELEASE_URL_BASE = "https://github.com/NousResearch/hermes-agent/releases/tag"',
+              '_RELEASE_URL_BASE = "https://github.com/9529360-cpu/stardust-hermes/releases/tag"',
+          )
+          replace_once(
+              banner,
+              '    Release URL always points at the canonical NousResearch/hermes-agent repo (forks get no link).',
+              '    Release URL always points at the authoritative Stardust product repository.',
+          )
+
+          banner_text = Path(banner).read_text(encoding="utf-8")
+          for forbidden in ("https://github.com/NousResearch/hermes-agent", "github.com/nousresearch/hermes-agent"):
+              if forbidden in banner_text:
+                  raise SystemExit(f"banner still contains legacy product-update source: {forbidden}")
+
+          update_test = "tests/hermes_cli/test_update_check.py"
+          replace_once(
+              update_test,
+              'def _stub_git(monkeypatch, *, head=SHA_A, origin="https://github.com/NousResearch/hermes-agent.git"):',
+              'def _stub_git(monkeypatch, *, head=SHA_A, origin="https://github.com/9529360-cpu/stardust-hermes.git"):',
+          )
+          replace_once(
+              update_test,
+              'tip.assert_called_once_with("nousresearch/hermes-agent", "main")',
+              'tip.assert_called_once_with("9529360-cpu/stardust-hermes", "main")',
+          )
+
+          dashboard_test = "tests/hermes_cli/test_dashboard_admin_endpoints.py"
+          replace_once(
+              dashboard_test,
+              '''    def test_git_install_reports_behind_count(self, monkeypatch):
+        import hermes_cli.web_server as ws
+
+        monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
+        # Stub the shared checker so the contract is deterministic (no network).
+        import hermes_cli.banner as banner
+
+        monkeypatch.setattr(banner, "check_for_updates", lambda: 5)
+
+        r = self.client.get("/api/hermes/update/check")
+        assert r.status_code == 200
+        body = r.json()
+        assert {
+            "install_method",
+            "current_version",
+            "behind",
+            "update_available",
+            "can_apply",
+            "update_command",
+            "message",
+        } <= set(body)
+        assert body["install_method"] == "git"
+        assert body["behind"] == 5
+        assert body["update_available"] is True
+        # git/pip installs can apply the update in place from the dashboard.
+        assert body["can_apply"] is True
+''',
+              '''    def test_git_install_reports_behind_count(self, monkeypatch):
+        import hermes_cli.stardust_update as stardust_update
+        import hermes_cli.web_routers.actions as actions
+
+        monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
+        monkeypatch.setattr(
+            actions,
+            "_stardust_git_source_state",
+            lambda _root: (True, stardust_update.PRODUCT_GIT_URL, "product"),
+        )
+        monkeypatch.setattr(
+            stardust_update,
+            "stardust_update_status",
+            lambda _root, branch="main": {
+                "behind": 5,
+                "head": "a" * 40,
+                "target": "b" * 40,
+                "commits": [],
+            },
+        )
+
+        r = self.client.get("/api/hermes/update/check?force=true")
+        assert r.status_code == 200
+        body = r.json()
+        assert {
+            "install_method",
+            "current_version",
+            "behind",
+            "update_available",
+            "can_apply",
+            "update_command",
+            "message",
+        } <= set(body)
+        assert body["install_method"] == "git"
+        assert body["behind"] == 5
+        assert body["update_available"] is True
+        assert body["can_apply"] is True
+''',
+          )
+
+      - name: Validate patched Python
+        run: |
+          python -m py_compile hermes_cli/banner.py hermes_cli/stardust_update.py hermes_cli/web_routers/actions.py tests/hermes_cli/test_update_check.py tests/hermes_cli/test_dashboard_admin_endpoints.py tests/hermes_cli/test_stardust_update_authority.py
+          python -m pytest -q tests/hermes_cli/test_update_check.py tests/hermes_cli/test_stardust_update_authority.py tests/hermes_cli/test_dashboard_admin_endpoints.py -k 'UpdateCheckEndpoint or stardust or passive_check_uses_the_api_and_never_fetches or upstream_main_sha'
+      - name: Commit patch and remove one-shot workflow
+        run: |
+          git config user.name "stardust-ci"
+          git config user.email "stardust-ci@users.noreply.github.com"
+          git rm .github/workflows/stardust-authority-patch-once.yml
+          git add hermes_cli/banner.py tests/hermes_cli/test_update_check.py tests/hermes_cli/test_dashboard_admin_endpoints.py
+          git commit -m "fix(update): keep passive checks on Stardust authority"
+          git push origin HEAD:feat/stardust-release-authority
