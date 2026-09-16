@@ -12,16 +12,52 @@ const TRANSLUCENCY_BOOK_KEY = 'hermes.desktop.translucency.v2'
 const LEGACY_TRANSLUCENCY_KEY = 'hermes.desktop.translucency.v1'
 const STARDUST_GLASS_DEFAULTS_KEY = 'stardust.desktop.glassDefaults.v1'
 
+type PersistedBook = {
+  base?: unknown
+  dark?: unknown
+  light?: unknown
+  mode?: unknown
+}
+
+const hasOwnValues = (value: unknown): boolean =>
+  Boolean(value && typeof value === 'object' && Object.keys(value as Record<string, unknown>).length > 0)
+
 /**
- * Stardust is a glass-first product. The underlying Hermes translucency system
- * already provides native macOS Vibrancy and Windows 11 Acrylic/Mica, but its
- * historical untouched default only glasses the sidebar. Seed a whole-window
- * material once for a truly new/untuned install.
+ * The translucency store persists the normalized BOOK even when nobody touched
+ * the setting. That untouched payload is essentially
+ * `{ mode: 'glass', base: {}, light: {}, dark: {} }`; key presence alone is
+ * therefore not evidence of a user preference.
+ */
+export function hasUserTranslucencyPreference(bookRaw: null | string, legacyRaw: null | string): boolean {
+  // A legacy flat state came from a real pre-book setting. Preserve it even at
+  // zero: explicitly turning translucency off is still a preference.
+  if (legacyRaw !== null) {
+    return true
+  }
+
+  if (bookRaw === null) {
+    return false
+  }
+
+  try {
+    const book = JSON.parse(bookRaw) as PersistedBook
+
+    return book.mode === 'clear' || hasOwnValues(book.base) || hasOwnValues(book.light) || hasOwnValues(book.dark)
+  } catch {
+    // Malformed persisted state is not useful preference evidence; the store's
+    // own normalizer also falls back safely, so let Stardust repair the default.
+    return false
+  }
+}
+
+/**
+ * Stardust is a glass-first product. The underlying translucency system already
+ * provides native macOS Vibrancy and Windows 11 Acrylic/Mica, but the historic
+ * untouched default glasses only the sidebar. Seed whole-window material once
+ * for a genuinely untuned install.
  *
- * Existing users are authoritative: the presence of either persisted
- * translucency key means the person (or an earlier release) has a window
- * preference, so we never overwrite it. The migration marker prevents a user
- * who later clears or changes settings from being "helpfully" reset.
+ * Real user edits are authoritative. The separate migration marker means a
+ * person who changes the setting after this migration will never be reset.
  */
 export function applyStardustGlassDefaults(winParam: string | null): void {
   if (!shouldEnableReferenceShell(winParam) || !GLASS_SUPPORTED) {
@@ -32,8 +68,10 @@ export function applyStardustGlassDefaults(winParam: string | null): void {
     return
   }
 
-  const hasExistingPreference =
-    readKey(TRANSLUCENCY_BOOK_KEY) !== null || readKey(LEGACY_TRANSLUCENCY_KEY) !== null
+  const hasExistingPreference = hasUserTranslucencyPreference(
+    readKey(TRANSLUCENCY_BOOK_KEY),
+    readKey(LEGACY_TRANSLUCENCY_KEY)
+  )
 
   if (!hasExistingPreference) {
     setTranslucencyMode('glass')
