@@ -30,6 +30,7 @@ import { StatusbarControls } from '../shell/statusbar-controls'
 
 import { latestChatActions, latestSidebarActions } from './latest-actions'
 import { setStatusbarItemGroup, useStatusbarContributions } from './panes'
+import { PersonalProductNav } from './personal-product-nav'
 import type { SidebarActions, WiringActions } from './types'
 
 // Same lazy-view split as DesktopController — pages load on demand. The
@@ -54,7 +55,12 @@ export const SidebarSurface = memo(function SidebarSurface({
 }) {
   const latestActions = useMemo(() => latestSidebarActions(actions), [actions])
 
-  return <ChatSidebar currentView={currentView} {...latestActions} />
+  return (
+    <div className="relative h-full min-h-0 overflow-hidden" data-personal-sidebar-shell="">
+      <ChatSidebar currentView={currentView} {...latestActions} />
+      <PersonalProductNav currentView={currentView} onNavigate={latestActions.onNavigate} />
+    </div>
+  )
 })
 
 export const TerminalSurface = memo(function TerminalSurface() {
