@@ -379,15 +379,21 @@ def _read_json(path: Path) -> Optional[dict]:
 def check_for_updates(*, passive: bool = False) -> Optional[int]:
     """Check whether a Hermes update is available.
 
-    If ``HERMES_REVISION`` is set (nix builds embed it), compare it to upstream main; otherwise
-    compare the local checkout's HEAD. Both go through the GitHub API, never ``git fetch``.
+    Explicit calls compare the installed revision to the configured checkout/upstream.  Passive
+    calls are a separate product policy: pinned Stardust never contacts upstream automatically.
     """
-    def _read_config_opt_out():
-        from hermes_cli.config import load_config
-        return load_config().get("updates", {}).get("check", True) is False
+    if passive:
+        from hermes_cli.update_contract import STARDUST_PASSIVE_UPSTREAM_CHECKS
+        if not STARDUST_PASSIVE_UPSTREAM_CHECKS:
+            return None
 
-    if passive and _quiet(_read_config_opt_out) is True:
-        return None
+        # Retain the upstream Hermes opt-out semantics if this product policy is ever relaxed.
+        def _read_config_opt_out():
+            from hermes_cli.config import load_config
+            return load_config().get("updates", {}).get("check", True) is False
+
+        if _quiet(_read_config_opt_out) is True:
+            return None
 
     cache_file = get_hermes_home() / ".update_check"
     embedded_rev = os.environ.get("HERMES_REVISION") or None
