@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { Button, Codicon, type HermesPlugin } from '@hermes/plugin-sdk'
-import { useEffect } from 'react'
+import { type ReactNode, useEffect } from 'react'
 
 import { NEW_SESSION_TITLE, sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { $repoStatus, registerRepoStatusCwd } from '@/store/coding-status'
@@ -11,7 +11,7 @@ import { $workingSessionIds } from '@/store/session-states'
 
 const OVERVIEW_PANE_ID = 'personal-shell:overview'
 
-function Card({ children, title }: { children: React.ReactNode; title: string }) {
+function Card({ children, title }: { children: ReactNode; title: string }) {
   return (
     <section className="rounded-xl border border-(--ui-stroke-tertiary) bg-(--ui-widget-surface-background) px-3 py-3 shadow-[inset_0_1px_0_color-mix(in_srgb,white_5%,transparent)]">
       <div className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-(--ui-text-tertiary)">{title}</div>
