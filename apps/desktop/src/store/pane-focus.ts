@@ -5,6 +5,7 @@ import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
 
 import { setFileBrowserOpen, setSidebarOpen } from './layout'
+import { setRightContextOpen } from './right-context'
 import { openReview } from './review'
 
 // Explicit-request pane reveals, keyed to the backend `focus_pane` tool. Each
@@ -13,8 +14,14 @@ import { openReview } from './review'
 // without a project cwd, which is the honest behavior.
 const PANE_REVEALERS: Record<string, () => void> = {
   chat: () => revealTreePane('workspace'),
-  files: () => setFileBrowserOpen(true),
-  review: () => openReview(),
+  files: () => {
+    setRightContextOpen(true)
+    setFileBrowserOpen(true)
+  },
+  review: () => {
+    setRightContextOpen(true)
+    openReview()
+  },
   sessions: () => setSidebarOpen(true),
   terminal: () => setTerminalTakeover(true)
 }
