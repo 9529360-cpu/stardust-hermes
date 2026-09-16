@@ -16,7 +16,9 @@ import { isAuxiliaryWindow } from '@/store/windows'
 
 export const WORKSPACE_OVERVIEW_PANE_ID = 'workspace-overview'
 
-const PERSONAL_LAYOUT_VERSION = 2
+// v3 is the first version that treats the inspector as its own permanent rail
+// instead of stacking Review / Files tabs into the initial right-hand zone.
+const PERSONAL_LAYOUT_VERSION = 3
 const PERSONAL_LAYOUT_VERSION_KEY = 'hermes.desktop.personalLayoutVersion'
 
 function Card({ children, title }: { children: ReactNode; title: string }) {
@@ -208,6 +210,7 @@ export function registerWorkspaceOverviewPane(): () => void {
     data: {
       placement: 'right',
       collapsible: true,
+      headerVeto: true,
       uncloseable: true,
       revealAliases: ['overview', 'workspace-overview'],
       width: '310px',
