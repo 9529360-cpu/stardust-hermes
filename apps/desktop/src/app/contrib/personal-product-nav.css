@@ -1,24 +1,49 @@
 [data-personal-sidebar-shell] [data-slot='sidebar-content'] {
-  padding-bottom: 9.25rem;
+  padding-top: 7.6rem;
+  padding-bottom: 9.4rem;
 }
 
-[data-personal-sidebar-shell]
-  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-cron']) {
-  display: none;
+[data-product-rail-header] {
+  box-sizing: border-box;
+  padding: 1rem 0.85rem 0;
+  pointer-events: none;
+  -webkit-app-region: drag;
+}
+
+[data-product-rail-header] [data-product-brand] {
+  min-height: 2rem;
+  padding-inline: 0.1rem;
+}
+
+[data-product-rail-header] [data-product-new-task] {
+  margin-top: 0.75rem;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
 }
 
 [data-personal-product-nav] {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.7rem 0 0.1rem;
   -webkit-app-region: no-drag;
 }
 
 @media (max-height: 720px) {
   [data-personal-sidebar-shell] [data-slot='sidebar-content'] {
-    padding-bottom: 5.75rem;
+    padding-top: 6.8rem;
+    padding-bottom: 5.9rem;
+  }
+
+  [data-product-rail-header] {
+    padding-top: 0.65rem;
   }
 
   [data-personal-product-nav] {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.125rem;
+    padding-top: 0.45rem;
   }
 }
