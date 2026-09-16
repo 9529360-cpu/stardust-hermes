@@ -1,11 +1,11 @@
 """Stardust-owned update entrypoint.
 
 The mature Hermes updater remains the implementation engine, but Stardust owns
-its product source.  This wrapper is the authority boundary: an in-place update
+its product source. This wrapper is the authority boundary: an in-place update
 may run only from ``9529360-cpu/stardust-hermes`` and the legacy fork/upstream
 sync path is disabled for the duration of the update.
 
-NousResearch/hermes-agent remains a maintainer reference only.  Importing from
+NousResearch/hermes-agent remains a maintainer reference only. Importing from
 that upstream is a deliberate repository-maintenance operation, never an end
 user update operation.
 """
@@ -98,8 +98,8 @@ def _stardust_updater_scope():
     """Make the legacy updater treat the already-validated Stardust origin as official.
 
     The mature updater has a fork helper that otherwise offers to fetch
-    ``NousResearch/hermes-agent`` and sync it into ``origin/main``.  Product
-    updates must never take that path.  The override is process-local and is
+    ``NousResearch/hermes-agent`` and sync it into ``origin/main``. Product
+    updates must never take that path. The override is process-local and is
     restored even when the updater exits through ``SystemExit``.
     """
     import hermes_cli.update_cmd as update_cmd
@@ -164,23 +164,27 @@ def cmd_update(args):
     project_root = Path(main_mod.PROJECT_ROOT)
 
     # Managed/container installs and --plan retain their canonical preflight
-    # behavior.  These paths do not perform a product-source fetch.
+    # behavior. These paths do not perform a product-source fetch.
     if is_managed() or bool(getattr(args, "plan", False)):
         if main_mod._update_preflight_handled(args):
             return
 
-    # Stardust intentionally supports in-place updates only for its own git
-    # checkout.  This also prevents the legacy Windows ZIP fallback from ever
-    # downloading the NousResearch source archive.
+    # Stardust intentionally supports in-place source updates only for its own
+    # git checkout. Check image/nix/apt admission before refusing non-git so
+    # those managed methods keep their canonical remediation, but never let an
+    # unknown non-git `--check` reach the legacy Nous ZIP/API fallback.
     if not (project_root / ".git").exists():
-        if main_mod._update_preflight_handled(args):
-            return
+        from hermes_cli.update_contract import evaluate_update_admission
+
+        if evaluate_update_admission(project_root) is not None:
+            if main_mod._update_preflight_handled(args):
+                return
         _refuse_non_git_update(project_root)
 
     _require_product_git_origin(project_root)
 
     with _stardust_updater_scope() as update_cmd:
-        # Includes admission checks and `update --check`.  Running it inside
+        # Includes admission checks and `update --check`. Running it inside
         # the scope makes explicit checks compare origin/main from Stardust,
         # rather than entering the old fork/upstream synchronization path.
         if main_mod._update_preflight_handled(args):
