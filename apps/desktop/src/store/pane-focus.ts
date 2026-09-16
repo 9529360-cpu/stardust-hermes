@@ -1,5 +1,5 @@
 import { setTerminalTakeover } from '@/app/right-sidebar/store'
-import { isLayoutNode, type LayoutNode } from '@/components/pane-shell/tree/model'
+import { allPaneIds, isLayoutNode, type LayoutNode } from '@/components/pane-shell/tree/model'
 import { applyLayoutPreset, LAYOUTS_AREA } from '@/components/pane-shell/tree/presets'
 import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
@@ -74,7 +74,23 @@ export function applyDesktopLayoutPreset(preset: string): boolean {
     return false
   }
 
-  applyLayoutPreset(entry.id, entry.data as LayoutNode)
+  const tree = entry.data as LayoutNode
+  const paneIds = new Set(allPaneIds(tree))
+
+  // A preset is a visible workspace promise, not just tree geometry. Review
+  // and Files are backed by independent persisted visibility stores; opening
+  // those owners before applying the tree prevents a preset from reserving a
+  // blank/collapsed zone. Terminal already opts into the generic
+  // revealOnPreset mechanism in its pane contribution.
+  if (paneIds.has('review')) {
+    openReview()
+  }
+
+  if (paneIds.has('files')) {
+    setFileBrowserOpen(true)
+  }
+
+  applyLayoutPreset(entry.id, tree)
 
   return true
 }
