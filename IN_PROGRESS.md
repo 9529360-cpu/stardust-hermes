@@ -5,7 +5,7 @@ This file coordinates concurrent work on the Stardust fork. Keep claims narrow, 
 ## Backend route failover reliability & operability
 
 - **Owner:** ChatGPT backend reliability session
-- **Status:** in progress
+- **Status:** implementation complete; validation/review in progress
 - **Started:** 2026-09-16
 - **Branch:** `fix/backend-route-health-hardening`
 - **Goal:** make persistent model-route health cross-process safe, observable, and safely resettable without issuing network/model probes.
@@ -14,7 +14,8 @@ This file coordinates concurrent work on the Stardust fork. Keep claims narrow, 
   - `hermes_cli/fallback_cmd.py`
   - `hermes_cli/subcommands/fallback.py`
   - `tests/agent/test_persistent_route_health.py`
-  - `tests/hermes_cli/test_fallback_cmd.py`
+  - `tests/agent/test_route_health_observability.py`
+  - `tests/hermes_cli/test_fallback_health_cmd.py`
   - `IN_PROGRESS.md`
 - **Protected / out of scope:**
   - `apps/desktop/**`
