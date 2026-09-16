@@ -8,8 +8,10 @@ unwritable health file can never make the agent unavailable.
 from __future__ import annotations
 
 import contextlib
+import errno
 import json
 import logging
+import math
 import os
 import threading
 import time
@@ -27,6 +29,12 @@ _STATE_VERSION = 1
 _DEFAULT_PROBE_LEASE_S = 45
 _MAX_COOLDOWN_S = 24 * 60 * 60
 _STATE_LOCK_TIMEOUT_S = 1.0
+_LOCK_CONTENTION_ERRNOS = frozenset({
+    errno.EWOULDBLOCK,
+    errno.EAGAIN,
+    errno.EACCES,
+    errno.EDEADLK,
+})
 _LOCK = threading.RLock()
 
 _BASE_COOLDOWNS = {
@@ -105,6 +113,11 @@ def _write_state(state: dict[str, Any], path: Path | None = None) -> None:
     atomic_json_write(path, state, indent=2, mode=0o600)
 
 
+def _is_lock_contention_errno(exc: OSError) -> bool:
+    """Return whether a lock syscall error means another process owns the lock."""
+    return exc.errno in _LOCK_CONTENTION_ERRNOS
+
+
 @contextlib.contextmanager
 def _state_file_lock(path: Path):
     """Serialize route-health transactions across processes without wedging inference.
@@ -131,7 +144,9 @@ def _state_file_lock(path: Path):
                     msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
                     acquired = True
                     break
-                except OSError:
+                except OSError as exc:
+                    if not _is_lock_contention_errno(exc):
+                        raise
                     if time.monotonic() >= deadline:
                         raise TimeoutError(f"timed out waiting for route health lock {lock_path}")
                     time.sleep(0.05)
@@ -142,7 +157,9 @@ def _state_file_lock(path: Path):
                     fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     acquired = True
                     break
-                except OSError:
+                except OSError as exc:
+                    if not _is_lock_contention_errno(exc):
+                        raise
                     if time.monotonic() >= deadline:
                         raise TimeoutError(f"timed out waiting for route health lock {lock_path}")
                     time.sleep(0.05)
@@ -173,22 +190,23 @@ def _base_cooldown(reason: FailoverReason | None) -> int | None:
     if isinstance(overrides, dict) and name in overrides:
         try:
             return max(0, int(overrides[name]))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             pass
     return _BASE_COOLDOWNS[effective]
 
 
 def _coerce_float(value: Any, default: float = 0.0) -> float:
     try:
-        return float(value)
-    except (TypeError, ValueError):
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
         return default
+    return result if math.isfinite(result) else default
 
 
 def _coerce_nonnegative_int(value: Any, default: int = 0) -> int:
     try:
         return max(0, int(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return default
 
 
@@ -247,7 +265,7 @@ def health_rows(
     and never claims the half-open probe lease.
     """
     _, wanted = route_identity(provider, model, base_url)
-    when = time.time() if now is None else float(now)
+    when = time.time() if now is None else _coerce_float(now, time.time())
     state = snapshot()
     rows: list[dict[str, Any]] = []
     for raw in state.get("routes", {}).values():
@@ -341,13 +359,17 @@ def allow_route(provider: str, model: str, base_url: str = "", *, claim_probe: b
                 probe_until = _coerce_float(row.get("probe_until"))
                 if probe_until > now:
                     return False, max(1, int(probe_until - now + 0.999)), "half_open_busy"
-                if not claim_probe or row.get("status") == "healthy":
+                stored_status = str(row.get("status") or "healthy").strip().lower()
+                if not claim_probe or stored_status not in {"open", "half_open"}:
                     return True, 0, "healthy"
-                lease = max(
-                    5,
-                    _coerce_nonnegative_int(
-                        _config().get("probe_lease_seconds") or _DEFAULT_PROBE_LEASE_S,
-                        _DEFAULT_PROBE_LEASE_S,
+                lease = min(
+                    _MAX_COOLDOWN_S,
+                    max(
+                        5,
+                        _coerce_nonnegative_int(
+                            _config().get("probe_lease_seconds") or _DEFAULT_PROBE_LEASE_S,
+                            _DEFAULT_PROBE_LEASE_S,
+                        ),
                     ),
                 )
                 state["routes"][key] = {**row, **identity, "status": "half_open", "probe_until": now + lease}
