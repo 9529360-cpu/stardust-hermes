@@ -18,15 +18,20 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: stardust-release
   cancel-in-progress: false
 
+env:
+  STARDUST_IMAGE: ghcr.io/9529360-cpu/stardust-hermes
+
 jobs:
   release:
     if: github.repository == '9529360-cpu/stardust-hermes'
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - name: Resolve release tag and source commit
         id: release
@@ -37,13 +42,16 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
           SHA: ${{ github.sha }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             tag="$INPUT_TAG"
+            prerelease="${INPUT_PRERELEASE:-false}"
           else
             [[ "$REF_TYPE" == "tag" ]] || { echo "Expected tag push" >&2; exit 1; }
             tag="$REF_NAME"
+            prerelease="false"
           fi
 
           if [[ ! "$tag" =~ ^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]+)?$ ]]; then
@@ -54,6 +62,7 @@ jobs:
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - name: Checkout Stardust repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
@@ -73,6 +82,98 @@ jobs:
             echo "Merge reviewed work into Stardust main before publishing." >&2
             exit 1
           fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+
+      - name: Build release smoke image
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: stardust-release-smoke:${{ steps.release.outputs.tag }}
+          build-args: |
+            HERMES_GIT_SHA=${{ steps.release.outputs.sha }}
+          cache-from: type=gha,scope=stardust-release-amd64
+          cache-to: type=gha,mode=max,scope=stardust-release-amd64
+
+      - name: Verify release image provenance before publication
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          EXPECTED_IMAGE: ${{ env.STARDUST_IMAGE }}
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint cat "stardust-release-smoke:$TAG" /etc/hermes/image-provenance.json > /tmp/stardust-provenance.json
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = json.loads(Path('/tmp/stardust-provenance.json').read_text(encoding='utf-8'))
+          assert payload.get('deployment_kind') == 'image', payload
+          assert payload.get('manager') == 'docker', payload
+          assert payload.get('image') == os.environ['EXPECTED_IMAGE'], payload
+          assert payload.get('revision') == os.environ['RELEASE_SHA'], payload
+          PY
+
+      - name: Log in to Stardust GHCR
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve container tags
+        id: container
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+          IMAGE: ${{ env.STARDUST_IMAGE }}
+        run: |
+          set -euo pipefail
+          {
+            echo 'tags<<EOF'
+            echo "$IMAGE:$TAG"
+            if [[ "$PRERELEASE" != "true" ]]; then
+              echo "$IMAGE:latest"
+            fi
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish Stardust multi-arch container
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.container.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/9529360-cpu/stardust-hermes
+            org.opencontainers.image.revision=${{ steps.release.outputs.sha }}
+          build-args: |
+            HERMES_GIT_SHA=${{ steps.release.outputs.sha }}
+          cache-from: |
+            type=gha,scope=stardust-release-amd64
+            type=gha,scope=stardust-release-multiarch
+          cache-to: type=gha,mode=max,scope=stardust-release-multiarch
+
+      - name: Verify published Stardust container
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          IMAGE: ${{ env.STARDUST_IMAGE }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect "$IMAGE:$TAG"
 
       - name: Create tag for manual releases
         if: github.event_name == 'workflow_dispatch'
@@ -99,30 +200,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
-          PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
         run: |
           set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists in $GITHUB_REPOSITORY; leaving it unchanged."
-            exit 0
+          else
+            args=(
+              release create "$TAG"
+              --repo "$GITHUB_REPOSITORY"
+              --title "Stardust $TAG"
+              --generate-notes
+            )
+            if [[ "$PRERELEASE" == "true" ]]; then
+              args+=(--prerelease)
+            fi
+            gh "${args[@]}"
           fi
-
-          args=(
-            release create "$TAG"
-            --repo "$GITHUB_REPOSITORY"
-            --title "Stardust $TAG"
-            --generate-notes
-          )
-          if [[ "$PRERELEASE" == "true" ]]; then
-            args+=(--prerelease)
-          fi
-          gh "${args[@]}"
 
       - name: Verify release authority
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs.tag }}
+          IMAGE: ${{ env.STARDUST_IMAGE }}
         run: |
           set -euo pipefail
           url="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
@@ -130,4 +231,6 @@ jobs:
             https://github.com/9529360-cpu/stardust-hermes/releases/*) ;;
             *) echo "Release escaped Stardust repository authority: $url" >&2; exit 1 ;;
           esac
-          echo "Published: $url"
+          docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null
+          echo "Published GitHub Release: $url"
+          echo "Published container: $IMAGE:$TAG"
