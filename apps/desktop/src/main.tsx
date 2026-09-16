@@ -1,6 +1,7 @@
 import './styles.css'
 import './reference-shell.css'
 import './stardust-glass-surfaces.css'
+import './stardust-glass-depth.css'
 import './stardust-titlebar.css'
 import './personal-settings.css'
 // Side-effect: reports in-flight turns to the main process for the quit guard.
@@ -60,7 +61,7 @@ applyReferenceShell(winParam)
 applyStardustGlassDefaults(winParam)
 
 if (winParam === 'hud') {
-  document.title = 'Hermes HUD'
+  document.title = 'Stardust HUD'
 }
 
 // The `?win=` kinds whose Electron window is `transparent: true` and so paints
