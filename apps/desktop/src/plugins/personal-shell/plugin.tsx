@@ -161,7 +161,7 @@ const plugin: HermesPlugin = {
       data: {
         placement: 'right',
         collapsible: true,
-        hideOnly: true,
+        uncloseable: true,
         revealAliases: ['overview', 'workspace-overview'],
         width: '300px',
         minWidth: '260px',
