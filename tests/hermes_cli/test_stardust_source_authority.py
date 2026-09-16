@@ -27,6 +27,25 @@ def test_shell_bootstrap_rewrites_repo_prefix_and_fails_closed() -> None:
     assert 'STARDUST_REF="${STARDUST_INSTALL_REF:-${ARG_REF:-main}}"' in source
 
 
+def test_shell_bootstrap_normalizes_tauri_stage_protocol() -> None:
+    source = _read("scripts/install-stardust.sh")
+
+    expected_mappings = {
+        "-Manifest": "--manifest",
+        "-Stage": "--stage",
+        "-NonInteractive": "--non-interactive",
+        "-Json": "--json",
+        "-IncludeDesktop": "--include-desktop",
+        "-Commit": "--commit",
+        "-Tag": "--tag",
+        "-Branch": "--branch",
+    }
+    for powershell_flag, posix_flag in expected_mappings.items():
+        assert f'{powershell_flag}) NORMALIZED_ARGS+=("{posix_flag}")' in source
+
+    assert 'exec /bin/bash "$TMP_INSTALLER" "${NORMALIZED_ARGS[@]}"' in source
+
+
 def test_powershell_bootstrap_rewrites_repo_prefix_and_fails_closed() -> None:
     source = _read("scripts/install-stardust.ps1")
 
