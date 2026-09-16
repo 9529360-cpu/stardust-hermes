@@ -32,6 +32,7 @@ import { installClipboardShim } from './lib/clipboard'
 import { queryClient } from './lib/query-client'
 import { installRendererAnimationPauseState } from './lib/renderer-loop-pause'
 import { installSelectionCopyColorGuard } from './lib/selection-copy-colors'
+import { PRODUCT_NAME } from './product-brand'
 import { applyReferenceShell } from './reference-shell'
 import { ThemeProvider } from './themes/context'
 
@@ -58,11 +59,11 @@ const winParam = new URLSearchParams(window.location.search).get('win')
 applyReferenceShell(winParam)
 
 if (winParam === null || winParam === 'secondary') {
-  document.title = 'Stardust'
+  document.title = PRODUCT_NAME
 }
 
 if (winParam === 'hud') {
-  document.title = 'Stardust HUD'
+  document.title = `${PRODUCT_NAME} HUD`
 }
 
 // The `?win=` kinds whose Electron window is `transparent: true` and so paints
