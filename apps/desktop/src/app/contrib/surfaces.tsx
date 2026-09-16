@@ -8,7 +8,7 @@
  */
 
 import { useStore } from '@nanostores/react'
-import { type ComponentProps, lazy, memo, type ReactNode, Suspense, useMemo } from 'react'
+import { lazy, memo, type ReactNode, Suspense, useMemo } from 'react'
 import { Navigate, Route, Routes, useParams } from 'react-router'
 
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
@@ -19,9 +19,8 @@ import { $activeGatewayProfile } from '@/store/profile'
 import { $freshDraftReady, $gatewayState } from '@/store/session'
 
 import { ChatView } from '../chat'
-import { ChatSidebar } from '../chat/sidebar'
 import { TerminalPaneChrome } from '../right-sidebar/terminal/chrome'
-import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute } from '../routes'
+import { contributedRoutes, NEW_CHAT_ROUTE, ROUTES_AREA, sessionRoute, type AppView } from '../routes'
 import { useStatusSnapshot } from '../shell/hooks/use-status-snapshot'
 import { useStatusbarItems } from '../shell/hooks/use-statusbar-items'
 import { ModelMenuPanel } from '../shell/model-menu-panel'
@@ -30,7 +29,7 @@ import { StatusbarControls } from '../shell/statusbar-controls'
 
 import { latestChatActions, latestSidebarActions } from './latest-actions'
 import { setStatusbarItemGroup, useStatusbarContributions } from './panes'
-import { PersonalProductNav, ProductRailHeader } from './personal-product-nav'
+import { TaskRail } from './task-rail'
 import { TaskWorkspaceFrame } from './task-workspace-frame'
 import type { SidebarActions, WiringActions } from './types'
 
@@ -52,17 +51,11 @@ export const SidebarSurface = memo(function SidebarSurface({
   currentView
 }: {
   actions: SidebarActions
-  currentView: ComponentProps<typeof ChatSidebar>['currentView']
+  currentView: AppView
 }) {
   const latestActions = useMemo(() => latestSidebarActions(actions), [actions])
 
-  return (
-    <div className="relative h-full min-h-0 overflow-hidden" data-personal-sidebar-shell="">
-      <ProductRailHeader onNavigate={latestActions.onNavigate} />
-      <ChatSidebar currentView={currentView} {...latestActions} />
-      <PersonalProductNav currentView={currentView} onNavigate={latestActions.onNavigate} />
-    </div>
-  )
+  return <TaskRail actions={latestActions} currentView={currentView} />
 })
 
 export const TerminalSurface = memo(function TerminalSurface() {
