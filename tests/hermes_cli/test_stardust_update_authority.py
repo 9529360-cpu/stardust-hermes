@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import subprocess
 from pathlib import Path
 from types import SimpleNamespace
@@ -256,6 +257,117 @@ def test_valid_product_checkout_enters_apply_preflight_inside_stardust_scope(mon
     assert seen == [(False, True)]
     assert update_cmd._is_fork is original_is_fork
     assert banner._github_compare_behind is original_compare
+
+
+def test_dashboard_passive_check_does_not_contact_update_source(monkeypatch, tmp_path):
+    from hermes_cli.web_routers import actions
+
+    monkeypatch.setattr(actions, "_dashboard_local_update_managed_externally", lambda: False)
+    monkeypatch.setattr(actions, "_server_path", lambda _name: tmp_path)
+    monkeypatch.setattr(actions, "detect_install_method", lambda _root: "git")
+    monkeypatch.setattr(
+        actions,
+        "_stardust_git_source_state",
+        lambda _root: (True, stardust_update.PRODUCT_GIT_URL, "product"),
+    )
+    monkeypatch.setattr(
+        stardust_update,
+        "stardust_update_status",
+        lambda *_args, **_kwargs: pytest.fail("passive dashboard status must not query the network"),
+    )
+
+    payload = asyncio.run(actions.check_hermes_update(force=False))
+
+    assert payload["can_apply"] is True
+    assert payload["behind"] is None
+    assert payload["update_available"] is False
+    assert "background update checks are off" in payload["message"]
+
+
+def test_dashboard_forced_check_reads_stardust_status(monkeypatch, tmp_path):
+    from hermes_cli.web_routers import actions
+
+    monkeypatch.setattr(actions, "_dashboard_local_update_managed_externally", lambda: False)
+    monkeypatch.setattr(actions, "_server_path", lambda _name: tmp_path)
+    monkeypatch.setattr(actions, "detect_install_method", lambda _root: "git")
+    monkeypatch.setattr(
+        actions,
+        "_stardust_git_source_state",
+        lambda _root: (True, stardust_update.PRODUCT_GIT_URL, "product"),
+    )
+    monkeypatch.setattr(
+        stardust_update,
+        "stardust_update_status",
+        lambda root, branch="main": {
+            "behind": 2,
+            "head": "1" * 40,
+            "target": "2" * 40,
+            "commits": [{"sha": "2222222", "summary": "fix", "author": "A", "at": 1}],
+        },
+    )
+
+    payload = asyncio.run(actions.check_hermes_update(force=True))
+
+    assert payload["can_apply"] is True
+    assert payload["behind"] == 2
+    assert payload["update_available"] is True
+    assert payload["commits"][0]["sha"] == "2222222"
+
+
+def test_dashboard_custom_fork_is_not_advertised_as_applyable(monkeypatch, tmp_path):
+    from hermes_cli.web_routers import actions
+
+    monkeypatch.setattr(actions, "_dashboard_local_update_managed_externally", lambda: False)
+    monkeypatch.setattr(actions, "_server_path", lambda _name: tmp_path)
+    monkeypatch.setattr(actions, "detect_install_method", lambda _root: "git")
+    monkeypatch.setattr(
+        actions,
+        "_stardust_git_source_state",
+        lambda _root: (False, "https://github.com/someone/fork.git", "other"),
+    )
+    monkeypatch.setattr(
+        stardust_update,
+        "stardust_update_status",
+        lambda *_args, **_kwargs: pytest.fail("wrong-origin dashboard check must fail before network"),
+    )
+
+    payload = asyncio.run(actions.check_hermes_update(force=True))
+
+    assert payload["can_apply"] is False
+    assert payload["update_available"] is False
+    assert "not attached to the Stardust product repository" in payload["message"]
+
+
+def test_dashboard_apply_refuses_custom_fork_before_spawn(monkeypatch, tmp_path):
+    import hermes_cli.update_contract as update_contract
+    from hermes_cli.web_routers import actions
+
+    monkeypatch.setattr(actions, "_dashboard_local_update_managed_externally", lambda: False)
+    monkeypatch.setattr(actions, "_server_path", lambda _name: tmp_path)
+    monkeypatch.setattr(actions, "detect_install_method", lambda _root: "git")
+    monkeypatch.setattr(update_contract, "evaluate_update_admission", lambda _root: None)
+    monkeypatch.setattr(
+        actions,
+        "_stardust_git_source_state",
+        lambda _root: (False, "https://github.com/someone/fork.git", "other"),
+    )
+    monkeypatch.setattr(
+        actions,
+        "_update_refused",
+        lambda error, message, command: {
+            "ok": False, "error": error, "message": message, "update_command": command
+        },
+    )
+    monkeypatch.setattr(
+        actions,
+        "_spawn_hermes_action",
+        lambda *_args, **_kwargs: pytest.fail("wrong-origin apply must not spawn updater"),
+    )
+
+    payload = asyncio.run(actions.update_hermes())
+
+    assert payload["ok"] is False
+    assert payload["error"] == "stardust_source_mismatch"
 
 
 def test_release_workflow_is_repo_scoped_and_main_gated():
