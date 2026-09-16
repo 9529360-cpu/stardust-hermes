@@ -1,6 +1,7 @@
 import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { readKey, writeKey } from '@/lib/storage'
 import { applyDesktopLayoutPreset } from '@/store/pane-focus'
+import { openReview } from '@/store/review'
 import { isAuxiliaryWindow } from '@/store/windows'
 
 const PERSONAL_LAYOUT_VERSION = 4
@@ -25,6 +26,9 @@ export function schedulePersonalLayoutMigration(): void {
 
   queueMicrotask(() => {
     if ($activePresetId.get() === 'default') {
+      // The default Codex-style shell treats Review as the standing right work
+      // surface, so keep the visibility owner in sync with the tree preset.
+      openReview()
       applyDesktopLayoutPreset('default')
     }
 
