@@ -8,16 +8,19 @@ import {
   WORKSPACE_OVERVIEW_PANE_ID
 } from './workspace-overview'
 
+const productGroup = (panes: string[], id?: string) => group(panes, { id, tabStrip: 'never' })
+
 // Stardust's default shell has three permanent product regions only:
 // task rail / task workspace / context inspector. Files, Review and Terminal
 // remain real tools, but they are summoned on demand instead of creating IDE
-// tabs in the first frame.
+// tabs in the first frame. The three product regions explicitly opt out of the
+// generic pane tab strip at the layout-model level — this is not a CSS trick.
 export const DEFAULT_TREE = split(
   'row',
   [
-    group(['sessions'], { id: 'grp-sessions' }),
-    group(['workspace'], { id: 'grp-main' }),
-    group([WORKSPACE_OVERVIEW_PANE_ID], { id: 'grp-context' })
+    productGroup(['sessions'], 'grp-sessions'),
+    productGroup(['workspace'], 'grp-main'),
+    productGroup([WORKSPACE_OVERVIEW_PANE_ID], 'grp-context')
   ],
   [1.05, 4.15, 1.45],
   'spl-root'
@@ -25,13 +28,13 @@ export const DEFAULT_TREE = split(
 
 const FOCUS_TREE = split(
   'row',
-  [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
+  [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
   [0.9, 5.2, 1.25]
 )
 
 const BASIC_TREE = split(
   'row',
-  [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
+  [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
   [1, 4.6, 1.25]
 )
 
@@ -40,7 +43,7 @@ const TERMINAL_TREE = split(
   [
     split(
       'row',
-      [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
+      [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
       [1.05, 4, 1.4]
     ),
     group(['terminal'])
@@ -51,7 +54,11 @@ const TERMINAL_TREE = split(
 const QUAD_TREE = split(
   'column',
   [
-    split('row', [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])], [1, 3.8, 1.35]),
+    split(
+      'row',
+      [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
+      [1, 3.8, 1.35]
+    ),
     split('row', [group(['terminal']), group(['review', 'files'])], [1.8, 1])
   ],
   [3.2, 1]
