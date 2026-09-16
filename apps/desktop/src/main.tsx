@@ -1,4 +1,5 @@
 import './styles.css'
+import './reference-shell.css'
 // Side-effect: reports in-flight turns to the main process for the quit guard.
 import './store/active-work'
 // Side-effect: mirrors the machine's AC/battery state for poll demotion.
@@ -46,6 +47,14 @@ if (import.meta.env.MODE !== 'production' || import.meta.env.VITE_PERF_PROBE ===
 }
 
 const winParam = new URLSearchParams(window.location.search).get('win')
+
+// The reference shell is intentionally presentation-only and scoped to the
+// full desktop workspace. Secondary session windows keep the same visual
+// language; utility windows (browser/HUD/quick entry/etc.) keep their own
+// purpose-built chrome.
+if (!winParam || winParam === 'secondary') {
+  document.documentElement.dataset.hermesReferenceShell = 'aurora'
+}
 
 if (winParam === 'hud') {
   document.title = 'Hermes HUD'
