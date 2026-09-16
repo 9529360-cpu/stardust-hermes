@@ -18,7 +18,7 @@ import {
   runBootstrap
 } from './bootstrap-runner'
 
-const SCRIPT_NAME = process.platform === 'win32' ? 'install.ps1' : 'install.sh'
+const SCRIPT_NAME = process.platform === 'win32' ? 'install-stardust.ps1' : 'install-stardust.sh'
 const ZERO_COMMIT = '0000000000000000000000000000000000000000'
 
 function mkTmpHome() {
