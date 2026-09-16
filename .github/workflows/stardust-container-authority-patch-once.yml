@@ -38,21 +38,10 @@ jobs:
               p.write_text(text.replace(old, new), encoding="utf-8")
               return count
 
-          require_replace(
-              "Dockerfile",
-              '"image": "nousresearch/hermes-agent"',
-              f'"image": "{IMAGE}"',
-          )
+          require_replace("Dockerfile", '"image": "nousresearch/hermes-agent"', f'"image": "{IMAGE}"')
 
           # config.py owns the authoritative update command and the full Docker refusal/help text.
-          # Replace every image reference, not just the first `docker pull` line, so the verify
-          # command and explanatory text cannot send an operator back to the Nous image.
-          require_replace(
-              "hermes_cli/config.py",
-              "nousresearch/hermes-agent:latest",
-              f"{IMAGE}:latest",
-              minimum=2,
-          )
+          require_replace("hermes_cli/config.py", "nousresearch/hermes-agent:latest", f"{IMAGE}:latest", minimum=2)
           require_replace(
               "hermes_cli/config.py",
               "Hermes Agent runs as a published image (nousresearch/hermes-agent), not a",
@@ -113,19 +102,6 @@ jobs:
               "editUrl: 'https://github.com/9529360-cpu/stardust-hermes/edit/main/website/'",
           )
 
-          # Pin third-party release actions to immutable commits. The release path has write
-          # access to contents/packages, so floating major tags are not acceptable authority.
-          require_replace(
-              ".github/workflows/stardust-release.yml",
-              "uses: docker/setup-qemu-action@v3",
-              "uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3",
-          )
-          require_replace(
-              ".github/workflows/stardust-release.yml",
-              "uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121",
-              "uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3",
-          )
-
           for path in (
               "tests/hermes_cli/test_cmd_update_docker.py",
               "tests/hermes_cli/test_update_inventory.py",
@@ -144,8 +120,6 @@ jobs:
           text = text.replace("docker pull nousresearch/hermes-agent:latest", PULL)
           contract_test.write_text(text, encoding="utf-8")
 
-          # Authority guard: production product-update/container surfaces must not point at
-          # Nous container registries after this patch.
           forbidden_files = (
               "Dockerfile",
               "hermes_cli/config.py",
@@ -162,9 +136,6 @@ jobs:
               text = Path(path).read_text(encoding="utf-8").lower()
               if "nousresearch/hermes-agent:latest" in text or "ghcr.io/nousresearch/hermes-agent" in text:
                   raise SystemExit(f"legacy container authority remains in {path}")
-          release_workflow = Path(".github/workflows/stardust-release.yml").read_text(encoding="utf-8")
-          if "docker/setup-qemu-action@v3" in release_workflow:
-              raise SystemExit("release workflow still has floating qemu action tag")
           PY
 
       - name: Validate patched sources
@@ -177,13 +148,10 @@ jobs:
           dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
           config = Path("hermes_cli/config.py").read_text(encoding="utf-8")
           example = Path("cli-config.yaml.example").read_text(encoding="utf-8")
-          release = Path(".github/workflows/stardust-release.yml").read_text(encoding="utf-8")
           assert f'"image": "{expected}"' in dockerfile
           assert f"docker pull {expected}:latest" in config
           assert f"docker run --rm {expected}:latest --version" in config
           assert "check: false" in example
-          assert "setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130" in release
-          assert "login-action@c94ce9fb468520275223c153574b00df6fe4bcc9" in release
           PY
 
       - name: Commit patch and remove one-shot workflow
@@ -192,6 +160,6 @@ jobs:
           git config user.name "stardust-ci"
           git config user.email "stardust-ci@users.noreply.github.com"
           git rm .github/workflows/stardust-container-authority-patch-once.yml
-          git add Dockerfile .github/workflows/stardust-release.yml hermes_cli/config.py hermes_cli/tools_config_post_setup.py tools/browser_tool_session.py tools/browser_tool_lightpanda_fallback.py docker-compose.windows.yml cli-config.yaml.example website/docusaurus.config.ts website/docs/getting-started/updating.md website/docs/user-guide/docker.md website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/getting-started/updating.md website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-guide/docker.md tests/hermes_cli/test_cmd_update_docker.py tests/hermes_cli/test_update_inventory.py tests/hermes_cli/test_update_contract.py tests/hermes_cli/test_doctor.py tests/hermes_cli/test_web_server.py
+          git add Dockerfile hermes_cli/config.py hermes_cli/tools_config_post_setup.py tools/browser_tool_session.py tools/browser_tool_lightpanda_fallback.py docker-compose.windows.yml cli-config.yaml.example website/docusaurus.config.ts website/docs/getting-started/updating.md website/docs/user-guide/docker.md website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/getting-started/updating.md website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-guide/docker.md tests/hermes_cli/test_cmd_update_docker.py tests/hermes_cli/test_update_inventory.py tests/hermes_cli/test_update_contract.py tests/hermes_cli/test_doctor.py tests/hermes_cli/test_web_server.py
           git commit -m "fix(release): align Stardust container authority"
           git push origin HEAD:feat/stardust-release-authority
