@@ -5,6 +5,12 @@
  * not fall back to opaque Hermes cards on top of a glass workspace.
  */
 
+:root[data-hermes-reference-shell='aurora'] {
+  /* Review's compact changed-file counter uses this semantic fill. Hermes did
+   * not expose it globally, so Stardust owns the quiet glass badge fill. */
+  --ui-fill-quaternary: var(--sd-control-hover);
+}
+
 :root[data-hermes-reference-shell='aurora'] :is(
   [data-slot='dialog-content'],
   [data-slot='popover-content'],
@@ -99,4 +105,98 @@
 ) {
   backdrop-filter: blur(26px) saturate(124%);
   -webkit-backdrop-filter: blur(26px) saturate(124%);
+}
+
+/* ── Unsupported/native-glass-off fallback ─────────────────────────────
+ * Linux CI cannot render macOS Vibrancy or Windows Mica/Acrylic. Previously
+ * the fallback collapsed to a nearly flat black rectangle, which meant the
+ * visual gate never exercised the requested liquid-glass language. Give the
+ * fallback its own OS-style aurora backing and let the product surfaces blur
+ * that backing. On supported platforms [data-hermes-glass] wins and the real
+ * desktop material remains the source of the backdrop instead. */
+:root[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) #root {
+  padding: 9px;
+}
+
+:root[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-contrib-shell] {
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--sd-frame) 68%, transparent) !important;
+  box-shadow:
+    0 30px 90px rgba(11, 16, 34, 0.2),
+    inset 0 1px 0 color-mix(in srgb, var(--sd-highlight) 88%, transparent);
+}
+
+:root.dark[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) body {
+  background-color: #080a12;
+  background-image:
+    linear-gradient(145deg, rgba(5, 8, 17, 0.12), rgba(6, 8, 16, 0.42)),
+    url('./assets/stardust-os-wallpaper.svg');
+  background-position: center;
+  background-size: cover;
+}
+
+:root.dark[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-contrib-shell] {
+  background: rgba(10, 12, 19, 0.54) !important;
+  border-color: rgba(228, 234, 255, 0.13) !important;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.44),
+    0 0 0 1px rgba(122, 142, 255, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09) !important;
+  backdrop-filter: blur(32px) saturate(132%);
+  -webkit-backdrop-filter: blur(32px) saturate(132%);
+}
+
+:root.dark[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-tree-group='grp-sessions'] {
+  background:
+    linear-gradient(180deg, rgba(31, 34, 45, 0.58), rgba(16, 19, 29, 0.42)) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(235, 240, 255, 0.075),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(34px) saturate(128%);
+  -webkit-backdrop-filter: blur(34px) saturate(128%);
+}
+
+:root.dark[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-tree-group='grp-main'] {
+  background:
+    radial-gradient(42rem 28rem at 42% -12%, rgba(102, 124, 255, 0.065), transparent 68%),
+    rgba(9, 11, 18, 0.26) !important;
+  backdrop-filter: blur(24px) saturate(118%);
+  -webkit-backdrop-filter: blur(24px) saturate(118%);
+}
+
+:root.dark[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-tree-group='grp-review'] {
+  background:
+    linear-gradient(180deg, rgba(28, 31, 42, 0.54), rgba(14, 17, 26, 0.4)) !important;
+  box-shadow:
+    inset 1px 0 0 rgba(235, 240, 255, 0.075),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(34px) saturate(128%);
+  -webkit-backdrop-filter: blur(34px) saturate(128%);
+}
+
+:root.dark[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-task-header] {
+  background: rgba(13, 16, 24, 0.42) !important;
+  box-shadow: inset 0 -1px 0 rgba(235, 240, 255, 0.045);
+}
+
+:root.dark[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-task-workspace] [data-tour='composer'] {
+  background:
+    linear-gradient(180deg, rgba(38, 42, 55, 0.68), rgba(22, 25, 36, 0.58)) !important;
+  border-color: rgba(232, 237, 255, 0.14) !important;
+  box-shadow:
+    0 14px 42px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(124, 142, 255, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.085) !important;
+  backdrop-filter: blur(30px) saturate(132%);
+  -webkit-backdrop-filter: blur(30px) saturate(132%);
+}
+
+@media (max-width: 900px) {
+  :root[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) #root {
+    padding: 0;
+  }
+
+  :root[data-hermes-reference-shell='aurora']:not([data-hermes-glass]) [data-contrib-shell] {
+    border-radius: 0;
+  }
 }
