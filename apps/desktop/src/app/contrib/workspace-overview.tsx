@@ -54,11 +54,11 @@ export function WorkspaceOverview() {
   const normalizedCwd = cwd.replace(/[/\\]+$/, '')
   const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? 'No project selected'
   const changedFiles = repoStatus?.files ?? []
-  const changedCount = repoStatus?.changed ?? changedFiles.length
+  const changedCount = changedFiles.length
   const branch = repoStatus?.branch || 'No repository'
   const staged = repoStatus?.staged ?? changedFiles.filter(file => file.staged).length
-  const additions = repoStatus?.added ?? 0
-  const removals = repoStatus?.removed ?? 0
+  const unstaged = repoStatus?.unstaged ?? changedFiles.filter(file => file.unstaged).length
+  const untracked = repoStatus?.untracked ?? changedFiles.filter(file => file.untracked).length
   const summary = !cwd
     ? 'Choose a project to give this workspace persistent file and review context.'
     : working
@@ -173,9 +173,7 @@ export function WorkspaceOverview() {
             </div>
           ) : (
             <div className="text-[0.68rem] leading-relaxed text-(--ui-text-tertiary)">
-              {changedCount > 0
-                ? 'The repository reports changes outside the capped file preview. Open Review to inspect them.'
-                : 'Local edits will appear here while you work.'}
+              Local edits will appear here while you work.
             </div>
           )}
 
@@ -186,12 +184,12 @@ export function WorkspaceOverview() {
                 <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">staged</div>
               </div>
               <div>
-                <div className="text-xs font-semibold text-(--ui-success)">+{additions}</div>
-                <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">added</div>
+                <div className="text-xs font-semibold text-(--theme-midground)">{unstaged}</div>
+                <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">unstaged</div>
               </div>
               <div>
-                <div className="text-xs font-semibold text-(--ui-text-secondary)">-{removals}</div>
-                <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">removed</div>
+                <div className="text-xs font-semibold text-(--ui-success)">{untracked}</div>
+                <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">untracked</div>
               </div>
             </div>
           )}
