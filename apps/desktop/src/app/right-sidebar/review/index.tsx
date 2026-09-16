@@ -150,9 +150,15 @@ export function ReviewPane() {
         <PaneEmptyState label={t.rightSidebar.noDiffs} />
       )}
 
-      {/* Selected file's diff — reuses the shiki-highlighted FileDiffPanel. */}
+      {/* Selected file's diff shares the remaining work surface with the file
+          tree. `max-height + shrink-0` left this parent with no actual height,
+          so FileDiffPanel's `h-full` collapsed to a title strip. Two flex-1
+          siblings give Review a real split without hard-coding viewport math. */}
       {selectedFile && (
-        <div className="flex max-h-[55%] shrink-0 flex-col border-t border-(--ui-stroke-secondary)">
+        <div
+          className="flex min-h-0 flex-1 flex-col border-t border-(--ui-stroke-secondary)"
+          data-review-diff-panel=""
+        >
           <div className="flex items-center gap-1 px-2.5 py-1.5" data-suppress-pane-reveal-side="">
             <span
               className="min-w-0 flex-1 truncate font-mono text-[0.66rem] text-(--ui-text-secondary)"
