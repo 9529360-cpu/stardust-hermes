@@ -16,6 +16,7 @@ $LogFile = Join-Path $LogDir 'stardust-auto-sync.log'
 $StateFile = Join-Path $HermesHome 'stardust-auto-sync.json'
 $Mutex = [Threading.Mutex]::new($false, 'Local\StardustAutoSync')
 $HasLock = $false
+$DesktopStopped = $false
 
 function Write-Log([string]$Message) {
     New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
@@ -32,8 +33,9 @@ function Invoke-Step([string]$File, [string[]]$Arguments, [string]$WorkingDirect
     }
 }
 
-function Git([string[]]$Arguments) {
-    $output = & git -C $Checkout @Arguments 2>&1
+function Invoke-Git([string[]]$Arguments) {
+    $gitExe = (Get-Command git.exe -ErrorAction Stop).Source
+    $output = & $gitExe -C $Checkout @Arguments 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "git $($Arguments -join ' ') failed: $($output -join [Environment]::NewLine)"
     }
@@ -70,23 +72,23 @@ try {
         throw "Checkout not found: $Checkout"
     }
 
-    $origin = Git @('remote', 'get-url', 'origin')
+    $origin = Invoke-Git @('remote', 'get-url', 'origin')
     $canonicalOrigin = $origin.TrimEnd('/').TrimEnd('.git')
     $canonicalExpected = $ExpectedOrigin.TrimEnd('/').TrimEnd('.git')
     if ($canonicalOrigin -ne $canonicalExpected) {
         throw "Refusing untrusted origin: $origin"
     }
 
-    $dirty = Git @('status', '--porcelain')
+    $dirty = Invoke-Git @('status', '--porcelain')
     if ($dirty) {
         Save-State 'deferred' '' '' 'Tracked local changes are present.'
         Write-Log 'Tracked local changes are present; leaving the installation untouched.'
         exit 0
     }
 
-    Git @('fetch', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main') | Out-Null
-    $current = Git @('rev-parse', 'HEAD')
-    $target = Git @('rev-parse', 'refs/remotes/origin/main')
+    Invoke-Git @('fetch', '--no-tags', 'origin', '+refs/heads/main:refs/remotes/origin/main') | Out-Null
+    $current = Invoke-Git @('rev-parse', 'HEAD')
+    $target = Invoke-Git @('rev-parse', 'refs/remotes/origin/main')
 
     if ($current -eq $target) {
         Save-State 'current' $current $target 'Already current.'
@@ -94,7 +96,8 @@ try {
         exit 0
     }
 
-    & git -C $Checkout merge-base --is-ancestor $current $target
+    $gitExe = (Get-Command git.exe -ErrorAction Stop).Source
+    & $gitExe -C $Checkout merge-base --is-ancestor $current $target
     if ($LASTEXITCODE -ne 0) {
         Save-State 'refused' $current $target 'Remote main is not a fast-forward descendant.'
         throw 'Remote main diverged or moved backwards; refusing automatic update.'
@@ -107,10 +110,10 @@ try {
     }
 
     Write-Log "Applying verified fast-forward $($current.Substring(0, 12)) -> $($target.Substring(0, 12))."
-    Git @('update-ref', 'refs/stardust/auto-sync-last-good', $current) | Out-Null
-    Git @('merge', '--ff-only', 'refs/remotes/origin/main') | Out-Null
+    Invoke-Git @('update-ref', 'refs/stardust/auto-sync-last-good', $current) | Out-Null
+    Invoke-Git @('merge', '--ff-only', 'refs/remotes/origin/main') | Out-Null
 
-    $dependencyChanges = Git @('diff', '--name-only', $current, $target, '--', 'package.json', 'package-lock.json', 'apps/desktop/package.json')
+    $dependencyChanges = Invoke-Git @('diff', '--name-only', $current, $target, '--', 'package.json', 'package-lock.json', 'apps/desktop/package.json')
     if ($dependencyChanges) {
         Invoke-Step 'npm.cmd' @('install') $Checkout
     }
@@ -120,8 +123,12 @@ try {
     Invoke-Step 'npm.cmd' @('run', 'build') $Desktop
 
     if (-not $NoRestart) {
-        Get-Process -Name Hermes -ErrorAction SilentlyContinue | Stop-Process -Force
-        Start-Sleep -Seconds 2
+        $runningDesktop = Get-Process -Name Hermes -ErrorAction SilentlyContinue
+        if ($runningDesktop) {
+            $runningDesktop | Stop-Process -Force
+            $DesktopStopped = $true
+            Start-Sleep -Seconds 2
+        }
     }
 
     if (Test-Path -LiteralPath $BackupRelease) {
@@ -161,14 +168,14 @@ catch {
 
     try {
         if ($current -and $target -and $current -ne $target) {
-            Git @('reset', '--hard', $current) | Out-Null
+            Invoke-Git @('reset', '--hard', $current) | Out-Null
             Write-Log "Source rolled back to $($current.Substring(0, 12))."
         }
         if ((Test-Path -LiteralPath $BackupRelease) -and -not (Test-Path -LiteralPath $Release)) {
             Move-Item -LiteralPath $BackupRelease -Destination $Release
         }
         Save-State 'failed' $current $target $message
-        Start-Stardust
+        if ($DesktopStopped) { Start-Stardust }
     }
     catch {
         Write-Log "Rollback warning: $($_.Exception.Message)"
