@@ -20,8 +20,9 @@ jobs:
           ref: feat/stardust-release-authority
           fetch-depth: 0
       - name: Apply exact authority substitutions
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           def replace_once(path: str, old: str, new: str) -> None:
@@ -165,12 +166,14 @@ jobs:
         assert body["can_apply"] is True
 ''',
           )
-
+          PY
       - name: Validate patched Python
+        shell: bash
         run: |
           python -m py_compile hermes_cli/banner.py hermes_cli/stardust_update.py hermes_cli/web_routers/actions.py tests/hermes_cli/test_update_check.py tests/hermes_cli/test_dashboard_admin_endpoints.py tests/hermes_cli/test_stardust_update_authority.py
           python -m pytest -q tests/hermes_cli/test_update_check.py tests/hermes_cli/test_stardust_update_authority.py tests/hermes_cli/test_dashboard_admin_endpoints.py -k 'UpdateCheckEndpoint or stardust or passive_check_uses_the_api_and_never_fetches or upstream_main_sha'
       - name: Commit patch and remove one-shot workflow
+        shell: bash
         run: |
           git config user.name "stardust-ci"
           git config user.email "stardust-ci@users.noreply.github.com"
