@@ -18,7 +18,7 @@ from utils import atomic_write_text
 _INSTALL_ID_FILENAME = "install_id"
 _INSTALL_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 _INSTALL_ID_CACHE: dict[str, Optional[str]] = {"root": None, "value": None}
-_INSTALL_ID_LOCK, _INSTALL_ID_PUBLICATION_LOCK = threading.Lock(), threading.Lock()
+_INSTALL_ID_LOCK = threading.Lock()
 _INSTALL_ID_FILE_LOCK_TIMEOUT_S = 5.0
 _LOCK_CONTENTION_ERRNOS = frozenset({
     errno.EWOULDBLOCK,
@@ -42,12 +42,13 @@ def _lock_retry_sleep(deadline: float) -> None:
 
 @contextlib.contextmanager
 def _install_id_file_lock(root: Path, *, timeout: float | None = None):
-    """Serialize identity publication across processes on POSIX and Windows.
+    """Serialize identity publication across threads/processes on POSIX and Windows.
 
     The install id is an authority value, so contention must never cause a second identity to be
     minted.  At the same time, a wedged publisher must not block every caller forever.  Use a
-    bounded non-blocking lock loop; timeout surfaces as ``TimeoutError`` and the public creation
-    path returns ``None`` so a later call can retry safely.
+    single bounded non-blocking file-lock loop for both thread and process contention; timeout
+    surfaces as ``TimeoutError`` and the public creation path returns ``None`` so a later call can
+    retry safely.
     """
     wait = _INSTALL_ID_FILE_LOCK_TIMEOUT_S if timeout is None else max(0.0, float(timeout))
     deadline = time.monotonic() + wait
@@ -121,9 +122,7 @@ def read_or_create_install_id(root: Path | None = None) -> Optional[str]:
         return existing
     try:
         root.mkdir(parents=True, exist_ok=True)
-        # Windows byte-range locks can report a same-process conflict instead of waiting for another
-        # thread: serialize threads here, then keep the bounded file lock as the cross-process fence.
-        with _INSTALL_ID_PUBLICATION_LOCK, _install_id_file_lock(root):
+        with _install_id_file_lock(root):
             existing, mint = _read_existing(path)
             if not mint:
                 return existing
