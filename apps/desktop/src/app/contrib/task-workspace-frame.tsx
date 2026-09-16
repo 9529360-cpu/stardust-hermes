@@ -5,13 +5,27 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { DiffCount } from '@/components/ui/diff-count'
 import { Tip } from '@/components/ui/tooltip'
-import { NEW_SESSION_TITLE, sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
+import { useI18n } from '@/i18n'
+import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { $repoStatus, registerRepoStatusCwd } from '@/store/coding-status'
+import { getPaneStateSnapshot, setPaneWidthOverride } from '@/store/panes'
 import { revealDesktopPane } from '@/store/pane-focus'
 import { $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $workingSessionIds } from '@/store/session-states'
 
+const CODEX_REVIEW_DEFAULT_WIDTH = 320
+
+const NEW_THREAD_COPY = {
+  ar: 'محادثة جديدة',
+  en: 'New thread',
+  ja: '新しいスレッド',
+  ru: 'Новый тред',
+  zh: '新建线程',
+  'zh-hant': '新增執行緒'
+} as const
+
 export function TaskWorkspaceFrame({ children }: { children: ReactNode }) {
+  const { locale } = useI18n()
   const cwd = useStore($currentCwd)
   const repoStatus = useStore($repoStatus)
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
@@ -20,11 +34,23 @@ export function TaskWorkspaceFrame({ children }: { children: ReactNode }) {
 
   useEffect(() => registerRepoStatusCwd(cwd), [cwd])
 
+  // Hermes historically sized Review like the file tree (237px). Codex uses
+  // Review as a work surface, not a utility rail. Seed the widest value the
+  // existing pane contract already allows, but never overwrite a width the
+  // user has explicitly dragged and persisted.
+  useEffect(() => {
+    const reviewState = getPaneStateSnapshot('review')
+
+    if (reviewState?.widthOverride === undefined) {
+      setPaneWidthOverride('review', CODEX_REVIEW_DEFAULT_WIDTH)
+    }
+  }, [])
+
   const session = selectedStoredSessionId
     ? sessions.find(candidate => sessionMatchesStoredId(candidate, selectedStoredSessionId))
     : undefined
   const working = session ? workingSessionIds.includes(session.id) : workingSessionIds.length > 0
-  const title = session ? storedSessionTitle(session) : NEW_SESSION_TITLE
+  const title = session ? storedSessionTitle(session) : NEW_THREAD_COPY[locale]
   const normalizedCwd = cwd.replace(/[/\\]+$/, '')
   const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? 'No project'
   const changedFiles = repoStatus?.files ?? []
