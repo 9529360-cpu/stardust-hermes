@@ -29,6 +29,13 @@ test.describe('Stardust Codex desktop shell', () => {
     await expect(page.locator('[data-stardust-task-rail]')).toBeVisible()
     await expect(page.locator('[data-task-workspace]')).toBeVisible()
 
+    // "New thread" is a creation action, not a selected destination. Keeping
+    // it out of aria-current also keeps the rail visually quiet like Codex.
+    await expect(page.getByRole('button', { name: 'New thread', exact: true }).first()).not.toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+
     const projectRow = page.locator('[data-task-project-row]').first()
     await expect(projectRow).toBeVisible()
     await projectRow.hover()
@@ -66,6 +73,7 @@ test.describe('Stardust Codex desktop shell', () => {
       await expect(changedFile).toBeVisible({ timeout: 15_000 })
       await changedFile.click()
       await expect(review).toContainText(SMOKE_DIFF_MARKER, { timeout: 15_000 })
+      await expect(review.getByText('Ask Stardust to open PR', { exact: true })).toBeVisible()
 
       const diffPanel = review.locator('[data-review-diff-panel]')
       await expect(diffPanel).toBeVisible()
