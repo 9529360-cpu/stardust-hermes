@@ -19,3 +19,11 @@ def test_passive_update_check_returns_before_network(monkeypatch) -> None:
     )
 
     assert banner.check_for_updates(passive=True) is None
+
+
+def test_stardust_dashboard_backend_updates_are_externally_managed() -> None:
+    from hermes_cli.web_server_files import _dashboard_local_update_managed_externally
+
+    # Dashboard check/apply must never reactivate the inherited upstream-oriented
+    # update machinery while the Stardust CLI updater is intentionally disabled.
+    assert _dashboard_local_update_managed_externally() is True
