@@ -33,7 +33,7 @@ def git_repo(tmp_path, monkeypatch):
     return repo_dir
 
 
-def _stub_git(monkeypatch, *, head=SHA_A, origin="https://github.com/NousResearch/hermes-agent.git"):
+def _stub_git(monkeypatch, *, head=SHA_A, origin="https://github.com/9529360-cpu/stardust-hermes.git"):
     calls = []
 
     def fake_run(args, **kwargs):
@@ -59,7 +59,7 @@ def test_passive_check_uses_the_api_and_never_fetches(git_repo, monkeypatch):
     monkeypatch.setattr(banner, "_github_compare_behind", lambda cur, tgt: 61)
 
     assert banner.check_for_updates() == 61
-    tip.assert_called_once_with("nousresearch/hermes-agent", "main")
+    tip.assert_called_once_with("9529360-cpu/stardust-hermes", "main")
     assert not any(c[1] in {"fetch", "ls-remote"} for c in calls)
 
     cached = json.loads((git_repo.parent / ".update_check").read_text())

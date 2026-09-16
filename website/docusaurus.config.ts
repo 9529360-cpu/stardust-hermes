@@ -80,7 +80,7 @@ const config: Config = {
         docs: {
           routeBasePath: '/',  // Docs at the root of /docs/
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/NousResearch/hermes-agent/edit/main/website/',
+          editUrl: 'https://github.com/9529360-cpu/stardust-hermes/edit/main/website/',
         },
         blog: false,
         theme: {

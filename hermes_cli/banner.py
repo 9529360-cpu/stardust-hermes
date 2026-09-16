@@ -144,8 +144,8 @@ _last_target_rev: Optional[str] = None
 # Returned when an update is known to exist but commits can't be counted (e.g. nix builds).
 UPDATE_AVAILABLE_NO_COUNT = -1
 
-_UPSTREAM_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
-_OFFICIAL_REPO_CANONICAL = "github.com/nousresearch/hermes-agent"
+_UPSTREAM_REPO_URL = "https://github.com/9529360-cpu/stardust-hermes.git"
+_OFFICIAL_REPO_CANONICAL = "github.com/9529360-cpu/stardust-hermes"
 
 
 def _canonical_github_remote(url: str | None) -> str:
@@ -236,7 +236,7 @@ def _github_compare(current_rev: str, target_rev: str) -> Optional[dict]:
     key = (current_rev, target_rev)
     if key in _compare_payload_cache:
         return _compare_payload_cache[key]
-    url = f"https://api.github.com/repos/nousresearch/hermes-agent/compare/{current_rev}...{target_rev}"
+    url = f"https://api.github.com/repos/9529360-cpu/stardust-hermes/compare/{current_rev}...{target_rev}"
 
     def _fetch():
         import urllib.request
@@ -349,19 +349,13 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     API, the local one from ``rev-parse`` — and ``_tips_behind`` recovers the exact count through
     the compare API when they differ. ``git fetch`` happens only inside ``hermes update``.
     """
-    # Probe the origin URL under the config-isolated env: a global url.<https>.insteadOf rewrite
-    # otherwise makes an SSH origin masquerade as HTTPS (#104591).
-    origin_url = _git_stdout(["remote", "get-url", "origin"], cwd=repo_dir, network=True)
+    # Stardust is the product authority. Passive checks deliberately ignore any
+    # configured origin/upstream remote so a legacy Hermes origin or a developer fork cannot
+    # redirect an installed product update probe.
     head_rev = _git_stdout(["rev-parse", "HEAD"], cwd=repo_dir)
     if not head_rev:
         return None
-    canonical = _canonical_github_remote(origin_url)
-    if canonical.startswith("github.com/"):
-        target_rev = _github_branch_tip(canonical.removeprefix("github.com/"), "main")
-    else:
-        # Non-GitHub origin: one ls-remote for the tip (ref advertisement only, no pack transfer).
-        result = _git_run(["ls-remote", "origin", "refs/heads/main"], cwd=repo_dir, timeout=10, network=True)
-        target_rev = result.stdout.split()[0] if result is not None and result.returncode == 0 and result.stdout else None
+    target_rev = _upstream_main_sha()
     global _last_target_rev
     _last_target_rev = target_rev
     # Tip SHAs alone can't distinguish "behind" from a local commit AHEAD of origin/main, and
@@ -468,13 +462,13 @@ def _compute_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]
     return {"upstream": upstream, "local": local, "ahead": max(ahead, 0)}
 
 
-_RELEASE_URL_BASE = "https://github.com/NousResearch/hermes-agent/releases/tag"
+_RELEASE_URL_BASE = "https://github.com/9529360-cpu/stardust-hermes/releases/tag"
 
 
 def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
     """Return ``(tag, release_url)`` for the latest local git tag, or None (a miss is cached too).
 
-    Release URL always points at the canonical NousResearch/hermes-agent repo (forks get no link).
+    Release URL always points at the authoritative Stardust product repository.
     """
     def _compute():
         rd = repo_dir or _resolve_repo_dir()

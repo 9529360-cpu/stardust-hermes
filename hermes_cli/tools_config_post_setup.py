@@ -137,7 +137,7 @@ def _post_setup_agent_browser(post_setup_key: str) -> None:
     if _running_in_docker():
         _print_warning("    Chromium is missing but you're running in Docker.")
         _info_lines("Pull the latest image to get the bundled Chromium:",
-                    "  docker pull ghcr.io/nousresearch/hermes-agent:latest")
+                    "  docker pull ghcr.io/9529360-cpu/stardust-hermes:latest")
         return
 
     if _is_npx_agent_browser_sentinel(browser_cmd):

@@ -842,30 +842,20 @@ class TestUpdateCheckEndpoint:
         self.client, _ = _client()
 
     def test_git_install_reports_behind_count(self, monkeypatch):
-        import hermes_cli.web_server as ws
+        import hermes_cli.stardust_update as stardust_update
+        import hermes_cli.web_routers.actions as actions
 
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
-        # Stub the shared checker so the contract is deterministic (no network).
-        import hermes_cli.banner as banner
+        monkeypatch.setattr(actions, "_stardust_git_source_state", lambda _root: (True, stardust_update.PRODUCT_GIT_URL, "product"))
+        monkeypatch.setattr(stardust_update, "stardust_update_status", lambda _root, branch="main": {"behind": 5, "head": "a" * 40, "target": "b" * 40, "commits": []})
 
-        monkeypatch.setattr(banner, "check_for_updates", lambda: 5)
-
-        r = self.client.get("/api/hermes/update/check")
+        r = self.client.get("/api/hermes/update/check?force=true")
         assert r.status_code == 200
         body = r.json()
-        assert {
-            "install_method",
-            "current_version",
-            "behind",
-            "update_available",
-            "can_apply",
-            "update_command",
-            "message",
-        } <= set(body)
+        assert {"install_method", "current_version", "behind", "update_available", "can_apply", "update_command", "message"} <= set(body)
         assert body["install_method"] == "git"
         assert body["behind"] == 5
         assert body["update_available"] is True
-        # git/pip installs can apply the update in place from the dashboard.
         assert body["can_apply"] is True
 
 

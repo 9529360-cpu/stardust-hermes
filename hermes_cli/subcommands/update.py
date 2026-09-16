@@ -5,18 +5,36 @@ from __future__ import annotations
 from typing import Callable
 
 
+def _product_update_handler(cmd_update: Callable) -> Callable:
+    """Use Stardust's authority wrapper for the real CLI, while preserving injected test handlers.
+
+    ``main.cmd_update`` intentionally remains a compatibility symbol because a large legacy
+    test/plugin surface imports it directly. The product parser is the command boundary, so
+    only the real handler supplied by ``hermes_cli.main`` is replaced here; parser-builder
+    tests and embedders that inject their own handler keep the documented builder contract.
+    """
+    if (
+        getattr(cmd_update, "__module__", "") == "hermes_cli.main"
+        and getattr(cmd_update, "__name__", "") == "cmd_update"
+    ):
+        from hermes_cli.stardust_update import cmd_update as stardust_cmd_update
+
+        return stardust_cmd_update
+    return cmd_update
+
+
 def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
     """Attach the ``update`` subcommand to ``subparsers``."""
     update_parser = subparsers.add_parser(
-        "update", help="Update Hermes Agent to the latest version",
-        description="Pull the latest changes from git and reinstall dependencies")
+        "update", help="Update Stardust from the Stardust repository",
+        description="Pull reviewed Stardust changes from 9529360-cpu/stardust-hermes and reinstall dependencies")
     update_parser.add_argument(
         "--gateway", action="store_true", default=False,
         help="Gateway mode: use file-based IPC for prompts instead of stdin (used internally by /update)",
     )
     update_parser.add_argument(
         "--check", action="store_true", default=False,
-        help="Check whether an update is available without installing anything")
+        help="Check the Stardust repository for an update without installing anything")
     update_parser.add_argument(
         "--plan", action="store_true", default=False,
         help="Show the update plan and exit without changing anything: install "
@@ -33,7 +51,7 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
     )
     update_parser.add_argument(
         "--yes", "-y", action="store_true", default=False,
-        help="Run without blocking on prompts: accepts the config-migration and stash-restore prompts, skips the fork-upstream prompt without adding a remote. API-key entry is skipped; run 'hermes config migrate' separately for those.",
+        help="Run without blocking on prompts. Stardust never adds or syncs a NousResearch upstream remote during product update.",
     )
     update_parser.add_argument(
         "--keep-stash", action="store_true", default=False,
@@ -44,10 +62,9 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
             "never silently ride along across updates.")
     update_parser.add_argument(
         "--branch", default=None, metavar="NAME",
-        help="Update against this branch instead of the default (main). "
-            "If the local checkout is on a different branch, hermes will "
-            "switch to the requested branch first (auto-stashing any "
-            "uncommitted changes).")
+        help="Update against this branch of the Stardust repository instead of the default (main). "
+            "If the local checkout is on a different branch, the updater may switch to the requested "
+            "branch using its normal safety rules.")
     update_parser.add_argument(
         "--switch-branch", action="store_true", default=False,
         help="With updates.parked_branch_strategy: update_in_place configured, "
@@ -66,4 +83,4 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
         "--force-venv", action="store_true", default=False,
         help="Windows: mutate the venv even while other processes are running from its interpreter (desktop backend, gateway, terminals). Those processes keep native .pyd files locked, so the dependency sync will likely fail partway and strand the install half-updated. Use only if you know the detected holders are false positives.",
     )
-    update_parser.set_defaults(func=cmd_update)
+    update_parser.set_defaults(func=_product_update_handler(cmd_update))
