@@ -11,6 +11,7 @@ import { FileTypeIcon } from '@/components/ui/file-type-icon'
 import { useI18n } from '@/i18n'
 import { displayPath } from '@/lib/display-path'
 import { cn } from '@/lib/utils'
+import { setRightContextOpen } from '@/store/right-context'
 import { openReviewForPath, revealReview } from '@/store/review'
 
 // ~5 rows. A turn that rewrites twenty files should still read as one card in
@@ -40,6 +41,16 @@ export const ChangedFilesCard: FC<{ parts: readonly unknown[] }> = ({ parts }) =
     return null
   }
 
+  const showReview = () => {
+    setRightContextOpen(true)
+    revealReview(scopeCwd, composerScope.target)
+  }
+
+  const showReviewFile = (path: string) => {
+    setRightContextOpen(true)
+    void openReviewForPath(path, scopeCwd, composerScope.target)
+  }
+
   return (
     <div
       className={cn(WIDGET_SHELL_CLASS, 'mt-1.5 text-[length:var(--conversation-tool-font-size)]')}
@@ -49,7 +60,7 @@ export const ChangedFilesCard: FC<{ parts: readonly unknown[] }> = ({ parts }) =
         <span className="min-w-0 flex-1 truncate text-(--ui-text-primary)">{copy.filesChanged(files.length)}</span>
         <button
           className="shrink-0 cursor-pointer text-(--ui-text-tertiary) transition-colors hover:text-(--ui-text-primary)"
-          onClick={() => revealReview(scopeCwd, composerScope.target)}
+          onClick={showReview}
           type="button"
         >
           {copy.reviewChanges}
@@ -60,7 +71,7 @@ export const ChangedFilesCard: FC<{ parts: readonly unknown[] }> = ({ parts }) =
           <button
             className="row-hover flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 text-left"
             key={file.path}
-            onClick={() => void openReviewForPath(file.path, scopeCwd, composerScope.target)}
+            onClick={() => showReviewFile(file.path)}
             title={displayPath(file.path)}
             type="button"
           >
