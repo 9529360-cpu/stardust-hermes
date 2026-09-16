@@ -154,3 +154,14 @@ def test_structurally_corrupt_route_row_fails_open(monkeypatch, tmp_path):
     assert route_health.allow_route("p", "m", "https://x.test") == (True, 0, "healthy")
     assert route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout) == 30
     assert route_health.snapshot()["routes"][key]["consecutive_failures"] == 1
+
+
+def test_non_mapping_route_row_does_not_break_health_updates(monkeypatch, tmp_path):
+    _home(monkeypatch, tmp_path)
+    key, _ = route_health.route_identity("p", "m", "https://x.test")
+    route_health._write_state({"version": 1, "routes": {key: "corrupt"}})
+
+    assert route_health.allow_route("p", "m", "https://x.test") == (True, 0, "healthy")
+    assert route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout) == 30
+    route_health.record_success("p", "m", "https://x.test")
+    assert route_health.snapshot()["routes"][key]["status"] == "healthy"
