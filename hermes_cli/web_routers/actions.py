@@ -56,6 +56,7 @@ _MANAGED_EXTERNALLY_MESSAGE = "Hermes updates are managed outside this dashboard
 
 # Per-kind dashboard error codes the UI keys on, by admission-refusal code.
 _UPDATE_REFUSAL_ERROR_CODES = {
+    "stardust-pinned": "stardust_update_disabled",
     "docker": "docker_update_unsupported", "image-marker": "docker_update_unsupported",
     "image-marker-invalid": "docker_update_unsupported", "apt": "apt_update_required",
     "nix": "nix_update_unsupported",
@@ -217,16 +218,23 @@ def _update_refused(error: str, message: str, update_command: str) -> Dict[str, 
 
 @router.post("/api/hermes/update")
 async def update_hermes():
-    """Kick off ``hermes update`` in the background."""
+    """Kick off ``hermes update`` in the background when product and install policy allow it."""
     if _dashboard_local_update_managed_externally():
         message = _MANAGED_EXTERNALLY_MESSAGE + " The built-in local updater is disabled here."
         return _update_refused("dashboard_update_managed_externally", message, "managed outside dashboard")
 
-    # Shared admission gate: marker-first, then the docker/nix/apt heuristics —
-    # one decision with the CLI paths.
-    from hermes_cli.update_contract import evaluate_update_admission, record_refusal_receipt
+    # Product policy is authoritative before install heuristics.  In Stardust this returns a
+    # refusal, so the dashboard never spawns the CLI no-op and can never mistake its exit 0 for a
+    # successful update.  Generic install-method refusal remains the second gate for compatibility.
+    from hermes_cli.update_contract import (
+        evaluate_update_admission,
+        record_refusal_receipt,
+        stardust_apply_refusal,
+    )
 
-    refusal = evaluate_update_admission(_server_path("PROJECT_ROOT"))
+    refusal = stardust_apply_refusal()
+    if refusal is None:
+        refusal = evaluate_update_admission(_server_path("PROJECT_ROOT"))
     if refusal is not None:
         response = _update_refused(
             _UPDATE_REFUSAL_ERROR_CODES.get(refusal.code, "update_not_in_place"), refusal.message, refusal.update_command,
@@ -256,14 +264,11 @@ _NON_APPLYABLE_MESSAGES = {
 
 @router.get("/api/hermes/update/check")
 async def check_hermes_update(force: bool = False):
-    """Report whether a Hermes update is available, without applying it.
+    """Report update comparison state without violating the Stardust passive-check policy.
 
-    Returns install_method ('apt'|'git'|'docker'|'nix'|'nixos'|'unknown'),
-    current_version, behind (commits behind, 0 = up to date, -1 = unknown count,
-    null = check could not run), update_available, can_apply (git only — the
-    dashboard button can apply in place), update_command, message (guidance for
-    non-applyable methods) and, for git installs that are behind, commits
-    [{sha, summary, author, at}] (additive; existing consumers ignore it).
+    ``force=False`` is a passive UI/status read and never contacts upstream in the pinned Stardust
+    edition. ``force=True`` is an explicit maintainer comparison and may contact upstream, but the
+    response still advertises ``can_apply=False`` because built-in in-place apply is disabled.
     """
     if _dashboard_local_update_managed_externally():
         return {
@@ -272,26 +277,44 @@ async def check_hermes_update(force: bool = False):
             "update_command": "managed outside dashboard", "message": _MANAGED_EXTERNALLY_MESSAGE,
         }
 
+    from hermes_cli.update_contract import (
+        STARDUST_IN_PLACE_UPDATES,
+        STARDUST_LOCAL_EDITION,
+        STARDUST_PASSIVE_UPSTREAM_CHECKS,
+        STARDUST_UPDATE_MESSAGE,
+    )
+
     install_method = detect_install_method(_server_path("PROJECT_ROOT"))
+    stardust_apply_disabled = STARDUST_LOCAL_EDITION and not STARDUST_IN_PLACE_UPDATES
     payload: Dict[str, Any] = {
         "install_method": install_method, "current_version": __version__, "behind": None,
-        "update_available": False, "can_apply": install_method == "git",
-        "update_command": recommended_update_command_for_method(install_method), "message": None,
+        "update_available": False, "can_apply": install_method == "git" and not stardust_apply_disabled,
+        "update_command": (
+            "manual maintainer review required" if stardust_apply_disabled
+            else recommended_update_command_for_method(install_method)
+        ),
+        "message": None,
     }
     non_applyable = _NON_APPLYABLE_MESSAGES.get(install_method)
     if non_applyable is not None:
         payload["message"] = non_applyable()
         return payload
 
-    # banner.check_for_updates() handles git / nix-revision paths through the GitHub API and
-    # caches the result for 24h. ``force`` busts the cache so "Check now" reflects reality.
+    # Normal dashboard loads are passive.  In Stardust they stop here before importing the banner
+    # updater at all, so no checkout probe, GitHub API call, or stale cached upstream notice occurs.
+    if not force and STARDUST_LOCAL_EDITION and not STARDUST_PASSIVE_UPSTREAM_CHECKS:
+        payload["message"] = STARDUST_UPDATE_MESSAGE
+        return payload
+
+    # An explicit force is intentionally a read-only maintainer comparison.  It may contact the
+    # upstream source, but it never re-enables apply capability.
     try:
         from hermes_cli.banner import check_for_updates, upstream_commits_behind
 
         if force:
             with contextlib.suppress(OSError):
                 (get_hermes_home() / ".update_check").unlink()
-        behind = await asyncio.to_thread(check_for_updates)
+        behind = await asyncio.to_thread(check_for_updates, passive=not force)
     except Exception:
         _log.exception("Update check failed")
         behind = None
@@ -300,7 +323,7 @@ async def check_hermes_update(force: bool = False):
     if behind is None:
         payload["message"] = "Couldn't reach the update source — try again later."
     elif behind == 0:
-        payload["message"] = "You're on the latest version."
+        payload["message"] = "You're on the latest compared source revision."
     else:
         payload["update_available"] = True
         # "What's changed" for the desktop's remote update overlay; best-effort
