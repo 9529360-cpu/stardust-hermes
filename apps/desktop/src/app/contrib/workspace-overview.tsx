@@ -12,6 +12,7 @@ import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { openReviewForPath } from '@/store/review'
 import { $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $workingSessionIds } from '@/store/session-states'
+import { isAuxiliaryWindow } from '@/store/windows'
 
 export const WORKSPACE_OVERVIEW_PANE_ID = 'workspace-overview'
 
@@ -154,6 +155,13 @@ export function WorkspaceOverview() {
 }
 
 export function schedulePersonalLayoutMigration(): void {
+  // Helper windows share the primary window's storage origin. Letting one of
+  // them consume this version marker would make the real desktop skip its
+  // one-time product-layout migration later.
+  if (isAuxiliaryWindow()) {
+    return
+  }
+
   const current = Number(readKey(PERSONAL_LAYOUT_VERSION_KEY) ?? 0)
 
   if (Number.isFinite(current) && current >= PERSONAL_LAYOUT_VERSION) {
