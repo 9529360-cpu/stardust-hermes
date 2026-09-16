@@ -30,6 +30,7 @@ import { installClipboardShim } from './lib/clipboard'
 import { queryClient } from './lib/query-client'
 import { installRendererAnimationPauseState } from './lib/renderer-loop-pause'
 import { installSelectionCopyColorGuard } from './lib/selection-copy-colors'
+import { applyReferenceShell } from './reference-shell'
 import { ThemeProvider } from './themes/context'
 
 installClipboardShim()
@@ -52,9 +53,7 @@ const winParam = new URLSearchParams(window.location.search).get('win')
 // full desktop workspace. Secondary session windows keep the same visual
 // language; utility windows (browser/HUD/quick entry/etc.) keep their own
 // purpose-built chrome.
-if (!winParam || winParam === 'secondary') {
-  document.documentElement.dataset.hermesReferenceShell = 'aurora'
-}
+applyReferenceShell(winParam)
 
 if (winParam === 'hud') {
   document.title = 'Hermes HUD'
