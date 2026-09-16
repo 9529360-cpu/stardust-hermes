@@ -1,4 +1,4 @@
-//! Resolves and downloads `scripts/install.ps1` (and `install.sh`).
+//! Resolves and downloads the Stardust bootstrap wrappers for `install.ps1` / `install.sh`.
 //!
 //! Resolution order:
 //!   1. Dev shortcut: a sibling repo checkout via $HERMES_SETUP_DEV_REPO_ROOT
@@ -19,14 +19,14 @@ use tokio::io::AsyncWriteExt;
 
 use crate::paths;
 
-/// Identity of the install.ps1 we'll execute. Used by both the manifest
+/// Identity of the installer wrapper we'll execute. Used by both the manifest
 /// fetch and the per-stage runs.
 #[derive(Debug, Clone)]
 pub struct ResolvedScript {
     pub path: PathBuf,
     pub source: ScriptSource,
-    /// Commit pin (40-char SHA) if known. install.ps1's `-Commit` arg is
-    /// what makes the repo stage clone the exact tested SHA.
+    /// Commit pin (40-char SHA) if known. The wrapper forwards install.ps1's
+    /// `-Commit` arg so the repo stage clones the exact tested SHA.
     pub commit: Option<String>,
     pub branch: Option<String>,
 }
@@ -57,8 +57,8 @@ impl ScriptKind {
 
     fn filename(&self) -> &'static str {
         match self {
-            Self::Ps1 => "install.ps1",
-            Self::Sh => "install.sh",
+            Self::Ps1 => "install-stardust.ps1",
+            Self::Sh => "install-stardust.sh",
         }
     }
 }
@@ -324,7 +324,7 @@ fn upgrade_cached_script(kind: ScriptKind, cached: &Path, emit_log: &impl Fn(&st
 /// falling back to the cached script.
 async fn download(kind: ScriptKind, commit_or_ref: &str, dest_path: &Path) -> Result<()> {
     let url = format!(
-        "https://raw.githubusercontent.com/NousResearch/hermes-agent/{}/scripts/{}",
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/{}/scripts/{}",
         commit_or_ref,
         kind.filename()
     );
@@ -394,6 +394,12 @@ async fn download(kind: ScriptKind, commit_or_ref: &str, dest_path: &Path) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn installer_filenames_are_stardust_wrappers() {
+        assert_eq!(ScriptKind::Ps1.filename(), "install-stardust.ps1");
+        assert_eq!(ScriptKind::Sh.filename(), "install-stardust.sh");
+    }
 
     #[test]
     fn is_valid_commit_accepts_short_and_full_shas() {
