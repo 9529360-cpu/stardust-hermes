@@ -62,6 +62,7 @@ import {
   SIDEBAR_MAX_WIDTH
 } from '@/store/layout'
 import { runExportProfileFlow, runImportProfileFlow } from '@/store/profile-share'
+import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import {
   $reviewOpen,
   $reviewScopeCwd,
@@ -495,25 +496,11 @@ $workspaceIsPage.listen(syncWorkspaceTitle)
 registerLayoutResetHandler(stackSessionTilesIntoMain)
 
 // ---------------------------------------------------------------------------
-// Titlebar chrome toggles -> tree. The TitlebarControls buttons keep their
-// store semantics ($sidebarOpen / $fileBrowserOpen / $panesFlipped); the tree
-// reacts — a hidden pane's zone collapses (content stays mounted), the flip
-// toggle mirrors the root row.
+// Titlebar chrome toggles -> tree. The private shell treats the sessions rail
+// and workspace context rail as product-level surfaces. Files / Review remain
+// independent tenants inside the context rail.
 // ---------------------------------------------------------------------------
 
-// HIDE-STYLE PANES (files, review, preview): the binding lives in the tree
-// store — bindPaneVisibility — alongside bindToolPaneCollapse, so both are
-// testable against the real function instead of a copy.
-
-// TOOL PANELS (terminal, logs): the binding lives in the tree store —
-// bindToolPaneCollapse — so the boot rule it encodes is testable against the
-// real function instead of a copy. See its docblock for the semantics.
-
-// SIDES have one source of truth: the TREE. The legacy $panesFlipped flag is
-// DERIVED from where the sessions zone actually sits (TitlebarControls maps
-// its left/right buttons through it), so dragging sessions across — or
-// applying a mirrored preset — remaps the buttons automatically. The flip
-// action (⌘\ / titlebar) mirrors the tree only when they disagree.
 const sessionsOnRight = () => {
   const tree = $layoutTree.get()
 
@@ -544,29 +531,28 @@ $panesFlipped.listen(flipped => {
   }
 })
 
-// POSITIONAL side toggles (titlebar buttons, ⌘B / ⌘J): $sidebarOpen ≙ the
-// LEFT side of the main zone, $fileBrowserOpen ≙ the RIGHT — everything on
-// that side hides together, whatever panes have been rearranged there.
 bindTreeSideVisibility('left', $sidebarOpen, setSidebarOpen)
-bindTreeSideVisibility('right', $fileBrowserOpen, setFileBrowserOpen)
+bindTreeSideVisibility('right', $rightContextOpen, setRightContextOpen)
+
+// Opening a tool is also intent to see the context rail that hosts it. Closing
+// a tool never collapses the overview rail; the rail has its own titlebar /
+// keybind toggle now.
+$fileBrowserOpen.listen(open => {
+  if (open) {
+    setRightContextOpen(true)
+  }
+})
+$reviewOpen.listen(open => {
+  if (open) {
+    setRightContextOpen(true)
+  }
+})
 
 // Workspace-scoped surfaces: the file tree and git diff only mean something
-// inside a project. A detached chat (no cwd) hides them — their zones
-// collapse and the chat absorbs the width; picking a project brings them
-// back. The terminal is NOT workspace-gated: unlike the old shell (where it
-// rode the rail's row and vanished with it), its zone stands on its own.
+// inside a project. A detached chat (no cwd) hides them while the overview rail
+// remains useful for session/project context.
 const $hasWorkspace = computed($currentCwd, cwd => Boolean(cwd.trim()))
 
-// The tree pane's own presence tracks ⌘J directly, not just the column's
-// collapse — otherwise a pane revealed into that shared column would drag the
-// tree along with it.
-//
-// Both get a CLOSER and an OPENER. The closer keeps ⌘J/⌘G truthful when the
-// pane is closed from the tab menu; the opener is its mirror, so bringing the
-// pane back through the tree (the toggle's reveal path, the rail, a preset)
-// writes the store too. Without the opener the boolean went stale the moment
-// anything but the toggle showed the pane — the divergence this whole change
-// is about.
 bindPaneVisibility(
   'files',
   computed([$hasWorkspace, $fileBrowserOpen], (workspace, open) => workspace && open),
@@ -748,11 +734,9 @@ registry.register(
   })
 )
 
-// Sessions/files Close = collapse their SIDE (⌘B/⌘J truthful, titlebar button
-// flips back) — but only while the pane actually lives in that root side
-// column. Dragged next to main, a side collapse can't hide it (the collapse
-// skips main-bearing children), so Close falls back to dismissal there —
-// otherwise ⌘W/Close silently no-op.
+// Sessions Close collapses the left conversation rail. Files closes only its
+// tool tab now; the right-side overview rail remains present until its own
+// product-level toggle is used.
 registerPaneCloser('sessions', () =>
   paneRootSide('sessions') === 'left' ? setSidebarOpen(false) : dismissTreePane('sessions')
 )
