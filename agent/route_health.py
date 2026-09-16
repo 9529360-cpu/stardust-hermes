@@ -107,6 +107,25 @@ def _read_state(path: Path | None = None) -> dict[str, Any]:
         return _empty_state()
 
 
+def state_file_status() -> tuple[str, int]:
+    """Return ``(status, route_count)`` for operator surfaces without mutating state.
+
+    ``status`` is ``missing``, ``ok`` or ``corrupt``.  Runtime routing deliberately fails
+    open on corrupt state; exposing that distinction keeps status surfaces from presenting an
+    ignored/corrupt file as ordinary healthy history.
+    """
+    path = state_path()
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return "missing", 0
+    except Exception:
+        return "corrupt", 0
+    if not isinstance(raw, dict) or not isinstance(raw.get("routes"), dict):
+        return "corrupt", 0
+    return "ok", len(raw["routes"])
+
+
 def _write_state(state: dict[str, Any], path: Path | None = None) -> None:
     path = state_path() if path is None else path
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -288,12 +307,12 @@ def reset_state() -> int:
 
     Unlike inference-time health writes, this is an explicit operator action.  Lock or write
     failures therefore surface to the caller instead of pretending the reset succeeded.  The
-    return value is the number of well-formed route rows that were cleared.
+    return value is the number of stored route rows that were cleared.
     """
     path = state_path()
     with _LOCK, _state_file_lock(path):
         state = _read_state(path)
-        cleared = sum(1 for row in state.get("routes", {}).values() if isinstance(row, dict))
+        cleared = len(state.get("routes", {}))
         _write_state(_empty_state(), path)
         return cleared
 
