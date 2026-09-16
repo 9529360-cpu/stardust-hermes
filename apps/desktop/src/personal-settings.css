@@ -1,0 +1,46 @@
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model'],
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace'],
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications'],
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers'] {
+  position: relative;
+  margin-top: 1.45rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model']::before,
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace']::before,
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before,
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
+  position: absolute;
+  left: 0.5rem;
+  top: -1.1rem;
+  color: var(--ui-text-quaternary);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model']::before {
+  content: 'ASSISTANT';
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace']::before {
+  content: 'WORKSPACE';
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before {
+  content: 'APP';
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
+  content: 'CONNECTIONS';
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour^='nav-config:'] {
+  min-height: 2rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:advanced'] {
+  color: var(--ui-text-tertiary);
+}
