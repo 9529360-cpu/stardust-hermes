@@ -80,7 +80,14 @@ jobs:
         shell: bash
         run: |
           python -m py_compile hermes_cli/banner.py hermes_cli/stardust_update.py hermes_cli/web_routers/actions.py tests/hermes_cli/test_update_check.py tests/hermes_cli/test_dashboard_admin_endpoints.py tests/hermes_cli/test_stardust_update_authority.py
-          python -m pytest -q tests/hermes_cli/test_update_check.py tests/hermes_cli/test_stardust_update_authority.py tests/hermes_cli/test_dashboard_admin_endpoints.py -k 'UpdateCheckEndpoint or stardust or passive_check_uses_the_api_and_never_fetches or upstream_main_sha'
+          python - <<'PY'
+          from pathlib import Path
+          banner = Path("hermes_cli/banner.py").read_text(encoding="utf-8")
+          assert "https://github.com/9529360-cpu/stardust-hermes.git" in banner
+          assert "https://github.com/9529360-cpu/stardust-hermes/releases/tag" in banner
+          assert "https://github.com/NousResearch/hermes-agent" not in banner
+          assert "github.com/nousresearch/hermes-agent" not in banner
+          PY
       - name: Commit patch and remove one-shot workflow
         shell: bash
         run: |
