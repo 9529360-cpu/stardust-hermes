@@ -29,26 +29,31 @@ interface PersonalProductNavProps {
 
 interface ProductNavButtonProps {
   active?: boolean
+  expanded?: boolean
   icon: string
   label: string
   onClick: () => void
 }
 
-function ProductNavButton({ active = false, icon, label, onClick }: ProductNavButtonProps) {
+function ProductNavButton({ active = false, expanded = false, icon, label, onClick }: ProductNavButtonProps) {
   return (
     <button
       aria-current={active ? 'page' : undefined}
+      aria-expanded={expanded || undefined}
       className={cn(
         'flex h-8 w-full items-center gap-2 rounded-lg border border-transparent px-2.5 text-left text-[0.72rem] font-medium transition-colors',
         active
           ? 'border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-(--ui-text-primary)'
-          : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
+          : expanded
+            ? 'text-(--ui-text-secondary)'
+            : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
       )}
       onClick={onClick}
       type="button"
     >
       <Codicon className="shrink-0" name={icon} size="0.88rem" />
       <span className="truncate">{label}</span>
+      {expanded && !active && <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-(--theme-midground)" />}
     </button>
   )
 }
@@ -95,7 +100,7 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
     >
       <ProductNavButton active={currentView === 'chat'} icon="home" label={copy.home} onClick={openHome} />
       <ProductNavButton active={currentView === 'cron'} icon="checklist" label={copy.tasks} onClick={openTasks} />
-      <ProductNavButton active={rightContextOpen} icon="layout-sidebar-right" label={copy.workspace} onClick={openWorkspace} />
+      <ProductNavButton expanded={rightContextOpen} icon="layout-sidebar-right" label={copy.workspace} onClick={openWorkspace} />
       <ProductNavButton active={currentView === 'settings'} icon="settings-gear" label={copy.settings} onClick={openSettings} />
     </nav>
   )
