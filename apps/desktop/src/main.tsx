@@ -1,5 +1,6 @@
 import './styles.css'
 import './reference-shell.css'
+import './stardust-glass-surfaces.css'
 import './stardust-titlebar.css'
 import './personal-settings.css'
 // Side-effect: reports in-flight turns to the main process for the quit guard.
