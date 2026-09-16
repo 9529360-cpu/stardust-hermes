@@ -1,35 +1,60 @@
 /*
  * Stardust desktop shell
  * ----------------------
- * The reference direction is a task-first desktop app, not a recolored Hermes
- * pane tree. Structure now lives in React (product rail, task frame, workspace
- * inspector); this file is responsible only for the shared desktop material.
- *
- * Native glass is already implemented by the Electron shell. When it is live,
- * this skin deliberately gets out of the way and lets macOS vibrancy / Windows
- * Mica-Acrylic show through. On platforms without native glass, the bundled
- * Stardust OS wallpaper is the fallback behind the floating app frame.
+ * Layout is owned by React/pane-tree composition. This stylesheet is the
+ * material system: native OS glass first, bundled aurora wallpaper as fallback.
  */
 
 :root[data-hermes-reference-shell='aurora'] {
-  --stardust-ink: #f2f5ff;
-  --stardust-ink-2: #c2cbe0;
-  --stardust-ink-3: #8794ad;
-  --stardust-blue: #7b96ff;
-  --stardust-violet: #9178ff;
-  --stardust-cyan: #7ed7ff;
-  --stardust-frame: rgba(8, 13, 27, 0.82);
-  --stardust-frame-strong: rgba(8, 13, 27, 0.94);
-  --stardust-rail: rgba(13, 21, 39, 0.76);
-  --stardust-main: rgba(8, 14, 28, 0.68);
-  --stardust-card: rgba(23, 34, 58, 0.64);
-  --stardust-card-strong: rgba(27, 39, 66, 0.82);
-  --stardust-control: rgba(124, 151, 219, 0.1);
-  --stardust-control-hover: rgba(133, 159, 226, 0.16);
-  --stardust-control-active: rgba(132, 158, 229, 0.2);
-  --stardust-line: rgba(184, 202, 246, 0.12);
-  --stardust-line-soft: rgba(184, 202, 246, 0.075);
-  --stardust-shadow: 0 28px 90px rgba(0, 0, 0, 0.52), 0 8px 32px rgba(5, 11, 28, 0.34);
+  color-scheme: light;
+  --sd-text-1: #17213b;
+  --sd-text-2: #43506e;
+  --sd-text-3: #71809d;
+  --sd-text-4: rgba(83, 99, 132, 0.64);
+  --sd-accent: #627cf2;
+  --sd-accent-2: #826bea;
+  --sd-accent-soft: rgba(102, 126, 242, 0.12);
+  --sd-frame: rgba(244, 247, 255, 0.62);
+  --sd-frame-strong: rgba(246, 248, 255, 0.78);
+  --sd-rail: rgba(238, 243, 255, 0.57);
+  --sd-main: rgba(250, 251, 255, 0.42);
+  --sd-context: rgba(240, 245, 255, 0.54);
+  --sd-card: rgba(255, 255, 255, 0.48);
+  --sd-card-strong: rgba(255, 255, 255, 0.66);
+  --sd-control: rgba(93, 112, 170, 0.07);
+  --sd-control-hover: rgba(92, 110, 173, 0.12);
+  --sd-control-active: rgba(96, 118, 196, 0.16);
+  --sd-line: rgba(70, 91, 142, 0.13);
+  --sd-line-strong: rgba(78, 96, 151, 0.2);
+  --sd-highlight: rgba(255, 255, 255, 0.7);
+  --sd-shadow: 0 34px 100px rgba(38, 51, 92, 0.22), 0 12px 34px rgba(38, 51, 92, 0.12);
+  --sd-card-shadow: 0 12px 28px rgba(59, 72, 117, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] {
+  color-scheme: dark;
+  --sd-text-1: #f2f5ff;
+  --sd-text-2: #c5cee2;
+  --sd-text-3: #8e9bb3;
+  --sd-text-4: rgba(139, 154, 184, 0.65);
+  --sd-accent: #8298ff;
+  --sd-accent-2: #9a7fff;
+  --sd-accent-soft: rgba(126, 148, 255, 0.14);
+  --sd-frame: rgba(8, 14, 28, 0.58);
+  --sd-frame-strong: rgba(9, 15, 29, 0.72);
+  --sd-rail: rgba(17, 27, 47, 0.56);
+  --sd-main: rgba(7, 13, 27, 0.36);
+  --sd-context: rgba(14, 23, 42, 0.52);
+  --sd-card: rgba(30, 43, 69, 0.42);
+  --sd-card-strong: rgba(34, 48, 77, 0.56);
+  --sd-control: rgba(124, 148, 206, 0.07);
+  --sd-control-hover: rgba(133, 158, 220, 0.13);
+  --sd-control-active: rgba(137, 156, 233, 0.17);
+  --sd-line: rgba(190, 207, 248, 0.095);
+  --sd-line-strong: rgba(198, 214, 255, 0.16);
+  --sd-highlight: rgba(255, 255, 255, 0.1);
+  --sd-shadow: 0 38px 110px rgba(0, 0, 0, 0.48), 0 12px 42px rgba(2, 7, 20, 0.28);
+  --sd-card-shadow: 0 12px 32px rgba(0, 0, 0, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 :root[data-hermes-reference-shell='aurora'],
@@ -38,19 +63,27 @@
   min-height: 100%;
 }
 
-/* Fallback wallpaper. Native glass overrides this below. */
+/* OS-style fallback wallpaper. Native Electron material clears this below. */
 :root[data-hermes-reference-shell='aurora'] body {
   overflow: hidden;
-  background-color: #060b17;
-  background-image: url('./assets/stardust-os-wallpaper.svg');
+  background-color: #d9e4ff;
+  background-image:
+    radial-gradient(70rem 42rem at 20% 5%, rgba(123, 150, 255, 0.5), transparent 58%),
+    radial-gradient(54rem 34rem at 84% 88%, rgba(155, 112, 255, 0.38), transparent 62%),
+    url('./assets/stardust-os-wallpaper.svg');
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
 }
 
-/* The actual OS material is more valuable than a synthetic wallpaper. The
-   base translucency system paints a full-window tint; remove it for Stardust
-   and let the semi-transparent product frame below do the tinting instead. */
+:root.dark[data-hermes-reference-shell='aurora'] body {
+  background-color: #050a16;
+  background-image:
+    radial-gradient(62rem 38rem at 18% -4%, rgba(70, 105, 230, 0.3), transparent 62%),
+    radial-gradient(52rem 34rem at 86% 92%, rgba(117, 68, 210, 0.28), transparent 66%),
+    url('./assets/stardust-os-wallpaper.svg');
+}
+
 :root[data-hermes-reference-shell='aurora'][data-hermes-glass] body {
   background: transparent !important;
 }
@@ -58,7 +91,7 @@
 :root[data-hermes-reference-shell='aurora'] #root {
   box-sizing: border-box;
   height: 100vh;
-  padding: 12px;
+  padding: 14px;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-slot='sidebar-wrapper'] {
@@ -68,34 +101,35 @@
   background: transparent !important;
 }
 
+/* ── Floating application frame ───────────────────────────────────────── */
 :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
-  --ui-text-primary: var(--stardust-ink);
-  --ui-text-secondary: var(--stardust-ink-2);
-  --ui-text-tertiary: var(--stardust-ink-3);
-  --ui-text-quaternary: rgba(132, 145, 173, 0.72);
-  --ui-bg-chrome: var(--stardust-frame-strong);
-  --ui-bg-primary: rgba(18, 28, 49, 0.9);
-  --ui-bg-secondary: rgba(21, 32, 55, 0.82);
-  --ui-bg-tertiary: rgba(28, 41, 68, 0.72);
-  --ui-bg-quaternary: rgba(101, 124, 179, 0.11);
-  --ui-bg-quinary: rgba(100, 124, 180, 0.07);
-  --ui-sidebar-surface-background: var(--stardust-rail);
+  --ui-text-primary: var(--sd-text-1);
+  --ui-text-secondary: var(--sd-text-2);
+  --ui-text-tertiary: var(--sd-text-3);
+  --ui-text-quaternary: var(--sd-text-4);
+  --ui-bg-chrome: transparent;
+  --ui-bg-primary: var(--sd-card-strong);
+  --ui-bg-secondary: var(--sd-card);
+  --ui-bg-tertiary: var(--sd-control-active);
+  --ui-bg-quaternary: var(--sd-control);
+  --ui-bg-quinary: transparent;
+  --ui-sidebar-surface-background: transparent;
   --ui-chat-surface-background: transparent;
   --ui-editor-surface-background: transparent;
-  --ui-panel-surface-background: rgba(17, 27, 48, 0.62);
-  --ui-widget-surface-background: var(--stardust-card);
-  --ui-terminal-surface-background: rgba(5, 9, 19, 0.92);
-  --ui-control-hover-background: var(--stardust-control-hover);
-  --ui-control-active-background: var(--stardust-control-active);
-  --ui-stroke-primary: rgba(190, 206, 247, 0.2);
-  --ui-stroke-secondary: var(--stardust-line);
-  --ui-stroke-tertiary: var(--stardust-line-soft);
-  --ui-stroke-quaternary: rgba(188, 205, 246, 0.045);
+  --ui-panel-surface-background: var(--sd-card);
+  --ui-widget-surface-background: var(--sd-card);
+  --ui-terminal-surface-background: color-mix(in srgb, #050a14 88%, transparent);
+  --ui-control-hover-background: var(--sd-control-hover);
+  --ui-control-active-background: var(--sd-control-active);
+  --ui-stroke-primary: var(--sd-line-strong);
+  --ui-stroke-secondary: var(--sd-line);
+  --ui-stroke-tertiary: color-mix(in srgb, var(--sd-line) 76%, transparent);
+  --ui-stroke-quaternary: color-mix(in srgb, var(--sd-line) 48%, transparent);
   --sidebar: transparent;
-  --sidebar-foreground: var(--stardust-ink);
-  --sidebar-border: var(--stardust-line-soft);
-  --sidebar-accent: var(--stardust-control-active);
-  --sidebar-accent-foreground: var(--stardust-ink);
+  --sidebar-foreground: var(--sd-text-1);
+  --sidebar-border: transparent;
+  --sidebar-accent: var(--sd-control-active);
+  --sidebar-accent-foreground: var(--sd-text-1);
   --sidebar-edge-border: transparent;
 
   width: 100% !important;
@@ -103,199 +137,244 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(198, 213, 250, 0.14);
-  border-radius: 24px;
-  background: var(--stardust-frame) !important;
-  box-shadow: var(--stardust-shadow);
-  backdrop-filter: blur(32px) saturate(125%);
+  border: 1px solid var(--sd-line-strong);
+  border-radius: 22px;
+  background: var(--sd-frame) !important;
+  box-shadow: var(--sd-shadow), inset 0 1px 0 var(--sd-highlight);
+  backdrop-filter: blur(34px) saturate(138%);
+  -webkit-backdrop-filter: blur(34px) saturate(138%);
 }
 
 :root[data-hermes-reference-shell='aurora'][data-hermes-glass] [data-contrib-shell] {
-  background: color-mix(in srgb, #07101f 74%, transparent) !important;
+  background: color-mix(in srgb, var(--sd-frame) 78%, transparent) !important;
+  backdrop-filter: blur(22px) saturate(118%);
+  -webkit-backdrop-filter: blur(22px) saturate(118%);
 }
 
-/* Three real product columns. The tree still owns resizes; the visual shell
-   removes the old IDE-panel treatment and makes each semantic column read as a
-   single surface. */
+/* Existing pane-tree keeps drag-resize/persistence, but product columns no
+   longer look like IDE panes. */
 :root[data-hermes-reference-shell='aurora'] [data-tree-group] {
+  min-width: 0;
+  min-height: 0;
   border: 0 !important;
   background: transparent !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
-  background: linear-gradient(180deg, rgba(18, 28, 50, 0.76), rgba(11, 18, 34, 0.78)) !important;
-  box-shadow: inset -1px 0 0 var(--stardust-line-soft);
+  background: var(--sd-rail) !important;
+  box-shadow: inset -1px 0 0 var(--sd-line), inset 0 1px 0 var(--sd-highlight);
+  backdrop-filter: blur(26px) saturate(126%);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] {
-  background: rgba(7, 13, 26, 0.38) !important;
+  background: var(--sd-main) !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
-  background: linear-gradient(180deg, rgba(17, 27, 48, 0.68), rgba(10, 17, 32, 0.74)) !important;
-  box-shadow: inset 1px 0 0 var(--stardust-line-soft);
+  background: var(--sd-context) !important;
+  box-shadow: inset 1px 0 0 var(--sd-line), inset 0 1px 0 var(--sd-highlight);
+  backdrop-filter: blur(28px) saturate(130%);
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-panel-header] {
-  min-height: 30px;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: inset 0 -1px 0 var(--stardust-line-soft);
-}
-
-/* ── Left task rail ─────────────────────────────────────────────────────── */
-:root[data-hermes-reference-shell='aurora'] [data-personal-sidebar-shell] [data-tour='sessions-sidebar'] {
-  border: 0 !important;
-  background: transparent !important;
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-product-brand] {
-  color: var(--stardust-ink);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-product-brand-mark] {
-  border: 1px solid rgba(201, 217, 255, 0.16);
-  background:
-    radial-gradient(circle at 32% 28%, rgba(126, 215, 255, 0.56), transparent 42%),
-    linear-gradient(145deg, rgba(124, 150, 255, 0.9), rgba(126, 86, 227, 0.88));
-  color: white;
-  box-shadow: 0 5px 18px rgba(79, 94, 207, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-product-new-task] {
-  min-height: 42px;
-  border: 1px solid rgba(211, 222, 255, 0.2);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
-    linear-gradient(135deg, #7798ff 0%, #7a70ec 56%, #5d6fc4 100%);
-  color: white;
-  box-shadow: 0 10px 26px rgba(55, 72, 171, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  transition: transform 120ms ease, filter 120ms ease;
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-product-new-task]:hover {
-  filter: brightness(1.07);
-  transform: translateY(-1px);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-personal-product-nav] {
-  border-top: 1px solid var(--stardust-line-soft);
-  background: linear-gradient(180deg, transparent, rgba(11, 18, 34, 0.9) 24%);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-personal-product-nav] button {
-  min-height: 32px;
-  border-radius: 9px;
-}
-
-/* The old Hermes capability nav is still mounted for command/keybind
-   compatibility but is not part of this product rail. */
-:root[data-hermes-reference-shell='aurora']
-  [data-personal-sidebar-shell]
-  [data-slot='sidebar-content']
-  > [data-slot='sidebar-group']:first-child {
+/* Product regions own their own chrome. This removes the old SESSIONS/BOTS/
+   TERMINAL and OVERVIEW/REVIEW strips — including the draft-title editor that
+   produced the giant white field in the real-device screenshot. */
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] [data-panel-header],
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] [data-panel-header],
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] [data-panel-header] {
   display: none !important;
 }
 
-/* Search should read like the reference rail, not the old underline-only field. */
-:root[data-hermes-reference-shell='aurora']
-  [data-personal-sidebar-shell]
-  [data-slot='sidebar-content']
-  > div:has(input[type='text']) {
-  margin-inline: 0.1rem;
-  padding: 0 0.3rem 0.55rem;
+/* Other summoned tool zones keep functional tabs, but use glass chrome. */
+:root[data-hermes-reference-shell='aurora'] [data-panel-header] {
+  min-height: 30px;
+  border: 0 !important;
+  border-bottom: 1px solid var(--sd-line) !important;
+  background: color-mix(in srgb, var(--sd-card) 74%, transparent) !important;
+  backdrop-filter: blur(18px);
 }
 
-:root[data-hermes-reference-shell='aurora']
-  [data-personal-sidebar-shell]
-  [data-slot='sidebar-content']
-  > div:has(input[type='text'])
-  > div {
-  width: 100%;
+/* ── Dedicated Codex-style task rail ─────────────────────────────────── */
+:root[data-hermes-reference-shell='aurora'] [data-stardust-task-rail] {
+  color: var(--sd-text-2);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-header] {
+  padding: 16px 13px 12px;
+  border-bottom: 1px solid var(--sd-line);
+  -webkit-app-region: drag;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-header] button,
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-search],
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-scroll],
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-footer] {
+  -webkit-app-region: no-drag;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-brand] {
   min-height: 34px;
-  padding-inline: 10px;
-  border: 1px solid var(--stardust-line-soft);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-mark] {
+  border: 1px solid rgba(211, 222, 255, 0.24);
+  background:
+    radial-gradient(circle at 32% 26%, rgba(158, 223, 255, 0.72), transparent 38%),
+    linear-gradient(145deg, #7796ff 0%, #866fe9 58%, #4d67c5 100%);
+  color: #fff;
+  box-shadow: 0 7px 22px rgba(73, 87, 190, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-new] {
+  border: 1px solid rgba(211, 223, 255, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), transparent 44%),
+    linear-gradient(135deg, #6e91ff 0%, #796fe7 56%, #5668bd 100%);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(67, 80, 177, 0.23), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-new]:hover {
+  filter: brightness(1.055);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(67, 80, 177, 0.29), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-search] > div {
+  min-height: 34px;
+  border: 1px solid var(--sd-line);
   border-radius: 10px;
-  background: rgba(83, 106, 160, 0.07);
+  background: var(--sd-control);
+  box-shadow: inset 0 1px 0 var(--sd-highlight);
   opacity: 1;
 }
 
-/* Session rows get Codex-like compact density and a clear active state. */
-:root[data-hermes-reference-shell='aurora'] [data-personal-sidebar-shell] [data-sessions-mode] button {
-  border-radius: 9px;
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-scroll] {
+  padding-top: 12px;
+  scrollbar-gutter: stable;
 }
 
-/* ── Center task workspace ─────────────────────────────────────────────── */
+:root[data-hermes-reference-shell='aurora'] [data-task-project-icon] {
+  border: 1px solid var(--sd-line);
+  background: var(--sd-control);
+  color: var(--sd-text-3);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-footer] {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 10px 11px;
+  border-top: 1px solid var(--sd-line);
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--sd-rail) 82%, transparent) 28%);
+}
+
+/* ── Central task workspace ───────────────────────────────────────────── */
 :root[data-hermes-reference-shell='aurora'] [data-task-workspace] {
+  position: relative;
   background:
-    radial-gradient(44rem 26rem at 58% -8%, rgba(97, 117, 215, 0.085), transparent 58%),
+    radial-gradient(46rem 30rem at 58% -16%, color-mix(in srgb, var(--sd-accent) 9%, transparent), transparent 62%),
     transparent;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-header] {
-  padding: 22px 28px 14px;
-  border-bottom: 1px solid var(--stardust-line-soft);
+  position: relative;
+  z-index: 3;
+  padding: 21px 28px 14px;
+  border-bottom: 1px solid var(--sd-line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sd-main) 72%, transparent), transparent);
+  backdrop-filter: blur(18px) saturate(120%);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-progress] {
+  position: relative;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 12px 28px 4px;
+  margin: 11px 26px 6px;
   padding: 10px 12px;
-  border: 1px solid var(--stardust-line-soft);
+  border: 1px solid var(--sd-line);
   border-radius: 13px;
-  background: rgba(63, 82, 127, 0.065);
+  background: color-mix(in srgb, var(--sd-card) 70%, transparent);
+  box-shadow: var(--sd-card-shadow);
+  backdrop-filter: blur(20px) saturate(125%);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-progress] > div {
-  color: var(--stardust-ink-3);
+  color: var(--sd-text-3);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-active] {
-  color: var(--stardust-ink);
+  color: var(--sd-text-1);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-complete] {
-  color: #aab7ff;
+  color: color-mix(in srgb, var(--sd-accent) 78%, var(--sd-text-1));
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-phase-icon] {
-  border: 1px solid var(--stardust-line-soft);
-  background: rgba(99, 124, 181, 0.08);
+  border: 1px solid var(--sd-line);
+  background: var(--sd-control);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-active] [data-task-phase-icon] {
-  border-color: rgba(146, 166, 255, 0.34);
-  background: rgba(116, 126, 246, 0.18);
-  box-shadow: 0 0 16px rgba(105, 112, 246, 0.16);
+  border-color: color-mix(in srgb, var(--sd-accent) 38%, transparent);
+  background: var(--sd-accent-soft);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--sd-accent) 16%, transparent);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-phase-line] {
-  background: var(--stardust-line-soft);
+  background: var(--sd-line);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-complete] [data-task-phase-line] {
-  background: rgba(141, 157, 255, 0.25);
+  background: color-mix(in srgb, var(--sd-accent) 24%, transparent);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-transcript] {
+  position: relative;
   overflow: hidden;
+  color: var(--sd-text-1);
 }
 
-/* Composer is the visual anchor at the bottom of the task, like Codex. */
+/* TaskWorkspaceFrame owns the title/status, so the legacy ChatView header is a
+   duplicate and must not consume vertical space. */
+:root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-chat-surface] > header {
+  display: none !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-chat-surface],
+:root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-slot='composer-bounds'] {
+  background: transparent !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-chat-unfocused] {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* Keep transcript content readable; the real screenshot showed the old chat
+   surface dimmed nearly to black beneath the new shell. */
+:root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-slot='aui_assistant-message-content'],
+:root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-slot='aui_user-message-root'] {
+  color: var(--sd-text-1);
+}
+
 :root[data-hermes-reference-shell='aurora'] [data-task-workspace] [data-tour='composer'] {
-  border: 1px solid rgba(190, 207, 250, 0.13) !important;
-  border-radius: 16px !important;
-  background: rgba(21, 31, 53, 0.78) !important;
-  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.045);
-  backdrop-filter: blur(22px) saturate(120%);
+  border: 1px solid var(--sd-line-strong) !important;
+  border-radius: 17px !important;
+  background: color-mix(in srgb, var(--sd-card-strong) 86%, transparent) !important;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.16), inset 0 1px 0 var(--sd-highlight);
+  backdrop-filter: blur(26px) saturate(130%);
+  -webkit-backdrop-filter: blur(26px) saturate(130%);
 }
 
-/* ── Right workspace inspector ────────────────────────────────────────── */
+/* ── Right context inspector ─────────────────────────────────────────── */
 :root[data-hermes-reference-shell='aurora'] [data-personal-overview] {
   background: transparent;
-  color: var(--stardust-ink-2);
+  color: var(--sd-text-2);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-inspector] {
@@ -305,48 +384,46 @@
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-card] {
   padding: 12px;
-  border: 1px solid var(--stardust-line-soft);
+  border: 1px solid var(--sd-line);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(35, 48, 78, 0.42), rgba(23, 33, 56, 0.34));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  background: color-mix(in srgb, var(--sd-card) 88%, transparent);
+  box-shadow: var(--sd-card-shadow);
+  backdrop-filter: blur(20px) saturate(125%);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-card-title] {
   margin-bottom: 10px;
-  color: var(--stardust-ink-3);
-  font-size: 0.62rem;
+  color: var(--sd-text-3);
+  font-size: 0.6rem;
   font-weight: 650;
   letter-spacing: 0.115em;
   text-transform: uppercase;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-project-icon] {
-  border: 1px solid var(--stardust-line-soft);
-  background: rgba(112, 132, 196, 0.1);
-  color: #a8b7ff;
+  border: 1px solid var(--sd-line);
+  background: var(--sd-accent-soft);
+  color: color-mix(in srgb, var(--sd-accent) 82%, var(--sd-text-1));
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-tools] button {
   border-radius: 8px;
-  color: var(--stardust-ink-3);
+  color: var(--sd-text-3);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-sync-grid],
-:root[data-hermes-reference-shell='aurora'] [data-result-summary-grid] {
+:root[data-hermes-reference-shell='aurora'] [data-result-summary-grid],
+:root[data-hermes-reference-shell='aurora'] [data-workspace-change-grid] {
   padding-top: 10px;
-  border-top: 1px solid var(--stardust-line-soft);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-result-status-dot] {
-  box-shadow: 0 0 12px color-mix(in srgb, currentColor 40%, transparent);
+  border-top: 1px solid var(--sd-line);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-result-mini-card] {
   min-height: 58px;
   padding: 9px;
-  border: 1px solid rgba(186, 202, 243, 0.065);
+  border: 1px solid color-mix(in srgb, var(--sd-line) 74%, transparent);
   border-radius: 10px;
-  background: rgba(80, 101, 153, 0.065);
+  background: var(--sd-control);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-file-list] {
@@ -356,21 +433,16 @@
 :root[data-hermes-reference-shell='aurora'] [data-workspace-file-row] {
   display: flex;
   min-width: 0;
+  min-height: 28px;
   align-items: center;
   gap: 8px;
-  min-height: 28px;
   padding: 4px 6px;
   border-radius: 7px;
   text-align: left;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-file-row]:hover {
-  background: var(--stardust-control-hover);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-change-grid] {
-  padding-top: 10px;
-  border-top: 1px solid var(--stardust-line-soft);
+  background: var(--sd-control-hover);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-workspace-change-grid] [data-workspace-metric] {
@@ -380,23 +452,21 @@
   gap: 2px;
   padding: 7px;
   border-radius: 9px;
-  background: rgba(76, 96, 146, 0.06);
+  background: var(--sd-control);
 }
 
-/* Low-noise scrollbars across the three columns. */
+/* Low-noise scrollbars. */
 :root[data-hermes-reference-shell='aurora'] * {
-  scrollbar-color: rgba(140, 157, 194, 0.28) transparent;
+  scrollbar-color: color-mix(in srgb, var(--sd-text-3) 28%, transparent) transparent;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1040px) {
   :root[data-hermes-reference-shell='aurora'] #root {
-    padding: 0;
+    padding: 8px;
   }
 
   :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
-    border-width: 0;
-    border-radius: 0;
-    box-shadow: none;
+    border-radius: 18px;
   }
 
   :root[data-hermes-reference-shell='aurora'] [data-task-header] {
@@ -408,22 +478,38 @@
   }
 }
 
+@media (max-width: 820px) {
+  :root[data-hermes-reference-shell='aurora'] #root {
+    padding: 0;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
 @media (max-height: 700px) {
   :root[data-hermes-reference-shell='aurora'] [data-task-progress] {
     display: none;
   }
 
   :root[data-hermes-reference-shell='aurora'] [data-task-header] {
-    padding-block: 14px 10px;
+    padding-block: 13px 10px;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-task-rail-header] {
+    padding-top: 11px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-hermes-reference-shell='aurora'] [data-product-new-task] {
+  :root[data-hermes-reference-shell='aurora'] [data-task-rail-new] {
     transition: none;
   }
 
-  :root[data-hermes-reference-shell='aurora'] [data-product-new-task]:hover {
+  :root[data-hermes-reference-shell='aurora'] [data-task-rail-new]:hover {
     transform: none;
   }
 }
