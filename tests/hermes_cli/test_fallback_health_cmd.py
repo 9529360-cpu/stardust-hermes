@@ -87,6 +87,27 @@ def test_health_command_does_not_claim_half_open_probe(isolated_home, capsys):
     )
 
 
+def test_health_command_does_not_rewrite_persisted_state(isolated_home, capsys):
+    _write_config(
+        isolated_home,
+        {
+            "fallback_providers": [
+                {"provider": "p", "model": "m", "base_url": "https://x.test"},
+            ],
+        },
+    )
+    route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+    path = route_health.state_path()
+    before = path.read_bytes()
+
+    from hermes_cli.fallback_cmd import cmd_fallback_health
+
+    cmd_fallback_health(types.SimpleNamespace())
+    capsys.readouterr()
+
+    assert path.read_bytes() == before
+
+
 def test_reset_health_clears_state_but_preserves_fallback_chain(isolated_home, capsys):
     config = {
         "model": {"provider": "anthropic", "default": "primary"},
