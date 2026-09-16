@@ -1,30 +1,54 @@
-# Stardust local edition / 星尘本地定制版
+# Stardust / 星尘个人助理
 
-This repository is a public source-code fork of [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent), based on upstream revision `24fd22b94d`. The original project, copyright notice, MIT license, and Git history are retained.
+Stardust is an independently maintained personal-assistant project built on the open-source Hermes Agent codebase. The repository keeps the original Git history, copyright notices, and MIT license, but Stardust now has its own product direction and maintenance policy.
 
-本仓库是 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) 的公开源码分支，基于上游版本 `24fd22b94d`。原项目版权声明、MIT 许可证和 Git 历史均予以保留。
+Stardust 是一个以 Hermes Agent 开源代码为技术底座、但独立维护和持续改造的个人助理项目。仓库保留原始 Git 历史、版权声明与 MIT 许可证，但从现在开始，Stardust 拥有独立的产品方向和维护策略。
 
-## What this edition changes / 主要改动
+## Product direction / 产品方向
 
-- A quieter, localized personal-assistant desktop home and navigation hierarchy.
-- Persistent health tracking and circuit-breaker behavior for an arbitrary model-route fallback chain.
-- Credential-pool rotation remains available before route-level fallback.
-- Automatic upstream checks and update installation are disabled intentionally, keeping the local edition pinned.
-- Focused regression tests for the assistant home and persistent route health.
+The goal is not to mirror Hermes or stay aligned with upstream releases. The goal is to keep reshaping the codebase into a personal assistant optimized for long-term individual use.
 
-- 更安静、中文优先的个人助理桌面首页与导航层级。
-- 面向任意数量模型路由的持久化健康状态、冷却和半开探测。
-- 路由降级前仍支持凭据池轮换。
-- 主动关闭上游自动检查和更新安装，避免本地定制被覆盖。
-- 为助理首页和持久化路由健康机制补充回归测试。
+本项目的目标不是继续作为 Hermes 的镜像，也不是保持与上游版本同步，而是持续把现有底座改造成更适合个人长期使用的专属助理。
 
-## Product source / 产品源码权威
+Current priorities include:
 
-`9529360-cpu/stardust-hermes` is the source authority for this edition. Runtime update checks, release links, package metadata, and the Stardust bootstrap installers must point to this repository rather than silently treating the upstream project as the product release source.
+- a calmer, Chinese-first personal-assistant desktop and navigation hierarchy;
+- persistent health tracking and circuit-breaker behavior for arbitrary model-route fallback chains;
+- credential-pool rotation before route-level fallback;
+- repository-owned install, recovery, update, and release paths;
+- focused regression coverage for assistant UI and model-routing behavior.
 
-`9529360-cpu/stardust-hermes` 是本版本的源码权威。运行时更新检查、Release 链接、包元数据以及 Stardust 安装入口都必须指向本仓库，不能把上游项目默认为本产品的发布源。
+当前重点包括：
 
-For fresh installs, use the Stardust-owned bootstrap entrypoints. They reuse the mature Hermes installers while pinning clone/recovery URLs to this repository:
+- 更安静、中文优先的个人助理桌面首页与导航层级；
+- 面向任意数量模型路由的持久化健康状态、冷却、半开探测和故障切换；
+- 路由降级前的凭据池轮换；
+- 由本仓库自行控制的安装、恢复、更新与发布路径；
+- 面向助理界面和模型路由行为的回归测试。
+
+## Source authority / 源码权威
+
+`9529360-cpu/stardust-hermes` is the source and release authority for Stardust.
+
+`9529360-cpu/stardust-hermes` 是 Stardust 的唯一源码与发布权威。
+
+Runtime update checks, release links, package metadata, installers, recovery paths, and future distribution logic must point to this repository unless explicitly changed by the maintainer.
+
+运行时更新检查、Release 链接、包元数据、安装入口、恢复地址以及后续分发逻辑，都应以本仓库为准，除非维护者明确决定修改。
+
+## Upstream policy / 上游策略
+
+Stardust does **not** track upstream Hermes releases as an ongoing maintenance strategy.
+
+There is no planned periodic upstream merge, rebase, automated sync, or automatic upstream update installation. Future work is maintained directly in this repository. If a specific upstream implementation is ever useful, it may be referenced or manually adapted as an isolated engineering decision, but that is not the default maintenance path.
+
+Stardust **不再把跟踪 Hermes 上游版本作为维护策略**。
+
+后续不计划进行定期 upstream merge、rebase、自动同步，也不从上游自动安装更新。未来开发直接在本仓库继续维护。若某个上游实现确实有参考价值，可以针对单项能力进行人工研究或移植，但这属于独立的工程决策，不代表恢复上游跟踪关系。
+
+## Installation / 安装
+
+Fresh installs should use Stardust-owned bootstrap entrypoints:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash
@@ -34,36 +58,44 @@ curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/sc
 iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1)
 ```
 
-新安装请使用以上 Stardust 安装入口。它们继续复用成熟的 Hermes 安装逻辑，但会在执行前把源码和恢复地址固定到本仓库，避免重装时回到上游版本。
+新安装应使用 Stardust 自己的安装入口，源码与恢复地址固定指向本仓库。
+
+## Compatibility naming / 兼容命名
+
+Some internal paths, package names, commands, environment variables, and configuration locations still contain `hermes`. These names are inherited from the technical base and may remain where changing them would create unnecessary compatibility risk.
+
+部分内部目录、包名、命令、环境变量和配置路径仍会保留 `hermes`。这些名称来自技术底座；如果重命名只会增加兼容性风险而没有实际收益，则可以继续保留。
+
+This should not be interpreted as the product identity. The product maintained here is Stardust.
+
+这些内部兼容命名不代表当前产品身份；本仓库维护的产品是 Stardust。
 
 ## Privacy boundary / 隐私边界
 
-This Git repository contains source code and test fixtures only. Runtime/operator data belongs outside the checkout and must not be committed. In particular, do not add:
+This Git repository contains source code, tests, and project documentation only. Runtime/operator data belongs outside the checkout and must not be committed. In particular, do not add:
 
 - `.env` files or real API keys/tokens;
-- `%LOCALAPPDATA%\Hermes\config.yaml` or other operator configuration;
-- conversations, memory/profile files, pairing state, logs, caches, or route-health state;
+- local operator configuration;
+- conversations, memories, profile files, pairing state, logs, caches, or route-health state;
 - SQLite/database files, credentials, private keys, backups, or packaged desktop builds.
 
-本 Git 仓库只包含源码和测试夹具。运行时和使用者数据必须留在源码目录之外，禁止提交：
+本 Git 仓库只包含源码、测试和项目文档。运行时与个人数据必须留在源码目录之外，禁止提交：
 
 - `.env` 文件或真实 API Key、Token；
-- `%LOCALAPPDATA%\Hermes\config.yaml` 等个人配置；
-- 对话、记忆/画像、配对状态、日志、缓存和路由健康状态；
-- SQLite/数据库、凭据、私钥、备份以及打包后的桌面程序。
+- 本地使用者配置；
+- 对话、记忆、画像、配对状态、日志、缓存和路由健康状态；
+- SQLite / 数据库、凭据、私钥、备份以及打包后的桌面程序。
 
-The root `.gitignore` excludes these common runtime paths. Review staged files before every public push; ignore rules are a guardrail, not a substitute for review.
+The root `.gitignore` is only a guardrail. Public changes should still be reviewed before being pushed.
 
-根目录 `.gitignore` 已排除常见运行时路径。每次公开推送前仍应检查暂存内容；忽略规则只是防线，不能代替人工审查。
-
-## Update policy / 更新策略
-
-This edition does not automatically contact or install from upstream. Passive CLI update checks are off by default and the desktop background poller is disabled for the local edition. Explicit desktop update checks, when used, resolve against the Stardust repository rather than NousResearch. Upstream changes should be reviewed and ported deliberately rather than merged into an operator installation automatically.
-
-本版本不会自动联系或安装上游更新。CLI 被动更新检查默认关闭，桌面端后台轮询在本地定制版中也保持关闭。用户主动触发桌面更新检查时，更新源解析为 Stardust 仓库，而不是 NousResearch。上游改动应经过审查后有选择地移植，而不是自动合并进正在使用的版本。
+根目录 `.gitignore` 只是防线。公开推送前仍应检查变更内容。
 
 ## License and attribution / 许可证与归属
 
-The project remains under the repository's [`LICENSE`](LICENSE) (MIT). Hermes Agent and the original code are by Nous Research and upstream contributors. Stardust-specific modifications are provided under the same license. This fork is not presented as an official Nous Research release.
+Stardust was originally built from the open-source [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) codebase. Hermes Agent and its original code are by Nous Research and upstream contributors. Stardust keeps the repository's MIT license and original attribution/history.
 
-本项目继续使用仓库中的 [`LICENSE`](LICENSE)（MIT）。Hermes Agent 及原始代码归 Nous Research 和上游贡献者；星尘定制改动以相同许可证提供。本分支不是 Nous Research 官方发行版。
+Stardust 最初基于 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) 的开源代码构建。Hermes Agent 及其原始代码归 Nous Research 和上游贡献者；Stardust 保留仓库中的 MIT License、原始归属与 Git 历史。
+
+Stardust-specific modifications are independently maintained in this repository. This project is not an official Nous Research release.
+
+Stardust 后续改造由本仓库独立维护。本项目不是 Nous Research 官方发行版。
