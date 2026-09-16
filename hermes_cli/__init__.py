@@ -11,16 +11,20 @@ def _apply_stardust_product_defaults() -> None:
     """Apply local-edition defaults before any config consumer initializes.
 
     ``hermes_cli.config_defaults`` is deliberately a pure-data leaf module, so
-    importing it here does not pull the config loader into package startup. The
-    Stardust product must never passively follow the upstream project: the
-    banner/update probe already honors ``updates.check`` before any network
-    request, and this makes the no-network choice the default for every fresh
-    install. A user can still opt in explicitly in their own config.
+    importing it here does not pull the config loader into package startup.
+    Stardust owns both its update and operations authority: fresh installs do
+    not passively follow the upstream project and do not inherit an upstream
+    telemetry destination. Users may still opt into metrics transmission only
+    by configuring an explicit endpoint that the send policy accepts.
     """
     from hermes_cli.config_defaults import DEFAULT_CONFIG
 
     updates = DEFAULT_CONFIG.setdefault("updates", {})
     updates["check"] = False
+
+    telemetry = DEFAULT_CONFIG.setdefault("telemetry", {})
+    shared_metrics = telemetry.setdefault("shared_metrics", {})
+    shared_metrics["endpoint"] = ""
 
 
 _apply_stardust_product_defaults()
