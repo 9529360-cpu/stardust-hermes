@@ -30,13 +30,7 @@ import {
 } from '@/store/find-in-page'
 import { toggleHud } from '@/store/hud'
 import { $capture, $comboIndex, endCapture, setBinding } from '@/store/keybinds'
-import {
-  requestSessionSearchFocus,
-  setFileBrowserOpen,
-  toggleFileBrowserOpen,
-  togglePanesFlipped,
-  toggleSidebarOpen
-} from '@/store/layout'
+import { requestSessionSearchFocus, setFileBrowserOpen, togglePanesFlipped, toggleSidebarOpen } from '@/store/layout'
 import { openBrowserTab } from '@/store/preview'
 import {
   $newChatProfile,
@@ -47,6 +41,7 @@ import {
   toggleShowAllProfiles
 } from '@/store/profile'
 import { openFolderAsProject } from '@/store/projects'
+import { setRightContextOpen, toggleRightContextOpen } from '@/store/right-context'
 import { toggleReview } from '@/store/review'
 import { $selectedStoredSessionId, setModelPickerOpen } from '@/store/session'
 import { reopenLastClosedTile } from '@/store/session-states'
@@ -177,6 +172,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
   }
 
   const showFiles = () => {
+    setRightContextOpen(true)
     setFileBrowserOpen(true)
     setTerminalTakeover(false)
   }
@@ -242,12 +238,15 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
 
     // Narrow-viewport reveal is handled inside the store toggles now.
     'view.toggleSidebar': toggleSidebarOpen,
-    // ⌘J toggles the right sidebar — but a layout with no right side (e.g.
-    // terminal-on-bottom) would leave it a dead key, so it falls back to the
-    // terminal there. The single "secondary panel" toggle.
+    // The private shell's right-side toggle owns the context rail itself. Files
+    // and Review are tenants inside that rail and no longer control whether the
+    // whole workspace context column exists.
     'view.toggleRightSidebar': () =>
-      layoutHasRootSide('right') ? toggleFileBrowserOpen() : togglePaneVisible('terminal'),
-    'view.toggleReview': toggleReview,
+      layoutHasRootSide('right') ? toggleRightContextOpen() : togglePaneVisible('terminal'),
+    'view.toggleReview': () => {
+      setRightContextOpen(true)
+      toggleReview()
+    },
     'view.toggleStatusbar': toggleStatusbarVisible,
     'view.toggleTabStrip': () => void toggleTargetZoneTabStrip(),
     'view.showFiles': showFiles,
