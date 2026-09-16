@@ -30,13 +30,11 @@ export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: Us
   const projectScoped = Boolean(cwd.trim())
   const newSessionPlaceholders = t.composer.newSessionPlaceholders
   const followUpPlaceholders = t.composer.followUpPlaceholders
-  const pickNewSessionPlaceholder = () =>
-    projectScoped
-      ? (newSessionPlaceholders[0] ?? t.composer.message)
-      : pickPlaceholder(newSessionPlaceholders)
+  const projectPlaceholder = newSessionPlaceholders[0] ?? t.composer.message
+  const newPlaceholder = () => (projectScoped ? projectPlaceholder : pickPlaceholder(newSessionPlaceholders))
 
   const [restingPlaceholder, setRestingPlaceholder] = useState(() =>
-    sessionId ? pickPlaceholder(followUpPlaceholders) : pickNewSessionPlaceholder()
+    sessionId ? pickPlaceholder(followUpPlaceholders) : newPlaceholder()
   )
 
   const prevSessionIdRef = useRef(sessionId)
@@ -45,9 +43,9 @@ export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: Us
   // stored session id yet. Keep the starter aligned with that visible context.
   useEffect(() => {
     if (!sessionId) {
-      setRestingPlaceholder(pickNewSessionPlaceholder())
+      setRestingPlaceholder(projectScoped ? projectPlaceholder : pickPlaceholder(newSessionPlaceholders))
     }
-  }, [projectScoped])
+  }, [newSessionPlaceholders, projectPlaceholder, projectScoped, sessionId])
 
   // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
   useEffect(() => {
@@ -65,8 +63,14 @@ export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: Us
     }
 
     resetBrowseState(prev)
-    setRestingPlaceholder(sessionId ? pickPlaceholder(followUpPlaceholders) : pickNewSessionPlaceholder())
-  }, [followUpPlaceholders, newSessionPlaceholders, projectScoped, sessionId])
+    setRestingPlaceholder(
+      sessionId
+        ? pickPlaceholder(followUpPlaceholders)
+        : projectScoped
+          ? projectPlaceholder
+          : pickPlaceholder(newSessionPlaceholders)
+    )
+  }, [followUpPlaceholders, newSessionPlaceholders, projectPlaceholder, projectScoped, sessionId])
 
   // When the transport is disabled it's because the gateway isn't open.
   // Distinguish a cold start ("Starting Hermes...") from a dropped connection
