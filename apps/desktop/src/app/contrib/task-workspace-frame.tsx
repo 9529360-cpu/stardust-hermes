@@ -8,8 +8,8 @@ import { $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredI
 import { $workingSessionIds } from '@/store/session-states'
 
 const PHASES = [
-  { icon: 'folder-opened', label: 'Context' },
-  { icon: 'comment-discussion', label: 'Task' },
+  { icon: 'lightbulb', label: 'Understanding' },
+  { icon: 'list-tree', label: 'Planning' },
   { icon: 'sparkle', label: 'Working' },
   { icon: 'checklist', label: 'Review' }
 ] as const
@@ -31,7 +31,7 @@ export function TaskWorkspaceFrame({ children }: { children: ReactNode }) {
   const normalizedCwd = cwd.replace(/[/\\]+$/, '')
   const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? 'No workspace'
   const changedCount = repoStatus?.files.length ?? 0
-  const stagedCount = repoStatus?.staged ?? repoStatus?.files.filter(file => file.staged).length ?? 0
+  const stagedCount = repoStatus?.staged ?? (repoStatus ? repoStatus.files.filter(file => file.staged).length : 0)
   const activePhase = working ? 2 : changedCount > 0 ? 3 : session ? 1 : cwd ? 1 : 0
 
   return (
