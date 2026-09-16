@@ -203,6 +203,7 @@ def cmd_fallback_health(args) -> None:  # noqa: ARG001
 
     config = load_config()
     chain = _read_chain(config)
+    state_status, _ = route_health.state_file_status()
     print("\n  Persistent route health")
     print(f"  Enabled: {'yes' if route_health.enabled() else 'no'}")
     print(f"  State:   {route_health.state_path()}")
@@ -210,8 +211,24 @@ def cmd_fallback_health(args) -> None:  # noqa: ARG001
         print("\n  Persistent circuit tracking is disabled; stored state does not gate routes.\n")
         return
 
-    matched: set[tuple[str, str, str]] = set()
     primary = _extract_fallback_from_model_cfg(config.get("model"))
+    if state_status == "corrupt":
+        print("\n  CORRUPT — persisted route-health state cannot be trusted; routing is failing open.")
+        print("  Configured routes remain eligible until a new valid health state is written.")
+        print()
+        if primary:
+            print(f"  Primary: {_format_entry(primary)}")
+        else:
+            print("  Primary: not resolvable from model config")
+        if chain:
+            for index, entry in enumerate(chain, 1):
+                print(f"  Fallback {index}: {_format_entry(entry)}")
+        else:
+            print("  Fallbacks: none configured")
+        print("\n  Repair the advisory state with: hermes fallback reset-health\n")
+        return
+
+    matched: set[tuple[str, str, str]] = set()
     print()
     if primary:
         _print_route_health("Primary", primary, matched=matched)
@@ -245,13 +262,17 @@ def cmd_fallback_reset_health(args) -> None:
     """Clear persisted route-health history without changing fallback configuration."""
     from agent import route_health
 
-    rows = route_health.health_rows()
-    if not rows:
+    state_status, stored_count = route_health.state_file_status()
+    if state_status == "missing" or (state_status == "ok" and stored_count == 0):
         print("\n  No persisted route-health entries to clear.\n")
         return
 
     if not bool(getattr(args, "yes", False)):
-        print(f"\n  This will clear {_entries(len(rows))} of route-health history for the active profile.")
+        if state_status == "corrupt":
+            print("\n  The persisted route-health state is corrupt or unreadable.")
+            print("  This will replace it with a clean empty state for the active profile.")
+        else:
+            print(f"\n  This will clear {_entries(stored_count)} of route-health history for the active profile.")
         print("  Fallback providers and credentials are not changed.")
         try:
             response = input("  Clear route-health history? [y/N]: ").strip().lower()
@@ -267,7 +288,10 @@ def cmd_fallback_reset_health(args) -> None:
     except (OSError, TimeoutError) as exc:
         print(f"\n  Could not clear route-health state: {exc}")
         raise SystemExit(1) from exc
-    print(f"\n  Cleared {_entries(cleared)} of persisted route-health history.")
+    if state_status == "corrupt":
+        print("\n  Reset corrupt route-health state to a clean empty file.")
+    else:
+        print(f"\n  Cleared {_entries(cleared)} of persisted route-health history.")
     print("  The next real request may probe routes that were previously cooling down.\n")
 
 
