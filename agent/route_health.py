@@ -206,7 +206,9 @@ def record_failure(provider: str, model: str, base_url: str = "", reason: Failov
         try:
             with _state_file_lock(path):
                 state = _read_state(path)
-                previous = state["routes"].get(key) or {}
+                previous = state["routes"].get(key)
+                if not isinstance(previous, dict):
+                    previous = {}
                 failures = _coerce_nonnegative_int(previous.get("consecutive_failures")) + 1
                 cooldown = min(base * (2 ** min(failures - 1, 8)), _MAX_COOLDOWN_S) if base else 0
                 state["routes"][key] = {
@@ -279,7 +281,9 @@ def record_success(provider: str, model: str, base_url: str = "") -> None:
         try:
             with _state_file_lock(path):
                 state = _read_state(path)
-                previous = state["routes"].get(key) or {}
+                previous = state["routes"].get(key)
+                if not isinstance(previous, dict):
+                    previous = {}
                 state["routes"][key] = {
                     **identity,
                     "status": "healthy",
