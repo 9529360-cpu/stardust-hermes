@@ -6,8 +6,8 @@
 //   consent   — privacy notice (what's collected, who can see it, retention)
 //               with an explicit Upload button; nothing is sent before it.
 //   uploading — spinner while the backend collects, redacts and uploads.
-//   done      — the private view link (copyable) + where to pick up the
-//               discussion: GitHub Issues · Nous Portal Support · Discord.
+//   done      — the private view link (copyable) + the Stardust issue tracker
+//               that owns support for this independently maintained product.
 import { useStore } from '@nanostores/react'
 
 import { Button } from '@/components/ui/button'
@@ -25,11 +25,10 @@ import { ExternalLink as ExternalLinkAnchor, openExternalLink } from '@/lib/exte
 import { ExternalLink, Loader2Icon, Lock } from '@/lib/icons'
 import { $sendDiagnostics, confirmSendDiagnostics, dismissSendDiagnostics } from '@/store/send-diagnostics'
 
-const SUPPORT_LINKS = [
-  { key: 'github', url: 'https://github.com/NousResearch/hermes-agent/issues' },
-  { key: 'portal', url: 'https://portal.nousresearch.com/help' },
-  { key: 'discord', url: 'https://discord.gg/NousResearch' }
-] as const
+// The upload transport is still the explicit, consent-gated legacy Nous path
+// for now.  Support ownership is different: Stardust bugs belong in Stardust,
+// not the upstream Hermes issue tracker / portal / Discord.
+const SUPPORT_LINKS = [{ key: 'github', url: 'https://github.com/9529360-cpu/stardust-hermes/issues' }] as const
 
 export function SendDiagnosticsHost() {
   const { t } = useI18n()
@@ -108,7 +107,7 @@ export function SendDiagnosticsHost() {
                   // working. `truncate` only clips the paint — selection and
                   // copy still carry the full URL. `native` because the in-app
                   // preview pane would open BEHIND this modal dialog; the
-                  // support buttons below already go to the system browser.
+                  // support button below already goes to the system browser.
                   <ExternalLinkAnchor
                     className="min-w-0 flex-1 truncate font-mono text-[0.78rem] text-(--ui-text-secondary)"
                     href={state.result.viewUrl}
