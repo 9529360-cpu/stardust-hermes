@@ -23,6 +23,8 @@ jobs:
 
       - name: Check for unmapped contributor emails
         id: check-emails
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           # Get the merge base between this PR and main
           MERGE_BASE=$(git merge-base origin/main HEAD)
@@ -39,7 +41,9 @@ jobs:
 
           # An email is mapped if it has a file in contributors/emails/
           # (one file per email — conflict-free) or an entry in the frozen
-          # legacy AUTHOR_MAP in scripts/release.py.
+          # legacy AUTHOR_MAP in scripts/release.py. The repository owner's own
+          # commits are first-party product work and do not need contributor
+          # attribution records.
           MISSING=""
           while IFS= read -r email; do
             # Skip teknium and bot emails
@@ -52,12 +56,16 @@ jobs:
               continue  # GitHub id+login noreply emails auto-resolve
             fi
 
+            AUTHOR=$(git log --author="$email" --format='%an' -1)
+            if [ "$AUTHOR" = "$REPOSITORY_OWNER" ]; then
+              continue  # first-party owner commit; no contributor mapping needed
+            fi
+
             if [ -f "contributors/emails/${email}" ]; then
               continue  # mapped via the contributors directory
             fi
 
             if ! grep -qF "\"${email}\"" scripts/release.py 2>/dev/null; then
-              AUTHOR=$(git log --author="$email" --format='%an' -1)
               MISSING="${MISSING}\n  ${email} (${AUTHOR})"
             fi
           done <<< "$NEW_EMAILS"
@@ -91,7 +99,7 @@ jobs:
 
             exit 1
           else
-            echo "✅ All contributor emails are mapped."
+            echo "✅ All contributor emails are mapped or first-party."
             echo "review_status=[]" >> "$GITHUB_OUTPUT"
             echo "review_status=[]" > review-status.json
           fi

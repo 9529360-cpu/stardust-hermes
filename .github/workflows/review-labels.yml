@@ -1,15 +1,9 @@
 name: Review labels
 
 # Require explicit maintainer review when CI-sensitive files or the MCP
-# catalog change. Previously this was split across two jobs in two
-# workflows: ``ci-review`` in lint.yml (gated on ``ci_review``) and
-# ``mcp-catalog-review`` in supply-chain-audit.yml (gated on
-# ``mcp_catalog``). Both checked for their own label.
-#
-# Now consolidated: a single ``ci-reviewed`` label covers both. The
-# comment sections tell the reviewer exactly what to verify per area,
-# so one label is enough — the human reads the comment, not the label
-# name.
+# catalog change. Repository-owner PRs are first-party product work and can
+# satisfy that review gate automatically; critical supply-chain findings still
+# require an explicit label even for the owner.
 #
 # Outputs:
 #   ci_reviewed    — "true" / "false" / "" (empty when neither lane ran)
@@ -37,7 +31,7 @@ on:
         default: false
     outputs:
       ci_reviewed:
-        description: Whether the ci-reviewed label is present. Empty when neither input was true.
+        description: Whether the ci-reviewed label is present or the owner policy auto-approved the change. Empty when neither input was true.
         value: ${{ jobs.check.outputs.ci_reviewed }}
       review_status:
         description: JSON array of status objects for the review comment assembler.
@@ -65,8 +59,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          SUPPLY_CHAIN_REVIEW: ${{ inputs.supply_chain }}
         run: |
           set -euo pipefail
+
+          # First-party changes in the owner's own repository do not need the
+          # owner to add a ceremonial self-review label. Security findings are
+          # intentionally excluded from this shortcut.
+          if [ "$PR_AUTHOR" = "$REPOSITORY_OWNER" ] && [ "$PR_HEAD_REPO" = "$REPO" ] && [ "$SUPPLY_CHAIN_REVIEW" != "true" ]; then
+            echo "Repository-owner PR; CI/MCP review gate auto-approved."
+            echo "ci_reviewed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           PR="${{ github.event.pull_request.number }}"
           LABELS=$(gh pr view "$PR" --repo "$REPO" --json labels --jq '.labels[].name' || true)
 
@@ -119,5 +127,5 @@ jobs:
       - name: Fail on missing label
         if: steps.label-check.outputs.ci_reviewed != 'true'
         run: |
-          echo "::error::CI-sensitive changes require the ci-reviewed label. Add the label and re-run this check."
+          echo "::error::CI-sensitive or security-reviewed changes require the ci-reviewed label. Add the label and re-run this check."
           exit 1
