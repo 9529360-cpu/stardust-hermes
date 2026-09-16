@@ -1,97 +1,90 @@
 /*
- * Stardust desktop shell
- * ----------------------
- * Layout is owned by React/pane-tree composition. This stylesheet is the
- * material system: native OS glass first, bundled aurora wallpaper as fallback.
+ * Stardust Codex shell
+ * -------------------
+ * React owns information architecture; this file owns material and density.
+ * The visual target is Codex Desktop's quiet task workspace, with native OS
+ * glass where Electron supports it and a restrained Stardust fallback tint.
  */
 
 :root[data-hermes-reference-shell='aurora'] {
   color-scheme: light;
-  --sd-text-1: #17213b;
-  --sd-text-2: #43506e;
-  --sd-text-3: #71809d;
-  --sd-text-4: rgba(83, 99, 132, 0.64);
-  --sd-accent: #627cf2;
-  --sd-accent-2: #826bea;
-  --sd-accent-soft: rgba(102, 126, 242, 0.12);
-  --sd-frame: rgba(244, 247, 255, 0.62);
-  --sd-frame-strong: rgba(246, 248, 255, 0.78);
-  --sd-rail: rgba(238, 243, 255, 0.57);
-  --sd-main: rgba(250, 251, 255, 0.42);
-  --sd-context: rgba(240, 245, 255, 0.54);
-  --sd-card: rgba(255, 255, 255, 0.48);
-  --sd-card-strong: rgba(255, 255, 255, 0.66);
-  --sd-control: rgba(93, 112, 170, 0.07);
-  --sd-control-hover: rgba(92, 110, 173, 0.12);
-  --sd-control-active: rgba(96, 118, 196, 0.16);
-  --sd-line: rgba(70, 91, 142, 0.13);
-  --sd-line-strong: rgba(78, 96, 151, 0.2);
-  --sd-highlight: rgba(255, 255, 255, 0.7);
-  --sd-shadow: 0 34px 100px rgba(38, 51, 92, 0.22), 0 12px 34px rgba(38, 51, 92, 0.12);
-  --sd-card-shadow: 0 12px 28px rgba(59, 72, 117, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --sd-text-1: #17191f;
+  --sd-text-2: #464b56;
+  --sd-text-3: #737986;
+  --sd-text-4: rgba(76, 83, 97, 0.56);
+  --sd-accent: #626fe8;
+  --sd-accent-soft: rgba(91, 105, 219, 0.1);
+  --sd-frame: rgba(248, 249, 252, 0.72);
+  --sd-rail: rgba(242, 244, 249, 0.72);
+  --sd-main: rgba(252, 252, 254, 0.58);
+  --sd-review: rgba(246, 247, 251, 0.7);
+  --sd-control: rgba(48, 55, 70, 0.055);
+  --sd-control-hover: rgba(48, 55, 70, 0.085);
+  --sd-control-active: rgba(74, 84, 125, 0.11);
+  --sd-raised: rgba(255, 255, 255, 0.72);
+  --sd-line: rgba(48, 55, 70, 0.105);
+  --sd-line-soft: rgba(48, 55, 70, 0.065);
+  --sd-highlight: rgba(255, 255, 255, 0.72);
+  --sd-shadow: 0 20px 70px rgba(45, 51, 75, 0.16);
 }
 
 :root.dark[data-hermes-reference-shell='aurora'] {
   color-scheme: dark;
-  --sd-text-1: #f2f5ff;
-  --sd-text-2: #c5cee2;
-  --sd-text-3: #8e9bb3;
-  --sd-text-4: rgba(139, 154, 184, 0.65);
-  --sd-accent: #8298ff;
-  --sd-accent-2: #9a7fff;
-  --sd-accent-soft: rgba(126, 148, 255, 0.14);
-  --sd-frame: rgba(8, 14, 28, 0.58);
-  --sd-frame-strong: rgba(9, 15, 29, 0.72);
-  --sd-rail: rgba(17, 27, 47, 0.56);
-  --sd-main: rgba(7, 13, 27, 0.36);
-  --sd-context: rgba(14, 23, 42, 0.52);
-  --sd-card: rgba(30, 43, 69, 0.42);
-  --sd-card-strong: rgba(34, 48, 77, 0.56);
-  --sd-control: rgba(124, 148, 206, 0.07);
-  --sd-control-hover: rgba(133, 158, 220, 0.13);
-  --sd-control-active: rgba(137, 156, 233, 0.17);
-  --sd-line: rgba(190, 207, 248, 0.095);
-  --sd-line-strong: rgba(198, 214, 255, 0.16);
-  --sd-highlight: rgba(255, 255, 255, 0.1);
-  --sd-shadow: 0 38px 110px rgba(0, 0, 0, 0.48), 0 12px 42px rgba(2, 7, 20, 0.28);
-  --sd-card-shadow: 0 12px 32px rgba(0, 0, 0, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --sd-text-1: #f3f4f7;
+  --sd-text-2: #c9cbd3;
+  --sd-text-3: #9297a4;
+  --sd-text-4: rgba(160, 166, 181, 0.56);
+  --sd-accent: #8a93ff;
+  --sd-accent-soft: rgba(124, 137, 255, 0.11);
+  --sd-frame: rgba(18, 19, 24, 0.7);
+  --sd-rail: rgba(27, 28, 34, 0.7);
+  --sd-main: rgba(17, 18, 23, 0.56);
+  --sd-review: rgba(23, 24, 30, 0.7);
+  --sd-control: rgba(235, 238, 255, 0.055);
+  --sd-control-hover: rgba(235, 238, 255, 0.09);
+  --sd-control-active: rgba(156, 164, 220, 0.12);
+  --sd-raised: rgba(36, 38, 46, 0.72);
+  --sd-line: rgba(238, 241, 255, 0.105);
+  --sd-line-soft: rgba(238, 241, 255, 0.06);
+  --sd-highlight: rgba(255, 255, 255, 0.075);
+  --sd-shadow: 0 26px 80px rgba(0, 0, 0, 0.36);
 }
 
 :root[data-hermes-reference-shell='aurora'],
 :root[data-hermes-reference-shell='aurora'] body,
 :root[data-hermes-reference-shell='aurora'] #root {
-  min-height: 100%;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
 }
 
-/* OS-style fallback wallpaper. Native Electron material clears this below. */
+/* Fallback surface for Linux/unsupported material. The violet/blue is ambient,
+   not panel paint — Codex content remains neutral and legible. */
 :root[data-hermes-reference-shell='aurora'] body {
   overflow: hidden;
-  background-color: #d9e4ff;
-  background-image:
-    radial-gradient(70rem 42rem at 20% 5%, rgba(123, 150, 255, 0.5), transparent 58%),
-    radial-gradient(54rem 34rem at 84% 88%, rgba(155, 112, 255, 0.38), transparent 62%),
-    url('./assets/stardust-os-wallpaper.svg');
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
+  background:
+    radial-gradient(56rem 38rem at 12% -10%, rgba(104, 129, 239, 0.22), transparent 62%),
+    radial-gradient(52rem 36rem at 98% 108%, rgba(145, 105, 220, 0.18), transparent 64%),
+    #dfe5f2;
 }
 
 :root.dark[data-hermes-reference-shell='aurora'] body {
-  background-color: #050a16;
-  background-image:
-    radial-gradient(62rem 38rem at 18% -4%, rgba(70, 105, 230, 0.3), transparent 62%),
-    radial-gradient(52rem 34rem at 86% 92%, rgba(117, 68, 210, 0.28), transparent 66%),
-    url('./assets/stardust-os-wallpaper.svg');
+  background:
+    radial-gradient(56rem 38rem at 12% -10%, rgba(75, 92, 205, 0.2), transparent 62%),
+    radial-gradient(52rem 36rem at 98% 108%, rgba(104, 67, 173, 0.18), transparent 64%),
+    #090a0e;
 }
 
-:root[data-hermes-reference-shell='aurora'][data-hermes-glass] body {
+/* Whole-window glass is the Stardust default on supported macOS / Windows.
+   Sidebar-only glass remains owned by the existing translucency stylesheet. */
+:root[data-hermes-reference-shell='aurora'][data-hermes-glass][data-hermes-glass-scope='window'] body {
   background: transparent !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] #root {
   box-sizing: border-box;
-  height: 100vh;
-  padding: 14px;
+  padding: 0;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-slot='sidebar-wrapper'] {
@@ -101,30 +94,30 @@
   background: transparent !important;
 }
 
-/* ── Floating application frame ───────────────────────────────────────── */
+/* ── Application frame ───────────────────────────────────────────────── */
 :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
   --ui-text-primary: var(--sd-text-1);
   --ui-text-secondary: var(--sd-text-2);
   --ui-text-tertiary: var(--sd-text-3);
   --ui-text-quaternary: var(--sd-text-4);
   --ui-bg-chrome: transparent;
-  --ui-bg-primary: var(--sd-card-strong);
-  --ui-bg-secondary: var(--sd-card);
+  --ui-bg-primary: var(--sd-raised);
+  --ui-bg-secondary: var(--sd-control);
   --ui-bg-tertiary: var(--sd-control-active);
   --ui-bg-quaternary: var(--sd-control);
   --ui-bg-quinary: transparent;
   --ui-sidebar-surface-background: transparent;
   --ui-chat-surface-background: transparent;
   --ui-editor-surface-background: transparent;
-  --ui-panel-surface-background: var(--sd-card);
-  --ui-widget-surface-background: var(--sd-card);
-  --ui-terminal-surface-background: color-mix(in srgb, #050a14 88%, transparent);
+  --ui-panel-surface-background: var(--sd-raised);
+  --ui-widget-surface-background: var(--sd-raised);
+  --ui-terminal-surface-background: color-mix(in srgb, #0c0d11 88%, transparent);
   --ui-control-hover-background: var(--sd-control-hover);
   --ui-control-active-background: var(--sd-control-active);
-  --ui-stroke-primary: var(--sd-line-strong);
+  --ui-stroke-primary: var(--sd-line);
   --ui-stroke-secondary: var(--sd-line);
-  --ui-stroke-tertiary: color-mix(in srgb, var(--sd-line) 76%, transparent);
-  --ui-stroke-quaternary: color-mix(in srgb, var(--sd-line) 48%, transparent);
+  --ui-stroke-tertiary: var(--sd-line-soft);
+  --ui-stroke-quaternary: color-mix(in srgb, var(--sd-line-soft) 72%, transparent);
   --sidebar: transparent;
   --sidebar-foreground: var(--sd-text-1);
   --sidebar-border: transparent;
@@ -137,22 +130,19 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--sd-line-strong);
-  border-radius: 22px;
+  border: 1px solid var(--sd-line);
+  border-radius: 14px;
   background: var(--sd-frame) !important;
   box-shadow: var(--sd-shadow), inset 0 1px 0 var(--sd-highlight);
-  backdrop-filter: blur(34px) saturate(138%);
-  -webkit-backdrop-filter: blur(34px) saturate(138%);
+  backdrop-filter: blur(28px) saturate(122%);
+  -webkit-backdrop-filter: blur(28px) saturate(122%);
 }
 
 :root[data-hermes-reference-shell='aurora'][data-hermes-glass] [data-contrib-shell] {
-  background: color-mix(in srgb, var(--sd-frame) 78%, transparent) !important;
-  backdrop-filter: blur(22px) saturate(118%);
-  -webkit-backdrop-filter: blur(22px) saturate(118%);
+  background: color-mix(in srgb, var(--sd-frame) 58%, transparent) !important;
 }
 
-/* Existing pane-tree keeps drag-resize/persistence, but product columns no
-   longer look like IDE panes. */
+/* Keep the pane engine for sizing/drag/persistence, erase IDE-looking seams. */
 :root[data-hermes-reference-shell='aurora'] [data-tree-group] {
   min-width: 0;
   min-height: 0;
@@ -162,175 +152,127 @@
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
   background: var(--sd-rail) !important;
-  box-shadow: inset -1px 0 0 var(--sd-line), inset 0 1px 0 var(--sd-highlight);
-  backdrop-filter: blur(26px) saturate(126%);
+  box-shadow: inset -1px 0 0 var(--sd-line-soft);
+  backdrop-filter: blur(24px) saturate(116%);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] {
   background: var(--sd-main) !important;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
-  background: var(--sd-context) !important;
-  box-shadow: inset 1px 0 0 var(--sd-line), inset 0 1px 0 var(--sd-highlight);
-  backdrop-filter: blur(28px) saturate(130%);
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-review'] {
+  background: var(--sd-review) !important;
+  box-shadow: inset 1px 0 0 var(--sd-line-soft);
+  backdrop-filter: blur(24px) saturate(116%);
 }
 
-/* Product regions own their own chrome. This removes the old SESSIONS/BOTS/
-   TERMINAL and OVERVIEW/REVIEW strips — including the draft-title editor that
-   produced the giant white field in the real-device screenshot. */
+:root[data-hermes-reference-shell='aurora'][data-hermes-glass][data-hermes-glass-scope='window'] [data-tree-group='grp-sessions'],
+:root[data-hermes-reference-shell='aurora'][data-hermes-glass][data-hermes-glass-scope='window'] [data-tree-group='grp-main'],
+:root[data-hermes-reference-shell='aurora'][data-hermes-glass][data-hermes-glass-scope='window'] [data-tree-group='grp-review'] {
+  background: color-mix(in srgb, currentColor 0%, transparent) !important;
+}
+
+/* Product regions are structurally tabStrip:'never'; this is defensive only. */
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] [data-panel-header],
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] [data-panel-header],
-:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] [data-panel-header] {
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-review'] [data-panel-header] {
   display: none !important;
 }
 
-/* Other summoned tool zones keep functional tabs, but use glass chrome. */
+/* Summoned tools (Terminal / Files / plugin panes) keep their real tabs. */
 :root[data-hermes-reference-shell='aurora'] [data-panel-header] {
-  min-height: 30px;
+  min-height: 29px;
   border: 0 !important;
-  border-bottom: 1px solid var(--sd-line) !important;
-  background: color-mix(in srgb, var(--sd-card) 74%, transparent) !important;
+  border-bottom: 1px solid var(--sd-line-soft) !important;
+  background: color-mix(in srgb, var(--sd-raised) 66%, transparent) !important;
   backdrop-filter: blur(18px);
 }
 
-/* ── Dedicated Codex-style task rail ─────────────────────────────────── */
+/* ── Codex-style project/thread rail ─────────────────────────────────── */
 :root[data-hermes-reference-shell='aurora'] [data-stardust-task-rail] {
   color: var(--sd-text-2);
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-rail-header] {
-  padding: 16px 13px 12px;
-  border-bottom: 1px solid var(--sd-line);
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-drag] {
   -webkit-app-region: drag;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-rail-header] button,
-:root[data-hermes-reference-shell='aurora'] [data-task-rail-search],
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-actions],
 :root[data-hermes-reference-shell='aurora'] [data-task-rail-scroll],
 :root[data-hermes-reference-shell='aurora'] [data-task-rail-footer] {
   -webkit-app-region: no-drag;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-rail-brand] {
-  min-height: 34px;
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-actions] {
+  border-bottom: 1px solid var(--sd-line-soft);
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-rail-mark] {
-  border: 1px solid rgba(211, 222, 255, 0.24);
-  background:
-    radial-gradient(circle at 32% 26%, rgba(158, 223, 255, 0.72), transparent 38%),
-    linear-gradient(145deg, #7796ff 0%, #866fe9 58%, #4d67c5 100%);
-  color: #fff;
-  box-shadow: 0 7px 22px rgba(73, 87, 190, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.28);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-task-rail-new] {
-  border: 1px solid rgba(211, 223, 255, 0.2);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.09), transparent 44%),
-    linear-gradient(135deg, #6e91ff 0%, #796fe7 56%, #5668bd 100%);
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(67, 80, 177, 0.23), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-task-rail-new]:hover {
-  filter: brightness(1.055);
-  transform: translateY(-1px);
-  box-shadow: 0 12px 28px rgba(67, 80, 177, 0.29), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-wordmark] {
+  user-select: none;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-rail-search] > div {
-  min-height: 34px;
-  border: 1px solid var(--sd-line);
-  border-radius: 10px;
+  width: 100%;
+  min-height: 31px;
+  padding-inline: 7px;
+  border: 1px solid var(--sd-line-soft);
+  border-radius: 7px;
   background: var(--sd-control);
-  box-shadow: inset 0 1px 0 var(--sd-highlight);
   opacity: 1;
 }
 
+:root[data-hermes-reference-shell='aurora'] [data-task-rail-search] input {
+  width: 100%;
+  field-sizing: fixed;
+}
+
 :root[data-hermes-reference-shell='aurora'] [data-task-rail-scroll] {
-  padding-top: 12px;
   scrollbar-gutter: stable;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-project-icon] {
-  border: 1px solid var(--sd-line);
-  background: var(--sd-control);
-  color: var(--sd-text-3);
+:root[data-hermes-reference-shell='aurora'] [data-task-project-row] {
+  min-height: 29px;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-task-project-threads] {
+  margin-top: 1px;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-rail-footer] {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 9px 10px 11px;
-  border-top: 1px solid var(--sd-line);
-  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--sd-rail) 82%, transparent) 28%);
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--sd-rail) 78%, transparent) 34%);
 }
 
-/* ── Central task workspace ───────────────────────────────────────────── */
+/* ── Active thread workspace ─────────────────────────────────────────── */
 :root[data-hermes-reference-shell='aurora'] [data-task-workspace] {
   position: relative;
   background:
-    radial-gradient(46rem 30rem at 58% -16%, color-mix(in srgb, var(--sd-accent) 9%, transparent), transparent 62%),
+    radial-gradient(42rem 22rem at 50% -12%, color-mix(in srgb, var(--sd-accent) 5%, transparent), transparent 64%),
     transparent;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-header] {
   position: relative;
   z-index: 3;
-  padding: 21px 28px 14px;
-  border-bottom: 1px solid var(--sd-line);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--sd-main) 72%, transparent), transparent);
-  backdrop-filter: blur(18px) saturate(120%);
+  min-height: 48px;
+  padding: 9px 14px 8px 18px;
+  border-bottom: 1px solid var(--sd-line-soft);
+  background: color-mix(in srgb, var(--sd-main) 62%, transparent);
+  backdrop-filter: blur(18px) saturate(116%);
+  -webkit-app-region: drag;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-progress] {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 11px 26px 6px;
-  padding: 10px 12px;
-  border: 1px solid var(--sd-line);
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--sd-card) 70%, transparent);
-  box-shadow: var(--sd-card-shadow);
-  backdrop-filter: blur(20px) saturate(125%);
+:root[data-hermes-reference-shell='aurora'] [data-task-header] button,
+:root[data-hermes-reference-shell='aurora'] [data-task-toolbar] {
+  -webkit-app-region: no-drag;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-progress] > div {
+:root[data-hermes-reference-shell='aurora'] [data-task-toolbar] button {
+  border-radius: 6px;
   color: var(--sd-text-3);
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-active] {
+:root[data-hermes-reference-shell='aurora'] [data-task-toolbar] button:hover {
   color: var(--sd-text-1);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-complete] {
-  color: color-mix(in srgb, var(--sd-accent) 78%, var(--sd-text-1));
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-task-phase-icon] {
-  border: 1px solid var(--sd-line);
-  background: var(--sd-control);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-active] [data-task-phase-icon] {
-  border-color: color-mix(in srgb, var(--sd-accent) 38%, transparent);
-  background: var(--sd-accent-soft);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--sd-accent) 16%, transparent);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-task-phase-line] {
-  background: var(--sd-line);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-task-progress] > div[data-complete] [data-task-phase-line] {
-  background: color-mix(in srgb, var(--sd-accent) 24%, transparent);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-task-transcript] {
@@ -339,8 +281,8 @@
   color: var(--sd-text-1);
 }
 
-/* TaskWorkspaceFrame owns the title/status, so the legacy ChatView header is a
-   duplicate and must not consume vertical space. */
+/* TaskWorkspaceFrame owns the thread chrome; ChatView's title menu would be a
+   duplicate Codex-unlike bar above the transcript. */
 :root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-chat-surface] > header {
   display: none !important;
 }
@@ -355,161 +297,74 @@
   filter: none !important;
 }
 
-/* Keep transcript content readable; the real screenshot showed the old chat
-   surface dimmed nearly to black beneath the new shell. */
 :root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-slot='aui_assistant-message-content'],
 :root[data-hermes-reference-shell='aurora'] [data-task-transcript] [data-slot='aui_user-message-root'] {
   color: var(--sd-text-1);
 }
 
+/* Codex's composer is the main raised object in the center column. */
 :root[data-hermes-reference-shell='aurora'] [data-task-workspace] [data-tour='composer'] {
-  border: 1px solid var(--sd-line-strong) !important;
-  border-radius: 17px !important;
-  background: color-mix(in srgb, var(--sd-card-strong) 86%, transparent) !important;
-  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.16), inset 0 1px 0 var(--sd-highlight);
-  backdrop-filter: blur(26px) saturate(130%);
-  -webkit-backdrop-filter: blur(26px) saturate(130%);
+  border: 1px solid var(--sd-line) !important;
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--sd-raised) 86%, transparent) !important;
+  box-shadow: 0 8px 30px rgba(16, 18, 25, 0.1), inset 0 1px 0 var(--sd-highlight);
+  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
 }
 
-/* ── Right context inspector ─────────────────────────────────────────── */
-:root[data-hermes-reference-shell='aurora'] [data-personal-overview] {
-  background: transparent;
+/* ── Review: first-class work surface, not an inspector dashboard ────── */
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-review'] aside {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-review'] [data-pane-self-label] {
   color: var(--sd-text-2);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-workspace-inspector] {
-  gap: 10px;
-  padding: 14px 12px 18px;
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-review'] [data-slot='code-card'],
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-review'] pre {
+  border-color: var(--sd-line-soft);
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-workspace-card] {
-  padding: 12px;
-  border: 1px solid var(--sd-line);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--sd-card) 88%, transparent);
-  box-shadow: var(--sd-card-shadow);
-  backdrop-filter: blur(20px) saturate(125%);
+/* Terminal stays a real bottom pane when summoned. */
+:root[data-hermes-reference-shell='aurora'] [data-tree-group]:has([data-terminal]) {
+  background: color-mix(in srgb, #0d0e12 90%, transparent) !important;
 }
 
-:root[data-hermes-reference-shell='aurora'] [data-workspace-card-title] {
-  margin-bottom: 10px;
-  color: var(--sd-text-3);
-  font-size: 0.6rem;
-  font-weight: 650;
-  letter-spacing: 0.115em;
-  text-transform: uppercase;
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-project-icon] {
-  border: 1px solid var(--sd-line);
-  background: var(--sd-accent-soft);
-  color: color-mix(in srgb, var(--sd-accent) 82%, var(--sd-text-1));
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-tools] button {
-  border-radius: 8px;
-  color: var(--sd-text-3);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-sync-grid],
-:root[data-hermes-reference-shell='aurora'] [data-result-summary-grid],
-:root[data-hermes-reference-shell='aurora'] [data-workspace-change-grid] {
-  padding-top: 10px;
-  border-top: 1px solid var(--sd-line);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-result-mini-card] {
-  min-height: 58px;
-  padding: 9px;
-  border: 1px solid color-mix(in srgb, var(--sd-line) 74%, transparent);
-  border-radius: 10px;
-  background: var(--sd-control);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-file-list] {
-  gap: 2px;
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-file-row] {
-  display: flex;
-  min-width: 0;
-  min-height: 28px;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 6px;
-  border-radius: 7px;
-  text-align: left;
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-file-row]:hover {
-  background: var(--sd-control-hover);
-}
-
-:root[data-hermes-reference-shell='aurora'] [data-workspace-change-grid] [data-workspace-metric] {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 7px;
-  border-radius: 9px;
-  background: var(--sd-control);
-}
-
-/* Low-noise scrollbars. */
+/* Low-noise scrollbars across Codex-style work surfaces. */
 :root[data-hermes-reference-shell='aurora'] * {
-  scrollbar-color: color-mix(in srgb, var(--sd-text-3) 28%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--sd-text-3) 24%, transparent) transparent;
 }
 
-@media (max-width: 1040px) {
-  :root[data-hermes-reference-shell='aurora'] #root {
-    padding: 8px;
-  }
-
-  :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
-    border-radius: 18px;
-  }
-
-  :root[data-hermes-reference-shell='aurora'] [data-task-header] {
-    padding-inline: 20px;
-  }
-
-  :root[data-hermes-reference-shell='aurora'] [data-task-progress] {
-    margin-inline: 20px;
-  }
-}
-
-@media (max-width: 820px) {
-  :root[data-hermes-reference-shell='aurora'] #root {
-    padding: 0;
-  }
-
+@media (max-width: 900px) {
   :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
     border-width: 0;
     border-radius: 0;
     box-shadow: none;
   }
+
+  :root[data-hermes-reference-shell='aurora'] [data-task-header] {
+    padding-inline: 12px;
+  }
 }
 
-@media (max-height: 700px) {
-  :root[data-hermes-reference-shell='aurora'] [data-task-progress] {
-    display: none;
+@media (max-height: 680px) {
+  :root[data-hermes-reference-shell='aurora'] [data-task-rail-drag] {
+    height: 1rem;
   }
 
   :root[data-hermes-reference-shell='aurora'] [data-task-header] {
-    padding-block: 13px 10px;
-  }
-
-  :root[data-hermes-reference-shell='aurora'] [data-task-rail-header] {
-    padding-top: 11px;
+    min-height: 42px;
+    padding-block: 6px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root[data-hermes-reference-shell='aurora'] [data-task-rail-new] {
-    transition: none;
-  }
-
-  :root[data-hermes-reference-shell='aurora'] [data-task-rail-new]:hover {
-    transform: none;
+  :root[data-hermes-reference-shell='aurora'] * {
+    scroll-behavior: auto !important;
   }
 }
