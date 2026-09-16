@@ -1,0 +1,16 @@
+name: Actions Smoke
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm Actions dispatch
+        run: echo "GitHub Actions dispatch is working"
