@@ -9,6 +9,7 @@ import pytest
 from hermes_cli.config import DEFAULT_CONFIG
 from hermes_cli.observability.shared_metrics_send_config import (
     DEFAULT_ENDPOINT,
+    LEGACY_UPSTREAM_ENDPOINT,
     resolve_send_config,
     reset_warning_latch_for_tests,
 )
@@ -31,10 +32,18 @@ class TestDefaults:
         assert shared["enabled"] is False
         assert shared["send"] is False
 
-    def test_default_endpoint_is_production(self):
-        shared = DEFAULT_CONFIG["telemetry"]["shared_metrics"]
-        assert shared["endpoint"] == DEFAULT_ENDPOINT
-        assert DEFAULT_ENDPOINT.startswith("https://")
+    def test_stardust_has_no_implicit_remote_endpoint(self):
+        assert DEFAULT_ENDPOINT == ""
+
+    def test_legacy_hermes_default_is_not_stardust_authority(self):
+        shared = dict(DEFAULT_CONFIG["telemetry"]["shared_metrics"])
+        assert shared["endpoint"] == LEGACY_UPSTREAM_ENDPOINT
+        shared.update(enabled=True, send=True)
+
+        resolved = resolve_send_config(_config(**shared))
+
+        assert resolved.endpoint == LEGACY_UPSTREAM_ENDPOINT
+        assert resolved.send is False
 
     def test_empty_config_sends_nothing(self):
         resolved = resolve_send_config({})
@@ -51,8 +60,10 @@ class TestSendRequiresCollection:
         assert resolved.enabled is True
         assert resolved.send is False
 
-    def test_send_with_collection_sends(self):
-        resolved = resolve_send_config(_config(enabled=True, send=True))
+    def test_send_with_collection_and_explicit_endpoint_sends(self):
+        resolved = resolve_send_config(
+            _config(enabled=True, send=True, endpoint="https://metrics.stardust.invalid/v1")
+        )
         assert resolved.send is True
 
     def test_send_without_collection_is_refused(self):
@@ -77,7 +88,7 @@ class TestSendRequiresCollection:
 
 
 class TestEndpointPrecedence:
-    def test_config_endpoint_overrides_default(self):
+    def test_config_endpoint_is_used(self):
         resolved = resolve_send_config(
             _config(enabled=True, send=True, endpoint="https://example.test/v1")
         )
@@ -96,10 +107,22 @@ class TestEndpointPrecedence:
             monkeypatch.setenv(name, "https://attacker.test/v1")
         resolved = resolve_send_config(_config(enabled=True, send=True))
         assert resolved.endpoint == DEFAULT_ENDPOINT
+        assert resolved.send is False
 
-    def test_blank_endpoint_falls_back_to_production(self):
-        resolved = resolve_send_config(_config(enabled=True, send=True, endpoint="   "))
+    def test_blank_endpoint_is_refused(self, caplog):
+        with caplog.at_level(logging.ERROR):
+            resolved = resolve_send_config(_config(enabled=True, send=True, endpoint="   "))
         assert resolved.endpoint == DEFAULT_ENDPOINT
+        assert resolved.send is False
+        assert any("no default telemetry endpoint" in r.getMessage() for r in caplog.records)
+
+    def test_legacy_upstream_endpoint_is_refused(self, caplog):
+        with caplog.at_level(logging.ERROR):
+            resolved = resolve_send_config(
+                _config(enabled=True, send=True, endpoint=LEGACY_UPSTREAM_ENDPOINT)
+            )
+        assert resolved.send is False
+        assert any("legacy Hermes upstream" in r.getMessage() for r in caplog.records)
 
     def test_endpoint_is_stripped(self):
         resolved = resolve_send_config(
