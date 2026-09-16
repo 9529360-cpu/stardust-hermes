@@ -42,6 +42,14 @@ def test_desktop_update_authority_is_stardust() -> None:
     assert "git@github.com:9529360-cpu/stardust-hermes.git" in source
 
 
+def test_desktop_bootstrap_downloads_installer_from_stardust() -> None:
+    source = _read("apps/desktop/electron/bootstrap-runner.ts")
+
+    assert "const STARDUST_SOURCE_REPO = '9529360-cpu/stardust-hermes'" in source
+    assert "raw.githubusercontent.com/${STARDUST_SOURCE_REPO}/${ref}/scripts/${scriptName}" in source
+    assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in source
+
+
 def test_cli_update_entrypoint_cannot_reactivate_upstream_sync() -> None:
     source = _read("hermes_cli/main.py")
     marker = "def cmd_update(args):"
