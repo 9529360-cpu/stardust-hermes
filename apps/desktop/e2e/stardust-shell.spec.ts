@@ -40,13 +40,21 @@ test.describe('Stardust Codex desktop shell', () => {
     await expect(newThreadInProject).toBeVisible()
     await newThreadInProject.click()
 
-    await expect(page.locator('[data-task-header]')).not.toContainText('No project')
+    const taskHeader = page.locator('[data-task-header]')
+    await expect(taskHeader).not.toContainText('No project')
+    await expect(taskHeader).toContainText('New thread')
     await expect(page.getByText('Project workspace', { exact: true })).toBeVisible()
     await expect(page.getByText('What should we change?', { exact: true })).toBeVisible()
     await expect(page.locator('[data-tree-group="grp-review"]')).toBeVisible()
 
     const review = page.locator('aside[aria-label="Review"]')
     await expect(review).toBeVisible()
+
+    // Codex Review is a work surface, not Hermes' historical 237px utility
+    // rail. User-resized panes still win; a clean install gets this readable
+    // default before the diff is rendered.
+    const reviewBounds = await review.boundingBox()
+    expect(reviewBounds?.width ?? 0).toBeGreaterThanOrEqual(315)
 
     // A blank "No diffs" rail proves only layout. Create one reversible change
     // in the real checkout, explicitly refresh Review, and open the real diff so
