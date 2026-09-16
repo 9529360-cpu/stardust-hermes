@@ -28,6 +28,15 @@ function Card({ children, title }: { children: ReactNode; title: string }) {
   )
 }
 
+function Metric({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-3 py-0.5 text-[0.68rem]">
+      <span className="text-(--ui-text-tertiary)">{label}</span>
+      <span className="min-w-0 truncate text-right font-medium text-(--ui-text-secondary)">{value}</span>
+    </div>
+  )
+}
+
 export function WorkspaceOverview() {
   const cwd = useStore($currentCwd)
   const repoStatus = useStore($repoStatus)
@@ -45,6 +54,20 @@ export function WorkspaceOverview() {
   const normalizedCwd = cwd.replace(/[/\\]+$/, '')
   const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? 'No project selected'
   const changedFiles = repoStatus?.files ?? []
+  const changedCount = repoStatus?.changed ?? changedFiles.length
+  const branch = repoStatus?.branch || 'No repository'
+  const staged = repoStatus?.staged ?? changedFiles.filter(file => file.staged).length
+  const additions = repoStatus?.added ?? 0
+  const removals = repoStatus?.removed ?? 0
+  const summary = !cwd
+    ? 'Choose a project to give this workspace persistent file and review context.'
+    : working
+      ? changedCount > 0
+        ? `Work is in progress with ${changedCount} changed file${changedCount === 1 ? '' : 's'} in the current workspace.`
+        : 'Work is in progress. File changes will appear here as soon as they land.'
+      : changedCount > 0
+        ? `${changedCount} changed file${changedCount === 1 ? ' is' : 's are'} ready for review.`
+        : 'The workspace is clean and ready for the next task.'
 
   return (
     <aside
@@ -54,7 +77,15 @@ export function WorkspaceOverview() {
     >
       <div className="mb-3 px-1">
         <div className="text-[0.72rem] font-semibold tracking-[0.12em] text-(--ui-text-primary)">WORKSPACE</div>
-        <div className="mt-1 truncate text-[0.68rem] text-(--ui-text-tertiary)">{projectName}</div>
+        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[0.68rem] text-(--ui-text-tertiary)">
+          <span className="truncate">{projectName}</span>
+          {repoStatus?.branch && (
+            <>
+              <span aria-hidden="true" className="text-(--ui-text-quaternary)">/</span>
+              <span className="truncate font-mono text-(--ui-text-quaternary)">{repoStatus.branch}</span>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -70,29 +101,40 @@ export function WorkspaceOverview() {
             />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-(--ui-text-primary)">{sessionLabel}</div>
-              <div className="mt-0.5 text-[0.68rem] text-(--ui-text-tertiary)">{working ? 'Working' : 'Ready'}</div>
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Project">
-          <div className="flex items-start gap-2">
-            <Codicon className="mt-0.5 shrink-0 text-(--ui-text-tertiary)" name="folder" size="0.9rem" />
-            <div className="min-w-0">
-              <div className="truncate text-sm font-medium text-(--ui-text-primary)">{projectName}</div>
-              <div className="mt-1 break-all font-mono text-[0.62rem] leading-relaxed text-(--ui-text-quaternary)">
-                {cwd || 'Choose a project to enable workspace tools.'}
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.68rem] text-(--ui-text-tertiary)">
+                <span className="rounded-full border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-1.5 py-0.5 text-[0.62rem] font-medium text-(--ui-text-secondary)">
+                  {working ? 'Working' : 'Ready'}
+                </span>
+                {session?.model && <span className="max-w-full truncate font-mono text-(--ui-text-quaternary)">{session.model}</span>}
               </div>
             </div>
           </div>
         </Card>
 
-        <Card title="Changes">
+        <Card title="Project context">
+          <div className="flex items-start gap-2">
+            <Codicon className="mt-0.5 shrink-0 text-(--ui-text-tertiary)" name="folder" size="0.9rem" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium text-(--ui-text-primary)">{projectName}</div>
+              <div className="mt-1 break-all font-mono text-[0.62rem] leading-relaxed text-(--ui-text-quaternary)">
+                {cwd || 'Choose a project to enable workspace tools.'}
+              </div>
+              {repoStatus && (
+                <div className="mt-2 border-t border-(--ui-stroke-quaternary) pt-2">
+                  <Metric label="Branch" value={<span className="font-mono">{branch}</span>} />
+                  <Metric label="Sync" value={`${repoStatus.ahead} ahead · ${repoStatus.behind} behind`} />
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        <Card title="Files touched">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-sm text-(--ui-text-primary)">
-              {changedFiles.length === 0 ? 'Working tree clean' : `${changedFiles.length} file${changedFiles.length === 1 ? '' : 's'} changed`}
+              {changedCount === 0 ? 'Working tree clean' : `${changedCount} file${changedCount === 1 ? '' : 's'} changed`}
             </span>
-            {changedFiles.length > 0 && (
+            {changedCount > 0 && (
               <button
                 className="shrink-0 text-[0.68rem] text-(--theme-midground) hover:underline"
                 onClick={() => revealDesktopPane('review')}
@@ -131,7 +173,37 @@ export function WorkspaceOverview() {
             </div>
           ) : (
             <div className="text-[0.68rem] leading-relaxed text-(--ui-text-tertiary)">
-              Local edits will appear here while you work with Hermes.
+              {changedCount > 0
+                ? 'The repository reports changes outside the capped file preview. Open Review to inspect them.'
+                : 'Local edits will appear here while you work.'}
+            </div>
+          )}
+
+          {repoStatus && changedCount > 0 && (
+            <div className="mt-2 grid grid-cols-3 gap-1 border-t border-(--ui-stroke-quaternary) pt-2 text-center">
+              <div>
+                <div className="text-xs font-semibold text-(--ui-text-primary)">{staged}</div>
+                <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">staged</div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-(--ui-success)">+{additions}</div>
+                <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">added</div>
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-(--ui-text-secondary)">-{removals}</div>
+                <div className="text-[0.58rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">removed</div>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card title="Summary">
+          <p className="text-[0.72rem] leading-5 text-(--ui-text-secondary)">{summary}</p>
+          {cwd && (
+            <div className="mt-2 border-t border-(--ui-stroke-quaternary) pt-2">
+              <Metric label="Session" value={working ? 'In progress' : 'Idle'} />
+              <Metric label="Working tree" value={changedCount === 0 ? 'Clean' : `${changedCount} changed`} />
+              <Metric label="Review state" value={staged > 0 ? `${staged} staged` : changedCount > 0 ? 'Not staged' : 'Nothing pending'} />
             </div>
           )}
         </Card>
