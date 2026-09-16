@@ -14,6 +14,7 @@ import json
 import logging
 import threading
 from contextlib import suppress
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -26,6 +27,29 @@ SENTINEL_NAME = "ESTOP"
 # Per-component "logged already for this engagement" flags: log once per engagement, not per tick.
 _log_lock = threading.Lock()
 _logged_components: set[str] = set()
+
+
+@dataclass(frozen=True)
+class DisengageResult:
+    """Authoritative outcome of one resume attempt.
+
+    ``resumed`` is true only when at least one visible/fail-safe sentinel existed and every candidate
+    is now verifiably absent.  ``incomplete`` covers unlink/stat failures and any sentinel that
+    remains, so callers never have to infer safety from "we managed to unlink one file".
+    """
+
+    had_sentinel: bool
+    removed_paths: tuple[Path, ...]
+    failed_paths: tuple[Path, ...]
+    remaining_paths: tuple[Path, ...]
+
+    @property
+    def resumed(self) -> bool:
+        return self.had_sentinel and not self.failed_paths and not self.remaining_paths
+
+    @property
+    def incomplete(self) -> bool:
+        return bool(self.failed_paths or self.remaining_paths)
 
 
 def sentinel_path() -> Path:
@@ -74,16 +98,63 @@ def engage(reason: Optional[str] = None) -> Path:
     return path
 
 
-def disengage() -> bool:
-    """Remove every visible sentinel (process-local and fleet-root)."""
-    lifted = False
-    for path in _candidate_sentinel_paths():
+def disengage_result() -> DisengageResult:
+    """Remove every visible sentinel and verify that the emergency stop is actually clear.
+
+    A stat error is treated exactly like :func:`is_engaged`: fail safe.  A concurrent remover that
+    wins between ``exists`` and ``unlink`` is success, while permission/filesystem failures remain
+    explicit.  A second verification pass closes the partial-delete hole where one profile/fleet
+    sentinel disappeared but another could not be removed.
+    """
+    paths = _candidate_sentinel_paths()
+    had_sentinel = False
+    removed: list[Path] = []
+    failed: list[Path] = []
+
+    for path in paths:
+        try:
+            exists = path.exists()
+        except (OSError, AttributeError):
+            # is_engaged() treats an unreadable candidate as engaged; resume must be at least as safe.
+            had_sentinel = True
+            failed.append(path)
+            continue
+        if not exists:
+            continue
+
+        had_sentinel = True
         try:
             path.unlink()
-            lifted = True
+            removed.append(path)
+        except FileNotFoundError:
+            # Another actor completed the same resume between exists() and unlink().
+            removed.append(path)
         except (OSError, AttributeError):
-            continue
-    return lifted
+            failed.append(path)
+
+    remaining: list[Path] = []
+    for path in paths:
+        try:
+            if path.exists():
+                remaining.append(path)
+        except (OSError, AttributeError):
+            # Unknown is engaged/fail-safe. Preserve both the operation failure and the remaining
+            # safety state without duplicating entries.
+            if path not in failed:
+                failed.append(path)
+            remaining.append(path)
+
+    return DisengageResult(
+        had_sentinel=had_sentinel,
+        removed_paths=tuple(removed),
+        failed_paths=tuple(failed),
+        remaining_paths=tuple(remaining),
+    )
+
+
+def disengage() -> bool:
+    """Compatibility wrapper: True only when resume fully succeeded, False otherwise."""
+    return disengage_result().resumed
 
 
 def get_state() -> Optional[dict]:
