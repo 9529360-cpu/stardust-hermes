@@ -11,13 +11,8 @@ import { useContributions } from '@/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { cn } from '@/lib/utils'
-import {
-  $fileBrowserOpen,
-  $panesFlipped,
-  $sidebarOpen,
-  toggleFileBrowserOpen,
-  toggleSidebarOpen
-} from '@/store/layout'
+import { $panesFlipped, $sidebarOpen, toggleSidebarOpen } from '@/store/layout'
+import { $rightContextOpen, toggleRightContextOpen } from '@/store/right-context'
 import { $unreadSessionCount } from '@/store/session-dot-state'
 import { $titlebarAppActionsSide } from '@/store/titlebar-app-actions'
 
@@ -78,9 +73,9 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
-  const fileBrowserOpen = useStore($fileBrowserOpen)
   const panesFlipped = useStore($panesFlipped)
   const sidebarOpen = useStore($sidebarOpen)
+  const rightContextOpen = useStore($rightContextOpen)
   const unreadCount = useStore($unreadSessionCount)
   const appActionsSide = useStore($titlebarAppActionsSide)
   const unreadBadge = unreadCount > 0 ? unreadCount : undefined
@@ -95,7 +90,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   // exist through their keybinds / command-palette actions, but they no longer
   // compete with the conversation for permanent titlebar space.
   const leftEdge = { open: sidebarOpen, toggle: toggleSidebarOpen }
-  const rightEdge = { open: fileBrowserOpen, toggle: toggleFileBrowserOpen }
+  const rightEdge = { open: rightContextOpen, toggle: toggleRightContextOpen }
   const leftLabel = leftEdge.open ? t.titlebar.hideSidebar : t.titlebar.showSidebar
   const rightLabel = rightEdge.open ? t.titlebar.hideRightSidebar : t.titlebar.showRightSidebar
 
