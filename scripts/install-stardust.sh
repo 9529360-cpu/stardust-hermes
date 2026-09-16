@@ -16,6 +16,29 @@ set -euo pipefail
 
 STARDUST_REPO="9529360-cpu/stardust-hermes"
 
+# The Tauri bootstrap owns one cross-platform stage protocol and historically
+# emits PowerShell-style flags on every OS. On Unix the mature installer uses
+# GNU-style long flags instead. Normalize that compatibility surface here so
+# both Electron's native POSIX args and Tauri's shared protocol reach
+# scripts/install.sh with the syntax it actually accepts.
+NORMALIZED_ARGS=()
+normalize_args() {
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            -Manifest) NORMALIZED_ARGS+=("--manifest") ;;
+            -Stage) NORMALIZED_ARGS+=("--stage") ;;
+            -NonInteractive) NORMALIZED_ARGS+=("--non-interactive") ;;
+            -Json) NORMALIZED_ARGS+=("--json") ;;
+            -IncludeDesktop) NORMALIZED_ARGS+=("--include-desktop") ;;
+            -Commit) NORMALIZED_ARGS+=("--commit") ;;
+            -Tag) NORMALIZED_ARGS+=("--tag") ;;
+            -Branch) NORMALIZED_ARGS+=("--branch") ;;
+            *) NORMALIZED_ARGS+=("$arg") ;;
+        esac
+    done
+}
+
 resolve_ref_from_args() {
     local commit_ref=""
     local tag_ref=""
@@ -53,7 +76,8 @@ resolve_ref_from_args() {
     fi
 }
 
-ARG_REF="$(resolve_ref_from_args "$@")"
+normalize_args "$@"
+ARG_REF="$(resolve_ref_from_args "${NORMALIZED_ARGS[@]}")"
 STARDUST_REF="${STARDUST_INSTALL_REF:-${ARG_REF:-main}}"
 INSTALLER_URL="https://raw.githubusercontent.com/${STARDUST_REPO}/${STARDUST_REF}/scripts/install.sh"
 
@@ -89,4 +113,4 @@ if grep -Eq 'github\.com/NousResearch/hermes-agent|raw\.githubusercontent\.com/N
 fi
 
 chmod +x "$TMP_INSTALLER"
-exec /bin/bash "$TMP_INSTALLER" "$@"
+exec /bin/bash "$TMP_INSTALLER" "${NORMALIZED_ARGS[@]}"
