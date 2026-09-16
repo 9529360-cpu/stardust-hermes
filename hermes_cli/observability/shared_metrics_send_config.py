@@ -8,11 +8,14 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-#: Production ingest endpoint. Overridable through config only — deliberately NOT by an
-#: environment variable: AGENTS.md reserves HERMES_* for secrets, and an inherited variable
-#: could silently redirect consented metrics to any host with nothing visible in config.
-#: Tests and the staging E2E write this key into a throwaway profile instead.
-DEFAULT_ENDPOINT = "https://telemetry.nousresearch.com/v1/telemetry"
+#: Stardust deliberately has no implicit remote metrics authority. Operators may configure a
+#: HTTPS endpoint explicitly (or loopback HTTP for local testing), but turning on transmission
+#: without one must fail closed instead of inheriting Hermes' vendor endpoint.
+DEFAULT_ENDPOINT = ""
+
+#: Historical Hermes production endpoint. Old/default config files can still contain this value;
+#: Stardust treats it as an upstream-owned legacy destination, not as its own operations backend.
+LEGACY_UPSTREAM_ENDPOINT = "https://telemetry.nousresearch.com/v1/telemetry"
 
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
 
@@ -45,10 +48,10 @@ def _endpoint_is_safe(endpoint: str) -> bool:
 
 
 def resolve_send_config(config: dict | None) -> SendConfig:
-    """Resolve transmission settings from config (endpoint: config > production default).
+    """Resolve transmission settings from config.
 
-    ``send`` is False whenever transmission cannot legitimately happen, so callers never
-    have to re-check the combination.
+    Stardust has no implicit remote destination. ``send`` is False whenever transmission cannot
+    legitimately happen, so callers never have to re-check the combination.
     """
     global _warned_send_without_collection
 
@@ -77,6 +80,20 @@ def resolve_send_config(config: dict | None) -> SendConfig:
     if not isinstance(endpoint, str) or not endpoint.strip():
         endpoint = DEFAULT_ENDPOINT
     endpoint = endpoint.strip()
+
+    if send_requested and not endpoint:
+        logger.error(
+            "Refusing to send shared metrics: Stardust has no default telemetry endpoint. "
+            "Configure telemetry.shared_metrics.endpoint explicitly."
+        )
+        return SendConfig(enabled=enabled, send=False, endpoint=endpoint)
+
+    if send_requested and endpoint.rstrip("/") == LEGACY_UPSTREAM_ENDPOINT.rstrip("/"):
+        logger.error(
+            "Refusing to send shared metrics to the legacy Hermes upstream telemetry endpoint. "
+            "Configure a Stardust-owned endpoint explicitly."
+        )
+        return SendConfig(enabled=enabled, send=False, endpoint=endpoint)
 
     if send_requested and not _endpoint_is_safe(endpoint):
         logger.error(
