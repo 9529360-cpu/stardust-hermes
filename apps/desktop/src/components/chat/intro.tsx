@@ -48,7 +48,7 @@ const ASSISTANT_COPY = {
     body: 'Скажите, какой результат вам нужен. Я возьму детали на себя и обращусь только за важным решением.',
     actions: [
       ['Спланировать день', 'Помоги расставить приоритеты на сегодня и составить простой реалистичный план.'],
-      ['Написать текст', 'Помоги написать ясное и естественное сообщение. Спроси только действительно нужные детали.'],
+      ['Написать текст', 'Помоги написать ясный и естественный текст. Спроси только действительно нужные детали.'],
       ['Решить проблему', 'У меня есть проблема. Помоги разобраться в причине и выполнить лучший следующий шаг.']
     ]
   },
@@ -140,7 +140,42 @@ const PROJECT_COPY = {
 export function Intro({ personality: _personality, seed: _seed }: IntroProps) {
   const { locale } = useI18n()
   const cwd = useStore($currentCwd)
-  const assistant = cwd.trim() ? PROJECT_COPY[locale] : ASSISTANT_COPY[locale]
+  const inProject = cwd.trim().length > 0
+  const assistant = inProject ? PROJECT_COPY[locale] : ASSISTANT_COPY[locale]
+
+  if (inProject) {
+    return (
+      <div
+        className="mx-auto flex w-full max-w-xl flex-col items-start px-6 pb-5 pt-10 text-left"
+        data-project-thread-intro=""
+        data-slot="aui_intro"
+      >
+        <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-(--ui-text-quaternary)">
+          {assistant.eyebrow}
+        </p>
+        <h1 className="mt-1.5 text-balance text-xl font-semibold tracking-[-0.03em] text-(--ui-text-primary)">
+          {assistant.headline}
+        </h1>
+        <p className="mt-1.5 max-w-lg text-pretty text-[0.78rem] leading-5 text-(--ui-text-tertiary)">
+          {assistant.body}
+        </p>
+        <div className="mt-4 flex w-full flex-wrap gap-1.5" data-testid="assistant-quick-actions">
+          {assistant.actions.map(([label, prompt]) => (
+            <Button
+              className="h-7 rounded-md px-2.5 text-[0.66rem] font-medium"
+              key={label}
+              onClick={() => requestComposerInsert(prompt, { mode: 'block', target: 'active' })}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="assistant-home mx-auto flex w-full max-w-2xl flex-col items-center px-5 py-8 text-center" data-slot="aui_intro">
