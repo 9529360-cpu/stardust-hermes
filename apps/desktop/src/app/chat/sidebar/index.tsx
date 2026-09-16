@@ -1476,6 +1476,7 @@ export function ChatSidebar({
             <SidebarMenu className="gap-px">
               {[...SIDEBAR_NAV, ...contributedNav].map(item => {
                 const isInteractive = Boolean(item.action) || Boolean(item.route)
+                const startsSecondaryNav = item.id === 'skills'
 
                 const active =
                   (item.id === 'skills' && currentView === 'skills') ||
@@ -1574,7 +1575,14 @@ export function ChatSidebar({
                 // New session + route-backed pages can open in a split —
                 // right-click for the directional "Open in split" submenu.
                 return (
-                  <SidebarMenuItem key={item.id}>
+                  <SidebarMenuItem
+                    className={cn(
+                      startsSecondaryNav &&
+                        'mt-2 before:mb-1.5 before:block before:px-2 before:text-[0.625rem] before:font-semibold before:uppercase before:tracking-[0.14em] before:text-(--ui-text-quaternary) before:content-[attr(data-section-label)]'
+                    )}
+                    data-section-label={startsSecondaryNav ? (s.nav.more ?? 'More') : undefined}
+                    key={item.id}
+                  >
                     {isNewSession || item.route ? (
                       <ContextMenu>
                         <ContextMenuTrigger asChild>{button}</ContextMenuTrigger>

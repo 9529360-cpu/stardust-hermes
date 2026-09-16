@@ -2829,8 +2829,9 @@ export const zh = defineLocale({
       'new-session': '新建会话',
       skills: '技能与工具',
       messaging: '消息平台',
-      artifacts: '产物',
-      cron: '定时任务'
+      artifacts: '文件与成果',
+      cron: '自动任务',
+      more: '更多功能'
     },
     searchAria: '搜索会话',
     searchPlaceholder: '搜索会话…',
@@ -2999,13 +3000,13 @@ export const zh = defineLocale({
     placeholderReconnecting: '正在重新连接 Hermes…',
     placeholderFollowUp: '发送后续消息',
     newSessionPlaceholders: [
-      '我们要构建什么？',
-      '给 Hermes 一个任务',
-      '你在想什么？',
-      '描述你需要什么',
-      '我们该处理什么？',
-      '随便问点什么',
-      '从一个目标开始'
+      '今天想做什么？',
+      '告诉我你需要什么帮助',
+      '有什么想让我处理的？',
+      '从一个问题或目标开始',
+      '把麻烦的事情交给我',
+      '想聊点什么？',
+      '我能为你做什么？'
     ],
     followUpPlaceholders: [
       '发送后续消息',

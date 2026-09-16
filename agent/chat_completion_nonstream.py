@@ -282,4 +282,6 @@ class _NonStreamRequest:
         # Success — the provider proved responsive: clear the breaker (#58962).
         if self.result["response"] is not None:
             h._reset_stale_streak(agent)
+            from agent.route_health import record_agent_success
+            record_agent_success(agent)
         return self.result["response"]

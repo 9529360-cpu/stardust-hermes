@@ -961,6 +961,8 @@ def direct_api_call(agent, api_kwargs: dict):
         # reset undoes the bump; the finally discards the poisoned client).
         request.mark_done()
         _reset_stale_streak(agent)
+        from agent.route_health import record_agent_success
+        record_agent_success(agent)
         succeeded = True
         return response
     finally:
@@ -1727,13 +1729,28 @@ def _fallback_chain_exhausted(agent, reason: "FailoverReason | None") -> bool:
 
 
 def _should_skip_fallback_candidate(agent, fb: dict, fb_key: tuple, fb_provider: str, fb_model: str, unavailable: set) -> bool:
-    """True when the entry is already unavailable, malformed, locally unusable, or resolves
-    to the backend that just failed (falling back to it would loop the failure)."""
+    """True when the entry is unavailable, persistently cooling down, malformed, locally
+    unusable, or resolves to the backend that just failed (which would loop the failure)."""
     if fb_key in unavailable:
         logger.debug("Fallback skip: %s previously marked unavailable", fb_key)
         return True
     if not fb_provider or not fb_model:
         return True
+    explicit_base_url = str(fb.get("base_url") or "")
+    if explicit_base_url:
+        from agent.route_health import allow_route
+        allowed, retry_after, health_state = allow_route(
+            fb_provider, fb_model, explicit_base_url, claim_probe=True,
+        )
+        agent._candidate_route_health_state = health_state
+        if not allowed:
+            logger.info(
+                "Fallback skip: %s/%s persistent circuit is %s (retry in ~%ss)",
+                fb_provider, fb_model, health_state, retry_after,
+            )
+            return True
+    else:
+        agent._candidate_route_health_state = "unresolved"
     from agent.fallback_cooldown import _is_entitlement_rejected
     if _is_entitlement_rejected(agent, fb_provider, fb_model):
         logger.info("Fallback skip: %s/%s was rejected as unentitled for this account", fb_provider, fb_model)
@@ -1833,7 +1850,19 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
     model slug and provider in place so the retry loop continues on the new backend; client
     construction goes through resolve_provider_client (no duplicated provider→key mappings)."""
     from agent.fallback_cooldown import _arm_rate_limit_cooldown
+    # Credential rotation is attempted before this function. Reaching provider fallback means the
+    # active route itself could not recover, so persist its circuit state for every future agent and
+    # process in this profile. Request-shape failures call us without a reason and are not penalized.
+    persistent_cooldown = 0
+    if reason is not None:
+        from agent.route_health import record_failure
+        persistent_cooldown = record_failure(
+            getattr(agent, "provider", ""), getattr(agent, "model", ""),
+            str(getattr(agent, "base_url", "") or ""), reason,
+        )
     cooldown_seconds = _arm_rate_limit_cooldown(agent, reason)
+    if persistent_cooldown:
+        logger.info("Persistent route circuit opened for %ss", persistent_cooldown)
     while True:
         if agent._fallback_index >= len(agent._fallback_chain):
             return _fallback_chain_exhausted(agent, reason)
@@ -1875,6 +1904,20 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
                 logger.warning("Could not normalize fallback model %r for provider %r: %s", fb_model, fb_provider, _norm_err)
 
             fb_base_url = str(fb_client.base_url)
+            # Entries commonly omit base_url. Re-check with the resolved endpoint so persistent
+            # health recorded from a real failed request cannot be bypassed by an empty hint.
+            if not fb_base_url_hint:
+                from agent.route_health import allow_route
+                allowed, retry_after, resolved_health_state = allow_route(
+                    fb_provider, fb_model, fb_base_url, claim_probe=True,
+                )
+                if not allowed:
+                    logger.info(
+                        "Fallback skip after resolution: %s/%s circuit is %s (retry in ~%ss)",
+                        fb_provider, fb_model, resolved_health_state, retry_after,
+                    )
+                    continue
+                agent._candidate_route_health_state = resolved_health_state
             from hermes_cli.providers import is_actual_route
             if is_actual_route(fb_provider, fb_base_url):
                 fb_api_mode = "chat_completions"
@@ -1921,7 +1964,9 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             # provenance so the restore path only emits a recovery notice after a real fallback.
             agent._provider_fallback_active = True
             agent._provider_fallback_route = (str(fb_model), str(fb_provider))
-            logger.info("Fallback activated: %s → %s (%s)", old_model, fb_model, fb_provider)
+            health_state = getattr(agent, "_candidate_route_health_state", "healthy")
+            agent._active_route_health_state = health_state
+            logger.info("Fallback activated: %s → %s (%s, health=%s)", old_model, fb_model, fb_provider, health_state)
             # The stale-call streak measured the OLD provider; carrying it over would
             # short-circuit the fresh fallback before its first stream attempt.
             _reset_stale_streak(agent)
@@ -2413,6 +2458,8 @@ class _BedrockStream:
         # Success clears the cross-turn breaker (#58962).
         if self.result["response"] is not None:
             _reset_stale_streak(self.agent)
+            from agent.route_health import record_agent_success
+            record_agent_success(self.agent)
         return self.result["response"]
 
     def run(self):
@@ -3414,6 +3461,8 @@ class _StreamingCall(StreamingWaitMonitor):
             raise self.result["error"]
         if self.result["response"] is not None:
             _reset_stale_streak(self.agent)  # provider proved responsive: clear the breaker
+            from agent.route_health import record_agent_success
+            record_agent_success(self.agent)
         # Propagate first-chunk timing for the ``post_api_request`` hook.
         if isinstance(self.clients.diag, dict) and self.clients.diag.get("first_chunk_at"):
             self.agent._last_api_first_chunk_at = float(self.clients.diag["first_chunk_at"])

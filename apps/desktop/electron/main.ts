@@ -3150,7 +3150,20 @@ async function resolveHealedBranch(updateRoot, branch) {
 // update changes HEAD, which busts the cache immediately). `git fetch` runs only
 // inside applyUpdates. `force` (menu item, Settings "Check now") skips the
 // cache; the renderer's background poller never passes it.
+const STARDUST_LOCAL_EDITION = true
+
 async function checkUpdates({ force = false }: { force?: boolean } = {}) {
+  if (STARDUST_LOCAL_EDITION) {
+    return {
+      supported: false,
+      reason: 'local-edition',
+      message: 'Stardust local edition is pinned and does not connect to upstream update services.',
+      branch: 'local',
+      updateAvailable: false,
+      fetchedAt: Date.now()
+    }
+  }
+
   const updateRoot = resolveUpdateRoot()
   let { branch } = readDesktopUpdateConfig()
   const gitDir = path.join(updateRoot, '.git')
@@ -3961,6 +3974,14 @@ async function releaseBackendLock(updateRoot, tag) {
 // Detection (checkUpdates / commit changelog / "N behind") stays in the UI;
 // only this apply action changed.
 async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
+  if (STARDUST_LOCAL_EDITION) {
+    return {
+      ok: false,
+      error: 'local-edition',
+      message: 'Stardust local edition is pinned; upstream update installation is disabled.'
+    }
+  }
+
   if (updateInFlight) {
     throw new Error('An update is already in progress.')
   }

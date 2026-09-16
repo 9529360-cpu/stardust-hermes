@@ -189,8 +189,13 @@ class TestRestorePrimaryRuntime:
         with patch("agent.process_bootstrap.OpenAI", return_value=MagicMock()):
             assert agent._restore_primary_runtime() is True
 
+        # Selecting a primary client is only a half-open probe; recovery is announced after an
+        # actual successful model response, not before the network call.
+        assert emitted == []
+        from agent.route_health import record_agent_success
+        record_agent_success(agent)
         assert emitted == [
-            f"✅ Primary model restored: {original_model} via {original_provider}; "
+            f"✅ Primary model recovered: {original_model} via {original_provider}; "
             "fallback anthropic/claude-sonnet-4 via openrouter is no longer active."
         ]
 
@@ -234,8 +239,11 @@ class TestRestorePrimaryRuntime:
             assert agent._restore_primary_runtime() is False
             assert agent._restore_primary_runtime() is True
 
+        assert emitted == []
+        from agent.route_health import record_agent_success
+        record_agent_success(agent)
         assert emitted == [
-            "✅ Primary model restored: primary-model via custom; "
+            "✅ Primary model recovered: primary-model via custom; "
             "fallback anthropic/claude-sonnet-4 via openrouter is no longer active."
         ]
 

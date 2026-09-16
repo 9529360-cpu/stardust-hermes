@@ -2202,7 +2202,8 @@ export const ja = defineLocale({
       skills: 'スキルとツール',
       messaging: 'メッセージング',
       artifacts: 'アーティファクト',
-      cron: 'スケジュール済みジョブ'
+      cron: 'スケジュール済みジョブ',
+      more: 'その他'
     },
     searchAria: 'セッションを検索',
     searchPlaceholder: 'セッションを検索…',

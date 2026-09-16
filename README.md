@@ -2,6 +2,9 @@
   <img src="assets/banner.png" alt="Hermes Agent" width="100%">
 </p>
 
+> [!IMPORTANT]
+> **Stardust local edition.** This public fork is based on [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) and keeps its MIT license and Git history. It adds a calmer personal-assistant desktop, persistent multi-route model failover, and intentionally disables automatic upstream update checks/installations so local customizations stay pinned. It contains source code only—no operator configuration, credentials, conversations, memory, logs, databases, or packaged builds. See [`STARDUST.md`](STARDUST.md).
+
 # Hermes Agent ☤
 <p align="center">
   <a href="https://hermes-agent.nousresearch.com/">Hermes Agent</a> | <a href="https://hermes-agent.nousresearch.com/">Hermes Desktop</a>

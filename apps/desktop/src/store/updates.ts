@@ -1006,6 +1006,8 @@ function ingestProgress(payload: DesktopUpdateProgress): void {
   })
 }
 
+const STARDUST_LOCAL_EDITION = true
+
 let pollerStarted = false
 let backgroundTimer: ReturnType<typeof setInterval> | null = null
 let connectionUnsub: (() => void) | null = null
@@ -1033,6 +1035,12 @@ function runPassiveChecks(): void {
 
 /** Wire up background polling + progress streaming. Idempotent. */
 export function startUpdatePoller(): void {
+  // Stardust local edition is intentionally detached from upstream. Keep the update
+  // store/API available for diagnostics, but never initiate passive network checks.
+  if (STARDUST_LOCAL_EDITION) {
+    return
+  }
+
   if (pollerStarted || typeof window === 'undefined') {
     return
   }

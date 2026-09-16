@@ -22,6 +22,27 @@ DEFAULT_CONFIG = {
     "model": "",
     "providers": {},
     "fallback_providers": [],
+    # Cross-session circuit breaker for arbitrary provider/model routes. Credential-level
+    # failures are still handled first by credential_pool; this layer activates after that pool
+    # cannot recover, skips cooling routes, and admits one half-open recovery probe.
+    "route_failover": {
+        "persistent_health": True,
+        "health_file": "",
+        "probe_lease_seconds": 45,
+        "cooldown_seconds": {
+            "auth": 3600,
+            "auth_permanent": 86400,
+            "billing": 14400,
+            "rate_limit": 60,
+            "upstream_rate_limit": 60,
+            "overloaded": 120,
+            "server_error": 60,
+            "timeout": 30,
+            "model_not_found": 86400,
+            "provider_policy_blocked": 3600,
+            "unknown": 30,
+        },
+    },
     "credential_pool_strategies": {},
     "toolsets": ["hermes-cli"],
     # journal_mode: SQLite journal mode for every Hermes DB. "wal" default; use "delete" on

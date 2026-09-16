@@ -84,6 +84,9 @@ def test_restore_primary_runtime_is_gated_on_rejected_primary_slug():
     assert (agent.provider, agent.model, agent._fallback_activated) == ("zai", "glm-5.2", True)
     assert not any("Primary model restored" in n for n in emitted)
 
-    _, restored, emitted = _run("some-other-slug")
+    agent, restored, emitted = _run("some-other-slug")
     assert restored is True
-    assert any("Primary model restored" in n for n in emitted)
+    assert emitted == []
+    from agent.route_health import record_agent_success
+    record_agent_success(agent)
+    assert any("Primary model recovered" in n for n in emitted)

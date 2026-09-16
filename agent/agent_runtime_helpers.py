@@ -1118,17 +1118,27 @@ def restore_primary_runtime(agent) -> bool:
     # skips this block entirely, stranding the index and silently blocking all future fallback attempts for
     # the session. Fixes #20465.
     if getattr(agent, "_rate_limited_until", 0) > time.monotonic():
-        return False  # primary still in rate-limit cooldown, stay on fallback
+        return False  # legacy in-session gate; persistent route gate below survives restarts
     rt = agent._primary_runtime
     primary_provider = str((rt or {}).get("provider") or "").strip().lower()
     primary_model = str((rt or {}).get("model") or "").strip()
+    primary_runtime_base_url = str((rt or {}).get("base_url") or "")
+    from agent.route_health import allow_route
+    allowed, retry_after, health_state = allow_route(
+        primary_provider, primary_model, primary_runtime_base_url, claim_probe=True,
+    )
+    if not allowed:
+        logger.info(
+            "Primary restore deferred: %s/%s circuit is %s (retry in ~%ss)",
+            primary_provider, primary_model, health_state, retry_after,
+        )
+        return False
     from agent.fallback_cooldown import _is_entitlement_rejected
     if primary_model and _is_entitlement_rejected(agent, primary_provider, primary_model):
         # The primary slug was rejected as unentitled for this account (#106475): restoring
         # here would announce a recovery that was never verified and re-fail every turn.
         # Stay on the fallback; the user sees the terminal entitlement error instead.
         return False
-    primary_runtime_base_url = str((rt or {}).get("base_url") or "")
 
     def _matches_primary(candidate) -> bool:
         return credential_pool_matches_provider(candidate, primary_provider, base_url=primary_runtime_base_url)
@@ -1185,16 +1195,14 @@ def restore_primary_runtime(agent) -> bool:
         # Undo the fallback's identity rewrite so the prompt is byte-identical to the stored copy
         # again (prefix cache match).
         rewrite_prompt_model_identity(agent, rt["model"], rt["provider"])
-        logger.info("Primary runtime restored for new turn: %s (%s)", agent.model, agent.provider)
-        agent._provider_fallback_active = False
-        agent._provider_fallback_route = None
-        if provider_fallback_active:
-            # Notification surfaces are best-effort and must never undo a successful restore.
-            with contextlib.suppress(Exception):
-                agent._emit_status(
-                    f"✅ Primary model restored: {agent.model} via {agent.provider}; "
-                    f"fallback {previous_model} via {previous_provider} is no longer active."
-                )
+        logger.info(
+            "Primary runtime selected for new-turn probe: %s (%s, health=%s)",
+            agent.model, agent.provider, health_state,
+        )
+        # Do not announce recovery merely because a client was constructed. The next verified
+        # model response closes the circuit and emits the one-shot notice from record_route_success.
+        agent._primary_restore_probe_pending = bool(provider_fallback_active)
+        agent._primary_restore_previous_route = (previous_model, previous_provider)
         return True
     except Exception as e:
         logger.warning("Failed to restore primary runtime: %s", e)

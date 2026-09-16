@@ -2318,7 +2318,13 @@ def _update_preflight_handled(args) -> bool:
 
 
 def cmd_update(args):
-    """Update Hermes Agent: hangup protection + update lock around ``_cmd_update_impl``."""
+    """Update Hermes Agent: disabled for the pinned Stardust local edition."""
+    print(
+        "Stardust local edition is pinned. Upstream update checks and installation are disabled; "
+        "the origin URL is retained only as a manual recovery reference."
+    )
+    return
+
     if _update_preflight_handled(args):
         return
     gateway_mode = getattr(args, "gateway", False)

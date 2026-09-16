@@ -2,6 +2,9 @@
   <img src="assets/banner.png" alt="Hermes Agent" width="100%">
 </p>
 
+> [!IMPORTANT]
+> **星尘本地定制版。** 本公开分支基于 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)，保留其 MIT 许可证和 Git 历史。定制内容包括更安静的个人助理桌面、持久化多路模型容灾，以及为保护本地改造而主动关闭的上游自动更新。仓库只包含源码，不包含使用者配置、API 凭据、对话、记忆、日志、数据库或打包程序。详见 [`STARDUST.md`](STARDUST.md)。
+
 # Hermes Agent ☤
 
 <p align="center">

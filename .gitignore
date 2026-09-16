@@ -20,6 +20,17 @@ act/
 .env.production.local
 .env.development
 .env.test
+# Never publish operator runtime data from a copied/local checkout.
+/config.yaml
+/route-health.json
+/.update_check
+/backups/
+*.db
+*.sqlite
+*.sqlite3
+*.key
+credentials.json
+auth.json
 .hermes-docker/
 .notebooklm-home/
 .notebooklm-cli-venv/
