@@ -12,6 +12,7 @@ user update operation.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import subprocess
@@ -93,23 +94,65 @@ def _refuse_non_git_update(project_root: Path) -> None:
     raise SystemExit(2)
 
 
+def _is_full_sha(value: str | None) -> bool:
+    return bool(value) and len(str(value)) == 40 and all(c in "0123456789abcdefABCDEF" for c in str(value))
+
+
+def _product_github_compare_behind(current_rev: str, target_rev: str) -> int | None:
+    """Exact behind count for shallow Stardust checkouts using Stardust's GitHub graph."""
+    if not (_is_full_sha(current_rev) and _is_full_sha(target_rev)):
+        return None
+    if current_rev == target_rev:
+        return 0
+
+    from urllib.request import Request, urlopen
+
+    url = (
+        f"https://api.github.com/repos/{PRODUCT_REPOSITORY}/compare/"
+        f"{current_rev}...{target_rev}"
+    )
+    request = Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "stardust-update-check",
+        },
+    )
+    try:
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return None
+
+    ahead = payload.get("ahead_by") if isinstance(payload, dict) else None
+    if isinstance(ahead, int) and not isinstance(ahead, bool) and ahead >= 0:
+        return ahead
+    return None
+
+
 @contextmanager
 def _stardust_updater_scope():
-    """Make the legacy updater treat the already-validated Stardust origin as official.
+    """Fence every legacy updater source decision onto the Stardust repository.
 
     The mature updater has a fork helper that otherwise offers to fetch
-    ``NousResearch/hermes-agent`` and sync it into ``origin/main``. Product
-    updates must never take that path. The override is process-local and is
-    restored even when the updater exits through ``SystemExit``.
+    ``NousResearch/hermes-agent`` and sync it into ``origin/main``. Shallow
+    checkouts also delegate commit counting to ``banner._github_compare_behind``,
+    whose legacy implementation targets NousResearch. Both seams are overridden
+    only for this command and restored even when the updater exits via
+    ``SystemExit``.
     """
+    import hermes_cli.banner as banner
     import hermes_cli.update_cmd as update_cmd
 
     original_is_fork = update_cmd._is_fork
+    original_compare_behind = banner._github_compare_behind
     update_cmd._is_fork = lambda _origin_url: False
+    banner._github_compare_behind = _product_github_compare_behind
     try:
         yield update_cmd
     finally:
         update_cmd._is_fork = original_is_fork
+        banner._github_compare_behind = original_compare_behind
 
 
 def _run_mature_update(args, *, update_cmd, main_mod) -> None:
