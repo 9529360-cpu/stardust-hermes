@@ -1,11 +1,8 @@
 import { compactNumber } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
-import { type ComponentProps, type MouseEvent, type ReactNode, useEffect, useState } from 'react'
+import { type ComponentProps, type MouseEvent, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { hudTargetSessionId } from '@/app/hud/handoff'
-import { toggleLayoutEditMode } from '@/components/pane-shell/edit-mode'
-import { resetLayoutTree } from '@/components/pane-shell/tree/store'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
@@ -13,15 +10,12 @@ import { Slot } from '@/contrib/react/slot'
 import { useContributions } from '@/contrib/react/use-contributions'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { formatModifierToken } from '@/lib/keybinds/combo'
 import { cn } from '@/lib/utils'
-import { toggleHud } from '@/store/hud'
 import {
   $fileBrowserOpen,
   $panesFlipped,
   $sidebarOpen,
   toggleFileBrowserOpen,
-  togglePanesFlipped,
   toggleSidebarOpen
 } from '@/store/layout'
 import { $unreadSessionCount } from '@/store/session-dot-state'
@@ -29,12 +23,7 @@ import { $titlebarAppActionsSide } from '@/store/titlebar-app-actions'
 
 import { appViewForPath, hidesFixedTitlebarClusters, isOverlayView } from '../routes'
 
-import {
-  TITLEBAR_ICON_BADGE_SCALE,
-  titlebarButtonClass,
-  titlebarIconSizeCss,
-  titlebarToolClusterClass
-} from './titlebar'
+import { titlebarButtonClass, titlebarToolClusterClass } from './titlebar'
 import { TitlebarIcon } from './titlebar-icon'
 
 export interface TitlebarTool {
@@ -67,29 +56,6 @@ interface TitlebarControlsProps extends ComponentProps<'div'> {
   onOpenSettings: () => void
 }
 
-/**
- * The layout button's glyph. Morphs into its composite reset form — the
- * layout icon wearing a small counter-clockwise arrow badge ("layout, back
- * to how it was") — ONLY while the pointer is on the button AND ⌘/Ctrl is
- * held: hover gates via CSS (`group/tool` on the button), the modifier via
- * the window listener. Pressing the modifier elsewhere changes nothing.
- */
-function LayoutGlyph({ modHeld }: { modHeld: boolean }) {
-  return (
-    <>
-      <span className={cn('inline-flex', modHeld && 'group-hover/tool:hidden')}>
-        <TitlebarIcon name="layout" />
-      </span>
-      <span className={cn('relative hidden', modHeld && 'group-hover/tool:inline-flex')}>
-        <TitlebarIcon name="layout" />
-        <span className="absolute -bottom-1 -right-1.5 grid place-items-center rounded-full bg-(--ui-bg-chrome) p-px">
-          <TitlebarIcon className="-scale-x-100" name="refresh" size={titlebarIconSizeCss(TITLEBAR_ICON_BADGE_SCALE)} />
-        </span>
-      </span>
-    </>
-  )
-}
-
 /** Overlay count on a titlebar glyph. Hidden when count is 0/undefined. */
 function withCountBadge(icon: ReactNode, count: number | undefined): ReactNode {
   if (!count) {
@@ -108,34 +74,10 @@ function withCountBadge(icon: ReactNode, count: number | undefined): ReactNode {
   )
 }
 
-/** Live ⌘/Ctrl tracking — mod-click affordances telegraph themselves (the
- *  layout button morphs into its reset form while the modifier is down). */
-function useModifierHeld(): boolean {
-  const [held, setHeld] = useState(false)
-
-  useEffect(() => {
-    const sync = (event: KeyboardEvent) => setHeld(event.metaKey || event.ctrlKey)
-    const clear = () => setHeld(false)
-
-    window.addEventListener('keydown', sync)
-    window.addEventListener('keyup', sync)
-    window.addEventListener('blur', clear)
-
-    return () => {
-      window.removeEventListener('keydown', sync)
-      window.removeEventListener('keyup', sync)
-      window.removeEventListener('blur', clear)
-    }
-  }, [])
-
-  return held
-}
-
 export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }: TitlebarControlsProps) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
-  const modHeld = useModifierHeld()
   const fileBrowserOpen = useStore($fileBrowserOpen)
   const panesFlipped = useStore($panesFlipped)
   const sidebarOpen = useStore($sidebarOpen)
@@ -144,19 +86,14 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const unreadBadge = unreadCount > 0 ? unreadCount : undefined
   const unreadHint = unreadBadge ? ` · ${t.titlebar.unreadSessions(unreadBadge)}` : ''
 
-  // `titleBar.*` slot content is mount-scoped — a page's <Contribute> registers
-  // only while that surface is up — so a non-empty area means a page is
-  // actively projecting chrome into the band right now.
   const titleBarLeft = useContributions('titleBar.left')
   const titleBarCenter = useContributions('titleBar.center')
   const titleBarRight = useContributions('titleBar.right')
   const pageOwnsTitlebar = titleBarLeft.length + titleBarCenter.length + titleBarRight.length > 0
 
-  // POSITIONAL toggles: each button shows/hides everything on its physical
-  // side of the main zone (the layout tree collapses the whole side), so they
-  // stay correct through flips and rearranges. $sidebarOpen ≙ left side,
-  // $fileBrowserOpen ≙ right side. Never an active highlight — plain
-  // show/hide affordances.
+  // Keep the everyday chrome tiny. Layout editing, pane flipping and HUD still
+  // exist through their keybinds / command-palette actions, but they no longer
+  // compete with the conversation for permanent titlebar space.
   const leftEdge = { open: sidebarOpen, toggle: toggleSidebarOpen }
   const rightEdge = { open: fileBrowserOpen, toggle: toggleFileBrowserOpen }
   const leftLabel = leftEdge.open ? t.titlebar.hideSidebar : t.titlebar.showSidebar
@@ -174,17 +111,6 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
     }
   }
 
-  const flipTool: TitlebarTool = {
-    actionId: 'view.flipPanes',
-    icon: <TitlebarIcon name="arrow-swap" />,
-    id: 'flip-panes',
-    label: t.titlebar.swapSidebarSides,
-    onSelect: () => {
-      triggerHaptic('tap')
-      togglePanesFlipped()
-    }
-  }
-
   const rightSidebarTool: TitlebarTool = {
     actionId: 'view.toggleRightSidebar',
     badge: panesFlipped ? unreadBadge : undefined,
@@ -198,8 +124,6 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
     tour: 'right-pane-toggle'
   }
 
-  // Static system tools — always pinned to the screen's right edge so the
-  // left titlebar stays free for tabs (#107351).
   const systemTools: TitlebarTool[] = [
     {
       actionId: 'nav.settings',
@@ -210,48 +134,11 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
         triggerHaptic('open')
         onOpenSettings()
       }
-    },
-    {
-      className: 'group/tool',
-      // Hover + held ⌘/Ctrl morphs the glyph into its reset form (see
-      // LayoutGlyph) — the mod-click telegraphs itself before it happens.
-      icon: <LayoutGlyph modHeld={modHeld} />,
-      id: 'layout',
-      label: t.titlebar.layoutEditor,
-      onSelect: event => {
-        if (event?.metaKey || event?.ctrlKey) {
-          triggerHaptic('warning')
-          resetLayoutTree()
-
-          return
-        }
-
-        triggerHaptic('open')
-        toggleLayoutEditMode()
-      },
-      title: t.titlebar.layoutEditorTitle(formatModifierToken('mod'))
-    },
-    {
-      // No `title`: TitlebarToolButton passes `title` to TipKeybindLabel as a
-      // text OVERRIDE, so a long sentence there replaces the short label and
-      // crowds the ⌘⇧H hint off the tooltip. Label only — the hint is appended
-      // from the action registry, same as every other tool here.
-      actionId: 'view.toggleHud',
-      icon: <TitlebarIcon name="comment-discussion" />,
-      id: 'hud',
-      label: t.titlebar.enterHud,
-      onSelect: () => {
-        triggerHaptic('open')
-        toggleHud(hudTargetSessionId())
-      }
     }
   ]
 
   const view = appViewForPath(location.pathname)
 
-  // Overlays own the window. These clusters are `fixed` at a higher z-index
-  // than the overlay card, so they'd otherwise bleed over it — hide them (and
-  // the nested titleBar slots) and let the overlay's own chrome take over.
   if (isOverlayView(view)) {
     return null
   }
@@ -269,12 +156,6 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
     'left-(--titlebar-controls-left) top-(--titlebar-controls-top) translate-y-(--titlebar-controls-y-nudge)'
   )
 
-  // A contributed full page (`extension`) yields the fixed clusters only while
-  // it actually projects chrome into the band — page-mounted `titleBar.*` slots
-  // like kanban's board switcher. A page that mounts no titlebar chrome keeps
-  // the app's controls; an empty claim would leave a bare strip on every plugin
-  // route. Contributed `titleBar.tools` items keep rendering here too, so a
-  // chrome-owning page never silently drops a registered item.
   if (hidesFixedTitlebarClusters(view) && pageOwnsTitlebar) {
     const pageTools = [...leftTools, ...tools].filter(tool => !tool.hidden)
 
@@ -327,7 +208,6 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
         {visibleSystemTools.map(tool => (
           <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />
         ))}
-        <TitlebarToolButton navigate={navigate} tool={flipTool} />
         <TitlebarToolButton navigate={navigate} tool={rightSidebarTool} />
         <Slot area="titleBar.right" />
       </div>
@@ -336,9 +216,6 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
 }
 
 function TitlebarToolButton({ navigate, tool }: { navigate: ReturnType<typeof useNavigate>; tool: TitlebarTool }) {
-  // Titlebar actions never show an active background — state reads from the
-  // icon itself (e.g. the mute/unmute glyph). aria-pressed still carries it
-  // for a11y.
   const className = cn(titlebarButtonClass, 'bg-transparent select-none', tool.className)
 
   const tooltipLabel = tool.actionId ? (
