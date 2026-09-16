@@ -830,27 +830,28 @@ class TestAdminEndpointsAuthGate:
 
 
 class TestUpdateCheckEndpoint:
-    """``GET /api/hermes/update/check`` reports availability without applying.
+    """``GET /api/hermes/update/check`` is passive by default in Stardust.
 
-    Powers the dashboard's check-before-you-update flow: the System page
-    shows the commit-behind count and asks the user to confirm before
-    ``POST /api/hermes/update`` runs ``hermes update``.
+    Normal dashboard loads must not contact upstream. Maintainers may request
+    ``force=true`` for an explicit read-only comparison, but pinned Stardust
+    never advertises in-place apply capability.
     """
 
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hermes_home):
         self.client, _ = _client()
 
-    def test_git_install_reports_behind_count(self, monkeypatch):
+    def test_forced_git_compare_reports_behind_count_but_never_apply(self, monkeypatch):
         import hermes_cli.web_server as ws
 
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
-        # Stub the shared checker so the contract is deterministic (no network).
+        # Stub the shared checker so the explicit comparison is deterministic (no network).
         import hermes_cli.banner as banner
 
-        monkeypatch.setattr(banner, "check_for_updates", lambda: 5)
+        monkeypatch.setattr(banner, "check_for_updates", lambda **kwargs: 5)
+        monkeypatch.setattr(banner, "upstream_commits_behind", lambda: [])
 
-        r = self.client.get("/api/hermes/update/check")
+        r = self.client.get("/api/hermes/update/check?force=true")
         assert r.status_code == 200
         body = r.json()
         assert {
@@ -865,8 +866,8 @@ class TestUpdateCheckEndpoint:
         assert body["install_method"] == "git"
         assert body["behind"] == 5
         assert body["update_available"] is True
-        # git/pip installs can apply the update in place from the dashboard.
-        assert body["can_apply"] is True
+        assert body["can_apply"] is False
+        assert body["update_command"] == "manual maintainer review required"
 
 
 
