@@ -45,6 +45,7 @@ const IS_WINDOWS = process.platform === 'win32'
 const STAMP_COMMIT_RE = /^[0-9a-f]{7,40}$/i
 const FALLBACK_COMMIT_RE = /^0{7,40}$/
 const FALLBACK_BRANCH = 'main'
+const STARDUST_SOURCE_REPO = '9529360-cpu/stardust-hermes'
 
 function isPinnedCommit(commit) {
   return typeof commit === 'string' && STAMP_COMMIT_RE.test(commit) && !FALLBACK_COMMIT_RE.test(commit)
@@ -233,7 +234,7 @@ function downloadInstallScript(ref, destPath) {
   // ref so local builds can still bootstrap without pretending the all-zero
   // placeholder is a real GitHub commit.
   const scriptName = installScriptName()
-  const url = `https://raw.githubusercontent.com/NousResearch/hermes-agent/${ref}/scripts/${scriptName}`
+  const url = `https://raw.githubusercontent.com/${STARDUST_SOURCE_REPO}/${ref}/scripts/${scriptName}`
 
   return new Promise((resolve, reject) => {
     fs.mkdirSync(path.dirname(destPath), { recursive: true })
