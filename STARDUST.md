@@ -10,25 +10,25 @@ This repository is a public source-code fork of [NousResearch/hermes-agent](http
 - Persistent health tracking and circuit-breaker behavior for an arbitrary model-route fallback chain.
 - Credential-pool rotation remains available before route-level fallback.
 - Stardust product updates are owned by this repository; Hermes upstream is never an automatic product-update source.
-- Passive/background update traffic may stay disabled by default, while explicit Stardust update actions target this repository.
+- Passive/background update traffic stays quiet by default, while explicit Stardust update actions target this repository.
 - Focused regression tests for the assistant home, route health, and product update authority.
 
 - 更安静、中文优先的个人助理桌面首页与导航层级。
 - 面向任意数量模型路由的持久化健康状态、冷却和半开探测。
 - 路由降级前仍支持凭据池轮换。
 - Stardust 产品更新由本仓库负责，Hermes 上游绝不会成为自动产品更新源。
-- 后台/被动更新流量可继续默认关闭，但用户主动执行 Stardust 更新时只访问本仓库。
+- 后台/被动更新流量默认保持安静，但用户主动执行 Stardust 更新时只访问本仓库。
 - 为助理首页、路由健康和产品更新权威机制补充回归测试。
 
 ## Product source / 产品源码权威
 
-`9529360-cpu/stardust-hermes` is the source, update, and release authority for this edition. Runtime update checks, update apply operations, GitHub Releases, release tags, release notes, package metadata, and the Stardust bootstrap installers must resolve to this repository.
+`9529360-cpu/stardust-hermes` is the source, update, and release authority for this edition. Runtime product-update checks, update apply operations, GitHub Releases, release tags, release notes, package metadata, and the Stardust bootstrap installers must resolve to this repository.
 
-`9529360-cpu/stardust-hermes` 是本版本唯一的源码、更新和发布权威。运行时更新检查、更新安装、GitHub Release、发布 Tag、Release Notes、包元数据以及 Stardust 安装入口都必须指向本仓库。
+`9529360-cpu/stardust-hermes` 是本版本唯一的源码、更新和发布权威。运行时产品更新检查、更新安装、GitHub Release、发布 Tag、Release Notes、包元数据以及 Stardust 安装入口都必须指向本仓库。
 
-`NousResearch/hermes-agent` is retained for attribution and deliberate maintainer review only. Bringing upstream work into Stardust is an explicit engineering operation: review the upstream change, port or merge it on a development branch, run Stardust validation, and then merge it into Stardust `main`. An installed Stardust copy must never fetch/merge/push upstream automatically.
+`NousResearch/hermes-agent` is retained for attribution and deliberate maintainer review only. Bringing upstream work into Stardust is an explicit engineering operation: review the upstream change, port or merge it on a development branch, run Stardust validation, and then merge it into Stardust `main`. An installed Stardust copy must never fetch/merge/push upstream automatically as part of a product update.
 
-`NousResearch/hermes-agent` 只用于版权归属和维护者人工参考。吸收上游改动必须是明确的工程操作：先审查上游变更，在开发分支移植或合并，运行 Stardust 验证，再进入 Stardust `main`。已安装的 Stardust 不得自动 fetch、merge 或 push Hermes 上游。
+`NousResearch/hermes-agent` 只用于版权归属和维护者人工参考。吸收上游改动必须是明确的工程操作：先审查上游变更，在开发分支移植或合并，运行 Stardust 验证，再进入 Stardust `main`。已安装的 Stardust 不得在产品更新流程里自动 fetch、merge 或 push Hermes 上游。
 
 For fresh installs, use the Stardust-owned bootstrap entrypoints. They reuse the mature Hermes installers while pinning clone/recovery URLs to this repository:
 
@@ -44,13 +44,17 @@ iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scri
 
 ## Update policy / 更新策略
 
-For normal product installs, `origin` must resolve to `9529360-cpu/stardust-hermes`. `hermes update --check` and `hermes update` use the Stardust-owned command boundary. The updater refuses a different/missing origin rather than silently rewriting a developer fork, and the legacy automatic Hermes-upstream synchronization path is disabled during a Stardust product update.
+For normal product installs, `origin` must resolve to `9529360-cpu/stardust-hermes`. `hermes update --check` and `hermes update` use the Stardust-owned command boundary. A check never probes a configured `upstream` remote. A third-party or missing origin is refused rather than silently rewritten.
 
-普通产品安装的 `origin` 必须解析到 `9529360-cpu/stardust-hermes`。`hermes update --check` 与 `hermes update` 经过 Stardust 自己的更新权威边界。若 origin 缺失或指向其他仓库，更新会明确拒绝，而不是偷偷改写开发者 fork；在 Stardust 产品更新过程中，旧 Hermes 自动同步上游的路径会被禁用。
+普通产品安装的 `origin` 必须解析到 `9529360-cpu/stardust-hermes`。`hermes update --check` 与 `hermes update` 经过 Stardust 自己的更新权威边界。检查更新不会探测本地配置的 `upstream` remote；第三方或缺失的 origin 会被明确拒绝，而不是被偷偷改写。
 
-Background/passive checks can remain off by default to keep the private edition quiet. That does not mean Stardust is permanently pinned: explicit updates and release-driven distribution are supported, but their authority is Stardust itself.
+Older installations may still have the historical `NousResearch/hermes-agent` URL as `origin`. `hermes update --check` treats that case read-only and checks Stardust directly. An explicit `hermes update` may migrate only that exact historical origin to the Stardust repository before applying the update. Arbitrary forks are never migrated automatically.
 
-后台/被动检查仍可以默认关闭，让私人定制版保持安静。这不代表 Stardust 永久锁死版本：用户主动更新和基于 Release 的分发可以继续使用，但唯一权威是 Stardust 自己。
+较老的安装可能仍把历史 `NousResearch/hermes-agent` 地址保存为 `origin`。`hermes update --check` 在这种情况下保持只读，并直接检查 Stardust。真正执行 `hermes update` 时，只允许把这一种精确的历史来源迁移到 Stardust 后再应用更新；任意第三方 fork 都不会被自动迁移。
+
+Dashboard/System page loading is passive and does not contact an update source. The explicit **Check now** action queries Stardust and the apply button is enabled only for a Stardust origin or the exact migratable historical origin. This keeps background traffic quiet without pinning the product forever.
+
+Dashboard/System 页面加载属于被动路径，不会主动联系更新源。用户明确点击 **Check now** 时才查询 Stardust；只有 Stardust origin 或可迁移的精确历史 origin 才允许执行更新。这样既保持后台安静，也不会把产品永久锁死在旧版本。
 
 Non-git/image-managed installs continue to follow their deployment manager. An unknown non-git install is not allowed to fall back to the legacy NousResearch ZIP updater; repair/reinstall it from a Stardust Release or Stardust bootstrap installer instead.
 
