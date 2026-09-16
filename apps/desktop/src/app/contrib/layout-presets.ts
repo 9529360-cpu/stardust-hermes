@@ -2,7 +2,7 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { registry } from '@/contrib/registry'
 import { isOnboardingEnabled } from '@/lib/onboarding-enabled'
 
-const PERSONAL_OVERVIEW_PANE = 'personal-shell:overview'
+import { registerWorkspaceOverviewPane, WORKSPACE_OVERVIEW_PANE_ID } from './workspace-overview'
 
 // Private-product default: conversations on the left, the active chat as the
 // dominant surface, and one calm context rail on the right. Files and Review
@@ -15,7 +15,7 @@ export const DEFAULT_TREE = split(
   [
     group(['sessions'], { id: 'grp-sessions' }),
     group(['workspace'], { id: 'grp-main' }),
-    group([PERSONAL_OVERVIEW_PANE, 'review', 'files'], { id: 'grp-context' })
+    group([WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'], { id: 'grp-context' })
   ],
   [1, 3.5, 1.2],
   'spl-root'
@@ -23,13 +23,13 @@ export const DEFAULT_TREE = split(
 
 const FOCUS_TREE = split(
   'row',
-  [group(['sessions']), group(['workspace', PERSONAL_OVERVIEW_PANE, 'files', 'review', 'terminal'])],
+  [group(['sessions']), group(['workspace', WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review', 'terminal'])],
   [1, 4.6]
 )
 
 const BASIC_TREE = split(
   'row',
-  [group(['sessions']), group(['workspace']), group([PERSONAL_OVERVIEW_PANE])],
+  [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
   [1, 3.8, 1.05]
 )
 
@@ -38,7 +38,7 @@ const TERMINAL_TREE = split(
   [
     split(
       'row',
-      [group(['sessions']), group(['workspace']), group([PERSONAL_OVERVIEW_PANE, 'files', 'review'])],
+      [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review'])],
       [1, 3.2, 1.2]
     ),
     group(['terminal'])
@@ -49,13 +49,17 @@ const TERMINAL_TREE = split(
 const QUAD_TREE = split(
   'column',
   [
-    split('row', [group(['sessions', 'files']), group(['workspace']), group([PERSONAL_OVERVIEW_PANE])], [1, 3, 1.1]),
+    split('row', [group(['sessions', 'files']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])], [1, 3, 1.1]),
     split('row', [group(['terminal']), group(['review'])], [1.4, 1])
   ],
   [3, 1]
 )
 
 export function registerLayoutPresets() {
+  // The overview is product chrome, not an optional plugin: it must exist
+  // whenever a preset references it.
+  registerWorkspaceOverviewPane()
+
   return registry.registerMany([
     { id: 'default', area: 'layouts', title: 'Default', order: 0, data: DEFAULT_TREE },
     ...(isOnboardingEnabled() ? [{ id: 'basic', area: 'layouts', title: 'Basic', order: 5, data: BASIC_TREE }] : []),
