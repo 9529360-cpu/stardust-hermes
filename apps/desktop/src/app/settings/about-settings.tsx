@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw } from '@/lib/icons'
+import { PRODUCT_DESKTOP_NAME, PRODUCT_NAME, PRODUCT_REPOSITORY_URL } from '@/product-brand'
 import { cn } from '@/lib/utils'
 import {
   $desktopVersion,
@@ -21,8 +22,12 @@ import {
 import { SectionHeading, SettingsContent } from './primitives'
 import { UninstallSection } from './uninstall-section'
 
-const RELEASE_NOTES_URL = 'https://github.com/9529360-cpu/stardust-hermes/releases'
+const RELEASE_NOTES_URL = `${PRODUCT_REPOSITORY_URL}/releases`
 const INSTALLER_URL = RELEASE_NOTES_URL
+
+function productCopy(value: string): string {
+  return value.replaceAll('Hermes Desktop', PRODUCT_DESKTOP_NAME).replaceAll('Hermes', PRODUCT_NAME)
+}
 
 function relativeTime(ms: number | undefined, a: Translations['settings']['about']) {
   if (!ms) {
@@ -102,7 +107,7 @@ export function AboutSettings() {
       <div className="flex flex-col items-center gap-3 pt-6 pb-2 text-center">
         <BrandMark className="size-16" />
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">{a.heading}</h2>
+          <h2 className="text-lg font-semibold tracking-tight">{productCopy(a.heading)}</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             {version?.appVersion ? a.version(version.appVersion) : a.versionUnavailable}
           </p>
@@ -119,8 +124,8 @@ export function AboutSettings() {
                   // this banner is meant to resolve: the Updates card below
                   // already reports the runtime as current.
                   <>
-                    <p className="font-medium">{a.bundleSwapPending}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{a.bundleSwapPendingDesc}</p>
+                    <p className="font-medium">{productCopy(a.bundleSwapPending)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{productCopy(a.bundleSwapPendingDesc)}</p>
                     <Button
                       className="mt-2"
                       onClick={() => void window.hermesDesktop?.relaunchApp?.()}
@@ -128,13 +133,13 @@ export function AboutSettings() {
                       variant="textStrong"
                     >
                       <RefreshCw className="size-3" />
-                      {a.bundleSwapPendingAction}
+                      {productCopy(a.bundleSwapPendingAction)}
                     </Button>
                   </>
                 ) : (
                   <>
-                    <p className="font-medium">{a.bundleOutOfSync}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{a.bundleOutOfSyncDesc}</p>
+                    <p className="font-medium">{productCopy(a.bundleOutOfSync)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{productCopy(a.bundleOutOfSyncDesc)}</p>
                     <Button asChild className="mt-2" size="sm" variant="textStrong">
                       <a
                         href={INSTALLER_URL}
@@ -146,7 +151,7 @@ export function AboutSettings() {
                         target="_blank"
                       >
                         <ExternalLink className="size-3" />
-                        {a.bundleOutOfSyncAction}
+                        {productCopy(a.bundleOutOfSyncAction)}
                       </a>
                     </Button>
                   </>
@@ -175,7 +180,7 @@ export function AboutSettings() {
               <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
             )}
             <div className="min-w-0">
-              <p className="font-medium">{statusLine}</p>
+              <p className="font-medium">{productCopy(statusLine)}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {a.lastChecked(relativeTime(status?.fetchedAt, a))}
                 {justChecked && !checking ? a.justNowSuffix : ''}
