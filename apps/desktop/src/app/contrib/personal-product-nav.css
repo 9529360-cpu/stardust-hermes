@@ -1,0 +1,24 @@
+[data-personal-sidebar-shell] [data-slot='sidebar-content'] {
+  padding-bottom: 9.25rem;
+}
+
+[data-personal-sidebar-shell]
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-cron']) {
+  display: none;
+}
+
+[data-personal-product-nav] {
+  -webkit-app-region: no-drag;
+}
+
+@media (max-height: 720px) {
+  [data-personal-sidebar-shell] [data-slot='sidebar-content'] {
+    padding-bottom: 5.75rem;
+  }
+
+  [data-personal-product-nav] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.125rem;
+  }
+}
