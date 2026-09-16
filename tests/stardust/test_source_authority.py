@@ -40,3 +40,22 @@ def test_desktop_update_authority_is_stardust() -> None:
 
     assert "https://github.com/9529360-cpu/stardust-hermes.git" in source
     assert "git@github.com:9529360-cpu/stardust-hermes.git" in source
+
+
+def test_cli_update_entrypoint_cannot_reactivate_upstream_sync() -> None:
+    source = _read("hermes_cli/main.py")
+    marker = "def cmd_update(args):"
+    assert marker in source
+
+    block = source.split(marker, 1)[1].split("\ndef ", 1)[0]
+    assert "disabled for the pinned Stardust local edition" in block
+    assert "_cmd_update_impl" not in block
+    assert "_sync_with_upstream_if_needed" not in block
+
+
+def test_security_reports_belong_to_stardust() -> None:
+    for path in ("SECURITY.md", "SECURITY.es.md"):
+        source = _read(path)
+        assert "9529360-cpu/stardust-hermes/security/advisories/new" in source
+        assert "NousResearch/hermes-agent/security/advisories/new" not in source
+        assert "security@nousresearch.com" not in source
