@@ -1,0 +1,133 @@
+name: Stardust Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (CalVer: vYYYY.M.D or vYYYY.M.D.N)"
+        required: true
+        type: string
+      prerelease:
+        description: "Publish as a prerelease"
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v[0-9][0-9][0-9][0-9].[0-9]*.[0-9]*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stardust-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == '9529360-cpu/stardust-hermes'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag and source commit
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            tag="$INPUT_TAG"
+          else
+            [[ "$REF_TYPE" == "tag" ]] || { echo "Expected tag push" >&2; exit 1; }
+            tag="$REF_NAME"
+          fi
+
+          if [[ ! "$tag" =~ ^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]+)?$ ]]; then
+            echo "Invalid Stardust release tag: $tag" >&2
+            echo "Expected vYYYY.M.D or vYYYY.M.D.N" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout Stardust repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'push' && github.ref || github.sha }}
+
+      - name: Require release commit on Stardust main
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --quiet
+          if ! git merge-base --is-ancestor "$RELEASE_SHA" origin/main; then
+            echo "Release commit $RELEASE_SHA is not contained in origin/main." >&2
+            echo "Merge reviewed work into Stardust main before publishing." >&2
+            exit 1
+          fi
+
+      - name: Create tag for manual releases
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            existing="$(git rev-list -n 1 "$TAG")"
+            if [[ "$existing" != "$RELEASE_SHA" ]]; then
+              echo "Tag $TAG already exists at $existing, not $RELEASE_SHA." >&2
+              exit 1
+            fi
+            echo "Tag $TAG already exists at the requested commit."
+          else
+            git tag "$TAG" "$RELEASE_SHA"
+            git push origin "refs/tags/$TAG"
+          fi
+
+      - name: Publish GitHub Release from Stardust
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists in $GITHUB_REPOSITORY; leaving it unchanged."
+            exit 0
+          fi
+
+          args=(
+            release create "$TAG"
+            --repo "$GITHUB_REPOSITORY"
+            --title "Stardust $TAG"
+            --generate-notes
+          )
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          gh "${args[@]}"
+
+      - name: Verify release authority
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          url="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          case "$url" in
+            https://github.com/9529360-cpu/stardust-hermes/releases/*) ;;
+            *) echo "Release escaped Stardust repository authority: $url" >&2; exit 1 ;;
+          esac
+          echo "Published: $url"
