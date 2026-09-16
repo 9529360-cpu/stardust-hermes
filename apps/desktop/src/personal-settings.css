@@ -11,7 +11,7 @@
 :root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before,
 :root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
   position: absolute;
-  left: 0.5rem;
+  inset-inline-start: 0.5rem;
   top: -1.1rem;
   color: var(--ui-text-quaternary);
   font-size: 0.58rem;
@@ -35,6 +35,86 @@
 
 :root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
   content: 'CONNECTIONS';
+}
+
+:root:lang(zh)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model']::before {
+  content: '助手';
+}
+
+:root:lang(zh)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace']::before {
+  content: '工作区';
+}
+
+:root:lang(zh)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before {
+  content: '应用';
+}
+
+:root:lang(zh)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
+  content: '连接';
+}
+
+:root:lang(zh-hant)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model']::before {
+  content: '助理';
+}
+
+:root:lang(zh-hant)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace']::before {
+  content: '工作區';
+}
+
+:root:lang(zh-hant)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before {
+  content: '應用';
+}
+
+:root:lang(zh-hant)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
+  content: '連線';
+}
+
+:root:lang(ja)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model']::before {
+  content: 'アシスタント';
+}
+
+:root:lang(ja)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace']::before {
+  content: 'ワークスペース';
+}
+
+:root:lang(ja)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before {
+  content: 'アプリ';
+}
+
+:root:lang(ja)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
+  content: '接続';
+}
+
+:root:lang(ru)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model']::before {
+  content: 'АССИСТЕНТ';
+}
+
+:root:lang(ru)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace']::before {
+  content: 'РАБОЧАЯ ОБЛАСТЬ';
+}
+
+:root:lang(ru)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before {
+  content: 'ПРИЛОЖЕНИЕ';
+}
+
+:root:lang(ru)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
+  content: 'ПОДКЛЮЧЕНИЯ';
+}
+
+:root:lang(ar)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:model']::before {
+  content: 'المساعد';
+}
+
+:root:lang(ar)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-config:workspace']::before {
+  content: 'مساحة العمل';
+}
+
+:root:lang(ar)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-notifications']::before {
+  content: 'التطبيق';
+}
+
+:root:lang(ar)[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour='nav-providers']::before {
+  content: 'الاتصالات';
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tour='overlay-nav'] button[data-tour^='nav-config:'] {
