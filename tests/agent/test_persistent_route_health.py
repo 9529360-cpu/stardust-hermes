@@ -1,3 +1,4 @@
+import errno
 import json
 import multiprocessing
 import os
@@ -154,6 +155,37 @@ def test_structurally_corrupt_route_row_fails_open(monkeypatch, tmp_path):
     assert route_health.allow_route("p", "m", "https://x.test") == (True, 0, "healthy")
     assert route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout) == 30
     assert route_health.snapshot()["routes"][key]["consecutive_failures"] == 1
+
+
+def test_unknown_status_and_nonfinite_values_fail_open(monkeypatch, tmp_path):
+    _home(monkeypatch, tmp_path)
+    key, identity = route_health.route_identity("p", "m", "https://x.test")
+    route_health._write_state({
+        "version": 1,
+        "routes": {
+            key: {
+                **identity,
+                "status": "mystery-state",
+                "cooldown_until": float("inf"),
+                "probe_until": float("nan"),
+                "consecutive_failures": float("inf"),
+            },
+        },
+    })
+
+    assert route_health.allow_route("p", "m", "https://x.test") == (True, 0, "healthy")
+    rows = route_health.health_rows("p", "m", "https://x.test")
+    assert rows[0]["status"] == "healthy"
+    assert rows[0]["consecutive_failures"] == 0
+    assert route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout) == 30
+    assert route_health.snapshot()["routes"][key]["consecutive_failures"] == 1
+
+
+def test_lock_error_classification_retries_only_contention():
+    assert route_health._is_lock_contention_errno(OSError(errno.EAGAIN, "busy"))
+    assert route_health._is_lock_contention_errno(OSError(errno.EACCES, "busy"))
+    assert not route_health._is_lock_contention_errno(OSError(errno.EMFILE, "too many files"))
+    assert not route_health._is_lock_contention_errno(OSError(errno.ENOSPC, "disk full"))
 
 
 def test_non_mapping_route_row_does_not_break_health_updates(monkeypatch, tmp_path):
