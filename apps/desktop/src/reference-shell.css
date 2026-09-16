@@ -1,0 +1,307 @@
+/*
+ * Aurora desktop shell
+ * --------------------
+ * A presentation-only skin for the primary/secondary Electron windows. The
+ * reference is a dark, glassy three-column desktop shell: cool blue-violet
+ * ambient light, a floating rounded window, quieter separators, a stronger
+ * primary action in the session rail, and a compact elevated composer.
+ *
+ * Keep this file scoped to data-hermes-reference-shell so auxiliary windows
+ * (HUD, browser, quick entry, wake indicator, onboarding reveal) keep their
+ * purpose-built chrome. Raw palette values live here as shell tokens instead
+ * of leaking into feature components.
+ */
+
+:root[data-hermes-reference-shell='aurora'] {
+  --aurora-night-0: #050914;
+  --aurora-night-1: #081126;
+  --aurora-night-2: #0c1730;
+  --aurora-blue: #5f83ff;
+  --aurora-blue-soft: #8db1ff;
+  --aurora-violet: #806cff;
+  --aurora-cyan: #70d3ff;
+  --aurora-ink: #eef4ff;
+  --aurora-ink-2: #b6c4df;
+  --aurora-ink-3: #7f91b2;
+  --aurora-stroke: rgba(180, 201, 255, 0.16);
+  --aurora-stroke-soft: rgba(180, 201, 255, 0.09);
+  --aurora-glass: rgba(8, 15, 32, 0.88);
+  --aurora-glass-strong: rgba(8, 15, 32, 0.96);
+  --aurora-rail: rgba(13, 24, 48, 0.86);
+  --aurora-panel: rgba(11, 21, 42, 0.74);
+  --aurora-panel-strong: rgba(12, 23, 46, 0.9);
+  --aurora-control: rgba(117, 145, 213, 0.1);
+  --aurora-control-hover: rgba(132, 160, 229, 0.16);
+  --aurora-control-active: rgba(126, 157, 231, 0.2);
+}
+
+:root[data-hermes-reference-shell='aurora'],
+:root[data-hermes-reference-shell='aurora'] body,
+:root[data-hermes-reference-shell='aurora'] #root {
+  min-height: 100%;
+  background: transparent;
+}
+
+:root[data-hermes-reference-shell='aurora'] body {
+  overflow: hidden;
+  background:
+    radial-gradient(70rem 48rem at -7% 26%, rgba(81, 128, 255, 0.46), transparent 56%),
+    radial-gradient(56rem 42rem at 108% 16%, rgba(107, 94, 255, 0.34), transparent 58%),
+    radial-gradient(48rem 34rem at 74% 112%, rgba(171, 97, 177, 0.24), transparent 55%),
+    linear-gradient(145deg, var(--aurora-night-1) 0%, var(--aurora-night-0) 48%, #08152d 100%);
+}
+
+:root[data-hermes-reference-shell='aurora'] body::before,
+:root[data-hermes-reference-shell='aurora'] body::after {
+  content: '';
+  position: fixed;
+  z-index: 0;
+  width: 58vw;
+  height: 38vh;
+  pointer-events: none;
+  border-radius: 999px;
+  filter: blur(64px);
+  opacity: 0.5;
+  transform: rotate(-13deg);
+}
+
+:root[data-hermes-reference-shell='aurora'] body::before {
+  top: -14vh;
+  left: 16vw;
+  background: linear-gradient(90deg, rgba(98, 129, 255, 0.15), rgba(142, 117, 255, 0.4), rgba(101, 180, 255, 0.16));
+}
+
+:root[data-hermes-reference-shell='aurora'] body::after {
+  right: -12vw;
+  bottom: -18vh;
+  background: linear-gradient(90deg, rgba(61, 100, 217, 0.12), rgba(138, 91, 181, 0.34), rgba(215, 124, 155, 0.14));
+}
+
+:root[data-hermes-reference-shell='aurora'] #root {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 10px;
+}
+
+/* The provider and shell both carry h-screen/w-screen utility classes. In the
+   reference treatment the root owns the outer gutter, so these two fill the
+   root's content box rather than the raw viewport. */
+:root[data-hermes-reference-shell='aurora'] [data-slot='sidebar-wrapper'] {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  background: transparent !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+  /* Dark semantic surface values are scoped to the desktop frame. Feature
+     components keep consuming the existing design-system tokens. */
+  --ui-text-primary: var(--aurora-ink);
+  --ui-text-secondary: var(--aurora-ink-2);
+  --ui-text-tertiary: var(--aurora-ink-3);
+  --ui-text-quaternary: rgba(126, 145, 179, 0.72);
+  --ui-bg-chrome: var(--aurora-glass);
+  --ui-bg-primary: rgba(18, 31, 58, 0.92);
+  --ui-bg-secondary: rgba(20, 34, 64, 0.82);
+  --ui-bg-tertiary: rgba(26, 42, 75, 0.72);
+  --ui-bg-quaternary: rgba(92, 119, 177, 0.12);
+  --ui-bg-quinary: rgba(99, 127, 190, 0.08);
+  --ui-sidebar-surface-background: var(--aurora-rail);
+  --ui-editor-surface-background: rgba(8, 16, 33, 0.75);
+  --ui-chat-surface-background: rgba(8, 16, 33, 0.66);
+  --ui-panel-surface-background: var(--aurora-panel);
+  --ui-widget-surface-background: rgba(26, 42, 75, 0.58);
+  --ui-terminal-surface-background: rgba(5, 11, 24, 0.93);
+  --ui-control-hover-background: var(--aurora-control-hover);
+  --ui-control-active-background: var(--aurora-control-active);
+  --ui-stroke-primary: rgba(181, 202, 255, 0.22);
+  --ui-stroke-secondary: var(--aurora-stroke);
+  --ui-stroke-tertiary: var(--aurora-stroke-soft);
+  --ui-stroke-quaternary: rgba(177, 199, 255, 0.055);
+  --sidebar: transparent;
+  --sidebar-foreground: var(--aurora-ink);
+  --sidebar-border: var(--aurora-stroke-soft);
+  --sidebar-accent: rgba(123, 151, 220, 0.16);
+  --sidebar-accent-foreground: var(--aurora-ink);
+  --sidebar-edge-border: rgba(172, 196, 255, 0.1);
+
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--aurora-stroke);
+  border-radius: 20px;
+  background: var(--aurora-glass) !important;
+  color: var(--aurora-ink) !important;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    0 8px 30px rgba(13, 27, 65, 0.45),
+    inset 0 1px 0 rgba(226, 235, 255, 0.08);
+  backdrop-filter: blur(28px) saturate(135%);
+}
+
+/* Pane chrome: quiet separators and a subtle top-light instead of opaque
+   utility gray. The layout tree still owns all resize seams. */
+:root[data-hermes-reference-shell='aurora'] [data-tree-group] {
+  background: rgba(8, 16, 33, 0.52) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+  background: linear-gradient(180deg, rgba(19, 33, 63, 0.88), rgba(11, 21, 43, 0.88)) !important;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  :is([data-tree-group='grp-review'], [data-tree-group='grp-files'], [data-tree-group='grp-terminal']) {
+  background: linear-gradient(180deg, rgba(17, 30, 57, 0.8), rgba(9, 18, 37, 0.8)) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-panel-header] {
+  background: rgba(15, 28, 53, 0.78) !important;
+  box-shadow: inset 0 -1px 0 rgba(172, 198, 255, 0.075);
+  backdrop-filter: blur(18px);
+}
+
+/* Session rail: introduce a small branded masthead without adding another
+   React surface. ::before participates as the first flex item in SidebarContent. */
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']::before {
+  content: 'HERMES';
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 42px;
+  padding: 7px 10px 3px 46px;
+  color: #dce7ff;
+  background-image:
+    radial-gradient(circle at 22px 50%, #d8e6ff 0 3px, transparent 3.5px),
+    radial-gradient(circle at 22px 50%, #86a9ff 0 9px, #745cff 10px, transparent 11px),
+    radial-gradient(circle at 18px 42%, rgba(113, 209, 255, 0.7), transparent 13px);
+  background-repeat: no-repeat;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 20px rgba(118, 151, 255, 0.38);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='sessions-sidebar'] {
+  border-color: rgba(173, 198, 255, 0.08) !important;
+  background: transparent !important;
+}
+
+/* Turn the existing New session command into the strong gradient action from
+   the reference without forking its click/drag/keybind behavior. Chromium in
+   Electron supports :has(), which lets the durable data-tour hook identify it. */
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
+  [data-slot='sidebar-menu-button'] {
+  height: 42px;
+  margin-bottom: 6px;
+  border-color: rgba(203, 217, 255, 0.2) !important;
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(135deg, #7294ff 0%, #716fe9 52%, #526fc8 100%) !important;
+  color: #f7f9ff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 8px 24px rgba(61, 82, 178, 0.32);
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
+  [data-slot='sidebar-menu-button']:hover {
+  border-color: rgba(220, 230, 255, 0.32) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 42%),
+    linear-gradient(135deg, #7ca0ff 0%, #7b79ef 52%, #5c79d2 100%) !important;
+  transform: translateY(-1px);
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-button'] {
+  border-radius: 8px;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-button'][data-active='true'] {
+  box-shadow: inset 0 0 0 1px rgba(171, 197, 255, 0.08);
+}
+
+/* The shared SearchField remains the shared primitive; only its rail context
+   receives the compact glass capsule treatment. */
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])
+  > div:has(> input[type='text']) {
+  width: 100%;
+  min-height: 34px;
+  padding-inline: 10px;
+  border: 1px solid rgba(172, 198, 255, 0.12);
+  border-radius: 9px;
+  background: rgba(8, 16, 34, 0.36);
+  opacity: 0.78;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])
+  > div:has(> input[type='text']):focus-within {
+  border-color: rgba(145, 176, 255, 0.34);
+  background: rgba(10, 20, 42, 0.68);
+  opacity: 1;
+  box-shadow: 0 0 0 3px rgba(96, 126, 220, 0.08);
+}
+
+/* Composer: the reference uses a contained command field floating above the
+   transcript rather than a hard bottom edge. Keep all existing composer
+   behavior; just strengthen its surface. */
+:root[data-hermes-reference-shell='aurora'] [data-tour='composer'] {
+  border: 1px solid rgba(173, 199, 255, 0.14) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, rgba(20, 34, 63, 0.9), rgba(10, 20, 40, 0.9)) !important;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(231, 238, 255, 0.055) !important;
+  backdrop-filter: blur(18px);
+}
+
+/* Scrollbars fade into the glass instead of reading as bright browser chrome. */
+:root[data-hermes-reference-shell='aurora'] * {
+  scrollbar-color: rgba(137, 160, 207, 0.28) transparent;
+}
+
+@media (max-width: 900px), (max-height: 620px) {
+  :root[data-hermes-reference-shell='aurora'] #root {
+    padding: 0;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+    border-width: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] body::before,
+  :root[data-hermes-reference-shell='aurora'] body::after {
+    opacity: 0.28;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-hermes-reference-shell='aurora']
+    [data-tour='sessions-sidebar']
+    [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
+    [data-slot='sidebar-menu-button']:hover {
+    transform: none;
+  }
+}
