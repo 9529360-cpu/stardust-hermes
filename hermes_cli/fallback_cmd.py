@@ -1,6 +1,7 @@
-"""hermes fallback — manage the fallback provider chain (tried in order when the primary fails).
+"""hermes fallback — manage the fallback provider chain and its persistent route health.
 
-Subcommands: ``list`` (default), ``add`` (same picker as `hermes model`), ``remove``, ``clear``.
+Subcommands: ``list`` (default), ``add`` (same picker as `hermes model`), ``remove``,
+``clear``, ``health`` and ``reset-health``.
 """
 from __future__ import annotations
 
@@ -124,6 +125,63 @@ def _describe_primary(config: Dict[str, Any]) -> Optional[str]:
     return model_cfg.strip() or None if isinstance(model_cfg, str) else None
 
 
+def _health_row_key(row: Dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(row.get("provider") or ""),
+        str(row.get("model") or ""),
+        str(row.get("base_url") or ""),
+    )
+
+
+def _format_health_row(row: Dict[str, Any], *, include_endpoint: bool = False) -> str:
+    """Render one normalized route-health row without changing circuit state."""
+    status = str(row.get("status") or "healthy")
+    retry_after = int(row.get("retry_after_seconds") or 0)
+    labels = {
+        "open": "BLOCKED",
+        "half_open_busy": "PROBE IN PROGRESS",
+        "probe_ready": "PROBE READY",
+        "healthy": "HEALTHY",
+    }
+    text = labels.get(status, status.upper().replace("_", " "))
+    if status == "open" and retry_after:
+        text += f" — retry eligible in ~{retry_after}s"
+    elif status == "half_open_busy" and retry_after:
+        text += f" — probe lease expires in ~{retry_after}s"
+    elif status == "probe_ready":
+        text += " — next real request may test this route"
+
+    details: list[str] = []
+    if reason := row.get("reason"):
+        details.append(f"reason={reason}")
+    failures = int(row.get("consecutive_failures") or 0)
+    if failures:
+        details.append(f"failures={failures}")
+    if include_endpoint and (endpoint := row.get("base_url")):
+        details.append(f"endpoint={endpoint}")
+    if details:
+        text += "  (" + "; ".join(details) + ")"
+    return text
+
+
+def _print_route_health(label: str, entry: Dict[str, Any], *, matched: set[tuple[str, str, str]]) -> None:
+    from agent import route_health
+
+    rows = route_health.health_rows(
+        str(entry.get("provider") or ""),
+        str(entry.get("model") or ""),
+        str(entry.get("base_url") or ""),
+    )
+    print(f"  {label}: {_format_entry(entry)}")
+    if not rows:
+        print("    ELIGIBLE — no persisted route failures recorded")
+        return
+    include_endpoint = len(rows) > 1 or not entry.get("base_url")
+    for row in rows:
+        matched.add(_health_row_key(row))
+        print(f"    {_format_health_row(row, include_endpoint=include_endpoint)}")
+
+
 def cmd_fallback_list(args) -> None:  # noqa: ARG001
     """Print the current fallback chain."""
     config, chain = _load_chain("  No fallback providers configured.")
@@ -135,7 +193,82 @@ def cmd_fallback_list(args) -> None:  # noqa: ARG001
         print(f"  Primary:   {primary}\n")
     _print_chain("Fallback chain", chain)
     print("  Tried in order when the primary fails (rate-limit, 5xx, connection errors).")
-    print("  Docs: https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers\n")
+    print("  Route circuit status: hermes fallback health\n")
+
+
+def cmd_fallback_health(args) -> None:  # noqa: ARG001
+    """Show persisted circuit state without claiming a recovery probe or making network calls."""
+    from agent import route_health
+    from hermes_cli.config import load_config
+
+    config = load_config()
+    chain = _read_chain(config)
+    print("\n  Persistent route health")
+    print(f"  Enabled: {'yes' if route_health.enabled() else 'no'}")
+    print(f"  State:   {route_health.state_path()}")
+    if not route_health.enabled():
+        print("\n  Persistent circuit tracking is disabled; stored state does not gate routes.\n")
+        return
+
+    matched: set[tuple[str, str, str]] = set()
+    primary = _extract_fallback_from_model_cfg(config.get("model"))
+    print()
+    if primary:
+        _print_route_health("Primary", primary, matched=matched)
+    else:
+        print("  Primary: not resolvable from model config")
+
+    if chain:
+        for index, entry in enumerate(chain, 1):
+            _print_route_health(f"Fallback {index}", entry, matched=matched)
+    else:
+        print("  Fallbacks: none configured")
+
+    remembered = route_health.health_rows()
+    extra = [row for row in remembered if _health_row_key(row) not in matched]
+    if extra:
+        print("\n  Other remembered routes:")
+        for row in extra:
+            entry = {
+                "provider": row.get("provider"),
+                "model": row.get("model"),
+                "base_url": row.get("base_url"),
+            }
+            print(f"    {_format_entry(entry)}")
+            print(f"      {_format_health_row(row)}")
+
+    print("\n  Inspection is read-only: it never probes a provider or claims a half-open lease.")
+    print("  Clear advisory circuit history with: hermes fallback reset-health\n")
+
+
+def cmd_fallback_reset_health(args) -> None:
+    """Clear persisted route-health history without changing fallback configuration."""
+    from agent import route_health
+
+    rows = route_health.health_rows()
+    if not rows:
+        print("\n  No persisted route-health entries to clear.\n")
+        return
+
+    if not bool(getattr(args, "yes", False)):
+        print(f"\n  This will clear {_entries(len(rows))} of route-health history for the active profile.")
+        print("  Fallback providers and credentials are not changed.")
+        try:
+            response = input("  Clear route-health history? [y/N]: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print("\n  Cancelled.")
+            return
+        if response not in {"y", "yes"}:
+            print("  Cancelled — no change.")
+            return
+
+    try:
+        cleared = route_health.reset_state()
+    except (OSError, TimeoutError) as exc:
+        print(f"\n  Could not clear route-health state: {exc}")
+        raise SystemExit(1) from exc
+    print(f"\n  Cleared {_entries(cleared)} of persisted route-health history.")
+    print("  The next real request may probe routes that were previously cooling down.\n")
 
 
 def cmd_fallback_add(args) -> None:
@@ -241,12 +374,16 @@ def cmd_fallback(args) -> None:
     handler = _SUBCOMMANDS.get(sub)
     if handler is None:
         print(f"Unknown fallback subcommand: {sub}")
-        print("Use one of: list, add, remove, clear")
+        print("Use one of: list, add, remove, clear, health, reset-health")
         raise SystemExit(2)
     handler(args)
 
 
 _SUBCOMMANDS = {
-    **dict.fromkeys((None, "", "list", "ls"), cmd_fallback_list), "add": cmd_fallback_add,
-    **dict.fromkeys(("remove", "rm"), cmd_fallback_remove), "clear": cmd_fallback_clear,
+    **dict.fromkeys((None, "", "list", "ls"), cmd_fallback_list),
+    "add": cmd_fallback_add,
+    **dict.fromkeys(("remove", "rm"), cmd_fallback_remove),
+    "clear": cmd_fallback_clear,
+    "health": cmd_fallback_health,
+    "reset-health": cmd_fallback_reset_health,
 }
