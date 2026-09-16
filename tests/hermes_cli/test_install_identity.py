@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import errno
 import multiprocessing
 from pathlib import Path
+import threading
 import time
 
 from gateway.hosted_rooms import local_authority_gateway_id
@@ -147,6 +148,40 @@ def test_contended_publication_lock_times_out_without_minting(tmp_path, monkeypa
     committed = read_or_create_install_id(tmp_path)
     assert committed
     assert (tmp_path / "install_id").read_text(encoding="utf-8").strip() == committed
+
+
+def test_cache_lock_does_not_span_slow_authority_io(tmp_path, monkeypatch):
+    stable = "a" * 32
+    first_entered = threading.Event()
+    release_first = threading.Event()
+    call_lock = threading.Lock()
+    calls = 0
+
+    monkeypatch.setattr(install_identity, "get_default_hermes_root", lambda: tmp_path)
+
+    def controlled_resolve(root):
+        nonlocal calls
+        assert root == tmp_path
+        with call_lock:
+            calls += 1
+            call_number = calls
+        if call_number == 1:
+            first_entered.set()
+            assert release_first.wait(timeout=10)
+        return stable
+
+    monkeypatch.setattr(install_identity, "read_or_create_install_id", controlled_resolve)
+    cache = {"root": None, "value": None}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(install_identity.get_install_id, cache=cache)
+        assert first_entered.wait(timeout=2)
+        second = executor.submit(install_identity.get_install_id, cache=cache)
+        assert second.result(timeout=2) == stable
+        release_first.set()
+        assert first.result(timeout=2) == stable
+
+    assert cache == {"root": str(tmp_path), "value": stable}
 
 
 def test_lock_error_classification_retries_only_contention():
