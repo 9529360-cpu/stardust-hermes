@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import types
 from pathlib import Path
 
@@ -106,6 +107,31 @@ def test_health_command_does_not_rewrite_persisted_state(isolated_home, capsys):
     capsys.readouterr()
 
     assert path.read_bytes() == before
+
+
+def test_corrupt_health_state_is_reported_and_repairable(isolated_home, capsys):
+    _write_config(
+        isolated_home,
+        {
+            "model": {"provider": "anthropic", "default": "primary"},
+            "fallback_providers": [{"provider": "openrouter", "model": "fallback"}],
+        },
+    )
+    path = route_health.state_path()
+    path.write_text("not-json", encoding="utf-8")
+
+    from hermes_cli.fallback_cmd import cmd_fallback_health, cmd_fallback_reset_health
+
+    cmd_fallback_health(types.SimpleNamespace())
+    health_output = capsys.readouterr().out
+    assert "CORRUPT" in health_output
+    assert "routing is failing open" in health_output
+    assert "ELIGIBLE" not in health_output
+
+    cmd_fallback_reset_health(types.SimpleNamespace(yes=True))
+    reset_output = capsys.readouterr().out
+    assert "Reset corrupt route-health state" in reset_output
+    assert json.loads(path.read_text(encoding="utf-8")) == {"version": 1, "routes": {}}
 
 
 def test_reset_health_clears_state_but_preserves_fallback_chain(isolated_home, capsys):
