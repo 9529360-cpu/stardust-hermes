@@ -30,7 +30,8 @@ import { StatusbarControls } from '../shell/statusbar-controls'
 
 import { latestChatActions, latestSidebarActions } from './latest-actions'
 import { setStatusbarItemGroup, useStatusbarContributions } from './panes'
-import { PersonalProductNav } from './personal-product-nav'
+import { PersonalProductNav, ProductRailHeader } from './personal-product-nav'
+import { TaskWorkspaceFrame } from './task-workspace-frame'
 import type { SidebarActions, WiringActions } from './types'
 
 // Same lazy-view split as DesktopController — pages load on demand. The
@@ -57,6 +58,7 @@ export const SidebarSurface = memo(function SidebarSurface({
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden" data-personal-sidebar-shell="">
+      <ProductRailHeader onNavigate={latestActions.onNavigate} />
       <ChatSidebar currentView={currentView} {...latestActions} />
       <PersonalProductNav currentView={currentView} onNavigate={latestActions.onNavigate} />
     </div>
@@ -162,16 +164,18 @@ export const ChatRoutesSurface = memo(function ChatRoutesSurface({
   const chatActions = useMemo(() => latestChatActions(actions), [actions])
 
   const chatView = (
-    <ChatView
-      gateway={gateway}
-      maxVoiceRecordingSeconds={maxVoiceRecordingSeconds}
-      modelMenuContent={modelMenuContent}
-      modelOptionsOwnerConnectionId={activeConnectionId || undefined}
-      modelOptionsProfile={activeGatewayProfile}
-      reasoningMenuContent={reasoningMenuContent}
-      requestModelOptionsForOwner={actions.requestGateway}
-      {...chatActions}
-    />
+    <TaskWorkspaceFrame>
+      <ChatView
+        gateway={gateway}
+        maxVoiceRecordingSeconds={maxVoiceRecordingSeconds}
+        modelMenuContent={modelMenuContent}
+        modelOptionsOwnerConnectionId={activeConnectionId || undefined}
+        modelOptionsProfile={activeGatewayProfile}
+        reasoningMenuContent={reasoningMenuContent}
+        requestModelOptionsForOwner={actions.requestGateway}
+        {...chatActions}
+      />
+    </TaskWorkspaceFrame>
   )
 
   // FULL-PAGE views (not chat): a page is not a tab-able surface, so the zone's
