@@ -23,7 +23,7 @@ test.afterAll(async () => {
 })
 
 test.describe('Stardust Codex desktop shell', () => {
-  test('shows projects/threads, active thread and a real Review diff', async () => {
+  test('shows projects/threads, active thread and a readable real Review diff', async () => {
     const page = fixture!.page
 
     await expect(page.locator('[data-stardust-task-rail]')).toBeVisible()
@@ -41,6 +41,8 @@ test.describe('Stardust Codex desktop shell', () => {
     await newThreadInProject.click()
 
     await expect(page.locator('[data-task-header]')).not.toContainText('No project')
+    await expect(page.getByText('Project workspace', { exact: true })).toBeVisible()
+    await expect(page.getByText('What should we change?', { exact: true })).toBeVisible()
     await expect(page.locator('[data-tree-group="grp-review"]')).toBeVisible()
 
     const review = page.locator('aside[aria-label="Review"]')
@@ -62,6 +64,14 @@ test.describe('Stardust Codex desktop shell', () => {
       await expect(changedFile).toBeVisible({ timeout: 15_000 })
       await changedFile.click()
       await expect(review).toContainText(SMOKE_DIFF_MARKER, { timeout: 15_000 })
+
+      // Text existing in the DOM is not enough. This caught the prior flex bug
+      // where FileDiffPanel mounted inside a zero-height parent and only its
+      // title strip was visible to the user.
+      const diffPanel = review.locator('[data-review-diff-panel]')
+      await expect(diffPanel).toBeVisible()
+      const diffBounds = await diffPanel.boundingBox()
+      expect(diffBounds?.height ?? 0).toBeGreaterThan(180)
 
       // The three permanent product regions are not generic IDE tab stacks.
       for (const groupId of ['grp-sessions', 'grp-main', 'grp-review']) {
