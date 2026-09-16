@@ -1,7 +1,9 @@
+import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
 import { useI18n } from '@/i18n'
 import { resetBrowseState } from '@/store/composer-input-history'
+import { $currentCwd } from '@/store/session'
 
 import { pickPlaceholder } from '../composer-utils'
 
@@ -17,17 +19,35 @@ interface UseComposerPlaceholderOptions {
  * a *different* conversation — the null→id persist of a freshly-started session
  * keeps its starter so the text doesn't flip mid-stream. While the transport is
  * down, it swaps to a reconnecting / starting message instead.
+ *
+ * A new project-scoped thread is the exception to the randomized starter pool:
+ * use the locale's first starter (the coding/build prompt) so the Codex-style
+ * workspace never randomly falls back to generic or Hermes-branded chat copy.
  */
 export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: UseComposerPlaceholderOptions): string {
   const { t } = useI18n()
+  const cwd = useStore($currentCwd)
+  const projectScoped = Boolean(cwd.trim())
   const newSessionPlaceholders = t.composer.newSessionPlaceholders
   const followUpPlaceholders = t.composer.followUpPlaceholders
+  const pickNewSessionPlaceholder = () =>
+    projectScoped
+      ? (newSessionPlaceholders[0] ?? t.composer.message)
+      : pickPlaceholder(newSessionPlaceholders)
 
   const [restingPlaceholder, setRestingPlaceholder] = useState(() =>
-    pickPlaceholder(sessionId ? followUpPlaceholders : newSessionPlaceholders)
+    sessionId ? pickPlaceholder(followUpPlaceholders) : pickNewSessionPlaceholder()
   )
 
   const prevSessionIdRef = useRef(sessionId)
+
+  // A draft can move from no workspace into a project without receiving a
+  // stored session id yet. Keep the starter aligned with that visible context.
+  useEffect(() => {
+    if (!sessionId) {
+      setRestingPlaceholder(pickNewSessionPlaceholder())
+    }
+  }, [projectScoped])
 
   // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
   useEffect(() => {
@@ -45,8 +65,8 @@ export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: Us
     }
 
     resetBrowseState(prev)
-    setRestingPlaceholder(pickPlaceholder(sessionId ? followUpPlaceholders : newSessionPlaceholders))
-  }, [followUpPlaceholders, newSessionPlaceholders, sessionId])
+    setRestingPlaceholder(sessionId ? pickPlaceholder(followUpPlaceholders) : pickNewSessionPlaceholder())
+  }, [followUpPlaceholders, newSessionPlaceholders, projectScoped, sessionId])
 
   // When the transport is disabled it's because the gateway isn't open.
   // Distinguish a cold start ("Starting Hermes...") from a dropped connection
