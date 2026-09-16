@@ -43,6 +43,7 @@ export function ReviewShipBar() {
   const commitDefault = useStore($reviewCommitDefault)
   const [message, setMessage] = useState('')
   const prLabel = ship.pr?.url ? c.openPr : c.createPr
+  const agentShipLabel = c.agentShip.replaceAll('Hermes', 'Stardust')
 
   const hasFiles = files.length > 0
   const canCommit = hasFiles && message.trim().length > 0 && !busy
@@ -134,13 +135,13 @@ export function ReviewShipBar() {
           disabled={!hasFiles}
           onClick={() => {
             if (!requestComposerSubmit(c.agentShipPrompt, { target: scopeTarget })) {
-              notifyError(new Error(c.agentShipUnavailable), c.agentShip)
+              notifyError(new Error(c.agentShipUnavailable), agentShipLabel)
             }
           }}
           size="sm"
           variant="ghost"
         >
-          <span className="truncate underline underline-offset-2">{c.agentShip}</span>
+          <span className="truncate underline underline-offset-2">{agentShipLabel}</span>
         </Button>
         <Tip label={ship.ghReady ? prLabel : c.ghMissing}>
           <span className="absolute inset-y-0 right-0 flex items-center">
