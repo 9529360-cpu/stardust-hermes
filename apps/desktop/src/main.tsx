@@ -1,5 +1,6 @@
 import './styles.css'
 import './reference-shell.css'
+import './stardust-brand.css'
 import './personal-settings.css'
 // Side-effect: reports in-flight turns to the main process for the quit guard.
 import './store/active-work'
@@ -56,8 +57,12 @@ const winParam = new URLSearchParams(window.location.search).get('win')
 // purpose-built chrome.
 applyReferenceShell(winParam)
 
+if (winParam === null || winParam === 'secondary') {
+  document.title = 'Stardust'
+}
+
 if (winParam === 'hud') {
-  document.title = 'Hermes HUD'
+  document.title = 'Stardust HUD'
 }
 
 // The `?win=` kinds whose Electron window is `transparent: true` and so paints
