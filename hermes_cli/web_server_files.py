@@ -95,29 +95,17 @@ def _default_hermes_root_is_opt_data() -> bool:
 
 
 def _dashboard_local_update_managed_externally() -> bool:
-    """True when the dashboard should not offer ``hermes update``.
+    """Stardust never offers an in-dashboard backend source update.
 
-    Containerized dashboards are updated by the outer launcher/image — except a
-    ``git`` install (bind-mounted checkout, e.g. the hermes-webui image), where
-    the update button is the correct path. pip stays blocked in containers: its
-    apply path mutates the running container filesystem.
+    The personal edition is maintained from its own pinned Stardust source authority.  The inherited
+    Hermes dashboard updater still has an upstream-oriented check/apply state machine; exposing it
+    would let a manual ``Check now`` bypass Stardust's passive-update opt-out and then offer an
+    apply action whose CLI entrypoint is intentionally disabled.  Treat the backend as externally
+    managed on every deployment kind until Stardust owns a complete release/update/rollback lane.
+
+    This policy covers the backend/source checkout only.  It does not disable the desktop shell's
+    own client-version/build lifecycle.
     """
-    from hermes_cli.web_server import PROJECT_ROOT
-    from hermes_cli.config import detect_install_method
-    if _default_hermes_root_is_opt_data():
-        return True
-    try:
-        from hermes_constants import is_container
-
-        if not is_container():
-            return False
-    except Exception:
-        return False
-    try:
-        if detect_install_method(PROJECT_ROOT) == "git":
-            return False
-    except Exception:
-        pass
     return True
 
 
