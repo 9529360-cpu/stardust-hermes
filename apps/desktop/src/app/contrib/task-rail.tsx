@@ -1,14 +1,15 @@
 import { useStore } from '@nanostores/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
 import { SearchField } from '@/components/ui/search-field'
+import { useI18n } from '@/i18n'
 import { NEW_SESSION_TITLE, sessionTitle } from '@/lib/chat-runtime'
 import { cn } from '@/lib/utils'
 import { $newChatProfile } from '@/store/profile'
-import { $projectTree } from '@/store/projects'
+import { $projectTree, refreshProjectTree } from '@/store/projects'
 import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
-import { $sessions } from '@/store/session'
+import { $gatewayState, $sessions } from '@/store/session'
 import { $focusedStoredSessionId, $workingSessionIds } from '@/store/session-states'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -44,7 +45,12 @@ function RailNavButton({ active = false, icon, label, onClick }: { active?: bool
   return (
     <button
       aria-current={active ? 'page' : undefined}
-      className={cn('flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[0.72rem] font-medium transition-colors', active ? 'bg-(--ui-control-active-background) text-(--ui-text-primary)' : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)')}
+      className={cn(
+        'flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-[0.72rem] font-medium transition-colors',
+        active
+          ? 'bg-(--ui-control-active-background) text-(--ui-text-primary)'
+          : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
+      )}
       onClick={onClick}
       type="button"
     >
@@ -68,15 +74,24 @@ function sessionMatchesQuery(session: SessionInfo, query: string): boolean {
 }
 
 export function TaskRail({ actions, currentView }: TaskRailProps) {
+  const { locale } = useI18n()
   const sessions = useStore($sessions)
   const focusedSessionId = useStore($focusedStoredSessionId)
   const workingSessionIds = useStore($workingSessionIds)
   const projectTree = useStore($projectTree)
+  const gatewayState = useStore($gatewayState)
   const rightContextOpen = useStore($rightContextOpen)
   const [query, setQuery] = useState('')
+  const copy = COPY[locale]
 
-  const locale = document.documentElement.lang.toLowerCase()
-  const copy = COPY[locale as keyof typeof COPY] ?? COPY.en
+  // The old ChatSidebar used to own the first project-tree refresh. Now that
+  // Stardust has a dedicated task rail, move that data responsibility here so
+  // the redesign does not silently trade clean UI for an empty Projects list.
+  useEffect(() => {
+    if (gatewayState === 'open') {
+      void refreshProjectTree()
+    }
+  }, [gatewayState])
 
   const visibleSessions = useMemo(
     () => sessions.filter(session => !session.archived && sessionMatchesQuery(session, query.trim())).slice(0, 14),
@@ -102,7 +117,12 @@ export function TaskRail({ actions, currentView }: TaskRailProps) {
           </div>
         </div>
 
-        <button className="mt-3 flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[0.76rem] font-semibold" data-task-rail-new onClick={newTask} type="button">
+        <button
+          className="mt-3 flex h-10 w-full items-center gap-2 rounded-xl px-3 text-left text-[0.76rem] font-semibold"
+          data-task-rail-new
+          onClick={newTask}
+          type="button"
+        >
           <Codicon name="add" size="0.9rem" />
           <span>{copy.newTask}</span>
         </button>
@@ -151,21 +171,41 @@ export function TaskRail({ actions, currentView }: TaskRailProps) {
                 return (
                   <button
                     aria-current={active ? 'page' : undefined}
-                    className={cn('group flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors', active ? 'bg-(--ui-control-active-background)' : 'hover:bg-(--ui-control-hover-background)')}
+                    className={cn(
+                      'group flex min-h-10 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors',
+                      active ? 'bg-(--ui-control-active-background)' : 'hover:bg-(--ui-control-hover-background)'
+                    )}
                     key={session.id}
                     onClick={() => actions.onResumeSession(session.id, session)}
                     type="button"
                   >
-                    <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full', working ? 'bg-(--theme-midground)' : active ? 'bg-(--ui-success)' : 'bg-(--ui-stroke-primary)')} />
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'size-1.5 shrink-0 rounded-full',
+                        working ? 'bg-(--theme-midground)' : active ? 'bg-(--ui-success)' : 'bg-(--ui-stroke-primary)'
+                      )}
+                    />
                     <span className="min-w-0 flex-1">
-                      <span className={cn('block truncate text-[0.7rem] font-medium', active ? 'text-(--ui-text-primary)' : 'text-(--ui-text-secondary)')}>{sessionTitle(session)}</span>
-                      <span className="mt-0.5 block truncate text-[0.57rem] text-(--ui-text-quaternary)">{session.model || session.cwd || NEW_SESSION_TITLE}</span>
+                      <span
+                        className={cn(
+                          'block truncate text-[0.7rem] font-medium',
+                          active ? 'text-(--ui-text-primary)' : 'text-(--ui-text-secondary)'
+                        )}
+                      >
+                        {sessionTitle(session)}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[0.57rem] text-(--ui-text-quaternary)">
+                        {session.model || session.cwd || NEW_SESSION_TITLE}
+                      </span>
                     </span>
                   </button>
                 )
               })
             ) : (
-              <div className="rounded-lg px-2 py-4 text-center text-[0.65rem] text-(--ui-text-quaternary)">{query ? 'No matching tasks' : 'No recent tasks'}</div>
+              <div className="rounded-lg px-2 py-4 text-center text-[0.65rem] text-(--ui-text-quaternary)">
+                {query ? 'No matching tasks' : 'No recent tasks'}
+              </div>
             )}
           </div>
         </section>
@@ -173,16 +213,34 @@ export function TaskRail({ actions, currentView }: TaskRailProps) {
         <section className="mt-4">
           <RailSectionTitle>Tools</RailSectionTitle>
           <div className="mt-1.5">
-            <RailNavButton icon="tools" label={copy.skills} onClick={() => navigate({ id: 'skills', label: copy.skills, icon: NULL_ICON, route: SKILLS_ROUTE })} />
+            <RailNavButton
+              icon="tools"
+              label={copy.skills}
+              onClick={() => navigate({ id: 'skills', label: copy.skills, icon: NULL_ICON, route: SKILLS_ROUTE })}
+            />
           </div>
         </section>
       </div>
 
       <nav aria-label="Product navigation" className="shrink-0" data-task-rail-footer="">
         <RailNavButton active={currentView === 'chat'} icon="home" label={copy.home} onClick={newTask} />
-        <RailNavButton active={currentView === 'cron'} icon="checklist" label={copy.tasks} onClick={() => navigate({ id: 'cron', label: copy.tasks, icon: NULL_ICON, route: CRON_ROUTE })} />
-        <RailNavButton icon="layout-sidebar-right" label={copy.workspace} onClick={() => setRightContextOpen(!rightContextOpen)} />
-        <RailNavButton active={currentView === 'settings'} icon="settings-gear" label={copy.settings} onClick={() => navigate({ id: 'settings', label: copy.settings, icon: NULL_ICON, route: SETTINGS_ROUTE })} />
+        <RailNavButton
+          active={currentView === 'cron'}
+          icon="checklist"
+          label={copy.tasks}
+          onClick={() => navigate({ id: 'cron', label: copy.tasks, icon: NULL_ICON, route: CRON_ROUTE })}
+        />
+        <RailNavButton
+          icon="layout-sidebar-right"
+          label={copy.workspace}
+          onClick={() => setRightContextOpen(!rightContextOpen)}
+        />
+        <RailNavButton
+          active={currentView === 'settings'}
+          icon="settings-gear"
+          label={copy.settings}
+          onClick={() => navigate({ id: 'settings', label: copy.settings, icon: NULL_ICON, route: SETTINGS_ROUTE })}
+        />
       </nav>
     </aside>
   )
