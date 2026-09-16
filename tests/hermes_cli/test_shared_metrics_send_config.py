@@ -34,13 +34,12 @@ class TestDefaults:
 
     def test_stardust_has_no_implicit_remote_endpoint(self):
         assert DEFAULT_ENDPOINT == ""
+        assert DEFAULT_CONFIG["telemetry"]["shared_metrics"]["endpoint"] == ""
 
-    def test_legacy_hermes_default_is_not_stardust_authority(self):
-        shared = dict(DEFAULT_CONFIG["telemetry"]["shared_metrics"])
-        assert shared["endpoint"] == LEGACY_UPSTREAM_ENDPOINT
-        shared.update(enabled=True, send=True)
-
-        resolved = resolve_send_config(_config(**shared))
+    def test_legacy_hermes_endpoint_is_not_stardust_authority(self):
+        resolved = resolve_send_config(
+            _config(enabled=True, send=True, endpoint=LEGACY_UPSTREAM_ENDPOINT)
+        )
 
         assert resolved.endpoint == LEGACY_UPSTREAM_ENDPOINT
         assert resolved.send is False
