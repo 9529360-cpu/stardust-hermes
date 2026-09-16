@@ -8,6 +8,7 @@ This file coordinates concurrent work on the Stardust fork. Keep claims narrow, 
 - **Status:** implementation complete; validation/review in progress
 - **Started:** 2026-09-16
 - **Branch:** `fix/backend-route-health-hardening`
+- **PR:** #2 (draft)
 - **Goal:** make persistent model-route health cross-process safe, observable, and safely resettable without issuing network/model probes.
 - **Expected write set:**
   - `agent/route_health.py`
