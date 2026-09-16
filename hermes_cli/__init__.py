@@ -7,6 +7,25 @@ __version__ = "0.21.3"
 __release_date__ = "2026.9.14"
 
 
+def _apply_stardust_product_defaults() -> None:
+    """Apply local-edition defaults before any config consumer initializes.
+
+    ``hermes_cli.config_defaults`` is deliberately a pure-data leaf module, so
+    importing it here does not pull the config loader into package startup. The
+    Stardust product must never passively follow the upstream project: the
+    banner/update probe already honors ``updates.check`` before any network
+    request, and this makes the no-network choice the default for every fresh
+    install. A user can still opt in explicitly in their own config.
+    """
+    from hermes_cli.config_defaults import DEFAULT_CONFIG
+
+    updates = DEFAULT_CONFIG.setdefault("updates", {})
+    updates["check"] = False
+
+
+_apply_stardust_product_defaults()
+
+
 def _ensure_utf8():
     """Force UTF-8 stdout/stderr to prevent UnicodeEncodeError crashes.
 
