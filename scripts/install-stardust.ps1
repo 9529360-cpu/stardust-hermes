@@ -4,11 +4,63 @@
 # product-source / recovery URL to Stardust, then refuses to execute if an
 # upstream Hermes source URL survived. This keeps repair and fallback paths from
 # silently replacing the personal build with NousResearch/hermes-agent.
+#
+# STARDUST_INSTALL_REF can override the source script ref explicitly. Otherwise
+# inherit -Commit / -Tag / -Branch from a stage-protocol invocation so packaged
+# desktop/bootstrap installs execute installer logic from the same pinned ref.
 
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+
+function Get-StardustInstallRef([object[]]$Arguments) {
+    $CommitRef = ''
+    $TagRef = ''
+    $BranchRef = ''
+
+    for ($i = 0; $i -lt $Arguments.Count; $i++) {
+        $Arg = [string]$Arguments[$i]
+
+        if ($Arg -match '^(?i)-Commit$' -and ($i + 1) -lt $Arguments.Count) {
+            $CommitRef = [string]$Arguments[++$i]
+            continue
+        }
+        if ($Arg -match '^(?i)-Tag$' -and ($i + 1) -lt $Arguments.Count) {
+            $TagRef = [string]$Arguments[++$i]
+            continue
+        }
+        if ($Arg -match '^(?i)-Branch$' -and ($i + 1) -lt $Arguments.Count) {
+            $BranchRef = [string]$Arguments[++$i]
+            continue
+        }
+        if ($Arg -match '^(?i)-Commit[:=](.+)$') {
+            $CommitRef = $Matches[1]
+            continue
+        }
+        if ($Arg -match '^(?i)-Tag[:=](.+)$') {
+            $TagRef = $Matches[1]
+            continue
+        }
+        if ($Arg -match '^(?i)-Branch[:=](.+)$') {
+            $BranchRef = $Matches[1]
+            continue
+        }
+    }
+
+    if ($CommitRef) { return $CommitRef }
+    if ($TagRef) { return $TagRef }
+    if ($BranchRef) { return $BranchRef }
+    return ''
+}
 
 $Repo = '9529360-cpu/stardust-hermes'
-$Ref = if ($env:STARDUST_INSTALL_REF) { $env:STARDUST_INSTALL_REF } else { 'main' }
+$ArgRef = Get-StardustInstallRef $args
+$Ref = if ($env:STARDUST_INSTALL_REF) {
+    $env:STARDUST_INSTALL_REF
+} elseif ($ArgRef) {
+    $ArgRef
+} else {
+    'main'
+}
 $InstallerUrl = "https://raw.githubusercontent.com/$Repo/$Ref/scripts/install.ps1"
 $TempInstaller = Join-Path ([System.IO.Path]::GetTempPath()) ("stardust-install-{0}.ps1" -f ([guid]::NewGuid().ToString('N')))
 
