@@ -2,14 +2,16 @@ import { useStore } from '@nanostores/react'
 import { Button, Codicon, type HermesPlugin } from '@hermes/plugin-sdk'
 import { type ReactNode, useEffect } from 'react'
 
+import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { NEW_SESSION_TITLE, sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { $repoStatus, registerRepoStatusCwd } from '@/store/coding-status'
-import { revealDesktopPane } from '@/store/pane-focus'
+import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { openReviewForPath } from '@/store/review'
 import { $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $workingSessionIds } from '@/store/session-states'
 
 const OVERVIEW_PANE_ID = 'personal-shell:overview'
+const PERSONAL_LAYOUT_VERSION = 1
 
 function Card({ children, title }: { children: ReactNode; title: string }) {
   return (
@@ -167,6 +169,21 @@ const plugin: HermesPlugin = {
       },
       render: () => <WorkspaceOverview />
     })
+
+    // Existing installs may still have the old default tree persisted. Move
+    // only people who are still on the stock/default preset onto this product
+    // layout once; never overwrite a layout they already customized.
+    if (ctx.storage.get('layout-version', 0) < PERSONAL_LAYOUT_VERSION) {
+      if ($activePresetId.get() === 'default') {
+        queueMicrotask(() => {
+          if (applyDesktopLayoutPreset('default')) {
+            ctx.storage.set('layout-version', PERSONAL_LAYOUT_VERSION)
+          }
+        })
+      } else {
+        ctx.storage.set('layout-version', PERSONAL_LAYOUT_VERSION)
+      }
+    }
   }
 }
 
