@@ -4,6 +4,7 @@ import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
+import { $newChatProfile } from '@/store/profile'
 import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 
 import { CRON_ROUTE, SETTINGS_ROUTE, type AppView } from '../routes'
@@ -12,12 +13,12 @@ import './personal-product-nav.css'
 import { WORKSPACE_OVERVIEW_PANE_ID } from './workspace-overview'
 
 const PRODUCT_NAV_COPY = {
-  ar: { home: 'الرئيسية', settings: 'الإعدادات', tasks: 'المهام', workspace: 'مساحة العمل' },
-  en: { home: 'Home', settings: 'Settings', tasks: 'Tasks', workspace: 'Workspace' },
-  ja: { home: 'ホーム', settings: '設定', tasks: 'タスク', workspace: 'ワークスペース' },
-  ru: { home: 'Главная', settings: 'Настройки', tasks: 'Задачи', workspace: 'Рабочая область' },
-  zh: { home: '主页', settings: '设置', tasks: '任务', workspace: '工作区' },
-  'zh-hant': { home: '首頁', settings: '設定', tasks: '任務', workspace: '工作區' }
+  ar: { home: 'الرئيسية', newTask: 'مهمة جديدة', settings: 'الإعدادات', tasks: 'المهام', workspace: 'مساحة العمل' },
+  en: { home: 'Home', newTask: 'New task', settings: 'Settings', tasks: 'Tasks', workspace: 'Workspace' },
+  ja: { home: 'ホーム', newTask: '新しいタスク', settings: '設定', tasks: 'タスク', workspace: 'ワークスペース' },
+  ru: { home: 'Главная', newTask: 'Новая задача', settings: 'Настройки', tasks: 'Задачи', workspace: 'Рабочая область' },
+  zh: { home: '主页', newTask: '新建任务', settings: '设置', tasks: '任务', workspace: '工作区' },
+  'zh-hant': { home: '首頁', newTask: '新增任務', settings: '設定', tasks: '任務', workspace: '工作區' }
 } as const
 
 const NULL_ICON: SidebarNavItem['icon'] = () => null
@@ -58,6 +59,38 @@ function ProductNavButton({ active = false, expanded = false, icon, label, onCli
   )
 }
 
+export function ProductRailHeader({ onNavigate }: { onNavigate: (item: SidebarNavItem) => void }) {
+  const { locale } = useI18n()
+  const copy = PRODUCT_NAV_COPY[locale]
+
+  const newTask = () => {
+    $newChatProfile.set(null)
+    onNavigate({
+      id: 'new-session',
+      label: copy.newTask,
+      icon: NULL_ICON,
+      action: 'new-session'
+    })
+  }
+
+  return (
+    <div className="absolute inset-x-0 top-0 z-30" data-product-rail-header="">
+      <div className="flex items-center gap-2.5" data-product-brand="">
+        <span aria-hidden="true" className="grid size-7 place-items-center rounded-lg" data-product-brand-mark="">
+          ✦
+        </span>
+        <span className="text-[0.72rem] font-semibold tracking-[0.16em]">STARDUST</span>
+      </div>
+
+      <button className="flex w-full items-center gap-2 rounded-xl px-3 text-left text-[0.76rem] font-semibold" onClick={newTask} type="button" data-product-new-task="">
+        <Codicon name="add" size="0.92rem" />
+        <span>{copy.newTask}</span>
+        <span aria-hidden="true" className="ml-auto text-[0.62rem] opacity-65">⌘N</span>
+      </button>
+    </div>
+  )
+}
+
 export function PersonalProductNav({ currentView, onNavigate }: PersonalProductNavProps) {
   const { locale } = useI18n()
   const copy = PRODUCT_NAV_COPY[locale]
@@ -93,11 +126,7 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
   }
 
   return (
-    <nav
-      aria-label="Product navigation"
-      className="absolute inset-x-2.5 bottom-2 z-20 rounded-xl border border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) p-1.5 shadow-[0_10px_32px_color-mix(in_srgb,black_24%,transparent)] backdrop-blur-xl"
-      data-personal-product-nav=""
-    >
+    <nav aria-label="Product navigation" className="absolute inset-x-3 bottom-3 z-20" data-personal-product-nav="">
       <ProductNavButton active={currentView === 'chat'} icon="home" label={copy.home} onClick={openHome} />
       <ProductNavButton active={currentView === 'cron'} icon="checklist" label={copy.tasks} onClick={openTasks} />
       <ProductNavButton expanded={rightContextOpen} icon="layout-sidebar-right" label={copy.workspace} onClick={openWorkspace} />
