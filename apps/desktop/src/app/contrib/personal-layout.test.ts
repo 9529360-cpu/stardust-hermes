@@ -6,13 +6,7 @@ import { DEFAULT_TREE } from './layout-presets'
 
 describe('personal desktop default layout', () => {
   it('keeps chat dominant with conversations and workspace context on the sides', () => {
-    expect(allPaneIds(DEFAULT_TREE)).toEqual([
-      'sessions',
-      'workspace',
-      'personal-shell:overview',
-      'review',
-      'files'
-    ])
+    expect(allPaneIds(DEFAULT_TREE)).toEqual(['sessions', 'workspace', 'workspace-overview', 'review', 'files'])
   })
 
   it('keeps developer tools out of the first view', () => {
@@ -31,7 +25,7 @@ describe('personal desktop default layout', () => {
     expect(context.type).toBe('group')
 
     if (context.type === 'group') {
-      expect(context.panes).toEqual(['personal-shell:overview', 'review', 'files'])
+      expect(context.panes).toEqual(['workspace-overview', 'review', 'files'])
     }
   })
 })
