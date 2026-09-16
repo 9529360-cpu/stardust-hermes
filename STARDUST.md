@@ -18,6 +18,24 @@ This repository is a public source-code fork of [NousResearch/hermes-agent](http
 - 主动关闭上游自动检查和更新安装，避免本地定制被覆盖。
 - 为助理首页和持久化路由健康机制补充回归测试。
 
+## Product source / 产品源码权威
+
+`9529360-cpu/stardust-hermes` is the source authority for this edition. Runtime update checks, release links, package metadata, and the Stardust bootstrap installers must point to this repository rather than silently treating the upstream project as the product release source.
+
+`9529360-cpu/stardust-hermes` 是本版本的源码权威。运行时更新检查、Release 链接、包元数据以及 Stardust 安装入口都必须指向本仓库，不能把上游项目默认为本产品的发布源。
+
+For fresh installs, use the Stardust-owned bootstrap entrypoints. They reuse the mature Hermes installers while pinning clone/recovery URLs to this repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash
+```
+
+```powershell
+iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1)
+```
+
+新安装请使用以上 Stardust 安装入口。它们继续复用成熟的 Hermes 安装逻辑，但会在执行前把源码和恢复地址固定到本仓库，避免重装时回到上游版本。
+
 ## Privacy boundary / 隐私边界
 
 This Git repository contains source code and test fixtures only. Runtime/operator data belongs outside the checkout and must not be committed. In particular, do not add:
@@ -40,9 +58,9 @@ The root `.gitignore` excludes these common runtime paths. Review staged files b
 
 ## Update policy / 更新策略
 
-This edition does not automatically contact or install from upstream. The upstream URL may be retained as a manual reference for maintainers. Upstream changes should be reviewed and ported deliberately rather than merged into an operator installation automatically.
+This edition does not automatically contact or install from upstream. Passive CLI update checks are off by default and the desktop background poller is disabled for the local edition. Explicit desktop update checks, when used, resolve against the Stardust repository rather than NousResearch. Upstream changes should be reviewed and ported deliberately rather than merged into an operator installation automatically.
 
-本版本不会自动联系或安装上游更新。维护者可以保留上游地址作为人工参考，但应审查后有选择地移植改动，而不是让使用中的本地版本自动合并上游。
+本版本不会自动联系或安装上游更新。CLI 被动更新检查默认关闭，桌面端后台轮询在本地定制版中也保持关闭。用户主动触发桌面更新检查时，更新源解析为 Stardust 仓库，而不是 NousResearch。上游改动应经过审查后有选择地移植，而不是自动合并进正在使用的版本。
 
 ## License and attribution / 许可证与归属
 
