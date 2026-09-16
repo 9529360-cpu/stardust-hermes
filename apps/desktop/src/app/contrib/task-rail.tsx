@@ -158,7 +158,7 @@ export function TaskRail({ actions, currentView }: TaskRailProps) {
         <div className="px-2 pb-1.5 text-[0.64rem] font-semibold tracking-[0.08em] text-(--ui-text-tertiary)" data-task-rail-wordmark="">
           STARDUST
         </div>
-        <NavRow active={currentView === 'chat'} icon="add" label={copy.newThread} onClick={newThread} />
+        <NavRow icon="add" label={copy.newThread} onClick={newThread} />
         <NavRow
           active={searchOpen}
           icon="search"
