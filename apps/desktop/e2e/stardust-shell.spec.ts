@@ -23,15 +23,12 @@ test.afterAll(async () => {
 })
 
 test.describe('Stardust Codex desktop shell', () => {
-  test('shows projects/threads, active thread and a readable real Review diff', async () => {
+  test('shows projects/threads, active thread, Review and a bottom terminal deck', async () => {
     const page = fixture!.page
 
     await expect(page.locator('[data-stardust-task-rail]')).toBeVisible()
     await expect(page.locator('[data-task-workspace]')).toBeVisible()
 
-    // The mock backend exposes the checkout as a project. Enter it through the
-    // same project-row affordance a user clicks so this screenshot exercises
-    // real workspace routing / CWD ownership instead of a synthetic DOM seed.
     const projectRow = page.locator('[data-task-project-row]').first()
     await expect(projectRow).toBeVisible()
     await projectRow.hover()
@@ -45,21 +42,17 @@ test.describe('Stardust Codex desktop shell', () => {
     await expect(taskHeader).toContainText('New thread')
     await expect(page.getByText('Project workspace', { exact: true })).toBeVisible()
     await expect(page.getByText('What should we change?', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-project-thread-intro] .assistant-home__mark')).toHaveCount(0)
     await expect(page.locator('[data-slot="composer-rich-input"]')).toHaveAttribute('data-placeholder', 'What are we building?')
     await expect(page.locator('[data-tree-group="grp-review"]')).toBeVisible()
 
     const review = page.locator('aside[aria-label="Review"]')
     await expect(review).toBeVisible()
+    await expect(review.locator('[data-review-workspace-header]')).toBeVisible()
 
-    // Codex Review is a work surface, not Hermes' historical 237px utility
-    // rail. User-resized panes still win; a clean install gets this readable
-    // default before the diff is rendered.
     const reviewBounds = await review.boundingBox()
     expect(reviewBounds?.width ?? 0).toBeGreaterThanOrEqual(315)
 
-    // A blank "No diffs" rail proves only layout. Create one reversible change
-    // in the real checkout, explicitly refresh Review, and open the real diff so
-    // the screenshot validates the working Codex review surface end to end.
     const originalSmokeFile = fs.readFileSync(SMOKE_DIFF_PATH, 'utf8')
 
     try {
@@ -74,15 +67,11 @@ test.describe('Stardust Codex desktop shell', () => {
       await changedFile.click()
       await expect(review).toContainText(SMOKE_DIFF_MARKER, { timeout: 15_000 })
 
-      // Text existing in the DOM is not enough. This caught the prior flex bug
-      // where FileDiffPanel mounted inside a zero-height parent and only its
-      // title strip was visible to the user.
       const diffPanel = review.locator('[data-review-diff-panel]')
       await expect(diffPanel).toBeVisible()
       const diffBounds = await diffPanel.boundingBox()
       expect(diffBounds?.height ?? 0).toBeGreaterThan(180)
 
-      // The three permanent product regions are not generic IDE tab stacks.
       for (const groupId of ['grp-sessions', 'grp-main', 'grp-review']) {
         const visibleHeaders = await page.locator(`[data-tree-group="${groupId}"] [data-panel-header]`).evaluateAll(nodes =>
           nodes.filter(node => getComputedStyle(node).display !== 'none').length
@@ -91,15 +80,27 @@ test.describe('Stardust Codex desktop shell', () => {
         expect(visibleHeaders).toBe(0)
       }
 
-      // One real chat composer only. The failed skin rendered the old title
-      // editor as a second giant field above the transcript.
       await expect(page.locator('[data-task-workspace] [data-tour="composer"]')).toHaveCount(1)
-
-      // The discarded dashboard implementation must never leak back into the
-      // product shell: Review is the right-side work surface now.
       await expect(page.locator('[data-personal-overview]')).toHaveCount(0)
 
       await expectVisualSnapshot(page, { name: 'stardust-codex-project-shell', app: fixture!.app })
+
+      // Terminal is a real, resizable bottom work surface. Opening it from the
+      // thread header must not replace Review or turn into another right rail.
+      const terminalButton = taskHeader.getByRole('button', { name: 'Terminal' })
+      await expect(terminalButton).toBeVisible()
+      await terminalButton.click()
+
+      const terminalSlot = page.locator('[data-terminal-slot]')
+      await expect(terminalSlot).toBeVisible({ timeout: 20_000 })
+      await expect(page.locator('[data-persistent-terminal] .xterm')).toBeVisible({ timeout: 20_000 })
+      await expect(review).toBeVisible()
+
+      const workspaceBounds = await page.locator('[data-task-workspace]').boundingBox()
+      const terminalBounds = await terminalSlot.boundingBox()
+      expect(terminalBounds?.y ?? 0).toBeGreaterThan((workspaceBounds?.y ?? 0) + (workspaceBounds?.height ?? 0) * 0.52)
+
+      await expectVisualSnapshot(page, { name: 'stardust-codex-terminal-deck', app: fixture!.app })
     } finally {
       fs.writeFileSync(SMOKE_DIFF_PATH, originalSmokeFile, 'utf8')
     }
