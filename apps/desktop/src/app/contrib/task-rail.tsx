@@ -119,7 +119,7 @@ export function TaskRail({ actions, currentView }: TaskRailProps) {
   }
 
   return (
-    <aside className="flex h-full min-h-0 flex-col" data-stardust-task-rail="">
+    <aside className="flex h-full min-h-0 flex-col" data-slot="sidebar" data-stardust-task-rail="">
       <header className="shrink-0" data-task-rail-header="">
         <div className="flex items-center gap-2.5" data-task-rail-brand="">
           <span aria-hidden="true" className="grid size-7 place-items-center rounded-[10px]" data-task-rail-mark="">✦</span>
