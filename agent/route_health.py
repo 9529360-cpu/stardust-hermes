@@ -192,6 +192,94 @@ def _coerce_nonnegative_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _optional_timestamp(value: Any) -> float | None:
+    timestamp = _coerce_float(value, -1.0)
+    return timestamp if timestamp >= 0 else None
+
+
+def _normalized_health_row(row: dict[str, Any], now: float) -> dict[str, Any]:
+    """Return a read-only operator projection without claiming a half-open probe."""
+    _, identity = route_identity(
+        str(row.get("provider") or ""),
+        str(row.get("model") or ""),
+        str(row.get("base_url") or ""),
+    )
+    cooldown_until = _coerce_float(row.get("cooldown_until"))
+    probe_until = _coerce_float(row.get("probe_until"))
+    stored_status = str(row.get("status") or "healthy").strip().lower()
+    retry_after = 0
+    if cooldown_until > now:
+        status = "open"
+        retry_after = max(1, int(cooldown_until - now + 0.999))
+    elif probe_until > now:
+        status = "half_open_busy"
+        retry_after = max(1, int(probe_until - now + 0.999))
+    elif stored_status in {"open", "half_open"}:
+        # The cooldown/lease expired.  Do not claim here: inspection must never cause model traffic
+        # or make another session skip a route.  The next real caller may claim the recovery probe.
+        status = "probe_ready"
+    else:
+        status = "healthy"
+    reason = row.get("reason")
+    return {
+        **identity,
+        "status": status,
+        "retry_after_seconds": retry_after,
+        "reason": str(reason) if reason is not None else None,
+        "consecutive_failures": _coerce_nonnegative_int(row.get("consecutive_failures")),
+        "last_failure_at": _optional_timestamp(row.get("last_failure_at")),
+        "last_success_at": _optional_timestamp(row.get("last_success_at")),
+    }
+
+
+def health_rows(
+    provider: str = "",
+    model: str = "",
+    base_url: str = "",
+    *,
+    now: float | None = None,
+) -> list[dict[str, Any]]:
+    """Return normalized persisted health rows, optionally filtered to one configured route.
+
+    An omitted ``base_url`` deliberately matches every endpoint recorded for the provider/model.
+    Fallback config commonly omits the URL and lets provider resolution supply it later; exact-key
+    lookup would otherwise report a real cooling route as "untracked".  This function is read-only
+    and never claims the half-open probe lease.
+    """
+    _, wanted = route_identity(provider, model, base_url)
+    when = time.time() if now is None else float(now)
+    state = snapshot()
+    rows: list[dict[str, Any]] = []
+    for raw in state.get("routes", {}).values():
+        if not isinstance(raw, dict):
+            continue
+        normalized = _normalized_health_row(raw, when)
+        if wanted["provider"] and normalized["provider"] != wanted["provider"]:
+            continue
+        if wanted["model"] and normalized["model"] != wanted["model"]:
+            continue
+        if wanted["base_url"] and normalized["base_url"] != wanted["base_url"]:
+            continue
+        rows.append(normalized)
+    rows.sort(key=lambda row: (row["provider"], row["model"], row["base_url"]))
+    return rows
+
+
+def reset_state() -> int:
+    """Clear all persisted route-health history for the active profile.
+
+    Unlike inference-time health writes, this is an explicit operator action.  Lock or write
+    failures therefore surface to the caller instead of pretending the reset succeeded.  The
+    return value is the number of well-formed route rows that were cleared.
+    """
+    path = state_path()
+    with _LOCK, _state_file_lock(path):
+        state = _read_state(path)
+        cleared = sum(1 for row in state.get("routes", {}).values() if isinstance(row, dict))
+        _write_state(_empty_state(), path)
+        return cleared
+
+
 def record_failure(provider: str, model: str, base_url: str = "", reason: FailoverReason | None = None) -> int:
     """Persist a route failure and return its exponential cooldown in seconds."""
     if not enabled() or not provider or not model:
