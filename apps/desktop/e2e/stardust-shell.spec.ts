@@ -85,6 +85,21 @@ test.describe('Stardust Codex desktop shell', () => {
 
       await expectVisualSnapshot(page, { name: 'stardust-codex-project-shell', app: fixture!.app })
 
+      // The reference product direction is dark OS glass. CI follows the host
+      // appearance (usually light), so explicitly switch through the same
+      // rebindable user shortcut and prove the real dark renderer before the
+      // terminal opens.
+      const root = page.locator('html')
+      const alreadyDark = await root.evaluate(node => node.classList.contains('dark'))
+
+      if (!alreadyDark) {
+        await page.keyboard.press('Shift+X')
+      }
+
+      await expect(root).toHaveClass(/dark/)
+      await expect(root).toHaveAttribute('data-hermes-mode', 'dark')
+      await expectVisualSnapshot(page, { name: 'stardust-codex-project-shell-dark', app: fixture!.app })
+
       // Terminal is a real, resizable bottom work surface. Opening it from the
       // thread header must not replace Review or turn into another right rail.
       const terminalButton = taskHeader.getByRole('button', { name: 'Terminal' })
@@ -100,7 +115,7 @@ test.describe('Stardust Codex desktop shell', () => {
       const terminalBounds = await terminalSlot.boundingBox()
       expect(terminalBounds?.y ?? 0).toBeGreaterThan((workspaceBounds?.y ?? 0) + (workspaceBounds?.height ?? 0) * 0.52)
 
-      await expectVisualSnapshot(page, { name: 'stardust-codex-terminal-deck', app: fixture!.app })
+      await expectVisualSnapshot(page, { name: 'stardust-codex-terminal-deck-dark', app: fixture!.app })
     } finally {
       fs.writeFileSync(SMOKE_DIFF_PATH, originalSmokeFile, 'utf8')
     }
