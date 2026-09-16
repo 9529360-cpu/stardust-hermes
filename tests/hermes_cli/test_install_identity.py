@@ -171,7 +171,7 @@ def test_cache_lock_does_not_span_slow_authority_io(tmp_path, monkeypatch):
         return stable
 
     monkeypatch.setattr(install_identity, "read_or_create_install_id", controlled_resolve)
-    cache = {"root": None, "value": None}
+    cache: dict[str, str | None] = {"root": None, "value": None}
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         first = executor.submit(install_identity.get_install_id, cache=cache)
