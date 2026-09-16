@@ -134,7 +134,12 @@ def read_or_create_install_id(root: Path | None = None) -> Optional[str]:
 
 
 def get_install_id(*, cache: dict[str, Optional[str]] | None = None) -> Optional[str]:
-    """Return the process-cached stable id for the active Hermes root."""
+    """Return the process-cached stable id for the active Hermes root.
+
+    The file-backed identity is authoritative.  Keep the process cache lock around memory updates
+    only so a slow or wedged filesystem cannot serialize unrelated callers behind an unbounded
+    thread lock; the bounded cross-thread/process file lock owns publication safety.
+    """
     root = get_default_hermes_root()
     root_key = str(root)
     target_cache = _INSTALL_ID_CACHE if cache is None else cache
@@ -145,14 +150,17 @@ def get_install_id(*, cache: dict[str, Optional[str]] | None = None) -> Optional
 
     if value := _cached():
         return value
+
+    value = read_or_create_install_id(root)
+    if not value:
+        return None
+
     with _INSTALL_ID_LOCK:
-        if value := _cached():
-            return value
-        value = read_or_create_install_id(root)
-        if value:
-            target_cache["root"] = root_key
-            target_cache["value"] = value
-        return value
+        if cached := _cached():
+            return cached
+        target_cache["root"] = root_key
+        target_cache["value"] = value
+    return value
 
 
 __all__ = ["get_install_id", "read_or_create_install_id"]
