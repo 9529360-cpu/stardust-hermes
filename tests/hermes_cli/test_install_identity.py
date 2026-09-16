@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+import errno
 import multiprocessing
 from pathlib import Path
 import time
@@ -31,6 +32,14 @@ def _race_first_install_id(
 
         utils.tempfile.mkstemp = held_mkstemp
     results.put(read_or_create_install_id(root))
+
+
+def _hold_install_id_publication_lock(root_value, entered, release):
+    root = Path(root_value)
+    root.mkdir(parents=True, exist_ok=True)
+    with install_identity._install_id_file_lock(root, timeout=2.0):
+        entered.set()
+        assert release.wait(timeout=10)
 
 
 def test_concurrent_first_use_returns_one_persisted_identity(tmp_path):
@@ -111,3 +120,37 @@ def test_concurrent_corrupt_file_repair_returns_one_committed_identity(tmp_path)
     persisted = (tmp_path / "install_id").read_text(encoding="utf-8").strip()
 
     assert returned == [persisted, persisted]
+
+
+def test_contended_publication_lock_times_out_without_minting(tmp_path, monkeypatch):
+    context = multiprocessing.get_context("spawn")
+    entered = context.Event()
+    release = context.Event()
+    holder = context.Process(
+        target=_hold_install_id_publication_lock,
+        args=(str(tmp_path), entered, release),
+    )
+    holder.start()
+    assert entered.wait(timeout=10)
+    monkeypatch.setattr(install_identity, "_INSTALL_ID_FILE_LOCK_TIMEOUT_S", 0.1)
+
+    started = time.monotonic()
+    assert read_or_create_install_id(tmp_path) is None
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 1.0
+    assert not (tmp_path / "install_id").exists()
+    release.set()
+    holder.join(timeout=10)
+    assert holder.exitcode == 0
+
+    committed = read_or_create_install_id(tmp_path)
+    assert committed
+    assert (tmp_path / "install_id").read_text(encoding="utf-8").strip() == committed
+
+
+def test_lock_error_classification_retries_only_contention():
+    assert install_identity._is_lock_contention_errno(OSError(errno.EAGAIN, "busy"))
+    assert install_identity._is_lock_contention_errno(OSError(errno.EACCES, "busy"))
+    assert not install_identity._is_lock_contention_errno(OSError(errno.ENOSPC, "disk full"))
+    assert not install_identity._is_lock_contention_errno(OSError(errno.EMFILE, "too many files"))
