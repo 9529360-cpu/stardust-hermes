@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n'
 import { NEW_SESSION_TITLE, sessionTitle } from '@/lib/chat-runtime'
 import { cn } from '@/lib/utils'
 import { $newChatProfile } from '@/store/profile'
-import { $projectTree, refreshProjectTree } from '@/store/projects'
+import { $projectTree, refreshProjectTree, scanAndRecordRepos } from '@/store/projects'
 import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import { $gatewayState, $sessions } from '@/store/session'
 import { $focusedStoredSessionId, $workingSessionIds } from '@/store/session-states'
@@ -84,12 +84,24 @@ export function TaskRail({ actions, currentView }: TaskRailProps) {
   const [query, setQuery] = useState('')
   const copy = COPY[locale]
 
-  // The old ChatSidebar used to own the first project-tree refresh. Now that
-  // Stardust has a dedicated task rail, move that data responsibility here so
-  // the redesign does not silently trade clean UI for an empty Projects list.
+  // Projects are first-class Stardust navigation, not an optional grouping.
+  // Fetch the fast cached/tree view first, then perform the heavier repo crawl
+  // in the background so a new repository appears without blocking first paint.
   useEffect(() => {
-    if (gatewayState === 'open') {
-      void refreshProjectTree()
+    if (gatewayState !== 'open') {
+      return
+    }
+
+    let cancelled = false
+
+    void refreshProjectTree().finally(() => {
+      if (!cancelled) {
+        void scanAndRecordRepos()
+      }
+    })
+
+    return () => {
+      cancelled = true
     }
   }, [gatewayState])
 
