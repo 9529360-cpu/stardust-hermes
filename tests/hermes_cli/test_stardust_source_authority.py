@@ -24,6 +24,7 @@ def test_shell_bootstrap_rewrites_repo_prefix_and_fails_closed() -> None:
     assert "raw.githubusercontent.com/NousResearch/hermes-agent" in source
     assert "upstream product-source URL survived rewriting" in source
     assert "grep -Eq" in source
+    assert 'STARDUST_REF="${STARDUST_INSTALL_REF:-${ARG_REF:-main}}"' in source
 
 
 def test_powershell_bootstrap_rewrites_repo_prefix_and_fails_closed() -> None:
@@ -33,6 +34,7 @@ def test_powershell_bootstrap_rewrites_repo_prefix_and_fails_closed() -> None:
     assert "$Source.Replace('https://github.com/NousResearch/hermes-agent', 'https://github.com/9529360-cpu/stardust-hermes')" in source
     assert "$ForbiddenSourceUrls" in source
     assert "upstream product-source URL survived rewriting" in source
+    assert "$ArgRef = Get-StardustInstallRef $args" in source
 
 
 def test_desktop_update_authority_is_stardust() -> None:
@@ -42,11 +44,22 @@ def test_desktop_update_authority_is_stardust() -> None:
     assert "git@github.com:9529360-cpu/stardust-hermes.git" in source
 
 
-def test_desktop_bootstrap_downloads_installer_from_stardust() -> None:
+def test_desktop_bootstrap_downloads_stardust_wrapper() -> None:
     source = _read("apps/desktop/electron/bootstrap-runner.ts")
 
     assert "const STARDUST_SOURCE_REPO = '9529360-cpu/stardust-hermes'" in source
+    assert "install-stardust.ps1" in source
+    assert "install-stardust.sh" in source
     assert "raw.githubusercontent.com/${STARDUST_SOURCE_REPO}/${ref}/scripts/${scriptName}" in source
+    assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in source
+
+
+def test_tauri_bootstrap_downloads_stardust_wrapper() -> None:
+    source = _read("apps/bootstrap-installer/src-tauri/src/install_script.rs")
+
+    assert 'Self::Ps1 => "install-stardust.ps1"' in source
+    assert 'Self::Sh => "install-stardust.sh"' in source
+    assert "raw.githubusercontent.com/9529360-cpu/stardust-hermes" in source
     assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in source
 
 
