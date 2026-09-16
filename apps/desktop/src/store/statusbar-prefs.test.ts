@@ -10,24 +10,24 @@ describe('statusbar whole-bar visibility', () => {
     vi.resetModules()
   })
 
-  it('shows the bar on a fresh install and for installs that hid it under the v1 key', async () => {
-    window.localStorage.setItem(LEGACY_VISIBLE_KEY, 'false')
+  it('keeps the bar hidden on a fresh private-product install and ignores the retired v1 key', async () => {
+    window.localStorage.setItem(LEGACY_VISIBLE_KEY, 'true')
 
     const { $statusbarVisible } = await loadStore()
 
-    expect($statusbarVisible.get()).toBe(true)
+    expect($statusbarVisible.get()).toBe(false)
   })
 
-  it('still honours a hide made after the update', async () => {
+  it('still honours an explicit show made after the update', async () => {
     const first = await loadStore()
 
     first.toggleStatusbarVisible()
-    expect(first.$statusbarVisible.get()).toBe(false)
+    expect(first.$statusbarVisible.get()).toBe(true)
 
     vi.resetModules()
     const reloaded = await loadStore()
 
-    expect(reloaded.$statusbarVisible.get()).toBe(false)
+    expect(reloaded.$statusbarVisible.get()).toBe(true)
   })
 })
 
