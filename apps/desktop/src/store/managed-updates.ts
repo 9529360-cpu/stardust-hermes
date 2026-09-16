@@ -39,11 +39,17 @@ function managedUpdater(): ((id: string) => Promise<DesktopManagedConnectionUpda
   return window.hermesDesktop?.connections?.updateManaged ?? null
 }
 
-/** Whether this Electron main exposes the transactional SSH update bridge.
- * Older mains without it hide the section entirely (fail closed, no fake
- * button that could mutate a live serve process). */
+/** Whether this product may expose the transactional SSH update bridge.
+ *
+ * Stardust currently owns installation source but does not yet own a complete
+ * stable release/update/rollback lane. The inherited bridge drains live SSH
+ * scopes and then invokes `hermes update --yes`; that CLI entrypoint is
+ * intentionally disabled in the pinned local edition. Exposing the button
+ * would therefore start a disruptive transaction that can only fail. Keep it
+ * hidden until a Stardust-native updater makes this capability real again.
+ */
 export function managedUpdatesSupported(): boolean {
-  return Boolean(managedUpdater())
+  return false
 }
 
 export function isManagedUpdateBusyMessage(message: string | null | undefined): boolean {
@@ -101,11 +107,12 @@ export function runManagedUpdate(connectionId: string): Promise<ManagedUpdateSta
 
   const updateManaged = managedUpdater()
 
-  if (!updateManaged) {
+  if (!updateManaged || !managedUpdatesSupported()) {
     const state: ManagedUpdateState = {
       ...blankState(connectionId),
       finishedAt: Date.now(),
-      status: 'failed'
+      message: 'Managed SSH updates are disabled in the Stardust local edition.',
+      status: 'refused'
     }
 
     publish(state)
