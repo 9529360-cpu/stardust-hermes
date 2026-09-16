@@ -215,24 +215,53 @@ def _update_refused(error: str, message: str, update_command: str) -> Dict[str, 
     }
 
 
+def _stardust_git_source_state(project_root: Path) -> tuple[bool, str | None, str]:
+    """Return (applyable, origin, kind) for Stardust's product-source authority."""
+    from hermes_cli.stardust_update import (
+        _git_origin,
+        is_legacy_upstream_remote,
+        is_product_remote,
+    )
+
+    origin = _git_origin(project_root)
+    if is_product_remote(origin):
+        return True, origin, "product"
+    if is_legacy_upstream_remote(origin):
+        # Explicit apply can migrate exactly this historical product origin.
+        return True, origin, "legacy"
+    return False, origin, "other"
+
+
 @router.post("/api/hermes/update")
 async def update_hermes():
-    """Kick off ``hermes update`` in the background."""
+    """Kick off a Stardust-owned ``hermes update`` in the background."""
     if _dashboard_local_update_managed_externally():
         message = _MANAGED_EXTERNALLY_MESSAGE + " The built-in local updater is disabled here."
         return _update_refused("dashboard_update_managed_externally", message, "managed outside dashboard")
+
+    project_root = _server_path("PROJECT_ROOT")
 
     # Shared admission gate: marker-first, then the docker/nix/apt heuristics —
     # one decision with the CLI paths.
     from hermes_cli.update_contract import evaluate_update_admission, record_refusal_receipt
 
-    refusal = evaluate_update_admission(_server_path("PROJECT_ROOT"))
+    refusal = evaluate_update_admission(project_root)
     if refusal is not None:
         response = _update_refused(
             _UPDATE_REFUSAL_ERROR_CODES.get(refusal.code, "update_not_in_place"), refusal.message, refusal.update_command,
         )
         record_refusal_receipt(refusal)
         return response
+
+    if detect_install_method(project_root) == "git":
+        applyable, origin, _kind = _stardust_git_source_state(project_root)
+        if not applyable:
+            message = (
+                "Stardust update refused: this checkout is not attached to "
+                "9529360-cpu/stardust-hermes. "
+                f"Current origin: {origin or '(missing/unreadable)'}."
+            )
+            return _update_refused("stardust_source_mismatch", message, "hermes update")
 
     existing = _ACTION_PROCS.get("hermes-update")
     if existing is not None and existing.poll() is None:
@@ -256,14 +285,12 @@ _NON_APPLYABLE_MESSAGES = {
 
 @router.get("/api/hermes/update/check")
 async def check_hermes_update(force: bool = False):
-    """Report whether a Hermes update is available, without applying it.
+    """Report Stardust update status without consulting Hermes upstream.
 
-    Returns install_method ('apt'|'git'|'docker'|'nix'|'nixos'|'unknown'),
-    current_version, behind (commits behind, 0 = up to date, -1 = unknown count,
-    null = check could not run), update_available, can_apply (git only — the
-    dashboard button can apply in place), update_command, message (guidance for
-    non-applyable methods) and, for git installs that are behind, commits
-    [{sha, summary, author, at}] (additive; existing consumers ignore it).
+    ``force=false`` is the passive/page-load path and intentionally performs no network
+    check for Stardust. ``force=true`` is an explicit user check against
+    ``9529360-cpu/stardust-hermes``. Git installs advertise apply only when their origin is
+    Stardust or the exact historical NousResearch origin that the apply path can migrate.
     """
     if _dashboard_local_update_managed_externally():
         return {
@@ -272,10 +299,17 @@ async def check_hermes_update(force: bool = False):
             "update_command": "managed outside dashboard", "message": _MANAGED_EXTERNALLY_MESSAGE,
         }
 
-    install_method = detect_install_method(_server_path("PROJECT_ROOT"))
+    project_root = _server_path("PROJECT_ROOT")
+    install_method = detect_install_method(project_root)
+    can_apply = install_method == "git"
+    source_kind = None
+    source_origin = None
+    if can_apply:
+        can_apply, source_origin, source_kind = _stardust_git_source_state(project_root)
+
     payload: Dict[str, Any] = {
         "install_method": install_method, "current_version": __version__, "behind": None,
-        "update_available": False, "can_apply": install_method == "git",
+        "update_available": False, "can_apply": can_apply,
         "update_command": recommended_update_command_for_method(install_method), "message": None,
     }
     non_applyable = _NON_APPLYABLE_MESSAGES.get(install_method)
@@ -283,29 +317,40 @@ async def check_hermes_update(force: bool = False):
         payload["message"] = non_applyable()
         return payload
 
-    # banner.check_for_updates() handles git / nix-revision paths through the GitHub API and
-    # caches the result for 24h. ``force`` busts the cache so "Check now" reflects reality.
-    try:
-        from hermes_cli.banner import check_for_updates, upstream_commits_behind
+    if install_method == "git" and not can_apply:
+        payload["message"] = (
+            "This checkout is not attached to the Stardust product repository; "
+            f"current origin: {source_origin or '(missing/unreadable)'}."
+        )
+        return payload
 
-        if force:
-            with contextlib.suppress(OSError):
-                (get_hermes_home() / ".update_check").unlink()
-        behind = await asyncio.to_thread(check_for_updates)
+    if not force:
+        payload["message"] = "Stardust background update checks are off. Use Check now to query the Stardust repository."
+        if source_kind == "legacy":
+            payload["message"] += " The legacy Hermes origin will migrate to Stardust when an update is applied."
+        return payload
+
+    try:
+        from hermes_cli.stardust_update import stardust_update_status
+
+        status = await asyncio.to_thread(stardust_update_status, project_root, branch="main")
+        behind = status.get("behind")
     except Exception:
-        _log.exception("Update check failed")
+        _log.exception("Stardust update check failed")
+        status = {"commits": []}
         behind = None
 
     payload["behind"] = behind
     if behind is None:
-        payload["message"] = "Couldn't reach the update source — try again later."
+        payload["message"] = "Couldn't reach the Stardust update source — try again later."
     elif behind == 0:
-        payload["message"] = "You're on the latest version."
+        payload["message"] = "You're on the latest Stardust version."
     else:
         payload["update_available"] = True
-        # "What's changed" for the desktop's remote update overlay; best-effort
-        # (empty list on any failure).
-        payload["commits"] = await asyncio.to_thread(upstream_commits_behind)
+        payload["commits"] = status.get("commits", [])
+    if source_kind == "legacy":
+        migration_note = " Legacy Hermes origin detected; applying the update will migrate origin to Stardust."
+        payload["message"] = (payload.get("message") or "") + migration_note
     return payload
 
 
@@ -411,6 +456,7 @@ def _latest_update_receipt_summary() -> Optional[Dict[str, Any]]:
 async def get_update_receipt():
     """The FULL latest update receipt (steps, skips, gateway restart outcome, fleet
     matrix) plus a compact ``summary``; 404 when no update has run since receipts landed.
+
     Clients read this instead of inferring success from backend liveness, which misread
     the update's own restart gap as a failed update/boot.
 
