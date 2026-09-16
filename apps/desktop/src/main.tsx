@@ -32,6 +32,7 @@ import { queryClient } from './lib/query-client'
 import { installRendererAnimationPauseState } from './lib/renderer-loop-pause'
 import { installSelectionCopyColorGuard } from './lib/selection-copy-colors'
 import { applyReferenceShell } from './reference-shell'
+import { applyStardustGlassDefaults } from './stardust-glass-defaults'
 import { ThemeProvider } from './themes/context'
 
 installClipboardShim()
@@ -50,11 +51,11 @@ if (import.meta.env.MODE !== 'production' || import.meta.env.VITE_PERF_PROBE ===
 
 const winParam = new URLSearchParams(window.location.search).get('win')
 
-// The reference shell is intentionally presentation-only and scoped to the
-// full desktop workspace. Secondary session windows keep the same visual
-// language; utility windows (browser/HUD/quick entry/etc.) keep their own
-// purpose-built chrome.
+// Stardust owns the visible product shell. Apply its structural skin first,
+// then seed native whole-window glass only for untouched installs. Secondary
+// session windows share the language; utility windows keep purpose-built chrome.
 applyReferenceShell(winParam)
+applyStardustGlassDefaults(winParam)
 
 if (winParam === 'hud') {
   document.title = 'Hermes HUD'
