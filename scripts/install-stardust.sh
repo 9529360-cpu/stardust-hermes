@@ -9,11 +9,52 @@ set -euo pipefail
 # survived. Dependency hosts and unrelated third-party installers are left
 # untouched.
 #
-# STARDUST_INSTALL_REF is intentionally overridable for release-candidate smoke
-# tests; normal installs stay on main.
+# STARDUST_INSTALL_REF can override the source script ref explicitly. Otherwise
+# inherit --commit / --tag / --branch from the stage-protocol invocation so a
+# packaged desktop bootstrap keeps the same immutable pin as the code it will
+# install. Plain interactive installs default to main.
 
 STARDUST_REPO="9529360-cpu/stardust-hermes"
-STARDUST_REF="${STARDUST_INSTALL_REF:-main}"
+
+resolve_ref_from_args() {
+    local commit_ref=""
+    local tag_ref=""
+    local branch_ref=""
+    local expect=""
+    local arg
+
+    for arg in "$@"; do
+        if [ -n "$expect" ]; then
+            case "$expect" in
+                commit) commit_ref="$arg" ;;
+                tag) tag_ref="$arg" ;;
+                branch) branch_ref="$arg" ;;
+            esac
+            expect=""
+            continue
+        fi
+
+        case "$arg" in
+            --commit) expect="commit" ;;
+            --tag) expect="tag" ;;
+            --branch) expect="branch" ;;
+            --commit=*) commit_ref="${arg#--commit=}" ;;
+            --tag=*) tag_ref="${arg#--tag=}" ;;
+            --branch=*) branch_ref="${arg#--branch=}" ;;
+        esac
+    done
+
+    if [ -n "$commit_ref" ]; then
+        printf '%s' "$commit_ref"
+    elif [ -n "$tag_ref" ]; then
+        printf '%s' "$tag_ref"
+    elif [ -n "$branch_ref" ]; then
+        printf '%s' "$branch_ref"
+    fi
+}
+
+ARG_REF="$(resolve_ref_from_args "$@")"
+STARDUST_REF="${STARDUST_INSTALL_REF:-${ARG_REF:-main}}"
 INSTALLER_URL="https://raw.githubusercontent.com/${STARDUST_REPO}/${STARDUST_REF}/scripts/install.sh"
 
 if ! command -v curl >/dev/null 2>&1; then
