@@ -3,6 +3,13 @@
   padding-bottom: 9.4rem;
 }
 
+/* Profile management remains available from the app/settings surfaces; the
+   permanent square rail belonged to the upstream multi-agent shell and made
+   the reference task rail read like two navigation systems stacked together. */
+[data-personal-sidebar-shell] [data-slot='sidebar-content'] > div:last-child {
+  display: none;
+}
+
 [data-product-rail-header] {
   box-sizing: border-box;
   padding: 1rem 0.85rem 0;
