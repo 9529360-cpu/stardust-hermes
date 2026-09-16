@@ -44,17 +44,26 @@ def test_wrong_origin_fails_closed_without_rewriting(monkeypatch, tmp_path, caps
     assert "NousResearch/hermes-agent" in output
 
 
-def test_scope_disables_legacy_fork_sync_and_restores_it(monkeypatch):
+def test_scope_disables_legacy_sources_and_restores_them(monkeypatch):
+    import hermes_cli.banner as banner
     import hermes_cli.update_cmd as update_cmd
 
-    sentinel = lambda _url: True
-    monkeypatch.setattr(update_cmd, "_is_fork", sentinel)
+    def sentinel_is_fork(_url):
+        return True
+
+    def sentinel_compare(_current, _target):
+        return 99
+
+    monkeypatch.setattr(update_cmd, "_is_fork", sentinel_is_fork)
+    monkeypatch.setattr(banner, "_github_compare_behind", sentinel_compare)
 
     with stardust_update._stardust_updater_scope() as scoped:
         assert scoped is update_cmd
         assert update_cmd._is_fork("https://example.invalid/fork.git") is False
+        assert banner._github_compare_behind is stardust_update._product_github_compare_behind
 
-    assert update_cmd._is_fork is sentinel
+    assert update_cmd._is_fork is sentinel_is_fork
+    assert banner._github_compare_behind is sentinel_compare
 
 
 def test_parser_swaps_only_the_real_main_update_handler():
@@ -94,6 +103,7 @@ def test_unknown_non_git_install_never_enters_legacy_check(monkeypatch, tmp_path
 
 
 def test_valid_product_checkout_enters_preflight_inside_stardust_scope(monkeypatch, tmp_path):
+    import hermes_cli.banner as banner
     import hermes_cli.config as config
     import hermes_cli.update_cmd as update_cmd
     from hermes_cli import main as main_mod
@@ -108,18 +118,25 @@ def test_valid_product_checkout_enters_preflight_inside_stardust_scope(monkeypat
     )
 
     original_is_fork = update_cmd._is_fork
+    original_compare = banner._github_compare_behind
     seen = []
 
     def handled(_args):
-        seen.append(update_cmd._is_fork("https://github.com/NousResearch/hermes-agent.git"))
+        seen.append(
+            (
+                update_cmd._is_fork("https://github.com/NousResearch/hermes-agent.git"),
+                banner._github_compare_behind is stardust_update._product_github_compare_behind,
+            )
+        )
         return True
 
     monkeypatch.setattr(main_mod, "_update_preflight_handled", handled)
 
     stardust_update.cmd_update(SimpleNamespace(plan=False, check=True, gateway=False))
 
-    assert seen == [False]
+    assert seen == [(False, True)]
     assert update_cmd._is_fork is original_is_fork
+    assert banner._github_compare_behind is original_compare
 
 
 def test_release_workflow_is_repo_scoped_and_main_gated():
