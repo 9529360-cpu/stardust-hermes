@@ -3,11 +3,14 @@ set -euo pipefail
 
 # Stardust-owned install entrypoint.
 #
-# Keep the mature Hermes installer as the implementation, but rewrite the few
-# source-authority constants before execution so a fresh install, repair, or
-# re-run can never silently clone NousResearch/hermes-agent over this product.
+# The large cross-platform installer still lives in scripts/install.sh, but
+# Stardust owns the source/recovery authority. We rewrite every repository URL
+# that can select product source, then fail closed if an upstream product URL
+# survived. Dependency hosts and unrelated third-party installers are left
+# untouched.
+#
 # STARDUST_INSTALL_REF is intentionally overridable for release-candidate smoke
-# tests; normal users stay on main.
+# tests; normal installs stay on main.
 
 STARDUST_REPO="9529360-cpu/stardust-hermes"
 STARDUST_REF="${STARDUST_INSTALL_REF:-main}"
@@ -20,21 +23,29 @@ fi
 
 TMP_INSTALLER="$(mktemp 2>/dev/null || printf '/tmp/stardust-install.%s.sh' "$$")"
 cleanup() {
-    rm -f "$TMP_INSTALLER"
+    rm -f "$TMP_INSTALLER" "${TMP_INSTALLER}.bak"
 }
 trap cleanup EXIT HUP INT TERM
 
 curl -fsSL --retry 3 --retry-delay 2 "$INSTALLER_URL" -o "$TMP_INSTALLER"
 
-# Only product-source / recovery URLs are rewritten. Dependency hosts and
-# third-party tool installers remain untouched.
+# Replace the whole upstream repository prefix, not only the .git form. This
+# also catches archive/zip recovery URLs and future paths beneath the repo.
 sed -i.bak \
-    -e 's#git@github.com:NousResearch/hermes-agent.git#git@github.com:9529360-cpu/stardust-hermes.git#g' \
-    -e 's#https://github.com/NousResearch/hermes-agent.git#https://github.com/9529360-cpu/stardust-hermes.git#g' \
+    -e 's#git@github.com:NousResearch/hermes-agent#git@github.com:9529360-cpu/stardust-hermes#g' \
+    -e 's#https://github.com/NousResearch/hermes-agent#https://github.com/9529360-cpu/stardust-hermes#g' \
+    -e 's#https://raw.githubusercontent.com/NousResearch/hermes-agent#https://raw.githubusercontent.com/9529360-cpu/stardust-hermes#g' \
     -e 's#https://hermes-agent.nousresearch.com/install.ps1#https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1#g' \
     -e 's#https://hermes-agent.nousresearch.com/install.sh#https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh#g' \
     "$TMP_INSTALLER"
 rm -f "${TMP_INSTALLER}.bak"
-chmod +x "$TMP_INSTALLER"
 
+# Supply-chain boundary: never execute an installer that can still select the
+# original Hermes repository or installer endpoint as product source.
+if grep -Eq 'github\.com/NousResearch/hermes-agent|raw\.githubusercontent\.com/NousResearch/hermes-agent|hermes-agent\.nousresearch\.com/install\.(sh|ps1)' "$TMP_INSTALLER"; then
+    echo "Stardust installer refused to run: an upstream product-source URL survived rewriting." >&2
+    exit 1
+fi
+
+chmod +x "$TMP_INSTALLER"
 exec /bin/bash "$TMP_INSTALLER" "$@"
