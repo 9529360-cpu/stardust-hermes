@@ -6,6 +6,21 @@ import time
 from hermes_constants import get_hermes_home
 
 
+def test_stardust_default_disables_passive_update_checks(monkeypatch):
+    from hermes_cli import banner
+    from hermes_cli.config_defaults import DEFAULT_CONFIG
+
+    assert DEFAULT_CONFIG["updates"]["check"] is False
+    config = get_hermes_home() / "config.yaml"
+    config.unlink(missing_ok=True)
+
+    def unexpected_repo_probe():
+        raise AssertionError("passive update check reached repository/network probing")
+
+    monkeypatch.setattr(banner, "_resolve_repo_dir", unexpected_repo_probe)
+    assert banner.check_for_updates(passive=True) is None
+
+
 def test_passive_check_obeys_config_before_using_cached_notice(monkeypatch):
     from hermes_cli import banner
 
