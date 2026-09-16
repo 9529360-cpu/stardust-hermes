@@ -8,6 +8,7 @@ import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 
 import { CRON_ROUTE, SETTINGS_ROUTE, type AppView } from '../routes'
 import type { SidebarNavItem } from '../types'
+import './personal-product-nav.css'
 import { WORKSPACE_OVERVIEW_PANE_ID } from './workspace-overview'
 
 const PRODUCT_NAV_COPY = {
