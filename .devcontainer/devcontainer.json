@@ -1,0 +1,46 @@
+{
+  "name": "Stardust Hermes Desktop",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "26"
+    },
+    "ghcr.io/devcontainers/features/desktop-lite:1.2.10": {
+      "password": "noPassword",
+      "webPort": "6080",
+      "vncPort": "5901"
+    }
+  },
+  "runArgs": [
+    "--shm-size=2g"
+  ],
+  "forwardPorts": [
+    6080,
+    5174
+  ],
+  "portsAttributes": {
+    "6080": {
+      "label": "Stardust Desktop (noVNC)",
+      "onAutoForward": "openBrowser"
+    },
+    "5174": {
+      "label": "Desktop Vite renderer",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteEnv": {
+    "DISPLAY": ":1"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  }
+}
