@@ -2,40 +2,40 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { registry } from '@/contrib/registry'
 import { isOnboardingEnabled } from '@/lib/onboarding-enabled'
 
-import {
-  registerWorkspaceOverviewPane,
-  schedulePersonalLayoutMigration,
-  WORKSPACE_OVERVIEW_PANE_ID
-} from './workspace-overview'
+import { schedulePersonalLayoutMigration } from './layout-migration'
 
 const productGroup = (panes: string[], id?: string) => group(panes, { id, tabStrip: 'never' })
 
-// Stardust's default shell has three permanent product regions only:
-// task rail / task workspace / context inspector. Files, Review and Terminal
-// remain real tools, but they are summoned on demand instead of creating IDE
-// tabs in the first frame. The three product regions explicitly opt out of the
-// generic pane tab strip at the layout-model level — this is not a CSS trick.
+/**
+ * Codex-style default shell:
+ *
+ *   Projects / Threads | active thread workspace | Review
+ *
+ * Review is not a dashboard card stack — it is the real git work surface.
+ * Terminal stays a bottom tool pane and Files stays an on-demand right tool;
+ * both retain the pane-tree's sash resizing, collapse and persistence.
+ */
 export const DEFAULT_TREE = split(
   'row',
   [
     productGroup(['sessions'], 'grp-sessions'),
     productGroup(['workspace'], 'grp-main'),
-    productGroup([WORKSPACE_OVERVIEW_PANE_ID], 'grp-context')
+    productGroup(['review'], 'grp-review')
   ],
-  [1.05, 4.15, 1.45],
+  [1.05, 3.9, 1.95],
   'spl-root'
 )
 
 const FOCUS_TREE = split(
   'row',
-  [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
-  [0.9, 5.2, 1.25]
+  [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+  [0.9, 4.8, 1.7]
 )
 
 const BASIC_TREE = split(
   'row',
-  [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
-  [1, 4.6, 1.25]
+  [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+  [1, 4.25, 1.75]
 )
 
 const TERMINAL_TREE = split(
@@ -43,12 +43,12 @@ const TERMINAL_TREE = split(
   [
     split(
       'row',
-      [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
-      [1.05, 4, 1.4]
+      [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+      [1.05, 3.9, 1.95]
     ),
     group(['terminal'])
   ],
-  [3.4, 1]
+  [3.5, 1]
 )
 
 const QUAD_TREE = split(
@@ -56,17 +56,15 @@ const QUAD_TREE = split(
   [
     split(
       'row',
-      [productGroup(['sessions']), productGroup(['workspace']), productGroup([WORKSPACE_OVERVIEW_PANE_ID])],
-      [1, 3.8, 1.35]
+      [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+      [1, 3.7, 1.8]
     ),
-    split('row', [group(['terminal']), group(['review', 'files'])], [1.8, 1])
+    split('row', [group(['terminal']), group(['files'])], [1.9, 1])
   ],
-  [3.2, 1]
+  [3.25, 1]
 )
 
 export function registerLayoutPresets() {
-  registerWorkspaceOverviewPane()
-
   const dispose = registry.registerMany([
     { id: 'default', area: 'layouts', title: 'Default', order: 0, data: DEFAULT_TREE },
     ...(isOnboardingEnabled() ? [{ id: 'basic', area: 'layouts', title: 'Basic', order: 5, data: BASIC_TREE }] : []),
