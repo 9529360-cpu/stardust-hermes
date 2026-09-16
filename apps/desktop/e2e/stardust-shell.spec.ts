@@ -1,7 +1,14 @@
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+
 import { expect, test } from './test'
 
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
 import { expectVisualSnapshot } from './visual-snapshot'
+
+const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..')
+const SMOKE_DIFF_PATH = path.join(REPO_ROOT, 'STARDUST.md')
+const SMOKE_DIFF_MARKER = 'stardust visual smoke diff'
 
 let fixture: MockBackendFixture | null = null
 
@@ -16,7 +23,7 @@ test.afterAll(async () => {
 })
 
 test.describe('Stardust Codex desktop shell', () => {
-  test('shows projects/threads, active thread and Review in a real workspace', async () => {
+  test('shows projects/threads, active thread and a real Review diff', async () => {
     const page = fixture!.page
 
     await expect(page.locator('[data-stardust-task-rail]')).toBeVisible()
@@ -36,23 +43,46 @@ test.describe('Stardust Codex desktop shell', () => {
     await expect(page.locator('[data-task-header]')).not.toContainText('No project')
     await expect(page.locator('[data-tree-group="grp-review"]')).toBeVisible()
 
-    // The three permanent product regions are not generic IDE tab stacks.
-    for (const groupId of ['grp-sessions', 'grp-main', 'grp-review']) {
-      const visibleHeaders = await page.locator(`[data-tree-group="${groupId}"] [data-panel-header]`).evaluateAll(nodes =>
-        nodes.filter(node => getComputedStyle(node).display !== 'none').length
-      )
+    const review = page.locator('aside[aria-label="Review"]')
+    await expect(review).toBeVisible()
 
-      expect(visibleHeaders).toBe(0)
+    // A blank "No diffs" rail proves only layout. Create one reversible change
+    // in the real checkout, explicitly refresh Review, and open the real diff so
+    // the screenshot validates the working Codex review surface end to end.
+    const originalSmokeFile = fs.readFileSync(SMOKE_DIFF_PATH, 'utf8')
+
+    try {
+      fs.writeFileSync(SMOKE_DIFF_PATH, `${originalSmokeFile}\n<!-- ${SMOKE_DIFF_MARKER} -->\n`, 'utf8')
+
+      const refreshReview = review.locator('button:has(.codicon-refresh)')
+      await expect(refreshReview).toBeVisible()
+      await refreshReview.click()
+
+      const changedFile = review.getByText('STARDUST.md', { exact: true }).first()
+      await expect(changedFile).toBeVisible({ timeout: 15_000 })
+      await changedFile.click()
+      await expect(review).toContainText(SMOKE_DIFF_MARKER, { timeout: 15_000 })
+
+      // The three permanent product regions are not generic IDE tab stacks.
+      for (const groupId of ['grp-sessions', 'grp-main', 'grp-review']) {
+        const visibleHeaders = await page.locator(`[data-tree-group="${groupId}"] [data-panel-header]`).evaluateAll(nodes =>
+          nodes.filter(node => getComputedStyle(node).display !== 'none').length
+        )
+
+        expect(visibleHeaders).toBe(0)
+      }
+
+      // One real chat composer only. The failed skin rendered the old title
+      // editor as a second giant field above the transcript.
+      await expect(page.locator('[data-task-workspace] [data-tour="composer"]')).toHaveCount(1)
+
+      // The discarded dashboard implementation must never leak back into the
+      // product shell: Review is the right-side work surface now.
+      await expect(page.locator('[data-personal-overview]')).toHaveCount(0)
+
+      await expectVisualSnapshot(page, { name: 'stardust-codex-project-shell', app: fixture!.app })
+    } finally {
+      fs.writeFileSync(SMOKE_DIFF_PATH, originalSmokeFile, 'utf8')
     }
-
-    // One real chat composer only. The failed skin rendered the old title
-    // editor as a second giant field above the transcript.
-    await expect(page.locator('[data-task-workspace] [data-tour="composer"]')).toHaveCount(1)
-
-    // The discarded dashboard implementation must never leak back into the
-    // product shell: Review is the right-side work surface now.
-    await expect(page.locator('[data-personal-overview]')).toHaveCount(0)
-
-    await expectVisualSnapshot(page, { name: 'stardust-codex-project-shell', app: fixture!.app })
   })
 })
