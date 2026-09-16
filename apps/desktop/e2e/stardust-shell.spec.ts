@@ -15,16 +15,16 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test.describe('Stardust desktop shell', () => {
-  test('boots into the task-first three-region product shell', async () => {
+test.describe('Stardust Codex desktop shell', () => {
+  test('boots into projects/threads, active thread and Review', async () => {
     const page = fixture!.page
 
     await expect(page.locator('[data-stardust-task-rail]')).toBeVisible()
     await expect(page.locator('[data-task-workspace]')).toBeVisible()
-    await expect(page.locator('[data-personal-overview]')).toBeVisible()
+    await expect(page.locator('[data-tree-group="grp-review"]')).toHaveCount(1)
 
-    // The permanent product regions must not expose the old IDE tab chrome.
-    for (const groupId of ['grp-sessions', 'grp-main', 'grp-context']) {
+    // The three permanent product regions are not generic IDE tab stacks.
+    for (const groupId of ['grp-sessions', 'grp-main', 'grp-review']) {
       const visibleHeaders = await page.locator(`[data-tree-group="${groupId}"] [data-panel-header]`).evaluateAll(nodes =>
         nodes.filter(node => getComputedStyle(node).display !== 'none').length
       )
@@ -32,10 +32,14 @@ test.describe('Stardust desktop shell', () => {
       expect(visibleHeaders).toBe(0)
     }
 
-    // One task composer only. The failed skin rendered the legacy title editor
-    // as a second giant white field above the transcript.
+    // One real chat composer only. The failed skin rendered the old title
+    // editor as a second giant field above the transcript.
     await expect(page.locator('[data-task-workspace] [data-tour="composer"]')).toHaveCount(1)
 
-    await expectVisualSnapshot(page, { name: 'stardust-shell-ready', app: fixture!.app })
+    // The discarded dashboard implementation must not leak back into the
+    // product shell: Review is the right-side work surface now.
+    await expect(page.locator('[data-personal-overview]')).toHaveCount(0)
+
+    await expectVisualSnapshot(page, { name: 'stardust-codex-shell-ready', app: fixture!.app })
   })
 })
