@@ -13,16 +13,16 @@ afterEach(() => {
   disposeOverview = null
 })
 
-describe('personal desktop default layout', () => {
-  it('keeps chat dominant with conversations and workspace context on the sides', () => {
-    expect(allPaneIds(DEFAULT_TREE)).toEqual(['sessions', 'workspace', WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'])
+describe('Stardust desktop default layout', () => {
+  it('boots into only the three permanent product regions', () => {
+    expect(allPaneIds(DEFAULT_TREE)).toEqual(['sessions', 'workspace', WORKSPACE_OVERVIEW_PANE_ID])
   })
 
-  it('keeps developer tools out of the first view', () => {
-    expect(allPaneIds(DEFAULT_TREE)).not.toContain('terminal')
+  it.each(['terminal', 'review', 'files'])('keeps %s out of the first view', paneId => {
+    expect(allPaneIds(DEFAULT_TREE)).not.toContain(paneId)
   })
 
-  it('hosts overview, review and files in one contextual right rail', () => {
+  it('keeps the inspector as a dedicated right rail instead of an IDE tab stack', () => {
     expect(DEFAULT_TREE.type).toBe('split')
 
     if (DEFAULT_TREE.type !== 'split') {
@@ -34,16 +34,18 @@ describe('personal desktop default layout', () => {
     expect(context.type).toBe('group')
 
     if (context.type === 'group') {
-      expect(context.panes).toEqual([WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'])
+      expect(context.panes).toEqual([WORKSPACE_OVERVIEW_PANE_ID])
     }
   })
 
-  it('registers the overview as fixed core product chrome', () => {
+  it('registers the inspector as fixed core product chrome without a pane tab strip', () => {
     disposeOverview = registerWorkspaceOverviewPane()
 
     const overview = registry.getArea('panes').find(pane => pane.id === WORKSPACE_OVERVIEW_PANE_ID)
+    const data = overview?.data as { headerVeto?: boolean; uncloseable?: boolean } | undefined
 
     expect(overview?.source).toBe('core')
-    expect((overview?.data as { uncloseable?: boolean } | undefined)?.uncloseable).toBe(true)
+    expect(data?.uncloseable).toBe(true)
+    expect(data?.headerVeto).toBe(true)
   })
 })
