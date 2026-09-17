@@ -126,8 +126,11 @@ class AssistantExecutionDecision:
             raise ValueError("scheduled work must use a restart-safe execution rail")
         if self.intent is AssistantIntent.BACKGROUND and self.durability is ExecutionDurability.TURN:
             raise ValueError("background work cannot be turn-scoped")
-        if self.intent in {AssistantIntent.RESPOND, AssistantIntent.CLARIFY} and self.task_id is not None:
-            raise ValueError("non-execution decisions cannot own a task id")
+        if self.intent in {AssistantIntent.RESPOND, AssistantIntent.CLARIFY}:
+            if self.task_id is not None:
+                raise ValueError("non-execution decisions cannot own a task id")
+            if self.rail is not ExecutionRail.NONE:
+                raise ValueError("non-execution decisions cannot select an execution rail")
         if self.intent is AssistantIntent.SCHEDULE and self.rail not in _DURABLE_RAILS:
             raise ValueError("scheduled work must select a durable execution rail")
         if self.rail not in _ALLOWED_RAILS_BY_INTENT[self.intent]:
