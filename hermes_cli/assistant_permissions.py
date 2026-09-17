@@ -77,6 +77,11 @@ def _normalize(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
 
 
+def _action_matches(value: str, families: frozenset[str]) -> bool:
+    normalized = _normalize(value)
+    return bool(normalized) and (normalized in families or any(normalized.startswith(f"{item}_") for item in families))
+
+
 def _action(args: Mapping[str, Any]) -> str:
     for key in ("action", "operation", "op", "verb", "method"):
         value = args.get(key)
@@ -85,13 +90,19 @@ def _action(args: Mapping[str, Any]) -> str:
     return ""
 
 
-def _session_platform() -> str:
+def _session_identities() -> tuple[str, str]:
     try:
         from gateway.session_context import get_session_env
 
-        return _normalize(get_session_env("HERMES_SESSION_PLATFORM", ""))
+        return (
+            _normalize(get_session_env("HERMES_SESSION_PLATFORM", "")),
+            _normalize(get_session_env("HERMES_SESSION_SOURCE", "")),
+        )
     except Exception:
-        return _normalize(os.environ.get("HERMES_SESSION_PLATFORM", ""))
+        return (
+            _normalize(os.environ.get("HERMES_SESSION_PLATFORM", "")),
+            _normalize(os.environ.get("HERMES_SESSION_SOURCE", "")),
+        )
 
 
 def personal_assistant_permissions_active() -> bool:
@@ -101,7 +112,7 @@ def personal_assistant_permissions_active() -> bool:
     for the whole durable worker lineage so moving work into the background cannot weaken safety.
     Other inherited CLI/TUI/messaging surfaces keep their established behavior for compatibility.
     """
-    return _session_platform() == "desktop" or bool(os.environ.get("HERMES_KANBAN_TASK"))
+    return "desktop" in _session_identities() or bool(os.environ.get("HERMES_KANBAN_TASK"))
 
 
 def _decision(level: str, reason: str, category: str = "", tool_name: str = "", action: str = "") -> PermissionDecision:
@@ -112,12 +123,12 @@ def _decision(level: str, reason: str, category: str = "", tool_name: str = "", 
 
 def _connector_decision(tool_name: str, action: str) -> PermissionDecision:
     """Dynamic connector tools are external by definition; unknown mutations fail toward confirmation."""
-    if action in _READ_ACTIONS:
+    if _action_matches(action, _READ_ACTIONS):
         return _decision(ALLOW, "Read-only connector operation.")
     category = "connector-write"
-    if action in _DESTRUCTIVE_ACTIONS:
+    if _action_matches(action, _DESTRUCTIVE_ACTIONS):
         category = "destructive"
-    elif action in _FINANCIAL_ACTIONS:
+    elif _action_matches(action, _FINANCIAL_ACTIONS):
         category = "financial"
     return _decision(
         CONFIRM,
@@ -128,12 +139,14 @@ def _connector_decision(tool_name: str, action: str) -> PermissionDecision:
 
 def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] = None) -> PermissionDecision:
     """Classify one fully-resolved tool call without performing any side effect."""
-    name = _normalize(tool_name)
+    raw_name = str(tool_name or "").strip().lower()
+    name = _normalize(raw_name)
     values: Mapping[str, Any] = args if isinstance(args, Mapping) else {}
     action = _action(values)
 
-    if name.startswith("connectors__"):
-        return _connector_decision(name, action)
+    if raw_name.startswith("connectors__"):
+        connector_action = action or raw_name.rsplit("__", 1)[-1]
+        return _connector_decision(raw_name, connector_action)
 
     # Stardust's own task graph is internal durable state. Mutations are visible/reportable, not a
     # reason to interrupt the user with approval every time the coordinator decomposes work.
@@ -182,13 +195,13 @@ def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] =
             "external-write", name, action,
         )
 
-    if action in _DESTRUCTIVE_ACTIONS:
+    if _action_matches(action, _DESTRUCTIVE_ACTIONS):
         return _decision(
             CONFIRM,
             f"Stardust wants to perform the destructive action '{action}' with {tool_name}; confirm first.",
             "destructive", name, action,
         )
-    if action in _FINANCIAL_ACTIONS:
+    if _action_matches(action, _FINANCIAL_ACTIONS):
         return _decision(
             CONFIRM,
             f"Stardust wants to perform the financial action '{action}' with {tool_name}; confirm first.",
