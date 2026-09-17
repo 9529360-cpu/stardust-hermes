@@ -9,8 +9,15 @@ from agent.assistant_intent import (
     ExecutionDurability,
     ExecutionRail,
     TaskLifecycleState,
+    assistant_task_id,
+    cron_job_lifecycle_state,
     default_durability,
     default_rail,
+    delegation_lifecycle_state,
+    kanban_lifecycle_state,
+    project_cron_job,
+    project_delegation,
+    project_kanban_task,
     task_state_is_terminal,
     task_state_needs_attention,
 )
@@ -30,6 +37,7 @@ def test_intent_wire_values_match_mission_vocabulary():
 def test_task_lifecycle_wire_values_cover_running_attention_and_terminal_states():
     assert [state.value for state in TaskLifecycleState] == [
         "queued",
+        "paused",
         "running",
         "waiting_for_user",
         "blocked",
@@ -55,6 +63,8 @@ def test_task_lifecycle_wire_values_cover_running_attention_and_terminal_states(
 def test_task_state_helpers_keep_waiting_nonterminal_and_interruption_visible():
     assert not task_state_is_terminal(TaskLifecycleState.WAITING_FOR_USER)
     assert task_state_needs_attention(TaskLifecycleState.WAITING_FOR_USER)
+    assert not task_state_is_terminal(TaskLifecycleState.PAUSED)
+    assert not task_state_needs_attention(TaskLifecycleState.PAUSED)
     assert task_state_is_terminal(TaskLifecycleState.INTERRUPTED)
     assert task_state_needs_attention(TaskLifecycleState.INTERRUPTED)
     assert task_state_is_terminal(TaskLifecycleState.COMPLETED)
@@ -140,6 +150,99 @@ def test_task_projection_requires_real_owner_and_truthful_durability():
             rail=ExecutionRail.CRON,
             durability=ExecutionDurability.PROCESS,
         )
+
+
+def test_stable_task_ids_namespace_native_owner_ids_by_rail():
+    assert assistant_task_id(ExecutionRail.DELEGATION, "42") == "delegation:42"
+    assert assistant_task_id(ExecutionRail.CRON, "42") == "cron:42"
+    assert assistant_task_id(ExecutionRail.KANBAN, "42") == "kanban:42"
+
+    with pytest.raises(ValueError, match="execution rail"):
+        assistant_task_id(ExecutionRail.NONE, "42")
+    with pytest.raises(ValueError, match="owner id"):
+        assistant_task_id(ExecutionRail.CRON, " ")
+
+
+def test_delegation_owner_states_map_without_claiming_restart_durability():
+    for native in ("dispatched", "running", "stalling", "finalizing"):
+        assert delegation_lifecycle_state(native) is TaskLifecycleState.RUNNING
+    for native in ("completed", "success", "ok"):
+        assert delegation_lifecycle_state(native) is TaskLifecycleState.COMPLETED
+    for native in ("failed", "error", "timeout", "stalled", "rejected"):
+        assert delegation_lifecycle_state(native) is TaskLifecycleState.FAILED
+    assert delegation_lifecycle_state("cancelled") is TaskLifecycleState.CANCELLED
+    assert delegation_lifecycle_state("unknown") is TaskLifecycleState.INTERRUPTED
+
+    with pytest.raises(ValueError, match="unknown delegation state"):
+        delegation_lifecycle_state("new-future-state")
+
+
+def test_kanban_owner_states_map_from_canonical_board_columns():
+    for native in ("triage", "todo", "scheduled", "ready"):
+        assert kanban_lifecycle_state(native) is TaskLifecycleState.QUEUED
+    for native in ("running", "review"):
+        assert kanban_lifecycle_state(native) is TaskLifecycleState.RUNNING
+    assert kanban_lifecycle_state("blocked") is TaskLifecycleState.BLOCKED
+    assert kanban_lifecycle_state("done") is TaskLifecycleState.COMPLETED
+    assert kanban_lifecycle_state("archived") is TaskLifecycleState.COMPLETED
+
+    with pytest.raises(ValueError, match="unknown kanban state"):
+        kanban_lifecycle_state("failed")
+
+
+def test_cron_job_state_preserves_paused_scheduled_and_active_semantics():
+    assert cron_job_lifecycle_state(enabled=False) is TaskLifecycleState.PAUSED
+    assert cron_job_lifecycle_state(enabled=True) is TaskLifecycleState.QUEUED
+    assert cron_job_lifecycle_state(enabled=True, running=True) is TaskLifecycleState.RUNNING
+    assert cron_job_lifecycle_state(enabled=False, running=True) is TaskLifecycleState.RUNNING
+
+
+def test_owner_projection_adapters_keep_native_owner_as_authority():
+    delegated = project_delegation(
+        {
+            "delegation_id": "d-1",
+            "status": "unknown",
+            "goal": "Research the library",
+            "parent_session_id": "session-7",
+            "error": "owner exited",
+        }
+    )
+    cron = project_cron_job(
+        {"id": "c-1", "name": "Morning inbox watch", "enabled": False, "paused_reason": "user paused"}
+    )
+    kanban = project_kanban_task(
+        {"id": "k-1", "title": "Fix the bug", "status": "blocked", "blocked_reason": "needs credential"}
+    )
+
+    assert delegated.task_id == "delegation:d-1"
+    assert delegated.owner_id == "d-1"
+    assert delegated.parent_session_id == "session-7"
+    assert delegated.state is TaskLifecycleState.INTERRUPTED
+    assert delegated.durability is ExecutionDurability.PROCESS
+    assert delegated.recoverable
+
+    assert cron.task_id == "cron:c-1"
+    assert cron.owner_id == "c-1"
+    assert cron.state is TaskLifecycleState.PAUSED
+    assert cron.durability is ExecutionDurability.RESTART_SAFE
+    assert cron.detail == "user paused"
+
+    assert kanban.task_id == "kanban:k-1"
+    assert kanban.owner_id == "k-1"
+    assert kanban.state is TaskLifecycleState.BLOCKED
+    assert kanban.durability is ExecutionDurability.RESTART_SAFE
+    assert kanban.needs_attention
+
+
+def test_batch_delegation_projection_uses_bounded_human_title():
+    projection = project_delegation(
+        {
+            "delegation_id": "d-batch",
+            "status": "running",
+            "goals": ["inspect API", "run tests", "write report"],
+        }
+    )
+    assert projection.title == "3 delegated tasks"
 
 
 def test_default_durability_keeps_background_process_local_and_schedule_restart_safe():
