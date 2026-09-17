@@ -1,104 +1,68 @@
 ---
 sidebar_position: 3
 title: "Android / Termux"
-description: "Run Hermes Agent directly on an Android phone with Termux"
+description: "Run Stardust's Hermes-compatible runtime directly on Android with Termux"
 ---
 
-# Hermes on Android with Termux
+# Stardust on Android with Termux
 
 :::warning Tier 2 platform
-Termux (Android) is a [Tier 2 platform](./platform-support.md#tier-2). The installer script and documentation here are maintained on a best-effort basis only. Commits to `main` may break these packages at any point in time.
+Termux (Android) is a [Tier 2 platform](./platform-support.md#tier-2). The installer path and documentation are maintained on a best-effort basis. Commits to `main` may temporarily break Android-specific dependencies.
 :::
 
-Hermes Agent can run directly on an Android phone through [Termux](https://termux.dev/).
+Stardust can run directly on an Android phone through [Termux](https://termux.dev/) using the inherited `hermes` CLI/runtime compatibility layer.
 
-It gives you a working local CLI on the phone, plus the core extras that are currently known to install cleanly on Android.
+## Tested runtime bundle
 
-## What is supported in the tested path?
+The tested Termux bundle installs the compatible CLI plus core features known to work on Android:
 
-The tested Termux bundle installs:
+- the `hermes` CLI runtime used by Stardust;
+- cron support;
+- PTY/background terminal support;
+- Telegram gateway support (manual / best-effort background runs);
+- MCP support;
+- Honcho memory support;
+- ACP support.
 
-- the Hermes CLI
-- cron support
-- PTY/background terminal support
-- Telegram gateway support (manual / best-effort background runs)
-- MCP support
-- Honcho memory support
-- ACP support
-
-Concretely, it maps to:
+The Python bundle maps to:
 
 ```bash
 python -m pip install -e '.[termux]' -c constraints-termux.txt
 ```
 
-## What is not part of the tested path yet?
+## Current limitations
 
-A few features still need desktop/server-style dependencies that are not published for Android, or have not been validated on phones yet:
+Some desktop/server features rely on dependencies that are unavailable or unvalidated on Android:
 
-- `.[all]` is not supported on Android today
-- the `voice` extra is blocked by `faster-whisper -> ctranslate2`, and `ctranslate2` does not publish Android wheels
-- automatic browser / Playwright bootstrap is skipped in the Termux installer
-- Docker-based terminal isolation is not available inside Termux
-- Android may still suspend Termux background jobs, so gateway persistence is best-effort rather than a normal managed service
-
-That does not stop Hermes from working well as a phone-native CLI agent — it just means the recommended mobile install is intentionally narrower than the desktop/server install.
+- `.[all]` is not supported on Android today;
+- the `voice` extra is blocked by `faster-whisper -> ctranslate2`, which does not publish Android wheels;
+- automatic browser / Playwright bootstrap is skipped;
+- Docker-based terminal isolation is unavailable inside Termux;
+- Android may suspend Termux background jobs, so gateway persistence is best-effort.
 
 ---
 
-## Community-maintained native `pkg` option
+## Option 1: Stardust one-line installer
 
-:::caution Contributor-operated distribution
-This APT repository is **community-maintained by `@adybag14-cyber` and is not an official NousResearch distribution**. NousResearch does not build, sign, host, or audit these packages. Enabling the repository means trusting the contributor-operated repository and its signing key. Termux itself remains a Tier 2 / best-effort platform.
-:::
-
-For users who prefer a native package-manager install rather than building Python/Rust dependencies on the phone, a community-maintained APT repository is available. The repository bootstrap and packaging sources are published in [`adybag14-cyber/termux-python`](https://github.com/adybag14-cyber/termux-python), with the Hermes package build in [`adybag14-cyber/termux-hermes`](https://github.com/adybag14-cyber/termux-hermes).
-
-Install the repository key/source and Hermes with:
+Use the Stardust-owned bootstrap, not the former Hermes website installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/adybag14-cyber/termux-python/main/scripts/setup_apt_repo.sh | bash
-pkg install hermes-agent
+curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash
 ```
 
-The repository signing-key fingerprint currently documented by the community distribution is:
+On Termux, the inherited installer logic automatically:
 
-```text
-EAD24A2124EFA7393A78B7B14699F966313F7A6B
-```
+- uses `pkg` for system packages;
+- creates the venv with `python -m venv`;
+- attempts `.[termux-all]`, then falls back to `.[termux]`, then a base install;
+- links `hermes` into `$PREFIX/bin` so the compatibility command stays on PATH;
+- skips untested browser / WhatsApp bootstrap.
 
-APT-managed Hermes installs are marked with install method `apt`. Hermes therefore does not run its Git self-updater against package-owned files; use the package manager instead:
-
-```bash
-pkg update
-pkg upgrade hermes-agent
-```
-
-Packaging/repository/signing problems for this option should be reported to the community packaging repositories above. Hermes runtime bugs can still be reported here, keeping in mind that Android/Termux support is best-effort.
+The bootstrap obtains product source from `9529360-cpu/stardust-hermes` and refuses to execute if an upstream Hermes product-source URL survives its source-authority rewrite.
 
 ---
 
-## Option 1: One-line installer
-
-Hermes now ships a Termux-aware installer path:
-
-```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-```
-
-On Termux, the installer automatically:
-
-- uses `pkg` for system packages
-- creates the venv with `python -m venv`
-- attempts the broad `.[termux-all]` extra first and falls back to the smaller `.[termux]` extra (then a base install) — the curl installer matches this order automatically
-- links `hermes` into `$PREFIX/bin` so it stays on your Termux PATH
-- skips the untested browser / WhatsApp bootstrap
-
-If you want the explicit commands or need to debug a failed install, use the manual path below.
-
----
-
-## Option 2: Manual install (fully explicit)
+## Option 2: Manual Stardust source install
 
 ### 1. Update Termux and install system packages
 
@@ -107,36 +71,22 @@ pkg update
 pkg install -y git python clang rust make pkg-config libffi openssl nodejs ripgrep ffmpeg
 ```
 
-Why these packages?
-
-- `python` — runtime + venv support
-
 :::warning Supported Python range
-Hermes requires **Python >=3.11,&lt;3.14**. Current Termux ships `python`
-3.14.x, which is outside that range — the installer detects this, and will
-automatically try the [Termux User Repository (TUR)](https://github.com/termux-user-repository/tur)
-for a supported interpreter. For a manual install, get one yourself:
+The inherited runtime currently requires **Python >=3.11,&lt;3.14**. If Termux ships a newer unsupported Python, install a supported interpreter from the [Termux User Repository (TUR)](https://github.com/termux-user-repository/tur):
 
 ```bash
 pkg install tur-repo
 pkg install python3.13
 ```
 
-Then use `python3.13` in place of `python` in the commands below
-(e.g. `python3.13 -m venv venv`).
+Then use `python3.13` in place of `python` below.
 :::
 
-- `git` — clone/update the repo
-- `clang`, `rust`, `make`, `pkg-config`, `libffi`, `openssl` — needed to build a few Python dependencies on Android
-- `nodejs` — optional Node runtime for experiments beyond the tested core path
-- `ripgrep` — fast file search
-- `ffmpeg` — media / TTS conversions
-
-### 2. Clone Hermes
+### 2. Clone Stardust
 
 ```bash
-git clone https://github.com/NousResearch/hermes-agent.git
-cd hermes-agent
+git clone https://github.com/9529360-cpu/stardust-hermes.git
+cd stardust-hermes
 ```
 
 ### 3. Create a virtual environment
@@ -156,7 +106,7 @@ python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e '.[termux]' -c constraints-termux.txt
 ```
 
-If you only want the minimal core agent, this also works:
+For the minimal core runtime:
 
 ```bash
 python -m pip install -e '.' -c constraints-termux.txt
@@ -168,59 +118,66 @@ python -m pip install -e '.' -c constraints-termux.txt
 ln -sf "$PWD/venv/bin/hermes" "$PREFIX/bin/hermes"
 ```
 
-`$PREFIX/bin` is already on PATH in Termux, so this makes the `hermes` command persist across new shells without re-activating the venv every time.
+`hermes` remains the inherited command name for compatibility; the product/source maintained by this repository is Stardust.
 
-### 6. Verify the install
+### 6. Verify and start
 
 ```bash
 hermes --version
 hermes doctor
-```
-
-### 7. Start Hermes
-
-```bash
 hermes
 ```
 
 ---
 
-## Recommended follow-up setup
+## Community `pkg` option
 
-### Configure a model
+:::caution External distribution
+A community-maintained APT repository exists for the upstream Hermes-compatible package. It is operated outside Stardust and is **not a Stardust release channel**. Installing it means trusting that external repository and may install a package that does not match this repository's Stardust modifications.
+:::
+
+The external packaging sources are published in [`adybag14-cyber/termux-python`](https://github.com/adybag14-cyber/termux-python) and [`adybag14-cyber/termux-hermes`](https://github.com/adybag14-cyber/termux-hermes).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/adybag14-cyber/termux-python/main/scripts/setup_apt_repo.sh | bash
+pkg install hermes-agent
+```
+
+That package is managed through APT rather than the Stardust Git checkout:
+
+```bash
+pkg update
+pkg upgrade hermes-agent
+```
+
+Use the Stardust installer/manual clone above when you specifically want the code maintained in `9529360-cpu/stardust-hermes`.
+
+---
+
+## Follow-up setup
+
+Configure a model:
 
 ```bash
 hermes model
 ```
 
-Or set keys directly in `~/.hermes/.env`.
-
-### Re-run the full interactive setup wizard later
+Re-run the setup wizard later:
 
 ```bash
 hermes setup
 ```
 
-### Install optional Node dependencies manually
+### Optional browser tooling
 
-The tested Termux path skips Node/browser bootstrap on purpose. If you want to experiment with browser tooling later, what you need depends on which backend you use:
+The tested Termux path skips local browser bootstrap. Cloud browser providers host their own browser. For local experiments you can install Node and `agent-browser` manually:
 
-- **Cloud browser providers** (Browserbase, Browser Use, Firecrawl) host their own Chromium, so Node.js alone is enough — `agent-browser` resolves lazily via `npx agent-browser` on first use:
+```bash
+pkg install nodejs-lts
+npm install -g agent-browser && agent-browser install
+```
 
-  ```bash
-  pkg install nodejs-lts
-  ```
-
-- **Local browser automation** on Termux needs a real `agent-browser` install — the bare npx fallback is deliberately rejected in local mode as too fragile to advertise as ready:
-
-  ```bash
-  pkg install nodejs-lts
-  npm install -g agent-browser && agent-browser install
-  ```
-
-The browser tool automatically includes Termux directories (`/data/data/com.termux/files/usr/bin`) in its PATH search, so `agent-browser` and `npx` are discovered without any extra PATH configuration.
-
-Treat browser / WhatsApp tooling on Android as experimental until documented otherwise.
+Treat local browser and WhatsApp tooling on Android as experimental until documented otherwise.
 
 ---
 
@@ -228,21 +185,15 @@ Treat browser / WhatsApp tooling on Android as experimental until documented oth
 
 ### `No solution found` when installing `.[all]`
 
-Use the tested Termux bundle instead:
+Use the tested Termux bundle:
 
 ```bash
 python -m pip install -e '.[termux]' -c constraints-termux.txt
 ```
 
-The blocker is currently the `voice` extra:
-
-- `voice` pulls `faster-whisper`
-- `faster-whisper` depends on `ctranslate2`
-- `ctranslate2` does not publish Android wheels
-
 ### `uv pip install` fails on Android
 
-Use the Termux path with the stdlib venv + `pip` instead:
+Use the stdlib venv + pip path:
 
 ```bash
 python -m venv venv
@@ -254,8 +205,6 @@ python -m pip install -e '.[termux]' -c constraints-termux.txt
 
 ### `jiter` / `maturin` complains about `ANDROID_API_LEVEL`
 
-Set the API level explicitly before installing:
-
 ```bash
 export ANDROID_API_LEVEL="$(getprop ro.build.version.sdk)"
 python -m pip install -e '.[termux]' -c constraints-termux.txt
@@ -263,39 +212,31 @@ python -m pip install -e '.[termux]' -c constraints-termux.txt
 
 ### `hermes doctor` says ripgrep or Node is missing
 
-Install them with Termux packages:
-
 ```bash
 pkg install ripgrep nodejs
 ```
 
 ### Build failures while installing Python packages
 
-Make sure the build toolchain is installed:
-
 ```bash
 pkg install clang rust make pkg-config libffi openssl
 ```
 
-Then retry:
-
-```bash
-python -m pip install -e '.[termux]' -c constraints-termux.txt
-```
+Then retry the `.[termux]` install.
 
 ---
 
-## Known limitations on phones
+## Known phone limitations
 
-- Docker backend is unavailable
-- local voice transcription via `faster-whisper` is unavailable in the tested path
-- browser automation setup is intentionally skipped by the installer
-- some optional extras may work, but only `.[termux]` and `.[termux-all]` are currently documented as the tested Android bundles
+- Docker backend is unavailable;
+- local voice transcription via `faster-whisper` is unavailable in the tested path;
+- browser automation setup is intentionally skipped by the installer;
+- only `.[termux]` and `.[termux-all]` are documented as tested Android bundles.
 
-If you hit a new Android-specific issue, please open a GitHub issue with:
+If you hit an Android-specific issue, open an issue in the Stardust repository and include:
 
-- your Android version
-- `termux-info`
-- `python --version`
-- `hermes doctor`
-- the exact install command and full error output
+- Android version;
+- `termux-info`;
+- `python --version`;
+- `hermes doctor`;
+- the exact install command and full error output.
