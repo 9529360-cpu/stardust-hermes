@@ -29,7 +29,6 @@ VALID_MIDDLEWARE: set[str] = {
 @dataclass
 class RequestMiddlewareResult:
     """Result of applying request middleware to a mutable payload."""
-
     payload: Any
     original_payload: Any
     changed: bool = False
@@ -133,7 +132,8 @@ def apply_tool_request_middleware(
 
 
 def run_llm_execution_middleware(
-    request: Dict[str, Any], next_call: Callable[[Dict[str, Any]], Any], **context: Any) -> Any:
+    request: Dict[str, Any], next_call: Callable[[Dict[str, Any]], Any], **context: Any
+) -> Any:
     """Run provider execution through registered LLM execution middleware."""
     return _run_execution_chain(
         LLM_EXECUTION_MIDDLEWARE, next_call,
@@ -143,7 +143,13 @@ def run_llm_execution_middleware(
 def run_tool_execution_middleware(
     tool_name: str, args: Dict[str, Any], next_call: Callable[[Dict[str, Any]], Any], **context: Any,
 ) -> Any:
-    """Run tool execution through registered tool execution middleware."""
+    """Run tool execution through registered tool execution middleware.
+
+    In Stardust personal-assistant contexts, request/pre-tool stages are the last places allowed to
+    rewrite tool arguments because the first-party permission gate has already authorized that resolved
+    payload. Execution middleware may still wrap, observe, retry its own non-downstream work, or transform
+    results, but a changed downstream args object is rejected before the real tool runs.
+    """
     return _run_execution_chain(
         TOOL_EXECUTION_MIDDLEWARE, next_call,
         tool_name=tool_name, args=args, original_args=context.pop("original_args", args), **context)
@@ -158,16 +164,41 @@ class _DownstreamExecutionError(Exception):
         self.original = original
 
 
+def _enforce_authorized_tool_payload(kind: str, authorized: Any, candidate: Any) -> None:
+    """For personal-assistant tool calls, forbid post-approval execution-arg rewrites."""
+    if kind != TOOL_EXECUTION_MIDDLEWARE or candidate == authorized:
+        return
+    try:
+        from hermes_cli.assistant_permissions import personal_assistant_permissions_active
+
+        active = bool(personal_assistant_permissions_active())
+    except Exception as exc:
+        # A rewrite after the authorization boundary is the dangerous case. If policy scope cannot be
+        # inspected, fail closed for the rewrite rather than silently executing an unreviewed payload.
+        raise PermissionError(
+            "Tool execution middleware changed arguments after the permission gate, but Stardust "
+            "could not verify whether that rewrite is authorized."
+        ) from exc
+    if active:
+        raise PermissionError(
+            "Tool execution middleware cannot rewrite arguments after the Stardust permission gate. "
+            "Move the rewrite to tool_request middleware or a pre_tool_call modify directive so the "
+            "final arguments are classified before execution."
+        )
+
+
 def _run_execution_chain(kind: str, terminal_call: Callable[[Any], Any], **kwargs: Any) -> Any:
     from hermes_cli.plugins import get_plugin_manager
 
     payload_key = "request" if "request" in kwargs else "args"
+    authorized_payload = _safe_copy(kwargs[payload_key])
     callbacks = list(get_plugin_manager()._middleware.get(kind, []))
     if not callbacks:
         return terminal_call(kwargs[payload_key])
 
     def call_at(index: int, payload: Any) -> Any:
         if index >= len(callbacks):
+            _enforce_authorized_tool_payload(kind, authorized_payload, payload)
             return terminal_call(payload)
 
         callback = callbacks[index]
