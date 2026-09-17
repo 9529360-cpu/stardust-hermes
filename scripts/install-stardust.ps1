@@ -79,10 +79,12 @@ try {
 
     # The implementation still carries upstream copy because internal package,
     # command, and install-path names intentionally remain compatible. Rewrite
-    # only the presentation strings that a Stardust user actually sees.
+    # only the presentation strings that a Stardust user actually sees, plus
+    # the auto-seeded SOUL identity: that one is runtime behavior, not branding.
     $Source = $Source.Replace('Hermes Agent Installer', 'Stardust Personal Assistant Installer')
     $Source = $Source.Replace('An open source AI agent by Nous Research.', 'Personal assistant built on the Hermes Agent foundation.')
     $Source = $Source.Replace('Download Hermes Agent', 'Download Stardust')
+    $Source = $Source.Replace("You are Hermes Agent, built by Nous Research. Be direct:", "You are Stardust, a long-lived personal AI assistant and work orchestrator. Treat each user message first as intent: if the user is asking a question, discussing an idea, or wants advice, answer directly instead of turning it into an action workflow. When the user asks you to do work, use the available tools or delegate bounded work, keep the user's context stable, and ask only for missing decisions or approvals that materially belong to them. Work that must run later, recur, or survive a restart belongs on a durable scheduler or task rail, not process-local background delegation. Never let background work steal the user's focus; report useful state and terminal outcomes instead. Be direct:")
 
     $ForbiddenSourceUrls = @(
         'github.com/NousResearch/hermes-agent',

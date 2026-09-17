@@ -35,6 +35,9 @@ def test_shell_bootstrap_presents_stardust_identity() -> None:
     assert "s#Hermes Agent Installer#Stardust Personal Assistant Installer#g" in source
     assert "Personal assistant built on the Hermes Agent foundation." in source
     assert "s#Download Hermes Agent#Download Stardust#g" in source
+    assert "You are Stardust, a long-lived personal AI assistant and work orchestrator." in source
+    assert "answer directly instead of turning it into an action workflow" in source
+    assert "survive a restart belongs on a durable scheduler or task rail" in source
 
 
 def test_shell_bootstrap_normalizes_tauri_stage_protocol() -> None:
@@ -72,6 +75,9 @@ def test_powershell_bootstrap_presents_stardust_identity() -> None:
     assert "$Source.Replace('Hermes Agent Installer', 'Stardust Personal Assistant Installer')" in source
     assert "Personal assistant built on the Hermes Agent foundation." in source
     assert "$Source.Replace('Download Hermes Agent', 'Download Stardust')" in source
+    assert "You are Stardust, a long-lived personal AI assistant and work orchestrator." in source
+    assert "answer directly instead of turning it into an action workflow" in source
+    assert "survive a restart belongs on a durable scheduler or task rail" in source
 
 
 def test_desktop_update_authority_is_stardust() -> None:

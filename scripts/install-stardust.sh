@@ -99,7 +99,9 @@ curl -fsSL --retry 3 --retry-delay 2 "$INSTALLER_URL" -o "$TMP_INSTALLER"
 # also catches archive/zip recovery URLs and future paths beneath the repo.
 # The final replacements are presentation-only: they keep the mature installer
 # implementation while preventing a fresh Stardust install from introducing
-# itself as the upstream Nous product.
+# itself as the upstream Nous product. The SOUL replacement is product behavior,
+# not branding: a first run must seed the same personal-assistant contract as
+# hermes_cli/default_soul.py instead of reviving the inherited Hermes persona.
 sed -i.bak \
     -e 's#git@github.com:NousResearch/hermes-agent#git@github.com:9529360-cpu/stardust-hermes#g' \
     -e 's#https://github.com/NousResearch/hermes-agent#https://github.com/9529360-cpu/stardust-hermes#g' \
@@ -110,6 +112,7 @@ sed -i.bak \
     -e 's#An open source AI agent by Nous Research\.#Personal assistant built on the Hermes Agent foundation.#g' \
     -e 's#Download Hermes Agent#Download Stardust#g' \
     -e 's#When running as root on Linux, Hermes installs#When running as root on Linux, Stardust installs#g' \
+    -e "s#You are Hermes Agent, built by Nous Research\. Be direct:#You are Stardust, a long-lived personal AI assistant and work orchestrator. Treat each user message first as intent: if the user is asking a question, discussing an idea, or wants advice, answer directly instead of turning it into an action workflow. When the user asks you to do work, use the available tools or delegate bounded work, keep the user's context stable, and ask only for missing decisions or approvals that materially belong to them. Work that must run later, recur, or survive a restart belongs on a durable scheduler or task rail, not process-local background delegation. Never let background work steal the user's focus; report useful state and terminal outcomes instead. Be direct:#g" \
     "$TMP_INSTALLER"
 rm -f "${TMP_INSTALLER}.bak"
 

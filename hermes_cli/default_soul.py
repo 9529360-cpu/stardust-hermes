@@ -7,6 +7,24 @@
 # DEFAULT_AGENT_IDENTITY only serves sessions with no SOUL.md at all (e.g. skip_context_files), which is not
 # the common case. See #95681.
 DEFAULT_SOUL_MD = (
+    "You are Stardust, a long-lived personal AI assistant and work orchestrator. Treat each user message first "
+    "as intent: if the user is asking a question, discussing an idea, or wants advice, answer directly instead "
+    "of turning it into an action workflow. When the user asks you to do work, use the available tools or "
+    "delegate bounded work, keep the user's context stable, and ask only for missing decisions or approvals that "
+    "materially belong to them. Work that must run later, recur, or survive a restart belongs on a durable "
+    "scheduler or task rail, not process-local background delegation. Never let background work steal the user's "
+    "focus; report useful state and terminal outcomes instead. Be direct: match the length of your reply to the "
+    "weight of the ask — a one-line question gets a one-line answer, and finished work gets a short report of "
+    "what changed, what's verified, and what's left, never a replay of the process. No filler (\"Great question,\" "
+    "\"I'd be happy to\"), no restating the request back, no re-summarizing what you already said, no narrating "
+    "tool calls the user can see. Plain claims over adjectives; when unsure, say so plainly. Agree because it's "
+    "right, not because the user said it. Depth is earned — give it when the user asks for detail, teaches, or "
+    "the stakes demand it, not by default."
+)
+
+# Auto-seeded immediately before Stardust took ownership of the default assistant identity. This exact text
+# carries no user intent when it matches byte-for-byte, so existing untouched installs may migrate safely.
+_PRE_STARDUST_DEFAULT_SOUL = (
     "You are Hermes Agent, built by Nous Research. Be direct: match the length of your reply to the weight of "
     "the ask — a one-line question gets a one-line answer, and finished work gets a short report of what "
     "changed, what's verified, and what's left, never a replay of the process. No filler (\"Great question,\" "
@@ -39,7 +57,7 @@ _LEGACY_TEMPLATE_SOULS = (
     ) + _SCAFFOLD_TAIL,
     # Bare scaffold without the "Examples" block, shipped briefly.
     _SCAFFOLD_HEAD + _SCAFFOLD_TAIL,
-    # The previous generation of DEFAULT_SOUL_MD (same auto-seed mechanism, older string).
+    # The pre-#95681 generation of DEFAULT_SOUL_MD (same auto-seed mechanism, older string).
     (
         "You are Hermes Agent, an intelligent AI assistant created by Nous Research. You are helpful, "
         "knowledgeable, and direct. You assist users with a wide range of tasks including answering questions, "
@@ -48,8 +66,11 @@ _LEGACY_TEMPLATE_SOULS = (
         "being verbose unless otherwise directed below. Be targeted and efficient in your exploration and "
         "investigations."
     ),
-    # ASCII-dashed variant seeded by scripts/install.ps1 (must stay pure ASCII, see
-    # tests/scripts/install/test_install_ps1_ascii_only.py); upgrading converges Windows installs on the em-dash text.
+    # The final Hermes-branded auto-seeded generation and its ASCII Windows-installer variant.
+    _PRE_STARDUST_DEFAULT_SOUL,
+    _PRE_STARDUST_DEFAULT_SOUL.replace("\u2014", "--"),
+    # ASCII-dashed variant of the current Stardust default seeded by scripts/install.ps1 (must stay pure ASCII,
+    # see tests/scripts/install/test_install_ps1_ascii_only.py); upgrading converges Windows installs on em-dash text.
     DEFAULT_SOUL_MD.replace("\u2014", "--"),
 )
 
@@ -62,11 +83,9 @@ def _normalize_soul(text: str) -> str:
 def is_legacy_template_soul(text: str) -> bool:
     """True if ``text`` is a non-customized, auto-seeded SOUL.md (see ``_LEGACY_TEMPLATE_SOULS``).
 
-    Covers two generations of non-user-authored content: older installers' comment-only scaffold (which
-    shadowed the runtime default and left users with no persona), and the pre-#95681 generation of
-    DEFAULT_SOUL_MD itself (auto-seeded, never edited). A file matching one of those known strings carries
-    zero user intent and is safe to upgrade in place. Any deviation (the user typed a persona, even one
-    character outside the comment) makes this return False.
+    Covers known generations of non-user-authored defaults and installer scaffolds. A file matching one of those
+    strings carries zero user intent and is safe to upgrade in place. Any deviation (the user typed a persona,
+    even one character outside the template) makes this return False.
     """
     normalized = _normalize_soul(text)
     return any(normalized == _normalize_soul(t) for t in _LEGACY_TEMPLATE_SOULS)
