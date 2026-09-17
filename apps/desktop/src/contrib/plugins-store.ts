@@ -31,8 +31,8 @@ export interface PluginRecord {
 }
 
 // Explicit user enable/disable choices, id -> boolean. ABSENCE means "no
-// choice" — the plugin falls back to its own `defaultEnabled`. This is what
-// lets an opt-in plugin ship off-by-default: absence ≠ enabled anymore.
+// choice". Bundled/reviewed plugins may fall back to their shipped default;
+// non-bundled code remains inert until the user explicitly enables it.
 const DECISIONS_KEY = 'hermes.desktop.pluginDecisions.v2'
 const LEGACY_DISABLED_KEY = 'hermes.desktop.disabledPlugins.v1'
 
@@ -59,12 +59,18 @@ function loadDecisions(): Record<string, boolean> {
 
 export const $pluginDecisions = atom<Record<string, boolean>>(loadDecisions())
 
-/** Whether a plugin should register: the user's explicit choice if any, else
- *  the plugin's own default (true for ordinary plugins, false for opt-in). */
+/** Whether a plugin should register. An explicit user decision always wins.
+ *  Without one, only bundled/reviewed app code may adopt its shipped default;
+ *  disk/runtime code inventories disabled so plugin metadata cannot self-grant
+ *  full renderer authority on first discovery. */
 export function pluginActive(id: string, defaultEnabled = true): boolean {
   const decisions = $pluginDecisions.get()
 
-  return id in decisions ? decisions[id] : defaultEnabled
+  if (id in decisions) {
+    return decisions[id]
+  }
+
+  return $pluginRecords.get()[id]?.kind === 'bundled' ? defaultEnabled : false
 }
 
 function saveDecisions(next: Record<string, boolean>) {
