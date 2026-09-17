@@ -1,49 +1,49 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import { allPaneIds } from '@/components/pane-shell/tree/model'
-import { registry } from '@/contrib/registry'
 
 import { DEFAULT_TREE } from './layout-presets'
-import { registerWorkspaceOverviewPane, WORKSPACE_OVERVIEW_PANE_ID } from './workspace-overview'
 
-let disposeOverview: (() => void) | null = null
-
-afterEach(() => {
-  disposeOverview?.()
-  disposeOverview = null
-})
-
-describe('personal desktop default layout', () => {
-  it('keeps chat dominant with conversations and workspace context on the sides', () => {
-    expect(allPaneIds(DEFAULT_TREE)).toEqual(['sessions', 'workspace', WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'])
+describe('Stardust Codex-style default layout', () => {
+  it('boots into projects/threads, active workspace and Review', () => {
+    expect(allPaneIds(DEFAULT_TREE)).toEqual(['sessions', 'workspace', 'review'])
   })
 
-  it('keeps developer tools out of the first view', () => {
-    expect(allPaneIds(DEFAULT_TREE)).not.toContain('terminal')
+  it.each(['terminal', 'files'])('keeps %s available on demand instead of permanently occupying first view', paneId => {
+    expect(allPaneIds(DEFAULT_TREE)).not.toContain(paneId)
   })
 
-  it('hosts overview, review and files in one contextual right rail', () => {
+  it('makes Review the dedicated chromeless right work surface', () => {
     expect(DEFAULT_TREE.type).toBe('split')
 
     if (DEFAULT_TREE.type !== 'split') {
       return
     }
 
-    const context = DEFAULT_TREE.children[2]
+    const review = DEFAULT_TREE.children[2]
 
-    expect(context.type).toBe('group')
+    expect(review.type).toBe('group')
 
-    if (context.type === 'group') {
-      expect(context.panes).toEqual([WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'])
+    if (review.type === 'group') {
+      expect(review.id).toBe('grp-review')
+      expect(review.panes).toEqual(['review'])
+      expect(review.tabStrip).toBe('never')
     }
   })
 
-  it('registers the overview as fixed core product chrome', () => {
-    disposeOverview = registerWorkspaceOverviewPane()
+  it('keeps the permanent left and center product regions free of generic IDE tabs', () => {
+    expect(DEFAULT_TREE.type).toBe('split')
 
-    const overview = registry.getArea('panes').find(pane => pane.id === WORKSPACE_OVERVIEW_PANE_ID)
+    if (DEFAULT_TREE.type !== 'split') {
+      return
+    }
 
-    expect(overview?.source).toBe('core')
-    expect((overview?.data as { uncloseable?: boolean } | undefined)?.uncloseable).toBe(true)
+    for (const region of DEFAULT_TREE.children) {
+      expect(region.type).toBe('group')
+
+      if (region.type === 'group') {
+        expect(region.tabStrip).toBe('never')
+      }
+    }
   })
 })

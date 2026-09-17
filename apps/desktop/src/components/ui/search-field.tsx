@@ -11,6 +11,8 @@ interface SearchFieldProps {
   placeholder: string
   value: string
   onChange: (value: string) => void
+  /** Focus the input when a conditionally mounted search surface opens. */
+  autoFocus?: boolean
   /**
    * Data-driven placeholder suggestions ("Try \u201ccreative\u201d") — one is picked at
    * random per mount, the nudge that search understands more than names.
@@ -36,6 +38,7 @@ export function SearchField({
   placeholder,
   value,
   onChange,
+  autoFocus = false,
   hints,
   containerClassName,
   inputClassName,
@@ -69,6 +72,7 @@ export function SearchField({
       <Search className="pointer-events-none size-3.5 shrink-0 text-muted-foreground/70" />
       <input
         aria-label={ariaLabel ?? placeholder}
+        autoFocus={autoFocus}
         className={cn(
           // `field-sizing: content` grows the input to fit the placeholder/typed
           // text; min-w-0 lets it shrink back below content size when the

@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
+import { setCurrentCwd } from '@/store/session'
 
 import { Intro } from './intro'
 
@@ -14,6 +15,10 @@ function renderIntro(locale: 'en' | 'zh' = 'zh') {
     </I18nProvider>
   )
 }
+
+afterEach(() => {
+  setCurrentCwd('')
+})
 
 describe('personal assistant intro', () => {
   it('presents a calm localized assistant home instead of the developer wordmark', () => {
@@ -30,5 +35,17 @@ describe('personal assistant intro', () => {
 
     expect(screen.getByText('Your personal assistant')).toBeTruthy()
     expect(screen.getByText('What can I take care of?')).toBeTruthy()
+  })
+
+  it('switches a project draft to the Codex-style development workspace', () => {
+    setCurrentCwd('/workspace/stardust-hermes')
+    renderIntro('en')
+
+    expect(screen.getByText('Project workspace')).toBeTruthy()
+    expect(screen.getByText('What should we change?')).toBeTruthy()
+    expect(screen.queryByText('Your personal assistant')).toBeNull()
+    expect(screen.getByText('Build a feature')).toBeTruthy()
+    expect(screen.getByText('Fix a bug')).toBeTruthy()
+    expect(screen.getByText('Review the code')).toBeTruthy()
   })
 })

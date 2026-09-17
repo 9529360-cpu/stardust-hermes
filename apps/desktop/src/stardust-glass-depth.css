@@ -1,0 +1,108 @@
+/* Stardust depth pass.
+ *
+ * reference-shell.css owns the Codex workspace geometry. This layer makes the
+ * desktop read as an OS material stack instead of a dark IDE painted edge to
+ * edge: ambient desktop -> floating app glass -> rail/main/review materials ->
+ * raised composer/transient surfaces.
+ */
+
+:root.dark[data-hermes-reference-shell='aurora'] body:not([data-no-stardust-wallpaper]) {
+  background:
+    linear-gradient(rgba(4, 7, 16, 0.22), rgba(4, 7, 16, 0.34)),
+    url('./assets/stardust-os-wallpaper.svg') center / cover fixed no-repeat !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] #root {
+  box-sizing: border-box;
+  padding: 12px !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+  border-radius: 20px !important;
+  background: color-mix(in srgb, var(--sd-frame) 58%, transparent) !important;
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.28),
+    0 8px 28px rgba(15, 21, 46, 0.18),
+    inset 0 1px 0 color-mix(in srgb, var(--sd-highlight) 90%, transparent) !important;
+  backdrop-filter: blur(34px) saturate(132%) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(132%) !important;
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+  border-color: rgba(224, 229, 255, 0.12) !important;
+  background: rgba(12, 14, 22, 0.56) !important;
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+  background: rgba(19, 23, 34, 0.54) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(235, 239, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+  backdrop-filter: blur(34px) saturate(126%) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(126%) !important;
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] {
+  background:
+    radial-gradient(46rem 30rem at 54% 22%, rgba(95, 91, 201, 0.085), transparent 68%),
+    rgba(10, 12, 20, 0.34) !important;
+  backdrop-filter: blur(24px) saturate(118%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(118%) !important;
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] [data-tree-group='grp-review'] {
+  background: rgba(21, 20, 39, 0.48) !important;
+  box-shadow:
+    inset 1px 0 0 rgba(235, 239, 255, 0.075),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(36px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(130%) !important;
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] [data-task-header] {
+  background: rgba(13, 16, 25, 0.36) !important;
+  box-shadow: inset 0 -1px 0 rgba(235, 239, 255, 0.055);
+  backdrop-filter: blur(28px) saturate(124%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(124%) !important;
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] [data-task-workspace] [data-tour='composer'] {
+  border-color: rgba(226, 231, 255, 0.15) !important;
+  background: rgba(24, 27, 37, 0.74) !important;
+  box-shadow:
+    0 16px 44px rgba(0, 0, 0, 0.32),
+    0 3px 12px rgba(58, 66, 126, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09) !important;
+  backdrop-filter: blur(32px) saturate(132%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(132%) !important;
+}
+
+:root.dark[data-hermes-reference-shell='aurora'] [data-panel-header] {
+  background: rgba(22, 24, 34, 0.68) !important;
+  backdrop-filter: blur(28px) saturate(124%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(124%) !important;
+}
+
+/* The Review count badge used to reference an upstream token that is not
+ * defined by the product shell. Keep it inside the same material system. */
+:root[data-hermes-reference-shell='aurora'] [data-review-workspace] {
+  --ui-fill-quaternary: var(--sd-control-active);
+}
+
+/* Native Mica/Vibrancy is the backing material on supported platforms. Keep
+ * the faux wallpaper out of that path while retaining the same panel depth. */
+:root[data-hermes-reference-shell='aurora'][data-hermes-glass][data-hermes-glass-scope='window'] body {
+  background: transparent !important;
+}
+
+@media (max-width: 900px), (max-height: 660px) {
+  :root[data-hermes-reference-shell='aurora'] #root {
+    padding: 0 !important;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+    border-radius: 0 !important;
+    border-width: 0 !important;
+    box-shadow: none !important;
+  }
+}

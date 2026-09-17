@@ -2,39 +2,40 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { registry } from '@/contrib/registry'
 import { isOnboardingEnabled } from '@/lib/onboarding-enabled'
 
-import {
-  registerWorkspaceOverviewPane,
-  schedulePersonalLayoutMigration,
-  WORKSPACE_OVERVIEW_PANE_ID
-} from './workspace-overview'
+import { schedulePersonalLayoutMigration } from './layout-migration'
 
-// Private-product default: conversations on the left, the active chat as the
-// dominant surface, and one calm context rail on the right. Files and Review
-// live as tabs in that context rail and stay hidden until the user asks for
-// them; the always-available overview keeps the rail useful when no tool pane
-// is open. Terminal is intentionally absent from the first view and appears on
-// demand.
+const productGroup = (panes: string[], id?: string) => group(panes, { id, tabStrip: 'never' })
+
+/**
+ * Codex-style default shell:
+ *
+ *   Projects / Threads | active thread workspace | Review
+ *
+ * Review is not a dashboard card stack — it is the real git work surface.
+ * Terminal stays a bottom tool pane and Files stays an on-demand right tool;
+ * both retain the pane-tree's sash resizing, collapse and persistence.
+ */
 export const DEFAULT_TREE = split(
   'row',
   [
-    group(['sessions'], { id: 'grp-sessions' }),
-    group(['workspace'], { id: 'grp-main' }),
-    group([WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'], { id: 'grp-context' })
+    productGroup(['sessions'], 'grp-sessions'),
+    productGroup(['workspace'], 'grp-main'),
+    productGroup(['review'], 'grp-review')
   ],
-  [1, 3.5, 1.2],
+  [1.05, 3.9, 1.95],
   'spl-root'
 )
 
 const FOCUS_TREE = split(
   'row',
-  [group(['sessions']), group(['workspace', WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review', 'terminal'])],
-  [1, 4.6]
+  [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+  [0.9, 4.8, 1.7]
 )
 
 const BASIC_TREE = split(
   'row',
-  [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
-  [1, 3.8, 1.05]
+  [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+  [1, 4.25, 1.75]
 )
 
 const TERMINAL_TREE = split(
@@ -42,28 +43,28 @@ const TERMINAL_TREE = split(
   [
     split(
       'row',
-      [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review'])],
-      [1, 3.2, 1.2]
+      [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+      [1.05, 3.9, 1.95]
     ),
     group(['terminal'])
   ],
-  [3, 1]
+  [3.5, 1]
 )
 
 const QUAD_TREE = split(
   'column',
   [
-    split('row', [group(['sessions', 'files']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])], [1, 3, 1.1]),
-    split('row', [group(['terminal']), group(['review'])], [1.4, 1])
+    split(
+      'row',
+      [productGroup(['sessions']), productGroup(['workspace']), productGroup(['review'])],
+      [1, 3.7, 1.8]
+    ),
+    split('row', [group(['terminal']), group(['files'])], [1.9, 1])
   ],
-  [3, 1]
+  [3.25, 1]
 )
 
 export function registerLayoutPresets() {
-  // The overview is product chrome, not an optional plugin: it must exist
-  // whenever a preset references it.
-  registerWorkspaceOverviewPane()
-
   const dispose = registry.registerMany([
     { id: 'default', area: 'layouts', title: 'Default', order: 0, data: DEFAULT_TREE },
     ...(isOnboardingEnabled() ? [{ id: 'basic', area: 'layouts', title: 'Basic', order: 5, data: BASIC_TREE }] : []),

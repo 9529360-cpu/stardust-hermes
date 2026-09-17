@@ -1,0 +1,15 @@
+:root[data-hermes-reference-shell='aurora'] [data-titlebar-cluster='right'],
+:root[data-hermes-reference-shell='aurora'] [data-titlebar-pane-tools] {
+  display: none !important;
+}
+
+/* Keep the single left-edge sidebar control: Codex has a lightweight rail
+   toggle, and native macOS / Windows window buttons are painted outside these
+   renderer clusters. */
+:root[data-hermes-reference-shell='aurora'] [data-titlebar-cluster='left'] {
+  opacity: 0.72;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-titlebar-cluster='left']:hover {
+  opacity: 1;
+}

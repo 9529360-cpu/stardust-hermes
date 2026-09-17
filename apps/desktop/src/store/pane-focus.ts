@@ -1,12 +1,30 @@
 import { setTerminalTakeover } from '@/app/right-sidebar/store'
-import { isLayoutNode, type LayoutNode } from '@/components/pane-shell/tree/model'
+import { allPaneIds, isLayoutNode, type LayoutNode } from '@/components/pane-shell/tree/model'
 import { applyLayoutPreset, LAYOUTS_AREA } from '@/components/pane-shell/tree/presets'
-import { revealTreePane } from '@/components/pane-shell/tree/store'
+import { $activePresetId, revealTreePane } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
 
 import { setFileBrowserOpen, setSidebarOpen } from './layout'
 import { setRightContextOpen } from './right-context'
 import { openReview } from './review'
+
+function openTerminalWorkSurface(): void {
+  const activePreset = $activePresetId.get()
+
+  // The old terminal reveal path only toggled PersistentTerminal. In Stardust's
+  // default/focus shells that left its slot spanning the entire center column,
+  // so the fixed persistent terminal covered the conversation instead of
+  // becoming Codex's bottom tool deck. Promote the first open onto the real
+  // terminal-deck tree preset. Once there, later opens only flip visibility so
+  // user-resized height survives. A custom layout remains authoritative.
+  if (activePreset === 'default' || activePreset === 'basic' || activePreset === 'focus') {
+    if (applyDesktopLayoutPreset('terminal-deck')) {
+      return
+    }
+  }
+
+  setTerminalTakeover(true)
+}
 
 // Explicit-request pane reveals, keyed to the backend `focus_pane` tool. Each
 // entry drives the pane's own reveal path (some are toggle-bound) so a revealed
@@ -23,7 +41,7 @@ const PANE_REVEALERS: Record<string, () => void> = {
     openReview()
   },
   sessions: () => setSidebarOpen(true),
-  terminal: () => setTerminalTakeover(true)
+  terminal: openTerminalWorkSurface
 }
 
 // The store setters above are same-value no-ops: `$open` already reads true
@@ -74,7 +92,23 @@ export function applyDesktopLayoutPreset(preset: string): boolean {
     return false
   }
 
-  applyLayoutPreset(entry.id, entry.data as LayoutNode)
+  const tree = entry.data as LayoutNode
+  const paneIds = new Set(allPaneIds(tree))
+
+  // A preset is a visible workspace promise, not just tree geometry. Review
+  // and Files are backed by independent persisted visibility stores; opening
+  // those owners before applying the tree prevents a preset from reserving a
+  // blank/collapsed zone. Terminal already opts into the generic
+  // revealOnPreset mechanism in its pane contribution.
+  if (paneIds.has('review')) {
+    openReview()
+  }
+
+  if (paneIds.has('files')) {
+    setFileBrowserOpen(true)
+  }
+
+  applyLayoutPreset(entry.id, tree)
 
   return true
 }
