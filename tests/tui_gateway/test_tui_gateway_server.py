@@ -22516,3 +22516,44 @@ def test_load_cfg_raw_sees_replacement_with_pinned_mtime_and_size(monkeypatch, t
     shutil.copy2(other, cfg)
     os.utime(cfg, ns=(st.st_atime_ns, st.st_mtime_ns))
     assert server._load_cfg_raw()["model"]["default"] == "aaaa-route"
+
+
+def test_desktop_notify_permission_emits_settled_tool_when_progress_off(monkeypatch):
+    events: list[tuple[str, str, dict]] = []
+    monkeypatch.setattr(
+        server, "_emit", lambda event_type, sid, payload: events.append((event_type, sid, payload))
+    )
+    monkeypatch.setitem(
+        server._sessions,
+        "desktop-notify-off-test",
+        {"source": "desktop", "tool_progress_mode": "off", "tool_started_at": {}, "edit_snapshots": {}},
+    )
+
+    args = {"command": "pwd"}
+    server._on_tool_start("desktop-notify-off-test", "tool-1", "terminal", args)
+    assert events == []  # notify is deliberately after the effect, not before it
+
+    server._on_tool_complete("desktop-notify-off-test", "tool-1", "terminal", args, "done")
+
+    assert [event[0] for event in events] == ["tool.complete"]
+    assert events[0][2]["name"] == "terminal"
+    assert events[0][2]["permission_level"] == "notify"
+    assert events[0][2]["result"] == "done"
+
+
+def test_desktop_allow_permission_stays_hidden_when_progress_off(monkeypatch):
+    events: list[tuple[str, str, dict]] = []
+    monkeypatch.setattr(
+        server, "_emit", lambda event_type, sid, payload: events.append((event_type, sid, payload))
+    )
+    monkeypatch.setitem(
+        server._sessions,
+        "desktop-allow-off-test",
+        {"source": "desktop", "tool_progress_mode": "off", "tool_started_at": {}, "edit_snapshots": {}},
+    )
+
+    server._on_tool_complete(
+        "desktop-allow-off-test", "tool-read", "read_file", {"path": "README.md"}, '{"content":"ok"}'
+    )
+
+    assert events == []

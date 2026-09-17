@@ -252,6 +252,24 @@ def _on_tool_start(sid: str, tool_call_id: str, name: str, args: dict):
         _emit_tool_lifecycle("tool.start", sid, name, args, payload)
 
 
+def _assistant_notify_completion(sid: str, name: str, args: dict) -> bool:
+    """True when Desktop's first-party permission policy promises execute-then-notify.
+
+    Tool progress is optional chrome, but a ``notify`` permission decision is product semantics:
+    when the user hides ordinary progress we still leave one settled tool row after the effect lands.
+    Read-only ``allow`` calls stay silent and ``confirm`` calls use the approval surface instead.
+    """
+    session = _sessions.get(sid)
+    if not session or _session_source(session).strip().lower() != "desktop":
+        return False
+    try:
+        from hermes_cli.assistant_permissions import NOTIFY, classify_tool_permission
+
+        return classify_tool_permission(name, args).level == NOTIFY
+    except Exception:
+        return False
+
+
 def _on_tool_complete(sid: str, tool_call_id: str, name: str, args: dict, result: str):
     if _connector_lifecycle_is_stale(sid, name, args):
         return
@@ -281,8 +299,11 @@ def _on_tool_complete(sid: str, tool_call_id: str, name: str, args: dict, result
         rendered: list[str] = []
         if render_edit_diff_with_delta(name, result, function_args=args, snapshot=snapshot, print_fn=rendered.append):
             payload["inline_diff"] = "\n".join(rendered)
+    assistant_notify = _assistant_notify_completion(sid, name, args)
+    if assistant_notify:
+        payload["permission_level"] = "notify"
     if (_tool_progress_enabled(sid) or payload.get("inline_diff") or _tool_lifecycle_required_for_ui(name)
-            or name in _TODO_TOOL_NAMES or _connector_tool_lifecycle(name, args)):
+            or name in _TODO_TOOL_NAMES or _connector_tool_lifecycle(name, args) or assistant_notify):
         _emit_tool_lifecycle("tool.complete", sid, name, args, payload)
     # Task state is application data, not tool-progress chrome: a dedicated full-snapshot event lets
     # every client reconcile without parsing tool args.
