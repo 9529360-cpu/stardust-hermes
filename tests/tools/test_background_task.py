@@ -97,6 +97,23 @@ def test_read_and_mutation_actions_route_to_existing_kanban_handlers(monkeypatch
     ]
 
 
+def test_approval_actions_use_durable_approval_owner(monkeypatch):
+    calls = []
+
+    def operation(task_id, action, args):
+        calls.append((task_id, action, dict(args)))
+        return json.dumps({"ok": True, "task_id": task_id, "action": action})
+
+    monkeypatch.setattr(bt, "_approval_operation", operation)
+    for action in ("approvals", "approve", "deny"):
+        result = json.loads(registry.dispatch(
+            "background_task",
+            {"action": action, "task_id": "t1", "approval_id": "apr-1"},
+        ))
+        assert result["action"] == action
+    assert [item[1] for item in calls] == ["approvals", "approve", "deny"]
+
+
 def test_cancel_uses_kernel_cancel_path(monkeypatch):
     monkeypatch.setattr(
         bt,
@@ -153,6 +170,7 @@ def test_invalid_background_task_requests_fail_before_dispatch(monkeypatch):
     missing_title = json.loads(registry.dispatch("background_task", {"action": "start"}))
     missing_id = json.loads(registry.dispatch("background_task", {"action": "status"}))
     missing_cancel_id = json.loads(registry.dispatch("background_task", {"action": "cancel"}))
+    missing_approval_id = json.loads(registry.dispatch("background_task", {"action": "approve"}))
     missing_comment = json.loads(registry.dispatch(
         "background_task", {"action": "comment", "task_id": "t1"}
     ))
@@ -160,17 +178,16 @@ def test_invalid_background_task_requests_fail_before_dispatch(monkeypatch):
     assert "title" in missing_title["error"]
     assert "task_id" in missing_id["error"]
     assert "task_id" in missing_cancel_id["error"]
+    assert "task_id" in missing_approval_id["error"]
     assert "body" in missing_comment["error"]
 
 
 def test_background_task_permission_semantics_match_action():
-    assert permissions.classify_tool_permission(
-        "background_task", {"action": "status"}
-    ).level == permissions.ALLOW
-    assert permissions.classify_tool_permission(
-        "background_task", {"action": "list"}
-    ).level == permissions.ALLOW
-    for action in ("start", "comment", "resume", "cancel"):
+    for action in ("status", "list", "approvals"):
+        assert permissions.classify_tool_permission(
+            "background_task", {"action": action}
+        ).level == permissions.ALLOW
+    for action in ("start", "approve", "deny", "comment", "resume", "cancel"):
         assert permissions.classify_tool_permission(
             "background_task", {"action": action}
         ).level == permissions.NOTIFY
