@@ -3,16 +3,17 @@ import { useI18n } from '@/i18n'
 import { Check, ChevronRight, Terminal } from '@/lib/icons'
 import type { OAuthProvider } from '@/types/hermes'
 
+const RETIRED_BUILTIN_ACCOUNT_PROVIDER_ID = 'nous'
+
 const PROVIDER_DISPLAY: Record<string, { order: number; title: string }> = {
-  nous: { order: 0, title: 'Nous Portal' },
-  'openai-codex': { order: 1, title: 'ChatGPT or Codex Subscription' },
-  'minimax-oauth': { order: 2, title: 'MiniMax' },
-  'qwen-oauth': { order: 3, title: 'Qwen Code' },
-  'xai-oauth': { order: 4, title: 'xAI Grok' },
+  'openai-codex': { order: 0, title: 'ChatGPT or Codex Subscription' },
+  'minimax-oauth': { order: 1, title: 'MiniMax' },
+  'qwen-oauth': { order: 2, title: 'Qwen Code' },
+  'xai-oauth': { order: 3, title: 'xAI Grok' },
   // Both Anthropic entries sit at the bottom: the API-key path first, then
   // the subscription OAuth path (only works with extra usage credits).
-  anthropic: { order: 5, title: 'Anthropic API Key' },
-  'claude-code': { order: 6, title: 'Anthropic OAuth: Required Extra Usage Credits to Use Subscription' }
+  anthropic: { order: 4, title: 'Anthropic API Key' },
+  'claude-code': { order: 5, title: 'Anthropic OAuth: Required Extra Usage Credits to Use Subscription' }
 }
 
 const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
@@ -20,8 +21,18 @@ const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/
 export const providerTitle = (p: OAuthProvider) => PROVIDER_DISPLAY[p.id]?.title ?? p.name
 const orderOf = (p: OAuthProvider) => PROVIDER_DISPLAY[p.id]?.order ?? 99
 
+/**
+ * Provider rows shown by Stardust Desktop.
+ *
+ * The inherited Nous account is deliberately absent from Desktop setup and
+ * Settings. Backend compatibility remains intact for existing installations,
+ * but the desktop no longer advertises or initiates that built-in account
+ * path. User-selected third-party OAuth and API-key providers remain available.
+ */
 export const sortProviders = (providers: OAuthProvider[]) =>
-  [...providers].sort((a, b) => orderOf(a) - orderOf(b) || a.name.localeCompare(b.name))
+  providers
+    .filter(provider => provider.id !== RETIRED_BUILTIN_ACCOUNT_PROVIDER_ID)
+    .sort((a, b) => orderOf(a) - orderOf(b) || a.name.localeCompare(b.name))
 
 export function FeaturedProviderRow({
   onSelect,
@@ -67,7 +78,8 @@ export function FeaturedProviderRow({
   )
 }
 
-// The free tier is an identity without an account: never "Connected", never the account's name.
+// Kept for compatibility with older renderer states while the remaining
+// free-tier surfaces are retired. New Desktop provider lists filter this row.
 function FreeTierTag() {
   const { t } = useI18n()
 
@@ -92,7 +104,7 @@ function ConnectedTag() {
 const PROVIDER_ROW_CLASS =
   'group flex w-full items-center justify-between gap-3 rounded-[6px] px-3 py-2.5 text-left transition-colors hover:bg-(--ui-control-hover-background)'
 
-/** Quick-key row for API-key providers (Fireworks leads the expanded list after Nous, OpenRouter further down). */
+/** Quick-key row for API-key providers. */
 export function KeyProviderRow({ onClick, pitch, title }: { onClick: () => void; pitch: string; title: string }) {
   return (
     <RowButton className={PROVIDER_ROW_CLASS} onClick={onClick}>
