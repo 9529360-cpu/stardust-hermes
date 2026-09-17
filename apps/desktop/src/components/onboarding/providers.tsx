@@ -21,18 +21,28 @@ const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/
 export const providerTitle = (p: OAuthProvider) => PROVIDER_DISPLAY[p.id]?.title ?? p.name
 const orderOf = (p: OAuthProvider) => PROVIDER_DISPLAY[p.id]?.order ?? 99
 
+const visibleInDesktopProviderPicker = (provider: OAuthProvider) => {
+  if (provider.id !== RETIRED_BUILTIN_ACCOUNT_PROVIDER_ID) {
+    return true
+  }
+
+  // Do not advertise or initiate the inherited Nous account path. A real Nous
+  // account that the user signed into previously stays visible so Settings can
+  // still describe/manage/disconnect it. Anonymous/free-tier identities remain
+  // hidden even though they have a token and therefore report logged_in=true.
+  return provider.status?.logged_in === true && provider.status?.free_tier !== true
+}
+
 /**
  * Provider rows shown by Stardust Desktop.
  *
- * The inherited Nous account is deliberately absent from Desktop setup and
- * Settings. Backend compatibility remains intact for existing installations,
- * but the desktop no longer advertises or initiates that built-in account
- * path. User-selected third-party OAuth and API-key providers remain available.
+ * The inherited Nous login/free-tier entry is deliberately absent from setup
+ * and Settings. Backend compatibility remains intact for existing installs,
+ * including management of an already-authenticated real Nous account. New
+ * user-selected third-party OAuth and API-key providers remain available.
  */
 export const sortProviders = (providers: OAuthProvider[]) =>
-  providers
-    .filter(provider => provider.id !== RETIRED_BUILTIN_ACCOUNT_PROVIDER_ID)
-    .sort((a, b) => orderOf(a) - orderOf(b) || a.name.localeCompare(b.name))
+  providers.filter(visibleInDesktopProviderPicker).sort((a, b) => orderOf(a) - orderOf(b) || a.name.localeCompare(b.name))
 
 export function FeaturedProviderRow({
   onSelect,
