@@ -54,7 +54,10 @@ export const $updateChecking = atom<boolean>(false)
 export const $updateOverlayOpen = atom<boolean>(false)
 export const $updateStatus = atom<DesktopUpdateStatus | null>(null)
 
-// Client and backend are independently updatable; each keeps its own state.
+// Client and backend keep separate state because old installs and remote
+// backends can still report version information. Stardust does not expose the
+// inherited backend updater as a product update path, though: generic update
+// entrypoints below are deliberately client-only.
 export const $backendUpdateStatus = atom<DesktopUpdateStatus | null>(null)
 export const $backendUpdateApply = atom<UpdateApplyState>(IDLE)
 export const $backendUpdateChecking = atom<boolean>(false)
@@ -62,12 +65,19 @@ export const $backendUpdateChecking = atom<boolean>(false)
 export type UpdateTarget = 'client' | 'backend'
 export const $updateOverlayTarget = atom<UpdateTarget>('client')
 
+const STARDUST_LOCAL_EDITION = true
+
 export const setUpdateOverlayOpen = (open: boolean) => $updateOverlayOpen.set(open)
 
 export const openUpdateOverlayFor = (target: UpdateTarget) => {
-  $updateOverlayTarget.set(target)
+  // The legacy overlay can still render backend state for compatibility tests,
+  // but Stardust must never expose that inherited updater through a product
+  // affordance. Any user-facing update request is for this desktop app.
+  const effectiveTarget = STARDUST_LOCAL_EDITION ? 'client' : target
+
+  $updateOverlayTarget.set(effectiveTarget)
   $updateOverlayOpen.set(true)
-  void (target === 'backend' ? checkBackendUpdates({ force: true }) : checkUpdates({ force: true }))
+  void (effectiveTarget === 'backend' ? checkBackendUpdates({ force: true }) : checkUpdates({ force: true }))
 }
 
 export const resetUpdateApplyState = () => {
@@ -145,9 +155,9 @@ function isInstallMethodToastSnoozed(): boolean {
 
 /**
  * Guard against a desktop GUI talking to a backend that predates its contract
- * (e.g. a bb/gui-built app pointed at a `main` checkout). Rather than failing
- * cryptically downstream, surface a warning with a one-click align that runs
- * the normal update flow (which self-heals to the right branch).
+ * (for example, an older remote checkout). Stardust owns backend maintenance
+ * outside the inherited desktop updater, so this is deliberately warning-only:
+ * it must never offer the old one-click `hermes update` action.
  *
  * Runs on every session open; closing the toast snoozes it for a cooldown so it
  * doesn't nag on every thread switch.
@@ -167,13 +177,6 @@ export function reportBackendContract(contract: number | undefined): void {
   }
 
   notify({
-    action: {
-      label: translateNow('notifications.updateHermes'),
-      onClick: () => {
-        snoozeSkewToast()
-        void applyBackendUpdate()
-      }
-    },
     durationMs: 0,
     id: SKEW_TOAST_ID,
     kind: 'warning',
@@ -207,12 +210,11 @@ export function reportInstallMethodWarning(message: string | undefined): void {
 /**
  * Fire a toast when an update is available, at most once per cooldown window.
  * Closing the toast — dismissing it or opening the updates window from it —
- * (re)starts the cooldown, so a busy upstream branch doesn't re-spam the user
- * on every new commit. The snooze is persisted, so it survives relaunches too.
+ * (re)starts the cooldown, so a busy branch doesn't re-spam the user on every
+ * new commit. The snooze is persisted, so it survives relaunches too.
  *
- * `target` is the target whose status produced this toast. The overlay has no
- * target switcher, so a client-status toast that opened the backend overlay
- * showed the user a machine they weren't told about, with no way back.
+ * `target` is retained for compatibility with backend diagnostics. Stardust
+ * normalizes product-facing overlay opens to the desktop client.
  */
 export function maybeNotifyUpdateAvailable(status: DesktopUpdateStatus | null, target: UpdateTarget = 'client') {
   if (!status || status.supported === false || status.error || !status.targetSha) {
@@ -263,62 +265,49 @@ export function maybeNotifyUpdateAvailable(status: DesktopUpdateStatus | null, t
   })
 }
 
-/** The target a generic, surface-less update command acts on: the machine the
- *  user is connected to. Surfaces that display one target's status must pass
- *  that target explicitly instead of inheriting this. */
+/** The target a generic, surface-less update command acts on. Stardust owns
+ * backend maintenance separately, so all product-facing generic update actions
+ * target this desktop client even while connected to a remote backend. */
 function activeUpdateTarget(): UpdateTarget {
-  return isRemoteMode() ? 'backend' : 'client'
+  return STARDUST_LOCAL_EDITION ? 'client' : isRemoteMode() ? 'backend' : 'client'
 }
 
 /**
  * Open the updates overlay and kick off its check.
  *
- * Callers tied to a specific status surface pass its target; only genuinely
- * generic entry points take the connection-mode default. The macOS "Check for
- * Updates…" menu item is the former — it is the OS-standard affordance for
- * updating *this app*, so in remote mode it checked the wrong machine and the
- * Mac client silently drifted behind (#70266).
+ * Callers tied to a specific status surface pass its target; Stardust still
+ * normalizes the resulting product affordance to the desktop client. The macOS
+ * "Check for Updates…" menu item remains the OS-standard affordance for
+ * updating *this app*.
  */
 export function openUpdatesWindow(target: UpdateTarget = activeUpdateTarget()): void {
   openUpdateOverlayFor(target)
 }
 
 /**
- * Start applying the available update for the active target right away. Opens
- * the updates overlay first so the user sees apply progress (the overlay
- * renders ApplyingView once `applying` flips true), then kicks off the install.
- * Used by the "Update now" affordance on the About panel, which would otherwise
- * only be able to open the changelog overlay.
- *
- * Multi-target installs (remote mode / multi-connection registry) route
- * through the everything-flow so "update" means every machine, not just the
- * active target — the single-target ternary is what left remote-mode users
- * updating the backend forever while the GUI itself went stale.
- *
- * An explicit `target` opts out of both: the caller is acting on one named
- * machine's status and must not fan out to the others.
+ * Start applying an available update right away. Opens the updates overlay
+ * first so the user sees apply progress. The inherited backend/everything
+ * engine remains below for compatibility and recovery work, but Stardust's
+ * product-facing entrypoint is client-only and cannot call it.
  */
 export function startActiveUpdate(target?: UpdateTarget): void {
-  if (!target && hasMultipleUpdateTargets()) {
+  if (!STARDUST_LOCAL_EDITION && !target && hasMultipleUpdateTargets()) {
     $updateOverlayOpen.set(true)
     void applyEverythingUpdate()
 
     return
   }
 
-  const effective = target ?? activeUpdateTarget()
+  const effective = STARDUST_LOCAL_EDITION ? 'client' : (target ?? activeUpdateTarget())
   $updateOverlayTarget.set(effective)
   $updateOverlayOpen.set(true)
   void (effective === 'backend' ? applyBackendUpdate() : applyUpdates())
 }
 
 /**
- * Command-palette entry point. The About panel's "Update now" only renders once
- * we know an update is waiting; this row is always listed, so it also has to
- * handle "already current" — open the overlay for the active target and let its
- * check answer, and only apply when there's something to install. On
- * multi-target installs an update waiting on EITHER the client or the backend
- * triggers the everything-flow.
+ * Command-palette entry point. The row is always listed, so it handles both an
+ * already-known update and the check-first path. Stardust intentionally ignores
+ * inherited backend update state here: "Update" means update this desktop app.
  */
 export function requestActiveUpdate(): void {
   if (hasMultipleUpdateTargets()) {
@@ -825,16 +814,9 @@ export function applyBackendUpdate(): Promise<DesktopUpdateApplyResult> {
 
 // ── Update everything: the client + every registered backend in one action ──
 //
-// Remote-mode installs update on two (or more) clocks: the GUI app on this
-// machine, the connected backend, and any other registered sources. Each has
-// its own updater, and before this flow existed every remote-mode affordance
-// targeted only the backend — so users "updated" and stayed on a stale GUI.
-// This orchestration drives all of them:
-//   1. The ACTIVE backend (remote mode) through the detailed-progress path.
-//   2. Every OTHER eligible registered connection via the Electron fan-out
-//      (cloud rows are platform-managed and report as skipped).
-//   3. The local client LAST — its apply relaunches or hands off the app, so
-//      it must not preempt the dispatches above.
+// This inherited orchestration remains for compatibility/recovery tests while
+// Stardust builds a repository-owned release/rollback lane. Product-facing
+// update entrypoints never call it in the local edition.
 
 const CLIENT_BEHIND_TOAST_ID = 'client-update-after-backend'
 
@@ -876,11 +858,14 @@ export interface UpdateEverythingState {
 
 export const $updateEverything = atom<UpdateEverythingState>({ running: false })
 
-/** True when this install has more than one update target — a remote-mode
- *  window (backend + client) or a multi-connection registry. Gates the
- *  "Update everything" affordance so single-machine installs keep the
- *  one-button experience. */
+/** Stardust exposes one product update target: this desktop client. The old
+ * backend/multi-connection updater remains internal until a Stardust-native
+ * release and rollback contract replaces it. */
 export function hasMultipleUpdateTargets(): boolean {
+  if (STARDUST_LOCAL_EDITION) {
+    return false
+  }
+
   return isRemoteMode() || ($connectionsRegistry.get()?.connections.length ?? 0) > 1
 }
 
@@ -1005,8 +990,6 @@ function ingestProgress(payload: DesktopUpdateProgress): void {
     log
   })
 }
-
-const STARDUST_LOCAL_EDITION = true
 
 let pollerStarted = false
 let backgroundTimer: ReturnType<typeof setInterval> | null = null
