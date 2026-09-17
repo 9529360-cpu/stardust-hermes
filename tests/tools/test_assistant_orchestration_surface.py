@@ -58,6 +58,12 @@ def test_selection_context_keeps_assistant_and_kernel_capabilities_independent()
     assert assistant_orchestration_requested() is None
     assert kanban_toolset_requested() is None
 
+    with scoped_kanban_toolset_selection(None):
+        assert assistant_orchestration_requested() is False
+        assert kanban_toolset_requested() is False
+        assert _check_background_task_mode() is False
+        assert _check_kanban_orchestrator_mode() is False
+
     with scoped_kanban_toolset_selection(["assistant_orchestration"]):
         assert assistant_orchestration_requested() is True
         assert kanban_toolset_requested() is False
