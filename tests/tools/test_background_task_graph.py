@@ -43,16 +43,14 @@ def _plan():
 
 
 def test_normalize_graph_accepts_forward_references_and_stable_parallel_order():
-    specs, topo = graph._normalize_tasks({
-        "tasks": []
-    }.get("tasks") or [
+    specs, topo = graph._normalize_tasks([
         {"key": "reply", "title": "Reply", "depends_on": ["convert"]},
         {"key": "develop", "title": "Develop"},
         {"key": "convert", "title": "Convert"},
     ])
     assert set(specs) == {"reply", "develop", "convert"}
-    assert topo.index("convert") < topo.index("reply")
-    assert topo.index("develop") < topo.index("reply") or topo.index("develop") > topo.index("convert")
+    # develop/convert are both initially ready and keep caller order; reply opens only after convert.
+    assert topo == ["develop", "convert", "reply"]
 
 
 def test_normalize_graph_rejects_unknown_and_cyclic_dependencies():
