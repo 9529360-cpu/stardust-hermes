@@ -38,6 +38,7 @@ _KERNEL_FILTER_BY_PUBLIC_STATE = {
 _SHARED_KERNEL_FILTER_STATES = frozenset({
     "queued", "waiting_dependency", "waiting_confirmation", "waiting_input", "needs_attention", "failed",
 })
+_PRECISE_LIST_STATES = frozenset({"waiting_confirmation", "waiting_input", "needs_attention", "failed"})
 
 
 def _current_profile_name() -> str:
@@ -281,7 +282,11 @@ def _project_list_task(
     task_id = str(task.get("id") or "")
     kernel_status = str(task.get("status") or "")
     parent_count = int(task.get("parent_count") or 0)
-    projection = _precise_list_state(task_id, kwargs) if precise and task_id else None
+    projection = (
+        _precise_list_state(task_id, kwargs)
+        if precise and task_id and kernel_status == "blocked"
+        else None
+    )
     if projection is None:
         if kernel_status == "blocked":
             # List summaries intentionally do not carry the event ledger. Without a precise lookup,
@@ -335,7 +340,7 @@ def _list(args: Mapping[str, Any], kwargs: Mapping[str, Any]) -> str:
     if decoded is None or decoded.get("error"):
         return _encode_or_original(raw, decoded)
     tasks = decoded.get("tasks") if isinstance(decoded.get("tasks"), list) else []
-    precise = bool(requested_state)
+    precise = requested_state in _PRECISE_LIST_STATES
     projected = [
         _project_list_task(task, kwargs, precise=precise)
         for task in tasks
@@ -522,7 +527,7 @@ BACKGROUND_TASK_SCHEMA = {
         "Manage durable personal-assistant background work. Use start only when the user should not have to wait and "
         "the work must survive chat/app restarts, retry safely, or participate in dependency/review flows. Answer "
         "ordinary questions directly; keep work that can finish in this live turn in the live session instead of "
-        "creating a background task. Use status/list to inspect durable work. Returned state values are personal-" 
+        "creating a background task. Use status/list to inspect durable work. Returned state values are personal-"
         "assistant states such as queued, running, waiting_confirmation, waiting_dependency, completed, failed, and "
         "cancelled; do not reason from internal scheduler phases. If a high-risk background action pauses for user "
         "consent, use approvals to inspect the pending request and approve/deny to record the user's decision; approve "
