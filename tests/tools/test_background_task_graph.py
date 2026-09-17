@@ -49,7 +49,6 @@ def test_normalize_graph_accepts_forward_references_and_stable_parallel_order():
         {"key": "convert", "title": "Convert"},
     ])
     assert set(specs) == {"reply", "develop", "convert"}
-    # develop/convert are both initially ready and keep caller order; reply opens only after convert.
     assert topo == ["develop", "convert", "reply"]
 
 
@@ -65,7 +64,7 @@ def test_normalize_graph_rejects_unknown_and_cyclic_dependencies():
         ])
 
 
-def test_start_graph_creates_parallel_ready_nodes_and_dependency_wait(kanban_home):
+def test_start_graph_projects_parallel_queue_and_dependency_wait(kanban_home):
     result = graph.start_graph(
         _plan(), {}, default_assignee="default", created_by="desktop-main"
     )
@@ -73,10 +72,11 @@ def test_start_graph_creates_parallel_ready_nodes_and_dependency_wait(kanban_hom
 
     assert result["ok"] is True
     assert result["count"] == 3
-    assert by_key["convert"]["status"] == "ready"
-    assert by_key["develop"]["status"] == "ready"
-    assert by_key["reply"]["status"] == "todo"
+    assert by_key["convert"]["state"] == "queued"
+    assert by_key["develop"]["state"] == "queued"
+    assert by_key["reply"]["state"] == "waiting_dependency"
     assert by_key["reply"]["depends_on"] == ["convert"]
+    assert all("status" not in item for item in result["tasks"])
 
     with kbc.connect_closing() as conn:
         link = conn.execute(
@@ -95,9 +95,7 @@ def test_final_report_fans_in_every_leaf_for_one_combined_completion(kanban_home
     assert result["count"] == 4
     assert result["final_task_key"] == "final-report"
     assert result["final_task_id"] == by_key["final-report"]["task_id"]
-    assert by_key["final-report"]["status"] == "todo"
-    # convert is not a leaf because reply already depends on it. The reporter waits on the two
-    # terminal branches, so it cannot run until both the reply branch and development branch finish.
+    assert by_key["final-report"]["state"] == "waiting_dependency"
     assert by_key["final-report"]["depends_on"] == ["develop", "reply"]
 
     with kbc.connect_closing() as conn:
@@ -125,8 +123,6 @@ def test_graph_creation_rolls_back_every_node_when_one_node_is_invalid(kanban_ho
     bad_plan = {
         "tasks": [
             {"key": "first", "title": "First valid task"},
-            # Toolset names are not valid skill bundle names; create_task rejects this after
-            # the first node was inserted inside the outer transaction.
             {"key": "second", "title": "Invalid task", "skills": ["web"]},
         ]
     }
@@ -167,4 +163,5 @@ def test_graph_tool_is_high_level_orchestration_surface():
     assert "current-turn work" in description
     assert "depends_on" in description
     assert "final_report" in description
+    assert "queued/running/waiting_*/completed/failed/cancelled" in description
     assert "kanban" not in description.lower()
