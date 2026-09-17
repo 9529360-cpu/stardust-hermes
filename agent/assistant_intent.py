@@ -38,6 +38,7 @@ class ExecutionRail(str, Enum):
 
     NONE = "none"
     CURRENT_SESSION = "current_session"
+    PROCESS = "process"
     DELEGATION = "delegation"
     CRON = "cron"
     KANBAN = "kanban"
@@ -87,6 +88,9 @@ _KANBAN_QUEUED_STATES = frozenset({"triage", "todo", "scheduled", "ready"})
 _KANBAN_RUNNING_STATES = frozenset({"running", "review"})
 _KANBAN_COMPLETED_STATES = frozenset({"done", "archived"})
 
+_PROCESS_ACTIVE_STATES = frozenset({"running", "starting"})
+_PROCESS_EXIT_STATES = frozenset({"exited", "already_exited", "completed"})
+
 
 @dataclass(frozen=True)
 class AssistantExecutionDecision:
@@ -111,6 +115,18 @@ class AssistantExecutionDecision:
                 raise ValueError("non-execution decisions cannot select an execution rail")
         if self.intent is AssistantIntent.SCHEDULE and self.rail not in _DURABLE_RAILS:
             raise ValueError("scheduled work must select a durable execution rail")
+
+    def to_wire(self) -> dict[str, Any]:
+        """JSON-safe decision metadata for gateway/telemetry boundaries."""
+
+        return {
+            "intent": self.intent.value,
+            "durability": self.durability.value,
+            "rail": self.rail.value,
+            "reason": self.reason,
+            "requires_approval": self.requires_approval,
+            "task_id": self.task_id,
+        }
 
 
 @dataclass(frozen=True)
@@ -152,6 +168,25 @@ class AssistantTaskProjection:
     def needs_attention(self) -> bool:
         return task_state_needs_attention(self.state) or self.requires_approval
 
+    def to_wire(self) -> dict[str, Any]:
+        """Stable JSON-safe read model for gateway/Desktop projection."""
+
+        return {
+            "task_id": self.task_id,
+            "title": self.title,
+            "state": self.state.value,
+            "rail": self.rail.value,
+            "durability": self.durability.value,
+            "parent_session_id": self.parent_session_id,
+            "owner_id": self.owner_id,
+            "detail": self.detail,
+            "requires_approval": self.requires_approval,
+            "recoverable": self.recoverable,
+            "artifact_refs": list(self.artifact_refs),
+            "terminal": self.terminal,
+            "needs_attention": self.needs_attention,
+        }
+
 
 def _owner_state(value: Any, owner: str) -> str:
     state = str(value or "").strip().lower()
@@ -188,6 +223,32 @@ def delegation_lifecycle_state(owner_state: Any) -> TaskLifecycleState:
     raise ValueError(f"unknown delegation state: {state}")
 
 
+def process_lifecycle_state(
+    owner_state: Any, *, exit_code: Any = None, completion_reason: Any = None,
+) -> TaskLifecycleState:
+    """Normalize ``tools.process_registry`` rows without hiding lost/killed outcomes."""
+
+    state = _owner_state(owner_state, "process")
+    reason = str(completion_reason or "").strip().lower()
+    if state in _PROCESS_ACTIVE_STATES:
+        return TaskLifecycleState.RUNNING
+    if reason == "killed":
+        return TaskLifecycleState.CANCELLED
+    if reason == "lost":
+        return TaskLifecycleState.INTERRUPTED
+    if reason == "failed_start":
+        return TaskLifecycleState.FAILED
+    if state in _PROCESS_EXIT_STATES:
+        if exit_code is None:
+            return TaskLifecycleState.INTERRUPTED
+        try:
+            code = int(exit_code)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"invalid process exit code: {exit_code!r}") from exc
+        return TaskLifecycleState.COMPLETED if code == 0 else TaskLifecycleState.FAILED
+    raise ValueError(f"unknown process state: {state}")
+
+
 def kanban_lifecycle_state(owner_state: Any) -> TaskLifecycleState:
     """Normalize canonical ``hermes_cli.kanban_db.VALID_STATUSES`` values."""
 
@@ -209,6 +270,28 @@ def cron_job_lifecycle_state(*, enabled: bool, running: bool = False) -> TaskLif
     if running:
         return TaskLifecycleState.RUNNING
     return TaskLifecycleState.QUEUED if enabled else TaskLifecycleState.PAUSED
+
+
+def project_process(record: Mapping[str, Any]) -> AssistantTaskProjection:
+    """Project a session-scoped background process from ``process.list``."""
+
+    owner_id = str(record.get("session_id") or "").strip()
+    state = process_lifecycle_state(
+        record.get("status"),
+        exit_code=record.get("exit_code"),
+        completion_reason=record.get("completion_reason"),
+    )
+    detail = str(record.get("handoff_note") or record.get("completion_reason") or "").strip()
+    return AssistantTaskProjection(
+        task_id=assistant_task_id(ExecutionRail.PROCESS, owner_id),
+        title=str(record.get("command") or "Background process").strip() or "Background process",
+        state=state,
+        rail=ExecutionRail.PROCESS,
+        durability=ExecutionDurability.PROCESS,
+        parent_session_id=str(record.get("parent_session_id") or "").strip() or None,
+        owner_id=owner_id,
+        detail=detail,
+    )
 
 
 def project_delegation(record: Mapping[str, Any]) -> AssistantTaskProjection:
