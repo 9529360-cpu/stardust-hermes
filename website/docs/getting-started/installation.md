@@ -1,12 +1,12 @@
 ---
 sidebar_position: 2
 title: "Installation"
-description: "Install Hermes Agent on Linux, macOS, WSL2, native Windows, or Android via Termux"
+description: "Install Stardust on Linux, macOS, WSL2, native Windows, or Android via Termux"
 ---
 
 # Installation
 
-Get Hermes Agent up and running in under two minutes!
+Stardust is maintained and distributed from `9529360-cpu/stardust-hermes`. Fresh installs must use the Stardust-owned bootstrap scripts below rather than the former Hermes website installer.
 
 :::tip Platform Support
 For the full platform support matrix (which OSes, distribution methods, and
@@ -14,47 +14,43 @@ platform-gated features are supported), see **[Platform Support](./platform-supp
 :::
 
 ## Quick Install
-### With the Hermes Desktop installer on macOS or Windows (recommended)
-To easily install the command-line and desktop applications, [download the Hermes Desktop installer](https://hermes-agent.nousresearch.com/) from our website and run it.
 
-:::note
-The macOS installer is **Apple Silicon only**. macOS on x86 (Intel) processors is [not a supported platform](./platform-support.md#unsupported).
-:::
+### Linux / macOS / WSL2 / Android (Termux)
 
-### Without Hermes Desktop:
-For a command-line only install without Hermes Desktop, run:
-
-#### Linux / macOS / WSL2 / Android (Termux)
 ```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash
 ```
 
-#### Windows (native)
+### Windows (native)
 
-Run in powershell:
+Run in PowerShell:
+
 ```powershell
-iex (irm https://hermes-agent.nousresearch.com/install.ps1) 
+iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1)
 ```
 
-If you want to install & run Hermes Desktop after a command-line only install, simply run
+The inherited CLI command remains `hermes` for compatibility. After a command-line install, launch the Stardust desktop surface with:
+
 ```bash
 hermes desktop
 ```
 
 ### What the Installer Does
 
-The installer handles everything automatically — all dependencies (Python, Node.js, ripgrep, ffmpeg), the repo clone, virtual environment, global `hermes` command setup, and LLM provider configuration. By the end, you're ready to chat.
+The Stardust bootstrap downloads installer logic from this repository, pins the selected source ref when requested, rewrites inherited product-source/recovery URLs to Stardust, and fails closed if an upstream Hermes product source survives that boundary. The underlying installer then handles dependencies (Python, Node.js, ripgrep, ffmpeg), the repo clone, virtual environment, `hermes` command setup, and provider configuration.
 
 #### Install Layout
 
-Where the installer puts things depends on whether you're installing as a normal user or as root:
+Stardust deliberately keeps the inherited runtime/data layout so an existing Hermes-based installation can remain compatible while the product evolves:
 
 | Installer                              | Code lives at                  | `hermes` binary                         | Data directory                       |
 | -------------------------------------- | ------------------------------ | --------------------------------------- | ------------------------------------ |
 | Per-user (git installer)               | `~/.hermes/hermes-agent/`      | `~/.local/bin/hermes` (symlink)         | `~/.hermes/`                         |
 | Root-mode (`sudo curl … \| sudo bash`) | `/usr/local/lib/hermes-agent/` | `/usr/local/bin/hermes`                 | `/root/.hermes/` (or `$HERMES_HOME`) |
 
-The root-mode **FHS layout** (`/usr/local/lib/…`, `/usr/local/bin/hermes`) matches where other system-wide developer tools land on Linux. It's useful for shared-machine deployments where one system install should serve every user. Per-user config (auth, skills, sessions) still lives under each user's `~/.hermes/` or explicit `HERMES_HOME`.
+Those names are compatibility interfaces, not current product branding. Renaming them without a migration would risk existing config, sessions, launchers, services, and desktop installs.
+
+The root-mode FHS layout (`/usr/local/lib/…`, `/usr/local/bin/hermes`) is useful for shared-machine deployments where one system install serves every user. Per-user config, auth, skills, and sessions still live under each user's `~/.hermes/` or explicit `HERMES_HOME`.
 
 ### After Installation
 
@@ -62,10 +58,10 @@ Reload your shell and start chatting:
 
 ```bash
 source ~/.bashrc   # or: source ~/.zshrc
-hermes             # Start chatting!
+hermes             # Start the compatible Stardust CLI runtime
 ```
 
-To reconfigure individual settings later, use the dedicated commands:
+To reconfigure individual settings later:
 
 ```bash
 hermes model          # Choose your LLM provider and model
@@ -73,76 +69,71 @@ hermes tools          # Configure which tools are enabled
 hermes gateway setup  # Set up messaging platforms
 hermes config set     # Set individual config values
 hermes config get     # Inspect individual config values
-hermes setup          # Or run the full setup wizard to configure everything at once
+hermes setup          # Run the full setup wizard
 ```
 
-:::tip Fastest path: Nous Portal
-One subscription covers 300+ models plus the [Tool Gateway](/user-guide/features/tool-gateway) (web search, image generation, TTS, cloud browser). Skip the per-tool key juggling:
+Optional provider integrations documented elsewhere in this site, including Nous Portal, remain available where they are useful. They are service choices, not the source or update authority for Stardust.
 
-```bash
-hermes setup --portal
-```
-
-That logs you in, sets Nous as your provider, and turns on the Tool Gateway in one command.
-:::
-
-:::tip Already running Hermes on another machine?
-You don't need to rebuild your setup from scratch. Restore a full backup with `hermes import` (see [Exporting Hermes to another machine](/reference/faq#exporting-hermes-to-another-machine)), or bring over a single agent with `hermes profile import` (see [Moving a single profile to another machine](/reference/faq#moving-a-single-profile-to-another-machine)). Note that a profile export excludes credentials by design, so an export alone is not a full backup — [`hermes backup` vs `hermes profile export`](/reference/faq#hermes-backup-vs-hermes-profile-export) explains which to use.
+:::tip Moving an existing setup
+You do not need to rebuild your setup from scratch. Restore a full backup with `hermes import` (see [Exporting Hermes-compatible data to another machine](/reference/faq#exporting-hermes-to-another-machine)), or bring over a single profile with `hermes profile import`. Profile exports exclude credentials by design, so an export alone is not a full backup.
 :::
 
 ---
 
 ## Prerequisites
 
-**Installer:** On non-Windows platforms, the only prerequisite is **Git**. On Linux, also make sure `curl` and `xz-utils` are available (the installer downloads Node.js as a `.tar.xz` archive). The desktop app additionally requires `g++` (or `build-essential` on Debian/Ubuntu) to compile native modules. The installer automatically handles everything else:
+**Installer:** On non-Windows platforms, the primary prerequisite is **Git**. On Linux, also make sure `curl` and `xz-utils` are available. The desktop app additionally requires `g++` (or `build-essential` on Debian/Ubuntu) to compile native modules. The installer handles the rest:
 
-- **uv** (fast Python package manager)
-- **Python 3.11** (via uv, no sudo needed)
-- **Node.js v26** (for browser automation and WhatsApp bridge; existing system Node 22.22+, 24.11+, or 26+ is used as-is)
-- **ripgrep** (fast file search)
-- **ffmpeg** (audio format conversion for TTS)
+- **uv** (Python package manager)
+- **Python 3.11**
+- **Node.js v26** (existing compatible system Node is reused when appropriate)
+- **ripgrep**
+- **ffmpeg**
 
 :::info
-You do **not** need to install Python, Node.js, ripgrep, or ffmpeg manually. The installer detects what's missing and installs it for you. Just make sure `git` is available (`git --version`). On Linux, ensure `curl` and `xz-utils` are installed (`sudo apt install curl xz-utils` on Debian/Ubuntu). For the desktop app, also install `build-essential` (`sudo apt install build-essential`).
+You do **not** need to install Python, Node.js, ripgrep, or ffmpeg manually. Make sure `git` is available (`git --version`). On Debian/Ubuntu, ensure `curl`, `xz-utils`, and—when building the desktop—`build-essential` are installed.
 :::
 
 :::tip Nix users
-Nix is **no longer an explicitly supported install path** (best-effort only). If you already use Nix (on NixOS, macOS, or Linux), there's a dedicated setup path with a Nix flake, declarative NixOS module, and optional container mode. See the **[Nix & NixOS Setup](./nix-setup.md)** guide.
+Nix is a best-effort compatibility path rather than Stardust's primary installation route. Existing Nix users can still use the inherited flake/module documentation in **[Nix & NixOS Setup](./nix-setup.md)**.
 :::
 
 ---
 
 ## Manual / Developer Installation
 
-If you want to clone the repo and install from source — for contributing, running from a specific branch, or having full control over the virtual environment — see the [Development Setup](../developer-guide/contributing.md#development-setup) section in the Contributing guide.
+If you want a source checkout for development or to run a specific branch/ref, see the [Development Setup](../developer-guide/contributing.md#development-setup) section. Any clone, recovery URL, or bootstrap command for Stardust should ultimately resolve to `9529360-cpu/stardust-hermes`.
 
 ---
 
 ## Non-Sudo / System Service User Installs
 
-Running Hermes as a dedicated unprivileged user (e.g. a `hermes` systemd service account, or any user without `sudo` access) is supported. The only thing on the install path that genuinely needs root is Playwright's `--with-deps` step, which `apt`-installs shared libraries (`libnss3`, `libxkbcommon`, etc.) used by Chromium. The installer detects whether sudo is available and gracefully degrades when it isn't — it will install the Chromium binary into the service user's own Playwright cache and print the exact command an administrator needs to run separately.
+Running Stardust as a dedicated unprivileged user is supported. The Playwright `--with-deps` step is the part most likely to require root because it installs system libraries for Chromium. The installer detects whether sudo is available and can continue without that system-library step when necessary.
 
 **Recommended split (Debian/Ubuntu):**
 
 1. **One time, as an admin user with sudo**, install the system libraries Chromium needs:
+
    ```bash
    sudo npx playwright install-deps chromium
    ```
-   (You can run this from anywhere — `npx` will fetch Playwright on the fly.)
 
-2. **As the unprivileged service user**, run the regular installer. It will detect the missing sudo, skip `--with-deps`, and install Chromium into the user's local Playwright cache:
+2. **As the unprivileged service user**, run the Stardust installer:
+
    ```bash
-   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash
    ```
 
-   If you want to skip the Playwright step entirely — for example because you're running headless and don't need browser automation — pass `--skip-browser`:
+   To skip browser automation entirely:
+
    ```bash
-   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser
+   curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash -s -- --skip-browser
    ```
 
-   The installer also pre-installs [`cua-driver`](../user-guide/features/computer-use.md) so the Computer Use toolset works the moment you enable it; pass `--skip-computer-use` to opt out (it will then install on demand when you enable the tool).
+   The installer also pre-installs `cua-driver` for Computer Use; pass `--skip-computer-use` to opt out.
 
-3. **Make `hermes` available to the service user's shells.** The installer writes the launcher to `~/.local/bin/hermes`. System service accounts often have a minimal PATH that doesn't include `~/.local/bin`. Either add it to the user's environment, or symlink the launcher into a system location:
+3. **Make `hermes` available to the service user's shells.** The compatible launcher is written to `~/.local/bin/hermes`. System service accounts often have a minimal PATH, so either add that directory or symlink the launcher into a system location:
+
    ```bash
    # Option A — add to the service user's profile
    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
@@ -151,17 +142,17 @@ Running Hermes as a dedicated unprivileged user (e.g. a `hermes` systemd service
    sudo ln -s /home/hermes/.hermes/hermes-agent/venv/bin/hermes /usr/local/bin/hermes
    ```
 
-4. **Verify:** `hermes doctor` should now run cleanly. If you get `ModuleNotFoundError: No module named 'dotenv'`, you're invoking the repo source `hermes` file (`~/.hermes/hermes-agent/hermes`) with system Python instead of the venv launcher (`~/.hermes/hermes-agent/venv/bin/hermes`) — fix step 3.
+4. **Verify:** `hermes doctor` should run cleanly. If you get `ModuleNotFoundError: No module named 'dotenv'`, you are likely invoking the checkout's source wrapper with system Python instead of the venv launcher.
 
-5. **Running the messaging gateway from this account?** A user-level service stops at logout and does not start at boot until you enable lingering for the service user:
+5. **Running the messaging gateway from this account?** Enable lingering if you need a user service to survive logout and start at boot:
 
    ```bash
    sudo loginctl enable-linger <service-user>
    ```
 
-   See [Messaging Gateway](/user-guide/messaging/) for the service setup itself.
+   See [Messaging Gateway](/user-guide/messaging/) for service setup.
 
-The same pattern works on Arch (the installer uses pacman with the same sudo-detection logic), Fedora/RHEL, and openSUSE — those distros don't support `--with-deps` at all, so an administrator always installs the system libraries separately. The relevant `dnf`/`zypper` commands are printed by the installer.
+The same pattern works on other supported/best-effort Linux distributions; system library installation is distro-specific and the installer prints the relevant guidance.
 
 ---
 
@@ -171,30 +162,23 @@ The same pattern works on Arch (the installer uses pacman with the same sudo-det
 |---------|----------|
 | `hermes: command not found` | Reload your shell (`source ~/.bashrc`) or check PATH |
 | `API key not set` | Run `hermes model` to configure your provider, or `hermes config set OPENROUTER_API_KEY your_key` |
-| Missing config after update | Run `hermes config check` then `hermes config migrate` |
+| Missing config after a code change | Run `hermes config check` then `hermes config migrate` |
 
-For more diagnostics, run `hermes doctor` — it will tell you exactly what's missing and how to fix it.
+For more diagnostics, run `hermes doctor`.
 
 ### Symlinked home directories and external storage
 
-Hermes supports a symlinked `HERMES_HOME` and symlinked home subdirectories,
-including `hooks`, `skills`, `sessions`, and `logs`. During home initialization,
-existing directory links are preserved, and permissions on linked directories
-(and descendants such as `logs/curator`) are left to their owner.
+The inherited runtime supports a symlinked `HERMES_HOME` and symlinked home subdirectories, including `hooks`, `skills`, `sessions`, and `logs`. During home initialization, existing directory links are preserved and permissions on linked directories are left to their owner.
 
-If a link target is missing, inaccessible, or not a directory, initialization
-stops with a storage error naming the path and link target. Hermes does **not**
-replace the link or create its missing target: doing so could write data onto
-the local disk while an external or NAS volume is unmounted. Check the reported
-link, restore the mount or correct its target, and verify access permissions
-before retrying. For a deliberately new dotfiles target, create it yourself only
-after confirming the intended storage is available.
+If a link target is missing, inaccessible, or not a directory, initialization stops with a storage error naming the path and link target. Stardust does not replace the link or create its missing target because doing so could write data onto the local disk while an external or NAS volume is unmounted. Restore the intended mount/target and verify permissions before retrying.
 
-`hermes doctor` reports these failures as storage problems, not invalid YAML.
-Keep your existing `config.yaml`; running `hermes setup` is not the repair for an
-unavailable directory. This is a directory-availability check, not a mount monitor:
-an existing directory cannot establish that the intended volume is mounted.
+`hermes doctor` reports these failures as storage problems rather than invalid YAML. Keep the existing `config.yaml`; setup is not the repair for an unavailable directory.
 
-## Install method auto-detection
+## Update policy
 
-Hermes auto-detects whether it was installed via the git installer, Docker, or NixOS, and `hermes update` prints the matching update command for that path. There's no env var to set — the detection is based on the install layout (`~/.hermes/hermes-agent/` checkout, Docker image stamp, or Nix store path). `hermes doctor` also surfaces the detected method under its environment summary.
+Stardust does **not** use the inherited upstream `hermes update` flow as its product update mechanism. That entrypoint is intentionally disabled so an independently maintained checkout cannot be silently synchronized back to Hermes upstream.
+
+- Stardust Desktop product update actions update the Stardust client itself.
+- Repository/source updates are maintained and released from `9529360-cpu/stardust-hermes`.
+- Docker/Nix/external-package deployments remain externally managed according to their deployment model.
+- If a repair or reinstall is required, use the Stardust-owned installer commands at the top of this page.
