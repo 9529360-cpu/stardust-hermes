@@ -16,6 +16,37 @@ import type { Locale, Translations } from './types'
 
 export { LOCALE_META } from './languages'
 
+const UPSTREAM_INSTALL_COMMAND = /curl -fsSL https:\/\/hermes-agent\.nousresearch\.com\/install\.sh \| (?:ba)?sh/g
+const STARDUST_INSTALL_COMMAND =
+  'curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash'
+
+/**
+ * The inherited locale catalogs still carry a handful of Hermes-era SSH
+ * recovery strings. Keep those catalogs intact until they are naturally
+ * translated again, but never let a live Stardust UI send a user to the
+ * upstream installer. The second "Hermes" in the not-installed copy usually
+ * names the compatibility path/CLI, so only the first product-name occurrence
+ * is rewritten.
+ */
+export function normalizeStardustProductCopy(translations: Translations): Translations {
+  const gateway = translations.settings.gateway
+
+  return {
+    ...translations,
+    settings: {
+      ...translations.settings,
+      gateway: {
+        ...gateway,
+        sshErrAuth: gateway.sshErrAuth.replace('Hermes', 'Stardust'),
+        sshErrNotInstalled: gateway.sshErrNotInstalled
+          .replace('Hermes', 'Stardust')
+          .replace(UPSTREAM_INSTALL_COMMAND, STARDUST_INSTALL_COMMAND),
+        sshErrPlatform: gateway.sshErrPlatform.replace('Hermes Desktop', 'Stardust Desktop')
+      }
+    }
+  }
+}
+
 export interface I18nConfigClient {
   getConfig: () => Promise<HermesConfigRecord>
   saveConfig: (config: HermesConfigRecord) => Promise<{ ok: boolean }>
@@ -77,7 +108,7 @@ const I18nContext = createContext<I18nContextValue>({
   locale: DEFAULT_LOCALE,
   saveError: null,
   setLocale: async () => {},
-  t: TRANSLATIONS[DEFAULT_LOCALE]
+  t: normalizeStardustProductCopy(TRANSLATIONS[DEFAULT_LOCALE])
 })
 
 export interface I18nProviderProps {
@@ -226,7 +257,7 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
       locale,
       saveError,
       setLocale,
-      t: TRANSLATIONS[locale]
+      t: normalizeStardustProductCopy(TRANSLATIONS[locale])
     }),
     [configLoadError, isLoadingConfig, isSavingLocale, locale, saveError, setLocale]
   )
