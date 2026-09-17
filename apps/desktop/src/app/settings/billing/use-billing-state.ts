@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { fmtDate } from '@/lib/time'
-import { FREE_TIER_MODEL } from '@/store/free-tier'
-import { openFreeTierSignIn } from '@/store/free-tier-sign-in'
 
 import type { BillingRefusal, BillingResult } from './api'
 import { useBillingApi } from './api'
@@ -11,7 +9,6 @@ import type { BillingStateResponse, SubscriptionStateResponse, SubscriptionTierO
 
 export const EMPTY_BILLING_VALUE = '—'
 export const FALLBACK_PORTAL_BILLING_URL = 'https://portal.nousresearch.com/billing'
-export const FALLBACK_PORTAL_URL = 'https://portal.nousresearch.com'
 
 // The billing endpoint is the authoritative source of truth for balance / cap /
 // plan — the inference `x-nous-credits-*` headers are best-effort and can drift
@@ -101,14 +98,11 @@ export type BillingPlanCardView = {
   tierName: string
 } & (
   | {
-      // `onSelect` overrides the card's default "open the plans grid" action —
-      // the free-tier card signs in instead. Absent = the plans grid.
+      // `onSelect` overrides the card's default "open the plans grid" action.
       action: { label: string; onSelect?: () => void }
       link?: undefined
     }
   | { action?: undefined; link: { label: string; url: string } }
-  // The free-tier card is the "what you get" text alone: the page's one Sign in lives on the
-  // notice above it, so the card carries neither an action nor a link.
   | { action?: undefined; link?: undefined }
 )
 
@@ -155,7 +149,7 @@ export interface BillingView {
   planFootnote?: string
   /** Automatic-refill section row. */
   refillRow?: BillingAccountRowView
-  status: 'free_tier' | 'loading' | 'logged_out' | 'normal' | 'refusal'
+  status: 'loading' | 'logged_out' | 'normal' | 'refusal'
   summary: BillingSummaryItemView[]
   /** Live tier catalog for the plans sub-view (empty when unavailable). */
   tiers: BillingPlanTierView[]
@@ -212,25 +206,11 @@ export function deriveBillingView(
   const billing = stateResult.data
   const subscription = subscriptionResult?.ok ? subscriptionResult.data : null
 
-  // Read BEFORE the logged-out branch: a free-tier install has no account, so
-  // `logged_in` is false and the generic "connect your account" notice would
-  // otherwise win and tell the user to go to the portal.
-  if (billing.free_tier) {
-    return freeTierView(billing)
-  }
-
-  if (!billing.logged_in || subscription?.logged_in === false) {
-    return {
-      notice: {
-        action: { label: 'Open portal ↗', url: billing.portal_url ?? subscription?.portal_url ?? FALLBACK_PORTAL_URL },
-        message: 'Run /portal in the TUI or open the Nous portal to connect your account.',
-        title: 'Connect your Nous account'
-      },
-      status: 'logged_out',
-      summary: emptySummary(),
-      tiers: [],
-      usageRows: []
-    }
+  // Stardust Desktop has no built-in billing identity. Older backends may still
+  // report the retired guest/free-tier account; treat that exactly like a logged-out
+  // billing surface and never turn it into a new account/login affordance.
+  if (billing.free_tier || !billing.logged_in || subscription?.logged_in === false) {
+    return disconnectedBillingView()
   }
 
   // One "can change plans in-app" verdict, shared by the plan card (button vs portal
@@ -320,33 +300,16 @@ function emptySummary(): BillingSummaryItemView[] {
   ]
 }
 
-/**
- * The no-account state: nothing is owed, nothing is owned, and every money
- * control would be a lie. So the page collapses to one notice, a three-item
- * summary, and a single plan card whose only action is signing in — no payment,
- * credits, auto-refill or usage sections at all.
- */
-function freeTierView(billing: BillingStateResponse): BillingView {
+function disconnectedBillingView(): BillingView {
   return {
     notice: {
-      action: { label: 'Sign in', onSelect: openFreeTierSignIn },
-      message: 'Sign in with a Nous account to unlock more models and tools.',
-      title: "You're on the Nous free tier",
+      message:
+        'Stardust does not use a built-in billing account. Billing details appear only for an existing connected account.',
+      title: 'No billing account connected',
       tone: 'info'
     },
-    plan: {
-      caption:
-        'Runs on nous/welcome with connectors included. Signing in keeps your connectors and adds the tools that need an account and every other model.',
-      tierName: 'Nous · free tier'
-    },
-    planFootnote:
-      'The free tier has no balance and nothing to pay. Payment and usage appear when you sign in with a Nous account.',
-    status: 'free_tier',
-    summary: [
-      { label: 'Plan', value: 'Free tier' },
-      { label: 'Model', value: billing.free_tier_model ?? FREE_TIER_MODEL },
-      { label: 'Connectors', tone: 'primary', value: 'Included' }
-    ],
+    status: 'logged_out',
+    summary: emptySummary(),
     tiers: [],
     usageRows: []
   }
