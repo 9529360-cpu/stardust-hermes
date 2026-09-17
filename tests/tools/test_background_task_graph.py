@@ -87,6 +87,40 @@ def test_start_graph_creates_parallel_ready_nodes_and_dependency_wait(kanban_hom
         assert link["parent_id"] == by_key["convert"]["task_id"]
 
 
+def test_final_report_fans_in_every_leaf_for_one_combined_completion(kanban_home):
+    plan = _plan() | {"final_report": {}}
+    result = graph.start_graph(plan, {}, default_assignee="default", created_by="desktop-main")
+    by_key = {item["key"]: item for item in result["tasks"]}
+
+    assert result["count"] == 4
+    assert result["final_task_key"] == "final-report"
+    assert result["final_task_id"] == by_key["final-report"]["task_id"]
+    assert by_key["final-report"]["status"] == "todo"
+    # convert is not a leaf because reply already depends on it. The reporter waits on the two
+    # terminal branches, so it cannot run until both the reply branch and development branch finish.
+    assert by_key["final-report"]["depends_on"] == ["develop", "reply"]
+
+    with kbc.connect_closing() as conn:
+        parent_rows = conn.execute(
+            "SELECT parent_id FROM task_links WHERE child_id = ? ORDER BY parent_id",
+            (result["final_task_id"],),
+        ).fetchall()
+        assert {row["parent_id"] for row in parent_rows} == {
+            by_key["develop"]["task_id"], by_key["reply"]["task_id"],
+        }
+
+
+def test_final_report_key_conflict_is_rejected_before_writes(kanban_home):
+    plan = {
+        "tasks": [{"key": "final-report", "title": "Already used"}],
+        "final_report": {},
+    }
+    with pytest.raises(ValueError, match="conflicts"):
+        graph.start_graph(plan, {}, default_assignee="default", created_by="desktop-main")
+    with kbc.connect_closing() as conn:
+        assert conn.execute("SELECT COUNT(*) AS n FROM tasks").fetchone()["n"] == 0
+
+
 def test_graph_creation_rolls_back_every_node_when_one_node_is_invalid(kanban_home):
     bad_plan = {
         "tasks": [
@@ -132,3 +166,5 @@ def test_graph_tool_is_high_level_orchestration_surface():
     assert "ordinary questions" in description
     assert "current-turn work" in description
     assert "depends_on" in description
+    assert "final_report" in description
+    assert "kanban" not in description.lower()
