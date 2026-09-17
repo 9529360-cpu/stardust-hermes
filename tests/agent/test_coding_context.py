@@ -353,3 +353,13 @@ class TestDetection:
     def test_bare_dir_is_not_coding(self, tmp_path):
         cfg = {"agent": {"coding_context": "auto"}}
         assert cc.is_coding_context(platform="cli", cwd=tmp_path, config=cfg) is False
+
+
+def test_coding_guidance_keeps_general_assistant_intent_authority():
+    guidance = cc.CODING_AGENT_GUIDANCE
+    assert "general-purpose assistant" in guidance
+    assert "repository is context, not authorization to modify it" in guidance
+    assert "ordinary questions" in guidance
+    assert "answered directly even when the current directory is a code workspace" in guidance
+    assert "Only enter implementation, debugging, review, or edit mode" in guidance
+    assert "When code or repository changes are requested" in guidance
