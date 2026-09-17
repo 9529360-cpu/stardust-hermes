@@ -13,12 +13,14 @@ export const NOUS_PROVIDER_ID = 'nous'
 export type FreeTierRequester = <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>
 
 /**
- * The backend's free-tier verdict, cached for the chrome that paints it (the
- * statusbar chip, the first-launch intro, the billing view). The backend is
- * authoritative — this atom is only a cache of `free_tier.status`, which is a
- * local, zero-network read — so nothing here ever decides on its own that the
- * free tier is on or off. `null` means "not asked yet"; every consumer must
- * render as if there were no free tier until an answer lands.
+ * The backend's free-tier verdict, cached for compatibility hosts that still
+ * expose the inherited Nous guest tier. Stardust Desktop has retired that
+ * product path entirely, so the Desktop preload bridge is an authority boundary:
+ * renderer code must behave as though no guest/free-tier identity exists even
+ * when an older local or remote backend still reports one.
+ *
+ * `null` means "no free tier for this renderer" as well as "not asked yet";
+ * every consumer already renders both cases as absent.
  */
 export const $freeTierStatus = atom<FreeTierStatus | null>(null)
 
@@ -26,16 +28,26 @@ function isFreeTierStatus(value: unknown): value is FreeTierStatus {
   return typeof value === 'object' && value !== null && typeof (value as FreeTierStatus).has_guest === 'boolean'
 }
 
+function desktopRetiresFreeTier(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.hermesDesktop)
+}
+
 /**
- * Pull the current status. No polling loop of its own: callers ride an existing
- * cadence (the ambient status snapshot) or a seam that just changed the answer
- * (boot, a completed sign-in, an acknowledged notice).
+ * Pull the current status on compatibility hosts. Stardust Desktop deliberately
+ * does not ask the backend: an old remote backend must not be able to resurrect
+ * the retired built-in account by reporting a guest identity.
  *
- * A failed read leaves the last known answer in place rather than blanking the
- * chrome — an older backend without the method, or a gateway flap, is not
- * evidence that the free tier went away.
+ * A failed read on compatibility hosts leaves the last known answer in place
+ * rather than blanking the chrome — an older backend without the method, or a
+ * gateway flap, is not evidence that the free tier went away there.
  */
 export async function refreshFreeTierStatus(requestGateway: FreeTierRequester): Promise<FreeTierStatus | null> {
+  if (desktopRetiresFreeTier()) {
+    $freeTierStatus.set(null)
+
+    return null
+  }
+
   try {
     const status = await requestGateway<FreeTierStatus>('free_tier.status')
 
@@ -51,9 +63,15 @@ export async function refreshFreeTierStatus(requestGateway: FreeTierRequester): 
   }
 }
 
-/** Persist the one-time notice acknowledgement, then re-read so every surface
- *  keyed on `notice_pending` drops away together. */
+/** Persist the one-time notice acknowledgement on compatibility hosts, then
+ *  re-read so every surface keyed on `notice_pending` drops away together. */
 export async function ackFreeTierNotice(requestGateway: FreeTierRequester): Promise<boolean> {
+  if (desktopRetiresFreeTier()) {
+    $freeTierStatus.set(null)
+
+    return true
+  }
+
   try {
     const result = await requestGateway<{ acked?: boolean }>('free_tier.ack_notice')
 
@@ -74,12 +92,12 @@ export async function ackFreeTierNotice(requestGateway: FreeTierRequester): Prom
  * Whether the SELECTED route runs on the free tier: `setup.runtime_check.free_tier`, keyed on the
  * endpoint the backend resolved, not on profile state. `null` until a readiness round answers. A
  * free-tier identity beside the user's own key reads `false` here while `$freeTierStatus.available`
- * stays true — that split is what picks the intro's shape.
+ * stays true — that split is what picks the intro's shape on compatibility hosts.
  */
 export const $freeTierRoute = atom<boolean | null>(null)
 
 export function setFreeTierRoute(route: boolean | null | undefined) {
-  $freeTierRoute.set(typeof route === 'boolean' ? route : null)
+  $freeTierRoute.set(desktopRetiresFreeTier() ? null : typeof route === 'boolean' ? route : null)
 }
 
 /** True when the one-time introduction is still owed to this user. */
