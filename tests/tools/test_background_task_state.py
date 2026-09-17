@@ -28,6 +28,28 @@ def test_blocked_approval_has_priority_over_generic_block_reason():
     ) == "waiting_confirmation"
 
 
+def test_durable_approval_request_and_denial_change_public_wait_state():
+    blocked = {
+        "kind": "blocked",
+        "payload": {
+            "kind": "needs_input",
+            "reason": "Waiting for user approval apr-1 before send_message.",
+        },
+    }
+    assert project_background_state(
+        "blocked",
+        events=[blocked, {"kind": "assistant_approval_requested", "payload": {"approval_id": "apr-1"}}],
+    ) == "waiting_confirmation"
+    assert project_background_state(
+        "blocked",
+        events=[
+            blocked,
+            {"kind": "assistant_approval_requested", "payload": {"approval_id": "apr-1"}},
+            {"kind": "assistant_approval_denied", "payload": {"approval_id": "apr-1"}},
+        ],
+    ) == "waiting_input"
+
+
 def test_block_kinds_project_without_leaking_kernel_terms():
     assert project_background_state(
         "blocked", events=[{"kind": "blocked", "payload": {"kind": "dependency"}}]
