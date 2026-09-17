@@ -3,15 +3,18 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
-  title: 'Hermes Agent',
-  tagline: 'The self-improving AI agent',
+  title: 'Stardust',
+  tagline: 'Independently maintained personal AI assistant',
   favicon: 'img/favicon.ico',
 
-  url: 'https://hermes-agent.nousresearch.com',
+  // Stardust does not currently publish a standalone documentation site.
+  // Keep production builds self-contained instead of emitting canonical URLs
+  // for the former upstream Hermes website.
+  url: 'http://localhost',
   baseUrl: '/docs/',
 
-  organizationName: 'NousResearch',
-  projectName: 'hermes-agent',
+  organizationName: '9529360-cpu',
+  projectName: 'stardust-hermes',
 
   onBrokenLinks: 'warn',
 
@@ -44,8 +47,8 @@ const config: Config = {
     [
       '@docusaurus/plugin-client-redirects',
       {
-        // Static-host redirects for renamed doc pages (GitHub Pages can't
-        // do server-side redirects). Paths are relative to baseUrl (/docs/).
+        // Static-host redirects for renamed doc pages. Paths are relative to
+        // baseUrl (/docs/) and remain useful for local/static Stardust builds.
         redirects: [
           {
             // Renamed in #44470 (Automation Blueprints terminology rebrand)
@@ -80,7 +83,7 @@ const config: Config = {
         docs: {
           routeBasePath: '/',  // Docs at the root of /docs/
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/NousResearch/hermes-agent/edit/main/website/',
+          editUrl: 'https://github.com/9529360-cpu/stardust-hermes/edit/main/website/',
         },
         blog: false,
         theme: {
@@ -91,21 +94,6 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/hermes-agent-banner.png',
-    // Algolia DocSearch (replaces @easyops-cn/docusaurus-search-local).
-    // The local plugin shipped a ~16 MB client-side lunr index that every
-    // visitor downloaded and hydrated before their first result; DocSearch
-    // answers from Algolia's servers with no client index at all. These are
-    // public search-only credentials — safe to commit (the admin key is not
-    // in the repo). Index is populated by the Algolia Crawler configured at
-    // crawler.algolia.com; contextualSearch scopes results to the active
-    // locale via the docusaurus_tag/lang facets the crawler records carry.
-    algolia: {
-      appId: '2JLBVEYZN5',
-      apiKey: '8fda2a49223ce185ac30c2dbf6898a07',
-      indexName: 'hermes docs',
-      contextualSearch: true,
-    },
     colorMode: {
       defaultMode: 'dark',
       respectPrefersColorScheme: true,
@@ -117,11 +105,7 @@ const config: Config = {
       },
     },
     navbar: {
-      title: 'Hermes Agent',
-      logo: {
-        alt: 'Hermes Agent',
-        src: 'img/logo.png',
-      },
+      title: 'Stardust',
       items: [
         {
           type: 'docSidebar',
@@ -140,27 +124,17 @@ const config: Config = {
           position: 'left',
         },
         {
-          href: 'https://hermes-agent.nousresearch.com/',
-          label: 'Download',
-          position: 'left',
-        },
-        {
           type: 'localeDropdown',
           position: 'right',
         },
         {
-          href: 'https://hermes-agent.nousresearch.com',
-          label: 'Home',
+          href: 'https://github.com/9529360-cpu/stardust-hermes',
+          label: 'Repository',
           position: 'right',
         },
         {
-          href: 'https://github.com/NousResearch/hermes-agent',
-          label: 'GitHub',
-          position: 'right',
-        },
-        {
-          href: 'https://discord.gg/NousResearch',
-          label: 'Discord',
+          href: 'https://github.com/9529360-cpu/stardust-hermes/issues',
+          label: 'Issues',
           position: 'right',
         },
       ],
@@ -178,23 +152,22 @@ const config: Config = {
           ],
         },
         {
-          title: 'Community',
+          title: 'Stardust',
           items: [
-            { label: 'Discord', href: 'https://discord.gg/NousResearch' },
-            { label: 'GitHub Issues', href: 'https://github.com/NousResearch/hermes-agent/issues' },
+            { label: 'Repository', href: 'https://github.com/9529360-cpu/stardust-hermes' },
+            { label: 'GitHub Issues', href: 'https://github.com/9529360-cpu/stardust-hermes/issues' },
             { label: 'Skills Hub', href: 'https://agentskills.io' },
           ],
         },
         {
-          title: 'More',
+          title: 'Foundation',
           items: [
-            { label: 'Desktop Download', href: 'https://hermes-agent.nousresearch.com/' },
-            { label: 'GitHub', href: 'https://github.com/NousResearch/hermes-agent' },
-            { label: 'Nous Research', href: 'https://nousresearch.com' },
+            { label: 'Hermes Agent source', href: 'https://github.com/NousResearch/hermes-agent' },
+            { label: 'License', href: 'https://github.com/9529360-cpu/stardust-hermes/blob/main/LICENSE' },
           ],
         },
       ],
-      copyright: `Built by <a href="https://nousresearch.com">Nous Research</a> · MIT License · ${new Date().getFullYear()}`,
+      copyright: `Stardust · Built on the Hermes Agent open-source foundation · MIT License · ${new Date().getFullYear()}`,
     },
     prism: {
       theme: prismThemes.github,
