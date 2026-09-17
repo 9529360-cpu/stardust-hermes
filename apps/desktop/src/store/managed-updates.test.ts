@@ -46,8 +46,8 @@ describe('managedUpdatesSupported', () => {
     expect(managedUpdatesSupported()).toBe(false)
   })
 
-  it('is true when the preload bridge exposes updateManaged', () => {
-    expect(managedUpdatesSupported()).toBe(true)
+  it('stays false in Stardust even when the inherited bridge exists', () => {
+    expect(managedUpdatesSupported()).toBe(false)
   })
 })
 
