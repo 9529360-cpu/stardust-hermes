@@ -208,8 +208,21 @@ def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] =
             "financial", name, action,
         )
 
+    # Known local/Stardust-owned mutation surfaces have explicit execute-then-notify semantics. Keep
+    # this before the generic action-family fallback so a local ``create``/``update`` operation does
+    # not become an unnecessary approval prompt merely because it shares a verb with a remote API.
     if name in _NOTIFY_TOOLS:
         return _decision(NOTIFY, "Changes local or Stardust-owned state; proceed and report the result.")
+
+    # Extensible tools/plugins may have innocuous names (``calendar``, ``crm``) while exposing remote
+    # write verbs through their arguments. Unknown reads continue to allow, but unknown write families
+    # fail toward confirmation so adding a new tool cannot silently punch through the assistant policy.
+    if _action_matches(action, _EXTERNAL_WRITE_ACTIONS):
+        return _decision(
+            CONFIRM,
+            f"Stardust wants to perform the write action '{action}' with {tool_name}; confirm before changing external state.",
+            "external-write", name, action,
+        )
 
     return _decision(ALLOW, "No consequential side effect is identified by the first-party policy.")
 
