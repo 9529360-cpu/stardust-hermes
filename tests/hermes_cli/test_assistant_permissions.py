@@ -59,6 +59,25 @@ def test_local_mutations_notify_without_interrupting():
     assert permissions.classify_tool_permission("write_file", {"path": "x"}).level == permissions.NOTIFY
 
 
+def test_unknown_extensible_write_actions_fail_toward_confirmation():
+    for action in (
+        "create_event", "update_record", "edit_item", "upload_file",
+        "share_document", "invite_member", "react_message",
+    ):
+        decision = permissions.classify_tool_permission("calendar_plugin", {"action": action})
+        assert decision.level == permissions.CONFIRM, action
+        assert decision.rule_key.startswith("stardust:external-write:calendar_plugin"), action
+
+    # Known Stardust/local surfaces retain execute-then-notify semantics even when they use
+    # a verb that would be consequential on an unknown external tool.
+    local = permissions.classify_tool_permission("desktop_project", {"action": "create"})
+    assert local.level == permissions.NOTIFY
+
+    # An unknown read-like operation stays non-interrupting.
+    read = permissions.classify_tool_permission("calendar_plugin", {"action": "search_events"})
+    assert read.level == permissions.ALLOW
+
+
 def test_plugin_rewrite_is_classified_before_execution(monkeypatch):
     monkeypatch.setenv("HERMES_KANBAN_TASK", "task-1")
     monkeypatch.setattr(lifecycle, "_observe", lambda *_args, **_kwargs: None)
