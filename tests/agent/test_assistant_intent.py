@@ -15,9 +15,11 @@ from agent.assistant_intent import (
     default_rail,
     delegation_lifecycle_state,
     kanban_lifecycle_state,
+    process_lifecycle_state,
     project_cron_job,
     project_delegation,
     project_kanban_task,
+    project_process,
     task_state_is_terminal,
     task_state_needs_attention,
 )
@@ -31,6 +33,17 @@ def test_intent_wire_values_match_mission_vocabulary():
         "background",
         "schedule",
         "clarify",
+    ]
+
+
+def test_execution_rails_include_real_background_process_owner():
+    assert [rail.value for rail in ExecutionRail] == [
+        "none",
+        "current_session",
+        "process",
+        "delegation",
+        "cron",
+        "kanban",
     ]
 
 
@@ -136,9 +149,9 @@ def test_task_projection_requires_real_owner_and_truthful_durability():
     with pytest.raises(ValueError, match="restart-safe task projections require cron or kanban ownership"):
         AssistantTaskProjection(
             task_id="assistant-task-11",
-            title="Pretend durable delegation",
+            title="Pretend durable process",
             state=TaskLifecycleState.RUNNING,
-            rail=ExecutionRail.DELEGATION,
+            rail=ExecutionRail.PROCESS,
             durability=ExecutionDurability.RESTART_SAFE,
         )
 
@@ -153,6 +166,7 @@ def test_task_projection_requires_real_owner_and_truthful_durability():
 
 
 def test_stable_task_ids_namespace_native_owner_ids_by_rail():
+    assert assistant_task_id(ExecutionRail.PROCESS, "42") == "process:42"
     assert assistant_task_id(ExecutionRail.DELEGATION, "42") == "delegation:42"
     assert assistant_task_id(ExecutionRail.CRON, "42") == "cron:42"
     assert assistant_task_id(ExecutionRail.KANBAN, "42") == "kanban:42"
@@ -177,6 +191,21 @@ def test_delegation_owner_states_map_without_claiming_restart_durability():
         delegation_lifecycle_state("new-future-state")
 
 
+def test_process_owner_states_preserve_exit_reason_and_code():
+    assert process_lifecycle_state("running") is TaskLifecycleState.RUNNING
+    assert process_lifecycle_state("exited", exit_code=0) is TaskLifecycleState.COMPLETED
+    assert process_lifecycle_state("exited", exit_code=7) is TaskLifecycleState.FAILED
+    assert process_lifecycle_state("exited", exit_code=None) is TaskLifecycleState.INTERRUPTED
+    assert process_lifecycle_state("exited", exit_code=0, completion_reason="killed") is TaskLifecycleState.CANCELLED
+    assert process_lifecycle_state("exited", exit_code=-1, completion_reason="lost") is TaskLifecycleState.INTERRUPTED
+    assert process_lifecycle_state("exited", exit_code=-1, completion_reason="failed_start") is TaskLifecycleState.FAILED
+
+    with pytest.raises(ValueError, match="invalid process exit code"):
+        process_lifecycle_state("exited", exit_code="not-a-code")
+    with pytest.raises(ValueError, match="unknown process state"):
+        process_lifecycle_state("future-state", exit_code=0)
+
+
 def test_kanban_owner_states_map_from_canonical_board_columns():
     for native in ("triage", "todo", "scheduled", "ready"):
         assert kanban_lifecycle_state(native) is TaskLifecycleState.QUEUED
@@ -198,6 +227,16 @@ def test_cron_job_state_preserves_paused_scheduled_and_active_semantics():
 
 
 def test_owner_projection_adapters_keep_native_owner_as_authority():
+    process = project_process(
+        {
+            "session_id": "proc-1",
+            "status": "exited",
+            "exit_code": 0,
+            "completion_reason": "exited",
+            "command": "python report.py",
+            "parent_session_id": "session-7",
+        }
+    )
     delegated = project_delegation(
         {
             "delegation_id": "d-1",
@@ -213,6 +252,12 @@ def test_owner_projection_adapters_keep_native_owner_as_authority():
     kanban = project_kanban_task(
         {"id": "k-1", "title": "Fix the bug", "status": "blocked", "blocked_reason": "needs credential"}
     )
+
+    assert process.task_id == "process:proc-1"
+    assert process.owner_id == "proc-1"
+    assert process.parent_session_id == "session-7"
+    assert process.state is TaskLifecycleState.COMPLETED
+    assert process.durability is ExecutionDurability.PROCESS
 
     assert delegated.task_id == "delegation:d-1"
     assert delegated.owner_id == "d-1"
@@ -232,6 +277,51 @@ def test_owner_projection_adapters_keep_native_owner_as_authority():
     assert kanban.state is TaskLifecycleState.BLOCKED
     assert kanban.durability is ExecutionDurability.RESTART_SAFE
     assert kanban.needs_attention
+
+
+def test_wire_serialization_is_json_safe_and_includes_derived_attention_flags():
+    decision = AssistantExecutionDecision(
+        intent=AssistantIntent.BACKGROUND,
+        durability=ExecutionDurability.PROCESS,
+        rail=ExecutionRail.PROCESS,
+        reason="long command",
+        task_id="process:proc-1",
+    )
+    projection = AssistantTaskProjection(
+        task_id="current_session:s-1",
+        title="Approve deployment",
+        state=TaskLifecycleState.WAITING_FOR_USER,
+        rail=ExecutionRail.CURRENT_SESSION,
+        durability=ExecutionDurability.TURN,
+        parent_session_id="s-1",
+        owner_id="s-1",
+        requires_approval=True,
+        artifact_refs=("diff://42",),
+    )
+
+    assert decision.to_wire() == {
+        "intent": "background",
+        "durability": "process",
+        "rail": "process",
+        "reason": "long command",
+        "requires_approval": False,
+        "task_id": "process:proc-1",
+    }
+    assert projection.to_wire() == {
+        "task_id": "current_session:s-1",
+        "title": "Approve deployment",
+        "state": "waiting_for_user",
+        "rail": "current_session",
+        "durability": "turn",
+        "parent_session_id": "s-1",
+        "owner_id": "s-1",
+        "detail": "",
+        "requires_approval": True,
+        "recoverable": False,
+        "artifact_refs": ["diff://42"],
+        "terminal": False,
+        "needs_attention": True,
+    }
 
 
 def test_batch_delegation_projection_uses_bounded_human_title():
