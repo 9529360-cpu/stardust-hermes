@@ -70,6 +70,16 @@ def _ref_line(snapshot: str, ref: str) -> str:
     return ""
 
 
+def _decode_accessible_name(raw: str) -> str:
+    """Decode snapshot quote escapes without corrupting already-decoded Unicode text."""
+    if "\\" not in raw:
+        return raw
+    try:
+        return json.loads(f'"{raw}"')
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return raw
+
+
 def _element_identity(snapshot: str, ref: str) -> tuple[str, str, str]:
     line = _ref_line(snapshot, ref)
     if not line:
@@ -77,7 +87,7 @@ def _element_identity(snapshot: str, ref: str) -> tuple[str, str, str]:
     role_match = _ROLE_RE.search(line)
     name_match = _QUOTED_NAME_RE.search(line)
     role = role_match.group(1).lower() if role_match else ""
-    name = bytes(name_match.group(1), "utf-8").decode("unicode_escape") if name_match else ""
+    name = _decode_accessible_name(name_match.group(1)) if name_match else ""
     return role, name.strip(), line
 
 
