@@ -42,6 +42,38 @@ class ExecutionRail(str, Enum):
     KANBAN = "kanban"
 
 
+class TaskLifecycleState(str, Enum):
+    """Common read-model state for assistant work owned by existing runtimes."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    WAITING_FOR_USER = "waiting_for_user"
+    BLOCKED = "blocked"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    INTERRUPTED = "interrupted"
+
+
+TERMINAL_TASK_STATES = frozenset(
+    {
+        TaskLifecycleState.COMPLETED,
+        TaskLifecycleState.FAILED,
+        TaskLifecycleState.CANCELLED,
+        TaskLifecycleState.INTERRUPTED,
+    }
+)
+
+ATTENTION_TASK_STATES = frozenset(
+    {
+        TaskLifecycleState.WAITING_FOR_USER,
+        TaskLifecycleState.BLOCKED,
+        TaskLifecycleState.FAILED,
+        TaskLifecycleState.INTERRUPTED,
+    }
+)
+
+
 @dataclass(frozen=True)
 class AssistantExecutionDecision:
     """Serializable decision metadata; execution remains owned by existing rails."""
@@ -93,3 +125,15 @@ def default_rail(intent: AssistantIntent) -> ExecutionRail:
     if intent is AssistantIntent.SCHEDULE:
         return ExecutionRail.CRON
     raise ValueError(f"unsupported assistant intent: {intent!r}")
+
+
+def task_state_is_terminal(state: TaskLifecycleState) -> bool:
+    """Whether the authoritative owner has reached a terminal outcome."""
+
+    return state in TERMINAL_TASK_STATES
+
+
+def task_state_needs_attention(state: TaskLifecycleState) -> bool:
+    """Whether a user-facing activity projection should surface the work prominently."""
+
+    return state in ATTENTION_TASK_STATES
