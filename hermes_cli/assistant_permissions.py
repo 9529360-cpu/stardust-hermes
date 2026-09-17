@@ -155,6 +155,11 @@ def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] =
             return _decision(ALLOW, "Read-only durable task inspection.")
         return _decision(NOTIFY, "Updates Stardust's durable task state; proceed and report the change.")
 
+    if name == "background_task":
+        if action in {"status", "list"}:
+            return _decision(ALLOW, "Reads durable background-task state only.")
+        return _decision(NOTIFY, "Updates Stardust's durable background-task state; proceed and report the change.")
+
     if name == "manage_connections":
         if action in _READ_ACTIONS or action in {"", "list_connections"}:
             return _decision(ALLOW, "Reads connection/account status only.")
