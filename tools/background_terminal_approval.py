@@ -64,14 +64,35 @@ def _terminal_security_context_sha256(plan: Any, *, has_host_access: bool) -> st
     return hashlib.sha256(encoded.encode("utf-8", errors="replace")).hexdigest()
 
 
+def _resolve_terminal_security_context(args: Mapping[str, Any] | None) -> tuple[Any, bool, str]:
+    """Use terminal's own planner so task overrides/backend/cwd resolution cannot drift from execution."""
+    values = args if isinstance(args, Mapping) else {}
+    command = values.get("command")
+    from tools.terminal_tool import _docker_has_host_access, _plan_execution
+
+    task_id = str(os.environ.get("HERMES_KANBAN_TASK") or "").strip() or None
+    plan = _plan_execution(
+        command,
+        task_id=task_id,
+        timeout=values.get("timeout"),
+        background=bool(values.get("background", False)),
+        _host_local=False,
+    )
+    has_host_access = bool(_docker_has_host_access(plan.config))
+    return plan, has_host_access, _terminal_security_context_sha256(plan, has_host_access=has_host_access)
+
+
 def approval_fingerprint_args(
     args: Mapping[str, Any] | None,
-    requirement: TerminalApprovalRequirement,
+    requirement: TerminalApprovalRequirement | None = None,
 ) -> dict[str, Any]:
     """Opaque payload for the durable exact-call hash; never forwarded to the terminal handler."""
+    context_sha256 = str(requirement.context_sha256 or "") if requirement is not None else ""
+    if not context_sha256:
+        _plan, _has_host_access, context_sha256 = _resolve_terminal_security_context(args)
     return {
         "tool_args": dict(args) if isinstance(args, Mapping) else {},
-        "terminal_security_context_sha256": str(requirement.context_sha256 or ""),
+        "terminal_security_context_sha256": context_sha256,
     }
 
 
@@ -90,19 +111,9 @@ def inspect_terminal_approval(args: Mapping[str, Any] | None) -> TerminalApprova
     try:
         from tools import approval
         from tools import approval_context
-        from tools.terminal_tool import _docker_has_host_access, _plan_execution
 
-        task_id = str(os.environ.get("HERMES_KANBAN_TASK") or "").strip() or None
-        plan = _plan_execution(
-            command,
-            task_id=task_id,
-            timeout=values.get("timeout"),
-            background=bool(values.get("background", False)),
-            _host_local=False,
-        )
+        plan, has_host_access, context_sha256 = _resolve_terminal_security_context(values)
         env_type = str(plan.env_type or "local")
-        has_host_access = bool(_docker_has_host_access(plan.config))
-        context_sha256 = _terminal_security_context_sha256(plan, has_host_access=has_host_access)
     except Exception:
         return TerminalApprovalRequirement(
             block_message=(
