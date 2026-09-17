@@ -27,6 +27,14 @@ def test_shell_bootstrap_rewrites_repo_prefix_and_fails_closed() -> None:
     assert 'STARDUST_REF="${STARDUST_INSTALL_REF:-${ARG_REF:-main}}"' in source
 
 
+def test_shell_bootstrap_presents_stardust_identity() -> None:
+    source = _read("scripts/install-stardust.sh")
+
+    assert "s#Hermes Agent Installer#Stardust Personal Assistant Installer#g" in source
+    assert "Personal assistant built on the Hermes Agent foundation." in source
+    assert "s#Download Hermes Agent#Download Stardust#g" in source
+
+
 def test_shell_bootstrap_normalizes_tauri_stage_protocol() -> None:
     source = _read("scripts/install-stardust.sh")
 
@@ -54,6 +62,14 @@ def test_powershell_bootstrap_rewrites_repo_prefix_and_fails_closed() -> None:
     assert "$ForbiddenSourceUrls" in source
     assert "upstream product-source URL survived rewriting" in source
     assert "$ArgRef = Get-StardustInstallRef $args" in source
+
+
+def test_powershell_bootstrap_presents_stardust_identity() -> None:
+    source = _read("scripts/install-stardust.ps1")
+
+    assert "$Source.Replace('Hermes Agent Installer', 'Stardust Personal Assistant Installer')" in source
+    assert "Personal assistant built on the Hermes Agent foundation." in source
+    assert "$Source.Replace('Download Hermes Agent', 'Download Stardust')" in source
 
 
 def test_desktop_update_authority_is_stardust() -> None:
