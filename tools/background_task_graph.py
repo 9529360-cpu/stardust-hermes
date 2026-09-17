@@ -1,7 +1,7 @@
 """Atomic task-graph creation for the personal-assistant background-task facade.
 
 The public surface uses logical task keys and ``depends_on`` keys. This module translates those into
-one transaction in the existing Kanban kernel; it owns no scheduler, queue, or worker state itself.
+one transaction in the existing durable task kernel; it owns no scheduler, queue, or worker state itself.
 Independent nodes land ``ready`` together, dependency-gated nodes land ``todo`` until their parents
 complete, and every created node is subscribed to the originating assistant session when possible.
 """
@@ -18,6 +18,13 @@ from tools.registry import no_cache_check_fn, registry, tool_error
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _MAX_GRAPH_TASKS = 32
+_DEFAULT_FINAL_KEY = "final-report"
+_DEFAULT_FINAL_TITLE = "Summarize background work"
+_DEFAULT_FINAL_BODY = (
+    "Review the completed parent task handoffs and produce one concise completion report for the user. "
+    "State what finished, any failures or blockers, important artifacts/results, and any follow-up the user still "
+    "needs to decide. Do not redo work already completed by parent tasks."
+)
 
 
 def _text(value: Any, *, limit: int = 10000) -> str:
@@ -30,6 +37,43 @@ def _string_list(value: Any, field: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"{field} must be a list of strings")
     return [item.strip() for item in value if item.strip()]
+
+
+def _with_final_report(raw_tasks: Any, final_report: Any) -> tuple[Any, str | None]:
+    """Append one fan-in reporter that depends on all current graph leaves."""
+    if final_report is None:
+        return raw_tasks, None
+    if not isinstance(final_report, Mapping):
+        raise ValueError("final_report must be an object when provided")
+    if not isinstance(raw_tasks, list) or not raw_tasks:
+        return raw_tasks, None  # normal validation owns the empty/malformed error
+
+    copied = [dict(item) if isinstance(item, Mapping) else item for item in raw_tasks]
+    keys = [
+        _text(item.get("key"), limit=64)
+        for item in copied
+        if isinstance(item, Mapping)
+    ]
+    referenced: set[str] = set()
+    for item in copied:
+        if isinstance(item, Mapping):
+            referenced.update(_string_list(item.get("depends_on"), "tasks[].depends_on"))
+    leaves = [key for key in keys if key and key not in referenced]
+
+    final_key = _text(final_report.get("key"), limit=64) or _DEFAULT_FINAL_KEY
+    if final_key in keys:
+        raise ValueError(f"final_report key conflicts with an existing task key: {final_key}")
+    explicit_dependencies = _string_list(final_report.get("depends_on"), "final_report.depends_on")
+    depends_on = list(dict.fromkeys([*leaves, *explicit_dependencies]))
+    final_spec = dict(final_report)
+    final_spec.update(
+        key=final_key,
+        title=_text(final_report.get("title"), limit=500) or _DEFAULT_FINAL_TITLE,
+        body=_text(final_report.get("body")) or _DEFAULT_FINAL_BODY,
+        depends_on=depends_on,
+    )
+    copied.append(final_spec)
+    return copied, final_key
 
 
 def _normalize_tasks(raw_tasks: Any) -> tuple[dict[str, dict[str, Any]], list[str]]:
@@ -134,7 +178,8 @@ def start_graph(
     created_by: str,
 ) -> dict[str, Any]:
     """Create an arbitrary acyclic durable task graph in one kernel transaction."""
-    specs, topo = _normalize_tasks(args.get("tasks"))
+    raw_tasks, final_key = _with_final_report(args.get("tasks"), args.get("final_report"))
+    specs, topo = _normalize_tasks(raw_tasks)
     graph_key = _text(args.get("idempotency_key"), limit=300)
     default_priority = _optional_int(args.get("priority"), "priority") or 0
     default_project = args.get("project") if "project" in args else None
@@ -200,7 +245,7 @@ def start_graph(
         else "partial" if subscribed_count
         else "manual"
     )
-    return {
+    result: dict[str, Any] = {
         "ok": True,
         "kind": "background_task_graph",
         "count": len(nodes),
@@ -208,6 +253,9 @@ def start_graph(
         "notification_mode": notification_mode,
         "subscribed_count": subscribed_count,
     }
+    if final_key:
+        result.update(final_task_key=final_key, final_task_id=ids[final_key])
+    return result
 
 
 def background_task_graph(args: dict[str, Any], **kwargs: Any) -> str:
@@ -238,6 +286,38 @@ def _check_background_task_graph_mode() -> bool:
         return False
 
 
+_NODE_PROPERTIES = {
+    "key": {
+        "type": "string",
+        "description": "Unique short logical key used by sibling depends_on entries.",
+    },
+    "title": {"type": "string", "description": "Short outcome title."},
+    "body": {"type": "string", "description": "Self-contained execution specification."},
+    "depends_on": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Sibling keys that must complete first. Omit/empty for parallel-ready work.",
+    },
+    "agent": {
+        "type": "string",
+        "description": "Optional specialist profile; omit for normal assistant-managed work.",
+    },
+    "skills": {"type": "array", "items": {"type": "string"}},
+    "priority": {"type": "integer"},
+    "max_runtime_seconds": {"type": "integer", "minimum": 1},
+    "goal_mode": {"type": "boolean"},
+    "goal_max_turns": {"type": "integer", "minimum": 1},
+    "project": {"type": "string"},
+    "workspace_kind": {"type": "string", "enum": ["scratch", "dir", "worktree"]},
+    "workspace_path": {"type": "string"},
+    "completion_contract": {"type": "string"},
+    "idempotency_key": {
+        "type": "string",
+        "description": "Optional node-specific key for exact retry deduplication.",
+    },
+}
+
+
 BACKGROUND_TASK_GRAPH_SCHEMA = {
     "name": "background_task_graph",
     "description": (
@@ -245,9 +325,11 @@ BACKGROUND_TASK_GRAPH_SCHEMA = {
         "background outcomes. Use logical task keys plus depends_on: independent nodes can run in parallel, while "
         "dependent nodes wait automatically. Do not use this for ordinary questions, current-turn work, or a single "
         "background job (use background_task start). This is a high-level personal-assistant planning surface; do not "
-        "call low-level Kanban/link tools for the same plan. All nodes share the existing durable scheduler and retry "
-        "kernel. notification_mode=automatic means every node has a persisted completion/block route; partial/manual "
-        "means do not promise complete automatic reporting."
+        "call low-level task-kernel/link tools for the same plan. All nodes share the existing durable scheduler and "
+        "retry kernel. When the user expects one combined completion summary, provide final_report: Stardust adds one "
+        "fan-in reporting task that waits for every current leaf and receives their result handoffs. "
+        "notification_mode=automatic means every node has a persisted completion/block route; partial/manual means do "
+        "not promise complete automatic reporting."
     ),
     "parameters": {
         "type": "object",
@@ -255,42 +337,21 @@ BACKGROUND_TASK_GRAPH_SCHEMA = {
             "tasks": {
                 "type": "array",
                 "minItems": 1,
-                "maxItems": _MAX_GRAPH_TASKS,
+                "maxItems": _MAX_GRAPH_TASKS - 1,
                 "description": "Durable task nodes. depends_on references sibling logical keys, never task ids.",
                 "items": {
                     "type": "object",
-                    "properties": {
-                        "key": {
-                            "type": "string",
-                            "description": "Unique short logical key used by sibling depends_on entries.",
-                        },
-                        "title": {"type": "string", "description": "Short outcome title."},
-                        "body": {"type": "string", "description": "Self-contained execution specification."},
-                        "depends_on": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Sibling keys that must complete first. Omit/empty for parallel-ready work.",
-                        },
-                        "agent": {
-                            "type": "string",
-                            "description": "Optional specialist profile; omit for normal assistant-managed work.",
-                        },
-                        "skills": {"type": "array", "items": {"type": "string"}},
-                        "priority": {"type": "integer"},
-                        "max_runtime_seconds": {"type": "integer", "minimum": 1},
-                        "goal_mode": {"type": "boolean"},
-                        "goal_max_turns": {"type": "integer", "minimum": 1},
-                        "project": {"type": "string"},
-                        "workspace_kind": {"type": "string", "enum": ["scratch", "dir", "worktree"]},
-                        "workspace_path": {"type": "string"},
-                        "completion_contract": {"type": "string"},
-                        "idempotency_key": {
-                            "type": "string",
-                            "description": "Optional node-specific key for exact retry deduplication.",
-                        },
-                    },
+                    "properties": _NODE_PROPERTIES,
                     "required": ["key", "title"],
                 },
+            },
+            "final_report": {
+                "type": "object",
+                "description": (
+                    "Optional fan-in completion reporter. It automatically depends on every leaf task; key/title/body "
+                    "default to a concise user completion report. Extra depends_on entries are additive."
+                ),
+                "properties": _NODE_PROPERTIES,
             },
             "project": {"type": "string", "description": "Optional default project for all nodes."},
             "priority": {"type": "integer", "description": "Optional default priority for all nodes."},
