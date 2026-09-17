@@ -1,0 +1,87 @@
+name: Stardust Docker Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'web/package.json'
+      - 'ui-tui/package.json'
+      - 'ui-tui/packages/hermes-ink/**'
+      - 'apps/shared/**'
+      - 'plugins/platforms/photon/sidecar/**'
+      - '.github/workflows/stardust-docker-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'web/package.json'
+      - 'ui-tui/package.json'
+      - 'ui-tui/packages/hermes-ink/**'
+      - 'apps/shared/**'
+      - 'plugins/platforms/photon/sidecar/**'
+      - '.github/workflows/stardust-docker-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stardust-docker-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Build and boot amd64 image
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Stardust
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Reject profile exports in build context
+        run: python3 scripts/ci/check_profile_archive_boundary.py
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build local Stardust image
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          platforms: linux/amd64
+          tags: stardust-hermes:smoke
+          push: false
+          build-args: |
+            HERMES_GIT_SHA=${{ github.sha }}
+          cache-from: type=gha,scope=stardust-docker-smoke-amd64
+          cache-to: type=gha,mode=max,scope=stardust-docker-smoke-amd64
+
+      - name: Verify runtime imports and SQLite floor
+        run: |
+          docker run --rm --entrypoint python stardust-hermes:smoke -c \
+            'import hermes_cli, sqlite3; assert sqlite3.sqlite_version_info >= (3, 51, 3), sqlite3.sqlite_version; print("runtime", hermes_cli.__version__, "sqlite", sqlite3.sqlite_version)'
+
+      - name: Verify baked image provenance
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          docker run --rm --entrypoint python -e EXPECTED_SHA="$EXPECTED_SHA" stardust-hermes:smoke -c \
+            'import json, os, pathlib; p=json.loads(pathlib.Path("/etc/hermes/image-provenance.json").read_text()); assert p["deployment_kind"] == "image"; assert p["manager"] == "docker"; assert p["revision"] == os.environ["EXPECTED_SHA"]; print(json.dumps(p, sort_keys=True))'
+
+      - name: Verify real container entrypoint reaches CLI
+        run: |
+          timeout 60 docker run --rm stardust-hermes:smoke --version
