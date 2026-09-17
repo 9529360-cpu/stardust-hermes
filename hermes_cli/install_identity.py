@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import contextlib
+import errno
 import os
 from pathlib import Path
 import re
 import threading
+import time
 from typing import Optional
 import uuid
 
@@ -16,35 +18,84 @@ from utils import atomic_write_text
 _INSTALL_ID_FILENAME = "install_id"
 _INSTALL_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 _INSTALL_ID_CACHE: dict[str, Optional[str]] = {"root": None, "value": None}
-_INSTALL_ID_LOCK, _INSTALL_ID_PUBLICATION_LOCK = threading.Lock(), threading.Lock()
+_INSTALL_ID_LOCK = threading.Lock()
+_INSTALL_ID_FILE_LOCK_TIMEOUT_S = 5.0
+_LOCK_CONTENTION_ERRNOS = frozenset({
+    errno.EWOULDBLOCK,
+    errno.EAGAIN,
+    errno.EACCES,
+    errno.EDEADLK,
+})
+
+
+def _is_lock_contention_errno(exc: OSError) -> bool:
+    """True only for a lock already owned by another thread/process."""
+    return exc.errno in _LOCK_CONTENTION_ERRNOS
+
+
+def _lock_retry_sleep(deadline: float) -> None:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return
+    time.sleep(min(0.05, remaining))
 
 
 @contextlib.contextmanager
-def _install_id_file_lock(root: Path):
-    """Serialize identity publication across processes on POSIX and Windows."""
+def _install_id_file_lock(root: Path, *, timeout: float | None = None):
+    """Serialize identity publication across threads/processes on POSIX and Windows.
+
+    The install id is an authority value, so contention must never cause a second identity to be
+    minted.  At the same time, a wedged publisher must not block every caller forever.  Use a
+    single bounded non-blocking file-lock loop for both thread and process contention; timeout
+    surfaces as ``TimeoutError`` and the public creation path returns ``None`` so a later call can
+    retry safely.
+    """
+    wait = _INSTALL_ID_FILE_LOCK_TIMEOUT_S if timeout is None else max(0.0, float(timeout))
+    deadline = time.monotonic() + wait
     fd = os.open(root / ".install_id.lock", os.O_RDWR | os.O_CREAT, 0o600)
     windows = os.name == "nt"
+    acquired = False
     try:
         if windows:
             import msvcrt
             if os.fstat(fd).st_size == 0:
                 os.write(fd, b"\0")
                 os.fsync(fd)
-            os.lseek(fd, 0, os.SEEK_SET)
-            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+            while True:
+                try:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                    acquired = True
+                    break
+                except OSError as exc:
+                    if not _is_lock_contention_errno(exc):
+                        raise
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("timed out waiting for install identity publication lock")
+                    _lock_retry_sleep(deadline)
         else:
             import fcntl
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                    break
+                except OSError as exc:
+                    if not _is_lock_contention_errno(exc):
+                        raise
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("timed out waiting for install identity publication lock")
+                    _lock_retry_sleep(deadline)
         yield
     finally:
-        try:
-            if windows:
-                os.lseek(fd, 0, os.SEEK_SET)
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(fd, fcntl.LOCK_UN)
-        finally:
-            os.close(fd)
+        if acquired:
+            with contextlib.suppress(OSError):
+                if windows:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def _read_existing(path: Path) -> tuple[Optional[str], bool]:
@@ -61,7 +112,8 @@ def _read_existing(path: Path) -> tuple[Optional[str], bool]:
 def read_or_create_install_id(root: Path | None = None) -> Optional[str]:
     """Read or atomically mint the opaque id for the physical install.
 
-    ``None`` = neither readable nor persistable; an ephemeral id would violate the authority/registry contract.
+    ``None`` = neither readable nor safely persistable right now; an ephemeral or competing id
+    would violate the authority/registry contract.  Lock timeout therefore fails closed to None.
     """
     root = get_default_hermes_root() if root is None else root
     path = root / _INSTALL_ID_FILENAME
@@ -70,9 +122,7 @@ def read_or_create_install_id(root: Path | None = None) -> Optional[str]:
         return existing
     try:
         root.mkdir(parents=True, exist_ok=True)
-        # Windows byte-range locks can report a same-process conflict instead of waiting for another
-        # thread: serialize threads here, then keep the file lock as the cross-process publication fence.
-        with _INSTALL_ID_PUBLICATION_LOCK, _install_id_file_lock(root):
+        with _install_id_file_lock(root):
             existing, mint = _read_existing(path)
             if not mint:
                 return existing
@@ -84,25 +134,35 @@ def read_or_create_install_id(root: Path | None = None) -> Optional[str]:
 
 
 def get_install_id(*, cache: dict[str, Optional[str]] | None = None) -> Optional[str]:
-    """Return the process-cached stable id for the active Hermes root."""
+    """Return the process-cached stable id for the active Hermes root.
+
+    The file-backed identity is authoritative.  Keep the process cache lock around the two-field
+    in-memory cache pair only so readers cannot observe a mismatched root/value while a slow or
+    wedged filesystem remains entirely outside that lock.  The bounded file lock owns publication
+    safety for the durable identity itself.
+    """
     root = get_default_hermes_root()
     root_key = str(root)
     target_cache = _INSTALL_ID_CACHE if cache is None else cache
 
-    def _cached() -> Optional[str]:
+    def _cached_locked() -> Optional[str]:
         cached = target_cache.get("value")
         return cached if cached and target_cache.get("root") in (None, root_key) else None
 
-    if value := _cached():
-        return value
     with _INSTALL_ID_LOCK:
-        if value := _cached():
-            return value
-        value = read_or_create_install_id(root)
-        if value:
-            target_cache["root"] = root_key
-            target_cache["value"] = value
-        return value
+        if cached := _cached_locked():
+            return cached
+
+    value = read_or_create_install_id(root)
+    if not value:
+        return None
+
+    with _INSTALL_ID_LOCK:
+        if cached := _cached_locked():
+            return cached
+        target_cache["root"] = root_key
+        target_cache["value"] = value
+    return value
 
 
 __all__ = ["get_install_id", "read_or_create_install_id"]
