@@ -51,7 +51,11 @@ def _assistant_permission_directive(plugin_results: List[Any], **kwargs: Any) ->
         from hermes_cli.assistant_permissions import pre_tool_call_directive
 
         effective_args = _effective_pre_tool_args(plugin_results, kwargs.get("args"))
-        return pre_tool_call_directive(str(kwargs.get("tool_name") or ""), effective_args)
+        return pre_tool_call_directive(
+            str(kwargs.get("tool_name") or ""),
+            effective_args,
+            tool_call_id=str(kwargs.get("tool_call_id") or ""),
+        )
     except Exception:
         # This gate only owns Desktop/durable-personal-assistant contexts. Fail closed there: a policy
         # crash must never become a silent authorization bypass for an external side effect.
