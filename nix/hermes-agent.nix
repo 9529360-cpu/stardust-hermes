@@ -1,4 +1,4 @@
-# nix/hermes-agent.nix — Overridable Hermes Agent package
+# nix/hermes-agent.nix — Stardust runtime package using inherited Hermes-compatible names
 #
 # callPackage auto-wires nixpkgs args; flake inputs are passed explicitly.
 # Users override via:
@@ -262,8 +262,8 @@ stdenv.mkDerivation (finalAttrs: {
     };
 
   meta = with lib; {
-    description = "AI agent with advanced tool-calling capabilities";
-    homepage = "https://github.com/NousResearch/hermes-agent";
+    description = "Stardust personal AI assistant built on the Hermes Agent foundation";
+    homepage = "https://github.com/9529360-cpu/stardust-hermes";
     mainProgram = "hermes";
     license = licenses.mit;
     platforms = platforms.unix;
