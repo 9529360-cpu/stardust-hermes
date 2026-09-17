@@ -4,21 +4,39 @@ import type { OAuthProvider } from '@/types/hermes'
 
 import { sortProviders } from './providers'
 
-const provider = (id: string, name = id): OAuthProvider => ({
+const provider = (
+  id: string,
+  name = id,
+  status: OAuthProvider['status'] = { logged_in: false }
+): OAuthProvider => ({
   cli_command: '',
   docs_url: '',
   flow: 'device_code',
   id,
   name,
-  status: { logged_in: false }
+  status
 })
 
 describe('sortProviders', () => {
-  it('removes the inherited Nous account from Stardust Desktop provider surfaces', () => {
-    const input = [provider('nous', 'Nous Portal'), provider('qwen-oauth', 'Qwen'), provider('openai-codex', 'Codex')]
+  it('removes the inherited Nous login and anonymous free-tier identity from Desktop provider surfaces', () => {
+    const input = [
+      provider('nous', 'Nous Portal'),
+      provider('nous', 'Nous Free Tier', { logged_in: true, free_tier: true }),
+      provider('qwen-oauth', 'Qwen'),
+      provider('openai-codex', 'Codex')
+    ]
 
     expect(sortProviders(input).map(row => row.id)).toEqual(['openai-codex', 'qwen-oauth'])
-    expect(input.map(row => row.id)).toEqual(['nous', 'qwen-oauth', 'openai-codex'])
+    expect(input).toHaveLength(4)
+  })
+
+  it('keeps an already-authenticated real Nous account visible for management', () => {
+    const input = [
+      provider('qwen-oauth', 'Qwen'),
+      provider('nous', 'Nous Portal', { logged_in: true, free_tier: false })
+    ]
+
+    expect(sortProviders(input).map(row => row.id)).toEqual(['qwen-oauth', 'nous'])
   })
 
   it('keeps user-selected OAuth providers in Stardust order', () => {
