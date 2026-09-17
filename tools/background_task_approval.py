@@ -1,0 +1,264 @@
+"""Durable approval handoff for personal-assistant background workers.
+
+Gateway/CLI approval queues are process-local, while Kanban workers are one-shot subprocesses.
+This module stores only approval metadata in the existing task event ledger and reuses the task's
+``blocked(kind=needs_input)`` lifecycle. Raw tool arguments are never persisted: exact-call matching
+uses a SHA-256 fingerprint of the resolved tool name and arguments.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import uuid
+from dataclasses import dataclass
+from typing import Any, Mapping
+
+_REQUEST = "assistant_approval_requested"
+_GRANTED = "assistant_approval_granted"
+_DENIED = "assistant_approval_denied"
+_CONSUMED = "assistant_approval_consumed"
+_EVENT_KINDS = (_REQUEST, _GRANTED, _DENIED, _CONSUMED)
+
+
+@dataclass(frozen=True)
+class WorkerApprovalResult:
+    allowed: bool
+    approval_id: str = ""
+    message: str = ""
+
+
+def _canonical_args(args: Mapping[str, Any] | None) -> str:
+    values = dict(args) if isinstance(args, Mapping) else {}
+    try:
+        return json.dumps(values, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    except (TypeError, ValueError):
+        # Tool inputs originate as JSON. This fallback is defensive and is hashed immediately;
+        # the representation itself is never written to the task database.
+        return repr(sorted(values.items(), key=lambda item: str(item[0])))
+
+
+def call_fingerprint(tool_name: str, args: Mapping[str, Any] | None) -> str:
+    material = f"{str(tool_name or '').strip().lower()}\n{_canonical_args(args)}"
+    return hashlib.sha256(material.encode("utf-8", errors="replace")).hexdigest()
+
+
+def _load_events(conn, task_id: str) -> list[dict[str, Any]]:
+    placeholders = ",".join("?" for _ in _EVENT_KINDS)
+    rows = conn.execute(
+        f"SELECT id, kind, payload, created_at FROM task_events "
+        f"WHERE task_id = ? AND kind IN ({placeholders}) ORDER BY id ASC",
+        (task_id, *_EVENT_KINDS),
+    ).fetchall()
+    events: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            payload = json.loads(row["payload"] or "{}")
+        except (TypeError, ValueError):
+            payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        events.append({
+            "id": int(row["id"]), "kind": row["kind"], "payload": payload,
+            "created_at": int(row["created_at"] or 0),
+        })
+    return events
+
+
+def _approval_states(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    states: dict[str, dict[str, Any]] = {}
+    for event in events:
+        payload = event["payload"]
+        approval_id = str(payload.get("approval_id") or "").strip()
+        if not approval_id:
+            continue
+        if event["kind"] == _REQUEST:
+            states[approval_id] = {
+                "approval_id": approval_id,
+                "tool_name": str(payload.get("tool_name") or ""),
+                "rule_key": str(payload.get("rule_key") or ""),
+                "args_sha256": str(payload.get("args_sha256") or ""),
+                "reason": str(payload.get("reason") or ""),
+                "requested_at": event["created_at"],
+                "request_event_id": event["id"],
+                "state": "pending",
+            }
+            continue
+        state = states.get(approval_id)
+        if state is None:
+            continue
+        if event["kind"] == _GRANTED:
+            state["state"] = "approved"
+        elif event["kind"] == _DENIED:
+            state["state"] = "denied"
+            if payload.get("reason"):
+                state["decision_reason"] = str(payload["reason"])
+        elif event["kind"] == _CONSUMED:
+            state["state"] = "consumed"
+    return states
+
+
+def list_approvals(conn, task_id: str, *, pending_only: bool = False) -> list[dict[str, Any]]:
+    states = list(_approval_states(_load_events(conn, task_id)).values())
+    if pending_only:
+        states = [item for item in states if item["state"] == "pending"]
+    return states
+
+
+def _pending_match(states: dict[str, dict[str, Any]], fingerprint: str, tool_name: str) -> dict[str, Any] | None:
+    for state in reversed(list(states.values())):
+        if (
+            state["state"] == "pending"
+            and state["args_sha256"] == fingerprint
+            and state["tool_name"] == tool_name
+        ):
+            return state
+    return None
+
+
+def _approved_match(states: dict[str, dict[str, Any]], fingerprint: str, tool_name: str) -> dict[str, Any] | None:
+    for state in reversed(list(states.values())):
+        if (
+            state["state"] == "approved"
+            and state["args_sha256"] == fingerprint
+            and state["tool_name"] == tool_name
+        ):
+            return state
+    return None
+
+
+def _append_event(conn, kb, task_id: str, kind: str, payload: dict[str, Any]) -> None:
+    with kb.write_txn(conn):
+        kb._append_event(conn, task_id, kind, payload)
+
+
+def authorize_or_block_current_worker(
+    tool_name: str,
+    args: Mapping[str, Any] | None,
+    *,
+    reason: str,
+    rule_key: str,
+) -> WorkerApprovalResult:
+    """Consume one exact durable grant or block the current worker pending user approval.
+
+    The caller must already have classified the call as high-risk. Any storage/state failure raises;
+    the first-party permission caller catches it and fails closed.
+    """
+    task_id = str(os.environ.get("HERMES_KANBAN_TASK") or "").strip()
+    if not task_id:
+        raise RuntimeError("durable worker approval requires HERMES_KANBAN_TASK")
+    normalized_tool = str(tool_name or "").strip()
+    fingerprint = call_fingerprint(normalized_tool, args)
+
+    from tools.kanban_tools import _board
+
+    with _board(None) as (kb, conn):
+        task = kb.get_task(conn, task_id)
+        if task is None:
+            raise RuntimeError(f"unknown background task {task_id}")
+
+        states = _approval_states(_load_events(conn, task_id))
+        granted = _approved_match(states, fingerprint, normalized_tool)
+        if granted is not None:
+            _append_event(conn, kb, task_id, _CONSUMED, {
+                "approval_id": granted["approval_id"],
+                "tool_name": normalized_tool,
+                "args_sha256": fingerprint,
+            })
+            return WorkerApprovalResult(True, approval_id=granted["approval_id"])
+
+        pending = _pending_match(states, fingerprint, normalized_tool)
+        if pending is None:
+            approval_id = f"apr-{uuid.uuid4().hex[:12]}"
+            safe_reason = str(reason or "Approval required").strip()[:500]
+            _append_event(conn, kb, task_id, _REQUEST, {
+                "approval_id": approval_id,
+                "tool_name": normalized_tool,
+                "rule_key": str(rule_key or "")[:300],
+                "args_sha256": fingerprint,
+                "reason": safe_reason,
+            })
+        else:
+            approval_id = pending["approval_id"]
+
+        task = kb.get_task(conn, task_id)
+        if task is not None and task.status in {"running", "ready"}:
+            block_reason = (
+                f"Waiting for user approval {approval_id} before {normalized_tool}. "
+                "The requested action has not executed."
+            )
+            kb.block_task(
+                conn,
+                task_id,
+                reason=block_reason,
+                kind="needs_input",
+                expected_run_id=task.current_run_id if task.status == "running" else None,
+            )
+
+    return WorkerApprovalResult(
+        False,
+        approval_id=approval_id,
+        message=(
+            f"BLOCKED: background task is waiting for user approval {approval_id} before "
+            f"{normalized_tool}. The action was not executed. Do not retry or use another route; "
+            "the task has been durably paused for a user decision."
+        ),
+    )
+
+
+def _select_pending(states: list[dict[str, Any]], approval_id: str = "") -> dict[str, Any] | None:
+    pending = [item for item in states if item["state"] == "pending"]
+    if approval_id:
+        return next((item for item in pending if item["approval_id"] == approval_id), None)
+    return pending[-1] if pending else None
+
+
+def decide_task_approval(
+    conn,
+    kb,
+    task_id: str,
+    *,
+    decision: str,
+    approval_id: str = "",
+    reason: str = "",
+) -> dict[str, Any]:
+    """Persist a user decision. Approval unblocks the task; denial leaves it paused."""
+    task = kb.get_task(conn, task_id)
+    if task is None:
+        raise ValueError(f"unknown background task: {task_id}")
+    states = list_approvals(conn, task_id)
+    selected = _select_pending(states, approval_id)
+    if selected is None:
+        raise ValueError(
+            f"no pending approval{f' {approval_id}' if approval_id else ''} for background task {task_id}"
+        )
+    approval_id = selected["approval_id"]
+    if decision == "approve":
+        _append_event(conn, kb, task_id, _GRANTED, {
+            "approval_id": approval_id,
+            "tool_name": selected["tool_name"],
+            "args_sha256": selected["args_sha256"],
+        })
+        # Grant-first is intentional: if unblocking loses a race, the exact one-time grant remains
+        # durable while the task stays blocked; a retry can safely unblock it without losing consent.
+        unblocked = kb.unblock_task(conn, task_id) if task.status == "blocked" else False
+        return {
+            "ok": True, "task_id": task_id, "approval_id": approval_id,
+            "decision": "approved", "resumed": bool(unblocked),
+            "status": kb.get_task(conn, task_id).status,
+        }
+    if decision == "deny":
+        _append_event(conn, kb, task_id, _DENIED, {
+            "approval_id": approval_id,
+            "tool_name": selected["tool_name"],
+            "args_sha256": selected["args_sha256"],
+            "reason": str(reason or "").strip()[:500],
+        })
+        if reason and str(reason).strip():
+            kb.add_comment(conn, task_id, "user", f"Approval denied: {str(reason).strip()[:500]}")
+        return {
+            "ok": True, "task_id": task_id, "approval_id": approval_id,
+            "decision": "denied", "resumed": False,
+            "status": kb.get_task(conn, task_id).status,
+        }
+    raise ValueError("decision must be approve or deny")
