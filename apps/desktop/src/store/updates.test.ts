@@ -48,9 +48,9 @@ vi.mock('@/store/notifications', () => ({
   dismissNotification: (...args: unknown[]) => dismissSpy(...args)
 }))
 
-// updates.ts reads the connections registry (multi-target gating + the
-// everything-flow fan-out). Mock the store shallowly: the real module drags in
-// the profile/gateway-switch graph, which is far heavier than these tests need.
+// updates.ts still retains the inherited backend/multi-target engine for
+// compatibility and recovery work. Mock the registry shallowly so those
+// explicit engine tests do not drag in the profile/gateway-switch graph.
 const { atom: registryAtom } = await import('nanostores')
 const $mockConnectionsRegistry = registryAtom<unknown>(null)
 
@@ -69,10 +69,8 @@ vi.mock('@/hermes', () => ({
   getActionStatus: (...args: unknown[]) => getActionStatusSpy(...args)
 }))
 
-// A successful backend apply must nudge the gateway reconnect handler — the
-// update restarted the gateway process, and over tunnels the old socket dies
-// without a close event (users force-quit to recover). Mock the tiny registry
-// module so the assertion is direct.
+// The retained backend recovery engine still has to reconnect cleanly when it
+// is invoked explicitly by compatibility/recovery code.
 const reconnectGatewaySpy = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/store/gateway-reconnect', () => ({
@@ -150,10 +148,9 @@ describe('maybeNotifyUpdateAvailable', () => {
 
   it('stays quiet for new commits once the toast was closed', () => {
     maybeNotifyUpdateAvailable(status())
-    lastToast().onDismiss() // user closes it → cooldown starts
+    lastToast().onDismiss()
     notifySpy.mockClear()
 
-    // A different commit lands while still within the cooldown window.
     maybeNotifyUpdateAvailable(status({ targetSha: 'sha-b', behind: 9 }))
     expect(notifySpy).not.toHaveBeenCalled()
   })
@@ -166,7 +163,7 @@ describe('maybeNotifyUpdateAvailable', () => {
     lastToast().onDismiss()
     notifySpy.mockClear()
 
-    vi.setSystemTime(25 * 60 * 60 * 1000) // > 24h cooldown
+    vi.setSystemTime(25 * 60 * 60 * 1000)
     maybeNotifyUpdateAvailable(status({ targetSha: 'sha-b' }))
     expect(notifySpy).toHaveBeenCalledTimes(1)
   })
@@ -176,9 +173,6 @@ describe('maybeNotifyUpdateAvailable', () => {
     expect(notifySpy).not.toHaveBeenCalled()
   })
 
-  // FAIL-BEFORE: a shallow installer clone reports behind:null + updateAvailable
-  // (exact count unknowable without a merge-base). The guard treated null as 0
-  // and silently swallowed the notification entirely.
   it('still notifies with generic copy when the exact behind count is unknown', () => {
     maybeNotifyUpdateAvailable(status({ behind: null, updateAvailable: true }))
     expect(notifySpy).toHaveBeenCalledTimes(1)
@@ -200,19 +194,21 @@ describe('reportBackendContract', () => {
     expect(notifySpy).not.toHaveBeenCalled()
   })
 
-  it('warns when the backend is behind (or reports no contract)', () => {
+  it('warns when the backend is behind without exposing the inherited updater', () => {
     reportBackendContract(undefined)
     expect(notifySpy).toHaveBeenCalledTimes(1)
+    expect(notifySpy.mock.calls[0]?.[0]).not.toHaveProperty('action')
+
     reportBackendContract(1)
     expect(notifySpy).toHaveBeenCalledTimes(2)
+    expect(updateHermesSpy).not.toHaveBeenCalled()
   })
 
   it('stays quiet on later session opens once the user closed it', () => {
     reportBackendContract(1)
-    lastToast().onDismiss() // user closes it → cooldown starts
+    lastToast().onDismiss()
     notifySpy.mockClear()
 
-    // Opening another pre-existing session re-runs the check within cooldown.
     reportBackendContract(1)
     expect(notifySpy).not.toHaveBeenCalled()
   })
@@ -225,7 +221,7 @@ describe('reportBackendContract', () => {
     lastToast().onDismiss()
     notifySpy.mockClear()
 
-    vi.setSystemTime(25 * 60 * 60 * 1000) // > 24h cooldown
+    vi.setSystemTime(25 * 60 * 60 * 1000)
     reportBackendContract(1)
     expect(notifySpy).toHaveBeenCalledTimes(1)
   })
@@ -235,8 +231,8 @@ describe('reportBackendContract', () => {
     lastToast().onDismiss()
     notifySpy.mockClear()
 
-    reportBackendContract(REQUIRED_BACKEND_CONTRACT) // backend updated → satisfied, snooze cleared
-    reportBackendContract(5) // a later regression must warn immediately
+    reportBackendContract(REQUIRED_BACKEND_CONTRACT)
+    reportBackendContract(5)
     expect(notifySpy).toHaveBeenCalledTimes(1)
   })
 })
@@ -250,7 +246,7 @@ describe('checkBackendUpdates', () => {
     vi.useRealTimers()
   })
 
-  it('maps the backend /update/check onto the backend status, including commits', async () => {
+  it('maps the backend /update/check onto backend diagnostic state, including commits', async () => {
     setRemote(true)
     checkHermesUpdateSpy.mockResolvedValue({
       install_method: 'git',
@@ -310,16 +306,15 @@ describe('checkBackendUpdates', () => {
     expect(result?.message).toBe('Docker images are immutable.')
   })
 
-  it('is a no-op in local mode (backend check only runs when remote)', async () => {
+  it('is a no-op in local mode', async () => {
     setRemote(false)
     await checkBackendUpdates()
     expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
   })
 })
 
-// The ⌘K "Update Hermes" row. It used to call applyBackendUpdate() flat, which
-// in local mode aimed at the backend checkout instead of the client and, with
-// no overlay open, showed nothing at all.
+// Every product-facing Stardust update affordance owns exactly one target: the
+// local desktop client. Remote backend update state must never redirect ⌘K.
 describe('requestActiveUpdate', () => {
   const applyClientMock = vi.fn()
   const checkClientMock = vi.fn()
@@ -352,18 +347,13 @@ describe('requestActiveUpdate', () => {
   })
 
   afterEach(async () => {
-    // Drain any backend apply this suite kicked off: applyBackendUpdate() now
-    // memoizes the in-flight run, so a dangling promise here would be handed
-    // to the next suite's tests instead of a fresh run.
     await vi.waitFor(() => expect($backendUpdateApply.get().applying).toBe(false), { timeout: 5000 })
-    // Remote-mode rows now route through the everything-flow; drain its tail
-    // (fan-out + client check) so it can't bleed into the next test.
     await vi.waitFor(() => expect($updateEverything.get().running).toBe(false), { timeout: 5000 })
     setRemote(false)
     delete (globalThis as unknown as { window?: unknown }).window
   })
 
-  it('applies the CLIENT update in local mode, never the backend', async () => {
+  it('applies the client update in local mode, never the backend', async () => {
     setRemote(false)
     $updateStatus.set(status({ behind: 3 }))
 
@@ -374,15 +364,16 @@ describe('requestActiveUpdate', () => {
     expect($updateOverlayTarget.get()).toBe('client')
   })
 
-  it('applies the BACKEND update in remote mode', async () => {
+  it('still applies the client update in remote mode, never the backend', async () => {
     setRemote(true)
-    $backendUpdateStatus.set(status({ behind: 3 }))
+    $updateStatus.set(status({ behind: 3 }))
+    $backendUpdateStatus.set(status({ behind: 9 }))
 
     requestActiveUpdate()
-    await vi.waitFor(() => expect(updateHermesSpy).toHaveBeenCalled())
+    await vi.waitFor(() => expect(applyClientMock).toHaveBeenCalled())
 
-    expect(applyClientMock).not.toHaveBeenCalled()
-    expect($updateOverlayTarget.get()).toBe('backend')
+    expect(updateHermesSpy).not.toHaveBeenCalled()
+    expect($updateOverlayTarget.get()).toBe('client')
   })
 
   it('always opens the overlay, so selecting the row is never a silent no-op', () => {
@@ -394,32 +385,22 @@ describe('requestActiveUpdate', () => {
     expect($updateOverlayOpen.get()).toBe(true)
   })
 
-  it('opens the overlay to re-check instead of applying when already current', () => {
-    setRemote(false)
+  it('opens the client overlay to re-check instead of applying when already current', async () => {
+    setRemote(true)
     $updateStatus.set(status({ behind: 0, updateAvailable: false }))
+    $backendUpdateStatus.set(status({ behind: 6, updateAvailable: true }))
 
     requestActiveUpdate()
 
     expect($updateOverlayOpen.get()).toBe(true)
+    expect($updateOverlayTarget.get()).toBe('client')
+    await vi.waitFor(() => expect(checkClientMock).toHaveBeenCalled())
     expect(applyClientMock).not.toHaveBeenCalled()
     expect(updateHermesSpy).not.toHaveBeenCalled()
   })
-
-  it('applies on a backend that reports an update it cannot count commits for', async () => {
-    setRemote(true)
-    $backendUpdateStatus.set(status({ behind: 0, updateAvailable: true }))
-
-    requestActiveUpdate()
-    await vi.waitFor(() => expect(updateHermesSpy).toHaveBeenCalled())
-  })
 })
 
-// Surface-bound update entry points. A surface that displays ONE target's
-// status must act on that target: the overlay has no target switcher, so
-// inheriting the connection-mode default silently pointed the user at the
-// other machine. This is what left a Mac desktop on a months-old build while
-// its remote Linux backend updated fine, with no error anywhere (#70266).
-describe('explicit update targets', () => {
+describe('Stardust update targets', () => {
   const applyClientMock = vi.fn()
   const checkClientMock = vi.fn()
 
@@ -460,8 +441,6 @@ describe('explicit update targets', () => {
     delete (globalThis as unknown as { window?: unknown }).window
   })
 
-  // The macOS "Check for Updates…" app-menu item — the OS-standard affordance
-  // for updating THIS app — routes here via `hermes:open-updates`.
   it('opens the client overlay on an explicit client target, even in remote mode', async () => {
     openUpdatesWindow('client')
 
@@ -470,12 +449,20 @@ describe('explicit update targets', () => {
     expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
   })
 
-  it('still defaults to the connected machine when no target is named', async () => {
+  it('defaults to the desktop client even while connected to a remote backend', async () => {
     openUpdatesWindow()
 
-    expect($updateOverlayTarget.get()).toBe('backend')
-    await vi.waitFor(() => expect(checkHermesUpdateSpy).toHaveBeenCalled())
-    expect(checkClientMock).not.toHaveBeenCalled()
+    expect($updateOverlayTarget.get()).toBe('client')
+    await vi.waitFor(() => expect(checkClientMock).toHaveBeenCalledTimes(1))
+    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
+  })
+
+  it('normalizes an inherited explicit backend overlay target to the client', async () => {
+    openUpdatesWindow('backend')
+
+    expect($updateOverlayTarget.get()).toBe('client')
+    await vi.waitFor(() => expect(checkClientMock).toHaveBeenCalledTimes(1))
+    expect(checkHermesUpdateSpy).not.toHaveBeenCalled()
   })
 
   it('applies the client update on an explicit client target, without fanning out', async () => {
@@ -487,36 +474,39 @@ describe('explicit update targets', () => {
     expect($updateEverything.get().running).toBe(false)
   })
 
-  it('keeps the everything-flow for the generic, target-less apply', async () => {
+  it('normalizes a legacy backend apply target to the client', async () => {
+    startActiveUpdate('backend')
+
+    expect($updateOverlayTarget.get()).toBe('client')
+    await vi.waitFor(() => expect(applyClientMock).toHaveBeenCalledTimes(1))
+    expect(updateHermesSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps the generic target-less apply client-only', async () => {
     $backendUpdateStatus.set(status({ behind: 3 }))
 
     startActiveUpdate()
 
-    await vi.waitFor(() => expect(updateHermesSpy).toHaveBeenCalled(), { timeout: 5000 })
+    await vi.waitFor(() => expect(applyClientMock).toHaveBeenCalled())
+    expect(updateHermesSpy).not.toHaveBeenCalled()
+    expect($updateEverything.get().running).toBe(false)
   })
 
-  // A toast raised by the CLIENT check must open the client overlay: the user
-  // was told the app is behind, so landing them on the backend's (current)
-  // status reads as the update having vanished.
-  it('opens the overlay for the target whose status raised the toast', () => {
+  it('opens the client overlay even when a legacy backend status raised the toast', () => {
     maybeNotifyUpdateAvailable(status(), 'client')
     lastToast().action.onClick()
     expect($updateOverlayTarget.get()).toBe('client')
 
-    storage.clear() // clear the snooze the click just set
+    storage.clear()
     maybeNotifyUpdateAvailable(status({ targetSha: 'sha-b' }), 'backend')
     lastToast().action.onClick()
-    expect($updateOverlayTarget.get()).toBe('backend')
+    expect($updateOverlayTarget.get()).toBe('client')
   })
 })
 
-// The everything-flow: on multi-target installs (remote mode / multi-connection
-// registry) "update" must mean every machine — active backend, other registered
-// sources via the Electron fan-out, and the client LAST. Before this flow,
-// every remote-mode affordance updated only the backend, so users "updated"
-// forever while the desktop app itself stayed weeks stale (the Aug 2026
-// mac-app-on-v0.20.0 report).
-describe('applyEverythingUpdate', () => {
+// Keep direct coverage for the inherited orchestration while it remains in the
+// module. It is intentionally not reachable from Stardust product affordances.
+describe('applyEverythingUpdate compatibility engine', () => {
   const applyClientMock = vi.fn()
   const checkClientMock = vi.fn()
   const updateAllMock = vi.fn()
@@ -561,23 +551,22 @@ describe('applyEverythingUpdate', () => {
     delete (globalThis as unknown as { window?: unknown }).window
   })
 
-  it('gates on multiple targets: remote mode OR a multi-connection registry', () => {
+  it('never advertises multiple product update targets in Stardust', () => {
     setRemote(false)
     $mockConnectionsRegistry.set(null)
     expect(hasMultipleUpdateTargets()).toBe(false)
 
     setRemote(true)
-    expect(hasMultipleUpdateTargets()).toBe(true)
+    expect(hasMultipleUpdateTargets()).toBe(false)
 
     setRemote(false)
     $mockConnectionsRegistry.set(registryOf(['local', 'vps']))
-    expect(hasMultipleUpdateTargets()).toBe(true)
+    expect(hasMultipleUpdateTargets()).toBe(false)
   })
 
-  it('remote mode: updates the backend, then the still-behind client — the stale-GUI gap', async () => {
+  it('can still update backend then client when invoked explicitly for recovery', async () => {
     setRemote(true)
     $backendUpdateStatus.set(status({ behind: 3 }))
-    // The client is ALSO behind; the old flow never touched it.
     checkClientMock.mockResolvedValue(status({ behind: 7, updateAvailable: true }))
 
     await applyEverythingUpdate()
@@ -586,7 +575,7 @@ describe('applyEverythingUpdate', () => {
     expect(applyClientMock).toHaveBeenCalledTimes(1)
   })
 
-  it('remote mode: skips the client apply when the client is already current', async () => {
+  it('skips the client apply when the explicit recovery flow finds it current', async () => {
     setRemote(true)
     $backendUpdateStatus.set(status({ behind: 3 }))
     checkClientMock.mockResolvedValue(status({ behind: 0, updateAvailable: false }))
@@ -609,7 +598,7 @@ describe('applyEverythingUpdate', () => {
     expect(options.excludeIds).toContain('local')
   })
 
-  it('local mode with a multi-connection registry: fans out and updates the client, no active-backend leg', async () => {
+  it('local explicit recovery flow can fan out and update the client', async () => {
     setRemote(false)
     $mockConnectionsRegistry.set(registryOf(['local', 'vps']))
     checkClientMock.mockResolvedValue(status({ behind: 2, updateAvailable: true }))
@@ -652,7 +641,7 @@ describe('applyEverythingUpdate', () => {
     expect(titles).toContain('dead-box')
   })
 
-  it('memoizes the in-flight run so a double click cannot double-dispatch', async () => {
+  it('memoizes the explicit in-flight recovery run so a double call cannot double-dispatch', async () => {
     setRemote(false)
     $mockConnectionsRegistry.set(registryOf(['local', 'vps']))
 
@@ -667,10 +656,6 @@ describe('applyEverythingUpdate', () => {
   it('re-checks the client instead of trusting a stale cached status', async () => {
     setRemote(true)
     $backendUpdateStatus.set(status({ behind: 3 }))
-    // FAIL-BEFORE: `$updateStatus.get() ?? (await checkUpdates())` short-circuits
-    // on this cached row — captured up to a poll interval (30 min) ago, and
-    // before the backend leg ran — so the client apply was skipped and the app
-    // stayed stale. The live check says otherwise and must win.
     $updateStatus.set(status({ behind: 0, updateAvailable: false }))
     checkClientMock.mockResolvedValue(status({ behind: 7, updateAvailable: true }))
 
@@ -683,9 +668,6 @@ describe('applyEverythingUpdate', () => {
     setRemote(true)
     $backendUpdateStatus.set(status({ behind: 3 }))
     $updateStatus.set(status({ behind: 7, updateAvailable: true }))
-    // `checkUpdates()` never rejects — it resolves with an error-status and
-    // overwrites the atom with it, so an unreachable bridge must not read as
-    // "client is current" and skip the leg.
     checkClientMock.mockRejectedValue(new Error('bridge gone'))
 
     await applyEverythingUpdate()
@@ -693,25 +675,20 @@ describe('applyEverythingUpdate', () => {
     expect(applyClientMock).toHaveBeenCalledTimes(1)
   })
 
-  it('requestActiveUpdate routes through the everything-flow when EITHER target is behind', async () => {
+  it('requestActiveUpdate bypasses the recovery engine and applies only the client', async () => {
     setRemote(true)
-    // Backend current, client behind — the exact case the old remote-only
-    // ternary missed entirely.
-    $backendUpdateStatus.set(status({ behind: 0, updateAvailable: false }))
+    $backendUpdateStatus.set(status({ behind: 8, updateAvailable: true }))
     $updateStatus.set(status({ behind: 5, updateAvailable: true }))
-    checkClientMock.mockResolvedValue(status({ behind: 5, updateAvailable: true }))
 
     requestActiveUpdate()
 
-    // The everything-flow runs the backend leg first (a 1.5s status poll on
-    // real timers) before reaching the client apply — give it room.
-    await vi.waitFor(() => expect(applyClientMock).toHaveBeenCalled(), { timeout: 5000 })
+    await vi.waitFor(() => expect(applyClientMock).toHaveBeenCalled())
+    expect(updateHermesSpy).not.toHaveBeenCalled()
+    expect(updateAllMock).not.toHaveBeenCalled()
   })
 })
 
-// Post-backend-update client nudge: a successful backend apply re-checks the
-// CLIENT and warns when it is still behind, with a one-click client update.
-describe('client nudge after a backend update', () => {
+describe('client nudge after an explicit backend recovery update', () => {
   const applyClientMock = vi.fn()
   const checkClientMock = vi.fn()
 
@@ -765,13 +742,12 @@ describe('client nudge after a backend update', () => {
 
     await applyBackendUpdate()
 
-    // Give the fire-and-forget nudge a beat to (not) fire.
     await new Promise(resolve => setTimeout(resolve, 50))
     const ids = notifySpy.mock.calls.map(call => (call[0] as { id?: string }).id)
     expect(ids).not.toContain('client-update-after-backend')
   })
 
-  it('nudges a gateway reconnect after the backend caught up (tunnel socket may be dead)', async () => {
+  it('nudges a gateway reconnect after the backend caught up', async () => {
     checkClientMock.mockResolvedValue(status({ behind: 0, updateAvailable: false }))
     reconnectGatewaySpy.mockClear()
 
@@ -816,15 +792,12 @@ describe('applyUpdates terminal state', () => {
     const result = await applyUpdates()
 
     expect(result.handedOff).toBe(true)
-    // The detached relauncher will quit + reopen us; keep "applying" until then.
     expect($updateApply.get().applying).toBe(true)
     expect($updateOverlayOpen.get()).toBe(true)
     expect(notifySpy).not.toHaveBeenCalled()
   })
 
   it('closes the overlay + toasts when updated but not relaunched in place', async () => {
-    // The Linux AppImage / dev-run path: backend + GUI updated, no in-place
-    // relaunch. Must not strand the overlay on a closeless spinner.
     applyMock.mockResolvedValue({ ok: true, backendUpdated: true })
 
     await applyUpdates()
@@ -878,10 +851,7 @@ describe('applyUpdates terminal state', () => {
     expect(notifySpy).not.toHaveBeenCalled()
   })
 
-  it('lands on the guiSkew terminal state for a GUI/backend skew (AppImage/.deb/.rpm), without claiming a GUI update', async () => {
-    // Linux: backend updated, but the running desktop package was NOT replaced.
-    // Must NOT toast "loads next launch" — that's the dishonest message #45205
-    // guards against. Lands on a closeable guiSkew view instead.
+  it('lands on the guiSkew terminal state for a GUI/backend skew, without claiming a GUI update', async () => {
     applyMock.mockResolvedValue({
       ok: true,
       backendUpdated: true,
@@ -896,14 +866,11 @@ describe('applyUpdates terminal state', () => {
     expect($updateApply.get().stage).toBe('guiSkew')
     expect($updateApply.get().applying).toBe(false)
     expect($updateApply.get().message).toMatch(/desktop app package was not changed/)
-    // Overlay stays open on a closeable terminal view; no "all set" toast.
     expect($updateOverlayOpen.get()).toBe(true)
     expect(notifySpy).not.toHaveBeenCalled()
   })
 
   it('lands on a closeable manual-restart state when the rebuilt sandbox blocks auto-relaunch', async () => {
-    // Under release/*-unpacked but chrome-sandbox isn't launchable: don't quit
-    // into a dead app — keep a working window on a closeable manual state.
     applyMock.mockResolvedValue({
       ok: true,
       backendUpdated: true,
@@ -1355,43 +1322,18 @@ describe('startUpdatePoller', () => {
     vi.useRealTimers()
   })
 
-  it('calls checkUpdates() on startup so the version pill populates immediately', async () => {
+  it('does not perform passive update checks in the detached Stardust edition', async () => {
     startUpdatePoller()
+    await vi.advanceTimersByTimeAsync(BACKGROUND_UPDATE_CHECK_MS * 2)
 
-    // checkUpdates() is async — flush microtasks without advancing the daily interval.
-    await vi.advanceTimersByTimeAsync(0)
-
-    expect(checkMock).toHaveBeenCalled()
-    expect($updateStatus.get()?.behind).toBe(5)
+    expect(checkMock).not.toHaveBeenCalled()
+    expect(onProgressMock).not.toHaveBeenCalled()
   })
 
-  it('polls once per day and never forces past the caches', async () => {
+  it('does not register focus polling in the detached Stardust edition', () => {
     startUpdatePoller()
-    await vi.advanceTimersByTimeAsync(0)
-    expect(checkMock).toHaveBeenCalledWith({ force: false })
-    checkMock.mockClear()
 
-    await vi.advanceTimersByTimeAsync(BACKGROUND_UPDATE_CHECK_MS - 1)
+    expect(listeners).toEqual({})
     expect(checkMock).not.toHaveBeenCalled()
-
-    await vi.advanceTimersByTimeAsync(1)
-    expect(checkMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('window focus only re-checks once the daily cadence has elapsed', async () => {
-    startUpdatePoller()
-    await vi.advanceTimersByTimeAsync(0)
-    checkMock.mockClear()
-
-    // Invoke the registered focus handler directly (the mock window doesn't
-    // propagate DOM events, so call the stored listener).
-    listeners['focus']?.()
-    await vi.advanceTimersByTimeAsync(0)
-    expect(checkMock).not.toHaveBeenCalled()
-
-    vi.setSystemTime(Date.now() + BACKGROUND_UPDATE_CHECK_MS)
-    listeners['focus']?.()
-    await vi.advanceTimersByTimeAsync(0)
-    expect(checkMock).toHaveBeenCalledTimes(1)
   })
 })
