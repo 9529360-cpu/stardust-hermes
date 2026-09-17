@@ -1,4 +1,4 @@
-# nix/desktop.nix — Hermes Desktop (Electron) app build + wrapper
+# nix/desktop.nix — Stardust Desktop (Electron) app build + compatibility wrapper
 #
 # `hermesAgent` is the fully-built `.#default` package — it ships the
 # `hermes` binary with the venv, runtime PATH, bundled skills/plugins, etc.
@@ -208,8 +208,8 @@ stdenv.mkDerivation {
   };
 
   meta = with lib; {
-    description = "Native Electron desktop shell for Hermes Agent";
-    homepage = "https://github.com/NousResearch/hermes-agent";
+    description = "Stardust personal-assistant desktop built on the Hermes Agent foundation";
+    homepage = "https://github.com/9529360-cpu/stardust-hermes";
     license = licenses.mit;
     platforms = platforms.unix;
     mainProgram = "hermes-desktop";
