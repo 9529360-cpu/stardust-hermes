@@ -157,8 +157,8 @@ function OAuthPicker({
 
   const select = (p: OAuthProvider) => startManualProviderOAuth(p.id, profile)
 
-  // The free tier holds a token but no account: it is never "connected"; the featured Nous row
-  // names it (Nous · free tier) and offers the sign-in that keeps its connectors.
+  // sortProviders already removes the inherited guest/unlogged Nous rows. Existing real
+  // Nous accounts stay ordinary connected rows; Stardust has no built-in featured account.
   const isConnected = (p: OAuthProvider) => Boolean(p.status?.logged_in) && p.status?.free_tier !== true
   const featured = ordered.find(p => p.id === FEATURED_ID && !isConnected(p)) ?? null
   const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered

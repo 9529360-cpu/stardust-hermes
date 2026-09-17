@@ -532,7 +532,9 @@ function Header() {
   )
 }
 
-export const FEATURED_ID = 'nous'
+// Stardust Desktop deliberately has no built-in or recommended account.
+// Keep a sentinel while the shared featured-card plumbing is still used by Settings.
+export const FEATURED_ID = '__stardust_no_featured_provider__'
 const SHOW_ALL_KEY = 'hermes-onboarding-show-all-v1'
 
 const readShowAll = () => {
@@ -600,10 +602,9 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const select = (p: OAuthProvider) => void startProviderOAuth(p, ctx)
   const featured = ordered.find(p => p.id === FEATURED_ID) ?? null
   const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-  // Collapse the secondary providers behind a disclosure whenever Nous Portal
-  // is present to anchor the choice — otherwise show the full list. The
-  // Fireworks/OpenRouter key rows always live behind the disclosure, so the
-  // toggle is warranted even when there are no other OAuth providers.
+  // Stardust has no featured built-in provider, so first-run stays a flat list and
+  // every provider/key choice remains visible. Keep this branch for shared compatibility
+  // until the featured-card plumbing is removed.
   const collapsible = Boolean(featured)
   const showRest = !collapsible || showAll
 
