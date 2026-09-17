@@ -62,7 +62,6 @@ import {
   SIDEBAR_MAX_WIDTH
 } from '@/store/layout'
 import { runExportProfileFlow, runImportProfileFlow } from '@/store/profile-share'
-import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import {
   $reviewOpen,
   $reviewScopeCwd,
@@ -71,6 +70,7 @@ import {
   openReview,
   REVIEW_PANE_ID
 } from '@/store/review'
+import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import { $currentCwd, $selectedStoredSessionId, $sessions, $yoloActive, sessionMatchesStoredId } from '@/store/session'
 import { watchSessionPins } from '@/store/session-pin-sync'
 import { $botChatScopes } from '@/store/session-states'

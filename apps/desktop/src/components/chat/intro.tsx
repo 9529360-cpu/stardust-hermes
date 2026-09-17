@@ -76,7 +76,10 @@ export function Intro({ personality: _personality, seed: _seed }: IntroProps) {
   const assistant = ASSISTANT_COPY[locale]
 
   return (
-    <div className="assistant-home mx-auto flex w-full max-w-2xl flex-col items-center px-5 py-8 text-center" data-slot="aui_intro">
+    <div
+      className="assistant-home mx-auto flex w-full max-w-2xl flex-col items-center px-5 py-8 text-center"
+      data-slot="aui_intro"
+    >
       <div aria-hidden className="assistant-home__mark">
         <Sun className="size-5" />
       </div>
@@ -86,9 +89,7 @@ export function Intro({ personality: _personality, seed: _seed }: IntroProps) {
       <h1 className="mt-2 text-balance text-2xl font-semibold tracking-[-0.035em] text-(--ui-text-primary) sm:text-[1.75rem]">
         {assistant.headline}
       </h1>
-      <p className="mt-2 max-w-xl text-pretty text-sm leading-6 text-(--ui-text-tertiary)">
-        {assistant.body}
-      </p>
+      <p className="mt-2 max-w-xl text-pretty text-sm leading-6 text-(--ui-text-tertiary)">{assistant.body}</p>
       <div className="mt-7 grid w-full gap-2.5 sm:grid-cols-3" data-testid="assistant-quick-actions">
         {assistant.actions.map(([label, prompt]) => (
           <Button

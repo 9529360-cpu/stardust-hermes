@@ -53,7 +53,11 @@ const TERMINAL_TREE = split(
 const QUAD_TREE = split(
   'column',
   [
-    split('row', [group(['sessions', 'files']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])], [1, 3, 1.1]),
+    split(
+      'row',
+      [group(['sessions', 'files']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
+      [1, 3, 1.1]
+    ),
     split('row', [group(['terminal']), group(['review'])], [1.4, 1])
   ],
   [3, 1]

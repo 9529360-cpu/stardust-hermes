@@ -22,7 +22,9 @@ const PERSONAL_LAYOUT_VERSION_KEY = 'hermes.desktop.personalLayoutVersion'
 function Card({ children, title }: { children: ReactNode; title: string }) {
   return (
     <section className="rounded-xl border border-(--ui-stroke-tertiary) bg-(--ui-widget-surface-background) px-3 py-3 shadow-[inset_0_1px_0_color-mix(in_srgb,white_5%,transparent)]">
-      <div className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-(--ui-text-tertiary)">{title}</div>
+      <div className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-(--ui-text-tertiary)">
+        {title}
+      </div>
       {children}
     </section>
   )
@@ -49,6 +51,7 @@ export function WorkspaceOverview() {
   const session = selectedStoredSessionId
     ? sessions.find(candidate => sessionMatchesStoredId(candidate, selectedStoredSessionId))
     : undefined
+
   const working = session ? workingSessionIds.includes(session.id) : workingSessionIds.length > 0
   const sessionLabel = session ? storedSessionTitle(session) : NEW_SESSION_TITLE
   const normalizedCwd = cwd.replace(/[/\\]+$/, '')
@@ -59,6 +62,7 @@ export function WorkspaceOverview() {
   const staged = repoStatus?.staged ?? changedFiles.filter(file => file.staged).length
   const additions = repoStatus?.added ?? 0
   const removals = repoStatus?.removed ?? 0
+
   const summary = !cwd
     ? 'Choose a project to give this workspace persistent file and review context.'
     : working
@@ -81,7 +85,9 @@ export function WorkspaceOverview() {
           <span className="truncate">{projectName}</span>
           {repoStatus?.branch && (
             <>
-              <span aria-hidden="true" className="text-(--ui-text-quaternary)">/</span>
+              <span aria-hidden="true" className="text-(--ui-text-quaternary)">
+                /
+              </span>
               <span className="truncate font-mono text-(--ui-text-quaternary)">{repoStatus.branch}</span>
             </>
           )}
@@ -105,7 +111,9 @@ export function WorkspaceOverview() {
                 <span className="rounded-full border border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) px-1.5 py-0.5 text-[0.62rem] font-medium text-(--ui-text-secondary)">
                   {working ? 'Working' : 'Ready'}
                 </span>
-                {session?.model && <span className="max-w-full truncate font-mono text-(--ui-text-quaternary)">{session.model}</span>}
+                {session?.model && (
+                  <span className="max-w-full truncate font-mono text-(--ui-text-quaternary)">{session.model}</span>
+                )}
               </div>
             </div>
           </div>
@@ -132,7 +140,9 @@ export function WorkspaceOverview() {
         <Card title="Files touched">
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="text-sm text-(--ui-text-primary)">
-              {changedCount === 0 ? 'Working tree clean' : `${changedCount} file${changedCount === 1 ? '' : 's'} changed`}
+              {changedCount === 0
+                ? 'Working tree clean'
+                : `${changedCount} file${changedCount === 1 ? '' : 's'} changed`}
             </span>
             {changedCount > 0 && (
               <button
@@ -168,7 +178,9 @@ export function WorkspaceOverview() {
                 </button>
               ))}
               {changedFiles.length > 5 && (
-                <div className="px-1.5 pt-1 text-[0.64rem] text-(--ui-text-quaternary)">+{changedFiles.length - 5} more</div>
+                <div className="px-1.5 pt-1 text-[0.64rem] text-(--ui-text-quaternary)">
+                  +{changedFiles.length - 5} more
+                </div>
               )}
             </div>
           ) : (
@@ -203,7 +215,10 @@ export function WorkspaceOverview() {
             <div className="mt-2 border-t border-(--ui-stroke-quaternary) pt-2">
               <Metric label="Session" value={working ? 'In progress' : 'Idle'} />
               <Metric label="Working tree" value={changedCount === 0 ? 'Clean' : `${changedCount} changed`} />
-              <Metric label="Review state" value={staged > 0 ? `${staged} staged` : changedCount > 0 ? 'Not staged' : 'Nothing pending'} />
+              <Metric
+                label="Review state"
+                value={staged > 0 ? `${staged} staged` : changedCount > 0 ? 'Not staged' : 'Nothing pending'}
+              />
             </div>
           )}
         </Card>

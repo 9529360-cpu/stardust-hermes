@@ -1,3 +1,5 @@
+import './personal-product-nav.css'
+
 import { useStore } from '@nanostores/react'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
@@ -6,9 +8,9 @@ import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 
-import { CRON_ROUTE, SETTINGS_ROUTE, type AppView } from '../routes'
+import { type AppView, CRON_ROUTE, SETTINGS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
-import './personal-product-nav.css'
+
 import { WORKSPACE_OVERVIEW_PANE_ID } from './workspace-overview'
 
 const PRODUCT_NAV_COPY = {
@@ -53,7 +55,9 @@ function ProductNavButton({ active = false, expanded = false, icon, label, onCli
     >
       <Codicon className="shrink-0" name={icon} size="0.88rem" />
       <span className="truncate">{label}</span>
-      {expanded && !active && <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-(--theme-midground)" />}
+      {expanded && !active && (
+        <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-(--theme-midground)" />
+      )}
     </button>
   )
 }
@@ -100,8 +104,18 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
     >
       <ProductNavButton active={currentView === 'chat'} icon="home" label={copy.home} onClick={openHome} />
       <ProductNavButton active={currentView === 'cron'} icon="checklist" label={copy.tasks} onClick={openTasks} />
-      <ProductNavButton expanded={rightContextOpen} icon="layout-sidebar-right" label={copy.workspace} onClick={openWorkspace} />
-      <ProductNavButton active={currentView === 'settings'} icon="settings-gear" label={copy.settings} onClick={openSettings} />
+      <ProductNavButton
+        expanded={rightContextOpen}
+        icon="layout-sidebar-right"
+        label={copy.workspace}
+        onClick={openWorkspace}
+      />
+      <ProductNavButton
+        active={currentView === 'settings'}
+        icon="settings-gear"
+        label={copy.settings}
+        onClick={openSettings}
+      />
     </nav>
   )
 }

@@ -5,8 +5,8 @@ import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
 
 import { setFileBrowserOpen, setSidebarOpen } from './layout'
-import { setRightContextOpen } from './right-context'
 import { openReview } from './review'
+import { setRightContextOpen } from './right-context'
 
 // Explicit-request pane reveals, keyed to the backend `focus_pane` tool. Each
 // entry drives the pane's own reveal path (some are toggle-bound) so a revealed
