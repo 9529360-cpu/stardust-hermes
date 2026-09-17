@@ -4,11 +4,11 @@ This module classifies tool calls into three product-level postures:
 
 ``allow``   - read-only / planning work may run silently.
 ``notify``  - reversible local or Stardust-internal mutations may run, but belong in the completion report.
-``confirm`` - consequential external effects must cross the existing human approval gate first.
+``confirm`` - consequential external effects must cross a human approval boundary first.
 
-The policy is intentionally narrow in v1: it is active for Desktop personal-assistant sessions and
-for durable Kanban worker lineages. Existing tool-specific safety checks (notably terminal dangerous-
-command approval) remain authoritative and are not duplicated here.
+Desktop turns reuse the existing interactive approval gate. Durable background workers cannot wait on
+that process-local gate, so high-risk calls are paused into the task's durable approval handoff instead.
+Existing tool-specific safety checks (notably terminal dangerous-command approval) remain authoritative.
 """
 
 from __future__ import annotations
@@ -106,13 +106,25 @@ def _session_identities() -> tuple[str, str]:
 
 
 def personal_assistant_permissions_active() -> bool:
-    """Whether the first-party personal-assistant permission policy owns this call.
-
-    Desktop is the interactive coordinator surface. A Kanban task marker activates the same policy
-    for the whole durable worker lineage so moving work into the background cannot weaken safety.
-    Other inherited CLI/TUI/messaging surfaces keep their established behavior for compatibility.
-    """
+    """Whether the first-party personal-assistant permission policy owns this call."""
     return "desktop" in _session_identities() or bool(os.environ.get("HERMES_KANBAN_TASK"))
+
+
+def _durable_worker_confirmation_active() -> bool:
+    """True only for the dispatcher-owned Kanban worker, never a nested delegate child."""
+    if not os.environ.get("HERMES_KANBAN_TASK"):
+        return False
+    try:
+        from agent.delegation_context import (
+            is_delegated_child_context,
+            is_dispatcher_owned_worker_context,
+        )
+
+        return not is_delegated_child_context() and is_dispatcher_owned_worker_context()
+    except Exception:
+        # A missing lineage probe must not downgrade a durable worker to process-local approval.
+        # The durable handoff itself will fail closed if this is not a legitimate task owner.
+        return True
 
 
 def _decision(level: str, reason: str, category: str = "", tool_name: str = "", action: str = "") -> PermissionDecision:
@@ -156,7 +168,7 @@ def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] =
         return _decision(NOTIFY, "Updates Stardust's durable task state; proceed and report the change.")
 
     if name == "background_task":
-        if action in {"status", "list"}:
+        if action in {"status", "list", "approvals"}:
             return _decision(ALLOW, "Reads durable background-task state only.")
         return _decision(NOTIFY, "Updates Stardust's durable background-task state; proceed and report the change.")
 
@@ -233,10 +245,33 @@ def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] =
 
 
 def pre_tool_call_directive(tool_name: str, args: Optional[Mapping[str, Any]] = None) -> Optional[dict[str, str]]:
-    """Return a ``pre_tool_call`` approval directive for high-risk personal-assistant calls."""
+    """Resolve the first-party permission decision into an execution directive."""
     if not personal_assistant_permissions_active():
         return None
     decision = classify_tool_permission(tool_name, args)
     if decision.level != CONFIRM:
         return None
+
+    if _durable_worker_confirmation_active():
+        try:
+            from tools.background_task_approval import authorize_or_block_current_worker
+
+            result = authorize_or_block_current_worker(
+                tool_name,
+                args,
+                reason=decision.reason,
+                rule_key=decision.rule_key,
+            )
+        except Exception:
+            return {
+                "action": "block",
+                "message": (
+                    "BLOCKED: Stardust could not persist the required background-task approval. "
+                    "The action was not executed; do not retry through another route."
+                ),
+            }
+        if result.allowed:
+            return None
+        return {"action": "block", "message": result.message}
+
     return {"action": "approve", "message": decision.reason, "rule_key": decision.rule_key}
