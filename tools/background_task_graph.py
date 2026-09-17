@@ -2,8 +2,8 @@
 
 The public surface uses logical task keys and ``depends_on`` keys. This module translates those into
 one transaction in the existing durable task kernel; it owns no scheduler, queue, or worker state itself.
-Independent nodes land ``ready`` together, dependency-gated nodes land ``todo`` until their parents
-complete, and every created node is subscribed to the originating assistant session when possible.
+Independent nodes become runnable together, dependency-gated nodes wait until their parents complete,
+and every created node is subscribed to the originating assistant session when possible.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import re
 from collections import deque
 from typing import Any, Mapping
 
+from tools.background_task_state import project_background_state
 from tools.registry import no_cache_check_fn, registry, tool_error
 
 
@@ -46,7 +47,7 @@ def _with_final_report(raw_tasks: Any, final_report: Any) -> tuple[Any, str | No
     if not isinstance(final_report, Mapping):
         raise ValueError("final_report must be an object when provided")
     if not isinstance(raw_tasks, list) or not raw_tasks:
-        return raw_tasks, None  # normal validation owns the empty/malformed error
+        return raw_tasks, None
 
     copied = [dict(item) if isinstance(item, Mapping) else item for item in raw_tasks]
     keys = [
@@ -111,7 +112,6 @@ def _normalize_tasks(raw_tasks: Any) -> tuple[dict[str, dict[str, Any]], list[st
         if missing:
             raise ValueError(f"task {key} depends on unknown task key(s): {', '.join(missing)}")
 
-    # Stable Kahn order: preserves caller order among simultaneously-ready nodes.
     position = {key: index for index, key in enumerate(order)}
     indegree = {key: len(specs[key]["depends_on"]) for key in order}
     children: dict[str, list[str]] = {key: [] for key in order}
@@ -189,8 +189,6 @@ def start_graph(
 
     ids: dict[str, str] = {}
     with _board(None) as (kb, conn):
-        # create_task explicitly supports nested writes so this outer transaction is the visibility
-        # boundary: the dispatcher sees the whole graph or none of it.
         with kb.write_txn(conn):
             for key in topo:
                 spec = specs[key]
@@ -231,11 +229,15 @@ def start_graph(
             task_id = ids[key]
             subscriptions[key] = bool(_maybe_auto_subscribe(conn, task_id))
             task = kb.get_task(conn, task_id)
+            kernel_status = task.status if task else ""
             nodes.append({
                 "key": key,
                 "task_id": task_id,
                 "title": specs[key]["title"],
-                "status": task.status if task else None,
+                "state": project_background_state(
+                    kernel_status,
+                    dependencies=specs[key]["depends_on"],
+                ),
                 "depends_on": list(specs[key]["depends_on"]),
             })
 
@@ -328,6 +330,7 @@ BACKGROUND_TASK_GRAPH_SCHEMA = {
         "call low-level task-kernel/link tools for the same plan. All nodes share the existing durable scheduler and "
         "retry kernel. When the user expects one combined completion summary, provide final_report: Stardust adds one "
         "fan-in reporting task that waits for every current leaf and receives their result handoffs. "
+        "Returned task states use personal-assistant vocabulary (queued/running/waiting_*/completed/failed/cancelled). "
         "notification_mode=automatic means every node has a persisted completion/block route; partial/manual means do "
         "not promise complete automatic reporting."
     ),
