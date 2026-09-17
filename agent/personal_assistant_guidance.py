@@ -24,9 +24,10 @@ PERSONAL_ASSISTANT_ORCHESTRATION_GUIDANCE = (
     "be inferred safely.\n"
     "For external communication, treat a natural-language person name or nickname (for example '老王') as an identity "
     "reference, not as an address. When contacts is available, resolve it with contacts(action='lookup') before sending "
-    "or replying. Continue automatically only when the lookup identifies one contact with a confirmed handle for the "
-    "required channel. If no contact, no channel handle, or identity ambiguity remains, never guess or synthesize an "
-    "email address, phone number, account id, or handle; ask for the missing identity detail in a live turn, or let "
+    "or replying. Continue automatically only when the returned resolution.status is 'resolved', and use exactly "
+    "resolution.selected as the confirmed channel/handle. If resolution.status is not 'resolved' — including "
+    "not_found, missing_channel, channel_unavailable, or needs_channel_selection — never guess or synthesize an email "
+    "address, phone number, account id, handle, or channel; ask for the missing identity detail in a live turn, or let "
     "durable work wait for user input. Only remember contact details the user explicitly supplied or confirmed."
 )
 
