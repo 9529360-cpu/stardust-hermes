@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS contact_channels (
     contact_id  TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
     channel     TEXT NOT NULL,
     handle      TEXT NOT NULL,
-    label       TEXT,
     created_at  INTEGER NOT NULL,
     UNIQUE (channel, handle),
     UNIQUE (contact_id, channel)
@@ -107,10 +106,9 @@ def connect_closing(db_path: Optional[Path] = None):
 class ContactChannel:
     channel: str
     handle: str
-    label: Optional[str] = None
 
     def to_dict(self) -> dict:
-        return {"channel": self.channel, "handle": self.handle, "label": self.label}
+        return {"channel": self.channel, "handle": self.handle}
 
 
 @dataclass(frozen=True)
@@ -144,8 +142,10 @@ def _load_contact(conn: sqlite3.Connection, row: sqlite3.Row) -> Contact:
         "SELECT alias FROM contact_aliases WHERE contact_id = ? ORDER BY created_at, alias_key",
         (row["id"],),
     ).fetchall()
+    # Older development DBs may still carry an unused ``label`` column. Selecting only the two
+    # authoritative fields keeps the read path compatible without retaining that field in the model.
     channels = conn.execute(
-        "SELECT channel, handle, label FROM contact_channels WHERE contact_id = ? ORDER BY channel",
+        "SELECT channel, handle FROM contact_channels WHERE contact_id = ? ORDER BY channel",
         (row["id"],),
     ).fetchall()
     return Contact(
@@ -157,7 +157,7 @@ def _load_contact(conn: sqlite3.Connection, row: sqlite3.Row) -> Contact:
         created_at=int(row["created_at"]),
         updated_at=int(row["updated_at"]),
         aliases=tuple(item["alias"] for item in aliases),
-        channels=tuple(ContactChannel(item["channel"], item["handle"], item["label"]) for item in channels),
+        channels=tuple(ContactChannel(item["channel"], item["handle"]) for item in channels),
     )
 
 
@@ -262,8 +262,7 @@ def remember_contact(
                 (contact_id, channel),
             )
             conn.execute(
-                "INSERT INTO contact_channels (contact_id, channel, handle, label, created_at) "
-                "VALUES (?, ?, ?, NULL, ?)",
+                "INSERT INTO contact_channels (contact_id, channel, handle, created_at) VALUES (?, ?, ?, ?)",
                 (contact_id, channel, handle, now),
             )
 
