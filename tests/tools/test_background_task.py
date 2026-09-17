@@ -80,9 +80,14 @@ def test_read_and_mutation_actions_route_to_existing_kanban_handlers(monkeypatch
 
     def dispatch(name, payload, kwargs):
         calls.append((name, dict(payload)))
-        return json.dumps({"ok": True})
+        if name == "kanban_show":
+            return json.dumps({"task": {"id": "t1", "status": "running"}})
+        if name == "kanban_list":
+            return json.dumps({"tasks": [], "count": 0, "limit": 5, "truncated": False})
+        return json.dumps({"ok": True, "task_id": "t1"})
 
     monkeypatch.setattr(bt, "_dispatch_kanban", dispatch)
+    monkeypatch.setattr(bt, "_pending_approvals", lambda _task_id: [])
 
     registry.dispatch("background_task", {"action": "status", "task_id": "t1"})
     registry.dispatch("background_task", {"action": "list", "status": "running", "limit": 5})
@@ -95,6 +100,74 @@ def test_read_and_mutation_actions_route_to_existing_kanban_handlers(monkeypatch
         ("kanban_comment", {"task_id": "t1", "body": "note"}),
         ("kanban_unblock", {"task_id": "t1"}),
     ]
+
+
+def test_status_projects_kernel_state_without_worker_internals(monkeypatch):
+    raw = {
+        "task": {
+            "id": "t1", "title": "Prepare client pack", "status": "blocked",
+            "priority": 7, "assignee": "worker-a", "workspace_path": "C:/secret/worktree",
+            "current_run_id": 99, "result": None, "created_at": 100, "started_at": 110,
+        },
+        "parents": ["parent-1"],
+        "children": ["child-1"],
+        "comments": [{"author": "worker-a", "body": "internal note"}],
+        "worker_context": "INTERNAL WORKER PROMPT",
+        "events": [
+            {"kind": "assistant_approval_requested", "payload": {"approval_id": "apr-1"}},
+            {"kind": "blocked", "payload": {"reason": "Waiting for user approval apr-1 before send_message."}},
+        ],
+        "runs": [{
+            "id": 99, "profile": "worker-a", "status": "ended", "outcome": "blocked",
+            "summary": "draft ready", "metadata": {"secret": "no"}, "started_at": 110, "ended_at": 120,
+        }],
+    }
+    monkeypatch.setattr(bt, "_dispatch_kanban", lambda *_args, **_kwargs: json.dumps(raw))
+    monkeypatch.setattr(bt, "_pending_approvals", lambda _task_id: [{
+        "approval_id": "apr-1", "tool_name": "send_message", "reason": "Send client reply",
+        "requested_at": 120, "state": "pending",
+    }])
+
+    result = json.loads(registry.dispatch(
+        "background_task", {"action": "status", "task_id": "t1"}
+    ))
+
+    assert result["kind"] == "background_task"
+    assert result["task_id"] == "t1"
+    assert result["status"] == "blocked"
+    assert result["dependencies"] == ["parent-1"]
+    assert result["dependents"] == ["child-1"]
+    assert result["needs_user_input"] is True
+    assert result["pending_approvals"][0]["approval_id"] == "apr-1"
+    assert result["latest_attempt"]["summary"] == "draft ready"
+    encoded = json.dumps(result)
+    for internal in ("worker_context", "workspace_path", "current_run_id", "assignee", "profile", "metadata"):
+        assert internal not in encoded
+
+
+def test_list_projects_compact_background_task_summaries(monkeypatch):
+    raw = {
+        "tasks": [{
+            "id": "t1", "title": "Prepare report", "status": "running", "priority": 3,
+            "assignee": "worker-a", "workspace_path": "/private/worktree", "current_run_id": 5,
+            "parent_count": 1, "child_count": 2, "project_id": "proj-1", "created_at": 100,
+        }],
+        "count": 1, "limit": 20, "truncated": False, "next_limit": None, "promoted": ["x"],
+    }
+    monkeypatch.setattr(bt, "_dispatch_kanban", lambda *_args, **_kwargs: json.dumps(raw))
+
+    result = json.loads(registry.dispatch(
+        "background_task", {"action": "list", "limit": 20}
+    ))
+
+    assert result["kind"] == "background_task_list"
+    assert result["tasks"] == [{
+        "task_id": "t1", "title": "Prepare report", "status": "running", "priority": 3,
+        "created_at": 100, "dependency_count": 1, "dependent_count": 2, "project_id": "proj-1",
+    }]
+    encoded = json.dumps(result)
+    for internal in ("assignee", "workspace_path", "current_run_id", "promoted"):
+        assert internal not in encoded
 
 
 def test_approval_actions_use_durable_approval_owner(monkeypatch):
@@ -112,6 +185,18 @@ def test_approval_actions_use_durable_approval_owner(monkeypatch):
         ))
         assert result["action"] == action
     assert [item[1] for item in calls] == ["approvals", "approve", "deny"]
+
+
+def test_approval_projection_hides_hash_and_rule_key():
+    projected = bt._public_approval({
+        "approval_id": "apr-1", "tool_name": "send_message", "reason": "Send reply",
+        "requested_at": 10, "state": "pending", "args_sha256": "secret-hash",
+        "rule_key": "stardust:external-write:send_message",
+    })
+    assert projected == {
+        "approval_id": "apr-1", "tool_name": "send_message", "reason": "Send reply",
+        "requested_at": 10, "state": "pending",
+    }
 
 
 def test_cancel_uses_kernel_cancel_path(monkeypatch):
@@ -195,6 +280,14 @@ def test_background_task_permission_semantics_match_action():
 
 def test_assistant_orchestration_toolset_contains_background_task():
     assert "background_task" in resolve_toolset("assistant_orchestration")
+
+
+def test_schema_teaches_three_way_routing_without_kanban_vocabulary():
+    description = bt.BACKGROUND_TASK_SCHEMA["description"]
+    assert "ordinary questions directly" in description
+    assert "finish in this live turn" in description
+    assert "scheduled/recurring" in description
+    assert "kanban" not in description.lower()
 
 
 def test_configured_default_assignee_wins_over_active_profile(monkeypatch):
