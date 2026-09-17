@@ -2,7 +2,8 @@
 
 ``background_task`` is intentionally a narrow intention-level surface. It owns no task state and
 runs no workers itself; every operation delegates to the existing Kanban kernel so task identity,
-dependencies, retries, subscriptions, workspaces, cancellation, and dispatcher semantics keep one owner.
+dependencies, retries, subscriptions, workspaces, cancellation, approvals, and dispatcher semantics
+keep one owner.
 """
 from __future__ import annotations
 
@@ -14,8 +15,8 @@ from hermes_cli.config import cfg_get, load_config_readonly
 from tools.registry import no_cache_check_fn, registry, tool_error
 
 
-_READ_ACTIONS = frozenset({"status", "list"})
-_MUTATING_ACTIONS = frozenset({"start", "comment", "resume", "cancel"})
+_READ_ACTIONS = frozenset({"status", "list", "approvals"})
+_MUTATING_ACTIONS = frozenset({"start", "comment", "resume", "cancel", "approve", "deny"})
 _ACTIONS = _READ_ACTIONS | _MUTATING_ACTIONS
 
 
@@ -142,6 +143,37 @@ def _cancel_task(task_id: str) -> str:
         }, ensure_ascii=False)
 
 
+def _approval_operation(task_id: str, action: str, args: Mapping[str, Any]) -> str:
+    from tools.background_task_approval import decide_task_approval, list_approvals
+    from tools.kanban_tools import _board
+
+    with _board(None) as (kb, conn):
+        task = kb.get_task(conn, task_id)
+        if task is None:
+            return tool_error(f"unknown background task: {task_id}")
+        if action == "approvals":
+            return json.dumps({
+                "ok": True,
+                "kind": "background_task",
+                "task_id": task_id,
+                "status": task.status,
+                "approvals": list_approvals(conn, task_id, pending_only=True),
+            }, ensure_ascii=False)
+        try:
+            result = decide_task_approval(
+                conn,
+                kb,
+                task_id,
+                decision=action,
+                approval_id=str(args.get("approval_id") or "").strip(),
+                reason=str(args.get("reason") or "").strip(),
+            )
+        except ValueError as exc:
+            return tool_error(str(exc))
+        result["kind"] = "background_task"
+        return json.dumps(result, ensure_ascii=False)
+
+
 def background_task(args: dict[str, Any], **kwargs: Any) -> str:
     """Translate personal-assistant background-task intent onto the durable queue."""
     action = str(args.get("action") or "").strip().lower()
@@ -165,6 +197,8 @@ def background_task(args: dict[str, Any], **kwargs: Any) -> str:
         return _dispatch_kanban("kanban_comment", {"task_id": task_id, "body": body}, kwargs)
     if action == "cancel":
         return _cancel_task(task_id)
+    if action in {"approvals", "approve", "deny"}:
+        return _approval_operation(task_id, action, args)
     return _dispatch_kanban("kanban_unblock", {"task_id": task_id}, kwargs)
 
 
@@ -173,18 +207,19 @@ BACKGROUND_TASK_SCHEMA = {
     "description": (
         "Manage durable personal-assistant background work. Use start when the user should not have to wait and the "
         "work must survive chat/app restarts, retry safely, or participate in dependency/review flows. Use status/list "
-        "to inspect that durable work, comment to add durable context, resume to continue a blocked task, and cancel "
-        "to stop pending/running work (the durable kernel also terminates its live worker). Do not use this for ordinary "
-        "questions, work that will finish in the current turn, or scheduled/recurring triggers. The returned "
-        "subscribed/notification_mode fields are authoritative: promise automatic completion reporting only when "
-        "subscribed=true (notification_mode=automatic)."
+        "to inspect durable work. If a high-risk background action pauses for user consent, use approvals to inspect "
+        "the pending request and approve/deny to record the user's decision; approve resumes the task and the grant is "
+        "valid exactly once for the same resolved tool call. Use comment to add durable context, resume for ordinary "
+        "non-approval blockers, and cancel to stop pending/running work. Do not use this for ordinary questions, work "
+        "that will finish in the current turn, or scheduled/recurring triggers. The returned subscribed/notification_mode "
+        "fields are authoritative: promise automatic completion reporting only when subscribed=true."
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["start", "status", "list", "comment", "resume", "cancel"],
+                "enum": ["start", "status", "list", "approvals", "approve", "deny", "comment", "resume", "cancel"],
                 "description": "Operation to perform on durable background work.",
             },
             "title": {"type": "string", "description": "Short outcome title; required for start."},
@@ -192,7 +227,18 @@ BACKGROUND_TASK_SCHEMA = {
                 "type": "string",
                 "description": "For start: self-contained task specification. For comment: durable comment text.",
             },
-            "task_id": {"type": "string", "description": "Task id for status/comment/resume/cancel."},
+            "task_id": {
+                "type": "string",
+                "description": "Task id for status/approvals/approve/deny/comment/resume/cancel.",
+            },
+            "approval_id": {
+                "type": "string",
+                "description": "Optional pending approval id for approve/deny; omit to decide the latest pending request.",
+            },
+            "reason": {
+                "type": "string",
+                "description": "Optional user-provided reason when denying a pending background approval.",
+            },
             "assignee": {
                 "type": "string",
                 "description": (
