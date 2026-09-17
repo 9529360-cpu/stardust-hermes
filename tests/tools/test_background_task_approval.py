@@ -66,6 +66,33 @@ def test_worker_request_is_durable_deduplicated_and_redacted(running_task):
     assert "args_sha256" in raw_payloads
 
 
+def test_durable_approval_reason_is_force_redacted_before_persist(running_task, monkeypatch):
+    seen = {}
+
+    def redact(value, *, force=False):
+        seen["value"] = value
+        seen["force"] = force
+        return "redacted approval reason"
+
+    monkeypatch.setattr("agent.redact.redact_sensitive_text", redact)
+    requested = _request({"message": "hello"}, reason="send using secret-value")
+    assert requested.allowed is False
+
+    with kbc.connect_closing() as conn:
+        states = approval.list_approvals(conn, running_task)
+        assert states[0]["reason"] == "redacted approval reason"
+        raw_payloads = "\n".join(
+            str(row["payload"] or "")
+            for row in conn.execute(
+                "SELECT payload FROM task_events WHERE task_id = ? AND kind = 'assistant_approval_requested'",
+                (running_task,),
+            ).fetchall()
+        )
+
+    assert seen == {"value": "send using secret-value", "force": True}
+    assert "secret-value" not in raw_payloads
+
+
 def test_approved_exact_call_is_consumed_once(running_task):
     args = {"to": "client@example.test", "message": "approved"}
     requested = _request(args)
