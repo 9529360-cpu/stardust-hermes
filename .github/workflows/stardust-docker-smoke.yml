@@ -80,7 +80,7 @@ jobs:
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           docker run --rm --entrypoint python -e EXPECTED_SHA="$EXPECTED_SHA" stardust-hermes:smoke -c \
-            'import json, os, pathlib; p=json.loads(pathlib.Path("/etc/hermes/image-provenance.json").read_text()); assert p["deployment_kind"] == "image"; assert p["manager"] == "docker"; assert p["revision"] == os.environ["EXPECTED_SHA"]; print(json.dumps(p, sort_keys=True))'
+            'import json, os, pathlib; p=json.loads(pathlib.Path("/etc/hermes/image-provenance.json").read_text()); assert p["deployment_kind"] == "image"; assert p["manager"] == "docker"; assert p["image"] == "stardust-hermes"; assert p["revision"] == os.environ["EXPECTED_SHA"]; print(json.dumps(p, sort_keys=True))'
 
       - name: Verify real container entrypoint reaches CLI
         run: |
