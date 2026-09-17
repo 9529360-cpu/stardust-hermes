@@ -32,12 +32,23 @@ class ExecutionDurability(str, Enum):
     RESTART_SAFE = "restart_safe"
 
 
+class ExecutionRail(str, Enum):
+    """Existing runtime owner that should carry executable work."""
+
+    NONE = "none"
+    CURRENT_SESSION = "current_session"
+    DELEGATION = "delegation"
+    CRON = "cron"
+    KANBAN = "kanban"
+
+
 @dataclass(frozen=True)
 class AssistantExecutionDecision:
     """Serializable decision metadata; execution remains owned by existing rails."""
 
     intent: AssistantIntent
     durability: ExecutionDurability
+    rail: ExecutionRail = ExecutionRail.NONE
     reason: str = ""
     requires_approval: bool = False
     task_id: Optional[str] = None
@@ -47,20 +58,38 @@ class AssistantExecutionDecision:
             raise ValueError("scheduled work must use a restart-safe execution rail")
         if self.intent is AssistantIntent.BACKGROUND and self.durability is ExecutionDurability.TURN:
             raise ValueError("background work cannot be turn-scoped")
-        if self.intent in {AssistantIntent.RESPOND, AssistantIntent.CLARIFY} and self.task_id is not None:
-            raise ValueError("non-execution decisions cannot own a task id")
+        if self.intent in {AssistantIntent.RESPOND, AssistantIntent.CLARIFY}:
+            if self.task_id is not None:
+                raise ValueError("non-execution decisions cannot own a task id")
+            if self.rail is not ExecutionRail.NONE:
+                raise ValueError("non-execution decisions cannot select an execution rail")
+        if self.intent is AssistantIntent.SCHEDULE and self.rail not in {ExecutionRail.CRON, ExecutionRail.KANBAN}:
+            raise ValueError("scheduled work must select a durable execution rail")
 
 
 def default_durability(intent: AssistantIntent) -> ExecutionDurability:
-    """Return the minimum truthful durability for an intent.
-
-    Background delegation is process-local by design. Future/recurring work is
-    restart-safe and must be routed through cron/kanban (or a future durable task
-    owner), never represented as ordinary background delegation.
-    """
+    """Return the minimum truthful durability for an intent."""
 
     if intent is AssistantIntent.BACKGROUND:
         return ExecutionDurability.PROCESS
     if intent is AssistantIntent.SCHEDULE:
         return ExecutionDurability.RESTART_SAFE
     return ExecutionDurability.TURN
+
+
+def default_rail(intent: AssistantIntent) -> ExecutionRail:
+    """Return the existing owner that normally carries this intent.
+
+    Durable work intentionally chooses cron as the simple default; multi-step durable
+    graphs can explicitly select KANBAN. No new task runtime is introduced here.
+    """
+
+    if intent in {AssistantIntent.RESPOND, AssistantIntent.CLARIFY}:
+        return ExecutionRail.NONE
+    if intent is AssistantIntent.EXECUTE:
+        return ExecutionRail.CURRENT_SESSION
+    if intent in {AssistantIntent.DELEGATE, AssistantIntent.BACKGROUND}:
+        return ExecutionRail.DELEGATION
+    if intent is AssistantIntent.SCHEDULE:
+        return ExecutionRail.CRON
+    raise ValueError(f"unsupported assistant intent: {intent!r}")
