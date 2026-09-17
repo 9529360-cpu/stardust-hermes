@@ -3,6 +3,7 @@ import json
 from hermes_cli import assistant_permissions as permissions
 from tools import background_task as bt
 from tools.registry import registry
+from toolsets import resolve_toolset
 
 
 def test_start_defaults_assignee_and_surfaces_delivery_truth(monkeypatch):
@@ -76,6 +77,27 @@ def test_read_and_mutation_actions_route_to_existing_kanban_handlers(monkeypatch
     ]
 
 
+def test_cancel_uses_kernel_cancel_path(monkeypatch):
+    monkeypatch.setattr(
+        bt,
+        "_cancel_task",
+        lambda task_id: json.dumps({
+            "ok": True, "kind": "background_task", "task_id": task_id,
+            "status": "archived", "cancelled": True,
+        }),
+    )
+    result = json.loads(registry.dispatch(
+        "background_task", {"action": "cancel", "task_id": "t1"}
+    ))
+    assert result == {
+        "ok": True,
+        "kind": "background_task",
+        "task_id": "t1",
+        "status": "archived",
+        "cancelled": True,
+    }
+
+
 def test_invalid_background_task_requests_fail_before_dispatch(monkeypatch):
     monkeypatch.setattr(
         bt,
@@ -85,12 +107,14 @@ def test_invalid_background_task_requests_fail_before_dispatch(monkeypatch):
 
     missing_title = json.loads(registry.dispatch("background_task", {"action": "start"}))
     missing_id = json.loads(registry.dispatch("background_task", {"action": "status"}))
+    missing_cancel_id = json.loads(registry.dispatch("background_task", {"action": "cancel"}))
     missing_comment = json.loads(registry.dispatch(
         "background_task", {"action": "comment", "task_id": "t1"}
     ))
 
     assert "title" in missing_title["error"]
     assert "task_id" in missing_id["error"]
+    assert "task_id" in missing_cancel_id["error"]
     assert "body" in missing_comment["error"]
 
 
@@ -101,10 +125,14 @@ def test_background_task_permission_semantics_match_action():
     assert permissions.classify_tool_permission(
         "background_task", {"action": "list"}
     ).level == permissions.ALLOW
-    for action in ("start", "comment", "resume"):
+    for action in ("start", "comment", "resume", "cancel"):
         assert permissions.classify_tool_permission(
             "background_task", {"action": action}
         ).level == permissions.NOTIFY
+
+
+def test_assistant_orchestration_toolset_contains_background_task():
+    assert "background_task" in resolve_toolset("assistant_orchestration")
 
 
 def test_configured_default_assignee_wins_over_active_profile(monkeypatch):
