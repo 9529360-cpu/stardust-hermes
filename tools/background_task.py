@@ -77,11 +77,11 @@ def _default_assignee() -> str:
 
 @no_cache_check_fn
 def _check_background_task_mode() -> bool:
-    """Match the existing orchestrator gate; capability remains session-scoped to Desktop."""
+    """Expose the product facade only when personal-assistant orchestration was selected."""
     try:
-        from tools.kanban_tools import _check_kanban_orchestrator_mode
+        from tools.kanban_toolset_context import assistant_orchestration_requested
 
-        return bool(_check_kanban_orchestrator_mode())
+        return assistant_orchestration_requested() is True
     except Exception:
         return False
 
