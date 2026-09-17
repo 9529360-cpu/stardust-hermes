@@ -3,11 +3,11 @@
   "productName": "Hermes",
   "private": true,
   "version": "0.17.3",
-  "description": "Native desktop shell for Hermes Agent.",
-  "author": "Nous Research",
+  "description": "Stardust personal-assistant desktop built on the Hermes Agent foundation.",
+  "author": "Stardust",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NousResearch/hermes-agent.git"
+    "url": "git+https://github.com/9529360-cpu/stardust-hermes.git"
   },
   "type": "module",
   "main": "dist/electron-main.mjs",
@@ -91,7 +91,7 @@
     "@codemirror/view": "6.43.6",
     "@dnd-kit/core": "6.3.1",
     "@dnd-kit/sortable": "10.0.0",
-    "@dnd-kit/utilities": "3.2.2",
+    "@dnd-kit/utilities": "3.2.1",
     "@hermes/shared": "file:../shared",
     "@icons-pack/react-simple-icons": "13.11.1",
     "@lezer/highlight": "1.2.3",
@@ -165,7 +165,6 @@
     "@testing-library/react": "16.3.2",
     "@types/babel__core": "7.20.5",
     "@types/d3-force": "3.0.10",
-    "@types/hast": "3.0.5",
     "@types/node": "22.20.1",
     "@types/qrcode": "1.5.6",
     "@types/react": "19.2.17",
@@ -194,7 +193,7 @@
     "executableName": "Hermes",
     "protocols": [
       {
-        "name": "Hermes Protocol",
+        "name": "Stardust Protocol",
         "schemes": [
           "hermes"
         ]
@@ -236,19 +235,19 @@
       "entitlements": "electron/entitlements.mac.plist",
       "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "extendInfo": {
-        "CFBundleDisplayName": "Hermes",
+        "CFBundleDisplayName": "Stardust",
         "CFBundleExecutable": "Hermes",
         "CFBundleName": "Hermes",
-        "NSAudioCaptureUsageDescription": "Hermes uses audio capture for voice conversations.",
-        "NSCameraUsageDescription": "Hermes uses the camera when a plugin or feature you enable requests it.",
-        "NSMicrophoneUsageDescription": "Hermes uses the microphone for voice input and voice conversations.",
-        "NSCalendarsUsageDescription": "Hermes needs access to Calendar to provide requested meeting and scheduling support.",
-        "NSCalendarsFullAccessUsageDescription": "Hermes needs full access to Calendar to read and manage events when explicitly requested.",
-        "NSRemindersUsageDescription": "Hermes needs access to Reminders to provide requested personal-assistant and scheduling support.",
-        "NSRemindersFullAccessUsageDescription": "Hermes needs full access to Reminders to read and manage reminders when explicitly requested.",
-        "NSScreenCaptureUsageDescription": "Hermes captures the screen when you ask the agent to screenshot or record it.",
-        "NSLocalNetworkUsageDescription": "Hermes connects to devices on your local network when a plugin or feature you enable requests it.",
-        "NSAppleMusicUsageDescription": "Hermes accesses your music library when a plugin or feature you enable requests it."
+        "NSAudioCaptureUsageDescription": "Stardust uses audio capture for voice conversations.",
+        "NSCameraUsageDescription": "Stardust uses the camera when a plugin or feature you enable requests it.",
+        "NSMicrophoneUsageDescription": "Stardust uses the microphone for voice input and voice conversations.",
+        "NSCalendarsUsageDescription": "Stardust needs access to Calendar to provide requested meeting and scheduling support.",
+        "NSCalendarsFullAccessUsageDescription": "Stardust needs full access to Calendar to read and manage events when explicitly requested.",
+        "NSRemindersUsageDescription": "Stardust needs access to Reminders to provide requested personal-assistant and scheduling support.",
+        "NSRemindersFullAccessUsageDescription": "Stardust needs full access to Reminders to read and manage reminders when explicitly requested.",
+        "NSScreenCaptureUsageDescription": "Stardust captures the screen when you ask the agent to screenshot or record it.",
+        "NSLocalNetworkUsageDescription": "Stardust connects to devices on your local network when a plugin or feature you enable requests it.",
+        "NSAppleMusicUsageDescription": "Stardust accesses your music library when a plugin or feature you enable requests it."
       },
       "gatekeeperAssess": false,
       "hardenedRuntime": true,
@@ -258,7 +257,7 @@
       ]
     },
     "dmg": {
-      "title": "Install Hermes",
+      "title": "Install Stardust",
       "backgroundColor": "#f5f5f7",
       "iconSize": 96,
       "window": {
@@ -280,7 +279,7 @@
       ]
     },
     "win": {
-      "legalTrademarks": "Hermes",
+      "legalTrademarks": "Stardust",
       "target": [
         "nsis",
         "msi"
@@ -289,8 +288,8 @@
     },
     "linux": {
       "category": "Development",
-      "maintainer": "Nous Research <support@nousresearch.com>",
-      "synopsis": "Native desktop shell for Hermes Agent.",
+      "maintainer": "Stardust",
+      "synopsis": "Stardust personal-assistant desktop built on the Hermes Agent foundation.",
       "target": [
         "AppImage",
         "deb",
