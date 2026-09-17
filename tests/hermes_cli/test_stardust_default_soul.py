@@ -11,6 +11,8 @@ def test_default_soul_is_stardust_personal_assistant_contract():
     assert DEFAULT_SOUL_MD.startswith("You are Stardust, a long-lived personal AI assistant")
     assert "answer directly instead of turning it into an action workflow" in DEFAULT_SOUL_MD
     assert "use the available tools or delegate bounded work" in DEFAULT_SOUL_MD
+    assert "survive a restart belongs on a durable scheduler or task rail" in DEFAULT_SOUL_MD
+    assert "Never let background work steal the user's focus" in DEFAULT_SOUL_MD
     assert "Hermes Agent, built by Nous Research" not in DEFAULT_SOUL_MD
 
 
