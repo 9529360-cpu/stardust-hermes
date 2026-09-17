@@ -53,6 +53,7 @@ _NOTIFY_TOOLS = frozenset({
     "delegate_task", "cronjob_manage", "desktop_project", "computer_use", "browser_navigate",
     "browser_click", "browser_type", "browser_scroll", "browser_back", "browser_press",
     "browser_dialog", "browser_cdp", "spotify_playback", "spotify_queue", "spotify_library",
+    "background_task_graph",
     "kanban_create", "kanban_link", "kanban_unblock", "kanban_comment", "kanban_complete",
     "kanban_block", "kanban_request_review", "kanban_request_changes", "kanban_heartbeat",
     "kanban_attach", "kanban_attach_url",
