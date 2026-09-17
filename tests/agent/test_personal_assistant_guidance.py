@@ -19,6 +19,9 @@ def test_product_facades_enable_personal_assistant_guidance():
     assert "background_task(action='start')" in guidance
     assert "background_task_graph" in guidance
     assert "contacts(action='lookup')" in guidance
+    assert "resolution.status is 'resolved'" in guidance
+    assert "resolution.selected" in guidance
+    assert "needs_channel_selection" in guidance
     assert "never guess or synthesize" in guidance
     assert "kanban_create" not in guidance
 
