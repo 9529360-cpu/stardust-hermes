@@ -53,6 +53,13 @@ def call_fingerprint(tool_name: str, args: Mapping[str, Any] | None) -> str:
     return hashlib.sha256(material.encode("utf-8", errors="replace")).hexdigest()
 
 
+def _safe_persisted_reason(reason: Any) -> str:
+    """Force-redact durable approval copy before it reaches the task event ledger."""
+    from agent.redact import redact_sensitive_text
+
+    return redact_sensitive_text(str(reason or "Approval required"), force=True).strip()[:500]
+
+
 def _load_events(conn, task_id: str) -> list[dict[str, Any]]:
     placeholders = ",".join("?" for _ in _EVENT_KINDS)
     rows = conn.execute(
@@ -180,7 +187,7 @@ def authorize_or_block_current_worker(
                 pending = _pending_match(states, fingerprint, normalized_tool)
                 if pending is None:
                     approval_id = f"apr-{uuid.uuid4().hex[:12]}"
-                    safe_reason = str(reason or "Approval required").strip()[:500]
+                    safe_reason = _safe_persisted_reason(reason)
                     kb._append_event(conn, task_id, _REQUEST, {
                         "approval_id": approval_id,
                         "tool_name": normalized_tool,
