@@ -1,8 +1,8 @@
 """Desktop personal-assistant facade over the durable Kanban work queue.
 
 ``background_task`` is intentionally a narrow intention-level surface. It owns no task state and
-runs no workers itself; every operation delegates to the existing ``kanban_*`` handlers so task
-identity, dependencies, retries, subscriptions, workspaces, and dispatcher semantics keep one owner.
+runs no workers itself; every operation delegates to the existing Kanban kernel so task identity,
+dependencies, retries, subscriptions, workspaces, cancellation, and dispatcher semantics keep one owner.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from tools.registry import no_cache_check_fn, registry, tool_error
 
 
 _READ_ACTIONS = frozenset({"status", "list"})
-_MUTATING_ACTIONS = frozenset({"start", "comment", "resume"})
+_MUTATING_ACTIONS = frozenset({"start", "comment", "resume", "cancel"})
 _ACTIONS = _READ_ACTIONS | _MUTATING_ACTIONS
 
 
@@ -112,6 +112,36 @@ def _require_task_id(args: Mapping[str, Any], action: str) -> str | None:
     return task_id or None
 
 
+def _cancel_task(task_id: str) -> str:
+    """Cancel through the Kanban kernel so a running worker is terminated after the archive commits."""
+    from tools.kanban_tools import _board
+
+    with _board(None) as (kb, conn):
+        task = kb.get_task(conn, task_id)
+        if task is None:
+            return tool_error(f"unknown background task: {task_id}")
+        if task.status == "archived":
+            return json.dumps({
+                "ok": True,
+                "kind": "background_task",
+                "task_id": task_id,
+                "status": "archived",
+                "cancelled": False,
+                "already_cancelled": True,
+            }, ensure_ascii=False)
+        if task.status == "done":
+            return tool_error(f"background task {task_id} is already done and cannot be cancelled")
+        if not kb.archive_task(conn, task_id):
+            return tool_error(f"background task {task_id} could not be cancelled because its state changed")
+        return json.dumps({
+            "ok": True,
+            "kind": "background_task",
+            "task_id": task_id,
+            "status": "archived",
+            "cancelled": True,
+        }, ensure_ascii=False)
+
+
 def background_task(args: dict[str, Any], **kwargs: Any) -> str:
     """Translate personal-assistant background-task intent onto the durable queue."""
     action = str(args.get("action") or "").strip().lower()
@@ -133,6 +163,8 @@ def background_task(args: dict[str, Any], **kwargs: Any) -> str:
         if not body:
             return tool_error("background_task comment requires a non-empty body")
         return _dispatch_kanban("kanban_comment", {"task_id": task_id, "body": body}, kwargs)
+    if action == "cancel":
+        return _cancel_task(task_id)
     return _dispatch_kanban("kanban_unblock", {"task_id": task_id}, kwargs)
 
 
@@ -141,17 +173,18 @@ BACKGROUND_TASK_SCHEMA = {
     "description": (
         "Manage durable personal-assistant background work. Use start when the user should not have to wait and the "
         "work must survive chat/app restarts, retry safely, or participate in dependency/review flows. Use status/list "
-        "to inspect that durable work, comment to add durable context, and resume to continue a blocked task. Do not "
-        "use this for ordinary questions, work that will finish in the current turn, or scheduled/recurring triggers. "
-        "The returned subscribed/notification_mode fields are authoritative: promise automatic completion reporting "
-        "only when subscribed=true (notification_mode=automatic)."
+        "to inspect that durable work, comment to add durable context, resume to continue a blocked task, and cancel "
+        "to stop pending/running work (the durable kernel also terminates its live worker). Do not use this for ordinary "
+        "questions, work that will finish in the current turn, or scheduled/recurring triggers. The returned "
+        "subscribed/notification_mode fields are authoritative: promise automatic completion reporting only when "
+        "subscribed=true (notification_mode=automatic)."
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["start", "status", "list", "comment", "resume"],
+                "enum": ["start", "status", "list", "comment", "resume", "cancel"],
                 "description": "Operation to perform on durable background work.",
             },
             "title": {"type": "string", "description": "Short outcome title; required for start."},
@@ -159,7 +192,7 @@ BACKGROUND_TASK_SCHEMA = {
                 "type": "string",
                 "description": "For start: self-contained task specification. For comment: durable comment text.",
             },
-            "task_id": {"type": "string", "description": "Task id for status/comment/resume."},
+            "task_id": {"type": "string", "description": "Task id for status/comment/resume/cancel."},
             "assignee": {
                 "type": "string",
                 "description": (
