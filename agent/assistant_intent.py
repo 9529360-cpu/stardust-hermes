@@ -73,6 +73,8 @@ ATTENTION_TASK_STATES = frozenset(
     }
 )
 
+_DURABLE_RAILS = frozenset({ExecutionRail.CRON, ExecutionRail.KANBAN})
+
 
 @dataclass(frozen=True)
 class AssistantExecutionDecision:
@@ -95,8 +97,48 @@ class AssistantExecutionDecision:
                 raise ValueError("non-execution decisions cannot own a task id")
             if self.rail is not ExecutionRail.NONE:
                 raise ValueError("non-execution decisions cannot select an execution rail")
-        if self.intent is AssistantIntent.SCHEDULE and self.rail not in {ExecutionRail.CRON, ExecutionRail.KANBAN}:
+        if self.intent is AssistantIntent.SCHEDULE and self.rail not in _DURABLE_RAILS:
             raise ValueError("scheduled work must select a durable execution rail")
+
+
+@dataclass(frozen=True)
+class AssistantTaskProjection:
+    """Read-only task metadata projected from an existing authoritative owner.
+
+    ``owner_id`` is the native delegation/job/card/process identifier. This object
+    deliberately stores no mutable execution state: it is safe for gateway/Desktop
+    projections precisely because reconciliation always returns to the real owner.
+    """
+
+    task_id: str
+    title: str
+    state: TaskLifecycleState
+    rail: ExecutionRail
+    durability: ExecutionDurability
+    parent_session_id: Optional[str] = None
+    owner_id: Optional[str] = None
+    detail: str = ""
+    requires_approval: bool = False
+    recoverable: bool = False
+    artifact_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.task_id.strip():
+            raise ValueError("assistant task projections require a stable task id")
+        if self.rail is ExecutionRail.NONE:
+            raise ValueError("assistant task projections require an authoritative execution rail")
+        if self.durability is ExecutionDurability.RESTART_SAFE and self.rail not in _DURABLE_RAILS:
+            raise ValueError("restart-safe task projections require cron or kanban ownership")
+        if self.rail in _DURABLE_RAILS and self.durability is not ExecutionDurability.RESTART_SAFE:
+            raise ValueError("cron/kanban task projections must be restart-safe")
+
+    @property
+    def terminal(self) -> bool:
+        return task_state_is_terminal(self.state)
+
+    @property
+    def needs_attention(self) -> bool:
+        return task_state_needs_attention(self.state) or self.requires_approval
 
 
 def default_durability(intent: AssistantIntent) -> ExecutionDurability:
