@@ -143,6 +143,14 @@ fallback narrow and tied to an identified older runtime, and cover it with a
 test. A fallback that quietly degrades the feature it's meant to protect is worse
 than the crash it replaced.
 
+Compatibility does **not** let an older backend restore a product path Stardust
+Desktop has explicitly retired. The inherited Hermes/Nous guest/free-tier account
+is one such path: Desktop must not mint it, advertise it, prompt for it, or let an
+old local/remote backend light those surfaces back up. Existing authenticated real
+Nous accounts may remain manageable as an ordinary provider, but they are not a
+built-in account or a recommended first-run identity. See `src/AGENTS.md` for the
+concrete renderer/runtime invariants.
+
 ## Keep the waist narrow, grow at the edges
 
 The root contribution rubric governs here too. New capability should arrive at
@@ -196,13 +204,18 @@ boundaries, optimistic rollback and stale-response ordering, and both sides of a
 local/remote adapter with its profile routing intact. Match how the suite is
 actually run rather than inventing a command; when in doubt, read the scripts.
 
-## Rehearsing the guided onboarding
+## Rehearsing provider onboarding
 
-From `apps/desktop`, use a fresh temporary directory for each rehearsal and run
-`env -u NODE_ENV HERMES_GUEST_ONBOARDING=1 HERMES_HOME=<tmp>/.hermes HERMES_DESKTOP_USER_DATA_DIR=<tmp>/electron-user-data npm run dev`
-(replace `<tmp>` with that directory). To use the portal stand-in, add
-`HERMES_PORTAL_BASE_URL=http://127.0.0.1:8765 HERMES_ANON_API_SECRET=test-secret HERMES_SHARED_AUTH_DIR=<tmp>/.hermes/shared`
-before `npm run dev`. Stop Electron and its dev server after the run.
+Use a fresh temporary directory for each rehearsal so cached configuration cannot
+hide first-run behavior. From `apps/desktop`, run
+`env -u NODE_ENV HERMES_HOME=<tmp>/.hermes HERMES_DESKTOP_USER_DATA_DIR=<tmp>/electron-user-data npm run dev`
+(replace `<tmp>` with that directory). To skip only the first-run film while
+rehearsing provider selection, add `HERMES_SKIP_INTRO=1`.
+
+Do **not** set `HERMES_GUEST_ONBOARDING=1`: Stardust Desktop intentionally
+tombstones that inherited switch at the Electron process boundary. A rehearsal
+that depends on a minted guest/free-tier identity is testing a retired Hermes
+product path, not Stardust Desktop.
 
 ## The taste test before you hand off
 
@@ -217,17 +230,3 @@ before `npm run dev`. Stop Electron and its dev server after the run.
   locales?
 
 If any answer is "not sure," that's the part to go verify.
-
-## Nous free tier: state is pulled, never latched in the renderer
-
-The free tier (a Nous identity with no account, `hermes_cli/anon_auth.py`) reaches the renderer
-through one JSON-RPC pair: `free_tier.status` (has_guest, enabled, available,
-notice_pending, model, label) read from local auth state with zero network, and
-`free_tier.ack_notice`, which persists the one-time notice flag on the identity itself. The
-first-launch ready screen and the own-key strip are the SAME state rendered for two situations,
-keyed on `notice_pending`; there is no localStorage latch, so the CLI and the desktop cannot
-disagree about whether the notice was shown. Sign-in goes through the existing
-`POST /api/providers/oauth/nous/start` + poll route, which over a free-tier identity registers the
-connector transfer and reports `reason`, `account_email` and `model` on completion; every entry
-point (Billing, status chip, ready screen) opens the one free-tier sign-in dialog. Never branch on
-provider display names: the picker row carries `free_tier_row`, status cards carry `free_tier`.
