@@ -1,4 +1,4 @@
-"""Hermes Agent Uninstaller."""
+"""Stardust uninstaller for the inherited Hermes runtime layout."""
 
 import os
 import shutil
@@ -425,15 +425,15 @@ def run_gui_uninstall(args):
     skip_confirm = bool(getattr(args, "yes", False))
 
     print()
-    _print_box("│         ☤ Hermes Chat GUI Uninstaller                  │", Colors.MAGENTA)
+    _print_box("│         Stardust Desktop Uninstaller                    │", Colors.MAGENTA)
     print()
 
     if not summary["gui_installed"]:
-        print("No Hermes Chat GUI installation was found.")
+        print("No Stardust Desktop installation was found.")
         print(f"  Checked: {hermes_home}, and the standard app locations for this OS.")
         return
 
-    print(color("This removes the Chat GUI only. The Hermes agent stays installed.", Colors.CYAN))
+    print(color("This removes Stardust Desktop only. The compatible agent runtime stays installed.", Colors.CYAN))
     print()
     print(color("Will remove:", Colors.YELLOW, Colors.BOLD))
     for p in (*summary["source_built_artifacts"], *summary["packaged_app_paths"]):
@@ -443,23 +443,23 @@ def run_gui_uninstall(args):
     print()
     if agent_is_installed(hermes_home):
         print(color("Kept intact:", Colors.GREEN, Colors.BOLD))
-        print(f"  • The Hermes agent at {hermes_home / 'hermes-agent'}")
+        print(f"  • The Stardust agent runtime at {hermes_home / 'hermes-agent'}")
         print(f"  • Your config, sessions, and secrets under {hermes_home}")
         print()
 
-    if not skip_confirm and not _confirm_yes("to remove the Chat GUI"):
+    if not skip_confirm and not _confirm_yes("to remove Stardust Desktop"):
         return
 
     print()
-    print(color("Uninstalling Chat GUI...", Colors.CYAN, Colors.BOLD))
+    print(color("Uninstalling Stardust Desktop...", Colors.CYAN, Colors.BOLD))
     print()
     uninstall_gui(hermes_home)
 
     print()
-    _print_box("│            ✓ Chat GUI Uninstalled!                      │", Colors.GREEN)
+    _print_box("│          ✓ Stardust Desktop Uninstalled!                │", Colors.GREEN)
     print()
-    print("The Hermes agent is still installed. Run 'hermes' to use the CLI,")
-    print("or 'hermes uninstall' to remove the agent too.")
+    print("The compatible agent runtime is still installed. Run 'hermes' to use the CLI,")
+    print("or 'hermes uninstall' to remove the runtime too.")
     print()
 
 
@@ -489,7 +489,7 @@ def run_uninstall(args):
         return
 
     print()
-    _print_box("│            ☤ Hermes Agent Uninstaller                  │", Colors.MAGENTA)
+    _print_box("│              Stardust Uninstaller                       │", Colors.MAGENTA)
     print()
 
     # Show what will be affected
@@ -546,12 +546,12 @@ def run_uninstall(args):
     # Final confirmation
     print()
     if full_uninstall:
-        print(color("⚠️  WARNING: This will permanently delete ALL Hermes data!", Colors.RED, Colors.BOLD))
+        print(color("⚠️  WARNING: This will permanently delete ALL Stardust data!", Colors.RED, Colors.BOLD))
         print(color("   Including: configs, API keys, sessions, scheduled jobs, logs", Colors.RED))
         if remove_profiles:
             print(color(f"   Plus {n_profiles} profile(s): {profile_names}", Colors.RED))
     else:
-        print("This will remove the Hermes code but keep your configuration and data.")
+        print("This will remove the Stardust code but keep your configuration and data.")
 
     print()
     if not _confirm_yes("to confirm"):
@@ -571,12 +571,12 @@ def _print_uninstall_dry_run(*, project_root: Path, hermes_home: Path, full_unin
     print("  • Gateway services and standalone gateway processes")
     print("  • Hermes PATH entries from shell configs / Windows User PATH")
     print("  • Hermes wrapper scripts and Hermes-managed node/npm/npx symlinks")
-    print("  • Desktop Chat GUI artifacts")
+    print("  • Stardust Desktop artifacts")
     print(f"  • Code checkout: {project_root}")
     if not full_uninstall:
-        print(f"  • Keep Hermes config/data: {hermes_home}")
+        print(f"  • Keep Stardust config/data: {hermes_home}")
     else:
-        print(f"  • Hermes config/data: {hermes_home}")
+        print(f"  • Stardust config/data: {hermes_home}")
         profiles = _discover_named_profiles() if _is_default_hermes_home(hermes_home) else []
         if profiles:
             print("  • Named profiles (interactive uninstall asks before removing):")
@@ -652,13 +652,13 @@ def _perform_uninstall(
 
     # 3c. Chat GUI artifacts go with the agent code. uninstall_gui() never touches config/sessions/
     #     .env (safe in keep-data mode); the packaged app + Electron userData live OUTSIDE HERMES_HOME.
-    log_info("Removing desktop Chat GUI artifacts...")
+    log_info("Removing Stardust Desktop artifacts...")
     try:
         from hermes_cli.gui_uninstall import uninstall_gui
         if not uninstall_gui(hermes_home):
-            log_info("No desktop GUI artifacts found")
+            log_info("No Stardust Desktop artifacts found")
     except Exception as e:
-        log_warn(f"Could not remove desktop GUI artifacts: {e}")
+        log_warn(f"Could not remove Stardust Desktop artifacts: {e}")
 
     # 4. Remove installation directory (code) — we may be running from inside it.
     log_info("Removing installation directory...")
@@ -690,20 +690,20 @@ def _perform_uninstall(
         print(color("Your configuration and data have been preserved:", Colors.CYAN))
         print(f"  {hermes_home}/")
         print()
-        print("To reinstall later with your existing settings:")
+        print("To reinstall Stardust later with your existing settings:")
         print(color(_REINSTALL_HINT[windows], Colors.DIM))
         print()
 
     for line, col in _RELOAD_HINT[windows]:
         print(color(line, col) if col else line)
     print()
-    print("Thank you for using Hermes Agent! ☤")
+    print("Thank you for using Stardust!")
     print()
 
 
 _REINSTALL_HINT = {
-    True: "  iex (irm https://hermes-agent.nousresearch.com/install.ps1)",
-    False: "  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"}
+    True: "  iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1)",
+    False: "  curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash"}
 # windows -> [(line, color or None)]
 _RELOAD_HINT = {
     True: [("Open a new terminal (PowerShell / Windows Terminal) to pick up", Colors.YELLOW),
@@ -729,7 +729,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m hermes_cli.uninstall")
     parser.add_argument(
         "--mode", choices=["gui", "lite", "full"], required=True,
-        help="gui = Chat GUI only; lite = GUI + agent, keep data; full = everything")
+        help="gui = Stardust Desktop only; lite = desktop + runtime, keep data; full = everything")
     args = _UninstallArgs(mode=parser.parse_args(argv).mode)
     (run_gui_uninstall if args.gui else run_uninstall)(args)
     return 0
