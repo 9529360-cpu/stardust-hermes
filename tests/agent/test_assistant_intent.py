@@ -8,6 +8,17 @@ from agent.assistant_intent import (
 )
 
 
+def test_intent_wire_values_match_mission_vocabulary():
+    assert [intent.value for intent in AssistantIntent] == [
+        "respond",
+        "execute",
+        "delegate",
+        "background",
+        "schedule",
+        "clarify",
+    ]
+
+
 def test_default_durability_keeps_background_process_local_and_schedule_restart_safe():
     assert default_durability(AssistantIntent.RESPOND) is ExecutionDurability.TURN
     assert default_durability(AssistantIntent.EXECUTE) is ExecutionDurability.TURN
