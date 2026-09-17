@@ -78,6 +78,24 @@ ATTENTION_TASK_STATES = frozenset(
 
 _DURABLE_RAILS = frozenset({ExecutionRail.CRON, ExecutionRail.KANBAN})
 
+_ALLOWED_RAILS_BY_INTENT = {
+    AssistantIntent.RESPOND: frozenset({ExecutionRail.NONE}),
+    AssistantIntent.CLARIFY: frozenset({ExecutionRail.NONE}),
+    AssistantIntent.EXECUTE: frozenset({ExecutionRail.CURRENT_SESSION}),
+    AssistantIntent.DELEGATE: frozenset({ExecutionRail.DELEGATION}),
+    AssistantIntent.BACKGROUND: frozenset({ExecutionRail.PROCESS, ExecutionRail.DELEGATION}),
+    AssistantIntent.SCHEDULE: _DURABLE_RAILS,
+}
+
+_ALLOWED_DURABILITY_BY_INTENT = {
+    AssistantIntent.RESPOND: frozenset({ExecutionDurability.TURN}),
+    AssistantIntent.CLARIFY: frozenset({ExecutionDurability.TURN}),
+    AssistantIntent.EXECUTE: frozenset({ExecutionDurability.TURN}),
+    AssistantIntent.DELEGATE: frozenset({ExecutionDurability.TURN}),
+    AssistantIntent.BACKGROUND: frozenset({ExecutionDurability.PROCESS}),
+    AssistantIntent.SCHEDULE: frozenset({ExecutionDurability.RESTART_SAFE}),
+}
+
 _DELEGATION_RUNNING_STATES = frozenset({"dispatched", "pending", "queued", "running", "stalling", "finalizing"})
 _DELEGATION_COMPLETED_STATES = frozenset({"completed", "complete", "success", "succeeded", "ok", "done"})
 _DELEGATION_FAILED_STATES = frozenset({"failed", "error", "rejected", "timeout", "stalled"})
@@ -108,13 +126,14 @@ class AssistantExecutionDecision:
             raise ValueError("scheduled work must use a restart-safe execution rail")
         if self.intent is AssistantIntent.BACKGROUND and self.durability is ExecutionDurability.TURN:
             raise ValueError("background work cannot be turn-scoped")
-        if self.intent in {AssistantIntent.RESPOND, AssistantIntent.CLARIFY}:
-            if self.task_id is not None:
-                raise ValueError("non-execution decisions cannot own a task id")
-            if self.rail is not ExecutionRail.NONE:
-                raise ValueError("non-execution decisions cannot select an execution rail")
+        if self.intent in {AssistantIntent.RESPOND, AssistantIntent.CLARIFY} and self.task_id is not None:
+            raise ValueError("non-execution decisions cannot own a task id")
         if self.intent is AssistantIntent.SCHEDULE and self.rail not in _DURABLE_RAILS:
             raise ValueError("scheduled work must select a durable execution rail")
+        if self.rail not in _ALLOWED_RAILS_BY_INTENT[self.intent]:
+            raise ValueError(f"{self.intent.value} intent cannot select {self.rail.value} execution rail")
+        if self.durability not in _ALLOWED_DURABILITY_BY_INTENT[self.intent]:
+            raise ValueError(f"{self.intent.value} intent cannot use {self.durability.value} durability")
 
     def to_wire(self) -> dict[str, Any]:
         """JSON-safe decision metadata for gateway/telemetry boundaries."""
