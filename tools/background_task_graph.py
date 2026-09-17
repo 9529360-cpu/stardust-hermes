@@ -7,10 +7,13 @@ complete, and every created node is subscribed to the originating assistant sess
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from collections import deque
 from typing import Any, Mapping
+
+from tools.registry import no_cache_check_fn, registry, tool_error
 
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -31,9 +34,9 @@ def _string_list(value: Any, field: str) -> list[str]:
 
 def _normalize_tasks(raw_tasks: Any) -> tuple[dict[str, dict[str, Any]], list[str]]:
     if not isinstance(raw_tasks, list) or not raw_tasks:
-        raise ValueError("background_task start_graph requires a non-empty tasks list")
+        raise ValueError("background_task_graph requires a non-empty tasks list")
     if len(raw_tasks) > _MAX_GRAPH_TASKS:
-        raise ValueError(f"background_task start_graph supports at most {_MAX_GRAPH_TASKS} tasks")
+        raise ValueError(f"background_task_graph supports at most {_MAX_GRAPH_TASKS} tasks")
 
     specs: dict[str, dict[str, Any]] = {}
     order: list[str] = []
@@ -205,3 +208,115 @@ def start_graph(
         "notification_mode": notification_mode,
         "subscribed_count": subscribed_count,
     }
+
+
+def background_task_graph(args: dict[str, Any], **kwargs: Any) -> str:
+    """Registry handler: product-level graph intent -> existing durable task kernel."""
+    try:
+        from tools.background_task import _current_profile_name, _default_assignee
+
+        result = start_graph(
+            args,
+            kwargs,
+            default_assignee=_default_assignee(),
+            created_by=_current_profile_name(),
+        )
+        return json.dumps(result, ensure_ascii=False)
+    except (TypeError, ValueError) as exc:
+        return tool_error(str(exc))
+    except Exception as exc:
+        return tool_error(f"background_task_graph: {exc}")
+
+
+@no_cache_check_fn
+def _check_background_task_graph_mode() -> bool:
+    try:
+        from tools.background_task import _check_background_task_mode
+
+        return bool(_check_background_task_mode())
+    except Exception:
+        return False
+
+
+BACKGROUND_TASK_GRAPH_SCHEMA = {
+    "name": "background_task_graph",
+    "description": (
+        "Atomically create a durable dependency graph when one user goal clearly decomposes into multiple long-running "
+        "background outcomes. Use logical task keys plus depends_on: independent nodes can run in parallel, while "
+        "dependent nodes wait automatically. Do not use this for ordinary questions, current-turn work, or a single "
+        "background job (use background_task start). This is a high-level personal-assistant planning surface; do not "
+        "call low-level Kanban/link tools for the same plan. All nodes share the existing durable scheduler and retry "
+        "kernel. notification_mode=automatic means every node has a persisted completion/block route; partial/manual "
+        "means do not promise complete automatic reporting."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "tasks": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": _MAX_GRAPH_TASKS,
+                "description": "Durable task nodes. depends_on references sibling logical keys, never task ids.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "key": {
+                            "type": "string",
+                            "description": "Unique short logical key used by sibling depends_on entries.",
+                        },
+                        "title": {"type": "string", "description": "Short outcome title."},
+                        "body": {"type": "string", "description": "Self-contained execution specification."},
+                        "depends_on": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Sibling keys that must complete first. Omit/empty for parallel-ready work.",
+                        },
+                        "agent": {
+                            "type": "string",
+                            "description": "Optional specialist profile; omit for normal assistant-managed work.",
+                        },
+                        "skills": {"type": "array", "items": {"type": "string"}},
+                        "priority": {"type": "integer"},
+                        "max_runtime_seconds": {"type": "integer", "minimum": 1},
+                        "goal_mode": {"type": "boolean"},
+                        "goal_max_turns": {"type": "integer", "minimum": 1},
+                        "project": {"type": "string"},
+                        "workspace_kind": {"type": "string", "enum": ["scratch", "dir", "worktree"]},
+                        "workspace_path": {"type": "string"},
+                        "completion_contract": {"type": "string"},
+                        "idempotency_key": {
+                            "type": "string",
+                            "description": "Optional node-specific key for exact retry deduplication.",
+                        },
+                    },
+                    "required": ["key", "title"],
+                },
+            },
+            "project": {"type": "string", "description": "Optional default project for all nodes."},
+            "priority": {"type": "integer", "description": "Optional default priority for all nodes."},
+            "completion_contract": {
+                "type": "string",
+                "description": "Optional default completion contract for all nodes.",
+            },
+            "idempotency_key": {
+                "type": "string",
+                "description": (
+                    "Optional graph retry key. Use only for retries of the exact same graph; each node derives a stable "
+                    "key from this value and its logical key."
+                ),
+            },
+        },
+        "required": ["tasks"],
+    },
+}
+
+
+registry.register(
+    name="background_task_graph",
+    toolset="assistant_orchestration",
+    schema=BACKGROUND_TASK_GRAPH_SCHEMA,
+    handler=lambda args, **kw: background_task_graph(args, **kw),
+    check_fn=_check_background_task_graph_mode,
+    description="Atomic parallel/dependency graph for durable personal-assistant work",
+    emoji="🕸️",
+)
