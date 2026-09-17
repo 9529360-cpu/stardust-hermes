@@ -23,7 +23,7 @@ function desktopApi<T>(path: string, body?: Record<string, unknown>): Promise<T>
   const desktop = window.hermesDesktop
 
   if (!desktop) {
-    throw new Error('Hermes Desktop bridge is unavailable')
+    throw new Error('Stardust Desktop bridge is unavailable')
   }
 
   return hermesApi<T>(
@@ -74,8 +74,7 @@ const remoteGit: GitBridge = {
       gitGet<HermesReviewList>('review/list', { base: baseRef, path: repoPath, scope }),
 
     diff: async (repoPath, filePath, scope, baseRef, staged) =>
-      (await gitGet<{ diff: string }>('review/diff', { base: baseRef, file: filePath, path: repoPath, scope, staged }))
-        .diff,
+      (await gitGet<{ diff: string }>('review/diff', { base: baseRef, file: filePath, path: repoPath, scope, staged })).diff,
 
     stage: (repoPath, filePath) => gitPost('review/stage', { file: filePath ?? null, path: repoPath }),
 
