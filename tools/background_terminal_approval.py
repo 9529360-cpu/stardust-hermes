@@ -7,6 +7,10 @@ final authority for hardline, sudo, user-deny, Tirith, and dangerous-command enf
 """
 from __future__ import annotations
 
+import hashlib
+import json
+import os
+import socket
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -17,6 +21,58 @@ class TerminalApprovalRequirement:
     reason: str = ""
     rule_key: str = ""
     block_message: str = ""
+    context_sha256: str = ""
+
+
+def _terminal_security_context_sha256(plan: Any, *, has_host_access: bool) -> str:
+    """Fingerprint the resolved execution target without persisting its raw configuration.
+
+    A durable approval must not migrate from local -> SSH, host A -> host B, one container image/mount
+    policy -> another, or one effective cwd -> another. Only this SHA is carried into the outer exact-
+    call fingerprint; host paths/SSH details/container configuration never enter the task event ledger.
+    """
+    config = plan.config if isinstance(getattr(plan, "config", None), Mapping) else {}
+    material = {
+        "executor_host": socket.gethostname(),
+        "env_type": str(getattr(plan, "env_type", "") or ""),
+        "image": str(getattr(plan, "image", "") or ""),
+        "cwd": str(getattr(plan, "cwd", "") or ""),
+        "host_cwd": str(getattr(plan, "host_cwd", "") or ""),
+        "has_host_access": bool(has_host_access),
+        "ssh": {
+            "host": str(config.get("ssh_host") or ""),
+            "user": str(config.get("ssh_user") or ""),
+            "port": config.get("ssh_port"),
+            "key": str(config.get("ssh_key") or ""),
+        },
+        "container": {
+            "persistent": bool(config.get("container_persistent")),
+            "docker_mount_cwd_to_workspace": bool(config.get("docker_mount_cwd_to_workspace")),
+            "docker_volumes": config.get("docker_volumes") or [],
+            "docker_run_as_host_user": bool(config.get("docker_run_as_host_user")),
+            "docker_network": bool(config.get("docker_network", True)),
+            "docker_extra_args": config.get("docker_extra_args") or [],
+            "docker_shared_container_key": str(config.get("docker_shared_container_key") or ""),
+            "docker_persist_across_processes": bool(config.get("docker_persist_across_processes")),
+            "singularity_image": str(config.get("singularity_image") or ""),
+            "modal_image": str(config.get("modal_image") or ""),
+            "daytona_image": str(config.get("daytona_image") or ""),
+            "vercel_runtime": str(config.get("vercel_runtime") or ""),
+        },
+    }
+    encoded = json.dumps(material, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(encoded.encode("utf-8", errors="replace")).hexdigest()
+
+
+def approval_fingerprint_args(
+    args: Mapping[str, Any] | None,
+    requirement: TerminalApprovalRequirement,
+) -> dict[str, Any]:
+    """Opaque payload for the durable exact-call hash; never forwarded to the terminal handler."""
+    return {
+        "tool_args": dict(args) if isinstance(args, Mapping) else {},
+        "terminal_security_context_sha256": str(requirement.context_sha256 or ""),
+    }
 
 
 def inspect_terminal_approval(args: Mapping[str, Any] | None) -> TerminalApprovalRequirement:
@@ -34,11 +90,19 @@ def inspect_terminal_approval(args: Mapping[str, Any] | None) -> TerminalApprova
     try:
         from tools import approval
         from tools import approval_context
-        from tools.terminal_tool import _docker_has_host_access, _get_env_config
+        from tools.terminal_tool import _docker_has_host_access, _plan_execution
 
-        config = _get_env_config()
-        env_type = str(config.get("env_type") or "local")
-        has_host_access = bool(_docker_has_host_access(config))
+        task_id = str(os.environ.get("HERMES_KANBAN_TASK") or "").strip() or None
+        plan = _plan_execution(
+            command,
+            task_id=task_id,
+            timeout=values.get("timeout"),
+            background=bool(values.get("background", False)),
+            _host_local=False,
+        )
+        env_type = str(plan.env_type or "local")
+        has_host_access = bool(_docker_has_host_access(plan.config))
+        context_sha256 = _terminal_security_context_sha256(plan, has_host_access=has_host_access)
     except Exception:
         return TerminalApprovalRequirement(
             block_message=(
@@ -84,8 +148,8 @@ def inspect_terminal_approval(args: Mapping[str, Any] | None) -> TerminalApprova
     if not warnings:
         return TerminalApprovalRequirement()
 
-    # The durable task ledger fingerprints the complete resolved terminal args, so this rule key is
-    # descriptive only; it does not grant a broad command pattern or session-level allowlist entry.
+    # The durable task ledger fingerprints the resolved terminal args plus context_sha256, so this
+    # descriptive rule key never grants a broad command pattern or session-level allowlist entry.
     return TerminalApprovalRequirement(
         requires_approval=True,
         reason=(
@@ -94,4 +158,5 @@ def inspect_terminal_approval(args: Mapping[str, Any] | None) -> TerminalApprova
             + ". Confirm this exact terminal call before it runs."
         ),
         rule_key="stardust:terminal-risk",
+        context_sha256=context_sha256,
     )
