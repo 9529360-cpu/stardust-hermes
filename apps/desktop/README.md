@@ -1,194 +1,96 @@
-# Hermes Desktop ☤
+# Stardust Desktop
 
-<p align="center">
-  <a href="https://github.com/NousResearch/hermes-agent/releases"><img src="https://img.shields.io/badge/Download-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-FFD700?style=for-the-badge" alt="Download"></a>
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-</p>
+> Stardust 的桌面个人助理工作台。Hermes Agent 是底层运行时来源，不是当前产品品牌。
 
-**The native desktop app for [Hermes Agent](../../README.md) — the self-improving AI agent from [Nous Research](https://nousresearch.com).** Same agent, same skills, same memory as the CLI and gateway, in a polished native window — chat with streaming tool output, side-by-side previews, a file browser, voice, and settings, no terminal required. Available for **macOS, Windows, and Linux**.
+Stardust Desktop 是本仓库面向日常长期使用的主要桌面界面。它保留 Hermes Agent 已经成熟的 CLI、Gateway、工具与运行时兼容层，同时把桌面端继续改造成独立维护的个人助理：中文优先、个人工作流优先、Stardust 自己的安装与更新来源优先。
 
-<table>
-<tr><td><b>Chat with the full agent</b></td><td>Streaming responses, live tool activity, structured tool summaries, and the same conversation history as every other Hermes surface.</td></tr>
-<tr><td><b>Side-by-side previews</b></td><td>Render web pages, files, and tool outputs in a right-hand pane while you keep chatting.</td></tr>
-<tr><td><b>File browser</b></td><td>Explore and preview the working directory without leaving the app.</td></tr>
-<tr><td><b>Voice</b></td><td>Talk to Hermes and hear it back.</td></tr>
-<tr><td><b>Settings & onboarding</b></td><td>Manage providers, models, tools, and credentials from a real UI. First-run setup gets you to your first message in seconds.</td></tr>
-<tr><td><b>Stays current</b></td><td>Built-in updates pull the latest agent and rebuild the app in place.</td></tr>
-</table>
+本目录后续以 `9529360-cpu/stardust-hermes` 为唯一源码和发布权威，不跟随 Hermes 上游发布节奏。
 
----
+## 当前方向
 
-## Install
+- **个人助理工作台**：桌面导航、首页、会话、项目与工作区围绕长期个人使用重构。
+- **独立视觉体系**：继续推进 Codex 式信息结构与系统级液态玻璃视觉，不复刻上游桌面 UI。
+- **稳定模型路由**：模型路由健康状态、故障切换、冷却与凭据轮换属于 Stardust 自己的长期能力。
+- **本地与远程兼容**：可连接本地运行时或远程 Gateway；真正的执行边界始终由当前连接决定。
+- **Stardust 更新权威**：桌面产品入口只更新 Stardust 客户端；不会从 UI 触发上游 `hermes update` 或替换后端源码。
 
-### Install with Hermes (recommended)
+## 安装与运行
 
-Already have the Hermes CLI? Just run:
+推荐先使用仓库根目录 README 中的 Stardust 安装入口。底层仍保留 `hermes` CLI 名称以避免无意义的兼容性破坏，因此已有源码安装可以继续使用：
 
 ```bash
 hermes desktop
 ```
 
-It builds and launches the GUI against your existing install — same config, keys, sessions, and skills. If Desktop cannot find a usable runtime or saved remote connection, first launch lets you connect to an existing Hermes gateway or install Hermes locally. Local onboarding then walks you through choosing a provider and model.
-
-### Prebuilt installers
-
-Prebuilt installers are built and distributed via [the Hermes Desktop website.](https://hermes-agent.nousresearch.com/).
-
----
-
-## Updating
-
-The app checks for updates in the background and offers a one-click update when one is ready. You can also update any time from the CLI:
+开发模式：
 
 ```bash
-hermes update
-```
-
----
-
-## Requirements
-
-The installer handles everything for you (Python 3.11+, a portable Git, ripgrep).
-
----
-
-## Development
-
-Want to hack on the app itself? Install workspace deps from the repo root once, then run the dev server from this directory:
-
-```bash
-npm install          # from repo root — links apps/desktop, web, apps/shared
+npm install
 cd apps/desktop
-npm run dev          # Vite renderer + Electron, which boots the Python backend
+npm run dev
 ```
 
-Point the app at a specific source checkout, or sandbox it away from your real config:
+需要隔离真实配置时：
 
 ```bash
-# throwaway HERMES_HOME, separate Electron userData, distinct app name to avoid the single-instance lock
 ../scripts/dev-sandbox.sh npm run dev
-HERMES_DESKTOP_HERMES_ROOT=/path/to/clone npm run dev
-HERMES_HOME=/tmp/throwaway npm run dev
-npm run dev:fake-boot   # exercise the startup overlay with deterministic delays
+HERMES_DESKTOP_HERMES_ROOT=/path/to/stardust-hermes npm run dev
+HERMES_HOME=/tmp/stardust-dev npm run dev
+npm run dev:fake-boot
 ```
 
-### Building installers
+## 构建桌面包
 
 ```bash
-npm run dist:mac     # DMG + zip
-npm run dist:win     # NSIS + MSI
-npm run dist:linux   # AppImage + deb + rpm
-npm run pack         # unpacked app under release/ (no installer)
+npm run dist:mac
+npm run dist:win
+npm run dist:linux
+npm run pack
 ```
 
-Installers are built and uploaded to GitHub Releases manually. macOS/Windows signing & notarization happen automatically when the relevant credentials are present in the environment (`CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_*` for macOS, `WIN_CSC_*` for Windows).
+构建产物与正式发布应以本仓库的 GitHub Releases 为准。macOS / Windows 的签名和 notarization 仍使用现有 Electron Builder 凭据约定；没有对应签名凭据时，应把产物视为本地开发构建而不是正式发行包。
 
-### How it works
+## 更新策略
 
-The packaged app ships the Electron shell and a native React chat surface. On
-first launch it can install the Hermes Agent runtime into `HERMES_HOME`
-(`~/.hermes`, or `%LOCALAPPDATA%\hermes` on Windows), using the same layout as a
-CLI install.
+Stardust 不再把 Hermes 上游作为自动更新源。
 
-The app has three boundaries:
+- 桌面客户端的检查与应用动作只针对 Stardust Desktop 自身。
+- 远程后端的版本状态可以作为诊断信息显示，但不会变成“一键更新后端”的产品动作。
+- `hermes update` 在 Stardust 中被有意禁用，避免把独立维护的安装重新同步回上游。
+- 安装、恢复、bootstrap 与后续发布来源都应指向 `9529360-cpu/stardust-hermes`。
 
-- **Electron** resolves and validates a runnable backend, owns native
-  filesystem/git/window capabilities, and exposes a narrow preload bridge.
-- **React** owns the Desktop routes, panes, interaction state, and
-  `@assistant-ui/react` transcript.
-- **Hermes Agent** runs as a headless `hermes serve` process and exposes the
-  `tui_gateway` JSON-RPC/WebSocket API. The renderer connects through
-  [`apps/shared`](../shared/), which is also used by the browser dashboard.
+## 架构边界
 
-Backend resolution is an ordered ladder:
+Stardust Desktop 仍沿用成熟的三层边界：
+
+- **Electron**：负责进程生命周期、原生文件系统 / Git / 窗口能力、安装更新和窄化后的 preload bridge。
+- **React renderer**：负责导航、展示、面板、交互状态与桌面体验。
+- **Agent backend**：负责会话、工具、模型调用和流式执行，通过 Gateway 协议向桌面提供能力。
+
+内部仍可能出现 `Hermes`、`HERMES_HOME`、`hermes serve`、`tui_gateway` 等名称。这些属于底层兼容接口和历史包名，不应被当作产品品牌重新暴露到新的用户界面。
+
+Backend resolution 继续按验证后的候选链工作：
 
 1. `HERMES_DESKTOP_HERMES_ROOT`
-2. the current source checkout during development
-3. a completed managed install
-4. `HERMES_DESKTOP_HERMES`, or `hermes` on `PATH`
-5. a system Python that can import the Hermes runtime
-6. the first-launch bootstrap installer
+2. 当前开发 checkout
+3. 已完成的 Stardust managed install
+4. `HERMES_DESKTOP_HERMES` 或 `hermes` on `PATH`
+5. 可导入兼容运行时的 system Python
+6. Stardust first-launch bootstrap installer
 
-Candidates are probed before use; an existing shim or interpreter is not enough.
-A runtime that predates `serve` falls back to headless
-`dashboard --no-open`. This is compatibility for the backend command only and
-does not launch or embed the dashboard UI.
+候选只在通过真实 probe 后才可使用；文件存在本身不是有效运行时的证明。
 
-The Electron orchestration entry point is `electron/main.ts`; pure resolution,
-probe, hardening, and platform policies live in focused modules beside it. The
-renderer is under `src/`, with shared atoms in `src/store` and transport/native
-adapters in `src/lib`.
+## Connections 与 Projects
 
-Before changing the app, read:
+Desktop 支持本地 backend 和显式远程 Gateway。远程模式下，Agent tools、终端命令和文件操作都发生在远端 Gateway 主机，而不是显示 Desktop UI 的电脑上。
 
-- [`AGENTS.md`](./AGENTS.md): architecture, state ownership, resolver/fallback,
-  transport, performance, and testing rules.
-- [`DESIGN.md`](./DESIGN.md): visual system, information architecture, motion,
-  direct manipulation, and keyboard behavior.
+Projects 是工作区抽象。一个 Project 可以承载多个目录、仓库、worktree 和会话；不要另外再造一套并行的 per-session folder picker。
 
-### Connections, projects, and switching
+切换 profile / connection 应优先作为 workspace switch 处理：前台 shell 保持挂载，只清理和重建属于当前 Gateway 的状态，避免把旧连接的会话、列表或缓存泄漏到新连接。
 
-Desktop supports a managed local backend, explicit remote gateways, and Hermes
-Cloud connections. Remote and cloud modes use the same remote-capability path;
-authentication and discovery differ, not the renderer feature model.
+## 验证
 
-When no usable local runtime or saved remote connection exists, the first-run
-screen offers **Connect to existing Hermes** before starting the local installer.
-Desktop probes the gateway to discover token or OAuth authentication, requires a
-successful HTTP and WebSocket connection test, and saves the connection using
-the same encrypted Desktop configuration used by Settings. A saved remote
-connection bypasses this choice on later launches. The regular Desktop build
-still includes the local-install option; this is a remote operating mode, not a
-separate client-only application.
-
-In remote mode the gateway host is the execution boundary: agent tools,
-terminal commands, and file operations run against the remote Hermes host, not
-the computer displaying the Desktop UI.
-
-Remote gateways that sit behind an access proxy may require extra headers on
-every HTTP and WebSocket request. Configure them per connection in Settings →
-Connections (Extra gateway headers), or add a `headers` object to Desktop's
-Electron `userData/connection.json` remote block:
-
-```json
-{
-  "mode": "remote",
-  "remote": {
-    "url": "https://hermes.example.com",
-    "authMode": "token",
-    "token": { "encoding": "safeStorage", "value": "..." },
-    "headers": {
-      "CF-Access-Client-Id": { "encoding": "safeStorage", "value": "..." },
-      "CF-Access-Client-Secret": { "encoding": "safeStorage", "value": "..." }
-    }
-  }
-}
-```
-
-Per-profile remote entries under `profiles[name].headers` use the same shape.
-Desktop applies these headers only to matching remote gateway requests, treats
-`https` and `wss` as the same gateway origin for WebSocket upgrades, and drops
-transport- or Hermes-managed header names such as `Authorization`, `Cookie`,
-`Host`, `Origin`, `Referer`, and `X-Hermes-Session-Token`.
-
-Projects are the workspace abstraction. A project may own multiple folders,
-repositories, worktrees, and sessions; a bare new chat remains detached unless
-the user enters a project or configures a default project directory. Use the
-Projects UI rather than adding a second per-session folder-picker workflow.
-
-Changing profiles or connection modes is a soft workspace switch, not another
-cold boot. The shell and current management overlay remain mounted while
-gateway-bound nanostores are wiped, query-backed data is invalidated, and the
-new connection repopulates skeletons. This prevents rows or transcripts from
-the previous gateway bleeding into the next one. Switching changes only the
-foreground view and request route: it does not cancel turns or stop a backend,
-and retained background sockets continue receiving events from running jobs.
-
-### Verification
-
-Run before opening a PR (lint may surface pre-existing warnings but must exit cleanly):
+修改 Desktop 后至少运行：
 
 ```bash
 npm run fix
@@ -198,47 +100,44 @@ npm run test:ui
 npm run test:desktop:platforms
 ```
 
-Run `npm run test:desktop:all` for install, boot, update, packaging, or other
-release-path changes.
-
-### Troubleshooting
-
-Boot logs land in `HERMES_HOME/logs/desktop.log` (includes backend output and recent Python tracebacks) — check it first if the app reports a boot failure.
-
-**macOS / Linux:**
+涉及安装、启动、更新、打包或发布路径时，再运行：
 
 ```bash
-# Force a clean first-launch setup
-rm "$HOME/.hermes/hermes-agent/.hermes-bootstrap-complete"
-# Rebuild a broken Python venv
-rm -rf "$HOME/.hermes/hermes-agent/venv"
-# Reset a stuck macOS microphone prompt (macOS only)
-tccutil reset Microphone com.nousresearch.hermes
+npm run test:desktop:all
 ```
 
-**Windows (PowerShell):**
+重要的视觉与交互改动不能只以 typecheck / unit test 作为完成证据，还需要在真实 Electron 窗口中检查代表性尺寸与状态。
+
+## 维护指南
+
+改动桌面前先读：
+
+- [`AGENTS.md`](./AGENTS.md)：桌面架构、状态所有权、resolver / fallback、transport、性能与测试约束。
+- [`DESIGN.md`](./DESIGN.md)：Stardust Desktop 的视觉与交互设计约束。
+- [`../../STARDUST.md`](../../STARDUST.md)：独立维护、源码权威、隐私边界与上游策略。
+
+## 故障排查
+
+运行日志仍保存在兼容路径 `HERMES_HOME/logs/desktop.log`。现阶段不为了品牌统一强行迁移用户数据目录，因为这会带来不必要的安装和升级风险。
+
+macOS / Linux：
+
+```bash
+rm "$HOME/.hermes/hermes-agent/.hermes-bootstrap-complete"
+rm -rf "$HOME/.hermes/hermes-agent/venv"
+```
+
+Windows PowerShell：
 
 ```powershell
-# Force a clean first-launch setup
 Remove-Item "$env:LOCALAPPDATA\hermes\hermes-agent\.hermes-bootstrap-complete"
-# Rebuild a broken Python venv
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\hermes\hermes-agent\venv"
 ```
 
-> The default Hermes home on Windows is `%LOCALAPPDATA%\hermes`. Set the `HERMES_HOME` env var if you've relocated it.
+## 技术底座与许可证
 
----
+Stardust Desktop 最初建立在 Hermes Agent 的开源桌面与运行时实现之上，并保留原项目的 Git 历史、版权声明与 MIT License。
 
-## Community
+Hermes Agent 是技术底座；当前由本仓库独立维护和继续改造的产品是 **Stardust Desktop**。
 
-- 💬 [Discord](https://discord.gg/NousResearch)
-- 📖 [Documentation](https://hermes-agent.nousresearch.com/docs/)
-- 🐛 [Issues](https://github.com/NousResearch/hermes-agent/issues)
-
----
-
-## License
-
-MIT — see [LICENSE](../../LICENSE).
-
-Built by [Nous Research](https://nousresearch.com).
+MIT — see [`../../LICENSE`](../../LICENSE).
