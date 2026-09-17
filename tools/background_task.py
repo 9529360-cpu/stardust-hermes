@@ -3,7 +3,8 @@
 ``background_task`` is intentionally a narrow intention-level surface. It owns no task state and
 runs no workers itself; every operation delegates to the existing Kanban kernel so task identity,
 dependencies, retries, subscriptions, workspaces, cancellation, approvals, and dispatcher semantics
-keep one owner.
+keep one owner. Read operations project that kernel into personal-assistant vocabulary instead of
+leaking worker/Kanban implementation details back into the coordinator.
 """
 from __future__ import annotations
 
@@ -18,6 +19,12 @@ from tools.registry import no_cache_check_fn, registry, tool_error
 _READ_ACTIONS = frozenset({"status", "list", "approvals"})
 _MUTATING_ACTIONS = frozenset({"start", "comment", "resume", "cancel", "approve", "deny"})
 _ACTIONS = _READ_ACTIONS | _MUTATING_ACTIONS
+_APPROVAL_EVENT_KINDS = frozenset({
+    "assistant_approval_requested",
+    "assistant_approval_granted",
+    "assistant_approval_denied",
+    "assistant_approval_consumed",
+})
 
 
 def _current_profile_name() -> str:
@@ -84,6 +91,12 @@ def _decode_result(result: str | dict) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
+def _encode_or_original(raw: str | dict, decoded: dict[str, Any] | None) -> str:
+    if decoded is None:
+        return raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+    return json.dumps(decoded, ensure_ascii=False)
+
+
 def _start(args: dict[str, Any], kwargs: Mapping[str, Any]) -> str:
     title = str(args.get("title") or "").strip()
     if not title:
@@ -100,7 +113,7 @@ def _start(args: dict[str, Any], kwargs: Mapping[str, Any]) -> str:
     raw = _dispatch_kanban("kanban_create", payload, kwargs)
     decoded = _decode_result(raw)
     if decoded is None or decoded.get("error"):
-        return raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+        return _encode_or_original(raw, decoded)
     # ``subscribed`` is the durable delivery truth. Keep it verbatim and add a semantic alias so
     # the coordinator never promises a completion notification when no route was actually stored.
     decoded["kind"] = "background_task"
@@ -111,6 +124,119 @@ def _start(args: dict[str, Any], kwargs: Mapping[str, Any]) -> str:
 def _require_task_id(args: Mapping[str, Any], action: str) -> str | None:
     task_id = str(args.get("task_id") or "").strip()
     return task_id or None
+
+
+def _public_approval(approval: Mapping[str, Any]) -> dict[str, Any]:
+    """Approval projection deliberately excludes args hashes/rule keys and other kernel metadata."""
+    return {
+        key: approval.get(key)
+        for key in ("approval_id", "tool_name", "reason", "requested_at", "state")
+        if approval.get(key) not in (None, "")
+    }
+
+
+def _pending_approvals(task_id: str) -> list[dict[str, Any]]:
+    from tools.background_task_approval import list_approvals
+    from tools.kanban_tools import _board
+
+    with _board(None) as (_kb, conn):
+        return [_public_approval(item) for item in list_approvals(conn, task_id, pending_only=True)]
+
+
+def _latest_block_reason(events: list[Any]) -> str | None:
+    for event in reversed(events):
+        if not isinstance(event, Mapping) or event.get("kind") != "blocked":
+            continue
+        payload = event.get("payload")
+        if isinstance(payload, Mapping) and str(payload.get("reason") or "").strip():
+            return str(payload.get("reason")).strip()
+    return None
+
+
+def _latest_run_summary(runs: list[Any]) -> dict[str, Any] | None:
+    for run in reversed(runs):
+        if not isinstance(run, Mapping):
+            continue
+        projected = {
+            key: run.get(key)
+            for key in ("status", "outcome", "summary", "error", "started_at", "ended_at")
+            if run.get(key) not in (None, "")
+        }
+        if projected:
+            return projected
+    return None
+
+
+def _status(args: Mapping[str, Any], kwargs: Mapping[str, Any]) -> str:
+    task_id = str(args.get("task_id") or "").strip()
+    raw = _dispatch_kanban("kanban_show", {"task_id": task_id}, kwargs)
+    decoded = _decode_result(raw)
+    if decoded is None or decoded.get("error"):
+        return _encode_or_original(raw, decoded)
+
+    task = decoded.get("task") if isinstance(decoded.get("task"), Mapping) else {}
+    events = decoded.get("events") if isinstance(decoded.get("events"), list) else []
+    runs = decoded.get("runs") if isinstance(decoded.get("runs"), list) else []
+    parents = decoded.get("parents") if isinstance(decoded.get("parents"), list) else []
+    children = decoded.get("children") if isinstance(decoded.get("children"), list) else []
+    pending = _pending_approvals(task_id)
+    status = str(task.get("status") or "")
+    result: dict[str, Any] = {
+        "ok": True,
+        "kind": "background_task",
+        "task_id": task.get("id") or task_id,
+        "title": task.get("title"),
+        "status": status,
+        "priority": task.get("priority"),
+        "created_at": task.get("created_at"),
+        "started_at": task.get("started_at"),
+        "completed_at": task.get("completed_at"),
+        "result": task.get("result"),
+        "dependencies": list(parents),
+        "dependents": list(children),
+        "blocked_reason": _latest_block_reason(events) if status == "blocked" else None,
+        "needs_user_input": bool(pending),
+        "pending_approvals": pending,
+        "latest_attempt": _latest_run_summary(runs),
+    }
+    return json.dumps({key: value for key, value in result.items() if value is not None}, ensure_ascii=False)
+
+
+def _project_list_task(task: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in {
+            "task_id": task.get("id"),
+            "title": task.get("title"),
+            "status": task.get("status"),
+            "priority": task.get("priority"),
+            "created_at": task.get("created_at"),
+            "started_at": task.get("started_at"),
+            "completed_at": task.get("completed_at"),
+            "dependency_count": task.get("parent_count"),
+            "dependent_count": task.get("child_count"),
+            "project_id": task.get("project_id"),
+        }.items()
+        if value is not None
+    }
+
+
+def _list(args: Mapping[str, Any], kwargs: Mapping[str, Any]) -> str:
+    payload = {key: value for key, value in args.items() if key in {"status", "limit"} and value is not None}
+    raw = _dispatch_kanban("kanban_list", payload, kwargs)
+    decoded = _decode_result(raw)
+    if decoded is None or decoded.get("error"):
+        return _encode_or_original(raw, decoded)
+    tasks = decoded.get("tasks") if isinstance(decoded.get("tasks"), list) else []
+    return json.dumps({
+        "ok": True,
+        "kind": "background_task_list",
+        "tasks": [_project_list_task(task) for task in tasks if isinstance(task, Mapping)],
+        "count": decoded.get("count", len(tasks)),
+        "limit": decoded.get("limit"),
+        "truncated": bool(decoded.get("truncated")),
+        "next_limit": decoded.get("next_limit"),
+    }, ensure_ascii=False)
 
 
 def _cancel_task(task_id: str) -> str:
@@ -157,7 +283,10 @@ def _approval_operation(task_id: str, action: str, args: Mapping[str, Any]) -> s
                 "kind": "background_task",
                 "task_id": task_id,
                 "status": task.status,
-                "approvals": list_approvals(conn, task_id, pending_only=True),
+                "approvals": [
+                    _public_approval(item)
+                    for item in list_approvals(conn, task_id, pending_only=True)
+                ],
             }, ensure_ascii=False)
         try:
             result = decide_task_approval(
@@ -174,6 +303,15 @@ def _approval_operation(task_id: str, action: str, args: Mapping[str, Any]) -> s
         return json.dumps(result, ensure_ascii=False)
 
 
+def _normalize_mutation(raw: str | dict, action: str) -> str:
+    decoded = _decode_result(raw)
+    if decoded is None or decoded.get("error"):
+        return _encode_or_original(raw, decoded)
+    decoded["kind"] = "background_task"
+    decoded["action"] = action
+    return json.dumps(decoded, ensure_ascii=False)
+
+
 def background_task(args: dict[str, Any], **kwargs: Any) -> str:
     """Translate personal-assistant background-task intent onto the durable queue."""
     action = str(args.get("action") or "").strip().lower()
@@ -182,36 +320,38 @@ def background_task(args: dict[str, Any], **kwargs: Any) -> str:
     if action == "start":
         return _start(args, kwargs)
     if action == "list":
-        payload = {key: value for key, value in args.items() if key in {"status", "limit"} and value is not None}
-        return _dispatch_kanban("kanban_list", payload, kwargs)
+        return _list(args, kwargs)
 
     task_id = _require_task_id(args, action)
     if not task_id:
         return tool_error(f"background_task {action} requires task_id")
     if action == "status":
-        return _dispatch_kanban("kanban_show", {"task_id": task_id}, kwargs)
+        return _status(args, kwargs)
     if action == "comment":
         body = str(args.get("body") or "").strip()
         if not body:
             return tool_error("background_task comment requires a non-empty body")
-        return _dispatch_kanban("kanban_comment", {"task_id": task_id, "body": body}, kwargs)
+        raw = _dispatch_kanban("kanban_comment", {"task_id": task_id, "body": body}, kwargs)
+        return _normalize_mutation(raw, action)
     if action == "cancel":
         return _cancel_task(task_id)
     if action in {"approvals", "approve", "deny"}:
         return _approval_operation(task_id, action, args)
-    return _dispatch_kanban("kanban_unblock", {"task_id": task_id}, kwargs)
+    raw = _dispatch_kanban("kanban_unblock", {"task_id": task_id}, kwargs)
+    return _normalize_mutation(raw, action)
 
 
 BACKGROUND_TASK_SCHEMA = {
     "name": "background_task",
     "description": (
-        "Manage durable personal-assistant background work. Use start when the user should not have to wait and the "
-        "work must survive chat/app restarts, retry safely, or participate in dependency/review flows. Use status/list "
-        "to inspect durable work. If a high-risk background action pauses for user consent, use approvals to inspect "
-        "the pending request and approve/deny to record the user's decision; approve resumes the task and the grant is "
-        "valid exactly once for the same resolved tool call. Use comment to add durable context, resume for ordinary "
-        "non-approval blockers, and cancel to stop pending/running work. Do not use this for ordinary questions, work "
-        "that will finish in the current turn, or scheduled/recurring triggers. The returned subscribed/notification_mode "
+        "Manage durable personal-assistant background work. Use start only when the user should not have to wait and "
+        "the work must survive chat/app restarts, retry safely, or participate in dependency/review flows. Answer "
+        "ordinary questions directly; keep work that can finish in this live turn in the live session instead of "
+        "creating a background task. Use status/list to inspect durable work. If a high-risk background action pauses "
+        "for user consent, use approvals to inspect the pending request and approve/deny to record the user's decision; "
+        "approve resumes the task and the grant is valid exactly once for the same resolved tool call. Use comment to "
+        "add durable context, resume for ordinary non-approval blockers, and cancel to stop pending/running work. Use "
+        "cronjob_manage, not this tool, for scheduled/recurring triggers. The returned subscribed/notification_mode "
         "fields are authoritative: promise automatic completion reporting only when subscribed=true."
     ),
     "parameters": {
@@ -249,7 +389,7 @@ BACKGROUND_TASK_SCHEMA = {
             "parents": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Optional prerequisite task ids for start; work waits until all parents finish.",
+                "description": "Optional prerequisite background-task ids for start; work waits until all parents finish.",
             },
             "project": {"type": "string", "description": "Optional Stardust project id/slug for a managed worktree."},
             "priority": {"type": "integer", "description": "Optional dispatch priority; higher runs sooner."},
