@@ -1,10 +1,10 @@
 """Desktop personal-assistant facade over the durable Kanban work queue.
 
 ``background_task`` is intentionally a narrow intention-level surface. It owns no task state and
-runs no workers itself; every operation delegates to the existing Kanban kernel so task identity,
+runs no workers itself; every operation delegates to the existing durable task kernel so task identity,
 dependencies, retries, subscriptions, workspaces, cancellation, approvals, and dispatcher semantics
-keep one owner. Read operations project that kernel into personal-assistant vocabulary instead of
-leaking worker/Kanban implementation details back into the coordinator.
+keep one owner. Read and mutation results project that kernel into personal-assistant vocabulary instead
+of leaking worker/task-kernel implementation details back into the coordinator.
 """
 from __future__ import annotations
 
@@ -13,17 +13,30 @@ import os
 from typing import Any, Mapping
 
 from hermes_cli.config import cfg_get, load_config_readonly
+from tools.background_task_state import PUBLIC_STATES, project_background_state, state_flags
 from tools.registry import no_cache_check_fn, registry, tool_error
 
 
 _READ_ACTIONS = frozenset({"status", "list", "approvals"})
 _MUTATING_ACTIONS = frozenset({"start", "comment", "resume", "cancel", "approve", "deny"})
 _ACTIONS = _READ_ACTIONS | _MUTATING_ACTIONS
-_APPROVAL_EVENT_KINDS = frozenset({
-    "assistant_approval_requested",
-    "assistant_approval_granted",
-    "assistant_approval_denied",
-    "assistant_approval_consumed",
+
+# Public states with a one-to-one kernel phase can keep the low-level list query selective. States
+# sharing one kernel phase (blocked/todo) are filtered after projection so approval/failure/dependency
+# semantics stay truthful.
+_KERNEL_FILTER_BY_PUBLIC_STATE = {
+    "running": "running",
+    "scheduled": "scheduled",
+    "waiting_dependency": "todo",
+    "waiting_confirmation": "blocked",
+    "waiting_input": "blocked",
+    "waiting_review": "review",
+    "completed": "done",
+    "failed": "blocked",
+    "cancelled": "archived",
+}
+_SHARED_KERNEL_FILTER_STATES = frozenset({
+    "queued", "waiting_dependency", "waiting_confirmation", "waiting_input", "needs_attention", "failed",
 })
 
 
@@ -97,6 +110,24 @@ def _encode_or_original(raw: str | dict, decoded: dict[str, Any] | None) -> str:
     return json.dumps(decoded, ensure_ascii=False)
 
 
+def _state_projection(
+    kernel_status: Any,
+    *,
+    dependencies: Any = (),
+    pending_approvals: Any = (),
+    events: Any = (),
+    last_failure_error: Any = None,
+) -> tuple[str, dict[str, bool]]:
+    state = project_background_state(
+        str(kernel_status or ""),
+        dependencies=dependencies or (),
+        pending_approvals=pending_approvals or (),
+        events=events or (),
+        last_failure_error=str(last_failure_error) if last_failure_error else None,
+    )
+    return state, state_flags(state)
+
+
 def _start(args: dict[str, Any], kwargs: Mapping[str, Any]) -> str:
     title = str(args.get("title") or "").strip()
     if not title:
@@ -114,11 +145,25 @@ def _start(args: dict[str, Any], kwargs: Mapping[str, Any]) -> str:
     decoded = _decode_result(raw)
     if decoded is None or decoded.get("error"):
         return _encode_or_original(raw, decoded)
-    # ``subscribed`` is the durable delivery truth. Keep it verbatim and add a semantic alias so
-    # the coordinator never promises a completion notification when no route was actually stored.
-    decoded["kind"] = "background_task"
-    decoded["notification_mode"] = "automatic" if decoded.get("subscribed") else "manual"
-    return json.dumps(decoded, ensure_ascii=False)
+
+    state, flags = _state_projection(
+        decoded.get("status"),
+        dependencies=payload.get("parents") or (),
+    )
+    result = {
+        "ok": bool(decoded.get("ok", True)),
+        "kind": "background_task",
+        "task_id": decoded.get("task_id"),
+        "project_id": decoded.get("project_id"),
+        "state": state,
+        **flags,
+        "subscribed": bool(decoded.get("subscribed")),
+        "notification_mode": "automatic" if decoded.get("subscribed") else "manual",
+    }
+    return json.dumps(
+        {key: value for key, value in result.items() if value is not None},
+        ensure_ascii=False,
+    )
 
 
 def _require_task_id(args: Mapping[str, Any], action: str) -> str | None:
@@ -180,13 +225,21 @@ def _status(args: Mapping[str, Any], kwargs: Mapping[str, Any]) -> str:
     parents = decoded.get("parents") if isinstance(decoded.get("parents"), list) else []
     children = decoded.get("children") if isinstance(decoded.get("children"), list) else []
     pending = _pending_approvals(task_id)
-    status = str(task.get("status") or "")
+    kernel_status = str(task.get("status") or "")
+    state, flags = _state_projection(
+        kernel_status,
+        dependencies=parents,
+        pending_approvals=pending,
+        events=events,
+        last_failure_error=task.get("last_failure_error"),
+    )
     result: dict[str, Any] = {
         "ok": True,
         "kind": "background_task",
         "task_id": task.get("id") or task_id,
         "title": task.get("title"),
-        "status": status,
+        "state": state,
+        **flags,
         "priority": task.get("priority"),
         "created_at": task.get("created_at"),
         "started_at": task.get("started_at"),
@@ -194,21 +247,60 @@ def _status(args: Mapping[str, Any], kwargs: Mapping[str, Any]) -> str:
         "result": task.get("result"),
         "dependencies": list(parents),
         "dependents": list(children),
-        "blocked_reason": _latest_block_reason(events) if status == "blocked" else None,
-        "needs_user_input": bool(pending),
+        "blocked_reason": _latest_block_reason(events) if kernel_status == "blocked" else None,
         "pending_approvals": pending,
         "latest_attempt": _latest_run_summary(runs),
     }
     return json.dumps({key: value for key, value in result.items() if value is not None}, ensure_ascii=False)
 
 
-def _project_list_task(task: Mapping[str, Any]) -> dict[str, Any]:
+def _precise_list_state(task_id: str, kwargs: Mapping[str, Any]) -> tuple[str, dict[str, bool]] | None:
+    raw = _dispatch_kanban("kanban_show", {"task_id": task_id}, kwargs)
+    decoded = _decode_result(raw)
+    if decoded is None or decoded.get("error"):
+        return None
+    task = decoded.get("task") if isinstance(decoded.get("task"), Mapping) else {}
+    events = decoded.get("events") if isinstance(decoded.get("events"), list) else []
+    parents = decoded.get("parents") if isinstance(decoded.get("parents"), list) else []
+    pending = _pending_approvals(task_id)
+    return _state_projection(
+        task.get("status"),
+        dependencies=parents,
+        pending_approvals=pending,
+        events=events,
+        last_failure_error=task.get("last_failure_error"),
+    )
+
+
+def _project_list_task(
+    task: Mapping[str, Any],
+    kwargs: Mapping[str, Any],
+    *,
+    precise: bool = False,
+) -> dict[str, Any]:
+    task_id = str(task.get("id") or "")
+    kernel_status = str(task.get("status") or "")
+    parent_count = int(task.get("parent_count") or 0)
+    projection = _precise_list_state(task_id, kwargs) if precise and task_id else None
+    if projection is None:
+        if kernel_status == "blocked":
+            # List summaries intentionally do not carry the event ledger. Without a precise lookup,
+            # never guess whether blocked means consent, input, capability, or retry exhaustion.
+            state, flags = "needs_attention", state_flags("needs_attention")
+        else:
+            state, flags = _state_projection(
+                kernel_status,
+                dependencies=(None,) * parent_count,
+            )
+    else:
+        state, flags = projection
     return {
         key: value
         for key, value in {
             "task_id": task.get("id"),
             "title": task.get("title"),
-            "status": task.get("status"),
+            "state": state,
+            **flags,
             "priority": task.get("priority"),
             "created_at": task.get("created_at"),
             "started_at": task.get("started_at"),
@@ -222,25 +314,55 @@ def _project_list_task(task: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _list(args: Mapping[str, Any], kwargs: Mapping[str, Any]) -> str:
-    payload = {key: value for key, value in args.items() if key in {"status", "limit"} and value is not None}
+    requested_state = str(args.get("state") or "").strip()
+    if requested_state and requested_state not in PUBLIC_STATES:
+        return tool_error(f"unknown background task state: {requested_state}")
+    try:
+        requested_limit = int(args.get("limit") or 50)
+    except (TypeError, ValueError):
+        return tool_error("background_task list limit must be an integer")
+    if requested_limit < 1 or requested_limit > 200:
+        return tool_error("background_task list limit must be between 1 and 200")
+
+    kernel_filter = _KERNEL_FILTER_BY_PUBLIC_STATE.get(requested_state)
+    source_limit = 200 if requested_state in _SHARED_KERNEL_FILTER_STATES else requested_limit
+    payload: dict[str, Any] = {"limit": source_limit}
+    if kernel_filter:
+        payload["status"] = kernel_filter
+
     raw = _dispatch_kanban("kanban_list", payload, kwargs)
     decoded = _decode_result(raw)
     if decoded is None or decoded.get("error"):
         return _encode_or_original(raw, decoded)
     tasks = decoded.get("tasks") if isinstance(decoded.get("tasks"), list) else []
+    precise = bool(requested_state)
+    projected = [
+        _project_list_task(task, kwargs, precise=precise)
+        for task in tasks
+        if isinstance(task, Mapping)
+    ]
+    if requested_state:
+        projected = [task for task in projected if task.get("state") == requested_state]
+    local_truncated = len(projected) > requested_limit
+    projected = projected[:requested_limit]
+    truncated = bool(decoded.get("truncated")) or local_truncated
     return json.dumps({
         "ok": True,
         "kind": "background_task_list",
-        "tasks": [_project_list_task(task) for task in tasks if isinstance(task, Mapping)],
-        "count": decoded.get("count", len(tasks)),
-        "limit": decoded.get("limit"),
-        "truncated": bool(decoded.get("truncated")),
-        "next_limit": decoded.get("next_limit"),
+        "tasks": projected,
+        "count": len(projected),
+        "limit": requested_limit,
+        "truncated": truncated,
+        "next_limit": (
+            min(requested_limit * 2, 200)
+            if truncated and requested_limit < 200
+            else None
+        ),
     }, ensure_ascii=False)
 
 
 def _cancel_task(task_id: str) -> str:
-    """Cancel through the Kanban kernel so a running worker is terminated after the archive commits."""
+    """Cancel through the durable kernel so a running worker is terminated after the archive commits."""
     from tools.kanban_tools import _board
 
     with _board(None) as (kb, conn):
@@ -248,11 +370,13 @@ def _cancel_task(task_id: str) -> str:
         if task is None:
             return tool_error(f"unknown background task: {task_id}")
         if task.status == "archived":
+            state, flags = _state_projection(task.status)
             return json.dumps({
                 "ok": True,
                 "kind": "background_task",
                 "task_id": task_id,
-                "status": "archived",
+                "state": state,
+                **flags,
                 "cancelled": False,
                 "already_cancelled": True,
             }, ensure_ascii=False)
@@ -260,13 +384,22 @@ def _cancel_task(task_id: str) -> str:
             return tool_error(f"background task {task_id} is already done and cannot be cancelled")
         if not kb.archive_task(conn, task_id):
             return tool_error(f"background task {task_id} could not be cancelled because its state changed")
+        state, flags = _state_projection("archived")
         return json.dumps({
             "ok": True,
             "kind": "background_task",
             "task_id": task_id,
-            "status": "archived",
+            "state": state,
+            **flags,
             "cancelled": True,
         }, ensure_ascii=False)
+
+
+def _kernel_event_projection(kb, conn, task_id: str) -> list[dict[str, Any]]:
+    return [
+        {"kind": event.kind, "payload": event.payload, "created_at": event.created_at}
+        for event in kb.list_events(conn, task_id)
+    ]
 
 
 def _approval_operation(task_id: str, action: str, args: Mapping[str, Any]) -> str:
@@ -278,18 +411,24 @@ def _approval_operation(task_id: str, action: str, args: Mapping[str, Any]) -> s
         if task is None:
             return tool_error(f"unknown background task: {task_id}")
         if action == "approvals":
+            approvals = list_approvals(conn, task_id, pending_only=True)
+            state, flags = _state_projection(
+                task.status,
+                dependencies=kb.parent_ids(conn, task_id),
+                pending_approvals=approvals,
+                events=_kernel_event_projection(kb, conn, task_id),
+                last_failure_error=task.last_failure_error,
+            )
             return json.dumps({
                 "ok": True,
                 "kind": "background_task",
                 "task_id": task_id,
-                "status": task.status,
-                "approvals": [
-                    _public_approval(item)
-                    for item in list_approvals(conn, task_id, pending_only=True)
-                ],
+                "state": state,
+                **flags,
+                "approvals": [_public_approval(item) for item in approvals],
             }, ensure_ascii=False)
         try:
-            result = decide_task_approval(
+            decision = decide_task_approval(
                 conn,
                 kb,
                 task_id,
@@ -299,17 +438,45 @@ def _approval_operation(task_id: str, action: str, args: Mapping[str, Any]) -> s
             )
         except ValueError as exc:
             return tool_error(str(exc))
-        result["kind"] = "background_task"
-        return json.dumps(result, ensure_ascii=False)
+
+        task = kb.get_task(conn, task_id)
+        if task is None:  # pragma: no cover - defensive after a successful durable decision
+            return tool_error(f"background task disappeared after approval decision: {task_id}")
+        pending = list_approvals(conn, task_id, pending_only=True)
+        state, flags = _state_projection(
+            task.status,
+            dependencies=kb.parent_ids(conn, task_id),
+            pending_approvals=pending,
+            events=_kernel_event_projection(kb, conn, task_id),
+            last_failure_error=task.last_failure_error,
+        )
+        result = {
+            "ok": bool(decision.get("ok", True)),
+            "kind": "background_task",
+            "task_id": task_id,
+            "approval_id": decision.get("approval_id"),
+            "decision": decision.get("decision"),
+            "already_decided": decision.get("already_decided"),
+            "resumed": decision.get("resumed"),
+            "state": state,
+            **flags,
+        }
+        return json.dumps(
+            {key: value for key, value in result.items() if value is not None},
+            ensure_ascii=False,
+        )
 
 
 def _normalize_mutation(raw: str | dict, action: str) -> str:
     decoded = _decode_result(raw)
     if decoded is None or decoded.get("error"):
         return _encode_or_original(raw, decoded)
-    decoded["kind"] = "background_task"
-    decoded["action"] = action
-    return json.dumps(decoded, ensure_ascii=False)
+    return json.dumps({
+        "ok": bool(decoded.get("ok", True)),
+        "kind": "background_task",
+        "task_id": decoded.get("task_id"),
+        "action": action,
+    }, ensure_ascii=False)
 
 
 def background_task(args: dict[str, Any], **kwargs: Any) -> str:
@@ -337,8 +504,16 @@ def background_task(args: dict[str, Any], **kwargs: Any) -> str:
         return _cancel_task(task_id)
     if action in {"approvals", "approve", "deny"}:
         return _approval_operation(task_id, action, args)
+
     raw = _dispatch_kanban("kanban_unblock", {"task_id": task_id}, kwargs)
-    return _normalize_mutation(raw, action)
+    decoded = _decode_result(raw)
+    if decoded is None or decoded.get("error"):
+        return _encode_or_original(raw, decoded)
+    status_result = _decode_result(_status({"task_id": task_id}, kwargs))
+    if status_result is None or status_result.get("error"):
+        return _normalize_mutation(raw, action)
+    status_result["action"] = action
+    return json.dumps(status_result, ensure_ascii=False)
 
 
 BACKGROUND_TASK_SCHEMA = {
@@ -347,10 +522,12 @@ BACKGROUND_TASK_SCHEMA = {
         "Manage durable personal-assistant background work. Use start only when the user should not have to wait and "
         "the work must survive chat/app restarts, retry safely, or participate in dependency/review flows. Answer "
         "ordinary questions directly; keep work that can finish in this live turn in the live session instead of "
-        "creating a background task. Use status/list to inspect durable work. If a high-risk background action pauses "
-        "for user consent, use approvals to inspect the pending request and approve/deny to record the user's decision; "
-        "approve resumes the task and the grant is valid exactly once for the same resolved tool call. Use comment to "
-        "add durable context, resume for ordinary non-approval blockers, and cancel to stop pending/running work. Use "
+        "creating a background task. Use status/list to inspect durable work. Returned state values are personal-" 
+        "assistant states such as queued, running, waiting_confirmation, waiting_dependency, completed, failed, and "
+        "cancelled; do not reason from internal scheduler phases. If a high-risk background action pauses for user "
+        "consent, use approvals to inspect the pending request and approve/deny to record the user's decision; approve "
+        "resumes the task and the grant is valid exactly once for the same resolved tool call. Use comment to add "
+        "durable context, resume for ordinary non-approval blockers, and cancel to stop pending/running work. Use "
         "cronjob_manage, not this tool, for scheduled/recurring triggers. The returned subscribed/notification_mode "
         "fields are authoritative: promise automatic completion reporting only when subscribed=true."
     ),
@@ -383,7 +560,7 @@ BACKGROUND_TASK_SCHEMA = {
                 "type": "string",
                 "description": (
                     "Optional specialist profile. Omit for normal personal-assistant work: Stardust uses the configured "
-                    "kanban.default_assignee, then the current Desktop profile."
+                    "orchestration default, then the current Desktop profile."
                 ),
             },
             "parents": {
@@ -401,7 +578,7 @@ BACKGROUND_TASK_SCHEMA = {
             "max_runtime_seconds": {"type": "integer", "description": "Optional per-attempt runtime cap."},
             "idempotency_key": {
                 "type": "string",
-                "description": "Optional retry-safe key; repeated start calls reuse the non-archived task.",
+                "description": "Optional retry-safe key; repeated start calls reuse the non-cancelled task.",
             },
             "skills": {
                 "type": "array",
@@ -417,10 +594,10 @@ BACKGROUND_TASK_SCHEMA = {
                 "description": "Optional workspace flavor for start.",
             },
             "workspace_path": {"type": "string", "description": "Absolute path for dir/worktree workspace."},
-            "status": {
+            "state": {
                 "type": "string",
-                "enum": ["triage", "todo", "ready", "running", "blocked", "done", "archived"],
-                "description": "Optional status filter for list.",
+                "enum": sorted(PUBLIC_STATES),
+                "description": "Optional personal-assistant state filter for list.",
             },
             "limit": {"type": "integer", "description": "Optional list row limit (default 50, max 200)."},
         },
