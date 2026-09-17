@@ -13,6 +13,8 @@ Routing contract (see ``tests/tools/test_browser_extension_router.py``):
 - ``args`` is never mutated.
 - In Stardust personal-assistant contexts, ``browser_click`` is semantically
   preflighted from a fresh accessibility snapshot immediately before the effect.
+- Advanced escape hatches (arbitrary console JavaScript and non-read-only raw CDP)
+  cross the same human/durable approval boundary before either backend executes them.
 
 :func:`routed_browser_handler` resolves the flag and broker lazily on every call
 so importing this module never pulls in the gateway and config changes apply
@@ -69,21 +71,38 @@ def _browser_permission_failure(message: str) -> str:
     return json.dumps({"success": False, "status": "blocked", "error": message}, ensure_ascii=False)
 
 
+def _browser_escape_guard(action: str, args: Dict[str, Any]) -> Optional[str]:
+    """Approval guard for expert browser primitives that can bypass semantic tools."""
+    if action not in {"browser_console", "browser_cdp"}:
+        return None
+    try:
+        from tools.browser_escape_approval import guard_browser_escape
+
+        return guard_browser_escape(action, args)
+    except Exception:
+        logger.error("Stardust advanced browser permission guard failed", exc_info=True)
+        return _browser_permission_failure(
+            "Stardust could not verify this advanced browser action safely. The action was not executed."
+        )
+
+
 def _legacy_effect_or_guard(
     action: str, args: Dict[str, Any], task_id: Optional[str], fallback: Callable[[], Any]
 ) -> Any:
-    """Run the legacy backend, except semantic-preflight a personal-assistant click first."""
-    if action != "browser_click":
-        return fallback()
-    try:
-        from tools.browser_action_approval import guard_browser_click
+    """Run the legacy backend after Stardust's final-effect browser guards."""
+    if action == "browser_click":
+        try:
+            from tools.browser_action_approval import guard_browser_click
 
-        blocked = guard_browser_click(args.get("ref"), task_id)
-    except Exception:
-        logger.error("Stardust browser click permission guard failed", exc_info=True)
-        return _browser_permission_failure(
-            "Stardust could not verify this browser click safely. Refresh the page snapshot and retry."
-        )
+            blocked = guard_browser_click(args.get("ref"), task_id)
+        except Exception:
+            logger.error("Stardust browser click permission guard failed", exc_info=True)
+            return _browser_permission_failure(
+                "Stardust could not verify this browser click safely. Refresh the page snapshot and retry."
+            )
+        return blocked if blocked is not None else fallback()
+
+    blocked = _browser_escape_guard(action, args)
     return blocked if blocked is not None else fallback()
 
 
@@ -172,6 +191,12 @@ def route_browser_tool(
     if blocked is not None:
         return blocked
 
+    # Raw JS/CDP approval is backend-independent and binds to the exact arguments already resolved
+    # for this controller call, so it runs at the same final effect boundary immediately before dispatch.
+    blocked = _browser_escape_guard(action, args)
+    if blocked is not None:
+        return blocked
+
     # Registry handlers must return a string; keep string results byte-identical and
     # serialize decoded JSON values at this boundary.
     result = broker.dispatch(scope, action=action, arguments=args, tool_call_id=tool_call_id)
@@ -194,8 +219,8 @@ def routed_browser_handler(
     transport_family: Optional[str] = None, tool_call_id: Optional[str] = None,
 ) -> Any:
     """Lazy registry-handler route wrapper for ``browser_*`` tools.
-    Feature off (or gateway unimportable) ⇒ the legacy handler runs unchanged,
-    except Stardust click approval still executes at this final effect boundary."""
+    Feature off (or gateway unimportable) ⇒ the legacy handler runs through the same
+    Stardust final-effect guards used by extension-controller execution."""
     try:
         from gateway.browser_control_broker import browser_control_enabled, get_browser_control_broker
     except Exception as exc:  # pragma: no cover - defensive, gateway always present
