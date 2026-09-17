@@ -144,6 +144,15 @@ def test_public_install_docs_only_advertise_stardust_bootstrap() -> None:
         assert "raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install" not in source
 
 
+def test_llms_index_is_canonical_to_stardust() -> None:
+    source = _read("website/scripts/generate-llms-txt.py")
+
+    assert 'REPO_URL = "https://github.com/9529360-cpu/stardust-hermes"' in source
+    assert "install-stardust.sh" in source
+    assert "hermes-agent.nousresearch.com/docs" not in source
+    assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in source
+
+
 def test_uninstall_reinstall_guidance_stays_on_stardust() -> None:
     source = _read("hermes_cli/uninstall.py")
 
