@@ -88,11 +88,27 @@ reads/writes a stored pointer), `canonical-chat-creation.test.ts`, `canonical-ch
 `bot-row-opens-canonical-chat.test.ts`, `hide-bot-chats.test.ts`; plus repo-root
 `tests/tui_gateway/test_profiles_list_canonical_session.py`.
 
-## Free tier surfaces (`src/store/free-tier*.ts`, Billing, statusbar chip, onboarding ready screen)
+## Built-in Nous account / guest free tier is retired on Stardust Desktop
 
-`$freeTierStatus` mirrors `free_tier.status` (pull; refreshed with the status snapshot and after a
-sign-in). `deriveBillingView` branches on `billing.free_tier` BEFORE `logged_in` (status
-`free_tier`: notice + one Sign in, Plan/Model/Connectors summary, no payment or usage rows). The
-sign-in dialog is a single claimed owner (first mount wins, like the real-profile consent prompt);
-its states map 1:1 to the poll route's `status` + `reason`. Copy is the ruled free-tier copy: never
-"guest", "anonymous", "claim" or "Nous Portal" in user-facing text.
+Stardust Desktop is a user-controlled assistant and coding workbench. It must not mint, advertise,
+or prompt for the inherited Hermes/Nous guest identity merely because an older backend still
+supports `free_tier.*` or because a stale launch environment contains `HERMES_GUEST_ONBOARDING=1`.
+The Desktop client owns this product decision; backend compatibility must not regain authority over it.
+
+Keep these invariants together:
+
+- Electron launch plumbing forces the inherited guest switch off for Desktop-created backends.
+- A renderer with `window.hermesDesktop` treats legacy `free_tier.status` as absent and does not call
+  the legacy free-tier status/notice RPCs. Old local or remote backends cannot light the UI back up.
+- Desktop entry points never open the inherited built-in-account sign-in flow. Do not reintroduce
+  sign-in chips, notices, ready screens, or onboarding that depend on an anonymous/free-tier identity.
+- Provider pickers hide an unlogged `nous` provider and an anonymous/free-tier Nous identity.
+  An already-authenticated **real** Nous account (`logged_in === true`, `free_tier !== true`) may stay
+  visible for management/disconnect compatibility; that is not permission to advertise Nous as the
+  built-in or recommended account for new users.
+- Shared non-Desktop hosts may keep the old compatibility behavior while it is being retired from
+  common code, but tests must prove that the Desktop preload boundary stays closed.
+
+If an old backend reports a guest/free tier, ignoring it in Desktop is correct. Do not "fix" this by
+making backend truth repaint the retired surfaces. New account/provider UX must be explicit and
+user-selected, alongside other providers, not a hidden app-level identity.
