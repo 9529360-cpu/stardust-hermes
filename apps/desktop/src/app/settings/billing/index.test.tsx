@@ -596,14 +596,15 @@ describe('BillingSettings', () => {
     await waitFor(() => expect(screen.getByText(`${formatMoney(25)} added. Balance is refreshing.`)).toBeTruthy())
   })
 
-  it('renders logged-out as a connect card without normal account rows', async () => {
+  it('renders logged-out as read-only billing with no account action', async () => {
     apiMocks.fetchBillingState.mockResolvedValue(okBilling(loggedOutBillingState))
     apiMocks.fetchSubscriptionState.mockResolvedValue(okSubscription(loggedOutSubscriptionState))
 
     renderBilling()
 
-    expect(await screen.findByText('Connect your Nous account')).toBeTruthy()
-    expect(screen.getByText('Run /portal in the TUI or open the Nous portal to connect your account.')).toBeTruthy()
+    expect(await screen.findByText('No billing account connected')).toBeTruthy()
+    expect(screen.getByText(/does not use a built-in billing account/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /sign in|open portal/i })).toBeNull()
     expect(screen.queryByText('Payment method')).toBeNull()
     expect(screen.queryByText('Usage')).toBeNull()
   })
