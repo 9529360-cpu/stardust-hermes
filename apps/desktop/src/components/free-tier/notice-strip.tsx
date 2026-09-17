@@ -15,37 +15,42 @@ import { setModelPickerOpen } from '@/store/session'
  * once (split zones, a popout mid-dock); the first to mount claims it and the
  * rest report false, so one pending notice never paints N times. The CALLER
  * asks, so a non-owning stack adds no empty row to its card.
+ *
+ * Stardust Desktop has retired the inherited Nous free-tier account surface.
+ * When the preload bridge is present we therefore decline the claim entirely,
+ * even if an older backend still reports a pending free-tier notice.
  */
 export function useFreeTierNoticeOwner(): boolean {
   const id = useId()
   const claim = useStore(freeTierNoticeClaim())
+  const desktop = typeof window !== 'undefined' && Boolean(window.hermesDesktop)
 
   useEffect(() => {
+    if (desktop) {
+      return
+    }
+
     claimFreeTierNotice(id)
 
     return () => releaseFreeTierNotice(id)
-  }, [id])
+  }, [desktop, id])
 
   // When the owner unmounts it releases the claim; a composer still mounted takes it over,
   // so the notice does not vanish until some later mount.
   useEffect(() => {
-    if (claim === null) {
+    if (!desktop && claim === null) {
       claimFreeTierNotice(id)
     }
-  }, [claim, id])
+  }, [claim, desktop, id])
 
-  return claim === id
+  return !desktop && claim === id
 }
 
 /**
- * The quiet half of the free-tier introduction: shown when the user already has
- * a provider of their own carrying inference, so the free models are an offer
- * rather than the only road. It lives in the composer status stack — the same
- * lane as the billing wall — and never blocks the composer.
- *
- * Backend-latched: `notice_pending` is the only source of truth, so any of the
- * three actions retires it everywhere at once and no renderer flag can strand a
- * strip the backend considers seen.
+ * The quiet half of the legacy free-tier introduction. Desktop callers no
+ * longer reach this component because `useFreeTierNoticeOwner` declines the
+ * claim there. Keep the rendering path temporarily for non-Desktop shared
+ * hosts while the compatibility surface is retired separately.
  */
 export function FreeTierNoticeStrip() {
   const { requestGateway } = useGatewayRequest()
