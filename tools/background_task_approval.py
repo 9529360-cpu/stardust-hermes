@@ -3,7 +3,8 @@
 Gateway/CLI approval queues are process-local, while Kanban workers are one-shot subprocesses.
 This module stores only approval metadata in the existing task event ledger and reuses the task's
 ``blocked(kind=needs_input)`` lifecycle. Raw tool arguments are never persisted: exact-call matching
-uses a SHA-256 fingerprint of the resolved tool name and arguments.
+uses a SHA-256 fingerprint of the resolved tool name and arguments. Terminal fingerprints additionally
+bind the resolved execution/security context so consent cannot migrate across hosts/backends/mounts.
 """
 from __future__ import annotations
 
@@ -39,7 +40,16 @@ def _canonical_args(args: Mapping[str, Any] | None) -> str:
 
 
 def call_fingerprint(tool_name: str, args: Mapping[str, Any] | None) -> str:
-    material = f"{str(tool_name or '').strip().lower()}\n{_canonical_args(args)}"
+    normalized_tool = str(tool_name or "").strip().lower()
+    fingerprint_args: Mapping[str, Any] | None = args
+    if normalized_tool == "terminal":
+        # Terminal consent is target-sensitive: the same shell text on local, SSH, or a differently
+        # mounted container is not the same authorized action. The bridge returns an opaque nested
+        # payload containing only the original JSON args plus a SHA of the resolved security context.
+        from tools.background_terminal_approval import approval_fingerprint_args
+
+        fingerprint_args = approval_fingerprint_args(args)
+    material = f"{normalized_tool}\n{_canonical_args(fingerprint_args)}"
     return hashlib.sha256(material.encode("utf-8", errors="replace")).hexdigest()
 
 
