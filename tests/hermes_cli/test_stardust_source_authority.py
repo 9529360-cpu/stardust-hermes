@@ -2,6 +2,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
+STARDUST_INSTALL_BASE = "raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust"
+UPSTREAM_INSTALL_HOST = "hermes-agent.nousresearch.com/install."
 
 
 def _read(path: str) -> str:
@@ -121,7 +123,29 @@ def test_public_readmes_install_stardust_not_upstream() -> None:
     readmes = ("README.md", "README.zh-CN.md", "README.es.md", "README.ur-pk.md")
     for path in readmes:
         source = _read(path)
-        assert "raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust" in source
+        assert STARDUST_INSTALL_BASE in source
         assert "hermes-agent.nousresearch.com/install.sh" not in source
         assert "hermes-agent.nousresearch.com/install.ps1" not in source
         assert "raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install" not in source
+
+
+def test_public_install_docs_only_advertise_stardust_bootstrap() -> None:
+    install_docs = (
+        "website/docs/index.mdx",
+        "website/docs/getting-started/installation.md",
+        "website/docs/getting-started/termux.md",
+        "website/docs/developer-guide/contributing.md",
+    )
+    for path in install_docs:
+        source = _read(path)
+        assert STARDUST_INSTALL_BASE in source
+        assert UPSTREAM_INSTALL_HOST not in source
+        assert "raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install" not in source
+
+
+def test_uninstall_reinstall_guidance_stays_on_stardust() -> None:
+    source = _read("hermes_cli/uninstall.py")
+
+    assert STARDUST_INSTALL_BASE in source
+    assert UPSTREAM_INSTALL_HOST not in source
+    assert "Thank you for using Stardust!" in source
