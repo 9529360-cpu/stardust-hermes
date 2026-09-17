@@ -35,6 +35,12 @@ def test_contacts_tool_remember_lookup_list_archive(contact_home):
     assert looked_up["found"] is True
     assert looked_up["contact"]["id"] == contact_id
     assert looked_up["contact"]["channels"][0]["handle"] == "wxid_wang"
+    assert looked_up["resolution"] == {
+        "status": "resolved",
+        "requires_user_input": False,
+        "selected": {"channel": "wechat", "handle": "wxid_wang"},
+        "available_channels": [{"channel": "wechat", "handle": "wxid_wang"}],
+    }
 
     listed = json.loads(registry.dispatch("contacts", {"action": "list", "query": "王"}))
     assert listed["count"] == 1
@@ -48,6 +54,66 @@ def test_contacts_tool_remember_lookup_list_archive(contact_home):
     }
     missing = json.loads(registry.dispatch("contacts", {"action": "lookup", "query": "老王"}))
     assert missing["found"] is False
+    assert missing["resolution"]["status"] == "not_found"
+    assert missing["resolution"]["requires_user_input"] is True
+
+
+def test_contacts_lookup_single_channel_resolves_without_guessing(contact_home):
+    registry.dispatch("contacts", {
+        "action": "remember",
+        "display_name": "王强",
+        "aliases": ["老王"],
+        "channels": [{"channel": "email", "handle": "wang@example.test"}],
+    })
+
+    looked_up = json.loads(registry.dispatch("contacts", {"action": "lookup", "query": "老王"}))
+    assert looked_up["resolution"] == {
+        "status": "resolved",
+        "requires_user_input": False,
+        "selected": {"channel": "email", "handle": "wang@example.test"},
+        "available_channels": [{"channel": "email", "handle": "wang@example.test"}],
+    }
+
+
+def test_contacts_lookup_multiple_channels_requires_explicit_selection(contact_home):
+    registry.dispatch("contacts", {
+        "action": "remember",
+        "display_name": "王强",
+        "aliases": ["老王"],
+        "channels": [
+            {"channel": "email", "handle": "wang@example.test"},
+            {"channel": "wechat", "handle": "wxid_wang"},
+        ],
+    })
+
+    looked_up = json.loads(registry.dispatch("contacts", {"action": "lookup", "query": "老王"}))
+    assert looked_up["found"] is True
+    assert looked_up["resolution"]["status"] == "needs_channel_selection"
+    assert looked_up["resolution"]["requires_user_input"] is True
+    assert looked_up["resolution"]["selected"] is None
+    assert {item["channel"] for item in looked_up["resolution"]["available_channels"]} == {"email", "wechat"}
+
+
+def test_contacts_lookup_distinguishes_missing_channel_from_missing_person(contact_home):
+    registry.dispatch("contacts", {
+        "action": "remember",
+        "display_name": "王强",
+        "aliases": ["老王"],
+        "channels": [{"channel": "email", "handle": "wang@example.test"}],
+    })
+
+    looked_up = json.loads(registry.dispatch("contacts", {
+        "action": "lookup", "query": "老王", "channel": "wechat",
+    }))
+    assert looked_up["found"] is True
+    assert looked_up["contact"]["display_name"] == "王强"
+    assert looked_up["resolution"] == {
+        "status": "channel_unavailable",
+        "requires_user_input": True,
+        "requested_channel": "wechat",
+        "selected": None,
+        "available_channels": [{"channel": "email", "handle": "wang@example.test"}],
+    }
 
 
 def test_contacts_tool_rejects_duplicate_channel_entries(contact_home):
@@ -68,6 +134,8 @@ def test_contacts_toolset_is_memory_and_schema_forbids_silent_imports():
     assert "explicitly supplied or confirmed" in description
     assert "never infer private contact details" in description
     assert "silently import" in description
+    assert "resolution.status" in description
+    assert "missing_channel/channel_unavailable/needs_channel_selection" in description
     assert "Projects" in description
 
 
