@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate llms.txt and llms-full.txt for the Hermes docs site.
+"""Generate llms.txt and llms-full.txt for the Stardust documentation tree.
 
 Outputs:
   website/static/llms.txt        — index of the docs, one link per page, grouped by
@@ -10,20 +10,14 @@ Outputs:
 
 Both are driven by `iter_docs()`, which walks the docs tree. `SECTIONS` below
 curates *order and grouping*, never membership: a page nobody curated still
-gets indexed, under the section its path belongs to. That distinction is the
-reason this file was rewritten — when the section list also decided membership,
-it silently drifted to 53% coverage, and Bot Mode, the desktop app, computer
-use, web search, and 22 messaging platforms were absent from the index every
-LLM reads to learn what Hermes does.
+gets indexed, under the section its path belongs to. That distinction keeps
+new product and compatibility documentation discoverable without turning the
+curated section list into a second source of truth.
 
-Both publish at:
-  https://hermes-agent.nousresearch.com/docs/llms.txt
-  https://hermes-agent.nousresearch.com/docs/llms-full.txt
-
-The `/docs/` prefix is not a mistake — Docusaurus serves `website/static/`
-at the `docs/` base path. Clients and IDE plugins that probe the classic
-`/llms.txt` root will miss these. Document the canonical URLs in the docs
-index and in the repo README.
+Stardust does not currently publish a standalone documentation domain. The
+short index therefore links to the authoritative source files in
+`9529360-cpu/stardust-hermes` rather than advertising the former upstream
+Hermes docs site as canonical.
 
 Called from `website/scripts/prebuild.mjs` on every `npm run start` /
 `npm run build` so the output stays in sync with the docs tree.
@@ -39,7 +33,12 @@ WEBSITE = SCRIPT_DIR.parent
 DOCS = WEBSITE / "docs"
 STATIC = WEBSITE / "static"
 
-SITE_BASE = "https://hermes-agent.nousresearch.com/docs"
+REPO_URL = "https://github.com/9529360-cpu/stardust-hermes"
+DOCS_SOURCE_BASE = f"{REPO_URL}/blob/main/website/docs"
+STARDUST_INSTALL_COMMAND = (
+    "curl -fsSL https://raw.githubusercontent.com/9529360-cpu/"
+    "stardust-hermes/main/scripts/install-stardust.sh | bash"
+)
 
 # The product story: which pages lead, and in what order. Everything not named
 # here is still indexed — ABSORB decides where it lands — so this list is safe
@@ -55,7 +54,7 @@ SECTIONS: list[tuple[str, list[tuple[str, str, str | None]]]] = [
         ("getting-started/termux", "Termux (Android)", None),
         ("getting-started/nix-setup", "Nix Setup", None),
     ]),
-    ("Using Hermes", [
+    ("Using Stardust", [
         ("user-guide/cli", "CLI", None),
         ("user-guide/tui", "TUI (Ink terminal UI)", None),
         ("user-guide/configuration", "Configuration", None),
@@ -127,17 +126,17 @@ SECTIONS: list[tuple[str, list[tuple[str, str, str | None]]]] = [
         ("guides/local-llm-on-mac", "Local LLMs on Mac", None),
         ("guides/daily-briefing-bot", "Daily Briefing Bot", None),
         ("guides/team-telegram-assistant", "Team Telegram Assistant", None),
-        ("guides/python-library", "Use Hermes as a Python Library", None),
-        ("guides/use-mcp-with-hermes", "Use MCP with Hermes", None),
-        ("guides/use-voice-mode-with-hermes", "Use Voice Mode with Hermes", None),
-        ("guides/use-soul-with-hermes", "Use SOUL.md with Hermes", None),
+        ("guides/python-library", "Use Stardust as a Python Library", None),
+        ("guides/use-mcp-with-hermes", "Use MCP with Stardust", None),
+        ("guides/use-voice-mode-with-hermes", "Use Voice Mode with Stardust", None),
+        ("guides/use-soul-with-hermes", "Use SOUL.md with Stardust", None),
         ("guides/automate-with-cron", "Automate with Cron", None),
         ("guides/work-with-skills", "Work with Skills", None),
         ("guides/delegation-patterns", "Delegation Patterns", None),
         ("guides/github-pr-review-agent", "GitHub PR Review Agent", None),
     ]),
     ("Developer Guide", [
-        ("developer-guide/contributing", "Contributing", None),
+        ("developer-guide/contributing", "Development & Maintenance", None),
         ("developer-guide/architecture", "Architecture", None),
         ("developer-guide/agent-loop", "Agent Loop", None),
         ("developer-guide/prompt-assembly", "Prompt Assembly", None),
@@ -160,8 +159,8 @@ SECTIONS: list[tuple[str, list[tuple[str, str, str | None]]]] = [
         ("reference/toolsets-reference", "Toolsets Reference", None),
         ("reference/mcp-config-reference", "MCP Config Reference", None),
         ("reference/model-catalog", "Model Catalog", None),
-        ("reference/skills-catalog", "Bundled Skills Catalog", "Table of all ~90 skills bundled with Hermes"),
-        ("reference/optional-skills-catalog", "Optional Skills Catalog", "Table of ~60 additional installable skills"),
+        ("reference/skills-catalog", "Bundled Skills Catalog", "Table of skills bundled with the inherited runtime"),
+        ("reference/optional-skills-catalog", "Optional Skills Catalog", "Table of additional installable skills"),
         ("reference/faq", "FAQ & Troubleshooting", None),
     ]),
 ]
@@ -181,7 +180,7 @@ ABSORB: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Getting Started", ("getting-started",)),
     ("Messaging Platforms", ("user-guide/messaging",)),
     ("Core Features", ("user-guide/features",)),
-    ("Using Hermes", ("user-guide",)),
+    ("Using Stardust", ("user-guide",)),
     ("Integrations", ("integrations",)),
     ("Guides & Tutorials", ("guides",)),
     ("Developer Guide", ("developer-guide",)),
@@ -280,7 +279,8 @@ def resolve_desc(slug: str, provided: str | None) -> str:
 
 
 def _entry(slug: str, title: str, desc: str) -> str:
-    url = f"{SITE_BASE}/{slug}"
+    path = doc_path(slug)
+    url = f"{DOCS_SOURCE_BASE}/{path.relative_to(DOCS)}" if path else f"{REPO_URL}/tree/main/website/docs"
     return f"- [{title}]({url}): {desc}" if desc else f"- [{title}]({url})"
 
 
@@ -293,25 +293,19 @@ def emit_llms_index() -> str:
             absorbed.setdefault(section_for(slug), []).append(slug)
 
     lines: list[str] = []
-    lines.append("# Hermes Agent")
+    lines.append("# Stardust")
     lines.append("")
     lines.append(
-        "> The self-improving AI agent built by Nous Research. A terminal-native "
-        "autonomous coding and task agent with persistent memory, agent-created skills, "
-        "and a messaging gateway that lives on 21+ messaging platforms — 19 native to "
-        "the gateway plus IRC and Microsoft Teams via plugins (Telegram, Discord, Slack, "
-        "SMS, Matrix, ...). Runs on local, Docker, SSH, Daytona, Modal, or Singularity "
-        "backends. Works with Nous Portal, OpenRouter, OpenAI, Anthropic, Google, or any "
-        "OpenAI-compatible endpoint."
+        "> Independently maintained personal AI assistant built on the Hermes Agent "
+        "open-source foundation. Stardust owns the desktop experience, model-routing "
+        "behavior, install/update/recovery sources, and ongoing maintenance in "
+        "9529360-cpu/stardust-hermes; inherited Hermes names remain where compatibility "
+        "requires them."
     )
     lines.append("")
-    lines.append(
-        "Install: `curl -fsSL https://raw.githubusercontent.com/NousResearch/"
-        "hermes-agent/main/scripts/install.sh | bash`  "
-        "(Linux, macOS, WSL2, Termux)"
-    )
+    lines.append(f"Install: `{STARDUST_INSTALL_COMMAND}`  (Linux, macOS, WSL2, Termux)")
     lines.append("")
-    lines.append("Repo: https://github.com/NousResearch/hermes-agent")
+    lines.append(f"Repo: {REPO_URL}")
     lines.append("")
 
     for section, items in SECTIONS:
@@ -338,15 +332,15 @@ def emit_llms_full() -> str:
     """Concatenate every doc under website/docs/ into a single markdown file."""
     seen: set[Path] = set()
     chunks: list[str] = [
-        "# Hermes Agent — Full Documentation\n",
+        "# Stardust — Full Documentation\n",
         (
-            "This file is the entire Hermes Agent documentation concatenated for LLM "
-            "context ingestion. Section order reflects docs-site navigation: Getting "
-            "Started, Using Hermes, Features, Messaging, Integrations, Guides, "
-            "Developer Guide, Reference, then everything else.\n"
+            "This file is the Stardust documentation tree concatenated for LLM context "
+            "ingestion. Stardust is independently maintained on the Hermes Agent "
+            "open-source foundation; inherited command and path names may still use "
+            "Hermes where compatibility requires them.\n"
         ),
-        "Canonical site: https://hermes-agent.nousresearch.com/docs\n",
-        "Short index: https://hermes-agent.nousresearch.com/docs/llms.txt\n",
+        f"Canonical source: {REPO_URL}/tree/main/website/docs\n",
+        f"Short index source: {REPO_URL}/blob/main/website/static/llms.txt\n",
         "\n---\n\n",
     ]
 
