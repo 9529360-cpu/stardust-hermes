@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 
 import { test } from 'vitest'
 
-import { desktopBackendSpawnEnv, guestOnboardingEnabled, skipIntroEnabled } from './guest-onboarding'
+import { desktopBackendSpawnEnv, guestOnboardingEnabled, guidedOnboardingEnabled, skipIntroEnabled } from './guest-onboarding'
 import { buildSpawnCommand } from './remote-lifecycle'
 
 test('skipIntroEnabled: exactly "1" in env or --skip-intro on argv skips the first-run film', () => {
@@ -11,6 +11,14 @@ test('skipIntroEnabled: exactly "1" in env or --skip-intro on argv skips the fir
 
   assert.equal(skipIntroEnabled([], {}), false)
   assert.equal(skipIntroEnabled([], { HERMES_SKIP_INTRO: 'true' }), false)
+})
+
+test('guidedOnboardingEnabled: guided UI has its own launch switch', () => {
+  assert.equal(guidedOnboardingEnabled([], { HERMES_GUIDED_ONBOARDING: '1' }), true)
+  assert.equal(guidedOnboardingEnabled(['electron', '.', '--guided-onboarding'], {}), true)
+  assert.equal(guidedOnboardingEnabled([], { HERMES_GUEST_ONBOARDING: '1' }), false)
+  assert.equal(guidedOnboardingEnabled([], {}), false)
+  assert.equal(guidedOnboardingEnabled([], { HERMES_GUIDED_ONBOARDING: 'true' }), false)
 })
 
 test('guestOnboardingEnabled: inherited guest switches cannot enable a built-in account', () => {
@@ -50,6 +58,9 @@ test('remote SSH production-shaped spawns do not carry the retired guest switch'
   const off = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.hermes/log', guestOnboarding: false })
   assert.match(off, /exec env HERMES_DESKTOP=1 /)
   assert.doesNotMatch(off, /HERMES_GUEST_ONBOARDING/)
+
+  const attemptedOn = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.hermes/log', guestOnboarding: true })
+  assert.doesNotMatch(attemptedOn, /HERMES_GUEST_ONBOARDING/)
 
   const unset = buildSpawnCommand('/x/hermes', 'work', { logPath: '~/.hermes/log' })
   assert.doesNotMatch(unset, /HERMES_GUEST_ONBOARDING/)

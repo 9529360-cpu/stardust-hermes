@@ -18,10 +18,11 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   // Launch-flag fact: the app was started with --local, so the renderer may
   // show the local-models surfaces. Static for the window's lifetime.
   localModelsEnabled: launchFlags?.localModels === true,
-  // Launch-flag fact: the Nous free tier is on for this launch
-  // (HERMES_GUEST_ONBOARDING=1 or --guest-onboarding). Read-only; the same
-  // decision is stamped onto every backend the app spawns.
+  // Compatibility tombstone for the inherited guest/free-tier account.
+  // Stardust keeps this false even if stale launch inputs request it.
   guestOnboardingEnabled: launchFlags?.guestOnboarding === true,
+  // Guided first-run UI is independent from account provisioning.
+  guidedOnboardingEnabled: launchFlags?.guidedOnboarding === true,
   // Launch-flag fact: skip the first-run film (HERMES_SKIP_INTRO=1 or
   // --skip-intro). Rehearsal aid for the guided chat behind it.
   skipIntro: launchFlags?.skipIntro === true,

@@ -1314,11 +1314,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       {!isAuxiliaryWindow() && <DesktopInstallOverlay />}
       {!isAuxiliaryWindow() && <IntroRevealGate enabled={gatewayState === 'open'} />}
       {!isAuxiliaryWindow() && (
-        <OnboardingChatGate
-          enabled={gatewayState === 'open'}
-          onKickoff={kickoffFirstChat}
-          requestGateway={ambientRequestGateway}
-        />
+        <OnboardingChatGate enabled={gatewayState === 'open'} onKickoff={kickoffFirstChat} />
       )}
       {!isAuxiliaryWindow() && (
         <DesktopOnboardingOverlay

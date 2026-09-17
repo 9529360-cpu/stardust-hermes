@@ -26,8 +26,9 @@ import * as path from 'node:path'
 
 import { _electron, type ElectronApplication, type Page } from '@playwright/test'
 
+import { type MockServerOptions, startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import { resolveElectronBinary } from './electron-binary'
-import { startMockServer, type MockServerOptions } from '../../../tests-js/scripts/mock-server'
 import { installErrorBannerGuard } from './test'
 
 const DESKTOP_ROOT = path.resolve(import.meta.dirname, '..')
@@ -376,6 +377,7 @@ export interface MockBackendOptions {
   extraConfig?: string
   /** Override the mock model's context window for compression scenarios. */
   modelContextLength?: number
+  mockServer?: MockServerOptions
 }
 
 /**
@@ -385,9 +387,6 @@ export interface MockBackendOptions {
  *   3. Launch the desktop app
  *   4. Return handles for test interaction
  */
-export interface MockBackendOptions {
-  mockServer?: MockServerOptions
-}
 
 export async function setupMockBackend(options: MockBackendOptions = {}): Promise<MockBackendFixture> {
   // 1. Start mock server
@@ -433,11 +432,11 @@ export interface NoProviderFixture {
  * Launch the app with no provider configured. The onboarding overlay should
  * appear because there's no inference provider in config.yaml.
  */
-export async function setupNoProvider(): Promise<NoProviderFixture> {
+export async function setupNoProvider(extraEnv: Record<string, string> = {}): Promise<NoProviderFixture> {
   const sandbox = createSandbox('noprovider')
   writeEmptyConfig(sandbox.hermesHome)
 
-  const env = buildAppEnv(sandbox)
+  const env = buildAppEnv(sandbox, extraEnv)
   const { app, page } = await launchDesktop(env)
 
   return {
@@ -643,6 +642,7 @@ export async function waitForAppReady(fixture: MockBackendFixture | NoProviderFi
       // `position: fixed; inset: 0`. If the hit element or an ancestor
       // is a full-viewport fixed overlay, we're still covered.
       let node: Element | null = el
+
       while (node) {
         const cs = window.getComputedStyle(node)
 
@@ -689,29 +689,7 @@ export async function waitForAppReady(fixture: MockBackendFixture | NoProviderFi
  * Wait for the onboarding overlay to appear (no provider configured).
  */
 export async function waitForOnboarding(page: Page, timeoutMs = 60_000): Promise<void> {
-  // The onboarding overlay contains a heading with "Choose your provider"
-  // or similar text. We look for any text that indicates the picker.
-  await page.waitForFunction(
-    () => {
-      const root = document.getElementById('root')
-
-      if (!root) {
-        return false
-      }
-
-      const text = root.textContent ?? ''
-
-      return (
-        text.includes('provider') ||
-        text.includes('Provider') ||
-        text.includes('Choose') ||
-        text.includes('API key') ||
-        text.includes('Sign in')
-      )
-    },
-    undefined,
-    { timeout: timeoutMs },
-  )
+  await page.locator('[data-desktop-onboarding]').waitFor({ state: 'visible', timeout: timeoutMs })
 }
 
 /**

@@ -170,6 +170,11 @@ const INITIAL: DesktopOnboardingState = {
 
 export const $desktopOnboarding = atom<DesktopOnboardingState>(INITIAL)
 
+// Current-process proof that setup.runtime_check actually reached a usable provider.
+// Unlike `configured`, this is never seeded from localStorage. Guided onboarding
+// must not use a cached configured bit as authority for starting a model turn.
+export const $desktopRuntimeVerified = atom(false)
+
 let flowGeneration = 0
 let flowProfile: string | undefined
 let pollTimer: number | null = null
@@ -420,6 +425,8 @@ async function completeWithModelConfirm(
     return
   }
 
+  $desktopRuntimeVerified.set(runtime.ready)
+
   if (!runtime.ready && !ignoreRuntimeGate) {
     onFail(runtime.reason)
 
@@ -493,13 +500,18 @@ async function refreshProviders() {
   await providersRefreshPromise
 }
 
+function configuredGuideOwnsProviderSurface(): boolean {
+  return (
+    guidedOnboardingActive() &&
+    $desktopOnboarding.get().configured === true &&
+    $desktopRuntimeVerified.get() === true
+  )
+}
+
 export function requestDesktopOnboarding(reason = DEFAULT_ONBOARDING_REASON) {
-  // Not during the guided first launch. The free tier carries inference
-  // there, and a credential probe that fires anyway (a free-tier token mid
-  // refresh, a setup-profile session before its runtime settles) would drop
-  // the provider picker over the guide the user is in the middle of. Sign-in
-  // is offered where the guide chooses to, on its own ready screen.
-  if (guidedOnboardingActive()) {
+  // A healthy guide already has a usable provider and owns the foreground.
+  // A persisted/stale guide without one must yield so provider recovery can run.
+  if (configuredGuideOwnsProviderSurface()) {
     return
   }
 
@@ -520,7 +532,7 @@ let pendingCredentialWarning: null | string = null
 export function requestDesktopOnboardingForCredentialWarning(reason: null | string | undefined) {
   const warning = reason?.trim()
 
-  if (!warning || !isProviderSetupErrorMessage(warning) || guidedOnboardingActive()) {
+  if (!warning || !isProviderSetupErrorMessage(warning) || configuredGuideOwnsProviderSurface()) {
     pendingCredentialWarning = null
 
     return
@@ -683,6 +695,7 @@ export async function refreshOnboarding(ctx: OnboardingContext) {
   }
 
   const runtime = await checkRuntime(ctx)
+  $desktopRuntimeVerified.set(runtime.ready)
 
   if (runtime.ready) {
     completeDesktopOnboarding()
@@ -740,12 +753,9 @@ async function applyFreeTierIntro(ctx: OnboardingContext, runtime: RuntimeReadin
   setFreeTierRoute(runtime.freeTier)
   const status = await refreshFreeTierStatus(ctx.requestGateway)
 
-  // The guided first launch IS the introduction. Raising the ready screen on
-  // top of it (a readiness round fires when the layout pick assembles the
-  // window) covered the guide mid-conversation, and dismissing it remounted
-  // the card the user had just answered. The guide acks the notice itself
-  // when it hands off.
-  if (guidedOnboardingActive()) {
+  // Compatibility-only free-tier chrome must not cover an active, configured
+  // guide. Stardust Desktop tombstones this status before it can reach here.
+  if (configuredGuideOwnsProviderSurface()) {
     return
   }
 
@@ -1138,6 +1148,8 @@ export async function saveOnboardingLocalEndpoint(baseUrl: string, apiKey: strin
     if (generation !== flowGeneration) {
       return { ok: false }
     }
+
+    $desktopRuntimeVerified.set(runtime.ready)
 
     if (!runtime.ready) {
       const detail = (runtime.reason ?? '').trim()

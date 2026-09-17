@@ -353,10 +353,10 @@ declare global {
       /** Launch flag: the app was started with --local, enabling the
        *  local-models GUI surfaces. Absent/false = every local surface hides. */
       localModelsEnabled?: boolean
-      /** Launch flag: the Nous free tier is on for this launch
-       *  (HERMES_GUEST_ONBOARDING=1 or --guest-onboarding). Read-only fact the
-       *  main process also stamps onto every backend it spawns. */
+      /** Compatibility tombstone for the retired built-in guest account. */
       guestOnboardingEnabled?: boolean
+      /** Launch flag for the account-independent guided first-run UI. */
+      guidedOnboardingEnabled?: boolean
       /** Launch flag: skip the first-run film (HERMES_SKIP_INTRO=1 or
        *  --skip-intro) so a fresh HERMES_HOME lands on the guided chat. */
       skipIntro?: boolean

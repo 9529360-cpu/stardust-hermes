@@ -206,7 +206,7 @@ import {
 import { startGatewaysAfterUpdateAbort, stopGatewayBeforeUpdate } from './gateway-stop-before-update'
 import { probeGatewayWebSocket } from './gateway-ws-probe'
 import { registerGitIpc } from './git-ipc'
-import { desktopBackendSpawnEnv, guestOnboardingEnabled, skipIntroEnabled } from './guest-onboarding'
+import { desktopBackendSpawnEnv, guestOnboardingEnabled, guidedOnboardingEnabled, skipIntroEnabled } from './guest-onboarding'
 import { readAndConsumeHandoffResult } from './handoff-result'
 import {
   ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
@@ -907,9 +907,10 @@ const BOOT_FAKE_ERROR = process.env.HERMES_DESKTOP_BOOT_FAKE_ERROR || ''
 // nobody to answer a modal, so the active-work confirmation would hang the
 // caller instead of letting the process exit. Force quits set this.
 const SKIP_QUIT_CONFIRM = process.env.HERMES_DESKTOP_SKIP_QUIT_CONFIRM === '1'
-// Nous free tier gate, decided ONCE here and stamped onto every backend spawn
-// (desktopBackendSpawnEnv) and the renderer (hermes:launch-flags).
+// The inherited guest account stays off. Guided onboarding is a separate UI-only
+// launch decision and is never stamped into the backend environment.
 const GUEST_ONBOARDING = guestOnboardingEnabled()
+const GUIDED_ONBOARDING = guidedOnboardingEnabled()
 const SKIP_INTRO = skipIntroEnabled()
 
 const BOOT_FAKE_STEP_MS = (() => {
@@ -10655,8 +10656,8 @@ async function bootstrapSshConnectionInner(profile, sshConfig, reuseToken, sourc
       probeReuseProof: sshProbeReuseProof,
       adoptServedToken: adoptServedDashboardToken,
       rememberLog: sshRememberLog,
-      // Same launch-time free-tier decision the local spawns get; the POSIX
-      // spawn command adds HERMES_GUEST_ONBOARDING=1 only when this is on.
+      // Compatibility field only. The retired guest-account resolver is
+      // unconditional false, so remote spawns cannot resurrect that identity.
       guestOnboarding: GUEST_ONBOARDING,
       signal: lease.signal
     })
@@ -13727,7 +13728,7 @@ const wakeIndicatorController = createWakeIndicatorWindowController({
 
 const introRevealController = createIntroRevealWindowController({
   devServer: DEV_SERVER,
-  enabled: GUEST_ONBOARDING,
+  enabled: GUIDED_ONBOARDING,
   isMac: IS_MAC,
   loadWindowUrl,
   log: rememberLog,
@@ -13742,7 +13743,7 @@ const introRevealController = createIntroRevealWindowController({
 })
 
 registerChatOnboardingWindow({
-  enabled: GUEST_ONBOARDING,
+  enabled: GUIDED_ONBOARDING,
   mainWindow: () => mainWindow
 })
 
@@ -17201,6 +17202,7 @@ ipcMain.on('hermes:launch-flags', event => {
   event.returnValue = {
     localModels: process.argv.includes('--local') || process.platform === 'win32' || process.platform === 'darwin',
     guestOnboarding: GUEST_ONBOARDING,
+    guidedOnboarding: GUIDED_ONBOARDING,
     skipIntro: SKIP_INTRO
   }
 })

@@ -17,16 +17,13 @@ export const PLAIN_SPEECH = `${VOICE_RULES} Keep every turn short. This is a cha
 
 /** Seed rows for the guided chat's session.create: the hidden runbook row, then the greeting. Pass the greeting the
  *  client is already animating (pickOnboardingGreeting) so the stored row and the animation hold the same words. */
-export function buildChatOnboardingSeedMessages(
-  greeting: string,
-  signedIn = false
-): {
+export function buildChatOnboardingSeedMessages(greeting: string): {
   content: string
   display_kind?: 'hidden'
   role: 'assistant' | 'user'
 }[] {
   return [
-    { content: buildChatOnboardingPrompt(machineUserName(), signedIn), display_kind: 'hidden', role: 'user' },
+    { content: buildChatOnboardingPrompt(machineUserName()), display_kind: 'hidden', role: 'user' },
     { content: greeting, role: 'assistant' }
   ]
 }
@@ -93,7 +90,7 @@ export function forkFallbackOptions(): string[] {
   return machineSetupLeads() ? [mind, automate, figure, skip] : []
 }
 
-export function buildChatOnboardingPrompt(suggestedName?: string | null, signedIn = false): string {
+export function buildChatOnboardingPrompt(suggestedName?: string | null): string {
   const kind = machineKind()
   const machine = machineForkOption()
   const fallback = forkFallbackOptions()
@@ -129,13 +126,6 @@ export function buildChatOnboardingPrompt(suggestedName?: string | null, signedI
     '1. This turn is exactly four things and then you stop: a few warm words about their name, then ::onboarding{step="name" value="THEIR_NAME"} on a line of its own (THEIR_NAME being the name they actually gave; it renders as nothing and just saves it), then one short sentence about their colour, then ::onboarding{step="look"} on a line of its own. That is one turn, not two, and it is not a conflict with RULE 3: the name line is not a question, the look card is, and it is the last thing you write.',
     '2. Then the apps they already use, so Hermes can connect to them later: one short sentence that makes clear what connecting means — you would read and act inside those apps for them (their inbox, their calendar, their repos), not message them there — then ::onboarding{step="connectors"} on a line of its own. Chat apps like Discord or Telegram are a different thing (how they reach you) and are not what this card is asking about; if they bring one up, say it lives in Messaging in the app’s settings and move on.',
     'CONNECTING, IF THEY ASK FOR IT HERE. The picks are preferences, not connections — but if at any point they ask you to connect an app, or say they want one wired up now, do it in this chat: call manage_connections action="status" once, then one action="connect" with EVERY app they named as a batch (connectors=["gmail","googlecalendar"], not one call per app). The app renders that as a Connect card per app and the call blocks until every app is connected, skipped, or the deadline passes; never paste the links, never describe a settings page. The result lists each app as connected, skipped or not_connected; continue from that. Never call connect a second time for an app that already has a card. If an app is not in the status catalog, say so plainly. There is no Connectors page in Settings; do not send them to one.',
-    // The only place sign-in is named before it is needed. It sits at the connectors step because the user has just
-    // listed the accounts they use.
-    ...(signedIn
-      ? []
-      : [
-          'In that same turn, once, mention in ONE short clause that wiring those up later will want a model provider — a free Nous account is there if they want it, free tier, no card, and they can bring their own provider instead — then move straight on. Do not sell it, do not list providers, do not ask them to do it now, and never bring it up again: they will be asked properly at the point it actually matters.'
-        ]),
     '3. Then their layout: one short sentence, then ::onboarding{step="layout"} on a line of its own.',
     `4. The app has just arranged itself around this chat, so offer them a look at it: one short sentence, then the line ::ask{question="${TOUR_QUESTION}" options="${TOUR_OPTIONS.basics}|${TOUR_OPTIONS.tour}|${TOUR_OPTIONS.none}"} alone as its own paragraph. Branch on the answer, then go straight to step 5 IN THE SAME TURN whichever they picked — the tour overlay has its own Done button and ending your turn on it strands them with nothing to click next.`,
     `   - "${TOUR_OPTIONS.basics}": three steps, the essentials only — where their conversations live, where they ask for a job, and how to start a fresh one. Point at each and say one useful thing about it.`,

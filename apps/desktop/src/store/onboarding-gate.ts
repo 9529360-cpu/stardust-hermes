@@ -46,10 +46,9 @@ function setPhase(phase: OnboardingPhase): void {
   $onboardingGate.set({ phase, guideQueued: false })
 }
 
-/** The guided first launch is on screen or mid-handoff. Ambient chrome that
- *  would send the user elsewhere (the provider picker, the free-tier chip)
- *  yields to it: the free tier IS the provider for those phases, and the
- *  guide's ready screen is where sign-in is offered. */
+/** The guided first launch is on screen or mid-handoff. This phase fact does
+ * not override provider recovery: callers must also confirm a usable provider
+ * before allowing the guide to own the foreground. */
 export function guidedOnboardingActive(): boolean {
   const { phase } = $onboardingGate.get()
 

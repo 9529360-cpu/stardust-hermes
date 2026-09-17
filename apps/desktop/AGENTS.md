@@ -208,9 +208,10 @@ actually run rather than inventing a command; when in doubt, read the scripts.
 
 Use a fresh temporary directory for each rehearsal so cached configuration cannot
 hide first-run behavior. From `apps/desktop`, run
-`env -u NODE_ENV HERMES_HOME=<tmp>/.hermes HERMES_DESKTOP_USER_DATA_DIR=<tmp>/electron-user-data npm run dev`
-(replace `<tmp>` with that directory). To skip only the first-run film while
-rehearsing provider selection, add `HERMES_SKIP_INTRO=1`.
+`env -u NODE_ENV HERMES_GUIDED_ONBOARDING=1 HERMES_HOME=<tmp>/.hermes HERMES_DESKTOP_USER_DATA_DIR=<tmp>/electron-user-data npm run dev`
+(replace `<tmp>` with that directory). `HERMES_GUIDED_ONBOARDING=1` enables only
+the account-independent guide. To skip its first-run film and land directly in
+the guided chat, also add `HERMES_SKIP_INTRO=1`.
 
 Do **not** set `HERMES_GUEST_ONBOARDING=1`: Stardust Desktop intentionally
 tombstones that inherited switch at the Electron process boundary. A rehearsal

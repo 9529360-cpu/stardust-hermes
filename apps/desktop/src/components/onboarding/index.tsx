@@ -314,6 +314,7 @@ export function DesktopOnboardingOverlay({
 
   if (
     !onboarding.manual &&
+    onboarding.configured === true &&
     (introReveal.phase !== 'hidden' || onboardingSurfaceActive() || shouldPlayFirstRunIntro(onboarding.firstRunSkipped))
   ) {
     return null
@@ -374,6 +375,7 @@ export function DesktopOnboardingOverlay({
       // Masks the whole app until onboarding finishes — must stay filled under
       // window glass or the shell shows through. Contract:
       // `[data-glass-opaque]` in styles.css.
+      data-desktop-onboarding=""
       data-glass-opaque=""
     >
       <div

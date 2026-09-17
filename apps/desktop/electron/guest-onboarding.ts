@@ -5,6 +5,8 @@
 
 export const GUEST_ONBOARDING_ENV = 'HERMES_GUEST_ONBOARDING'
 export const GUEST_ONBOARDING_FLAG = '--guest-onboarding'
+export const GUIDED_ONBOARDING_ENV = 'HERMES_GUIDED_ONBOARDING'
+export const GUIDED_ONBOARDING_FLAG = '--guided-onboarding'
 
 // Skip the first-run film. This remains a renderer-only rehearsal aid for any
 // onboarding work that does not depend on the retired guest-account path.
@@ -24,6 +26,15 @@ export function guestOnboardingEnabled(
   _env: NodeJS.ProcessEnv = process.env
 ): boolean {
   return false
+}
+
+/** Guided onboarding is a renderer/native-window feature only. It is
+ * deliberately independent from the retired built-in Nous identity. */
+export function guidedOnboardingEnabled(
+  argv: readonly string[] = process.argv,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  return env[GUIDED_ONBOARDING_ENV] === '1' || argv.includes(GUIDED_ONBOARDING_FLAG)
 }
 
 export function skipIntroEnabled(

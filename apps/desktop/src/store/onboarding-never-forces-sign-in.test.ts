@@ -1,18 +1,15 @@
 /**
- * The free tier is unmetered and the guided first launch never demands an
- * account. This is the acceptance criterion the guided onboarding was built
- * to, as a test rather than a memory: a user can work through the guide and
- * the first build, tool call after tool call, and the only way a sign-in
- * reaches them is the guide's own ready screen at the moment the guide picks.
- * Every surface that could push a sign-in over the guide — the provider
- * picker, the deferred credential warning, the free-tier ready screen — has
- * to yield while the gate is cinematic, guided or handoff.
+ * Guided onboarding never supplies or requires a hidden account. A configured
+ * guide may own the foreground, but a guide whose provider disappeared must
+ * yield immediately to provider recovery instead of trapping the user in a
+ * conversation that cannot run.
  */
 import { expect, it, vi } from 'vitest'
 
 import type * as storageModule from '@/lib/storage'
 
 const storage = vi.hoisted(() => new Map<string, string>())
+const WARNING = "No API key configured for provider 'openai'. First message will fail."
 
 vi.mock('@/lib/onboarding-enabled', () => ({ isOnboardingEnabled: () => true }))
 vi.mock('@/lib/storage', async importOriginal => ({
@@ -38,26 +35,71 @@ async function load(phase: string) {
   return { gate, onboarding }
 }
 
-it.each(['cinematic', 'guided', 'handoff'])('the provider picker never opens over the guide (%s)', async phase => {
+function setProviderReady(
+  onboarding: Awaited<ReturnType<typeof load>>['onboarding'],
+  ready: boolean
+) {
+  onboarding.$desktopOnboarding.set({
+    ...onboarding.$desktopOnboarding.get(),
+    configured: ready
+  })
+  onboarding.$desktopRuntimeVerified.set(ready)
+}
+
+it.each(['cinematic', 'guided', 'handoff'])(
+  'provider recovery outranks an active guide without a provider (%s)',
+  async phase => {
+    const { onboarding } = await load(phase)
+
+    setProviderReady(onboarding, false)
+    onboarding.requestDesktopOnboarding('No inference provider is configured.')
+
+    expect(onboarding.$desktopOnboarding.get().requested).toBe(true)
+  }
+)
+
+it('does not treat a cached configured bit as runtime proof', async () => {
+  const { onboarding } = await load('guided')
+
+  onboarding.$desktopOnboarding.set({
+    ...onboarding.$desktopOnboarding.get(),
+    configured: true
+  })
+  onboarding.$desktopRuntimeVerified.set(false)
+  onboarding.requestDesktopOnboarding('No inference provider is configured.')
+
+  expect(onboarding.$desktopOnboarding.get().requested).toBe(true)
+})
+
+it.each(['cinematic', 'guided', 'handoff'])('a configured guide suppresses a passive picker (%s)', async phase => {
   const { onboarding } = await load(phase)
 
+  setProviderReady(onboarding, true)
   onboarding.requestDesktopOnboarding('No inference provider is configured.')
 
   expect(onboarding.$desktopOnboarding.get().requested).toBe(false)
 })
 
 it.each(['cinematic', 'guided', 'handoff'])(
-  'a credential warning during the guide is dropped, not deferred (%s)',
+  'credential recovery is retained when an active guide loses its provider (%s)',
   async phase => {
     const { onboarding } = await load(phase)
 
-    onboarding.requestDesktopOnboardingForCredentialWarning(
-      "No API key configured for provider 'nous'. First message will fail."
-    )
+    setProviderReady(onboarding, false)
+    onboarding.requestDesktopOnboardingForCredentialWarning(WARNING)
 
-    expect(onboarding.consumePendingCredentialWarning()).toBeNull()
+    expect(onboarding.consumePendingCredentialWarning()).toBe(WARNING)
   }
 )
+
+it.each(['cinematic', 'guided', 'handoff'])('a configured guide drops passive credential noise (%s)', async phase => {
+  const { onboarding } = await load(phase)
+
+  setProviderReady(onboarding, true)
+  onboarding.requestDesktopOnboardingForCredentialWarning(WARNING)
+
+  expect(onboarding.consumePendingCredentialWarning()).toBeNull()
+})
 
 it.each(['idle', 'skipped', 'done'])('outside the guide the picker opens as before (%s)', async phase => {
   const { onboarding } = await load(phase)

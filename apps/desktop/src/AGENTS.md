@@ -98,6 +98,10 @@ The Desktop client owns this product decision; backend compatibility must not re
 Keep these invariants together:
 
 - Electron launch plumbing forces the inherited guest switch off for Desktop-created backends.
+- Guided first-run UI uses the separate `HERMES_GUIDED_ONBOARDING` / `--guided-onboarding`
+  launch switch. It must never reuse the guest-account flag as its enablement signal.
+- Guided onboarding starts only after a user-selected provider is configured and runtime-ready. Provider recovery
+  outranks cinematic/guided phases; never rely on an implicit guest model to carry the first conversation.
 - A renderer with `window.hermesDesktop` treats legacy `free_tier.status` as absent and does not call
   the legacy free-tier status/notice RPCs. Old local or remote backends cannot light the UI back up.
 - Desktop entry points never open the inherited built-in-account sign-in flow. Do not reintroduce

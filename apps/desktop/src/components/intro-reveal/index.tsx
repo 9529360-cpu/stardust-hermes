@@ -12,7 +12,7 @@ import {
   shouldPlayFirstRunIntro,
   startIntroReveal
 } from '@/store/intro-reveal'
-import { $desktopOnboarding } from '@/store/onboarding'
+import { $desktopOnboarding, $desktopRuntimeVerified } from '@/store/onboarding'
 import { beginOnboardingFlow, beginOnboardingFlowWithoutIntro, queueGuideAfterIntro } from '@/store/onboarding-gate'
 
 import { INTRO_DEADMAN_MS, INTRO_EXIT_MS } from './timeline'
@@ -23,8 +23,10 @@ interface IntroRevealGateProps {
 
 export function IntroRevealGate({ enabled }: IntroRevealGateProps) {
   const onboarding = useStore($desktopOnboarding)
+  const runtimeVerified = useStore($desktopRuntimeVerified)
   const intro = useStore($introReveal)
   const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const providerReady = onboarding.configured === true && runtimeVerified
 
   useEffect(() => {
     if (enabled && isIntroRevealEnabled()) {
@@ -49,11 +51,13 @@ export function IntroRevealGate({ enabled }: IntroRevealGateProps) {
   }, [enabled])
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !providerReady) {
       return
     }
 
-    // skipIntro turns the film off; the guided chat behind it must still run.
+    // Provider setup owns fresh boot. Once a usable provider exists, the film
+    // and guided chat may take over without relying on an implicit account.
+    // skipIntro turns only the film off; the guided chat behind it still runs.
     // Take the guide's shape on this tick, exactly like the film's completion
     // edge, so no full-size shell paints while the guide session comes up.
     if (isIntroRevealSkipped()) {
@@ -69,7 +73,7 @@ export function IntroRevealGate({ enabled }: IntroRevealGateProps) {
       beginOnboardingFlow()
       startIntroReveal()
     }
-  }, [enabled, intro.phase, onboarding.firstRunSkipped])
+  }, [enabled, intro.phase, onboarding.firstRunSkipped, providerReady])
 
   // The native surface runs the frame loop: the hidden main renderer's animation frames are throttled.
   useEffect(() => {

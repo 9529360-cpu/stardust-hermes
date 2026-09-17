@@ -6,10 +6,11 @@ reply, expands into parallel agents, then ends on the brand. The seven beats tak
 brand briefly instead. Sound is on by default and respects the haptics mute
 preference. Fonts are the existing Collapse and JetBrains Mono faces.
 
-Eligibility is `guestOnboardingEnabled && !firstRunSkipped && !hasSeenIntroReveal()`.
-Electron sets the flag from `HERMES_GUEST_ONBOARDING=1` or `--guest-onboarding`.
-The gate queues the guided chat on completion; the chat gate acknowledges the
-free-tier notice as the cinematic starts. With the flag off, neither gate starts.
+Eligibility is `guidedOnboardingEnabled && providerConfigured && !firstRunSkipped && !hasSeenIntroReveal()`.
+Electron sets that UI-only flag from `HERMES_GUIDED_ONBOARDING=1` or `--guided-onboarding`.
+Fresh users configure a provider first; only after runtime readiness is verified may the film/guide own the foreground.
+The gate queues the guided chat on completion. It is deliberately independent
+from the retired guest/free-tier account path; with the guided flag off, neither gate starts.
 `HERMES_SKIP_INTRO=1` turns the film off but keeps the guided chat: the gate
 records the film as watched and queues the guide directly.
 
