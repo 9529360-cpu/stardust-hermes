@@ -43,7 +43,17 @@ def _require_terminal_consent(monkeypatch):
             requires_approval=True,
             reason="Existing terminal security checks require consent for this exact call.",
             rule_key="stardust:terminal-risk",
+            context_sha256="test-terminal-context",
         ),
+    )
+    # This integration test owns the durable approval state machine, not terminal backend planning.
+    # Planner/host/mount-sensitive hashing has dedicated tests in test_background_terminal_approval.py.
+    monkeypatch.setattr(
+        "tools.background_terminal_approval.approval_fingerprint_args",
+        lambda args, requirement=None: {
+            "tool_args": dict(args or {}),
+            "terminal_security_context_sha256": "test-terminal-context",
+        },
     )
 
 
@@ -62,11 +72,8 @@ def _dangerous_terminal_guard(monkeypatch):
         lambda _command: (True, "danger:test", "test dangerous command"),
     )
     monkeypatch.setattr(approval, "is_approved", lambda *_args, **_kwargs: False)
-    monkeypatch.setattr(
-        approval_context,
-        "_get_approval_config",
-        lambda: {"mode": "manual", "single_query_mode": "deny"},
-    )
+    monkeypatch.setattr(approval_context, "_get_approval_config", lambda: {"mode": "manual"})
+    monkeypatch.setattr(approval_context, "_get_single_query_approval_mode", lambda: "deny")
 
 
 def test_risky_background_terminal_pauses_then_exact_retry_runs_once(running_task, monkeypatch):
@@ -91,8 +98,8 @@ def test_risky_background_terminal_pauses_then_exact_retry_runs_once(running_tas
         assert decided["resumed"] is True
         assert kb.claim_task(conn, running_task) is not None
 
-    # A new worker/model tool call id is expected after durable resume. The args fingerprint, not
-    # the old call id, is what matches the durable grant; the new id scopes the terminal bypass once.
+    # A new worker/model tool call id is expected after durable resume. The args+target fingerprint,
+    # not the old call id, matches the durable grant; the new id scopes the terminal bypass once.
     retry = permissions.pre_tool_call_directive("terminal", args, tool_call_id="call-retry")
     assert retry is None
 
