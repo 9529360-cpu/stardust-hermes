@@ -1,17 +1,19 @@
 name: "🐛 Bug Report"
-description: Report a bug — something that's broken, crashes, or behaves incorrectly.
+description: Report a Stardust bug — something that's broken, crashes, or behaves incorrectly.
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug! Please fill out the sections below so we can reproduce and fix it quickly.
+        Thanks for reporting a Stardust bug. Please fill out the sections below so the failure can be reproduced and fixed quickly.
 
         **Before submitting**, please:
-        - [ ] Search [existing issues](https://github.com/NousResearch/hermes-agent/issues) to avoid duplicates
-        - [ ] Update to the latest version (`hermes update`) and confirm the bug still exists
-        - [ ] Run `hermes debug share` and paste the links below (see Debug Report section)
+        - [ ] Search [existing Stardust issues](https://github.com/9529360-cpu/stardust-hermes/issues) to avoid duplicates
+        - [ ] Run `hermes doctor` and include any relevant failures below
+        - [ ] Record `hermes version`; if this is a source checkout, also record `git rev-parse --short HEAD`
+
+        Stardust's inherited `hermes update` path is intentionally disabled while the project is on its pinned/local release policy. Do **not** update from the upstream Hermes repository as a troubleshooting step.
 
   - type: textarea
     id: description
@@ -27,10 +29,10 @@ body:
     id: reproduction
     attributes:
       label: Steps to Reproduce
-      description: Minimal steps to trigger the bug. The more specific, the faster we can fix it.
+      description: Minimal steps to trigger the bug. The more specific, the faster it can be fixed.
       placeholder: |
-        1. Run `hermes chat`
-        2. Send the message "..."
+        1. Start the Stardust desktop app or run `hermes chat`
+        2. Perform the action "..."
         3. Agent calls tool X
         4. Error appears: ...
     validations:
@@ -56,15 +58,19 @@ body:
     id: component
     attributes:
       label: Affected Component
-      description: Which part of Hermes is affected?
+      description: Which part of Stardust is affected?
       multiple: true
       options:
+        - Desktop app
         - CLI (interactive chat)
         - Gateway (Telegram/Discord/Slack/WhatsApp)
         - Setup / Installation
+        - Update / Recovery
         - Tools (terminal, file ops, web, code execution, etc.)
-        - Skills (skill loading, skill hub, skill guard)
+        - Skills / Plugins / MCP
         - Agent Core (conversation loop, context compression, memory)
+        - Model routing / failover
+        - Cron / Automations
         - Configuration (config.yaml, .env, hermes setup)
         - Other
     validations:
@@ -77,27 +83,27 @@ body:
       description: Which platform adapter is affected?
       multiple: true
       options:
-        - N/A (CLI only)
+        - N/A
         - Telegram
         - Discord
         - Slack
         - WhatsApp
 
   - type: textarea
-    id: debug-report
+    id: diagnostics
     attributes:
-      label: Debug Report
+      label: Local Diagnostics
       description: |
-        Run `hermes debug share` from your terminal and paste the links it prints here.
-        This uploads your system info, config, and recent logs to a paste service automatically.
+        Prefer local diagnostics first. Run `hermes doctor`, then `hermes debug share --local` if more detail is needed.
+        Review the output before attaching or pasting it. Do not include API keys, tokens, cookies, private prompts, or other secrets.
 
-        If you're in an interactive chat session, you can also use the `/debug` slash command — it does the same thing.
-
-        If the upload fails, run `hermes debug share --local` and paste the output directly.
+        If the desktop app offers an explicit diagnostics upload, that is a separate opt-in transport; it is not required to file a Stardust issue.
       placeholder: |
-        Report   https://paste.rs/abc123
-        agent.log   https://paste.rs/def456
-        gateway.log   https://paste.rs/ghi789
+        hermes doctor:
+        ...
+
+        hermes debug share --local:
+        ...
       render: shell
     validations:
       required: true
@@ -115,23 +121,29 @@ body:
     id: python-version
     attributes:
       label: Python Version
-      description: Output of `python --version`
+      description: Output of `python --version` when relevant
       placeholder: "3.11.9"
 
   - type: input
     id: hermes-version
     attributes:
-      label: Hermes Version
+      label: Stardust / Hermes Runtime Version
       description: Output of `hermes version`
-      placeholder: "2.1.0"
+      placeholder: "0.21.3"
+
+  - type: input
+    id: source-revision
+    attributes:
+      label: Source Revision (if running from a checkout)
+      description: Output of `git rev-parse --short HEAD`
+      placeholder: "abcdef1"
 
   - type: textarea
     id: logs
     attributes:
       label: Additional Logs / Traceback (optional)
       description: |
-        The debug report above covers most logs. Use this field for any extra error output, 
-        tracebacks, or screenshots not captured by `hermes debug share`.
+        Add only the extra error output needed to reproduce the failure. Review logs before posting and remove secrets or unrelated private content.
       render: shell
 
   - type: textarea
@@ -140,19 +152,15 @@ body:
       label: Root Cause Analysis (optional)
       description: |
         If you've dug into the code and identified the root cause, share it here.
-        Include file paths, line numbers, and code snippets if possible. This massively speeds up fixes.
+        Include file paths, line numbers, and small code snippets if useful.
       placeholder: |
-        The bug is in `gateway/run.py` line 949. `len(history)` counts session_meta entries
-        but `agent_messages` was built from filtered history...
+        The failure appears to start in `gateway/run.py` when ...
 
   - type: textarea
     id: proposed-fix
     attributes:
       label: Proposed Fix (optional)
       description: If you have a fix in mind (or a PR ready), describe it here.
-      placeholder: |
-        Replace `.get()` with `.pop()` on line 289 of `gateway/platforms/base.py`
-        to actually clear the pending message after retrieval.
 
   - type: checkboxes
     id: pr-ready
