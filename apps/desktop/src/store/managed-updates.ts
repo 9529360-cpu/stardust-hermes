@@ -47,6 +47,9 @@ function managedUpdater(): ((id: string) => Promise<DesktopManagedConnectionUpda
  * intentionally disabled in the pinned local edition. Exposing the button
  * would therefore start a disruptive transaction that can only fail. Keep it
  * hidden until a Stardust-native updater makes this capability real again.
+ *
+ * The transaction engine itself stays callable/testable below so its mature
+ * drain/update/restore machinery remains available for the future updater.
  */
 export function managedUpdatesSupported(): boolean {
   return false
@@ -107,12 +110,11 @@ export function runManagedUpdate(connectionId: string): Promise<ManagedUpdateSta
 
   const updateManaged = managedUpdater()
 
-  if (!updateManaged || !managedUpdatesSupported()) {
+  if (!updateManaged) {
     const state: ManagedUpdateState = {
       ...blankState(connectionId),
       finishedAt: Date.now(),
-      message: 'Managed SSH updates are disabled in the Stardust local edition.',
-      status: 'refused'
+      status: 'failed'
     }
 
     publish(state)
