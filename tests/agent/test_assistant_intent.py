@@ -5,6 +5,7 @@ from agent.assistant_intent import (
     TERMINAL_TASK_STATES,
     AssistantExecutionDecision,
     AssistantIntent,
+    AssistantTaskProjection,
     ExecutionDurability,
     ExecutionRail,
     TaskLifecycleState,
@@ -58,6 +59,87 @@ def test_task_state_helpers_keep_waiting_nonterminal_and_interruption_visible():
     assert task_state_needs_attention(TaskLifecycleState.INTERRUPTED)
     assert task_state_is_terminal(TaskLifecycleState.COMPLETED)
     assert not task_state_needs_attention(TaskLifecycleState.COMPLETED)
+
+
+def test_task_projection_reuses_owner_identity_without_becoming_state_owner():
+    projection = AssistantTaskProjection(
+        task_id="assistant-task-7",
+        title="Research the library",
+        state=TaskLifecycleState.RUNNING,
+        rail=ExecutionRail.DELEGATION,
+        durability=ExecutionDurability.PROCESS,
+        parent_session_id="session-parent",
+        owner_id="delegation-42",
+        artifact_refs=("/tmp/report.md",),
+    )
+
+    assert projection.owner_id == "delegation-42"
+    assert projection.parent_session_id == "session-parent"
+    assert not projection.terminal
+    assert not projection.needs_attention
+
+
+def test_task_projection_surfaces_approval_and_terminal_attention_truthfully():
+    waiting = AssistantTaskProjection(
+        task_id="assistant-task-8",
+        title="Deploy the release",
+        state=TaskLifecycleState.WAITING_FOR_USER,
+        rail=ExecutionRail.CURRENT_SESSION,
+        durability=ExecutionDurability.TURN,
+        requires_approval=True,
+    )
+    interrupted = AssistantTaskProjection(
+        task_id="assistant-task-9",
+        title="Background research",
+        state=TaskLifecycleState.INTERRUPTED,
+        rail=ExecutionRail.DELEGATION,
+        durability=ExecutionDurability.PROCESS,
+        recoverable=True,
+    )
+
+    assert not waiting.terminal
+    assert waiting.needs_attention
+    assert interrupted.terminal
+    assert interrupted.needs_attention
+    assert interrupted.recoverable
+
+
+def test_task_projection_requires_real_owner_and_truthful_durability():
+    with pytest.raises(ValueError, match="stable task id"):
+        AssistantTaskProjection(
+            task_id=" ",
+            title="No identity",
+            state=TaskLifecycleState.QUEUED,
+            rail=ExecutionRail.DELEGATION,
+            durability=ExecutionDurability.PROCESS,
+        )
+
+    with pytest.raises(ValueError, match="authoritative execution rail"):
+        AssistantTaskProjection(
+            task_id="assistant-task-10",
+            title="No owner",
+            state=TaskLifecycleState.QUEUED,
+            rail=ExecutionRail.NONE,
+            durability=ExecutionDurability.TURN,
+        )
+
+    with pytest.raises(ValueError, match="restart-safe task projections require cron or kanban ownership"):
+        AssistantTaskProjection(
+            task_id="assistant-task-11",
+            title="Pretend durable delegation",
+            state=TaskLifecycleState.RUNNING,
+            rail=ExecutionRail.DELEGATION,
+            durability=ExecutionDurability.RESTART_SAFE,
+        )
+
+    with pytest.raises(ValueError, match="cron/kanban task projections must be restart-safe"):
+        AssistantTaskProjection(
+            task_id="assistant-task-12",
+            title="Pretend volatile cron",
+            state=TaskLifecycleState.RUNNING,
+            rail=ExecutionRail.CRON,
+            durability=ExecutionDurability.PROCESS,
+        )
 
 
 def test_default_durability_keeps_background_process_local_and_schedule_restart_safe():
