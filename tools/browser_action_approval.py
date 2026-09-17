@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Callable, Mapping, Optional
 from urllib.parse import urlsplit
 
 
@@ -54,7 +54,7 @@ def _clean_ref(ref: Any) -> str:
 
 
 def _ref_line(snapshot: str, ref: str) -> str:
-    """Return the exact accessibility line containing ``ref`` across both supported formats."""
+    """Return the exact accessibility line containing ``ref`` across supported text formats."""
     clean = _clean_ref(ref)
     if not clean:
         return ""
@@ -95,10 +95,87 @@ def _safe_url_label(url: str) -> str:
         if parsed.port:
             host = f"{host}:{parsed.port}"
         path = parsed.path or "/"
-        label = f"{parsed.scheme}://{host}{path}"
-        return label[:180]
+        return f"{parsed.scheme}://{host}{path}"[:180]
     except Exception:
         return "the current page"
+
+
+def _risk_from_identity(ref: str, role: str, name: str, url: str) -> BrowserClickRisk:
+    clean = _clean_ref(ref)
+    role = str(role or "").strip().lower()
+    name = str(name or "").strip()
+    url = str(url or "").strip()
+    if not clean or not role or not _looks_consequential(name):
+        return BrowserClickRisk(False, role=role, name=name, url=url)
+
+    material = json.dumps(
+        {"ref": clean.lower(), "role": role, "name": name, "url": url},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+    context_sha256 = hashlib.sha256(material.encode("utf-8", errors="replace")).hexdigest()
+    reason = (
+        f"Stardust wants to click the {role} '{name}' on {_safe_url_label(url)}. "
+        "This control appears to submit, publish, purchase, delete, create, or otherwise change external state; confirm first."
+    )
+    return BrowserClickRisk(
+        True,
+        context_sha256=context_sha256,
+        reason=reason,
+        rule_key=f"stardust:browser-external-write:click:{context_sha256[:20]}",
+        role=role,
+        name=name,
+        url=url,
+    )
+
+
+def inspect_snapshot_click(snapshot: str, ref: Any, *, url: str = "") -> BrowserClickRisk:
+    """Pure snapshot-text classifier shared by agent-browser, Camofox, and extension control."""
+    clean = _clean_ref(ref)
+    role, name, _line = _element_identity(snapshot, clean)
+    return _risk_from_identity(clean, role, name, url)
+
+
+def inspect_controller_snapshot(payload: Any, ref: Any) -> BrowserClickRisk:
+    """Classify a browser-extension snapshot response.
+
+    Controllers may return either the same text snapshot as legacy backends or a structured
+    ``refs`` list. Both are accepted; opaque/string-only ref lists intentionally classify as
+    unknown rather than inventing an accessible name.
+    """
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except (TypeError, ValueError):
+            return BrowserClickRisk(False)
+    if not isinstance(payload, Mapping):
+        return BrowserClickRisk(False)
+    data = payload.get("data") if isinstance(payload.get("data"), Mapping) else payload
+    url = str(data.get("url") or payload.get("url") or "")
+    snapshot = str(data.get("snapshot") or payload.get("snapshot") or "")
+    if snapshot:
+        risk = inspect_snapshot_click(snapshot, ref, url=url)
+        if risk.role or risk.name:
+            return risk
+
+    clean = _clean_ref(ref).lower()
+    refs = data.get("refs") if isinstance(data, Mapping) else None
+    if refs is None:
+        refs = payload.get("refs")
+    if isinstance(refs, Mapping):
+        candidates = [dict(value, ref=key) if isinstance(value, Mapping) else {"ref": key}
+                      for key, value in refs.items()]
+    elif isinstance(refs, list):
+        candidates = [item for item in refs if isinstance(item, Mapping)]
+    else:
+        candidates = []
+    for item in candidates:
+        item_ref = _clean_ref(item.get("ref") or item.get("id") or item.get("element_ref")).lower()
+        if item_ref != clean:
+            continue
+        role = str(item.get("role") or item.get("type") or "").strip().lower()
+        name = str(item.get("name") or item.get("label") or item.get("text") or "").strip()
+        return _risk_from_identity(clean, role, name, url)
+    return BrowserClickRisk(False, url=url)
 
 
 def _snapshot_non_camofox(task_id: Optional[str]) -> tuple[str, str]:
@@ -144,7 +221,7 @@ def _snapshot_camofox(task_id: Optional[str]) -> tuple[str, str]:
 
 
 def inspect_browser_click(ref: Any, task_id: Optional[str] = None) -> BrowserClickRisk:
-    """Inspect one referenced element without clicking it."""
+    """Inspect one legacy/Camofox referenced element without clicking it."""
     clean = _clean_ref(ref)
     if not clean:
         return BrowserClickRisk(False)
@@ -154,38 +231,18 @@ def inspect_browser_click(ref: Any, task_id: Optional[str] = None) -> BrowserCli
         snapshot, url = _snapshot_camofox(task_id) if bt._is_camofox_mode() else _snapshot_non_camofox(task_id)
     except Exception:
         return BrowserClickRisk(False)
-
-    role, name, _line = _element_identity(snapshot, clean)
-    if not role or not _looks_consequential(name):
-        return BrowserClickRisk(False, role=role, name=name, url=url)
-
-    material = json.dumps(
-        {"ref": clean.lower(), "role": role, "name": name, "url": url},
-        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
-    )
-    context_sha256 = hashlib.sha256(material.encode("utf-8", errors="replace")).hexdigest()
-    label = _safe_url_label(url)
-    reason = (
-        f"Stardust wants to click the {role} '{name}' on {label}. "
-        "This control appears to submit, publish, purchase, delete, create, or otherwise change external state; confirm first."
-    )
-    return BrowserClickRisk(
-        True,
-        context_sha256=context_sha256,
-        reason=reason,
-        rule_key=f"stardust:browser-external-write:click:{context_sha256[:20]}",
-        role=role,
-        name=name,
-        url=url,
-    )
+    return inspect_snapshot_click(snapshot, clean, url=url)
 
 
 def _blocked_payload(message: str, *, status: str = "waiting_confirmation") -> str:
     return json.dumps({"success": False, "status": status, "error": message}, ensure_ascii=False)
 
 
-def guard_browser_click(ref: Any, task_id: Optional[str] = None) -> Optional[str]:
-    """Return a finished blocked-result JSON for a risky click, else ``None`` to execute it."""
+def guard_browser_click_with_probe(
+    ref: Any,
+    probe: Callable[[], BrowserClickRisk],
+) -> Optional[str]:
+    """Approval flow around a backend-specific fresh semantic-risk probe."""
     try:
         from hermes_cli.assistant_permissions import (
             _durable_worker_confirmation_active,
@@ -197,7 +254,7 @@ def guard_browser_click(ref: Any, task_id: Optional[str] = None) -> Optional[str
     if not personal_assistant_permissions_active():
         return None
 
-    first = inspect_browser_click(ref, task_id)
+    first = probe()
     if not first.requires_approval:
         return None
 
@@ -235,7 +292,7 @@ def guard_browser_click(ref: Any, task_id: Optional[str] = None) -> Optional[str
 
     # Interactive approvals may wait for minutes, and durable grants may resume in a new worker.
     # Re-snapshot immediately before the click. Any semantic drift invalidates the approval.
-    second = inspect_browser_click(ref, task_id)
+    second = probe()
     if (
         not second.requires_approval
         or not second.context_sha256
@@ -248,4 +305,12 @@ def guard_browser_click(ref: Any, task_id: Optional[str] = None) -> Optional[str
     return None
 
 
-__all__ = ["BrowserClickRisk", "inspect_browser_click", "guard_browser_click"]
+def guard_browser_click(ref: Any, task_id: Optional[str] = None) -> Optional[str]:
+    """Legacy/Camofox wrapper used immediately before the real click executes."""
+    return guard_browser_click_with_probe(ref, lambda: inspect_browser_click(ref, task_id))
+
+
+__all__ = [
+    "BrowserClickRisk", "inspect_snapshot_click", "inspect_controller_snapshot",
+    "inspect_browser_click", "guard_browser_click_with_probe", "guard_browser_click",
+]
