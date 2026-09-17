@@ -35,6 +35,66 @@ def _public_contact(contact: contacts_db.Contact) -> dict[str, Any]:
     return contact.to_dict()
 
 
+def _contact_resolution(
+    contact: contacts_db.Contact | None,
+    *,
+    requested_channel: str | None,
+) -> dict[str, Any]:
+    """Project one lookup into an explicit send-routing state.
+
+    The contacts DB already guarantees exact aliases are globally unique. The remaining ambiguity
+    is channel choice: no channel cannot be sent, exactly one is safe to use, and multiple require
+    the user/model to select a channel explicitly instead of silently picking one.
+    """
+    if contact is None:
+        return {
+            "status": "not_found",
+            "requires_user_input": True,
+            "selected": None,
+            "available_channels": [],
+        }
+
+    available = [item.to_dict() for item in contact.channels]
+    if requested_channel:
+        wanted = contacts_db.normalize_channel(requested_channel)
+        selected = next((item for item in available if item["channel"] == wanted), None)
+        if selected is not None:
+            return {
+                "status": "resolved",
+                "requires_user_input": False,
+                "selected": selected,
+                "available_channels": available,
+            }
+        return {
+            "status": "channel_unavailable",
+            "requires_user_input": True,
+            "requested_channel": wanted,
+            "selected": None,
+            "available_channels": available,
+        }
+
+    if len(available) == 1:
+        return {
+            "status": "resolved",
+            "requires_user_input": False,
+            "selected": available[0],
+            "available_channels": available,
+        }
+    if not available:
+        return {
+            "status": "missing_channel",
+            "requires_user_input": True,
+            "selected": None,
+            "available_channels": [],
+        }
+    return {
+        "status": "needs_channel_selection",
+        "requires_user_input": True,
+        "selected": None,
+        "available_channels": available,
+    }
+
+
 def contacts_tool(args: dict[str, Any], **_kwargs: Any) -> str:
     action = str(args.get("action") or "").strip().lower()
     if action not in _ACTIONS:
@@ -67,17 +127,18 @@ def contacts_tool(args: dict[str, Any], **_kwargs: Any) -> str:
                 query = str(args.get("query") or "").strip()
                 if not query:
                     return tool_error("contacts lookup requires query")
-                contact = contacts_db.lookup_contact(
-                    conn,
-                    query,
-                    channel=str(args.get("channel") or "").strip() or None,
-                )
+                requested_channel = str(args.get("channel") or "").strip() or None
+                # Resolve the human identity first, then project channel availability separately.
+                # This distinguishes "person not found" from "person found but no such channel".
+                contact = contacts_db.lookup_contact(conn, query)
+                resolution = _contact_resolution(contact, requested_channel=requested_channel)
                 return json.dumps({
                     "ok": True,
                     "kind": "contact_lookup",
                     "query": query,
                     "found": contact is not None,
                     "contact": _public_contact(contact) if contact else None,
+                    "resolution": resolution,
                 }, ensure_ascii=False)
 
             if action == "list":
@@ -116,11 +177,12 @@ CONTACTS_SCHEMA = {
     "name": "contacts",
     "description": (
         "Structured personal contact memory. Use it to resolve durable person aliases such as '老王' to one "
-        "confirmed identity and optional communication handles. Only remember identity/relationship/channel details "
-        "the user explicitly supplied or confirmed; never infer private contact details or silently import an address "
-        "book from connected services. Use lookup before an external communication action when the user names a person "
-        "by alias. General user preferences belong in memory(target='user'); project paths/identity belong in Projects, "
-        "not here."
+        "confirmed identity and communication route. Only remember identity/relationship/channel details the user "
+        "explicitly supplied or confirmed; never infer private contact details or silently import an address book from "
+        "connected services. Use lookup before an external communication action when the user names a person by alias. "
+        "The lookup result includes resolution.status: resolved means resolution.selected is safe to use; "
+        "missing_channel/channel_unavailable/needs_channel_selection require user input instead of guessing a route. "
+        "General user preferences belong in memory(target='user'); project paths/identity belong in Projects, not here."
     ),
     "parameters": {
         "type": "object",
@@ -157,7 +219,10 @@ CONTACTS_SCHEMA = {
                 },
             },
             "query": {"type": "string", "description": "Exact alias/name for lookup; substring filter for list."},
-            "channel": {"type": "string", "description": "Optional channel filter for lookup/list."},
+            "channel": {
+                "type": "string",
+                "description": "Optional required channel for lookup/list. For alias-based sending, pass it when the user already specified the medium.",
+            },
             "contact_id": {"type": "string", "description": "Stable contact id for archive."},
             "limit": {"type": "integer", "description": "List limit, 1-200 (default 50)."},
         },
