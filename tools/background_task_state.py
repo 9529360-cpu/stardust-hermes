@@ -23,6 +23,12 @@ PUBLIC_STATES = frozenset({
     "failed",
     "cancelled",
 })
+_APPROVAL_EVENTS = frozenset({
+    "assistant_approval_requested",
+    "assistant_approval_granted",
+    "assistant_approval_denied",
+    "assistant_approval_consumed",
+})
 
 
 def _event_values(events: Iterable[Any]) -> list[Mapping[str, Any]]:
@@ -33,6 +39,13 @@ def _latest_lifecycle_event(events: Iterable[Any]) -> Mapping[str, Any] | None:
     interesting = {"blocked", "unblocked", "gave_up", "completed", "archived", "status"}
     for event in reversed(_event_values(events)):
         if str(event.get("kind") or "") in interesting:
+            return event
+    return None
+
+
+def _latest_approval_event(events: Iterable[Any]) -> Mapping[str, Any] | None:
+    for event in reversed(_event_values(events)):
+        if str(event.get("kind") or "") in _APPROVAL_EVENTS:
             return event
     return None
 
@@ -85,11 +98,24 @@ def project_background_state(
         if latest and str(latest.get("kind") or "") == "gave_up":
             return "failed"
 
+        latest_approval = _latest_approval_event(event_list)
+        latest_approval_kind = str(latest_approval.get("kind") or "") if latest_approval else ""
+        if latest_approval_kind == "assistant_approval_requested":
+            return "waiting_confirmation"
+        if latest_approval_kind == "assistant_approval_denied":
+            return "waiting_input"
+
         payload = _blocked_payload(event_list)
         reason = str(payload.get("reason") or "")
         block_kind = str(payload.get("kind") or payload.get("block_kind") or "").strip().lower()
         reason_lower = reason.lower()
-        if "approval" in reason_lower and ("user" in reason_lower or "confirm" in reason_lower):
+        # Legacy tasks may predate the durable approval event ledger. Only use the reason-text fallback
+        # when there is no newer grant/deny/consume evidence that proves the old request is no longer pending.
+        if (
+            not latest_approval_kind
+            and "approval" in reason_lower
+            and ("user" in reason_lower or "confirm" in reason_lower)
+        ):
             return "waiting_confirmation"
         if block_kind == "dependency":
             return "waiting_dependency"
