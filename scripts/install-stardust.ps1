@@ -4,6 +4,8 @@
 # product-source / recovery URL to Stardust, then refuses to execute if an
 # upstream Hermes source URL survived. This keeps repair and fallback paths from
 # silently replacing the personal build with NousResearch/hermes-agent.
+# User-facing inherited installer copy is normalized to Stardust; internal
+# Hermes paths/commands remain where compatibility still requires them.
 #
 # STARDUST_INSTALL_REF can override the source script ref explicitly. Otherwise
 # inherit -Commit / -Tag / -Branch from a stage-protocol invocation so packaged
@@ -74,6 +76,13 @@ try {
     $Source = $Source.Replace('https://raw.githubusercontent.com/NousResearch/hermes-agent', 'https://raw.githubusercontent.com/9529360-cpu/stardust-hermes')
     $Source = $Source.Replace('https://hermes-agent.nousresearch.com/install.ps1', 'https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1')
     $Source = $Source.Replace('https://hermes-agent.nousresearch.com/install.sh', 'https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh')
+
+    # The implementation still carries upstream copy because internal package,
+    # command, and install-path names intentionally remain compatible. Rewrite
+    # only the presentation strings that a Stardust user actually sees.
+    $Source = $Source.Replace('Hermes Agent Installer', 'Stardust Personal Assistant Installer')
+    $Source = $Source.Replace('An open source AI agent by Nous Research.', 'Personal assistant built on the Hermes Agent foundation.')
+    $Source = $Source.Replace('Download Hermes Agent', 'Download Stardust')
 
     $ForbiddenSourceUrls = @(
         'github.com/NousResearch/hermes-agent',
