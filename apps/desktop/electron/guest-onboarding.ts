@@ -1,23 +1,29 @@
-// The Nous free tier is gated by ONE launch-time decision. The Python backend
-// reads HERMES_GUEST_ONBOARDING and treats exactly "1" as on; the desktop
-// decides once at launch (env or `--guest-onboarding` argv) and stamps that
-// answer onto every backend it spawns, so the app and its backends can never
-// disagree about whether the free tier is live.
+// Stardust Desktop does not create or advertise the inherited Nous guest/free-tier
+// identity. Keep the old launch inputs as compatibility tombstones so stale
+// shortcuts or parent environments cannot accidentally reactivate that product
+// path while the remaining backend compatibility code is retired separately.
 
 export const GUEST_ONBOARDING_ENV = 'HERMES_GUEST_ONBOARDING'
 export const GUEST_ONBOARDING_FLAG = '--guest-onboarding'
-// Skip the first-run film. A rehearsal aid: the intro is a one-time reveal,
-// so anyone iterating on the guided chat behind it otherwise sits through it
-// on every fresh HERMES_HOME. The guide still runs — only the film is
-// skipped. Renderer-only; the backend never sees it.
+
+// Skip the first-run film. This remains a renderer-only rehearsal aid for any
+// onboarding work that does not depend on the retired guest-account path.
 export const SKIP_INTRO_ENV = 'HERMES_SKIP_INTRO'
 export const SKIP_INTRO_FLAG = '--skip-intro'
 
+/**
+ * Compatibility tombstone for the old built-in account switch.
+ *
+ * Stardust must never mint or surface an implicit Nous identity merely because
+ * an inherited environment variable or command-line flag is present. Callers
+ * keep using this resolver until the surrounding launch plumbing is deleted,
+ * but the product decision is now unconditional: guest onboarding is off.
+ */
 export function guestOnboardingEnabled(
-  argv: readonly string[] = process.argv,
-  env: NodeJS.ProcessEnv = process.env
+  _argv: readonly string[] = process.argv,
+  _env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  return env[GUEST_ONBOARDING_ENV] === '1' || argv.includes(GUEST_ONBOARDING_FLAG)
+  return false
 }
 
 export function skipIntroEnabled(
@@ -27,10 +33,11 @@ export function skipIntroEnabled(
   return env[SKIP_INTRO_ENV] === '1' || argv.includes(SKIP_INTRO_FLAG)
 }
 
-// Outermost wrapper for a backend spawn env: the flag is written LAST so no
-// earlier spread (process.env, backend.env) can resurrect a stray value, and
-// "off" is an explicit '0' rather than an absent key so a '1' inherited from
-// the parent's environment cannot leak into a backend the launch decided off.
-export function desktopBackendSpawnEnv(base: NodeJS.ProcessEnv, guestOnboarding: boolean): NodeJS.ProcessEnv {
-  return { ...base, [GUEST_ONBOARDING_ENV]: guestOnboarding ? '1' : '0' }
+/**
+ * Stamp the retired guest switch off at the process boundary even when the
+ * parent environment still contains HERMES_GUEST_ONBOARDING=1. This preserves
+ * inherited interface compatibility without allowing it to regain authority.
+ */
+export function desktopBackendSpawnEnv(base: NodeJS.ProcessEnv, _guestOnboarding: boolean): NodeJS.ProcessEnv {
+  return { ...base, [GUEST_ONBOARDING_ENV]: '0' }
 }
