@@ -133,6 +133,7 @@ def test_public_install_docs_only_advertise_stardust_bootstrap() -> None:
     install_docs = (
         "website/docs/index.mdx",
         "website/docs/getting-started/installation.md",
+        "website/docs/getting-started/quickstart.md",
         "website/docs/getting-started/termux.md",
         "website/docs/developer-guide/contributing.md",
     )
