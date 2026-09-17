@@ -1,12 +1,17 @@
 import pytest
 
 from agent.assistant_intent import (
+    ATTENTION_TASK_STATES,
+    TERMINAL_TASK_STATES,
     AssistantExecutionDecision,
     AssistantIntent,
     ExecutionDurability,
     ExecutionRail,
+    TaskLifecycleState,
     default_durability,
     default_rail,
+    task_state_is_terminal,
+    task_state_needs_attention,
 )
 
 
@@ -19,6 +24,40 @@ def test_intent_wire_values_match_mission_vocabulary():
         "schedule",
         "clarify",
     ]
+
+
+def test_task_lifecycle_wire_values_cover_running_attention_and_terminal_states():
+    assert [state.value for state in TaskLifecycleState] == [
+        "queued",
+        "running",
+        "waiting_for_user",
+        "blocked",
+        "completed",
+        "failed",
+        "cancelled",
+        "interrupted",
+    ]
+    assert TERMINAL_TASK_STATES == {
+        TaskLifecycleState.COMPLETED,
+        TaskLifecycleState.FAILED,
+        TaskLifecycleState.CANCELLED,
+        TaskLifecycleState.INTERRUPTED,
+    }
+    assert ATTENTION_TASK_STATES == {
+        TaskLifecycleState.WAITING_FOR_USER,
+        TaskLifecycleState.BLOCKED,
+        TaskLifecycleState.FAILED,
+        TaskLifecycleState.INTERRUPTED,
+    }
+
+
+def test_task_state_helpers_keep_waiting_nonterminal_and_interruption_visible():
+    assert not task_state_is_terminal(TaskLifecycleState.WAITING_FOR_USER)
+    assert task_state_needs_attention(TaskLifecycleState.WAITING_FOR_USER)
+    assert task_state_is_terminal(TaskLifecycleState.INTERRUPTED)
+    assert task_state_needs_attention(TaskLifecycleState.INTERRUPTED)
+    assert task_state_is_terminal(TaskLifecycleState.COMPLETED)
+    assert not task_state_needs_attention(TaskLifecycleState.COMPLETED)
 
 
 def test_default_durability_keeps_background_process_local_and_schedule_restart_safe():
