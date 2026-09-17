@@ -137,4 +137,13 @@ describe('error copy never names a hidden Retry', () => {
     const surface: ErrorSurface = { authKind: 'api_key', code: 'auth', layer: 'auth', provider: 'openai', retryable: false }
     expect(errorRecoveryPlan(surface).retry).toBe(true)
   })
+
+  it('does not offer the removed built-in Nous OAuth sign-in', () => {
+    const surface: ErrorSurface = { authKind: 'oauth', code: 'auth', layer: 'auth', provider: 'nous', retryable: false }
+    const plan = errorRecoveryPlan(surface)
+
+    expect(plan.signInAgain).toBe(false)
+    expect(plan.switchProvider).toBe(true)
+    expect(plan.retry).toBe(false)
+  })
 })

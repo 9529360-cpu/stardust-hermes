@@ -1150,3 +1150,43 @@ def test_connect_creates_state_db_0o600_under_permissive_umask(tmp_path, monkeyp
         sidecar = tmp_path / f"state.db{suffix}"
         if sidecar.exists():
             assert stat.S_IMODE(sidecar.stat().st_mode) == 0o600
+
+
+def test_completed_tail_prune_never_drops_live_records(monkeypatch):
+    """Retention may evict terminal history, never stalling/finalizing work."""
+    monkeypatch.setattr(ad, "_MAX_RETAINED_COMPLETED", 2)
+    with ad._records_lock:
+        ad._records.update({
+            "stall": {"delegation_id": "stall", "status": "stalling", "dispatched_at": 1.0},
+            "final": {"delegation_id": "final", "status": "finalizing", "dispatched_at": 2.0},
+            "done-1": {"delegation_id": "done-1", "status": "completed", "completed_at": 3.0},
+            "done-2": {"delegation_id": "done-2", "status": "failed", "completed_at": 4.0},
+            "done-3": {"delegation_id": "done-3", "status": "interrupted", "completed_at": 5.0},
+        })
+        ad._prune_completed_locked()
+        snapshot = dict(ad._records)
+
+    assert "stall" in snapshot
+    assert "final" in snapshot
+    terminal_ids = [
+        rid for rid, record in snapshot.items()
+        if record.get("status") not in ad._LIVE_STATES
+    ]
+    assert set(terminal_ids) == {"done-2", "done-3"}
+
+
+def test_active_task_count_includes_stalling_work():
+    """Health/load metrics must count children still alive in the stall grace window."""
+    with ad._records_lock:
+        ad._records.update({
+            "stall-single": {
+                "delegation_id": "stall-single", "status": "stalling", "is_batch": False,
+            },
+            "stall-batch": {
+                "delegation_id": "stall-batch", "status": "stalling", "is_batch": True,
+                "goals": ["a", "b"], "task_indexes": [0, 1],
+            },
+            "done": {"delegation_id": "done", "status": "completed"},
+        })
+
+    assert ad.active_task_count() == 3

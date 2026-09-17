@@ -182,11 +182,12 @@ class WebhookRouteProcessor:
             logger.warning("[webhook] script ignored webhook: bash not found")
             return False, None
         try:
-            from tools.environments.local import build_subprocess_env
+            from tools.environments.local import build_subprocess_env, strip_launch_profile_env
             popen_kwargs = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
             result = subprocess.run(
                 [interpreter, str(path)], input=json.dumps(payload), capture_output=True, text=True, encoding="utf-8", errors="replace",
-                timeout=self.script_timeout_seconds, cwd=str(path.parent), env=build_subprocess_env(), **popen_kwargs,
+                timeout=self.script_timeout_seconds, cwd=str(path.parent),
+                env=strip_launch_profile_env(build_subprocess_env()), **popen_kwargs,
             )
         except subprocess.TimeoutExpired:
             logger.warning("[webhook] script timed out: %s", path)

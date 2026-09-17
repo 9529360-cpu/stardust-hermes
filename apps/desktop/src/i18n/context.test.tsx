@@ -31,12 +31,12 @@ describe('I18nProvider', () => {
     vi.restoreAllMocks()
   })
 
-  it('normalizes inherited SSH recovery copy to Stardust without renaming the compatibility path', () => {
+  it('normalizes inherited SSH recovery copy to Stardust while preserving the real installer path', () => {
     const copy = normalizeStardustProductCopy(TRANSLATIONS.en).settings.gateway
 
     expect(copy.sshErrNotInstalled).toContain('Stardust is not installed')
     expect(copy.sshErrNotInstalled).toContain('install-stardust.sh')
-    expect(copy.sshErrNotInstalled).toContain('set the Hermes path')
+    expect(copy.sshErrNotInstalled).toContain('set the Stardust path')
     expect(copy.sshErrNotInstalled).not.toContain('hermes-agent.nousresearch.com')
     expect(copy.sshErrPlatform).toContain('Stardust Desktop')
   })

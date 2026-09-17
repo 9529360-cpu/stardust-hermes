@@ -343,7 +343,7 @@ def _run_job_script(
         return False, err
 
     try:
-        from tools.environments.local import build_subprocess_env
+        from tools.environments.local import build_subprocess_env, strip_launch_profile_env
         popen_kwargs: dict[str, Any] = {"start_new_session": True}
         if sys.platform == "win32":
             popen_kwargs = {
@@ -355,7 +355,7 @@ def _run_job_script(
                 # reader threads on non-UTF-8 Windows (#45099).
                 "encoding": "utf-8",
                 "errors": "replace"}
-        env = build_subprocess_env()
+        env = strip_launch_profile_env(build_subprocess_env())
         env.update(env_overlay)
         # Subprocess cwd only (default: scripts-dir parent). NEVER os.chdir() the process.
         # Use the job's workdir as the subprocess cwd when configured, otherwise default to the scripts-dir

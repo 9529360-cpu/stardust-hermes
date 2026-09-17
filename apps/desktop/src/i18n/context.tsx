@@ -17,16 +17,15 @@ import type { Locale, Translations } from './types'
 export { LOCALE_META } from './languages'
 
 const UPSTREAM_INSTALL_COMMAND = /curl -fsSL https:\/\/hermes-agent\.nousresearch\.com\/install\.sh \| (?:ba)?sh/g
+
 const STARDUST_INSTALL_COMMAND =
   'curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash'
 
 /**
- * The inherited locale catalogs still carry a handful of Hermes-era SSH
- * recovery strings. Keep those catalogs intact until they are naturally
- * translated again, but never let a live Stardust UI send a user to the
- * upstream installer. The second "Hermes" in the not-installed copy usually
- * names the compatibility path/CLI, so only the first product-name occurrence
- * is rewritten.
+ * Some locale catalogs can still carry an upstream SSH installer command.
+ * Never let a live Stardust UI send a user to that upstream installer. Brand normalization is intentionally presentation-only;
+ * lowercase CLI names, URLs, environment variables, and runtime keys remain
+ * compatibility identities.
  */
 export function normalizeStardustProductCopy(translations: Translations): Translations {
   const gateway = translations.settings.gateway

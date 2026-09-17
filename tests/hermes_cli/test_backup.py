@@ -775,11 +775,15 @@ class TestBackupEdgeCases:
         args = Namespace(output=str(out_zip))
 
         from hermes_cli.backup import run_backup
-        run_backup(args)
+        with pytest.raises(SystemExit) as exc:
+            run_backup(args)
+        assert exc.value.code == 1
 
-        # Zip should still be created with the valid files
-        assert out_zip.exists()
-        with zipfile.ZipFile(out_zip, "r") as zf:
+        # The salvage zip still contains valid files, but an incomplete backup is quarantined.
+        partial_zip = out_zip.with_suffix(out_zip.suffix + ".incomplete")
+        assert not out_zip.exists()
+        assert partial_zip.exists()
+        with zipfile.ZipFile(partial_zip, "r") as zf:
             names = zf.namelist()
             assert "config.yaml" in names
             # The pre-1980 file should be skipped, not crash the backup
@@ -2115,7 +2119,9 @@ class TestMemoryProviderExternalPaths:
         hermes_home.mkdir(parents=True, exist_ok=True)
         (hermes_home / "config.yaml").write_text("model:\n  provider: openrouter\n")
         (hermes_home / ".env").write_text("OPENROUTER_API_KEY=sk-test\n")
-        (hermes_home / "state.db").write_bytes(b"x")
+        with sqlite3.connect(hermes_home / "state.db") as conn:
+            conn.execute("CREATE TABLE sample (value TEXT)")
+            conn.execute("INSERT INTO sample VALUES ('portable')")
 
 
     def test_backup_skips_external_paths_outside_home(self, tmp_path, monkeypatch):
@@ -2169,8 +2175,9 @@ class TestMemoryProviderExternalPaths:
         restored = dst_home / ".honcho" / "config.json"
         assert restored.exists()
         assert restored.read_text() == '{"peer":"bob"}'
-        # Credential-shaped file tightened.
-        assert (restored.stat().st_mode & 0o777) == 0o600
+        # Credential-shaped files are mode-tightened where POSIX permission bits are meaningful.
+        if os.name != "nt":
+            assert (restored.stat().st_mode & 0o777) == 0o600
         # External state did NOT leak into HERMES_HOME.
         assert not (hermes_home / "_external").exists()
 
@@ -2499,3 +2506,32 @@ def test_run_backup_prunes_older_default_named_zips_but_not_others(tmp_path, mon
     kept = sorted(p.name for p in tmp_path.glob("hermes-backup-*.zip"))
     assert len(kept) == 2 and kept[0] == "hermes-backup-2026-01-04-000000.zip"
     assert (tmp_path / "my-archive.zip").exists()
+
+
+def test_incomplete_backup_exits_nonzero_and_preserves_last_good_archive(tmp_path, monkeypatch, capsys):
+    """An incomplete operator backup must not look successful or rotate away recovery history."""
+    from hermes_cli import backup as backup_mod
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    (home / "config.yaml").write_text("model: x\n")
+    with sqlite3.connect(home / "state.db") as conn:
+        conn.execute("CREATE TABLE sample (value TEXT)")
+        conn.execute("INSERT INTO sample VALUES ('recover-me')")
+
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    monkeypatch.setattr(backup_mod, "_safe_copy_db", lambda src, dst: False)
+    last_good = tmp_path / "hermes-backup-2026-01-01-000000.zip"
+    last_good.write_bytes(b"known-good")
+
+    with pytest.raises(SystemExit) as exc:
+        backup_mod.run_backup(Namespace(output=None, keep=1))
+
+    assert exc.value.code == 1
+    assert "Backup incomplete" in capsys.readouterr().out
+    assert last_good.exists(), "an incomplete backup must never prune the last known-good archive"
+    regular = sorted(tmp_path.glob("hermes-backup-*.zip"))
+    partial = sorted(tmp_path.glob("hermes-backup-*.zip.incomplete"))
+    assert regular == [last_good], "partial archives must not masquerade as restorable backups"
+    assert len(partial) == 1 and zipfile.is_zipfile(partial[0])

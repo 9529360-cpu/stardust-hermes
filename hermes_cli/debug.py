@@ -262,7 +262,7 @@ def _redact_log_text(text: str) -> str:
     if not text:
         return text
     from agent.redact import redact_sensitive_text
-    text = redact_sensitive_text(text, force=True)
+    text = redact_sensitive_text(text, force=True, redact_url_credentials=True)
     return _EMAIL_ADDRESS_RE.sub("[REDACTED_EMAIL]", text)
 
 
@@ -357,13 +357,19 @@ def _capture_dump() -> str:
 
 def collect_debug_report(
     *, log_lines: int = 200, dump_text: str = "",
-    log_snapshots: Optional[dict[str, LogSnapshot]] = None) -> str:
+    log_snapshots: Optional[dict[str, LogSnapshot]] = None,
+    redact_dump: bool = True) -> str:
     """Build the summary debug report (system dump + log tails) as upload-ready text.
 
     ``dump_text`` is pre-captured dump output; when empty, ``hermes dump`` is run internally.
+    Direct callers are upload-safe by default: the dump gets the same forced secret/email/URL
+    credential redaction as log snapshots. Explicit no-redact flows may opt out.
     """
+    rendered_dump = dump_text or _capture_dump()
+    if redact_dump:
+        rendered_dump = _redact_log_text(rendered_dump)
     buf = io.StringIO()
-    buf.write(dump_text or _capture_dump())
+    buf.write(rendered_dump)
     if log_snapshots is None:
         log_snapshots = _capture_default_log_snapshots(log_lines)
     # In-process sanitiser heal counters: populated only inside a process that ran agent turns
@@ -395,9 +401,11 @@ def collect_share_bundle(log_lines: int = 200, redact: bool = True) -> dict[str,
     redaction banner is prepended when ``redact`` is True.
     """
     dump_text = _capture_dump()
+    if redact:
+        dump_text = _redact_log_text(dump_text)
     log_snapshots = _capture_default_log_snapshots(log_lines, redact=redact)
     report = collect_debug_report(log_lines=log_lines, dump_text=dump_text,
-                                  log_snapshots=log_snapshots)
+                                  log_snapshots=log_snapshots, redact_dump=False)
     banner = _REDACTION_BANNER if redact else ""
     bundle: dict[str, str] = {"report": banner + report}
     for name in _FULL_LOGS:

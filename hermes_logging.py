@@ -8,6 +8,7 @@ with ``RedactingFormatter`` so secrets never reach disk.
 
 import atexit
 import copy
+import errno
 import io
 import logging
 import os
@@ -82,9 +83,15 @@ def _is_windows_concurrent_log_lock_timeout(exc: BaseException | None) -> bool:
 
 
 def _is_unavailable_log_stream(exc: BaseException | None) -> bool:
-    """True when a file handler lost its backing stream during teardown or I/O."""
+    """True when a file handler's destination is temporarily unable to accept writes."""
+    unavailable_errnos = {
+        errno.EIO,
+        errno.ENOSPC,
+        errno.EROFS,
+        getattr(errno, "EDQUOT", -1),
+    }
     return (
-        (isinstance(exc, OSError) and exc.errno == 5)
+        (isinstance(exc, OSError) and exc.errno in unavailable_errnos)
         or (isinstance(exc, ValueError) and "closed file" in str(exc).lower())
     )
 

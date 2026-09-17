@@ -1442,7 +1442,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     // boot()'s getConnection() had no bound of its own — only main's own
     // eventual timeout (e.g. waitForHermes, ~45s) ever settled it. A wedge
     // that main never resolves (not even a rejection) must not hang
-    // "Starting Hermes…" forever; the renderer needs to own its own bound
+    // "Starting Stardust…" forever; the renderer needs to own its own bound
     // here too, same as attemptReconnect() and softSwitch().
     const desktop = fakeDesktop()
     desktop.getConnection = vi.fn(() => new Promise(() => undefined))
@@ -1906,7 +1906,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     desktop.getBootProgress = vi.fn(async () => ({
       error: null,
       fakeMode: false,
-      message: 'Hermes is ready',
+      message: 'Stardust is ready',
       phase: 'backend.ready',
       progress: 100,
       retryable: false,
@@ -1941,7 +1941,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     desktop.getBootProgress = vi.fn(async () => ({
       error: null,
       fakeMode: false,
-      message: 'Hermes is ready',
+      message: 'Stardust is ready',
       phase: 'backend.ready',
       progress: 100,
       retryable: false,
@@ -1966,7 +1966,7 @@ describe('useGatewayBoot remote reconnect loop (real hook, fake socket)', () => 
     desktop.getBootProgress = vi.fn(async () => ({
       error: null,
       fakeMode: false,
-      message: 'Hermes is ready',
+      message: 'Stardust is ready',
       phase: 'backend.ready',
       progress: 100,
       retryable: false,

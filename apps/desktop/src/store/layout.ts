@@ -10,7 +10,7 @@ import {
 import { matchesQuery } from '@/hooks/use-media-query'
 import { connectionScopedAtom } from '@/lib/connection-scoped'
 import { type Codec, Codecs, persistentAtom } from '@/lib/persisted'
-import { arraysEqual, insertUniqueId, readKey } from '@/lib/storage'
+import { arraysEqual, insertUniqueId, readKey, writeKey } from '@/lib/storage'
 
 import { $paneStates, ensurePaneRegistered, setPaneOpen, setPaneWidthOverride } from './panes'
 import { $showAllProfiles, setShowAllProfiles } from './profile'
@@ -59,6 +59,56 @@ const SIDEBAR_DISMISSED_AUTO_PROJECTS_STORAGE_KEY = 'hermes.desktop.dismissedAut
 const SIDEBAR_DISMISSED_WORKTREES_STORAGE_KEY = 'hermes.desktop.dismissedWorktrees'
 const PANES_FLIPPED_STORAGE_KEY = 'hermes.desktop.panesFlipped'
 const RIGHT_RAIL_ACTIVE_TAB_STORAGE_KEY = 'hermes.desktop.rightRailActiveTab'
+const SIDEBAR_ASSISTANT_FIRST_MIGRATION_KEY = 'stardust.desktop.sidebarAssistantFirst.v1'
+
+/**
+ * The Codex-shell pass temporarily shipped Project grouping as the untouched
+ * default. Stardust is an assistant first, so migrate only users whose sidebar
+ * still matches that exact shipped view; any visible customization keeps its
+ * previous grouping. Runtime/session keys stay unchanged.
+ */
+export function migrateSidebarAssistantFirstDefault(): void {
+  if (readKey(SIDEBAR_ASSISTANT_FIRST_MIGRATION_KEY) === '1') {
+    return
+  }
+
+  const oldDefault = (key: string, expected: string) => {
+    const raw = readKey(key)
+
+    return raw === null || raw === expected
+  }
+
+  const untouchedProjectDefault =
+    oldDefault(SIDEBAR_AGENTS_GROUPED_STORAGE_KEY, 'true') &&
+    oldDefault(SIDEBAR_ALL_PROFILES_AGENTS_GROUPED_STORAGE_KEY, 'true') &&
+    oldDefault(SIDEBAR_GROUPING_STORAGE_KEY, 'date') &&
+    oldDefault(SIDEBAR_ALL_PROFILES_GROUPING_STORAGE_KEY, 'date') &&
+    oldDefault(SIDEBAR_SORT_KEY_STORAGE_KEY, 'updated') &&
+    oldDefault(SIDEBAR_ROW_META_STORAGE_KEY, JSON.stringify(['preview', 'updated'])) &&
+    oldDefault(SIDEBAR_CARD_ROWS_STORAGE_KEY, 'false') &&
+    oldDefault(SIDEBAR_SHOW_ALL_SESSIONS_STORAGE_KEY, 'false') &&
+    oldDefault(SIDEBAR_SHOW_ARCHIVED_STORAGE_KEY, 'false') &&
+    readKey(SIDEBAR_STATUS_FILTER_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_PROJECT_FILTER_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_PROFILE_FILTER_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_PR_FILTER_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_SESSION_ORDER_STORAGE_KEY) === null &&
+    oldDefault(SIDEBAR_SESSION_ORDER_MANUAL_STORAGE_KEY, 'false') &&
+    readKey(SIDEBAR_WORKSPACE_ORDER_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_WORKSPACE_PARENT_ORDER_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_PROJECT_ORDER_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_DISMISSED_AUTO_PROJECTS_STORAGE_KEY) === null &&
+    readKey(SIDEBAR_DISMISSED_WORKTREES_STORAGE_KEY) === null
+
+  if (untouchedProjectDefault) {
+    writeKey(SIDEBAR_AGENTS_GROUPED_STORAGE_KEY, 'false')
+    writeKey(SIDEBAR_ALL_PROFILES_AGENTS_GROUPED_STORAGE_KEY, 'false')
+  }
+
+  writeKey(SIDEBAR_ASSISTANT_FIRST_MIGRATION_KEY, '1')
+}
+
+migrateSidebarAssistantFirstDefault()
 
 export const CHAT_SIDEBAR_PANE_ID = 'chat-sidebar'
 export const FILE_BROWSER_PANE_ID = 'file-browser'
@@ -715,8 +765,10 @@ export function resetSidebarView() {
   // Both scopes, not just the one on screen: each keeps its own grouping (and
   // its own Project flag), so a reset that left the other customized would
   // hand it back on the next flip.
-  $sidebarFlatGrouping.set(SIDEBAR_DEFAULT_GROUPING)
-  $sidebarAllProfilesGrouping.set(SIDEBAR_DEFAULT_GROUPING)
+  // Assistant-first default: recent tasks by date. Project/worktree lanes stay
+  // available explicitly and keep the same underlying runtime/state model.
+  $sidebarFlatGrouping.set('date')
+  $sidebarAllProfilesGrouping.set('date')
   $sidebarFlatAgentsGrouped.set(false)
   $sidebarAllProfilesAgentsGrouped.set(false)
   setSidebarOrdering(SIDEBAR_DEFAULT_ORDERING)

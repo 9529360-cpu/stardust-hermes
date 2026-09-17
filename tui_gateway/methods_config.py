@@ -1,4 +1,4 @@
-"""Config / projects / setup JSON-RPC handlers. Bodies are rebound onto server.py's globals
+﻿"""Config / projects / setup JSON-RPC handlers. Bodies are rebound onto server.py's globals
 (method_ctx.bind_module) and reference them bare. ``config.set`` lives in methods_config_set.
 """
 
@@ -250,16 +250,16 @@ def _readiness_check(rid, params, probe):
     for the launch profile instead)."""
     import contextlib
     profile = str(params.get("profile") or "").strip() if isinstance(params, dict) else ""
-    scope = contextlib.nullcontext()
+    home = None
     if profile:
         from hermes_cli import profiles as profiles_mod
         if not profiles_mod.profile_exists(profile):
             return _ok(rid, {"ok": False, "profile": params.get("profile"),
                              "error": f"Profile '{profile}' does not exist on this backend."})
         home = _profile_home(profile)
-        if home is not None:
-            scope = _session_profile_runtime_scope({"profile_home": str(home)})
-    with scope:
+    # The launch profile needs its own frozen secret/terminal scope after this process starts
+    # serving multiple profiles too. The shared helper is a no-op for a single-profile launch.
+    with _session_profile_runtime_scope({"profile_home": str(home) if home else None}):
         payload = probe(profile, {"profile": profile} if profile else {})
     return _ok(rid, payload)
 

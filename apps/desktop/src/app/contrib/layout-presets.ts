@@ -1,69 +1,58 @@
 import { group, split } from '@/components/pane-shell/tree/model'
+import { $activePresetId, resetLayoutTree } from '@/components/pane-shell/tree/store'
 import { registry } from '@/contrib/registry'
 import { isOnboardingEnabled } from '@/lib/onboarding-enabled'
+import { readKey, writeKey } from '@/lib/storage'
+import { isAuxiliaryWindow } from '@/store/windows'
 
-import {
-  registerWorkspaceOverviewPane,
-  schedulePersonalLayoutMigration,
-  WORKSPACE_OVERVIEW_PANE_ID
-} from './workspace-overview'
+const CODEX_SHELL_MIGRATION_KEY = 'stardust.desktop.codexShellLayout.v1'
 
-// Private-product default: conversations on the left, the active chat as the
-// dominant surface, and one calm context rail on the right. Files and Review
-// live as tabs in that context rail and stay hidden until the user asks for
-// them; the always-available overview keeps the rail useful when no tool pane
-// is open. Terminal is intentionally absent from the first view and appears on
-// demand.
+// Stardust's primary desktop is a developer command center: project/task
+// navigation on the left, the active agent thread as the dominant surface.
+// Diff, files and terminal are task tools revealed on demand instead of a
+// permanent dashboard column competing with the work itself.
 export const DEFAULT_TREE = split(
   'row',
-  [
-    group(['sessions'], { id: 'grp-sessions' }),
-    group(['workspace'], { id: 'grp-main' }),
-    group([WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'], { id: 'grp-context' })
-  ],
-  [1, 3.5, 1.2],
+  [group(['sessions'], { id: 'grp-sessions' }), group(['workspace'], { id: 'grp-main' })],
+  [1, 4.2],
   'spl-root'
 )
 
-const FOCUS_TREE = split(
-  'row',
-  [group(['sessions']), group(['workspace', WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review', 'terminal'])],
-  [1, 4.6]
-)
-
-const BASIC_TREE = split(
-  'row',
-  [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
-  [1, 3.8, 1.05]
-)
+const BASIC_TREE = split('row', [group(['sessions']), group(['workspace'])], [1, 4])
+const FOCUS_TREE = split('row', [group(['sessions']), group(['workspace'])], [1, 5])
 
 const TERMINAL_TREE = split(
   'column',
-  [
-    split(
-      'row',
-      [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID, 'files', 'review'])],
-      [1, 3.2, 1.2]
-    ),
-    group(['terminal'])
-  ],
-  [3, 1]
+  [split('row', [group(['sessions']), group(['workspace'])], [1, 4]), group(['terminal'])],
+  [3.2, 1]
 )
 
 const QUAD_TREE = split(
   'column',
   [
-    split('row', [group(['sessions', 'files']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])], [1, 3, 1.1]),
-    split('row', [group(['terminal']), group(['review'])], [1.4, 1])
+    split('row', [group(['sessions']), group(['workspace']), group(['review'])], [1, 3.6, 1.35]),
+    split('row', [group(['terminal']), group(['files'])], [2, 1])
   ],
   [3, 1]
 )
 
-export function registerLayoutPresets() {
-  // The overview is product chrome, not an optional plugin: it must exist
-  // whenever a preset references it.
-  registerWorkspaceOverviewPane()
+function scheduleCodexShellLayoutMigration() {
+  if (isAuxiliaryWindow() || readKey(CODEX_SHELL_MIGRATION_KEY) === 'done') {
+    return
+  }
 
+  queueMicrotask(() => {
+    // Preserve hand-built layouts. `basic` was the old onboarding-owned shipped
+    // preset, so it migrates with `default`; anything custom stays untouched.
+    if (['default', 'basic'].includes($activePresetId.get())) {
+      resetLayoutTree()
+    }
+
+    writeKey(CODEX_SHELL_MIGRATION_KEY, 'done')
+  })
+}
+
+export function registerLayoutPresets() {
   const dispose = registry.registerMany([
     { id: 'default', area: 'layouts', title: 'Default', order: 0, data: DEFAULT_TREE },
     ...(isOnboardingEnabled() ? [{ id: 'basic', area: 'layouts', title: 'Basic', order: 5, data: BASIC_TREE }] : []),
@@ -72,7 +61,7 @@ export function registerLayoutPresets() {
     { id: 'quad', area: 'layouts', title: 'Quad', order: 30, data: QUAD_TREE }
   ])
 
-  schedulePersonalLayoutMigration()
+  scheduleCodexShellLayoutMigration()
 
   return dispose
 }

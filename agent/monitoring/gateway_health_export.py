@@ -47,7 +47,11 @@ _METRICS_SDK = (
 _OBSERVABLE_METRIC_NAMES = (
     "hermes.gateway.up", "hermes.gateway.state", "hermes.gateway.active_agents", "hermes.gateway.busy",
     "hermes.gateway.drainable", "hermes.gateway.restart_requested", "hermes.gateway.background_work",
-    "hermes.gateway.background_delegations", "hermes.platform.up", "hermes.platform.degraded",
+    "hermes.gateway.background_delegations", "hermes.gateway.process_completions_pending",
+    "hermes.platform.up", "hermes.platform.degraded",
+    "hermes.host.disk.pressure_level", "hermes.host.disk.free_mb", "hermes.host.disk.used_percent",
+    "hermes.host.memory.pressure_level", "hermes.host.memory.available_mb",
+    "hermes.host.memory.gateway_rss_mb", "hermes.host.memory.swap_used_mb",
     "hermes.cron.scheduler.heartbeat_age_seconds", "hermes.cron.scheduler.last_success_age_seconds",
     "hermes.cron.scheduler.catch_up_occurrences", "hermes.cron.jobs.enabled", "hermes.cron.jobs.running",
     "hermes.cron.jobs.overdue",
@@ -170,20 +174,74 @@ def _read_background_delegations_count() -> int:
     return _count("background-delegations count failed", "tools.async_delegation", lambda m: m.active_count())
 
 
+def _read_process_completion_queue_depth() -> int:
+    """Undelivered background-process/watch notifications waiting for the gateway drain."""
+    return _count(
+        "process-completion queue depth failed", "tools.process_registry",
+        lambda m: m.process_registry.completion_queue.qsize(),
+    )
+
+
+_PRESSURE_LEVELS = {"unknown": -1, "ok": 0, "elevated": 1, "critical": 2}
+
+
+def _host_metric(metrics: list[GatewayMetric], name: str, raw: Any, base: Dict[str, str]) -> None:
+    """Append one non-negative host gauge when *raw* is numeric (bools are not numbers here)."""
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return
+    metrics.append(GatewayMetric(name=name, value=max(0, raw), attributes=dict(base)))
+
+
+def _read_host_resource_metrics(base: Dict[str, str]) -> list[GatewayMetric]:
+    """Content-free host pressure/capacity gauges, reusing the local status collectors."""
+    metrics: list[GatewayMetric] = []
+    try:
+        from gateway.disk_status import collect_disk_status
+
+        disk = collect_disk_status()
+        metrics.append(GatewayMetric(
+            "hermes.host.disk.pressure_level",
+            _PRESSURE_LEVELS.get(str(disk.get("pressure") or "unknown"), -1),
+            dict(base),
+        ))
+        _host_metric(metrics, "hermes.host.disk.free_mb", disk.get("free_mb"), base)
+        _host_metric(metrics, "hermes.host.disk.used_percent", disk.get("used_percent"), base)
+    except Exception as exc:
+        logger.warning("disk health snapshot unavailable; metrics not exported (error_type=%s)", type(exc).__name__)
+        logger.debug("disk health snapshot traceback", exc_info=True)
+    try:
+        from gateway.memory_status import collect_memory_status
+
+        memory = collect_memory_status()
+        metrics.append(GatewayMetric(
+            "hermes.host.memory.pressure_level",
+            _PRESSURE_LEVELS.get(str(memory.get("pressure") or "unknown"), -1),
+            dict(base),
+        ))
+        _host_metric(metrics, "hermes.host.memory.available_mb", memory.get("system_available_mb"), base)
+        _host_metric(metrics, "hermes.host.memory.gateway_rss_mb", memory.get("gateway_rss_mb"), base)
+        _host_metric(metrics, "hermes.host.memory.swap_used_mb", memory.get("swap_used_mb"), base)
+    except Exception as exc:
+        logger.warning("memory health snapshot unavailable; metrics not exported (error_type=%s)", type(exc).__name__)
+        logger.debug("memory health snapshot traceback", exc_info=True)
+    return metrics
+
 def _read_runtime_snapshot(config: Dict[str, Any]):
     gateway_snapshot = _read_gateway_snapshot(config)
+    base = dict(gateway_snapshot.metrics[0].attributes) if gateway_snapshot.metrics else {}
     # Background/subagent work is appended to the gateway snapshot so it rides the same base
     # resource attributes (service.instance.id etc.).
     try:
-        base = dict(gateway_snapshot.metrics[0].attributes) if gateway_snapshot.metrics else {}
         for name, read in (
             ("hermes.gateway.background_work", _read_background_work_count),
             ("hermes.gateway.background_delegations", _read_background_delegations_count),
+            ("hermes.gateway.process_completions_pending", _read_process_completion_queue_depth),
         ):
             gateway_snapshot.metrics.append(GatewayMetric(name=name, value=read(), attributes=base))
     except Exception as exc:
         logger.warning("background-work snapshot unavailable; metric not exported (error_type=%s)", type(exc).__name__)
         logger.debug("background-work snapshot traceback", exc_info=True)
+    gateway_snapshot.metrics.extend(_read_host_resource_metrics(base))
     try:
         gateway_snapshot.metrics.extend(_read_cron_snapshot().metrics)
     except Exception as exc:

@@ -64,7 +64,9 @@ _V2_REPLAY_WINDOW_SECONDS = 300
 _TEMPLATE_KEY_RE = re.compile(r"\{([a-zA-Z0-9_.]+)\}")
 _REPO_RE = re.compile(r"[A-Za-z0-9._-]+/[A-Za-z0-9._-]+")
 # Credentials `gh` reads; a routed profile's github_comment must use its own, never the process env's.
-_GH_TOKEN_VARS = ("GH_TOKEN", "GITHUB_TOKEN")
+_GH_TOKEN_VARS = ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN")
+_GH_PROFILE_ENV_VARS = (*_GH_TOKEN_VARS, "GH_HOST")
+_GH_AMBIENT_STRIP_VARS = frozenset((*_GH_PROFILE_ENV_VARS, "GH_REPO", "GH_CONFIG_DIR"))
 
 
 def _is_loopback_host(host: Optional[str]) -> bool:
@@ -810,6 +812,13 @@ class WebhookAdapter(BasePlatformAdapter):
         if not _REPO_RE.fullmatch(repo):
             logger.error("[webhook] invalid repo format: %r", repo)
             return SendResult(success=False, error="Invalid repo format")
+        profile = delivery.get("profile")
+        github_env = self._github_env(profile)
+        if profile and isinstance(profile, str) and profile != "default" and not any(
+            github_env and github_env.get(name) for name in _GH_TOKEN_VARS
+        ):
+            logger.error("[webhook] github_comment profile %r has no GitHub credential", profile)
+            return SendResult(success=False, error="GitHub credential not configured for routed profile")
         try:
             # Off-loop: `gh` does network I/O up to its 30s timeout; inline it froze every adapter and
             # timer on the gateway event loop.
@@ -819,7 +828,7 @@ class WebhookAdapter(BasePlatformAdapter):
             result = await asyncio.to_thread(
                 subprocess.run, ["gh", "pr", "comment", str(pr_int), "--repo", repo, "--body", content],
                 capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30,
-                env=self._github_env(delivery.get("profile")))
+                env=github_env)
             if result.returncode == 0:
                 logger.info("[webhook] Posted comment on %s#%s", repo, pr_number)
                 return SendResult(success=True)
@@ -833,17 +842,19 @@ class WebhookAdapter(BasePlatformAdapter):
             return SendResult(success=False, error=str(e))
 
     def _github_env(self, profile: Optional[str]) -> Optional[dict]:
-        """``gh`` environment for a delivery: a routed profile authenticates with ITS ``GH_TOKEN`` /
-        ``GITHUB_TOKEN`` from the profile secret scope; under multiplex ``os.environ`` carries the default
-        profile's, so those keys are dropped when the profile has none (fail closed, ``gh`` then falls to
-        its own stored login). ``None`` (inherit) for bare/default-bound routes."""
+        """`gh` environment for a delivery: a routed profile uses only its own GitHub auth token / host.
+        Under multiplex `os.environ` carries the default profile's GitHub host, enterprise tokens and CLI
+        config too, so routed profiles strip those ambient values before overlaying their scoped values. If
+        the routed profile has no token, the caller rejects before `gh` can fall back to machine-wide stored
+        login. `None` (inherit) for bare/default-bound routes."""
         if not profile or not isinstance(profile, str) or profile == "default":
             return None
-        from agent.secret_scope import get_secret
-        env = {k: v for k, v in os.environ.items() if k not in _GH_TOKEN_VARS}
+        from agent.secret_scope import current_secret_scope
+        env = {k: v for k, v in os.environ.items() if k not in _GH_AMBIENT_STRIP_VARS}
         with self._profile_scope(profile):
-            for name in _GH_TOKEN_VARS:
-                if value := get_secret(name):
+            scope = current_secret_scope() or {}
+            for name in _GH_PROFILE_ENV_VARS:
+                if value := scope.get(name):
                     env[name] = value
         return env
 

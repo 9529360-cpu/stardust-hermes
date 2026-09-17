@@ -16,6 +16,7 @@ import tempfile
 import threading
 import time
 import unicodedata
+from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -189,6 +190,57 @@ def validate_env_var_name_for_write(key: str) -> None:
 # (approval, browser, setup flows) load/save config concurrently during long agent runs.
 # RLock because save_config internally calls read_raw_config.
 _CONFIG_LOCK = threading.RLock()
+_CONFIG_FILE_LOCK_DEPTH = threading.local()
+
+
+@contextmanager
+def config_mutation_scope(config_path: Optional[Path] = None):
+    """Serialize one config.yaml read-modify-write across threads and processes.
+
+    Atomic replacement prevents torn files but cannot prevent lost updates when two processes
+    both read the same old document and then atomically replace it. The sibling lock file keeps
+    the full read -> mutate -> write transition exclusive. Re-entrant in the owning thread so
+    helpers can compose without deadlocking.
+    """
+    path = config_path or get_config_path()
+    lock_path = path.with_name(f".{path.name}.lock")
+    lock_key = str(lock_path.resolve(strict=False))
+    depths = getattr(_CONFIG_FILE_LOCK_DEPTH, "depths", None)
+    if depths is None:
+        depths = {}
+        _CONFIG_FILE_LOCK_DEPTH.depths = depths
+
+    with _CONFIG_LOCK:
+        if depths.get(lock_key, 0):
+            depths[lock_key] += 1
+            try:
+                yield
+            finally:
+                depths[lock_key] -= 1
+            return
+
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(lock_path, "a+b") as handle:
+            if os.name == "nt":
+                import msvcrt
+                if handle.seek(0, os.SEEK_END) == 0:
+                    handle.write(b"\0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            depths[lock_key] = 1
+            try:
+                yield
+            finally:
+                depths.pop(lock_key, None)
+                if os.name == "nt":
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 # path -> last successfully loaded (expanded) config; served after a parse failure so a
 # mid-edit broken YAML never silently drops user overrides (e.g. approvals.deny rules).
 _LAST_EXPANDED_CONFIG_BY_PATH: Dict[str, Any] = {}
@@ -3505,29 +3557,31 @@ def set_config_value(key: str, value: str, force: bool = False):
         print(_redirect_note)
     is_known, suggestion = _validate_config_key(key)
 
-    # Read the RAW user config (not merged) so defaults are never dumped back; fail-closed.
+    # Read + mutate + replace is one cross-process transaction. Atomic replacement alone only
+    # prevents torn YAML; without this scope successful writers can silently lose siblings.
     config_path = get_config_path()
-    user_config = require_readable_config_before_write(config_path)
-    value = _coerce_config_set_value(key, value)
-    # A scalar ``model`` shorthand must become a dict before writing sub-keys, or _set_nested
-    # replaces it with an empty dict and the model id is lost.
-    _model_val = user_config.get("model")
-    if key.strip().lower().startswith("model.") and isinstance(_model_val, str) and _model_val:
-        user_config["model"] = {"default": _model_val}
-    key = _guard_section_overwrite(key, value, user_config, force)
-    try:
-        _set_nested(user_config, key, value)
-    except ValueError as e:
-        _exit_invalid(f"✗ {e}")
-    # api_base -> base_url alias at set-time too (mirrors _normalize_root_model_keys).
-    if key.strip().lower() in ("model.api_base", "api_base"):
-        # Normalize the api_base → base_url alias at set-time too (issue #8919), so a fresh `hermes config
-        # set model.api_base ...` lands on the canonical key the runtime resolver actually reads, instead of
-        # being silently ignored.
-        user_config = _normalize_root_model_keys(user_config)
-        key = "model.base_url"
-        print("  (note: 'api_base' is an alias — saved as model.base_url)")
-    _write_user_config(config_path, user_config)
+    with config_mutation_scope(config_path):
+        user_config = require_readable_config_before_write(config_path)
+        value = _coerce_config_set_value(key, value)
+        # A scalar ``model`` shorthand must become a dict before writing sub-keys, or _set_nested
+        # replaces it with an empty dict and the model id is lost.
+        _model_val = user_config.get("model")
+        if key.strip().lower().startswith("model.") and isinstance(_model_val, str) and _model_val:
+            user_config["model"] = {"default": _model_val}
+        key = _guard_section_overwrite(key, value, user_config, force)
+        try:
+            _set_nested(user_config, key, value)
+        except ValueError as e:
+            _exit_invalid(f"✗ {e}")
+        # api_base -> base_url alias at set-time too (mirrors _normalize_root_model_keys).
+        if key.strip().lower() in ("model.api_base", "api_base"):
+            # Normalize the api_base → base_url alias at set-time too (issue #8919), so a fresh `hermes config
+            # set model.api_base ...` lands on the canonical key the runtime resolver actually reads, instead of
+            # being silently ignored.
+            user_config = _normalize_root_model_keys(user_config)
+            key = "model.base_url"
+            print("  (note: 'api_base' is an alias — saved as model.base_url)")
+        _write_user_config(config_path, user_config)
 
     # Keep .env in sync: terminal_tool reads TERMINAL_ENV etc. directly from env vars.
     env_var = terminal_config_env_var_for_key(key)
@@ -3597,22 +3651,23 @@ def unset_config_value(key: str):
         return
 
     config_path = get_config_path()
-    user_config = require_readable_config_before_write(config_path)
+    with config_mutation_scope(config_path):
+        user_config = require_readable_config_before_write(config_path)
 
-    key, _redirect_note = _redirect_platform_display_key(key)
-    if _redirect_note:
-        # Mirror set_config_value's display.platforms canonicalization (#71047).
-        print(_redirect_note.replace("saved as", "resolved as"))
-    removed = _unset_nested(user_config, key)
+        key, _redirect_note = _redirect_platform_display_key(key)
+        if _redirect_note:
+            # Mirror set_config_value's display.platforms canonicalization (#71047).
+            print(_redirect_note.replace("saved as", "resolved as"))
+        removed = _unset_nested(user_config, key)
 
-    env_var = terminal_config_env_var_for_key(key)
-    if env_var and key != "terminal.cwd":
-        removed = remove_env_value(env_var) or removed
+        env_var = terminal_config_env_var_for_key(key)
+        if env_var and key != "terminal.cwd":
+            removed = remove_env_value(env_var) or removed
 
-    if not removed:
-        _exit_invalid(f"Config key not set: {key}")
+        if not removed:
+            _exit_invalid(f"Config key not set: {key}")
 
-    _write_user_config(config_path, user_config)
+        _write_user_config(config_path, user_config)
     print(f"✓ Unset {key} from {config_path}")
 
 

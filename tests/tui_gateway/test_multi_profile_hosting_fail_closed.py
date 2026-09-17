@@ -123,6 +123,27 @@ def test_rpc_scope_reaches_llm_oneshot_and_model_options(two_homes, monkeypatch)
     assert seen["options"] == (b, B_VAL, None)
 
 
+def test_setup_runtime_check_scopes_launch_profile_once_multiplexing(two_homes, monkeypatch):
+    """Default-profile setup polling must use the launch profile scope after multiplexing flips on."""
+    from agent.secret_scope import get_secret
+
+    _root, _b = two_homes
+    lpp.activate_multi_profile_hosting()
+    seen = {}
+
+    def fake_resolve(requested=None):
+        seen["launch_secret"] = get_secret("A_ONLY_TOKEN")
+        return {"provider": "custom", "api_key": "no-key-required", "source": "env/config"}
+
+    monkeypatch.setattr("hermes_cli.runtime_provider.resolve_runtime_provider", fake_resolve)
+    monkeypatch.setattr("hermes_cli.main._has_any_provider_configured", lambda **_kw: True)
+
+    resp = server.handle_request({"id": "setup", "method": "setup.runtime_check", "params": {}})
+
+    assert resp["result"]["ok"] is True
+    assert seen == {"launch_secret": A_VAL}
+
+
 def test_launch_profile_agent_build_is_scoped_once_multiplexing(two_homes, monkeypatch):
     """The C6 asymmetry: a default-profile session (``profile_home`` None) in a multiplexing process
     must bind the launch profile's own scope for its agent build instead of running unscoped."""

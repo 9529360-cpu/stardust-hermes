@@ -14,6 +14,7 @@ Both tests force exactly that interleaving and assert both writes land.
 
 from __future__ import annotations
 
+import pathlib
 import threading
 import time
 
@@ -128,3 +129,97 @@ def test_custom_endpoint_activate_racing_moa_save_keeps_both_writes(client, monk
     on_disk = _on_disk()
     assert on_disk["model"]["provider"] == "racebox"
     assert on_disk["moa"]["aggregator"]["model"] == "openai/gpt-5.5"
+
+
+def test_config_set_cross_process_writes_do_not_drop_siblings(tmp_path):
+    """Independent CLI writers must serialize the full config read-modify-write."""
+    import os
+    import subprocess
+    import sys
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("seed: keep\n", encoding="utf-8")
+    gate = tmp_path / "go"
+    script = r'''
+import os, pathlib, sys, time
+import hermes_cli.config as config
+home = pathlib.Path(os.environ["HERMES_HOME"])
+index = sys.argv[1]
+(home / f"ready-{index}").write_text("1", encoding="utf-8")
+while not (home / "go").exists():
+    time.sleep(0.01)
+config.set_config_value(f"race_{index}", index, force=True)
+'''
+    env = dict(os.environ, HERMES_HOME=str(tmp_path))
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-c", script, str(index)],
+            cwd=pathlib.Path(__file__).resolve().parents[2],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        for index in range(8)
+    ]
+    deadline = time.time() + 20
+    while sum((tmp_path / f"ready-{index}").exists() for index in range(8)) < 8:
+        assert time.time() < deadline, "config writers did not reach the start gate"
+        time.sleep(0.02)
+    gate.write_text("1", encoding="utf-8")
+    results = [process.communicate(timeout=30) for process in processes]
+    assert [process.returncode for process in processes] == [0] * 8, results
+
+    on_disk = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert on_disk["seed"] == "keep"
+    assert {f"race_{index}": on_disk.get(f"race_{index}") for index in range(8)} == {
+        f"race_{index}": index for index in range(8)
+    }
+
+
+def test_dashboard_lock_serializes_with_cli_config_writer(tmp_path):
+    """Dashboard RMW lock must coordinate with config CLI processes, not only threads."""
+    import os
+    import subprocess
+    import sys
+
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("seed: keep\n", encoding="utf-8")
+    repo = pathlib.Path(__file__).resolve().parents[2]
+    env = dict(os.environ, HERMES_HOME=str(tmp_path))
+    web_script = r'''
+import os, pathlib, time
+from hermes_cli import web_server
+from hermes_cli.config import require_readable_config_before_write
+from utils import atomic_yaml_write
+home = pathlib.Path(os.environ["HERMES_HOME"])
+path = home / "config.yaml"
+with web_server._CONFIG_MUTATION_LOCK:
+    data = require_readable_config_before_write(path)
+    data["dashboard"] = "kept"
+    (home / "dashboard-ready").write_text("1", encoding="utf-8")
+    while not (home / "cli-attempt").exists():
+        time.sleep(0.01)
+    time.sleep(0.75)
+    atomic_yaml_write(path, data, sort_keys=False)
+'''
+    cli_script = r'''
+import os, pathlib
+import hermes_cli.config as config
+home = pathlib.Path(os.environ["HERMES_HOME"])
+(home / "cli-attempt").write_text("1", encoding="utf-8")
+config.set_config_value("cli", "kept", force=True)
+'''
+    web = subprocess.Popen([sys.executable, "-c", web_script], cwd=repo, env=env)
+    deadline = time.time() + 20
+    while not (tmp_path / "dashboard-ready").exists():
+        assert web.poll() is None and time.time() < deadline
+        time.sleep(0.02)
+    cli = subprocess.Popen([sys.executable, "-c", cli_script], cwd=repo, env=env)
+    assert web.wait(timeout=30) == 0
+    assert cli.wait(timeout=30) == 0
+
+    on_disk = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    assert on_disk == {"seed": "keep", "dashboard": "kept", "cli": "kept"}

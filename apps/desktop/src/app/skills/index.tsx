@@ -39,7 +39,7 @@ import { cn } from '@/lib/utils'
 import { $gateway, activeGatewayConnectionId } from '@/store/gateway'
 import { $hubActions, installHubSkill, notifyHubActionFailed, OFFICIAL_SKILLS_KEY } from '@/store/hub-actions'
 import { notify, notifyError } from '@/store/notifications'
-import { $activeGatewayProfile, normalizeProfileKey } from '@/store/profile'
+import { $activeGatewayProfile, normalizeProfileKey, profileLabel, profileNameLabel } from '@/store/profile'
 import type { OfficialSkillInfo, SkillInfo, ToolsetInfo } from '@/types/hermes'
 
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
@@ -792,15 +792,15 @@ export function SkillsView({
         key: `${agent.connectionId}::${agent.profile}`,
         label:
           agent.connectionId === activeId
-            ? `${agent.profile} — ${agent.connectionLabel} (current)`
-            : `${agent.profile} — ${agent.connectionLabel}`,
+            ? `${profileNameLabel(agent.profile)} — ${agent.connectionLabel} (current)`
+            : `${profileNameLabel(agent.profile)} — ${agent.connectionLabel}`,
         value: `${agent.connectionId}::${agent.profile}`
       }))
     }
 
     return (profilesData?.profiles ?? []).map(p => ({
       key: p.name,
-      label: p.is_default ? 'Hermes (default)' : p.name,
+      label: p.is_default ? 'Stardust (default)' : profileLabel(p),
       value: p.name
     }))
   }, [multiConnection, profilesData, rosterData])

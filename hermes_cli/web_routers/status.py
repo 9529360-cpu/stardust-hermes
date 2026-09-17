@@ -701,14 +701,14 @@ async def run_config_migrate():
 
 @router.post("/api/ops/debug-share")
 async def run_debug_share_endpoint(body: DebugShareRequest | None = None):
-    """Upload a redacted debug report + full logs and return the paste URLs. Synchronous,
+    """Upload a force-redacted debug report + full logs and return the paste URLs. Synchronous,
     unlike the other diagnostics actions: the point is the shareable URLs, returned as a
     structured payload the dashboard renders as copyable links."""
     from hermes_cli.debug import build_debug_share
     req = body or DebugShareRequest()
     try:
         result = await asyncio.to_thread(
-            build_debug_share, log_lines=max(1, min(int(req.lines), 5000)), redact=bool(req.redact))
+            build_debug_share, log_lines=max(1, min(int(req.lines), 5000)), redact=True)
     except RuntimeError as exc:
         # Required summary-report upload failed (offline / paste service down).
         raise HTTPException(status_code=502, detail=f"Upload failed: {exc}")

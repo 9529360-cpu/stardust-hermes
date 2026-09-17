@@ -351,20 +351,39 @@ _FD_EXHAUSTION_HINT = ("  Hint: the ticker hit file-descriptor exhaustion (EMFIL
                        "persists, restart the gateway to recover scheduling.")
 
 
+def _builtin_ticker_health_state() -> tuple[str, Optional[float], Optional[float], float]:
+    """Return ``(state, heartbeat_age, success_age, stale_after)`` for the builtin ticker.
+
+    States: ``missing`` (no heartbeat yet), ``stalled`` (heartbeat stale), ``failing``
+    (loop alive but no successful tick), or ``healthy``. The threshold is derived from the
+    scheduler's single source of truth so every operator surface agrees.
+    """
+    from cron.jobs import get_ticker_heartbeat_age, get_ticker_success_age, TICKER_INTERVAL_SECONDS
+
+    stale_after = float(TICKER_INTERVAL_SECONDS * 3 + 20)
+    hb_age = get_ticker_heartbeat_age()
+    ok_age = get_ticker_success_age()
+    if hb_age is None:
+        state = "missing"
+    elif hb_age > stale_after:
+        state = "stalled"
+    elif ok_age is not None and ok_age > stale_after:
+        state = "failing"
+    else:
+        state = "healthy"
+    return state, hb_age, ok_age, stale_after
+
+
 def _print_ticker_health(pids: list) -> None:
     """Report builtin-ticker liveness for a gateway process known to be alive.
 
     The ticker THREAD can die silently or stay alive while every tick fails, so check both
     the liveness heartbeat and the last-successful-tick marker before saying "will fire".
     """
-    # See #32612, #32895.
-    from cron.jobs import (
-        get_ticker_heartbeat_age, get_ticker_last_error, get_ticker_success_age,
-        TICKER_INTERVAL_SECONDS)
+    from cron.jobs import get_ticker_last_error
     from cron.scheduler import _is_fd_exhaustion_text as _cron_is_fd_exhaustion_text
-    STALE_AFTER = TICKER_INTERVAL_SECONDS * 3 + 20  # ~3 missed iterations + slack (200s @ 60s)
-    hb_age = get_ticker_heartbeat_age()
-    ok_age = get_ticker_success_age()
+
+    state, hb_age, ok_age, _stale_after = _builtin_ticker_health_state()
     pid_line = f"  PID: {', '.join(map(str, pids))}" if pids else None
 
     def _warn(headline: str) -> None:
@@ -372,25 +391,20 @@ def _print_ticker_health(pids: list) -> None:
         if pid_line:
             print(pid_line)
 
-    if hb_age is None:
-        # Ticker never started (non-cron profile, gateway just started, or a config issue).
+    if state == "missing":
         _warn("⚠ Gateway is running but the cron ticker has not reported a heartbeat.")
         print("  Cron jobs will NOT fire until the ticker writes its first heartbeat.\n"
               "  If the gateway just started, wait ~60s and re-run `hermes cron status`.\n"
               "  If heartbeat never appears, restart: hermes gateway restart")
-    elif hb_age > STALE_AFTER:  # ticker thread is gone
+    elif state == "stalled":
         _warn("⚠ Gateway is running but the cron ticker looks STALLED — "
-              f"no heartbeat for {int(hb_age)}s (expected every ~60s).")
+              f"no heartbeat for {int(hb_age or 0)}s (expected every ~60s).")
         print("  Cron jobs may NOT be firing. Restart: hermes gateway restart")
-    elif ok_age is not None and ok_age > STALE_AFTER:  # loop alive but every tick fails
+    elif state == "failing":
         _warn("⚠ Gateway and cron ticker are running, but no tick has "
-              f"succeeded in {int(ok_age)}s — ticks may be failing.")
+              f"succeeded in {int(ok_age or 0)}s — ticks may be failing.")
         last_error = get_ticker_last_error()
         if last_error:
-            # WHY ticks fail: root-rewritten jobs.json (PermissionError) or fd exhaustion.
-            # Show WHY ticks fail — e.g. a root-rewritten jobs.json (PermissionError) that silently locked
-            # out the ticker's uid for ~14h in the field (#68483), or fd exhaustion (EMFILE) that used to
-            # stall the scheduler invisibly (#87644).
             print(color(f"  Last tick error: {last_error}", Colors.RED))
             if "Permission denied" in last_error:
                 print(color(_PERMISSION_HINT, Colors.YELLOW))
@@ -403,7 +417,6 @@ def _print_ticker_health(pids: list) -> None:
             print(pid_line)
         if hb_age is not None:
             print(f"  Ticker heartbeat: {int(hb_age)}s ago")
-
 
 def cron_status():
     """Show cron execution status."""

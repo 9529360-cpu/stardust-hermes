@@ -61,6 +61,7 @@ import {
   SESSION_SEARCH_FOCUS_EVENT,
   setPinnedSessionOrder,
   setSidebarCronOpen,
+  setSidebarGrouping,
   setSidebarPinsOpen,
   setSidebarProjectOrderIds,
   setSidebarRecentsOpen,
@@ -134,12 +135,8 @@ import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
 
 import {
   type AppView,
-  ARTIFACTS_ROUTE,
-  CRON_ROUTE,
-  MESSAGING_ROUTE,
   SIDEBAR_NAV_AREA,
-  type SidebarNavContribution,
-  SKILLS_ROUTE
+  type SidebarNavContribution
 } from '../../routes'
 import type { SidebarNavItem } from '../../types'
 import { type NewSessionSplitHandler, startNewSessionDrag } from '../new-session-drag'
@@ -199,37 +196,9 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
   {
     id: 'new-session',
     label: '',
-    icon: props => <Codicon name="robot" {...props} />,
+    icon: props => <Codicon name="add" {...props} />,
     action: 'new-session',
     keybindActionId: 'session.new'
-  },
-  {
-    id: 'skills',
-    label: '',
-    icon: props => <Codicon name="symbol-misc" {...props} />,
-    route: SKILLS_ROUTE,
-    keybindActionId: 'nav.skills'
-  },
-  {
-    id: 'messaging',
-    label: '',
-    icon: props => <Codicon name="comment" {...props} />,
-    route: MESSAGING_ROUTE,
-    keybindActionId: 'nav.messaging'
-  },
-  {
-    id: 'artifacts',
-    label: '',
-    icon: props => <Codicon name="files" {...props} />,
-    route: ARTIFACTS_ROUTE,
-    keybindActionId: 'nav.artifacts'
-  },
-  {
-    id: 'cron',
-    label: '',
-    icon: props => <Codicon name="watch" {...props} />,
-    route: CRON_ROUTE,
-    keybindActionId: 'nav.cron'
   }
 ]
 
@@ -309,7 +278,7 @@ interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onDeleteSession: (sessionId: string) => void
   onArchiveSession: (sessionId: string) => void
   onBranchSession: (sessionId: string) => void
-  onNewSessionInWorkspace: (path: null | string) => void
+  onNewSessionInWorkspace: (path: null | string, options?: { replaceMain?: boolean }) => void
   /** Create a brand-new session and open it as a tile. `dir` is the dock edge
    *  (or `center` to stack a tab); `anchor`/`before` optionally pin it to a
    *  specific zone / tab-strip slot, and `cwd` pins it to a project's path —
@@ -1164,14 +1133,25 @@ export function ChatSidebar({
   const onEnterProject = useCallback(
     (id: string) => {
       const project = projectModel.find(node => node.id === id)
+      const targetCwd = project ? projectTreeCwd(project) : null
 
       if (project) {
         syncProjectCwd(project)
       }
 
       enterProject(id)
+
+      // Projects-first shell: drilling into a concrete project must also put
+      // the main task surface in that project's context. Reusing an unrelated
+      // selected session leaves the sidebar scoped to project A while the task
+      // header/composer still operate in project B. Start a draft only when the
+      // cwd actually changes; a user already working in this project keeps the
+      // current task instead of accumulating throwaway tabs.
+      if (targetCwd && targetCwd !== currentCwd) {
+        onNewSessionInWorkspace(targetCwd, { replaceMain: true })
+      }
     },
-    [projectModel, syncProjectCwd]
+    [currentCwd, onNewSessionInWorkspace, projectModel, syncProjectCwd]
   )
 
   // The Sessions section is a project switcher in grouped mode: its label reads
@@ -1827,6 +1807,24 @@ export function ChatSidebar({
                             }
                           }}
                         />
+                        {!agentsGrouped && (
+                          <div className="grid size-6 place-items-center">
+                            <Tip label={s.showProjects}>
+                              <Button
+                                aria-label={s.showProjects}
+                                className={HEADER_NAV_BTN}
+                                onClick={event => {
+                                  event.stopPropagation()
+                                  setSidebarGrouping('project')
+                                }}
+                                size="icon-xs"
+                                variant="ghost"
+                              >
+                                <Codicon name="repo" size="0.75rem" />
+                              </Button>
+                            </Tip>
+                          </div>
+                        )}
                         <div className="grid size-6 place-items-center">
                           <SidebarFilterMenu className={HEADER_NAV_BTN} />
                         </div>

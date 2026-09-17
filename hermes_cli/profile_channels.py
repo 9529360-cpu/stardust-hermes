@@ -224,7 +224,7 @@ def _shared_adapters_active(source_dir: Optional[Path]) -> Set[str]:
         return set(_SHARED_WITH_TOOLS)  # no source to consult: the historical (strip) behaviour
     raw: dict = {}
     if (source_dir / "config.yaml").is_file():
-        from hermes_cli.config import read_user_config_raw
+        from hermes_cli.config import config_mutation_scope, read_user_config_raw
         with contextlib.suppress(Exception):
             raw = read_user_config_raw(source_dir / "config.yaml") or {}
     env = _env_values(source_dir / ".env")
@@ -330,22 +330,23 @@ def strip_channel_config(config_path: Path, index: Optional[ChannelKeyIndex] = N
     """Remove platform sections from a raw ``config.yaml`` in place. Returns the dotted paths removed."""
     if not config_path.is_file():
         return []
-    from hermes_cli.config import read_user_config_raw
+    from hermes_cli.config import config_mutation_scope, read_user_config_raw
     from utils import atomic_yaml_write
     index = index or ChannelKeyIndex()
-    raw = read_user_config_raw(config_path)
-    paths = _channel_config_paths(raw, index.platforms)
-    if not paths:
-        return []
-    for path in paths:
-        node = raw
-        for seg in path[:-1]:
-            node = node[seg]
-        node.pop(path[-1], None)
-    if isinstance(raw.get("gateway"), dict) and not raw["gateway"]:
-        raw.pop("gateway")
-    atomic_yaml_write(config_path, raw, sort_keys=False)
-    return [".".join(path) for path in paths]
+    with config_mutation_scope(config_path):
+        raw = read_user_config_raw(config_path)
+        paths = _channel_config_paths(raw, index.platforms)
+        if not paths:
+            return []
+        for path in paths:
+            node = raw
+            for seg in path[:-1]:
+                node = node[seg]
+            node.pop(path[-1], None)
+        if isinstance(raw.get("gateway"), dict) and not raw["gateway"]:
+            raw.pop("gateway")
+        atomic_yaml_write(config_path, raw, sort_keys=False)
+        return [".".join(path) for path in paths]
 
 
 def channel_state_entries(root: Path, index: Optional[ChannelKeyIndex] = None) -> List[Path]:
@@ -404,7 +405,7 @@ def channel_platforms_configured(profile_dir: Path) -> List[str]:
                 found.add(platform)
     config_path = profile_dir / "config.yaml"
     if config_path.is_file():
-        from hermes_cli.config import read_user_config_raw
+        from hermes_cli.config import config_mutation_scope, read_user_config_raw
         raw = read_user_config_raw(config_path)
         for path in _channel_config_paths(raw, index.platforms):
             node = raw
@@ -445,7 +446,7 @@ def _config_platform_tokens(config_path: Path) -> Dict[str, str]:
     tokens: Dict[str, str] = {}
     if not config_path.is_file():
         return tokens
-    from hermes_cli.config import read_user_config_raw
+    from hermes_cli.config import config_mutation_scope, read_user_config_raw
     raw = read_user_config_raw(config_path)
     gateway: dict = raw["gateway"] if isinstance(raw.get("gateway"), dict) else {}
     for section in (raw.get("platforms"), gateway.get("platforms")):

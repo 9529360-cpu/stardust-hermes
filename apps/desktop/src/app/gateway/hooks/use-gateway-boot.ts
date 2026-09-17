@@ -360,7 +360,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(),
           RECONNECT_ATTEMPT_TIMEOUT_MS,
-          'Timed out reconnecting to Hermes backend'
+          'Timed out reconnecting to Stardust backend'
         )
 
         setPrimaryGatewayConnection(conn)
@@ -669,7 +669,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(windowProfileOverride() ?? undefined),
           BACKEND_BOOT_WAIT_TIMEOUT_MS,
-          'Timed out reconnecting to Hermes backend'
+          'Timed out reconnecting to Stardust backend'
         )
 
         if (!ownsSwitch()) {
@@ -963,7 +963,7 @@ export function useGatewayBoot({
         activeGateway()?.close()
 
         if (!(await ensureActiveGatewayOpen())) {
-          throw new Error('Hermes gateway is not connected')
+          throw new Error('Stardust gateway is not connected')
         }
 
         return
@@ -1136,7 +1136,7 @@ export function useGatewayBoot({
         const conn = await withTimeout(
           desktop.getConnection(windowProfileOverride() ?? undefined),
           BACKEND_BOOT_WAIT_TIMEOUT_MS,
-          'Timed out connecting to Hermes backend'
+          'Timed out connecting to Stardust backend'
         )
 
         if (cancelled) {

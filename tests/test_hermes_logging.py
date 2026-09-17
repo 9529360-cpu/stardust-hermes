@@ -830,3 +830,26 @@ class TestAsyncQueueLogging:
             "agent.log" in getattr(h, "baseFilename", "")
             for h in hermes_logging._queued_file_handlers
         )
+
+
+def test_enospc_from_file_handler_is_throttled_instead_of_traceback_storm(tmp_path, capsys):
+    """Disk-full logging failures are destination outages, not one traceback per log record."""
+    import errno
+
+    path = tmp_path / "agent.log"
+    handler = hermes_logging._ManagedRotatingFileHandler(
+        str(path), maxBytes=1024, backupCount=1, encoding="utf-8",
+    )
+    record = logging.LogRecord("t", logging.INFO, __file__, 0, "disk full", (), None)
+    try:
+        for _ in range(3):
+            try:
+                raise OSError(errno.ENOSPC, "No space left on device")
+            except OSError:
+                handler.handleError(record)
+        err = capsys.readouterr().err
+        assert "--- Logging error ---" not in err
+        assert err.count(str(path)) == 1
+        assert "No space left on device" in err
+    finally:
+        handler.close()

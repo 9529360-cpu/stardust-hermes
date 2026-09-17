@@ -431,3 +431,87 @@ def test_retained_endpoint_validates_identity(tmp_path, monkeypatch, damage):
         if proc.poll() is None:
             proc.kill()
         proc.wait(timeout=5)
+
+
+def test_watchdog_terminates_restart_that_never_becomes_healthy(tmp_path, monkeypatch):
+    """A live-but-unhealthy respawn must not wedge the watchdog forever."""
+    from types import SimpleNamespace
+    from hermes_cli.local_runtime import supervisor
+
+    sup = supervisor.LlamaServerSupervisor(tmp_path, tmp_path, port=59998)
+    sup.proc = SimpleNamespace(pid=101, poll=lambda: 1)
+    respawned = SimpleNamespace(pid=202, poll=lambda: None)
+    terminated = []
+
+    monkeypatch.setattr(sup._stop_event, "wait", lambda _seconds: False)
+    monkeypatch.setattr(sup, "_reap_orphaned_children", lambda: None)
+    monkeypatch.setattr(sup, "_spawn", lambda: setattr(sup, "proc", respawned))
+    monkeypatch.setattr(sup, "_terminate_tree", lambda proc: terminated.append(proc))
+
+    def fail_health(_timeout):
+        sup._stopping = True  # make the unit test exit after this restart attempt
+        raise TimeoutError("still unhealthy")
+
+    monkeypatch.setattr(sup, "_wait_health", fail_health)
+    sup._watch()
+
+    assert terminated == [respawned]
+
+
+def test_stable_api_key_uses_atomic_secret_writer(tmp_path, monkeypatch):
+    """The durable local-runtime credential must be atomic and mode-tightened."""
+    from hermes_cli.local_runtime import supervisor
+    import utils
+
+    monkeypatch.setattr(supervisor, "runtimes_root", lambda: tmp_path)
+    writes = []
+
+    def capture(path, content, **kwargs):
+        writes.append((path, content, kwargs))
+
+    monkeypatch.setattr(utils, "atomic_write_text", capture)
+    key = supervisor._stable_api_key()
+
+    assert len(key) >= 16
+    assert len(writes) == 1
+    path, content, kwargs = writes[0]
+    assert path == tmp_path / ".api_key"
+    assert content == key
+    assert kwargs.get("mode") == 0o600
+
+
+def test_spawn_log_redacts_durable_api_key(tmp_path, monkeypatch):
+    """The long-lived local-runtime credential must never be copied into logs."""
+    from types import SimpleNamespace
+    from hermes_cli.local_runtime import supervisor
+
+    install = tmp_path / "install"
+    models = tmp_path / "models"
+    install.mkdir()
+    models.mkdir()
+    exe = install / "llama-server.exe"
+    exe.write_bytes(b"")
+
+    sup = supervisor.LlamaServerSupervisor(install, models, port=59998)
+    secret = "PersistentLocalRuntimeSecret123456"
+    sup.api_key = secret
+
+    monkeypatch.setattr(supervisor, "server_binary", lambda _root: exe)
+    monkeypatch.setattr(supervisor, "_direct_io_args", lambda _exe: ())
+    monkeypatch.setattr(
+        supervisor,
+        "spawn_server",
+        lambda *a, **k: (SimpleNamespace(pid=4242), None),
+    )
+    monkeypatch.setattr(sup, "_write_state", lambda: None)
+
+    try:
+        sup._spawn()
+        text = sup.log_path.read_text(encoding="utf-8")
+        assert secret not in text
+        assert "--api-key" in text
+        assert "***" in text
+    finally:
+        if sup._log_handle is not None:
+            sup._log_handle.close()
+            sup._log_handle = None

@@ -33,7 +33,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from hermes_cli import __version__
-from hermes_cli.config import load_config
+from hermes_cli.config import config_mutation_scope, load_config
 
 try:
     from fastapi import FastAPI, HTTPException, Request
@@ -825,11 +825,42 @@ def get_install_id() -> Optional[str]:
     return _shared_get_install_id(cache=_INSTALL_ID_CACHE)
 
 
-# Serializes config.yaml read-modify-write cycles for handlers on worker threads
-# (asyncio.to_thread): config.py's _CONFIG_LOCK covers each load/save call, not
-# the span between them, so two off-loop updates could drop each other's writes.
-# RLock so nested helpers that also take it can't self-deadlock.
-_CONFIG_MUTATION_LOCK = threading.RLock()
+# Serializes config.yaml read-modify-write cycles for handlers on worker threads AND
+# across sibling CLI/gateway/desktop processes. Atomic replace prevents torn YAML but not a
+# stale-reader lost update, so the file lock must span load -> mutate -> save. Re-entrant because
+# extracted routers/helpers can nest the same transaction in one thread.
+class _CrossProcessConfigMutationLock:
+    def __init__(self) -> None:
+        self._thread_lock = threading.RLock()
+        self._local = threading.local()
+
+    def __enter__(self):
+        self._thread_lock.acquire()
+        try:
+            scope = config_mutation_scope()
+            scope.__enter__()
+        except BaseException:
+            self._thread_lock.release()
+            raise
+        stack = getattr(self._local, "scopes", None)
+        if stack is None:
+            stack = []
+            self._local.scopes = stack
+        stack.append(scope)
+        return self
+
+    def __exit__(self, *exc):
+        stack = self._local.scopes
+        scope = stack.pop()
+        try:
+            return scope.__exit__(*exc)
+        finally:
+            if not stack:
+                del self._local.scopes
+            self._thread_lock.release()
+
+
+_CONFIG_MUTATION_LOCK = _CrossProcessConfigMutationLock()
 
 # A finished ``gateway-restart`` child does not mean the gateway is back (it
 # exits once the restart is handed off), so in-flight reuse stops coalescing

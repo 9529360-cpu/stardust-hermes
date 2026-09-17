@@ -81,3 +81,29 @@ def test_runtime_status_running_pid_validates_live_gateway_record(monkeypatch):
     assert status_mod.get_runtime_status_running_pid(runtime) == 12345
 
 
+
+
+def test_runtime_health_lines_flags_live_pid_with_wedged_loop(monkeypatch):
+    """A live PID with a proven-dead event loop must not look operationally healthy."""
+    import hermes_cli.gateway as gateway_cli
+
+    monkeypatch.setattr(
+        "gateway.status.read_runtime_status",
+        lambda: {
+            "gateway_state": "running",
+            "pid": 4242,
+            "start_time": 111,
+            "updated_at": _iso_age(1),
+            "active_agents": 0,
+        },
+    )
+    monkeypatch.setattr("gateway.status.runtime_status_pid_is_live", lambda state: True)
+    monkeypatch.setattr(
+        gateway_cli,
+        "probe_gateway_loop_liveness",
+        lambda pid, **kwargs: gateway_cli.GATEWAY_LOOP_WEDGED,
+    )
+
+    lines = _runtime_health_lines()
+
+    assert any("event loop" in line.lower() and "unresponsive" in line.lower() for line in lines), lines

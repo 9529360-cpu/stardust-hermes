@@ -720,9 +720,17 @@ def _run_backup_locked(args, hermes_root: Path) -> None:
                 errors.append(f"{arcname}: {exc}")
     elapsed = time.monotonic() - t0
     zip_size = out_path.stat().st_size
+    result_path = out_path
+    if errors:
+        incomplete_path = out_path.with_suffix(out_path.suffix + ".incomplete")
+        try:
+            out_path.replace(incomplete_path)
+            result_path = incomplete_path
+        except OSError as exc:
+            logger.warning("Could not quarantine incomplete backup %s: %s", out_path, exc)
     logger.info("backup phase=archive status=complete duration_ms=%.1f files=%d errors=%d bytes=%d",
                 elapsed * 1000, file_count, len(errors), zip_size)
-    print(f"\nBackup {'incomplete' if errors else 'complete'}: {out_path}\n"
+    print(f"\nBackup {'incomplete' if errors else 'complete'}: {result_path}\n"
           f"  Files:       {file_count}\n"
           f"  Original:    {_format_size(total_bytes)}\n"
           f"  Compressed:  {_format_size(zip_size)}\n"
@@ -736,8 +744,14 @@ def _run_backup_locked(args, hermes_root: Path) -> None:
         print("\n  Excluded directories:\n" + "\n".join(f"    {d}/" for d in sorted(skipped_dirs)))
     if errors:
         _print_capped(f"\n  Warnings ({len(errors)} files skipped):", errors, "  ")
-    else:
-        print(f"\nRestore with: hermes import {out_path.name}")
+        if result_path != out_path:
+            print(f"\n  Partial archive retained for salvage only: {result_path}")
+        else:
+            print("\n  Warning: incomplete archive could not be quarantined; do not treat it as a recovery point.")
+        # Never report success or let a partial archive masquerade as the newest known-good recovery point.
+        raise SystemExit(1)
+
+    print(f"\nRestore with: hermes import {out_path.name}")
     keep = getattr(args, "keep", 0)  # 0 / absent: never prune (non-CLI callers)
     if keep and out_path.name.startswith(_RUN_BACKUP_PREFIX):
         pruned = _prune_prefixed_zips(out_path.parent, _RUN_BACKUP_PREFIX, keep, "backup")

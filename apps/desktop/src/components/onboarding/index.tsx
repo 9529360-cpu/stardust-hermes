@@ -15,7 +15,6 @@ import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { cn } from '@/lib/utils'
 import { $desktopBoot, type DesktopBootState } from '@/store/boot'
 import { FREE_TIER_MODEL } from '@/store/free-tier'
-import { openFreeTierSignIn } from '@/store/free-tier-sign-in'
 import { $introReveal, shouldPlayFirstRunIntro } from '@/store/intro-reveal'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import {
@@ -81,7 +80,7 @@ export interface ApiKeyOption {
 }
 
 // Curated order mirrors CANONICAL_PROVIDERS: Fireworks sits #2 overall (after
-// Nous Portal OAuth), ahead of OpenRouter and the rest of the key catalog.
+// the removed first-party Nous OAuth), ahead of OpenRouter and the rest of the key catalog.
 const API_KEY_OPTIONS: ApiKeyOption[] = [
   {
     id: 'fireworks',
@@ -424,8 +423,8 @@ export function DesktopOnboardingOverlay({
  * The one-time free-tier welcome, shown when the free tier is what serves this
  * user. Bare and centered like the model-confirm screen it stands in for: this
  * IS their "you're in" moment, so it names the route, its model and its price,
- * and offers the two ways out of it (a real account, or a provider of their
- * own) without making either the default.
+ * and offers a clean path into the app or to a provider of the user's own.
+ * Stardust does not surface the first-party Nous account sign-in here.
  */
 function FreeTierReadyPanel({
   leaving,
@@ -467,9 +466,6 @@ function FreeTierReadyPanel({
       >
         <Button onClick={() => void onDismiss()} type="button">
           {copy.begin}
-        </Button>
-        <Button onClick={() => void onDismiss(() => openFreeTierSignIn())} size="xs" type="button" variant="text">
-          {copy.signInInstead}
         </Button>
         <Button
           onClick={() => void onDismiss(() => startManualOnboarding(null))}
@@ -566,7 +562,11 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
     setOnboardingMode('apikey')
   }
 
-  const ordered = useMemo(() => (providers ? sortProviders(providers) : []), [providers])
+  const ordered = useMemo(
+    () => (providers ? sortProviders(providers).filter(provider => provider.id !== FEATURED_ID) : []),
+    [providers]
+  )
+
   const hasOauth = ordered.length > 0
   const apiKeyOptions = useApiKeyCatalog()
 
@@ -600,7 +600,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const select = (p: OAuthProvider) => void startProviderOAuth(p, ctx)
   const featured = ordered.find(p => p.id === FEATURED_ID) ?? null
   const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-  // Collapse the secondary providers behind a disclosure whenever Nous Portal
+  // The removed first-party Nous provider is filtered above; keep this legacy
   // is present to anchor the choice — otherwise show the full list. The
   // Fireworks/OpenRouter key rows always live behind the disclosure, so the
   // toggle is warranted even when there are no other OAuth providers.

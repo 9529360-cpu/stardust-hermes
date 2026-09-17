@@ -45,3 +45,28 @@ class TestHandleDebugCommand:
         mock_sweep.assert_called_once()
         assert "https://paste.rs/report" in result
 
+
+
+@pytest.mark.asyncio
+async def test_gateway_debug_redacts_dump_before_public_upload(monkeypatch):
+    """The chat /debug path must not bypass strict upload-time dump redaction."""
+    runner = _make_runner()
+    event = _make_event()
+    secret = "GatewayDumpAccessToken123456789"
+    uploaded = []
+
+    monkeypatch.setattr(
+        "hermes_cli.debug._capture_dump",
+        lambda: f"endpoint=https://u:p@example.com/?access_token={secret}&page=2\n",
+    )
+    monkeypatch.setattr("hermes_cli.debug._schedule_auto_delete", lambda _urls: None)
+    monkeypatch.setattr(
+        "hermes_cli.debug.upload_to_pastebin",
+        lambda body: uploaded.append(body) or "https://paste.rs/report",
+    )
+
+    await runner._handle_debug_command(event)
+
+    assert len(uploaded) == 1
+    assert secret not in uploaded[0]
+    assert "access_token=***" in uploaded[0]

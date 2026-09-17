@@ -71,6 +71,22 @@ def _stable_port() -> int:
         return _free_port()
 
 
+def _redacted_spawn_argv(argv: list[str]) -> list[str]:
+    """Copy argv for logs while masking every llama-server API-key value."""
+    redacted: list[str] = []
+    hide_next = False
+    for arg in argv:
+        if hide_next:
+            redacted.append("***")
+            hide_next = False
+            continue
+        if arg.startswith("--api-key="):
+            redacted.append("--api-key=***")
+            continue
+        redacted.append(arg)
+        hide_next = arg == "--api-key"
+    return redacted
+
 def _stable_api_key() -> str:
     """One key for the life of the install, persisted beside the runtimes.
 
@@ -82,11 +98,15 @@ def _stable_api_key() -> str:
     with suppress(OSError):
         existing = key_path.read_text(encoding="utf-8").strip()
         if len(existing) >= 16:
+            with suppress(OSError):
+                key_path.chmod(0o600)
             return existing
     key = secrets.token_urlsafe(24)
     try:
+        from utils import atomic_write_text
         key_path.parent.mkdir(parents=True, exist_ok=True)
-        key_path.write_text(key, encoding="utf-8")
+        atomic_write_text(
+            key_path, key, tmp_prefix=".api_key_", mode=0o600, fsync_dir=True)
     except OSError as exc:
         logger.warning("could not persist api key (%s); sessions will need "
                        "a re-pick after restart", exc)
@@ -193,7 +213,7 @@ class LlamaServerSupervisor:
             # The crash-restart loop calls _spawn repeatedly; each restart would leak one fd.
             _quiet(self._log_handle.close)
         self._log_handle = open(self.log_path, "a", encoding="utf-8", errors="replace")
-        self._log_handle.write(f"\n# spawn: {cmd}\n")
+        self._log_handle.write(f"\n# spawn: {_redacted_spawn_argv(cmd)}\n")
         self._log_handle.flush()
         # list-args, never a shell: spaced paths (user homes) must survive.
         self.proc, self._job = spawn_server(cmd, stdout=self._log_handle,
@@ -259,6 +279,7 @@ class LlamaServerSupervisor:
             if self._stop_event.wait(backoff):
                 return
             self._restarts += 1
+            router_healthy = False
             try:
                 with self._lifecycle_lock:
                     if self._stopping:
@@ -266,9 +287,20 @@ class LlamaServerSupervisor:
                     self._reap_orphaned_children()
                     self._spawn()
                 self._wait_health(120)
+                router_healthy = True
                 if self.primary_model:
                     self.ensure_model_ready(self.primary_model)
             except Exception as exc:  # noqa: BLE001
+                # A respawn can stay alive without ever becoming healthy. Leaving that process
+                # in self.proc makes the next watchdog iteration see poll() is None forever, so
+                # no further restart is attempted. Clean up only pre-health failures; a healthy
+                # router whose primary-model warmup failed is still useful and should stay up.
+                if not router_healthy:
+                    with self._lifecycle_lock:
+                        proc = self.proc
+                        if proc is not None and proc.poll() is None:
+                            with suppress(Exception):
+                                self._terminate_tree(proc)
                 logger.error("llama-server restart failed: %s", exc)
 
     def stop(self) -> None:

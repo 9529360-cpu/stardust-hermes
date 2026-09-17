@@ -6,7 +6,7 @@
 
 import type { ErrorCardCopy, Translations } from '@/i18n/types'
 
-import { errorCardKey, type ErrorSurface } from './error-surface'
+import { errorCardKey, type ErrorSurface, isOAuthReauthSurface } from './error-surface'
 
 export interface ErrorCardText {
   title: string
@@ -19,6 +19,13 @@ const render = (value: ErrorCardCopy['title'], provider: string) =>
 /** The failing provider's display name for copy — the descriptor's label,
  *  else its id, else the generic "the AI service". */
 export function errorProviderName(thread: Translations['assistant']['thread'], surface?: ErrorSurface | null): string {
+  // The removed built-in Nous account can still appear in descriptors from an
+  // older backend/session. Keep that compatibility payload private instead of
+  // surfacing the old product account name in Stardust.
+  if (surface?.provider === 'nous') {
+    return thread.errorGenericProvider
+  }
+
   return surface?.providerLabel || surface?.provider || thread.errorGenericProvider
 }
 
@@ -30,7 +37,7 @@ export function errorCardText(
 
   // A credential rejection is worded by HOW the provider is credentialed
   // (key vs sign-in), which the code alone (`auth`) cannot tell.
-  if (surface?.layer === 'auth' && surface.authKind === 'oauth') {
+  if (isOAuthReauthSurface(surface)) {
     return { body: thread.errorOauthExpired(provider), title: render(thread.errorAuthKinds.oauth.title, provider) }
   }
 

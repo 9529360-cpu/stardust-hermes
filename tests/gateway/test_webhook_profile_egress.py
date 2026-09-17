@@ -6,6 +6,7 @@ borrows a secondary's adapter. Real ``GatewayAuthorizationMixin`` resolver, real
 ``load_gateway_config`` against a temp HERMES_HOME — no patched predicates.
 """
 import os
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -92,9 +93,16 @@ async def test_delivery_fails_closed_instead_of_crossing_profiles(profile_homes)
 @pytest.mark.asyncio
 async def test_github_comment_authenticates_with_routed_profile_token(profile_homes, monkeypatch):
     seen = {}
+    sec = Path(os.environ["HERMES_HOME"]) / "profiles" / "sec"
+    (sec / ".env").write_text("GH_TOKEN=sec-token\nGH_HOST=github.com\n")
+    monkeypatch.setenv("GH_ENTERPRISE_TOKEN", "default-enterprise-token")
+    monkeypatch.setenv("GITHUB_ENTERPRISE_TOKEN", "default-enterprise-token-2")
+    monkeypatch.setenv("GH_HOST", "enterprise.default.example")
+    monkeypatch.setenv("GH_REPO", "default/ambient")
+    monkeypatch.setenv("GH_CONFIG_DIR", str(Path(os.environ["HERMES_HOME"]) / "default-gh-config"))
 
     def fake_run(cmd, **kw):
-        seen["GH_TOKEN"] = kw["env"].get("GH_TOKEN") if kw.get("env") is not None else os.environ.get("GH_TOKEN")
+        seen.update(kw.get("env") or os.environ)
         return MagicMock(returncode=0, stderr="")
 
     monkeypatch.setattr("gateway.platforms.webhook.subprocess.run", fake_run)
@@ -105,8 +113,67 @@ async def test_github_comment_authenticates_with_routed_profile_token(profile_ho
 
     assert res.success
     assert seen["GH_TOKEN"] == "sec-token"
+    assert seen["GH_HOST"] == "github.com"
+    for key in ("GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN", "GH_REPO", "GH_CONFIG_DIR"):
+        assert key not in seen, (key, seen.get(key))
 
 
+@pytest.mark.asyncio
+async def test_github_comment_named_profile_without_token_fails_closed(profile_homes, monkeypatch):
+    """A named profile must never fall through to the machine-wide ``gh`` login."""
+    sec = Path(os.environ["HERMES_HOME"]) / "profiles" / "sec"
+    (sec / ".env").write_text("")
+    called = False
+
+    def fake_run(*args, **kwargs):
+        nonlocal called
+        called = True
+        return MagicMock(returncode=0, stderr="")
+
+    monkeypatch.setattr("gateway.platforms.webhook.subprocess.run", fake_run)
+    adapter = _webhook(_Runner({}, {"sec": {}}, profile_homes))
+    from agent import secret_scope as ss
+    previous = ss.is_multiplex_active()
+    ss.set_multiplex_active(True)
+    try:
+        res = await adapter._deliver_github_comment(
+            "body", {"deliver": "github_comment", "profile": "sec", "deliver_extra": {"repo": "o/r", "pr_number": "7"}})
+    finally:
+        ss.set_multiplex_active(previous)
+
+    assert not res.success
+    assert "credential" in res.error.lower()
+    assert called is False
+
+@pytest.mark.asyncio
+async def test_routed_profile_script_drops_launch_profile_runtime_residue(profile_homes, monkeypatch):
+    """A routed profile's script gets its home, never the launch profile's runtime settings."""
+    from agent import secret_scope as ss
+
+    sec = Path(os.environ["HERMES_HOME"]) / "profiles" / "sec"
+    scripts = sec / "scripts"
+    scripts.mkdir()
+    (scripts / "env_probe.py").write_text(
+        "import json, os\n"
+        "print(json.dumps({'home': os.getenv('HERMES_HOME'), 'model': os.getenv('HERMES_MODEL'), "
+        "'terminal': os.getenv('TERMINAL_ENV')}))\n",
+        encoding="utf-8",
+    )
+    root = Path(os.environ["HERMES_HOME"])
+    (root / ".env").write_text("HERMES_MODEL=default-model\nTERMINAL_ENV=docker\n", encoding="utf-8")
+    monkeypatch.setenv("HERMES_MODEL", "default-model")
+    monkeypatch.setenv("TERMINAL_ENV", "docker")
+    adapter = _webhook(_Runner({}, {"sec": {}}, profile_homes))
+    previous = ss.is_multiplex_active()
+    ss.set_multiplex_active(True)
+    try:
+        with adapter._profile_scope("sec"):
+            keep, transformed = adapter._route_processor.run_route_script("env_probe.py", {})
+    finally:
+        ss.set_multiplex_active(previous)
+
+    assert keep is True
+    assert transformed == {"home": str(sec), "model": None, "terminal": None}
 def test_api_server_profile_callback_resolves_routed_profile_adapter_fail_closed():
     default, secondary = object(), object()
     api = APIServerAdapter(PlatformConfig(enabled=True, extra={"port": 0}))

@@ -54,6 +54,18 @@ describe('SettingsProfileScope', () => {
     expect($settingsScopeOverride.get()).toBeNull()
   })
 
+  it('keeps the onboarding profile canonical key internal', () => {
+    $activeGatewayProfile.set('hermes-setup')
+    $profiles.set([profile('default', true), profile('hermes-setup')])
+
+    const { container } = render(<SettingsProfileScope />)
+
+    expect(screen.getByRole('button', { name: 'Stardust' })).toBeTruthy()
+    expect(screen.queryByText('hermes-setup')).toBeNull()
+    expect(container.textContent).toContain('Stardust')
+    expect(container.textContent).not.toContain('hermes-setup')
+  })
+
   it('selecting another profile sets the shared override; re-selecting the active clears it', () => {
     $profiles.set([profile('default', true), profile('coder')])
 

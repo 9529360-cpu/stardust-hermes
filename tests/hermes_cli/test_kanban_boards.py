@@ -155,19 +155,22 @@ class TestBoardCRUD:
         # downstream readers hit `no such table: task_events`.
         kb.create_board("recycle")
         # First connect populates _INITIALIZED_PATHS for this DB.
-        with kbc.connect(board="recycle") as conn:
+        with kbc.connect_closing(board="recycle") as conn:
             kb.create_task(conn, title="t1", assignee="dev")
         db_path = kb.board_dir("recycle") / "kanban.db"
-        assert str(db_path.resolve()) in kb._INITIALIZED_PATHS
+        resolved_db = str(db_path.resolve())
+        assert resolved_db in kb._INITIALIZED_PATHS
+        assert resolved_db in kbc._INITIALIZED_FILE_IDENTITIES
 
         kb.remove_board("recycle", archive=archive)
-        # remove_board must drop the cache entry so a re-create through
-        # connect() gets a fresh schema-init pass.
-        assert str(db_path.resolve()) not in kb._INITIALIZED_PATHS
+        # remove_board must drop both halves of the init cache so a re-create
+        # through connect() gets a fresh schema-init pass with no stale identity.
+        assert resolved_db not in kb._INITIALIZED_PATHS
+        assert resolved_db not in kbc._INITIALIZED_FILE_IDENTITIES
 
         # Simulate the event-stream poll: re-open the same slug. connect()
         # recreates the directory + empty .db; the schema must be re-applied.
-        with kbc.connect(board="recycle") as conn:
+        with kbc.connect_closing(board="recycle") as conn:
             tables = {
                 row[0]
                 for row in conn.execute(

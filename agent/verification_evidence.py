@@ -124,10 +124,10 @@ def _connect() -> sqlite3.Connection:
     return open_db(_db_path(), db_label="verification_evidence.db", initialize=_ensure_schema)
 
 
-def _transaction():
+def _transaction(*, immediate: bool = False):
     from hermes_cli.sqlite_util import transaction
 
-    return transaction(_connect())
+    return transaction(_connect(), immediate=immediate)
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -508,7 +508,7 @@ def mark_workspace_edited(
     changed_paths = sorted({str(p) for p in (paths or []) if p})
     edited_at = _utc_now()
 
-    with _DB_LOCK, _transaction() as conn:
+    with _DB_LOCK, _transaction(immediate=True) as conn:
         row = conn.execute(
             "SELECT changed_paths_json FROM verification_state WHERE session_id = ? AND root = ?",
             (sid, root),

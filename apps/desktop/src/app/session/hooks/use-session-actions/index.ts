@@ -737,7 +737,10 @@ export function useSessionActions({
     (item: SidebarNavItem) => {
       if (item.action === 'new-session') {
         setWorkspaceScope('sessions')
-        startFreshSessionDraft()
+        // The global New Task is the assistant door, not "new task in whatever
+        // repo I happened to touch last". Project/worktree + buttons pass an
+        // explicit cwd through their own paths; this top-level action detaches.
+        startFreshSessionDraft({ workspaceTarget: null })
 
         return
       }

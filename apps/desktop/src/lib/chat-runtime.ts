@@ -48,13 +48,20 @@ export function createClientSessionState(
   }
 }
 
+const LEGACY_PRODUCT_SESSION_TITLES: Readonly<Record<string, string>> = {
+  'Welcome to Hermes': 'Welcome to Stardust',
+  'Bot Chat': 'Agent workspace'
+}
+
 export function sessionTitle(session: SessionInfo): string {
-  return session.title?.trim() || session.preview?.trim() || 'Untitled session'
+  const raw = session.title?.trim() || session.preview?.trim() || 'Untitled session'
+
+  return LEGACY_PRODUCT_SESSION_TITLES[raw] ?? raw
 }
 
 /** What a session is called before it has been sent — and before its composer
  *  has been typed into, which is the only thing that can name it earlier. */
-export const NEW_SESSION_TITLE = 'New session'
+export const NEW_SESSION_TITLE = 'New task'
 
 export function coerceGatewayText(value: unknown): string {
   if (typeof value === 'string') {

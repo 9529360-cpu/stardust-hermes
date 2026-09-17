@@ -220,7 +220,8 @@ def _render_gateway(ctx):
     _section("Gateway Service")
     try:
         from hermes_cli.gateway import (
-            get_gateway_runtime_snapshot, _format_gateway_pids, named_profile_served_by_running_multiplexer)
+            get_gateway_runtime_snapshot, _format_gateway_pids, named_profile_served_by_running_multiplexer,
+            _runtime_health_lines)
         from hermes_cli.gateway_multiplex_served import multiplexer_served_secondaries
         snapshot = get_gateway_runtime_snapshot()
         # A satellite profile has no gateway.pid of its own; the default multiplexer is its live process.
@@ -245,6 +246,8 @@ def _render_gateway(ctx):
             _kv("Note:", "Android may stop background jobs when Termux is suspended")
         elif snapshot.service_installed and not snapshot.service_running:
             _kv("Service:", "installed but stopped")
+        for line in _runtime_health_lines():
+            _kv("Health:", line)
     except Exception:
         platform = "termux" if _is_termux() else "linux" if sys.platform.startswith("linux") else sys.platform
         status_text, manager = _GATEWAY_FALLBACK.get(platform, ("N/A", "(not supported on this platform)"))
@@ -267,10 +270,26 @@ def _render_cron(ctx):
         # utf-8-sig: same dialect as cron/jobs.load_jobs — Windows editors may leave a UTF-8 BOM
         # that plain utf-8 json.load rejects.
         jobs = _load_json(jobs_file, "utf-8-sig").get("jobs", [])
-        _kv("Jobs:", f"{sum(1 for j in jobs if j.get('enabled', True))} active, {len(jobs)} total")
+        active_count = sum(1 for j in jobs if j.get("enabled", True))
+        _kv("Jobs:", f"{active_count} active, {len(jobs)} total")
+        if active_count:
+            from hermes_cli.cron import (
+                _active_cron_provider_name, _builtin_gateway_liveness, _builtin_ticker_health_state)
+
+            if _active_cron_provider_name() == "builtin":
+                gateway_live = _builtin_gateway_liveness()
+                if gateway_live is False:
+                    _kv("Health:", "gateway is not running; scheduled jobs will not fire")
+                elif gateway_live is True:
+                    state, hb_age, ok_age, _stale_after = _builtin_ticker_health_state()
+                    if state == "missing":
+                        _kv("Health:", "cron ticker heartbeat is missing")
+                    elif state == "stalled":
+                        _kv("Health:", f"cron ticker STALLED; no heartbeat for {int(hb_age or 0)}s")
+                    elif state == "failing":
+                        _kv("Health:", f"cron ticker alive but no successful tick for {int(ok_age or 0)}s")
     except Exception:
         _kv("Jobs:", "(error reading jobs file)")
-
 
 def _render_sessions(ctx):
     _section("Sessions")

@@ -18,7 +18,11 @@ vi.mock('@/store/profile', () => ({
   $activeGatewayProfile: atom('alpha'),
   $profiles: atom([]),
   refreshProfiles: async () => {},
-  normalizeProfileKey: (p: string | null) => p || 'default'
+  normalizeProfileKey: (p: string | null) => p || 'default',
+  profileNameLabel: (name: string, displayName?: null | string) =>
+    (displayName ?? '').trim() || (name === 'hermes-setup' ? 'Stardust' : name),
+  profileLabel: (profile: { display_name?: null | string; name: string }) =>
+    (profile.display_name ?? '').trim() || (profile.name === 'hermes-setup' ? 'Stardust' : profile.name)
 }))
 
 vi.mock('@/hermes', () => ({
@@ -73,9 +77,9 @@ function keyVar(patch: Partial<EnvVarInfo> = {}): EnvVarInfo {
 beforeEach(() => {
   onboarding.set({ manual: false })
   getEnvVars.mockResolvedValue({})
-  disconnectOAuthProvider.mockResolvedValue({ ok: true, provider: 'nous' })
+  disconnectOAuthProvider.mockResolvedValue({ ok: true, provider: 'minimax-oauth' })
   listOAuthProviders.mockResolvedValue({
-    providers: [provider('nous', true), provider('minimax-oauth', false)]
+    providers: [provider('nous', true), provider('minimax-oauth', true)]
   })
 })
 
@@ -104,6 +108,13 @@ async function renderProvidersSettings() {
 }
 
 describe('ProvidersSettings', () => {
+  it('does not surface the first-party Nous account in provider sign-in', async () => {
+    await renderProvidersSettings()
+
+    expect(screen.queryByText('Nous Portal')).toBeNull()
+    expect(await screen.findByText('MiniMax')).toBeTruthy()
+  })
+
   it('reads and saves API keys for the shared Settings target and reloads when it changes', async () => {
     const { $settingsScopeOverride } = await import('@/store/settings-scope')
     const { $activeGatewayProfile, $profiles } = await import('@/store/profile')
@@ -151,11 +162,11 @@ describe('ProvidersSettings', () => {
       await renderProvidersSettings()
       expect(getEnvVars).toHaveBeenCalledWith('beta')
       expect(listOAuthProviders).toHaveBeenCalledWith('beta')
-      fireEvent.click(await screen.findByText('Nous Portal'))
-      expect(startManualProviderOAuth).toHaveBeenCalledWith('nous', 'beta')
-      fireEvent.click(await screen.findByRole('button', { name: 'Remove Nous Portal' }))
+      fireEvent.click(await screen.findByText('MiniMax'))
+      expect(startManualProviderOAuth).toHaveBeenCalledWith('minimax-oauth', 'beta')
+      fireEvent.click(await screen.findByRole('button', { name: 'Remove MiniMax' }))
       fireEvent.click(await screen.findByRole('button', { name: 'Disconnect' }))
-      await waitFor(() => expect(disconnectOAuthProvider).toHaveBeenCalledWith('nous', 'beta'))
+      await waitFor(() => expect(disconnectOAuthProvider).toHaveBeenCalledWith('minimax-oauth', 'beta'))
     } finally {
       $settingsScopeOverride.set(null)
     }
@@ -164,7 +175,7 @@ describe('ProvidersSettings', () => {
   it('disconnects a connected provider account and refreshes the accounts list', async () => {
     await renderProvidersSettings()
 
-    const remove = await screen.findByRole('button', { name: 'Remove Nous Portal' })
+    const remove = await screen.findByRole('button', { name: 'Remove MiniMax' })
     await act(async () => {
       fireEvent.click(remove)
     })
@@ -177,7 +188,7 @@ describe('ProvidersSettings', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
     })
 
-    await waitFor(() => expect(disconnectOAuthProvider).toHaveBeenCalledWith('nous', undefined))
+    await waitFor(() => expect(disconnectOAuthProvider).toHaveBeenCalledWith('minimax-oauth', undefined))
     expect(listOAuthProviders).toHaveBeenCalledTimes(2)
   })
 
@@ -185,7 +196,7 @@ describe('ProvidersSettings', () => {
     await renderProvidersSettings()
 
     await act(async () => {
-      fireEvent.click(await screen.findByRole('button', { name: 'Remove Nous Portal' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Remove MiniMax' }))
     })
 
     await act(async () => {
@@ -199,10 +210,10 @@ describe('ProvidersSettings', () => {
     await renderProvidersSettings()
 
     await act(async () => {
-      fireEvent.click(await screen.findByText('Nous Portal'))
+      fireEvent.click(await screen.findByText('MiniMax'))
     })
 
-    expect(startManualProviderOAuth).toHaveBeenCalledWith('nous', undefined)
+    expect(startManualProviderOAuth).toHaveBeenCalledWith('minimax-oauth', undefined)
     expect(disconnectOAuthProvider).not.toHaveBeenCalled()
   })
 

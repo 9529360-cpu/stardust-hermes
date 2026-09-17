@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -335,3 +336,30 @@ def test_cli_list_and_ack(monkeypatch, tmp_path, capsys):
         incident_action="ack", state=None, incident_id=None
     )
     assert cron_incidents(missing_args) == 1
+
+
+def test_incident_mutations_use_immediate_transactions(monkeypatch, tmp_path):
+    """Cross-process read/modify/write paths must reserve the writer before SELECT."""
+    inc = _point_db(monkeypatch, tmp_path)
+    import hermes_cli.sqlite_util as sqlite_util
+
+    real_transaction = sqlite_util.transaction
+    modes: list[bool] = []
+
+    @contextmanager
+    def recording_transaction(conn, *, immediate=False):
+        modes.append(bool(immediate))
+        with real_transaction(conn, immediate=immediate) as tx:
+            yield tx
+
+    monkeypatch.setattr(sqlite_util, "transaction", recording_transaction)
+
+    incident_id, _ = inc.upsert_incident("job-race", "provider timeout")
+    assert modes[-1] is True
+    assert inc.set_incident_state(incident_id, "alerted") is True
+    assert modes[-1] is True
+    assert inc.close_incidents_for_recovered_job("job-race") == 1
+    assert modes[-1] is True
+
+    assert inc.get_incident(incident_id) is not None
+    assert modes[-1] is False

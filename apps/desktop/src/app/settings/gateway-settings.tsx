@@ -42,6 +42,10 @@ import { enrichSelectedSshHost, selectSshHost } from './ssh-host-selection'
 type Mode = 'local' | 'remote' | 'cloud' | 'ssh'
 type AuthMode = 'oauth' | 'token'
 type ProbeStatus = 'idle' | 'probing' | 'done' | 'error'
+// Stardust keeps the legacy cloud runtime code for compatibility with existing
+// saved connections, but the first-party Hermes Cloud account/discovery UI is
+// not a product surface anymore.
+const FIRST_PARTY_CLOUD_UI = false
 // Hermes Cloud discovery lifecycle for the cloud-mode panel.
 type CloudDiscoverStatus = 'idle' | 'loading' | 'done' | 'error'
 
@@ -227,7 +231,10 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
   const acceptSavedConfig = (config: GatewaySettingsState) => {
     const normalized = normalizeGatewaySettingsState(config)
 
-    setState(normalized)
+    // Older installs can have a Hermes Cloud connection persisted. Do not
+    // delete it; present the same URL/auth material as an ordinary remote
+    // gateway so the user can keep using or edit it without a product account.
+    setState(normalized.mode === 'cloud' ? { ...normalized, mode: 'remote' } : normalized)
   }
 
   // When set, the plain-text opt-in dialog is open; `apply` remembers whether
@@ -1138,7 +1145,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
         <div className="text-[length:var(--conversation-caption-font-size)] font-medium text-(--ui-text-secondary)">
           {g.modeTitle}
         </div>
-        <div className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 min-[72rem]:grid-cols-4">
+        <div className="grid auto-rows-fr grid-cols-1 gap-2 sm:grid-cols-2 min-[72rem]:grid-cols-3">
           <ModeCard
             active={state.mode === 'local'}
             description={g.localDesc}
@@ -1147,14 +1154,16 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
             onSelect={() => setState(current => ({ ...current, mode: 'local' }))}
             title={g.localTitle}
           />
-          <ModeCard
-            active={state.mode === 'cloud'}
-            description={g.cloudDesc}
-            disabled={state.envOverride}
-            icon={Cloud}
-            onSelect={() => setState(current => ({ ...current, mode: 'cloud' }))}
-            title={g.cloudTitle}
-          />
+          {FIRST_PARTY_CLOUD_UI ? (
+            <ModeCard
+              active={state.mode === 'cloud'}
+              description={g.cloudDesc}
+              disabled={state.envOverride}
+              icon={Cloud}
+              onSelect={() => setState(current => ({ ...current, mode: 'cloud' }))}
+              title={g.cloudTitle}
+            />
+          ) : null}
           <ModeCard
             active={state.mode === 'remote'}
             description={g.remoteDesc}
@@ -1179,7 +1188,7 @@ export function GatewaySettings({ embedded = false }: { embedded?: boolean } = {
       {/* Hermes Cloud panel: one portal sign-in, then a discovered-agent picker
           whose selection drives the silent per-agent cascade + a cloud
           connection. Replaces the URL/token form while in cloud mode. */}
-      {state.mode === 'cloud' && !state.envOverride ? (
+      {FIRST_PARTY_CLOUD_UI && state.mode === 'cloud' && !state.envOverride ? (
         <div className="mt-5 grid gap-1">
           {savedCloudConnections.length > 0 ? (
             <div className="mb-4 grid gap-1">

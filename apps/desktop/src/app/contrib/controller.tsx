@@ -62,7 +62,6 @@ import {
   SIDEBAR_MAX_WIDTH
 } from '@/store/layout'
 import { runExportProfileFlow, runImportProfileFlow } from '@/store/profile-share'
-import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import {
   $reviewOpen,
   $reviewScopeCwd,
@@ -71,6 +70,7 @@ import {
   openReview,
   REVIEW_PANE_ID
 } from '@/store/review'
+import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import { $currentCwd, $selectedStoredSessionId, $sessions, $yoloActive, sessionMatchesStoredId } from '@/store/session'
 import { watchSessionPins } from '@/store/session-pin-sync'
 import { $botChatScopes } from '@/store/session-states'
@@ -162,7 +162,7 @@ registry.registerMany([
   {
     id: 'sessions',
     area: 'panes',
-    title: 'sessions',
+    title: 'tasks',
     // Collapsible: leaves the grid on narrow viewports (edge overlay instead).
     // dock: where a RE-ADOPTED pane lands (healed from a stale dismissal) —
     // its default-ish spot beside main, not a random same-placement stack.
@@ -209,6 +209,8 @@ registry.registerMany([
     // its rail there). A real floor left a sliver of unusable terminal.
     data: {
       placement: 'bottom',
+      dock: { pane: 'workspace', pos: 'bottom' },
+      defaultCollapsed: true,
       height: '20vh',
       maxHeight: '80vh',
       revealOnPreset: true,

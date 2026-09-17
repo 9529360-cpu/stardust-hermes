@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $profiles, normalizeProfileKey, refreshProfiles } from '@/store/profile'
+import { $profiles, normalizeProfileKey, profileLabel, profileNameLabel, refreshProfiles } from '@/store/profile'
 import {
   $settingsScopeEditsNonDefault,
   $settingsScopeOverride,
@@ -66,7 +66,7 @@ export function SettingsProfileScope({ className }: { className?: string }) {
           <ScopeChip
             active={normalizeProfileKey(profile.name) === selected}
             key={profile.name}
-            label={profile.name}
+            label={profileLabel(profile)}
             onSelect={() => setSettingsScope(profile.name)}
           />
         ))}
@@ -85,7 +85,12 @@ export function SettingsProfileScope({ className }: { className?: string }) {
           data-scope-loud={editingNonDefault ? 'true' : undefined}
           role="status"
         >
-          {scope.editsProfile(selected)}
+          {scope.editsProfile(
+            profileNameLabel(
+              selected,
+              profiles.find(profile => normalizeProfileKey(profile.name) === selected)?.display_name
+            )
+          )}
         </p>
       ) : null}
     </div>

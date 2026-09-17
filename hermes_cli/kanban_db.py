@@ -646,7 +646,9 @@ def remove_board(slug: str, *, archive: bool = True) -> dict:
 
     # A concurrent connect() after the rename recreates an empty DB file; drop
     # the init cache first so the schema pass re-runs on it.
-    _INITIALIZED_PATHS.discard(str((d / "kanban.db").resolve()))
+    resolved_db = str((d / "kanban.db").resolve())
+    _INITIALIZED_PATHS.discard(resolved_db)
+    _INITIALIZED_FILE_IDENTITIES.pop(resolved_db, None)
 
     if archive:
         archive_root = boards_root() / "_archived"
@@ -4171,6 +4173,7 @@ def latest_summaries(conn: sqlite3.Connection, task_ids: Iterable[str]) -> dict[
 
 # --- Split modules (imported at the tail: they import this module as ``_kb``) ---
 from hermes_cli.kanban_db_connect import (  # noqa: E402
+    _INITIALIZED_FILE_IDENTITIES,
     _INITIALIZED_PATHS,
     init_db,
     write_txn,

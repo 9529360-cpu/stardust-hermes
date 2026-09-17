@@ -908,7 +908,7 @@ class TestDebugShareEndpoint:
         (logs / "gateway.log").write_text("gw line\n")
 
 
-    def test_redact_false_is_honored(self, monkeypatch):
+    def test_redact_false_is_forced_on_at_remote_upload_boundary(self, monkeypatch):
         import hermes_cli.debug as dbg
 
         monkeypatch.setattr(
@@ -920,7 +920,7 @@ class TestDebugShareEndpoint:
 
         r = self.client.post("/api/ops/debug-share", json={"redact": False})
         assert r.status_code == 200
-        assert r.json()["redacted"] is False
+        assert r.json()["redacted"] is True
 
     def test_default_body_redacts(self, monkeypatch):
         import hermes_cli.debug as dbg

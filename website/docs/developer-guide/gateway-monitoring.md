@@ -21,7 +21,8 @@ integration and explicitly configured Relay subscribers or exporters.
 
 | Signal | OTLP route | Content |
 | --- | --- | --- |
-| Gateway gauges | `/v1/metrics` | `hermes.gateway.up/state/busy/drainable/active_agents/background_work/background_delegations/restart_requested`, `hermes.platform.up/degraded` with bounded `error_code` attributes |
+| Gateway gauges | `/v1/metrics` | `hermes.gateway.up/state/busy/drainable/active_agents/background_work/background_delegations/process_completions_pending/restart_requested`, `hermes.platform.up/degraded` with bounded `error_code` attributes |
+| Host resource gauges | `/v1/metrics` | Disk `pressure_level/free_mb/used_percent` and memory `pressure_level/available_mb/gateway_rss_mb/swap_used_mb`; pressure is a closed numeric enum (`unknown=-1`, `ok=0`, `elevated=1`, `critical=2`) reused from the local status collectors |
 | Health/lifecycle events | `/v1/traces` | `gateway.lifecycle` state transitions (`starting -> running -> draining -> stopped`, `startup_failed`, exit), `gateway.health_snapshot`, platform state changes |
 | Diagnostics | `/v1/logs` | Warning/error gateway events with a constant body and bounded subsystem, severity, error class, and error code attributes; rendered log messages are never exported |
 | Cron scheduler gauges | `/v1/metrics` | Ticker heartbeat and last-success age (omitted when unavailable), a monotonic catch-up-occurrence count from the scheduler's stale-window branch, enabled/running job counts, and overdue count derived from persisted `next_run_at` plus the scheduler's existing grace rule |
@@ -97,7 +98,8 @@ service:
 ```
 
 Point `monitoring.export.otlp.endpoint` at the collector. Alerts belong on
-`hermes.gateway.up`, `hermes.platform.up`, and `hermes.platform.degraded`.
+`hermes.gateway.up`, `hermes.platform.up`, `hermes.platform.degraded`, and the host
+disk/memory pressure gauges.
 
 ## Generic fleet queries and alerts
 
@@ -119,6 +121,13 @@ absent_over_time(hermes_gateway_up[5m])
 
 # Locally owned bridge is explicitly down.
 hermes_platform_up == 0
+
+# Host is entering a write-failure / OOM risk window. Level 1=elevated, 2=critical.
+hermes_host_disk_pressure_level >= 1
+hermes_host_memory_pressure_level >= 1
+
+# Process completion notifications have stayed queued for the whole window (drain stuck).
+min_over_time(hermes_gateway_process_completions_pending[5m]) > 0
 
 # Scheduler thread is stale even though the gateway may still be alive.
 hermes_cron_scheduler_heartbeat_age_seconds > 180
@@ -149,11 +158,12 @@ Recommended operator views:
 
 1. one row per `service.instance.id` with gateway and configured local-platform
    state;
-2. scheduler heartbeat, last-success age, running count, overdue count, and
+2. host disk/memory pressure and remaining headroom plus pending process-completion backlog;
+3. scheduler heartbeat, last-success age, running count, overdue count, and
    catch-up increase;
-3. a cron lifecycle feed keyed only by opaque `hermes.job_key`;
-4. separate alerts for box absence, local bridge down, scheduler stale, cron
-   failed/unknown, delivery failure, and overdue/catch-up activity.
+4. a cron lifecycle feed keyed only by opaque `hermes.job_key`;
+5. separate alerts for box absence, local bridge down, host pressure, scheduler stale,
+   cron failed/unknown, delivery failure, and overdue/catch-up activity.
 
 Keep alert thresholds and routing in deployment-owned configuration. Do not add
 job names, prompts, outputs, schedules, destinations, raw errors, profile names,
@@ -161,7 +171,7 @@ or account identity merely to make a dashboard easier to read.
 
 ## Release-validation scenarios
 
-Before accepting a deployment, force and verify all five cases through the real
+Before accepting a deployment, force and verify all seven cases through the real
 collector and backend:
 
 1. **Cron success:** observe `claimed -> running -> completed`, duration, and a
@@ -175,6 +185,10 @@ collector and backend:
    remain healthy.
 5. **Killed gateway:** terminate one canary, verify missing-series detection,
    restart it, and confirm the same opaque instance identity returns.
+6. **Host resource pressure:** inject a disk/memory pressure fixture or canary condition,
+   observe the bounded pressure level and headroom gauges, then verify they clear on recovery.
+7. **Completion drain stall:** hold the process-completion drain while background work finishes,
+   observe `process_completions_pending` stay non-zero, release the drain, and verify it returns to zero.
 
 Hermes Agent-owned Relay transport health remains in scope. A separate gateway
 or connector service remains authoritative for any shared connected-platform

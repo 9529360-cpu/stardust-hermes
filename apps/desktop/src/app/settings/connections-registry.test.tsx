@@ -120,7 +120,7 @@ describe('ConnectionsRegistrySection', () => {
     })
   })
 
-  it('offers every kind on create and disables Local while the managed entry exists', async () => {
+  it('offers supported kinds, omits managed cloud creation, and disables Local while managed', async () => {
     render(<ConnectionsRegistrySection />)
 
     await waitFor(() => expect(screen.getByText('Homelab')).toBeTruthy())
@@ -128,7 +128,7 @@ describe('ConnectionsRegistrySection', () => {
 
     const localKind = screen.getByRole('button', { name: 'Local' }) as HTMLButtonElement
     expect(localKind.disabled).toBe(true)
-    expect(screen.getByRole('button', { name: 'Hermes Cloud' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /(?:Hermes|Stardust) Cloud/ })).toBeNull()
     expect(screen.getByRole('button', { name: 'Remote gateway' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'SSH' })).toBeTruthy()
   })

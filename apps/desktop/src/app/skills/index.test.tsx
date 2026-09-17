@@ -192,6 +192,7 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
     await act(async () => {
       fireEvent.click(trigger)
     })
+    expect(await screen.findByRole('option', { name: 'Stardust (default)' })).toBeTruthy()
     const option = await screen.findByRole('option', { name: 'researcher' })
     await act(async () => {
       fireEvent.click(option)

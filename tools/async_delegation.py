@@ -458,7 +458,7 @@ def active_task_count() -> int:
         return sum(
             len(r.get("task_indexes") or r["goals"])
             if r.get("is_batch") and isinstance(r.get("goals"), (list, tuple)) and r["goals"] else 1
-            for r in _records.values() if r.get("status") in {"running", "finalizing"})
+            for r in _records.values() if r.get("status") in _LIVE_STATES)
 
 
 def _session_records(statuses, session_key: str, origin_ui_session_id: str, parent_session_id: str) -> list:
@@ -487,7 +487,7 @@ def _new_delegation_id() -> str:
 
 def _prune_completed_locked() -> None:
     """Drop the oldest completed records beyond the cap. Caller holds ``_records_lock``."""
-    completed = [(rid, r) for rid, r in _records.items() if r.get("status") != "running"]
+    completed = [(rid, r) for rid, r in _records.items() if r.get("status") not in _LIVE_STATES]
     completed.sort(key=lambda kv: kv[1].get("completed_at") or kv[1].get("dispatched_at") or 0)
     for rid, _ in completed[: max(0, len(completed) - _MAX_RETAINED_COMPLETED)]:
         _records.pop(rid, None)

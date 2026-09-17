@@ -237,3 +237,56 @@ def test_healthy_fast_path_stays_lock_free(tmp_path, monkeypatch):
     with kbc.connect_closing(db_path):
         pass
     assert len(locks) == 1
+
+
+def test_connect_revalidates_when_cached_db_is_replaced_by_legacy_file(tmp_path, monkeypatch):
+    """A path cache hit must not trust a different SQLite file restored in place.
+
+    Backup/sync tools commonly publish a restored DB with ``os.replace``.  If it
+    still has the ``tasks`` table, the old fast path accepted it without running
+    integrity checks or additive migrations, leaving long-lived gateways on a
+    stale schema until restart.
+    """
+    db_path = _default_board_db(tmp_path, monkeypatch)
+    with kbc.connect_closing(db_path):
+        pass
+    assert str(db_path.resolve()) in kb._INITIALIZED_PATHS
+
+    restored = tmp_path / "restored-kanban.db"
+    conn = sqlite3.connect(str(restored))
+    conn.executescript(kb.SCHEMA_SQL)
+    conn.execute("ALTER TABLE tasks DROP COLUMN worker_started_at")
+    conn.close()
+    restored.replace(db_path)
+
+    with kbc.connect_closing(db_path) as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+    assert "worker_started_at" in columns
+
+
+def test_fast_path_rechecks_identity_after_open(tmp_path, monkeypatch):
+    """Replacement between the pre-check and sqlite open must not escape migration."""
+    db_path = _default_board_db(tmp_path, monkeypatch)
+    with kbc.connect_closing(db_path):
+        pass
+
+    restored = tmp_path / "racing-restore.db"
+    raw = sqlite3.connect(str(restored))
+    raw.executescript(kb.SCHEMA_SQL)
+    raw.execute("ALTER TABLE tasks DROP COLUMN worker_started_at")
+    raw.close()
+
+    real_open = kbc._open_configured
+    swapped = False
+
+    def replace_before_open(path, under_lock):
+        nonlocal swapped
+        if not swapped:
+            swapped = True
+            restored.replace(path)
+        return real_open(path, under_lock)
+
+    monkeypatch.setattr(kbc, "_open_configured", replace_before_open)
+    with kbc.connect_closing(db_path) as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+    assert "worker_started_at" in columns

@@ -597,7 +597,9 @@ export function ConnectionsRegistrySection() {
   }, [bridge, s.updateAllDone, s.updateAllFailed, s.updateSkippedCloud])
 
   const kindMeta: Record<DesktopConnectionKind, { label: string; desc: string }> = {
-    cloud: { desc: s.kindCloudDesc, label: s.kindCloud },
+    // Legacy cloud records remain readable, but Stardust presents them as
+    // ordinary remote gateways now that the first-party cloud account UI is gone.
+    cloud: { desc: s.kindRemoteDesc, label: s.kindRemote },
     local: { desc: s.kindLocalDesc, label: s.kindLocal },
     remote: { desc: s.kindRemoteDesc, label: s.kindRemote },
     ssh: { desc: s.kindSshDesc, label: s.kindSsh }
@@ -763,7 +765,7 @@ export function ConnectionsRegistrySection() {
             {/* Kind is fixed once created (buttons disable on edit). On create
                 every kind is offered; Local is disabled while the managed
                 local entry exists (the registry holds at most one). */}
-            {(editor.id ? ([editor.kind] as const) : (['local', 'cloud', 'remote', 'ssh'] as const)).map(kind => (
+            {(editor.id ? ([editor.kind] as const) : (['local', 'remote', 'ssh'] as const)).map(kind => (
               <Button
                 disabled={Boolean(editor.id) || (kind === 'local' && hasLocal)}
                 key={kind}

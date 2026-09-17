@@ -115,7 +115,12 @@ export function isOAuthReauthSurface(surface: ErrorSurface | null | undefined): 
   authKind: 'oauth'
   provider: string
 } {
-  return surface?.layer === 'auth' && surface.authKind === 'oauth' && Boolean(surface.provider)
+  return (
+    surface?.layer === 'auth' &&
+    surface.authKind === 'oauth' &&
+    Boolean(surface.provider) &&
+    surface.provider !== 'nous'
+  )
 }
 
 /** True when the failed turn's provider rejected a saved API key — the fix is
@@ -221,7 +226,7 @@ export function formatErrorDiagnostics(input: {
   const model = input.surface?.model || input.model
 
   const lines = [
-    '── Hermes error details ──',
+    '── Stardust error details ──',
     `time: ${new Date().toISOString()}`,
     input.surface ? `layer: ${input.surface.layer}` : null,
     input.surface ? `code: ${input.surface.code}` : null,

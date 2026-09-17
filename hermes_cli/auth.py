@@ -29,7 +29,8 @@ from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Tup
 from urllib.parse import urlparse
 
 from hermes_cli.config import (
-    get_hermes_home, get_config_path, read_raw_config, require_readable_config_before_write)
+    config_mutation_scope, get_hermes_home, get_config_path, read_raw_config,
+    require_readable_config_before_write)
 from hermes_constants import OPENROUTER_BASE_URL, hermes_home_key, secure_parent_dir
 from agent.credential_persistence import sanitize_borrowed_credential_payload
 from utils import atomic_json_write, atomic_yaml_write, env_float, file_signature, is_truthy_value  # noqa: F401  (env_float: agent.credential_pool reads auth_mod.env_float)
@@ -2150,34 +2151,35 @@ def _update_config_for_provider(
 
     config_path = get_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    require_readable_config_before_write(config_path)
-    config = read_raw_config()
-    current_model = config.get("model")
-    if isinstance(current_model, dict):
-        model_cfg = dict(current_model)
-    else:
-        model_cfg = {"default": current_model.strip()} if _nonempty_str(current_model) else {}
-    model_cfg["provider"] = provider_id
-    if inference_base_url and inference_base_url.strip():
-        model_cfg["base_url"] = inference_base_url.rstrip("/")
-    else:
-        model_cfg.pop("base_url", None)  # clear stale base_url when switching providers
+    with config_mutation_scope(config_path):
+        require_readable_config_before_write(config_path)
+        config = read_raw_config()
+        current_model = config.get("model")
+        if isinstance(current_model, dict):
+            model_cfg = dict(current_model)
+        else:
+            model_cfg = {"default": current_model.strip()} if _nonempty_str(current_model) else {}
+        model_cfg["provider"] = provider_id
+        if inference_base_url and inference_base_url.strip():
+            model_cfg["base_url"] = inference_base_url.rstrip("/")
+        else:
+            model_cfg.pop("base_url", None)  # clear stale base_url when switching providers
 
-    # Built-in providers resolve credentials from env/auth state, not inline model.api_key left
-    # over from a previous custom provider.
-    from hermes_cli.config import clear_model_endpoint_credentials
-    clear_model_endpoint_credentials(model_cfg)
+        # Built-in providers resolve credentials from env/auth state, not inline model.api_key left
+        # over from a previous custom provider.
+        from hermes_cli.config import clear_model_endpoint_credentials
+        clear_model_endpoint_credentials(model_cfg)
 
-    # An OpenRouter-formatted default like "anthropic/claude-opus-4.6" fails on direct-API
-    # providers.
-    if default_model:
-        cur_default = model_cfg.get("default", "")
-        if not cur_default or "/" in cur_default:
-            model_cfg["default"] = default_model
-    elif clear_default:
-        model_cfg.pop("default", None)
-    config["model"] = model_cfg
-    atomic_yaml_write(config_path, config, sort_keys=False)
+        # An OpenRouter-formatted default like "anthropic/claude-opus-4.6" fails on direct-API
+        # providers.
+        if default_model:
+            cur_default = model_cfg.get("default", "")
+            if not cur_default or "/" in cur_default:
+                model_cfg["default"] = default_model
+        elif clear_default:
+            model_cfg.pop("default", None)
+        config["model"] = model_cfg
+        atomic_yaml_write(config_path, config, sort_keys=False)
     return config_path
 
 
@@ -2212,16 +2214,17 @@ def _reset_config_provider() -> Path:
     config_path = get_config_path()
     if not config_path.exists():
         return config_path
-    require_readable_config_before_write(config_path)
-    config = read_raw_config()
-    if not config:
-        return config_path
-    model = config.get("model")
-    if isinstance(model, dict):
-        model["provider"] = "auto"
-        if "base_url" in model:
-            model["base_url"] = OPENROUTER_BASE_URL
-    atomic_yaml_write(config_path, config, sort_keys=False)
+    with config_mutation_scope(config_path):
+        require_readable_config_before_write(config_path)
+        config = read_raw_config()
+        if not config:
+            return config_path
+        model = config.get("model")
+        if isinstance(model, dict):
+            model["provider"] = "auto"
+            if "base_url" in model:
+                model["base_url"] = OPENROUTER_BASE_URL
+        atomic_yaml_write(config_path, config, sort_keys=False)
     return config_path
 
 

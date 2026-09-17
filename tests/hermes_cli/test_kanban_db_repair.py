@@ -289,3 +289,27 @@ def test_cli_repair_json_shape(cli_home, capsys):
     assert Path(payload["backup_path"]).exists()
 
 
+
+
+def test_corrupt_backup_identity_includes_wal_bytes(tmp_path):
+    """A changed WAL must mint a new forensic backup even if main DB bytes match.
+
+    In WAL mode committed rows can live only in ``-wal`` while the main file is
+    unchanged. Reusing a backup keyed only by the main DB silently points later
+    corruption reports at an older WAL and can omit the newest committed data.
+    """
+    db_path = tmp_path / "kanban.db"
+    db_path.write_bytes(b"same-main-database-bytes")
+    wal_path = tmp_path / "kanban.db-wal"
+    wal_path.write_bytes(b"wal-generation-one")
+
+    first = kbc._backup_corrupt_db(db_path)
+    assert first is not None
+    assert first.with_name(first.name + "-wal").read_bytes() == b"wal-generation-one"
+
+    wal_path.write_bytes(b"wal-generation-two")
+    second = kbc._backup_corrupt_db(db_path)
+    assert second is not None
+    assert second != first
+    assert first.with_name(first.name + "-wal").read_bytes() == b"wal-generation-one"
+    assert second.with_name(second.name + "-wal").read_bytes() == b"wal-generation-two"

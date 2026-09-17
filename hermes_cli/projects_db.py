@@ -71,7 +71,6 @@ CREATE TABLE IF NOT EXISTS discovered_repos (
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]{0,63}$")
 # Deterministic branch slug: lowercase, separators collapsed, capped.
 _BRANCH_SAFE_RE = re.compile(r"[^a-z0-9._-]+")
-_INITIALIZED_PATHS: set[str] = set()
 # TEXT columns added to `projects` after v1; re-applied idempotently on every open so a legacy DB
 # upgrades in place.
 _OPTIONAL_PROJECT_COLUMNS = ("board_slug", "primary_path", "icon", "color")
@@ -112,23 +111,21 @@ def _normalize_path(path: str) -> str:
 
 
 def connect(db_path: Optional[Path] = None) -> sqlite3.Connection:
-    """Open (and initialize if needed) the per-profile projects DB.
+    """Open and idempotently initialize the per-profile projects DB.
 
-    WAL with DELETE fallback for network filesystems (``hermes_state`` helper). Schema init is
-    idempotent (``CREATE TABLE IF NOT EXISTS`` + additive migrations) and cached per-path per-process.
+    WAL with DELETE fallback for network filesystems (``hermes_state`` helper).
+    This store is deliberately small, so every open revalidates its schema. A
+    path-only initialization cache is unsafe when backup/sync tooling replaces
+    ``projects.db`` underneath a long-lived gateway.
     """
     path = db_path if db_path is not None else projects_db_path()
-    resolved = str(path.resolve())
 
     def _initialize(conn: sqlite3.Connection) -> None:
-        if resolved in _INITIALIZED_PATHS:
-            return
         conn.executescript(SCHEMA_SQL)
         cols = {row["name"] for row in conn.execute("PRAGMA table_info(projects)")}
         for col in _OPTIONAL_PROJECT_COLUMNS:
             if col not in cols:
                 _add_column_if_missing(conn, "projects", col, f"{col} TEXT")
-        _INITIALIZED_PATHS.add(resolved)
 
     return open_db(path, db_label="projects.db", foreign_keys=True, initialize=_initialize)
 

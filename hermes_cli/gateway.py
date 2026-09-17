@@ -5005,16 +5005,32 @@ def _runtime_health_lines() -> list[str]:
 
     # A live-claiming snapshot can outlive an ungracefully killed gateway (taskkill /F, OOM). Past
     # the freshness TTL with the recorded PID gone, say so instead of rendering stale live state.
-    if (
-        gateway_state in ("running", "starting", "draining")
-        and runtime_status_is_stale(state)
-        and not runtime_status_pid_is_live(state)
-    ):
+    live_runtime_state = gateway_state in ("running", "starting", "draining")
+    pid_live = runtime_status_pid_is_live(state) if live_runtime_state else False
+    if live_runtime_state and runtime_status_is_stale(state) and not pid_live:
         lines.append(
             f"⚠ Stale gateway_state.json: recorded state '{gateway_state}' but the "
             "recorded process is gone (likely an ungraceful shutdown)"
         )
         return lines
+
+    # PID liveness is not service liveness. Reuse the gateway's bounded dual-witness probe so
+    # `gateway status` exposes the common operational failure where the process survives but its
+    # asyncio loop no longer dispatches. Only a proven wedge is surfaced; unknown stays non-fatal.
+    if live_runtime_state and pid_live:
+        try:
+            runtime_pid = int(state.get("pid") or 0)
+            loop_liveness = (
+                probe_gateway_loop_liveness(runtime_pid, home=get_hermes_home())
+                if runtime_pid > 0 else GATEWAY_LOOP_UNKNOWN
+            )
+        except Exception:
+            loop_liveness = GATEWAY_LOOP_UNKNOWN
+        if loop_liveness == GATEWAY_LOOP_WEDGED:
+            lines.append(
+                f"✗ Gateway PID {runtime_pid} is alive but its event loop is unresponsive (wedged); "
+                "restart the gateway"
+            )
 
     if gateway_state == "startup_failed" and exit_reason:
         lines.append(f"⚠ Last startup issue: {exit_reason}")

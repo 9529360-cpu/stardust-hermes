@@ -6,6 +6,7 @@ import {
   $sidebarRowMeta,
   $sidebarShowAllSessions,
   $sidebarViewCustomized,
+  migrateSidebarAssistantFirstDefault,
   resetSidebarView,
   setSidebarGrouping,
   setSidebarOrdering,
@@ -38,7 +39,7 @@ describe('the sidebar as it ships', () => {
     expect(window.localStorage.getItem('hermes.desktop.sidebarShowAllSessions')).toBe('false')
   })
 
-  it('groups by date, sorts by recency, and pins the timestamp and preview', () => {
+  it('ships as a chronological task list while keeping recency metadata', () => {
     expect($sidebarGrouping.get()).toBe('date')
     expect($sidebarOrdering.get()).toBe('updated')
     expect($sidebarRowMeta.get()).toEqual(['preview', 'updated'])
@@ -67,7 +68,7 @@ describe('the sidebar as it ships', () => {
     expect($sidebarViewCustomized.get()).toBe(false)
   })
 
-  it('ships by date in the all-profiles scope too, and resets back to it', () => {
+  it('ships chronologically in the all-profiles scope too, and resets back to it', () => {
     $showAllProfiles.set(true)
     setSidebarGrouping('profile')
 
@@ -86,6 +87,40 @@ describe('the sidebar as it ships', () => {
     $showAllProfiles.set(false)
 
     expect($sidebarGrouping.get()).toBe('date')
+  })
+
+  it('keeps Project available as an explicit developer view', () => {
+    expect($sidebarGrouping.get()).toBe('date')
+
+    setSidebarGrouping('project')
+    expect($sidebarGrouping.get()).toBe('project')
+
+    setSidebarGrouping('date')
+    expect($sidebarGrouping.get()).toBe('date')
+  })
+
+  it('migrates only the untouched project-first shipped view to Tasks', () => {
+    window.localStorage.removeItem('stardust.desktop.sidebarAssistantFirst.v1')
+    window.localStorage.setItem('hermes.desktop.agentsGroupedByWorkspace', 'true')
+    window.localStorage.setItem('hermes.desktop.sidebarAgentsGrouped.allProfiles', 'true')
+
+    migrateSidebarAssistantFirstDefault()
+
+    expect(window.localStorage.getItem('hermes.desktop.agentsGroupedByWorkspace')).toBe('false')
+    expect(window.localStorage.getItem('hermes.desktop.sidebarAgentsGrouped.allProfiles')).toBe('false')
+    expect(window.localStorage.getItem('stardust.desktop.sidebarAssistantFirst.v1')).toBe('1')
+  })
+
+  it('preserves an explicitly customized old project view during migration', () => {
+    window.localStorage.removeItem('stardust.desktop.sidebarAssistantFirst.v1')
+    window.localStorage.setItem('hermes.desktop.agentsGroupedByWorkspace', 'true')
+    window.localStorage.setItem('hermes.desktop.sidebarAgentsGrouped.allProfiles', 'true')
+    window.localStorage.setItem('hermes.desktop.sidebarSortKey', 'cost')
+
+    migrateSidebarAssistantFirstDefault()
+
+    expect(window.localStorage.getItem('hermes.desktop.agentsGroupedByWorkspace')).toBe('true')
+    expect(window.localStorage.getItem('stardust.desktop.sidebarAssistantFirst.v1')).toBe('1')
   })
 
   it('turns all-profiles on when the user groups by profile, since that is the ask', () => {

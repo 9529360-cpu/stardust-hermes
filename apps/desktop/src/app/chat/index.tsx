@@ -17,6 +17,7 @@ import { usePaneVisible } from '@/components/pane-shell/pane-visibility'
 import { $sessionTileDragging, $sessionTileEdgeHover } from '@/components/pane-shell/tree/store'
 import { PromptOverlays } from '@/components/prompt-overlays'
 import { Button } from '@/components/ui/button'
+import { Codicon } from '@/components/ui/codicon'
 import { ErrorState } from '@/components/ui/error-state'
 import { TitleMenuTrigger } from '@/components/ui/title-menu-trigger'
 import { type HermesGateway } from '@/hermes'
@@ -27,6 +28,7 @@ import { useIncrementalExternalStoreRuntime } from '@/lib/incremental-external-s
 import { currentModelCapabilities, modelOptionsQueryKey, requestModelOptions } from '@/lib/model-options'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
+import { $repoStatus } from '@/store/coding-status'
 import { migrateSessionDraft } from '@/store/composer'
 import { migrateQueuedPrompts, parkQueuedPrompts } from '@/store/composer-queue'
 import { $introSplash } from '@/store/intro-splash'
@@ -34,6 +36,7 @@ import { $pinnedSessionIds } from '@/store/layout'
 import { $petActive } from '@/store/pet'
 import { $petOverlayActive } from '@/store/pet-overlay'
 import { $activeGatewayProfile, $gatewaySwapTarget, $hydrationSyncProfile, $profiles } from '@/store/profile'
+import { revealReview } from '@/store/review'
 import {
   $connection,
   $contextSuggestions,
@@ -53,8 +56,9 @@ import { $focusedStoredSessionId, $sessionStates, sessionTileDelegate } from '@/
 import { $transcriptTailBySessionId, transcriptTailState } from '@/store/transcript-tail'
 import { isAuxiliaryWindow, isWatchWindow } from '@/store/windows'
 
+import { setTerminalTakeover } from '../right-sidebar/store'
 import { primaryRouteSelectedSessionId, routeSessionId } from '../routes'
-import { titlebarHeaderBaseClass, titlebarHeaderShadowClass, titlebarHeaderTitleClass } from '../shell/titlebar'
+import { titlebarHeaderShadowClass } from '../shell/titlebar'
 
 import { ChatDropOverlay } from './chat-drop-overlay'
 import { ChatSwapOverlay, ChatSyncBadge } from './chat-swap-overlay'
@@ -115,8 +119,19 @@ interface ChatViewProps extends Omit<React.ComponentProps<'div'>, 'onSubmit'> {
   onDismissError?: (messageId: string) => void
 }
 
+const DEVELOPER_HEADER_COPY = {
+  ar: { noProject: 'لا مشروع', noBranch: 'بلا فرع', ready: 'جاهز', working: 'يعمل', review: 'مراجعة', terminal: 'الطرفية', noGit: 'لا توجد حالة Git', changes: (n: number) => `${n} تغييرات` },
+  en: { noProject: 'No project', noBranch: 'No branch', ready: 'Ready', working: 'Working', review: 'Review', terminal: 'Terminal', noGit: 'No Git status', changes: (n: number) => `${n} changes` },
+  ja: { noProject: 'プロジェクトなし', noBranch: 'ブランチなし', ready: '準備完了', working: '作業中', review: 'レビュー', terminal: 'ターミナル', noGit: 'Git 状態なし', changes: (n: number) => `${n} 件の変更` },
+  ru: { noProject: 'Нет проекта', noBranch: 'Нет ветки', ready: 'Готово', working: 'В работе', review: 'Ревью', terminal: 'Терминал', noGit: 'Нет Git-статуса', changes: (n: number) => `${n} изм.` },
+  zh: { noProject: '未选择项目', noBranch: '无分支', ready: '就绪', working: '运行中', review: '审查', terminal: '终端', noGit: '无 Git 状态', changes: (n: number) => `${n} 个改动` },
+  'zh-hant': { noProject: '未選擇專案', noBranch: '無分支', ready: '就緒', working: '執行中', review: '審查', terminal: '終端機', noGit: '無 Git 狀態', changes: (n: number) => `${n} 個變更` }
+} as const
+
 interface ChatHeaderProps {
   activeSessionId: null | string
+  busy: boolean
+  currentCwd: string
   isRoutedSessionView: boolean
   onDeleteSelectedSession: () => void
   onToggleSelectedPin: () => void
@@ -125,6 +140,8 @@ interface ChatHeaderProps {
 
 function ChatHeader({
   activeSessionId,
+  busy,
+  currentCwd,
   isRoutedSessionView,
   onDeleteSelectedSession,
   onToggleSelectedPin,
@@ -133,54 +150,77 @@ function ChatHeader({
   const sessions = useStore($sessions)
   const pinnedSessionIds = useStore($pinnedSessionIds)
   const profiles = useStore($profiles)
+  const repoStatus = useStore($repoStatus)
+  const { locale } = useI18n()
+  const copy = DEVELOPER_HEADER_COPY[locale]
 
   const activeStoredSession =
     (selectedSessionId && sessions.find(session => sessionMatchesStoredId(session, selectedSessionId))) || null
 
   const title = activeStoredSession ? sessionTitle(activeStoredSession) : NEW_SESSION_TITLE
-
-  // Which agent/persona owns this chat — glanceable in the header once a
-  // second profile exists, so the open session's ownership is never ambiguous
-  // (#66003). Single-profile users see the unchanged header.
   const showProfileTag = profiles.length > 1 && Boolean(activeStoredSession)
 
-  // Pins live on the durable lineage-root id, but selectedSessionId is the live
-  // (tip) id — resolve through the loaded row so the menu reflects the pin
-  // state after auto-compression rotates the id.
   const selectedIsPinned = activeStoredSession
     ? pinnedSessionIds.includes(sessionPinId(activeStoredSession))
     : selectedSessionId
       ? pinnedSessionIds.includes(selectedSessionId)
       : false
 
-  // Secondary windows (new-session scratch, subagent watch, cmd-click pop-out)
-  // are compact side panels — they drop the session-actions header + border
-  // entirely. A brand-new draft has nothing to pin/delete/rename either.
-  if (isAuxiliaryWindow() || (!selectedSessionId && !activeSessionId && !isRoutedSessionView)) {
+  const project = currentCwd.trim().replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || copy.noProject
+  const branch = repoStatus?.branch || copy.noBranch
+  const gitState = repoStatus ? copy.changes(repoStatus.changed) : copy.noGit
+
+  if (isAuxiliaryWindow()) {
     return null
   }
 
   return (
-    <header className={cn(titlebarHeaderBaseClass, isRoutedSessionView && titlebarHeaderShadowClass)}>
-      <div
-        className={cn(titlebarHeaderTitleClass, showProfileTag && 'flex items-center')}
-        style={{
-          maxWidth:
-            'calc(100vw - var(--titlebar-content-inset,0px) - var(--titlebar-tools-right) - var(--titlebar-tools-width) - 1.5rem)'
-        }}
-      >
-        {showProfileTag && <ProfileTag className="pointer-events-auto mr-1.5" profile={activeStoredSession?.profile} />}
-        <SessionActionsMenu
-          align="start"
-          onDelete={selectedSessionId ? onDeleteSelectedSession : undefined}
-          onPin={selectedSessionId ? onToggleSelectedPin : undefined}
-          pinned={selectedIsPinned}
-          sessionId={selectedSessionId || activeSessionId || ''}
-          sideOffset={8}
-          title={title}
-        >
-          <TitleMenuTrigger>{title}</TitleMenuTrigger>
-        </SessionActionsMenu>
+    <header
+      className={cn(
+        'pointer-events-none relative z-3 flex h-10 w-full min-w-0 shrink-0 items-center gap-3 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-chat-surface-background) px-3',
+        isRoutedSessionView && titlebarHeaderShadowClass
+      )}
+      data-developer-task-header=""
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+        {showProfileTag && <ProfileTag className="pointer-events-auto shrink-0" profile={activeStoredSession?.profile} />}
+        {selectedSessionId || activeSessionId || isRoutedSessionView ? (
+          <SessionActionsMenu
+            align="start"
+            onDelete={selectedSessionId ? onDeleteSelectedSession : undefined}
+            onPin={selectedSessionId ? onToggleSelectedPin : undefined}
+            pinned={selectedIsPinned}
+            sessionId={selectedSessionId || activeSessionId || ''}
+            sideOffset={8}
+            title={title}
+          >
+            <TitleMenuTrigger>{title}</TitleMenuTrigger>
+          </SessionActionsMenu>
+        ) : (
+          <span className="truncate text-xs font-medium text-(--ui-text-primary)">{title}</span>
+        )}
+        <span className="hidden min-w-0 items-center gap-1.5 truncate text-[0.68rem] text-(--ui-text-tertiary) lg:flex">
+          <span className="truncate">{project}</span>
+          <span aria-hidden>·</span>
+          <span className="truncate">{branch}</span>
+          <span aria-hidden>·</span>
+          <span>{gitState}</span>
+          <span aria-hidden>·</span>
+          <span className={cn('inline-flex items-center gap-1', busy && 'text-(--ui-text-primary)')}>
+            <span className={cn('size-1.5 rounded-full bg-(--ui-text-quaternary)', busy && 'animate-pulse bg-(--theme-midground)')} />
+            {busy ? copy.working : copy.ready}
+          </span>
+        </span>
+      </div>
+      <div className="pointer-events-auto ml-auto flex shrink-0 items-center gap-1 [-webkit-app-region:no-drag]">
+        <Button aria-label={copy.review} onClick={() => revealReview(currentCwd || null, 'main')} size="xs" variant="ghost">
+          <Codicon name="diff" size="0.75rem" />
+          <span className="hidden xl:inline">{copy.review}</span>
+        </Button>
+        <Button aria-label={copy.terminal} onClick={() => setTerminalTakeover(true)} size="xs" variant="ghost">
+          <Codicon name="terminal" size="0.75rem" />
+          <span className="hidden xl:inline">{copy.terminal}</span>
+        </Button>
       </div>
     </header>
   )
@@ -691,6 +731,8 @@ const ChatViewContent = memo(function ChatViewContent({
       {isPrimary && (
         <ChatHeader
           activeSessionId={activeSessionId}
+          busy={busy}
+          currentCwd={currentCwd}
           isRoutedSessionView={isRoutedSessionView}
           onDeleteSelectedSession={onDeleteSelectedSession}
           onToggleSelectedPin={onToggleSelectedPin}
@@ -720,7 +762,7 @@ const ChatViewContent = memo(function ChatViewContent({
             clampToComposer={showChatBar}
             cwd={currentCwd}
             gateway={gateway}
-            intro={showIntro ? { personality: introPersonality, seed: introSeed } : undefined}
+            intro={showIntro ? { cwd: currentCwd, personality: introPersonality, seed: introSeed } : undefined}
             loading={threadLoading}
             onBranchInNewChat={onBranchInNewChat}
             onCancel={haltRun}

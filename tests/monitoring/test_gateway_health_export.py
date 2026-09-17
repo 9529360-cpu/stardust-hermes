@@ -113,6 +113,6 @@ def test_install_id_persists_across_calls(tmp_path, monkeypatch):
     # Persisted: a fresh load (simulating a new gateway process) returns the same id.
     second = ensure_install_id(cfg_mod.load_config())
     assert second == first
-    assert first in (tmp_path / "config.yaml").read_text()
+    assert first in (tmp_path / "config.yaml").read_text(encoding="utf-8")
 
 

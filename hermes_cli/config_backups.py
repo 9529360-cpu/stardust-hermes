@@ -57,8 +57,15 @@ def backup_config(config_path: Path, reason: str, *, keep: int = DEFAULT_KEEP) -
         existing = list_config_backups(config_path, reason)
         if existing and filecmp.cmp(config_path, existing[0], shallow=False):
             return None
-        dest = root / f"{config_path.name}.{reason}.{time.strftime('%Y%m%d-%H%M%S')}"
-        if dest.is_symlink() or dest.exists():  # never write through a planted link
+        stem = root / f"{config_path.name}.{reason}.{time.strftime('%Y%m%d-%H%M%S')}"
+        dest = None
+        for serial in range(1000):
+            candidate = stem if serial == 0 else root / f"{stem.name}.{serial:03d}"
+            if not candidate.exists() and not candidate.is_symlink():
+                dest = candidate
+                break
+        if dest is None:
+            logger.warning("Could not allocate a unique config backup name for %s (%s)", config_path, reason)
             return None
         shutil.copy2(config_path, dest)
         for stale in [dest, *existing][keep:]:

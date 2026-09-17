@@ -236,9 +236,6 @@ export interface Translations {
       remoteSignInHint: (signInLabel: string) => string
       signOutAndSignIn: string
       remoteFailureHint: string
-      cloudDownTitle: string
-      cloudDownDescription: string
-      cloudDownHint: string
       cloudDownCheckPortal: string
       cloudDownDiscord: string
       hideRecentLogs: string
@@ -373,7 +370,6 @@ export interface Translations {
     links: {
       discord: string
       github: string
-      portal: string
     }
   }
 
@@ -1378,15 +1374,6 @@ export interface Translations {
       activeBackend: string
       activeBackendHint: string
       useBackend: string
-      nousIncluded: string
-      nousAuthNeededTitle: string
-      nousAuthNeededMessage: (provider: string) => string
-      nousAuthSignIn: string
-      nousAuthDoneTitle: string
-      nousAuthDoneMessage: string
-      nousAuthFailed: string
-      nousAuthFailedMessage: string
-      nousAuthTryAgain: string
       noApiKeyRequired: string
       postSetupHint: (step: string) => string
       postSetupInstalledHint: string
@@ -2842,6 +2829,7 @@ export interface Translations {
   guidedGreeting: {
     line: string
     nameSuggestion: (name: string) => string
+    skipSetup: string
   }
   install: {
     stageStates: Record<string, string>

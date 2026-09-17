@@ -42,11 +42,30 @@ export function normalizeProfileKey(name: string | null | undefined): string {
   return value || 'default'
 }
 
+// Presentation-only aliases for compatibility profiles whose canonical keys
+// are part of runtime/session identity and therefore cannot be renamed safely.
+const PROFILE_PRESENTATION_ALIASES: Readonly<Record<string, string>> = {
+  'hermes-setup': 'Stardust'
+}
+
+export function profileNameLabel(name: string, displayName?: null | string): string {
+  const explicit = (displayName ?? '').trim()
+
+  if (explicit) {
+    return explicit
+  }
+
+  const canonical = normalizeProfileKey(name)
+
+  return PROFILE_PRESENTATION_ALIASES[canonical] ?? name
+}
+
 // Presentation-only label: the display_name from profile.yaml when set (e.g. a
-// renamed default profile), else the canonical name. Never used for
-// comparison or routing — canonical `name` remains the identity everywhere.
+// renamed default profile), else a compatibility-safe display alias/canonical
+// name. Never used for comparison or routing ? canonical `name` remains the
+// identity everywhere.
 export function profileLabel(profile: Pick<ProfileInfo, 'display_name' | 'name'>): string {
-  return (profile.display_name ?? '').trim() || profile.name
+  return profileNameLabel(profile.name, profile.display_name)
 }
 
 // The profile the running local backend is actually scoped to (mirrors

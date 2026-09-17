@@ -12,6 +12,7 @@ import {
   $setupSession,
   ensureSetupProfile,
   guideSourceConnectionId,
+  LEGACY_SETUP_CHAT_TITLES,
   SETUP_CHAT_TITLE,
   SETUP_PROFILE
 } from '@/components/onboarding-chat/setup-profile'
@@ -124,16 +125,36 @@ export function useOnboardingKickoff({
       const guideRequest: AmbientGatewayRequest = (method, params, timeout) =>
         requestGatewayForProfile(SETUP_PROFILE, method, params, timeout)
 
-      // Look the guide up by its exact title: a relaunch adopts the existing guide session before creating
-      // one, so the backend's UNIQUE(title) constraint cannot leave an untitled duplicate behind.
-      const registryHit = await guideRequest<{ sessions?: GuideSession[] }>('session.list', {
-        include_hidden: true,
-        title: SETUP_CHAT_TITLE
-      })
+      // Prefer the Stardust title, but adopt legacy Hermes installs instead of
+      // creating a duplicate. The display layer also aliases the legacy title
+      // immediately; this rename makes the durable backend converge too.
+      const titles = [SETUP_CHAT_TITLE, ...LEGACY_SETUP_CHAT_TITLES]
+      let canonical: GuideSession | undefined
+      let legacyTitle = false
 
-      const canonical = registryHit?.sessions?.[0]
+      for (const title of titles) {
+        const hit = await guideRequest<{ sessions?: GuideSession[] }>('session.list', {
+          include_hidden: true,
+          title
+        })
+
+        canonical = hit?.sessions?.[0]
+
+        if (canonical?.id) {
+          legacyTitle = title !== SETUP_CHAT_TITLE
+
+          break
+        }
+      }
 
       if (canonical?.id) {
+        if (legacyTitle) {
+          await guideRequest('session.title', {
+            session_id: canonical.resolved_id ?? canonical.id,
+            title: SETUP_CHAT_TITLE
+          }).catch(() => undefined)
+        }
+
         await adoptGuideSession(canonical, record.free_tier, resumeSession, guideRequest)
 
         // runGuideKickoff records the guided phase only after adoption.

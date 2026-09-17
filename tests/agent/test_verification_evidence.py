@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -356,3 +357,30 @@ def test_windows_backslash_ad_hoc_script_path_is_matched(tmp_path, monkeypatch):
     assert result is not None, (
         "Windows backslash path should be matched via posix=False fallback"
     )
+
+
+def test_workspace_edit_merge_reserves_writer_before_read(monkeypatch, tmp_path):
+    """Cross-process edit merges must not lose paths to deferred SELECT/UPSERT races."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    _python_project(tmp_path)
+
+    import agent.verification_evidence as evidence_module
+    import hermes_cli.sqlite_util as sqlite_util
+
+    real_transaction = sqlite_util.transaction
+    modes: list[bool] = []
+
+    @contextmanager
+    def recording_transaction(conn, *, immediate=False):
+        modes.append(bool(immediate))
+        with real_transaction(conn, immediate=immediate) as tx:
+            yield tx
+
+    monkeypatch.setattr(sqlite_util, "transaction", recording_transaction)
+    evidence_module.mark_workspace_edited(
+        session_id="s-race", cwd=tmp_path, paths=[str(tmp_path / "a.py")]
+    )
+    assert modes[-1] is True
+
+    evidence_module.verification_status(session_id="s-race", cwd=tmp_path)
+    assert modes[-1] is False

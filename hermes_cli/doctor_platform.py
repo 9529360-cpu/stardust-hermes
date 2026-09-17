@@ -377,6 +377,41 @@ def _check_security_advisories(should_fix: bool, f: Finding) -> None:
             check_warn(f"{h.package}=={h.installed_version} still installed (advisory {h.advisory.id} acknowledged)")
 
 
+@doctor_check("Host resource check failed: {e}")
+def _check_host_resources(should_fix: bool, f: Finding) -> None:
+    """Report disk/memory pressure using the same collectors as status and fleet monitoring."""
+    from gateway.disk_status import collect_disk_status
+    from gateway.memory_status import collect_memory_status
+
+    disk = collect_disk_status()
+    disk_pressure = str(disk.get("pressure") or "unknown")
+    disk_detail = f"({disk.get('free_mb', '?')} MB free, {disk.get('used_percent', '?')}% used)"
+    if disk_pressure == "critical":
+        check_fail("Disk pressure critical", disk_detail)
+        f.manual_issues.append("Free disk space on the Hermes host before continuing writes, backups, or upgrades.")
+    elif disk_pressure == "elevated":
+        check_warn("Disk pressure elevated", disk_detail)
+    elif disk_pressure == "ok":
+        check_ok("Disk pressure OK", disk_detail)
+    else:
+        check_info(f"Disk pressure unavailable {disk_detail}")
+
+    memory = collect_memory_status()
+    memory_pressure = str(memory.get("pressure") or "unknown")
+    memory_detail = (
+        f"({memory.get('system_available_mb', '?')} MB available, "
+        f"gateway RSS {memory.get('gateway_rss_mb', '?')} MB, swap used {memory.get('swap_used_mb', '?')} MB)"
+    )
+    if memory_pressure == "critical":
+        check_fail("Memory pressure critical", memory_detail)
+        f.manual_issues.append("Reduce host memory pressure or resize/restart the affected service before sustained operation.")
+    elif memory_pressure == "elevated":
+        check_warn("Memory pressure elevated", memory_detail)
+    elif memory_pressure == "ok":
+        check_ok("Memory pressure OK", memory_detail)
+    else:
+        check_info(f"Memory pressure unavailable {memory_detail}")
+
 @doctor_check()
 def _check_python_environment(should_fix: bool, f: Finding) -> None:
     """Interpreter, linked SQLite, venv, macOS TCC anchors/FDA/grants, version-file drift."""

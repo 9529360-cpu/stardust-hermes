@@ -131,11 +131,13 @@ def persist_personality(value: Any) -> bool:
     name = normalize_personality_name(value)
     try:
         from hermes_constants import get_hermes_home
+        from hermes_cli.config import config_mutation_scope
         from utils import atomic_roundtrip_yaml_update
 
         config_path = get_hermes_home() / "config.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_roundtrip_yaml_update(config_path, "display.personality", name)
+        with config_mutation_scope(config_path):
+            atomic_roundtrip_yaml_update(config_path, "display.personality", name)
         try:
             os.chmod(config_path, 0o600)
         except (OSError, NotImplementedError):

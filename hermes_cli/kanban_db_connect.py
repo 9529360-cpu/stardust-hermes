@@ -29,6 +29,10 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 
 _INITIALIZED_PATHS: set[str] = set()
+# File identity observed after a successful full init.  The path-only cache is
+# insufficient when backup/sync tooling atomically replaces kanban.db with a
+# different but still schema-bearing SQLite file while a gateway stays alive.
+_INITIALIZED_FILE_IDENTITIES: dict[str, tuple[int, int]] = {}
 _INIT_LOCK = threading.RLock()
 _SQLITE_HEADER = b"SQLite format 3\x00"
 DEFAULT_BUSY_TIMEOUT_MS = 120_000
@@ -52,6 +56,24 @@ def _resolve_busy_timeout_ms() -> int:
     long timeout lets WAL serialize writers instead of surfacing transient
     ``database is locked`` failures."""
     return _kb._env_int("HERMES_KANBAN_BUSY_TIMEOUT_MS", DEFAULT_BUSY_TIMEOUT_MS, minimum=1)
+
+
+def _db_file_identity(path: Path) -> Optional[tuple[int, int]]:
+    """Stable filesystem identity for replacement detection (device, inode).
+
+    Normal SQLite/WAL writes mutate bytes in place, so this stays constant; an
+    atomic restore/replacement gets a new identity.  ``None`` is fail-safe: a
+    cached path whose identity cannot be confirmed is revalidated.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    inode = int(getattr(stat, "st_ino", 0) or 0)
+    device = int(getattr(stat, "st_dev", 0) or 0)
+    if inode == 0:
+        return None
+    return device, inode
 
 
 def _sqlite_connect(path: Path) -> sqlite3.Connection:
@@ -345,8 +367,9 @@ def _prune_corrupt_backups(parent: Path, base_name: str, keep: Optional[Path] = 
 
 def _backup_corrupt_db(path: Path) -> Optional[Path]:
     """Copy a corrupt DB (and WAL/SHM sidecars) to a content-addressed backup.
-    The name is deterministic in the main DB's sha256, so repeated quarantines
-    of the same bytes reuse one backup while changed bytes get a separate one.
+    The name is deterministic in the recoverable DB state: main DB bytes plus
+    WAL bytes when present. Repeated quarantines of the same state reuse one
+    backup while a changed main file or WAL gets a separate one.
     Returns the main backup path, or ``None`` if the copy failed (the caller
     still raises loudly). Writes are confined to the DB's parent directory:
     the basename derives only from ``path.name`` + content hash."""
@@ -377,6 +400,22 @@ def _backup_corrupt_db(path: Path) -> Optional[Path]:
                 digest.update(chunk)
     except OSError:
         return None
+    # In WAL mode the main database can stay byte-for-byte unchanged while new
+    # committed rows live only in ``-wal``. Keying a forensic backup on the main
+    # file alone can therefore reuse an older WAL and omit the newest commits.
+    # ``-shm`` is intentionally excluded: it is a transient index SQLite can
+    # rebuild from the WAL and should not mint duplicate backups by itself.
+    wal_path = parent / (base_name + "-wal")
+    if wal_path.exists():
+        digest.update(b"\0hermes-wal\0")
+        try:
+            with wal_path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        except OSError:
+            # Keep this distinct from a no-WAL snapshot even when the sidecar
+            # cannot be read; the later copy remains best-effort as before.
+            digest.update(b"<unreadable>")
     candidate = parent / f"{base_name}.corrupt.{digest.hexdigest()[:16]}.bak"
     # Defensive: candidate must still be inside parent after construction.
     if candidate.parent != parent:
@@ -604,6 +643,7 @@ def repair_db(db_path: Optional[Path] = None, *, board: Optional[str] = None) ->
         # to re-probe instead of trusting the stale healthy-path cache.
         with _INIT_LOCK:
             _INITIALIZED_PATHS.discard(str(resolved))
+            _INITIALIZED_FILE_IDENTITIES.pop(str(resolved), None)
         return RepairResult(
             status="repaired" if repaired else "corrupt",
             db_path=resolved,
@@ -691,23 +731,44 @@ def connect(db_path: Optional[Path] = None, *, board: Optional[str] = None) -> s
     # nothing for it to protect (no schema/migration writes).
     resolved = str(path.resolve())
     if resolved in _INITIALIZED_PATHS:
-        conn, schema_present = _open_configured(path, _schema_is_present)
-        if schema_present:
-            return conn
-        # Cache says "initialized", file says otherwise: it was deleted or
-        # replaced under a live process and the open silently recreated an empty
-        # DB. Left alone, every query fails with "no such table: tasks" for the
-        # rest of the process's life. Drop the stale entry and re-init.
-        conn.close()
-        with _INIT_LOCK:
-            # Drop the stale cache entry and fall through to the full init path, which re-runs the header
-            # and integrity probes and the schema script under the cross-process lock. See #83445.
-            _INITIALIZED_PATHS.discard(resolved)
-        _kb._log.warning(
-            "kanban DB %s lost its schema after this process initialized it "
-            "(deleted or replaced externally); re-initializing.",
-            path,
-        )
+        current_identity = _db_file_identity(path)
+        cached_identity = _INITIALIZED_FILE_IDENTITIES.get(resolved)
+        if cached_identity is None or current_identity != cached_identity:
+            with _INIT_LOCK:
+                _INITIALIZED_PATHS.discard(resolved)
+                _INITIALIZED_FILE_IDENTITIES.pop(resolved, None)
+            _kb._log.warning(
+                "kanban DB %s changed file identity after this process initialized it; "
+                "re-running integrity checks and migrations.",
+                path,
+            )
+        else:
+            conn, schema_present = _open_configured(path, _schema_is_present)
+            # Re-read identity AFTER sqlite opens the path. A restore can land
+            # between the pre-check above and sqlite3.connect(); accepting that
+            # connection would let a schema-bearing legacy replacement bypass
+            # the full integrity/migration path until process restart.
+            opened_identity = _db_file_identity(path)
+            if schema_present and opened_identity == cached_identity:
+                return conn
+            conn.close()
+            with _INIT_LOCK:
+                # Drop the stale cache entry and fall through to the full init path, which re-runs the header
+                # and integrity probes and the schema script under the cross-process lock. See #83445.
+                _INITIALIZED_PATHS.discard(resolved)
+                _INITIALIZED_FILE_IDENTITIES.pop(resolved, None)
+            if schema_present:
+                _kb._log.warning(
+                    "kanban DB %s changed file identity while opening it; "
+                    "re-running integrity checks and migrations.",
+                    path,
+                )
+            else:
+                _kb._log.warning(
+                    "kanban DB %s lost its schema after this process initialized it "
+                    "(deleted or replaced externally); re-initializing.",
+                    path,
+                )
 
     with _cross_process_init_lock(path):
         # Read-only file/sidecar preflight first, so a stray read-only kanban.db
@@ -728,6 +789,11 @@ def connect(db_path: Optional[Path] = None, *, board: Optional[str] = None) -> s
                 conn.executescript(_kb.SCHEMA_SQL)
                 _migrate_add_optional_columns(conn)
                 _INITIALIZED_PATHS.add(resolved)
+                identity = _db_file_identity(path)
+                if identity is not None:
+                    _INITIALIZED_FILE_IDENTITIES[resolved] = identity
+                else:
+                    _INITIALIZED_FILE_IDENTITIES.pop(resolved, None)
 
         conn, _ = _open_configured(path, _init_if_needed)
     return conn
@@ -760,6 +826,7 @@ def init_db(db_path: Optional[Path] = None, *, board: Optional[str] = None) -> P
     # Clear the cache entry so connect() re-runs schema + migrations.
     with _INIT_LOCK:
         _INITIALIZED_PATHS.discard(str(path.resolve()))
+        _INITIALIZED_FILE_IDENTITIES.pop(str(path.resolve()), None)
     with contextlib.closing(connect(path)):
         pass
     return path

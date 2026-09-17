@@ -7,8 +7,7 @@ import { Loader } from '@/components/ui/loader'
 import { LogView } from '@/components/ui/log-view'
 import type { DesktopConnectionConfig } from '@/global'
 import { useI18n } from '@/i18n'
-import { openExternalLink } from '@/lib/external-link'
-import { ChevronLeft, ExternalLink, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench } from '@/lib/icons'
+import { ChevronLeft, FileText, Loader2, LogIn, RefreshCw, SlidersHorizontal, Wrench } from '@/lib/icons'
 import { $desktopBoot } from '@/store/boot'
 import { notify, notifyError } from '@/store/notifications'
 import { $desktopOnboarding } from '@/store/onboarding'
@@ -283,7 +282,7 @@ export function BootFailureOverlay() {
 
   let actions: RecoveryAction[]
   let hint: string
-  // The electron boot path flags a Nous Cloud backend-down (502/503/504) with
+  // The electron boot path can flag a legacy managed-cloud backend-down (502/503/504) with
   // the structured isCloudBackendDown/statusCode it carries through boot
   // progress. When set, the recovery screen leads with the cloud-specific
   // guidance instead of the generic remote-failure copy (#85335).
@@ -302,32 +301,11 @@ export function BootFailureOverlay() {
       localAction
     ]
     hint = copy.remoteSignInHint(label)
-  } else if (cloudDown) {
-    // A Nous Cloud agent is down — the user cannot restart the managed
-    // instance and Repair is local-only. Lead with the paths that actually
-    // resolve it: check the portal (status/instance controls), switch to the
-    // local gateway, retry, or get support on Discord. Portal/Discord are
-    // buttons (not URLs buried in the hint prose) so localized hints can't
-    // drift the links.
-    actions = [
-      {
-        key: 'portal',
-        label: copy.cloudDownCheckPortal,
-        onClick: () => openExternalLink('https://portal.nousresearch.com'),
-        icon: <ExternalLink />
-      },
-      localAction,
-      { ...retryAction, variant: 'secondary' },
-      {
-        key: 'discord',
-        label: copy.cloudDownDiscord,
-        onClick: () => openExternalLink('https://discord.gg/NousResearch'),
-        variant: 'ghost'
-      },
-      { ...settingsAction, variant: 'ghost' }
-    ]
-    hint = copy.cloudDownHint
-  } else if (remoteFailure) {
+  } else if (cloudDown || remoteFailure) {
+    // Legacy managed-cloud connections are treated exactly like any other
+    // unreachable remote gateway. Stardust no longer sends users to a
+    // first-party account/portal; recovery stays inside gateway settings,
+    // retry, or the bundled local backend.
     actions = [settingsAction, { ...retryAction, variant: 'secondary' }, localAction]
     hint = copy.remoteFailureHint
   } else {
@@ -389,10 +367,10 @@ export function BootFailureOverlay() {
           <ErrorIcon className="mt-0.5" size="1.25rem" />
           <div>
             <h2 className="text-[0.9375rem] font-semibold tracking-tight">
-              {remoteReauth ? copy.remoteTitle : cloudDown ? copy.cloudDownTitle : copy.title}
+              {remoteReauth ? copy.remoteTitle : copy.title}
             </h2>
             <p className="mt-1 text-[0.8125rem] leading-5 text-(--ui-text-tertiary)">
-              {remoteReauth ? copy.remoteDescription : cloudDown ? copy.cloudDownDescription : copy.description}
+              {remoteReauth ? copy.remoteDescription : copy.description}
             </p>
           </div>
         </div>

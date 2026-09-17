@@ -102,3 +102,31 @@ def test_child_env_for_served_profile_drops_launch_profile_settings(two_homes):
         reset_hermes_home_override(home_token)
     assert env["TERMINAL_ENV"] == "docker"
     assert env["HERMES_MODEL"] == "default-model"
+
+
+def test_cron_script_for_served_profile_drops_launch_profile_settings(two_homes):
+    """The production script runner must use the same served-profile child-env contract."""
+    import json
+    from cron.scheduler_script import _run_job_script
+
+    _root, alpha = two_homes
+    scripts = alpha / "scripts"
+    scripts.mkdir(exist_ok=True)
+    (scripts / "env_probe.py").write_text(
+        "import json, os\n"
+        "print(json.dumps({key: os.getenv(key) for key in "
+        "['HERMES_HOME','HERMES_MODEL','TERMINAL_ENV','TERMINAL_DOCKER_IMAGE','HERMES_LANGUAGE','HERMES_CRON_TIMEOUT']}))\n",
+        encoding="utf-8",
+    )
+
+    token = set_secret_scope(build_profile_secret_scope(alpha))
+    try:
+        success, output = _run_job_script("env_probe.py")
+    finally:
+        reset_secret_scope(token)
+
+    assert success is True
+    child = json.loads(output)
+    assert child["HERMES_HOME"] == str(alpha)
+    for key in ("HERMES_MODEL", "TERMINAL_ENV", "TERMINAL_DOCKER_IMAGE", "HERMES_LANGUAGE", "HERMES_CRON_TIMEOUT"):
+        assert child[key] is None, (key, child[key])

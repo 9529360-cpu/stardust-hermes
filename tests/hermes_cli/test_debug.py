@@ -134,7 +134,7 @@ class TestCaptureLogSnapshot:
         # backward-reading loop so the truncation path actually fires.
         line = "A" * 99 + "\n"  # 100 bytes per line
         num_lines = 200  # 20000 bytes
-        (hermes_home / "logs" / "agent.log").write_text(line * num_lines)
+        (hermes_home / "logs" / "agent.log").write_bytes((line * num_lines).encode("utf-8"))
 
         # max_bytes = 1000 = 100 * 10 → cut at byte 20000 - 1000 = 19000,
         # and byte 19000 - 1 is '\n'.  Boundary hit → keep all 10 lines.
@@ -1129,3 +1129,47 @@ class TestShareConsentGate:
         mock_upload.assert_not_called()
         assert "Aborted" not in capsys.readouterr().out
 
+
+
+def test_debug_upload_redaction_scrubs_url_credentials():
+    """Upload-bound diagnostics must use strict URL credential redaction."""
+    from hermes_cli.debug import _redact_log_text
+
+    secret = "OpaqueAccessToken123456789"
+    text = (
+        "callback=https://alice:SuperSecretPassword@example.com/path"
+        f"?access_token={secret}&page=2"
+    )
+
+    redacted = _redact_log_text(text)
+
+    assert "SuperSecretPassword" not in redacted
+    assert secret not in redacted
+    assert "https://alice:***@example.com/path" in redacted
+    assert "access_token=***" in redacted
+    assert "page=2" in redacted
+
+
+def test_share_bundle_redacts_dump_text_at_upload_boundary(monkeypatch):
+    """The system dump must be scrubbed just like captured log text."""
+    from hermes_cli import debug
+
+    secret = "sk-proj-DumpSecret1234567890abcdef"
+    url_secret = "DumpAccessToken1234567890"
+    monkeypatch.setattr(
+        debug,
+        "_capture_dump",
+        lambda: (
+            f"OPENAI_API_KEY={secret}\n"
+            f"endpoint=https://alice:pw@example.com/api?access_token={url_secret}&page=2\n"
+        ),
+    )
+    monkeypatch.setattr(debug, "_capture_default_log_snapshots", lambda *_a, **_k: {
+        name: debug.LogSnapshot(path=None, tail_text="ok", full_text=None)
+        for name in debug._REPORT_LOGS
+    })
+
+    joined = "\n".join(debug.collect_share_bundle(log_lines=5, redact=True).values())
+    assert secret not in joined
+    assert url_secret not in joined
+    assert "access_token=***" in joined

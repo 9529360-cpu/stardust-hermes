@@ -134,3 +134,64 @@ def test_monitoring_docs_distinguish_relay_health_scope_and_terminal_flush():
     assert "authoritative shared connector/platform state" in text
     assert "up to one second" in text
     assert "terminal" in text
+
+
+def test_runtime_snapshot_exports_host_resource_pressure(monkeypatch):
+    """Fleet health must expose the same coarse disk/memory pressure the local status surface has."""
+    from agent.monitoring import gateway_health_export
+    from agent.monitoring.gateway_health import GatewayMetric
+
+    gateway_snapshot = type("S", (), {
+        "metrics": [GatewayMetric("hermes.gateway.up", 1, {"service.instance.id": "sha256:test"})],
+        "events": [],
+    })()
+    cron_snapshot = type("S", (), {"metrics": [], "events": []})()
+    monkeypatch.setattr(gateway_health_export, "_read_gateway_snapshot", lambda config: gateway_snapshot)
+    monkeypatch.setattr(gateway_health_export, "_read_cron_snapshot", lambda: cron_snapshot)
+    monkeypatch.setattr(gateway_health_export, "_read_background_work_count", lambda: 0)
+    monkeypatch.setattr(gateway_health_export, "_read_background_delegations_count", lambda: 0)
+    monkeypatch.setattr(
+        "gateway.disk_status.collect_disk_status",
+        lambda: {"pressure": "critical", "free_mb": 123, "used_percent": 97.5, "total_mb": 4096},
+    )
+    monkeypatch.setattr(
+        "gateway.memory_status.collect_memory_status",
+        lambda: {
+            "pressure": "elevated",
+            "system_available_mb": 456,
+            "gateway_rss_mb": 321,
+            "swap_used_mb": 12,
+        },
+    )
+
+    metrics = {m.name: m for m in gateway_health_export._read_runtime_snapshot({}).metrics}
+
+    assert metrics["hermes.host.disk.pressure_level"].value == 2
+    assert metrics["hermes.host.disk.free_mb"].value == 123
+    assert metrics["hermes.host.disk.used_percent"].value == 97.5
+    assert metrics["hermes.host.memory.pressure_level"].value == 1
+    assert metrics["hermes.host.memory.available_mb"].value == 456
+    assert metrics["hermes.host.memory.gateway_rss_mb"].value == 321
+    assert metrics["hermes.host.memory.swap_used_mb"].value == 12
+    assert metrics["hermes.host.disk.free_mb"].attributes["service.instance.id"] == "sha256:test"
+
+
+def test_runtime_snapshot_exports_pending_process_completions(monkeypatch):
+    """A stuck notification drain must be remotely visible without imposing a product threshold."""
+    from agent.monitoring import gateway_health_export
+    from agent.monitoring.gateway_health import GatewayMetric
+
+    snapshot = type("S", (), {
+        "metrics": [GatewayMetric("hermes.gateway.up", 1, {})],
+        "events": [],
+    })()
+    monkeypatch.setattr(gateway_health_export, "_read_gateway_snapshot", lambda config: snapshot)
+    monkeypatch.setattr(gateway_health_export, "_read_cron_snapshot", lambda: type("S", (), {"metrics": []})())
+    monkeypatch.setattr(gateway_health_export, "_read_background_work_count", lambda: 0)
+    monkeypatch.setattr(gateway_health_export, "_read_background_delegations_count", lambda: 0)
+    monkeypatch.setattr(gateway_health_export, "_read_process_completion_queue_depth", lambda: 7, raising=False)
+    monkeypatch.setattr(gateway_health_export, "_read_host_resource_metrics", lambda base: [])
+
+    metrics = {m.name: m.value for m in gateway_health_export._read_runtime_snapshot({}).metrics}
+
+    assert metrics["hermes.gateway.process_completions_pending"] == 7
