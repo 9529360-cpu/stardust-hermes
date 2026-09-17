@@ -68,18 +68,16 @@ def test_unknown_extensible_write_actions_fail_toward_confirmation():
         assert decision.level == permissions.CONFIRM, action
         assert decision.rule_key.startswith("stardust:external-write:calendar_plugin"), action
 
-    # Known Stardust/local surfaces retain execute-then-notify semantics even when they use
-    # a verb that would be consequential on an unknown external tool.
     local = permissions.classify_tool_permission("desktop_project", {"action": "create"})
     assert local.level == permissions.NOTIFY
 
-    # An unknown read-like operation stays non-interrupting.
     read = permissions.classify_tool_permission("calendar_plugin", {"action": "search_events"})
     assert read.level == permissions.ALLOW
 
 
-def test_plugin_rewrite_is_classified_before_execution(monkeypatch):
-    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-1")
+def test_plugin_rewrite_is_classified_before_interactive_approval(monkeypatch):
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    tokens = set_session_vars(platform="", source="desktop")
     monkeypatch.setattr(lifecycle, "_observe", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         lifecycle,
@@ -88,12 +86,14 @@ def test_plugin_rewrite_is_classified_before_execution(monkeypatch):
             {"action": "modify", "args": {"action": "send_message"}}
         ],
     )
-
-    results = lifecycle.invoke_hook(
-        "pre_tool_call",
-        tool_name="discord",
-        args={"action": "fetch_messages"},
-    )
+    try:
+        results = lifecycle.invoke_hook(
+            "pre_tool_call",
+            tool_name="discord",
+            args={"action": "fetch_messages"},
+        )
+    finally:
+        clear_session_vars(tokens)
 
     assert results[0]["action"] == "modify"
     assert results[-1]["action"] == "approve"
@@ -101,7 +101,8 @@ def test_plugin_rewrite_is_classified_before_execution(monkeypatch):
 
 
 def test_plugin_rewrite_to_read_stays_unprompted(monkeypatch):
-    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-1")
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    tokens = set_session_vars(platform="", source="desktop")
     monkeypatch.setattr(lifecycle, "_observe", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         lifecycle,
@@ -110,16 +111,20 @@ def test_plugin_rewrite_to_read_stays_unprompted(monkeypatch):
             {"action": "modify", "args": {"action": "fetch_messages"}}
         ],
     )
-    results = lifecycle.invoke_hook(
-        "pre_tool_call", tool_name="discord", args={"action": "send_message"}
-    )
+    try:
+        results = lifecycle.invoke_hook(
+            "pre_tool_call", tool_name="discord", args={"action": "send_message"}
+        )
+    finally:
+        clear_session_vars(tokens)
     assert results == [{"action": "modify", "args": {"action": "fetch_messages"}}]
 
 
-def test_permission_directive_reuses_existing_approval_gate(monkeypatch):
+def test_interactive_permission_directive_reuses_existing_approval_gate(monkeypatch):
     from hermes_cli import plugins
 
-    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-1")
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    tokens = set_session_vars(platform="", source="desktop")
     monkeypatch.setattr(lifecycle, "_observe", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(lifecycle, "_plugin_hooks", lambda *_args, **_kwargs: [])
     seen = {}
@@ -129,11 +134,54 @@ def test_permission_directive_reuses_existing_approval_gate(monkeypatch):
         return {"approved": True}
 
     monkeypatch.setattr("tools.approval.request_tool_approval", approve)
-    block, modified = plugins._dispatch_pre_tool_call_hooks(
-        "send_message", {"target": "client", "message": "hello"}
-    )
+    try:
+        block, modified = plugins._dispatch_pre_tool_call_hooks(
+            "send_message", {"target": "client", "message": "hello"}
+        )
+    finally:
+        clear_session_vars(tokens)
 
     assert block is None
     assert modified is None
     assert seen["tool_name"] == "send_message"
     assert seen["rule_key"].startswith("stardust:external-write:send_message")
+
+
+def test_durable_worker_permission_uses_durable_handoff(monkeypatch):
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-1")
+    monkeypatch.setattr(permissions, "_durable_worker_confirmation_active", lambda: True)
+    seen = {}
+
+    class Result:
+        allowed = False
+        message = "BLOCKED: durable approval apr-test"
+
+    def handoff(tool_name, args, *, reason, rule_key):
+        seen.update(tool_name=tool_name, args=args, reason=reason, rule_key=rule_key)
+        return Result()
+
+    monkeypatch.setattr("tools.background_task_approval.authorize_or_block_current_worker", handoff)
+    directive = permissions.pre_tool_call_directive(
+        "send_message", {"target": "client", "message": "hello"}
+    )
+
+    assert directive == {"action": "block", "message": "BLOCKED: durable approval apr-test"}
+    assert seen["tool_name"] == "send_message"
+    assert seen["rule_key"].startswith("stardust:external-write:send_message")
+
+
+def test_durable_worker_exact_grant_allows_without_process_local_approval(monkeypatch):
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-1")
+    monkeypatch.setattr(permissions, "_durable_worker_confirmation_active", lambda: True)
+
+    class Result:
+        allowed = True
+        message = ""
+
+    monkeypatch.setattr(
+        "tools.background_task_approval.authorize_or_block_current_worker",
+        lambda *args, **kwargs: Result(),
+    )
+    assert permissions.pre_tool_call_directive(
+        "send_message", {"target": "client", "message": "approved"}
+    ) is None
