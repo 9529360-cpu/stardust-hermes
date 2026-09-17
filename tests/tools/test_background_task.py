@@ -1,9 +1,29 @@
 import json
+from pathlib import Path
+
+import pytest
 
 from hermes_cli import assistant_permissions as permissions
+from hermes_cli import kanban_db as kb
+from hermes_cli import kanban_db_connect as kbc
 from tools import background_task as bt
 from tools.registry import registry
 from toolsets import resolve_toolset
+
+
+@pytest.fixture
+def kanban_home(tmp_path, monkeypatch):
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    db_path = kb.kanban_db_path(board="default")
+    kb._INITIALIZED_PATHS.discard(str(db_path.resolve()))
+    identities = getattr(kb, "_INITIALIZED_FILE_IDENTITIES", None)
+    if identities is not None:
+        identities.pop(str(db_path.resolve()), None)
+    kb.init_db()
+    return home
 
 
 def test_start_defaults_assignee_and_surfaces_delivery_truth(monkeypatch):
@@ -96,6 +116,31 @@ def test_cancel_uses_kernel_cancel_path(monkeypatch):
         "status": "archived",
         "cancelled": True,
     }
+
+
+def test_cancel_archives_real_durable_task(kanban_home):
+    with kbc.connect_closing() as conn:
+        task_id = kb.create_task(conn, title="Long task", assignee="default")
+        assert kb.get_task(conn, task_id).status != "archived"
+
+    result = json.loads(bt._cancel_task(task_id))
+    assert result["ok"] is True
+    assert result["cancelled"] is True
+    assert result["status"] == "archived"
+
+    with kbc.connect_closing() as conn:
+        assert kb.get_task(conn, task_id).status == "archived"
+
+
+def test_cancel_is_idempotent_for_already_archived_task(kanban_home):
+    with kbc.connect_closing() as conn:
+        task_id = kb.create_task(conn, title="Cancel twice", assignee="default")
+        assert kb.archive_task(conn, task_id)
+
+    result = json.loads(bt._cancel_task(task_id))
+    assert result["ok"] is True
+    assert result["cancelled"] is False
+    assert result["already_cancelled"] is True
 
 
 def test_invalid_background_task_requests_fail_before_dispatch(monkeypatch):
