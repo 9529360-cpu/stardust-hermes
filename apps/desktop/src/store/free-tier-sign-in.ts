@@ -83,11 +83,17 @@ const fail = (kind: FreeTierSignInFailure, message: null | string = null) => {
   set({ kind, message: message?.trim() || null, status: 'failed' })
 }
 
-/** Every entry point calls this — Settings › Billing, the statusbar chip, the
- *  first-launch intro. It only records the intent; the mounted host owns the
- *  gateway requester and drives the flow. Re-entrant by design: a second click
- *  while a sign-in is already on screen must not restart it. */
+/** Every legacy entry point used to call this — Settings › Billing, the
+ *  statusbar chip, and the first-launch intro. Stardust Desktop has retired the
+ *  inherited built-in Nous account, so a renderer with the Desktop preload
+ *  bridge must never turn one of those stale entry points into an account flow.
+ *  Non-Desktop hosts keep the old behavior temporarily while the shared
+ *  compatibility surface is retired separately. */
 export function openFreeTierSignIn() {
+  if (window.hermesDesktop) {
+    return
+  }
+
   if ($freeTierSignIn.get().status === 'closed') {
     set({ status: 'requested' })
   }
