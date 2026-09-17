@@ -20,11 +20,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from agent.prompt_builder import (
     DEFAULT_AGENT_IDENTITY, EXECUTION_GUIDANCE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
     HERMES_AGENT_HELP_GUIDANCE, HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS, KANBAN_GUIDANCE,
-    PARALLEL_TOOL_CALL_GUIDANCE, PERSONAL_ASSISTANT_ORCHESTRATION_GUIDANCE, PLATFORM_HINTS,
+    PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS,
     SESSION_SEARCH_GUIDANCE, SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE,
     TELEGRAM_RICH_MESSAGES_HINT,
     TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, drain_truncation_warnings,
 )
+from agent.personal_assistant_guidance import PERSONAL_ASSISTANT_ORCHESTRATION_GUIDANCE
 from agent import prompt_builder as _pb
 from agent.runtime_cwd import resolve_context_cwd
 from hermes_constants import get_default_hermes_root, get_hermes_home
@@ -284,9 +285,9 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
             skill_manage_available="skill_manage" in names,
         )
     # Worker guidance is keyed to the session-static runtime identity captured by agent_init,
-    # never inferred from tool presence: the desktop coordinator intentionally has Kanban tools.
+    # never inferred from tool presence. The desktop coordinator intentionally exposes product facades only.
     _kanban_guidance = getattr(agent, "_kanban_worker_guidance", "")
-    orchestration_tools = {"kanban_create", "kanban_list", "todo_list", "delegate_task"}
+    orchestration_tools = {"background_task", "background_task_graph", "todo_list", "delegate_task"}
     personal_orchestration_guidance = (
         PERSONAL_ASSISTANT_ORCHESTRATION_GUIDANCE
         if not _kanban_guidance and orchestration_tools.issubset(names)
