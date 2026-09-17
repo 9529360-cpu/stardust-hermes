@@ -20,8 +20,14 @@ def kanban_toolset_requested() -> Optional[bool]:
 
 @contextmanager
 def scoped_kanban_toolset_selection(toolsets: Optional[Iterable[str]]) -> Iterator[None]:
-    """An all/default selection is not an explicit workflow opt-in."""
-    token = _requested.set("kanban" in (toolsets or ()))
+    """An all/default selection is not an explicit workflow opt-in.
+
+    ``assistant_orchestration`` is the desktop coordinator surface: it exposes only
+    orchestrator-safe Kanban tools, while the full ``kanban`` toolset remains the
+    worker/operator surface.
+    """
+    selected = set(toolsets or ())
+    token = _requested.set(bool({"kanban", "assistant_orchestration"} & selected))
     try:
         yield
     finally:

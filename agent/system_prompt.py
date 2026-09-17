@@ -20,8 +20,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from agent.prompt_builder import (
     DEFAULT_AGENT_IDENTITY, EXECUTION_GUIDANCE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
     HERMES_AGENT_HELP_GUIDANCE, HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS, KANBAN_GUIDANCE,
-    PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS, SESSION_SEARCH_GUIDANCE,
-    SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TELEGRAM_RICH_MESSAGES_HINT,
+    PARALLEL_TOOL_CALL_GUIDANCE, PERSONAL_ASSISTANT_ORCHESTRATION_GUIDANCE, PLATFORM_HINTS,
+    SESSION_SEARCH_GUIDANCE, SKILLS_GUIDANCE, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE,
+    TELEGRAM_RICH_MESSAGES_HINT,
     TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, drain_truncation_warnings,
 )
 from agent import prompt_builder as _pb
@@ -282,15 +283,20 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
             getattr(agent, "_user_profile_enabled", True),
             skill_manage_available="skill_manage" in names,
         )
-    # Kanban lifecycle: resolved once at __init__ (_kanban_worker_guidance);
-    # the kanban_show fallback covers code paths that bypass agent_init.
-    _kanban_guidance = getattr(agent, "_kanban_worker_guidance", None)
-    if _kanban_guidance is None and "kanban_show" in names:
-        _kanban_guidance = KANBAN_GUIDANCE
+    # Worker guidance is keyed to the session-static runtime identity captured by agent_init,
+    # never inferred from tool presence: the desktop coordinator intentionally has Kanban tools.
+    _kanban_guidance = getattr(agent, "_kanban_worker_guidance", "")
+    orchestration_tools = {"kanban_create", "kanban_list", "todo_list", "delegate_task"}
+    personal_orchestration_guidance = (
+        PERSONAL_ASSISTANT_ORCHESTRATION_GUIDANCE
+        if not _kanban_guidance and orchestration_tools.issubset(names)
+        else None
+    )
     tool_guidance = [
         memory_guidance,
         SESSION_SEARCH_GUIDANCE if "session_search" in names else None,
         SKILLS_GUIDANCE if "skill_manage" in names else None,
+        personal_orchestration_guidance,
         _kanban_guidance,
     ]
     return " ".join(g for g in tool_guidance if g) or None

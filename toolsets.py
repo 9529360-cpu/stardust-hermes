@@ -129,6 +129,12 @@ TOOLSETS = {
     "session_search": _ts("Search and recall past conversations with summarization", ["session_search"]),
     "connections": _ts("Remote connector discovery, execution, and account authorization", ["manage_connections"]),
     "project": _ts("Desktop Projects — create/switch named workspaces (GUI sessions only)", ["desktop_project"]),
+    "assistant_orchestration": _ts(
+        "Personal-assistant orchestration — inspect, create, link, unblock, and annotate durable "
+        "background tasks without exposing worker-owned lifecycle transitions",
+        ["kanban_show", "kanban_list", "kanban_create", "kanban_link", "kanban_unblock",
+         "kanban_comment", "kanban_attachments"],
+    ),
     "bot_room": _ts("Verified text-only Group Chat turn capabilities"),
 
     # GUI-renderer affordances, enabled per desktop-sourced SESSION by the GUI

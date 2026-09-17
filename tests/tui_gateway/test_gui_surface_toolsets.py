@@ -85,6 +85,10 @@ class TestSurfaceResolution:
         for platform in ("desktop", "tui"):
             assert "project" in server._gui_surface_toolsets(platform)
 
+    def test_personal_agent_orchestration_is_desktop_only(self, no_desktop_env):
+        assert "assistant_orchestration" in server._gui_surface_toolsets("desktop")
+        assert "assistant_orchestration" not in server._gui_surface_toolsets("tui")
+
 
 class TestResolverPlumbing:
     def test_posture_path_folds_in_the_session_surface(self, no_desktop_env):
@@ -94,6 +98,7 @@ class TestResolverPlumbing:
         no_desktop_env.setattr(cc, "coding_selection", lambda **_: ["coding"])
 
         assert server._load_enabled_toolsets("desktop") == [
+            "assistant_orchestration",
             "coding",
             "desktop_ui",
             "project",
@@ -114,7 +119,9 @@ class TestResolverPlumbing:
 
         assert desktop is not None and tui is not None
         assert "desktop_ui" in desktop
+        assert "assistant_orchestration" in desktop
         assert "desktop_ui" not in tui
+        assert "assistant_orchestration" not in tui
 
     def test_explicit_env_pin_still_wins(self, no_desktop_env):
         """HERMES_TUI_TOOLSETS is an operator override; surface can't re-add."""

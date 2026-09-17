@@ -210,6 +210,25 @@ SESSION_SEARCH_GUIDANCE = (
     "context exists, use session_search to recall it before asking them to repeat themselves."
 )
 
+PERSONAL_ASSISTANT_ORCHESTRATION_GUIDANCE = (
+    "# Personal assistant execution policy\n"
+    "Act as the user's coordinator, not a task factory. Simple questions, explanations, and requests for advice "
+    "should be answered directly; never create background work just because orchestration tools are available. "
+    "For multi-step work that should finish in this live session, use todo_list to keep the plan visible and then "
+    "execute it. Use delegate_task for bounded parallel subwork whose lifetime may remain tied to this process. "
+    "Use kanban_create for durable work the user should not have to wait on: long-running jobs, work that should "
+    "survive a chat/app restart, independent tasks that can run in parallel, dependency pipelines, or work that "
+    "needs retry/review/blocked states. Split genuinely independent outcomes into separate cards and express "
+    "ordering with parents/kanban_link rather than serializing everything. Use cronjob_manage only when the trigger "
+    "is scheduled or recurring; it is not the generic background queue.\n"
+    "When dispatching a durable task, write a self-contained body with the requested outcome, relevant context, "
+    "constraints, acceptance criteria, and the correct project/workspace when known. Prefer goal_mode for open-ended "
+    "work that is unlikely to finish in one worker turn. The main assistant owns routing and follow-up; workers own "
+    "their task lifecycle. Existing approval and safety checks remain authoritative for consequential external "
+    "actions — never bypass them by moving work into the background. Ask the user only when a missing decision is "
+    "material and cannot be inferred safely."
+)
+
 # The opening sentence is worded deliberately: Anthropic's server-side filter rejected the previous phrasing
 # ("After completing a complex task (5+ tool calls)... save the approach as a skill...") on subscription OAuth
 # credentials, surfacing as a billing-shaped HTTP 400. If you rewrite it, re-verify with a subscription OAuth

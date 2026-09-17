@@ -1813,10 +1813,17 @@ def _load_tool_progress_mode() -> str:
 
 
 def _gui_surface_toolsets(platform: str) -> set[str]:
-    """Toolsets that exist because of the CLIENT (both off ``_HERMES_CORE_TOOLS``; this is the one gate).
+    """Toolsets that exist because of the CLIENT (off ``_HERMES_CORE_TOOLS``; this is the one gate).
     ``platform`` is the SESSION's source, never a process env var: the desktop may drive a URL/cloud
-    backend where ``HERMES_DESKTOP`` is unset (AGENTS.md surface rule)."""
-    return {"project", "desktop_ui"} if platform == "desktop" else {"project"}
+    backend where ``HERMES_DESKTOP`` is unset (AGENTS.md surface rule).
+
+    Desktop is also the personal-agent control surface, so it gets the narrow
+    orchestrator-only durable-task toolset. TUI keeps Projects without silently
+    gaining background task authority.
+    """
+    if platform == "desktop":
+        return {"project", "desktop_ui", "assistant_orchestration"}
+    return {"project"}
 
 
 def _tui_notice(text: str) -> None:
