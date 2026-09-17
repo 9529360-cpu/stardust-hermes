@@ -18,6 +18,30 @@ def test_desktop_source_activates_permission_policy(monkeypatch):
         clear_session_vars(tokens)
 
 
+def test_desktop_coordinator_redirects_low_level_durable_task_tools(monkeypatch):
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    tokens = set_session_vars(platform="", source="desktop")
+    try:
+        for tool_name in ("kanban_create", "kanban_show", "kanban_list", "kanban_link", "kanban_unblock"):
+            directive = permissions.pre_tool_call_directive(tool_name, {})
+            assert directive is not None, tool_name
+            assert directive["action"] == "block", tool_name
+            assert "background_task" in directive["message"], tool_name
+    finally:
+        clear_session_vars(tokens)
+
+
+def test_durable_worker_keeps_low_level_task_protocol(monkeypatch):
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-1")
+    tokens = set_session_vars(platform="", source="desktop")
+    try:
+        # Worker protocol tools are internal state mutations/reads, not coordinator redirects.
+        assert permissions.pre_tool_call_directive("kanban_show", {}) is None
+        assert permissions.pre_tool_call_directive("kanban_complete", {"summary": "done"}) is None
+    finally:
+        clear_session_vars(tokens)
+
+
 def test_non_assistant_surface_keeps_legacy_behavior(monkeypatch):
     monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
     tokens = set_session_vars(platform="", source="cli")
