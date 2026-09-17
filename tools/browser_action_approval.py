@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 @dataclass(frozen=True)
 class BrowserClickRisk:
     requires_approval: bool
+    resolved: bool = False
     context_sha256: str = ""
     reason: str = ""
     rule_key: str = ""
@@ -105,8 +106,9 @@ def _risk_from_identity(ref: str, role: str, name: str, url: str) -> BrowserClic
     role = str(role or "").strip().lower()
     name = str(name or "").strip()
     url = str(url or "").strip()
-    if not clean or not role or not _looks_consequential(name):
-        return BrowserClickRisk(False, role=role, name=name, url=url)
+    resolved = bool(clean and role and name)
+    if not resolved or not _looks_consequential(name):
+        return BrowserClickRisk(False, resolved=resolved, role=role, name=name, url=url)
 
     material = json.dumps(
         {"ref": clean.lower(), "role": role, "name": name, "url": url},
@@ -119,6 +121,7 @@ def _risk_from_identity(ref: str, role: str, name: str, url: str) -> BrowserClic
     )
     return BrowserClickRisk(
         True,
+        resolved=True,
         context_sha256=context_sha256,
         reason=reason,
         rule_key=f"stardust:browser-external-write:click:{context_sha256[:20]}",
@@ -139,8 +142,7 @@ def inspect_controller_snapshot(payload: Any, ref: Any) -> BrowserClickRisk:
     """Classify a browser-extension snapshot response.
 
     Controllers may return either the same text snapshot as legacy backends or a structured
-    ``refs`` list. Both are accepted; opaque/string-only ref lists intentionally classify as
-    unknown rather than inventing an accessible name.
+    ``refs`` list. Both are accepted; opaque/string-only ref lists intentionally remain unresolved.
     """
     if isinstance(payload, str):
         try:
@@ -154,7 +156,7 @@ def inspect_controller_snapshot(payload: Any, ref: Any) -> BrowserClickRisk:
     snapshot = str(data.get("snapshot") or payload.get("snapshot") or "")
     if snapshot:
         risk = inspect_snapshot_click(snapshot, ref, url=url)
-        if risk.role or risk.name:
+        if risk.resolved:
             return risk
 
     clean = _clean_ref(ref).lower()
@@ -175,7 +177,7 @@ def inspect_controller_snapshot(payload: Any, ref: Any) -> BrowserClickRisk:
         role = str(item.get("role") or item.get("type") or "").strip().lower()
         name = str(item.get("name") or item.get("label") or item.get("text") or "").strip()
         return _risk_from_identity(clean, role, name, url)
-    return BrowserClickRisk(False, url=url)
+    return BrowserClickRisk(False, resolved=False, url=url)
 
 
 def _snapshot_non_camofox(task_id: Optional[str]) -> tuple[str, str]:
@@ -255,6 +257,11 @@ def guard_browser_click_with_probe(
         return None
 
     first = probe()
+    if not first.resolved:
+        return _blocked_payload(
+            "BLOCKED: Stardust could not verify the current browser element behind this ref. Refresh the browser snapshot and retry the click.",
+            status="blocked",
+        )
     if not first.requires_approval:
         return None
 
@@ -294,7 +301,8 @@ def guard_browser_click_with_probe(
     # Re-snapshot immediately before the click. Any semantic drift invalidates the approval.
     second = probe()
     if (
-        not second.requires_approval
+        not second.resolved
+        or not second.requires_approval
         or not second.context_sha256
         or second.context_sha256 != first.context_sha256
     ):
