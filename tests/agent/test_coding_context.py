@@ -243,6 +243,25 @@ class TestRuntimeMode:
         assert mode.toolset_selection() is None
         assert mode.system_blocks() == []
 
+    def test_desktop_code_workspace_keeps_answer_first_intent_boundary(self, tmp_path):
+        _git_init(tmp_path)
+        mode = cc.resolve_runtime_mode(platform="desktop", cwd=tmp_path, config={})
+
+        assert mode.is_coding is True
+        brief = mode.system_blocks()[0]
+        assert "You are a coding agent" in brief
+        assert "Stardust Desktop intent boundary:" in brief
+        assert "A code workspace is context, not a request to modify it." in brief
+        assert "Questions, explanations, code review, research, writing, brainstorming, and planning are answer-first tasks." in brief
+        assert "Explicit requests to implement, fix, change, refactor, debug, test, build" in brief
+
+    def test_cli_code_workspace_does_not_receive_desktop_intent_boundary(self, tmp_path):
+        _git_init(tmp_path)
+        mode = cc.resolve_runtime_mode(platform="cli", cwd=tmp_path, config={})
+
+        assert mode.is_coding is True
+        assert "Stardust Desktop intent boundary:" not in mode.system_blocks()[0]
+
 
 
 

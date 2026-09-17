@@ -88,6 +88,25 @@ reads/writes a stored pointer), `canonical-chat-creation.test.ts`, `canonical-ch
 `bot-row-opens-canonical-chat.test.ts`, `hide-bot-chats.test.ts`; plus repo-root
 `tests/tui_gateway/test_profiles_list_canonical_session.py`.
 
+## Project context is not implementation permission
+
+Stardust Desktop stays coding-aware inside repositories, but repository context alone never authorizes
+implementation. The coding posture may expose project facts, coding/project tools, and engineering workflow
+guidance while still behaving as a general assistant. Preserve this distinction:
+
+- Questions, explanations, code review, research, writing, brainstorming, and planning are answer-first.
+  Read-only repository inspection is allowed when it improves the answer.
+- File edits, worktree creation, mutating terminal commands, builds/tests run as part of implementation, and
+  other repository changes require an explicit execution intent from the user or an already-established
+  implementation task in the conversation.
+- Explicit requests to implement, fix, change, refactor, debug, test, build, or otherwise modify the project
+  are execution tasks: take ownership, use the coding workflow, and validate the result.
+- Do not solve over-eager execution by removing Desktop from coding-context detection or stripping coding tools.
+  The product must remain a strong coding agent when asked; the boundary belongs in intent handling.
+
+The runtime seam is `agent/coding_context.py`; tests in `tests/agent/test_coding_context.py` lock the
+Desktop-only intent boundary while keeping CLI behavior unchanged.
+
 ## Built-in Nous account / guest free tier is retired on Stardust Desktop
 
 Stardust Desktop is a user-controlled assistant and coding workbench. It must not mint, advertise,

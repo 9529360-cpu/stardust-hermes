@@ -135,6 +135,19 @@ _TODO_SENTENCE = (
     "`path:line` instead of pasting whole files."
 )
 _NO_TODO_SENTENCE = "- Reference code as `path:line` instead of pasting whole files."
+
+DESKTOP_CODING_INTENT_GUIDANCE = (
+    "Stardust Desktop intent boundary:\n"
+    "- A code workspace is context, not a request to modify it. Do not start implementation merely because "
+    "the current working directory is a repository.\n"
+    "- Questions, explanations, code review, research, writing, brainstorming, and planning are answer-first tasks. "
+    "Use read-only inspection when it helps, but do not edit files, create worktrees, or run mutating implementation "
+    "commands unless the user asks for execution.\n"
+    "- Explicit requests to implement, fix, change, refactor, debug, test, build, or otherwise modify the project are "
+    "execution tasks. For those, take ownership and follow the engineering workflow above through validation.\n"
+    "- If intent is genuinely ambiguous and the conversation does not establish an implementation request, stay "
+    "answer-first rather than silently crossing into repository mutation."
+)
 # Clearly non-coding skill categories (deny-list; coding-adjacent and custom ones keep full entries).
 _NON_CODING_SKILL_CATEGORIES = (
     "apple", "communication", "cooking", "creative", "email", "finance", "gaming", "gifs", "health", "media",
@@ -342,6 +355,8 @@ class RuntimeMode:
             family = _model_family(self.model)
             if family is not None:
                 brief = f"{brief}\n{_EDIT_FORMAT_GUIDANCE[family][1]}"
+            if self.surface.strip().lower() == "desktop":
+                brief = f"{brief}\n\n{DESKTOP_CODING_INTENT_GUIDANCE}"
             prefix.append(brief)
         workspace = build_coding_workspace_block(self.cwd) if workspace_block is None else workspace_block
         trailing = [f"Operator instructions (from config):\n{self.instructions}"] if self.instructions else []
