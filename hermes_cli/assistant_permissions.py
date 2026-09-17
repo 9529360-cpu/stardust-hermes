@@ -1,0 +1,211 @@
+"""First-party permission policy for Stardust personal-assistant execution.
+
+This module classifies tool calls into three product-level postures:
+
+``allow``   - read-only / planning work may run silently.
+``notify``  - reversible local or Stardust-internal mutations may run, but belong in the completion report.
+``confirm`` - consequential external effects must cross the existing human approval gate first.
+
+The policy is intentionally narrow in v1: it is active for Desktop personal-assistant sessions and
+for durable Kanban worker lineages. Existing tool-specific safety checks (notably terminal dangerous-
+command approval) remain authoritative and are not duplicated here.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+from dataclasses import dataclass
+from typing import Any, Mapping, Optional
+
+ALLOW = "allow"
+NOTIFY = "notify"
+CONFIRM = "confirm"
+
+
+@dataclass(frozen=True)
+class PermissionDecision:
+    level: str
+    reason: str
+    rule_key: str = ""
+
+
+_READ_ACTIONS = frozenset({
+    "get", "read", "list", "search", "find", "fetch", "query", "inspect", "preview",
+    "status", "show", "describe", "lookup", "check", "history", "details", "info",
+})
+_EXTERNAL_WRITE_ACTIONS = frozenset({
+    "send", "send_message", "reply", "reply_message", "post", "publish", "comment",
+    "add_comment", "create", "update", "edit", "upload", "share", "invite", "react",
+})
+_DESTRUCTIVE_ACTIONS = frozenset({
+    "delete", "remove", "destroy", "revoke", "uninstall", "disconnect", "leave", "kick",
+    "ban", "archive", "purge", "clear", "reset", "cancel",
+})
+_FINANCIAL_ACTIONS = frozenset({
+    "buy", "purchase", "order", "pay", "transfer", "withdraw", "trade", "sell", "subscribe",
+})
+
+# These are mutations of local files, local execution, or Stardust-owned durable state. They should
+# not interrupt the user with an approval card, but the assistant should report them when it finishes.
+_NOTIFY_TOOLS = frozenset({
+    "write_file", "patch", "skill_manage", "memory", "terminal", "process_manage", "execute_code",
+    "delegate_task", "cronjob_manage", "desktop_project", "computer_use", "browser_navigate",
+    "browser_click", "browser_type", "browser_scroll", "browser_back", "browser_press",
+    "browser_dialog", "browser_cdp", "spotify_playback", "spotify_queue", "spotify_library",
+    "kanban_create", "kanban_link", "kanban_unblock", "kanban_comment", "kanban_complete",
+    "kanban_block", "kanban_request_review", "kanban_request_changes", "kanban_heartbeat",
+    "kanban_attach", "kanban_attach_url",
+})
+
+# Tool identity alone proves a consequential external effect. Multipurpose tools such as ``discord``
+# and ``manage_connections`` are handled below from their action argument.
+_CONFIRM_TOOLS = frozenset({
+    "ha_call_service", "discord_admin", "send_message", "yb_send_dm", "yb_send_sticker",
+    "feishu_drive_reply_comment", "feishu_drive_add_comment", "browser_vault_fill",
+    "browser_vault_save_login", "browser_vault_enter_code",
+})
+
+_EFFECT_NAME_FRAGMENTS = (
+    "send_", "_send_", "reply_", "_reply_", "add_comment", "publish_", "_publish_",
+    "delete_", "_delete_", "remove_", "_remove_", "revoke_", "_revoke_",
+    "transfer_", "_transfer_", "purchase_", "_purchase_", "pay_", "_pay_",
+)
+
+
+def _normalize(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
+
+
+def _action(args: Mapping[str, Any]) -> str:
+    for key in ("action", "operation", "op", "verb", "method"):
+        value = args.get(key)
+        if value is not None and str(value).strip():
+            return _normalize(value)
+    return ""
+
+
+def _session_platform() -> str:
+    try:
+        from gateway.session_context import get_session_env
+
+        return _normalize(get_session_env("HERMES_SESSION_PLATFORM", ""))
+    except Exception:
+        return _normalize(os.environ.get("HERMES_SESSION_PLATFORM", ""))
+
+
+def personal_assistant_permissions_active() -> bool:
+    """Whether the first-party personal-assistant permission policy owns this call.
+
+    Desktop is the interactive coordinator surface. A Kanban task marker activates the same policy
+    for the whole durable worker lineage so moving work into the background cannot weaken safety.
+    Other inherited CLI/TUI/messaging surfaces keep their established behavior for compatibility.
+    """
+    return _session_platform() == "desktop" or bool(os.environ.get("HERMES_KANBAN_TASK"))
+
+
+def _decision(level: str, reason: str, category: str = "", tool_name: str = "", action: str = "") -> PermissionDecision:
+    parts = ["stardust", category, _normalize(tool_name), _normalize(action)]
+    rule_key = ":".join(p for p in parts if p) if level == CONFIRM else ""
+    return PermissionDecision(level=level, reason=reason, rule_key=rule_key)
+
+
+def _connector_decision(tool_name: str, action: str) -> PermissionDecision:
+    """Dynamic connector tools are external by definition; unknown mutations fail toward confirmation."""
+    if action in _READ_ACTIONS:
+        return _decision(ALLOW, "Read-only connector operation.")
+    category = "connector-write"
+    if action in _DESTRUCTIVE_ACTIONS:
+        category = "destructive"
+    elif action in _FINANCIAL_ACTIONS:
+        category = "financial"
+    return _decision(
+        CONFIRM,
+        f"Stardust wants to run an external connector action via {tool_name}; confirm before it changes data outside Stardust.",
+        category, tool_name, action or "unknown",
+    )
+
+
+def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] = None) -> PermissionDecision:
+    """Classify one fully-resolved tool call without performing any side effect."""
+    name = _normalize(tool_name)
+    values: Mapping[str, Any] = args if isinstance(args, Mapping) else {}
+    action = _action(values)
+
+    if name.startswith("connectors__"):
+        return _connector_decision(name, action)
+
+    # Stardust's own task graph is internal durable state. Mutations are visible/reportable, not a
+    # reason to interrupt the user with approval every time the coordinator decomposes work.
+    if name.startswith("kanban_"):
+        if name in {"kanban_show", "kanban_list", "kanban_attachments"}:
+            return _decision(ALLOW, "Read-only durable task inspection.")
+        return _decision(NOTIFY, "Updates Stardust's durable task state; proceed and report the change.")
+
+    if name == "manage_connections":
+        if action in _READ_ACTIONS or action in {"", "list_connections"}:
+            return _decision(ALLOW, "Reads connection/account status only.")
+        return _decision(
+            CONFIRM,
+            "Stardust wants to change an external account connection or authorization; confirm first.",
+            "account", name, action or "change",
+        )
+
+    if name == "discord":
+        if action in _READ_ACTIONS or action in {"search_members", "fetch_messages", "fetch_channel", "list_channels"}:
+            return _decision(ALLOW, "Reads Discord data only.")
+        if action:
+            return _decision(
+                CONFIRM,
+                f"Stardust wants to perform the external Discord action '{action}'; confirm before publishing or changing remote state.",
+                "external-write", name, action,
+            )
+        return _decision(NOTIFY, "Discord action is unspecified; keep it visible in the completion report.")
+
+    if name == "cronjob_manage":
+        if action in _READ_ACTIONS or action in {"list_jobs"}:
+            return _decision(ALLOW, "Reads scheduled-task state only.")
+        return _decision(NOTIFY, "Changes Stardust's own schedule; proceed and report the schedule change.")
+
+    if name in _CONFIRM_TOOLS:
+        category = "physical" if name == "ha_call_service" else "external-write"
+        return _decision(
+            CONFIRM,
+            f"Stardust wants to perform a consequential external action with {tool_name}; confirm first.",
+            category, name, action,
+        )
+
+    if any(fragment in name for fragment in _EFFECT_NAME_FRAGMENTS):
+        return _decision(
+            CONFIRM,
+            f"Stardust wants to change external state with {tool_name}; confirm first.",
+            "external-write", name, action,
+        )
+
+    if action in _DESTRUCTIVE_ACTIONS:
+        return _decision(
+            CONFIRM,
+            f"Stardust wants to perform the destructive action '{action}' with {tool_name}; confirm first.",
+            "destructive", name, action,
+        )
+    if action in _FINANCIAL_ACTIONS:
+        return _decision(
+            CONFIRM,
+            f"Stardust wants to perform the financial action '{action}' with {tool_name}; confirm first.",
+            "financial", name, action,
+        )
+
+    if name in _NOTIFY_TOOLS:
+        return _decision(NOTIFY, "Changes local or Stardust-owned state; proceed and report the result.")
+
+    return _decision(ALLOW, "No consequential side effect is identified by the first-party policy.")
+
+
+def pre_tool_call_directive(tool_name: str, args: Optional[Mapping[str, Any]] = None) -> Optional[dict[str, str]]:
+    """Return a ``pre_tool_call`` approval directive for high-risk personal-assistant calls."""
+    if not personal_assistant_permissions_active():
+        return None
+    decision = classify_tool_permission(tool_name, args)
+    if decision.level != CONFIRM:
+        return None
+    return {"action": "approve", "message": decision.reason, "rule_key": decision.rule_key}
