@@ -31,15 +31,12 @@ def scoped_kanban_toolset_selection(toolsets: Optional[Iterable[str]]) -> Iterat
 
     ``kanban`` is the worker/operator kernel surface. ``assistant_orchestration`` is the Desktop
     coordinator surface. They may both be selected by an explicitly technical surface, but neither
-    selection implies the other. ``None`` remains an unscoped discovery context rather than an opt-in.
+    selection implies the other. During a schema pass, ``None`` means no explicit workflow opt-in and
+    therefore binds both flags to False; only callers outside schema assembly observe the default None.
     """
-    if toolsets is None:
-        kanban_selected: Optional[bool] = None
-        assistant_selected: Optional[bool] = None
-    else:
-        selected = {str(name).strip() for name in toolsets if str(name).strip()}
-        kanban_selected = "kanban" in selected
-        assistant_selected = "assistant_orchestration" in selected
+    selected = {str(name).strip() for name in (toolsets or ()) if str(name).strip()}
+    kanban_selected = "kanban" in selected
+    assistant_selected = "assistant_orchestration" in selected
 
     kanban_token = _kanban_requested.set(kanban_selected)
     assistant_token = _assistant_requested.set(assistant_selected)
