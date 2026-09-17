@@ -268,7 +268,72 @@ def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] =
     return _decision(ALLOW, "No consequential side effect is identified by the first-party policy.")
 
 
-def pre_tool_call_directive(tool_name: str, args: Optional[Mapping[str, Any]] = None) -> Optional[dict[str, str]]:
+def _durable_terminal_directive(
+    args: Optional[Mapping[str, Any]],
+    *,
+    tool_call_id: str,
+) -> Optional[dict[str, str]]:
+    """Pause recoverably-dangerous background terminal work and arm one exact retry after consent."""
+    from tools.background_terminal_approval import inspect_terminal_approval
+
+    requirement = inspect_terminal_approval(args)
+    if requirement.block_message:
+        return {"action": "block", "message": requirement.block_message}
+    if not requirement.requires_approval:
+        return None
+    if not str(tool_call_id or "").strip():
+        return {
+            "action": "block",
+            "message": (
+                "BLOCKED: Stardust cannot bind this terminal approval to an exact tool call identity. "
+                "The command was not executed."
+            ),
+        }
+
+    try:
+        from tools.background_task_approval import authorize_or_block_current_worker
+
+        result = authorize_or_block_current_worker(
+            "terminal",
+            args,
+            reason=requirement.reason,
+            rule_key=requirement.rule_key,
+        )
+    except Exception:
+        return {
+            "action": "block",
+            "message": (
+                "BLOCKED: Stardust could not persist the required background terminal approval. "
+                "The command was not executed; do not retry through another route."
+            ),
+        }
+    if not result.allowed:
+        return {"action": "block", "message": result.message}
+
+    # The durable grant was fingerprinted against these resolved args. Execution middleware is forbidden
+    # from rewriting args after the Stardust permission gate, and the terminal guard consumes this call-id
+    # grant exactly once after its unconditional safety floor.
+    try:
+        from tools.approval_context import arm_exact_tool_call_approval
+
+        arm_exact_tool_call_approval(tool_call_id)
+    except Exception:
+        return {
+            "action": "block",
+            "message": (
+                "BLOCKED: Stardust could not bind the approved terminal action to this execution. "
+                "The command was not executed; request approval again."
+            ),
+        }
+    return None
+
+
+def pre_tool_call_directive(
+    tool_name: str,
+    args: Optional[Mapping[str, Any]] = None,
+    *,
+    tool_call_id: str = "",
+) -> Optional[dict[str, str]]:
     """Resolve the first-party permission/routing decision into an execution directive."""
     if not personal_assistant_permissions_active():
         return None
@@ -283,6 +348,15 @@ def pre_tool_call_directive(tool_name: str, args: Optional[Mapping[str, Any]] = 
                 "get one stable background-work contract rather than Kanban/worker internals."
             ),
         }
+
+    # Terminal commands retain their existing safety engine. In a durable one-shot worker there is no
+    # process-local human to answer that engine, so recoverable warnings are handed to the task ledger;
+    # an approved exact retry is then armed for this tool-call id only. Unconditional terminal floors
+    # are never made user-approvable by this bridge.
+    if normalized_name == "terminal" and _durable_worker_confirmation_active():
+        terminal_directive = _durable_terminal_directive(args, tool_call_id=tool_call_id)
+        if terminal_directive is not None:
+            return terminal_directive
 
     decision = classify_tool_permission(tool_name, args)
     if decision.level != CONFIRM:
