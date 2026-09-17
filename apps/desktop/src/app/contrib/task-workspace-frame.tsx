@@ -54,8 +54,8 @@ export function TaskWorkspaceFrame({ children }: { children: ReactNode }) {
   const normalizedCwd = cwd.replace(/[/\\]+$/, '')
   const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? 'No project'
   const changedFiles = repoStatus?.files ?? []
-  const added = changedFiles.reduce((sum, file) => sum + file.added, 0)
-  const removed = changedFiles.reduce((sum, file) => sum + file.removed, 0)
+  const added = repoStatus?.added ?? 0
+  const removed = repoStatus?.removed ?? 0
 
   return (
     <section className="flex h-full min-h-0 flex-col" data-task-workspace="">
