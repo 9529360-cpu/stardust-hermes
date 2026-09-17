@@ -1,19 +1,20 @@
 name: "🔧 Setup / Installation Help"
-description: Having trouble installing or configuring Hermes? Ask here.
+description: Having trouble installing or configuring Stardust? Ask here.
 title: "[Setup]: "
 labels: ["setup"]
 body:
   - type: markdown
     attributes:
       value: |
-        Sorry you're having trouble! Please fill out the details below so we can help.
+        Please fill out the details below so the failing stage can be identified without changing the installation underneath it.
 
         **Quick checks first:**
-        - Run `hermes debug share` and paste the links in the Debug Report section below
-        - If you're in a chat session, you can use `/debug` instead — it does the same thing
-        - Try `hermes update` to get the latest version
-        - Check the [README troubleshooting section](https://github.com/NousResearch/hermes-agent#troubleshooting)
-        - For general questions, consider the [Nous Research Discord](https://discord.gg/NousResearch) for faster help
+        - Run `hermes doctor` if the CLI is available
+        - Record `hermes version`; for source installs also record `git rev-parse --short HEAD`
+        - If more detail is needed, run `hermes debug share --local` and review the output before posting it
+        - Check the [Stardust README](https://github.com/9529360-cpu/stardust-hermes/blob/main/README.md)
+
+        Stardust's inherited `hermes update` path is intentionally disabled while the project uses its pinned/local release policy. Do **not** update from the upstream Hermes repository as a troubleshooting step.
 
   - type: textarea
     id: description
@@ -21,8 +22,7 @@ body:
       label: What's Going Wrong?
       description: Describe what you're trying to do and where it fails.
       placeholder: |
-        I ran `hermes setup` and selected Nous Portal, but when I try to
-        start the gateway I get...
+        I ran the Stardust installer, reached the model/setup stage, and then...
     validations:
       required: true
 
@@ -32,10 +32,11 @@ body:
       label: Steps Taken
       description: What did you do? Include the exact commands you ran.
       placeholder: |
-        1. Ran the install script: `curl -fsSL ... | bash`
-        2. Ran `hermes setup` and chose "Quick setup"
-        3. Selected OpenRouter, entered API key
-        4. Ran `hermes chat` and got error...
+        1. Ran the Stardust install command from this repository
+        2. Ran `hermes setup`
+        3. Selected provider/model ...
+        4. Started the desktop app / `hermes chat`
+        5. Error appeared: ...
     validations:
       required: true
 
@@ -44,9 +45,10 @@ body:
     attributes:
       label: Installation Method
       options:
-        - Install script (curl | bash)
+        - Stardust install script (curl | bash)
+        - Stardust PowerShell installer (Windows)
+        - Desktop bootstrap installer
         - Manual clone + pip/uv install
-        - PowerShell installer (Windows)
         - Docker
         - Other
     validations:
@@ -70,33 +72,38 @@ body:
   - type: input
     id: hermes-version
     attributes:
-      label: Hermes Version
+      label: Stardust / Hermes Runtime Version
       description: Output of `hermes version` (if install got that far)
-      placeholder: "2.1.0"
+      placeholder: "0.21.3"
+
+  - type: input
+    id: source-revision
+    attributes:
+      label: Source Revision (if running from a checkout)
+      description: Output of `git rev-parse --short HEAD`
+      placeholder: "abcdef1"
 
   - type: textarea
-    id: debug-report
+    id: diagnostics
     attributes:
-      label: Debug Report
+      label: Local Diagnostics
       description: |
-        Run `hermes debug share` from your terminal and paste the links it prints here.
-        This uploads your system info, config, and recent logs to a paste service automatically.
-
-        If you're in an interactive chat session, you can also use the `/debug` slash command — it does the same thing.
-
-        If the upload fails or install didn't get that far, run `hermes debug share --local` and paste the output directly.
-        If even that doesn't work, run `hermes doctor` and paste that output instead.
+        Paste the relevant output from `hermes doctor` and, when needed, `hermes debug share --local`.
+        Review it first and remove API keys, tokens, cookies, private prompts, or unrelated personal data.
+        An explicit diagnostics upload offered by the desktop app is optional and is not required for Stardust support.
       placeholder: |
-        Report   https://paste.rs/abc123
-        agent.log   https://paste.rs/def456
-        gateway.log   https://paste.rs/ghi789
+        hermes doctor:
+        ...
+
+        hermes debug share --local:
+        ...
       render: shell
 
   - type: textarea
     id: error-output
     attributes:
       label: Full Error Output
-      description: Paste the complete error message or traceback. This will be auto-formatted.
+      description: Paste the complete relevant error message or traceback after removing secrets.
       render: shell
     validations:
       required: true
@@ -107,6 +114,6 @@ body:
       label: What I've Already Tried
       description: List any fixes or workarounds you've already attempted.
       placeholder: |
-        - Ran `hermes update`
-        - Tried reinstalling with `pip install -e ".[all]"`
-        - Checked that OPENROUTER_API_KEY is set in ~/.hermes/.env
+        - Re-ran `hermes doctor`
+        - Re-ran the Stardust installer at the same source revision
+        - Verified the provider credential is configured
