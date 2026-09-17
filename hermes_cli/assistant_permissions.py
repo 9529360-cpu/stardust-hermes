@@ -58,6 +58,16 @@ _NOTIFY_TOOLS = frozenset({
     "kanban_attach", "kanban_attach_url",
 })
 
+# The Desktop coordinator owns product-level ``background_task`` semantics. These names remain
+# registered for the durable kernel, workers, CLI/dashboard compatibility, and explicitly technical
+# surfaces, but a normal Desktop turn must not bypass the facade and leak Kanban/worker concepts.
+_LOW_LEVEL_COORDINATION_TOOLS = frozenset({
+    "kanban_show", "kanban_list", "kanban_create", "kanban_link", "kanban_unblock",
+    "kanban_comment", "kanban_attachments", "kanban_attach", "kanban_attach_url",
+    "kanban_complete", "kanban_block", "kanban_request_review", "kanban_request_changes",
+    "kanban_heartbeat",
+})
+
 # Tool identity alone proves a consequential external effect. Multipurpose tools such as ``discord``
 # and ``manage_connections`` are handled below from their action argument.
 _CONFIRM_TOOLS = frozenset({
@@ -108,6 +118,11 @@ def _session_identities() -> tuple[str, str]:
 def personal_assistant_permissions_active() -> bool:
     """Whether the first-party personal-assistant permission policy owns this call."""
     return "desktop" in _session_identities() or bool(os.environ.get("HERMES_KANBAN_TASK"))
+
+
+def _desktop_coordinator_active() -> bool:
+    """Interactive Desktop coordinator, excluding every durable worker lineage."""
+    return "desktop" in _session_identities() and not bool(os.environ.get("HERMES_KANBAN_TASK"))
 
 
 def _durable_worker_confirmation_active() -> bool:
@@ -245,9 +260,21 @@ def classify_tool_permission(tool_name: str, args: Optional[Mapping[str, Any]] =
 
 
 def pre_tool_call_directive(tool_name: str, args: Optional[Mapping[str, Any]] = None) -> Optional[dict[str, str]]:
-    """Resolve the first-party permission decision into an execution directive."""
+    """Resolve the first-party permission/routing decision into an execution directive."""
     if not personal_assistant_permissions_active():
         return None
+
+    normalized_name = _normalize(tool_name)
+    if _desktop_coordinator_active() and normalized_name in _LOW_LEVEL_COORDINATION_TOOLS:
+        return {
+            "action": "block",
+            "message": (
+                "BLOCKED: this is a low-level durable-task kernel operation. The Desktop personal assistant must use "
+                "background_task instead (start/status/list/comment/resume/cancel/approvals/approve/deny), so users "
+                "get one stable background-work contract rather than Kanban/worker internals."
+            ),
+        }
+
     decision = classify_tool_permission(tool_name, args)
     if decision.level != CONFIRM:
         return None
