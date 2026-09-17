@@ -56,6 +56,11 @@ export function FreeTierNoticeStrip() {
   const { requestGateway } = useGatewayRequest()
   const { t } = useI18n()
   const copy = t.freeTier
+  const desktop = typeof window !== 'undefined' && Boolean(window.hermesDesktop)
+
+  if (desktop) {
+    return null
+  }
 
   const consume = (after?: () => void) => {
     void ackFreeTierNotice(requestGateway)
