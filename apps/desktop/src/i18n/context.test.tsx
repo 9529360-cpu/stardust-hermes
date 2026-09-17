@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { HermesConfigRecord } from '@/hermes'
 
-import { type I18nConfigClient, I18nProvider, useI18n } from './context'
+import { TRANSLATIONS } from './catalog'
+import { type I18nConfigClient, I18nProvider, normalizeStardustProductCopy, useI18n } from './context'
 import type { Locale } from './types'
 
 function LanguageProbe({ target = 'zh' }: { target?: Locale }) {
@@ -28,6 +29,16 @@ describe('I18nProvider', () => {
   afterEach(() => {
     cleanup()
     vi.restoreAllMocks()
+  })
+
+  it('normalizes inherited SSH recovery copy to Stardust without renaming the compatibility path', () => {
+    const copy = normalizeStardustProductCopy(TRANSLATIONS.en).settings.gateway
+
+    expect(copy.sshErrNotInstalled).toContain('Stardust is not installed')
+    expect(copy.sshErrNotInstalled).toContain('install-stardust.sh')
+    expect(copy.sshErrNotInstalled).toContain('set the Hermes path')
+    expect(copy.sshErrNotInstalled).not.toContain('hermes-agent.nousresearch.com')
+    expect(copy.sshErrPlatform).toContain('Stardust Desktop')
   })
 
   it('defaults to English without a config client', () => {
