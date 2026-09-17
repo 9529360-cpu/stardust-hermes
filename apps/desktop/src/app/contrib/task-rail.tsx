@@ -93,7 +93,7 @@ function matches(session: SessionInfo, query: string): boolean {
     return true
   }
 
-  return [sessionTitle(session), session.model, session.cwd, session.provider]
+  return [sessionTitle(session), session.model, session.cwd, session.source, session.profile]
     .filter(Boolean)
     .join(' ')
     .toLocaleLowerCase()
