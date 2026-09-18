@@ -44,6 +44,16 @@ def repair():
     return AIAgent._repair_tool_call.__get__(stub, AIAgent)
 
 
+class TestLegacyAliases:
+    def test_legacy_todo_alias_maps_to_registered_todo_list(self):
+        from run_agent import AIAgent
+
+        stub = SimpleNamespace(valid_tool_names={"todo_list", "terminal"})
+        repair = AIAgent._repair_tool_call.__get__(stub, AIAgent)
+
+        assert repair("todo") == "todo_list"
+
+
 class TestExistingBehaviorStillWorks:
     """Pre-existing repairs must keep working (no regressions)."""
 

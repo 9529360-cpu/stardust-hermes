@@ -2352,6 +2352,16 @@ def repair_tool_call(agent, tool_name: str) -> str | None:
     normalized = _norm(tool_name)
     if normalized in agent.valid_tool_names:
         return normalized
+
+    # Legacy aliases must be canonicalized before validation rejects them. The
+    # actual dispatcher also owns this table, but validation runs earlier than
+    # dispatch; without this bridge a mixed batch such as `todo` + `terminal`
+    # drops the todo call while still executing the valid terminal call.
+    from model_tools import _LEGACY_TOOL_ALIASES
+
+    legacy_name = _LEGACY_TOOL_ALIASES.get(lowered) or _LEGACY_TOOL_ALIASES.get(normalized)
+    if legacy_name in agent.valid_tool_names:
+        return legacy_name
     cands: set[str] = {tool_name, lowered, normalized, _camel_snake(tool_name)}
     for _ in range(2):  # strip trailing tool-suffix up to twice (TodoTool_tool needs it)
         extra: set[str] = set()
