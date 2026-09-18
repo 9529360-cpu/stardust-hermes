@@ -61,6 +61,9 @@ const PILL_TONE: Record<StatusTone, string> = {
 const stateLabel = (state: null | string | undefined, m: Translations['messaging']) =>
   state ? m.states[state] || state.replace(/_/g, ' ') : m.unknown
 
+const platformDescription = (platform: MessagingPlatformInfo, m: Translations['messaging']) =>
+  m.platformDescriptions[platform.id] || platform.description
+
 function stateTone({ enabled, state }: MessagingPlatformInfo): StatusTone {
   if (!enabled) {
     return 'muted'
@@ -322,11 +325,11 @@ export function MessagingView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
     }
 
     return platforms.filter(platform =>
-      [platform.id, platform.name, platform.description, platform.state]
+      [platform.id, platform.name, platformDescription(platform, m), platform.description, platform.state]
         .filter(Boolean)
         .some(value => String(value).toLowerCase().includes(q))
     )
-  }, [platforms, query])
+  }, [m, platforms, query])
 
   async function handleToggle(platform: MessagingPlatformInfo, enabled: boolean) {
     setSaving(`enabled:${platform.id}`)
@@ -703,7 +706,7 @@ function PlatformDetail({
             )}
           </div>
           <p className="mt-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
-            {platform.description}
+            {platformDescription(platform, m)}
           </p>
           <PlatformHint platform={platform} />
         </div>

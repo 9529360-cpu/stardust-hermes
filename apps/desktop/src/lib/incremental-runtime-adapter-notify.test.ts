@@ -26,11 +26,14 @@
  * for observable state changes, not for object-identity churn of the adapter
  * literal — the render loop is impossible once no-op swaps are silent.
  */
-import { fromThreadMessageLike, getAutoStatus } from '@assistant-ui/core/internal'
+import { AssistantRuntimeImpl, fromThreadMessageLike, getAutoStatus } from '@assistant-ui/core/internal'
 import type { ExportedMessageRepository, ExternalStoreAdapter, ThreadMessage } from '@assistant-ui/react'
 import { describe, expect, it } from 'vitest'
 
-import { IncrementalExternalStoreRuntimeCore } from './incremental-external-store-runtime'
+import {
+  IncrementalExternalStoreRuntimeCore,
+  stabilizeThreadListSnapshot
+} from './incremental-external-store-runtime'
 
 const STATUS = getAutoStatus(false, false, false, false, undefined)
 
@@ -166,5 +169,26 @@ describe('IncrementalExternalStoreThreadRuntimeCore adapter swap notifications',
     core.setAdapter(adapterWith(repo))
 
     expect(depth).toBe(0)
+  })
+})
+
+describe('IncrementalExternalStoreRuntime thread-list snapshot stability', () => {
+  it('keeps equivalent disconnected snapshots referentially stable while still exposing real changes', () => {
+    const repo = repositoryOf([message('a', 'one')])
+    const core = new IncrementalExternalStoreRuntimeCore(adapterWith(repo))
+    const runtime = stabilizeThreadListSnapshot(new AssistantRuntimeImpl(core))
+
+    const first = runtime.threads.getState()
+    const second = runtime.threads.getState()
+
+    expect(second).toBe(first)
+
+    core.threads.__internal_setAdapter({ threadId: 'session-next' })
+
+    const changed = runtime.threads.getState()
+
+    expect(changed).not.toBe(first)
+    expect(changed.mainThreadId).toBe('session-next')
+    expect(runtime.threads.getState()).toBe(changed)
   })
 })

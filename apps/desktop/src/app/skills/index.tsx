@@ -119,9 +119,16 @@ const usageOf = (skill: SkillInfo): number => (typeof skill.usage === 'number' ?
 
 const categoryFor = (skill: SkillInfo): string => asText(skill.category) || 'general'
 
+function presentedSkillCategory(value: string | undefined, labels: Record<string, string>): string {
+  const category = asText(value) || 'general'
+  const key = category.trim().toLowerCase().replace(/\s+/g, '-')
+
+  return labels[key] || prettyName(category)
+}
+
 // Row subtitle: category, with non-default origins badged.
-function skillSubtitle(skill: SkillInfo): React.ReactNode {
-  const category = prettyName(categoryFor(skill))
+function skillSubtitle(skill: SkillInfo, labels: Record<string, string>): React.ReactNode {
+  const category = presentedSkillCategory(categoryFor(skill), labels)
   const provenance = skill.provenance
 
   return (
@@ -173,11 +180,29 @@ function filteredOfficial(skills: OfficialSkillInfo[], query: string): OfficialS
 const toolsetCalls = (toolset: ToolsetInfo, toolCalls: Record<string, number>): number =>
   toolNames(toolset).reduce((sum, name) => sum + (toolCalls[name] ?? 0), 0)
 
+function capabilitySummary(value: string): string {
+  const text = value.trim().replace(/\s+/g, ' ')
+
+  if (text.length <= 180) {
+    return text
+  }
+
+  return `${text.slice(0, 176).trimEnd()}…`
+}
+
+const presentedToolsetLabel = (toolset: ToolsetInfo, labels: Record<string, string>): string =>
+  labels[toolset.name] || toolsetDisplayLabel(toolset)
+
+const presentedToolsetDescription = (toolset: ToolsetInfo, descriptions: Record<string, string>): string =>
+  descriptions[toolset.name] || asText(toolset.description)
+
 function filteredToolsets(
   toolsets: ToolsetInfo[],
   query: string,
   toolCalls: Record<string, number>,
-  desc: boolean
+  desc: boolean,
+  labels: Record<string, string>,
+  descriptions: Record<string, string>
 ): ToolsetInfo[] {
   const q = normalize(query)
   const sign = desc ? 1 : -1
@@ -194,7 +219,8 @@ function filteredToolsets(
 
       return (
         includesQuery(toolset.name, q) ||
-        includesQuery(toolsetDisplayLabel(toolset), q) ||
+        includesQuery(presentedToolsetLabel(toolset, labels), q) ||
+        includesQuery(presentedToolsetDescription(toolset, descriptions), q) ||
         includesQuery(toolset.description, q) ||
         toolNames(toolset).some(name => includesQuery(name, q))
       )
@@ -202,7 +228,7 @@ function filteredToolsets(
     .sort(
       (a, b) =>
         sign * (toolsetCalls(b, toolCalls) - toolsetCalls(a, toolCalls)) ||
-        toolsetDisplayLabel(a).localeCompare(toolsetDisplayLabel(b))
+        presentedToolsetLabel(a, labels).localeCompare(presentedToolsetLabel(b, labels))
     )
 }
 
@@ -466,8 +492,18 @@ export function SkillsView({
   const runningInstalls = useMemo(() => new Set(runningInstallKey.split('|').filter(Boolean)), [runningInstallKey])
 
   const visibleToolsets = useMemo(
-    () => (toolsets ? filteredToolsets(toolsets, query, toolCalls ?? {}, toolsetsSortDesc) : []),
-    [query, toolCalls, toolsets, toolsetsSortDesc]
+    () =>
+      toolsets
+        ? filteredToolsets(
+            toolsets,
+            query,
+            toolCalls ?? {},
+            toolsetsSortDesc,
+            t.skills.toolsetLabels,
+            t.skills.toolsetDescriptions
+          )
+        : [],
+    [query, t.skills.toolsetDescriptions, t.skills.toolsetLabels, toolCalls, toolsets, toolsetsSortDesc]
   )
 
   // Bulk actions ("All" master switch, "Disable unused") and the master-switch
@@ -792,7 +828,7 @@ export function SkillsView({
         key: `${agent.connectionId}::${agent.profile}`,
         label:
           agent.connectionId === activeId
-            ? `${agent.profile} — ${agent.connectionLabel} (current)`
+            ? `${agent.profile} — ${agent.connectionLabel} (${t.skills.currentConnection})`
             : `${agent.profile} — ${agent.connectionLabel}`,
         value: `${agent.connectionId}::${agent.profile}`
       }))
@@ -800,10 +836,10 @@ export function SkillsView({
 
     return (profilesData?.profiles ?? []).map(p => ({
       key: p.name,
-      label: p.is_default ? 'Hermes (default)' : p.name,
+      label: p.is_default ? t.skills.defaultProfile : p.name,
       value: p.name
     }))
-  }, [multiConnection, profilesData, rosterData])
+  }, [multiConnection, profilesData, rosterData, t.skills.currentConnection, t.skills.defaultProfile])
 
   // The selector's current value must match one option's value exactly. On the
   // roster path an ambient (non-override) scope is the active gateway's
@@ -959,7 +995,7 @@ export function SkillsView({
                           setSelectedOfficial(null)
                         }}
                         onToggle={enabled => void handleToggleSkill(skill, enabled)}
-                        subtitle={skillSubtitle(skill)}
+                        subtitle={skillSubtitle(skill, t.skills.skillCategoryLabels)}
                         title={skill.name}
                         toggleLabel={skill.name}
                       />
@@ -993,7 +1029,7 @@ export function SkillsView({
                           enabled={false}
                           key={skill.identifier}
                           onSelect={() => setSelectedOfficial(skill.identifier)}
-                          subtitle={prettyName(skill.category)}
+                          subtitle={presentedSkillCategory(skill.category, t.skills.skillCategoryLabels)}
                           title={skill.name}
                         />
                       )
@@ -1033,7 +1069,7 @@ export function SkillsView({
                   }
                 >
                   {visibleToolsets.map(toolset => {
-                    const label = toolsetDisplayLabel(toolset)
+                    const label = presentedToolsetLabel(toolset, t.skills.toolsetLabels)
                     const calls = toolCalls ? toolsetCalls(toolset, toolCalls) : null
 
                     return (
@@ -1048,12 +1084,12 @@ export function SkillsView({
                           ) : calls > 0 ? (
                             `×${compactNumber(calls)}`
                           ) : (
-                            `${toolNames(toolset).length} tools`
+                            t.skills.toolCount(toolNames(toolset).length)
                           )
                         }
                         onSelect={() => setSelectedToolset(toolset.name)}
                         onToggle={checked => void handleToggleToolset(toolset, checked)}
-                        subtitle={asText(toolset.description)}
+                        subtitle={presentedToolsetDescription(toolset, t.skills.toolsetDescriptions)}
                         title={label}
                         toggleLabel={t.skills.toggleToolset(label, !toolset.enabled)}
                       />
@@ -1183,6 +1219,179 @@ function parseFrontmatter(content: string): { body: string; meta: [string, strin
   return { body: content.slice(match[0].length), meta }
 }
 
+function frontmatterValue(meta: [string, string][], keys: string[]): string {
+  const wanted = new Set(keys.map(key => key.toLowerCase()))
+
+  return meta.find(([key]) => wanted.has(key.toLowerCase()))?.[1] || ''
+}
+
+function frontmatterTokens(value: string): string[] {
+  return value
+    .split(/\r?\n/)
+    .flatMap(line => {
+      const rhs = line.replace(/^[\w-]+:\s*/, '')
+
+      return rhs.split(',')
+    })
+    .map(token => token.replace(/^[\s\[\]{"'\`]+|[\s\[\]}"'\`]+$/g, '').trim())
+    .filter(Boolean)
+}
+
+function inlineMarkdownText(value: string): string {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[*_~\`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function skillBodyOverview(body: string): string {
+  const paragraph: string[] = []
+  let inFence = false
+
+  for (const rawLine of body.split(/\r?\n/)) {
+    const line = rawLine.trim()
+
+    if (/^\`\`\`/.test(line)) {
+      inFence = !inFence
+      continue
+    }
+
+    if (inFence) {
+      continue
+    }
+
+    if (!line) {
+      if (paragraph.length > 0) {
+        break
+      }
+
+      continue
+    }
+
+    if (/^#{1,6}\s/.test(line) || /^[-*+]\s/.test(line) || /^\d+\.\s/.test(line) || /^>\s?/.test(line)) {
+      if (paragraph.length > 0) {
+        break
+      }
+
+      continue
+    }
+
+    paragraph.push(line)
+
+    if (paragraph.join(' ').length >= 320) {
+      break
+    }
+  }
+
+  return capabilitySummary(inlineMarkdownText(paragraph.join(' ')))
+}
+
+function SkillContentSummary({
+  body,
+  description,
+  meta
+}: {
+  body: string
+  description: string
+  meta: [string, string][]
+}) {
+  const { t } = useI18n()
+  const overview = skillBodyOverview(body)
+  const showOverview = overview && normalize(overview) !== normalize(description)
+  const platforms = frontmatterTokens(frontmatterValue(meta, ['platforms', 'platform']))
+  const requirements = frontmatterTokens(
+    frontmatterValue(meta, ['prerequisites', 'requirements', 'requires', 'dependencies'])
+  )
+
+  if (!showOverview && platforms.length === 0 && requirements.length === 0) {
+    return null
+  }
+
+  return (
+    <div
+      className="grid max-w-3xl gap-3 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3"
+      data-skill-overview=""
+    >
+      {showOverview && (
+        <section className="grid gap-1">
+          <span className="text-[0.68rem] font-medium text-(--ui-text-tertiary)">{t.skills.skillOverview}</span>
+          <p className="text-sm leading-5 text-(--ui-text-secondary)" data-selectable-text="true">
+            {overview}
+          </p>
+        </section>
+      )}
+      {(platforms.length > 0 || requirements.length > 0) && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {requirements.length > 0 && (
+            <section className="grid gap-1.5">
+              <span className="text-[0.68rem] font-medium text-(--ui-text-tertiary)">
+                {t.skills.skillRequirements}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {requirements.map(item => (
+                  <ToolChip key={item}>{item}</ToolChip>
+                ))}
+              </div>
+            </section>
+          )}
+          {platforms.length > 0 && (
+            <section className="grid gap-1.5">
+              <span className="text-[0.68rem] font-medium text-(--ui-text-tertiary)">
+                {t.skills.skillCompatibility}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {platforms.map(item => (
+                  <ToolChip key={item}>{item}</ToolChip>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SkillSourceDetails({ body, meta }: { body: string; meta: [string, string][] }) {
+  const { t } = useI18n()
+  const rawBody = body.trim()
+
+  return (
+    <div className="grid max-w-3xl gap-2">
+      {rawBody && (
+        <details data-skill-raw-instructions="">
+          <summary className="w-fit cursor-pointer select-none text-xs font-medium text-(--ui-text-tertiary) hover:text-(--ui-text-secondary)">
+            {t.skills.rawInstructions}
+          </summary>
+          <pre
+            className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap wrap-break-word rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3 font-mono text-[0.68rem] leading-relaxed"
+            data-selectable-text="true"
+          >
+            {rawBody}
+          </pre>
+        </details>
+      )}
+      {meta.length > 0 && (
+        <details data-skill-technical-metadata="">
+          <summary className="w-fit cursor-pointer select-none text-xs font-medium text-(--ui-text-tertiary) hover:text-(--ui-text-secondary)">
+            {t.skills.technicalMetadata}
+          </summary>
+          <div className="mt-2 grid gap-1 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3">
+            {meta.map(([key, value]) => (
+              <div className="flex gap-2 text-[0.68rem] leading-4" key={key}>
+                <span className="w-24 shrink-0 font-medium text-(--ui-text-tertiary)">{key}</span>
+                <span className="min-w-0 whitespace-pre-wrap break-words text-(--ui-text-secondary)">{value}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  )
+}
+
 function SkillDetail({
   onArchive,
   onEdit,
@@ -1199,9 +1408,9 @@ function SkillDetail({
   // and hub skills are managed by their sources.
   const editable = skill.provenance === 'agent'
 
-  // The FULL skill — frontmatter metadata + complete SKILL.md body — for any
-  // provenance, scoped to the Capabilities profile selector. The row list only
-  // carries name/description; the pane shows the whole thing.
+  // Fetch the complete SKILL.md for any provenance, scoped to the Capabilities
+  // profile selector. The default pane distills it into product-level context;
+  // exact frontmatter and source instructions remain available in disclosures.
   const contentQuery = useQuery({
     queryKey: ['skill-content', skill.name, profileScopeKey(profile)],
     queryFn: () => getSkillContent(skill.name, profile),
@@ -1219,7 +1428,7 @@ function SkillDetail({
         description={asText(skill.description) || t.skills.noDescription}
         pills={
           <>
-            <PanelPill>{prettyName(categoryFor(skill))}</PanelPill>
+            <PanelPill>{presentedSkillCategory(categoryFor(skill), t.skills.skillCategoryLabels)}</PanelPill>
             {skill.provenance && skill.provenance !== 'bundled' && (
               <PanelPill tone={skill.provenance === 'agent' ? 'good' : 'muted'}>
                 {t.skills.provenance[skill.provenance]}
@@ -1239,33 +1448,25 @@ function SkillDetail({
           </Button>
         </div>
       )}
-      {parsed && parsed.meta.length > 0 && (
-        <div className="grid gap-1 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3">
-          {parsed.meta.map(([key, value]) => (
-            <div className="flex gap-2 text-[0.68rem] leading-4" key={key}>
-              <span className="w-24 shrink-0 font-medium text-(--ui-text-tertiary)">{key}</span>
-              <span className="min-w-0 whitespace-pre-wrap break-words text-(--ui-text-secondary)">{value}</span>
-            </div>
-          ))}
-        </div>
-      )}
       {contentQuery.isLoading ? (
         <CountSkeleton />
       ) : parsed ? (
-        <pre
-          className="overflow-auto whitespace-pre-wrap wrap-break-word rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3 font-mono text-[0.68rem] leading-relaxed"
-          data-selectable-text="true"
-        >
-          {parsed.body.trim() || t.skills.noDescription}
-        </pre>
+        <>
+          <SkillContentSummary
+            body={parsed.body}
+            description={asText(skill.description) || t.skills.noDescription}
+            meta={parsed.meta}
+          />
+          <SkillSourceDetails body={parsed.body} meta={parsed.meta} />
+        </>
       ) : null}
     </>
   )
 }
 
-// Detail pane for a not-yet-installed catalog skill: metadata + full SKILL.md
-// via the hub preview endpoint (same resolver an install uses), plus the same
-// install button as the row.
+// Detail pane for a not-yet-installed catalog skill: the same summarized
+// content hierarchy as installed skills, backed by the hub preview endpoint
+// (same resolver an install uses), plus the same install button as the row.
 function OfficialSkillDetail({
   installing,
   onInstall,
@@ -1297,7 +1498,7 @@ function OfficialSkillDetail({
         description={asText(skill.description) || t.skills.noDescription}
         pills={
           <>
-            <PanelPill>{prettyName(skill.category)}</PanelPill>
+            <PanelPill>{presentedSkillCategory(skill.category, t.skills.skillCategoryLabels)}</PanelPill>
             <PanelPill tone="muted">{t.skills.officialPill}</PanelPill>
           </>
         }
@@ -1309,25 +1510,17 @@ function OfficialSkillDetail({
           {installing ? t.skills.hub.installing : t.skills.hub.install}
         </Button>
       </div>
-      {parsed && parsed.meta.length > 0 && (
-        <div className="grid gap-1 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3">
-          {parsed.meta.map(([key, value]) => (
-            <div className="flex gap-2 text-[0.68rem] leading-4" key={key}>
-              <span className="w-24 shrink-0 font-medium text-(--ui-text-tertiary)">{key}</span>
-              <span className="min-w-0 whitespace-pre-wrap break-words text-(--ui-text-secondary)">{value}</span>
-            </div>
-          ))}
-        </div>
-      )}
       {previewQuery.isLoading ? (
         <CountSkeleton />
       ) : parsed ? (
-        <pre
-          className="overflow-auto whitespace-pre-wrap wrap-break-word rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) p-3 font-mono text-[0.68rem] leading-relaxed"
-          data-selectable-text="true"
-        >
-          {parsed.body.trim() || t.skills.noDescription}
-        </pre>
+        <>
+          <SkillContentSummary
+            body={parsed.body}
+            description={asText(skill.description) || t.skills.noDescription}
+            meta={parsed.meta}
+          />
+          <SkillSourceDetails body={parsed.body} meta={parsed.meta} />
+        </>
       ) : null}
     </>
   )
@@ -1347,13 +1540,17 @@ function ToolsetDetail({
   const { t } = useI18n()
   const navigate = useNavigate()
   const tools = toolNames(toolset)
-  const label = toolsetDisplayLabel(toolset)
+  const label = presentedToolsetLabel(toolset, t.skills.toolsetLabels)
+  const technicalDescription = asText(toolset.description)
+  const description = presentedToolsetDescription(toolset, t.skills.toolsetDescriptions) || t.skills.noDescription
+  const summary = capabilitySummary(description)
+  const hasTechnicalDetails = technicalDescription.length > 180
 
   return (
     <>
       {/* "Configured" as a resting state is noise — only the warn state earns a pill. */}
       <DetailHeader
-        description={asText(toolset.description) || t.skills.noDescription}
+        description={summary}
         pills={!toolset.configured && <PanelPill tone="warn">{t.skills.needsKeys}</PanelPill>}
         title={label}
       />
@@ -1368,6 +1565,16 @@ function ToolsetDetail({
             </ToolChip>
           ))}
         </div>
+      )}
+      {hasTechnicalDetails && (
+        <details className="group/details max-w-3xl" data-toolset-technical-details="">
+          <summary className="w-fit cursor-pointer select-none text-xs font-medium text-(--ui-text-tertiary) hover:text-(--ui-text-secondary)">
+            {t.skills.technicalDetails}
+          </summary>
+          <p className="mt-2 text-xs leading-5 text-(--ui-text-tertiary)" data-selectable-text="true">
+            {technicalDescription}
+          </p>
+        </details>
       )}
       {toolset.name === 'vision' && (
         // Vision has no provider matrix — model resolution runs through the

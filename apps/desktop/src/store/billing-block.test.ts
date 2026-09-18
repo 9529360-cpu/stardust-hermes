@@ -79,8 +79,9 @@ test('requestBillingSettings increments the intent counter', () => {
   expect($billingSettingsRequest.get()).toBe(2)
 })
 
-test('billingCtaLabel picks the right verb per route', () => {
-  const copy = { addCredits: 'Add credits', openBilling: 'Open billing' }
-  expect(billingCtaLabel(makeBlock({ is_nous: true }), copy)).toBe('Open billing')
+test('billingCtaLabel describes the actual recovery destination', () => {
+  const copy = { addCredits: 'Add credits', providerSettings: 'Providers' }
+  expect(billingCtaLabel(makeBlock({ is_nous: true }), copy)).toBe('Providers')
   expect(billingCtaLabel(makeBlock({ is_nous: false }), copy)).toBe('Add credits')
+  expect(billingCtaLabel(makeBlock({ billing_url: null, is_nous: false }), copy)).toBe('Providers')
 })

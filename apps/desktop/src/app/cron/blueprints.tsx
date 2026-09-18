@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { AutomationBlueprint, AutomationBlueprintField } from '@/hermes'
+import type { Translations } from '@/i18n'
 
 // The blueprint catalog is shared with the dashboard, so its deliver slot
 // defaults to "origin" (the chat/home-channel a dashboard or gateway job was
@@ -10,6 +11,49 @@ import type { AutomationBlueprint, AutomationBlueprintField } from '@/hermes'
 // the raw "origin" option never reaches the desktop UI.
 const DELIVER_FIELD = 'deliver'
 const DESKTOP_DELIVER_DEFAULT = 'local'
+
+type CronCopy = Translations['cron']
+
+export function blueprintDisplayTitle(blueprint: AutomationBlueprint, c: CronCopy): string {
+  return c.blueprints.catalog[blueprint.key]?.title ?? blueprint.title
+}
+
+export function blueprintDisplayDescription(blueprint: AutomationBlueprint, c: CronCopy): string {
+  return c.blueprints.catalog[blueprint.key]?.description ?? blueprint.description
+}
+
+function blueprintFieldOverride(blueprintKey: string, fieldName: string, c: CronCopy) {
+  return c.blueprints.catalog[blueprintKey]?.fields?.[fieldName]
+}
+
+export function blueprintDisplayFieldLabel(
+  blueprintKey: string,
+  field: AutomationBlueprintField,
+  c: CronCopy
+): string {
+  return blueprintFieldOverride(blueprintKey, field.name, c)?.label ?? c.blueprints.fieldLabels[field.name] ?? field.label
+}
+
+export function blueprintDisplayFieldHelp(
+  blueprintKey: string,
+  field: AutomationBlueprintField,
+  c: CronCopy
+): string | undefined {
+  return blueprintFieldOverride(blueprintKey, field.name, c)?.help ?? c.blueprints.fieldHelp[field.name] ?? blueprintSlotHelp(field)
+}
+
+function blueprintDisplayFieldPlaceholder(blueprintKey: string, field: AutomationBlueprintField, c: CronCopy): string {
+  return (
+    blueprintFieldOverride(blueprintKey, field.name, c)?.help ??
+    c.blueprints.fieldHelp[field.name] ??
+    field.help ??
+    blueprintDisplayFieldLabel(blueprintKey, field, c)
+  )
+}
+
+export function blueprintDisplayOption(option: string, c: CronCopy): string {
+  return c.blueprints.optionLabels[option] ?? option
+}
 
 function isDeliverField(field: AutomationBlueprintField): boolean {
   return field.name === DELIVER_FIELD
@@ -48,11 +92,15 @@ export function blueprintSlotHelp(field: AutomationBlueprintField): string | und
 // input, else text). The deliver slot is handled separately by the dialog's
 // shared DeliverSelect, so it's not rendered here.
 export function BlueprintSlotControl({
+  blueprintKey,
+  c,
   field,
   id,
   onChange,
   value
 }: {
+  blueprintKey: string
+  c: CronCopy
   field: AutomationBlueprintField
   id: string
   onChange: (next: string) => void
@@ -67,7 +115,7 @@ export function BlueprintSlotControl({
         <SelectContent>
           {field.options.map(option => (
             <SelectItem key={option} value={option}>
-              {option}
+              {blueprintDisplayOption(option, c)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -83,7 +131,7 @@ export function BlueprintSlotControl({
     <Input
       id={id}
       onChange={event => onChange(event.target.value)}
-      placeholder={field.help || field.label}
+      placeholder={blueprintDisplayFieldPlaceholder(blueprintKey, field, c)}
       type="text"
       value={value}
     />

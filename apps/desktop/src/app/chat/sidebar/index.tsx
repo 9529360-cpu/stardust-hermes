@@ -1581,6 +1581,7 @@ export function ChatSidebar({
                         'mt-2 before:mb-1.5 before:block before:px-2 before:text-[0.625rem] before:font-semibold before:uppercase before:tracking-[0.14em] before:text-(--ui-text-quaternary) before:content-[attr(data-section-label)]'
                     )}
                     data-section-label={startsSecondaryNav ? (s.nav.more ?? 'More') : undefined}
+                    data-tools-label={isNewSession ? s.nav.more : undefined}
                     key={item.id}
                   >
                     {isNewSession || item.route ? (

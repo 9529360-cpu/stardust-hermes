@@ -279,7 +279,7 @@ export const en: Translations = {
       unavailable: 'Voice unavailable',
       liveEnded: 'Live voice session ended',
       liveError: 'Live voice',
-      liveDelegationFailed: 'Could not hand the request to Hermes',
+      liveDelegationFailed: 'Could not hand the request to Stardust',
       liveUnavailable: reason => `GPT-Live voice chat is not available: ${reason}. Using speech-to-text instead.`
     },
     native: {
@@ -287,8 +287,8 @@ export const en: Translations = {
       approveAction: 'Approve',
       rejectAction: 'Reject',
       inputTitle: 'Input needed',
-      inputBody: 'Hermes is waiting for your response.',
-      turnDoneTitle: 'Hermes finished',
+      inputBody: 'Stardust is waiting for your response.',
+      turnDoneTitle: 'Stardust finished',
       turnDoneBody: '',
       turnErrorTitle: 'Turn failed',
       backgroundDoneTitle: 'Background task finished',
@@ -700,6 +700,7 @@ export const en: Translations = {
       appearance: 'Appearance',
       workspace: 'Workspace',
       safety: 'Safety',
+      browser: 'Browser',
       memory: 'Memory & Context',
       voice: 'Voice',
       advanced: 'Advanced'
@@ -869,7 +870,23 @@ export const en: Translations = {
     uninstallSection: {
       dangerZone: 'Danger zone',
       confirmUninstall: 'Confirm uninstall',
-      uninstallHermes: 'Uninstall Hermes'
+      uninstallHermes: 'Uninstall Hermes',
+      checkingInstalled: "Checking what's installed…",
+      guiOnlyTitle: 'Uninstall desktop app only',
+      guiOnlyDescription: 'Remove this desktop app. The agent, your config, and chats all stay.',
+      guiOnlyConsequence: 'the desktop app and its local app data',
+      liteTitle: 'Uninstall app + agent, keep my data',
+      liteDescription: 'Remove the app and local agent, but keep config, chats, and secrets for a future reinstall.',
+      liteConsequence: 'the desktop app and local agent (config, chats, and secrets are kept)',
+      fullTitle: 'Uninstall everything',
+      fullDescription: 'Remove the app, agent, and all user data — config, chats, scheduled jobs, secrets, and logs.',
+      fullConsequence: 'everything — the desktop app, local agent, config, chats, secrets, and logs',
+      confirmRemoves: consequence => `This removes ${consequence}. This can't be undone.`,
+      appPathLabel: 'App',
+      couldNotStart: 'Uninstall could not start.',
+      uninstalling: 'Uninstalling…',
+      confirmAction: 'Yes, uninstall',
+      chooseDescription: 'Choose how much to remove. The app closes to finish the job; reinstall any time to come back.'
     },
     poolLimits: {
       warmBotBackendsAria: 'Warm bot backends',
@@ -1164,7 +1181,7 @@ export const en: Translations = {
       enterUrlFirst: 'Enter a remote URL first.',
       restartingTitle: 'Gateway connection restarting',
       savedTitle: 'Gateway settings saved',
-      restartingMessage: 'Hermes Desktop will reconnect using the saved settings — the shell stays open.',
+      restartingMessage: 'Stardust Desktop will reconnect using the saved settings — the shell stays open.',
       savedMessage: 'Saved for the next restart.',
       connectedTo: (baseUrl, version) => `Connected to ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'Remote gateway reachable',
@@ -1344,6 +1361,17 @@ export const en: Translations = {
       moaTitle: 'Mixture of Agents',
       moaPreset: 'Preset',
       moaAggregator: 'Aggregator',
+      moaDescription:
+        'Configure named presets that appear as models under the Mixture of Agents provider. The aggregator is the acting model.',
+      moaEnabled: 'Enabled',
+      moaSetDefault: 'Set default',
+      moaNewPreset: 'new preset',
+      moaAddPreset: 'Add preset',
+      moaDefault: 'Default',
+      moaReference: index => `Reference ${index}`,
+      moaEnableReference: index => `Enable reference ${index}`,
+      moaDisableReference: index => `Disable reference ${index}`,
+      moaAddReference: 'Add reference model',
       tasks: {
         vision: { label: 'Vision', hint: 'Image analysis' },
         compression: { label: 'Compression', hint: 'Context compaction' },
@@ -1691,6 +1719,9 @@ export const en: Translations = {
     bulkUpdated: count => `Updated ${count} ${count === 1 ? 'item' : 'items'} for new sessions.`,
     bulkNoChange: 'Nothing to change.',
     usageCount: count => `used ${count}×`,
+    toolCount: count => `${count} ${count === 1 ? 'tool' : 'tools'}`,
+    defaultProfile: 'Default profile',
+    currentConnection: 'current',
     provenance: {
       agent: 'Learned',
       bundled: 'Built-in',
@@ -1700,6 +1731,15 @@ export const en: Translations = {
     emptyNothingMatches: query => `Nothing matches “${query}”.`,
     emptyNoneAvailable: noun => `No ${noun} available yet.`,
     changesApplyNewSessions: 'Changes apply to new sessions.',
+    technicalDetails: 'Technical details',
+    skillOverview: 'What it does',
+    skillRequirements: 'Requirements',
+    skillCompatibility: 'Works on',
+    rawInstructions: 'Raw instructions',
+    technicalMetadata: 'Technical metadata',
+    skillCategoryLabels: {},
+    toolsetLabels: {},
+    toolsetDescriptions: {},
     skillUpdated: 'Skill updated',
     edit: 'Edit',
     archive: 'Archive',
@@ -1711,6 +1751,16 @@ export const en: Translations = {
       agentBlurb:
         'Extend the agent for the selected profile — tools, hooks, providers. Take effect after a gateway restart.',
       pageBlurb: 'One row per plugin. A plugin can extend this app, the agent, or both — each half has its own switch.',
+      bundledNames: {
+        'hermes-bots': 'Agents',
+        kanban: 'Task Board',
+        radio: 'Radio'
+      },
+      bundledDescriptions: {
+        'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.',
+        kanban: 'Multi-agent task board with a board view, sidebar entry, and live task activity in the status bar.',
+        radio: 'Live radio with pinned stations, search, and an audio-reactive waveform.'
+      },
       halfDesktop: 'Desktop',
       halfDesktopHint: 'this app, same for every profile',
       halfAgent: 'Agent',
@@ -2264,6 +2314,7 @@ export const en: Translations = {
         help: 'Recommended. Comma-separated phone numbers or WhatsApp IDs.'
       }
     },
+    platformDescriptions: {},
     platformIntro: {}
   },
 
@@ -2501,6 +2552,7 @@ export const en: Translations = {
       slack: 'Slack',
       email: 'Email'
     },
+    botChatTarget: profile => `Bot Chat (${profile})`,
     scheduleLabels: {
       daily: 'Daily',
       weekdays: 'Weekdays',
@@ -2610,7 +2662,11 @@ export const en: Translations = {
       loading: 'Loading blueprints...',
       failedLoad: 'Failed to load blueprints',
       emptyTitle: 'No blueprints available',
-      emptyDesc: 'No automation blueprints are available on this backend.'
+      emptyDesc: 'No automation blueprints are available on this backend.',
+      fieldLabels: {},
+      fieldHelp: {},
+      optionLabels: {},
+      catalog: {}
     }
   },
 
@@ -2695,7 +2751,7 @@ export const en: Translations = {
     noMatch: query => `No sessions match “${query}”.`,
     results: 'Results',
     pinned: 'Pinned',
-    sessions: 'Sessions',
+    sessions: 'Chats',
     cronJobs: 'Cron jobs',
     groupAriaGrouped: 'Show sessions as a single list',
     groupAriaUngrouped: 'Group sessions by workspace',
@@ -2854,12 +2910,12 @@ export const en: Translations = {
   composer: {
     message: 'Message',
     wakingProfile: profile => `Waking up ${profile}…`,
-    placeholderStarting: 'Starting Hermes...',
-    placeholderReconnecting: 'Reconnecting to Hermes…',
+    placeholderStarting: 'Starting your assistant...',
+    placeholderReconnecting: 'Reconnecting…',
     placeholderFollowUp: 'Send follow-up',
     newSessionPlaceholders: [
       'What are we building?',
-      'Give Hermes a task',
+      'Give me a task',
       "What's on your mind?",
       'Describe what you need',
       'What should we tackle?',
@@ -3175,7 +3231,7 @@ export const en: Translations = {
       createPr: 'Create PR',
       openPr: 'Open PR',
       ghMissing: 'Install the GitHub CLI (gh) and sign in to open PRs',
-      agentShip: 'Ask Hermes to open PR',
+      agentShip: 'Ask Stardust to open PR',
       agentShipUnavailable: "The chat that owns these changes isn't on screen.",
       agentShipPrompt:
         'Review the current changes, commit them with a clear conventional-commit message, push the branch, and open a pull request.',
@@ -3282,7 +3338,7 @@ export const en: Translations = {
     stayText: 'Switch to the setup profile and open Welcome to Hermes whenever you want a hand. It stays there.'
   },
   guidedGreeting: {
-    line: "Hey, come on in. I'm Hermes. Give me two minutes to set the place up around you, then we'll put me to work on something you actually want done.\n\nFirst though, what should I call you?",
+    line: "Hey, come on in. I'm Stardust. Give me two minutes to set the place up around you, then we'll put me to work on something you actually want done.\n\nFirst though, what should I call you?",
     nameSuggestion: (name: string) => `(I can also just call you ${name}, if you prefer.)`
   },
   install: {
@@ -3293,7 +3349,7 @@ export const en: Translations = {
       skipped: 'Skipped',
       failed: 'Failed'
     },
-    oneTimeTitle: 'Hermes needs a one-time install',
+    oneTimeTitle: 'Stardust needs a one-time install',
     unsupportedDesc: platform =>
       `Automated first-launch install isn’t available on ${platform} yet. Open Terminal and run the command below, then relaunch this app. Subsequent launches will skip this step.`,
     installCommand: 'Install command',
@@ -3301,7 +3357,7 @@ export const en: Translations = {
     viewDocs: 'View install docs',
     installTo: 'Will install to',
     retryAfterRun: 'I’ve run it -- retry',
-    setupChoiceTitle: 'Set up Hermes Desktop',
+    setupChoiceTitle: 'Set up Stardust Desktop',
     setupChoiceDesc:
       'Connect this app to a Hermes gateway you already run, or install Hermes locally on this computer.',
     connectExistingTitle: 'Connect to existing Hermes',
@@ -3309,7 +3365,7 @@ export const en: Translations = {
     connectExistingDesc: 'Use a remote backend with a session token or browser sign-in. No local install will start.',
     installLocalTitle: 'Install Hermes locally',
     installLocalDesc: 'Download Hermes, create its Python environment, and run the backend on this computer.',
-    localStartUnavailable: 'Local installation could not start. Restart Hermes Desktop and try again.',
+    localStartUnavailable: 'Local installation could not start. Restart Stardust Desktop and try again.',
     remoteSetupTitle: 'Connect to existing Hermes',
     remoteSetupDesc: 'Enter your gateway URL. Hermes Desktop will detect whether it needs a token or browser sign-in.',
     remoteUrlTitle: 'Gateway URL',
@@ -3337,7 +3393,7 @@ export const en: Translations = {
     applyRemote: 'Apply and reconnect',
     backToSetup: 'Back',
     failedTitle: 'Installation failed',
-    settingUpTitle: 'Setting up Hermes Agent',
+    settingUpTitle: 'Setting up Stardust Agent',
     finishingTitle: 'Finishing up',
     failedDesc:
       'One of the setup steps did not finish. This can happen when another copy of Hermes is running, the internet connection dropped, or antivirus blocked the installer. Close other Hermes windows, then choose Reload and retry. If it fails again, open the logs and send them to support.',
@@ -3361,10 +3417,10 @@ export const en: Translations = {
   },
 
   onboarding: {
-    headerTitle: "Let's get you setup with Hermes Agent",
+    headerTitle: "Let's get you setup with Stardust Agent",
     headerDesc: 'Connect a model provider to start chatting. Most options take one click.',
-    preparingInstall: 'Hermes is finishing install. This usually takes under a minute on first run.',
-    starting: 'Starting Hermes…',
+    preparingInstall: 'Stardust is finishing install. This usually takes under a minute on first run.',
+    starting: 'Starting Stardust…',
     lookingUpProviders: 'Looking up providers...',
     collapse: 'Collapse',
     otherProviders: 'Other providers',
@@ -3372,7 +3428,7 @@ export const en: Translations = {
     chooseLater: "I'll choose a provider later",
     recommended: 'Recommended',
     connected: 'Connected',
-    featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Hermes',
+    featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Stardust',
     fireworksPitch: 'Direct model API — Fireworks-hosted frontier models',
     localModelsTitle: 'Run models locally',
     localModelsPitch: 'No account needed — download a model and run it on this machine',
@@ -3391,7 +3447,7 @@ export const en: Translations = {
       xai: { short: 'Grok models', description: 'Direct access to xAI Grok models.' },
       local: {
         short: 'self-hosted',
-        description: 'Point Hermes at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
+        description: 'Point Stardust at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
       }
     },
     backToSignIn: 'Back to sign in',
@@ -3404,7 +3460,7 @@ export const en: Translations = {
     update: 'Update',
     flowSubtitles: {
       pkce: 'Opens your browser to sign in, then continues here',
-      device_code: 'Opens a verification page in your browser — Hermes connects automatically',
+      device_code: 'Opens a verification page in your browser — Stardust connects automatically',
       external: 'Sign in once in your terminal, then come back to chat'
     },
     startingSignIn: provider => `Starting sign-in for ${provider}...`,
@@ -3422,12 +3478,12 @@ export const en: Translations = {
     pickDifferentProvider: 'Pick a different provider',
     signInWith: provider => `Sign in with ${provider}`,
     openedBrowser: provider => `We opened ${provider} in your browser.`,
-    authorizeThere: 'Authorize Hermes there.',
+    authorizeThere: 'Authorize Stardust there.',
     copyAuthCode: 'Copy the authorization code and paste it below.',
     pasteAuthCode: 'Paste authorization code',
     reopenAuthPage: 'Re-open authorization page',
     autoBrowser: provider =>
-      `We opened ${provider} in your browser. Authorize Hermes there and you'll be connected automatically — nothing to copy or paste.`,
+      `We opened ${provider} in your browser. Authorize Stardust there and you'll be connected automatically — nothing to copy or paste.`,
     reopenSignInPage: 'Re-open sign-in page',
     waitingAuthorize: 'Waiting for you to authorize...',
     externalPending: provider =>
@@ -3449,7 +3505,7 @@ export const en: Translations = {
   freeTier: {
     providerRowTitle: 'Nous · free tier',
     providerRowPitch: 'Sign in with a Nous account to unlock more models and tools.',
-    readyTitle: 'Hermes is ready.',
+    readyTitle: 'Stardust is ready.',
     readyCaption: 'Free · connectors included',
     begin: 'Begin',
     signInInstead: 'Sign in with a Nous account instead',
@@ -3486,7 +3542,7 @@ export const en: Translations = {
     retiredBody: 'This free-tier identity was already used or expired; a new one is set up on the next start.',
     errorBody: 'Sign-in did not complete; run it again.',
     alreadySignedInHeading: 'Already signed in.',
-    alreadySignedInBody: 'This Hermes is already signed in to a Nous account.'
+    alreadySignedInBody: 'This Stardust is already signed in to a Nous account.'
   },
 
   modelPicker: {
@@ -3769,11 +3825,11 @@ export const en: Translations = {
         'This address points at the machine running your agent, not this one. The browser pane loads pages locally, so a remote dev server needs a port forward or a reachable hostname.',
       failedToLoad: 'Preview failed to load',
       tryAgain: 'Try again',
-      restarting: 'Hermes is restarting...',
-      askRestart: 'Ask Hermes to restart the server',
-      lookingRestart: taskId => `Hermes is looking for a preview server to restart (${taskId})`,
+      restarting: 'Stardust is restarting...',
+      askRestart: 'Ask Stardust to restart the server',
+      lookingRestart: taskId => `Stardust is looking for a preview server to restart (${taskId})`,
       restartingTitle: 'Restarting preview server',
-      restartingMessage: 'Hermes is working in the background. Watch the preview console for progress.',
+      restartingMessage: 'Stardust is working in the background. Watch the preview console for progress.',
       startRestartFailed: message => `Could not start server restart: ${message}`,
       restartFailed: 'Server restart failed',
       hideConsole: 'Hide preview console',
@@ -3785,14 +3841,14 @@ export const en: Translations = {
       reload: 'Reload page',
       address: 'Address',
       addressPlaceholder: 'Enter address',
-      blankPageBody: 'Type an address above to browse, or ask Hermes to open a page.',
-      finishedRestarting: message => `Hermes finished restarting the preview server${message ? `: ${message}` : ''}`,
+      blankPageBody: 'Type an address above to browse, or ask Stardust to open a page.',
+      finishedRestarting: message => `Stardust finished restarting the preview server${message ? `: ${message}` : ''}`,
       failedRestarting: message => `Server restart failed: ${message}`,
       unknownError: 'unknown error',
       restartedTitle: 'Preview server restarted',
       reloadingNow: 'Reloading the preview now.',
       restartFailedTitle: 'Preview restart failed',
-      restartFailedMessage: 'Hermes could not restart the server.',
+      restartFailedMessage: 'Stardust could not restart the server.',
       stillWorking:
         'Hermes is still working, but no restart result has arrived yet. The server command may be running in the foreground.',
       workspaceReloading: 'Workspace changed, reloading preview',
@@ -3895,7 +3951,7 @@ export const en: Translations = {
     thread: {
       loadingSession: 'Loading session',
       showEarlier: 'Show earlier messages',
-      loadingResponse: 'Hermes is loading a response',
+      loadingResponse: 'Stardust is loading a response',
       loadingLocalModel: model => `Loading ${model} into memory`,
       processingPrompt: 'Processing prompt',
       resumeWhenBackgroundDone: count =>

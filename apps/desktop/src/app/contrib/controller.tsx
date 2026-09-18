@@ -41,7 +41,7 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { discoverBundledPlugins } from '@/contrib/plugins'
 import { registry } from '@/contrib/registry'
 import { discoverRuntimePlugins } from '@/contrib/runtime-loader'
-import { translateNow } from '@/i18n'
+import { translateNow, useI18n } from '@/i18n'
 import { NEW_SESSION_TITLE, sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { Download, FileText, LayoutDashboard, PanelBottom, PanelTop, Terminal, Upload, Zap } from '@/lib/icons'
 import { type KeybindContribution, KEYBINDS_AREA } from '@/lib/keybinds/actions'
@@ -129,6 +129,21 @@ const idle = (node: ReactElement) => <IdleMount>{node}</IdleMount>
 // the loaded primary session; no menu on a fresh draft).
 const wrapWorkspaceTab = (tab: ReactElement) => <WorkspaceTabMenu>{tab}</WorkspaceTabMenu>
 
+const SESSION_PANE_TAB_COPY = {
+  ar: 'الدردشات',
+  en: 'Chats',
+  ja: 'チャット',
+  ru: 'Чаты',
+  zh: '会话',
+  'zh-hant': '會話'
+} as const
+
+function SessionsPaneTabTitle() {
+  const { locale } = useI18n()
+
+  return <>{SESSION_PANE_TAB_COPY[locale]}</>
+}
+
 /** The `@session` payload for the workspace tab — the loaded primary session,
  *  or null on a fresh draft / full-page view (nothing to link). */
 const workspaceDragPayload = (): SessionDragPayload | null => {
@@ -169,6 +184,7 @@ registry.registerMany([
     data: {
       placement: 'left',
       collapsible: true,
+      tabTitle: () => <SessionsPaneTabTitle />,
       dock: { pane: 'workspace', pos: 'left' },
       revealAliases: ['chat-sidebar'],
       // Standing chrome: no close gestures at all — the tab is shown/hidden
@@ -209,6 +225,7 @@ registry.registerMany([
     // its rail there). A real floor left a sliver of unusable terminal.
     data: {
       placement: 'bottom',
+      dock: { pane: 'workspace', pos: 'bottom' },
       height: '20vh',
       maxHeight: '80vh',
       revealOnPreset: true,
@@ -406,6 +423,14 @@ registry.registerMany([
 registerLayoutPresets()
 
 declareDefaultTree(DEFAULT_TREE)
+
+// Terminal is powerful working context, not default product chrome. A fresh or
+// legacy layout that does not already contain it keeps the pane unadopted until
+// the user explicitly opens it. Persisted open/layout state still wins, and an
+// explicit reveal un-dismisses the pane and docks it below the chat.
+if (!allPaneIds($layoutTree.get() ?? DEFAULT_TREE).includes('terminal') && !$terminalTakeover.get()) {
+  dismissTreePane('terminal')
+}
 
 // Bundled plugins load AFTER core, so a same-id contribution from a plugin
 // deliberately overrides the core default (last writer wins). Third-party

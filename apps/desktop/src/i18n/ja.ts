@@ -226,8 +226,8 @@ export const ja = defineLocale({
       approveAction: '承認',
       rejectAction: '拒否',
       inputTitle: '入力が必要です',
-      inputBody: 'Hermes が応答を待っています。',
-      turnDoneTitle: 'Hermes が完了しました',
+      inputBody: 'Stardust が応答を待っています。',
+      turnDoneTitle: 'Stardust が完了しました',
       turnDoneBody: '',
       turnErrorTitle: 'ターンが失敗しました',
       backgroundDoneTitle: 'バックグラウンドタスクが完了しました',
@@ -461,6 +461,7 @@ export const ja = defineLocale({
       appearance: '外観',
       workspace: 'ワークスペース',
       safety: '安全性',
+      browser: 'ブラウザ',
       memory: 'メモリとコンテキスト',
       voice: '音声',
       advanced: '詳細'
@@ -1005,7 +1006,7 @@ export const ja = defineLocale({
       enterUrlFirst: '最初にリモート URL を入力してください。',
       restartingTitle: 'ゲートウェイ接続を再起動中',
       savedTitle: 'ゲートウェイ設定を保存しました',
-      restartingMessage: 'Hermes Desktop は保存された設定を使用して再接続します。',
+      restartingMessage: 'Stardust Desktop は保存された設定を使用して再接続します。',
       savedMessage: '次回起動時に保存されます。',
       connectedTo: (baseUrl, version) => `${baseUrl}${version ? ` · Hermes ${version}` : ''} に接続しました`,
       reachableTitle: 'リモートゲートウェイに到達可能',
@@ -1467,6 +1468,9 @@ export const ja = defineLocale({
     bulkUpdated: count => `${count} 件を新しいセッション向けに更新しました。`,
     bulkNoChange: '変更するものはありません。',
     usageCount: count => `${count} 回使用`,
+    toolCount: count => `${count} 個のツール`,
+    defaultProfile: 'デフォルト設定',
+    currentConnection: '現在',
     provenance: {
       agent: '学習済み',
       bundled: '組み込み',
@@ -1476,6 +1480,7 @@ export const ja = defineLocale({
     emptyNothingMatches: query => `「${query}」に一致するものはありません。`,
     emptyNoneAvailable: noun => `利用可能な ${noun} はまだありません。`,
     changesApplyNewSessions: '変更は新しいセッションに適用されます。',
+    technicalDetails: '技術情報',
     skillUpdated: 'スキルを更新しました',
     edit: '編集',
     archive: 'アーカイブ',
@@ -1857,6 +1862,7 @@ export const ja = defineLocale({
         help: '推奨。カンマ区切りの電話番号または WhatsApp ID。'
       }
     },
+    platformDescriptions: {},
     platformIntro: {}
   },
 
@@ -2211,7 +2217,7 @@ export const ja = defineLocale({
     noMatch: query => `"${query}" に一致するセッションがありません。`,
     results: '結果',
     pinned: 'ピン留め',
-    sessions: 'セッション',
+    sessions: 'チャット',
     cronJobs: 'Cronジョブ',
     groupAriaGrouped: 'セッションを単一リストとして表示',
     groupAriaUngrouped: 'ワークスペースごとにセッションをグループ化',
@@ -2358,12 +2364,12 @@ export const ja = defineLocale({
   composer: {
     message: 'メッセージ',
     wakingProfile: profile => `${profile} を起動中…`,
-    placeholderStarting: 'Hermes を起動中...',
-    placeholderReconnecting: 'Hermes に再接続中…',
+    placeholderStarting: 'アシスタントを起動中...',
+    placeholderReconnecting: '再接続中…',
     placeholderFollowUp: 'フォローアップを送信',
     newSessionPlaceholders: [
       '何を作りますか？',
-      'Hermes にタスクを与える',
+      'タスクを任せる',
       '何か考えていることはありますか？',
       '必要なことを説明してください',
       '何に取り組みますか？',
@@ -2634,7 +2640,7 @@ export const ja = defineLocale({
       createPr: 'PR を作成',
       openPr: 'PR を開く',
       ghMissing: 'PR を開くには GitHub CLI (gh) をインストールしてサインインしてください',
-      agentShip: 'Hermes にコミットと PR を任せる',
+      agentShip: 'Stardust にコミットと PR を任せる',
       agentShipUnavailable: 'この変更を持つチャットが画面にありません。',
       agentShipPrompt:
         '現在の変更を確認し、分かりやすい Conventional Commits 形式でコミットし、ブランチをプッシュして、プルリクエストを作成してください。',
@@ -2730,7 +2736,7 @@ export const ja = defineLocale({
   },
 
   guidedGreeting: {
-    line: 'やあ、どうぞ。Hermes です。二分だけください、あなたに合わせて整えます。それから、本当にやりたいことに取りかかりましょう。\n\nまずは、何とお呼びすればいいですか。',
+    line: 'やあ、どうぞ。Stardust です。二分だけください、あなたに合わせて整えます。それから、本当にやりたいことに取りかかりましょう。\n\nまずは、何とお呼びすればいいですか。',
     nameSuggestion: (name: string) => `（よければ、${name} さんとお呼びします。）`
   },
   install: {
@@ -2741,7 +2747,7 @@ export const ja = defineLocale({
       skipped: 'スキップ',
       failed: '失敗'
     },
-    oneTimeTitle: 'Hermes には一度限りのインストールが必要です',
+    oneTimeTitle: 'Stardust には一度限りのインストールが必要です',
     unsupportedDesc: platform =>
       `${platform} では自動の初回インストールはまだ利用できません。ターミナルを開いて以下のコマンドを実行し、このアプリを再起動してください。以降の起動ではこの手順はスキップされます。`,
     installCommand: 'インストールコマンド',
@@ -2749,7 +2755,7 @@ export const ja = defineLocale({
     viewDocs: 'インストールドキュメントを見る',
     installTo: 'インストール先',
     retryAfterRun: '実行しました — 再試行',
-    setupChoiceTitle: 'Hermes Desktop をセットアップ',
+    setupChoiceTitle: 'Stardust Desktop をセットアップ',
     setupChoiceDesc:
       'すでに実行している Hermes ゲートウェイに接続するか、このコンピューターに Hermes をローカルインストールします。',
     connectExistingTitle: '既存の Hermes に接続',
@@ -2787,7 +2793,7 @@ export const ja = defineLocale({
     applyRemote: '適用して再接続',
     backToSetup: '戻る',
     failedTitle: 'インストールに失敗しました',
-    settingUpTitle: 'Hermes Agent を設定中',
+    settingUpTitle: 'Stardust Agent を設定中',
     finishingTitle: '仕上げ中',
     failedDesc:
       'インストール手順のいずれかが失敗しました。Windows では、別の Hermes CLI またはデスクトップインスタンスが実行中の場合に発生することがあります。実行中の Hermes インスタンスをすべて停止してから再試行してください。詳細は以下またはデスクトップログで確認できます。',
@@ -2810,10 +2816,10 @@ export const ja = defineLocale({
   },
 
   onboarding: {
-    headerTitle: 'Hermes Agent のセットアップをしましょう',
+    headerTitle: 'Stardust Agent のセットアップをしましょう',
     headerDesc: 'チャットを始めるにはモデルプロバイダーを接続してください。ほとんどのオプションはワンクリックです。',
-    preparingInstall: 'Hermes はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
-    starting: 'Hermes を起動中…',
+    preparingInstall: 'Stardust はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
+    starting: 'Stardust を起動中…',
     lookingUpProviders: 'プロバイダーを検索中...',
     collapse: '折りたたむ',
     otherProviders: 'その他のプロバイダー',
@@ -2821,7 +2827,7 @@ export const ja = defineLocale({
     chooseLater: '後でプロバイダーを選択します',
     recommended: '推奨',
     connected: '接続済み',
-    featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Hermes を実行するための推奨方法',
+    featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Stardust を実行するための推奨方法',
     fireworksPitch: '直接モデル API — Fireworks がホストする最先端モデル',
     localModelsTitle: 'モデルをローカルで実行',
     localModelsPitch: 'アカウント不要——モデルをダウンロードしてこのマシンで実行',
@@ -2841,7 +2847,7 @@ export const ja = defineLocale({
       local: {
         short: 'セルフホスト',
         description:
-          'ローカルまたはセルフホストの OpenAI 互換エンドポイント（vLLM、llama.cpp、Ollama など）に Hermes を接続。'
+          'ローカルまたはセルフホストの OpenAI 互換エンドポイント（vLLM、llama.cpp、Ollama など）に Stardust を接続。'
       }
     },
     backToSignIn: 'サインインに戻る',
@@ -2853,7 +2859,7 @@ export const ja = defineLocale({
     update: '更新',
     flowSubtitles: {
       pkce: 'ブラウザーを開いてサインインし、ここに戻ります',
-      device_code: 'ブラウザーで確認ページを開きます — Hermes が自動接続します',
+      device_code: 'ブラウザーで確認ページを開きます — Stardust が自動接続します',
       external: 'ターミナルで一度サインインして、チャットに戻ります'
     },
     startingSignIn: provider => `${provider} のサインインを開始中...`,
@@ -2866,12 +2872,12 @@ export const ja = defineLocale({
     pickDifferentProvider: '別のプロバイダーを選択',
     signInWith: provider => `${provider} でサインイン`,
     openedBrowser: provider => `${provider} をブラウザーで開きました。`,
-    authorizeThere: 'そこで Hermes を承認してください。',
+    authorizeThere: 'そこで Stardust を承認してください。',
     copyAuthCode: '認証コードをコピーして以下に貼り付けてください。',
     pasteAuthCode: '認証コードを貼り付け',
     reopenAuthPage: '認証ページを再度開く',
     autoBrowser: provider =>
-      `${provider} をブラウザーで開きました。Hermes をそこで承認すれば自動接続されます。コピーや貼り付けは不要です。`,
+      `${provider} をブラウザーで開きました。Stardust をそこで承認すれば自動接続されます。コピーや貼り付けは不要です。`,
     reopenSignInPage: 'サインインページを再度開く',
     waitingAuthorize: '承認を待っています...',
     externalPending: provider =>
@@ -3150,11 +3156,11 @@ export const ja = defineLocale({
         'このアドレスはエージェントを実行しているマシンを指しており、このマシンではありません。ブラウザペインはページをローカルで読み込むため、リモートの開発サーバーにはポート転送か到達可能なホスト名が必要です。',
       failedToLoad: 'プレビューの読み込みに失敗しました',
       tryAgain: '再試行',
-      restarting: 'Hermes を再起動中...',
-      askRestart: 'Hermes にサーバーの再起動を依頼',
-      lookingRestart: taskId => `Hermes は再起動するプレビューサーバーを検索中です (${taskId})`,
+      restarting: 'Stardust を再起動中...',
+      askRestart: 'Stardust にサーバーの再起動を依頼',
+      lookingRestart: taskId => `Stardust は再起動するプレビューサーバーを検索中です (${taskId})`,
       restartingTitle: 'プレビューサーバーを再起動中',
-      restartingMessage: 'Hermes はバックグラウンドで作業中です。進捗はプレビューコンソールで確認してください。',
+      restartingMessage: 'Stardust はバックグラウンドで作業中です。進捗はプレビューコンソールで確認してください。',
       startRestartFailed: message => `サーバー再起動を開始できませんでした: ${message}`,
       restartFailed: 'サーバーの再起動に失敗しました',
       hideConsole: 'プレビューコンソールを非表示',
@@ -3166,7 +3172,7 @@ export const ja = defineLocale({
       reload: 'ページを再読み込み',
       address: 'アドレス',
       addressPlaceholder: 'アドレスを入力',
-      blankPageBody: '上のアドレス欄に入力するか、Hermes にページを開くよう頼んでください。',
+      blankPageBody: '上のアドレス欄に入力するか、Stardust にページを開くよう頼んでください。',
       finishedRestarting: message =>
         `Hermes がプレビューサーバーの再起動を完了しました${message ? `: ${message}` : ''}`,
       failedRestarting: message => `サーバーの再起動に失敗しました: ${message}`,
@@ -3174,7 +3180,7 @@ export const ja = defineLocale({
       restartedTitle: 'プレビューサーバーが再起動しました',
       reloadingNow: 'プレビューを再読み込み中です。',
       restartFailedTitle: 'プレビューの再起動に失敗しました',
-      restartFailedMessage: 'Hermes がサーバーを再起動できませんでした。',
+      restartFailedMessage: 'Stardust がサーバーを再起動できませんでした。',
       stillWorking:
         'Hermes はまだ作業中ですが、再起動の結果がまだ届いていません。サーバーコマンドがフォアグラウンドで実行されている可能性があります。',
       workspaceReloading: 'ワークスペースが変更され、プレビューを再読み込み中',
@@ -3264,7 +3270,7 @@ export const ja = defineLocale({
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',
-      loadingResponse: 'Hermes が応答を読み込み中',
+      loadingResponse: 'Stardust が応答を読み込み中',
       resumeWhenBackgroundDone: count =>
         count === 1
           ? 'バックグラウンドタスクの完了後に再開します'

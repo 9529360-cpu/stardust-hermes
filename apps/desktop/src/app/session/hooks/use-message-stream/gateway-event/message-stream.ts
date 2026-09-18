@@ -29,8 +29,9 @@ function firstBillingLine(text: string): string {
  * A turn failed on a billing wall (out of credits / payment required). The
  * gateway forwards the structured descriptor built by `agent/billing_links.py`;
  * we cache it per-session (drives the in-chat banner) AND raise one sticky,
- * billing-specific toast — never the generic "Hermes error" — with a smart CTA
- * (Nous → in-app Settings → Billing, other providers → their billing page).
+ * billing-specific toast — never the generic "Hermes error" — with a smart CTA:
+ * legacy Nous account walls route to provider setup, while third-party providers
+ * may deep-link to their own billing page.
  */
 function surfaceBillingBlock(sessionId: string, raw: unknown): void {
   if (!raw || typeof raw !== 'object') {
@@ -47,7 +48,7 @@ function surfaceBillingBlock(sessionId: string, raw: unknown): void {
 
   const ctaCopy = {
     addCredits: translateNow('billingBlock.addCredits'),
-    openBilling: translateNow('billingBlock.openBilling')
+    providerSettings: translateNow('settings.nav.providers')
   }
 
   notify({

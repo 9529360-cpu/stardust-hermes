@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { I18nProvider } from '@/i18n'
+
 // Radix Select calls scrollIntoView on its items when the content opens; jsdom
 // doesn't implement it (nor hasPointerCapture / releasePointerCapture), so stub
 // them to let the dropdown open in tests.
@@ -98,6 +100,21 @@ async function renderModelSettings(scopeProfile?: string) {
         <ModelSettings scopeProfile={scopeProfile} />
       </QueryClientProvider>
     </MemoryRouter>
+  )
+}
+
+async function renderChineseModelSettings() {
+  const { ModelSettings } = await import('./model-settings')
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+  return render(
+    <I18nProvider configClient={null} initialLocale="zh">
+      <MemoryRouter>
+        <QueryClientProvider client={client}>
+          <ModelSettings />
+        </QueryClientProvider>
+      </MemoryRouter>
+    </I18nProvider>
   )
 }
 
@@ -559,6 +576,22 @@ describe('ModelSettings MoA preset editor', () => {
 
     return { ref1Provider: all.at(-6)!, ref1Model: all.at(-5)! }
   }
+
+  it('renders the MoA editor chrome in the active Chinese locale', async () => {
+    await renderChineseModelSettings()
+
+    expect(await screen.findByText('参考模型 1')).toBeTruthy()
+    expect(screen.getByText(/配置具名预设/)).toBeTruthy()
+    expect(screen.getByText('已启用')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '设为默认' })).toBeTruthy()
+    expect(screen.getByPlaceholderText('新预设')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '添加预设' })).toBeTruthy()
+    expect(screen.getByText(/默认预设:/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '添加参考模型' })).toBeTruthy()
+    expect(screen.queryByText('Enabled')).toBeNull()
+    expect(screen.queryByText('Set default')).toBeNull()
+    expect(screen.queryByText('Reference 1')).toBeNull()
+  })
 
   it('holds the autosave while a slot is half-filled (provider changed, model pending)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })

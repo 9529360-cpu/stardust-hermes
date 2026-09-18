@@ -1157,10 +1157,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       {moa && currentMoaPreset && (
         <section>
           <SectionHeading icon={Cpu} title={m.moaTitle} />
-          <p className="mb-2 text-xs text-muted-foreground">
-            Configure named presets that appear as models under the Mixture of Agents provider. The aggregator is the
-            acting model.
-          </p>
+          <p className="mb-2 text-xs text-muted-foreground">{m.moaDescription}</p>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <Select onValueChange={setSelectedMoaPreset} value={selectedMoaPreset || moa.default_preset}>
               <SelectTrigger className={cn('min-w-40', CONTROL_TEXT)}>
@@ -1175,7 +1172,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
               </SelectContent>
             </Select>
             <label className="flex items-center gap-2 rounded-sm border border-border px-2 py-1 text-xs">
-              Enabled
+              {m.moaEnabled}
               <Switch
                 checked={currentMoaPreset.enabled !== false}
                 disabled={applying}
@@ -1196,7 +1193,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
               size="sm"
               variant="text"
             >
-              Set default
+              {m.moaSetDefault}
             </Button>
             <Button
               disabled={Object.keys(moa.presets).length <= 1 || applying}
@@ -1222,12 +1219,12 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
               size="sm"
               variant="ghost"
             >
-              Delete
+              {t.common.delete}
             </Button>
             <Input
               className={cn('w-40', CONTROL_TEXT)}
               onChange={event => setNewMoaPresetName(event.target.value)}
-              placeholder="new preset"
+              placeholder={m.moaNewPreset}
               value={newMoaPresetName}
             />
             <Button
@@ -1250,18 +1247,20 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
               size="sm"
               variant="textStrong"
             >
-              Add preset
+              {m.moaAddPreset}
             </Button>
           </div>
           <div className="mb-2 text-xs text-muted-foreground">
-            Default: <span className="font-mono">{moa.default_preset}</span>
+            {m.moaDefault}: <span className="font-mono">{moa.default_preset}</span>
           </div>
           <div className="grid gap-1">
             {currentMoaPreset.reference_models.map((slot, index) => (
               <ListRow
                 action={
                   <Switch
-                    aria-label={`${slot.enabled !== false ? 'Disable' : 'Enable'} reference ${index + 1}`}
+                    aria-label={
+                      slot.enabled !== false ? m.moaDisableReference(index + 1) : m.moaEnableReference(index + 1)
+                    }
                     checked={slot.enabled !== false}
                     disabled={applying}
                     onCheckedChange={checked =>
@@ -1338,7 +1337,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                       size="sm"
                       variant="ghost"
                     >
-                      Remove
+                      {t.common.remove}
                     </Button>
                   </div>
                 }
@@ -1349,7 +1348,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                   </span>
                 }
                 key={`${selectedMoaPreset}-${index}`}
-                title={`Reference ${index + 1}`}
+                title={m.moaReference(index + 1)}
               />
             ))}
             <Button
@@ -1363,7 +1362,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
               size="sm"
               variant="textStrong"
             >
-              Add reference model
+              {m.moaAddReference}
             </Button>
             <ListRow
               below={

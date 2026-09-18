@@ -19,7 +19,6 @@ import { BootFailureOverlay } from '@/components/boot-failure-overlay'
 import { ConfirmHost } from '@/components/confirm-host'
 import { DesktopInstallOverlay } from '@/components/desktop-install-overlay'
 import { FindBar } from '@/components/find-bar'
-import { FreeTierSignInDialog } from '@/components/free-tier/sign-in-dialog'
 import { GatewayConnectingOverlay } from '@/components/gateway-connecting-overlay'
 import { IntroRevealGate } from '@/components/intro-reveal'
 import { NotificationStack } from '@/components/notifications'
@@ -195,9 +194,8 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
   const busyRef = useRef(false)
   const creatingSessionRef = useRef(false)
-  // Billing recovery routes to Settings → Billing from surfaces without router
-  // context (the sticky toast). The shell owns `navigate`, so it consumes the
-  // intent counter here; the ref skips the initial mount value.
+  // Billing recovery from surfaces without router context now lands on provider
+  // setup. The retired built-in Billing/account page is no longer a product surface.
   const billingSettingsSeenRef = useRef(0)
   const poolLimitsSettingsSeenRef = useRef(0)
   const routeRequestSeenRef = useRef(0)
@@ -264,7 +262,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     billingSettingsSeenRef.current = billingSettingsRequest
 
     if (billingSettingsRequest > 0) {
-      navigate(`${SETTINGS_ROUTE}?tab=billing`)
+      navigate(`${SETTINGS_ROUTE}?tab=providers`)
     }
   }, [billingSettingsRequest, navigate])
 
@@ -1332,10 +1330,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
           requestGateway={requestGateway}
         />
       )}
-      {/* One host for every free-tier sign-in entry point (Settings › Billing,
-          the statusbar chip, the first-launch intro). It owns the flow; the
-          entry points only record the intent. */}
-      {!isAuxiliaryWindow() && <FreeTierSignInDialog onSelectModel={selectModel} />}
       <ModelPickerOverlay
         gateway={gateway || undefined}
         onSelect={selectModel}

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as HermesApi from '@/hermes'
 import { queryClient } from '@/lib/query-client'
 import type * as HubActions from '@/store/hub-actions'
+import { setPaneHeightOverride } from '@/store/panes'
 
 const getSkills = vi.fn()
 const getToolsets = vi.fn()
@@ -97,6 +98,7 @@ async function renderSkills() {
 }
 
 beforeEach(() => {
+  setPaneHeightOverride('capabilities-hub', undefined)
   getSkills.mockResolvedValue([])
   getToolsets.mockResolvedValue([toolset()])
   setToolsetEnabled.mockResolvedValue({ ok: true, name: 'web', enabled: false })
@@ -153,6 +155,18 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
     expect(screen.queryByText(/⏰/)).toBeNull()
   })
 
+  it('keeps long toolset protocol documentation behind a secondary details disclosure', async () => {
+    const longDescription =
+      'A2A protocol support with inbound and outbound transport, discovery, authentication, routing, compatibility adapters, implementation notes, security defaults, wire-format details, troubleshooting guidance, and platform-specific transport behavior that are useful for debugging but too detailed for the primary capability summary.'
+    getToolsets.mockResolvedValue([toolset({ description: longDescription })])
+
+    await renderSkills()
+
+    const disclosure = (await screen.findByText('Technical details')).closest('details')
+    expect(disclosure).toBeTruthy()
+    expect(disclosure!.hasAttribute('open')).toBe(false)
+    expect(disclosure!.textContent).toContain(longDescription)
+  })
   it('renders the provider config panel inline for the selected toolset', async () => {
     // The master-detail UI dropped the resting "Configured" pill and the
     // "Configure" expander: the detail column auto-selects the first toolset
@@ -253,7 +267,7 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
     await waitFor(() => expect(setSkillEnabled).toHaveBeenCalledWith('web-research', false, 'researcher'))
   })
 
-  it('shows the FULL skill in the detail pane — frontmatter metadata + body', async () => {
+  it('summarizes a skill first while keeping raw instructions and metadata available on demand', async () => {
     getSkills.mockResolvedValue([
       {
         name: 'web-research',
@@ -264,6 +278,12 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
         provenance: 'bundled'
       }
     ])
+    getSkillContent.mockResolvedValue({
+      name: 'web-research',
+      path: '/skills/web-research/SKILL.md',
+      content:
+        '---\nname: web-research\nversion: 1.2.0\nauthor: Nous\nplatforms: [linux, macos, windows]\nprerequisites:\n  env_vars: [SEARCH_API_KEY]\n  commands: [curl]\n---\n\n# Web Research\n\nDeep research steps for comparing sources before answering.\n\n## Workflow\n\n1. Search broadly.\n2. Verify the strongest sources.'
+    })
 
     await act(async () => {
       render(
@@ -275,13 +295,26 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
       )
     })
 
-    // Frontmatter renders as metadata rows, the body as full text — not just
-    // the one-line description.
     await waitFor(() => expect(getSkillContent).toHaveBeenCalled())
     expect(getSkillContent.mock.calls[0][0]).toBe('web-research')
-    expect(await screen.findByText('version')).toBeTruthy()
-    expect(await screen.findByText('1.2.0')).toBeTruthy()
-    expect(await screen.findByText(/Deep research steps/)).toBeTruthy()
+
+    // Product-level information is immediately readable.
+    expect(await screen.findByText('What it does')).toBeTruthy()
+    expect(await screen.findByText('Deep research steps for comparing sources before answering.')).toBeTruthy()
+    expect(await screen.findByText('Requirements')).toBeTruthy()
+    expect(await screen.findByText('SEARCH_API_KEY')).toBeTruthy()
+    expect(await screen.findByText('curl')).toBeTruthy()
+    expect(await screen.findByText('Works on')).toBeTruthy()
+    expect(await screen.findByText('linux')).toBeTruthy()
+
+    // The exact source is preserved, but no longer fills the default pane.
+    const raw = document.querySelector('[data-skill-raw-instructions]')
+    const metadata = document.querySelector('[data-skill-technical-metadata]')
+    expect(raw?.hasAttribute('open')).toBe(false)
+    expect(metadata?.hasAttribute('open')).toBe(false)
+    expect(raw?.textContent).toContain('## Workflow')
+    expect(metadata?.textContent).toContain('version')
+    expect(metadata?.textContent).toContain('1.2.0')
   })
 
   it('hub picker refuses to reinstall an already-installed skill', async () => {
@@ -290,7 +323,9 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
 
     render(<EmbeddedHubPicker installedNames={new Set(['web-research'])} profile={null} />)
 
-    // The picker is expanded by default — the hub iframe is live on mount.
+    // Discovery is opt-in: the native capabilities surface stays primary.
+    expect(document.querySelector('iframe')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse the full hub' }))
     expect(document.querySelector('iframe')).toBeTruthy()
 
     await act(async () => {
@@ -330,6 +365,8 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
       )
     })
 
+    expect(document.querySelector('iframe')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse the full hub' }))
     const iframe = document.querySelector('iframe')
     expect(iframe).toBeTruthy()
     expect(iframe!.closest('section')!.classList.contains('hidden')).toBe(false)

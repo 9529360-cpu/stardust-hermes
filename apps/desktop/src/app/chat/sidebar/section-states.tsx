@@ -28,15 +28,17 @@ export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }
   const s = t.sidebar
 
   return (
-    <div className="grid min-h-0 flex-1 place-items-center px-4 text-center">
-      <div className="flex flex-col items-center gap-2">
-        <Codicon className="text-(--ui-text-quaternary)" name="root-folder" size="1.25rem" />
-        <p className="text-xs text-(--ui-text-tertiary)">{s.noSessions}</p>
-        <Button className="mt-0.5 text-(--ui-text-secondary)" onClick={onNewProject} size="sm" variant="ghost">
-          <Codicon name="add" size="0.75rem" />
-          {s.projects.newButton}
-        </Button>
-      </div>
+    <div className="flex min-h-0 flex-1 flex-col px-2 pt-2">
+      <p className="px-2 py-1 text-[0.7rem] text-(--ui-text-quaternary)">{s.noSessions}</p>
+      <Button
+        className="h-7 justify-start px-2 text-[0.72rem] font-normal text-(--ui-text-tertiary)"
+        onClick={onNewProject}
+        size="sm"
+        variant="ghost"
+      >
+        <Codicon name="add" size="0.7rem" />
+        {s.projects.newButton}
+      </Button>
     </div>
   )
 }

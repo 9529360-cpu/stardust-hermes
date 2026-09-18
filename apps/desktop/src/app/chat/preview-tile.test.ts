@@ -10,6 +10,7 @@ vi.mock('./right-rail/preview-console-store', () => ({
 
 import { registry } from '@/contrib/registry'
 import { $previewTabs, closeRightRail, noteBrowserPage, openPreview } from '@/store/preview'
+import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 
 import { browserTabExternalUrl, browserTabLabel, watchPreviewTiles } from './preview-tile'
 
@@ -19,6 +20,7 @@ beforeAll(() => {
 
 afterEach(() => {
   closeRightRail()
+  setRightContextOpen(false)
 })
 
 describe('browserTabLabel', () => {
@@ -125,5 +127,19 @@ describe('preview tiles stack, not split (#93610)', () => {
     openPreview(fileTarget('/tmp/c.ts'), 'file-browser')
 
     expect(dockOf('preview-tile:file:/tmp/c.ts')?.pos).toBe('right')
+  })
+})
+
+describe('context rail visibility', () => {
+  it('opens for an explicit preview action but stays closed for passive tab updates', () => {
+    openPreview({ kind: 'url', label: 'Example', source: 'https://example.com', url: 'https://example.com' }, 'explicit-link')
+    expect($rightContextOpen.get()).toBe(true)
+
+    setRightContextOpen(false)
+    $previewTabs.set(
+      $previewTabs.get().map(tab => ({ ...tab, target: { ...tab.target, label: 'Updated page title' } }))
+    )
+
+    expect($rightContextOpen.get()).toBe(false)
   })
 })

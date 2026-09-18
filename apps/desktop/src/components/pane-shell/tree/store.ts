@@ -1056,11 +1056,11 @@ export function layoutHasRootSide(side: TreeSide): boolean {
 }
 
 /**
- * Un-dismiss + re-adopt every registered pane whose placement maps to `side`
- * (the same semantic mapping as `rootChildSide`: 'left' panes ⇔ ⌘B, everything
- * else non-main ⇔ ⌘J). Dismissal records for core chrome panes only exist as
- * legacy state (they all register closers now), but they must not strand the
- * pane where only a layout reset can recover it.
+ * Un-dismiss + re-adopt registered SIDE panes whose semantic placement matches
+ * `side`. Bottom/floating tools are deliberately excluded: opening the right
+ * context rail must never revive a dismissed terminal or other non-side tool.
+ * Dismissal records for core side chrome panes only exist as legacy state, but
+ * they must not strand the pane where only a layout reset can recover it.
  */
 function restoreDismissedSidePanes(side: TreeSide) {
   const dismissed = $dismissedPanes.get()
@@ -1077,7 +1077,7 @@ function restoreDismissedSidePanes(side: TreeSide) {
     }
 
     const placement = (pane.data as { placement?: string } | undefined)?.placement
-    const paneSide = placement === 'left' ? 'left' : placement === 'main' ? null : 'right'
+    const paneSide = placement === 'left' ? 'left' : placement === 'right' ? 'right' : null
 
     if (paneSide === side) {
       setDismissed(pane.id, false)

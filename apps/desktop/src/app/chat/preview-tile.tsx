@@ -12,7 +12,7 @@
 
 import { useStore } from '@nanostores/react'
 
-import { findGroup } from '@/components/pane-shell/tree/model'
+import { allPaneIds, findGroup } from '@/components/pane-shell/tree/model'
 import { $activeTreeGroup, $layoutTree, revealTreePane, treePanesWithPrefix } from '@/components/pane-shell/tree/store'
 import { type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { FileTypeIcon } from '@/components/ui/file-type-icon'
@@ -187,7 +187,13 @@ function existingPreviewAnchor(tabId: string): string | undefined {
 
   const other = $dockedPreviewTabs.get().find(tab => tab.id !== tabId)
 
-  return other ? previewPaneId(other.id) : undefined
+  if (other) {
+    return previewPaneId(other.id)
+  }
+
+  const tree = $layoutTree.get()
+
+  return tree && allPaneIds(tree).includes('workspace-overview') ? 'workspace-overview' : undefined
 }
 
 /** Keep pane contributions mirroring `$previewTabs`, keep the store's selection
@@ -203,9 +209,9 @@ export function watchPreviewTiles(): void {
 
   // The reveal analog of session tiles (session-states calls revealTreePane on
   // open): `openPreview` selects the tab, and the TREE must front its pane —
-  // un-minimize, un-hide, activate in its zone. Both stores, because re-opening
-  // the already-active tab changes only `$previewTabs` (fresh tab object), while
-  // switching tabs changes only the active id.
+  // un-minimize, un-hide, activate in its zone. Both stores are observed so
+  // re-opening an already-active tab still fronts it. Visibility of the whole
+  // context rail is owned by explicit `openPreview`, not these passive mirrors.
   const reveal = () => {
     const tabId = $rightRailActiveTabId.get()
 

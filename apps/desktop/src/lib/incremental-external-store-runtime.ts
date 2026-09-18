@@ -239,6 +239,50 @@ class IncrementalExternalStoreThreadRuntimeCore extends ExternalStoreThreadRunti
   }
 }
 
+type ThreadListSnapshot = ReturnType<AssistantRuntime['threads']['getState']>
+
+const sameThreadListSnapshot = (a: ThreadListSnapshot, b: ThreadListSnapshot): boolean =>
+  a.mainThreadId === b.mainThreadId &&
+  a.newThreadId === b.newThreadId &&
+  a.threadIds === b.threadIds &&
+  a.archivedThreadIds === b.archivedThreadIds &&
+  a.isLoading === b.isLoading &&
+  a.isLoadingMore === b.isLoadingMore &&
+  a.hasMore === b.hasMore &&
+  a.threadItems === b.threadItems
+
+/**
+ * assistant-ui's ThreadListRuntimeImpl memoizes while subscribed, but its
+ * LazyMemoizeSubject intentionally re-reads the core once the last subscriber
+ * disconnects. That disconnected read constructs a fresh-but-equivalent
+ * ThreadListState object. React may read getSnapshot again during teardown;
+ * a new reference at that boundary trips useSyncExternalStore's snapshot-loop
+ * guard even though no thread-list field changed.
+ *
+ * Keep the public runtime snapshot referentially stable across those teardown
+ * reads. Real list changes still replace one of the scalar/reference fields
+ * above and therefore publish a new snapshot.
+ */
+export function stabilizeThreadListSnapshot(runtime: AssistantRuntime): AssistantRuntime {
+  const threads = runtime.threads
+  const read = threads.getState
+  let previous = read()
+
+  ;(threads as { getState: () => ThreadListSnapshot }).getState = () => {
+    const next = read()
+
+    if (sameThreadListSnapshot(previous, next)) {
+      return previous
+    }
+
+    previous = next
+
+    return next
+  }
+
+  return runtime
+}
+
 export class IncrementalExternalStoreRuntimeCore extends BaseAssistantRuntimeCore {
   threads: ExternalStoreThreadListRuntimeCore
 
@@ -280,5 +324,5 @@ export function useIncrementalExternalStoreRuntime<T extends ThreadMessage>(
     return runtime.registerModelContextProvider(modelContext)
   }, [modelContext, runtime])
 
-  return useMemo(() => new AssistantRuntimeImpl(runtime), [runtime])
+  return useMemo(() => stabilizeThreadListSnapshot(new AssistantRuntimeImpl(runtime)), [runtime])
 }

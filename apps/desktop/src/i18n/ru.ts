@@ -235,8 +235,8 @@ export const ru = defineLocale({
       approveAction: 'Одобрить',
       rejectAction: 'Отклонить',
       inputTitle: 'Требуется ввод',
-      inputBody: 'Hermes ожидает ваш ответ.',
-      turnDoneTitle: 'Hermes завершил',
+      inputBody: 'Stardust ожидает ваш ответ.',
+      turnDoneTitle: 'Stardust завершил',
       turnDoneBody: '',
       turnErrorTitle: 'Ход не удался',
       backgroundDoneTitle: 'Фоновая задача завершена',
@@ -530,6 +530,7 @@ export const ru = defineLocale({
       appearance: 'Внешний вид',
       workspace: 'Рабочее пространство',
       safety: 'Безопасность',
+      browser: 'Браузер',
       memory: 'Память и контекст',
       voice: 'Голос',
       advanced: 'Дополнительно'
@@ -1192,7 +1193,7 @@ export const ru = defineLocale({
       enterUrlFirst: 'Сначала введите удалённый URL.',
       restartingTitle: 'Перезапуск соединения шлюза',
       savedTitle: 'Настройки шлюза сохранены',
-      restartingMessage: 'Hermes Desktop переподключится с сохранёнными настройками — оболочка останется открытой.',
+      restartingMessage: 'Stardust Desktop переподключится с сохранёнными настройками — оболочка останется открытой.',
       savedMessage: 'Сохранено для следующего перезапуска.',
       connectedTo: (baseUrl, version) => `Подключено к ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'Удалённый шлюз доступен',
@@ -1566,6 +1567,9 @@ export const ru = defineLocale({
     bulkUpdated: count => `Обновлено ${count} ${RU_NOUN(count, 'элемент', 'элемента', 'элементов')} для новых сеансов.`,
     bulkNoChange: 'Менять нечего.',
     usageCount: count => `использован ${count}×`,
+    toolCount: count => `${count} ${RU_PLURAL(count, 'инструмент', 'инструмента', 'инструментов')}`,
+    defaultProfile: 'Профиль по умолчанию',
+    currentConnection: 'текущее',
     provenance: {
       agent: 'Научен',
       bundled: 'Встроенный',
@@ -1575,6 +1579,7 @@ export const ru = defineLocale({
     emptyNothingMatches: query => `Ничего не подходит под «${query}».`,
     emptyNoneAvailable: noun => `${noun} пока недоступны.`,
     changesApplyNewSessions: 'Изменения применяются к новым сеансам.',
+    technicalDetails: 'Технические сведения',
     skillUpdated: 'Навык обновлён',
     edit: 'Изменить',
     archive: 'В архив',
@@ -2091,6 +2096,7 @@ export const ru = defineLocale({
         help: 'Рекомендуется. Номера телефонов или ID WhatsApp через запятую.'
       }
     },
+    platformDescriptions: {},
     platformIntro: {}
   },
   webhooks: {
@@ -2472,7 +2478,7 @@ export const ru = defineLocale({
     noMatch: query => `Нет сеансов по запросу «${query}».`,
     results: 'Результаты',
     pinned: 'Закреплённые',
-    sessions: 'Сеансы',
+    sessions: 'Чаты',
     cronJobs: 'Cron-задачи',
     groupAriaGrouped: 'Показать сеансы одним списком',
     groupAriaUngrouped: 'Сгруппировать сеансы по рабочим пространствам',
@@ -2630,12 +2636,12 @@ export const ru = defineLocale({
   composer: {
     message: 'Сообщение',
     wakingProfile: profile => `Пробуждаем ${profile}…`,
-    placeholderStarting: 'Запуск Hermes...',
-    placeholderReconnecting: 'Переподключение к Hermes…',
+    placeholderStarting: 'Запуск помощника...',
+    placeholderReconnecting: 'Переподключение…',
     placeholderFollowUp: 'Отправить продолжение',
     newSessionPlaceholders: [
       'Что будем делать?',
-      'Дайте Hermes задачу',
+      'Поручите мне задачу',
       'О чём вы думаете?',
       'Опишите, что нужно',
       'Что обсудим?',
@@ -2944,7 +2950,7 @@ export const ru = defineLocale({
       createPr: 'Создать PR',
       openPr: 'Открыть PR',
       ghMissing: 'Установите GitHub CLI (gh) и войдите, чтобы открывать PR',
-      agentShip: 'Попросить Hermes открыть PR',
+      agentShip: 'Попросить Stardust открыть PR',
       agentShipUnavailable: 'Чат, которому принадлежат эти изменения, не на экране.',
       agentShipPrompt:
         'Проверьте текущие изменения, закоммитьте их с ясным conventional-commit сообщением, запушьте ветку и создайте pull request.',
@@ -3037,7 +3043,7 @@ export const ru = defineLocale({
     }
   },
   guidedGreeting: {
-    line: 'Заходите. Я Hermes. Дайте мне пару минут — обустрою тут всё под вас, а потом займёмся тем, что вам правда нужно.\n\nДля начала: как к вам обращаться?',
+    line: 'Заходите. Я Stardust. Дайте мне пару минут — обустрою тут всё под вас, а потом займёмся тем, что вам правда нужно.\n\nДля начала: как к вам обращаться?',
     nameSuggestion: (name: string) => `(Могу звать вас просто ${name}, если так удобнее.)`
   },
   install: {
@@ -3048,7 +3054,7 @@ export const ru = defineLocale({
       skipped: 'Пропущено',
       failed: 'Ошибка'
     },
-    oneTimeTitle: 'Hermes требует одноразовой установки',
+    oneTimeTitle: 'Stardust требует одноразовой установки',
     unsupportedDesc: platform =>
       `Автоматическая установка при первом запуске пока недоступна на ${platform}. Откройте Терминал и выполните команду ниже, затем перезапустите это приложение. При следующих запусках этот шаг будет пропущен.`,
     installCommand: 'Команда установки',
@@ -3056,7 +3062,7 @@ export const ru = defineLocale({
     viewDocs: 'Открыть документацию по установке',
     installTo: 'Будет установлено в',
     retryAfterRun: 'Я выполнил — попробовать снова',
-    setupChoiceTitle: 'Настройка Hermes Desktop',
+    setupChoiceTitle: 'Настройка Stardust Desktop',
     setupChoiceDesc:
       'Подключите это приложение к уже работающему шлюзу Hermes или установите Hermes локально на этот компьютер.',
     connectExistingTitle: 'Подключиться к существующему Hermes',
@@ -3065,7 +3071,7 @@ export const ru = defineLocale({
       'Используйте удалённый бэкенд с сессионным токеном или входом через браузер. Локальная установка не начнётся.',
     installLocalTitle: 'Установить Hermes локально',
     installLocalDesc: 'Скачайте Hermes, создайте его Python-окружение и запустите бэкенд на этом компьютере.',
-    localStartUnavailable: 'Не удалось начать локальную установку. Перезапустите Hermes Desktop и попробуйте снова.',
+    localStartUnavailable: 'Не удалось начать локальную установку. Перезапустите Stardust Desktop и попробуйте снова.',
     remoteSetupTitle: 'Подключиться к существующему Hermes',
     remoteSetupDesc: 'Введите URL вашего шлюза. Hermes Desktop определит, нужен токен или вход через браузер.',
     remoteUrlTitle: 'URL шлюза',
@@ -3092,7 +3098,7 @@ export const ru = defineLocale({
     applyRemote: 'Применить и переподключиться',
     backToSetup: 'Назад',
     failedTitle: 'Установка не удалась',
-    settingUpTitle: 'Настройка Hermes Agent',
+    settingUpTitle: 'Настройка Stardust Agent',
     finishingTitle: 'Завершаем',
     failedDesc:
       'Один из шагов установки завершился ошибкой. На Windows это может произойти, если запущена другая инстанция Hermes CLI или desktop. Остановите все работающие инстанции Hermes и повторите. Подробности — ниже или в журнале desktop.',
@@ -3114,10 +3120,10 @@ export const ru = defineLocale({
     reloadRetry: 'Перезагрузить и повторить'
   },
   onboarding: {
-    headerTitle: 'Настроим для вас Hermes Agent',
+    headerTitle: 'Настроим для вас Stardust Agent',
     headerDesc: 'Подключите провайдера модели, чтобы начать общение. Большинство вариантов — в один клик.',
-    preparingInstall: 'Hermes завершает установку. Обычно это занимает меньше минуты при первом запуске.',
-    starting: 'Запускаем Hermes…',
+    preparingInstall: 'Stardust завершает установку. Обычно это занимает меньше минуты при первом запуске.',
+    starting: 'Запускаем Stardust…',
     lookingUpProviders: 'Ищем провайдеров...',
     collapse: 'Свернуть',
     otherProviders: 'Другие провайдеры',
@@ -3125,7 +3131,7 @@ export const ru = defineLocale({
     chooseLater: 'Выберу провайдера позже',
     recommended: 'Рекомендуется',
     connected: 'Подключено',
-    featuredPitch: 'Одна подписка, 300+ передовых моделей — рекомендуемый способ запускать Hermes',
+    featuredPitch: 'Одна подписка, 300+ передовых моделей — рекомендуемый способ запускать Stardust',
     fireworksPitch: 'Прямой API моделей — передовые модели на хостинге Fireworks',
     openRouterPitch: 'Один ключ, сотни моделей — надёжный вариант по умолчанию',
     apiKeyOptions: {
@@ -3143,7 +3149,7 @@ export const ru = defineLocale({
       local: {
         short: 'self-hosted',
         description:
-          'Укажите Hermes локальный или self-hosted OpenAI-совместимый endpoint (vLLM, llama.cpp, Ollama и т.д.).'
+          'Укажите Stardust локальный или self-hosted OpenAI-совместимый endpoint (vLLM, llama.cpp, Ollama и т.д.).'
       }
     },
     backToSignIn: 'Назад ко входу',
@@ -3156,7 +3162,7 @@ export const ru = defineLocale({
     update: 'Обновить',
     flowSubtitles: {
       pkce: 'Откроет браузер для входа, затем продолжит здесь',
-      device_code: 'Откроет страницу подтверждения в браузере — Hermes подключится автоматически',
+      device_code: 'Откроет страницу подтверждения в браузере — Stardust подключится автоматически',
       external: 'Войдите один раз в терминале, затем вернитесь в чат'
     },
     startingSignIn: provider => `Начинаем вход для ${provider}...`,
@@ -3167,12 +3173,12 @@ export const ru = defineLocale({
     pickDifferentProvider: 'Выбрать другого провайдера',
     signInWith: provider => `Войти через ${provider}`,
     openedBrowser: provider => `Мы открыли ${provider} в вашем браузере.`,
-    authorizeThere: 'Авторизуйте Hermes там.',
+    authorizeThere: 'Авторизуйте Stardust там.',
     copyAuthCode: 'Скопируйте код авторизации и вставьте его ниже.',
     pasteAuthCode: 'Вставьте код авторизации',
     reopenAuthPage: 'Открыть страницу авторизации снова',
     autoBrowser: provider =>
-      `Мы открыли ${provider} в вашем браузере. Авторизуйте Hermes там, и подключение произойдёт автоматически — ничего копировать и вставлять не нужно.`,
+      `Мы открыли ${provider} в вашем браузере. Авторизуйте Stardust там, и подключение произойдёт автоматически — ничего копировать и вставлять не нужно.`,
     reopenSignInPage: 'Открыть страницу входа снова',
     waitingAuthorize: 'Ждём вашей авторизации...',
     externalPending: provider =>
@@ -3451,11 +3457,11 @@ export const ru = defineLocale({
         'Этот адрес указывает на машину, на которой работает ваш агент, а не на эту. Панель браузера загружает страницы локально, поэтому для удалённого dev-сервера нужен порт-форвардинг или доступный hostname.',
       failedToLoad: 'Не удалось загрузить предпросмотр',
       tryAgain: 'Попробовать снова',
-      restarting: 'Hermes перезапускается...',
-      askRestart: 'Попросить Hermes перезапустить сервер',
-      lookingRestart: taskId => `Hermes ищет сервер предпросмотра для перезапуска (${taskId})`,
+      restarting: 'Stardust перезапускается...',
+      askRestart: 'Попросить Stardust перезапустить сервер',
+      lookingRestart: taskId => `Stardust ищет сервер предпросмотра для перезапуска (${taskId})`,
       restartingTitle: 'Перезапуск сервера предпросмотра',
-      restartingMessage: 'Hermes работает в фоне. Следите за прогрессом в консоли предпросмотра.',
+      restartingMessage: 'Stardust работает в фоне. Следите за прогрессом в консоли предпросмотра.',
       startRestartFailed: message => `Не удалось запустить перезапуск сервера: ${message}`,
       restartFailed: 'Перезапуск сервера не удался',
       hideConsole: 'Скрыть консоль предпросмотра',
@@ -3467,14 +3473,14 @@ export const ru = defineLocale({
       reload: 'Перезагрузить страницу',
       address: 'Адрес',
       addressPlaceholder: 'Введите адрес',
-      blankPageBody: 'Введите адрес выше, чтобы просматривать, или попросите Hermes открыть страницу.',
-      finishedRestarting: message => `Hermes завершил перезапуск сервера предпросмотра${message ? `: ${message}` : ''}`,
+      blankPageBody: 'Введите адрес выше, чтобы просматривать, или попросите Stardust открыть страницу.',
+      finishedRestarting: message => `Stardust завершил перезапуск сервера предпросмотра${message ? `: ${message}` : ''}`,
       failedRestarting: message => `Перезапуск сервера не удался: ${message}`,
       unknownError: 'неизвестная ошибка',
       restartedTitle: 'Сервер предпросмотра перезапущен',
       reloadingNow: 'Перезагружаем предпросмотр.',
       restartFailedTitle: 'Перезапуск предпросмотра не удался',
-      restartFailedMessage: 'Hermes не смог перезапустить сервер.',
+      restartFailedMessage: 'Stardust не смог перезапустить сервер.',
       stillWorking:
         'Hermes всё ещё работает, но результата перезапуска пока нет. Команда сервера может выполняться в foreground.',
       workspaceReloading: 'Рабочее пространство изменилось, перезагружаем предпросмотр',
@@ -3566,7 +3572,7 @@ export const ru = defineLocale({
     thread: {
       loadingSession: 'Загрузка сеанса',
       showEarlier: 'Показать ранние сообщения',
-      loadingResponse: 'Hermes загружает ответ',
+      loadingResponse: 'Stardust загружает ответ',
       resumeWhenBackgroundDone: count =>
         count === 1
           ? 'Продолжится, когда фоновая задача завершится'

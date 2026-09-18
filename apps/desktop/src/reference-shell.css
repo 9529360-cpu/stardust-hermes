@@ -245,7 +245,7 @@
 :root[data-hermes-reference-shell='aurora']
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])::after {
-  content: 'TOOLS';
+  content: attr(data-tools-label);
   display: block;
   margin: 5px 2px 1px;
   color: rgba(142, 160, 194, 0.66);
@@ -400,5 +400,583 @@
     [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
     [data-slot='sidebar-menu-button']:hover {
     transform: none;
+  }
+}
+/* Aurora is a product shell, not the global appearance mode. Keep every
+   first-party surface on the same dark semantic palette even when the saved
+   appearance is light/system. OverlayView and Radix dialogs may render outside
+   data-contrib-shell, so those portal surfaces receive the same foundation explicitly. */
+:root[data-hermes-reference-shell='aurora'] :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content']) {
+  --ui-bg-chrome: var(--aurora-glass-strong);
+  --ui-bg-sidebar: var(--aurora-rail);
+  --ui-bg-editor: var(--aurora-panel-strong);
+  --ui-bg-primary: rgba(18, 31, 58, 0.92);
+  --ui-bg-secondary: rgba(20, 34, 64, 0.82);
+  --ui-bg-tertiary: rgba(26, 42, 75, 0.72);
+  --ui-bg-quaternary: rgba(92, 119, 177, 0.12);
+  --ui-bg-quinary: rgba(99, 127, 190, 0.08);
+  --ui-bg-elevated: rgba(17, 31, 58, 0.98);
+  --ui-bg-card: rgba(24, 42, 76, 0.68);
+  --ui-bg-input: rgba(8, 16, 33, 0.96);
+  --ui-chat-bubble-background: rgba(17, 31, 58, 0.98);
+  --ui-chat-bubble-opaque-background: rgba(17, 31, 58, 0.98);
+  --ui-text-primary: var(--aurora-ink);
+  --ui-text-secondary: var(--aurora-ink-2);
+  --ui-text-tertiary: var(--aurora-ink-3);
+  --ui-text-quaternary: rgba(126, 145, 179, 0.72);
+  --ui-control-hover-background: var(--aurora-control-hover);
+  --ui-control-active-background: var(--aurora-control-active);
+  --ui-row-hover-background: rgba(111, 140, 203, 0.12);
+  --ui-row-active-background: rgba(126, 157, 231, 0.2);
+  --ui-stroke-primary: rgba(181, 202, 255, 0.22);
+  --ui-stroke-secondary: var(--aurora-stroke);
+  --ui-stroke-tertiary: var(--aurora-stroke-soft);
+  --ui-stroke-quaternary: rgba(177, 199, 255, 0.055);
+}
+
+:root[data-hermes-reference-shell='aurora'] :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content']) {
+  --ui-sidebar-surface-background: var(--aurora-rail);
+  --ui-chat-surface-background: rgba(8, 16, 33, 0.9);
+  --ui-editor-surface-background: rgba(8, 16, 33, 0.84);
+  --ui-panel-surface-background: var(--aurora-panel);
+  --ui-widget-surface-background: rgba(26, 42, 75, 0.58);
+  --ui-terminal-surface-background: rgba(5, 11, 24, 0.93);
+  --sidebar: transparent;
+  --sidebar-foreground: var(--aurora-ink);
+  --sidebar-border: var(--aurora-stroke-soft);
+  --sidebar-accent: rgba(123, 151, 220, 0.16);
+  --sidebar-accent-foreground: var(--aurora-ink);
+  --sidebar-edge-border: rgba(172, 196, 255, 0.1);
+  --chrome-action-hover: var(--aurora-control-hover);
+  --dt-background: var(--ui-bg-chrome);
+  --dt-foreground: var(--ui-text-primary);
+  --dt-card: var(--ui-bg-editor);
+  --dt-card-foreground: var(--ui-text-primary);
+  --dt-muted: var(--ui-bg-tertiary);
+  --dt-muted-foreground: var(--ui-text-tertiary);
+  --dt-popover: var(--ui-bg-elevated);
+  --dt-popover-foreground: var(--ui-text-primary);
+  --dt-secondary: var(--ui-bg-secondary);
+  --dt-secondary-foreground: var(--ui-text-secondary);
+  --dt-accent: var(--ui-control-active-background);
+  --dt-accent-foreground: var(--ui-text-primary);
+  --dt-border: var(--ui-stroke-secondary);
+  --dt-input: var(--ui-stroke-primary);
+  --dt-ring: var(--ui-stroke-primary);
+  --dt-midground: var(--aurora-ink-3);
+  --dt-sidebar-bg: var(--aurora-rail);
+  --dt-sidebar-border: var(--aurora-stroke-soft);
+}
+
+/* Keep Chromium's native time-picker glyph readable on Aurora's dark overlay surfaces. */
+:root[data-hermes-reference-shell='aurora']
+  :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content'])
+  input[type='time'] {
+  color-scheme: dark;
+}
+/* Figma/macOS 27 refinement: unified desktop chrome, restrained depth. */
+:root[data-hermes-reference-shell='aurora'] {
+  --aurora-night-0: #090d14;
+  --aurora-night-1: #0b1018;
+  --aurora-night-2: #111824;
+  --aurora-blue: #6f8ff8;
+  --aurora-blue-soft: #9ab0ff;
+  --aurora-violet: #7b86f6;
+  --aurora-cyan: #7bb8da;
+  --aurora-ink: #f1f4f8;
+  --aurora-ink-2: #c3cad5;
+  --aurora-ink-3: #7f8998;
+  --aurora-stroke: rgba(255, 255, 255, 0.09);
+  --aurora-stroke-soft: rgba(255, 255, 255, 0.055);
+  --aurora-glass: #0b1018;
+  --aurora-glass-strong: #101620;
+  --aurora-rail: #10161f;
+  --aurora-panel: #0f151e;
+  --aurora-panel-strong: #111923;
+  --aurora-control: rgba(255, 255, 255, 0.045);
+  --aurora-control-hover: rgba(255, 255, 255, 0.075);
+  --aurora-control-active: rgba(111, 143, 248, 0.16);
+}
+
+:root[data-hermes-reference-shell='aurora'] body {
+  background: #090d14;
+}
+:root[data-hermes-reference-shell='aurora'] body::before,
+:root[data-hermes-reference-shell='aurora'] body::after {
+  display: none;
+}
+
+:root[data-hermes-reference-shell='aurora'] #root {
+  padding: 0;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+  border: 0;
+  border-radius: 0;
+  background: #0b1018 !important;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group] {
+  background: #0b1018 !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+  background: #10161f !important;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  :is([data-tree-group='grp-review'], [data-tree-group='grp-files'], [data-tree-group='grp-terminal']) {
+  background: #0f151e !important;
+}
+:root[data-hermes-reference-shell='aurora'] [data-panel-header] {
+  background: rgba(16, 22, 31, 0.96) !important;
+  box-shadow: inset 0 -1px 0 var(--aurora-stroke-soft);
+  backdrop-filter: none;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']::before {
+  min-height: 36px;
+  padding: 6px 10px 2px 30px;
+  color: #d9dee8;
+  background-image: radial-gradient(circle at 14px 50%, #7f9cf7 0 3px, transparent 3.5px);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-shadow: none;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu'] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item'] {
+  width: 100%;
+}
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
+  [data-slot='sidebar-menu-button'] {
+  height: 36px;
+  margin-bottom: 8px;
+  border-color: rgba(111, 143, 248, 0.28) !important;
+  border-radius: 8px;
+  background: rgba(63, 94, 196, 0.7) !important;
+  color: #f7f9ff !important;
+  box-shadow: none;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
+  [data-slot='sidebar-menu-button']:hover {
+  border-color: rgba(130, 158, 248, 0.42) !important;
+  background: rgba(72, 104, 211, 0.82) !important;
+  transform: none;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:is(
+    :has([data-tour='sidebar-nav-skills']),
+    :has([data-tour='sidebar-nav-messaging']),
+    :has([data-tour='sidebar-nav-artifacts']),
+    :has([data-tour='sidebar-nav-cron'])
+  ) {
+  margin-top: 0 !important;
+}
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:is(
+    :has([data-tour='sidebar-nav-skills']),
+    :has([data-tour='sidebar-nav-messaging']),
+    :has([data-tour='sidebar-nav-artifacts']),
+    :has([data-tour='sidebar-nav-cron'])
+  )
+  [data-slot='sidebar-menu-button'] {
+  height: 31px;
+  padding-inline: 9px;
+  border-color: transparent !important;
+  background: transparent !important;
+  color: rgba(195, 202, 213, 0.78);
+  font-size: 0.72rem;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:is(
+    :has([data-tour='sidebar-nav-skills']),
+    :has([data-tour='sidebar-nav-messaging']),
+    :has([data-tour='sidebar-nav-artifacts']),
+    :has([data-tour='sidebar-nav-cron'])
+  )
+  [data-slot='sidebar-menu-button']:hover {
+  border-color: transparent !important;
+  background: var(--aurora-control-hover) !important;
+  color: var(--aurora-ink-2);
+}
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])::before {
+  margin-bottom: 5px;
+  color: rgba(127, 137, 152, 0.78);
+  font-size: 0.56rem;
+  letter-spacing: 0.13em;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])
+  > div:has(> input[type='text']) {
+  min-height: 32px;
+  border-color: transparent;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.045);
+  opacity: 1;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])
+  > div:has(> input[type='text']):focus-within {
+  border-color: rgba(111, 143, 248, 0.24);
+  background: rgba(255, 255, 255, 0.065);
+  box-shadow: 0 0 0 2px rgba(111, 143, 248, 0.06);
+}
+:root[data-hermes-reference-shell='aurora'] [data-tour='composer'] {
+  border-color: rgba(255, 255, 255, 0.085) !important;
+  border-radius: 12px !important;
+  background: #111821 !important;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.18) !important;
+  backdrop-filter: none;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content']) {
+  --ui-bg-chrome: #0b1018;
+  --ui-bg-sidebar: #10161f;
+  --ui-bg-editor: #0f151e;
+  --ui-bg-primary: #111824;
+  --ui-bg-secondary: #151d29;
+  --ui-bg-tertiary: #1a2330;
+  --ui-bg-quaternary: rgba(255, 255, 255, 0.05);
+  --ui-bg-quinary: rgba(255, 255, 255, 0.035);
+  --ui-bg-elevated: #151d28;
+  --ui-bg-card: #131b26;
+  --ui-bg-input: #0d131c;
+  --ui-chat-bubble-background: #151d29;
+  --ui-chat-bubble-opaque-background: #151d29;
+  --ui-row-hover-background: rgba(255, 255, 255, 0.05);
+  --ui-row-active-background: rgba(111, 143, 248, 0.13);
+}
+
+/* Keep supporting rails subordinate to the conversation surface. */
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+  min-width: 220px;
+  max-width: 270px;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+  min-width: 272px;
+  max-width: 320px;
+}
+
+@media (max-width: 1100px) {
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+    max-width: 240px;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+    max-width: 292px;
+  }
+}
+
+
+/* The conversations/agents pair is a sidebar mode switch, not global app
+   navigation. Keep the enforced shared pane group, but render its titlebar
+   tabs as one quiet segmented control inside the rail. */
+:root[data-hermes-reference-shell='aurora']
+  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']) {
+  background: transparent !important;
+  box-shadow: none;
+  --pane-tab-active-bg: var(--ui-control-active-background);
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  > [role='tablist'] {
+  align-self: center;
+  flex: 0 0 auto;
+  height: 26px;
+  gap: 2px;
+  margin-inline-start: 5px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--ui-bg-quaternary);
+}
+:root[data-hermes-reference-shell='aurora']
+  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  [data-slot='pane-tab'] {
+  height: 22px;
+  min-width: 0;
+  border: 0 !important;
+  border-radius: 5px;
+  box-shadow: none !important;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  [data-slot='pane-tab'][data-active='false'] {
+  --tab-bg: transparent;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  [data-slot='pane-tab'] .pane-tab-content > span > span {
+  font-size: 0.67rem;
+  font-weight: 520;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+/* JARVIS workspace refinement — selected Stardust product direction. */
+:root[data-hermes-reference-shell='aurora'] {
+  --aurora-night-0: #020711;
+  --aurora-night-1: #040b15;
+  --aurora-night-2: #071321;
+  --aurora-blue: #45bdff;
+  --aurora-blue-soft: #9edfff;
+  --aurora-violet: #5c95ff;
+  --aurora-cyan: #62d2ff;
+  --aurora-ink: #e8f5ff;
+  --aurora-ink-2: #acc5d6;
+  --aurora-ink-3: #6f8ca1;
+  --aurora-stroke: rgba(88, 190, 255, 0.18);
+  --aurora-stroke-soft: rgba(88, 190, 255, 0.09);
+  --aurora-glass: #050d18;
+  --aurora-glass-strong: #07111e;
+  --aurora-rail: #06101d;
+  --aurora-panel: #081523;
+  --aurora-panel-strong: #091827;
+  --aurora-control: rgba(76, 177, 239, 0.055);
+  --aurora-control-hover: rgba(76, 177, 239, 0.09);
+  --aurora-control-active: rgba(52, 151, 222, 0.16);
+}
+
+:root[data-hermes-reference-shell='aurora'] body {
+  background: #020711;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
+  background: #040b15 !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group] {
+  background: #040b15 !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+  min-width: 176px;
+  max-width: 202px;
+  background: #06101d !important;
+  box-shadow: inset -1px 0 0 rgba(83, 184, 247, 0.12);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+  min-width: 242px;
+  max-width: 274px;
+  background: #050e19 !important;
+  box-shadow: inset 1px 0 0 rgba(83, 184, 247, 0.1);
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav {
+  background: linear-gradient(180deg, rgba(5, 15, 27, 0.98), rgba(6, 16, 29, 0.96)) !important;
+  border-color: rgba(80, 180, 244, 0.11) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button {
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #8fa9bc;
+  font-size: 0.72rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button:hover {
+  background: rgba(69, 174, 240, 0.07);
+  color: #d4eaff;
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button[aria-current='page'] {
+  border-color: rgba(92, 197, 255, 0.3);
+  background: linear-gradient(90deg, rgba(34, 132, 207, 0.18), rgba(29, 81, 129, 0.09));
+  color: #dff4ff;
+  box-shadow:
+    inset 2px 0 0 #5acbff,
+    0 0 22px rgba(41, 155, 226, 0.08);
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-personal-conversations]
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content'] {
+  padding-inline: 0.65rem;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-personal-conversations]
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])::before {
+  content: 'RECENT';
+  color: #557890;
+  letter-spacing: 0.15em;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-personal-conversations]
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-button'] {
+  border-radius: 6px;
+  color: #879faf;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] {
+  background:
+    radial-gradient(46rem 25rem at 92% 0%, rgba(27, 116, 182, 0.13), transparent 68%),
+    radial-gradient(34rem 20rem at 8% 100%, rgba(23, 94, 148, 0.08), transparent 72%),
+    linear-gradient(180deg, #040c17 0%, #030a13 100%);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] section {
+  backdrop-filter: blur(14px);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] .jarvis-earth {
+  mix-blend-mode: screen;
+  filter: saturate(0.82) brightness(0.72) hue-rotate(3deg);
+  mask-image: radial-gradient(circle at 52% 51%, black 0 45%, rgba(0, 0, 0, 0.82) 61%, transparent 78%);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] .jarvis-command-capsule {
+  -webkit-app-region: no-drag;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-personal-sidebar-shell] {
+  position: relative;
+  background: var(--ui-sidebar-surface-background);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-personal-sidebar-shell]::after {
+  content: none;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] button {
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-context-rail {
+  background: var(--ui-panel-surface-background) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-context-rail > div:first-child {
+  border-bottom: 1px solid var(--ui-stroke-quaternary);
+  padding-bottom: 0.5rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-context-rail section {
+  background: transparent !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-panel-header] {
+  background: var(--ui-bg-chrome) !important;
+  box-shadow: inset 0 -1px 0 var(--ui-stroke-quaternary);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tour='composer'] {
+  border-color: var(--ui-stroke-secondary) !important;
+  background: var(--ui-bg-input) !important;
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 20%, transparent) !important;
+}
+
+@media (max-width: 1100px) {
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+    min-width: 160px;
+    max-width: 184px;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+    min-width: 218px;
+    max-width: 246px;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] .jarvis-earth {
+    right: -14rem;
+    opacity: 0.38;
+  }
+}
+
+/* Conversation readability: human turns must read as compact chat bubbles,
+   never as a full-width light slab across the transcript. */
+:root[data-hermes-reference-shell='aurora'] [data-slot='aui_user-bubble-actions'] {
+  width: fit-content !important;
+  max-width: min(78%, 44rem) !important;
+  align-self: flex-end;
+  margin-left: auto;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='aui_user-message-root'] .composer-human-message {
+  background: var(--ui-chat-bubble-background) !important;
+  border-color: var(--ui-stroke-tertiary) !important;
+  color: var(--ui-text-primary) !important;
+  box-shadow: none !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='aui_user-message-root'] [data-slot='aui_user-inline-text'],
+:root[data-hermes-reference-shell='aurora'] [data-slot='aui_user-message-root'] [data-slot='aui_user-inline-code'] {
+  color: inherit !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='aui_assistant-message-content'] {
+  background: transparent !important;
+  color: var(--ui-text-primary) !important;
+}
+
+@media (max-width: 900px) {
+  :root[data-hermes-reference-shell='aurora'] [data-slot='aui_user-bubble-actions'] {
+    max-width: 90% !important;
+  }
+}
+
+/* Product shell sizing: conversation is primary; the contextual stage is wide
+   enough for browser/UI work when it is explicitly revealed. */
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+  min-width: 320px;
+  max-width: 520px;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] {
+  background: var(--ui-chat-surface-background) !important;
+}
+
+@media (max-width: 1100px) {
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+    min-width: 280px;
+    max-width: 360px;
   }
 }

@@ -11,9 +11,9 @@ import {
 // Private-product default: conversations on the left, the active chat as the
 // dominant surface, and one calm context rail on the right. Files and Review
 // live as tabs in that context rail and stay hidden until the user asks for
-// them; the always-available overview keeps the rail useful when no tool pane
-// is open. Terminal is intentionally absent from the first view and appears on
-// demand.
+// them. The whole rail is intent-driven: ordinary conversation can use the
+// full center width; project and preview work reveals the rail on demand.
+// Terminal is intentionally absent from the first view and appears on demand.
 export const DEFAULT_TREE = split(
   'row',
   [
@@ -21,7 +21,7 @@ export const DEFAULT_TREE = split(
     group(['workspace'], { id: 'grp-main' }),
     group([WORKSPACE_OVERVIEW_PANE_ID, 'review', 'files'], { id: 'grp-context' })
   ],
-  [1, 3.5, 1.2],
+  [0.82, 3.9, 1.45],
   'spl-root'
 )
 
@@ -34,7 +34,7 @@ const FOCUS_TREE = split(
 const BASIC_TREE = split(
   'row',
   [group(['sessions']), group(['workspace']), group([WORKSPACE_OVERVIEW_PANE_ID])],
-  [1, 3.8, 1.05]
+  [0.82, 4.4, 1.05]
 )
 
 const TERMINAL_TREE = split(

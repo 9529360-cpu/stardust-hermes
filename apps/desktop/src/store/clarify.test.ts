@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  $clarifyBatchDrafts,
   $clarifyRequest,
   $clarifyRequests,
   type ClarifyRequest,
+  clarifyBatchDraft,
   clearClarifyRequest,
   hasClarifyRequest,
   normalizeChoices,
   normalizeQuestions,
   setClarifyRequest,
-  skipClarifyRequest
+  skipClarifyRequest,
+  updateClarifyBatchDraft
 } from './clarify'
 import { $gateway } from './gateway'
 import { rememberServerRequest, resetServerRequestsForTests } from './server-requests'
@@ -28,11 +31,13 @@ function clarify(sessionId: string | null, requestId: string): ClarifyRequest {
 describe('clarify store', () => {
   beforeEach(() => {
     $clarifyRequests.set({})
+    $clarifyBatchDrafts.set({})
     $activeSessionId.set(null)
   })
 
   afterEach(() => {
     $clarifyRequests.set({})
+    $clarifyBatchDrafts.set({})
     $activeSessionId.set(null)
   })
 
@@ -84,6 +89,45 @@ describe('clarify store', () => {
 
     expect($clarifyRequests.get()['session-a']).toBeUndefined()
     expect($clarifyRequests.get()['session-b']?.requestId).toBe('other')
+  })
+
+  it('keeps an unsubmitted batch draft available to a remounted card for the same request', () => {
+    setClarifyRequest(clarify('session-a', 'req-a'))
+
+    updateClarifyBatchDraft('req-a', 'session-a', current => ({
+      ...current,
+      q0: { choices: ['Coffee (Recommended)'], draft: '' }
+    }))
+
+    const remountedView = clarifyBatchDraft('req-a', 'session-a')
+
+    expect(remountedView.get()).toEqual({
+      q0: { choices: ['Coffee (Recommended)'], draft: '' }
+    })
+  })
+
+  it('drops a batch draft when its clarify request is cleared', () => {
+    setClarifyRequest(clarify('session-a', 'req-a'))
+    updateClarifyBatchDraft('req-a', 'session-a', () => ({
+      q0: { choices: ['Coffee'], draft: '' }
+    }))
+
+    clearClarifyRequest('req-a', 'session-a')
+
+    expect(clarifyBatchDraft('req-a', 'session-a').get()).toEqual({})
+    expect($clarifyBatchDrafts.get()).toEqual({})
+  })
+
+  it('drops the old batch draft when a session receives a replacement request', () => {
+    setClarifyRequest(clarify('session-a', 'req-a'))
+    updateClarifyBatchDraft('req-a', 'session-a', () => ({
+      q0: { choices: ['Coffee'], draft: '' }
+    }))
+
+    setClarifyRequest(clarify('session-a', 'req-b'))
+
+    expect(clarifyBatchDraft('req-a', 'session-a').get()).toEqual({})
+    expect($clarifyRequests.get()['session-a']?.requestId).toBe('req-b')
   })
 })
 

@@ -29,12 +29,15 @@ import { visibleClarifyCard } from '@/lib/keybinds/composer-focus-keys'
 import { cn } from '@/lib/utils'
 import {
   bareChoice,
+  type ClarifyBatchDraft,
   type ClarifyQuestion,
   type ClarifyRequest,
+  clarifyBatchDraft,
   clearClarifyRequest,
   normalizeChoices,
   RECOMMENDED_LABEL,
   sessionClarifyRequest,
+  updateClarifyBatchDraft,
   warnDroppedChoices
 } from '@/store/clarify'
 import { $gateway } from '@/store/gateway'
@@ -947,7 +950,21 @@ function ClarifyToolBatchPending({ onAnswered, request }: { onAnswered: () => vo
   const questions = request?.questions ?? []
   const ready = Boolean(request?.requestId) && questions.length > 0
 
-  const [staged, setStaged] = useState<Record<string, { choices: string[]; draft: string }>>({})
+  const $staged = useMemo(
+    () => clarifyBatchDraft(request?.requestId, request?.sessionId),
+    [request?.requestId, request?.sessionId]
+  )
+  const staged = useStore($staged)
+  const setStaged = useCallback(
+    (update: (current: ClarifyBatchDraft) => ClarifyBatchDraft) => {
+      if (!request?.requestId) {
+        return
+      }
+
+      updateClarifyBatchDraft(request.requestId, request.sessionId, update)
+    },
+    [request?.requestId, request?.sessionId]
+  )
   const [submitting, setSubmitting] = useState(false)
 
   // Reconnect replay: answers the server already locked (an earlier window's

@@ -19,7 +19,7 @@ interface UseComposerPlaceholderOptions {
  * down, it swaps to a reconnecting / starting message instead.
  */
 export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: UseComposerPlaceholderOptions): string {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const newSessionPlaceholders = t.composer.newSessionPlaceholders
   const followUpPlaceholders = t.composer.followUpPlaceholders
 
@@ -28,28 +28,41 @@ export function useComposerPlaceholder({ disabled, reconnecting, sessionId }: Us
   )
 
   const prevSessionIdRef = useRef(sessionId)
+  const prevLocaleRef = useRef(locale)
 
   // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
   useEffect(() => {
     const prev = prevSessionIdRef.current
+    const localeChanged = prevLocaleRef.current !== locale
+    const persistedFreshSession = prev == null && Boolean(sessionId)
     prevSessionIdRef.current = sessionId
+    prevLocaleRef.current = locale
 
-    if (prev === sessionId) {
+    if (prev === sessionId && !localeChanged) {
       return
     }
 
-    // null → id: the new session we're already in just got persisted. Keep the
-    // starter we showed instead of swapping to a follow-up under the user.
-    if (prev == null && sessionId) {
+    // null → id means the new session we were already composing in was just
+    // persisted. Keep a starter placeholder; a locale change may translate it
+    // in place, but persistence alone must not flip it to a follow-up.
+    if (persistedFreshSession && !localeChanged) {
       return
     }
 
-    resetBrowseState(prev)
-    setRestingPlaceholder(pickPlaceholder(sessionId ? followUpPlaceholders : newSessionPlaceholders))
-  }, [followUpPlaceholders, newSessionPlaceholders, sessionId])
+    if (prev !== sessionId && !persistedFreshSession) {
+      resetBrowseState(prev)
+    }
+
+    const pool = persistedFreshSession
+      ? newSessionPlaceholders
+      : sessionId
+        ? followUpPlaceholders
+        : newSessionPlaceholders
+    setRestingPlaceholder(pickPlaceholder(pool))
+  }, [followUpPlaceholders, locale, newSessionPlaceholders, sessionId])
 
   // When the transport is disabled it's because the gateway isn't open.
-  // Distinguish a cold start ("Starting Hermes...") from a dropped connection
+  // Distinguish a cold start from a dropped connection
   // we're trying to restore. During reconnect, keep the textbox editable so a
   // flaky network doesn't block drafting; only submit/backend actions stay
   // disabled until the gateway is open again.

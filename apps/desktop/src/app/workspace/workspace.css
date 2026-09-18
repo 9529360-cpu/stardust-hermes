@@ -1,0 +1,33 @@
+.jarvis-workspace {
+  isolation: isolate;
+  background-color: #050d18;
+}
+
+.jarvis-workspace::after {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+  background: rgba(3, 11, 20, 0.76);
+}
+
+.jarvis-workspace :is(button, a) {
+  -webkit-app-region: no-drag;
+}
+
+@media (max-width: 1100px) {
+  .jarvis-workspace > div {
+    padding-inline: 1rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .jarvis-workspace > div {
+    padding-inline: 0.75rem;
+  }
+
+  .jarvis-workspace section {
+    border-radius: 0.65rem;
+  }
+}

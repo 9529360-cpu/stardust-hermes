@@ -35,6 +35,7 @@ import { useMemo } from 'react'
 import { getPluginCtx } from './shared'
 
 type BotsMessages = {
+  paneTitle: string
   /** Left rail: the bot + group-chat roster. */
   roster: {
     search: string
@@ -278,6 +279,7 @@ type BotsMessages = {
 }
 
 const en: BotsMessages = {
+  paneTitle: 'Agents',
   roster: {
     search: 'Search bots and group chats',
     searchPlaceholder: 'Search bots and group chats…',
@@ -506,6 +508,7 @@ const en: BotsMessages = {
 }
 
 const ja: BotsMessages = {
+  paneTitle: 'エージェント',
   roster: {
     search: 'ボットとグループチャットを検索',
     searchPlaceholder: 'ボットとグループチャットを検索…',
@@ -733,6 +736,7 @@ const ja: BotsMessages = {
 }
 
 const zh: BotsMessages = {
+  paneTitle: '智能体',
   roster: {
     search: '搜索机器人和群聊',
     searchPlaceholder: '搜索机器人和群聊…',
@@ -955,6 +959,7 @@ const zh: BotsMessages = {
 }
 
 const zhHant: BotsMessages = {
+  paneTitle: '智能體',
   roster: {
     search: '搜尋機器人和群組聊天',
     searchPlaceholder: '搜尋機器人和群組聊天…',
