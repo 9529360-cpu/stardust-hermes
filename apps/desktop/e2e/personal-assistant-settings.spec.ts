@@ -30,12 +30,12 @@ test('settings exposes provider configuration without reviving the legacy app ac
   await expect(settingsNav.getByText('账单', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/Nous/i)).toHaveCount(0)
   await settingsNav.getByRole('button', { name: /提供方/ }).click()
-  await expect(settingsNav.getByRole('button', { name: '账号' })).toBeVisible()
+  await expect(settingsNav.getByRole('button', { name: '网页登录' })).toBeVisible()
   await expect(settingsNav.getByRole('button', { name: 'API 密钥' })).toBeVisible()
   await expect(settingsNav.getByRole('button', { name: '自定义端点' })).toBeVisible()
   await expect(settingsNav.getByText('账单', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/Nous/i)).toHaveCount(0)
-  await expect(page.getByText(/Stardust 会在应用中为你完成浏览器登录/)).toBeVisible()
+  await expect(page.getByText(/Stardust 会在应用中完成提供方登录流程/)).toBeVisible()
   await expect(page.getByText(/Hermes 会在应用中为你完成浏览器登录/)).toHaveCount(0)
 
   const overlayTheme = await page.locator('[data-overlay-surface]').evaluate(element =>

@@ -11,7 +11,7 @@ export function movedSettingsTabRedirect(search: string): null | string {
   const params = new URLSearchParams(search)
   const tab = params.get('tab')
   if (tab === 'billing') {
-    return `${SETTINGS_ROUTE}?tab=providers`
+    return `${SETTINGS_ROUTE}?tab=providers&pview=keys`
   }
 
   const rowParam = tab ? MOVED_TO_CAPABILITIES[tab] : undefined

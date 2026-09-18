@@ -62,6 +62,7 @@ test.describe('onboarding with no provider configured', () => {
       rootText.includes('OpenAI')
 
     expect(hasProviderText).toBe(true)
+    expect(rootText).not.toMatch(/Nous Portal|Nous account|Nous · free tier|Nous · 免费层|登录 Nous 账户/i)
   })
 
   test('screenshot of onboarding overlay', async () => {

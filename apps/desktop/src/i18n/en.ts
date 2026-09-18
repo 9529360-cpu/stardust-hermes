@@ -490,7 +490,7 @@ export const en: Translations = {
     resetFailed: 'Reset failed',
     nav: {
       providers: 'Providers',
-      providerAccounts: 'Accounts',
+      providerAccounts: 'Provider sign-in',
       providerApiKeys: 'API keys',
       providerCustomEndpoints: 'Custom Endpoints',
       providerLocalModels: 'Local Models',
@@ -1507,10 +1507,10 @@ export const en: Translations = {
       deleteFailed: 'Delete failed'
     },
     providers: {
-      connectAccount: 'Connect an account',
+      connectAccount: 'Sign in to a model provider',
       haveApiKey: 'Have an API key instead?',
       intro:
-        'Sign in with a subscription — no API key to copy. Hermes runs the browser sign-in for you, right here in the app.',
+        'Use a provider subscription or web sign-in instead of copying an API key. Stardust completes the provider login flow in the app.',
       connected: 'Connected',
       collapse: 'Collapse',
       connectAnother: 'Connect another provider',
@@ -1592,15 +1592,6 @@ export const en: Translations = {
       activeBackend: 'Active',
       activeBackendHint: 'This is your active backend',
       useBackend: 'Use this backend',
-      nousIncluded: 'Included with a Nous subscription — sign in with your Nous account to activate.',
-      nousAuthNeededTitle: 'Sign in with your Nous account',
-      nousAuthNeededMessage: provider => `${provider} is saved but will only work once you sign in with your Nous account.`,
-      nousAuthSignIn: 'Sign in',
-      nousAuthDoneTitle: 'Nous account connected',
-      nousAuthDoneMessage: 'Your subscription backends are now active.',
-      nousAuthFailed: 'Nous sign-in did not complete',
-      nousAuthFailedMessage: 'Try again.',
-      nousAuthTryAgain: 'Try again',
       noApiKeyRequired: 'No API key required.',
       postSetupHint: step =>
         `This backend needs a one-time install (${step}). Runs on this machine — may take a few minutes.`,

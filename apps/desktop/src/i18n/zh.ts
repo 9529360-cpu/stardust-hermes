@@ -446,7 +446,7 @@ export const zh = defineLocale({
     resetFailed: '重置失败',
     nav: {
       providers: '提供方',
-      providerAccounts: '账号',
+      providerAccounts: '网页登录',
       providerApiKeys: 'API 密钥',
       providerCustomEndpoints: '自定义端点',
       providerLocalModels: '本地模型',
@@ -1689,9 +1689,10 @@ export const zh = defineLocale({
       deleteFailed: '删除失败'
     },
     providers: {
-      connectAccount: '连接账号',
+      connectAccount: '登录模型提供方',
       haveApiKey: '改用 API 密钥？',
-      intro: '使用订阅登录，无需复制 API 密钥。Hermes 会在应用中为你完成浏览器登录。',
+      intro:
+        '可以使用提供方订阅或网页登录，无需复制 API 密钥。Stardust 会在应用中完成提供方登录流程。',
       connected: '已连接',
       collapse: '收起',
       connectAnother: '连接其他提供方',
@@ -1770,13 +1771,6 @@ export const zh = defineLocale({
       activeBackend: '当前后端',
       activeBackendHint: '这是你当前使用的后端',
       useBackend: '使用此后端',
-      nousIncluded: '包含在 Nous 订阅中；登录 Nous Portal 即可激活。',
-      nousAuthNeededTitle: '登录 Nous Portal',
-      nousAuthNeededMessage: provider => `已保存 ${provider}，但在登录 Nous Portal 之前不会激活。`,
-      nousAuthSignIn: '登录',
-      nousAuthDoneTitle: '已连接 Nous Portal',
-      nousAuthDoneMessage: '订阅后端现已激活。',
-      nousAuthFailed: 'Nous Portal 登录未完成',
       noApiKeyRequired: '不需要 API 密钥。',
       postSetupHint: step => `此后端需要一次性安装 (${step})。将在此机器上执行，可能需要几分钟。`,
       postSetupInstalledHint: '已安装。仅在出现问题时才需要重新运行安装。',

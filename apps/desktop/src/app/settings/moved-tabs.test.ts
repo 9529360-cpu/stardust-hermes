@@ -12,7 +12,7 @@ describe('movedSettingsTabRedirect', () => {
   })
 
   it('moves the retired built-in Billing page to provider setup', () => {
-    expect(movedSettingsTabRedirect('?tab=billing')).toBe('/settings?tab=providers')
+    expect(movedSettingsTabRedirect('?tab=billing')).toBe('/settings?tab=providers&pview=keys')
   })
 
   it('leaves live Settings tabs alone', () => {

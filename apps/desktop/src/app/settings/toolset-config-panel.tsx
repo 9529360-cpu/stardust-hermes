@@ -9,14 +9,12 @@ import {
   getActionStatus,
   getToolsetConfig,
   getToolsetModels,
-  pollOAuthSession,
   type ProfileScope,
   revealEnvVar,
   runToolsetPostSetup,
   selectToolsetModel,
   selectToolsetProvider,
-  setEnvVar,
-  startOAuthLogin
+  setEnvVar
 } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Check, Loader2, Save, Terminal } from '@/lib/icons'
@@ -537,18 +535,6 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
   // Default-provider selection and a user click race just after config arrives:
   // a stale initialization effect must never replace an explicit choice.
   const providerChoiceClaimedRef = useRef(false)
-  // Guard the Nous Portal sign-in poll loop against unmount/state updates.
-  const mountedRef = useRef(true)
-
-  // eslint-disable-next-line no-restricted-syntax -- mount flag guarding an async poll loop, not an atom mirror
-  useEffect(() => {
-    mountedRef.current = true
-
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
-
   const refresh = useCallback(async () => {
     setLoading(true)
 
@@ -575,13 +561,14 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
     void refresh()
   }, [refresh])
 
-  const providers = useMemo(() => cfg?.providers ?? [], [cfg])
+  // Stardust does not expose first-party subscription/account backends. Keep
+  // the backend payload compatible, but remove managed-account rows from the
+  // product surface so Capabilities cannot become a backdoor into Nous login.
+  const providers = useMemo(() => (cfg?.providers ?? []).filter(provider => !provider.requires_nous_auth), [cfg])
 
   // Default the expanded provider to the one actually active in config
   // (`is_active` / `cfg.active_provider`, mirroring the CLI picker), then the
-  // first fully-configured provider, else the first provider. Without this the
-  // panel highlighted the first keyless provider (e.g. Nous Portal) even when
-  // the user had already selected another (e.g. DuckDuckGo).
+  // first fully-configured provider, else the first visible provider.
   // eslint-disable-next-line no-restricted-syntax -- one-shot provider-choice claim flag, not an atom mirror
   useEffect(() => {
     if (providerChoiceClaimedRef.current || expandedProvider || providers.length === 0) {
@@ -625,16 +612,11 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
       )
 
       if (result.needs_nous_auth) {
-        // Managed Nous row selected without Portal entitlement: the config
-        // keys are written but the backend won't activate until the user
-        // signs in (the CLI runs this gate inline; the GUI surfaces it as a
-        // sign-in action). Reuses the existing Nous Portal device-code flow.
-        notify({
-          kind: 'warning',
-          title: copy.nousAuthNeededTitle,
-          message: copy.nousAuthNeededMessage(provider.name),
-          action: { label: copy.nousAuthSignIn, onClick: () => void signInToNousPortal() }
-        })
+        // Defensive compatibility: managed-account providers are filtered from
+        // the UI above, so a visible provider should never hit this. If an
+        // older/mixed backend still reports the flag, fail closed instead of
+        // resurrecting the removed first-party sign-in flow.
+        notifyError(new Error('managed account provider is unavailable in Stardust'), copy.failedSelect(provider.name))
 
         return
       }
@@ -646,74 +628,6 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
     } finally {
       setSelecting(null)
     }
-  }
-
-  // Drive the existing Nous Portal OAuth device-code flow (the same session
-  // machinery onboarding uses: start → open verification URL → poll), then
-  // refetch the toolset config so is_active / status flip once entitled.
-  async function signInToNousPortal() {
-    try {
-      const start = await startOAuthLogin('nous', profile)
-
-      if (start.flow !== 'device_code') {
-        notifyNousAuthFailed(`unexpected flow: ${start.flow}`)
-
-        return
-      }
-
-      const url = start.verification_url
-
-      if (window.hermesDesktop?.openExternal) {
-        try {
-          await window.hermesDesktop.openExternal(url)
-        } catch {
-          window.open(url, '_blank', 'noopener,noreferrer')
-        }
-      } else {
-        window.open(url, '_blank', 'noopener,noreferrer')
-      }
-
-      // Poll until the device-code session resolves (~5s cadence, bounded).
-      for (let attempt = 0; attempt < 120 && mountedRef.current; attempt += 1) {
-        await new Promise(resolve => window.setTimeout(resolve, 5000))
-
-        if (!mountedRef.current) {
-          return
-        }
-
-        const polled = await pollOAuthSession('nous', start.session_id, profile)
-
-        if (polled.status === 'approved') {
-          notify({ kind: 'success', title: copy.nousAuthDoneTitle, message: copy.nousAuthDoneMessage })
-          await refresh()
-          onConfiguredChange?.()
-
-          return
-        }
-
-        if (polled.status !== 'pending') {
-          notifyNousAuthFailed(polled.error_message || `Sign-in ${polled.status}`)
-
-          return
-        }
-      }
-    } catch (err) {
-      if (mountedRef.current) {
-        notifyNousAuthFailed(err instanceof Error ? err.message : String(err))
-      }
-    }
-  }
-
-  // Plain failure copy with the raw poll status under Details and a one-click
-  // retry of the same sign-in flow (desktop-26).
-  function notifyNousAuthFailed(detail: string) {
-    notify({
-      kind: 'error',
-      title: copy.nousAuthFailed,
-      message: copy.nousAuthFailedMessage,
-      detail,
-      action: { label: copy.nousAuthTryAgain, onClick: () => void signInToNousPortal() }
-    })
   }
 
   function patchEnv(key: string, isSet: boolean) {
@@ -881,9 +795,6 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
                       </Button>
                     )}
                   </div>
-                )}
-                {provider.requires_nous_auth && (
-                  <p className="text-[0.72rem] text-muted-foreground">{copy.nousIncluded}</p>
                 )}
                 {provider.env_vars.length === 0 ? (
                   <p className="text-[0.72rem] text-muted-foreground">{copy.noApiKeyRequired}</p>

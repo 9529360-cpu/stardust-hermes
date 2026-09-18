@@ -1470,13 +1470,6 @@ export const ru = defineLocale({
       activeBackend: 'Активен',
       activeBackendHint: 'Это ваш активный бэкенд',
       useBackend: 'Использовать этот бэкенд',
-      nousIncluded: 'Входит в подписку Nous — войдите в Nous Portal, чтобы активировать.',
-      nousAuthNeededTitle: 'Войдите в Nous Portal',
-      nousAuthNeededMessage: provider => `${provider} сохранён, но не активируется, пока вы не войдёте в Nous Portal.`,
-      nousAuthSignIn: 'Войти',
-      nousAuthDoneTitle: 'Nous Portal подключён',
-      nousAuthDoneMessage: 'Ваши бэкенды по подписке теперь активны.',
-      nousAuthFailed: 'Вход в Nous Portal не завершён',
       noApiKeyRequired: 'API-ключ не требуется.',
       postSetupHint: step =>
         `Этому бэкенду нужна однократная установка (${step}). Выполняется на этой машине — может занять несколько минут.`,

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { ackFreeTierNotice, claimFreeTierNotice, freeTierNoticeClaim, releaseFreeTierNotice } from '@/store/free-tier'
-import { openFreeTierSignIn } from '@/store/free-tier-sign-in'
 import { setModelPickerOpen } from '@/store/session'
 
 /**
@@ -70,15 +69,6 @@ export function FreeTierNoticeStrip() {
             variant="text"
           >
             {copy.openModelPicker}
-          </Button>
-          <Button
-            className="text-foreground/90 hover:text-foreground"
-            onClick={() => consume(() => openFreeTierSignIn())}
-            size="micro"
-            type="button"
-            variant="text"
-          >
-            {copy.signIn}
           </Button>
           <Button
             className="text-muted-foreground/75 hover:text-foreground/90"

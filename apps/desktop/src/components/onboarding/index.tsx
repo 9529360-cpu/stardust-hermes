@@ -562,7 +562,10 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
     setOnboardingMode('apikey')
   }
 
-  const ordered = useMemo(() => (providers ? sortProviders(providers) : []), [providers])
+  const ordered = useMemo(
+    () => (providers ? sortProviders(providers).filter(provider => provider.id !== FEATURED_ID) : []),
+    [providers]
+  )
   const hasOauth = ordered.length > 0
   const apiKeyOptions = useApiKeyCatalog()
 
@@ -596,10 +599,10 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const select = (p: OAuthProvider) => void startProviderOAuth(p, ctx)
   const featured = ordered.find(p => p.id === FEATURED_ID) ?? null
   const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-  // Collapse the secondary providers behind a disclosure whenever Nous Portal
-  // is present to anchor the choice — otherwise show the full list. The
+  // The removed first-party Nous provider is filtered above; keep this legacy
+  // disclosure logic only for any future featured provider. The
   // Fireworks/OpenRouter key rows always live behind the disclosure, so the
-  // toggle is warranted even when there are no other OAuth providers.
+  // toggle is warranted whenever a featured provider exists.
   const collapsible = Boolean(featured)
   const showRest = !collapsible || showAll
 

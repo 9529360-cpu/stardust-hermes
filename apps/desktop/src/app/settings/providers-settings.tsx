@@ -149,7 +149,7 @@ function OAuthPicker({
   const { t } = useI18n()
   const p = t.settings.providers
   const [showAll, setShowAll] = useState(false)
-  const ordered = useMemo(() => sortProviders(providers), [providers])
+  const ordered = useMemo(() => sortProviders(providers).filter(provider => provider.id !== FEATURED_ID), [providers])
 
   if (ordered.length === 0) {
     return null
@@ -462,9 +462,11 @@ export function ProvidersSettings({
     return <SettingsSkeleton search sections={[{ rows: 6 }]} />
   }
 
-  const hasOauth = oauthProviders.length > 0
-  // The sidebar subnav owns the Accounts/API-keys split now; with no OAuth
-  // providers there's nothing for the "Accounts" view to show, so fall to keys.
+  const visibleOauthProviders = oauthProviders.filter(provider => provider.id !== FEATURED_ID)
+  const hasOauth = visibleOauthProviders.length > 0
+  // First-party Nous account sign-in is intentionally not a Stardust surface.
+  // Keep generic third-party OAuth/CLI providers available, but when none exist
+  // the provider page falls through to user-owned API keys instead.
   const showApiKeys = view === 'keys' || (!hasOauth && view !== 'custom-endpoints')
 
   const keyGroups = buildProviderKeyGroups(vars)
@@ -540,7 +542,7 @@ export function ProvidersSettings({
         onWantApiKey={() => onViewChange('keys')}
         onWantLocalModels={() => onViewChange('local')}
         profile={scopeProfile}
-        providers={oauthProviders}
+        providers={visibleOauthProviders}
       />
     </SettingsContent>
   )
