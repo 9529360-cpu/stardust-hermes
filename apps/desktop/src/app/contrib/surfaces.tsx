@@ -56,9 +56,17 @@ export const SidebarSurface = memo(function SidebarSurface({
   const latestActions = useMemo(() => latestSidebarActions(actions), [actions])
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden" data-personal-sidebar-shell="">
-      <ChatSidebar currentView={currentView} {...latestActions} />
+    <div
+      className="relative flex h-full min-h-0 flex-col overflow-hidden"
+      data-personal-sidebar-shell=""
+      data-personal-sidebar-view={currentView}
+    >
       <PersonalProductNav currentView={currentView} onNavigate={latestActions.onNavigate} />
+      {currentView === 'chat' && (
+        <div className="min-h-0 flex-1 overflow-hidden" data-personal-conversations="">
+          <ChatSidebar currentView={currentView} {...latestActions} />
+        </div>
+      )}
     </div>
   )
 })
@@ -192,6 +200,7 @@ export const ChatRoutesSurface = memo(function ChatRoutesSurface({
       <Route element={page(<SkillsView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="skills" />
       <Route element={page(<MessagingView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="messaging" />
       <Route element={page(<ArtifactsView setStatusbarItemGroup={setStatusbarItemGroup} />)} path="artifacts" />
+      <Route element={chatView} path="workspace" />
       <Route element={null} path="agents" />
       <Route element={null} path="command-center" />
       <Route element={null} path="cron" />

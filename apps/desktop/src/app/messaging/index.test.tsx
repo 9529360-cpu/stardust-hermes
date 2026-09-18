@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { I18nProvider } from '@/i18n'
+import type { Locale } from '@/i18n/types'
 import type { MessagingPlatformInfo } from '@/types/hermes'
 
 const getMessagingPlatforms = vi.fn()
@@ -102,13 +104,15 @@ afterEach(() => {
 // 34600757569, 34601269252). Same pattern as chat/index.test.tsx.
 const { MessagingView } = await import('./index')
 
-async function renderMessaging() {
+async function renderMessaging(locale?: Locale) {
   let result: ReturnType<typeof render>
   await act(async () => {
     result = render(
-      <MemoryRouter>
-        <MessagingView />
-      </MemoryRouter>
+      <I18nProvider configClient={null} initialLocale={locale}>
+        <MemoryRouter>
+          <MessagingView />
+        </MemoryRouter>
+      </I18nProvider>
     )
   })
 
@@ -126,6 +130,29 @@ describe('MessagingView profile scope', () => {
 
     await waitFor(() => expect(getMessagingPlatforms).toHaveBeenCalledWith(undefined))
     expect(getPairing).toHaveBeenCalledWith(undefined)
+  })
+})
+
+describe('MessagingView localized platform presentation', () => {
+  it('uses the localized product description instead of backend English for known platforms', async () => {
+    getMessagingPlatforms.mockResolvedValue({
+      platforms: [platform({ id: 'telegram', name: 'Telegram', description: 'Backend English description.' })]
+    })
+
+    await renderMessaging('zh')
+
+    expect(await screen.findByText('通过 Telegram 机器人随时与助理对话，并接收提醒和任务结果。')).toBeTruthy()
+    expect(screen.queryByText('Backend English description.')).toBeNull()
+  })
+
+  it('keeps backend descriptions as the fallback for unknown plugin platforms', async () => {
+    getMessagingPlatforms.mockResolvedValue({
+      platforms: [platform({ id: 'custom-chat', name: 'Custom Chat', description: 'Plugin-owned description.' })]
+    })
+
+    await renderMessaging('zh')
+
+    expect((await screen.findAllByText('Plugin-owned description.')).length).toBeGreaterThan(0)
   })
 })
 

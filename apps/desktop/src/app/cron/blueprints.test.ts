@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
 import type { AutomationBlueprint } from '@/hermes'
+import { TRANSLATIONS } from '@/i18n/catalog'
 
-import { initialBlueprintValues } from './blueprints'
+import {
+  blueprintDisplayDescription,
+  blueprintDisplayFieldLabel,
+  blueprintDisplayOption,
+  blueprintDisplayTitle,
+  initialBlueprintValues
+} from './blueprints'
 
 function blueprint(fields: AutomationBlueprint['fields']): AutomationBlueprint {
   return {
@@ -16,6 +23,31 @@ function blueprint(fields: AutomationBlueprint['fields']): AutomationBlueprint {
     fields
   }
 }
+
+describe('blueprint display copy', () => {
+  const c = TRANSLATIONS.zh.cron
+
+  it('localizes official blueprints and their field labels by stable key', () => {
+    const official = {
+      ...blueprint([{ name: 'time', type: 'time', label: 'Time', default: '08:00', options: [], optional: false, help: '' }]),
+      key: 'morning-brief',
+      title: 'Morning briefing',
+      description: "A short daily briefing: today's calendar, weather, and anything urgent waiting on you."
+    }
+
+    expect(blueprintDisplayTitle(official, c)).toBe('晨间简报')
+    expect(blueprintDisplayDescription(official, c)).toContain('今日日程')
+    expect(blueprintDisplayFieldLabel(official.key, official.fields[0], c)).toBe('时间')
+    expect(blueprintDisplayOption('sunday', c)).toBe('周日')
+  })
+
+  it('leaves third-party blueprint copy untouched when no display override exists', () => {
+    const thirdParty = { ...blueprint([]), key: 'vendor-custom', title: 'Vendor workflow', description: 'Vendor copy' }
+
+    expect(blueprintDisplayTitle(thirdParty, c)).toBe('Vendor workflow')
+    expect(blueprintDisplayDescription(thirdParty, c)).toBe('Vendor copy')
+  })
+})
 
 describe('initialBlueprintValues', () => {
   it('seeds each field from its default', () => {

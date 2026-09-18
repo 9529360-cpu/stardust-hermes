@@ -5,6 +5,7 @@ import { readKey } from '@/lib/storage'
 import { normalize } from '@/lib/text'
 
 import { $rightRailActiveTabId, type RightRailTabId, selectRightRailTab } from './layout'
+import { setRightContextOpen } from './right-context'
 import { canOpenBrowserWindow, openBrowserInNewWindow } from './windows'
 
 /**
@@ -389,6 +390,10 @@ export function openPreview(target: PreviewTarget, source: PreviewRecordSource =
   const index = current.findIndex(tab => tab.id === id)
   const tab: PreviewTab = { id, target: resolved }
 
+  // `openPreview` is the explicit entry point: a user click, a project/file
+  // action, or an on-screen agent preview request. That intent may reveal the
+  // contextual rail. Passive tab persistence/navigation updates must not.
+  setRightContextOpen(true)
   $previewTabs.set(index === -1 ? [...current, tab] : current.map((item, i) => (i === index ? tab : item)))
   selectRightRailTab(id)
 }

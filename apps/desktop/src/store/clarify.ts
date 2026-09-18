@@ -25,6 +25,13 @@ export interface ClarifyRequest {
   lockedAnswers?: Record<string, string>
 }
 
+export interface ClarifyBatchDraftEntry {
+  choices: string[]
+  draft: string
+}
+
+export type ClarifyBatchDraft = Record<string, ClarifyBatchDraftEntry>
+
 /**
  * The backend labels the agent's recommended option by appending this to the
  * first choice (`tools/clarify_tool.py::mark_recommended`). The renderer never
@@ -114,8 +121,57 @@ export function normalizeQuestions(questions: unknown): ClarifyQuestion[] {
 // resolve it once they switch over — without a second concurrent clarify
 // clobbering the first. A request with no session id lands under the empty key.
 const keyFor = (sessionId: string | null | undefined): string => sessionId ?? ''
+const batchDraftKey = (requestId: string, sessionId: string | null | undefined): string =>
+  `${keyFor(sessionId)}\u0000${requestId}`
+
+const EMPTY_BATCH_DRAFT: ClarifyBatchDraft = {}
 
 export const $clarifyRequests = atom<Record<string, ClarifyRequest>>({})
+
+/**
+ * Local, unsubmitted answers for a live batch clarify request.
+ *
+ * Transcript warm-resume reconciliation can replace the React message row a
+ * few milliseconds after it becomes visible. Component-local state is lost
+ * across that replacement, which used to make a user's first click disappear.
+ * Keep drafts under the request lifecycle instead: a remounted card reuses the
+ * same request id and immediately sees the staged answers again.
+ */
+export const $clarifyBatchDrafts = atom<Record<string, ClarifyBatchDraft>>({})
+
+export const clarifyBatchDraft = (requestId: string | null | undefined, sessionId: string | null | undefined) =>
+  computed($clarifyBatchDrafts, drafts =>
+    requestId ? (drafts[batchDraftKey(requestId, sessionId)] ?? EMPTY_BATCH_DRAFT) : EMPTY_BATCH_DRAFT
+  )
+
+export function updateClarifyBatchDraft(
+  requestId: string,
+  sessionId: string | null | undefined,
+  update: (current: ClarifyBatchDraft) => ClarifyBatchDraft
+): void {
+  const key = batchDraftKey(requestId, sessionId)
+  const drafts = $clarifyBatchDrafts.get()
+  const current = drafts[key] ?? EMPTY_BATCH_DRAFT
+  const next = update(current)
+
+  if (next === current) {
+    return
+  }
+
+  $clarifyBatchDrafts.set({ ...drafts, [key]: next })
+}
+
+function clearClarifyBatchDraft(requestId: string, sessionId: string | null | undefined): void {
+  const key = batchDraftKey(requestId, sessionId)
+  const drafts = $clarifyBatchDrafts.get()
+
+  if (!(key in drafts)) {
+    return
+  }
+
+  const { [key]: _removed, ...next } = drafts
+  $clarifyBatchDrafts.set(next)
+}
 
 // The clarify request for the currently-viewed session. The inline ClarifyTool
 // only ever mounts inside the active session's transcript, so it reads this
@@ -131,7 +187,15 @@ export const sessionClarifyRequest = (sessionId: string | null) =>
   computed($clarifyRequests, requests => requests[keyFor(sessionId)] ?? null)
 
 export function setClarifyRequest(request: ClarifyRequest): void {
-  $clarifyRequests.set({ ...$clarifyRequests.get(), [keyFor(request.sessionId)]: request })
+  const key = keyFor(request.sessionId)
+  const requests = $clarifyRequests.get()
+  const previous = requests[key]
+
+  if (previous && previous.requestId !== request.requestId) {
+    clearClarifyBatchDraft(previous.requestId, previous.sessionId)
+  }
+
+  $clarifyRequests.set({ ...requests, [key]: request })
 }
 
 export function clearClarifyRequest(requestId?: string, sessionId?: string | null): void {
@@ -150,6 +214,7 @@ export function clearClarifyRequest(requestId?: string, sessionId?: string | nul
     const next = { ...requests }
     delete next[key]
     $clarifyRequests.set(next)
+    clearClarifyBatchDraft(current.requestId, current.sessionId)
 
     return
   }
@@ -157,18 +222,26 @@ export function clearClarifyRequest(requestId?: string, sessionId?: string | nul
   // Fallback with no session hint: drop every entry matching the request id
   // (or clear all when none is given).
   const next: Record<string, ClarifyRequest> = {}
-  let changed = false
+  const removed: ClarifyRequest[] = []
 
   for (const [key, value] of Object.entries(requests)) {
     if (requestId && value.requestId !== requestId) {
       next[key] = value
     } else {
-      changed = true
+      removed.push(value)
     }
   }
 
-  if (changed) {
+  if (removed.length > 0) {
     $clarifyRequests.set(next)
+
+    for (const request of removed) {
+      clearClarifyBatchDraft(request.requestId, request.sessionId)
+    }
+  } else if (!requestId && Object.keys($clarifyBatchDrafts.get()).length > 0) {
+    // Test/reset callers can clear all requests after the request map is
+    // already empty. Do not strand stale drafts in that case.
+    $clarifyBatchDrafts.set({})
   }
 }
 

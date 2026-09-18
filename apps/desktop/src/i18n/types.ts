@@ -748,6 +748,22 @@ export interface Translations {
       dangerZone: string
       confirmUninstall: string
       uninstallHermes: string
+      checkingInstalled: string
+      guiOnlyTitle: string
+      guiOnlyDescription: string
+      guiOnlyConsequence: string
+      liteTitle: string
+      liteDescription: string
+      liteConsequence: string
+      fullTitle: string
+      fullDescription: string
+      fullConsequence: string
+      confirmRemoves: (consequence: string) => string
+      appPathLabel: string
+      couldNotStart: string
+      uninstalling: string
+      confirmAction: string
+      chooseDescription: string
     }
     poolLimits: {
       warmBotBackendsAria: string
@@ -1192,6 +1208,16 @@ export interface Translations {
       moaTitle: string
       moaPreset: string
       moaAggregator: string
+      moaDescription: string
+      moaEnabled: string
+      moaSetDefault: string
+      moaNewPreset: string
+      moaAddPreset: string
+      moaDefault: string
+      moaReference: (index: number) => string
+      moaEnableReference: (index: number) => string
+      moaDisableReference: (index: number) => string
+      moaAddReference: string
       tasks: Record<string, AuxTaskCopy>
     }
     localModels: {
@@ -1501,11 +1527,23 @@ export interface Translations {
     bulkUpdated: (count: number) => string
     bulkNoChange: string
     usageCount: (count: number | string) => string
+    toolCount: (count: number) => string
+    defaultProfile: string
+    currentConnection: string
     provenance: Record<'agent' | 'bundled' | 'hub', string>
     emptyNoneFound: (noun: string) => string
     emptyNothingMatches: (query: string) => string
     emptyNoneAvailable: (noun: string) => string
     changesApplyNewSessions: string
+    technicalDetails: string
+    skillOverview: string
+    skillRequirements: string
+    skillCompatibility: string
+    rawInstructions: string
+    technicalMetadata: string
+    skillCategoryLabels: Record<string, string>
+    toolsetLabels: Record<string, string>
+    toolsetDescriptions: Record<string, string>
     skillUpdated: string
     edit: string
     archive: string
@@ -1516,6 +1554,8 @@ export interface Translations {
       agentTitle: string
       agentBlurb: string
       pageBlurb: string
+      bundledNames: Record<'hermes-bots' | 'kanban' | 'radio', string>
+      bundledDescriptions: Record<'hermes-bots' | 'kanban' | 'radio', string>
       halfDesktop: string
       halfDesktopHint: string
       halfAgent: string
@@ -1947,6 +1987,7 @@ export interface Translations {
       savedRestartFailed: (detail: string) => string
     }
     fieldCopy: Record<string, { label?: string; help?: string; placeholder?: string }>
+    platformDescriptions: Record<string, string>
     platformIntro: Record<string, string>
   }
 
@@ -2159,6 +2200,7 @@ export interface Translations {
     editJob: string
     runAgain: string
     deliveryLabels: Record<string, string>
+    botChatTarget: (profile: string) => string
     scheduleLabels: Record<string, string>
     scheduleHints: Record<string, string>
     days: Record<string, string>
@@ -2243,6 +2285,19 @@ export interface Translations {
       failedLoad: string
       emptyTitle: string
       emptyDesc: string
+      fieldLabels: Partial<Record<string, string>>
+      fieldHelp: Partial<Record<string, string>>
+      optionLabels: Partial<Record<string, string>>
+      catalog: Partial<
+        Record<
+          string,
+          {
+            title?: string
+            description?: string
+            fields?: Partial<Record<string, { label?: string; help?: string }>>
+          }
+        >
+      >
     }
   }
 

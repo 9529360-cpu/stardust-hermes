@@ -57,7 +57,7 @@ import {
 } from './group-chat'
 import { groupWorkspaceOwnerKey } from './group-membership'
 import { annotateOrphanedGroupChatMembers } from './hygiene'
-import { BOTS_LOCALES } from './i18n'
+import { BOTS_LOCALES, useBots } from './i18n'
 import { displayName } from './labels'
 import { startBotRelay, stopBotRelay } from './relay'
 import { $activityToasts } from './roster-actions'
@@ -88,6 +88,12 @@ interface MentionCompletionItem {
 interface ComposerDraftPayload {
   attachments?: unknown[]
   text: string
+}
+
+function BotsPaneTabTitle() {
+  const b = useBots()
+
+  return <>{b.paneTitle}</>
 }
 
 export default {
@@ -391,6 +397,7 @@ export default {
       // zone's tab strip, so the pane stays reachable while collapsed.
       data: {
         placement: 'left',
+        tabTitle: () => <BotsPaneTabTitle />,
         width: '260px',
         collapsible: true,
         hideOnly: true,

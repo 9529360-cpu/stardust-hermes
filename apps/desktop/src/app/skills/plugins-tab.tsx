@@ -237,6 +237,12 @@ function PackageRow({
   const desktopOn = desktop ? desktop.status !== 'disabled' : false
   const agentOn = agent?.status === 'enabled'
   const agentToggleable = Boolean(agent?.key)
+  const displayName =
+    desktop?.kind === 'bundled' ? (p.bundledNames[desktop.id as keyof typeof p.bundledNames] ?? pkg.name) : pkg.name
+  const description =
+    desktop?.kind === 'bundled'
+      ? (p.bundledDescriptions[desktop.id as keyof typeof p.bundledDescriptions] ?? pkg.description)
+      : pkg.description
 
   return (
     <div
@@ -248,21 +254,21 @@ function PackageRow({
       <div className="flex min-w-0 flex-1 items-start gap-2" role="cell">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-[length:var(--conversation-text-font-size)] font-medium text-foreground">
-            <span>{pkg.name}</span>
+            <span>{displayName}</span>
             {agent?.version && <span className="text-(--ui-text-quaternary)">v{agent.version}</span>}
             <KindBadge kind={pkg.kind} />
             <ProvenancePill pkg={pkg} />
             {agent?.portable && <Pill>{p.portableBadge}</Pill>}
             {desktop?.status === 'error' && <Pill tone="primary">{d.failed}</Pill>}
           </div>
-          {(desktop?.status === 'error' ? desktop.error : pkg.description) && (
+          {(desktop?.status === 'error' ? desktop.error : description) && (
             <div
               className={cn(
                 'mt-0.5 text-[length:var(--conversation-caption-font-size)] break-words',
                 desktop?.status === 'error' ? 'text-(--ui-danger,#f87171)' : 'text-(--ui-text-tertiary)'
               )}
             >
-              {desktop?.status === 'error' ? desktop.error : pkg.description}
+              {desktop?.status === 'error' ? desktop.error : description}
             </div>
           )}
         </div>
@@ -286,7 +292,7 @@ function PackageRow({
       <HalfCell label={p.halfDesktop}>
         {desktop ? (
           <Switch
-            aria-label={`${p.halfDesktop}: ${pkg.name}`}
+            aria-label={`${p.halfDesktop}: ${displayName}`}
             checked={desktopOn}
             onCheckedChange={on => {
               triggerHaptic('selection')
@@ -319,7 +325,7 @@ function PackageRow({
             {busy && <Loader2 className="size-3.5 animate-spin text-(--ui-text-tertiary)" />}
             {agentToggleable ? (
               <Switch
-                aria-label={`${p.halfAgent}: ${pkg.name}`}
+                aria-label={`${p.halfAgent}: ${displayName}`}
                 checked={agentOn}
                 disabled={busy}
                 onCheckedChange={on => onAgentToggle(agent, on)}
@@ -327,7 +333,7 @@ function PackageRow({
             ) : (
               <Tip label={p.legacyBackend}>
                 <span>
-                  <Switch aria-label={`${p.halfAgent}: ${pkg.name}`} checked={agentOn} disabled />
+                  <Switch aria-label={`${p.halfAgent}: ${displayName}`} checked={agentOn} disabled />
                 </span>
               </Tip>
             )}
@@ -382,7 +388,7 @@ export const PluginsTab = memo(function PluginsTab({
   const busyKey = useStore($agentPluginBusy)
 
   const scope = profileParam(profile)
-  const label = scopeLabel ?? scope ?? t.skills.plugins.defaultProfile
+  const label = scopeLabel ?? scope ?? t.skills.defaultProfile
 
   useEffect(() => {
     void loadAgentPlugins(requestGateway, scope)
@@ -397,7 +403,7 @@ export const PluginsTab = memo(function PluginsTab({
 
   // Catalog picker viewport (persisted height, collapse toggle, top-edge sash).
   const heightOverride = useStore($paneHeightOverride(CATALOG_PANE_ID))
-  const height = heightOverride ?? CATALOG_DEFAULT_PX
+  const height = heightOverride ?? 0
   const open = height > CATALOG_COLLAPSED_PX
   const [pickerMounted, setPickerMounted] = useState(open)
   const [dragging, setDragging] = useState(false)
@@ -592,7 +598,7 @@ export const PluginsTab = memo(function PluginsTab({
         <div
           className="group/catsash absolute inset-x-0 top-0 z-10 h-1 -translate-y-1/2 cursor-row-resize"
           data-testid="plugin-catalog-sash"
-          onDoubleClick={() => setPaneHeightOverride(CATALOG_PANE_ID, undefined)}
+          onDoubleClick={() => setPaneHeightOverride(CATALOG_PANE_ID, CATALOG_DEFAULT_PX)}
           onPointerDown={startDrag}
         >
           <div
@@ -606,7 +612,7 @@ export const PluginsTab = memo(function PluginsTab({
           <span className="text-[0.62rem] font-medium tracking-wide uppercase text-(--ui-text-quaternary)">
             {p.catalogTitle}
           </span>
-          <Button onClick={() => setPaneHeightOverride(CATALOG_PANE_ID, open ? 0 : undefined)} size="xs" variant="text">
+          <Button onClick={() => setPaneHeightOverride(CATALOG_PANE_ID, open ? 0 : CATALOG_DEFAULT_PX)} size="xs" variant="text">
             {open ? p.catalogHide : p.catalogBrowse}
           </Button>
         </div>

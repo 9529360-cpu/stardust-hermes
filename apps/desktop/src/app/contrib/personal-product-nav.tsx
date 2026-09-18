@@ -4,20 +4,29 @@ import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
+import { $sidebarGrouping, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
+import { exitProjectScope } from '@/store/projects'
+import { $selectedStoredSessionId } from '@/store/session'
 
-import { CRON_ROUTE, SETTINGS_ROUTE, type AppView } from '../routes'
+import {
+  CRON_ROUTE,
+  NEW_CHAT_ROUTE,
+  SETTINGS_ROUTE,
+  SKILLS_ROUTE,
+  STARMAP_ROUTE,
+  type AppView,
+  sessionRoute
+} from '../routes'
 import type { SidebarNavItem } from '../types'
 import './personal-product-nav.css'
-import { WORKSPACE_OVERVIEW_PANE_ID } from './workspace-overview'
 
 const PRODUCT_NAV_COPY = {
-  ar: { home: 'الرئيسية', settings: 'الإعدادات', tasks: 'المهام', workspace: 'مساحة العمل' },
-  en: { home: 'Home', settings: 'Settings', tasks: 'Tasks', workspace: 'Workspace' },
-  ja: { home: 'ホーム', settings: '設定', tasks: 'タスク', workspace: 'ワークスペース' },
-  ru: { home: 'Главная', settings: 'Настройки', tasks: 'Задачи', workspace: 'Рабочая область' },
-  zh: { home: '主页', settings: '设置', tasks: '任务', workspace: '工作区' },
-  'zh-hant': { home: '首頁', settings: '設定', tasks: '任務', workspace: '工作區' }
+  ar: { conversation: 'المحادثة', knowledge: 'المعرفة', project: 'المشروع', settings: 'الإعدادات', tasks: 'المهام', tools: 'الأدوات' },
+  en: { conversation: 'Conversation', knowledge: 'Knowledge', project: 'Project', settings: 'Settings', tasks: 'Tasks', tools: 'Tools' },
+  ja: { conversation: '対話', knowledge: 'ナレッジ', project: 'プロジェクト', settings: '設定', tasks: 'タスク', tools: 'ツール' },
+  ru: { conversation: 'Диалог', knowledge: 'Знания', project: 'Проект', settings: 'Настройки', tasks: 'Задачи', tools: 'Инструменты' },
+  zh: { conversation: '对话', knowledge: '知识库', project: '项目', settings: '设置', tasks: '任务', tools: '工具' },
+  'zh-hant': { conversation: '對話', knowledge: '知識庫', project: '專案', settings: '設定', tasks: '任務', tools: '工具' }
 } as const
 
 const NULL_ICON: SidebarNavItem['icon'] = () => null
@@ -29,31 +38,26 @@ interface PersonalProductNavProps {
 
 interface ProductNavButtonProps {
   active?: boolean
-  expanded?: boolean
   icon: string
   label: string
   onClick: () => void
 }
 
-function ProductNavButton({ active = false, expanded = false, icon, label, onClick }: ProductNavButtonProps) {
+function ProductNavButton({ active = false, icon, label, onClick }: ProductNavButtonProps) {
   return (
     <button
       aria-current={active ? 'page' : undefined}
-      aria-expanded={expanded || undefined}
       className={cn(
-        'flex h-8 w-full items-center gap-2 rounded-lg border border-transparent px-2.5 text-left text-[0.72rem] font-medium transition-colors',
+        'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[0.74rem] font-medium transition-colors',
         active
-          ? 'border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-(--ui-text-primary)'
-          : expanded
-            ? 'text-(--ui-text-secondary)'
-            : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
+          ? 'bg-(--ui-control-active-background) text-(--ui-text-primary)'
+          : 'text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)'
       )}
       onClick={onClick}
       type="button"
     >
       <Codicon className="shrink-0" name={icon} size="0.88rem" />
       <span className="truncate">{label}</span>
-      {expanded && !active && <span aria-hidden="true" className="ml-auto size-1.5 rounded-full bg-(--theme-midground)" />}
     </button>
   )
 }
@@ -61,15 +65,8 @@ function ProductNavButton({ active = false, expanded = false, icon, label, onCli
 export function PersonalProductNav({ currentView, onNavigate }: PersonalProductNavProps) {
   const { locale } = useI18n()
   const copy = PRODUCT_NAV_COPY[locale]
-  const rightContextOpen = useStore($rightContextOpen)
-
-  const openHome = () =>
-    onNavigate({
-      id: 'new-session',
-      label: copy.home,
-      icon: NULL_ICON,
-      action: 'new-session'
-    })
+  const selectedStoredSessionId = useStore($selectedStoredSessionId)
+  const sidebarGrouping = useStore($sidebarGrouping)
 
   const openTasks = () =>
     onNavigate({
@@ -77,6 +74,22 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
       label: copy.tasks,
       icon: NULL_ICON,
       route: CRON_ROUTE
+    })
+
+  const openTools = () =>
+    onNavigate({
+      id: 'skills',
+      label: copy.tools,
+      icon: NULL_ICON,
+      route: SKILLS_ROUTE
+    })
+
+  const openKnowledge = () =>
+    onNavigate({
+      id: 'starmap',
+      label: copy.knowledge,
+      icon: NULL_ICON,
+      route: STARMAP_ROUTE
     })
 
   const openSettings = () =>
@@ -87,21 +100,65 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
       route: SETTINGS_ROUTE
     })
 
-  const openWorkspace = () => {
-    setRightContextOpen(true)
-    revealTreePane(WORKSPACE_OVERVIEW_PANE_ID)
+  const openConversation = () => {
+    setSidebarAgentsGrouped(false)
+    setSidebarOpen(true)
+    revealTreePane('sessions')
+    if (currentView !== 'chat') {
+      onNavigate({
+        id: 'conversation',
+        label: copy.conversation,
+        icon: NULL_ICON,
+        route: selectedStoredSessionId ? sessionRoute(selectedStoredSessionId) : NEW_CHAT_ROUTE
+      })
+    }
+  }
+
+  const openProject = () => {
+    setSidebarAgentsGrouped(true)
+    exitProjectScope()
+    setSidebarOpen(true)
+    revealTreePane('sessions')
+    if (currentView !== 'chat') {
+      onNavigate({
+        id: 'project',
+        label: copy.project,
+        icon: NULL_ICON,
+        route: selectedStoredSessionId ? sessionRoute(selectedStoredSessionId) : NEW_CHAT_ROUTE
+      })
+    }
   }
 
   return (
     <nav
       aria-label="Product navigation"
-      className="absolute inset-x-2.5 bottom-2 z-20 rounded-xl border border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) p-1.5 shadow-[0_10px_32px_color-mix(in_srgb,black_24%,transparent)] backdrop-blur-xl"
+      className={cn(
+        'jarvis-product-nav relative isolate flex flex-col overflow-hidden bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-[calc(var(--titlebar-height)+0.45rem)]',
+        currentView === 'chat' ? 'shrink-0 border-b border-(--ui-stroke-tertiary)' : 'min-h-0 flex-1'
+      )}
       data-personal-product-nav=""
     >
-      <ProductNavButton active={currentView === 'chat'} icon="home" label={copy.home} onClick={openHome} />
-      <ProductNavButton active={currentView === 'cron'} icon="checklist" label={copy.tasks} onClick={openTasks} />
-      <ProductNavButton expanded={rightContextOpen} icon="layout-sidebar-right" label={copy.workspace} onClick={openWorkspace} />
-      <ProductNavButton active={currentView === 'settings'} icon="settings-gear" label={copy.settings} onClick={openSettings} />
+      <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">
+        Stardust
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <ProductNavButton
+          active={currentView === 'chat' && sidebarGrouping !== 'project'}
+          icon="comment-discussion"
+          label={copy.conversation}
+          onClick={openConversation}
+        />
+        <ProductNavButton active={currentView === 'cron'} icon="checklist" label={copy.tasks} onClick={openTasks} />
+        <ProductNavButton
+          active={currentView === 'chat' && sidebarGrouping === 'project'}
+          icon="repo"
+          label={copy.project}
+          onClick={openProject}
+        />
+        <ProductNavButton active={currentView === 'starmap'} icon="library" label={copy.knowledge} onClick={openKnowledge} />
+        <ProductNavButton active={currentView === 'skills'} icon="tools" label={copy.tools} onClick={openTools} />
+        <ProductNavButton active={currentView === 'settings'} icon="settings-gear" label={copy.settings} onClick={openSettings} />
+      </div>
     </nav>
   )
 }

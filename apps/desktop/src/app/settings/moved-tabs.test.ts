@@ -11,6 +11,10 @@ describe('movedSettingsTabRedirect', () => {
     expect(movedSettingsTabRedirect('?tab=mcp&server=github')).toBe('/skills?tab=mcp&server=github')
   })
 
+  it('moves the retired built-in Billing page to provider setup', () => {
+    expect(movedSettingsTabRedirect('?tab=billing')).toBe('/settings?tab=providers')
+  })
+
   it('leaves live Settings tabs alone', () => {
     expect(movedSettingsTabRedirect('?tab=providers&pview=keys')).toBeNull()
     expect(movedSettingsTabRedirect('')).toBeNull()

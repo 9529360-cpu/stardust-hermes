@@ -228,8 +228,8 @@ export const ar = defineLocale({
       approveAction: 'موافقة',
       rejectAction: 'رفض',
       inputTitle: 'مطلوب إدخال',
-      inputBody: 'ينتظر Hermes ردّك.',
-      turnDoneTitle: 'أنهى Hermes',
+      inputBody: 'ينتظر Stardust ردّك.',
+      turnDoneTitle: 'أنهى Stardust',
       turnDoneBody: '',
       turnErrorTitle: 'فشلت الجولة',
       backgroundDoneTitle: 'انتهت المهمة في الخلفية',
@@ -519,6 +519,7 @@ export const ar = defineLocale({
       appearance: 'المظهر',
       workspace: 'مساحة العمل',
       safety: 'الأمان',
+      browser: 'المتصفح',
       memory: 'الذاكرة والسياق',
       voice: 'الصوت',
       advanced: 'متقدم'
@@ -911,7 +912,7 @@ export const ar = defineLocale({
       enterUrlFirst: 'أدخل رابط البوابة البعيدة أولاً.',
       restartingTitle: 'جار إعادة تشغيل اتصال البوابة',
       savedTitle: 'تم حفظ إعدادات البوابة',
-      restartingMessage: 'سيعيد Hermes Desktop الاتصال باستخدام الإعدادات المحفوظة.',
+      restartingMessage: 'سيعيد Stardust Desktop الاتصال باستخدام الإعدادات المحفوظة.',
       savedMessage: 'تم الحفظ للتشغيل القادم.',
       connectedTo: (baseUrl, version) => `متصل بـ ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
       reachableTitle: 'البوابة البعيدة قابلة للوصول',
@@ -1275,7 +1276,7 @@ export const ar = defineLocale({
     archivedChats: 'المحادثات المؤرشفة',
     commands: 'الأوامر',
     sections: {
-      sessions: 'الجلسات',
+      sessions: 'المحادثات',
       system: 'النظام',
       usage: 'الاستخدام'
     },
@@ -1574,6 +1575,7 @@ export const ar = defineLocale({
         help: 'موصى به. أرقام هواتف أو معرّفات WhatsApp مفصولة بفواصل.'
       }
     },
+    platformDescriptions: {},
     platformIntro: {}
   },
   profiles: {
@@ -1895,7 +1897,7 @@ export const ar = defineLocale({
     noMatch: query => `لا توجد جلسات تطابق "${query}"`,
     results: 'النتائج',
     pinned: 'المثبتة',
-    sessions: 'الجلسات',
+    sessions: 'المحادثات',
     cronJobs: 'المهام المجدولة',
     groupAriaGrouped: 'الجلسات مجمعة حسب مساحة العمل',
     groupAriaUngrouped: 'الجلسات غير مجمعة',
@@ -2028,10 +2030,10 @@ export const ar = defineLocale({
   composer: {
     message: 'الرسالة',
     wakingProfile: profile => `جار إيقاظ ${profile}`,
-    placeholderStarting: 'جار بدء Hermes...',
+    placeholderStarting: 'جار بدء المساعد...',
     placeholderReconnecting: 'جار إعادة الاتصال...',
     placeholderFollowUp: 'اكتب متابعة...',
-    newSessionPlaceholders: ['اسأل Hermes عن شيء...', 'اطلب من Hermes تنفيذ مهمة...', 'ابدأ محادثة جديدة...'],
+    newSessionPlaceholders: ['اسألني عن شيء...', 'كلّفني بمهمة...', 'ابدأ محادثة جديدة...'],
     followUpPlaceholders: ['اكتب متابعة...', 'أضف توجيها...', 'اسأل سؤالا آخر...'],
     startVoice: 'بدء الصوت',
     openDirective: 'فتح',
@@ -2278,7 +2280,7 @@ export const ar = defineLocale({
       createPr: 'إنشاء PR',
       openPr: 'فتح PR',
       ghMissing: 'ثبّت GitHub CLI (gh) وسجّل الدخول لفتح طلبات السحب',
-      agentShip: 'اطلب من Hermes فتح PR',
+      agentShip: 'اطلب من Stardust فتح PR',
       agentShipUnavailable: 'المحادثة التي تملك هذه التغييرات ليست على الشاشة.',
       agentShipPrompt: 'راجع التغييرات الحالية، وأودعها برسالة إيداع تقليدية واضحة، وادفع الفرع، وافتح طلب سحب.',
       newBranch: 'فرع جديد',
@@ -2368,7 +2370,7 @@ export const ar = defineLocale({
     }
   },
   guidedGreeting: {
-    line: 'أهلا، تفضل بالدخول. أنا Hermes. امنحني دقيقتين لأرتب المكان حولك، ثم نبدأ بشيء تريد إنجازه فعلا.\n\nبداية، بماذا أناديك؟',
+    line: 'أهلا، تفضل بالدخول. أنا Stardust. امنحني دقيقتين لأرتب المكان حولك، ثم نبدأ بشيء تريد إنجازه فعلا.\n\nبداية، بماذا أناديك؟',
     nameSuggestion: (name: string) => `(يمكنني أن أناديك ${name} إن كنت تفضل ذلك.)`
   },
   install: {
@@ -2379,7 +2381,7 @@ export const ar = defineLocale({
       skipped: 'تم التخطي',
       failed: 'فشل'
     },
-    oneTimeTitle: 'يحتاج Hermes إلى تثبيت لمرة واحدة',
+    oneTimeTitle: 'يحتاج Stardust إلى تثبيت لمرة واحدة',
     unsupportedDesc: platform =>
       `التثبيت التلقائي عند أول تشغيل غير متاح على ${platform} بعد. افتح الطرفية وشغّل الأمر أدناه، ثم أعد تشغيل هذا التطبيق. ستتخطى عمليات التشغيل اللاحقة هذه الخطوة.`,
     installCommand: 'أمر التثبيت',
@@ -2388,7 +2390,7 @@ export const ar = defineLocale({
     installTo: 'سيتم التثبيت في',
     retryAfterRun: 'لقد شغّلته -- إعادة المحاولة',
     failedTitle: 'فشل التثبيت',
-    settingUpTitle: 'جار إعداد وكيل Hermes',
+    settingUpTitle: 'جار إعداد وكيل Stardust',
     finishingTitle: 'جار الإنهاء',
     failedDesc:
       'فشلت إحدى خطوات التثبيت. على Windows، قد يحدث هذا إذا كان هناك نسخة أخرى من Hermes CLI أو تطبيق سطح المكتب قيد التشغيل. أوقف أي نسخ Hermes قيد التشغيل، ثم أعد المحاولة. تحقق من التفاصيل أدناه أو من سجل سطح المكتب للحصول على النص الكامل.',
@@ -2410,10 +2412,10 @@ export const ar = defineLocale({
     reloadRetry: 'إعادة التحميل وإعادة المحاولة'
   },
   onboarding: {
-    headerTitle: 'لنُعِدّ لك Hermes Agent',
+    headerTitle: 'لنُعِدّ لك Stardust Agent',
     headerDesc: 'اربط مزوّد نماذج لبدء المحادثة. معظم الخيارات تتطلب نقرة واحدة.',
-    preparingInstall: 'يُكمل Hermes التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
-    starting: 'جار بدء Hermes...',
+    preparingInstall: 'يُكمل Stardust التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
+    starting: 'جار بدء Stardust...',
     lookingUpProviders: 'جار البحث عن المزوّدين...',
     collapse: 'طي',
     otherProviders: 'مزودون آخرون',
@@ -2421,7 +2423,7 @@ export const ar = defineLocale({
     chooseLater: 'سأختار مزوّدا لاحقا',
     recommended: 'موصى به',
     connected: 'متصل',
-    featuredPitch: 'اشتراك واحد، أكثر من 300 نموذج متقدم — الطريقة الموصى بها لتشغيل Hermes',
+    featuredPitch: 'اشتراك واحد، أكثر من 300 نموذج متقدم — الطريقة الموصى بها لتشغيل Stardust',
     fireworksPitch: 'نماذج مفتوحة سريعة مع استضافة Fireworks.',
     openRouterPitch: 'مفتاح واحد لمئات النماذج — خيار افتراضي جيد',
     apiKeyOptions: {
@@ -2444,7 +2446,7 @@ export const ar = defineLocale({
       local: {
         short: 'مستضاف ذاتيا',
         description:
-          'وجّه Hermes إلى نقطة نهاية محلية أو مستضافة ذاتيا متوافقة مع OpenAI (vLLM، llama.cpp، Ollama، إلخ).'
+          'وجّه Stardust إلى نقطة نهاية محلية أو مستضافة ذاتيا متوافقة مع OpenAI (vLLM، llama.cpp، Ollama، إلخ).'
       }
     },
     backToSignIn: 'العودة إلى تسجيل الدخول',
@@ -2457,8 +2459,8 @@ export const ar = defineLocale({
     update: 'تحديث',
     flowSubtitles: {
       pkce: 'يفتح المتصفح لتسجيل الدخول ثم يتابع هنا',
-      device_code: 'يفتح صفحة تحقق في المتصفح — يتصل Hermes تلقائياً',
-      loopback: 'يفتح المتصفح لتسجيل الدخول — يتصل Hermes تلقائياً',
+      device_code: 'يفتح صفحة تحقق في المتصفح — يتصل Stardust تلقائياً',
+      loopback: 'يفتح المتصفح لتسجيل الدخول — يتصل Stardust تلقائياً',
       external: 'سجل الدخول مرة واحدة في الطرفية ثم عد إلى المحادثة'
     },
     startingSignIn: provider => `جار بدء تسجيل الدخول لـ ${provider}...`,
@@ -2471,11 +2473,11 @@ export const ar = defineLocale({
     pickDifferentProvider: 'اختر مزوداً آخر',
     signInWith: provider => `تسجيل الدخول عبر ${provider}`,
     openedBrowser: provider => `فتحنا ${provider} في المتصفح.`,
-    authorizeThere: 'صرّح لـ Hermes هناك.',
+    authorizeThere: 'صرّح لـ Stardust هناك.',
     copyAuthCode: 'انسخ رمز التفويض وألصقه أدناه.',
     pasteAuthCode: 'ألصق رمز التفويض',
     reopenAuthPage: 'إعادة فتح صفحة التفويض',
-    autoBrowser: provider => `فتحنا ${provider} في المتصفح. صرّح لـ Hermes هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
+    autoBrowser: provider => `فتحنا ${provider} في المتصفح. صرّح لـ Stardust هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
     reopenSignInPage: 'إعادة فتح صفحة تسجيل الدخول',
     waitingAuthorize: 'بانتظار التفويض...',
     externalPending: provider =>
@@ -2695,11 +2697,11 @@ export const ar = defineLocale({
         'يشير هذا العنوان إلى الجهاز الذي يشغّل الوكيل، وليس هذا الجهاز. تحمّل لوحة المتصفح الصفحات محليًا، لذا يحتاج خادم التطوير البعيد إلى إعادة توجيه منفذ أو اسم مضيف يمكن الوصول إليه.',
       failedToLoad: 'فشل تحميل المعاينة',
       tryAgain: 'إعادة المحاولة',
-      restarting: 'جار إعادة تشغيل Hermes...',
-      askRestart: 'اطلب من Hermes إعادة تشغيل الخادم',
-      lookingRestart: taskId => `يبحث Hermes عن خادم معاينة لإعادة تشغيله (${taskId})`,
+      restarting: 'جار إعادة تشغيل Stardust...',
+      askRestart: 'اطلب من Stardust إعادة تشغيل الخادم',
+      lookingRestart: taskId => `يبحث Stardust عن خادم معاينة لإعادة تشغيله (${taskId})`,
       restartingTitle: 'جار إعادة تشغيل خادم المعاينة',
-      restartingMessage: 'يعمل Hermes في الخلفية. راقب كونسول المعاينة لمتابعة التقدم.',
+      restartingMessage: 'يعمل Stardust في الخلفية. راقب كونسول المعاينة لمتابعة التقدم.',
       startRestartFailed: message => `تعذّر بدء إعادة تشغيل الخادم: ${message}`,
       restartFailed: 'فشلت إعادة تشغيل الخادم',
       hideConsole: 'إخفاء كونسول المعاينة',
@@ -2711,14 +2713,14 @@ export const ar = defineLocale({
       reload: 'إعادة تحميل الصفحة',
       address: 'العنوان',
       addressPlaceholder: 'أدخل العنوان',
-      blankPageBody: 'اكتب عنوانًا في الأعلى للتصفح، أو اطلب من Hermes فتح صفحة.',
-      finishedRestarting: message => `أنهى Hermes إعادة تشغيل خادم المعاينة${message ? `: ${message}` : ''}`,
+      blankPageBody: 'اكتب عنوانًا في الأعلى للتصفح، أو اطلب من Stardust فتح صفحة.',
+      finishedRestarting: message => `أنهى Stardust إعادة تشغيل خادم المعاينة${message ? `: ${message}` : ''}`,
       failedRestarting: message => `فشلت إعادة تشغيل الخادم: ${message}`,
       unknownError: 'خطأ غير معروف',
       restartedTitle: 'تمت إعادة تشغيل خادم المعاينة',
       reloadingNow: 'جار إعادة تحميل المعاينة الآن.',
       restartFailedTitle: 'فشلت إعادة تشغيل المعاينة',
-      restartFailedMessage: 'تعذّر على Hermes إعادة تشغيل الخادم.',
+      restartFailedMessage: 'تعذّر على Stardust إعادة تشغيل الخادم.',
       stillWorking:
         'لا يزال Hermes يعمل، لكن لم تصل نتيجة إعادة التشغيل بعد. قد يكون أمر الخادم قيد التشغيل في المقدمة.',
       workspaceReloading: 'تغيّرت مساحة العمل، جار إعادة تحميل المعاينة',

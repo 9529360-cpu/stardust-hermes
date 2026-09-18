@@ -45,23 +45,32 @@ one-off at the call site.
 
 ## Information architecture
 
-- **Chat is the home surface.** The transcript and composer stay primary; tools,
-  previews, files, review, and terminal complement the conversation.
-- **Pages are durable destinations.** Chat, Skills, Messaging, and Artifacts
-  remain in shell chrome. Do not hide a distinct product noun inside an
-  unrelated page.
-- **Route overlays are short tasks.** Settings, Command Center, Cron, Profiles,
-  Agents, and Starmap render as `OverlayView` cards and return to the previous
-  route on close. Model/session pickers and dialogs layer above the current
-  surface; they are not navigation stacks.
-- **Panes are working context.** Preview, files, review, and terminal remain
-  attached to the current task. Their state survives temporary hiding and chat
-  switches where the underlying tool is meant to persist.
+- **Conversation is the assistant home.** A fresh launch or new session lands
+  directly in the assistant conversation; no project or Workspace step is
+  required first. A legacy `/workspace` target may resolve back to chat for
+  compatibility, but Workspace is contextual state, not a product destination.
+- **The desktop shell is three-column by contract.** Left is navigation,
+  conversations, and project/task entry; center is the persistent conversation;
+  right is contextual capability and working state. No dashboard or project
+  surface may replace the center conversation.
+- **The right context rail is intent-driven, not always-on.** Ordinary questions
+  and casual chat do not force it open. Explicit project, Browser/Preview,
+  Files, Review, Terminal, or development actions may reveal it; passive
+  background updates may refresh hidden state but must not steal attention.
+- **Pages are secondary destinations.** Tasks, projects, knowledge, tools, and
+  settings may be reached from the left navigation or overlays. Returning to
+  Conversation restores the assistant transcript, never a separate Workspace
+  landing page.
+- **Panes are working context.** Browser/preview, agent activity, files, review,
+  terminal, tests, and diff belong to the right stage and remain attached to
+  the current task. Their state survives temporary hiding where the underlying
+  tool is meant to persist.
 - **One action, one home.** A command may have keyboard, palette, and visible
   affordances, but they invoke the same action and state. Do not fork behavior
   per entry point.
-- **Projects own workspace cwd.** Use Sidebar → Projects for local folders and
-  worktrees; do not reintroduce a per-session/right-sidebar folder-picker flow.
+- **Projects own workspace cwd.** Use the project owner/store for local folders
+  and worktrees; project context augments the conversation instead of replacing
+  it.
 
 Navigation must preserve context. A background session finishing, a tool result
 arriving, or a project refresh may update badges and cached data; it must not

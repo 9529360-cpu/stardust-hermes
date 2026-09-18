@@ -58,9 +58,9 @@ interface EmbeddedHubPickerProps {
 }
 
 /** The Skills Hub browser for the Skills tab: a resizable iframe of the live
- *  hub where every card installs with one click. Expanded by default —
- *  discovery IS the point — with a collapse toggle (persisted, like every
- *  other pane) and an update-all action. Memoized: the iframe must not sit in
+ *  hub where every card installs with one click. It starts collapsed so the
+ *  native Stardust capability surface remains primary; once opened, the
+ *  user's persisted height still wins. Memoized: the iframe must not sit in
  *  the parent's keystroke/re-render path. */
 export const EmbeddedHubPicker = memo(function EmbeddedHubPicker({
   hidden = false,
@@ -77,7 +77,7 @@ export const EmbeddedHubPicker = memo(function EmbeddedHubPicker({
   // switches and restarts instead of re-expanding — and re-loading the docs
   // site — on every visit. Same contract as DetailPane.
   const heightOverride = useStore($paneHeightOverride(HUB_PANE_ID))
-  const height = heightOverride ?? HUB_DEFAULT_PX
+  const height = heightOverride ?? 0
   const open = height > HUB_COLLAPSED_PX
   const [dragging, setDragging] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
@@ -180,7 +180,7 @@ export const EmbeddedHubPicker = memo(function EmbeddedHubPicker({
       {/* Top-edge drag sash — pull the whole hub section up/down. */}
       <div
         className="group/hubsash absolute inset-x-0 top-0 z-10 h-1 -translate-y-1/2 cursor-row-resize"
-        onDoubleClick={() => setPaneHeightOverride(HUB_PANE_ID, undefined)}
+        onDoubleClick={() => setPaneHeightOverride(HUB_PANE_ID, HUB_DEFAULT_PX)}
         onPointerDown={startDrag}
       >
         <div
@@ -197,7 +197,7 @@ export const EmbeddedHubPicker = memo(function EmbeddedHubPicker({
             {updating && <Loader2 className="size-3 animate-spin" />}
             {updating ? h.updating : h.updateAll}
           </Button>
-          <Button onClick={() => setPaneHeightOverride(HUB_PANE_ID, open ? 0 : undefined)} size="xs" variant="text">
+          <Button onClick={() => setPaneHeightOverride(HUB_PANE_ID, open ? 0 : HUB_DEFAULT_PX)} size="xs" variant="text">
             {open ? h.pickerHide : h.pickerBrowse}
           </Button>
         </div>

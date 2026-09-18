@@ -41,6 +41,36 @@ describe('I18nProvider', () => {
     expect(copy.sshErrPlatform).toContain('Stardust Desktop')
   })
 
+  it('normalizes product-facing settings copy while leaving provider identities alone', () => {
+    const settings = normalizeStardustProductCopy(TRANSLATIONS.en).settings
+
+    expect(settings.resetConfirm).toContain('Stardust')
+    expect(settings.searchPlaceholder.about).toContain('Stardust Desktop')
+    expect(settings.uninstallSection.uninstallHermes).toContain('Stardust')
+    expect(settings.config.loading).toContain('Stardust')
+    expect(settings.providers.intro).toContain('Stardust')
+    expect(settings.providers.localEndpoint.description).toContain('Stardust')
+    expect(settings.notifications.testTitle).toContain('Stardust')
+    expect(settings.appearance.tipsDesc).toContain('Stardust')
+    expect(settings.plugins.blurb).not.toContain('Hermes')
+    expect(settings.plugins.installModal.catalogPinned('Demo', 'abc')).toContain('Stardust')
+    expect(settings.providers.intro).not.toContain('Hermes')
+  })
+
+  it('normalizes visible product copy without rewriting compatibility commands', () => {
+    const copy = normalizeStardustProductCopy(TRANSLATIONS.zh)
+
+    expect(copy.connectors.disclaimer).toContain('Stardust')
+    expect(copy.sessionImport.subtitle).toContain('Stardust')
+    expect(copy.boot.ready).toContain('Stardust')
+    expect(copy.notifications.native.turnDoneTitle).toContain('Stardust')
+    expect(copy.cron.modelImpact.saveFailed).toContain('Stardust')
+    expect(copy.tips.items.skills.text).toContain('Stardust')
+    expect(copy.tips.items.artifacts.title).toContain('Stardust')
+    expect(copy.tips.items.profiles.text).toContain('Stardust')
+    expect(copy.desktop.handoff.timedOut).toContain('hermes gateway')
+  })
+
   it('defaults to English without a config client', () => {
     render(
       <I18nProvider configClient={null}>

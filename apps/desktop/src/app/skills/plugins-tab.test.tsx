@@ -20,6 +20,7 @@ describe('PluginsTab', () => {
     $agentPlugins.set([])
     $agentPluginsStatus.set('ready')
     closePluginInstallRequest()
+    setPaneHeightOverride('capabilities-plugin-catalog', undefined)
     requestGateway.mockClear()
   })
 
@@ -133,6 +134,7 @@ describe('PluginsTab', () => {
 
   it('opens the dual-target install modal from a catalog pick message', async () => {
     render(<PluginsTab profile="workbot" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
 
     window.dispatchEvent(
       new MessageEvent('message', {
@@ -161,6 +163,7 @@ describe('PluginsTab', () => {
 
   it('ignores pick messages from foreign origins', () => {
     render(<PluginsTab profile={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
 
     window.dispatchEvent(
       new MessageEvent('message', {
@@ -230,6 +233,7 @@ describe('PluginsTab', () => {
 
   it('appends the subdir fragment for multi-plugin repos', async () => {
     render(<PluginsTab profile={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
 
     window.dispatchEvent(
       new MessageEvent('message', {
@@ -254,6 +258,7 @@ describe('PluginsTab catalog UX', () => {
     $agentPlugins.set([])
     $agentPluginsStatus.set('ready')
     closePluginInstallRequest()
+    setPaneHeightOverride('capabilities-plugin-catalog', undefined)
     requestGateway.mockClear()
     setPaneHeightOverride('capabilities-plugin-catalog', undefined)
   })
@@ -266,6 +271,9 @@ describe('PluginsTab catalog UX', () => {
     const clientHeight = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(900)
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 1000 })
     render(<PluginsTab profile={null} />)
+    expect(document.querySelector('iframe')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
+    expect(document.querySelector('iframe')).toBeTruthy()
     const sash = screen.getByTestId('plugin-catalog-sash')
 
     fireEvent.pointerDown(sash, { button: 0, clientY: 600 })
@@ -276,7 +284,7 @@ describe('PluginsTab catalog UX', () => {
     expect($paneHeightOverride('capabilities-plugin-catalog').get()).toBe(580)
 
     fireEvent.doubleClick(sash)
-    expect($paneHeightOverride('capabilities-plugin-catalog').get()).toBeUndefined()
+    expect($paneHeightOverride('capabilities-plugin-catalog').get()).toBe(380)
     clientHeight.mockRestore()
   })
 
@@ -348,6 +356,7 @@ describe('PluginsTab catalog UX', () => {
     ])
 
     render(<PluginsTab profile={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
 
     window.dispatchEvent(
       new MessageEvent('message', {
@@ -381,6 +390,7 @@ describe('PluginsTab catalog UX', () => {
     ])
 
     render(<PluginsTab profile={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse' }))
 
     window.dispatchEvent(
       new MessageEvent('message', {

@@ -1,24 +1,75 @@
 [data-personal-sidebar-shell] [data-slot='sidebar-content'] {
-  padding-bottom: 9.25rem;
+  padding-bottom: 0;
 }
 
-[data-personal-sidebar-shell]
+/* Keep the conversation sidebar's real session entry points. The product
+   navigation already owns Tasks and Tools, so only those duplicated legacy
+   rows are suppressed; New conversation, Messaging, Artifacts and contributed
+   entries remain reachable. */
+[data-personal-conversations]
+  [data-slot='sidebar-group']:has([data-tour='sidebar-nav-new-session'])
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-skills']),
+[data-personal-conversations]
+  [data-slot='sidebar-group']:has([data-tour='sidebar-nav-new-session'])
   [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-cron']) {
   display: none;
+}
+
+[data-personal-conversations]
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']::before {
+  display: none !important;
+  content: none !important;
 }
 
 [data-personal-product-nav] {
   -webkit-app-region: no-drag;
 }
 
+[data-personal-product-nav] button[aria-current='page'] {
+  border: 1px solid transparent;
+  background: var(--ui-control-active-background);
+  box-shadow: inset 2px 0 0 var(--theme-primary);
+}
+:root:has([data-personal-sidebar-shell][data-personal-sidebar-view='chat'])
+  [data-zone-tabstrip]:has([data-tree-tab='sessions']) {
+  display: none !important;
+}
+
+:root:has([data-personal-sidebar-shell][data-personal-sidebar-view='chat'])
+  [data-tree-group='grp-sessions'] {
+  flex: 0 0 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  border-right: 1px solid var(--ui-stroke-tertiary);
+  background: var(--ui-sidebar-surface-background) !important;
+  box-shadow: none;
+}
+
+:root:has([data-personal-sidebar-shell][data-personal-sidebar-view='chat'])
+  [data-tree-split='spl-root'] > div:has(> [data-tree-group='grp-sessions']) {
+  flex: 0 0 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+}
+@media (max-width: 1100px) {
+  :root:has([data-personal-sidebar-shell][data-personal-sidebar-view='chat'])
+    [data-tree-group='grp-sessions'],
+  :root:has([data-personal-sidebar-shell][data-personal-sidebar-view='chat'])
+    [data-tree-split='spl-root'] > div:has(> [data-tree-group='grp-sessions']) {
+    flex-basis: 188px !important;
+    min-width: 188px !important;
+    max-width: 188px !important;
+  }
+}
+
 @media (max-height: 720px) {
-  [data-personal-sidebar-shell] [data-slot='sidebar-content'] {
-    padding-bottom: 5.75rem;
+  [data-personal-product-nav] {
+    max-height: 48vh;
+    overflow-y: auto;
   }
 
-  [data-personal-product-nav] {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.125rem;
+  [data-personal-product-nav] button {
+    min-height: 1.75rem;
   }
 }

@@ -10,7 +10,6 @@ import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import {
   Archive,
-  BarChart3,
   Bell,
   Cpu,
   Download,
@@ -44,7 +43,6 @@ import { OverlayView } from '../overlays/overlay-view'
 
 import { AboutSettings } from './about-settings'
 import { AppearanceSettings } from './appearance-settings'
-import { BillingSettings } from './billing'
 import { ConfigSettings } from './config-settings'
 import { SECTIONS } from './constants'
 import { GatewaySettings } from './gateway-settings'
@@ -93,8 +91,8 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
 
   const [activeView, setActiveView] = useRouteEnumParam('tab', SETTINGS_VIEWS, 'config:model' as SettingsViewId)
 
-  // Connections merged into the unified Gateways page: land old
-  // `?tab=connections` routes/bookmarks there instead of a dead entry.
+  // Connections merged into the unified Gateways page. Billing is redirected
+  // by movedSettingsTabRedirect above so legacy bookmarks never revive it.
   useEffect(() => {
     if (activeView === 'connections') {
       setActiveView('gateway')
@@ -206,13 +204,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         id: 'notifications',
         label: t.settings.nav.notifications,
         onSelect: () => setActiveView('notifications')
-      },
-      {
-        active: activeView === 'billing',
-        icon: BarChart3,
-        id: 'billing',
-        label: t.settings.nav.billing,
-        onSelect: () => setActiveView('billing')
       },
       {
         active: activeView === 'providers',
@@ -417,7 +408,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onConfigSaved={onConfigSaved}
         onMainModelChanged={onMainModelChanged}
       />
-    ) : activeView === 'providers' ? (
+    ) : activeView === 'providers' || activeView === 'billing' ? (
       <ProvidersSettings
         key={scopeProfile}
         onClose={onClose}
@@ -430,8 +421,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       <KeysSettings view={keysView} />
     ) : activeView === 'notifications' ? (
       <NotificationsSettings />
-    ) : activeView === 'billing' ? (
-      <BillingSettings />
     ) : activeView === 'vault' ? (
       <VaultSettings key={vaultOwnerKey(activeConnectionId, scopeProfile)} />
     ) : (
