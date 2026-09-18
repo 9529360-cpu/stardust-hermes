@@ -1,7 +1,7 @@
 """System-prompt assembly for :class:`AIAgent`.
 
-Built once per session and reused across turns (only context compression
-triggers a rebuild) so the upstream prefix cache stays warm.  Three tiers are
+Built once per session and reused across turns; context compression and a real built-in
+memory snapshot change trigger a rebuild, while unchanged turns keep the upstream prefix cache warm.  Three tiers are
 joined with ``\\n\\n``: ``stable`` (identity, guidance, env hints, coding brief,
 platform hints), ``context`` (workspace snapshot, caller ``system_message``,
 context files) and ``volatile`` (skills index, memory, USER.md, external memory
@@ -34,6 +34,26 @@ _PLUGIN_SECTION_FRAME_RE = re.compile(
     r"^## Plugin Context: (?P<id>[a-z0-9][a-z0-9._-]{0,127})\n<!-- hermes-plugin-section-chars:(?P<chars>[0-9]{1,4}) -->\n\n",
     re.MULTILINE,
 )
+_MEMORY_SNAPSHOT_MARKER_RE = re.compile(r'^<memory-snapshot version="([0-9a-f]{16})"/>$', re.MULTILINE)
+
+
+def _memory_snapshot_version(agent: Any) -> str:
+    """Current built-in memory snapshot digest, or ``""`` when no real store is active."""
+    store = getattr(agent, "_memory_store", None)
+    getter = getattr(store, "system_prompt_snapshot_version", None)
+    if not callable(getter):
+        return ""
+    try:
+        version = getter()
+    except Exception:
+        return ""
+    return version if isinstance(version, str) and re.fullmatch(r"[0-9a-f]{16}", version) else ""
+
+
+def _stored_memory_snapshot_version(prompt: str) -> str:
+    match = _MEMORY_SNAPSHOT_MARKER_RE.search(prompt or "")
+    return match.group(1) if match else ""
+
 _GATE_WORDS = {**dict.fromkeys(("true", "always", "yes", "on"), True), **dict.fromkeys(("false", "never", "no", "off"), False)}
 
 
@@ -494,6 +514,8 @@ def _memory_parts(agent: Any) -> List[str]:
             block = agent._memory_store.format_for_system_prompt(kind) if enabled else None
             if block:
                 parts.append(block)
+        if version := _memory_snapshot_version(agent):
+            parts.append(f'<memory-snapshot version="{version}"/>')
     # External memory provider system prompt block (additive to built-in). Gated on the same check
     # ``inject_memory_provider_tools`` uses so we never advertise provider tools that the agent's toolset
     # configuration has already gated off (#81014).
@@ -577,6 +599,11 @@ def _coding_parts(agent: Any) -> Tuple[List[str], List[str], List[str]]:
     try:
         from agent.coding_context import coding_system_prompt_parts
         if not agent.valid_tool_names:
+            return [], [], []
+        # A Desktop process often launches from the packaged/source install tree. That directory is
+        # execution plumbing, not a project the user chose; treating it as a code workspace turns
+        # every ordinary assistant chat into a coding posture. An explicit project/cwd clears this flag.
+        if getattr(agent, "_context_cwd_is_launch_artifact", False):
             return [], [], []
         cwd = resolve_context_cwd()
         cwd_key = str(cwd) if cwd is not None else ""

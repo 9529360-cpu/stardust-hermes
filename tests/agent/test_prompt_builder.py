@@ -61,6 +61,22 @@ def _drain_truncation_warnings():
 
 
 class TestGuidanceConstants:
+    def test_default_identity_is_stardust_personal_assistant_and_matches_seed(self):
+        from hermes_cli.default_soul import DEFAULT_SOUL_MD
+        from agent.prompt_builder import HERMES_AGENT_HELP_GUIDANCE
+
+        assert DEFAULT_AGENT_IDENTITY == DEFAULT_SOUL_MD
+        assert DEFAULT_AGENT_IDENTITY.startswith("You are Stardust")
+        assert "long-lived personal AI assistant" in DEFAULT_AGENT_IDENTITY
+        assert "not an instruction to turn ordinary conversation into a coding task" in DEFAULT_AGENT_IDENTITY
+        assert "answer/explain, plan/review, or execute" in DEFAULT_AGENT_IDENTITY
+        assert "not permission to edit files or run commands" in DEFAULT_AGENT_IDENTITY
+        assert "continue" in DEFAULT_AGENT_IDENTITY
+        assert "verify the result" in DEFAULT_AGENT_IDENTITY
+        assert "built by Nous Research" not in DEFAULT_AGENT_IDENTITY
+        assert "9529360-cpu/stardust-hermes" in HERMES_AGENT_HELP_GUIDANCE
+        assert "authoritative" in HERMES_AGENT_HELP_GUIDANCE
+
     def test_memory_guidance_keeps_form_rule_and_routing(self):
         """Dieted (#95681): WHAT belongs in memory is the memory tool
         schema's job (taught on every call). This block keeps only the
@@ -408,8 +424,9 @@ class TestBuildContextFilesPrompt:
         fake_home.mkdir()
         with patch("pathlib.Path.home", return_value=fake_home):
             result = build_context_files_prompt(cwd=str(tmp_path))
+        from hermes_cli.default_soul import DEFAULT_SOUL_MD
         assert "Project Context" in result
-        assert "Hermes Agent" in result
+        assert DEFAULT_SOUL_MD in result
 
     def test_loads_agents_md(self, tmp_path):
         (tmp_path / "AGENTS.md").write_text("Use Ruff for linting.")

@@ -110,7 +110,7 @@ def test_no_provider_configured_points_at_model_login_and_auth_add(monkeypatch, 
 
 class TestSignInFailureCopy:
     @pytest.mark.parametrize("code, pointer", [
-        ("expired_token", "`hermes portal`"),
+        ("expired_token", "`hermes auth add nous`"),
         ("access_denied", "`hermes model`"),
     ])
     def test_poll_error_codes_map_to_plain_copy(self, code, pointer):
@@ -128,7 +128,8 @@ class TestSignInFailureCopy:
 
         msg = str(excinfo.value)
         assert not msg.startswith(code)
-        assert "`hermes portal`" in msg and pointer in msg
+        assert "`hermes auth add nous`" in msg and pointer in msg
+        assert "`hermes portal`" not in msg
 
     def test_network_failure_names_host_and_retry_command(self):
         from hermes_cli.auth_error_copy import sign_in_failure_lines
@@ -137,7 +138,8 @@ class TestSignInFailureCopy:
                                       service_host="portal.nousresearch.com")
 
         assert lines[0].startswith("Could not sign in")
-        assert "portal.nousresearch.com" in lines[0] and "`hermes portal`" in lines[0]
+        assert "portal.nousresearch.com" in lines[0] and "`hermes auth add nous`" in lines[0]
+        assert "`hermes portal`" not in lines[0]
         assert "Errno" not in lines[0]
         assert any(line.strip().startswith("Details:") for line in lines[1:])
 
@@ -169,7 +171,8 @@ class TestSignInFailureCopy:
 
         assert excinfo.value.code == 1
         out = capsys.readouterr().out
-        assert "Could not sign in" in out and "`hermes portal`" in out
+        assert "Could not sign in" in out and "`hermes auth add nous`" in out
+        assert "`hermes portal`" not in out
         assert "Login failed:" not in out
 
 
@@ -287,7 +290,7 @@ class TestRunLoginProviderAwareCopy:
         assert "hermes portal" not in out and "portal.nousresearch.com" not in out
         assert "hermes login" not in out
 
-    def test_nous_failure_keeps_portal_retry(self, capsys):
+    def test_nous_failure_uses_generic_provider_auth_retry(self, capsys):
         from hermes_cli.auth import PROVIDER_REGISTRY
         from hermes_cli.model_setup_flows_common import _run_login
 
@@ -296,7 +299,8 @@ class TestRunLoginProviderAwareCopy:
 
         assert _run_login(_boom, SimpleNamespace(), PROVIDER_REGISTRY["nous"]) is False
         out = capsys.readouterr().out
-        assert "hermes portal" in out and "portal.nousresearch.com" in out
+        assert "hermes auth add nous" in out and "portal.nousresearch.com" in out
+        assert "hermes portal" not in out
 
     def test_silent_nonzero_system_exit_still_tells_user_how_to_retry(self, capsys):
         from hermes_cli.auth import PROVIDER_REGISTRY

@@ -41,10 +41,83 @@ def file_signature(st: os.stat_result) -> "tuple[int, int, int, int]":
     mtime + size alone miss a replacement that preserves both (``cp -p``, ``rsync -t``, a tar
     restore, a script pinning the timestamp with ``os.utime``). The inode changes on an atomic
     replace and ctime cannot be backdated from user space, so the pair catches those writers.
-    On Windows ``st_ino`` may be 0 and ``st_ctime_ns`` is the creation time — both stable across
-    an in-place rewrite, so the key degrades to mtime + size there rather than misfiring.
+    On Windows ``st_ctime_ns`` is creation time, not NTFS ChangeTime; use :func:`path_signature`
+    when same-path in-place rewrites must also invalidate a cache.
     """
     return (st.st_mtime_ns, st.st_size, st.st_ino, st.st_ctime_ns)
+
+
+def _windows_change_time(path: Union[str, Path]) -> int:
+    """Return NTFS/Win32 ChangeTime (100ns ticks) for *path*.
+
+    Python's Windows ``st_ctime`` is creation time, so a same-size in-place rewrite whose mtime is
+    restored can otherwise be invisible to stat-only caches. ChangeTime moves on both data and
+    metadata writes and cannot be pinned with ``os.utime``.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    class _FileBasicInfo(ctypes.Structure):
+        _fields_ = [
+            ("CreationTime", ctypes.c_longlong),
+            ("LastAccessTime", ctypes.c_longlong),
+            ("LastWriteTime", ctypes.c_longlong),
+            ("ChangeTime", ctypes.c_longlong),
+            ("FileAttributes", wintypes.DWORD),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+    ]
+    create_file.restype = wintypes.HANDLE
+    get_info = kernel32.GetFileInformationByHandleEx
+    get_info.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD]
+    get_info.restype = wintypes.BOOL
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
+
+    handle = create_file(
+        str(path), 0x80, 0x00000001 | 0x00000002 | 0x00000004,
+        None, 3, 0x80, None,
+    )
+    invalid = ctypes.c_void_p(-1).value
+    if handle == invalid:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        info = _FileBasicInfo()
+        if not get_info(handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return int(info.ChangeTime)
+    finally:
+        close_handle(handle)
+
+
+def path_signature(path: Union[str, Path]) -> tuple:
+    """Robust change-detection key for a filesystem path.
+
+    POSIX uses :func:`file_signature`. Windows appends the native ChangeTime so same-size,
+    timestamp-pinned in-place rewrites invalidate long-lived caches without reading the whole file.
+    """
+    st = os.stat(path)
+    sig = file_signature(st)
+    if os.name != "nt":
+        return sig
+    try:
+        return (*sig, _windows_change_time(path))
+    except OSError:
+        # Some network / virtual filesystems do not expose FileBasicInfo. Fall back to a
+        # small content digest so correctness wins over a stale cache on those mounts.
+        try:
+            import hashlib
+            with open(path, "rb") as f:
+                digest = hashlib.blake2b(f.read(), digest_size=16).digest()
+            return (*sig, digest)
+        except OSError:
+            return sig
 
 
 def _preserve_file_mode(path: Path) -> "int | None":

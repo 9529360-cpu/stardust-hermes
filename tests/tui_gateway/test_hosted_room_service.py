@@ -79,7 +79,9 @@ class _FakeRPC:
     def info(self, *, profile, session_id, source):
         return {"active": False, "task_id": None}
 
-    def interrupt(self, *, profile, session_id, source, expected_task_id):
+    def interrupt(
+        self, *, profile, session_id, source, expected_task_id, expected_execution_generation
+    ):
         return {"interrupted": True}
 
     def approve(self, **kwargs):
@@ -842,11 +844,18 @@ def test_acknowledged_stop_refuses_to_disband_while_exact_turn_is_still_running(
         def __init__(self) -> None:
             super().__init__()
             self.active_task_id = None
+            self.active_execution_generation = None
 
         def info(self, *, profile, session_id, source):
-            return {"active": True, "task_id": self.active_task_id}
+            return {
+                "active": True,
+                "task_id": self.active_task_id,
+                "execution_generation": self.active_execution_generation,
+            }
 
-        def interrupt(self, *, profile, session_id, source, expected_task_id):
+        def interrupt(
+            self, *, profile, session_id, source, expected_task_id, expected_execution_generation
+        ):
             return None
 
     db = tmp_path / "state.db"
@@ -879,7 +888,7 @@ def test_acknowledged_stop_refuses_to_disband_while_exact_turn_is_still_running(
         ttl_seconds=30,
         clock=time.time,
     )
-    driver.start_task(
+    attempt = driver.start_task(
         db,
         task["identity"],
         lease,
@@ -888,6 +897,7 @@ def test_acknowledged_stop_refuses_to_disband_while_exact_turn_is_still_running(
     )
     rpc.sessions[("ops", "Group: room-1")] = {"session_id": "ops-session"}
     rpc.active_task_id = task["identity"].task_id
+    rpc.active_execution_generation = attempt.execution_generation
 
     with pytest.raises(RuntimeError, match="still stopping"):
         service.stop_room(
@@ -955,10 +965,13 @@ def test_local_pending_approval_requires_exact_task_generation_and_request(
         task,
         session_id="ops-session",
         info={
+            "active": True,
+            "task_id": task["identity"].task_id,
+            "execution_generation": task["execution_generation"],
             "pending_approval": {
                 "request_id": "approval-1",
                 "choices": ["once", "always", "deny"],
-            }
+            },
         },
     )
 

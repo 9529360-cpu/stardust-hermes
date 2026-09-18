@@ -223,7 +223,7 @@ def _print_setup_summary(config: dict, hermes_home):
         _setup.print_warning("No inference provider is configured — Hermes cannot chat yet.")
         _setup._info("  Finish this one step with either of:",
               "    hermes model            (pick any provider/model)",
-              "    hermes setup --portal   (Nous Portal OAuth, no API key)")
+              "    hermes auth             (configure provider credentials)")
 
     print()
     _setup.print_header("Tool Availability Summary")

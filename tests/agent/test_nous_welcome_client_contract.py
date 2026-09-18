@@ -128,12 +128,16 @@ class TestRefusalCopy:
         assert anon_auth.parse_welcome_refusal({"reason": "nope"}) is None
         assert anon_auth.parse_welcome_refusal("not a dict") is None
 
-    def test_copy_names_the_served_model_and_the_sign_in(self):
+    def test_copy_names_the_served_model_and_provider_configuration_path(self):
         refusal = anon_auth.parse_welcome_refusal({"reason": "model_not_free", "alternates": ["nous/welcome"]})
         chat = anon_auth.welcome_refusal_copy(refusal, model="gpt-5", in_chat=True)
-        assert chat == "gpt-5 isn't on the Nous free tier; it serves nous/welcome only. Sign in with a Nous account for the full catalog: /login."
+        assert chat == (
+            "gpt-5 isn't on the Nous free tier; it serves nous/welcome only. "
+            "Use /model to choose a configured model, or ask the host operator to run `hermes auth`."
+        )
+        assert "/login" not in chat
         terminal = anon_auth.welcome_refusal_copy(refusal, model="gpt-5", in_chat=False)
-        assert "`hermes auth upgrade`" in terminal and "/login" not in terminal
+        assert "`hermes auth add <provider>`" in terminal and "/login" not in terminal
 
     def test_capacity_copy_carries_the_retry(self):
         refusal = anon_auth.parse_welcome_refusal({"reason": "at_capacity", "retry_after": 30})

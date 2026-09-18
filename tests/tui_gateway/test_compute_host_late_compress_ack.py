@@ -120,6 +120,24 @@ def test_host_crash_fails_outstanding_late_ack_handlers():
     assert sup._late_control_handlers == {}
 
 
+def test_host_crash_immediately_fails_current_control_waiters():
+    """A dead child cannot answer an in-flight control RPC; do not leave it blocked until timeout."""
+    sup, _sent = _supervisor()
+    waiter: queue.Queue[dict] = queue.Queue(maxsize=1)
+    sup._pending_controls["active-control"] = waiter
+
+    sup._fail_pending_turns(reason="crash", message="compute host exited with code 9")
+
+    failure = waiter.get_nowait()
+    assert failure == {
+        "type": "control.error",
+        "request_id": "active-control",
+        "reason": "crash",
+        "message": "compute host exited with code 9",
+    }
+    assert sup._pending_controls == {}
+
+
 # ── session.compress RPC: pending answer + late adoption ────────────────────
 
 

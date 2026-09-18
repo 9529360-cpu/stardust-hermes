@@ -126,6 +126,89 @@ def test_snapshot_returned_for_error_only_turn():
     assert snapshot["error"] == "agent initialization failed"
 
 
+def test_hosted_build_failure_commits_terminal_receipt_and_releases_task_proof(monkeypatch, emits):
+    """Once a room turn is admitted, agent-build failure is a terminal failed attempt, not a silent timeout."""
+    receipts = []
+    hosted_task = {
+        "room_id": "room-1", "task_id": "task-1", "thread_id": "thread-1",
+        "turn_id": "turn-1", "execution_generation": 3, "member_id": "member-1",
+    }
+    session = _session(agent=None, running=True, _hosted_room_task=hosted_task)
+    server._start_inflight_turn(session, "do hosted work")
+    monkeypatch.setattr(
+        server, "_wait_agent_for_prompt",
+        lambda *_args, **_kwargs: {"error": {"message": "No LLM provider configured"}},
+    )
+    monkeypatch.setattr(server, "_session_info", lambda *_args, **_kwargs: {"active": False})
+    monkeypatch.setattr(
+        server, "_run_prompt_submit",
+        lambda *_args, **_kwargs: pytest.fail("failed agent build must not enter the turn runner"),
+    )
+
+    server._run_after_agent_ready(
+        "rid", "sid", session, "do hosted work", None, receipts.append)
+
+    assert receipts == [{
+        "status": "failed", "text": "", "error": "No LLM provider configured",
+    }]
+    assert session["running"] is False
+    assert "_hosted_room_task" not in session
+    snapshot = server._inflight_snapshot(session)
+    assert snapshot is not None and snapshot["status"] == "error"
+    assert snapshot["error"] == "No LLM provider configured"
+    completes = _events(emits, "message.complete")
+    assert completes and completes[-1]["status"] == "error"
+
+
+def test_hosted_build_failure_keeps_task_proof_when_receipt_commit_fails(monkeypatch, emits):
+    """A failed terminal callback must not erase the task identity needed by recovery/Stop fencing."""
+    hosted_task = {
+        "room_id": "room-1", "task_id": "task-1", "thread_id": "thread-1",
+        "turn_id": "turn-1", "execution_generation": 3, "member_id": "member-1",
+    }
+    session = _session(agent=None, running=True, _hosted_room_task=hosted_task)
+    server._start_inflight_turn(session, "do hosted work")
+    monkeypatch.setattr(
+        server, "_wait_agent_for_prompt",
+        lambda *_args, **_kwargs: {"error": {"message": "provider setup failed"}},
+    )
+    monkeypatch.setattr(server, "_session_info", lambda *_args, **_kwargs: {"active": False})
+
+    def fail_receipt(_receipt):
+        raise RuntimeError("room db unavailable")
+
+    server._run_after_agent_ready(
+        "rid", "sid", session, "do hosted work", None, fail_receipt)
+
+    assert session["running"] is False
+    assert session["_hosted_room_task"] == hosted_task
+    snapshot = server._inflight_snapshot(session)
+    assert snapshot is not None and snapshot["error"] == "provider setup failed"
+
+
+def test_hosted_cancel_before_agent_ready_releases_stale_task_proof(monkeypatch, emits):
+    """The room driver owns cancellation; once the not-yet-started turn is inactive its session proof is stale."""
+    hosted_task = {
+        "room_id": "room-1", "task_id": "task-1", "thread_id": "thread-1",
+        "turn_id": "turn-1", "execution_generation": 3, "member_id": "member-1",
+    }
+    session = _session(
+        agent=None, running=True, _turn_cancel_requested=True,
+        _hosted_room_task=hosted_task,
+    )
+    server._start_inflight_turn(session, "do hosted work")
+    monkeypatch.setattr(server, "_wait_agent_for_prompt", lambda *_args, **_kwargs: None)
+
+    server._run_after_agent_ready(
+        "rid", "sid", session, "do hosted work", None, lambda _receipt: None)
+
+    assert session["running"] is False
+    assert "_hosted_room_task" not in session
+    assert server._inflight_snapshot(session) is None
+    errors = _events(emits, "error")
+    assert errors and "cancelled before the agent was ready" in errors[-1]["message"]
+
+
 def test_healthy_snapshot_carries_no_error_keys():
     session = _session()
     server._start_inflight_turn(session, "hi")

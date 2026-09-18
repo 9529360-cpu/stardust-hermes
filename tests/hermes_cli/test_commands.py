@@ -33,6 +33,14 @@ class TestCommandRegistry:
         for token in ("json", "md", "html"):
             assert token in (cmd.args_hint or "")
 
+    def test_stardust_omits_inherited_nous_account_product_commands(self):
+        for name in ("login", "subscription", "upgrade", "topup"):
+            assert resolve_command(name) is None
+            assert name not in GATEWAY_KNOWN_COMMANDS
+        assert not any(
+            cmd.name in {"login", "subscription", "topup"} for cmd in COMMAND_REGISTRY
+        )
+
     def test_no_duplicate_canonical_names(self):
         names = [cmd.name for cmd in COMMAND_REGISTRY]
         assert len(names) == len(set(names)), f"Duplicate names: {[n for n in names if names.count(n) > 1]}"

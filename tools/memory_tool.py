@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Memory Tool - persistent curated memory (MEMORY.md = agent notes, USER.md = user
-profile). Both enter the system prompt as a FROZEN snapshot at session start;
-mid-session writes hit disk but never change the prompt (prefix cache intact).
-Single `memory` tool: add/replace/remove or a batch `operations` list."""
+profile). The prompt snapshot stays fixed within a turn; disk changes become visible
+at the next turn boundary only when the rendered memory actually changed, so unchanged
+content keeps the prefix cache intact. Single `memory` tool: add/replace/remove or a
+batch `operations` list."""
 
 import copy
 import json

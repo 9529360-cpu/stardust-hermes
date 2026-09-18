@@ -70,11 +70,17 @@ def _flush_sessions_before_exit(budget_s: float | None = None) -> int:
     budget = _EXIT_FLUSH_BUDGET_S if budget_s is None else max(0.0, budget_s)
     if budget <= 0:
         return 0
+    sessions = _reaper_session_snapshot()
+    # atexit runs while Python is dismantling thread state. Do not create a worker when
+    # there is nothing to persist; besides being wasted work, thread start can fail or be
+    # interrupted during interpreter finalization and turn a clean process exit into code 1.
+    if not sessions:
+        return 0
     result = {"flushed": 0}
 
     def _run() -> None:
         deadline = time.monotonic() + budget
-        for session in _reaper_session_snapshot():
+        for session in sessions:
             if time.monotonic() >= deadline:
                 break
             result["flushed"] += _flush_session_messages(session)

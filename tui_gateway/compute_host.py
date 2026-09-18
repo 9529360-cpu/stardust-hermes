@@ -233,6 +233,8 @@ class ComputeHost:
                 session.update(running=True, _turn_cancel_requested=False, last_active=time.time())
                 server._start_inflight_turn(session, inflight)
                 turn_started_at = time.time()
+                turn_started_activity_generation = getattr(
+                    session.get("agent"), "_turn_liveness_activity_generation", None)
             self._reply("turn.started", sid, request_id, started_ns=now_ns())
             with contextlib.suppress(Exception):
                 server._ensure_session_db_row(session)
@@ -243,12 +245,23 @@ class ComputeHost:
                 server._persist_branch_seed(session)
             server._run_prompt_submit(
                 request_id, sid, session, text, display_kind=frame.get("display_kind") or None)
+            # A completed turn may synchronously schedule another internal turn (goal
+            # continuation, queued prompt) before its worker exits. Follow the session's
+            # thread-owner handoff until the same finished owner remains installed; caching
+            # only the first thread lets the parent observe turn.end while child work lives on.
             run_thread = session.get("_run_thread")
-            if run_thread is not None and hasattr(run_thread, "join"):
+            while run_thread is not None and hasattr(run_thread, "join"):
                 while run_thread.is_alive():
                     run_thread.join(timeout=1.0)
                     if run_thread.is_alive() and frame.get("turn_id"):
-                        self._emit_turn_activity(sid, session, frame["turn_id"], turn_started_at)
+                        self._emit_turn_activity(
+                            sid, session, frame["turn_id"], turn_started_at,
+                            turn_started_activity_generation)
+                with session["history_lock"]:
+                    current_run_thread = session.get("_run_thread")
+                if current_run_thread is run_thread:
+                    break
+                run_thread = current_run_thread
             with session["history_lock"]:
                 meta = _history_meta(session)
                 interrupted = bool(session.get("_turn_cancel_requested"))
@@ -268,15 +281,30 @@ class ComputeHost:
                         server._clear_inflight_turn(session)
             self._reply("turn.error", sid, request_id, reason="exception", message=str(exc))
 
-    def _emit_turn_activity(self, sid: str, session: dict, turn_id: str, started_at: float) -> None:
+    def _emit_turn_activity(
+        self, sid: str, session: dict, turn_id: str, started_at: float,
+        started_generation: int | None = None,
+    ) -> None:
         # Observe the agent clock, never the host heartbeat. A reused agent's last
         # turn must not lend its activity to a new turn that has not made progress.
         activity_ns = None
         try:
-            summary = session["agent"].get_activity_summary()
+            agent = session["agent"]
+            summary = agent.get_activity_summary()
             stamped_at = summary.get("last_activity_at")
             elapsed = summary.get("seconds_since_activity")
-            if stamped_at is not None and stamped_at >= started_at and elapsed is not None and elapsed >= 0:
+            current_generation = getattr(agent, "_turn_liveness_activity_generation", None)
+            generation_advanced = (
+                isinstance(started_generation, int)
+                and isinstance(current_generation, int)
+                and current_generation > started_generation
+            )
+            generation_unavailable = not (
+                isinstance(started_generation, int) and isinstance(current_generation, int)
+            )
+            if ((generation_advanced or generation_unavailable)
+                    and stamped_at is not None and stamped_at >= started_at
+                    and elapsed is not None and elapsed >= 0):
                 activity_ns = now_ns() - int(elapsed * 1_000_000_000)
         except Exception:
             logging.getLogger(__name__).debug("compute host activity unavailable sid=%s", sid, exc_info=True)
@@ -437,6 +465,19 @@ class ComputeHost:
                 return ack
             with session["history_lock"]:
                 ack.update(_history_meta(session))
+        elif route_name == "session.workspace.move":
+            raw_cwd = str(frame.get("cwd") or "").strip()
+            if not raw_cwd:
+                return {"error": "cwd required"}
+            resolved = os.path.abspath(os.path.expanduser(raw_cwd))
+            if not os.path.isdir(resolved):
+                return {"error": f"working directory does not exist: {raw_cwd}"}
+            with session["history_lock"]:
+                session.update(cwd=resolved, explicit_cwd=True, cwd_from_settle=False)
+                ack = {"result": {"cwd": resolved}, **_history_meta(session)}
+            # Safe mid-turn re-anchor: this updates the task cwd record and any cached live
+            # terminal env, without cleanup_vm() or a duplicate durable DB write in the child.
+            server._register_session_cwd(session)
         else:
             output = server._mirror_slash_side_effects(sid, session, command) if command else ""
             with session["history_lock"]:
@@ -492,6 +533,29 @@ def _default_workers() -> int:
         return 8
 
 
+def _iter_control_lines(stdin: Any):
+    """Yield newline-delimited control frames without Windows TextIO pipe EOF races."""
+    if os.name != "nt" or stdin is not sys.stdin:
+        yield from stdin
+        return
+    pending = bytearray()
+    fd = stdin.fileno()
+    while True:
+        chunk = os.read(fd, 4096)
+        if not chunk:
+            if pending:
+                yield bytes(pending).decode("utf-8", errors="replace")
+            return
+        pending.extend(chunk)
+        while True:
+            newline = pending.find(b"\n")
+            if newline < 0:
+                break
+            raw = bytes(pending[:newline + 1])
+            del pending[:newline + 1]
+            yield raw.decode("utf-8", errors="replace")
+
+
 def run_host(stdin: Any = None, stdout: Any = None) -> None:
     os.environ["HERMES_COMPUTE_HOST_CHILD"] = "1"
     stdin = stdin or sys.stdin
@@ -513,7 +577,7 @@ def run_host(stdin: Any = None, stdout: Any = None) -> None:
         "hermes_home": os.environ.get("HERMES_HOME", "")})
 
     def _reader() -> None:
-        for raw in stdin:
+        for raw in _iter_control_lines(stdin):
             if host._closed.is_set():
                 break
             try:

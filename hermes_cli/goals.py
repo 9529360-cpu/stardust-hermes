@@ -722,7 +722,7 @@ _JSON_OBJECT_RE = re.compile(r"\{.*?\}", re.DOTALL)
 
 def _goal_judge_setting(key: str, default, cast):
     """Resolve ``auxiliary.goal_judge.<key>``; non-positive/garbage falls back to ``default``
-    rather than crashing the loop. ``load_config()`` is cached on (mtime, size) so this is cheap."""
+    rather than crashing the loop. ``load_config()`` uses a robust file-signature cache, so this is cheap."""
     try:
         from hermes_cli.config import load_config
 

@@ -1043,10 +1043,13 @@ class TestFTS5Search:
         db.append_message("s1", role="user", content="after")
 
         statements = []
-        read_conn = db._get_read_conn() or db._conn
         traced_connections = [db._conn]
-        if read_conn is not db._conn:
-            traced_connections.append(read_conn)
+        # Prime one pooled reader, then return it before tracing the public search.
+        # Calling _get_read_conn() directly strands that fresh connection outside the
+        # pool, so search_messages opens a different reader and its SQL is invisible.
+        with db._read_ctx() as read_conn:
+            if read_conn is not db._conn:
+                traced_connections.append(read_conn)
         for conn in traced_connections:
             conn.set_trace_callback(statements.append)
 
@@ -1289,6 +1292,35 @@ class TestDeleteAndExport:
 
 
 
+
+    def test_import_sessions_preserves_session_scoped_todo_state(self, db, tmp_path):
+        todo_state = {
+            "todos": [
+                {"id": "1", "content": "ship fix", "status": "in_progress"},
+                {"id": "2", "content": "verify runtime", "status": "pending"},
+            ],
+            "revision": 7,
+        }
+        db.create_session(
+            session_id="todo-source",
+            source="desktop",
+            model_config={"_todo_state": todo_state},
+        )
+        exported = db.export_session("todo-source")
+
+        target = SessionDB(db_path=tmp_path / "todo-import.db")
+        try:
+            result = target.import_sessions([exported])
+            restored = target.get_session_model_config_value(
+                "todo-source",
+                "_todo_state",
+            )
+        finally:
+            target.close()
+
+        assert result["ok"] is True
+        assert result["imported_ids"] == ["todo-source"]
+        assert restored == todo_state
 
     def test_import_sessions_rejects_oversized_payloads_atomically(self, db):
         oversized = "x" * (SessionDB._IMPORT_MAX_SESSION_BYTES + 1)

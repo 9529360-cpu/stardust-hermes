@@ -26,3 +26,23 @@ def test_load_config_sees_replacement_with_pinned_mtime_and_size(tmp_path):
         assert config_mod._load_config_impl(want_deepcopy=False) is first  # unchanged file: cache hit
         _replace_pinning_mtime(cfg, "model:\n  default: bbbb-route\n")
         assert config_mod.load_config()["model"]["default"] == "bbbb-route"
+
+
+def test_read_raw_config_sees_replacement_with_pinned_mtime_and_size(tmp_path):
+    with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        config_mod._RAW_CONFIG_CACHE.clear()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("model:\n  default: aaaa-route\n", encoding="utf-8")
+        assert config_mod.read_raw_config()["model"]["default"] == "aaaa-route"
+        _replace_pinning_mtime(cfg, "model:\n  default: bbbb-route\n")
+        assert config_mod.read_raw_config()["model"]["default"] == "bbbb-route"
+
+
+def test_load_env_sees_replacement_with_pinned_mtime_and_size(tmp_path):
+    with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+        config_mod.invalidate_env_cache()
+        env = tmp_path / ".env"
+        env.write_text("JARVIS_KEY=aaaa\n", encoding="utf-8")
+        assert config_mod.load_env()["JARVIS_KEY"] == "aaaa"
+        _replace_pinning_mtime(env, "JARVIS_KEY=bbbb\n")
+        assert config_mod.load_env()["JARVIS_KEY"] == "bbbb"

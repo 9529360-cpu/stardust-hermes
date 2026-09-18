@@ -92,8 +92,32 @@ class FailoverHostedRoomPeerClient:
         call.__name__ = method
         return call
 
-    prepare, dispatch, history, status, stop = map(_delegate, ("prepare", "dispatch", "history", "status", "stop"))
+    (
+        prepare, dispatch, recover_dispatch, history, status, stop, stop_receipt,
+        approve_receipt, refresh_grant, revoke_grant,
+    ) = map(
+        _delegate,
+        (
+            "prepare", "dispatch", "recover_dispatch", "history", "status", "stop", "stop_receipt",
+            "approve_receipt", "refresh_grant", "revoke_grant",
+        ),
+    )
     del _delegate
+
+    def _broadcast_required(self, method: str, *args, **kwargs) -> None:
+        for candidate in self.candidates:
+            target = getattr(candidate.client, method, None)
+            if not callable(target):
+                raise AttributeError(
+                    f"RoomLink candidate {candidate.name!r} does not support {method}"
+                )
+            target(*args, **kwargs)
+
+    def bind_receipt_store(self, db_path) -> None:
+        self._broadcast_required("bind_receipt_store", db_path)
+
+    def bind_observation(self, **kwargs) -> None:
+        self._broadcast_required("bind_observation", **kwargs)
 
     def bind_room_scope(self, **kwargs):
         for candidate in self.candidates:
@@ -220,17 +244,24 @@ class PeerHostedRoomTransport(InternalSessionRPC):
         return self.client.status(**self._scoped(profile=profile, session_id=session_id))
 
     def interrupt(
-        self, *, profile: str, session_id: str, source: str, expected_task_id: str
+        self, *, profile: str, session_id: str, source: str, expected_task_id: str,
+        expected_execution_generation: int,
     ) -> Mapping[str, Any] | None:
         self._validate_coordinates(profile=profile, source=source)
         dispatch = self._dispatch
         if dispatch is not None:
-            if dispatch.task_id != expected_task_id:
+            if (
+                dispatch.task_id != expected_task_id
+                or dispatch.execution_generation != expected_execution_generation
+            ):
                 return None
             return self.client.stop(dispatch=dispatch.as_mapping(), grant=self.route.grant)
-        if (self.task_id != expected_task_id or not self.execution_generation
-                or not hasattr(self.client, "stop_receipt")):
+        if (
+            self.task_id != expected_task_id
+            or self.execution_generation != expected_execution_generation
+            or not hasattr(self.client, "stop_receipt")
+        ):
             return None
         return self.client.stop_receipt(
-            task_id=expected_task_id, execution_generation=self.execution_generation,
+            task_id=expected_task_id, execution_generation=expected_execution_generation,
             grant=self.route.grant)

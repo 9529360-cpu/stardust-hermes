@@ -93,22 +93,73 @@ def test_info_and_interrupt_are_exact_task_scoped():
     server._sessions["runtime"] = {
         "history_lock": lock,
         "running": True,
-        "_hosted_room_task": {"task_id": "task-a"},
+        "_hosted_room_task": {"task_id": "task-a", "execution_generation": 4},
     }
     rpc = HostedRoomServerRPC(server)
 
     assert rpc.info(profile="ops", session_id="runtime", source="bot_room") == {
         "active": True,
         "task_id": "task-a",
+        "execution_generation": 4,
     }
     rpc.interrupt(
         profile="ops",
         session_id="runtime",
         source="bot_room",
         expected_task_id="task-a",
+        expected_execution_generation=4,
     )
     params = next(params for method, params in calls if method == "session.interrupt")
     assert params["expected_hosted_task_id"] == "task-a"
+    assert params["expected_hosted_execution_generation"] == 4
+
+
+def test_info_session_key_lookup_is_profile_scoped():
+    """A stored id reused across profile DBs must resolve only that profile's live runtime."""
+    server, _calls = _server()
+    server._profile_home = lambda profile: f"/profiles/{profile}" if profile else None
+    server._sessions.update({
+        "wrong-runtime": {
+            "history_lock": threading.Lock(),
+            "running": True,
+            "session_key": "shared-stored-id",
+            "profile_home": "/profiles/other",
+            "_hosted_room_task": {"task_id": "wrong-task", "execution_generation": 9},
+        },
+        "right-runtime": {
+            "history_lock": threading.Lock(),
+            "running": True,
+            "session_key": "shared-stored-id",
+            "profile_home": "/profiles/ops",
+            "_hosted_room_task": {"task_id": "right-task", "execution_generation": 2},
+        },
+    })
+    rpc = HostedRoomServerRPC(server)
+
+    assert rpc.info(profile="ops", session_id="shared-stored-id", source="bot_room") == {
+        "active": True,
+        "task_id": "right-task",
+        "execution_generation": 2,
+    }
+
+
+def test_info_session_key_lookup_follows_compression_tip():
+    """The title resolver returns the compressed tip, which must still find the live runtime."""
+    server, _calls = _server()
+    server._sessions["runtime"] = {
+        "history_lock": threading.Lock(),
+        "running": True,
+        "session_key": "root-session",
+        "agent": SimpleNamespace(session_id="compressed-tip"),
+        "_hosted_room_task": {"task_id": "task-tip", "execution_generation": 5},
+    }
+    rpc = HostedRoomServerRPC(server)
+
+    assert rpc.info(profile="ops", session_id="compressed-tip", source="bot_room") == {
+        "active": True,
+        "task_id": "task-tip",
+        "execution_generation": 5,
+    }
 
 
 def test_local_approval_snapshot_and_response_use_exact_request():

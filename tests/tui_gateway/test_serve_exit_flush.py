@@ -98,9 +98,15 @@ def test_sigterm_flushes_populated_session_into_state_db(
     prev = {signal.SIGTERM: signal.signal(signal.SIGTERM, _prev_handler)}
     try:
         assert server.install_exit_flush_signal_handlers() is True
-        os.kill(os.getpid(), signal.SIGTERM)
-        # The handler runs synchronously on the main thread at the next
-        # bytecode boundary; poll briefly for robustness.
+        if os.name == "nt":
+            # Windows os.kill(SIGTERM) terminates the process instead of delivering
+            # SIGTERM through Python's signal handler. Exercise the installed handler
+            # directly here; POSIX still verifies real signal delivery below.
+            server._handle_exit_flush_signal(signal.SIGTERM, None)
+        else:
+            os.kill(os.getpid(), signal.SIGTERM)
+        # POSIX delivery is synchronous on the main thread at the next bytecode
+        # boundary; poll briefly for robustness.
         deadline = time.monotonic() + 5.0
         while not chained["called"] and time.monotonic() < deadline:
             time.sleep(0.01)
@@ -126,6 +132,20 @@ def test_exit_flush_is_bounded(registered_session):
     server._flush_sessions_before_exit(budget_s=0.3)
     elapsed = time.monotonic() - start
     assert elapsed < 2.0, f"exit flush blocked {elapsed:.1f}s past its budget"
+
+
+def test_exit_flush_with_no_sessions_does_not_start_a_thread(monkeypatch):
+    """The atexit path must be a no-op once there is no state left to persist."""
+    monkeypatch.setattr(server, "_reaper_session_snapshot", lambda: [])
+
+    class _NoThreading:
+        @staticmethod
+        def Thread(*_args, **_kwargs):
+            pytest.fail("empty exit flush must not create a thread")
+
+    monkeypatch.setattr(server, "threading", _NoThreading)
+
+    assert server._flush_sessions_before_exit(budget_s=0.3) == 0
 
 
 def test_shutdown_sessions_flushes_before_teardown(monkeypatch):

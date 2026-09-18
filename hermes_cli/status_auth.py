@@ -112,9 +112,15 @@ def _render_auth_providers(ctx):
     except Exception:
         statuses["get_xai_oauth_auth_status"] = {}
 
+    from hermes_cli.anon_auth import portal_identity_enabled
+
     info = None
-    if any(nous_status.get(k) for k in ("logged_in", "access_token", "portal_base_url",
-                                        "inference_credential_present", "error_code")):
+    nous_present = any(nous_status.get(k) for k in (
+        "logged_in", "free_tier", "access_token", "portal_base_url",
+        "inference_credential_present", "error_code"))
+    # Stardust treats Nous as an optional model provider, not a built-in account product. Only the
+    # legacy compatibility gate is allowed to fetch account/subscription state from the Portal.
+    if portal_identity_enabled() and nous_present:
         try:
             info = get_nous_portal_account_info()
         except Exception:
@@ -125,9 +131,9 @@ def _render_auth_providers(ctx):
         nous_status.get("inference_credential_present") or (info and info.inference_credential_present)
     )
     if nous_status.get("free_tier"):
-        # Free tier: never rendered as an account login (no account ids, no refresh row).
+        # Compatibility free tier is provider state, never a Stardust account/login surface.
         from hermes_cli.anon_auth import FREE_TIER_LABEL, GUEST_MODEL, UPGRADE_HINT
-        _status._row("Nous Portal", True, f"{FREE_TIER_LABEL} · {GUEST_MODEL}")
+        _status._row("Nous provider", True, f"{FREE_TIER_LABEL} · {GUEST_MODEL}")
         _status._detail("", UPGRADE_HINT)
         inference_url = nous_status.get("inference_base_url")
         if inference_url:
@@ -136,28 +142,33 @@ def _render_auth_providers(ctx):
             _oauth_block(name, statuses.get(getter, {}), hint, rows)
         return
     nous_error = nous_status.get("error")
-    _status._row("Nous Portal", logged_in,
-         "logged in" if logged_in else "not logged in (Nous inference key configured)" if inference
-         else "not logged in (run: hermes portal)")
-    portal_url = nous_status.get("portal_base_url") or "(unknown)"
-    inference_url = nous_status.get("inference_base_url") or (info.inference_base_url if info else None)
-    for label, value, show in (
-        ("Portal URL:", portal_url, logged_in or portal_url != "(unknown)" or nous_error),
-        ("Inference:", inference_url, inference and inference_url),
-        ("Access exp:", _format_iso_timestamp(nous_status.get("access_expires_at")),
-         logged_in or nous_status.get("access_expires_at")),
-        ("Key exp:", _format_iso_timestamp(nous_status.get("agent_key_expires_at")),
-         logged_in or inference or nous_status.get("agent_key_expires_at")),
-        ("Refresh:", "yes" if nous_status.get("has_refresh_token") else "no",
-         logged_in or nous_status.get("has_refresh_token")),
-        ("Error:", nous_error, nous_error)):
-        if show:
-            _status._detail(label, value)
+    if nous_present or logged_in or inference:
+        _status._row("Nous provider", logged_in or inference,
+             "OAuth configured" if logged_in else "inference credential configured" if inference
+             else "not ready (run: hermes auth add nous)")
+        auth_service_url = nous_status.get("portal_base_url") or "(unknown)"
+        inference_url = nous_status.get("inference_base_url") or (info.inference_base_url if info else None)
+        for label, value, show in (
+            ("Auth service:", auth_service_url,
+             logged_in or auth_service_url != "(unknown)" or nous_error),
+            ("Inference:", inference_url, inference and inference_url),
+            ("Access exp:", _format_iso_timestamp(nous_status.get("access_expires_at")),
+             logged_in or nous_status.get("access_expires_at")),
+            ("Key exp:", _format_iso_timestamp(nous_status.get("agent_key_expires_at")),
+             logged_in or inference or nous_status.get("agent_key_expires_at")),
+            ("Refresh:", "yes" if nous_status.get("has_refresh_token") else "no",
+             logged_in or nous_status.get("has_refresh_token")),
+            ("Error:", nous_error, nous_error)):
+            if show:
+                _status._detail(label, value)
     for name, getter, hint, rows in _OAUTH_BLOCKS:
         _oauth_block(name, statuses.get(getter, {}), hint, rows)
 
 
 def _render_nous_gateway(ctx):
+    from hermes_cli.anon_auth import portal_identity_enabled
+    if not portal_identity_enabled():
+        return
     if managed_nous_tools_enabled():
         features = get_nous_subscription_features(ctx.config)
         _status._section("Nous Tool Gateway")

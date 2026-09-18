@@ -755,7 +755,7 @@ class TestInterrupt:
 
 class TestHydrateTodoStore:
     @staticmethod
-    def _assistant_todo_call(call_id="c1"):
+    def _assistant_todo_call(call_id="c1", name="todo_list"):
         return {
             "role": "assistant",
             "content": None,
@@ -763,7 +763,7 @@ class TestHydrateTodoStore:
                 {
                     "id": call_id,
                     "type": "function",
-                    "function": {"name": "todo", "arguments": "{}"},
+                    "function": {"name": name, "arguments": "{}"},
                 }
             ],
         }
@@ -827,12 +827,69 @@ class TestHydrateTodoStore:
         assert agent._todo_store.snapshot()["revision"] == 2
         assert agent._todo_store.read()[0]["id"] == "new"
 
+    def test_legacy_todo_alias_still_recovers_snapshot(self, agent):
+        history = [
+            self._assistant_todo_call(name="todo"),
+            {
+                "role": "tool",
+                "tool_call_id": "c1",
+                "content": json.dumps({
+                    "todos": [{"id": "legacy", "content": "Old session", "status": "pending"}],
+                    "revision": 3,
+                }),
+            },
+        ]
 
+        with patch("run_agent._set_interrupt"), patch("agent.interrupt_control._set_interrupt"):
+            agent._hydrate_todo_store(history)
 
+        assert agent._todo_store.snapshot()["revision"] == 3
+        assert agent._todo_store.read()[0]["id"] == "legacy"
 
+    def test_persisted_session_state_recovers_without_old_tool_result(self, agent):
+        agent.session_id = "persisted-todo-session"
+        agent._session_db = MagicMock()
+        agent._session_db.get_session_model_config_value.return_value = {
+            "todos": [{"id": "active", "content": "Keep working", "status": "in_progress"}],
+            "revision": 8,
+        }
+        # Compacted history can contain only the human-readable snapshot; no old tool result is required.
+        history = [{"role": "user", "content": "[Your active task list was preserved across context compression]"}]
 
+        with patch("run_agent._set_interrupt"), patch("agent.interrupt_control._set_interrupt"):
+            agent._hydrate_todo_store(history)
 
+        assert agent._todo_store.snapshot()["revision"] == 8
+        assert agent._todo_store.read() == [
+            {"id": "active", "content": "Keep working", "status": "in_progress"}
+        ]
+        agent._session_db.patch_session_model_config.assert_not_called()
 
+    def test_history_recovery_heals_session_state_slot(self, agent):
+        agent.session_id = "history-heal-session"
+        agent._session_db = MagicMock()
+        agent._session_db.get_session_model_config_value.return_value = None
+        history = [
+            self._assistant_todo_call(),
+            {
+                "role": "tool",
+                "tool_call_id": "c1",
+                "content": json.dumps({
+                    "todos": [{"id": "heal", "content": "Persist me", "status": "pending"}],
+                    "revision": 4,
+                }),
+            },
+        ]
+
+        with patch("run_agent._set_interrupt"), patch("agent.interrupt_control._set_interrupt"):
+            agent._hydrate_todo_store(history)
+
+        patch_args = agent._session_db.patch_session_model_config_monotonic.call_args.args
+        assert patch_args[0] == agent.session_id
+        assert patch_args[1] == "_todo_state"
+        assert patch_args[2]["revision"] == 4
+        assert patch_args[2]["todos"][0]["id"] == "heal"
+        agent._session_db.patch_session_model_config.assert_not_called()
 
 
 class TestBuildSystemPrompt:

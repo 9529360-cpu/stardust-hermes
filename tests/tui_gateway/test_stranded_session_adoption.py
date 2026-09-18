@@ -51,6 +51,25 @@ def test_adoption_moves_session_and_messages(stores):
     assert msgs[-1]["content"] == "answer 3"
 
 
+def test_adoption_preserves_structured_todo_state(stores):
+    """Profile adoption must move the authoritative task snapshot, not only transcript rows."""
+    default_db, profile_db = stores
+    _seed_stranded(default_db)
+    todo_state = {
+        "todos": [
+            {"id": "1", "content": "verify migration", "status": "in_progress"},
+            {"id": "2", "content": "report result", "status": "pending"},
+        ],
+        "revision": 7,
+    }
+    default_db.patch_session_model_config(STRANDED_ID, {"_todo_state": todo_state})
+
+    result = profile_db.adopt_session_lineage_from(default_db, STRANDED_ID)
+
+    assert result["adopted"] is True
+    assert profile_db.get_session_model_config_value(STRANDED_ID, "_todo_state") == todo_state
+
+
 def test_donor_is_archived_not_deleted(stores):
     default_db, profile_db = stores
     _seed_stranded(default_db)

@@ -183,7 +183,7 @@ class TestLoadConfigParseFailure:
             # Backup preserves the original broken content verbatim
             assert baks[0].read_text() == broken
             # Original config.yaml is left untouched (not reset to clean state)
-            assert (tmp_path / "config.yaml").read_text() == broken
+            assert (tmp_path / "config.yaml").read_text(encoding="utf-8") == broken
             # User is told where the backup landed
             assert str(baks[0]) in err
 
@@ -283,7 +283,7 @@ class TestSaveAndLoadRoundtrip:
             assert reloaded["model"] == "test/custom-model"
             assert reloaded["agent"]["max_turns"] == 42
 
-            saved = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            saved = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
             assert saved["agent"]["max_turns"] == 42
             assert "max_turns" not in saved
 
@@ -1486,7 +1486,7 @@ class TestWriteApprovalMigration:
                         "_config_version: 28\nmemory:\n  write_mode: approve\n"
                         "skills:\n  write_mode: approve\n")
             migrate_config(interactive=False, quiet=True)
-            raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            raw = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
             assert raw["memory"]["write_approval"] is True
             assert raw["skills"]["write_approval"] is True
             assert "write_mode" not in raw["memory"]
@@ -1500,7 +1500,7 @@ class TestWriteApprovalMigration:
                         "_config_version: 28\nmemory:\n  write_mode: 'on'\n"
                         "skills:\n  write_mode: 'off'\n")
             migrate_config(interactive=False, quiet=True)
-            raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            raw = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
             loaded = load_config()
             # write_approval=False equals the schema default, so it is NOT
             # materialised to disk (lean-config invariant) — the legacy
@@ -1685,7 +1685,7 @@ class TestDelegationCapUnificationMigration:
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             self._write(tmp_path, "_config_version: 32\nmodel:\n  provider: openrouter\n")
             migrate_config(interactive=False, quiet=True)
-            raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            raw = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
         # Migration must not materialize a delegation section it never had.
         assert "delegation" not in raw
 
@@ -1705,7 +1705,7 @@ class TestBackgroundNotificationsConciseMigration:
                 "  background_process_notifications: all\n",
             )
             migrate_config(interactive=False, quiet=True)
-            raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            raw = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
         assert raw["display"]["background_process_notifications"] == "concise"
 
     def test_explicit_choices_preserved(self, tmp_path):
@@ -1723,14 +1723,14 @@ class TestBackgroundNotificationsConciseMigration:
                     f"  background_process_notifications: {written}\n",
                 )
                 migrate_config(interactive=False, quiet=True)
-                raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
+                raw = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
             assert raw["display"]["background_process_notifications"] == expected
 
     def test_unset_key_is_not_materialized(self, tmp_path):
         with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
             self._write(tmp_path, "_config_version: 34\nmodel:\n  provider: openrouter\n")
             migrate_config(interactive=False, quiet=True)
-            raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            raw = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
         # Unset users inherit the new default at read time; no write needed.
         assert "display" not in raw or "background_process_notifications" not in raw.get("display", {})
 
@@ -1792,7 +1792,7 @@ class TestCodexAppServerAutoConfig:
 
             migrate_config(interactive=False, quiet=True)
 
-            raw = yaml.safe_load((tmp_path / "config.yaml").read_text())
+            raw = yaml.safe_load((tmp_path / "config.yaml").read_text(encoding="utf-8"))
             assert raw["compression"]["codex_app_server_auto"] == "hermes"
 
 

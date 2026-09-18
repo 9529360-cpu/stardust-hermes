@@ -34,7 +34,8 @@ class InternalSessionRPC(Protocol):
     """Normalized in-process session operations required by the room driver.
 
     ``submit`` durably reports one fenced turn's terminal result via ``on_terminal``;
-    ``interrupt`` acts only while the current turn still matches ``expected_task_id``.
+    ``interrupt`` acts only while the current turn still matches both ``expected_task_id``
+    and ``expected_execution_generation``.
     """
 
     def resolve_exact(
@@ -50,6 +51,7 @@ class InternalSessionRPC(Protocol):
     def info(self, *, profile: str, session_id: str, source: str) -> Mapping[str, Any]: ...
     def interrupt(
         self, *, profile: str, session_id: str, source: str, expected_task_id: str,
+        expected_execution_generation: int,
     ) -> Mapping[str, Any] | None: ...
 
 
@@ -266,7 +268,14 @@ class HostedRoomRuntime:
                 "cannot retry while the original task attempt is still active")
         return self._requeue(state.requeue_indeterminate_task, task, lease, identity.room_id)
 
+    def _clear_pending_action(self, task: Mapping[str, Any]) -> None:
+        if self.pending_action is not None:
+            self.pending_action(task["identity"].room_id, _member_id(task), None)
+
     def _publish(self, binding: HostedRoomBinding, task: dict[str, Any]) -> dict[str, Any]:
+        # Every published task outcome has left the live attempt state (terminal or deferred).
+        # Pending approvals are process-local projections and must not outlive that boundary.
+        self._clear_pending_action(task)
         if self.publish_terminal is not None:
             self.publish_terminal(binding, task)
         return task
@@ -294,10 +303,12 @@ class HostedRoomRuntime:
 
     def _complete_cancel(
         self, task: Mapping[str, Any], *, cancel_id: str | None = None) -> dict[str, Any]:
-        return state.complete_task_cancel(
+        cancelled = state.complete_task_cancel(
             self.db_path, task["identity"], clock=self.clock,
             cancel_id=task["cancel_id"] if cancel_id is None else cancel_id,
             expected_cancel_generation=task["cancel_generation"])
+        self._clear_pending_action(cancelled)
+        return cancelled
 
     def _resolve_indeterminate(
         self, binding: HostedRoomBinding, task: Mapping[str, Any], lease: state.DriverLease,
@@ -359,19 +370,36 @@ class HostedRoomRuntime:
 
     def _interrupt_stopping_task(self, binding: HostedRoomBinding, task: Mapping[str, Any]) -> bool:
         transport, profile, session_id = self._open_session(binding, task)
+        is_local = transport is not None and transport is self.rpc
+        run_process_generation = str(task.get("run_process_generation") or "")
+        prior_local_process = (
+            is_local
+            and bool(run_process_generation)
+            and run_process_generation != self.process_generation
+        )
         if session_id is None:
-            # A local turn cannot survive without its canonical session, so an authoritative
-            # absence is a safe Stop acknowledgement (errors raise); a peer stays uncertain.
-            return transport is not None and transport is self.rpc
+            # Only a reclaimed LOCAL attempt has authoritative proof that its old process can
+            # no longer submit. For the current process, durable ``running`` precedes
+            # ``transport.submit``; acknowledging absence here races the worker and can mark
+            # the task cancelled immediately before it actually starts.
+            return prior_local_process
         info = transport.info(**_session_kw(profile, session_id))
+        exact_attempt = (
+            info.get("task_id") == task["identity"].task_id
+            and info.get("execution_generation") == int(task["execution_generation"])
+        )
         if not _info_active(info):
-            # History was checked just before this probe: an inactive exact session cannot
-            # keep executing, and after a restart its process-local task marker is absent.
-            return True
-        if not _info_is_active_for(info, task["identity"], require_exact=True):
+            # An inactive exact attempt is stopped. After a local process restart, the old
+            # in-memory task marker is necessarily gone, so an inactive canonical session is
+            # also sufficient even when it cannot restate the old generation.
+            return exact_attempt or prior_local_process
+        if not exact_attempt:
             return False
         result = transport.interrupt(
-            **_session_kw(profile, session_id), expected_task_id=task["identity"].task_id)
+            **_session_kw(profile, session_id),
+            expected_task_id=task["identity"].task_id,
+            expected_execution_generation=int(task["execution_generation"]),
+        )
         return result is not None and (
             result.get("interrupted") is True
             or str(result.get("status") or "") in _STOP_ACK_STATUSES)
@@ -392,6 +420,17 @@ class HostedRoomRuntime:
     def _report_pending_action(
         self, task: Mapping[str, Any], *, session_id: str, info: Mapping[str, Any]) -> None:
         if self.pending_action is None:
+            return
+        # Pending approvals are process-local projections of one exact attempt. A canonical
+        # session can outlive a Retry boundary, so never relabel an older generation's request
+        # with the current durable task generation merely because task_id was reused.
+        if not _info_is_active_for(
+            info,
+            task["identity"],
+            int(task["execution_generation"]),
+            require_exact=True,
+        ):
+            self._clear_pending_action(task)
             return
         approval, action = info.get("pending_approval") or info.get("approval"), None
         if isinstance(approval, Mapping):
@@ -611,9 +650,28 @@ class HostedRoomRuntime:
                 try:
                     state.requeue_not_admitted_task(self.db_path, attempt, clock=self.clock)
                 except (state.StaleLeaseError, state.StaleTaskError) as fence_exc:
-                    self._mark_ambiguous(binding, attempt)
+                    # ``not_admitted`` is proof this attempt created no external work. If an
+                    # exact Stop won the durable race, finish that cancellation rather than
+                    # misclassifying a known-non-run as ambiguous. Any other fence winner owns
+                    # the current state; do not invent external uncertainty for this attempt.
+                    current = None
+                    with suppress(state.DriverStateError):
+                        current = state.get_task(self.db_path, attempt.identity)
+                    if (
+                        current is not None
+                        and current["status"] == "stopping"
+                        and int(current["execution_generation"]) == attempt.execution_generation
+                    ):
+                        with suppress(state.StaleTaskError):
+                            current = self._complete_cancel(current)
+                    if isinstance(fence_exc, state.StaleLeaseError):
+                        self._drop_lease(binding.room_id)
                     self._record_task_error(
-                        attempt, f"not-admitted proof lost its fence: {fence_exc}")
+                        attempt,
+                        "not-admitted attempt changed before requeue"
+                        + (f" (now {current['status']})" if current is not None else "")
+                        + f": {fence_exc}",
+                    )
                 else:
                     delay = self._defer_unavailable_route(task)
                     self._record_task_error(
@@ -698,6 +756,32 @@ class HostedRoomRuntime:
                 return receipt
             info = transport.info(**_session_kw(profile, session_id))
             self._report_pending_action(task, session_id=session_id, info=info)
+            if (
+                not _info_active(info)
+                and str(info.get("status") or "") == "cancelled"
+                and info.get("task_id") == task["identity"].task_id
+                and info.get("execution_generation") == int(task["execution_generation"])
+            ):
+                # A target gateway may cancel an exact peer run independently of the home
+                # driver. Convert that observed terminal state into our durable two-phase
+                # cancellation instead of waiting until the local deadline and misreporting
+                # the already-cancelled run as a timeout failure.
+                try:
+                    stopping = state.begin_task_cancel(
+                        self.db_path,
+                        task["identity"],
+                        cancel_id=f"remote-cancel:{task['execution_generation']}",
+                        expected_cancel_generation=int(task["cancel_generation"]),
+                        clock=self.clock,
+                    )
+                    cancelled = self._complete_cancel(stopping)
+                except (state.InvalidTaskTransitionError, state.StaleTaskError):
+                    current = state.get_task(self.db_path, task["identity"])
+                    if current["status"] in state.TERMINAL_STATUSES:
+                        return None
+                    continue
+                self._publish(binding, cancelled)
+                return None
             remaining = max(0.0, deadline_monotonic - time.monotonic())
             self._wake.wait(min(self.active_poll_interval_seconds, remaining))
             self._wake.clear()
@@ -761,9 +845,19 @@ class HostedRoomRuntime:
             if read_history else None)
         info = transport.info(**_session_kw(profile, session_id))
         self._report_pending_action(task, session_id=session_id, info=info)
+        exact_attempt = (
+            info.get("task_id") == task["identity"].task_id
+            and info.get("execution_generation") == int(task["execution_generation"])
+        )
         return _RecoveryInspection(
-            terminal=receipt, active=_info_is_active_for(info, task["identity"]),
-            status=str(info.get("status") or "") or None)
+            terminal=receipt,
+            active=_info_is_active_for(
+                info, task["identity"], int(task["execution_generation"])
+            ),
+            # Terminal status is authoritative only for the exact attempt. A canonical
+            # room session can retain a cancelled status from an older/newer Retry.
+            status=(str(info.get("status") or "") or None) if exact_attempt else None,
+        )
 
     def _inspect_recovery_session(
         self, binding: HostedRoomBinding, task: Mapping[str, Any]) -> _RecoveryInspection:
@@ -966,9 +1060,18 @@ def _info_active(info: Mapping[str, Any]) -> bool:
 
 
 def _info_is_active_for(
-    info: Mapping[str, Any], identity: state.TaskIdentity, *, require_exact: bool = False) -> bool:
-    accepted = (identity.task_id,) if require_exact else (None, identity.task_id)
-    return _info_active(info) and info.get("task_id") in accepted
+    info: Mapping[str, Any], identity: state.TaskIdentity, execution_generation: int,
+    *, require_exact: bool = False,
+) -> bool:
+    accepted_tasks = (identity.task_id,) if require_exact else (None, identity.task_id)
+    accepted_generations = (
+        (execution_generation,) if require_exact else (None, execution_generation)
+    )
+    return (
+        _info_active(info)
+        and info.get("task_id") in accepted_tasks
+        and info.get("execution_generation") in accepted_generations
+    )
 
 
 # ---- BEGIN PLUGIN-COMPAT (revert-scheduled; see COMPAT_MANIFEST.md) ----

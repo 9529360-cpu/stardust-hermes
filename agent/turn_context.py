@@ -854,6 +854,32 @@ def _persist_turn_start(
     )
 
 
+def _refresh_builtin_memory_snapshot(agent: Any) -> bool:
+    """Reload built-in memory only when its on-disk prompt snapshot actually changed.
+
+    Returns True only when the rendered snapshot digest changed, so a metadata-only touch
+    does not break the system-prompt prefix cache.
+    """
+    store = getattr(agent, "_memory_store", None)
+    stale = getattr(store, "system_prompt_snapshot_stale", None)
+    version = getattr(store, "system_prompt_snapshot_version", None)
+    reload_store = getattr(store, "load_from_disk", None)
+    if not (callable(stale) and callable(version) and callable(reload_store)):
+        return False
+    try:
+        if not stale():
+            return False
+        before = version()
+        reload_store()
+        if version() == before:
+            return False
+    except Exception:
+        logger.warning("Built-in memory snapshot refresh failed; keeping the cached prompt", exc_info=True)
+        return False
+    agent._cached_system_prompt = None
+    agent._cached_system_prompt_static = None
+    return True
+
 def build_turn_context(
     agent, user_message: Any, system_message: Optional[str],
     conversation_history: Optional[List[Dict[str, Any]]], task_id: Optional[str], stream_callback,
@@ -950,7 +976,9 @@ def build_turn_context(
             f"{'...' if len(_preview_text) > 60 else ''}'"
         )
 
-    # System prompt is cached per session for prefix caching.
+    # System prompt is cached per session for prefix caching. A real built-in memory change
+    # is the one cross-session state change that deliberately invalidates it at a turn boundary.
+    _refresh_builtin_memory_snapshot(agent)
     if agent._cached_system_prompt is None:
         restore_or_build_system_prompt(agent, system_message, conversation_history)
     active_system_prompt = agent._cached_system_prompt

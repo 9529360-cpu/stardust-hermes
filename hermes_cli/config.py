@@ -30,15 +30,15 @@ from hermes_cli.default_soul import DEFAULT_SOUL_MD, is_legacy_template_soul
 from hermes_cli.secret_prompt import masked_secret_prompt
 # Re-export from hermes_constants — canonical definition lives there.
 from hermes_constants import get_hermes_home, get_process_hermes_home  # noqa: F401
-from utils import atomic_replace, atomic_yaml_write, fast_safe_load, file_signature
+from utils import atomic_replace, atomic_yaml_write, fast_safe_load, file_signature, path_signature
 
 logger = logging.getLogger(__name__)
 
-# (config_path, mtime_ns, size) tuples already warned about, so concurrent CLI/gateway
-# loads of a broken config.yaml don't spam stderr. A changed file (new mtime) warns again.
+# Robust per-file signatures already warned about, so concurrent CLI/gateway loads of a broken
+# config.yaml do not spam stderr. Any real file change makes the signature move and warns again.
 _CONFIG_PARSE_WARNED: set = set()
 
-# path -> (mtime_ns, size, error message) of active parse failures. Written by
+# path -> (*path_signature, error message) of active parse failures. Written by
 # _warn_config_parse_failure() (the single funnel for every load-path parse failure) and
 # probed by get_active_config_parse_failure() so provider auto-resolution can refuse to
 # adopt a paid provider from env keys while the user's REAL config is unreadable.
@@ -92,8 +92,7 @@ def _warn_config_parse_failure(
     in ``_load_config_impl``).
     """
     try:
-        st = config_path.stat()
-        sig = file_signature(st)
+        sig = path_signature(config_path)
         key = (str(config_path), *sig)
         _CONFIG_PARSE_FAILURES[str(config_path)] = (*sig, str(exc))
     except OSError:
@@ -115,12 +114,10 @@ def _warn_config_parse_failure(
 
 
 def get_active_config_parse_failure() -> Optional[str]:
-    """Return the recorded parse error while the ACTIVE config.yaml is still byte-identical
-    (mtime_ns + size + ino + ctime_ns) to the file that failed to parse; else None."""
+    """Return the recorded parse error while the ACTIVE config.yaml is still the failed file."""
     try:
         record = _CONFIG_PARSE_FAILURES[str(path := get_config_path())]
-        st = path.stat()
-        return record[4] if file_signature(st) == record[:4] else None
+        return record[-1] if path_signature(path) == record[:-1] else None
     except Exception:
         return None
 
@@ -204,7 +201,7 @@ _LAST_EXPANDED_CONFIG_BY_PATH: Dict[str, Any] = {}
 # atomic_yaml_write which produces a fresh inode, so stat() sees a new signature and the next load
 # repopulates automatically — no explicit invalidation hook. See #58514.
 _LOAD_CONFIG_CACHE: Dict[str, Tuple[int, ...]] = {}
-# path -> (mtime_ns, size, ino, ctime_ns, raw yaml dict) for read_raw_config() (no defaults merged in).
+# path -> (*path_signature, raw yaml dict) for read_raw_config() (no defaults merged in).
 _RAW_CONFIG_CACHE: Dict[str, Tuple[int, ...]] = {}
 
 # Env var names written to .env that aren't in OPTIONAL_ENV_VARS (managed by setup/provider
@@ -1900,8 +1897,7 @@ def _read_raw_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
     with _CONFIG_LOCK:
         try:
             config_path = get_config_path()
-            st = config_path.stat()
-            cache_key = file_signature(st)
+            cache_key = path_signature(config_path)
         except (FileNotFoundError, OSError):
             return {}
 
@@ -1928,7 +1924,7 @@ def _read_raw_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
 
 def read_raw_config() -> Dict[str, Any]:
     """Read config.yaml as-is (no defaults merged, no migration); ``{}`` if missing/unparseable.
-    Cached on the file signature (mtime_ns, size, ino, ctime_ns); returns a deepcopy since callers mutate before ``save_config()``."""
+    Cached on the robust path signature; returns a deepcopy since callers mutate before ``save_config()``."""
     return _read_raw_config_impl(want_deepcopy=True)
 
 
@@ -2139,24 +2135,27 @@ def apply_terminal_config_to_env(
     return target
 
 
-def _load_config_cache_sig(config_path: Path) -> Tuple[Optional[Tuple[int, int, int, int]], Optional[Tuple[int, ...]]]:
+def _load_config_cache_sig(config_path: Path) -> Tuple[Optional[tuple], Optional[tuple]]:
     """Return ``(user_sig, cache_sig)`` for ``_LOAD_CONFIG_CACHE``.
-    The managed config file's signature is folded in ((0, 0, 0, 0) = none) so editing it invalidates
-    the merged result. ``cache_sig`` is None only when neither file exists (nothing to cache on)."""
+
+    On Windows the per-file signature includes native ChangeTime so a same-size in-place rewrite
+    with a restored mtime still invalidates a long-lived process. The managed config signature is
+    folded in as well; ``cache_sig`` is None only when neither file exists.
+    """
+    empty_sig = (0, 0, 0, 0, 0) if os.name == "nt" else (0, 0, 0, 0)
     try:
-        st = config_path.stat()
-        user_sig: Optional[Tuple[int, int, int, int]] = file_signature(st)
+        user_sig: Optional[tuple] = path_signature(config_path)
     except FileNotFoundError:
         user_sig = None
     managed_dir = managed_scope.get_managed_dir()
     try:
-        mst = (managed_dir / "config.yaml").stat() if managed_dir else None
-        managed_sig = file_signature(mst) if mst else (0, 0, 0, 0)
+        managed_path = (managed_dir / "config.yaml") if managed_dir else None
+        managed_sig = path_signature(managed_path) if managed_path and managed_path.exists() else empty_sig
     except OSError:
-        managed_sig = (0, 0, 0, 0)
-    if user_sig is None and managed_sig == (0, 0, 0, 0):
+        managed_sig = empty_sig
+    if user_sig is None and managed_sig == empty_sig:
         return None, None
-    return user_sig, (*(user_sig or (0, 0, 0, 0)), *managed_sig)
+    return user_sig, (*(user_sig or empty_sig), *managed_sig)
 
 
 def _last_known_good_fallback(config_path: Path, path_key: str, cache_sig, exc: Exception) -> Optional[Dict[str, Any]]:
@@ -2223,15 +2222,16 @@ def _load_config_impl(*, want_deepcopy: bool) -> Dict[str, Any]:
         user_sig, cache_sig = _load_config_cache_sig(config_path)
 
         cached = _LOAD_CONFIG_CACHE.get(path_key)
-        if cached is not None and cache_sig is not None and cached[:8] == cache_sig:
-            # Signatures match, but the cached expansion is only valid if every ${VAR} it was
-            # expanded against still has the same value — otherwise a load before
-            # load_hermes_dotenv() pins unexpanded literals for the process lifetime.
-            # Without this, a load_config() that ran before load_hermes_dotenv() pins unexpanded literals
-            # (e.g. auxiliary.<task>.api_key) for the life of the process (#58514).
-            env_snapshot = cached[9] if len(cached) > 9 else {}
-            if all(_env_ref_lookup(k) == v for k, v in env_snapshot.items()):
-                return copy.deepcopy(cached[8]) if want_deepcopy else cached[8]
+        if cached is not None and cache_sig is not None:
+            sig_len = len(cache_sig)
+            if cached[:sig_len] == cache_sig:
+                # Signatures match, but the cached expansion is only valid if every ${VAR} it was
+                # expanded against still has the same value — otherwise a load before
+                # load_hermes_dotenv() pins unexpanded literals for the process lifetime.
+                env_snapshot = cached[sig_len + 1] if len(cached) > sig_len + 1 else {}
+                if all(_env_ref_lookup(k) == v for k, v in env_snapshot.items()):
+                    value = cached[sig_len]
+                    return copy.deepcopy(value) if want_deepcopy else value
 
         config = copy.deepcopy(DEFAULT_CONFIG)
 
@@ -2390,9 +2390,9 @@ def save_config(
         _LAST_EXPANDED_CONFIG_BY_PATH[str(config_path)] = copy.deepcopy(current_normalized)
 
 
-# load_env() memo keyed on (path, *file_signature). Editing .env bumps mtime/inode -> rebuild;
-# invalidate_env_cache() is the explicit knob for writers on coarse-mtime filesystems.
-_env_cache: Optional[Tuple[Tuple[str, Optional[Tuple[int, int, int, int]]], Dict[str, str]]] = None
+# load_env() memo keyed on a robust path signature. On Windows native ChangeTime catches
+# same-size edits whose mtime is restored; explicit writers still invalidate immediately.
+_env_cache: Optional[Tuple[Tuple[str, Optional[tuple]], Dict[str, str]]] = None
 
 
 def load_env() -> Dict[str, str]:
@@ -2402,8 +2402,7 @@ def load_env() -> Dict[str, str]:
     env_path = get_env_path()
 
     try:
-        st = env_path.stat()
-        cache_key = (str(env_path), file_signature(st))
+        cache_key = (str(env_path), path_signature(env_path))
     except FileNotFoundError:
         cache_key = (str(env_path), None)
     except Exception:

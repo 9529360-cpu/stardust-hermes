@@ -356,6 +356,33 @@ def _teardown_popped_session(session: dict | None, *, end_reason: str = "tui_clo
     """Finish a close after the caller has atomically detached the session."""
     if session is None:
         return False
+    if end_reason != "tui_shutdown" and session.get("running") and _session_uses_compute_host(session):
+        # Parent teardown has no local run thread to join for an isolated turn. Explicit close must
+        # cancel the child first, then let its terminal frame settle the parent mirror before
+        # finalizing resources; otherwise the closed conversation can keep executing off-screen.
+        sid = _lifecycle_own_sid(session)
+        if sid:
+            try:
+                _interrupt_session_turn(
+                    sid,
+                    session,
+                    request_id=f"close-{uuid.uuid4().hex}",
+                    wait_for_compute_host_ack=True,
+                )
+            except Exception:
+                logger.warning("compute-host session %s did not confirm close interrupt", sid, exc_info=True)
+                return False
+        deadline = time.monotonic() + _TURN_SETTLE_BEFORE_CLOSE_SECONDS
+        while session.get("running") and time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            time.sleep(min(0.05, max(0.0, remaining)))
+        if session.get("running"):
+            logger.warning(
+                "compute-host session %s still running after %.1fs teardown grace",
+                sid,
+                _TURN_SETTLE_BEFORE_CLOSE_SECONDS,
+            )
+            return False
     run_thread = session.get("_run_thread")
     if end_reason != "tui_shutdown" and run_thread is not None and run_thread is not threading.current_thread():
         try:
@@ -394,9 +421,15 @@ def _ws_session_is_orphaned(session: dict | None) -> bool:
     return bool(_ws_session_is_detached(session) and not session.get("running"))
 
 
-def _interrupt_session_turn(sid: str, session: dict, *, request_id: str | None = None) -> bool:
-    """Apply the shared ``session.interrupt`` contract to one claimed session; returns whether the compute-host control
-    channel was used. The WS orphan reaper reuses this so a dead client gets the same partial-history/queue semantics."""
+def _interrupt_session_turn(
+    sid: str, session: dict, *, request_id: str | None = None, wait_for_compute_host_ack: bool = False,
+) -> bool:
+    """Apply the shared ``session.interrupt`` contract to one claimed session.
+
+    The WS orphan reaper uses fire-and-forget host cancellation. An explicit user Stop sets
+    ``wait_for_compute_host_ack`` so success means the isolated child actually applied the interrupt.
+    Returns whether the compute-host control channel was used.
+    """
     use_compute_host = _session_uses_compute_host(session)
     should_interrupt = bool(session.get("running"))
     run_thread_alive = False
@@ -404,7 +437,15 @@ def _interrupt_session_turn(sid: str, session: dict, *, request_id: str | None =
         # The host owns the live turn (parent `running` can lag a blocked tool), so let it decide. Gate on
         # `_compute_host_active`: HostSupervisor.interrupt() calls start(), so a lazy session would spawn a child to interrupt.
         if should_interrupt or session.get("_compute_host_active"):
-            _get_compute_host_supervisor().interrupt(sid, request_id=request_id)
+            ack = _get_compute_host_supervisor().interrupt(
+                sid, request_id=request_id, wait=wait_for_compute_host_ack
+            )
+            if wait_for_compute_host_ack and (
+                not isinstance(ack, dict)
+                or ack.get("type") != "interrupt.ack"
+                or ack.get("applied") is not True
+            ):
+                raise RuntimeError("compute host did not confirm the turn interrupt")
     else:
         run_thread_alive = (rt := session.get("_run_thread")) is not None and rt.is_alive()
     with session["history_lock"]:

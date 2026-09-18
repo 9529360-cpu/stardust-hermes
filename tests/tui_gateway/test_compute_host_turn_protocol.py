@@ -127,6 +127,95 @@ def test_turn_start_without_sid_is_a_turn_error(turn_env):
     assert err["request_id"] == "nosid" and err["message"] == "sid required"
 
 
+def test_turn_end_waits_for_chained_followup_thread(turn_env, monkeypatch):
+    """The parent must not see turn.end while an internal goal continuation is still running."""
+    out = io.StringIO()
+    host = ComputeHost(stdout=out, heartbeat_secs=0)
+    sid = "s1"
+    session = _session(_agent(["unused"]))
+    server._sessions[sid] = session
+    first_started = threading.Event()
+    release_first = threading.Event()
+    followup_started = threading.Event()
+    release_followup = threading.Event()
+    terminal_sent = threading.Event()
+
+    original_reply = host._reply
+
+    def _reply(kind, *args, **kwargs):
+        if kind == "turn.end":
+            terminal_sent.set()
+        return original_reply(kind, *args, **kwargs)
+
+    def _fake_run_prompt_submit(*_args, **_kwargs):
+        def _followup():
+            followup_started.set()
+            assert release_followup.wait(timeout=2.0)
+            with session["history_lock"]:
+                session["running"] = False
+
+        def _first():
+            first_started.set()
+            assert release_first.wait(timeout=2.0)
+            followup = threading.Thread(target=_followup)
+            with session["history_lock"]:
+                session["_run_thread"] = followup
+            followup.start()
+
+        first = threading.Thread(target=_first)
+        with session["history_lock"]:
+            session["_run_thread"] = first
+        first.start()
+        return True
+
+    monkeypatch.setattr(host, "_reply", _reply)
+    monkeypatch.setattr(server, "_run_prompt_submit", _fake_run_prompt_submit)
+    monkeypatch.setattr(server, "_session_info", lambda _agent, _session=None: {})
+
+    try:
+        host.handle_frame({
+            "type": "turn.start",
+            "sid": sid,
+            "request_id": "turn",
+            "prompt": "continue the goal",
+        })
+        assert first_started.wait(timeout=1.0)
+        release_first.set()
+        assert followup_started.wait(timeout=1.0)
+        assert not terminal_sent.wait(timeout=0.2), (
+            "compute host emitted turn.end while the chained follow-up was still executing"
+        )
+        release_followup.set()
+        end = _wait(out, lambda f: f["type"] == "turn.end")
+    finally:
+        release_first.set()
+        release_followup.set()
+        server._sessions.pop(sid, None)
+        host.close()
+
+    assert end["request_id"] == "turn"
+    assert session["running"] is False
+
+
+def test_completed_turn_allows_next_turn_on_same_host_session(turn_env):
+    out = io.StringIO()
+    host = ComputeHost(stdout=out, heartbeat_secs=0)
+    sid = "s1"
+    server._sessions[sid] = _session(_agent(["ok"]))
+    try:
+        host.handle_frame({"type": "turn.start", "sid": sid, "request_id": "t1", "prompt": "first"})
+        _wait(out, lambda f: f["type"] == "turn.end" and f["request_id"] == "t1")
+        host.handle_frame({"type": "turn.start", "sid": sid, "request_id": "t2", "prompt": "second"})
+        second = _wait(out, lambda f: f["type"] == "turn.end" and f["request_id"] == "t2")
+    finally:
+        server._sessions.pop(sid, None)
+        host.close()
+
+    assert second["interrupted"] is False
+    starts = [f for f in _frames(out) if f["type"] == "turn.started"]
+    assert [f["request_id"] for f in starts] == ["t1", "t2"]
+
+
 def test_second_turn_start_while_running_is_session_busy(turn_env):
     out = io.StringIO()
     host = ComputeHost(stdout=out, heartbeat_secs=0)

@@ -14,9 +14,9 @@ Only two mechanics differ from an OAuth login and both are isolated behind ``is_
 token acquisition (re-exchange the ``anon_`` credential; there is no refresh token) and routing
 (the welcome inference host, single model ``nous/welcome``).
 
-Users are never shown the words guest / anonymous / account for this state: surfaces say
-"Nous · free tier". Two user-facing verbs reach the same flow, both keeping the identity's
-connectors: ``hermes auth upgrade`` in a terminal and ``/login`` inside a chat.
+Users are never shown the internal guest / anonymous identity vocabulary for this state: surfaces
+say "Nous · free tier". Stardust does not expose the inherited account-login product; users choose
+configured models with ``/model`` and operators manage provider credentials through ``hermes auth``.
 
 Lifecycle lives in ONE primitive, :func:`ensure_portal_identity`: adopt what the shared store already
 holds, else mint under the shared-store lock. It is the only minter; nothing else calls
@@ -53,10 +53,12 @@ GUEST_ONBOARDING_ENV = "HERMES_GUEST_ONBOARDING"
 GUEST_MINT_TIMEOUT_SECONDS = 5.0
 # Copy shared by every surface that names the free tier (R-USR-1): never guest / anonymous / account.
 FREE_TIER_LABEL = "Nous · free tier"
-UPGRADE_HINT = "Run `hermes auth upgrade` to sign in with a Nous account, or /login inside a chat."
+UPGRADE_HINT = (
+    "Use /model to choose a configured model, or run `hermes auth` on the host."
+)
 FREE_TIER_NOT_SIGNED_IN = (
-    "You're not signed in. Free inference and connectors are always on. "
-    "Run `hermes auth` to sign in with a Nous account.")
+    "No paid account is attached to this compatibility tier. "
+    "Use /model to choose a configured model, or run `hermes auth` on the host.")
 
 
 class AnonCredentialDead(AuthError):
@@ -84,6 +86,15 @@ def guest_enabled() -> bool:
     if not isinstance(nous_cfg, dict):
         return True
     return bool(nous_cfg.get("guest", True))
+
+
+def portal_identity_enabled() -> bool:
+    """Whether Stardust exposes the inherited Nous account/billing product identity.
+
+    Provider credentials remain a compatibility/runtime concern, but the built-in Nous
+    account, subscription and billing product is not part of Stardust.
+    """
+    return False
 
 
 def is_guest_state(state: Any) -> bool:
@@ -455,8 +466,10 @@ _WELCOME_ROUTE_COPY = {
                              "not the free tier's. Run /model and pick the Nous row again.",
     "tier_disabled": "The Nous free tier is switched off right now. {signin}",
 }
-_SIGNIN_CHAT = "Sign in with a Nous account for the full catalog: /login."
-_SIGNIN_TERMINAL = "Sign in with a Nous account for the full catalog: `hermes auth upgrade`."
+_SIGNIN_CHAT = (
+    "Use /model to choose a configured model, or ask the host operator to run `hermes auth`."
+)
+_SIGNIN_TERMINAL = "Configure a provider with `hermes auth add <provider>`."
 
 
 def parse_welcome_refusal(body: Any) -> Optional[Dict[str, Any]]:
@@ -483,9 +496,9 @@ def parse_welcome_refusal(body: Any) -> Optional[Dict[str, Any]]:
 
 
 def welcome_refusal_copy(refusal: Dict[str, Any], *, model: str = "", in_chat: bool = True) -> str:
-    """User copy for a structured welcome-tier refusal: what happened and the one way forward.
+    """User copy for a structured welcome-tier refusal and its provider-configuration recovery.
 
-    Never guest / anonymous / claim; ``in_chat`` picks ``/login`` over the terminal verb."""
+    Never expose the internal guest / anonymous / claim vocabulary."""
     signin = _SIGNIN_CHAT if in_chat else _SIGNIN_TERMINAL
     reason = str(refusal.get("reason") or "")
     alternates = refusal.get("alternates") or []
@@ -602,7 +615,7 @@ def apply_model_switch(agent: Any) -> Optional[str]:
 GUEST_NOTICE_FLAG = "guest_notice_shown"
 FREE_TIER_AVAILABLE_NOTICE = (
     "Free Nous inference and connectors are now available. "
-    "/model to try them, /login to sign in.")
+    "Use /model to choose among configured models.")
 
 
 def guest_notice_pending() -> bool:
@@ -866,4 +879,4 @@ from hermes_cli.anon_sign_in_cli import (  # noqa: E402
     upgrade_guest as upgrade_guest,
 )
 
-FREE_TIER_STATUS_LINE = f"{FREE_TIER_LABEL} \u00b7 {GUEST_MODEL} \u00b7 {LOGIN_COMMAND} to sign in"
+FREE_TIER_STATUS_LINE = f"{FREE_TIER_LABEL} \u00b7 {GUEST_MODEL} \u00b7 use /model for configured models"

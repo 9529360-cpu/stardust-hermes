@@ -185,8 +185,17 @@ def _notif_slash_loop_tick(rid: str, sid: str, session: dict, mgr, wakeup: str) 
             if not _notif_claim_turn(session):
                 mgr.abandon_tick()
                 return
-            _emit("message.start", sid)
-            _run_prompt_submit(rid, sid, session, payload["message"])
+            try:
+                _emit("message.start", sid)
+                started = bool(_run_prompt_submit(rid, sid, session, payload["message"]))
+            except Exception as exc:
+                _notif_log_failure("loop slash send dispatch failed", exc)
+                _notif_release_turn(session)
+                mgr.abandon_tick()
+                return
+            if not started:
+                _notif_release_turn(session)
+                mgr.abandon_tick()
             return
     except Exception:
         pass
@@ -252,7 +261,9 @@ def _maybe_fire_tui_loop_tick(sid: str, session: dict) -> None:
             _notif_slash_loop_tick(rid, sid, session, mgr, wakeup)
         else:
             _emit("message.start", sid)
-            _run_prompt_submit(rid, sid, session, wakeup)
+            if not _run_prompt_submit(rid, sid, session, wakeup):
+                _notif_release_turn(session)
+                mgr.abandon_tick()
     except Exception as exc:
         _notif_log_failure("loop wakeup dispatch failed", exc)
         _notif_release_turn(session)

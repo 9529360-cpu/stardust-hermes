@@ -484,6 +484,52 @@ class TestSegmentedDispatchIntegration:
 
 
 
+    def test_unknown_effect_timeout_blocks_later_segments(self, agent, monkeypatch):
+        """A timed-out write may still land after the batch deadline.
+
+        Later barriers must not execute against that ambiguous state. The executor
+        still emits one paired result per model tool call so the next model turn can
+        inspect reality before deciding whether a retry is safe.
+        """
+        calls = [
+            _tc("write_file", '{"path":"a.txt","content":"a"}', call_id="w1"),
+            _tc("write_file", '{"path":"b.txt","content":"b"}', call_id="w2"),
+            _tc("terminal", '{"command":"echo later"}', call_id="t1"),
+        ]
+        assert _kinds(_plan_tool_batch_segments(calls)) == ["parallel", "sequential"]
+
+        messages = []
+        executed: list[str] = []
+        release_write = threading.Event()
+        write_started = threading.Event()
+
+        def fake_handle(name, args, task_id, **kwargs):
+            call_id = kwargs["tool_call_id"]
+            executed.append(call_id)
+            if call_id == "w1":
+                write_started.set()
+                release_write.wait()
+                return json.dumps({"bytes_written": 1})
+            return json.dumps({"ok": True})
+
+        monkeypatch.setenv("HERMES_CONCURRENT_TOOL_TIMEOUT_S", "1.0")
+        try:
+            with patch("model_tools.handle_function_call", side_effect=fake_handle):
+                agent._execute_tool_calls(
+                    SimpleNamespace(content="", tool_calls=calls), messages, "task-1"
+                )
+            assert write_started.is_set()
+        finally:
+            release_write.set()
+
+        assert set(executed) == {"w1", "w2"}
+        assert "t1" not in executed
+        assert [message["tool_call_id"] for message in messages] == ["w1", "w2", "t1"]
+        assert messages[0]["effect_disposition"] == "unknown"
+        assert messages[2]["effect_disposition"] == "none"
+        assert "UNKNOWN outcome" in messages[2]["content"]
+        assert "Inspect current state" in messages[2]["content"]
+
     def test_interrupt_during_barrier_drains_later_segments(self, agent):
         """Interrupt raised while the barrier tool runs: the trailing parallel
         segment must be drained with cancelled results — one per call —
@@ -684,7 +730,15 @@ class TestPathCanonicalization:
         target.touch()
 
         alias_dir = tmp_path / "alias"
-        alias_dir.symlink_to(real_dir)
+        try:
+            alias_dir.symlink_to(real_dir, target_is_directory=True)
+        except OSError as exc:
+            if os.name == "nt" and getattr(exc, "winerror", None) == 1314:
+                pytest.skip(
+                    "Windows symlink creation requires Developer Mode or "
+                    "SeCreateSymbolicLinkPrivilege"
+                )
+            raise
 
         real_path = _canonical_path(str(target))
         alias_path = _canonical_path(str(alias_dir / "config.json"))

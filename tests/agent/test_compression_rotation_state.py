@@ -134,6 +134,48 @@ class TestGoalMigratesOnRotation:
             goals._DB_CACHE.clear()
 
 
+class TestTodoStateMigratesOnRotation:
+    def test_structured_todo_state_follows_compression_child(self, tmp_path: Path):
+        from tools.todo_tool import TODO_SESSION_STATE_KEY
+
+        db = SessionDB(db_path=tmp_path / "state.db")
+        try:
+            parent = "PARENT_TODO_STATE_ROT"
+            db.create_session(parent, source="cli")
+            agent = _build_agent_with_db(db, parent, platform="cli")
+            agent._todo_store.write([
+                {"id": "1", "content": "Finish the migration", "status": "in_progress"},
+                {"id": "2", "content": "Verify the result", "status": "pending"},
+            ])
+            expected = agent._todo_store.snapshot()
+
+            agent._compress_context(_msgs(), "sys", approx_tokens=120_000)
+            child = agent.session_id
+
+            assert child != parent
+            assert db.get_session_model_config_value(child, TODO_SESSION_STATE_KEY) == expected
+        finally:
+            db.close()
+
+    def test_unused_todo_store_does_not_stamp_authoritative_empty_state(self, tmp_path: Path):
+        from tools.todo_tool import TODO_SESSION_STATE_KEY
+
+        db = SessionDB(db_path=tmp_path / "state.db")
+        try:
+            parent = "PARENT_UNUSED_TODO_ROT"
+            db.create_session(parent, source="cli")
+            agent = _build_agent_with_db(db, parent, platform="cli")
+            assert agent._todo_store.snapshot() == {"todos": [], "revision": 0}
+
+            agent._compress_context(_msgs(), "sys", approx_tokens=120_000)
+
+            assert db.get_session_model_config_value(
+                agent.session_id, TODO_SESSION_STATE_KEY
+            ) is None
+        finally:
+            db.close()
+
+
 class TestOrphanRollbackOnCreateFailure:
     def test_rolls_back_to_parent_when_child_create_fails(self, tmp_path: Path):
         db = SessionDB(db_path=tmp_path / "state.db")

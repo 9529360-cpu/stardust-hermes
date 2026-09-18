@@ -30,6 +30,7 @@ from agent.display import (
     _detect_tool_failure,
 )
 from agent.message_sanitization import coalesce_tool_call_id
+from agent.tool_result_classification import tool_may_have_side_effect
 from agent.inline_tool_executors import (
     INLINE_TOOL_EXECUTORS,
     InlineToolContext,
@@ -286,12 +287,14 @@ class _ToolCallRef:
     def emit_cancelled(self, agent, start_time: float) -> str:
         """Synthesize the ``cancelled`` result for a KeyboardInterrupt mid-tool and emit its hook."""
         message = "Tool execution cancelled by user interrupt"
+        if tool_may_have_side_effect(self.name):
+            message += "; the tool may have partially or fully completed, so inspect current state before retrying"
         result = json.dumps({"error": message, "status": "cancelled"}, ensure_ascii=False)
         self.emit_post(
             agent, result, duration_ms=int((time.time() - start_time) * 1000),
             status="cancelled", error_type="keyboard_interrupt", error_message=message,
         )
-        return result
+        return _ToolCancelledResult(result)
 
     def emit_invalid_arguments(self, agent, result: str) -> None:
         self.emit_post(
@@ -308,6 +311,7 @@ def _append_skipped_tool_results(
     *,
     content: str,
     hook_error_type: Optional[str] = None,
+    hook_error_message: str = "Tool execution skipped due to user interrupt",
     hook_id: Optional[Callable[[Any], str]] = None,
     flush_stage: Optional[str] = None,
     stop_on_flush_failure: bool = True,
@@ -315,7 +319,7 @@ def _append_skipped_tool_results(
     """Append one ``tool`` result per unstarted call so the assistant tool-call turn never
     lacks matching results (role alternation). ``content`` is formatted with ``{name}``;
     ``hook_error_type`` also emits the terminal ``post_tool_call`` (status=cancelled) per
-    call with ``hook_id`` overriding the hook's id; ``flush_stage`` flushes after each
+    call using ``hook_error_message``; ``hook_id`` overrides the hook's id. ``flush_stage`` flushes after each
     append and returns False on the first failed flush when ``stop_on_flush_failure``."""
     for tc in tool_calls:
         name = _tc_name(tc)
@@ -324,13 +328,39 @@ def _append_skipped_tool_results(
         if hook_error_type is not None:
             _ToolCallRef(name, {}, effective_task_id, (hook_id or _pairing_tool_call_id)(tc), []).emit_post(
                 agent, result,
-                status="cancelled", error_type=hook_error_type, error_message="Tool execution skipped due to user interrupt",
+                status="cancelled", error_type=hook_error_type, error_message=hook_error_message,
             )
         if flush_stage is not None:
             flushed = _flush_session_db_after_tool_progress(agent, messages, stage=f"{flush_stage} {name}")
             if not flushed and stop_on_flush_failure:
                 return False
     return True
+
+
+def _append_unknown_effect_barrier(
+    agent,
+    messages: list,
+    tool_calls,
+    effective_task_id: str,
+    *,
+    prior_name: str,
+    timed_out: bool,
+) -> bool:
+    """Close an unstarted tool tail after a side-effecting outcome becomes ambiguous."""
+    if not tool_calls:
+        return True
+    cause = "timed out and may still have completed" if timed_out else "has UNKNOWN outcome"
+    reason = f"Tool '{prior_name}' {cause}; verify current state before continuing"
+    return _append_skipped_tool_results(
+        agent, messages, tool_calls, effective_task_id,
+        content=(
+            f"[Tool execution skipped — {{name}} was not started because an earlier side-effecting "
+            f"tool '{prior_name}' {cause}. Inspect current state before retrying or continuing.]"
+        ),
+        hook_error_type="unknown_effect_barrier",
+        hook_error_message=reason,
+        flush_stage="unknown-effect barrier tool result",
+    )
 
 
 def _tool_search_scoped_names(agent) -> frozenset:
@@ -889,6 +919,10 @@ def _run_sequential_tool_execution_middleware(
         else:
             assert timeout_s is not None  # only reachable when a deadline exists
             message = f"Error executing tool '{function_name}': timed out after {timeout_s:.1f}s"
+            if tool_may_have_side_effect(function_name):
+                message += (
+                    ". The tool may still be running or may have completed; inspect current state before retrying."
+                )
             logger.warning("sequential tool %s timed out after %.1fs", function_name, timeout_s)
             result_cls, outcome = _ToolTimeoutResult, dict(
                 duration_ms=int(timeout_s * 1000), status="timeout", error_type="tool_timeout", error_message=message,
@@ -1041,6 +1075,21 @@ def _commit_tool_result(
     messages.append(tool_message)
     if not _flush_session_db_after_tool_progress(agent, messages, stage=f"tool result {function_name}"):
         return None
+
+    # Todo is session state, not merely display text. Persist only after the paired tool result
+    # is durably flushed so a crash cannot leave model_config claiming a write the transcript
+    # never committed. Reads do not rewrite the state slot; empty-list writes remain authoritative.
+    if (
+        function_name == "todo_list"
+        and observed
+        and not blocked
+        and not is_error
+        and "todos" in ref.args
+        and ref.args.get("todos") is not None
+    ):
+        from tools.todo_tool import persist_todo_session_state
+
+        persist_todo_session_state(agent._session_db, agent.session_id, agent._todo_store)
 
     if not blocked:
         # ``tool.completed`` projects AFTER the canonical append + flush so resume can
@@ -1357,12 +1406,22 @@ def _unfinished_tool_result(agent, ref: _ToolCallRef, *, timed_out: bool, timeou
     if timed_out:
         suffix = f"{timeout_s:.1f}s" if timeout_s is not None else "the configured timeout"
         function_result = f"Error executing tool '{ref.name}': timed out after {suffix}"
+        uncertain = tool_may_have_side_effect(ref.name)
+        if uncertain:
+            function_result += ". The tool may still be running or may have completed; inspect current state before retrying."
         outcome = dict(duration_ms=int((timeout_s or 0.0) * 1000), status="timeout", error_type="tool_timeout", error_message=function_result)
-        tool_duration, effect_disposition = float(timeout_s or 0.0), "unknown"
+        tool_duration, effect_disposition = float(timeout_s or 0.0), "unknown" if uncertain else "none"
     elif agent._interrupt_requested:
-        function_result = f"[Tool execution cancelled — {ref.name} was skipped due to user interrupt]"
+        uncertain = tool_may_have_side_effect(ref.name)
+        if uncertain:
+            function_result = (
+                f"[Tool cancellation requested — {ref.name} did not return before the turn stopped. "
+                "Its outcome is UNKNOWN; inspect current state before retrying.]"
+            )
+        else:
+            function_result = f"[Tool execution cancelled — {ref.name} was skipped due to user interrupt]"
         outcome = dict(status="cancelled", error_type="keyboard_interrupt", error_message="Tool execution cancelled by user interrupt")
-        tool_duration, effect_disposition = 0.0, None
+        tool_duration, effect_disposition = 0.0, "unknown" if uncertain else "none"
     else:
         function_result = f"Error executing tool '{ref.name}': thread did not return a result"
         outcome = dict(status="error", error_type="thread_missing_result", error_message=function_result)
@@ -1385,7 +1444,11 @@ def _append_batch_results(agent, messages: list, effective_task_id: str, batch: 
             )
         else:
             ref, function_result, tool_duration, is_error, blocked = r.ref, r.result, r.duration, r.is_error, r.blocked
-            effect_disposition = "none" if blocked else None
+            abandoned = isinstance(function_result, (_ToolTimeoutResult, _ToolCancelledResult))
+            effect_disposition = (
+                "none" if blocked or (abandoned and not tool_may_have_side_effect(ref.name))
+                else "unknown" if abandoned else None
+            )
             if pc.parse_error is not None:
                 ref.emit_invalid_arguments(agent, r.result)
         committed = _commit_tool_result(
@@ -1639,19 +1702,22 @@ def _publish_sequential_result(agent, messages: list, ref: _ToolCallRef, managed
     """Terminal hook → observe → commit → completion callbacks/print for one sequential
     result; False when the incremental flush failed (the caller must stop the batch)."""
     ref.args, ref.trace, function_result = managed.args, managed.middleware_trace, managed.result
-    _execution_timed_out = isinstance(function_result, (_ToolTimeoutResult, _ToolCancelledResult))
+    _execution_abandoned = isinstance(function_result, (_ToolTimeoutResult, _ToolCancelledResult))
     # Multimodal dict results (_multimodal=True) are not sliceable as strings.
     _result_len = len(function_result) if isinstance(function_result, str) else len(str(function_result))
     _is_error_result, _ = _detect_tool_failure(ref.name, function_result)
     # Inline-dispatched runtime tools never reach handle_function_call, so the
     # executor owns the one terminal post_tool_call per tool_call_id (the inner
     # observer is suppressed); also stops an abandoned timeout worker reporting late.
-    if not managed.blocked and not _execution_timed_out:
+    if not managed.blocked and not _execution_abandoned:
         ref.emit_post(agent, function_result, duration_ms=int(tool_duration * 1000))
     committed = _commit_tool_result(
         agent, messages, ref, function_result,
         budget=budget, tool_duration=tool_duration, is_error=_is_error_result, blocked=managed.blocked,
-        effect_disposition="unknown" if _execution_timed_out else None, observed=True,
+        effect_disposition=(
+            "unknown" if _execution_abandoned and tool_may_have_side_effect(ref.name)
+            else "none" if _execution_abandoned else None
+        ), observed=True,
         error_preview=lambda res: res[:200] if isinstance(res, str) and not agent.verbose_logging else res,
         success_log_chars=_result_len,
         verbose_text=_multimodal_text_summary,
@@ -1709,6 +1775,13 @@ def execute_tool_calls_sequential(agent, assistant_message, messages: list, effe
         if not _publish_sequential_result(agent, messages, ref, managed, tool_duration=tool_duration, index=i, budget=_tool_budget):
             return
 
+        if isinstance(managed.result, _ToolTimeoutResult) and tool_may_have_side_effect(ref.name):
+            if not _append_unknown_effect_barrier(
+                agent, messages, tool_calls[i:], effective_task_id,
+                prior_name=ref.name, timed_out=True,
+            ):
+                return
+            break
         if agent._interrupt_requested and i < len(tool_calls):
             if not _skip_remaining_sequential(
                 agent, messages, tool_calls[i:], effective_task_id,
@@ -1728,7 +1801,8 @@ def execute_tool_calls_segmented(agent, assistant_message, messages: list, effec
     plan from ``_plan_tool_batch_segments``), preserving per-call result order and barrier
     boundaries exactly as fully-sequential execution. Turn-end work (budget + /steer) runs
     once here (segments run with ``finalize=False``); each segment executor checks the
-    interrupt flag up front, so an interrupt drains later segments with one result per call."""
+    interrupt flag up front, and an UNKNOWN side-effect result closes every later segment
+    before it can execute, while still emitting one paired result per skipped call."""
     from types import SimpleNamespace
 
     if segments is None:
@@ -1736,14 +1810,39 @@ def execute_tool_calls_segmented(agent, assistant_message, messages: list, effec
         _exec_cwd = Path(_active_env.cwd) if _active_env is not None and _active_env.cwd else None
         segments = _plan_tool_batch_segments(assistant_message.tool_calls, execution_cwd=_exec_cwd)
 
-    for kind, calls in segments:
+    for segment_index, (kind, calls) in enumerate(segments):
         if getattr(agent, "_incremental_persistence_failed", False):
             return
+        segment_start = len(messages)
         segment_message = SimpleNamespace(tool_calls=list(calls))
         run_segment = execute_tool_calls_concurrent if kind == "parallel" else execute_tool_calls_sequential
         run_segment(agent, segment_message, messages, effective_task_id, api_call_count, finalize=False)
         if getattr(agent, "_incremental_persistence_failed", False):
             return
+
+        unknown_effect = next(
+            (
+                message for message in messages[segment_start:]
+                if isinstance(message, dict)
+                and message.get("role") == "tool"
+                and message.get("effect_disposition") == "unknown"
+                and tool_may_have_side_effect(str(message.get("tool_name") or message.get("name") or ""))
+            ),
+            None,
+        )
+        if unknown_effect is not None:
+            prior_name = str(unknown_effect.get("tool_name") or unknown_effect.get("name") or "tool")
+            remaining_calls = [
+                call
+                for _kind, later_calls in segments[segment_index + 1:]
+                for call in later_calls
+            ]
+            if not _append_unknown_effect_barrier(
+                agent, messages, remaining_calls, effective_task_id,
+                prior_name=prior_name, timed_out=False,
+            ):
+                return
+            break
 
     total_tools = len(assistant_message.tool_calls)
     if total_tools > 0:

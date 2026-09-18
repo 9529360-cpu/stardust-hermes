@@ -111,6 +111,7 @@ def store(tmp_path, monkeypatch):
 
 
 class TestMemoryFileLockPermissions:
+    @pytest.mark.skipif(os.name == "nt", reason="Windows ACLs do not expose POSIX owner-only mode bits")
     def test_new_lock_file_is_owner_only_under_permissive_umask(self, tmp_path):
         memory_path = tmp_path / "MEMORY.md"
         previous_umask = os.umask(0o002)
@@ -123,6 +124,7 @@ class TestMemoryFileLockPermissions:
         lock_path = tmp_path / "MEMORY.md.lock"
         assert stat.S_IMODE(lock_path.stat().st_mode) == 0o600
 
+    @pytest.mark.skipif(os.name == "nt", reason="Windows ACLs do not expose POSIX owner-only mode bits")
     def test_existing_loose_lock_file_is_tightened(self, tmp_path):
         memory_path = tmp_path / "MEMORY.md"
         lock_path = tmp_path / "MEMORY.md.lock"
@@ -304,7 +306,7 @@ class TestMemoryStorePersistence:
         monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: tmp_path)
         # Write file with duplicates
         mem_file = tmp_path / "MEMORY.md"
-        mem_file.write_text("duplicate entry\n§\nduplicate entry\n§\nunique entry")
+        mem_file.write_text("duplicate entry\n§\nduplicate entry\n§\nunique entry", encoding="utf-8")
 
         store = MemoryStore()
         store.load_from_disk()
@@ -346,6 +348,56 @@ class TestMemoryStoreSnapshot:
         assert "MEMORY" in snapshot
         assert "loaded at start" in snapshot
         assert "added later" not in snapshot
+
+    def test_snapshot_detects_disk_drift_and_version_changes_only_after_reload(self, store):
+        initial_version = store.system_prompt_snapshot_version()
+        assert store.system_prompt_snapshot_stale() is False
+
+        store.add("memory", "shared preference")
+
+        # The live write does not mutate the frozen prompt bytes mid-turn, but the next
+        # turn can detect that disk moved without rereading the file on every request.
+        assert store.system_prompt_snapshot_stale() is True
+        assert store.system_prompt_snapshot_version() == initial_version
+        assert "shared preference" not in (store.format_for_system_prompt("memory") or "")
+
+        store.load_from_disk()
+
+        assert store.system_prompt_snapshot_stale() is False
+        assert store.system_prompt_snapshot_version() != initial_version
+        assert "shared preference" in store.format_for_system_prompt("memory")
+
+    def test_snapshot_detects_same_size_timestamp_pinned_external_rewrite(self, store):
+        store.add("memory", "alpha fact")
+        store.load_from_disk()
+        path = store._path_for("memory")
+        before = path.stat()
+
+        # Simulate a sister session/editor rewriting in place, then restoring mtime.
+        # The replacement is deliberately the same byte length so size cannot save us.
+        path.write_text("bravo fact", encoding="utf-8")
+        os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+
+        assert store.system_prompt_snapshot_stale() is True
+        assert "alpha fact" in (store.format_for_system_prompt("memory") or "")
+
+        store.load_from_disk()
+
+        assert store.system_prompt_snapshot_stale() is False
+        snapshot = store.format_for_system_prompt("memory") or ""
+        assert "bravo fact" in snapshot
+        assert "alpha fact" not in snapshot
+
+    def test_failed_reload_keeps_last_good_snapshot(self, store, monkeypatch):
+        store.add("memory", "known good")
+        store.load_from_disk()
+        before = store.format_for_system_prompt("memory")
+        monkeypatch.setattr(store, "_read_raw_checked", lambda path: ("", False))
+
+        store.load_from_disk()
+
+        assert store.format_for_system_prompt("memory") == before
+        assert "known good" in store.memory_entries
 
 
 # =========================================================================

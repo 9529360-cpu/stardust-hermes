@@ -192,8 +192,10 @@ class CLIBillingMixin:
     # ── /usage — Nous balance block ──
 
     def _print_nous_credits_block(self) -> bool:
-        """Nous dollar balance block (two bars); True if anything printed. Shared dollar model first, then
-        legacy ``nous_credits_lines``. Agent-independent (TUI slash-worker has no live agent). Fail-open."""
+        """Legacy Nous account balance block; disabled on normal Stardust product paths."""
+        from hermes_cli.anon_auth import portal_identity_enabled
+        if not portal_identity_enabled():
+            return False
         from cli import _cprint, _b, _d
         usage = self._try_usage_model()
         if usage is not None and usage.available:

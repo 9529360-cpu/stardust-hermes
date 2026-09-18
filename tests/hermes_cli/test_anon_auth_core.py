@@ -113,6 +113,9 @@ def _shared_store(tmp_path) -> dict:
 
 
 class TestIdentityLifecycle:
+    def test_stardust_disables_inherited_portal_identity_by_default(self):
+        assert anon_auth.portal_identity_enabled() is False
+
     def test_fresh_install_mints_once_and_is_the_active_provider(self, portal, tmp_path):
         state = anon_auth.ensure_portal_identity(explicit=True)
         assert anon_auth.is_guest_state(state)
@@ -330,7 +333,8 @@ class TestLogout:
         before = _auth_file_path().read_bytes()
         logout_command(SimpleNamespace(provider=None))
         out = capsys.readouterr().out.lower()
-        assert "not signed in" in out
+        assert "no paid account" in out
+        assert "/model" in out and "/login" not in out
         assert "guest" not in out and "anonymous" not in out
         assert _auth_file_path().read_bytes() == before
 
@@ -355,7 +359,8 @@ class TestModelSwitchCopy:
         result = model_switch.switch_model("gpt-5", "nous", anon_auth.GUEST_MODEL, WELCOME)
         assert not result.success
         msg = (result.error_message or "").lower()
-        assert "/login" in msg
+        assert "/model" in msg and "hermes auth add" in msg
+        assert "/login" not in msg
         assert "openrouter" not in msg and "switching" not in msg
 
 

@@ -29,6 +29,7 @@ def _session(sid):
                 attached_images=[], cols=80, source="desktop", inflight_turn=None)
 
 
+@pytest.mark.live_system_guard_bypass
 @pytest.mark.parametrize("mode", ["fresh", "stale", "missing", "previous"])
 def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
     """Real supervisor pipes, child admission/turn thread, bridge and orphan timer.
@@ -50,11 +51,25 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
     home = tmp_path / "home"
     home.mkdir()
     supervisor = HostSupervisor(
-        argv=[sys.executable, str(Path(__file__).resolve()), mode, str(tmp_path)],
-        registry_path=tmp_path / "host.json", env={"HERMES_HOME": str(home)},
+        argv=[
+            getattr(sys, "_base_executable", sys.executable), "-m", "tests.tui_gateway._isolated_orphan_activity_child",
+            mode, str(tmp_path),
+        ],
+        registry_path=tmp_path / "host.json", env={
+            "HERMES_HOME": str(home),
+            "PYTHONPATH": str(Path(sys.prefix) / "Lib" / "site-packages"),
+        },
         expected_hermes_home=str(home), rpc_sink=server._relay_compute_host_rpc,
         heartbeat_secs=1, autostart=False)
     monkeypatch.setattr(server, "_get_compute_host_supervisor", lambda *args: supervisor)
+    host_frames = []
+    base_handle_host_frame = supervisor._handle_host_frame
+
+    def _capture_host_frame(frame, **kwargs):
+        host_frames.append(dict(frame))
+        return base_handle_host_frame(frame, **kwargs)
+
+    monkeypatch.setattr(supervisor, "_handle_host_frame", _capture_host_frame)
     try:
         response = server._submit_prompt_to_compute_host("request", sid, session, "work")
         assert response["result"]["turn_isolation"] is True
@@ -63,12 +78,19 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
             time.sleep(0.02)
         assert (tmp_path / "provider-started").exists(), supervisor._stderr_tail
         # Give the actual child-to-parent sampler a bounded opportunity to arrive.
-        deadline = time.monotonic() + 3
+        deadline = time.monotonic() + 5
         while not server._ws_orphan_turn_activity_is_fresh(session) and time.monotonic() < deadline:
             time.sleep(0.02)
         assert supervisor.is_running()
         assert session["agent"] is None
-        assert server._ws_orphan_turn_activity_is_fresh(session) is (mode == "fresh")
+        active_pid = supervisor.pid
+        active_generation = supervisor._host_generation
+        activity_is_fresh = server._ws_orphan_turn_activity_is_fresh(session)
+        assert activity_is_fresh is (mode == "fresh"), {
+            "activity_ns": session.get("_compute_host_activity_ns"),
+            "turn_id": session.get("_compute_host_turn_id"),
+            "host_frames": [frame.get("type") for frame in host_frames[-20:]],
+        }
         monkeypatch.setattr(server.threading, "Timer", _Timer)
         server._schedule_ws_orphan_reap(sid)
         server._pending_ws_reaps[sid].callback()
@@ -80,7 +102,17 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
             deadline = time.monotonic() + 5
             while session["running"] and time.monotonic() < deadline:
                 time.sleep(0.02)
-            assert not session["running"], "stale child must receive and settle the real interrupt"
+            interrupt_acks = [frame for frame in host_frames if frame.get("type") == "interrupt.ack"]
+            assert interrupt_acks, [
+                "compute host never acknowledged the orphan interrupt",
+                *supervisor._stderr_tail[-20:],
+            ]
+            assert interrupt_acks[-1].get("applied") is True, interrupt_acks[-1]
+            assert supervisor.pid == active_pid
+            assert supervisor._host_generation == active_generation
+            assert not session["running"], [
+                frame.get("type") for frame in host_frames[-20:]
+            ]
         if mode == "fresh":
             old_token = session["_compute_host_turn_id"]
             old_request = next(iter(supervisor._pending_turns))
@@ -90,11 +122,27 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
                 time.sleep(0.02)
             assert not session["running"]
             assert "_compute_host_activity_ns" not in session
+            assert supervisor.is_running(), "compute host must survive a completed isolated turn"
+            assert supervisor.pid == active_pid
+            assert supervisor._host_generation == active_generation
             (tmp_path / "release").unlink()
             (tmp_path / "provider-started").unlink()
+            second_frames = []
+            first_capture_handle_host_frame = supervisor._handle_host_frame
+
+            def _capture_second_frame(frame, **kwargs):
+                second_frames.append(dict(frame))
+                return first_capture_handle_host_frame(frame, **kwargs)
+
+            monkeypatch.setattr(supervisor, "_handle_host_frame", _capture_second_frame)
             session["running"] = True
             # Same sid and caller rid, same child/agent, but NO new activity.
-            server._submit_prompt_to_compute_host("request", sid, session, "next")
+            assert supervisor.pid == active_pid
+            assert supervisor._host_generation == active_generation
+            second_response = server._submit_prompt_to_compute_host("request", sid, session, "next")
+            assert second_response["result"]["turn_isolation"] is True
+            assert supervisor.pid == active_pid
+            assert supervisor._host_generation == active_generation
             assert session["_compute_host_turn_id"] != old_token
             new_token = session["_compute_host_turn_id"]
             # A delayed terminal frame cannot resolve the new caller-rid reuse.
@@ -104,7 +152,10 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
             deadline = time.monotonic() + 5
             while not (tmp_path / "provider-started").exists() and time.monotonic() < deadline:
                 time.sleep(0.02)
-            assert (tmp_path / "provider-started").exists()
+            assert (tmp_path / "provider-started").exists(), [
+                (frame.get("type"), frame.get("request_id"), frame.get("message"), frame.get("interrupted"))
+                for frame in second_frames
+            ]
             # Also replay a delayed sample from the previous dispatch.
             server._relay_compute_host_rpc({"method": "compute_host.activity", "params": {
                 "session_id": sid, "turn_id": old_token, "activity_ns": time.perf_counter_ns()}})
@@ -144,64 +195,3 @@ def test_activity_relay_is_fenced_and_ages(monkeypatch, change):
         monkeypatch.setattr(server.time, "perf_counter_ns", lambda: params["activity_ns"] + 31_000_000_000)
         server._relay_compute_host_rpc({"method": "compute_host.activity", "params": params})
         assert not server._ws_orphan_turn_activity_is_fresh(session)
-
-
-def _run_child(mode, directory):
-    import socket
-    from agent.activity_tracking import ActivityTrackingMixin
-    from agent.session_activity import build_activity_snapshot
-    from tui_gateway.compute_host import run_host
-
-    def no_network(*args, **kwargs):
-        raise AssertionError("test child must not contact a provider")
-    socket.socket.connect = no_network
-
-    class Agent(ActivityTrackingMixin):
-        def __init__(self, sid):
-            self.session_id = sid
-            self._interrupt = threading.Event()
-            if mode == "previous":
-                self._touch_activity("previous turn")
-
-        def get_activity_summary(self):
-            return build_activity_snapshot(last_activity_at=getattr(self, "_last_activity_ts", None),
-                                           last_activity_description="test provider")
-
-        def clear_interrupt(self):
-            self._interrupt.clear()
-
-        def interrupt(self, **kwargs):
-            self._interrupt.set()
-
-        def run_conversation(self, *args, **kwargs):
-            Path(directory, "provider-started").touch()
-            deadline = time.monotonic() + 20
-            while not self._interrupt.wait(0.05) and time.monotonic() < deadline:
-                if Path(directory, "release").exists():
-                    break
-                if mode == "fresh" and args[0] != "next":
-                    self._touch_activity("provider wait")
-                elif mode == "stale":
-                    self._last_activity_ts = time.time() - 3600
-            return {"final_response": "done", "interrupted": self._interrupt.is_set()}
-
-    def init(sid, key, agent, history, **kwargs):
-        s = _session(sid)
-        s.update(agent=agent, running=False, transport=None,
-                 image_counter=0, slash_worker=None, show_reasoning=False,
-                 tool_progress_mode="all")
-        server._sessions[sid] = s
-
-    server._make_agent = lambda sid, *a, **kw: Agent(sid)
-    server._init_session = init
-    server._wire_callbacks = lambda *a: None
-    server._sync_agent_model_with_config = lambda *a: None
-    server._register_session_cwd = lambda *a: None
-    server._tts_stream_begin = lambda: None
-    server._sync_session_key_after_compress = lambda *a, **kw: None
-    server._get_usage = lambda *a: {}
-    run_host(stdout=sys.__stdout__)
-
-
-if __name__ == "__main__":
-    _run_child(sys.argv[1], sys.argv[2])

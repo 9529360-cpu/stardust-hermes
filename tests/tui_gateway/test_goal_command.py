@@ -295,6 +295,33 @@ def test_active_goal_retries_once_without_judging_failed_turn(
     assert [p["status"] for p in completes] == ["error", "complete"]
 
 
+def test_interrupted_goal_turn_pauses_instead_of_remaining_falsely_active(
+    server, turn_env
+):
+    from hermes_cli.goals import GoalManager
+
+    session_key = "goal-interrupted-pause"
+    GoalManager(session_key).set("finish the current task")
+    agent = types.SimpleNamespace(
+        session_id=session_key,
+        run_conversation=lambda *args, **kwargs: {"final_response": "", "interrupted": True},
+        clear_interrupt=lambda: None,
+    )
+    session = _turn_session(agent, session_key)
+
+    server._run_prompt_submit("rid", "sid", session, "continue the goal")
+
+    state = GoalManager(session_key).state
+    assert state.status == "paused"
+    assert "interrupted" in (state.paused_reason or "")
+    updates = [
+        payload["control"]["goal"]
+        for event, _sid, payload in turn_env
+        if event == "session.control.update"
+    ]
+    assert updates and updates[-1]["status"] == "paused"
+
+
 def test_second_consecutive_exhaustion_pauses_goal_instead_of_looping(
     server, turn_env, monkeypatch
 ):

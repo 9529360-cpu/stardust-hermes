@@ -380,6 +380,7 @@ def _truncate_history_for_submit(rid, sid, session, params, requested_rebind_ids
     # after the in-memory rewrite would stack the new exchange on the "undone" turns).
     # Writes through _session_db (profile sessions own their state.db).
     fields = {}
+    todo_target = None
     with _session_db(session) as db:
         if db is not None:
             try:
@@ -407,11 +408,19 @@ def _truncate_history_for_submit(rid, sid, session, params, requested_rebind_ids
                         raise RuntimeError("could not load durable row identities for truncation")
                     old_active_row_ids.update(_row_ids_of(durable_rebind_history))
                 old_survivor_row_ids = [_message_row_id(message) for message in truncated]
+                todo_patch, todo_target = _plan_todo_history_rewrite(
+                    session,
+                    truncated,
+                    session_db=db,
+                    target_row_id=_message_row_id(history[cut_index]),
+                )
                 # active_only: a bare replace would DELETE the compaction archive (active=0
-                # rows) on every edit.  archive_dropped: a mis-aimed cut stays recoverable.
+                # rows) on every edit. archive_dropped: a mis-aimed cut stays recoverable. Todo side-state
+                # rewinds in the same SQLite transaction so no crash can expose a past transcript with a future plan.
+                todo_patch_kw = {"model_config_patch": todo_patch} if todo_patch is not None else {}
                 db.replace_messages(
                     truncation_key, truncated, active_only=True, archive_dropped=True,
-                    reject_active_turn_lease=True)
+                    reject_active_turn_lease=True, **todo_patch_kw)
             except Exception as exc:
                 logger.error(
                     "prompt.submit: replace_messages failed for session %s (ordinal=%d); refusing "
@@ -433,8 +442,11 @@ def _truncate_history_for_submit(rid, sid, session, params, requested_rebind_ids
                     and old_row_id in requested_rebind_ids}
                 for dropped_row_id in requested_rebind_ids.intersection(old_active_row_ids):
                     row_id_map.setdefault(str(dropped_row_id), None)
+    if todo_target is None:
+        _unused_patch, todo_target = _plan_todo_history_rewrite(session, truncated)
     session["history"] = truncated
     session["history_version"] = int(session.get("history_version", 0)) + 1
+    _apply_todo_history_rewrite(session, todo_target, sid=sid)
     return None, fields
 
 
@@ -494,19 +506,38 @@ def _run_after_agent_ready(rid, sid, session, text, display_kind, hosted_termina
     err = _wait_agent_for_prompt(session, rid, sid)
     if err:
         # Terminal frame + retained snapshot (not a bare "error" event): the snapshot is
-        # the only way resume shows this to a disconnected client.
+        # the only way resume shows this to a disconnected client. A hosted-room submit was
+        # already durably admitted before this patient build wait, so it must also receive the
+        # same terminal failure receipt as failures inside _run_prompt_submit; otherwise the
+        # room driver waits until its deadline for work that has already definitively failed.
+        message = (err.get("error") or {}).get("message", "agent initialization failed")
         _emit_terminal_turn_error(
-            sid, session, (err.get("error") or {}).get("message", "agent initialization failed"),
-            error_surface={"layer": "runtime", "code": "agent_init_failed", "retryable": True})
+            sid, session, message,
+            error_surface={"layer": "runtime", "code": "agent_init_failed", "retryable": True},
+            retire_marker=hosted_terminal_callback is None)
+        receipt_committed = hosted_terminal_callback is None
+        if hosted_terminal_callback is not None:
+            try:
+                hosted_terminal_callback({"status": "failed", "text": "", "error": message})
+                receipt_committed = True
+            except Exception:
+                logger.exception("hosted room terminal receipt commit failed after agent build failure")
         with session["history_lock"]:
             session["running"] = False
             session["last_active"] = time.time()
+            if receipt_committed:
+                session.pop("_hosted_room_task", None)
         _emit("session.info", sid, _session_info(session.get("agent"), session))
         return
     with session["history_lock"]:
         if session.get("_turn_cancel_requested") or not session.get("running"):
             session["running"] = False
             _clear_inflight_turn(session)
+            # A hosted turn that never reached the agent has no process-local work left to fence.
+            # The durable room driver observes this inactive session and owns the cancellation
+            # settlement, so retaining the old task proof here would expose a stale task_id.
+            if hosted_terminal_callback is not None:
+                session.pop("_hosted_room_task", None)
             # Without this emit the turn vanishes silently after {"status": "streaming"}.
             _emit("error", sid, {"message": (
                 "Turn cancelled before the agent was ready"

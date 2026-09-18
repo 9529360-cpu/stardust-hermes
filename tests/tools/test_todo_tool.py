@@ -2,7 +2,13 @@
 
 import json
 
-from tools.todo_tool import TodoStore, todo_tool
+from tools.todo_tool import (
+    TODO_SESSION_STATE_KEY,
+    TodoStore,
+    load_todo_session_state,
+    persist_todo_session_state,
+    todo_tool,
+)
 
 
 class TestWriteAndRead:
@@ -160,6 +166,90 @@ class TestTodoStoreSnapshots:
 
         store.write([{"id": "1", "content": "Task", "status": "completed"}])
         assert store.snapshot()["revision"] == 8
+
+
+class TestTodoSessionStatePersistence:
+    def test_persist_and_load_roundtrip(self, tmp_path):
+        from hermes_state import SessionDB
+
+        store = TodoStore()
+        store.write([
+            {"id": "1", "content": "Keep task alive", "status": "in_progress"},
+            {"id": "2", "content": "Verify result", "status": "pending"},
+        ])
+        with SessionDB(db_path=tmp_path / "state.db") as db:
+            db.create_session("todo-session", source="test")
+
+            assert persist_todo_session_state(db, "todo-session", store) is True
+            restored = load_todo_session_state(db, "todo-session")
+
+        assert restored == store.snapshot()
+
+    def test_stale_revision_cannot_overwrite_newer_persisted_state(self, tmp_path):
+        from hermes_state import SessionDB
+
+        newer = TodoStore()
+        newer.restore(
+            [{"id": "new", "content": "New plan", "status": "in_progress"}], revision=7
+        )
+        stale = TodoStore()
+        stale.restore(
+            [{"id": "old", "content": "Old plan", "status": "pending"}], revision=4
+        )
+        with SessionDB(db_path=tmp_path / "state.db") as db:
+            db.create_session("todo-monotonic", source="test")
+            assert persist_todo_session_state(db, "todo-monotonic", newer) is True
+            assert persist_todo_session_state(db, "todo-monotonic", stale) is False
+            restored = load_todo_session_state(db, "todo-monotonic")
+
+        assert restored == newer.snapshot()
+
+    def test_equal_revision_divergence_is_a_conflict_not_last_writer_wins(self, tmp_path):
+        from hermes_state import SessionDB
+
+        first = TodoStore()
+        first.restore([{"id": "a", "content": "First", "status": "pending"}], revision=3)
+        rival = TodoStore()
+        rival.restore([{"id": "b", "content": "Rival", "status": "pending"}], revision=3)
+        with SessionDB(db_path=tmp_path / "state.db") as db:
+            db.create_session("todo-conflict", source="test")
+            assert persist_todo_session_state(db, "todo-conflict", first) is True
+            assert persist_todo_session_state(db, "todo-conflict", rival) is False
+            restored = load_todo_session_state(db, "todo-conflict")
+
+        assert restored == first.snapshot()
+
+    def test_equal_identical_revision_is_idempotent_success(self, tmp_path):
+        from hermes_state import SessionDB
+
+        store = TodoStore()
+        store.restore([{"id": "1", "content": "Same", "status": "pending"}], revision=2)
+        clone = TodoStore()
+        clone.restore(store.read(), revision=2)
+        with SessionDB(db_path=tmp_path / "state.db") as db:
+            db.create_session("todo-idempotent", source="test")
+            assert persist_todo_session_state(db, "todo-idempotent", store) is True
+            assert persist_todo_session_state(db, "todo-idempotent", clone) is True
+
+        assert clone.snapshot() == store.snapshot()
+
+    def test_empty_list_is_an_authoritative_persisted_clear(self, tmp_path):
+        from hermes_state import SessionDB
+
+        store = TodoStore()
+        store.write([{"id": "1", "content": "Old task", "status": "pending"}])
+        store.write([])
+        assert store.snapshot()["revision"] == 2
+        with SessionDB(db_path=tmp_path / "state.db") as db:
+            db.create_session("todo-clear", source="test")
+            assert persist_todo_session_state(db, "todo-clear", store) is True
+
+            raw = db.get_session_model_config_value("todo-clear", TODO_SESSION_STATE_KEY)
+            restored = load_todo_session_state(db, "todo-clear")
+
+        assert raw["revision"] == 2
+        assert raw["todos"] == []
+        assert restored == {"todos": [], "revision": 2}
 
 
 class TestTodoStoreBounds:

@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 MUTATOR_ROUTE_TABLE: dict[str, str] = {
     "prompt.submit": "turn-path", "session.interrupt": "turn-path", "reload.mcp": "run-concurrent",
-    "session.save": "run-concurrent", "session.compress": "idle-gated",
+    "session.save": "run-concurrent", "session.workspace.move": "run-concurrent",
+    "session.compress": "idle-gated",
     "prompt.submit.truncate": "idle-gated", "slash.model": "idle-gated",
     "slash.personality": "idle-gated", "slash.prompt": "idle-gated", "slash.compress": "idle-gated",
     "session.reset": "idle-gated", "session.history.reload": "idle-gated",
@@ -35,6 +36,8 @@ MUTATOR_ROUTE_TABLE: dict[str, str] = {
 _REGISTRY_NAME = "dashboard-compute-host.json"
 _RESPAWN_WINDOW_SECS = 300.0
 _SHUTDOWN_TIMEOUT_SECS = 10.0
+_HELLO_TIMEOUT_SECS = 10.0
+_STDOUT_DRAIN_AFTER_EXIT_SECS = 1.0
 # Late control-ack handlers: a compress that outlives its RPC waiter can run for the full
 # compression ceiling plus a stall-fallback retry, so keep registrations past that — bounded.
 # See #97948.
@@ -44,17 +47,22 @@ _LATE_CONTROL_MAX = 64
 _CONTROL_REPLY_TYPES = frozenset({
     "control.ack", "control.error", "respond.ack", "respond.error", "interrupt.ack",
     "reload_mcp.ack", "shutdown.ack"})
+_LOG_APPEND_LOCK = threading.Lock()
 
 
 def append_log_record(path: str | Path, record: str) -> None:
-    """Append one log record using O_APPEND and exactly one os.write call."""
+    """Append one process-local log record without platform-dependent thread races."""
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     text = record if record.endswith("\n") else f"{record}\n"
-    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-    try:
-        os.write(fd, text.encode("utf-8", errors="replace"))
-    finally:
-        os.close(fd)
+    # Windows O_APPEND does not provide the same multi-handle atomicity this helper gets on
+    # POSIX. Serialize the open/write/close sequence so concurrent gateway threads cannot
+    # overwrite each other's append position; O_APPEND still protects the actual write target.
+    with _LOG_APPEND_LOCK:
+        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        try:
+            os.write(fd, text.encode("utf-8", errors="replace"))
+        finally:
+            os.close(fd)
 
 
 def _repo_root() -> Path:
@@ -86,6 +94,20 @@ def _call_logged(cb: Callable[[dict], None], frame: dict, failure: str) -> None:
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    if os.name == "nt":
+        # ``os.kill(pid, 0)`` is NOT a POSIX-style no-op probe on Windows: Python routes
+        # non-CTRL signals through TerminateProcess, so probing a reused PID can kill the
+        # unrelated process before the identity guard runs. Query a process handle instead.
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+            if not handle:
+                return False
+            kernel32.CloseHandle(handle)
+            return True
+        except Exception:
+            return False
     try:
         os.kill(pid, 0)
         return True
@@ -112,6 +134,18 @@ def _pid_command(pid: int) -> str:
         data = (Path("/proc") / str(pid) / "cmdline").read_bytes()
         if data:
             return data.replace(b"\x00", b" ").decode("utf-8", errors="replace")
+    if os.name == "nt":
+        # ``ps`` is not a Windows process inventory (Git/MSYS ps cannot resolve native
+        # PIDs reliably). Query the native process table so startup orphan cleanup can
+        # distinguish our venv launcher from an unrelated PID reuse before signalling it.
+        command = (
+            "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+            f"(Get-CimInstance Win32_Process -Filter \"ProcessId = {int(pid)}\" "
+            "-ErrorAction SilentlyContinue).CommandLine"
+        )
+        return _check_output([
+            "powershell.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command,
+        ])
     return _check_output(["ps", "-p", str(pid), "-o", "command="])
 
 
@@ -144,6 +178,10 @@ class HostSupervisor:
         self._proc: subprocess.Popen[str] | None = None
         self._hello_event = threading.Event()
         self._hello: dict[str, Any] = {}
+        # Monotonic process-local fence for stdout readers. A dead child can leave buffered
+        # frames behind after its replacement starts; those frames must never satisfy the
+        # replacement host's hello/control/turn state merely because request ids collide.
+        self._host_generation = 0
         self._closing = False
         self._stopped_respawning = False
         self._restart_times: list[float] = []
@@ -170,11 +208,26 @@ class HostSupervisor:
 
     def start(self) -> None:
         with self._lock:
+            self._refresh_respawn_breaker_locked()
             if self.is_running():
                 return
             self._closing = False
             self.reconcile_startup_orphan()
             self._spawn_locked(reason="startup")
+
+    def _refresh_respawn_breaker_locked(self) -> None:
+        """Close an expired crash-loop breaker without weakening the live cooldown."""
+        if not self._stopped_respawning:
+            return
+        now = time.monotonic()
+        self._restart_times = [
+            t for t in self._restart_times
+            if now - t <= _RESPAWN_WINDOW_SECS
+        ]
+        if self._restart_times:
+            return
+        self._stopped_respawning = False
+        logger.info("compute host crash-loop cooldown elapsed; restart allowed")
 
     def shutdown(self) -> None:
         with self._lock:
@@ -233,10 +286,19 @@ class HostSupervisor:
             raise
         return request_id
 
-    def interrupt(self, sid: str, *, request_id: str | None = None) -> None:
+    def interrupt(
+        self, sid: str, *, request_id: str | None = None, wait: bool = False, timeout: float = 5.0,
+    ) -> dict | None:
+        """Interrupt ``sid``. Background cleanup stays fire-and-forget; an explicit user Stop may
+        ``wait`` for the host's ``interrupt.ack`` so the caller never reports success before the child
+        actually applied the cancellation."""
         self.start()
-        self._send_frame(
-            {"type": "interrupt", "sid": sid, "request_id": request_id or uuid.uuid4().hex})
+        request_id = request_id or uuid.uuid4().hex
+        frame = {"type": "interrupt", "sid": sid, "request_id": request_id}
+        if not wait:
+            self._send_frame(frame)
+            return None
+        return self._await_reply(frame, request_id, timeout)
 
     def _await_reply(self, frame: dict[str, Any], request_id: str, timeout: float) -> dict:
         """Send ``frame`` and block for the host reply carrying ``request_id``."""
@@ -290,7 +352,10 @@ class HostSupervisor:
         now = time.monotonic()
         with self._lock:
             handlers = self._late_control_handlers
-            for rid in [r for r, (at, _cb) in handlers.items() if now - at > _LATE_CONTROL_TTL_SECS]:
+            for rid in [
+                r for r, (at, _cb) in handlers.items()
+                if _LATE_CONTROL_TTL_SECS <= 0 or now - at > _LATE_CONTROL_TTL_SECS
+            ]:
                 handlers.pop(rid, None)
             while len(handlers) >= _LATE_CONTROL_MAX:
                 handlers.pop(min(handlers, key=lambda rid: handlers[rid][0]), None)
@@ -311,6 +376,8 @@ class HostSupervisor:
             raise RuntimeError("compute host respawn disabled after crash loop")
         self._hello_event.clear()
         self._hello = {}
+        self._host_generation += 1
+        host_generation = self._host_generation
         env = {**hermes_subprocess_env(inherit_credentials=True), **os.environ, **(self.env or {})}
         env["HERMES_COMPUTE_HOST_HEARTBEAT_SECS"] = str(self.heartbeat_secs)
         root = str(_repo_root())
@@ -323,15 +390,37 @@ class HostSupervisor:
             stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", bufsize=1,
             start_new_session=True)
         self._proc = proc
-        for target, name in ((self._drain_stdout, "compute-host-stdout"),
-                             (self._drain_stderr, "compute-host-stderr"),
-                             (self._wait_for_exit, "compute-host-wait")):
-            threading.Thread(target=target, args=(proc,), name=name, daemon=True).start()
-        if not self._hello_event.wait(timeout=10.0):
+        stdout_thread = threading.Thread(
+            target=self._drain_stdout, args=(proc, host_generation),
+            name="compute-host-stdout", daemon=True,
+        )
+        stdout_thread.start()
+        threading.Thread(
+            target=self._drain_stderr, args=(proc,), name="compute-host-stderr", daemon=True,
+        ).start()
+        threading.Thread(
+            target=self._wait_for_exit, args=(proc,), kwargs={"stdout_thread": stdout_thread},
+            name="compute-host-wait", daemon=True,
+        ).start()
+        try:
+            if not self._hello_event.wait(timeout=_HELLO_TIMEOUT_SECS):
+                raise RuntimeError(f"compute host did not send hello; stderr={self._stderr_tail[-5:]}")
+            self._validate_hello()
+            self._persist_registry()
+        except Exception:
+            # Startup is transactional: a child that never proved its hello/build/home identity
+            # (or could not be registered durably) must not remain the supervisor's live host.
+            # Retire its stdout generation before terminating it so buffered frames cannot race
+            # the next spawn; clearing _proc also makes its wait thread treat the exit as expected.
+            if self._proc is proc:
+                self._proc = None
+            if self._host_generation == host_generation:
+                self._host_generation += 1
+            self._hello = {}
+            self._hello_event.clear()
+            self._remove_registry()
             self._terminate_process(proc)
-            raise RuntimeError(f"compute host did not send hello; stderr={self._stderr_tail[-5:]}")
-        self._validate_hello()
-        self._persist_registry()
+            raise
         logger.info("compute host started pid=%s reason=%s", proc.pid, reason)
 
     def _validate_hello(self) -> None:
@@ -370,7 +459,7 @@ class HostSupervisor:
             proc.stdin.write(json.dumps(frame, separators=(",", ":"), ensure_ascii=False) + "\n")
             proc.stdin.flush()
 
-    def _drain_stdout(self, proc: subprocess.Popen[str]) -> None:
+    def _drain_stdout(self, proc: subprocess.Popen[str], host_generation: int) -> None:
         assert proc.stdout is not None
         for raw in proc.stdout:
             try:
@@ -379,7 +468,7 @@ class HostSupervisor:
                 logger.warning("compute host emitted invalid json: %r", raw[:200])
                 continue
             if isinstance(frame, dict):
-                self._handle_host_frame(frame)
+                self._handle_host_frame(frame, source_generation=host_generation)
 
     def _drain_stderr(self, proc: subprocess.Popen[str]) -> None:
         assert proc.stderr is not None
@@ -388,7 +477,19 @@ class HostSupervisor:
                 self._stderr_tail = (self._stderr_tail + [text])[-80:]
                 logger.warning("compute host stderr: %s", text)
 
-    def _handle_host_frame(self, frame: dict[str, Any]) -> None:
+    def _handle_host_frame(
+        self, frame: dict[str, Any], *, source_generation: int | None = None,
+    ) -> None:
+        if source_generation is not None and source_generation != self._host_generation:
+            # Do not take ``_lock`` here: start() holds it while waiting for the first hello,
+            # and the stdout reader is the thread that must set that event. Generation changes
+            # are supervisor-owned integer assignments, so a lock-free snapshot is sufficient
+            # for this stale-reader fence and avoids a startup handshake deadlock.
+            logger.debug(
+                "dropping stale compute-host frame generation=%s current=%s type=%s",
+                source_generation, self._host_generation, frame.get("type"),
+            )
+            return
         ftype = str(frame.get("type") or "")
         request_id = str(frame.get("request_id") or "")
         if ftype in _CONTROL_REPLY_TYPES or (ftype == "error" and request_id):
@@ -408,22 +509,48 @@ class HostSupervisor:
             if pending is not None and pending[1] is not None:
                 _call_logged(pending[1], frame, "compute host turn completion callback failed")
 
-    def _wait_for_exit(self, proc: subprocess.Popen[str]) -> None:
+    def _wait_for_exit(
+        self, proc: subprocess.Popen[str], *, stdout_thread: threading.Thread | Any | None = None,
+    ) -> None:
         code = proc.wait()
         if self._closing:
             return
+        # The child can exit immediately after writing a terminal frame. Let its stdout reader
+        # consume already-buffered frames before classifying the remaining waiters as crashed;
+        # otherwise wait-thread scheduling can turn a successful turn/control into a false error.
+        if stdout_thread is not None:
+            stdout_thread.join(timeout=_STDOUT_DRAIN_AFTER_EXIT_SECS)
         with self._lock:
             if self._proc is not proc:
                 return
             self._proc = None
+            pending = self._take_pending_work_locked()
         self._remove_registry()
-        self._fail_pending_turns(reason="crash", message=f"compute host exited with code {code}")
+        # Account the crash and open the breaker before invoking callbacks. A turn-error
+        # callback may synchronously drain a queued prompt and call start(); letting that
+        # happen first can spawn a replacement and only then mark that live host stopped.
         self._maybe_respawn_after_crash()
+        self._deliver_failed_pending(
+            *pending, reason="crash", message=f"compute host exited with code {code}")
+
+    def _take_pending_work_locked(self):
+        """Detach work owned by the current host while ``_lock`` prevents a replacement spawn."""
+        pending = self._pending_turns
+        controls = self._pending_controls
+        late = self._late_control_handlers
+        self._pending_turns = {}
+        self._pending_controls = {}
+        self._late_control_handlers = {}
+        return pending, controls, late
 
     def _fail_pending_turns(self, *, reason: str, message: str) -> None:
         with self._lock:
-            pending = self._pending_turns
-            self._pending_turns = {}
+            pending = self._take_pending_work_locked()
+        self._deliver_failed_pending(*pending, reason=reason, message=message)
+
+    def _deliver_failed_pending(
+        self, pending, controls, late, *, reason: str, message: str,
+    ) -> None:
         failure = {"reason": reason, "message": message}
         for request_id, (sid, cb) in pending.items():
             self.rpc_sink({"jsonrpc": "2.0", "method": "event",
@@ -431,27 +558,38 @@ class HostSupervisor:
             if cb is not None:
                 frame = {"type": "turn.error", "sid": sid, "request_id": request_id, **failure}
                 _call_logged(cb, frame, "compute host error callback failed")
+        # Current waiters know this child can never answer again. If a real ack won the race
+        # and already filled its one-slot queue, keep that ack; otherwise wake the waiter now
+        # rather than leaving it blocked for the full control/compression timeout.
+        for request_id, waiter in controls.items():
+            frame = {"type": "control.error", "request_id": request_id, **failure}
+            with contextlib.suppress(queue.Full):
+                waiter.put_nowait(frame)
         # A crashed host never emits the late acks timed-out control waiters still expect; fail
         # them too so the client's "still running" notice can't hang.
-        with self._lock:
-            late = self._late_control_handlers
-            self._late_control_handlers = {}
         for request_id, (_registered_at, handler) in late.items():
             frame = {"type": "control.error", "request_id": request_id, **failure}
             _call_logged(handler, frame, "compute host late control error handler failed")
 
     def _maybe_respawn_after_crash(self) -> None:
         now = time.monotonic()
-        self._restart_times = [t for t in self._restart_times if now - t <= _RESPAWN_WINDOW_SECS]
-        if len(self._restart_times) >= self.respawn_max:
-            self._stopped_respawning = True
-            logger.error(
-                "compute host crash loop: max %s restarts per 5min reached; not respawning",
-                self.respawn_max)
-            return
-        self._restart_times.append(now)
-        # Small bounded backoff; tests and first recovery stay quick.
-        delay = min(5.0, 0.25 * (2 ** max(0, len(self._restart_times) - 1)))
+        with self._lock:
+            self._restart_times = [
+                t for t in self._restart_times
+                if now - t <= _RESPAWN_WINDOW_SECS
+            ]
+            if len(self._restart_times) >= self.respawn_max:
+                # Record the crash that opened the breaker so the cooldown is measured
+                # from the final failure (and respawn_max=0 can recover after the window).
+                self._restart_times.append(now)
+                self._stopped_respawning = True
+                logger.error(
+                    "compute host crash loop: max %s restarts per 5min reached; not respawning",
+                    self.respawn_max)
+                return
+            self._restart_times.append(now)
+            # Small bounded backoff; tests and first recovery stay quick.
+            delay = min(5.0, 0.25 * (2 ** max(0, len(self._restart_times) - 1)))
 
         def _respawn() -> None:
             time.sleep(delay)
