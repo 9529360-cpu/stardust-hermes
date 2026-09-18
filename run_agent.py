@@ -1003,9 +1003,21 @@ class AIAgent(
             release_or_close(session_db)
 
     def _hydrate_todo_store(self, history: List[Dict[str, Any]]) -> None:
-        """Replay the most recent todo tool response (the gateway builds a fresh AIAgent per message). Only
-        results paired with an earlier assistant ``todo`` call count — a forged bare ``role: tool`` message
-        must not seed the store (GHSA-5g4g-6jrg-mw3g)."""
+        """Restore session todo state, then reconcile a newer paired transcript snapshot.
+
+        Fresh gateway agents are created per message, so task state cannot rely on one old tool-result
+        surviving compaction. The session-scoped snapshot is trusted local state; transcript recovery still
+        requires a paired assistant ``todo_list``/legacy ``todo`` call so a forged bare tool row cannot seed
+        the store (GHSA-5g4g-6jrg-mw3g).
+        """
+        from tools.todo_tool import load_todo_session_state, persist_todo_session_state
+
+        persisted = load_todo_session_state(self._session_db, self.session_id)
+        if persisted is not None:
+            persisted_revision = int(persisted.get("revision", 0) or 0)
+            if persisted_revision > int(self._todo_store.snapshot().get("revision", 0) or 0):
+                self._todo_store.restore(persisted["todos"], revision=persisted_revision)
+
         found = self._latest_todo_response(history)
         if found is not None:
             last_todo_response, last_todo_revision = found
@@ -1017,6 +1029,9 @@ class AIAgent(
                 history_revision = 1
             if history_revision > int(self._todo_store.snapshot().get("revision", 0) or 0):
                 self._todo_store.restore(last_todo_response, revision=history_revision)
+                # Heal pre-session-state histories after one successful replay. Persistence is a
+                # fail-open optimization; the paired transcript remains the recovery fallback.
+                persist_todo_session_state(self._session_db, self.session_id, self._todo_store)
                 if not self.quiet_mode:
                     self._vprint(f"{self.log_prefix}📋 Restored {len(last_todo_response)} todo item(s) from history")
         _set_interrupt(False)
@@ -1061,10 +1076,14 @@ class AIAgent(
 
     @classmethod
     def _assistant_has_todo_tool_call(cls, assistant_msg: Dict[str, Any], tool_call_id: str) -> bool:
-        """True when the assistant message issued a ``todo`` call with this id."""
+        """True when the assistant issued canonical ``todo_list`` (or legacy ``todo``) with this id."""
+        from model_tools import _LEGACY_TOOL_ALIASES
+
         tool_calls = assistant_msg.get("tool_calls")
         return isinstance(tool_calls, list) and any(
-            cls._get_tool_call_id_static(tc) == tool_call_id and cls._get_tool_call_name_static(tc) == "todo"
+            cls._get_tool_call_id_static(tc) == tool_call_id
+            and _LEGACY_TOOL_ALIASES.get(cls._get_tool_call_name_static(tc), cls._get_tool_call_name_static(tc))
+            == "todo_list"
             for tc in tool_calls
         )
 

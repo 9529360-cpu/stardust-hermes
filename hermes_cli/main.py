@@ -2683,7 +2683,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "dump", "egress", "fallback", "gateway", "hooks", "import", "import-agent", "insights",
         "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate", "moa",
         "journey", "memory-graph", "learning",
-        "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "portal", "profile",
+        "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "profile",
         "project", "proxy",
         "prompt-size",
         "resume",
@@ -3291,9 +3291,6 @@ def _build_cli_parser():
 
     from hermes_cli.subcommands.peer import build_peer_parser
     build_peer_parser(subparsers)
-
-    from hermes_cli.portal_cli import add_parser as _add_portal_parser
-    _add_portal_parser(subparsers)
 
     from hermes_cli.kanban import build_parser as _build_kanban_parser
     _build_kanban_parser(subparsers).set_defaults(func=cmd_kanban)

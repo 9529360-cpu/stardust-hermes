@@ -368,7 +368,8 @@ def _session_db(session: dict):
 
 
 def _rewind_active_session_history(
-    session: dict, user_ordinal: int, *, require_retryable: bool = False) -> tuple[list[dict], dict, int]:
+    session: dict, user_ordinal: int, *, require_retryable: bool = False, runtime_sid: str | None = None,
+) -> tuple[list[dict], dict, int]:
     """Rewind one canonical user turn while retaining carrier scaffolding. Caller holds ``history_lock``. Persistent
     sessions go through ``SessionDB.rewind_user_turn`` (the durable transcript is the authority; memory is installed
     only after the commit); a session without a key rewinds the warm history alone."""
@@ -378,18 +379,34 @@ def _rewind_active_session_history(
     user_indices = [i for i, m in enumerate(history) if user_originated_turn_view(m) is not None]
     if user_ordinal < 0 or user_ordinal >= len(user_indices):
         raise ValueError("target user message is no longer in session history")
+    target_index = user_indices[user_ordinal]
+    prospective_history, _prospective_live_view = history_before_user_originated_turn(history, target_index)
+    todo_target = None
     session_key = str(session.get("session_key") or "").strip()
     if session_key:
         with _session_db(session) as db:
             if db is None:
                 raise RuntimeError("session database is unavailable")
+            target_row_id = history[target_index].get("_row_id") if isinstance(history[target_index], dict) else None
+            if not isinstance(target_row_id, int):
+                durable = db.get_messages_as_conversation(session_key, include_row_ids=True)
+                durable_users = [i for i, message in enumerate(durable) if user_originated_turn_view(message) is not None]
+                if user_ordinal < len(durable_users):
+                    target_row_id = durable[durable_users[user_ordinal]].get("_row_id")
+            todo_patch, todo_target = _plan_todo_history_rewrite(
+                session,
+                prospective_history,
+                session_db=db,
+                target_row_id=target_row_id if isinstance(target_row_id, int) else None,
+            )
+            todo_patch_kw = {"model_config_patch": todo_patch} if todo_patch is not None else {}
             outcome = db.rewind_user_turn(
                 session_key, user_ordinal, warm_history=history, require_retryable=require_retryable,
-                adopt_row_ids=True)
+                adopt_row_ids=True, **todo_patch_kw)
         installed, live_view, rewound_count = outcome.prefix, outcome.live_view, outcome.rewound_count
     else:
-        target_index = user_indices[user_ordinal]
-        installed, live_view = history_before_user_originated_turn(history, target_index)
+        installed, live_view = prospective_history, _prospective_live_view
+        _unused_patch, todo_target = _plan_todo_history_rewrite(session, installed)
         rewound_count = len(history) - target_index
         if require_retryable:
             retryable_user_text(live_view.get("content"))
@@ -404,6 +421,7 @@ def _rewind_active_session_history(
             agent._last_flushed_db_idx = len(installed) if session_key else 0
         if hasattr(agent, "_db_flush_scan_prefix"):
             agent._db_flush_scan_prefix = installed[:] if session_key else None
+    _apply_todo_history_rewrite(session, todo_target, sid=runtime_sid)
     return installed, live_view, rewound_count
 
 

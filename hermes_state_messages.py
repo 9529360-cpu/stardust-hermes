@@ -493,11 +493,14 @@ class SessionMessagesMixin:
         return inserted, tool_calls_total
 
     def replace_messages(self, session_id: str, messages: List[Dict[str, Any]], active_only: bool = False,
-        archive_dropped: bool = False, reject_active_turn_lease: bool = False) -> None:
+        archive_dropped: bool = False, reject_active_turn_lease: bool = False,
+        model_config_patch: Optional[Dict[str, Any]] = None) -> None:
         """Atomically replace a session's messages (/retry, /undo, /compress). DESTRUCTIVE by default (rows
         DELETEd, leave FTS). ``active_only`` spares soft-archived rows (needed with in-place compaction).
         ``archive_dropped`` SOFT-archives live rows rewind-style: what rewind/edit/regenerate must use, since
         DELETE leaves nothing to recover. ``reject_active_turn_lease``: in-txn lease check for user rewrites.
+        ``model_config_patch`` merges session side-state in this same transaction (``None`` values remove keys),
+        so transcript rewrites can roll back their derived state without a crash window.
 
         Pass ``archive_dropped=True`` to SOFT-archive the live rows instead of DELETEing them: the replaced
         turns stay on disk with ``active = 0``, ``compacted = 0`` — the same "the user took it back" marking
@@ -516,6 +519,9 @@ class SessionMessagesMixin:
                     conn, session_id, None, reject_active_turn_lease=True, reject_active_compression_lock=True)
             elif _ended_by_compression(conn.execute(_ENDED_ROW_SQL, (session_id,)).fetchone()):
                 raise CompressionSessionClosedError(session_id)
+            patch = model_config_patch is not None
+            patched_model_config = self._merge_model_config_json(
+                conn, session_id, model_config_patch, on_missing="raise") if patch else None
             if archive_dropped:
                 # FTS triggers don't fire on `active`: replaced turns stay searchable (include_inactive=True).
                 conn.execute("UPDATE messages SET active = 0 WHERE session_id = ? AND active = 1", (session_id,))
@@ -523,7 +529,10 @@ class SessionMessagesMixin:
                 conn.execute(f"DELETE FROM messages WHERE session_id = ?{' AND active = 1' if active_only else ''}", (session_id,))
             conn.execute(_RESET_COUNTERS_SQL, (session_id,))
             total_messages, total_tool_calls = self._insert_message_rows(conn, session_id, messages)
-            conn.execute(f"{_SET_COUNTERS_SQL} WHERE id = ?", (total_messages, total_tool_calls, session_id))
+            conn.execute(
+                f"{_SET_COUNTERS_SQL}{', model_config = ?' if patch else ''} WHERE id = ?",
+                (total_messages, total_tool_calls, *((patched_model_config,) if patch else ()), session_id),
+            )
         self._execute_write(_do)
 
     def has_archived_messages(self, session_id: str) -> bool:
@@ -1165,17 +1174,22 @@ class SessionMessagesMixin:
 
     def rewind_to_message(self, session_id: str, target_message_id: int, *, preserve_compaction_handoff: bool = False,
                           expected_active_ids: Optional[List[int]] = None,
-                          expected_target_content: Any = None) -> Dict[str, Any]:
+                          expected_target_content: Any = None,
+                          model_config_patch: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Soft-delete (``active=0``) every message with id >= *target_message_id*, target included (the caller
         pre-fills it as the next prompt). Returns ``{"rewound_count", "target_message", "new_head_id"}``, plus
         ``replacement_message_id`` with ``preserve_compaction_handoff`` (archives a composite summary carrier,
         inserts its hidden handoff scaffold as the new head). ``ValueError``: target missing or not ``user``.
         ``expected_active_ids`` / ``expected_target_content`` pin the active set and canonical live payload
         in-txn before any mutation (presentation-only metadata changes don't invalidate a rewind). A live turn
-        lease refuses; expired/dead holders are reclaimed. ``rewind_count`` always increments."""
+        lease refuses; expired/dead holders are reclaimed. ``model_config_patch`` is committed with the rewind,
+        so derived session state can time-travel atomically. ``rewind_count`` always increments."""
         def _do(conn):
             self._check_transcript_write_guards(
                 conn, session_id, None, reject_active_turn_lease=True, reject_active_compression_lock=True)
+            patch = model_config_patch is not None
+            patched_model_config = self._merge_model_config_json(
+                conn, session_id, model_config_patch, on_missing="raise") if patch else None
             if expected_active_ids is not None:
                 active_rows = conn.execute(_ACTIVE_IDS_SQL, (session_id,)).fetchall()
                 if [int(r[0]) for r in active_rows] != expected_active_ids:
@@ -1201,7 +1215,10 @@ class SessionMessagesMixin:
             conn.execute(
                 "UPDATE sessions SET rewind_count = COALESCE(rewind_count, 0) + 1 WHERE id = ?", (session_id,))
             message_count, tool_call_count = self._active_transcript_counts(conn, session_id)
-            conn.execute(f"{_SET_COUNTERS_SQL} WHERE id = ?", (message_count, tool_call_count, session_id))
+            conn.execute(
+                f"{_SET_COUNTERS_SQL}{', model_config = ?' if patch else ''} WHERE id = ?",
+                (message_count, tool_call_count, *((patched_model_config,) if patch else ()), session_id),
+            )
             head_id = conn.execute(
                 "SELECT MAX(id) FROM messages WHERE session_id = ? AND active = 1", (session_id,)).fetchone()[0]
             return target_row, ids, head_id, replacement_message_id

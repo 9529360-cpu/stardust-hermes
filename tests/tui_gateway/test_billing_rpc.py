@@ -30,7 +30,22 @@ def _call(method: str, params: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def test_stardust_billing_state_is_local_and_does_not_query_portal(monkeypatch):
+    monkeypatch.setattr(
+        bv,
+        "build_billing_state",
+        lambda *a, **kw: pytest.fail("Stardust billing state must not query the inherited portal"),
+    )
+    res = _call("billing.state", {})
+    assert res["ok"] is True
+    assert res["logged_in"] is False
+    assert res["free_tier"] is False
+
+
 def test_billing_state_serializes_decimals_as_strings(monkeypatch):
+    from hermes_cli import anon_auth
+
+    monkeypatch.setattr(anon_auth, "portal_identity_enabled", lambda: True)
     state = BillingState(
         logged_in=True,
         org_name="Acme",

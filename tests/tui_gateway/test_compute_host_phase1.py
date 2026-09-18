@@ -1,6 +1,8 @@
 import io
 import json
 import os
+import queue
+import subprocess
 import sys
 import threading
 import time
@@ -80,12 +82,62 @@ def test_compute_host_routes_relayed_response_and_lock_to_its_open_request(monke
         host.close()
 
 
+def test_compute_host_workspace_move_rehomes_running_runtime(monkeypatch, tmp_path):
+    """A parent workspace move must update the child process used by later tools in the live turn."""
+    out = io.StringIO()
+    host = ComputeHost(stdout=out, heartbeat_secs=0)
+    sid = "move-live"
+    old_cwd = tmp_path / "old"
+    new_cwd = tmp_path / "new"
+    old_cwd.mkdir()
+    new_cwd.mkdir()
+    session = {
+        "history_lock": threading.Lock(),
+        "history": [],
+        "history_version": 0,
+        "session_key": "stored-key",
+        "cwd": str(old_cwd),
+        "running": True,
+        "agent": object(),
+    }
+    registered = []
+    server._sessions[sid] = session
+    monkeypatch.setattr(
+        server,
+        "_register_session_cwd",
+        lambda current: registered.append((current["session_key"], current["cwd"])),
+    )
+    monkeypatch.setattr(server, "_session_info", lambda _agent, _session=None: {})
+
+    try:
+        host.handle_frame({
+            "type": "control",
+            "sid": sid,
+            "request_id": "move-1",
+            "route_name": "session.workspace.move",
+            "cwd": str(new_cwd),
+        })
+        frame = _json_lines(out)[-1]
+    finally:
+        server._sessions.pop(sid, None)
+        host.close()
+
+    assert frame["type"] == "control.ack"
+    assert frame["request_id"] == "move-1"
+    assert frame["result"] == {"cwd": str(new_cwd)}
+    assert session["cwd"] == str(new_cwd)
+    assert session["explicit_cwd"] is True
+    assert session["cwd_from_settle"] is False
+    assert registered == [("stored-key", str(new_cwd))]
+
+
 def test_mutator_route_table_matches_prd_inventory():
     assert MUTATOR_ROUTE_TABLE == {
         "prompt.submit": "turn-path",
         "session.interrupt": "turn-path",
         "reload.mcp": "run-concurrent",
         "session.save": "run-concurrent",
+        "session.workspace.move": "run-concurrent",
         "session.compress": "idle-gated",
         "prompt.submit.truncate": "idle-gated",
         "slash.model": "idle-gated",
@@ -114,6 +166,343 @@ def test_append_log_record_single_write_lines(tmp_path):
     assert len(lines) == 32
     assert sorted(line.split("-", 2)[1] for line in lines) == [f"{i:03d}" for i in range(32)]
     assert all(line.endswith("x" * 2000) for line in lines)
+
+
+def test_supervisor_drops_frames_from_a_superseded_host_generation(tmp_path):
+    """Buffered stdout from a dead host must never satisfy the respawned host's waiters or hello gate."""
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=[sys.executable, "-c", ""],
+        autostart=False,
+    )
+    supervisor._host_generation = 2
+    supervisor._hello = {"boot_id": "new-boot"}
+    supervisor._hello_event.clear()
+    q = queue.Queue(maxsize=1)
+    supervisor._pending_controls["reused-request"] = q
+
+    supervisor._handle_host_frame(
+        {"type": "control.ack", "request_id": "reused-request", "result": {"status": "old"}},
+        source_generation=1,
+    )
+    supervisor._handle_host_frame(
+        {"type": "hello", "boot_id": "old-boot"},
+        source_generation=1,
+    )
+
+    assert q.empty()
+    assert supervisor._hello == {"boot_id": "new-boot"}
+    assert not supervisor._hello_event.is_set()
+
+    current = {
+        "type": "control.ack", "request_id": "reused-request", "result": {"status": "current"},
+    }
+    supervisor._handle_host_frame(current, source_generation=2)
+    assert q.get_nowait() == current
+
+
+def test_supervisor_drains_terminal_stdout_before_classifying_host_exit_as_crash(tmp_path, monkeypatch):
+    """A terminal frame already written by the child must win over the wait-thread exit race."""
+    completed = []
+    emitted = []
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=[sys.executable, "-c", ""],
+        rpc_sink=emitted.append,
+        autostart=False,
+    )
+    supervisor._host_generation = 4
+    supervisor._pending_turns["turn-1"] = ("sid-1", completed.append)
+
+    class _ExitedProc:
+        pid = 1234
+
+        @staticmethod
+        def wait():
+            return 9
+
+    proc = _ExitedProc()
+    supervisor._proc = proc
+    monkeypatch.setattr(supervisor, "_remove_registry", lambda: None)
+    monkeypatch.setattr(supervisor, "_maybe_respawn_after_crash", lambda: None)
+
+    class _StdoutDrain:
+        def join(self, timeout=None):
+            supervisor._handle_host_frame(
+                {"type": "turn.end", "sid": "sid-1", "request_id": "turn-1"},
+                source_generation=4,
+            )
+
+    supervisor._wait_for_exit(proc, stdout_thread=_StdoutDrain())
+
+    assert completed == [{"type": "turn.end", "sid": "sid-1", "request_id": "turn-1"}]
+    assert emitted == []
+    assert supervisor._pending_turns == {}
+
+
+def test_old_host_crash_cleanup_does_not_fail_replacement_host_work(tmp_path, monkeypatch):
+    """Retire old pending work atomically before a replacement can register its own waiters."""
+    completed = []
+    emitted = []
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=[sys.executable, "-c", ""],
+        rpc_sink=emitted.append,
+        autostart=False,
+    )
+    old_control: queue.Queue[dict] = queue.Queue(maxsize=1)
+    new_control: queue.Queue[dict] = queue.Queue(maxsize=1)
+    supervisor._pending_turns["old-turn"] = ("old-sid", completed.append)
+    supervisor._pending_controls["old-control"] = old_control
+
+    class _ExitedProc:
+        pid = 1234
+
+        @staticmethod
+        def wait():
+            return 9
+
+    class _StdoutDrain:
+        @staticmethod
+        def join(timeout=None):
+            return None
+
+    proc = _ExitedProc()
+    supervisor._proc = proc
+
+    def _replacement_arrives() -> None:
+        # This hook runs after the crashed host has been retired from _proc. It models a
+        # concurrent caller starting the replacement and registering new work before old
+        # crash callbacks are delivered.
+        supervisor._pending_turns["new-turn"] = ("new-sid", lambda _frame: None)
+        supervisor._pending_controls["new-control"] = new_control
+
+    monkeypatch.setattr(supervisor, "_remove_registry", _replacement_arrives)
+    monkeypatch.setattr(supervisor, "_maybe_respawn_after_crash", lambda: None)
+
+    supervisor._wait_for_exit(proc, stdout_thread=_StdoutDrain())
+
+    assert completed and completed[-1]["type"] == "turn.error"
+    assert old_control.get_nowait()["type"] == "control.error"
+    assert set(supervisor._pending_turns) == {"new-turn"}
+    assert supervisor._pending_controls == {"new-control": new_control}
+    assert new_control.empty()
+
+
+def test_crash_breaker_is_applied_before_reentrant_turn_callback_restart(
+    tmp_path, monkeypatch
+):
+    """A queued-turn callback must not spawn a replacement before the breaker opens."""
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=[sys.executable, "-c", ""],
+        respawn_max=1,
+        autostart=False,
+    )
+    supervisor._restart_times = [time.monotonic()]
+    spawned = []
+    blocked = []
+
+    class _ExitedProc:
+        pid = 1234
+
+        @staticmethod
+        def wait():
+            return 9
+
+    class _ReplacementProc:
+        pid = 5678
+
+        @staticmethod
+        def poll():
+            return None
+
+    class _StdoutDrain:
+        @staticmethod
+        def join(timeout=None):
+            return None
+
+    old_proc = _ExitedProc()
+    supervisor._proc = old_proc
+    monkeypatch.setattr(supervisor, "_remove_registry", lambda: None)
+    monkeypatch.setattr(supervisor, "reconcile_startup_orphan", lambda: "none")
+
+    def _fake_spawn_locked(*, reason):
+        if supervisor._stopped_respawning:
+            raise RuntimeError("compute host respawn disabled after crash loop")
+        spawned.append(reason)
+        supervisor._proc = _ReplacementProc()
+
+    monkeypatch.setattr(supervisor, "_spawn_locked", _fake_spawn_locked)
+
+    def _completion(_frame):
+        try:
+            supervisor.start()
+        except RuntimeError as exc:
+            blocked.append(str(exc))
+
+    supervisor._pending_turns["turn-1"] = ("sid-1", _completion)
+
+    supervisor._wait_for_exit(old_proc, stdout_thread=_StdoutDrain())
+
+    assert supervisor._stopped_respawning is True
+    assert spawned == []
+    assert blocked == ["compute host respawn disabled after crash loop"]
+    assert supervisor._proc is None
+
+
+def test_respawn_max_zero_still_records_crash_cooldown(tmp_path):
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=[sys.executable, "-c", ""],
+        respawn_max=0,
+        autostart=False,
+    )
+
+    before = time.monotonic()
+    supervisor._maybe_respawn_after_crash()
+
+    assert supervisor._stopped_respawning is True
+    assert len(supervisor._restart_times) == 1
+    assert supervisor._restart_times[0] >= before
+
+
+def test_supervisor_crash_breaker_recovers_after_cooldown(tmp_path, monkeypatch):
+    """Crash-loop protection must cool down; it must not brick the backend forever."""
+    from tui_gateway import host_supervisor as hs
+
+    child_code = (
+        "import json, os, sys\n"
+        "print(json.dumps({'type':'hello','host_pid':os.getpid(),'boot_id':'cooldown',"
+        "'build_sha':'unknown','hermes_home':''}), flush=True)\n"
+        "for line in sys.stdin:\n"
+        "    if json.loads(line).get('type') == 'shutdown':\n"
+        "        break\n"
+    )
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=[sys.executable, "-u", "-c", child_code],
+        expected_build_sha="unknown",
+        expected_hermes_home="",
+        respawn_max=1,
+        autostart=False,
+    )
+    monkeypatch.setattr(supervisor, "reconcile_startup_orphan", lambda: "none")
+    supervisor._stopped_respawning = True
+    supervisor._restart_times = [
+        time.monotonic() - hs._RESPAWN_WINDOW_SECS - 1.0
+    ]
+
+    try:
+        supervisor.start()
+        assert supervisor.is_running()
+        assert supervisor._stopped_respawning is False
+        assert supervisor._restart_times == []
+    finally:
+        supervisor.shutdown()
+
+
+def test_supervisor_interrupt_can_wait_for_host_ack(tmp_path, monkeypatch):
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=[sys.executable, "-c", ""],
+        autostart=False,
+    )
+    monkeypatch.setattr(supervisor, "start", lambda: None)
+    seen = []
+    ack = {"type": "interrupt.ack", "request_id": "stop-1", "applied": True}
+    monkeypatch.setattr(
+        supervisor,
+        "_await_reply",
+        lambda frame, request_id, timeout: seen.append((frame, request_id, timeout)) or ack,
+    )
+
+    result = supervisor.interrupt("sid-1", request_id="stop-1", wait=True, timeout=2.5)
+
+    assert result == ack
+    assert seen == [(
+        {"type": "interrupt", "sid": "sid-1", "request_id": "stop-1"},
+        "stop-1",
+        2.5,
+    )]
+
+
+def test_supervisor_rejects_and_terminates_mismatched_hello(tmp_path, monkeypatch):
+    """A child that fails the hello identity contract must not remain registered as the live host."""
+    from tui_gateway import host_supervisor as hs
+
+    class _Stdin:
+        def write(self, _value):
+            return None
+
+        def flush(self):
+            return None
+
+    class _FakeProc:
+        pid = 43210
+
+        def __init__(self):
+            self.stdin = _Stdin()
+            self.stdout = io.StringIO("")
+            self.stderr = io.StringIO("")
+            self.returncode = None
+            self.done = threading.Event()
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            if not self.done.wait(timeout):
+                raise subprocess.TimeoutExpired("fake-compute-host", timeout)
+            return self.returncode
+
+        def terminate(self):
+            self.returncode = 1
+            self.done.set()
+
+        def kill(self):
+            self.terminate()
+
+    proc = _FakeProc()
+    monkeypatch.setattr(hs.subprocess, "Popen", lambda *args, **kwargs: proc)
+    supervisor = HostSupervisor(
+        registry_path=tmp_path / "dashboard-compute-host.json",
+        argv=["fake-compute-host"],
+        expected_build_sha="expected-sha",
+        expected_hermes_home="expected-home",
+        autostart=False,
+    )
+    monkeypatch.setattr(supervisor, "reconcile_startup_orphan", lambda: "none")
+
+    def _hello_wait(timeout=None):
+        supervisor._hello = {
+            "type": "hello", "host_pid": proc.pid, "boot_id": "bad-boot",
+            "build_sha": "expected-sha", "hermes_home": "wrong-home",
+        }
+        return True
+
+    monkeypatch.setattr(supervisor._hello_event, "wait", _hello_wait)
+
+    with pytest.raises(RuntimeError, match="HERMES_HOME mismatch"):
+        supervisor.start()
+
+    assert proc.poll() is not None
+    assert supervisor._proc is None
+    assert not supervisor.registry_path.exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows os.kill(pid, 0) has destructive semantics")
+def test_windows_pid_alive_probe_does_not_signal_process():
+    from tui_gateway import host_supervisor as hs
+
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        assert hs._pid_alive(proc.pid) is True
+        assert proc.poll() is None
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            proc.wait(timeout=5)
 
 
 def test_supervisor_startup_reconcile_pid_reuse_guard(tmp_path, monkeypatch):
@@ -298,10 +687,9 @@ def test_shutdown_drain_sleep_never_overshoots_the_reserve(monkeypatch):
 
     A flat tick overshoots the drain deadline by up to one tick, eating the
     reserve held back for ``flush_all_sessions``; for a small ``wait`` that is
-    the whole reserve. Asserting on the *requested* sleep totals rather than on
-    wall-clock keeps this deterministic: each sleep is clamped to the remaining
-    time, so the sum can never exceed the drain budget however the scheduler
-    interleaves.
+    the whole reserve. Drive a fake monotonic clock from the requested sleeps so
+    the assertion is independent of Windows timer granularity (real short sleeps
+    may return early).
     """
     wait = 0.34
     drain_budget = wait - min(compute_host._FLUSH_RESERVE_SECS, wait / 2.0)
@@ -310,13 +698,22 @@ def test_shutdown_drain_sleep_never_overshoots_the_reserve(monkeypatch):
     _record_finalize(monkeypatch, events, "idle")
 
     slept: list[float] = []
-    real_sleep = time.sleep
+    now = [100.0]
 
     def _recording_sleep(seconds: float) -> None:
         slept.append(seconds)
-        real_sleep(seconds)
+        now[0] += seconds
 
-    monkeypatch.setattr(compute_host.time, "sleep", _recording_sleep)
+    class _FakeTime:
+        @staticmethod
+        def monotonic() -> float:
+            return now[0]
+
+        sleep = staticmethod(_recording_sleep)
+
+    # Replace only compute_host's module reference; mutating the shared stdlib ``time``
+    # module leaks the fake monotonic clock into host_supervisor tests that run later.
+    monkeypatch.setattr(compute_host, "time", _FakeTime)
 
     host = ComputeHost(stdout=io.StringIO(), heartbeat_secs=0)
     release = threading.Event()

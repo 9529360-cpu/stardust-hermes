@@ -517,16 +517,11 @@ async def test_the_drain_never_touches_the_shared_executor(monkeypatch):
     runner._login_exec.shutdown(wait=True)
 
 
-def test_the_registry_row_and_alias_match_the_command_contract():
-    command = resolve_command("login")
-    assert command.name == "login"
+def test_stardust_does_not_publish_the_legacy_login_command():
+    assert resolve_command("login") is None
     assert resolve_command("signin") is None
-    assert command.desktop == "settings"
-    assert command.aliases == ()
-    assert command.busy_policy == "dispatch"
-    assert not command.cli_only and not command.gateway_only
-    assert "login" in GATEWAY_KNOWN_COMMANDS
-    assert resolve_command("upgrade").name == "subscription"
+    assert resolve_command("upgrade") is None
+    assert "login" not in GATEWAY_KNOWN_COMMANDS
 
 
 def test_the_handler_table_builds():
@@ -534,12 +529,10 @@ def test_the_handler_table_builds():
     assert runner._command_handler_table(("login",))["login"] == runner._handle_login_command
 
 
-@pytest.mark.asyncio
-async def test_login_dispatches_mid_turn():
+def test_legacy_login_handler_is_not_reachable_from_the_command_registry():
     runner = object.__new__(GatewayRunner)
-    runner._handle_login_command = AsyncMock(return_value="started")
-    command = resolve_command("login")
-    event = _event()
-
-    assert await runner._dispatch_busy_slash_command(event, command, "", event.source) == "started"
-    runner._handle_login_command.assert_awaited_once_with(event)
+    assert resolve_command("login") is None
+    assert "login" not in GATEWAY_KNOWN_COMMANDS
+    # The old implementation may remain as a compatibility seam for now, but the
+    # authoritative command registry no longer routes users into it.
+    assert runner._command_handler_table(("login",))["login"] == runner._handle_login_command

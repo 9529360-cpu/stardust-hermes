@@ -234,6 +234,16 @@ class TestCLIStatusBar:
 
 
 class TestCLIUsageReport:
+    def test_default_usage_does_not_query_legacy_nous_account_product(self):
+        cli_obj = _make_cli()
+        with patch.object(
+            cli_obj, "_try_usage_model", side_effect=AssertionError("legacy billing queried")
+        ), patch(
+            "agent.account_usage.nous_credits_lines",
+            side_effect=AssertionError("legacy credits queried"),
+        ):
+            assert cli_obj._print_nous_credits_block() is False
+
     def test_show_usage_omits_cost_reporting(self, capsys):
         cli_obj = _attach_agent(
             _make_cli(),

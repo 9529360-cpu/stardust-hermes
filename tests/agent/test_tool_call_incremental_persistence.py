@@ -23,6 +23,7 @@ makes the corresponding assertion fail.
 """
 
 import copy
+import json
 from types import SimpleNamespace
 from pathlib import Path
 import tempfile
@@ -385,6 +386,46 @@ def test_execute_tool_calls_sequential_flushes_each_tool_result_before_next_disp
         ("dispatch", "c2"),
         ("flush", "tool", "c2"),
     ]
+
+
+def test_todo_write_persists_session_state_after_result_flush(tmp_path):
+    from tools import todo_tool as todo_module
+
+    agent = _make_agent()
+    db = _attach_real_session_db(agent, tmp_path / "state.db", "todo-persist")
+    events: list[str] = []
+    original_persist = todo_module.persist_todo_session_state
+
+    def _record_flush(_messages, conversation_history=None):
+        events.append("result-flush")
+        return True
+
+    def _record_state(session_db, session_id, store):
+        events.append("state-persist")
+        return original_persist(session_db, session_id, store)
+
+    args = {
+        "todos": [
+            {"id": "1", "content": "Execute the plan", "status": "in_progress"},
+            {"id": "2", "content": "Verify the outcome", "status": "pending"},
+        ]
+    }
+    call = _mock_tool_call(name="todo_list", arguments=json.dumps(args), call_id="todo-1")
+    assistant_message = SimpleNamespace(content="", tool_calls=[call])
+    messages: list = []
+    agent._flush_messages_to_session_db = MagicMock(side_effect=_record_flush)
+
+    try:
+        with patch("tools.todo_tool.persist_todo_session_state", side_effect=_record_state):
+            agent._execute_tool_calls_sequential(assistant_message, messages, "task-1")
+
+        state = db.get_session_model_config_value("todo-persist", "_todo_state")
+        assert events == ["result-flush", "state-persist"]
+        assert state == agent._todo_store.snapshot()
+        assert state["revision"] == 1
+        assert [item["id"] for item in state["todos"]] == ["1", "2"]
+    finally:
+        db.close()
 
 
 def test_sequential_keyboard_interrupt_emits_results_for_all_calls():

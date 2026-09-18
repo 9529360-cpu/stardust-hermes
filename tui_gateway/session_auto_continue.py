@@ -54,6 +54,48 @@ def _auto_continue_note(prompt: str) -> str:
             f"finish the task. The interrupted request was:]\n\n{prompt}")
 
 
+def _history_proves_marker_settled(session: dict, marker: dict) -> bool:
+    """True when durable replay already contains a terminal assistant row newer than ``marker``.
+
+    Turn-marker deletion is deliberately best-effort, so a stale sidecar must not by itself replay a turn that
+    actually committed. Resume histories are loaded from SessionDB before auto-continue runs. A real terminal
+    assistant row after the marker is therefore stronger evidence than the stale sidecar. Tool-call assistants are
+    intermediate, and compaction summaries are synthetic, so neither closes the turn.
+    """
+    try:
+        started_at = float(marker.get("started_at") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if started_at <= 0:
+        return False
+    history = session.get("history")
+    if not isinstance(history, list):
+        return False
+    from agent.context_compressor import ContextCompressor
+
+    saw_post_marker_user = False
+    for message in history:
+        if not isinstance(message, dict):
+            continue
+        try:
+            timestamp = float(message.get("timestamp") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if timestamp < started_at:
+            continue
+        content = message.get("content")
+        if message.get("_compressed_summary") or ContextCompressor._is_context_summary_content(content):
+            continue
+        role = message.get("role")
+        if role == "user":
+            saw_post_marker_user = True
+            continue
+        if role != "assistant" or not saw_post_marker_user or message.get("tool_calls"):
+            continue
+        return True
+    return False
+
+
 def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> dict | None:
     """Kick off a continuation turn for a crash-interrupted session (session.resume cold paths). Returns a descriptor
     for the resume payload when scheduled, else None. The turn runs on a background thread after the deferred agent
@@ -64,6 +106,12 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
         return None
     home = _session_home(session)
     if (marker := read_turn_marker(home, session_key)) is None:
+        return None
+    if _history_proves_marker_settled(session, marker):
+        # The terminal transcript won but best-effort sidecar cleanup lost. Treat durable conversation state
+        # as authoritative and retire the stale marker instead of replaying side effects.
+        clear_turn_marker(home, session_key)
+        logger.info("discarded stale auto-continue marker for settled session %s", session_key)
         return None
     if not marker.get("auto_continue", True):
         return None  # The mailbox owns recovery and receipt identity for imported turns.

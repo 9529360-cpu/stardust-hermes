@@ -545,8 +545,9 @@ def test_compute_host_interrupt_forwards_when_parent_running_mirror_is_stale(mon
     interrupted = []
 
     class _Supervisor:
-        def interrupt(self, sid, *, request_id=None):
-            interrupted.append((sid, request_id))
+        def interrupt(self, sid, *, request_id=None, wait=False):
+            interrupted.append((sid, request_id, wait))
+            return {"type": "interrupt.ack", "request_id": request_id, "applied": True} if wait else None
 
     sid = "host-stale-running"
     server._sessions[sid] = _session(
@@ -563,7 +564,7 @@ def test_compute_host_interrupt_forwards_when_parent_running_mirror_is_stale(mon
             {"id": "interrupt", "method": "session.interrupt", "params": {"session_id": sid}}
         )
         assert response["result"] == {"status": "interrupted", "turn_isolation": True}
-        assert interrupted == [(sid, "interrupt-interrupt")]
+        assert interrupted == [(sid, "interrupt-interrupt", True)]
     finally:
         server._sessions.pop(sid, None)
 
@@ -4839,6 +4840,118 @@ def test_session_close_releases_resume_lock_before_slow_teardown(monkeypatch):
     assert response["result"] == {"closed": True}
 
 
+def test_session_close_does_not_succeed_before_compute_host_turn_settles(monkeypatch):
+    """Interrupt ack is not terminal: close must fail instead of finalizing a still-running child turn."""
+    interrupted = []
+    teardown_running = []
+    session = _session(
+        agent=None,
+        agent_ready=threading.Event(),
+        running=True,
+        _compute_host_active=True,
+    )
+    server._sessions["isolated-close"] = session
+
+    class _Supervisor:
+        def interrupt(self, sid, *, request_id=None, wait=False):
+            interrupted.append((sid, request_id, wait))
+            return {
+                "type": "interrupt.ack",
+                "request_id": request_id,
+                "applied": True,
+            }
+
+    monkeypatch.setattr(server, "_load_cfg", lambda: {"dashboard": {"turn_isolation": True}})
+    monkeypatch.setattr(server, "_get_compute_host_supervisor", lambda _cfg=None: _Supervisor())
+    monkeypatch.setattr(server, "_TURN_SETTLE_BEFORE_CLOSE_SECONDS", 0.05, raising=False)
+    monkeypatch.setattr(
+        server,
+        "_teardown_session",
+        lambda current, *, end_reason="tui_close": teardown_running.append(
+            bool(current.get("running"))
+        ),
+    )
+
+    response = server.handle_request(
+        {
+            "id": "close-isolated",
+            "method": "session.close",
+            "params": {"session_id": "isolated-close"},
+        }
+    )
+
+    assert response["error"]["code"] == 5019
+    assert interrupted and interrupted[0][0] == "isolated-close"
+    assert interrupted[0][2] is True
+    assert interrupted[0][1]
+    assert teardown_running == []
+
+
+def test_session_close_waits_for_compute_host_terminal_frame_after_interrupt_ack(monkeypatch):
+    """A positive interrupt ack is only cancellation acceptance; close waits for terminal settlement."""
+    acked = threading.Event()
+    release_terminal = threading.Event()
+    teardown_running = []
+    response = {}
+    session = _session(
+        agent=None,
+        agent_ready=threading.Event(),
+        running=True,
+        _compute_host_active=True,
+    )
+    server._sessions["isolated-close-settle"] = session
+
+    class _Supervisor:
+        def interrupt(self, sid, *, request_id=None, wait=False):
+            assert sid == "isolated-close-settle"
+            assert wait is True
+            acked.set()
+
+            def _finish():
+                assert release_terminal.wait(timeout=2.0)
+                session["running"] = False
+
+            threading.Thread(target=_finish, daemon=True).start()
+            return {"type": "interrupt.ack", "request_id": request_id, "applied": True}
+
+    monkeypatch.setattr(server, "_load_cfg", lambda: {"dashboard": {"turn_isolation": True}})
+    monkeypatch.setattr(server, "_get_compute_host_supervisor", lambda _cfg=None: _Supervisor())
+    monkeypatch.setattr(server, "_TURN_SETTLE_BEFORE_CLOSE_SECONDS", 1.0, raising=False)
+    monkeypatch.setattr(
+        server,
+        "_teardown_session",
+        lambda current, *, end_reason="tui_close": teardown_running.append(
+            bool(current.get("running"))
+        ),
+    )
+
+    close_thread = threading.Thread(
+        target=lambda: response.update(
+            server.handle_request(
+                {
+                    "id": "close-isolated-settle",
+                    "method": "session.close",
+                    "params": {"session_id": "isolated-close-settle"},
+                }
+            )
+        )
+    )
+    close_thread.start()
+    try:
+        assert acked.wait(timeout=1.0)
+        assert close_thread.is_alive(), "close returned on ack before the child turn settled"
+        release_terminal.set()
+        close_thread.join(timeout=2.0)
+    finally:
+        release_terminal.set()
+        close_thread.join(timeout=2.0)
+        server._sessions.pop("isolated-close-settle", None)
+
+    assert not close_thread.is_alive()
+    assert response["result"] == {"closed": True}
+    assert teardown_running == [False]
+
+
 def test_session_close_settles_active_turn_before_teardown(monkeypatch):
     """Close must not tear down agent resources while their turn is unwinding."""
     turn_started = threading.Event()
@@ -4906,8 +5019,9 @@ def test_ws_orphan_reap_interrupts_isolated_turn_then_reaps(monkeypatch):
             return None
 
     class _Supervisor:
-        def interrupt(self, sid, *, request_id=None):
-            interrupted.append((sid, request_id))
+        def interrupt(self, sid, *, request_id=None, wait=False):
+            interrupted.append((sid, request_id, wait))
+            return None
 
     session = _session(
         agent=None,
@@ -4937,7 +5051,7 @@ def test_ws_orphan_reap_interrupts_isolated_turn_then_reaps(monkeypatch):
         server._schedule_ws_orphan_reap("isolated-sid")
         callbacks.pop(0)()
 
-        assert interrupted == [("isolated-sid", "client-gone-isolated-sid")]
+        assert interrupted == [("isolated-sid", "client-gone-isolated-sid", False)]
         assert session["_turn_cancel_requested"] is True
         assert session["queued_prompt"] is None
         assert session["history"] == [{"role": "assistant", "content": "partial"}]
@@ -4945,7 +5059,7 @@ def test_ws_orphan_reap_interrupts_isolated_turn_then_reaps(monkeypatch):
 
         callbacks.pop(0)()
 
-        assert interrupted == [("isolated-sid", "client-gone-isolated-sid")]
+        assert interrupted == [("isolated-sid", "client-gone-isolated-sid", False)]
         assert len(callbacks) == 1
 
         session["running"] = False
@@ -13655,6 +13769,65 @@ def test_run_prompt_submit_registers_turn_thread_for_interrupt(monkeypatch):
         server._sessions.pop("sid", None)
 
 
+def test_hosted_interrupt_rejects_stale_execution_generation():
+    """A stale hosted Stop must not interrupt a retried generation that reused the same task_id."""
+    calls = {"interrupted": False}
+    session = _session(
+        agent=types.SimpleNamespace(
+            interrupt=lambda: calls.__setitem__("interrupted", True)
+        ),
+        running=True,
+        _hosted_room_task={"task_id": "task-a", "execution_generation": 2},
+    )
+    server._sessions["sid"] = session
+
+    try:
+        resp = server.handle_request({
+            "id": "hosted-stop-stale",
+            "method": "session.interrupt",
+            "params": {
+                "session_id": "sid",
+                "expected_hosted_task_id": "task-a",
+                "expected_hosted_execution_generation": 1,
+            },
+        })
+
+        assert resp["result"] == {"status": "not_interrupted", "interrupted": False}
+        assert calls["interrupted"] is False
+        assert session["running"] is True
+    finally:
+        server._sessions.pop("sid", None)
+
+
+def test_hosted_interrupt_accepts_exact_execution_generation():
+    """The generation fence must still allow Stop for the exact retried attempt."""
+    calls = {"interrupted": False}
+    session = _session(
+        agent=types.SimpleNamespace(
+            interrupt=lambda: calls.__setitem__("interrupted", True)
+        ),
+        running=True,
+        _hosted_room_task={"task_id": "task-a", "execution_generation": 2},
+    )
+    server._sessions["sid"] = session
+
+    try:
+        resp = server.handle_request({
+            "id": "hosted-stop-current",
+            "method": "session.interrupt",
+            "params": {
+                "session_id": "sid",
+                "expected_hosted_task_id": "task-a",
+                "expected_hosted_execution_generation": 2,
+            },
+        })
+
+        assert resp["result"]["status"] == "interrupted"
+        assert calls["interrupted"] is True
+    finally:
+        server._sessions.pop("sid", None)
+
+
 def test_interrupt_drops_queued_prompt_for_session():
     """Explicit stop cancels a queued next turn instead of auto-draining it."""
     calls = {"interrupted": False}
@@ -15724,6 +15897,40 @@ def test_teardown_ends_session_in_profile_db(monkeypatch, tmp_path):
     assert seen.get("launch_end") is None
     assert seen.get("launch") is None
     assert str(seen.get("db_path")).endswith("state.db")
+
+
+def test_session_branch_rejects_running_parent_before_db_read(monkeypatch):
+    touched_db = []
+    session = _session(
+        agent=types.SimpleNamespace(),
+        running=True,
+        history=[{"role": "user", "content": "still changing"}],
+    )
+    server._sessions["parent"] = session
+
+    class _DB:
+        def __enter__(self):
+            touched_db.append(True)
+            return None
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(server, "_session_db", lambda _session: _DB())
+    try:
+        response = server.handle_request(
+            {
+                "id": "branch-busy",
+                "method": "session.branch",
+                "params": {"session_id": "parent", "name": "must-not-fork"},
+            }
+        )
+    finally:
+        server._sessions.pop("parent", None)
+
+    assert response["error"]["code"] == 4091
+    assert response["error"]["message"] == "session busy"
+    assert touched_db == []
 
 
 def test_session_branch_writes_to_parent_profile_db(monkeypatch, tmp_path):
@@ -19763,9 +19970,12 @@ def test_billing_rate_limit_without_error_defaults_wire_code():
 
 
 def _sub_rpc(method, params):
-    # These RPCs are in _LONG_HANDLERS (pool-routed → dispatch returns None and the
-    # worker writes via the transport), so drive the inline handler directly.
-    return server.handle_request({"id": "1", "method": method, "params": params})["result"]
+    # Stardust disables the inherited account/billing product by default. These
+    # tests exercise the retained compatibility adapter explicitly.
+    with patch("hermes_cli.anon_auth.portal_identity_enabled", return_value=True):
+        # These RPCs are in _LONG_HANDLERS (pool-routed → dispatch returns None and the
+        # worker writes via the transport), so drive the inline handler directly.
+        return server.handle_request({"id": "1", "method": method, "params": params})["result"]
 
 
 def test_subscription_preview_serializes_quote(monkeypatch):
@@ -20883,7 +21093,7 @@ def test_prompt_submit_releases_old_history_before_heap_trim(monkeypatch, tmp_pa
 
     class _Agent:
         def run_conversation(
-            self, prompt, conversation_history=None, stream_callback=None
+            self, prompt, conversation_history=None, stream_callback=None, **_kwargs
         ):
             return {
                 "final_response": "reply",
@@ -20947,7 +21157,8 @@ def test_prompt_submit_releases_old_history_before_heap_trim(monkeypatch, tmp_pa
         assert resp is not None and resp.get("result")
         assert not observed["history"]
         assert not observed["run_kwargs"]
-        assert cleanup_order == ["trim", "reset_home"]
+        assert cleanup_order.count("trim") == 1
+        assert cleanup_order[-2:] == ["trim", "reset_home"]
     finally:
         server._sessions.pop("sid_trim", None)
 
@@ -22444,6 +22655,83 @@ def test_persist_live_session_system_prompt_binds_session_cwd(monkeypatch, tmp_p
     expected = f"Current working directory: {session_cwd}"
     assert result["cached"] == expected, result["cached"]
     assert persisted["prompt"] == expected, persisted["prompt"]
+
+
+def test_workspace_move_syncs_running_compute_host(monkeypatch, tmp_path):
+    target = "stored-isolated-session"
+    new_cwd = tmp_path / "isolated-dest"
+    new_cwd.mkdir()
+    sent = []
+
+    class FakeDB:
+        def get_session(self, session_id):
+            return {"id": session_id}
+
+        def update_session_cwd(self, session_id, cwd, branch=None, root=None, replace_git_meta=True):
+            return 9
+
+    import contextlib
+
+    @contextlib.contextmanager
+    def _fake_db(_params, *, writer=False):
+        yield FakeDB()
+
+    live = {
+        "session_key": target,
+        "running": True,
+        "cwd": str(tmp_path / "old"),
+        "_compute_host_active": True,
+        "history_lock": threading.Lock(),
+        "agent": None,
+        "agent_ready": threading.Event(),
+    }
+    server._sessions["isolated-live"] = live
+    monkeypatch.setattr(
+        server,
+        "_load_dashboard_process_isolation_config",
+        lambda: {"turn_isolation": True},
+    )
+    monkeypatch.setattr(server, "_profile_db", _fake_db)
+    monkeypatch.setattr(server.git_probe, "branch", lambda _cwd: "main")
+    monkeypatch.setattr(server.git_probe, "common_repo_root", lambda _cwd: str(new_cwd))
+    monkeypatch.setattr(
+        server,
+        "_set_session_cwd",
+        lambda current, cwd: current.update(
+            cwd=cwd,
+            explicit_cwd=True,
+            cwd_from_settle=False,
+        ) or cwd,
+    )
+    monkeypatch.setattr(server, "_emit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        server,
+        "_send_compute_host_control",
+        lambda sid, **kwargs: sent.append((sid, kwargs)) or {
+            "type": "control.ack",
+            "result": {"cwd": kwargs["payload"]["cwd"]},
+        },
+    )
+
+    try:
+        response = server._methods["session.workspace.move"](
+            "move-isolated",
+            {"session_key": target, "cwd": str(new_cwd)},
+        )
+    finally:
+        server._sessions.pop("isolated-live", None)
+
+    assert "error" not in response, response
+    assert sent == [(
+        "isolated-live",
+        {
+            "route_name": "session.workspace.move",
+            "payload": {"cwd": str(new_cwd)},
+            "wait": True,
+            "timeout": 5.0,
+        },
+    )]
+    assert live["cwd"] == str(new_cwd)
 
 
 def test_workspace_move_rehomes_running_session(monkeypatch, tmp_path):

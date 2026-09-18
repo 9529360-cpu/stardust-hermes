@@ -89,17 +89,38 @@ class HostedRoomServerRPC:
         rows = result.get("messages")
         return tuple(row for row in rows if isinstance(row, dict)) if isinstance(rows, list) else ()
 
-    def _session_record(self, session_id: str) -> dict[str, Any] | None:
+    def _session_record(self, session_id: str, profile: str) -> dict[str, Any] | None:
+        """Resolve a live record without crossing profile stores that reuse the same stored id."""
+        resolve_home = getattr(self.server, "_profile_home", None)
+        profile_scoped = callable(resolve_home)
+        profile_home = resolve_home(profile) if profile_scoped else None
+        expected_home = str(profile_home) if profile_home else None
+
+        def matches(record: dict[str, Any]) -> bool:
+            return (
+                not record.get("_finalized")
+                and (
+                    not profile_scoped
+                    or (record.get("profile_home") or None) == expected_home
+                )
+            )
+
+        def lookup_key(runtime_id: str, record: dict[str, Any]) -> str:
+            agent_session_id = getattr(record.get("agent"), "session_id", None)
+            return str(agent_session_id or record.get("session_key") or runtime_id or "")
+
         with self.server._sessions_lock:
             record = self.server._sessions.get(session_id)
-            if record is not None:
+            if record is not None and matches(record):
                 return record
-            return next((c for c in self.server._sessions.values()
-                         if str(c.get("session_key") or "") == session_id), None)
+            return next((
+                candidate for runtime_id, candidate in self.server._sessions.items()
+                if lookup_key(runtime_id, candidate) == session_id and matches(candidate)
+            ), None)
 
     def info(self, *, profile: str, session_id: str, source: str) -> Mapping[str, Any]:
-        del profile, source
-        record = self._session_record(session_id)
+        del source
+        record = self._session_record(session_id, profile)
         if record is None:
             return {"active": False, "task_id": None}
         lock = record.get("history_lock")
@@ -107,8 +128,11 @@ class HostedRoomServerRPC:
             return {"active": bool(record.get("running")), "task_id": None}
         with lock:
             task = record.get("_hosted_room_task")
-            result = {"active": bool(record.get("running")),
-                      "task_id": task.get("task_id") if isinstance(task, dict) else None}
+            result = {
+                "active": bool(record.get("running")),
+                "task_id": task.get("task_id") if isinstance(task, dict) else None,
+                "execution_generation": task.get("execution_generation") if isinstance(task, dict) else None,
+            }
             pending_reader = getattr(self.server, "_pending_approval_request_payload", None)
             if callable(pending_reader) and (pending := pending_reader(str(record.get("session_key") or ""))):
                 result["status"] = "waiting_for_approval"
@@ -121,9 +145,11 @@ class HostedRoomServerRPC:
             "session_id": session_id, "request_id": request_id, "choice": choice, "all": False})
 
     def interrupt(
-        self, *, profile: str, session_id: str, source: str, expected_task_id: str
+        self, *, profile: str, session_id: str, source: str, expected_task_id: str,
+        expected_execution_generation: int,
     ) -> Mapping[str, Any] | None:
         del source
         return self._call("session.interrupt", {
             "profile": profile, "session_id": session_id,
-            "expected_hosted_task_id": expected_task_id})
+            "expected_hosted_task_id": expected_task_id,
+            "expected_hosted_execution_generation": expected_execution_generation})

@@ -582,8 +582,9 @@ def _format_exec_approval_fallback(
 # Ordered: auth beats policy beats rate-limit beats connection; first match wins. Copy names the
 # slash command the chat user can run; raw provider text stays in the gateway log (`hermes logs`).
 _PROVIDER_ERROR_REPLIES = (
-    (_GATEWAY_AUTH_ERROR_RE, "⚠️ Sign-in to the AI model service failed. Use /login to sign in again, "
-                             "or ask whoever runs this bot to run `hermes doctor` on the host."),
+    (_GATEWAY_AUTH_ERROR_RE, "⚠️ Authentication to the AI model service failed. Use /model to choose "
+                             "a configured model, or ask whoever runs this bot to run "
+                             "`hermes auth` on the host."),
     (_GATEWAY_PROVIDER_POLICY_RE, "⚠️ The AI model service rejected this request. Try rephrasing your "
                                   "message, or use /model to switch models."),
     (_GATEWAY_RATE_LIMIT_RE, "⏱️ The AI model service is rate-limiting requests. Wait a moment, then use /retry."),

@@ -166,6 +166,160 @@ def test_interrupt_ack_retires_marker_before_run_thread_exits(monkeypatch, marke
     assert "_active_turn_marker_key" not in session
 
 
+def test_compute_host_interrupt_waits_for_ack_then_retires_marker(monkeypatch, marker_home):
+    class _Supervisor:
+        def __init__(self):
+            self.calls = []
+
+        def interrupt(self, sid, *, request_id=None, wait=False, timeout=5.0):
+            self.calls.append((sid, request_id, wait, timeout))
+            return {"type": "interrupt.ack", "request_id": request_id, "applied": True}
+
+    supervisor = _Supervisor()
+    session = _session(running=True, _compute_host_active=True)
+    session["_active_turn_marker_key"] = "session-key"
+    record_turn_start(marker_home, "session-key", "stop this isolated turn")
+
+    monkeypatch.setattr(server, "_tts_stream_stop", lambda: None)
+    monkeypatch.setattr(server, "_sess_nowait", lambda params, rid: (session, None))
+    monkeypatch.setattr(server, "_session_uses_compute_host", lambda current: current is session)
+    monkeypatch.setattr(server, "_get_compute_host_supervisor", lambda: supervisor)
+    monkeypatch.setattr(server, "_clear_pending", lambda sid=None: None)
+
+    response = server._methods["session.interrupt"](
+        "request-iso", {"session_id": "runtime-iso"}
+    )
+
+    assert response["result"] == {"status": "interrupted", "turn_isolation": True}
+    assert supervisor.calls == [("runtime-iso", "interrupt-request-iso", True, 5.0)]
+    assert read_turn_marker(marker_home, "session-key") is None
+    assert "_active_turn_marker_key" not in session
+
+
+def test_compute_host_terminal_crash_error_retires_marker(monkeypatch, marker_home):
+    """Once the parent emits a terminal crash error, resume must not replay that turn."""
+    session = _session(
+        running=True,
+        _compute_host_active=True,
+        inflight_turn={
+            "user": "do not replay after terminal error",
+            "assistant": "",
+            "streaming": True,
+            "started_at": time.time(),
+        },
+    )
+    session["_active_turn_marker_key"] = "session-key"
+    record_turn_start(marker_home, "session-key", "do not replay after terminal error")
+    emitted = []
+
+    monkeypatch.setattr(
+        server,
+        "_emit",
+        lambda event, sid, payload=None: emitted.append((event, sid, payload)),
+    )
+    monkeypatch.setattr(server, "_apply_compute_host_metadata_mirror", lambda *args: None)
+    monkeypatch.setattr(server, "_compute_host_session_info", lambda current: {})
+    monkeypatch.setattr(server, "_drain_queued_prompt", lambda *args: False)
+
+    server._on_compute_host_turn_done(
+        "request-crash",
+        "runtime-iso",
+        session,
+        {
+            "type": "turn.error",
+            "sid": "runtime-iso",
+            "request_id": "request-crash",
+            "reason": "crash",
+            "message": "compute host exited with code 1",
+        },
+    )
+
+    assert emitted[0] == (
+        "message.complete",
+        "runtime-iso",
+        {"text": "Error: compute host exited with code 1", "status": "error"},
+    )
+    assert read_turn_marker(marker_home, "session-key") is None
+    assert "_active_turn_marker_key" not in session
+    inflight = session["inflight_turn"]
+    assert inflight["user"] == "do not replay after terminal error"
+    assert inflight["assistant"] == ""
+    assert inflight["streaming"] is False
+    assert inflight["error"] == "compute host exited with code 1"
+    assert inflight["status"] == "error"
+    assert inflight["recoverable"] is True
+    assert isinstance(inflight["started_at"], float)
+    assert isinstance(inflight["updated_at"], float)
+
+
+def test_compute_host_terminal_crash_leaves_hosted_marker_to_driver(monkeypatch, marker_home):
+    session = _session(
+        running=True,
+        _compute_host_active=True,
+        source="bot_room",
+        inflight_turn={
+            "user": "hosted work",
+            "assistant": "",
+            "streaming": True,
+            "started_at": time.time(),
+        },
+    )
+    session["_active_turn_marker_key"] = "session-key"
+    record_turn_start(
+        marker_home,
+        "session-key",
+        "hosted work",
+        auto_continue=False,
+    )
+
+    monkeypatch.setattr(server, "_emit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(server, "_apply_compute_host_metadata_mirror", lambda *args: None)
+    monkeypatch.setattr(server, "_compute_host_session_info", lambda current: {})
+    monkeypatch.setattr(server, "_drain_queued_prompt", lambda *args: False)
+
+    server._on_compute_host_turn_done(
+        "request-crash",
+        "runtime-room",
+        session,
+        {
+            "type": "turn.error",
+            "sid": "runtime-room",
+            "request_id": "request-crash",
+            "reason": "crash",
+            "message": "compute host exited with code 1",
+        },
+    )
+
+    assert read_turn_marker(marker_home, "session-key") is not None
+    assert session["_active_turn_marker_key"] == "session-key"
+    assert session["inflight_turn"]["status"] == "error"
+
+
+def test_compute_host_interrupt_without_positive_ack_keeps_marker(monkeypatch, marker_home):
+    class _Supervisor:
+        @staticmethod
+        def interrupt(sid, *, request_id=None, wait=False, timeout=5.0):
+            return {"type": "interrupt.ack", "request_id": request_id, "applied": False}
+
+    session = _session(running=True, _compute_host_active=True)
+    session["_active_turn_marker_key"] = "session-key"
+    record_turn_start(marker_home, "session-key", "do not claim this stopped")
+
+    monkeypatch.setattr(server, "_tts_stream_stop", lambda: None)
+    monkeypatch.setattr(server, "_sess_nowait", lambda params, rid: (session, None))
+    monkeypatch.setattr(server, "_session_uses_compute_host", lambda current: current is session)
+    monkeypatch.setattr(server, "_get_compute_host_supervisor", lambda: _Supervisor())
+    monkeypatch.setattr(server, "_clear_pending", lambda sid=None: None)
+
+    response = server._methods["session.interrupt"](
+        "request-noack", {"session_id": "runtime-iso"}
+    )
+
+    assert response["error"]["code"] == 5019
+    assert read_turn_marker(marker_home, "session-key") is not None
+    assert session["_active_turn_marker_key"] == "session-key"
+
+
 def test_interrupt_racing_marker_write_cannot_leave_recovery_state(
     monkeypatch, emits, turn_env, marker_home
 ):
@@ -385,6 +539,89 @@ def test_fresh_marker_schedules_continuation(emits, schedule_env, marker_home):
     assert "fix the flaky test" in text
     assert kwargs["display_kind"] == "auto_continue"
     assert ("message.start", "sid", None) in [(e, s, p) for e, s, p in emits]
+
+
+def test_durable_terminal_reply_retires_stale_marker_without_replay(schedule_env, marker_home):
+    """A sidecar cleanup failure must not replay a turn whose terminal reply already committed."""
+    record_turn_start(marker_home, "session-key", "send the report")
+    marker = read_turn_marker(marker_home, "session-key")
+    session = _session(history=[
+        {
+            "role": "user",
+            "content": "send the report",
+            "timestamp": marker["started_at"] + 0.5,
+        },
+        {
+            "role": "assistant",
+            "content": "Report sent.",
+            "timestamp": marker["started_at"] + 1,
+        },
+    ])
+
+    result = server._maybe_schedule_auto_continue("sid", session, "session-key")
+
+    assert result is None
+    assert not schedule_env
+    assert read_turn_marker(marker_home, "session-key") is None
+
+
+def test_post_marker_assistant_without_post_marker_user_does_not_suppress_recovery(schedule_env, marker_home):
+    """Clock-skewed/imported old replies are not proof that this marked turn committed."""
+    record_turn_start(marker_home, "session-key", "finish the migration")
+    marker = read_turn_marker(marker_home, "session-key")
+    session = _session(history=[{
+        "role": "assistant",
+        "content": "Older imported reply with a future timestamp",
+        "timestamp": marker["started_at"] + 10,
+    }])
+
+    result = server._maybe_schedule_auto_continue("sid", session, "session-key")
+
+    assert result is not None
+    assert len(schedule_env) == 1
+
+
+def test_intermediate_tool_call_does_not_suppress_crash_recovery(schedule_env, marker_home):
+    record_turn_start(marker_home, "session-key", "finish the migration")
+    marker = read_turn_marker(marker_home, "session-key")
+    session = _session(history=[
+        {
+            "role": "user",
+            "content": "finish the migration",
+            "timestamp": marker["started_at"] + 0.5,
+        },
+        {
+            "role": "assistant",
+            "content": "",
+            "timestamp": marker["started_at"] + 1,
+            "tool_calls": [{
+                "id": "call-1",
+                "type": "function",
+                "function": {"name": "terminal", "arguments": "{}"},
+            }],
+        },
+    ])
+
+    result = server._maybe_schedule_auto_continue("sid", session, "session-key")
+
+    assert result is not None
+    assert len(schedule_env) == 1
+
+
+def test_compaction_summary_does_not_suppress_crash_recovery(schedule_env, marker_home):
+    record_turn_start(marker_home, "session-key", "finish the migration")
+    marker = read_turn_marker(marker_home, "session-key")
+    session = _session(history=[{
+        "role": "assistant",
+        "content": "[CONTEXT COMPACTION] summary",
+        "timestamp": marker["started_at"] + 1,
+        "_compressed_summary": True,
+    }])
+
+    result = server._maybe_schedule_auto_continue("sid", session, "session-key")
+
+    assert result is not None
+    assert len(schedule_env) == 1
 
 
 def test_hosted_room_marker_is_left_to_the_driver(schedule_env, marker_home):

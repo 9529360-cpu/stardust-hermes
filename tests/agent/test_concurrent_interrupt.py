@@ -2,7 +2,7 @@
 
 import threading
 import time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -119,6 +119,55 @@ def test_concurrent_preflight_interrupt_skips_all(monkeypatch):
 
 
 
+
+def test_unfinished_side_effecting_interrupt_is_unknown(monkeypatch):
+    from agent.tool_executor import _ToolCallRef, _unfinished_tool_result
+
+    agent = _make_agent(monkeypatch)
+    agent._interrupt_requested = True
+    ref = _ToolCallRef("write_file", {"path": "x.txt", "content": "x"}, "task", "tc-write", [])
+
+    with patch("agent.tool_executor._emit_terminal_post_tool_call"):
+        result, duration, effect = _unfinished_tool_result(
+            agent, ref, timed_out=False, timeout_s=None
+        )
+
+    assert duration == 0.0
+    assert effect == "unknown"
+    assert "outcome is UNKNOWN" in result
+    assert "inspect current state before retrying" in result
+
+
+def test_unfinished_readonly_interrupt_has_no_side_effect(monkeypatch):
+    from agent.tool_executor import _ToolCallRef, _unfinished_tool_result
+
+    agent = _make_agent(monkeypatch)
+    agent._interrupt_requested = True
+    ref = _ToolCallRef("web_extract", {"url": "https://example.test"}, "task", "tc-read", [])
+
+    with patch("agent.tool_executor._emit_terminal_post_tool_call"):
+        result, duration, effect = _unfinished_tool_result(
+            agent, ref, timed_out=False, timeout_s=None
+        )
+
+    assert duration == 0.0
+    assert effect == "none"
+    assert "skipped due to user interrupt" in result
+    assert "UNKNOWN" not in result
+
+
+def test_observed_side_effecting_keyboard_interrupt_warns_before_retry(monkeypatch):
+    from agent.tool_executor import _ToolCallRef, _ToolCancelledResult
+
+    agent = _make_agent(monkeypatch)
+    ref = _ToolCallRef("terminal", {"command": "do-something"}, "task", "tc-terminal", [])
+
+    with patch("agent.tool_executor._emit_terminal_post_tool_call"):
+        result = ref.emit_cancelled(agent, time.time())
+
+    assert isinstance(result, _ToolCancelledResult)
+    assert "may have partially or fully completed" in result
+    assert "inspect current state before retrying" in result
 
 def test_clear_interrupt_clears_worker_tids(monkeypatch):
     """After clear_interrupt(), stale worker-tid bits must be cleared so the

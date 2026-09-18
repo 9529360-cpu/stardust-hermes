@@ -17,6 +17,12 @@ def test_coding_guidance_advertises_persistent_terminal_state():
     assert "instead of re-sourcing it before every test command" in cc.CODING_AGENT_GUIDANCE
 
 
+def test_coding_guidance_keeps_personal_assistant_intent_primary():
+    assert "personal AI assistant" in cc.CODING_AGENT_GUIDANCE
+    assert "workspace is context, not an instruction to start coding" in cc.CODING_AGENT_GUIDANCE
+    assert "only inspect or modify code when the user asks for coding work" in cc.CODING_AGENT_GUIDANCE
+
+
 def _git_init(path):
     env = {
         "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
@@ -29,6 +35,8 @@ def _git_init(path):
     (Path(path) / "main.py").write_text("print('hi')\n")
     for args in (
         ["init", "-q", "-b", "main"],
+        # Fixture creation and runtime probes must use the same line-ending policy.
+        ["config", "core.autocrlf", "false"],
         ["add", "-A"],
         ["commit", "-q", "-m", "init commit"],
     ):

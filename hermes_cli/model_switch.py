@@ -1256,8 +1256,9 @@ def _route_from_model_input(st: _Switch) -> Optional[ModelSwitchResult]:
         from hermes_cli.anon_auth import GUEST_MODEL, route_is_welcome_host
         if route_is_welcome_host(st.current_base_url) and st.new_model != GUEST_MODEL:
             return st.fail(
-                f"{st.new_model} needs a Nous account or an API key. "
-                "Use /login to sign in, or /model to pick another provider.")
+                f"{st.new_model} needs a configured provider credential. "
+                "Use /model to pick another configured provider, or run "
+                "`hermes auth add <provider>` on the host.")
     config_routed = _route_configured_provider(st)  # d.5 — deliberately NOT gated on ``not is_custom``
     if isinstance(config_routed, ModelSwitchResult):
         return config_routed

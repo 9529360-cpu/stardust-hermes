@@ -1102,7 +1102,8 @@ class TestNousDeviceAuthTimeoutMessage:
 
         msg = _nous_device_auth_timeout_message("https://portal.nousresearch.com")
         assert "CAPTCHA" in msg
-        assert "hermes portal" in msg
+        assert "hermes auth add nous" in msg
+        assert "hermes portal" not in msg
         assert "https://portal.nousresearch.com/login" in msg
         # Must NOT point at the nonexistent /device page (live Portal 404s it).
         assert "/device" not in msg
@@ -1149,7 +1150,8 @@ def test_poll_for_token_timeout_raises_actionable_message():
 
     msg = str(excinfo.value)
     assert "CAPTCHA" in msg
-    assert "hermes portal" in msg
+    assert "hermes auth add nous" in msg
+    assert "hermes portal" not in msg
     assert "https://portal.nousresearch.com/login" in msg
 
 
@@ -1197,5 +1199,6 @@ def test_nous_device_code_login_timeout_raises_actionable_message(monkeypatch):
 
     msg = str(excinfo.value)
     assert "CAPTCHA" in msg
-    assert "hermes portal" in msg
+    assert "hermes auth add nous" in msg
+    assert "hermes portal" not in msg
     assert "https://portal.nousresearch.com/login" in msg

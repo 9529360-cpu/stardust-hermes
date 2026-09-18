@@ -31,7 +31,9 @@ UPGRADE_NO_DEFAULT_CHAT = "No default model is set yet; run /model to pick one."
 UPGRADE_WAITING = "Waiting for sign-in..."
 UPGRADE_WAITING_UP_TO = "Waiting for sign-in, up to {minutes}."
 UPGRADE_CANCELLED = "\nSign-in cancelled."
-UPGRADE_UNAVAILABLE_CHAT = "The free tier is not available right now. Try /login again in a moment."
+UPGRADE_UNAVAILABLE_CHAT = (
+    "The free tier is not available right now. Use /model to choose a configured model."
+)
 LOGIN_COMMAND = "/login"
 LOGIN_STARTING = "Starting sign-in..."
 LOGIN_DM_ONLY = "Sign in from a direct message with Hermes."
@@ -39,7 +41,7 @@ LOGIN_BUSY_ELSEWHERE = "Another sign-in is already running on this Hermes. Try a
 LOGIN_NOT_ALLOWED = "Only an operator of this Hermes can sign it in."
 FREE_TIER_RATE_LIMIT_CHAT = (
     "Nous free tier rate limit active \u2014 resets in {reset}. "
-    "Sign in with a Nous account for higher limits: /login.")
+    "Use /model to choose another configured model.")
 
 
 def format_wait_line(expires_in: int) -> str:

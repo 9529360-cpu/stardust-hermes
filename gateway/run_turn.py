@@ -1823,11 +1823,11 @@ class GatewayTurnMixin:
 
         return response
 
-    # Chat-side next steps keyed by HTTP status; Hermes commands only (/login is the gateway's own
-    # sign-in, `hermes auth add <provider>` the host equivalent).
+    # Chat-side next steps keyed by HTTP status. Stardust keeps provider authentication
+    # on the provider-config path instead of exposing the inherited Nous account login.
     _STATUS_HINTS = {
-        401: (" Your sign-in to the AI model service has expired or the API key is wrong. "
-              "Use /login here, or run `hermes auth add <provider>` on the host."),
+        401: (" Your AI model credential has expired or the API key is wrong. "
+              "Use /model to choose a configured model, or run `hermes auth` on the host."),
         402: " Your AI model service balance or quota is used up. Top it up on the service's website, or use /model to switch models.",
         529: " The AI model service is temporarily overloaded. Wait a moment, then use /retry.",
     }
@@ -2225,8 +2225,9 @@ class GatewayTurnMixin:
             if not runtime_kwargs.get("api_key"):
                 await adapter.send(
                     source.chat_id,
-                    "❌ The background task couldn't start because no AI model sign-in is "
-                    "configured. Use /login, or run `hermes setup` on the host.",
+                    "❌ The background task couldn't start because no AI model credential is "
+                    "configured. Use /model to choose a configured model, or run "
+                    "`hermes auth` on the host.",
                     metadata=_thread_metadata,
                 )
                 return

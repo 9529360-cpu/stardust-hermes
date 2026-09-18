@@ -170,7 +170,7 @@ class TestShowStatusXaiOAuth:
         assert "◆ Auth Providers" in out
 
     def test_import_failure_does_not_break_other_oauth_providers(self, monkeypatch, capsys, tmp_path):
-        """Nous/Codex/MiniMax rows must still appear when xAI import fails."""
+        """Explicit Nous/Codex/MiniMax provider rows still appear when xAI import fails."""
         import hermes_cli.auth as auth_mod
         status_mod = _base_xai_mocks(monkeypatch, tmp_path)
         monkeypatch.setattr(auth_mod, "get_nous_auth_status_local",
@@ -180,8 +180,21 @@ class TestShowStatusXaiOAuth:
         status_mod.show_status(SimpleNamespace(all=False, deep=False))
         out = capsys.readouterr().out
 
-        assert "Nous Portal" in out
+        assert "Nous provider" in out
+        assert "Nous Portal" not in out
         assert "MiniMax OAuth" in out
+
+    def test_unconfigured_nous_account_product_is_absent(self, monkeypatch, capsys, tmp_path):
+        status_mod = _base_xai_mocks(monkeypatch, tmp_path)
+        import hermes_cli.auth as auth_mod
+        monkeypatch.setattr(auth_mod, "get_xai_oauth_auth_status", lambda: {}, raising=False)
+
+        status_mod.show_status(SimpleNamespace(all=False, deep=False))
+        out = capsys.readouterr().out
+
+        assert "Nous Portal" not in out
+        assert "Nous provider" not in out
+        assert "hermes portal" not in out
 
     def test_status_function_exception_does_not_crash(self, monkeypatch, capsys, tmp_path):
         """show_status must not propagate an exception raised by get_xai_oauth_auth_status."""

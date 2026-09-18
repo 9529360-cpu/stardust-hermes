@@ -98,11 +98,11 @@ def _make_agent(tmp_path: Path) -> AIAgent:
     return agent
 
 
-def _tool_call(call_id: str):
+def _tool_call(call_id: str, name: str = "web_extract"):
     return SimpleNamespace(
         id=call_id,
         type="function",
-        function=SimpleNamespace(name="web_extract", arguments="{}"),
+        function=SimpleNamespace(name=name, arguments="{}"),
     )
 
 
@@ -158,13 +158,56 @@ def test_sequential_tool_timeout_emits_result_and_continues(tmp_path, monkeypatc
     assert dispatched == ["hung", "next"]
     assert [message["tool_call_id"] for message in messages] == ["hung", "next"]
     assert "timed out after 1.0s" in messages[0]["content"]
-    assert messages[0]["effect_disposition"] == "unknown"
+    assert messages[0]["effect_disposition"] == "none"
     assert messages[1]["content"] == "second result"
     timeout_events = [event for event in terminal_events if event.get("error_type") == "tool_timeout"]
     assert len(timeout_events) == 1
     assert timeout_events[0]["status"] == "timeout"
     agent._flush_messages_to_session_db.assert_called()
 
+
+def test_side_effecting_timeout_stops_following_calls_until_state_is_verified(tmp_path, monkeypatch):
+    agent = _make_agent(tmp_path)
+    release_first = threading.Event()
+    dispatched: list[str] = []
+    terminal_events: list[dict] = []
+
+    def _dispatch(_name, _args, _task_id, *, tool_call_id, **_kwargs):
+        dispatched.append(tool_call_id)
+        if tool_call_id == "side-effect":
+            release_first.wait()
+            return "late mutation result"
+        return "must not run"
+
+    calls = [_tool_call("side-effect", "terminal"), _tool_call("next")]
+    messages: list[dict] = []
+    monkeypatch.setenv("HERMES_CONCURRENT_TOOL_TIMEOUT_S", "1.0")
+
+    try:
+        with (
+            patch("model_tools.handle_function_call", side_effect=_dispatch),
+            patch(
+                "agent.tool_executor._emit_terminal_post_tool_call",
+                side_effect=lambda *_args, **kwargs: terminal_events.append(kwargs),
+            ),
+        ):
+            execute_tool_calls_sequential(
+                agent, SimpleNamespace(tool_calls=calls), messages, "task"
+            )
+    finally:
+        release_first.set()
+
+    assert dispatched == ["side-effect"]
+    assert [message["tool_call_id"] for message in messages] == ["side-effect", "next"]
+    assert messages[0]["effect_disposition"] == "unknown"
+    assert "may still be running or may have completed" in messages[0]["content"]
+    assert messages[1]["effect_disposition"] == "none"
+    assert "was not started" in messages[1]["content"]
+    assert "Inspect current state before retrying" in messages[1]["content"]
+    assert [event.get("error_type") for event in terminal_events] == [
+        "tool_timeout",
+        "unknown_effect_barrier",
+    ]
 
 def test_sequential_tool_timeout_suppresses_late_terminal_event(tmp_path, monkeypatch):
     import hermes_cli.lifecycle as lifecycle

@@ -100,6 +100,25 @@ class TestResolverPlumbing:
         ]
         assert server._load_enabled_toolsets("tui") == ["coding", "project"]
 
+    def test_desktop_launch_artifact_skips_focus_collapse(self, no_desktop_env):
+        import agent.coding_context as cc
+        import hermes_cli.config as config_mod
+
+        no_desktop_env.setattr(
+            cc, "coding_selection",
+            lambda **_: (_ for _ in ()).throw(AssertionError("launch artifact must not resolve coding posture")),
+        )
+        no_desktop_env.setattr(
+            config_mod, "load_config", lambda: {"platform_toolsets": {"cli": ["memory"]}}
+        )
+
+        resolved = server._load_enabled_toolsets("desktop", coding_context_allowed=False)
+
+        assert resolved is not None
+        assert "memory" in resolved
+        assert "desktop_ui" in resolved and "project" in resolved
+        assert "coding" not in resolved
+
     def test_config_path_folds_in_the_session_surface(self, no_desktop_env):
         import agent.coding_context as cc
         import hermes_cli.config as config_mod

@@ -168,7 +168,7 @@ class TestCodingContextBlock:
         monkeypatch.setenv("TERMINAL_CWD", str(tmp_path))
         agent = _make_agent(valid_tool_names=["read_file"], platform="cli")
         parts = _prompt_parts(agent)
-        assert "coding agent" in parts["stable"]
+        assert "personal AI assistant with strong software-engineering capability" in parts["stable"]
         assert "Workspace" in parts["context"]
 
     def test_absent_when_off(self, monkeypatch, tmp_path):
@@ -178,13 +178,27 @@ class TestCodingContextBlock:
         # Drive the real path: force the resolved mode to "off" via config.
         with patch("agent.coding_context._coding_mode", return_value="off"):
             stable = _stable_prompt(agent)
-        assert "coding agent" not in stable
+        assert "personal AI assistant with strong software-engineering capability" not in stable
 
     def test_absent_without_tools(self, monkeypatch, tmp_path):
         _init_code_repo(tmp_path)
         monkeypatch.setenv("TERMINAL_CWD", str(tmp_path))
         agent = _make_agent(valid_tool_names=[], platform="cli")
-        assert "coding agent" not in _stable_prompt(agent)
+        assert "personal AI assistant with strong software-engineering capability" not in _stable_prompt(agent)
+
+    def test_desktop_launch_directory_is_not_a_coding_workspace(self, monkeypatch, tmp_path):
+        _init_code_repo(tmp_path)
+        monkeypatch.setenv("TERMINAL_CWD", str(tmp_path))
+        agent = _make_agent(
+            valid_tool_names=["read_file", "terminal"],
+            platform="desktop",
+            _context_cwd_is_launch_artifact=True,
+        )
+
+        parts = _prompt_parts(agent)
+
+        assert "personal AI assistant with strong software-engineering capability" not in parts["stable"]
+        assert "Workspace (snapshot" not in parts["context"]
 
 
 def test_shared_project_context_precedes_worktree_bytes(monkeypatch, tmp_path):

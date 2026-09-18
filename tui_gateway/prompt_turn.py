@@ -308,6 +308,16 @@ def _goal_followup_after_turn(
     input: the error text is not work toward the goal, and judging it spends a turn."""
     goal_followup = None
     compression_exhausted = bool(isinstance(result, dict) and result.get("compression_exhausted"))
+    if status == "interrupted":
+        try:
+            if session.get("session_key") and (goal_mgr := _active_goal_manager(session)) is not None:
+                goal_mgr.pause(reason="turn-interrupted")
+                _emit("status.update", sid, {"kind": "goal", "text": (
+                    "⏸ Goal paused — turn was interrupted. "
+                    "Use /goal resume to continue, or /goal clear to stop.")})
+        except Exception as _goal_interrupt_exc:
+            _hook_failure("goal pause-on-interrupt", _goal_interrupt_exc)
+        return None
     try:
         recovery_prompt, recovery_notice = _plan_goal_compression_recovery(
             session, result, status=status, raw=raw)
@@ -341,20 +351,40 @@ def _goal_followup_after_turn(
     return goal_followup
 
 
-def _after_complete_turn(sid: str, session: dict, st: _TurnRun, raw: Any) -> None:
-    """Hooks for a ``complete`` turn: /loop tick evaluation, pending title, voice fallback."""
+def _settle_loop_tick_after_turn(sid: str, session: dict, status: str, raw: Any) -> None:
+    """Close a fired /loop tick for every terminal turn outcome.
+
+    ``fire_tick`` durably sets ``awaiting_response`` before dispatch.  Success evaluates the
+    reply as before; a provider/runtime error consumes this failed wakeup and schedules the
+    next cadence (matching the classic CLI's empty-response behavior); an explicit interrupt
+    pauses the loop so a cancelled wakeup cannot silently re-fire or remain wedged forever.
+    """
     try:
         from hermes_cli.loops import LoopManager
+
         loop_sid_key = session.get("session_key") or ""
-        if loop_sid_key:
-            loop_mgr = LoopManager(session_id=loop_sid_key)
-            loop_state = loop_mgr.state
-            if loop_state is not None and loop_state.awaiting_response:
-                loop_decision = loop_mgr.complete_tick(raw if isinstance(raw, str) else "")
-                if loop_msg := loop_decision.get("message") or "":
-                    _emit("status.update", sid, {"kind": "loop", "text": loop_msg})
+        if not loop_sid_key:
+            return
+        loop_mgr = LoopManager(session_id=loop_sid_key)
+        loop_state = loop_mgr.state
+        if loop_state is None or not loop_state.awaiting_response:
+            return
+        if status == "interrupted":
+            loop_mgr.pause(reason="wakeup-turn-interrupted")
+            _emit("status.update", sid, {"kind": "loop", "text": (
+                "⏸ Loop paused — wakeup turn was interrupted. "
+                "Use /loop resume to continue, or /loop stop to end it.")})
+            return
+        loop_decision = loop_mgr.complete_tick(
+            raw if status == "complete" and isinstance(raw, str) else "")
+        if loop_msg := loop_decision.get("message") or "":
+            _emit("status.update", sid, {"kind": "loop", "text": loop_msg})
     except Exception as _loop_exc:
         _hook_failure("loop completion hook", _loop_exc)
+
+
+def _after_complete_turn(sid: str, session: dict, st: _TurnRun, raw: Any) -> None:
+    """Hooks unique to a successful turn: pending title and voice fallback."""
     # Apply pending_title now that the DB row exists — in the session-owned profile store.
     if _pending := session.get("pending_title"):
         _session_key = session.get("session_key") or sid
@@ -877,6 +907,7 @@ def _run_prompt_submit(
             payload, raw, status = _complete_turn_payload(session, st, status_note, cols)
             _emit("message.complete", sid, payload)
             goal_followup = _goal_followup_after_turn(sid, session, st.result, status, raw)
+            _settle_loop_tick_after_turn(sid, session, status, raw)
             if status == "complete":
                 _after_complete_turn(sid, session, st, raw)
             # Goal judge + loop tick evaluation mutate persisted state AFTER message.complete: publish the
@@ -884,6 +915,8 @@ def _run_prompt_submit(
             _publish_session_control_snapshot(sid, session, only_if_present=True)
         except Exception as e:
             _recover_turn_exception(sid, session, st, e)
+            _settle_loop_tick_after_turn(sid, session, "error", "")
+            _publish_session_control_snapshot(sid, session, only_if_present=True)
         finally:
             _finish_turn(sid, session, st)
             _current_runtime_session_record.reset(runtime_session_token)

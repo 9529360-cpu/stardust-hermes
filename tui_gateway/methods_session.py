@@ -197,6 +197,11 @@ def _active_pet():
 
 def _billing_call(rid, fn, extra: dict | None = None) -> dict:
     """Portal call → ok; BillingError → serialized envelope, else generic; ``extra`` rides both ERROR envelopes."""
+    from hermes_cli.anon_auth import portal_identity_enabled
+    if not portal_identity_enabled():
+        return _ok(rid, {
+            "ok": False, "error": "not_available",
+            "message": "Nous account billing is not available in Stardust.", **(extra or {})})
     from hermes_cli.nous_billing import BillingError
     try:
         return _ok(rid, fn())
@@ -221,13 +226,19 @@ def _billing_pending_change(result: dict) -> dict:
 
 # ── session.create / list / most_recent / facts ──────────────────────
 def _persist_branch(db, new_key: str, parent_key: str, title: str, history: list, *, source, cwd, profile_name,
-                    copy_fields=(), compensate: bool = False) -> None:
-    """Branch child row + parent transcript (bounded-chunk transactions) + title. ``_branched_from`` keeps the
-    row visible in list_sessions_rich() (the live parent never matches the legacy end_reason='branched'
-    heuristic); NULL ``profile_name`` rows drop out of profile-keyed sidebar matching / deep links. ``compensate``
-    deletes a committed row whose transcript/title failed (a durable-but-empty row would defeat the INSERT OR
-    IGNORE first-prompt seed) — except on disk-full, where the delete cannot land."""
-    db.create_session(new_key, source=source, model=_resolve_model(), model_config={"_branched_from": parent_key},
+                    copy_fields=(), compensate: bool = False, todo_state: dict | None = None) -> None:
+    """Branch child row + parent transcript (bounded-chunk transactions) + title.
+
+    ``todo_state`` is chosen by the caller at the branch point (current branches may inherit live state;
+    historical-count branches must not import future tasks). It rides the child row because branch transcript
+    projection intentionally drops tool plumbing. ``_branched_from`` keeps the row visible in rich listings.
+    """
+    model_config = {"_branched_from": parent_key}
+    if state := _normalize_todo_state(todo_state):
+        from tools.todo_tool import TODO_SESSION_STATE_KEY
+
+        model_config[TODO_SESSION_STATE_KEY] = state
+    db.create_session(new_key, source=source, model=_resolve_model(), model_config=model_config,
                       parent_session_id=parent_key, cwd=cwd, profile_name=profile_name)
     try:
         # Compensation guard (#93959 review): if the transcript copy or title write fails AFTER the row
@@ -259,9 +270,14 @@ def _seed_branch_row(record: dict, key: str, parent_session_id: str, history: li
         with _session_db(record) as db:
             if db is None:
                 return
-            _persist_branch(db, key, parent_session_id, _branch_title(db, parent_session_id), history,
-                            source=source, cwd=record["cwd"],
-                            profile_name=profile_name_for_home(profile_home) or _current_profile_name(), compensate=True)
+            _persist_branch(
+                db, key, parent_session_id, _branch_title(db, parent_session_id), history,
+                source=source, cwd=record["cwd"],
+                profile_name=profile_name_for_home(profile_home) or _current_profile_name(), compensate=True,
+                # Seeded history defines the branch point. Do not import the parent's current task state
+                # when the client intentionally branched an older transcript prefix.
+                todo_state=_todo_state_from_history(history),
+            )
             record["pending_title"] = None
             # The first submit's _persist_branch_seed is the fallback for a failed seed, not a second copy.
             record["_branch_seed_persisted"] = True
@@ -512,10 +528,19 @@ class _Resume:
         return *ids, self.profile_resume_cwd or _default_session_cwd()
 
     def record(self, source: str, cwd: str, history: list, overrides: dict | None = None, **extra) -> dict:
-        """``_deferred_session_record`` with this resume's common fields (lease claimed lazily on turn 1);
-        ``overrides`` restores the stored model/provider/reasoning/tier so the deferred build matches eager."""
+        """``_deferred_session_record`` with this resume's common fields (lease claimed lazily on turn 1).
+
+        Todo state is selected here once for every lazy/cold/deferred path: persisted session state keeps
+        task UI alive even when compaction removed the old tool result, while a newer transcript revision
+        still wins if the last mirror write failed. ``overrides`` restores the stored runtime identity.
+        """
         if overrides is not None:
             extra.update(model_override=overrides.get("model_override"), resume_runtime_overrides=overrides or None)
+        extra["todo_state"] = _newest_todo_state(
+            _todo_state_from_session_db(self.db, self.target),
+            extra.get("todo_state"),
+            _todo_state_from_history(history),
+        )
         return _deferred_session_record(
             self.target, cols=self.cols, cwd=cwd, history=history, lease=None, source=source,
             close_on_disconnect=_flag(self.params, "close_on_disconnect"),
@@ -919,6 +944,25 @@ def _(rid, params: dict) -> dict:
             _set_session_cwd(live, resolved)
         except ValueError as e:
             return _err(rid, 4017, str(e))
+        if _session_uses_compute_host(live):
+            try:
+                ack = _send_compute_host_control(
+                    live_sid,
+                    route_name="session.workspace.move",
+                    payload={"cwd": resolved},
+                    wait=True,
+                    timeout=5.0,
+                )
+                if ack.get("type") in {"control.error", "error"}:
+                    logger.warning(
+                        "compute-host workspace move live sync failed sid=%s: %s",
+                        live_sid,
+                        ack.get("message") or "unknown error",
+                    )
+            except Exception:
+                # Durable DB + parent mirror already own the new workspace. A missing/restarted
+                # child adopts it from the next turn.start frame, so do not roll back the move.
+                logger.warning("compute-host workspace move live sync failed sid=%s", live_sid, exc_info=True)
         _emit("session.info", live_sid, _cwd_info(live, resolved, branch=branch))
     return _ok(rid, {"cwd": resolved, "branch": branch, "git_repo_root": root})
 
@@ -1187,11 +1231,14 @@ def _(rid, params: dict, session: dict) -> dict:
     usage: dict = _session_usage_snapshot(session)
     if session.get("agent") is None and not usage:
         usage = {"calls": 0, "input": 0, "output": 0, "total": 0}
-    # Nous credits are agent-independent (portal fetch); fail-open when absent.
+    # Stardust does not expose the inherited Nous account/billing product. Keep the
+    # compatibility adapter dormant instead of polling its portal from ordinary usage reads.
     with contextlib.suppress(Exception):
-        from agent.account_usage import nous_credits_lines
-        if credits := nous_credits_lines():
-            usage["credits_lines"] = credits
+        from hermes_cli.anon_auth import portal_identity_enabled
+        if portal_identity_enabled():
+            from agent.account_usage import nous_credits_lines
+            if credits := nous_credits_lines():
+                usage["credits_lines"] = credits
     return _ok(rid, usage)
 
 
@@ -1556,6 +1603,11 @@ def _billing_view(name: str, module: str, builder: str, serializer: str, fallbac
     @method(name)
     def _(rid, params: dict) -> dict:
         try:
+            from hermes_cli.anon_auth import portal_identity_enabled
+            if not portal_identity_enabled():
+                payload = dict(fallback)
+                payload.pop("error", None)
+                return _ok(rid, payload)
             from importlib import import_module
             return _ok(rid, globals()[serializer](getattr(import_module(module), builder)()))
         except Exception:
@@ -1569,9 +1621,13 @@ def _(rid, params: dict) -> dict:
     round-trip that could only fail."""
     try:
         from agent.billing_view import BillingState, build_billing_state
-        from hermes_cli.anon_auth import guest_carries_inference
+        from hermes_cli.anon_auth import guest_carries_inference, portal_identity_enabled
+        # The optional anonymous free-tier runtime is not the removed account/billing product.
+        # If explicitly enabled, report it locally without touching the account portal.
         if guest_carries_inference():
             return _ok(rid, _serialize_billing_state(BillingState(logged_in=False), free_tier=True))
+        if not portal_identity_enabled():
+            return _ok(rid, _serialize_billing_state(BillingState(logged_in=False), free_tier=False))
         return _ok(rid, _serialize_billing_state(build_billing_state()))
     except Exception:
         return _ok(rid, {"ok": True, "logged_in": False, "free_tier": False, "error": "could not load billing state"})
@@ -1740,7 +1796,9 @@ def _(rid, params: dict, session: dict) -> dict:
         from agent.context_compressor import user_originated_turn_view
         if user_turns := sum(1 for message in history if user_originated_turn_view(message) is not None):
             try:
-                removed = _rewind_active_session_history(session, user_turns - 1)[2]
+                removed = _rewind_active_session_history(
+                    session, user_turns - 1, runtime_sid=str(params.get("session_id") or "")
+                )[2]
             except Exception as exc:
                 return _err(rid, 5008, f"undo: {exc}")
     return _ok(rid, {"removed": removed})
@@ -1908,7 +1966,11 @@ def _(rid, params: dict, session: dict) -> dict:
 def _(rid, params: dict) -> dict:
     with _session_resume_lock:  # lock only the ownership claim; finalization must not block resumes
         session = _pop_session_by_id(params.get("session_id", ""))
-    return _ok(rid, {"closed": _teardown_popped_session(session, end_reason="tui_close")})
+    if session is None:
+        return _ok(rid, {"closed": False})
+    if not _teardown_popped_session(session, end_reason="tui_close"):
+        return _err(rid, 5019, "compute-host turn did not settle before session close")
+    return _ok(rid, {"closed": True})
 
 
 # ── session.branch ───────────────────────────────────────────────────
@@ -1954,12 +2016,15 @@ _BRANCH_COPY_FIELDS = (
 
 
 def _branch_source_history(db, session: dict, old_key: str) -> list:
-    """Rows a branch copies: the persisted DISPLAY projection reconciled with live memory (live history is
-    the MODEL projection — post-compaction summary + tail — the child would lose every archived turn)."""
-    with session["history_lock"]:
-        in_memory_history = [
-            dict(msg) for msg in list(session.get("display_history_prefix") or []) + list(session.get("history", []))
-            if isinstance(msg, dict)]
+    """Rows a branch copies while the caller holds history_lock.
+
+    The persisted DISPLAY projection is reconciled with live memory (whose MODEL projection may be
+    only post-compaction summary + tail). Keeping the DB read inside the same lock as the idle check
+    gives branch a single linearization point against prompt.submit.
+    """
+    in_memory_history = [
+        dict(msg) for msg in list(session.get("display_history_prefix") or []) + list(session.get("history", []))
+        if isinstance(msg, dict)]
     history = None
     if callable(get_resume_conversations := getattr(db, "get_resume_conversations", None)):
         try:
@@ -1970,27 +2035,52 @@ def _branch_source_history(db, session: dict, old_key: str) -> list:
     return history or _visible_branch_history(in_memory_history)
 
 
+def _branch_todo_state(db, session: dict, old_key: str, history: list, *, historical: bool) -> dict | None:
+    """Todo snapshot appropriate to this branch point.
+
+    Branch projection intentionally excludes tool plumbing, so an older truncated branch cannot prove
+    a historical Todo revision. Never import the parent's current tasks into that past timeline. A current-tip
+    branch may inherit the newest persisted/live snapshot; revision ordering handles a failed last mirror write.
+    """
+    if historical:
+        return _todo_state_from_history(history)
+    return _newest_todo_state(
+        _todo_state_from_session_db(db, old_key),
+        _todo_state_from_history(history),
+        _session_todo_state(session),
+    )
+
+
 @_session_method("session.branch", live=True)
 def _(rid, params: dict, session: dict) -> dict:
-    # Write into the parent's profile-scoped state.db; the launch handle would orphan rows.
-    with _session_db(session) as db:
-        if db is None:
-            return _db_unavailable_error(rid, code=5008)
-        old_key = session["session_key"]
-        history = _branch_source_history(db, session, old_key)
-        if not history:
-            return _err(rid, 4008, "nothing to branch — send a message first")
-        if isinstance(count := params.get("count"), int) and count > 0:
-            history = history[:count]
-        new_key, new_sid, source = _new_session_key(), uuid.uuid4().hex[:8], _session_source(session)
-        try:
-            title = params.get("name", "") or _branch_title(db, old_key)
-            home = session.get("profile_home")
-            _persist_branch(db, new_key, old_key, title, history, source=source, cwd=_session_cwd(session),
-                            profile_name=profile_name_for_home(home) or _current_profile_name(),
-                            copy_fields=_BRANCH_COPY_FIELDS)
-        except Exception as e:
-            return _err(rid, 5008, f"branch failed: {e}")
+    # Branch is a structural snapshot. Serialize the idle check, source projection, Todo state and
+    # durable child write against prompt.submit so the fork cannot mix state from two turn revisions.
+    with session["history_lock"]:
+        if session.get("running"):
+            return _err(rid, 4091, "session busy")
+        # Write into the parent's profile-scoped state.db; the launch handle would orphan rows.
+        with _session_db(session) as db:
+            if db is None:
+                return _db_unavailable_error(rid, code=5008)
+            old_key = session["session_key"]
+            history = _branch_source_history(db, session, old_key)
+            if not history:
+                return _err(rid, 4008, "nothing to branch — send a message first")
+            historical_branch = isinstance(count := params.get("count"), int) and count > 0
+            if historical_branch:
+                history = history[:count]
+            branch_todo_state = _branch_todo_state(
+                db, session, old_key, history, historical=historical_branch
+            )
+            new_key, new_sid, source = _new_session_key(), uuid.uuid4().hex[:8], _session_source(session)
+            try:
+                title = params.get("name", "") or _branch_title(db, old_key)
+                home = session.get("profile_home")
+                _persist_branch(db, new_key, old_key, title, history, source=source, cwd=_session_cwd(session),
+                                profile_name=profile_name_for_home(home) or _current_profile_name(),
+                                copy_fields=_BRANCH_COPY_FIELDS, todo_state=branch_todo_state)
+            except Exception as e:
+                return _err(rid, 5008, f"branch failed: {e}")
     try:
         agent = _build_branch_agent(session, new_sid, new_key, history, source)
     except Exception as e:
@@ -2001,6 +2091,13 @@ def _(rid, params: dict, session: dict) -> dict:
 
 
 # ── interrupt / steer / redirect ─────────────────────────────────────
+def _retire_confirmed_interrupt_marker(session: dict) -> None:
+    """Once Stop is confirmed, prevent crash recovery from resurrecting that turn."""
+    with session["history_lock"]:
+        active_marker_key = str(session.pop("_active_turn_marker_key", "") or "")
+    _retire_turn_marker(session, active_marker_key)
+
+
 @method("session.interrupt")
 def _(rid, params: dict) -> dict:
     _tts_stream_stop()  # keypress barge-in also silences streaming TTS (voice is process-global)
@@ -2008,16 +2105,34 @@ def _(rid, params: dict) -> dict:
     if err:
         return err
     if expected := _str_param(params, "expected_hosted_task_id"):
+        expected_generation = params.get("expected_hosted_execution_generation")
         with session["history_lock"]:
             task = session.get("_hosted_room_task")
-            if not (session.get("running") and isinstance(task, dict) and task.get("task_id") == expected):
+            generation_matches = (
+                expected_generation is None
+                or (
+                    isinstance(expected_generation, int)
+                    and not isinstance(expected_generation, bool)
+                    and isinstance(task, dict)
+                    and task.get("execution_generation") == expected_generation
+                )
+            )
+            if not (
+                session.get("running")
+                and isinstance(task, dict)
+                and task.get("task_id") == expected
+                and generation_matches
+            ):
                 return _ok(rid, {"status": "not_interrupted", "interrupted": False})
     sid = str(params.get("session_id") or "")
     if _session_uses_compute_host(session):
         try:
-            _interrupt_session_turn(sid, session, request_id=f"interrupt-{rid}")
+            _interrupt_session_turn(
+                sid, session, request_id=f"interrupt-{rid}", wait_for_compute_host_ack=True
+            )
         except Exception as exc:
             return _err(rid, 5019, f"compute-host interrupt failed: {exc}")
+        _retire_confirmed_interrupt_marker(session)
         return _ok(rid, {"status": "interrupted", "turn_isolation": True})
     session, err = _sess(params, rid)
     if err:
@@ -2026,9 +2141,7 @@ def _(rid, params: dict) -> dict:
     # Retire the crash-recovery marker NOW: until the run thread's finally, a backend exit looks like a crash
     # and session.resume auto-continues the turn the user just stopped (the extra key covers compression
     # rotating session_key mid-turn).
-    with session["history_lock"]:
-        active_marker_key = str(session.pop("_active_turn_marker_key", "") or "")
-    _retire_turn_marker(session, active_marker_key)
+    _retire_confirmed_interrupt_marker(session)
     return _ok(rid, {"status": "interrupted"})
 
 

@@ -688,7 +688,8 @@ def _cmd_retry(rid, params, session, name, arg):
         except ValueError as exc:
             return _err(rid, 4018, str(exc))
         rewound, err = _rewind_or_err(
-            rid, session, len(user_indices) - 1, (4018, ""), "retry: failed to persist history: ", require_retryable=True)
+            rid, session, len(user_indices) - 1, (4018, ""), "retry: failed to persist history: ",
+            require_retryable=True, runtime_sid=str(params.get("session_id") or ""))
         if err:
             return err
         content = cc.retryable_user_text(rewound[1].get("content"))
@@ -768,7 +769,9 @@ def _cmd_undo(rid, params, session, name, arg):
         if err:
             return err
         turns_undone = min(n, len(user_indices))
-        rewound, err = _rewind_or_err(rid, session, len(user_indices) - turns_undone, (4004, "undo: "), "undo: ")
+        rewound, err = _rewind_or_err(
+            rid, session, len(user_indices) - turns_undone, (4004, "undo: "), "undo: ",
+            runtime_sid=str(params.get("session_id") or ""))
         if err:
             return err
         active, live_view, rewound_count = rewound
@@ -956,7 +959,10 @@ def _(rid, params: dict, session) -> dict:
                 _history, user_indices = _user_turn_indices(session)
                 if user_indices:
                     try:
-                        removed = _rewind_active_session_history(session, len(user_indices) - 1)[2]
+                        removed = _rewind_active_session_history(
+                            session, len(user_indices) - 1,
+                            runtime_sid=str(params.get("session_id") or ""),
+                        )[2]
                     except Exception as exc:
                         raise RuntimeError(f"checkpoint restored, but session history rewind failed: {exc}") from exc
             result["history_removed"] = removed

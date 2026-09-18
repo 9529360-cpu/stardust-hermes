@@ -270,20 +270,19 @@ def _request_device_code(
 
 
 def _nous_device_auth_timeout_message(portal_base_url: str) -> str:
-    """Actionable timeout text: the usual cause is Portal sign-in failing in the browser tab.
+    """Actionable timeout text for the Nous provider's device authorization flow.
 
-    A bare "Timed out waiting for device authorization" gives the user nothing to act on. The most common
-    cause is Portal sign-in failing in the opened browser tab (including the server-side CAPTCHA loop from
-    20605), so point at the Portal login page and the retry command. See #20605.
+    A bare timeout gives the user nothing to act on. Point at the provider login page and the generic
+    provider-auth retry command while keeping Stardust itself free of a first-party account/login product.
     """
     portal = (portal_base_url or DEFAULT_NOUS_PORTAL_URL).rstrip("/")
     return (
         "Timed out waiting for device authorization.\n"
         "  Portal sign-in is required before the device code can be approved.\n"
         "  If the browser showed a CAPTCHA / 'You did not pass CAPTCHA' error,\n"
-        "  finish signing in at the Portal in a normal browser tab, then retry:\n"
-        "    hermes portal\n"
-        f"  Portal login: {portal}/login")
+        "  finish signing in at the provider site in a normal browser tab, then retry:\n"
+        "    hermes auth add nous\n"
+        f"  Provider login: {portal}/login")
 
 
 def _print_device_code_instructions(

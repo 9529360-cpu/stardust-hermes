@@ -141,6 +141,7 @@ def test_tui_tick_fires_when_idle_and_due(server, session):
 
     def fake_submit(rid, sid_, session_, text, **kwargs):
         fired["text"] = text
+        return True
 
     with patch.object(server, "_run_prompt_submit", fake_submit), \
          patch.object(server, "_emit"):
@@ -150,6 +151,77 @@ def test_tui_tick_fires_when_idle_and_due(server, session):
     assert "[/loop wakeup #1" in fired["text"]
     # Session claimed for the wakeup turn.
     assert s["running"] is True
+
+
+def test_tui_tick_abandons_claim_when_prompt_turn_refuses_to_start(server, session):
+    sid, session_key, s = session
+    from hermes_cli.loops import LoopManager, save_loop
+
+    mgr = LoopManager(session_key)
+    mgr.set("poll the build", interval_seconds=60)
+    mgr.state.next_due_at = time.time() - 1
+    save_loop(session_key, mgr.state)
+
+    with patch.object(server, "_run_prompt_submit", return_value=False), \
+         patch.object(server, "_emit"):
+        server._maybe_fire_tui_loop_tick(sid, s)
+
+    state = LoopManager(session_key).state
+    assert state.awaiting_response is False
+    assert state.ticks_fired == 0
+    assert s["running"] is False
+
+
+def test_tui_slash_tick_abandons_claim_when_send_turn_refuses_to_start(
+    server, session, monkeypatch
+):
+    sid, session_key, s = session
+    from hermes_cli.loops import LoopManager, save_loop
+
+    mgr = LoopManager(session_key)
+    mgr.set("/work check the build", interval_seconds=60)
+    mgr.state.next_due_at = time.time() - 1
+    save_loop(session_key, mgr.state)
+    monkeypatch.setitem(
+        server._methods,
+        "command.dispatch",
+        lambda rid, params: {"id": rid, "result": {"type": "send", "message": "expanded work"}},
+    )
+
+    with patch.object(server, "_run_prompt_submit", return_value=False), \
+         patch.object(server, "_emit"):
+        server._maybe_fire_tui_loop_tick(sid, s)
+
+    state = LoopManager(session_key).state
+    assert state.awaiting_response is False
+    assert state.ticks_fired == 0
+    assert s["running"] is False
+
+
+def test_tui_slash_tick_abandons_claim_when_send_turn_raises(
+    server, session, monkeypatch
+):
+    sid, session_key, s = session
+    from hermes_cli.loops import LoopManager, save_loop
+
+    mgr = LoopManager(session_key)
+    mgr.set("/work check the build", interval_seconds=60)
+    mgr.state.next_due_at = time.time() - 1
+    save_loop(session_key, mgr.state)
+    monkeypatch.setitem(
+        server._methods,
+        "command.dispatch",
+        lambda rid, params: {"id": rid, "result": {"type": "send", "message": "expanded work"}},
+    )
+
+    with patch.object(server, "_run_prompt_submit", side_effect=RuntimeError("dispatch exploded")), \
+         patch.object(server, "_emit"):
+        server._maybe_fire_tui_loop_tick(sid, s)
+
+    state = LoopManager(session_key).state
+    assert state.awaiting_response is False
+    assert state.ticks_fired == 0
+    assert s["running"] is False
 
 
 def test_tui_tick_defers_when_running(server, session):
@@ -207,3 +279,121 @@ def test_tui_tick_noop_when_not_due(server, session):
 
     submit.assert_not_called()
     assert s["running"] is False
+
+
+def _run_claimed_loop_turn(server, monkeypatch, tmp_path, session, result):
+    """Run the real prompt-turn finalizer for an already-fired loop wakeup."""
+    from types import SimpleNamespace
+
+    sid, session_key, s = session
+
+    class _InlineThread:
+        def __init__(self, target=None, daemon=None, args=(), kwargs=None):
+            self._target, self._args, self._kwargs = target, args, kwargs or {}
+
+        def start(self):
+            self._target(*self._args, **self._kwargs)
+
+        def is_alive(self):
+            return False
+
+        def join(self, timeout=None):
+            return None
+
+    for name, value in {
+        "_wire_callbacks": lambda _sid: None,
+        "_sync_agent_model_with_config": lambda _sid, _session: None,
+        "_session_cwd": lambda _session: str(tmp_path),
+        "_register_session_cwd": lambda _session: None,
+        "_tts_stream_begin": lambda: None,
+        "_sync_session_key_after_compress": lambda *args, **kwargs: None,
+        "_get_usage": lambda _agent: {},
+        "_emit_settled_session_info": lambda *_args, **_kwargs: None,
+        "_hermes_home": tmp_path,
+    }.items():
+        monkeypatch.setattr(server, name, value)
+    monkeypatch.setattr(server.threading, "Thread", _InlineThread)
+    def run_conversation(*_args, **_kwargs):
+        if isinstance(result, BaseException):
+            raise result
+        return result
+
+    s.update({
+        "agent": SimpleNamespace(
+            session_id=session_key,
+            clear_interrupt=lambda: None,
+            run_conversation=run_conversation,
+        ),
+        "image_counter": 0,
+        "inflight_turn": None,
+        "running": True,
+        "show_reasoning": False,
+        "slash_worker": None,
+        "tool_progress_mode": "all",
+    })
+    assert server._run_prompt_submit("loop-rid", sid, s, "loop wakeup")
+
+
+def test_interrupted_loop_wakeup_pauses_and_releases_awaiting_response(
+    server, session, monkeypatch, tmp_path
+):
+    from hermes_cli.loops import LoopManager
+
+    _sid, session_key, _s = session
+    mgr = LoopManager(session_key)
+    mgr.set("poll", interval_seconds=60)
+    assert mgr.fire_tick()
+    assert LoopManager(session_key).state.awaiting_response is True
+
+    _run_claimed_loop_turn(
+        server, monkeypatch, tmp_path, session,
+        {"final_response": "", "interrupted": True},
+    )
+
+    state = LoopManager(session_key).state
+    assert state.status == "paused"
+    assert state.awaiting_response is False
+    assert "interrupted" in (state.paused_reason or "")
+
+
+def test_failed_loop_wakeup_releases_awaiting_response_and_keeps_loop_active(
+    server, session, monkeypatch, tmp_path
+):
+    from hermes_cli.loops import LoopManager
+
+    _sid, session_key, _s = session
+    mgr = LoopManager(session_key)
+    mgr.set("poll", interval_seconds=60)
+    assert mgr.fire_tick()
+    assert LoopManager(session_key).state.awaiting_response is True
+
+    _run_claimed_loop_turn(
+        server, monkeypatch, tmp_path, session,
+        {"final_response": "", "error": "provider unavailable", "failed": True},
+    )
+
+    state = LoopManager(session_key).state
+    assert state.status == "active"
+    assert state.awaiting_response is False
+    assert state.next_due_at > time.time()
+
+
+def test_exception_during_loop_wakeup_releases_awaiting_response(
+    server, session, monkeypatch, tmp_path
+):
+    from hermes_cli.loops import LoopManager
+
+    _sid, session_key, _s = session
+    mgr = LoopManager(session_key)
+    mgr.set("poll", interval_seconds=60)
+    assert mgr.fire_tick()
+    assert LoopManager(session_key).state.awaiting_response is True
+
+    _run_claimed_loop_turn(
+        server, monkeypatch, tmp_path, session, RuntimeError("turn pipeline exploded")
+    )
+
+    state = LoopManager(session_key).state
+    assert state.status == "active"
+    assert state.awaiting_response is False
+    assert state.next_due_at > time.time()

@@ -797,7 +797,7 @@ class GatewayNotificationsMixin:
         except Exception as exc:
             logger.debug("Free tier startup line skipped: %s", exc)
             return None
-        return "Inference: Nous free tier (nous/welcome). Sign in for more: /login"
+        return "Inference: Nous free tier (nous/welcome). Use /model to choose another configured model."
 
     async def _send_home_channel_startup_notifications(
         self, *, skip_targets: Optional[set[tuple[str, str, Optional[str]]]] = None

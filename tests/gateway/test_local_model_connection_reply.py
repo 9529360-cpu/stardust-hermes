@@ -56,7 +56,8 @@ class TestGatewayConnectionErrorReply:
 
     def test_auth_and_rate_limit_preserved(self):
         auth_reply = _gateway_provider_error_reply("provider authentication failed")
-        assert "sign-in" in auth_reply.lower() and "/login" in auth_reply
+        assert "authentication" in auth_reply.lower() and "/model" in auth_reply
+        assert "/login" not in auth_reply and "`hermes auth`" in auth_reply
         assert "rate-limiting" in _gateway_provider_error_reply(
             "rate limited after 3 retries"
         ).lower()
@@ -67,5 +68,6 @@ class TestGatewayConnectionErrorReply:
         from gateway.run import _PROVIDER_ERROR_REPLIES
         replies = [reply for _, reply in _PROVIDER_ERROR_REPLIES] + [_gateway_provider_error_reply("zzz")]
         for reply in replies:
-            assert any(cmd in reply for cmd in ("/login", "/retry", "/model")), reply
+            assert any(cmd in reply for cmd in ("/retry", "/model")), reply
+            assert "/login" not in reply, reply
             assert "provider" not in reply.lower(), reply

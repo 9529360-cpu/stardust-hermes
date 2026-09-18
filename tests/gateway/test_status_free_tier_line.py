@@ -117,8 +117,9 @@ async def test_a_status_gate_failure_never_breaks_status(monkeypatch):
 
 def test_the_line_comes_from_the_catalog_in_every_language():
     assert t("gateway.status.free_tier") == anon_auth.FREE_TIER_STATUS_LINE
-    # Every catalog carries its own translation; the product name, the route and the verb stay verbatim.
+    # Every catalog carries its own translated tier label; route and recovery command stay stable.
     for lang in ("ja", "de"):
         line = t("gateway.status.free_tier", lang=lang)
         assert line != anon_auth.FREE_TIER_STATUS_LINE
-        assert line.startswith("Nous · ") and " · nous/welcome · " in line and "/login" in line
+        assert line.startswith("Nous · ") and " · nous/welcome · " in line and line.endswith("/model")
+        assert "/login" not in line

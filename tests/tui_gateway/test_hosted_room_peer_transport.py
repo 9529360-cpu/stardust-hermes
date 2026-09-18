@@ -37,6 +37,12 @@ class FakePeerClient:
         self.active = False
         self.task_id = None
 
+    def bind_receipt_store(self, db_path):
+        self.calls.append(("bind_receipt_store", {"db_path": db_path}))
+
+    def bind_observation(self, **kwargs):
+        self.calls.append(("bind_observation", kwargs))
+
     def prepare(self, **kwargs):
         self.calls.append(("prepare", kwargs))
         return (
@@ -44,6 +50,15 @@ class FakePeerClient:
             if kwargs["create"] or kwargs.get("expected_session_id")
             else None
         )
+
+    def recover_dispatch(self, **kwargs):
+        self.calls.append(("recover_dispatch", kwargs))
+        dispatch = kwargs["dispatch"]
+        return {
+            "status": "accepted",
+            "task_id": dispatch["task_id"],
+            "execution_generation": dispatch["execution_generation"],
+        }
 
     def dispatch(self, **kwargs):
         self.calls.append(("dispatch", kwargs))
@@ -65,6 +80,26 @@ class FakePeerClient:
         self.active = False
         return {"status": "cancelled", "task_id": self.task_id}
 
+    def stop_receipt(self, **kwargs):
+        self.calls.append(("stop_receipt", kwargs))
+        return {
+            "status": "cancelled",
+            "task_id": kwargs["task_id"],
+            "execution_generation": kwargs["execution_generation"],
+        }
+
+    def approve_receipt(self, **kwargs):
+        self.calls.append(("approve_receipt", kwargs))
+        return {"resolved": 1}
+
+    def refresh_grant(self, **kwargs):
+        self.calls.append(("refresh_grant", kwargs))
+        return {"grant": "refreshed-grant"}
+
+    def revoke_grant(self, **kwargs):
+        self.calls.append(("revoke_grant", kwargs))
+        return {"revoked": True}
+
 
 class FailingPeerClient(FakePeerClient):
     def __init__(self, *, method, retryable=True, not_admitted=False):
@@ -82,6 +117,12 @@ class FailingPeerClient(FakePeerClient):
             raise self.error
         return super().prepare(**kwargs)
 
+    def recover_dispatch(self, **kwargs):
+        if self.method == "recover_dispatch":
+            self.calls.append(("recover_dispatch", kwargs))
+            raise self.error
+        return super().recover_dispatch(**kwargs)
+
     def dispatch(self, **kwargs):
         if self.method == "dispatch":
             self.calls.append(("dispatch", kwargs))
@@ -92,6 +133,11 @@ class FailingPeerClient(FakePeerClient):
         if self.method == "status":
             raise self.error
         return super().status(**kwargs)
+
+    def stop_receipt(self, **kwargs):
+        if self.method == "stop_receipt":
+            raise self.error
+        return super().stop_receipt(**kwargs)
 
 
 def _transport(client=None, *, source_event_seq=1):
@@ -158,6 +204,17 @@ def test_peer_transport_dispatches_full_fenced_coordinates_and_exact_stop():
             session_id="group-session",
             source=ROOM_SESSION_SOURCE,
             expected_task_id="other-task",
+            expected_execution_generation=3,
+        )
+        is None
+    )
+    assert (
+        transport.interrupt(
+            profile="reviewer",
+            session_id="group-session",
+            source=ROOM_SESSION_SOURCE,
+            expected_task_id="task-1",
+            expected_execution_generation=2,
         )
         is None
     )
@@ -166,6 +223,7 @@ def test_peer_transport_dispatches_full_fenced_coordinates_and_exact_stop():
         session_id="group-session",
         source=ROOM_SESSION_SOURCE,
         expected_task_id="task-1",
+        expected_execution_generation=3,
     )
     assert stopped["status"] == "cancelled"
     assert len([call for call in client.calls if call[0] == "stop"]) == 1
@@ -267,6 +325,86 @@ def test_roomlink_falls_back_after_proven_not_admitted_direct_failure():
     assert direct.calls[0][1]["dispatch"] is dispatch
     assert relay.calls[0][1]["dispatch"] is dispatch
     assert client.active_link.name == "relay"
+
+
+def test_roomlink_exposes_service_control_methods_without_losing_scope():
+    client_impl = FakePeerClient()
+    client = FailoverHostedRoomPeerClient([
+        RoomLinkCandidate("direct", "direct", "install-peer", client_impl),
+    ])
+
+    approved = client.approve_receipt(
+        task_id="task-1", execution_generation=3, request_id="approval-1",
+        choice="once", grant="grant",
+    )
+    refreshed = client.refresh_grant(
+        grant="grant", capability_digest="a" * 64, execution_policy_digest="b" * 64,
+    )
+    revoked = client.revoke_grant(grant="grant")
+
+    assert approved == {"resolved": 1}
+    assert refreshed == {"grant": "refreshed-grant"}
+    assert revoked == {"revoked": True}
+    assert [method for method, _params in client_impl.calls] == [
+        "approve_receipt", "refresh_grant", "revoke_grant",
+    ]
+
+
+def test_roomlink_restart_recovery_binds_all_links_and_fails_over_recovery_dispatch():
+    """Every link needs the same durable receipt/observation identity before recovery can switch routes."""
+    direct = FailingPeerClient(method="recover_dispatch")
+    relay = FakePeerClient()
+    client = FailoverHostedRoomPeerClient([
+        RoomLinkCandidate("direct", "direct", "install-peer", direct),
+        RoomLinkCandidate("relay", "relay", "install-peer", relay),
+    ])
+    dispatch = {"task_id": "task-1", "execution_generation": 3}
+
+    client.bind_receipt_store("state.db")
+    client.bind_observation(task_id="task-1", execution_generation=3)
+    recovered = client.recover_dispatch(dispatch=dispatch, grant="grant")
+
+    assert recovered == {
+        "status": "accepted", "task_id": "task-1", "execution_generation": 3,
+    }
+    for candidate in (direct, relay):
+        assert ("bind_receipt_store", {"db_path": "state.db"}) in candidate.calls
+        assert (
+            "bind_observation", {"task_id": "task-1", "execution_generation": 3}
+        ) in candidate.calls
+    assert client.active_link.name == "relay"
+    assert [method for method, _params in relay.calls].count("recover_dispatch") == 1
+
+
+def test_roomlink_recovery_stop_receipt_fails_over_under_exact_generation():
+    """After restart there is no dispatch object; exact Stop receipt still needs RoomLink failover."""
+    direct = FailingPeerClient(method="stop_receipt")
+    relay = FakePeerClient()
+    client = FailoverHostedRoomPeerClient([
+        RoomLinkCandidate("direct", "direct", "install-peer", direct),
+        RoomLinkCandidate("relay", "relay", "install-peer", relay),
+    ])
+    transport = PeerHostedRoomTransport(
+        binding=BINDING,
+        route=ROUTE,
+        client=client,
+        task_id="task-1",
+        execution_generation=3,
+    )
+
+    stopped = transport.interrupt(
+        profile="reviewer",
+        session_id="group-session",
+        source=ROOM_SESSION_SOURCE,
+        expected_task_id="task-1",
+        expected_execution_generation=3,
+    )
+
+    assert stopped == {
+        "status": "cancelled", "task_id": "task-1", "execution_generation": 3,
+    }
+    assert client.active_link.name == "relay"
+    assert [method for method, _params in relay.calls] == ["stop_receipt"]
 
 
 def test_roomlink_never_falls_back_after_nonretryable_rejection():

@@ -26,7 +26,7 @@ from hermes_constants import (
     get_hermes_home, get_hermes_home_override, profile_name_for_home,
     reset_hermes_home_override, set_hermes_home_override)
 from hermes_cli.env_loader import load_hermes_dotenv
-from utils import file_signature, is_truthy_value
+from utils import is_truthy_value, path_signature
 from hermes_state_ids import new_session_id
 from tools.environments.local import hermes_subprocess_env
 from agent.replay_cleanup import canonicalize_replay_history
@@ -1230,7 +1230,7 @@ def _load_cfg_raw() -> dict:
     global _cfg_cache, _cfg_sig, _cfg_path
     with contextlib.suppress(Exception):
         p = _active_config_path()
-        sig = file_signature(p.stat()) if p.exists() else None
+        sig = path_signature(p) if p.exists() else None
         with _cfg_lock:
             if _cfg_cache is not None and _cfg_sig == sig and _cfg_path == p:
                 return copy.deepcopy(_cfg_cache)
@@ -1263,7 +1263,7 @@ def _save_cfg(cfg: dict):
     with _cfg_lock:
         _cfg_cache, _cfg_path = copy.deepcopy(cfg), path
         try:
-            _cfg_sig = file_signature(path.stat())
+            _cfg_sig = path_signature(path)
         except Exception:
             _cfg_sig = None
 
@@ -1865,14 +1865,18 @@ def _resolve_explicit_toolsets(explicit: list[str], validate_toolset) -> list[st
     return (built_in + mcp_valid) or False
 
 
-def _load_enabled_toolsets(platform: str | None = None) -> list[str] | None:
+def _load_enabled_toolsets(
+    platform: str | None = None, *, coding_context_allowed: bool = True,
+) -> list[str] | None:
     """The agent's toolsets for this session (None = all): an explicit HERMES_TUI_TOOLSETS pin; else the
     coding posture (coding_context collapses to coding toolset + enabled MCP servers in a code workspace);
-    else the configured CLI toolsets. Client-surface toolsets fold in here — only this surface can answer them."""
+    else the configured CLI toolsets. ``coding_context_allowed=False`` is the Desktop launch-artifact path:
+    the backend's install directory must not collapse a personal-assistant session to coding-only tools.
+    Client-surface toolsets fold in here — only this surface can answer them."""
     session_platform = platform or _resolve_session_platform()
     explicit = [item.strip() for item in os.environ.get("HERMES_TUI_TOOLSETS", "").split(",") if item.strip()]
     fallback_notice = None
-    if not explicit:
+    if not explicit and coding_context_allowed:
         with contextlib.suppress(Exception):
             from agent.coding_context import coding_selection
             selection = coding_selection(platform=session_platform)
@@ -2353,6 +2357,8 @@ def _make_agent(
     ignore_rules = is_truthy_value(os.environ.get("HERMES_IGNORE_RULES"))
     with _sessions_lock:
         session = _sessions.get(sid)
+    if context_cwd_is_launch_artifact is None:
+        context_cwd_is_launch_artifact = _context_cwd_is_launch_artifact(session)
     agent = AIAgent(
         model=model, max_iterations=_cfg_max_turns(cfg, 500), provider=runtime.get("provider"),
         base_url=runtime.get("base_url"), api_key=runtime.get("api_key"), api_mode=runtime.get("api_mode"),
@@ -2362,7 +2368,8 @@ def _make_agent(
         reasoning_config=(
             reasoning_config_override if reasoning_config_override is not None else _load_reasoning_config(str(model or ""))),
         service_tier=service_tier_override if service_tier_override is not None else _load_service_tier(),
-        enabled_toolsets=_load_enabled_toolsets(platform),
+        enabled_toolsets=_load_enabled_toolsets(
+            platform, coding_context_allowed=not bool(context_cwd_is_launch_artifact)),
         # OpenRouter provider_routing prefs (gateway + CLI parity).
         providers_allowed=_pr.get("only"), providers_ignored=_pr.get("ignore"), providers_order=_pr.get("order"),
         provider_sort=_pr.get("sort"), provider_require_parameters=_pr.get("require_parameters", False),
@@ -2375,8 +2382,6 @@ def _make_agent(
         pass_session_id=is_truthy_value(os.environ.get("HERMES_TUI_PASS_SESSION_ID")),
         skip_context_files=ignore_rules, skip_memory=ignore_rules, fallback_model=_load_fallback_model(),
         **_agent_cbs(sid))
-    if context_cwd_is_launch_artifact is None:
-        context_cwd_is_launch_artifact = _context_cwd_is_launch_artifact(session)
     agent._context_cwd_is_launch_artifact = bool(context_cwd_is_launch_artifact)
     return agent
 
@@ -2434,6 +2439,12 @@ def _init_session(
             "transport": current_transport() or _stdio_transport,
             "auth_user_id": _transport_auth_user_id(current_transport()),
         }
+        # Eager resume builds the agent before turn hydration. Seed the UI-facing task snapshot
+        # directly from session state so session.info/resume can render it immediately; live agent
+        # state will supersede it by revision once hydrated.
+        persisted_todo = _todo_state_from_session_db(session_db, key)
+        if persisted_todo is not None:
+            _cache_todo_state(_sessions[sid], persisted_todo)
         _session_todo_state(_sessions[sid])
     _hydrate_session_cwd(sid, key, session_db, profile_home)
     _register_session_cwd(_sessions[sid])
@@ -2616,10 +2627,12 @@ def _schedule_resume_hydration(sid: str, stored_id: str, db, *, close_db: bool =
             with session["history_lock"]:
                 session.update(history=history, display_history_prefix=prefix, resume_hydrating=False,
                                resume_message_count=len(display_history))
-            # Deferred resumes answered before the transcript existed; cache the derived todo snapshot now.
+            # Deferred resumes answered before the transcript existed. Reconcile the history snapshot
+            # against the persisted state seeded in the initial ack; a newer transcript revision can occur
+            # when the last state-mirror write failed, so do not only fill an empty cache.
             todo_state = _todo_state_from_history(history)
-            if todo_state is not None and session.get("todo_state") is None:
-                session["todo_state"] = todo_state
+            if todo_state is not None:
+                _cache_todo_state(session, todo_state)
             session["resume_history_ready"].set()
             _emit("session.resume_progress", sid,
                   {"message_count": len(display_history), "phase": "history", "status": "complete"})

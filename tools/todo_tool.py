@@ -1,12 +1,19 @@
-"""Todo tool: in-memory, revisioned task list for multi-step work. State lives on the
-AIAgent (one per session), is re-injected after context compression, and every write bumps
-a monotonic revision so UI clients can reject stale updates. One ``todo_list`` tool: pass
-``todos`` to write, omit to read; every call returns the full list. No system-prompt mutation."""
+"""Todo tool: revisioned task state for multi-step work.
+
+Each live AIAgent owns an in-memory ``TodoStore`` for fast turn-local access; successful
+writes are mirrored into session state so fresh gateway agents and compression children can
+restore the same revision without depending on old transcript rows. The human-readable list
+is still re-injected after context compression. One ``todo_list`` tool: pass ``todos`` to
+write, omit to read; every call returns the full list. No system-prompt mutation."""
 
 import json
+import logging
 from typing import Any, Dict, List, Optional
 
+logger = logging.getLogger(__name__)
+
 VALID_STATUSES = {"pending", "in_progress", "completed", "cancelled"}
+TODO_SESSION_STATE_KEY = "_todo_state"
 # The list is re-read after every compression (format_for_injection), so unbounded
 # content/count would defeat the compression it rides through. Caps apply equally to
 # model-authored items and caller-replayed API history.
@@ -186,6 +193,61 @@ class TodoStore:
         normalized = items.copy()
         normalized.insert(statuses.index("pending"), normalized.pop(active_index))
         return normalized
+
+
+def load_todo_session_state(session_db: Any, session_id: str) -> Optional[Dict[str, Any]]:
+    """Return the trusted session-scoped todo snapshot, or ``None`` when unavailable.
+
+    The snapshot lives in ``sessions.model_config`` so fresh gateway agents do not depend on an
+    old ``todo_list`` tool-result surviving transcript compaction. History replay remains a
+    fallback for older sessions that predate this state slot.
+    """
+    if not session_db or not session_id:
+        return None
+    reader = getattr(session_db, "get_session_model_config_value", None)
+    if not callable(reader):
+        return None
+    try:
+        raw = reader(session_id, TODO_SESSION_STATE_KEY)
+    except Exception:
+        logger.debug("Could not read persisted todo state for session %s", session_id, exc_info=True)
+        return None
+    if not isinstance(raw, dict) or not isinstance(raw.get("todos"), list):
+        return None
+    try:
+        revision = max(0, int(raw.get("revision", 0) or 0))
+    except (TypeError, ValueError):
+        return None
+    return {"todos": raw["todos"], "revision": revision}
+
+
+def persist_todo_session_state(session_db: Any, session_id: str, store: "TodoStore") -> bool:
+    """Persist the authoritative todo snapshot without allowing revision rollback.
+
+    Transcript tool results remain the recovery fallback. A stale/conflicting state write therefore
+    returns ``False`` but never turns an otherwise successful todo update into a failed user turn.
+    """
+    if not session_db or not session_id or store is None:
+        return False
+    snapshot = store.snapshot()
+    monotonic_writer = getattr(session_db, "patch_session_model_config_monotonic", None)
+    legacy_writer = getattr(session_db, "patch_session_model_config", None)
+    if not callable(monotonic_writer) and not callable(legacy_writer):
+        return False
+    try:
+        if callable(monotonic_writer):
+            persisted = bool(monotonic_writer(session_id, TODO_SESSION_STATE_KEY, snapshot))
+            if not persisted:
+                logger.info(
+                    "Skipped stale or conflicting todo state for session %s at revision %s",
+                    session_id, snapshot.get("revision", 0),
+                )
+            return persisted
+        legacy_writer(session_id, {TODO_SESSION_STATE_KEY: snapshot})
+    except Exception:
+        logger.warning("Could not persist todo state for session %s", session_id, exc_info=True)
+        return False
+    return True
 
 
 def todo_tool(todos: Optional[List[Dict[str, Any]]] = None, merge: bool = False,

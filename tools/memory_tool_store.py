@@ -3,6 +3,7 @@ Entries are joined by ``ENTRY_DELIMITER``; budgets are in chars (model-independe
 Module state that tests monkeypatch (``get_memory_dir``, ``fcntl``/``msvcrt``) stays
 in ``tools.memory_tool`` and is read lazily."""
 
+import hashlib
 import logging
 import os
 import time
@@ -10,7 +11,7 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils import atomic_write_text
+from utils import atomic_write_text, path_signature
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 logger = logging.getLogger("tools.memory_tool")
@@ -66,8 +67,9 @@ def _find_unique_match(entries: List[str], old_text: str) -> Tuple[Optional[int]
 
 class MemoryStore:
     """Bounded curated memory with file persistence; one instance per AIAgent.
-    ``_system_prompt_snapshot`` is frozen at load time (prefix-cache stable);
-    ``memory_entries`` / ``user_entries`` are live state persisted to disk."""
+    ``_system_prompt_snapshot`` is stable between explicit reloads (prefix-cache friendly);
+    ``memory_entries`` / ``user_entries`` are live state persisted to disk. The host can
+    cheaply detect disk drift and refresh the snapshot at the next turn boundary."""
 
     # Failed consolidation attempts (overflow / zero-match) allowed per turn before
     # a TERMINAL "save skipped" result, so a fragile replace/add can't loop the turn
@@ -82,6 +84,7 @@ class MemoryStore:
         self.memory_char_limit, self.user_char_limit = memory_char_limit, user_char_limit
         self.memory_enabled, self.user_profile_enabled = memory_enabled, user_profile_enabled
         self._system_prompt_snapshot: Dict[str, str] = {"memory": "", "user": ""}
+        self._system_prompt_disk_state: Dict[str, Optional[tuple]] = {}
         self._consolidation_failures = 0  # per turn; reset by reset_consolidation_failures()
 
     # Per-turn counter of failed at-capacity consolidation attempts; reset at each turn boundary by
@@ -109,6 +112,48 @@ class MemoryStore:
             "memory calls — leave memory unchanged for now and continue with your reply to the user. "
             "The fact can be saved in a later turn.")}
 
+    @staticmethod
+    def _disk_state(path: Path) -> Optional[tuple]:
+        """Identity for the current file contents; ``None`` means the state could not be read.
+
+        Memory files are deliberately small, so include a content digest instead of relying only on
+        filesystem metadata. Some Windows/virtual filesystems do not advance the native ChangeTime
+        we can observe for a same-size in-place rewrite whose mtime is restored.
+        """
+        try:
+            signature = path_signature(path)
+            digest = hashlib.blake2b(path.read_bytes(), digest_size=16).digest()
+            return (True, *signature, digest)
+        except FileNotFoundError:
+            return (False,)
+        except OSError:
+            return None
+
+    def system_prompt_snapshot_stale(self) -> bool:
+        """Whether an enabled memory file changed since the snapshot was loaded.
+
+        The prompt bytes remain frozen until an explicit reload. The memory files are small enough
+        to include a content digest in the drift check; a transient state-read failure leaves the current
+        snapshot in place.
+        """
+        for target in ("memory", "user"):
+            if not self.target_enabled(target):
+                continue
+            current = self._disk_state(self._path_for(target))
+            if current is not None and current != self._system_prompt_disk_state.get(target):
+                return True
+        return False
+
+    def system_prompt_snapshot_version(self) -> str:
+        """Stable non-secret digest of the enabled prompt snapshot for persisted-prompt validation."""
+        parts: List[str] = []
+        for target in ("memory", "user"):
+            enabled = self.target_enabled(target)
+            parts.extend((target, "1" if enabled else "0"))
+            if enabled:
+                parts.append(self._system_prompt_snapshot.get(target, ""))
+        return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()[:16]
+
     def load_from_disk(self):
         """Load MEMORY.md / USER.md and capture the frozen system-prompt snapshot.
         Threat hits are replaced by a ``[BLOCKED: …]`` placeholder in the SNAPSHOT only;
@@ -128,8 +173,19 @@ class MemoryStore:
         for target in ("memory", "user"):
             path = self._path_for(target)
             path.parent.mkdir(parents=True, exist_ok=True)
+            # Capture state BEFORE the read. If an atomic writer swaps the file between these
+            # operations, the next turn sees the newer state and safely reloads once more.
+            disk_state = self._disk_state(path)
+            raw, read_ok = self._read_raw_checked(path)
+            if not read_ok:
+                logger.warning(
+                    "Could not refresh %s; keeping the previous in-memory snapshot and retrying on a later turn.",
+                    path.name,
+                )
+                self._system_prompt_disk_state[target] = None
+                continue
             # Deduplicate (order-preserving, first occurrence wins).
-            entries = list(dict.fromkeys(self._read_file(path)))
+            entries = list(dict.fromkeys(self._parse_entries(raw)))
             self._set_entries(target, entries)
             # External writers (MCP bridges, hand edits) can exceed the cap; the limit only fires on
             # add/replace, so the oversized block would silently ride in the prompt while every later
@@ -139,6 +195,7 @@ class MemoryStore:
                                "further additions are blocked until it is back under the limit.",
                                path.name, count, limit)
             self._system_prompt_snapshot[target] = self._render_block(target, [_sanitize(e, path.name) for e in entries])
+            self._system_prompt_disk_state[target] = disk_state
 
     @staticmethod
     @contextmanager

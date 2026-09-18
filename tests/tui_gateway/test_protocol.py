@@ -1150,7 +1150,7 @@ def test_slash_exec_scopes_skill_lookup_to_session_profile(server, tmp_path):
         "---\nname: b-only\ndescription: Only in profile b.\n---\n\n# b-only\n\nDo the thing.\n"
     )
     (profile_b / "config.yaml").write_text(
-        f"skills:\n  external_dirs:\n    - {external_b}\n"
+        f"skills:\n  external_dirs:\n    - {external_b}\n", encoding="utf-8"
     )
 
     sid = "test-session-profile-b"
@@ -1196,7 +1196,7 @@ def test_command_dispatch_scopes_skill_lookup_to_session_profile(server, tmp_pat
         "---\nname: b-only\ndescription: Only in profile b.\n---\n\n# b-only\n\nDo the thing.\n"
     )
     (profile_b / "config.yaml").write_text(
-        f"skills:\n  external_dirs:\n    - {external_b}\n"
+        f"skills:\n  external_dirs:\n    - {external_b}\n", encoding="utf-8"
     )
 
     sid = "test-session-profile-b-dispatch"
@@ -1238,7 +1238,9 @@ def test_slash_exec_routes_a_secondary_only_bundle_to_dispatch(server, tmp_path,
         (d / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {name}.\n---\n\n# {name}\n")
     (profile_b / "skill-bundles").mkdir(parents=True)
     (profile_b / "skill-bundles" / "b-pack.yaml").write_text("name: b-pack\nskills: [one, two]\n")
-    (profile_b / "config.yaml").write_text(f"skills:\n  external_dirs:\n    - {external_b}\n")
+    (profile_b / "config.yaml").write_text(
+        f"skills:\n  external_dirs:\n    - {external_b}\n", encoding="utf-8"
+    )
     sid = "test-session-profile-b-bundle"
     server._sessions[sid] = {"session_key": sid, "agent": None, "profile_home": str(profile_b)}
 

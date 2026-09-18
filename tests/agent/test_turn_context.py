@@ -18,6 +18,7 @@ from agent.context_compressor import ContextCompressor
 from agent.turn_context import (
     PreflightCompressionTimedOut,
     TurnContext,
+    _refresh_builtin_memory_snapshot,
     build_turn_context,
 )
 from hermes_state import SessionDB
@@ -200,6 +201,55 @@ def _build(agent, **overrides):
     kwargs.update(overrides)
     return build_turn_context(**kwargs)
 
+
+class _RefreshStore:
+    def __init__(self, *, stale: bool, before: str, after: str):
+        self.stale = stale
+        self.before = before
+        self.after = after
+        self.loaded = 0
+
+    def system_prompt_snapshot_stale(self):
+        return self.stale
+
+    def system_prompt_snapshot_version(self):
+        return self.after if self.loaded else self.before
+
+    def load_from_disk(self):
+        self.loaded += 1
+
+
+def test_memory_refresh_preserves_prompt_when_disk_is_unchanged():
+    agent = _FakeAgent()
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = _RefreshStore(stale=False, before="a" * 16, after="b" * 16)
+
+    assert _refresh_builtin_memory_snapshot(agent) is False
+    assert agent._memory_store.loaded == 0
+    assert agent._cached_system_prompt == "SYSTEM"
+    assert agent._cached_system_prompt_static == "STATIC"
+
+
+def test_memory_refresh_preserves_prompt_for_metadata_only_drift():
+    agent = _FakeAgent()
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = _RefreshStore(stale=True, before="a" * 16, after="a" * 16)
+
+    assert _refresh_builtin_memory_snapshot(agent) is False
+    assert agent._memory_store.loaded == 1
+    assert agent._cached_system_prompt == "SYSTEM"
+    assert agent._cached_system_prompt_static == "STATIC"
+
+
+def test_memory_refresh_invalidates_prompt_when_rendered_snapshot_changes():
+    agent = _FakeAgent()
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = _RefreshStore(stale=True, before="a" * 16, after="b" * 16)
+
+    assert _refresh_builtin_memory_snapshot(agent) is True
+    assert agent._memory_store.loaded == 1
+    assert agent._cached_system_prompt is None
+    assert agent._cached_system_prompt_static is None
 
 def test_returns_turn_context_with_user_message_appended():
     agent = _FakeAgent()

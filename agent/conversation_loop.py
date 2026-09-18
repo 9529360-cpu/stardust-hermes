@@ -787,7 +787,11 @@ def _restore_or_build_system_prompt(agent, system_message, conversation_history)
 
 
 def _stored_prompt_matches_runtime(agent, prompt: str) -> bool:
-    """Return False when the persisted runtime-identity lines are stale."""
+    """Return False when persisted runtime identity or built-in memory snapshot is stale."""
+
+    from agent.system_prompt import _memory_snapshot_version, _stored_memory_snapshot_version
+    if _memory_snapshot_version(agent) != _stored_memory_snapshot_version(prompt):
+        return False
 
     _identity, runtime_marker, runtime = split_runtime_boundary(prompt)
 

@@ -24,6 +24,17 @@ from agent.conversation_loop import _restore_or_build_system_prompt
 from agent.surface_switch import _SURFACE_NAME_END, _SURFACE_SWITCH_NOTE_PREFIX, identity_line_value
 
 
+class _SnapshotStore:
+    def __init__(self, version: str, blocks=None):
+        self.version = version
+        self.blocks = blocks or {}
+
+    def system_prompt_snapshot_version(self):
+        return self.version
+
+    def format_for_system_prompt(self, target: str):
+        return self.blocks.get(target)
+
 def _make_agent(session_db=None, prebuilt_prompt: str = "BUILT_PROMPT"):
     """Construct the minimal agent fake the helper needs."""
     agent = MagicMock()
@@ -209,6 +220,20 @@ class TestSurfaceSwitch:
         assert consume_surface_switch_note(agent) == ""
 
 
+
+def test_memory_parts_emit_version_marker_even_when_store_is_empty():
+    from agent.system_prompt import _memory_parts
+
+    agent = _make_agent()
+    agent._memory_store = _SnapshotStore("abcdef0123456789")
+    agent._memory_enabled = True
+    agent._user_profile_enabled = True
+    agent._memory_manager = None
+
+    parts = _memory_parts(agent)
+
+    assert parts == ['<memory-snapshot version="abcdef0123456789"/>']
+
 # ---------------------------------------------------------------------------
 # Happy paths
 # ---------------------------------------------------------------------------
@@ -241,6 +266,43 @@ class TestStoredPromptReuse:
         _restore_or_build_system_prompt(agent, None, [{"role": "user", "content": "hi"}])
         assert agent._cached_system_prompt == stored
 
+    def test_matching_memory_snapshot_marker_reuses_stored_prompt(self):
+        version = "1" * 16
+        stored = f"Stored prompt\n<memory-snapshot version=\"{version}\"/>"
+        db = MagicMock()
+        db.get_session.return_value = {"system_prompt": stored}
+        agent = _make_agent(session_db=db)
+        agent._memory_store = _SnapshotStore(version)
+
+        _restore_or_build_system_prompt(agent, None, [{"role": "user", "content": "hi"}])
+
+        assert agent._cached_system_prompt == stored
+        agent._build_system_prompt.assert_not_called()
+        db.update_system_prompt.assert_not_called()
+
+    def test_stale_memory_snapshot_marker_rebuilds_and_persists(self):
+        stored = 'Stored prompt\n<memory-snapshot version="1111111111111111"/>'
+        db = MagicMock()
+        db.get_session.return_value = {"system_prompt": stored}
+        agent = _make_agent(session_db=db, prebuilt_prompt='Fresh prompt\n<memory-snapshot version="2222222222222222"/>')
+        agent._memory_store = _SnapshotStore("2222222222222222")
+
+        _restore_or_build_system_prompt(agent, None, [{"role": "user", "content": "hi"}])
+
+        assert agent._cached_system_prompt == 'Fresh prompt\n<memory-snapshot version="2222222222222222"/>'
+        agent._build_system_prompt.assert_called_once_with(None)
+        db.update_system_prompt.assert_called_once_with(agent.session_id, agent._cached_system_prompt)
+
+    def test_legacy_prompt_without_memory_marker_rebuilds_once_when_memory_active(self):
+        db = MagicMock()
+        db.get_session.return_value = {"system_prompt": "Legacy prompt without marker"}
+        agent = _make_agent(session_db=db, prebuilt_prompt='Fresh prompt\n<memory-snapshot version="aaaaaaaaaaaaaaaa"/>')
+        agent._memory_store = _SnapshotStore("aaaaaaaaaaaaaaaa")
+
+        _restore_or_build_system_prompt(agent, None, [{"role": "user", "content": "hi"}])
+
+        agent._build_system_prompt.assert_called_once_with(None)
+        db.update_system_prompt.assert_called_once_with(agent.session_id, agent._cached_system_prompt)
     def test_present_row_with_stale_runtime_identity_rebuilds(self, caplog):
         """Stored prompts are cache gold unless their runtime identity is stale.
 

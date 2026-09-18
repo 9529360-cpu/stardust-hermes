@@ -169,6 +169,14 @@ class TestQuickFlag:
 class TestFreshInstall:
     """On a fresh install (no active provider), flags are no-ops."""
 
+    def test_first_time_modes_do_not_advertise_nous_account_product(self):
+        from hermes_cli import setup as setup_mod
+
+        labels = [label for label, _runner in setup_mod._FIRST_TIME_MODES]
+        assert labels
+        assert all("Nous Portal" not in label and "OAuth login" not in label for label in labels)
+        # Enter/default is the provider-neutral full setup, not a vendor account flow.
+        assert setup_mod._FIRST_TIME_MODES[0][1] is None
 
     def test_reconfigure_on_fresh_install_falls_through(self, fresh_install):
         args = _make_setup_args(reconfigure=True)
@@ -177,20 +185,14 @@ class TestFreshInstall:
             m = _enter_fresh_install_patches(
                 stack,
                 prompt=("hermes_cli.setup.prompt_choice", {"return_value": 0}),
-                first="hermes_cli.setup_quick._run_first_time_quick_setup",
+                full="hermes_cli.setup._run_full_setup",
+                summary="hermes_cli.setup._print_setup_summary",
             )
             from hermes_cli.setup import run_setup_wizard
-            from hermes_cli import setup as setup_mod
-
-            section_indexes = []
-            m["first"].side_effect = lambda *_args: section_indexes.append(
-                setup_mod._SETUP_NAVIGATION.get().section_index
-            )
             run_setup_wizard(args)
 
         m["prompt"].assert_called_once()
-        m["first"].assert_called_once()
-        assert section_indexes == [0]
+        m["full"].assert_called_once()
 
     def test_blank_slate_runs_inside_navigation_step(self, fresh_install):
         args = _make_setup_args()
@@ -198,7 +200,7 @@ class TestFreshInstall:
         with ExitStack() as stack:
             m = _enter_fresh_install_patches(
                 stack,
-                prompt=("hermes_cli.setup.prompt_choice", {"return_value": 2}),
+                prompt=("hermes_cli.setup.prompt_choice", {"return_value": 1}),
                 blank="hermes_cli.setup_quick._run_blank_slate_setup",
             )
             from hermes_cli import setup as setup_mod
@@ -232,3 +234,18 @@ class TestArgparse:
             pass
         assert captured["args"].reconfigure is True
         assert captured["args"].quick is False
+
+    def test_setup_portal_flag_is_not_registered(self):
+        import argparse
+        from hermes_cli.subcommands.setup import build_setup_parser
+
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers(dest="command")
+        build_setup_parser(subparsers, cmd_setup=lambda _args: None)
+        with pytest.raises(SystemExit):
+            parser.parse_args(["setup", "--portal"])
+
+    def test_portal_is_not_a_builtin_stardust_subcommand(self):
+        from hermes_cli.main import _BUILTIN_SUBCOMMANDS
+
+        assert "portal" not in _BUILTIN_SUBCOMMANDS

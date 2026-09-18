@@ -227,6 +227,7 @@ class FakeSessionRPC:
             result = {
                 "active": session_state["active"],
                 "task_id": session_state["task_id"],
+                "execution_generation": session_state["execution_generation"],
             }
             if session_state.get("pending_approval"):
                 result["status"] = "waiting_for_approval"
@@ -242,16 +243,22 @@ class FakeSessionRPC:
         session_id: str,
         source: str,
         expected_task_id: str,
+        expected_execution_generation: int,
     ):
         params = {
             "profile": profile,
             "session_id": session_id,
             "source": source,
             "expected_task_id": expected_task_id,
+            "expected_execution_generation": expected_execution_generation,
         }
         with self._lock:
             current = self.states[session_id]
-            if not current["active"] or current["task_id"] != expected_task_id:
+            if (
+                not current["active"]
+                or current["task_id"] != expected_task_id
+                or current["execution_generation"] != expected_execution_generation
+            ):
                 self.calls.append(("interrupt_skipped", params))
                 return {"interrupted": False}
             current["active"] = False
@@ -681,6 +688,74 @@ def test_not_admitted_peer_task_stays_queued_with_exponential_capped_retry(
     assert rpc.attempted_generations == [1, 2, 3, 4]
 
 
+def test_stop_racing_proven_not_admitted_submit_completes_cancel(db: Path):
+    """If Stop wins while submit proves non-admission, cancellation is certain rather than ambiguous."""
+    identity = _identity()
+    _admit(db, identity)
+
+    class StopThenRefuseRPC(FakeSessionRPC):
+        def __init__(self) -> None:
+            super().__init__(auto_complete=False)
+            self.before_refusal = None
+
+        def submit(self, **kwargs):
+            self.calls.append(("submit", dict(kwargs)))
+            assert self.before_refusal is not None
+            self.before_refusal()
+            raise PeerRunsHTTPError(
+                "peer refused before admission", retryable=True, not_admitted=True
+            )
+
+    rpc = StopThenRefuseRPC()
+    runtime = _runtime(db, rpc, lease_ttl_seconds=30)
+    rpc.before_refusal = lambda: runtime.cancel(identity, cancel_id="cancel-during-admission")
+
+    runtime._process_room(BINDING)
+
+    task = state.get_task(db, identity)
+    assert task["status"] == "cancelled"
+    assert task["cancel_id"] == "cancel-during-admission"
+    assert ROOM_ID not in runtime._ambiguous_rooms
+
+
+def test_stop_racing_successful_admission_interrupts_exact_attempt(db: Path):
+    """Stop may win just before admission; a later accepted submit must be stopped under the same generation."""
+    identity = _identity()
+    _admit(db, identity)
+
+    class StopThenAdmitRPC(FakeSessionRPC):
+        def __init__(self) -> None:
+            super().__init__(auto_complete=False)
+            self.before_admission = None
+
+        def submit(self, **kwargs):
+            assert self.before_admission is not None
+            stopping = self.before_admission()
+            assert stopping["status"] == "stopping"
+            return super().submit(**kwargs)
+
+    rpc = StopThenAdmitRPC()
+    runtime = _runtime(
+        db, rpc, lease_ttl_seconds=30, active_poll_interval_seconds=0.01
+    )
+    rpc.before_admission = lambda: runtime.cancel(
+        identity, cancel_id="cancel-before-admission"
+    )
+
+    runtime._process_room(BINDING)
+
+    task = state.get_task(db, identity)
+    assert task["status"] == "cancelled"
+    submits = [params for method, params in rpc.calls if method == "submit"]
+    interrupts = [params for method, params in rpc.calls if method == "interrupt"]
+    assert len(submits) == 1
+    assert len(interrupts) == 1
+    assert interrupts[0]["expected_task_id"] == identity.task_id
+    assert interrupts[0]["expected_execution_generation"] == task["execution_generation"]
+    session_id = next(iter(rpc.states))
+    assert rpc.states[session_id]["active"] is False
+
+
 def test_not_admitted_room_does_not_block_other_rooms(tmp_path: Path):
     db = tmp_path / "state.db"
     for room_id in ("room-1", "room-2"):
@@ -1038,6 +1113,37 @@ def test_peer_recovery_probe_is_bounded_by_attempt_and_stale_age(db: Path):
     assert state.get_task(db, identity)["status"] == "deferred"
 
 
+def test_exact_member_cancelled_status_terminalizes_running_task(db: Path):
+    """An exact remote cancellation is a terminal outcome, not a reason to wait until the local deadline."""
+    identity = _identity()
+    _admit(db, identity)
+
+    class CancelledStatusRPC(FakeSessionRPC):
+        def info(self, **kwargs):
+            info = super().info(**kwargs)
+            if info.get("task_id") == identity.task_id:
+                return {**info, "active": False, "status": "cancelled"}
+            return info
+
+    rpc = CancelledStatusRPC(auto_complete=False)
+    published = []
+    runtime = _runtime(
+        db,
+        rpc,
+        active_poll_interval_seconds=0.01,
+        turn_timeout_seconds=0.5,
+        publish_terminal=lambda _binding, task: published.append(task),
+    )
+
+    runtime.start()
+    _wait_for(lambda: state.get_task(db, identity)["status"] == "cancelled", timeout=1.0)
+    assert runtime.stop(timeout=5.0)
+
+    task = state.get_task(db, identity)
+    assert task["cancel_id"] == "remote-cancel:1"
+    assert [row["status"] for row in published] == ["cancelled"]
+
+
 def test_turn_deadline_stops_exact_attempt_and_publishes_durable_failure(db: Path):
     identity = _identity()
     _admit(db, identity)
@@ -1389,7 +1495,8 @@ def test_retry_reconciles_terminal_remote_cancellation_without_new_generation(
     state.recover_room(db, recovery_lease, clock=clock)
     state.release_lease(db, recovery_lease, clock=clock)
     rpc = FakeSessionRPC(auto_complete=False)
-    rpc.add_session(active=False, task_id=identity.task_id)
+    session_id = rpc.add_session(active=False, task_id=identity.task_id)
+    rpc.states[session_id]["execution_generation"] = attempt.execution_generation
     original_info = rpc.info
 
     def cancelled_info(**kwargs):
@@ -1403,6 +1510,52 @@ def test_retry_reconciles_terminal_remote_cancellation_without_new_generation(
     assert cancelled["status"] == "cancelled"
     assert cancelled["execution_generation"] == attempt.execution_generation
     assert not [call for call in rpc.calls if call[0] == "submit"]
+
+
+def test_retry_ignores_cancelled_status_from_wrong_execution_generation(db: Path):
+    """A cancelled canonical session from another retry generation cannot cancel this indeterminate attempt."""
+    identity = _identity()
+    now = [100.0]
+
+    def clock():
+        return now[0]
+
+    old_lease = state.acquire_lease(
+        db,
+        room_id=ROOM_ID,
+        gateway_id=BINDING.gateway_id,
+        authority_epoch=BINDING.authority_epoch,
+        process_generation="old-process",
+        ttl_seconds=1,
+        clock=clock,
+    )
+    _admit(db, identity)
+    attempt = state.start_task(
+        db, identity, old_lease, expected_cancel_generation=0, clock=clock
+    )
+    now[0] = 102.0
+    recovery_lease = state.acquire_lease(
+        db,
+        room_id=ROOM_ID,
+        gateway_id=BINDING.gateway_id,
+        authority_epoch=BINDING.authority_epoch,
+        process_generation="recovery-process",
+        ttl_seconds=30,
+        clock=clock,
+    )
+    state.recover_room(db, recovery_lease, clock=clock)
+    state.release_lease(db, recovery_lease, clock=clock)
+    rpc = FakeSessionRPC(auto_complete=False)
+    session_id = rpc.add_session(active=False, task_id=identity.task_id)
+    rpc.states[session_id]["execution_generation"] = attempt.execution_generation + 1
+    original_info = rpc.info
+    rpc.info = lambda **kwargs: {**original_info(**kwargs), "status": "cancelled"}
+    runtime = _runtime(db, rpc, clock=clock)
+
+    retried = runtime.retry_indeterminate(identity)
+
+    assert retried["status"] == "queued"
+    assert retried["execution_generation"] == attempt.execution_generation
 
 
 def test_ambiguous_recovery_remains_indeterminate(db: Path):
@@ -1576,6 +1729,107 @@ def test_post_submit_observation_failure_preserves_recoverable_outcome(db: Path)
     task = state.get_task(db, identity)
     assert task["result"]["text"] == "Recovered after a transient read."
     assert not [call for call in rpc.calls if call[0] == "submit"][1:]
+
+
+def test_current_process_stop_does_not_ack_before_session_admission(db: Path):
+    """Durable running precedes submit; session absence in the same process is not proof Stop completed."""
+    identity = _identity()
+    _admit(db, identity)
+    rpc = FakeSessionRPC(auto_complete=False)
+    runtime = _runtime(db, rpc, lease_ttl_seconds=30)
+    lease = state.acquire_lease(
+        db,
+        room_id=ROOM_ID,
+        gateway_id=BINDING.gateway_id,
+        authority_epoch=BINDING.authority_epoch,
+        process_generation=runtime.process_generation,
+        ttl_seconds=30,
+        clock=time.time,
+    )
+    runtime._leases[ROOM_ID] = lease
+    state.start_task(
+        db,
+        identity,
+        lease,
+        expected_cancel_generation=0,
+        clock=time.time,
+    )
+
+    result = runtime.cancel(identity, cancel_id="stop-before-submit")
+
+    assert result["status"] == "stopping"
+    assert not [call for call in rpc.calls if call[0] == "interrupt"]
+
+
+def test_stop_does_not_acknowledge_a_stale_session_generation_after_retry(db: Path):
+    """Same task_id is reused across Retry; Stop must fence the exact execution generation."""
+    identity = _identity()
+    _admit(db, identity)
+    now = [100.0]
+
+    def clock():
+        return now[0]
+
+    old_lease = state.acquire_lease(
+        db,
+        room_id=ROOM_ID,
+        gateway_id=BINDING.gateway_id,
+        authority_epoch=BINDING.authority_epoch,
+        process_generation="old-process",
+        ttl_seconds=1,
+        clock=clock,
+    )
+    old_attempt = state.start_task(
+        db,
+        identity,
+        old_lease,
+        expected_cancel_generation=0,
+        clock=clock,
+    )
+    now[0] = 102.0
+    rpc = FakeSessionRPC(auto_complete=False)
+    runtime = _runtime(
+        db,
+        rpc,
+        clock=clock,
+        process_generation="new-process",
+        lease_ttl_seconds=30,
+    )
+    lease = state.acquire_lease(
+        db,
+        room_id=ROOM_ID,
+        gateway_id=BINDING.gateway_id,
+        authority_epoch=BINDING.authority_epoch,
+        process_generation=runtime.process_generation,
+        ttl_seconds=30,
+        clock=clock,
+    )
+    runtime._leases[ROOM_ID] = lease
+    state.recover_room(db, lease, clock=clock)
+    state.requeue_indeterminate_task(
+        db,
+        identity,
+        lease,
+        expected_execution_generation=old_attempt.execution_generation,
+        expected_cancel_generation=old_attempt.cancel_generation,
+        clock=clock,
+    )
+    current_attempt = state.start_task(
+        db,
+        identity,
+        lease,
+        expected_cancel_generation=0,
+        clock=clock,
+    )
+    session_id = rpc.add_session(active=False, task_id=identity.task_id)
+    rpc.states[session_id]["execution_generation"] = old_attempt.execution_generation
+
+    result = runtime.cancel(identity, cancel_id="stop-current-generation")
+
+    assert current_attempt.execution_generation == old_attempt.execution_generation + 1
+    assert result["status"] == "stopping"
+    assert not [call for call in rpc.calls if call[0] == "interrupt"]
+    assert rpc.states[session_id]["active"] is False
 
 
 def test_cancellation_is_persisted_before_interrupt_and_fences_late_result(
@@ -1914,6 +2168,7 @@ def test_stop_resumes_persisted_session_before_reading_runtime_history(db: Path)
         clock=time.time,
     )
     stored_id = rpc.add_session(active=False, task_id=identity.task_id)
+    rpc.states[stored_id]["execution_generation"] = attempt.execution_generation
     runtime_id = "runtime-session"
     rpc.states[runtime_id] = rpc.states.pop(stored_id)
 
@@ -1942,6 +2197,73 @@ def test_stop_resumes_persisted_session_before_reading_runtime_history(db: Path)
 
     assert cancelled["status"] == "cancelled"
     assert events.index("resume") < events.index("history")
+
+
+def test_stale_generation_pending_approval_is_not_relabelled_as_current(db: Path):
+    """A pending approval from an older retry generation must never surface under the current attempt."""
+    identity = _identity()
+    actions = []
+    runtime = _runtime(
+        db,
+        FakeSessionRPC(auto_complete=False),
+        pending_action=lambda room_id, member_id, action: actions.append(
+            (room_id, member_id, action)
+        ),
+    )
+    task = {
+        "identity": identity,
+        "execution_generation": 2,
+        "payload": {"target_profile": PROFILE},
+    }
+    info = {
+        "active": True,
+        "task_id": identity.task_id,
+        "execution_generation": 1,
+        "status": "waiting_for_approval",
+        "pending_approval": {
+            "request_id": "approval-old",
+            "command": "pytest -q stale",
+            "choices": ["once", "deny"],
+        },
+    }
+
+    runtime._report_pending_action(task, session_id="stale-session", info=info)
+
+    assert actions == [(ROOM_ID, PROFILE, None)]
+
+
+def test_cancelling_approval_wait_clears_pending_action(db: Path):
+    """Once Stop is acknowledged, the cancelled attempt must not leave an approval card behind."""
+    identity = _identity()
+    _admit(db, identity)
+    rpc = FakeSessionRPC(auto_complete=False)
+    actions = []
+    runtime = _runtime(
+        db,
+        rpc,
+        active_poll_interval_seconds=0.01,
+        pending_action=lambda room_id, member_id, action: actions.append(
+            (room_id, member_id, action)
+        ),
+    )
+
+    runtime.start()
+    assert rpc.submitted.wait(1.0)
+    session_id = next(iter(rpc.states))
+    with rpc._lock:
+        rpc.states[session_id]["pending_approval"] = {
+            "request_id": "approval-stop",
+            "command": "pytest -q focused",
+            "choices": ["once", "deny"],
+        }
+    runtime.wakeup()
+    _wait_for(lambda: any(action for _room, _member, action in actions))
+
+    cancelled = runtime.cancel(identity, cancel_id="cancel-approval")
+
+    assert cancelled["status"] == "cancelled"
+    assert actions[-1] == (ROOM_ID, PROFILE, None)
+    assert runtime.stop(timeout=5.0)
 
 
 def test_pending_local_approval_is_reported_with_safe_choices(db: Path):

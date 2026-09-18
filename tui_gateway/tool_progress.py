@@ -157,6 +157,27 @@ def _attach_todo_state(payload: dict, session: dict) -> dict:
     return payload
 
 
+def _todo_state_from_session_db(db, session_id: str) -> dict | None:
+    """Trusted persisted todo snapshot for resume paths that answer before agent hydration."""
+    try:
+        from tools.todo_tool import load_todo_session_state
+
+        return _normalize_todo_state(load_todo_session_state(db, session_id))
+    except Exception:
+        logger.debug("failed to derive todo state from session db", exc_info=True)
+        return None
+
+
+def _newest_todo_state(*states) -> dict | None:
+    """Highest-revision valid snapshot; later arguments win revision ties."""
+    newest = None
+    for value in states:
+        state = _normalize_todo_state(value)
+        if state is not None and (newest is None or state["revision"] >= newest["revision"]):
+            newest = state
+    return newest
+
+
 def _todo_state_from_history(history) -> dict | None:
     """Latest todo snapshot from a loaded transcript, for resume paths that answer before an AIAgent (and
     its live TodoStore) exists: the newest tool result paired with an assistant ``todo`` call IS it."""
@@ -186,6 +207,89 @@ def _todo_state_from_history(history) -> dict | None:
     except Exception:
         logger.debug("failed to derive todo state from history", exc_info=True)
         return None
+
+
+def _todo_state_before_row(session_db, session_id: str, target_row_id: int) -> dict | None:
+    """Latest non-rewound todo snapshot before one durable row across compression lineage."""
+    if session_db is None or not session_id or not isinstance(target_row_id, int):
+        return None
+    try:
+        history = session_db.get_messages_as_conversation(
+            session_id,
+            include_ancestors=True,
+            include_compacted=True,
+            include_row_ids=True,
+        )
+        prefix = [
+            message
+            for message in history
+            if isinstance(message, dict)
+            and isinstance(message.get("_row_id"), int)
+            and message["_row_id"] < target_row_id
+        ]
+        return _todo_state_from_history(prefix)
+    except Exception:
+        logger.debug("failed to derive pre-rewrite todo state", exc_info=True)
+        return None
+
+
+def _plan_todo_history_rewrite(
+    session: dict, history: list, *, session_db=None, target_row_id: int | None = None,
+) -> tuple[dict | None, dict | None]:
+    """Return ``(model_config_patch, target_state)`` for a transcript rewind.
+
+    Todo contents time-travel to the last snapshot before the cut, but revision stays monotonic: a rewind is
+    itself a new state mutation. Compacted/ancestor rows are consulted when a durable target id is available,
+    so a valid pre-compression task list is not mistaken for "no todos" merely because it left active history.
+    """
+    from tools.todo_tool import TODO_SESSION_STATE_KEY
+
+    session_key = str(session.get("session_key") or "")
+    historical = (
+        _todo_state_before_row(session_db, session_key, target_row_id)
+        if isinstance(target_row_id, int)
+        else _todo_state_from_history(history)
+    )
+    persisted = _todo_state_from_session_db(session_db, session_key) if session_db is not None else None
+    current = _newest_todo_state(persisted, _session_todo_state(session))
+    if current is None and historical is None:
+        return None, None
+
+    desired_todos = list(historical["todos"]) if historical is not None else []
+    if current is None:
+        target = historical
+    elif current["todos"] == desired_todos:
+        target = historical if historical is not None and historical["revision"] > current["revision"] else current
+    else:
+        target = {
+            "todos": desired_todos,
+            "revision": max(
+                current["revision"],
+                historical["revision"] if historical is not None else 0,
+            ) + 1,
+        }
+    patch = None
+    if session_db is not None and session_key and target is not None and target != persisted:
+        patch = {TODO_SESSION_STATE_KEY: target}
+    return patch, target
+
+
+def _apply_todo_history_rewrite(session: dict, state: dict | None, *, sid: str | None = None) -> None:
+    """Install an already-committed rewind snapshot into the live agent/cache and notify clients once."""
+    state = _normalize_todo_state(state)
+    if state is None:
+        return
+    previous = _normalize_todo_state(session.get("todo_state"))
+    store = getattr(session.get("agent"), "_todo_store", None)
+    if store is not None and hasattr(store, "restore"):
+        try:
+            if _normalize_todo_state(store.snapshot()) != state:
+                store.restore(state["todos"], revision=state["revision"])
+        except Exception:
+            logger.debug("failed to restore live todo state after history rewrite", exc_info=True)
+    session["todo_state"] = state
+    if sid and previous != state:
+        _emit("todo.updated", sid, state)
 
 
 def _connector_tool_lifecycle(name: str, args: dict) -> bool:

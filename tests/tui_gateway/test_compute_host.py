@@ -6,6 +6,8 @@ import sys
 import threading
 from pathlib import Path
 
+from tui_gateway.host_supervisor import is_compute_host_identity
+
 
 def _stdout_queue(proc: subprocess.Popen) -> queue.Queue[dict]:
     out: queue.Queue[dict] = queue.Queue()
@@ -30,6 +32,10 @@ def test_compute_host_line_json_hello_and_shutdown():
     repo = Path(__file__).resolve().parents[2]
     env = dict(os.environ)
     env["PYTHONPATH"] = str(repo) + os.pathsep + env.get("PYTHONPATH", "")
+    # Match HostSupervisor's production wire contract: child stdio is UTF-8 even on
+    # Windows machines whose locale encoding is CP936/GBK.
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     proc = subprocess.Popen(
         [sys.executable, "-m", "tui_gateway.compute_host"],
         cwd=str(repo),
@@ -38,6 +44,8 @@ def test_compute_host_line_json_hello_and_shutdown():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="strict",
         bufsize=1,
     )
     assert proc.stdin is not None
@@ -45,7 +53,11 @@ def test_compute_host_line_json_hello_and_shutdown():
     try:
         hello = _read_json_line(out)
         assert hello["type"] == "hello"
-        assert hello["host_pid"] == proc.pid
+        assert int(hello["host_pid"]) > 0
+        # On Windows a venv python.exe may be a redirector whose PID differs from the
+        # interpreter reported by hello. The registry tracks Popen.pid, so that launcher
+        # must still be recognizable as the compute-host identity for orphan cleanup.
+        assert is_compute_host_identity(proc.pid)
 
         proc.stdin.write(json.dumps({"type": "bogus", "request_id": "b"}) + "\n")
         proc.stdin.flush()

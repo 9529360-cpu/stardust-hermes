@@ -557,7 +557,7 @@ from hermes_cli.setup_terminal import setup_terminal_backend  # noqa: E402
 from hermes_cli.setup_platforms import setup_gateway  # noqa: E402
 from hermes_cli.setup_summary import _print_setup_summary  # noqa: E402,F401
 from hermes_cli.setup_migration import _offer_openclaw_migration, _skip_configured_section  # noqa: E402
-from hermes_cli.setup_quick import _run_portal_one_shot, _run_quick_setup  # noqa: E402
+from hermes_cli.setup_quick import _run_quick_setup  # noqa: E402
 
 
 # ── Main Wizard Orchestrator ──
@@ -635,18 +635,16 @@ def _run_full_setup(config: dict, hermes_home, *, is_existing: bool, migration_r
         _step("tools", "Tools", lambda: setup_tools(config, first_install=not is_existing))])
 
 
-# First-time mode picker: (menu label, setup_quick runner name) — None falls through to Full Setup.
+# First-time mode picker: provider-neutral by default. Vendor/account onboarding is not a
+# Stardust product surface; provider credentials are configured inside Model & Provider / `hermes auth`.
 _FIRST_TIME_MODES = (
-    ("Quick Setup (Nous Portal) — free OAuth login, no API keys, model + tools (recommended)",
-     "_run_first_time_quick_setup"),
-    ("Full setup — configure every provider, tool & option yourself (bring your own keys)", None),
+    ("Full setup — choose your model/provider, tools and integrations", None),
     ("Blank Slate — everything off except the bare minimum; opt in to each capability", "_run_blank_slate_setup"),
 )
 
 
 def _run_setup_wizard_impl(args):
-    """Run the interactive setup wizard: full/quick (auto-detected), ``--portal``, or one
-    ``hermes setup <section>`` from SETUP_SECTIONS."""
+    """Run the interactive provider-neutral setup wizard or one named setup section."""
     from hermes_cli.config import is_managed, managed_error
     if is_managed():
         managed_error("run setup wizard")
@@ -669,9 +667,6 @@ def _run_setup_wizard_impl(args):
     # Non-interactive environments (headless SSH, Docker, CI/CD)
     if getattr(args, 'non_interactive', False) or not is_interactive_stdin():
         print_noninteractive_setup_guidance("Running in a non-interactive environment (no TTY detected).")
-        return
-    if getattr(args, "portal", False):  # one-shot Nous Portal setup; skips the rest
-        _run_portal_one_shot(config)
         return
     section = getattr(args, "section", None)
     if section:

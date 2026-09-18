@@ -702,6 +702,47 @@ class SessionSessionsMixin:
             return
         self._write_model_config_patch(session_id, patch)
 
+    def patch_session_model_config_monotonic(
+        self, session_id: str, key: str, value: Dict[str, Any], *, revision_key: str = "revision",
+    ) -> bool:
+        """Atomically write one revisioned model_config value without allowing state rollback.
+
+        A higher persisted revision wins. An equal revision is idempotent only when the complete
+        value is identical; equal-revision divergence is a concurrent-write conflict and is refused.
+        The check and update run under the same ``BEGIN IMMEDIATE`` transaction, so sibling gateway
+        or desktop processes sharing state.db cannot both pass the guard from a stale snapshot.
+        """
+        if not session_id or not key or not isinstance(value, dict):
+            return False
+        try:
+            incoming_revision = max(0, int(value.get(revision_key, 0) or 0))
+        except (TypeError, ValueError):
+            return False
+
+        def _do(conn):
+            row = conn.execute("SELECT model_config FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            if row is None:
+                return False
+            config = _parse_model_config(row[0])
+            current = config.get(key)
+            if isinstance(current, dict):
+                try:
+                    current_revision = max(0, int(current.get(revision_key, 0) or 0))
+                except (TypeError, ValueError):
+                    current_revision = -1
+                if current_revision > incoming_revision:
+                    return False
+                if current_revision == incoming_revision:
+                    return current == value
+            config[key] = value
+            conn.execute(
+                "UPDATE sessions SET model_config = ? WHERE id = ?",
+                (json.dumps(config) if config else None, session_id),
+            )
+            return True
+
+        return bool(self._execute_write(_do))
+
     def get_session_model_config_value(self, session_id: str, key: str, default: Any = None) -> Any:
         """Read one key out of a session's model_config JSON (tolerant parse)."""
         session = self.get_session(session_id) or {}
@@ -1267,7 +1308,7 @@ class SessionSessionsMixin:
                 {select_head}{_sql_session_last_active("s")} AS last_active
                 {from_sessions}
                 {where_sql}
-                ORDER BY s.started_at DESC
+                ORDER BY s.started_at DESC, s.id DESC
                 LIMIT ? OFFSET ?
             """
             params.extend([limit, offset])
@@ -1284,7 +1325,7 @@ class SessionSessionsMixin:
                     ) AS last_active
                 {from_sessions}
                 {pinned_where}
-                ORDER BY s.started_at DESC
+                ORDER BY s.started_at DESC, s.id DESC
             """
             for row in self._read_all(pinned_query, base_where_params):
                 s = self._list_row(row)
