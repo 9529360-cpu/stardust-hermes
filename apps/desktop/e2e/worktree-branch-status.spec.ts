@@ -129,8 +129,8 @@ test('worktree dialog renders the base-branch picker over the dialog, not clippe
   // Open the base-branch combobox. With 11 branches, the list is taller than
   // the space below the trigger. A popover that portals into the dialog's
   // `overflow-y-auto` box is therefore cut off. This snapshot catches that bug.
-  await page.getByRole('button', { name: /branch off/i }).click()
-  await expect(page.getByPlaceholder('Search branches…')).toBeVisible()
+  await page.getByRole('button', { name: /branch off|从 .* 分支/i }).click()
+  await expect(page.getByPlaceholder(/Search branches…|搜索分支…/)).toBeVisible()
   await expect(page.getByRole('option', { name: 'feature/alpha-one' })).toBeVisible()
 
   await expectVisualSnapshot(page, { name: 'worktree-dialog-base-branch-picker', app: fixture!.app })
@@ -170,9 +170,9 @@ test('worktree dialog convert-an-existing-branch sub-view lists the repo branche
   const page = fixture!.page
 
   await openWorktreeDialog()
-  await page.getByRole('button', { name: 'Convert an existing branch' }).click()
+  await page.getByRole('button', { name: /Convert an existing branch|转换现有分支/ }).click()
 
-  await expect(page.getByPlaceholder('Search branches…')).toBeVisible()
+  await expect(page.getByPlaceholder(/Search branches…|搜索分支…/)).toBeVisible()
   await expect(page.getByRole('option', { name: /feature\/alpha-one/ })).toBeVisible()
 
   await expectVisualSnapshot(page, { name: 'worktree-dialog-convert-branch', app: fixture!.app })
@@ -189,7 +189,7 @@ test('creating a branch with ctrl-shift-b updates the composer git-status branch
   // symptom of the double-open bug.
   await expect(page.locator(DIALOG)).toHaveCount(1)
 
-  const branchInput = page.locator('input[placeholder="e.g. my-feature"]').first()
+  const branchInput = page.getByPlaceholder(/e\.g\. my-feature|例如 my-feature/).first()
   await expect(branchInput).toBeVisible()
   await branchInput.fill(BRANCH_NAME)
   // Select a base branch, so this test uses the same path as the user: open the
@@ -197,13 +197,13 @@ test('creating a branch with ctrl-shift-b updates the composer git-status branch
   // The keyboard drives this step. The dialog still clips the popover, so a
   // mouse click on an option is not reliable until that bug is corrected. The
   // double-open check below is therefore independent of the clipping bug.
-  await page.getByRole('button', { name: /branch off/i }).click()
-  await page.getByPlaceholder('Search branches…').fill('main')
+  await page.getByRole('button', { name: /branch off|从 .* 分支/i }).click()
+  await page.getByPlaceholder(/Search branches…|搜索分支…/).fill('main')
   await expect(page.getByRole('option', { name: 'main' }).first()).toBeVisible()
   await page.keyboard.press('Enter')
   await expect(page.locator('[data-slot="popover-content"]')).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'New worktree' }).click()
+  await page.getByRole('button', { name: /New worktree|新建工作树/ }).click()
 
   await expect(codingRow).toContainText(BRANCH_NAME, { timeout: 15_000 })
 

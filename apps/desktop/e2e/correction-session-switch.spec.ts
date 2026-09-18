@@ -47,7 +47,7 @@ async function steer(page: Page, text: string): Promise<void> {
   await composer.type(text, { delay: 5 })
   // Since "running is not busy" (3bc52fb9df) the primary keeps the Send label
   // mid-turn; the submit engine still routes a text payload to steer.
-  await expect(primary).toHaveAttribute('aria-label', 'Send')
+  await expect(primary).toHaveAttribute('aria-label', /^(Send|发送)$/)
   await primary.click()
 }
 
@@ -117,7 +117,7 @@ async function transcriptMessageOrder(page: Page): Promise<string[]> {
  * for the old text to disappear from the page (it never will).
  */
 async function openFreshDraft(page: Page, priorSessionText: string): Promise<void> {
-  await page.locator('[data-slot="sidebar"] button[aria-label="New session"]').first().click()
+  await page.locator('[data-slot="sidebar"] button').filter({ hasText: /New session|新建会话/ }).first().click()
   await page.waitForFunction(
     ([priorText, surfaceSelector]: [string, string]) => {
       const surfaces = document.querySelectorAll(surfaceSelector)

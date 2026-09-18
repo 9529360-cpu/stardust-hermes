@@ -26,14 +26,14 @@ async function send(page: Page, text: string): Promise<void> {
 }
 
 async function openFreshDraft(page: Page): Promise<void> {
-  await page.locator('[data-slot="sidebar"] button[aria-label="New session"]').first().click()
+  await page.locator('[data-slot="sidebar"] button').filter({ hasText: /New session|新建会话/ }).first().click()
   await expect(activeSurface(page).locator('[data-slot="aui_thread-viewport"]')).not.toContainText(PROMPT)
   await page.waitForTimeout(1_000)
 }
 
 async function reopenWorkingSession(page: Page): Promise<void> {
   const sidebar = page.locator('[data-slot="sidebar"]')
-  const row = sidebar.getByRole('button', { name: /^(?:Session running|Needs your input|Working)\b/ }).first()
+  const row = sidebar.getByRole('button', { name: /(?:Session running|Needs your input|Working|会话运行中|需要.*输入|正在工作)/ }).first()
 
   await row.waitFor({ state: 'visible', timeout: 30_000 })
   await row.click()
@@ -97,7 +97,7 @@ test.describe('working-session task-panel clearance', () => {
     fixture!.mock.releaseHeldStream()
     await page.waitForTimeout(1_000)
     await reopenWorkingSession(page)
-    await expect(activeSurface(page).getByText('Tasks 1/5')).toBeVisible({ timeout: 30_000 })
+    await expect(activeSurface(page).getByText(/Tasks 1\/5|任务 1\/5/)).toBeVisible({ timeout: 30_000 })
 
     // Reproduce the stale geometry at the foreground boundary. Active turns
     // disable Chromium's background throttling, so visibility can stay `visible`

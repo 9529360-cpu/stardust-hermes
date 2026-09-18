@@ -327,14 +327,21 @@ const TASK_PANEL_RESUME_SCRIPT: ScriptedTurn[] = [
     text: TASK_PANEL_RESUME_TEXT,
     toolCalls: [
       {
-        name: 'todo',
+        name: 'tool_call',
         args: {
-          todos: [
-            { id: 'design', content: 'Design the restored layout', status: 'completed' },
-            { id: 'implement', content: 'Implement the measured clearance', status: 'in_progress' },
-            { id: 'verify', content: 'Verify the latest message stays visible', status: 'pending' },
-            { id: 'review', content: 'Review the visual regression', status: 'pending' },
-            { id: 'ship', content: 'Ship the focused fix', status: 'pending' },
+          calls: [
+            {
+              name: 'todo_list',
+              arguments: {
+                todos: [
+                  { id: 'design', content: 'Design the restored layout', status: 'completed' },
+                  { id: 'implement', content: 'Implement the measured clearance', status: 'in_progress' },
+                  { id: 'verify', content: 'Verify the latest message stays visible', status: 'pending' },
+                  { id: 'review', content: 'Review the visual regression', status: 'pending' },
+                  { id: 'ship', content: 'Ship the focused fix', status: 'pending' },
+                ],
+              },
+            },
           ],
         },
       },

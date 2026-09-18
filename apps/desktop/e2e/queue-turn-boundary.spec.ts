@@ -82,7 +82,7 @@ test.describe('queued prompt turn boundary', () => {
     await send(page, ACTIVE_PROMPT)
     await mock.waitForHeldStream()
     await queue(page, QUEUED_PROMPT)
-    await expect(page.getByText('1 Queued')).toBeVisible()
+    await expect(page.getByText(/1 Queued|1 条排队/)).toBeVisible()
 
     // The mock keeps the active SSE stream open, so a queued prompt has no
     // completed-turn boundary that could legitimately drain it. Wait past the
