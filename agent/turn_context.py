@@ -627,6 +627,7 @@ def _hydrate_from_history(agent: Any, conversation_history: Optional[List[Any]])
 def _tick_memory_nudge(agent: Any) -> bool:
     """Advance the turn-based memory nudge counter; ``True`` when the review should fire."""
     if (agent._memory_nudge_interval > 0
+            and getattr(agent, "_memory_persistence_enabled", True)
             and "memory" in agent.valid_tool_names
             and agent._memory_store):
         agent._turns_since_memory += 1
@@ -855,27 +856,61 @@ def _persist_turn_start(
 
 
 def _refresh_builtin_memory_snapshot(agent: Any) -> bool:
-    """Reload built-in memory only when its on-disk prompt snapshot actually changed.
+    """Refresh the built-in memory prompt at a turn boundary.
 
-    Returns True only when the rendered snapshot digest changed, so a metadata-only touch
-    does not break the system-prompt prefix cache.
+    The master privacy switch is checked live so long-lived agents that are not rebuilt
+    by the gateway still drop built-in memory on the next turn. Disk snapshot changes
+    retain the existing digest-based cache behavior.
     """
+    invalidated = False
+    try:
+        from tools.memory_tool import memory_persistence_enabled
+        live_enabled = memory_persistence_enabled(fail_closed=True)
+    except Exception:
+        live_enabled = False
+    previous_enabled = getattr(agent, "_memory_persistence_enabled", True)
+    if live_enabled != previous_enabled:
+        agent._memory_persistence_enabled = live_enabled
+        if live_enabled and getattr(agent, "_memory_manager", None) is None \
+                and not getattr(agent, "_memory_provider_skip", False):
+            try:
+                from agent.agent_init import _activate_configured_memory_provider
+                from tools.memory_tool import get_builtin_memory_config
+                _activate_configured_memory_provider(
+                    agent,
+                    get_builtin_memory_config(),
+                    getattr(agent, "_memory_platform", "cli"),
+                    memory_persistence_enabled,
+                )
+            except Exception:
+                logger.warning("Failed to activate memory provider after master enable", exc_info=True)
+        try:
+            from agent.memory_manager import refresh_memory_tool_surface
+            refresh_memory_tool_surface(agent, enabled=live_enabled)
+        except Exception:
+            logger.warning("Failed to refresh live memory tool surface", exc_info=True)
+        agent._cached_system_prompt = None
+        agent._cached_system_prompt_static = None
+        invalidated = True
+    if not live_enabled:
+        return invalidated
+
     store = getattr(agent, "_memory_store", None)
     stale = getattr(store, "system_prompt_snapshot_stale", None)
     version = getattr(store, "system_prompt_snapshot_version", None)
     reload_store = getattr(store, "load_from_disk", None)
     if not (callable(stale) and callable(version) and callable(reload_store)):
-        return False
+        return invalidated
     try:
         if not stale():
-            return False
+            return invalidated
         before = version()
         reload_store()
         if version() == before:
-            return False
+            return invalidated
     except Exception:
         logger.warning("Built-in memory snapshot refresh failed; keeping the cached prompt", exc_info=True)
-        return False
+        return invalidated
     agent._cached_system_prompt = None
     agent._cached_system_prompt_static = None
     return True
@@ -967,6 +1002,11 @@ def build_turn_context(
 
     # Preserve the original user message (no nudge injection).
     original_user_message = persist_user_message if persist_user_message is not None else user_message
+
+    # Refresh the live memory privacy state before any memory-specific trigger is
+    # computed. This also removes memory schemas from a long-lived CLI/TUI agent
+    # immediately after master-off.
+    _refresh_builtin_memory_snapshot(agent)
     should_review_memory = _tick_memory_nudge(agent)
     _emit_reaction(agent, original_user_message)
 
@@ -978,7 +1018,6 @@ def build_turn_context(
 
     # System prompt is cached per session for prefix caching. A real built-in memory change
     # is the one cross-session state change that deliberately invalidates it at a turn boundary.
-    _refresh_builtin_memory_snapshot(agent)
     if agent._cached_system_prompt is None:
         restore_or_build_system_prompt(agent, system_message, conversation_history)
     active_system_prompt = agent._cached_system_prompt

@@ -81,7 +81,7 @@ hermes [global-options] <command> [subcommand/options]
 | `hermes bundles` | Group several skills under a single `/<name>` slash command. See [Skill Bundles](../user-guide/features/skills.md#skill-bundles). |
 | `hermes curator` | Background skill maintenance — status, run, pause, pin. See [Curator](../user-guide/features/curator.md). |
 | `hermes journey` (aliases `learning`, `memory-graph`) | Timeline of learned skills + memories over time. |
-| `hermes memory` | Configure external memory provider. Plugin-specific subcommands (e.g. `hermes honcho`) register automatically when their provider is active. |
+| `hermes memory` | Control durable memory persistence and configure an external memory provider. Plugin-specific subcommands (e.g. `hermes honcho`) register automatically when their provider is active. |
 | `hermes acp` | Run Hermes as an ACP server for editor integration. |
 | `hermes mcp` | Manage MCP server configurations and run Hermes as an MCP server. |
 | `hermes plugins` | Manage Hermes Agent plugins (install, enable, disable, remove). |
@@ -1445,15 +1445,16 @@ See [Hooks](../user-guide/features/hooks.md) for event signatures and payload sh
 hermes memory <subcommand>
 ```
 
-Set up and manage external memory provider plugins. Available providers: honcho, openviking, mem0, hindsight, holographic, retaindb, byterover, supermemory. Only one external provider can be active at a time. Built-in memory (MEMORY.md/USER.md) is always active.
+Control durable memory persistence and configure external memory provider plugins. Only one external provider can be selected at a time. The master `memory.enabled` switch controls both the built-in MEMORY.md/USER.md layer and the selected external provider; ordinary SessionDB chat history is separate.
 
 Subcommands:
 
 | Subcommand | Description |
 |------------|-------------|
 | `setup` | Interactive provider selection and configuration. |
-| `status` | Show current memory provider config. |
-| `off` | Disable external provider (built-in only). |
+| `status` | Show the master privacy state, built-in targets, and provider configuration. |
+| `on` | Enable durable memory using the existing provider/target configuration. |
+| `off` | Pause built-in and external durable memory without clearing provider selection or chat history. |
 
 :::info Provider-specific subcommands
 When an external memory provider is active, it may register its own top-level `hermes <provider>` command for provider-specific management (e.g. `hermes honcho` when Honcho is active). Inactive providers do not expose their subcommands. Run `hermes --help` to see what's currently wired in.
