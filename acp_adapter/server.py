@@ -224,6 +224,59 @@ class _TurnCallbacks:
     streamed: bool = False
 
 
+@dataclass(frozen=True)
+class _ACPApprovalTrust:
+    """Immutable dangerous-command approval posture captured at ACP initialize time."""
+
+    client_name: str = "unknown"
+    client_version: str = ""
+    capability_names: tuple[str, ...] = ()
+    trusted_interactive: bool = False
+
+
+def _capture_acp_approval_trust(
+    client_info: Implementation | None,
+    client_capabilities: ClientCapabilities | None,
+) -> _ACPApprovalTrust:
+    """Resolve one connection's approval trust once; unknown/error paths fail closed."""
+    client_name = str(getattr(client_info, "name", "") or "unknown").strip() or "unknown"
+    client_version = str(getattr(client_info, "version", "") or "").strip()
+
+    capability_names: tuple[str, ...] = ()
+    if client_capabilities is not None:
+        try:
+            payload = client_capabilities.model_dump(exclude_none=True)
+            if isinstance(payload, dict):
+                capability_names = tuple(sorted(
+                    str(key) for key, value in payload.items()
+                    if value not in (None, False, {}, [], ())
+                ))
+        except Exception:
+            logger.debug("Could not snapshot ACP client capabilities for %s", client_name, exc_info=True)
+
+    trusted_names: set[str] = set()
+    try:
+        from hermes_cli.config import load_config
+
+        cfg = load_config() or {}
+        approvals = cfg.get("approvals") if isinstance(cfg, dict) else {}
+        raw = approvals.get("acp_trusted_clients", []) if isinstance(approvals, dict) else []
+        if isinstance(raw, (list, tuple, set)):
+            trusted_names = {
+                str(name).strip().casefold() for name in raw
+                if str(name).strip()
+            }
+    except Exception:
+        logger.warning("Could not load ACP approval trust config; failing closed", exc_info=True)
+
+    return _ACPApprovalTrust(
+        client_name=client_name,
+        client_version=client_version,
+        capability_names=capability_names,
+        trusted_interactive=client_name.casefold() in trusted_names,
+    )
+
+
 class HermesACPAgent(SlashCommandsMixin, acp.Agent):
     """ACP Agent implementation wrapping Hermes AIAgent."""
 
@@ -249,6 +302,7 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         super().__init__()
         self.session_manager = session_manager or SessionManager()
         self._conn: Optional[acp.Client] = None
+        self._approval_trust = _ACPApprovalTrust()
 
     # ---- Connection lifecycle -----------------------------------------------
 
@@ -504,9 +558,12 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         client_info: Implementation | None = None, **kwargs: Any,
     ) -> InitializeResponse:
         auth_methods = build_auth_methods()
+        self._approval_trust = _capture_acp_approval_trust(client_info, client_capabilities)
         logger.info(
-            "Initialize from %s (protocol v%s)", client_info.name if client_info else "unknown",
+            "Initialize from %s (protocol v%s; dangerous-command approvals=%s)",
+            self._approval_trust.client_name,
             protocol_version if isinstance(protocol_version, int) else acp.PROTOCOL_VERSION,
+            "trusted-interactive" if self._approval_trust.trusted_interactive else "deny-only",
         )
 
         return InitializeResponse(
@@ -864,7 +921,14 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
                 message_cb(text)
 
             cbs.stream_delta_cb = stream_delta_cb
-            cbs.approval_cb = make_approval_callback(conn.request_permission, loop, session_id)
+            trust = self._approval_trust
+            cbs.approval_cb = make_approval_callback(
+                conn.request_permission,
+                loop,
+                session_id,
+                trusted_interactive=trust.trusted_interactive,
+                client_name=trust.client_name,
+            )
             try:
                 from acp_adapter.edit_approval import make_acp_edit_approval_requester
 
