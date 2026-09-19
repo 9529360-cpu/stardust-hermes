@@ -173,10 +173,14 @@ describe('desktop slash command curation', () => {
     expect(isDesktopSlashCommand('/pets')).toBe(false)
   })
 
-  it('does not run /login on desktop before the catalog is loaded', () => {
+  it('does not treat retired account commands as extensions before the catalog is loaded', () => {
     rememberDesktopCommandsCatalog(undefined)
-    expect(isDesktopSlashCommand('/login')).toBe(false)
-    expect(desktopSlashUnavailableMessage('/login')).toBe('/login is managed from the desktop sidebar.')
+
+    for (const command of ['/login', '/subscription', '/topup']) {
+      expect(isDesktopSlashCommand(command)).toBe(false)
+      expect(isDesktopSlashSuggestion(command)).toBe(false)
+      expect(desktopSlashUnavailableMessage(command)).toBeNull()
+    }
   })
 
   it('routes /wake through the desktop wake action instead of the slash worker', () => {
