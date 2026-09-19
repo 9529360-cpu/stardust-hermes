@@ -101,8 +101,20 @@ export function getMemoryStatus(): Promise<MemoryStatusResponse> {
   })
 }
 
-export function resetMemory(target: 'all' | 'memory' | 'user'): Promise<{ ok: boolean; deleted: string[] }> {
-  return hermesApi<{ ok: boolean; deleted: string[] }>({
+export function resetMemory(
+  target: 'all' | 'memory' | 'user'
+): Promise<{
+  ok: boolean
+  deleted: string[]
+  reset?: string[]
+  active_session_behavior?: 'refresh_on_next_turn'
+}> {
+  return hermesApi<{
+    ok: boolean
+    deleted: string[]
+    reset?: string[]
+    active_session_behavior?: 'refresh_on_next_turn'
+  }>({
     ...profileScoped(),
     path: '/api/memory/reset',
     method: 'POST',
