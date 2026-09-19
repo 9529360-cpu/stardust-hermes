@@ -30,9 +30,9 @@ import { cn } from '@/lib/utils'
 import {
   bareChoice,
   type ClarifyBatchDraft,
+  clarifyBatchDraft,
   type ClarifyQuestion,
   type ClarifyRequest,
-  clarifyBatchDraft,
   clearClarifyRequest,
   normalizeChoices,
   RECOMMENDED_LABEL,

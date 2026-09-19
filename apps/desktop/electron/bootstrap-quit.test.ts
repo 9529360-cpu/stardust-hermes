@@ -16,7 +16,7 @@ for (const boundary of ['resolution', 'manifest'] as const) {
 
     fs.mkdirSync(path.join(home, 'scripts'))
     fs.writeFileSync(
-      path.join(home, 'scripts/install.sh'),
+      path.join(home, 'scripts/install-stardust.sh'),
       `#!/bin/bash\nprintf started > "$HERMES_HOME/manifest-started"\nprintf 'manifest-pid=%s\\n' "$$"\nwhile :; do :; done\n`
     )
 
