@@ -54,7 +54,7 @@ def test_every_reference_is_reachable_from_the_skill(skill_text):
 
 def test_unknown_features_route_to_the_published_index(skill_text):
     """The catch-all is what makes coverage of the whole product possible."""
-    assert "/docs/llms.txt" in skill_text
+    assert "website/static/llms.txt" in skill_text
     # web_extract can be disabled; terminal never is.
     assert "curl" in skill_text, "no way to reach the index without web tools"
 
@@ -66,4 +66,5 @@ def test_the_index_is_published_where_the_skill_says_it_is(skill_text):
     gen = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gen)
 
-    assert f"{gen.SITE_BASE}/llms.txt" in skill_text
+    assert gen.LLMS_INDEX_URL in skill_text
+    assert gen.LLMS_FULL_URL in skill_text
