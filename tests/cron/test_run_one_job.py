@@ -78,6 +78,24 @@ def test_local_session_completion_uses_execution_id_as_durable_identity(monkeypa
     }]
 
 
+def test_local_session_completion_skips_explicit_external_lane(monkeypatch):
+    published = []
+    monkeypatch.setattr(
+        "tools.async_delegation.publish_durable_completion",
+        lambda **kwargs: published.append(kwargs) or True,
+    )
+    job = {
+        "id": "watcher", "deliver": "slack:C123",
+        "local_session_origin": {"source": "desktop", "session_id": "session-old"},
+    }
+    delivery = s._RunDelivery(
+        job=job, success=True, error=None, should_deliver=True, delivery_content="done")
+
+    s._publish_local_session_completion(delivery, s._FireOwnership(job, None), "exec-external")
+
+    assert published == []
+    assert delivery.local_session_delivered is False
+
 def test_local_session_completion_skips_silent_delivery(monkeypatch):
     published = []
     monkeypatch.setattr(
