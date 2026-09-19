@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from hermes_cli.main import cmd_update
+from hermes_cli.main import _run_update_transaction as cmd_update
 
 
 @pytest.fixture(autouse=True)
