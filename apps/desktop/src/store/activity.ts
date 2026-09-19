@@ -6,6 +6,7 @@ import { sessionMatchesStoredId } from '@/store/session'
 import type { ActionStatusResponse, CronJob, SessionInfo } from '@/types/hermes'
 
 import type { ComposerStatusItem } from './composer-status'
+import type { ApprovalRequest } from './prompts'
 import { buildSubagentTree, type SubagentNode, type SubagentProgress } from './subagents'
 
 const HISTORY_LIMIT = 8
@@ -123,11 +124,12 @@ function prune(tasks: Record<string, DesktopActionTask>): Record<string, Desktop
 
 export type TaskCenterStatus = RailTaskStatus | 'interrupted' | 'paused' | 'queued'
 export type TaskDurability = 'process-local' | 'restart-durable' | 'turn'
-export type TaskCenterRail = 'action' | 'cron' | 'preview' | 'process' | 'session' | 'subagent'
+export type TaskCenterRail = 'action' | 'approval' | 'cron' | 'preview' | 'process' | 'session' | 'subagent'
 export type TaskCenterAction = 'manage-cron' | 'open-session' | 'stop-process'
 
 export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   action?: TaskCenterAction
+  approvalRef?: string
   artifactRefs?: string[]
   depth?: number
   durability?: TaskDurability
@@ -140,10 +142,12 @@ export interface TaskCenterTask extends Omit<RailTask, 'status'> {
 
 export interface TaskCenterSources {
   actionTasks: Record<string, DesktopActionTask>
+  approvalRequests?: Record<string, ApprovalRequest>
   attentionSessionIds: readonly string[]
   backgroundBySession: Record<string, ComposerStatusItem[]>
   cronJobs: readonly CronJob[]
   previewRestart: PreviewServerRestart | null
+  runtimeStoredSessionIds?: Record<string, null | string>
   sessions: readonly SessionInfo[]
   subagentsBySession: Record<string, SubagentProgress[]>
   workingSessionIds: readonly string[]
@@ -240,31 +244,68 @@ const flattenSubagents = (
  * actions. This store never writes lifecycle state back into those owners.
  */
 export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask[] {
+  const approvals = Object.entries(sources.approvalRequests ?? {}).map<TaskCenterTask>(
+    ([runtimeKey, request]) => {
+      const runtimeSessionId = request.sessionId || runtimeKey
+      const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
+      const storedSessionCandidate = mappedStoredSessionId ?? runtimeSessionId
+      const storedSessionId =
+        sources.sessions.find(session => sessionMatchesStoredId(session, storedSessionCandidate))?.id ??
+        mappedStoredSessionId
+
+      return {
+        action: storedSessionId ? 'open-session' : undefined,
+        approvalRef: request.requestId,
+        detail: request.command,
+        durability: 'turn',
+        id: `approval:${request.requestId || runtimeSessionId}`,
+        label: request.description || 'Approval required',
+        ownerSessionId: runtimeSessionId,
+        rail: 'approval',
+        sessionId: storedSessionId ?? undefined,
+        status: 'waiting',
+        updatedAt: 0
+      }
+    }
+  )
+
+  const approvalSessionIds = new Set(approvals.flatMap(task => (task.sessionId ? [task.sessionId] : [])))
+
   const base = buildRailTasks(
     sources.workingSessionIds,
     sources.attentionSessionIds,
     sources.sessions,
     sources.previewRestart,
     sources.actionTasks
-  ).map<TaskCenterTask>(task => {
-    if (task.id.startsWith('session:')) {
-      const sessionId = task.id.slice('session:'.length)
+  )
+    .map<TaskCenterTask>(task => {
+      if (task.id.startsWith('session:')) {
+        const sessionId = task.id.slice('session:'.length)
+
+        return {
+          ...task,
+          action: 'open-session',
+          durability: 'turn',
+          rail: 'session',
+          sessionId
+        }
+      }
 
       return {
         ...task,
-        action: 'open-session',
-        durability: 'turn',
-        rail: 'session',
-        sessionId
+        durability: 'process-local',
+        rail: task.id.startsWith('preview:') ? 'preview' : 'action'
       }
-    }
-
-    return {
-      ...task,
-      durability: 'process-local',
-      rail: task.id.startsWith('preview:') ? 'preview' : 'action'
-    }
-  })
+    })
+    .filter(
+      task =>
+        !(
+          task.rail === 'session' &&
+          task.status === 'waiting' &&
+          task.sessionId &&
+          approvalSessionIds.has(task.sessionId)
+        )
+    )
 
   const subagents = Object.entries(sources.subagentsBySession).flatMap(([runtimeSessionId, items]) =>
     flattenSubagents(runtimeSessionId, buildSubagentTree(items))
@@ -308,7 +349,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     updatedAt: parseTimestamp(job.last_run_at)
   }))
 
-  return [...base, ...subagents, ...processes, ...cron].sort(
+  return [...approvals, ...base, ...subagents, ...processes, ...cron].sort(
     (left, right) =>
       TASK_STATUS_PRIORITY[left.status] - TASK_STATUS_PRIORITY[right.status] ||
       right.updatedAt - left.updatedAt ||
