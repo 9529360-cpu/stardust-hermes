@@ -1051,10 +1051,15 @@ def _review_tool_whitelist(
     """``(whitelist, configured_extra_tools)`` for the review fork — DISPATCH-side only, so the
     advertised ``tools[]`` stays byte-identical to the parent's (prompt-cache parity)."""
     from model_tools import get_tool_definitions
-    # Gate the built-in memory tool on BOTH the profile's memory flags and the trigger that fired
-    # (#105921): a skill-nudge review never gets the memory tool, so an unattended fork cannot
-    # act on the memory tool's "consolidate now" hint and delete entries no one reviewed.
-    memory_on = review_agent._memory_enabled or review_agent._user_profile_enabled
+    # Gate the built-in memory tool on the master privacy posture, the per-target
+    # flags, AND the trigger that fired. Long-lived parents can outlive a config flip, so
+    # the master bit must dominate stale _memory_enabled/_user_profile_enabled values.
+    # (#105921): a skill-nudge review never gets the memory tool, so an unattended fork
+    # cannot act on the memory tool's "consolidate now" hint and delete entries no one reviewed.
+    memory_on = (
+        getattr(review_agent, "_memory_persistence_enabled", True)
+        and (review_agent._memory_enabled or review_agent._user_profile_enabled)
+    )
     review_toolsets = ["memory", "skills"] if memory_on and review_memory else ["skills"]
     whitelist = {t["function"]["name"] for t in get_tool_definitions(enabled_toolsets=review_toolsets, quiet_mode=True)}
     # Read-only file tools: denying read_file/search_files caused a per-review denial storm that
