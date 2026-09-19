@@ -243,6 +243,65 @@ class TestMemoryManager:
         mgr.on_session_end(raw_reenabled)
         assert len(provider.session_end_messages) == 1
 
+    def test_queued_session_boundary_rechecks_privacy_before_provider_write(self):
+        state = {"enabled": True}
+
+        class BoundaryProvider(FakeMemoryProvider):
+            def __init__(self):
+                super().__init__("boundary")
+                self.session_end_messages = []
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+        provider = BoundaryProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+
+        queued = []
+        mgr._submit_background = lambda fn, **kwargs: queued.append(fn)
+        mgr.commit_session_boundary_async([], new_session_id="new", parent_session_id="old")
+        assert len(queued) == 1
+
+        state["enabled"] = False
+        queued[0]()
+
+        assert provider.session_end_messages == []
+
+    def test_session_boundary_uses_frozen_visible_history_snapshot(self):
+        state = {"enabled": True}
+
+        class BoundaryProvider(FakeMemoryProvider):
+            def __init__(self):
+                super().__init__("boundary")
+                self.session_end_messages = []
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+        provider = BoundaryProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+
+        queued = []
+        mgr._submit_background = lambda fn, **kwargs: queued.append(fn)
+        mgr.commit_session_boundary_async([], new_session_id="new", parent_session_id="old")
+        mgr.sync_all("new user", "new answer", session_id="new")
+
+        # sync_all records the new visible turn synchronously, so this reproduces
+        # the old execution-time re-read race before the queued boundary runs.
+        assert len(queued) == 2
+        queued[0]()
+
+        assert [[row["content"] for row in snapshot] for snapshot in provider.session_end_messages] == [
+            ["old user", "old answer"]
+        ]
+
+
     def test_privacy_scoped_history_clears_on_session_switch(self):
         state = {"enabled": True}
 
