@@ -137,10 +137,13 @@ class TestFallbackChain:
     releases (opus 4.8, etc.) never reach the picker.
     """
 
-    PRIMARY = "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
-    FALLBACK = (
-        "https://raw.githubusercontent.com/NousResearch/hermes-agent"
+    PRIMARY = (
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
         "/main/website/static/api/model-catalog.json"
+    )
+    FALLBACK = (
+        "https://github.com/9529360-cpu/stardust-hermes"
+        "/raw/refs/heads/main/website/static/api/model-catalog.json"
     )
 
     def test_uses_primary_when_it_succeeds(self, isolated_home):
@@ -269,6 +272,21 @@ class TestDefaultModelFromCache:
                 f"{provider}: exactly one entry must be labeled default and it "
                 f"must match PREFERRED_SILENT_DEFAULT_MODEL"
             )
+
+
+class TestMasterCatalogOverride:
+    def test_explicit_user_url_is_preserved(self, isolated_home):
+        from hermes_cli import model_catalog
+
+        custom = "https://catalog.example.invalid/stardust.json"
+        with patch(
+            "hermes_cli.config.load_config",
+            return_value={"model_catalog": {"url": custom, "ttl_minutes": 45}},
+        ):
+            cfg = model_catalog._load_catalog_config()
+
+        assert cfg["url"] == custom
+        assert cfg["ttl_hours"] == 0.75
 
 
 class TestProviderOverride:
