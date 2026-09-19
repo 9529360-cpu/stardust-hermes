@@ -148,6 +148,47 @@ def test_direct_messages_filter_keeps_prose_of_tool_call_messages():
     assert messages[1]["tool_calls"]
 
 
+def test_privacy_manager_checkpoint_keeps_current_turn_and_normalizes_evidence():
+    state = {"enabled": True}
+    manager = MemoryManager(privacy_enabled=lambda: state["enabled"])
+    durable = _CheckpointProvider("durable")
+    manager.add_provider(durable)
+
+    # Simulate an earlier enabled turn already exposed to memory.
+    manager.sync_all("old enabled user", "old enabled answer")
+    manager.flush_pending(timeout=5)
+
+    raw = [
+        {"role": "user", "content": "disabled-era row must not appear"},
+        {"role": "assistant", "content": "disabled-era answer"},
+        {"role": "user", "content": "current user before compaction"},
+        {
+            "role": "assistant",
+            "content": "current assistant prose",
+            "tool_calls": [{"id": "t1", "function": {"name": "read_file"}}],
+        },
+        {"role": "tool", "content": "tool payload", "tool_call_id": "t1"},
+    ]
+    evidence = _direct_messages_for_pre_compress_memory(raw)
+
+    manager.on_pre_compress(
+        raw,
+        evidence_messages=evidence,
+        require_checkpoint=True,
+    )
+
+    received = durable.pre_compress_calls[-1]
+    assert [row["role"] for row in received] == ["user", "assistant", "user", "assistant"]
+    assert [row["content"] for row in received] == [
+        "old enabled user",
+        "old enabled answer",
+        "current user before compaction",
+        "current assistant prose",
+    ]
+    assert all("tool_calls" not in row for row in received)
+    assert all(row.get("content") != "disabled-era row must not appear" for row in received)
+
+
 def test_manager_advertises_checkpoint_capability_only_with_capable_provider():
     # The host allows one external provider per manager, so capability is
     # probed on two separate managers.
