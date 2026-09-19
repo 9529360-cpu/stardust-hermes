@@ -75,3 +75,42 @@ Action taken:
 
 Potential Skill finding:
 debugging 信号未被 context router 映射到回归调试 owner，值得后续评估；本次不修改 Skill。
+
+
+## Observation 3
+
+Stage:
+review / stabilization checkpoint
+
+Task:
+审查并收敛高风险开放修复；完成 e-stop incomplete-resume 修复合并，并修正 memory/ACP 候选的负空间回归。
+
+Primary owner:
+review
+
+Active references:
+- references/code-review-patterns.md
+- references/semantic-diff-behavior-change.md
+- references/negative-space-patch-compression.md
+
+Deferred references:
+- references/runtime-lifecycle-patterns.md
+- references/host-shell-platform-patterns.md
+
+Reference load:
+active count 3 / active bytes 21415 / byte budget 65536
+
+Tool activity:
+针对 PR patch、scoped AGENTS.md 和失败 job 摘要做定向读取；大型 CI 日志在工具内按失败签名过滤。未重新全仓扫描。
+
+Context behavior:
+checkpoint
+
+Observed issue:
+发现 PR #34 reset 会写穿 memory symlink；PR #35 off-start agent 无法在同一生命周期恢复 memory stack；PR #33 exact-name 文档与 casefold 实现不一致。
+
+Action taken:
+修复三条候选并补回归测试；确认 PR #24 的失败均来自共享基线后 squash 合并到 main（1af81c6）。
+
+Potential Skill finding:
+review 路由和 negative-space 检查对候选回归有效；除 Observation 2 的 debugging signal 未匹配外，未观察到新的 Skill 问题。
