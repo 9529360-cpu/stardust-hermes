@@ -433,6 +433,8 @@ class MemoryManager:
 
     def build_system_prompt(self) -> str:
         """Join every provider's non-empty ``system_prompt_block()`` with blank lines."""
+        if not self._privacy_enabled():
+            return ""
         blocks = self._each_provider("system_prompt_block() failed", lambda p: p.system_prompt_block(),
                                       level=logging.WARNING)
         return "\n\n".join(b for b in blocks if b and b.strip())
@@ -443,6 +445,8 @@ class MemoryManager:
 
     def prefetch_all(self, query: str, *, session_id: str = "") -> str:
         """Merge non-empty prefetch context from all providers (failures are non-fatal)."""
+        if not self._privacy_enabled():
+            return ""
         clean_query = self._strip_skill_scaffolding(query)
         if not clean_query:
             return ""
@@ -460,6 +464,9 @@ class MemoryManager:
         result_box: Dict[str, Any] = {}
 
         def _run() -> None:
+            if not self._privacy_enabled():
+                result_box["value"] = ""
+                return
             try:
                 result_box["value"] = provider.prefetch(query, session_id=session_id) or ""
             except Exception as exc:  # pragma: no cover - re-raised by caller
@@ -500,6 +507,8 @@ class MemoryManager:
     def describe_recall(self) -> str:
         """Deterministic recall indicator line (e.g. ``"🧠 Provider — recalled 3 memories"``); ``""`` if none.
         Call right after :meth:`prefetch_all` so the user SEES memory was used even if the model is silent."""
+        if not self._privacy_enabled():
+            return ""
         segments: List[str] = []
         for status in self._each_provider("recall_status failed (non-fatal)", lambda p: p.recall_status()):
             if status is None:
@@ -512,14 +521,21 @@ class MemoryManager:
 
     def queue_prefetch_all(self, query: str, *, session_id: str = "") -> None:
         """Queue background prefetch on all providers for the next turn (see ``sync_all``)."""
+        if not self._privacy_enabled():
+            return
         providers = list(self._providers)
         clean_query = self._strip_skill_scaffolding(query) if providers else None
         if not clean_query:
             return
-        self._submit_background(lambda: self._each_provider(
-            "queue_prefetch failed (non-fatal)", lambda p: p.queue_prefetch(clean_query, session_id=session_id),
-            providers=providers,
-        ), kind="prefetch")
+        def _queued_prefetch() -> None:
+            if not self._privacy_enabled():
+                return
+            self._each_provider(
+                "queue_prefetch failed (non-fatal)", lambda p: p.queue_prefetch(clean_query, session_id=session_id),
+                providers=providers,
+            )
+
+        self._submit_background(_queued_prefetch, kind="prefetch")
 
     @staticmethod
     def _provider_sync_accepts(provider: MemoryProvider, keyword: str) -> bool:
@@ -536,11 +552,15 @@ class MemoryManager:
         open after the user saw the response. The single worker also serializes writes (turn N before N+1).
         ``turn_author`` reaches only providers whose ``sync_turn`` accepts it.
         """
+        if not self._privacy_enabled():
+            return
         providers = list(self._providers)
         clean_user_content = self._strip_skill_scaffolding(user_content) if providers else None
         if not clean_user_content:
             return
-        optional_kwargs = {"messages": messages, "turn_author": turn_author}
+        self._record_provider_visible_turn(clean_user_content, assistant_content)
+        provider_messages = self._provider_history(messages)
+        optional_kwargs = {"messages": provider_messages, "turn_author": turn_author}
 
         def _sync(provider: MemoryProvider) -> None:
             kwargs: Dict[str, Any] = {"session_id": session_id}
@@ -549,9 +569,12 @@ class MemoryManager:
                     kwargs[keyword] = value
             provider.sync_turn(clean_user_content, assistant_content, **kwargs)
 
-        self._submit_background(
-            lambda: self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
-        )
+        def _run_sync() -> None:
+            if not self._privacy_enabled():
+                return
+            self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
+
+        self._submit_background(_run_sync)
 
     def _submit_background(self, fn, *, kind: str = "write") -> None:
         """Queue ``fn`` on the serialized worker (created lazily; None once shutting down) and track its
