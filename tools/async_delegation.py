@@ -221,11 +221,13 @@ def publish_durable_completion(
         **{k: v for k, v in metadata.items() if k in {"cron_job_id", "cron_job_name"}},
     }
     process_registry = None
-    try:
-        from tools.process_registry import process_registry as _process_registry
-        process_registry = _process_registry
-    except Exception:
-        logger.debug("Durable completion queue is unavailable before persistence", exc_info=True)
+    external_cron_worker = bool(os.environ.get("_HERMES_CRON_EXTERNAL_WORKER"))
+    if not external_cron_worker:
+        try:
+            from tools.process_registry import process_registry as _process_registry
+            process_registry = _process_registry
+        except Exception:
+            logger.debug("Durable completion queue is unavailable before persistence", exc_info=True)
     inserted = False
     with _DB_LOCK, _transaction() as conn:
         cur = conn.execute("""INSERT OR IGNORE INTO async_delegations
@@ -240,9 +242,14 @@ def publish_durable_completion(
         return False
     _prune_durable_records()
     if process_registry is None:
-        logger.error(
-            "Durable completion %s persisted but queue publication was unavailable; recovery will replay it.",
-            delegation_id)
+        if external_cron_worker:
+            logger.debug(
+                "Durable completion %s persisted by restart-safe cron worker; live session pollers will pick it up.",
+                delegation_id)
+        else:
+            logger.error(
+                "Durable completion %s persisted but queue publication was unavailable; recovery will replay it.",
+                delegation_id)
     else:
         try:
             process_registry.completion_queue.put(evt)
