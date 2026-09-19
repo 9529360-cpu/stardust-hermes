@@ -27,3 +27,12 @@ def test_stardust_dashboard_backend_updates_are_externally_managed() -> None:
     # Dashboard check/apply must never reactivate the inherited upstream-oriented
     # update machinery while the Stardust CLI updater is intentionally disabled.
     assert _dashboard_local_update_managed_externally() is True
+
+def test_shipped_example_keeps_passive_updates_off() -> None:
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parents[1] / "cli-config.yaml.example").read_text(encoding="utf-8")
+    updates = source.split("\nupdates:\n", 1)[1].split("\n\n", 1)[0]
+    assert "\n  check: false" in "\n" + updates
+    assert "\n  check: true" not in "\n" + updates
+
