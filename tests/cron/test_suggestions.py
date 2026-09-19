@@ -148,6 +148,27 @@ class TestStore:
         # And accepting again is a no-op (not pending anymore).
         assert store.accept_suggestion("acc") is None
 
+    def test_accept_from_desktop_captures_local_return_route(self, store):
+        from gateway.session_context import clear_session_vars, set_session_vars
+
+        _add(store, key="desktop-return", title="Desktop Job")
+        created = {}
+
+        def fake_create_job(**kwargs):
+            created.update(kwargs)
+            return {"id": "job-local", **kwargs}
+
+        tokens = set_session_vars(source="desktop", session_id="desktop-suggestion-session")
+        try:
+            with patch("cron.jobs.create_job", fake_create_job):
+                job = store.accept_suggestion("1")
+        finally:
+            clear_session_vars(tokens)
+
+        assert job is not None
+        assert created["local_session_origin"] == {
+            "source": "desktop", "session_id": "desktop-suggestion-session"}
+
     def test_registration_failure_marks_suggestion_accepted(self, store):
         """Retrying an acceptance must not create a duplicate durable job."""
         from cron.scheduler import CronSchedulerRegistrationError
