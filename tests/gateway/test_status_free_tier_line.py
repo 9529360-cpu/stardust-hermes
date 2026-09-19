@@ -79,9 +79,12 @@ def isolated_auth_store(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_status_names_the_free_tier_and_the_slash_command_when_the_free_tier_carries_inference(
+    monkeypatch,
 ):
     runner = _runner()
     _seed_nous(_free_tier_state())
+    monkeypatch.setattr("hermes_cli.auth.resolve_provider", lambda *_args, **_kwargs: "nous")
+    monkeypatch.setattr(anon_auth, "guest_carries_inference", lambda: True)
 
     result = await runner._handle_message(_make_event("/status"))
 
@@ -117,7 +120,7 @@ async def test_a_status_gate_failure_never_breaks_status(monkeypatch):
 
 def test_the_line_comes_from_the_catalog_in_every_language():
     assert t("gateway.status.free_tier") == anon_auth.FREE_TIER_STATUS_LINE
-    # Every catalog carries its own translated tier label; route and recovery command stay stable.
+    # Every catalog keeps its translated tier label, but recovery stays on Stardust's model surface.
     for lang in ("ja", "de"):
         line = t("gateway.status.free_tier", lang=lang)
         assert line != anon_auth.FREE_TIER_STATUS_LINE
