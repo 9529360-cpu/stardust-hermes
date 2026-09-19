@@ -91,6 +91,47 @@ class TestSpawnForwardsScope:
             assert captured["review_memory"] is True
 
 
+class TestMasterPrivacyReviewWriteGate:
+    def test_old_background_review_store_cannot_write_or_stage_after_master_off(self, tmp_path, monkeypatch):
+        import json
+
+        from tools import write_approval as wa
+        from tools.memory_tool import MemoryStore, memory_tool
+        from tools.skill_provenance import reset_current_write_origin, set_current_write_origin
+
+        home = tmp_path / "home"
+        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: home / "memories")
+        monkeypatch.setattr(
+            "hermes_cli.config.load_config_readonly",
+            lambda: {
+                "memory": {
+                    "enabled": False,
+                    "memory_enabled": True,
+                    "user_profile_enabled": True,
+                    "write_approval": True,
+                }
+            },
+        )
+
+        # Simulate a review fork/store created before the config flip. The live
+        # mutation chokepoint must still honor the new master privacy state.
+        store = MemoryStore(memory_enabled=True, user_profile_enabled=True)
+        store.load_from_disk()
+
+        token = set_current_write_origin("background_review")
+        try:
+            result = json.loads(memory_tool("add", "memory", "must stay forgotten", store=store))
+        finally:
+            reset_current_write_origin(token)
+
+        assert result["success"] is False
+        assert result["memory_disabled"] is True
+        assert "staged" not in result
+        assert wa.list_pending(wa.MEMORY) == []
+        assert not (home / "memories" / "MEMORY.md").exists()
+
+
 class TestExplicitRefineOrigin:
     """``/refine`` (explicit) must not inherit the unattended-review origin: the user asked
     for that review, so its fork keeps the full memory operation set and the delete gate
