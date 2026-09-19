@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HermesReadDirResult } from '@/global'
 import type * as HermesModule from '@/hermes'
 
-import { $pluginRecords, publishPlugin, setPluginEnabled } from './plugins-store'
+import { $pluginDecisions, $pluginRecords, publishPlugin, setPluginEnabled } from './plugins-store'
 import { discoverRuntimePlugins, loadRuntimePlugin, watchRuntimePlugins } from './runtime-loader'
 
 // getStatus would supply the connected backend's hermes_home — a REMOTE path in
@@ -35,6 +35,8 @@ beforeEach(() => {
   stopPreviewFileWatch.mockResolvedValue(true)
   onPreviewFileChanged.mockReset()
   getStatus.mockClear()
+  $pluginDecisions.set({})
+  $pluginRecords.set({})
   ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
     desktopPluginsRoot,
     onPreviewFileChanged,
@@ -152,7 +154,11 @@ describe('scanDiskPlugins (#66899)', () => {
     readFileText.mockImplementation(async file =>
       file.endsWith('.hermes-package.json')
         ? { text: JSON.stringify({ package: 'uni-pkg', source: '/x/plugins/uni-pkg/desktop', sourceMtimeMs: 1 }) }
-        : { text: 'export default { id: "uni", register: globalThis.__uniRegister }' }
+        : {
+            text:
+              'globalThis.__uniEvaluated = (globalThis.__uniEvaluated ?? 0) + 1; ' +
+              'export default { id: "uni", defaultEnabled: true, register: globalThis.__uniRegister }'
+          }
     )
     watchPreviewFile.mockResolvedValue({ id: 'w-uni' })
 
@@ -181,15 +187,22 @@ describe('scanDiskPlugins (#66899)', () => {
     try {
       await discoverRuntimePlugins()
 
-      // Inventoried for Capabilities → Plugins with its package identity, but
-      // the unified posture wins: installed-but-inert until the user toggles.
-      expect($pluginRecords.get().uni).toMatchObject({ kind: 'disk', status: 'disabled', packageName: 'uni-pkg' })
+      // Discovery inventories from metadata only. Even plugin-authored
+      // defaultEnabled=true cannot cause ESM top-level code to run.
+      expect($pluginRecords.get()['disk:uni']).toMatchObject({
+        kind: 'disk',
+        status: 'disabled',
+        packageName: 'uni-pkg',
+        decisionKey: 'uni'
+      })
+      expect((globalThis as unknown as { __uniEvaluated?: number }).__uniEvaluated).toBeUndefined()
       expect(register).not.toHaveBeenCalled()
 
-      // The user's explicit enable still activates it.
-      await setPluginEnabled('uni', true)
+      // The user's explicit enable is the FIRST point at which source is evaluated.
+      await setPluginEnabled('disk:uni', true)
+      expect((globalThis as unknown as { __uniEvaluated?: number }).__uniEvaluated).toBe(1)
       expect(register).toHaveBeenCalledTimes(1)
-      expect($pluginRecords.get().uni.status).toBe('loaded')
+      expect($pluginRecords.get().uni).toMatchObject({ status: 'loaded', decisionKey: 'uni' })
 
       // Electron removing the copy (package uninstalled) unloads the previous
       // Desktop registration instead of leaving a live ghost behind.
@@ -202,6 +215,7 @@ describe('scanDiskPlugins (#66899)', () => {
       revokeObjectURL.mockRestore()
       vi.stubGlobal('Blob', RealBlob)
       delete (globalThis as unknown as { __uniRegister?: unknown }).__uniRegister
+      delete (globalThis as unknown as { __uniEvaluated?: number }).__uniEvaluated
     }
   })
 })
@@ -268,7 +282,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     })
   }
 
-  it('loads the full source via readPluginSource when the shell offers it', async () => {
+  it('does not read or evaluate standalone source until the user explicitly enables it', async () => {
     ;(window.hermesDesktop as unknown as { readPluginSource: unknown }).readPluginSource = readPluginSource
     desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
     standaloneRootWith('big')
@@ -279,7 +293,9 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
 
     ;(globalThis as unknown as { __bigRegister: unknown }).__bigRegister = register
     readPluginSource.mockResolvedValue({
-      text: 'export default { id: "big", register: globalThis.__bigRegister }'
+      text:
+        'globalThis.__bigEvaluated = (globalThis.__bigEvaluated ?? 0) + 1; ' +
+        'export default { id: "big", defaultEnabled: true, register: globalThis.__bigRegister }'
     })
     watchPreviewFile.mockResolvedValue({ id: 'w-big' })
 
@@ -288,13 +304,57 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
-      // The EVALUATED source came from the full read, not the truncated preview.
+      expect(readPluginSource).not.toHaveBeenCalled()
+      expect((globalThis as unknown as { __bigEvaluated?: number }).__bigEvaluated).toBeUndefined()
+      expect(register).not.toHaveBeenCalled()
+      expect($pluginRecords.get()['disk:big']).toMatchObject({
+        kind: 'disk',
+        status: 'disabled',
+        decisionKey: 'big'
+      })
+
+      await setPluginEnabled('disk:big', true)
+
+      // Once trusted, the EVALUATED source comes from the full read, not preview.
       expect(readPluginSource).toHaveBeenCalledWith('/local/.hermes/desktop-plugins/big/plugin.js')
+      expect((globalThis as unknown as { __bigEvaluated?: number }).__bigEvaluated).toBe(1)
       expect(register).toHaveBeenCalledTimes(1)
-      expect($pluginRecords.get().big).toMatchObject({ kind: 'disk', status: 'loaded' })
+      expect($pluginRecords.get().big).toMatchObject({ kind: 'disk', status: 'loaded', decisionKey: 'big' })
     } finally {
       restore()
       delete (globalThis as unknown as { __bigRegister?: unknown }).__bigRegister
+      delete (globalThis as unknown as { __bigEvaluated?: number }).__bigEvaluated
+    }
+  })
+
+  it('binds enable/disable trust to the folder identity even when plugin.id differs', async () => {
+    desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
+    standaloneRootWith('folder-name')
+    readFileText.mockResolvedValue({
+      text: 'export default { id: "actual-id", register() {} }'
+    })
+    watchPreviewFile.mockResolvedValue({ id: 'w-different-id' })
+    const restore = blobToDataUrl()
+
+    try {
+      await discoverRuntimePlugins()
+      expect($pluginRecords.get()['disk:folder-name']).toMatchObject({
+        status: 'disabled',
+        decisionKey: 'folder-name'
+      })
+
+      await setPluginEnabled('disk:folder-name', true)
+      expect($pluginRecords.get()['actual-id']).toMatchObject({
+        status: 'loaded',
+        decisionKey: 'folder-name'
+      })
+      expect($pluginDecisions.get()['folder-name']).toBe(true)
+
+      await setPluginEnabled('actual-id', false)
+      expect($pluginDecisions.get()['folder-name']).toBe(false)
+      expect($pluginRecords.get()['actual-id'].status).toBe('disabled')
+    } finally {
+      restore()
     }
   })
 
@@ -313,7 +373,14 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
-      // No live plugin — an error inventory row names the folder instead.
+      // Discovery is safe even on an older shell: it does not read plugin.js.
+      expect(readFileText).not.toHaveBeenCalled()
+      expect($pluginRecords.get()['disk:huge']).toMatchObject({ kind: 'disk', status: 'disabled' })
+
+      await setPluginEnabled('disk:huge', true)
+
+      // Once the user trusts it, the legacy preview cap fails loudly rather than
+      // evaluating a truncated module.
       expect($pluginRecords.get().huge).toMatchObject({
         kind: 'disk',
         status: 'error',
@@ -342,8 +409,14 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
+      expect(readFileText).not.toHaveBeenCalled()
+      expect(register).not.toHaveBeenCalled()
+      expect($pluginRecords.get()['disk:small']).toMatchObject({ kind: 'disk', status: 'disabled' })
+
+      await setPluginEnabled('disk:small', true)
+
       expect(register).toHaveBeenCalledTimes(1)
-      expect($pluginRecords.get().small).toMatchObject({ kind: 'disk', status: 'loaded' })
+      expect($pluginRecords.get().small).toMatchObject({ kind: 'disk', status: 'loaded', decisionKey: 'small' })
     } finally {
       restore()
       delete (globalThis as unknown as { __smallRegister?: unknown }).__smallRegister
@@ -380,7 +453,7 @@ describe('bundled-shadowed disk copies', () => {
       const id = await loadRuntimePlugin(
         'export default { id: "hermes-bots", name: "Bot Mode", register() {} }',
         'hermes-bots',
-        { file: '/local/.hermes/desktop-plugins/hermes-bots/plugin.js' }
+        { evaluationAuthorized: true, file: '/local/.hermes/desktop-plugins/hermes-bots/plugin.js' }
       )
 
       // Skipped — the bundled copy stays the only live registration...
