@@ -710,7 +710,10 @@ class MemoryManager:
         share the same worker. If the executor is unavailable, ``_submit_background`` degrades to inline
         execution — the pre-#16454 synchronous behavior, slow but correct.
         """
-        if not self._providers or not self._privacy_enabled():
+        if not self._providers:
+            return
+        if not self._privacy_enabled():
+            self._clear_provider_visible_history()
             return
         snapshot = self._provider_history(messages)
 
