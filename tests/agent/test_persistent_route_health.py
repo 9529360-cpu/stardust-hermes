@@ -1,12 +1,12 @@
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
-from agent.error_classifier import FailoverReason
 from agent import route_health
+from agent.error_classifier import FailoverReason
 
 
 def _home(monkeypatch, tmp_path):
