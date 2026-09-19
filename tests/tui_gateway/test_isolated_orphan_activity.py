@@ -1,6 +1,8 @@
 """Detached Desktop/TUI turns use child-owned activity, not process heartbeats."""
 
+import os
 from pathlib import Path
+import site
 import sys
 import threading
 import time
@@ -57,7 +59,7 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
         ],
         registry_path=tmp_path / "host.json", env={
             "HERMES_HOME": str(home),
-            "PYTHONPATH": str(Path(sys.prefix) / "Lib" / "site-packages"),
+            "PYTHONPATH": os.pathsep.join(site.getsitepackages()),
         },
         expected_hermes_home=str(home), rpc_sink=server._relay_compute_host_rpc,
         heartbeat_secs=1, autostart=False)
