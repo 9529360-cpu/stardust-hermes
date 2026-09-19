@@ -281,16 +281,28 @@ class A2AAdapter(BasePlatformAdapter):
         # do_GET/do_POST run on ThreadingHTTPServer's per-connection OS threads, which never inherit
         # the profile scope contextvar (same class as A2A_PORT above).
         self._public_url = _get_scoped_secret("A2A_PUBLIC_URL", "").strip()
-        # Request/watchdog threads do not inherit the profile secret ContextVar. Capture the
-        # profile's timeout while construction still runs inside _profile_runtime_scope.
+        # Request/watchdog threads do not inherit the profile secret ContextVar. Capture every
+        # immutable request-thread setting while construction still runs inside _profile_runtime_scope.
         self._reply_timeout_seconds = _reply_timeout()
+        self._max_pingpong_turns = protocol.max_pingpong_turns(
+            _get_scoped_secret("A2A_MAX_PINGPONG_TURNS")
+        )
+        self._provider_organization = _get_scoped_secret(
+            "A2A_PROVIDER_ORG", "Hermes Agent"
+        )
+        self._provider_url = _get_scoped_secret("A2A_PROVIDER_URL", "")
+        self._rate_limit = _get_scoped_secret("A2A_RATE_LIMIT")
         self._agents = self._load_served_agents(extra)
         self._httpd: Optional[ThreadingHTTPServer] = None
         self._server_thread = self._watchdog_thread = None  # type: Optional[threading.Thread]
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._watchdog_stop = threading.Event()
         # Per-adapter protocol state (not module-global).
-        self.tasks, self._turns, self._rate_limiter = protocol.TaskStore(), protocol.TurnTracker(), protocol.RateLimiter()
+        self.tasks, self._turns, self._rate_limiter = (
+            protocol.TaskStore(),
+            protocol.TurnTracker(),
+            protocol.RateLimiter(self._rate_limit),
+        )
         # Forwarded profile sessions: (profile, agent_slug, context_id) -> session_id.
         self._profile_sessions: Dict[tuple[str, str, str], str] = {}
         self._profile_session_locks: Dict[tuple[str, str, str], threading.Lock] = {}
@@ -462,6 +474,8 @@ class A2AAdapter(BasePlatformAdapter):
             description=agent.get("description") or _DEFAULT_DESCRIPTION, skills=self._advertised_skills(agent),
             streaming=bool(agent.get("local", True)), push_notifications=True,
             auth_required=not self._security_context.localhost_only(), tenant=str(agent.get("tenant") or ""),
+            provider_organization=self._provider_organization,
+            provider_url=self._provider_url,
         )
 
     def _advertised_skills(self, agent: Optional[dict] = None) -> list[dict]:
@@ -537,7 +551,7 @@ class A2AAdapter(BasePlatformAdapter):
         context_id = protocol.extract_context_id(params) or protocol.new_context_id()
         task_id = protocol.new_task_id()
         turn = self._turns.track(context_id)
-        max_turns = protocol.max_pingpong_turns()
+        max_turns = self._max_pingpong_turns
         rec = self.tasks.create(task_id, context_id, peer, *self._scope_for_agent(agent))
         if turn > max_turns:
             protocol.metrics.anti_loop_triggers += 1
