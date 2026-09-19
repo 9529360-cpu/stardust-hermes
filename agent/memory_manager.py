@@ -335,23 +335,51 @@ class MemoryManager:
     def _provider_history(self, raw_messages: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """History a provider is allowed to see.
 
-        Production managers expose only direct user/assistant turns that passed through
-        sync_all while memory.enabled was on. This prevents a newly re-enabled provider
-        from receiving transcript rows created during the disabled interval via later
-        session-end or pre-compress hooks. Standalone managers without a privacy reader
-        keep the historical raw-message contract for compatibility.
+        Production managers retain the original message shape (including tool calls/results)
+        for turns that completed while memory.enabled was on. Turns completed while the
+        master switch was off never enter this exposure ledger, so re-enabling cannot
+        backfill that disabled interval through sync, pre-compress, or session-end hooks.
+        Standalone managers without a privacy reader keep the historical raw-message contract.
         """
         if self._privacy_enabled_check is None:
             return list(raw_messages or [])
         with self._provider_visible_history_lock:
             return [dict(message) for message in self._provider_visible_history]
 
-    def _record_provider_visible_turn(self, user_content: str, assistant_content: str) -> None:
-        if self._privacy_enabled_check is None:
-            return
-        rows = [{"role": "user", "content": user_content}]
+    @staticmethod
+    def _completed_turn_slice(
+        messages: Optional[List[Dict[str, Any]]],
+        user_content: str,
+        assistant_content: str,
+    ) -> List[Dict[str, Any]]:
+        """Copy only the just-completed turn from a full session transcript.
+
+        The last user-role row is the turn boundary in the conversation format; every
+        following assistant/tool row belongs to that turn. This preserves rich provider
+        inputs such as OpenViking tool-call evidence without exposing earlier disabled
+        transcript rows.
+        """
+        if isinstance(messages, list):
+            for index in range(len(messages) - 1, -1, -1):
+                row = messages[index]
+                if isinstance(row, dict) and row.get("role") == "user":
+                    copied = [dict(item) for item in messages[index:] if isinstance(item, dict)]
+                    if copied:
+                        return copied
+        rows: List[Dict[str, Any]] = [{"role": "user", "content": user_content}]
         if assistant_content:
             rows.append({"role": "assistant", "content": assistant_content})
+        return rows
+
+    def _record_provider_visible_turn(
+        self,
+        user_content: str,
+        assistant_content: str,
+        messages: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        if self._privacy_enabled_check is None:
+            return
+        rows = self._completed_turn_slice(messages, user_content, assistant_content)
         with self._provider_visible_history_lock:
             self._provider_visible_history.extend(rows)
 
@@ -558,7 +586,7 @@ class MemoryManager:
         clean_user_content = self._strip_skill_scaffolding(user_content) if providers else None
         if not clean_user_content:
             return
-        self._record_provider_visible_turn(clean_user_content, assistant_content)
+        self._record_provider_visible_turn(clean_user_content, assistant_content, messages)
         provider_messages = self._provider_history(messages)
         optional_kwargs = {"messages": provider_messages, "turn_author": turn_author}
 
