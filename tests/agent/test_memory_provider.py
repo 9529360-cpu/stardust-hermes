@@ -325,6 +325,54 @@ class TestMemoryManager:
         ]
 
 
+    def test_queued_sync_cancelled_by_privacy_off_is_not_backfilled_after_reenable(self):
+        state = {"enabled": True}
+        provider = MessagesMemoryProvider("privacy-queue")
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        queued = []
+        mgr._submit_background = lambda fn, **kwargs: queued.append(fn)
+
+        first_messages = [
+            {"role": "user", "content": "queued before privacy off"},
+            {"role": "assistant", "content": "must never reach provider"},
+        ]
+        mgr.sync_all(
+            "queued before privacy off",
+            "must never reach provider",
+            session_id="s1",
+            messages=first_messages,
+        )
+        assert len(queued) == 1
+
+        state["enabled"] = False
+        queued.pop(0)()
+        assert provider.synced_turns == []
+
+        state["enabled"] = True
+        second_messages = first_messages + [
+            {"role": "user", "content": "visible after re-enable"},
+            {"role": "assistant", "content": "visible answer"},
+        ]
+        mgr.sync_all(
+            "visible after re-enable",
+            "visible answer",
+            session_id="s1",
+            messages=second_messages,
+        )
+        assert len(queued) == 1
+        queued.pop(0)()
+
+        assert len(provider.synced_turns) == 1
+        forwarded = provider.synced_turns[0][3]
+        assert [row["content"] for row in forwarded] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+        assert all(row.get("content") != "queued before privacy off" for row in forwarded)
+
+
     def test_queued_session_boundary_rechecks_privacy_before_provider_write(self):
         state = {"enabled": True}
 
