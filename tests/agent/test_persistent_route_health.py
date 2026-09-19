@@ -35,6 +35,45 @@ def _claim_probe(home, results):
     results.put(("second", child_route_health.allow_route("p", "m", "https://x.test")))
 
 
+def test_relative_health_file_is_scoped_to_active_profile(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        route_health,
+        "_config",
+        lambda: {"persistent_health": True, "health_file": "runtime/route-health.json"},
+    )
+    first = tmp_path / "profile-a"
+    second = tmp_path / "profile-b"
+
+    monkeypatch.setenv("HERMES_HOME", str(first))
+    route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+    first_path = first / "runtime" / "route-health.json"
+    assert route_health.state_path() == first_path
+    assert first_path.exists()
+
+    monkeypatch.setenv("HERMES_HOME", str(second))
+    second_path = second / "runtime" / "route-health.json"
+    assert route_health.state_path() == second_path
+    assert second_path != first_path
+    assert route_health.allow_route("p", "m", "https://x.test") == (True, 0, "healthy")
+
+    route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+    assert second_path.exists()
+    assert first_path.read_bytes() != b""
+    assert second_path.read_bytes() != b""
+
+
+def test_absolute_health_file_override_remains_explicit(monkeypatch, tmp_path):
+    explicit = tmp_path / "shared-operator-state.json"
+    monkeypatch.setattr(
+        route_health,
+        "_config",
+        lambda: {"persistent_health": True, "health_file": str(explicit)},
+    )
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profile"))
+
+    assert route_health.state_path() == explicit
+
+
 def test_failure_persists_and_fresh_caller_skips(monkeypatch, tmp_path):
     _home(monkeypatch, tmp_path)
     cooldown = route_health.record_failure(
