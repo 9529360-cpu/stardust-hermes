@@ -355,9 +355,10 @@ class MemoryManager:
         with self._provider_visible_history_lock:
             visible = [dict(message) for message in self._provider_visible_history]
         if include_current_turn:
-            current = self._last_user_slice(raw_messages)
-            if current and current != visible[-len(current):]:
-                visible.extend(current)
+            # Pre-compress runs before this turn's end-of-turn sync, so the live
+            # last-user slice is always the not-yet-recorded current turn. Do not
+            # dedupe by content: two consecutive identical turns are still distinct.
+            visible.extend(self._last_user_slice(raw_messages))
         return visible
 
     @staticmethod
