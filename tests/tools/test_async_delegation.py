@@ -200,6 +200,44 @@ def test_completion_event_lands_on_shared_queue_with_session_key():
     assert evt["delegation_id"] == res["delegation_id"]
 
 
+def test_durable_receipt_exposes_parent_task_and_terminal_event_for_recovery(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+    def runner():
+        return {
+            "status": "completed",
+            "summary": "terminal report",
+            "api_calls": 1,
+            "duration_seconds": 0.1,
+        }
+
+    res = ad.dispatch_async_delegation(
+        goal="research task",
+        context="project context",
+        toolsets=["web"],
+        role="leaf",
+        model="test-model",
+        session_key="session-route",
+        parent_session_id="parent-session",
+        runner=runner,
+        max_async_children=1,
+    )
+    assert res["status"] == "dispatched"
+
+    evt = _drain_for(res["delegation_id"])
+    assert evt is not None
+
+    receipt = ad.get_durable_delegation(res["delegation_id"])
+    assert receipt is not None
+    assert receipt["parent_session_id"] == "parent-session"
+    assert receipt["task"]["goal"] == "research task"
+    assert receipt["task"]["context"] == "project context"
+    assert receipt["task"]["toolsets"] == ["web"]
+    assert receipt["event"]["status"] == "completed"
+    assert receipt["event"]["summary"] == "terminal report"
+    assert receipt["result"]["summary"] == "terminal report"
+
+
 def test_rich_reinjection_block_is_self_contained():
     def runner():
         return {"status": "completed", "summary": "The answer is 42.",
