@@ -151,6 +151,120 @@ class TestMemoryFileLockPermissions:
         assert outside.read_text(encoding="utf-8") == "do not touch"
 
 
+class TestMemoryResetGeneration:
+    def test_reset_blocks_stale_session_write_until_reload(self, store):
+        assert store.add("memory", "fact from before reset")["success"] is True
+        store.load_from_disk()
+        before_generation = store.reset_generation("memory")
+        assert "fact from before reset" in (store.format_for_system_prompt("memory") or "")
+
+        assert MemoryStore.reset_target("memory") is True
+
+        assert store.system_prompt_snapshot_stale() is True
+        assert store.reset_generation("memory") == before_generation
+        blocked = store.add("memory", "stale session tries to relearn it")
+        assert blocked["success"] is False
+        assert blocked["reset_conflict"] is True
+        assert not store._path_for("memory").exists()
+
+        store.load_from_disk()
+        assert store.reset_generation("memory") != before_generation
+        assert store.format_for_system_prompt("memory") is None
+        assert store.add("memory", "fresh post-reset fact")["success"] is True
+
+    def test_failed_post_reset_reload_keeps_old_generation_and_blocks_writes(self, store, monkeypatch):
+        assert store.add("memory", "old snapshot fact")["success"] is True
+        store.load_from_disk()
+        old_generation = store.reset_generation("memory")
+        old_snapshot = store.format_for_system_prompt("memory")
+        MemoryStore.reset_target("memory")
+
+        original_read = store._read_raw_checked
+        monkeypatch.setattr(store, "_read_raw_checked", lambda path: ("", False))
+        store.load_from_disk()
+
+        assert store.reset_generation("memory") == old_generation
+        assert store.format_for_system_prompt("memory") == old_snapshot
+        blocked = store.add("memory", "must stay blocked")
+        assert blocked["reset_conflict"] is True
+
+        monkeypatch.setattr(store, "_read_raw_checked", original_read)
+        store.load_from_disk()
+        assert store.format_for_system_prompt("memory") is None
+        assert store.reset_generation("memory") != old_generation
+
+    def test_empty_reset_still_advances_generation_without_changing_prompt_version(self, store):
+        before_version = store.system_prompt_snapshot_version()
+        before_generation = store.reset_generation("user")
+
+        assert MemoryStore.reset_target("user") is False
+        assert store.system_prompt_snapshot_stale() is True
+
+        store.load_from_disk()
+
+        assert store.system_prompt_snapshot_version() == before_version
+        assert store.reset_generation("user") != before_generation
+        assert store.system_prompt_snapshot_stale() is False
+        assert store.add("user", "post-reset profile fact")["success"] is True
+
+    def test_reset_erases_bytes_even_when_unlink_is_unavailable(self, store, monkeypatch):
+        path = store._path_for("memory")
+        path.write_text("sensitive fact", encoding="utf-8")
+        original_unlink = Path.unlink
+
+        def refuse_target_unlink(self, *args, **kwargs):
+            if self == path:
+                raise PermissionError("simulated directory-entry refusal")
+            return original_unlink(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", refuse_target_unlink)
+
+        assert MemoryStore.reset_target("memory") is True
+        assert path.exists()
+        assert path.read_text(encoding="utf-8") == ""
+
+    def test_reset_symlink_removes_pointer_without_erasing_referent(self, store, tmp_path):
+        path = store._path_for("memory")
+        outside = tmp_path / "external-memory.md"
+        outside.write_text("must survive reset", encoding="utf-8")
+        path.symlink_to(outside)
+
+        assert MemoryStore.reset_target("memory") is True
+
+        assert not path.exists()
+        assert not path.is_symlink()
+        assert outside.read_text(encoding="utf-8") == "must survive reset"
+
+    def test_reset_generation_marker_symlink_is_refused(self, store, tmp_path):
+        path = store._path_for("memory")
+        outside = tmp_path / "outside-generation"
+        outside.write_text("do not touch", encoding="utf-8")
+        marker = store._reset_generation_path(path)
+        marker.symlink_to(outside)
+
+        with pytest.raises(RuntimeError, match="reset-generation symlink"):
+            MemoryStore.reset_target("memory")
+
+        assert outside.read_text(encoding="utf-8") == "do not touch"
+
+    def test_reset_generation_is_scoped_to_memory_directory(self, tmp_path, monkeypatch):
+        first = tmp_path / "profile-a" / "memories"
+        second = tmp_path / "profile-b" / "memories"
+        first.mkdir(parents=True)
+        second.mkdir(parents=True)
+
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: first)
+        MemoryStore.reset_target("memory")
+        first_marker = first / "MEMORY.md.reset-generation"
+        assert first_marker.exists()
+
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: second)
+        assert not (second / "MEMORY.md.reset-generation").exists()
+        second_store = MemoryStore()
+        second_store.load_from_disk()
+        assert second_store.reset_generation("memory") == ""
+
+
 class TestMemoryStoreAdd:
     def test_add_entry(self, store):
         result = store.add("memory", "Python 3.12 project")
@@ -901,6 +1015,7 @@ class TestBackgroundReviewDeleteGate:
         from tools.write_approval import MEMORY, get_pending
         record = get_pending(MEMORY, result["pending_id"])
         assert record["payload"]["action"] == "remove"
+        assert record["payload"]["_reset_generation"] == store.reset_generation("memory")
         assert record["origin"] == "background_review"
 
     def test_replace_staged_in_background_review(self, store, tmp_path, monkeypatch):
