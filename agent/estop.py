@@ -16,7 +16,7 @@ import threading
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 # Same profile-aware / fleet-root resolvers the file-safety guards use (fail-open to ~/.hermes).
 from agent.file_safety import _hermes_home_path as _hermes_home, _hermes_root_path as _canonical_root
@@ -74,16 +74,45 @@ def engage(reason: Optional[str] = None) -> Path:
     return path
 
 
-def disengage() -> bool:
-    """Remove every visible sentinel (process-local and fleet-root)."""
-    lifted = False
-    for path in _candidate_sentinel_paths():
+DisengageStatus = Literal["resumed", "not_paused", "incomplete"]
+
+
+def disengage_status() -> DisengageStatus:
+    """Remove every visible sentinel and report whether resume fully completed.
+
+    A global pause can be represented by both a profile-local sentinel and the
+    fleet-root sentinel. Resume is successful only when every candidate is
+    absent after the removal attempt. Any removal/stat failure is fail-safe:
+    callers must report an incomplete resume rather than claiming work resumed.
+    """
+    paths = _candidate_sentinel_paths()
+    removed = False
+    incomplete = False
+
+    for path in paths:
         try:
             path.unlink()
-            lifted = True
-        except (OSError, AttributeError):
+            removed = True
+        except FileNotFoundError:
             continue
-    return lifted
+        except (OSError, AttributeError):
+            incomplete = True
+
+    for path in paths:
+        try:
+            if path.exists():
+                incomplete = True
+        except (OSError, AttributeError):
+            incomplete = True
+
+    if incomplete:
+        return "incomplete"
+    return "resumed" if removed else "not_paused"
+
+
+def disengage() -> bool:
+    """Compatibility bool: True only when an engaged pause was fully lifted."""
+    return disengage_status() == "resumed"
 
 
 def get_state() -> Optional[dict]:
