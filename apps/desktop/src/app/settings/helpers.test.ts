@@ -32,6 +32,33 @@ describe('settings helpers', () => {
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'desktop.repo_scan_exclude_paths')).toBeTruthy()
   })
 
+  it('surfaces and patches the memory privacy master independently', () => {
+    const config: HermesConfigRecord = {
+      memory: {
+        enabled: true,
+        memory_enabled: true,
+        user_profile_enabled: true,
+        provider: 'honcho'
+      }
+    }
+
+    const memoryFields = sectionFieldEntries({}, config).get('memory') ?? []
+    expect(memoryFields.map(([key]) => key)).toEqual(
+      expect.arrayContaining([
+        'memory.enabled',
+        'memory.memory_enabled',
+        'memory.user_profile_enabled',
+        'memory.provider'
+      ])
+    )
+    expect(fieldCopyForSchemaKey(FIELD_LABELS, 'memory.enabled')).toBe('Memory Persistence')
+    expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'memory.enabled')).toContain('Master privacy switch')
+
+    const next = setNested(config, 'memory.enabled', false)
+    expect(diffConfig(config, next)).toEqual({ memory: { enabled: false } })
+    expect(getNested(next, 'memory.provider')).toBe('honcho')
+  })
+
   it('does not shadow the backend schema options for memory.provider', () => {
     // memory.provider options are discovery-driven and served by the backend
     // config schema (merged per-request); enumOptionsFor must return undefined
