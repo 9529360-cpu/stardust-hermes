@@ -264,7 +264,7 @@ def _capture_acp_approval_trust(
         raw = approvals.get("acp_trusted_clients", []) if isinstance(approvals, dict) else []
         if isinstance(raw, (list, tuple, set)):
             trusted_names = {
-                str(name).strip().casefold() for name in raw
+                str(name).strip() for name in raw
                 if str(name).strip()
             }
     except Exception:
@@ -274,7 +274,7 @@ def _capture_acp_approval_trust(
         client_name=client_name,
         client_version=client_version,
         capability_names=capability_names,
-        trusted_interactive=client_name.casefold() in trusted_names,
+        trusted_interactive=client_name in trusted_names,
     )
 
 
