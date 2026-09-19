@@ -247,6 +247,7 @@ function assistantTerminalMessage(): ThreadMessage {
 }
 
 interface StreamingControls {
+  emitFirst: () => void
   emitSecond: () => void
   complete: () => void
 }
@@ -256,12 +257,11 @@ function StreamingHarness({ onControls }: { onControls?: (controls: StreamingCon
   const [isRunning, setIsRunning] = useState(true)
 
   useEffect(() => {
-    const first = window.setTimeout(() => {
-      setMessages([userMessage(), assistantMessage('first chunk')])
-    }, 50)
-
     if (onControls) {
       onControls({
+        emitFirst: () => {
+          setMessages([userMessage(), assistantMessage('first chunk')])
+        },
         emitSecond: () => {
           setMessages([userMessage(), assistantMessage('first chunk second chunk')])
         },
@@ -271,8 +271,12 @@ function StreamingHarness({ onControls }: { onControls?: (controls: StreamingCon
         }
       })
 
-      return () => window.clearTimeout(first)
+      return
     }
+
+    const first = window.setTimeout(() => {
+      setMessages([userMessage(), assistantMessage('first chunk')])
+    }, 50)
 
     const second = window.setTimeout(() => {
       setMessages([userMessage(), assistantMessage('first chunk second chunk')])
@@ -482,7 +486,9 @@ describe('assistant-ui streaming renderer', () => {
     const { container } = render(<StreamingHarness onControls={registerControls} />)
 
     expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
+    expect(controls).toBeTruthy()
 
+    act(() => controls?.emitFirst())
     await waitFor(() => {
       expect(container.textContent).toContain('first chunk')
     })
