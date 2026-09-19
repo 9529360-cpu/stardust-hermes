@@ -730,20 +730,33 @@ class MemoryManager:
         clean_user_content = self._strip_skill_scaffolding(user_content) if providers else None
         if not clean_user_content:
             return
-        self._record_provider_visible_turn(clean_user_content, assistant_content, messages)
-        provider_messages = self._provider_history(messages)
-        optional_kwargs = {"messages": provider_messages, "turn_author": turn_author}
-
-        def _sync(provider: MemoryProvider) -> None:
-            kwargs: Dict[str, Any] = {"session_id": session_id}
-            for keyword, value in optional_kwargs.items():
-                if value is not None and self._provider_sync_accepts(provider, keyword):
-                    kwargs[keyword] = value
-            provider.sync_turn(clean_user_content, assistant_content, **kwargs)
+        # Freeze only this completed turn at submission time; the live transcript
+        # may advance before the serialized worker gets to it. Do NOT add it to the
+        # provider-visible ledger yet: memory may be switched off while this task is
+        # queued, in which case the turn must never be backfilled after re-enable.
+        turn_snapshot = [
+            dict(row)
+            for row in self._completed_turn_slice(messages, clean_user_content, assistant_content)
+        ]
 
         def _run_sync() -> None:
             if not self._privacy_enabled():
                 return
+            self._record_provider_visible_turn(
+                clean_user_content,
+                assistant_content,
+                turn_snapshot,
+            )
+            provider_messages = self._provider_history(messages)
+            optional_kwargs = {"messages": provider_messages, "turn_author": turn_author}
+
+            def _sync(provider: MemoryProvider) -> None:
+                kwargs: Dict[str, Any] = {"session_id": session_id}
+                for keyword, value in optional_kwargs.items():
+                    if value is not None and self._provider_sync_accepts(provider, keyword):
+                        kwargs[keyword] = value
+                provider.sync_turn(clean_user_content, assistant_content, **kwargs)
+
             self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
 
         self._submit_background(_run_sync)
