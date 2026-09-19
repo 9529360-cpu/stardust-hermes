@@ -488,26 +488,25 @@ describe('assistant-ui streaming renderer', () => {
     expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
     expect(controls).toBeTruthy()
 
-    act(() => controls?.emitFirst())
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk')
+    await act(async () => {
+      controls?.emitFirst()
     })
+    expect(container.textContent).toContain('first chunk')
     expect(container.textContent).not.toContain('second chunk')
     expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
 
-    // Producer-gated, not wall-clock-gated: the old test slept 80ms and
-    // assumed a 500ms timer could not fire before the assertion. On a loaded
-    // runner the test thread could be descheduled for >500ms, so both chunks
-    // arrived and this clean behavior test flaked.
-    act(() => controls?.emitSecond())
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk second chunk')
+    // Producer-gated and flush-gated, not wall-clock-gated. A saturated CI
+    // worker may take longer than waitFor's default one-second budget to
+    // render a state update even though no runtime timer is involved.
+    await act(async () => {
+      controls?.emitSecond()
     })
+    expect(container.textContent).toContain('first chunk second chunk')
 
-    act(() => controls?.complete())
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk second chunk')
+    await act(async () => {
+      controls?.complete()
     })
+    expect(container.textContent).toContain('first chunk second chunk')
   })
 
   it('does not render composer clearance for intro-only threads', () => {
