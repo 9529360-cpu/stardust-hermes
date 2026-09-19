@@ -2,12 +2,13 @@ import { atom } from 'nanostores'
 
 import { sessionTitle } from '@/lib/chat-runtime'
 import type { PreviewServerRestart } from '@/store/preview'
+import { sessionMatchesStoredId } from '@/store/session'
 import type { ActionStatusResponse, SessionInfo } from '@/types/hermes'
 
 const HISTORY_LIMIT = 8
 const COMPLETED_TTL_MS = 5 * 60 * 1000
 
-export type RailTaskStatus = 'error' | 'running' | 'success'
+export type RailTaskStatus = 'error' | 'running' | 'success' | 'waiting'
 
 export interface RailTask {
   id: string
@@ -30,23 +31,41 @@ export function upsertDesktopActionTask(status: ActionStatusResponse): void {
 
 export function buildRailTasks(
   workingSessionIds: readonly string[],
+  attentionSessionIds: readonly string[],
   sessions: readonly SessionInfo[],
   previewRestart: PreviewServerRestart | null,
   actionTasks: Record<string, DesktopActionTask>
 ): RailTask[] {
-  const sessionsById = new Map(sessions.map(session => [session.id, session]))
+  const sessionTasks = new Map<string, RailTask>()
 
-  const sessionTasks: RailTask[] = workingSessionIds.map((id, index) => {
-    const session = sessionsById.get(id)
+  const upsertSessionTask = (id: string, status: Extract<RailTaskStatus, 'running' | 'waiting'>) => {
+    const session = sessions.find(candidate => sessionMatchesStoredId(candidate, id))
+    const canonicalId = session?.id ?? id
+    const existing = sessionTasks.get(canonicalId)
 
-    return {
-      id: `session:${id}`,
-      label: session ? sessionTitle(session) : 'Session task',
-      detail: 'Agent task running',
-      status: 'running',
-      updatedAt: session?.last_active || Date.now() - index
+    // A blocking prompt outranks ordinary running state for the same lineage.
+    if (existing?.status === 'waiting' && status === 'running') {
+      return
     }
-  })
+
+    const activitySeconds = session?.last_active || session?.started_at || 0
+
+    sessionTasks.set(canonicalId, {
+      id: `session:${canonicalId}`,
+      label: session ? sessionTitle(session) : 'Session task',
+      detail: status === 'waiting' ? 'Waiting for your input' : 'Agent task running',
+      status,
+      updatedAt: activitySeconds > 0 ? activitySeconds * 1000 : Date.now()
+    })
+  }
+
+  for (const id of workingSessionIds) {
+    upsertSessionTask(id, 'running')
+  }
+
+  for (const id of attentionSessionIds) {
+    upsertSessionTask(id, 'waiting')
+  }
 
   const previewTasks: RailTask[] = previewRestart
     ? [
@@ -69,7 +88,7 @@ export function buildRailTasks(
     updatedAt
   }))
 
-  return [...sessionTasks, ...previewTasks, ...actions].sort((left, right) => right.updatedAt - left.updatedAt)
+  return [...sessionTasks.values(), ...previewTasks, ...actions].sort((left, right) => right.updatedAt - left.updatedAt)
 }
 
 function actionStatus(status: ActionStatusResponse): RailTaskStatus {
