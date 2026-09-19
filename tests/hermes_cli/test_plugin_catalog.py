@@ -59,6 +59,22 @@ def test_find_removed_matches_name_or_normalized_repo(tmp_path):
     assert pc.find_removed("https://github.com/x/fine", tmp_path) is None
 
 
+def test_default_live_catalog_off_ignores_pre_stardust_cache(tmp_path, monkeypatch):
+    """No owned live endpoint means old upstream cache cannot remain catalog authority."""
+    cache = tmp_path / "cache" / "plugin-catalog.json"
+    cache.parent.mkdir(parents=True)
+    cache.write_text(json.dumps({
+        "entries": [_entry("old-upstream-only")],
+        "removed": [{"name": "stale-upstream-removal", "reason": "legacy"}],
+    }))
+    monkeypatch.setattr(pc, "_live_cache_path", lambda: cache)
+    monkeypatch.setattr(pc, "LIVE_CATALOG_URL", "")
+
+    assert pc.fetch_live_catalog() is None
+    assert [e.name for e in pc.load_catalog_live()] == [e.name for e in pc.load_catalog()]
+    assert pc.find_removed("stale-upstream-removal") is None
+
+
 def test_live_catalog_falls_back_to_in_tree_and_unions_removals(tmp_path, monkeypatch):
     """Network failure → in-tree entries; a cached live doc contributes entries AND removals."""
     cache = tmp_path / "cache" / "plugin-catalog.json"
