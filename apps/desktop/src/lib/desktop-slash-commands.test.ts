@@ -176,7 +176,7 @@ describe('desktop slash command curation', () => {
   it('does not treat retired account commands as extensions before the catalog is loaded', () => {
     rememberDesktopCommandsCatalog(undefined)
 
-    for (const command of ['/login', '/subscription', '/topup']) {
+    for (const command of ['/billing', '/credits', '/login', '/subscription', '/topup', '/upgrade']) {
       expect(isDesktopSlashCommand(command)).toBe(false)
       expect(isDesktopSlashSuggestion(command)).toBe(false)
       expect(desktopSlashUnavailableMessage(command)).toBeNull()
