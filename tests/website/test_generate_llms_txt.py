@@ -38,8 +38,22 @@ def index(gen) -> str:
     return gen.emit_llms_index()
 
 
+def _source_slug(raw: str) -> str:
+    rel = Path(raw).with_suffix("")
+    return str(rel.parent) if rel.name == "index" else str(rel)
+
+
+def _linked_entries(gen, index: str) -> list[str]:
+    sources = re.findall(
+        rf"\]\({re.escape(gen.DOCS_SOURCE_BASE)}/([^)]+)\)",
+        index,
+        re.MULTILINE,
+    )
+    return [_source_slug(raw) for raw in sources]
+
+
 def _linked(gen, index: str) -> set[str]:
-    return set(re.findall(rf"\]\({re.escape(gen.SITE_BASE)}/([^)]+)\)", index))
+    return set(_linked_entries(gen, index))
 
 
 def _pages_on_disk(gen) -> set[str]:
@@ -90,7 +104,7 @@ def test_every_indexed_page_exists(gen, index):
 
 def test_pages_are_listed_once(gen, index):
     """Curating a page must promote it, not duplicate it."""
-    entries = re.findall(rf"^- \[.*?\]\({re.escape(gen.SITE_BASE)}/([^)]+)\)", index, re.MULTILINE)
+    entries = _linked_entries(gen, index)
     duplicated = {slug for slug in entries if entries.count(slug) > 1}
     assert not duplicated, f"listed more than once in llms.txt: {sorted(duplicated)}"
 

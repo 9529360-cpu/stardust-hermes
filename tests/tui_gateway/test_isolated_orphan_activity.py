@@ -1,6 +1,5 @@
 """Detached Desktop/TUI turns use child-owned activity, not process heartbeats."""
 
-from pathlib import Path
 import sys
 import threading
 import time
@@ -52,13 +51,10 @@ def test_real_child_detached_turn_activity(tmp_path, monkeypatch, mode):
     home.mkdir()
     supervisor = HostSupervisor(
         argv=[
-            getattr(sys, "_base_executable", sys.executable), "-m", "tests.tui_gateway._isolated_orphan_activity_child",
+            sys.executable, "-m", "tests.tui_gateway._isolated_orphan_activity_child",
             mode, str(tmp_path),
         ],
-        registry_path=tmp_path / "host.json", env={
-            "HERMES_HOME": str(home),
-            "PYTHONPATH": str(Path(sys.prefix) / "Lib" / "site-packages"),
-        },
+        registry_path=tmp_path / "host.json", env={"HERMES_HOME": str(home)},
         expected_hermes_home=str(home), rpc_sink=server._relay_compute_host_rpc,
         heartbeat_secs=1, autostart=False)
     monkeypatch.setattr(server, "_get_compute_host_supervisor", lambda *args: supervisor)
