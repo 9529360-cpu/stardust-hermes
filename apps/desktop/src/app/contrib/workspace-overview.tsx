@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router'
 
 import { $activePresetId } from '@/components/pane-shell/tree/store'
@@ -10,9 +10,11 @@ import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { useSessionSlice, useStoreSelector } from '@/lib/use-session-slice'
 import { readKey, writeKey } from '@/lib/storage'
+import { $desktopActionTasks, buildRailTasks } from '@/store/activity'
 import { registerRepoStatusCwd, repoStatusForCwd } from '@/store/coding-status'
 import { $statusItemsBySession } from '@/store/composer-status'
 import { applyDesktopLayoutPreset } from '@/store/pane-focus'
+import { $previewServerRestart } from '@/store/preview'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
 import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
@@ -52,6 +54,18 @@ function Metric({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
+function activityIcon(status: 'error' | 'running' | 'success' | 'waiting'): string {
+  if (status === 'waiting') {
+    return 'warning'
+  }
+
+  if (status === 'error') {
+    return 'error'
+  }
+
+  return status === 'success' ? 'pass' : 'loading'
+}
+
 export function WorkspaceOverview() {
   const { locale } = useI18n()
   const navigate = useNavigate()
@@ -66,6 +80,11 @@ export function WorkspaceOverview() {
           assistantSummary: '这里显示当前对话需要的项目、文件、预览和工具上下文；普通聊天不需要项目。',
           assistantSession: '当前对话已经就绪；需要项目、文件或预览时再展开对应能力。',
           taskProgress: '任务进度',
+          activity: '其他任务活动',
+          activityRunning: '执行中',
+          activityWaiting: '等待你的输入',
+          activityCompleted: '已完成',
+          activityFailed: '失败',
           currentStep: '当前步骤',
           needsInput: '等待你的输入',
           attentionSummary: '当前任务正在等待你的确认或补充信息；工作上下文会保留，回复后可以继续。',
@@ -81,6 +100,11 @@ export function WorkspaceOverview() {
             assistantSummary: '這裡顯示目前對話需要的專案、檔案、預覽與工具上下文；一般聊天不需要專案。',
             assistantSession: '目前對話已就緒；需要專案、檔案或預覽時再展開對應能力。',
             taskProgress: '任務進度',
+            activity: '其他任務活動',
+            activityRunning: '執行中',
+            activityWaiting: '等待你的輸入',
+            activityCompleted: '已完成',
+            activityFailed: '失敗',
             currentStep: '目前步驟',
             needsInput: '等待你的輸入',
             attentionSummary: '目前任務正在等待你的確認或補充資訊；工作上下文會保留，回覆後可以繼續。',
@@ -95,6 +119,11 @@ export function WorkspaceOverview() {
             assistantSummary: 'Project, file, preview, and tool context appears here when the current conversation needs it; ordinary chat needs no project.',
             assistantSession: 'The current conversation is ready. Expand project, file, or preview context only when it is useful.',
             taskProgress: 'Task progress',
+            activity: 'Other task activity',
+            activityRunning: 'Running',
+            activityWaiting: 'Waiting for your input',
+            activityCompleted: 'Completed',
+            activityFailed: 'Failed',
             currentStep: 'Current step',
             needsInput: 'Waiting for your input',
             attentionSummary: 'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
@@ -108,6 +137,8 @@ export function WorkspaceOverview() {
   const sessions = useStore($sessions)
   const activeSessionId = useStore($activeSessionId)
   const attentionSessionIds = useStore($attentionSessionIds)
+  const desktopActionTasks = useStore($desktopActionTasks)
+  const previewServerRestart = useStore($previewServerRestart)
   const workingSessionIds = useStore($workingSessionIds)
 
   const session = selectedStoredSessionId
@@ -134,6 +165,17 @@ export function WorkspaceOverview() {
   )
   const statusSessionId = selectedStoredSessionId ? activeSessionId : (fallbackTaskRuntimeId ?? activeSessionId)
   const statusItems = useSessionSlice($statusItemsBySession, statusSessionId)
+  const activityTasks = useMemo(
+    () =>
+      buildRailTasks(
+        workingSessionIds,
+        attentionSessionIds,
+        sessions,
+        previewServerRestart,
+        desktopActionTasks
+      ),
+    [attentionSessionIds, desktopActionTasks, previewServerRestart, sessions, workingSessionIds]
+  )
 
   useEffect(() => registerRepoStatusCwd(effectiveCwd), [effectiveCwd])
 
@@ -183,6 +225,14 @@ export function WorkspaceOverview() {
     : primaryWorking
       ? systemLabels.workingSummary
       : assistantContextSummary
+  const currentActivityTaskId = displaySession?.id
+    ? `session:${displaySession.id}`
+    : displayTaskStoredId
+      ? `session:${displayTaskStoredId}`
+      : null
+  const secondaryActivityTasks = currentActivityTaskId
+    ? activityTasks.filter(task => task.id !== currentActivityTaskId)
+    : activityTasks
 
   return (
     <aside
@@ -287,6 +337,40 @@ export function WorkspaceOverview() {
               )}
           </>
         </Card>
+        )}
+
+        {secondaryActivityTasks.length > 0 && (
+          <Card title={systemLabels.activity}>
+            <div className="flex flex-col gap-2">
+              {secondaryActivityTasks.slice(0, 6).map(task => (
+                <div className="flex min-w-0 items-start gap-2" data-agent-activity-task="" key={task.id}>
+                  <Codicon
+                    className={
+                      task.status === 'running'
+                        ? 'mt-0.5 shrink-0 text-(--theme-primary)'
+                        : task.status === 'waiting' || task.status === 'error'
+                          ? 'mt-0.5 shrink-0 text-(--ui-text-secondary)'
+                          : 'mt-0.5 shrink-0 text-(--ui-text-tertiary)'
+                    }
+                    name={activityIcon(task.status)}
+                    size="0.7rem"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[0.66rem] font-medium text-(--ui-text-secondary)">{task.label}</div>
+                    <div className="mt-0.5 truncate text-[0.56rem] text-(--ui-text-quaternary)">
+                      {task.status === 'waiting'
+                        ? systemLabels.activityWaiting
+                        : task.status === 'running'
+                          ? systemLabels.activityRunning
+                          : task.status === 'success'
+                            ? systemLabels.activityCompleted
+                            : systemLabels.activityFailed}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
         )}
       </div>
     </aside>
