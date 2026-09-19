@@ -57,6 +57,7 @@ def test_imported_crash_marker_never_autocontinues(tmp_path):
         "read_turn_marker": read_turn_marker,
     })
     assert schedule("live", {}, "chat") is None
+    assert read_turn_marker(tmp_path, "chat") == marker
 
 
 def test_local_work_blocks_mailbox_claim_without_consuming_envelope(monkeypatch, tmp_path):
