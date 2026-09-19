@@ -62,6 +62,26 @@ def test_relative_health_file_is_scoped_to_active_profile(monkeypatch, tmp_path)
     assert second_path.read_bytes() != b""
 
 
+def test_relative_health_file_cannot_escape_profile(monkeypatch, tmp_path, caplog):
+    home = tmp_path / "profile"
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(
+        route_health,
+        "_config",
+        lambda: {"persistent_health": True, "health_file": "../shared/route-health.json"},
+    )
+    route_health._WARNED_UNSAFE_RELATIVE_PATHS.clear()
+
+    expected = home / "route-health.json"
+    assert route_health.state_path() == expected
+    assert "must stay inside the active HERMES_HOME" in caplog.text
+
+    route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+
+    assert expected.exists()
+    assert not (tmp_path / "shared" / "route-health.json").exists()
+
+
 def test_absolute_health_file_override_remains_explicit(monkeypatch, tmp_path):
     explicit = tmp_path / "shared-operator-state.json"
     monkeypatch.setattr(
