@@ -492,11 +492,11 @@ describe('assistant-ui streaming renderer', () => {
     await waitFor(
       () => {
         expect(container.textContent).toContain('first chunk')
+        expect(container.textContent).not.toContain('second chunk')
+        expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
       },
       { timeout: 5_000 }
     )
-    expect(container.textContent).not.toContain('second chunk')
-    expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
 
     // Producer-gated and condition-gated, not sleep-gated. React's state update
     // can finish before assistant-ui/virtualizer has committed the message DOM,
