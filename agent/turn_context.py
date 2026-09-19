@@ -855,27 +855,43 @@ def _persist_turn_start(
 
 
 def _refresh_builtin_memory_snapshot(agent: Any) -> bool:
-    """Reload built-in memory only when its on-disk prompt snapshot actually changed.
+    """Refresh the built-in memory prompt at a turn boundary.
 
-    Returns True only when the rendered snapshot digest changed, so a metadata-only touch
-    does not break the system-prompt prefix cache.
+    The master privacy switch is checked live so long-lived agents that are not rebuilt
+    by the gateway still drop built-in memory on the next turn. Disk snapshot changes
+    retain the existing digest-based cache behavior.
     """
+    invalidated = False
+    try:
+        from tools.memory_tool import memory_persistence_enabled
+        live_enabled = memory_persistence_enabled(fail_closed=True)
+    except Exception:
+        live_enabled = False
+    previous_enabled = getattr(agent, "_memory_persistence_enabled", True)
+    if live_enabled != previous_enabled:
+        agent._memory_persistence_enabled = live_enabled
+        agent._cached_system_prompt = None
+        agent._cached_system_prompt_static = None
+        invalidated = True
+    if not live_enabled:
+        return invalidated
+
     store = getattr(agent, "_memory_store", None)
     stale = getattr(store, "system_prompt_snapshot_stale", None)
     version = getattr(store, "system_prompt_snapshot_version", None)
     reload_store = getattr(store, "load_from_disk", None)
     if not (callable(stale) and callable(version) and callable(reload_store)):
-        return False
+        return invalidated
     try:
         if not stale():
-            return False
+            return invalidated
         before = version()
         reload_store()
         if version() == before:
-            return False
+            return invalidated
     except Exception:
         logger.warning("Built-in memory snapshot refresh failed; keeping the cached prompt", exc_info=True)
-        return False
+        return invalidated
     agent._cached_system_prompt = None
     agent._cached_system_prompt_static = None
     return True
