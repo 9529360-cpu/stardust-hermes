@@ -4,8 +4,8 @@ import {
   $pluginDecisions,
   $pluginRecords,
   pluginActive,
-  publishPlugin,
-  type PluginKind
+  type PluginKind,
+  publishPlugin
 } from './plugins-store'
 
 beforeEach(() => {
