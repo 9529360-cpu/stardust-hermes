@@ -244,7 +244,11 @@ class TestMemoryEndpoints:
 
         r = self.client.post("/api/memory/reset", json={"target": "user"})
         assert r.status_code == 200 and "USER.md" in r.json()["deleted"]
+        assert r.json()["reset"] == ["USER.md"]
+        assert r.json()["active_session_behavior"] == "refresh_on_next_turn"
         assert (mem / "MEMORY.md").exists()
+        assert not (mem / "USER.md").exists()
+        assert (mem / "USER.md.reset-generation").read_text(encoding="utf-8").strip()
 
         assert self.client.post(
             "/api/memory/reset", json={"target": "bogus"}
