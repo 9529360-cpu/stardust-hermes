@@ -181,6 +181,32 @@ def _is_hermes_internal_secret(key: str) -> bool:
     return upper.startswith("GATEWAY_RELAY_") and upper.endswith(("_SECRET", "_KEY", "_TOKEN"))
 
 
+# Authorization gates are profile-scoped policy, not credentials. A child spawned for
+# another profile must never inherit them from the launcher process (systemd/Compose/shell
+# exports are not visible to dotenv-name scrubs). Match by shape so new adapters inherit
+# the boundary automatically; HERMES_* process settings are deliberately excluded.
+_PROFILE_GATE_ENV_MARKERS = (
+    "_ALLOWED_", "_ALLOW_ALL_", "_ALLOW_FROM", "_ALLOW_BOTS", "_ALLOW_PUBLIC_",
+    "_IGNORED_CHANNELS", "_NO_THREAD_CHANNELS", "_FREE_RESPONSE_CHANNELS",
+    "_BACKFILL_CHANNELS", "_GROUP_ALLOWED",
+)
+
+
+def is_profile_gate_env(name: str) -> bool:
+    """True for a platform authorization gate that belongs to one profile."""
+    upper = name.upper()
+    if upper.startswith("HERMES_") or upper.startswith("_"):
+        return False
+    return any(marker in upper for marker in _PROFILE_GATE_ENV_MARKERS)
+
+
+def strip_profile_gate_env(env: dict) -> dict:
+    """Drop profile authorization gates from *env* in place."""
+    for key in [key for key in env if is_profile_gate_env(key)]:
+        del env[key]
+    return env
+
+
 def _plugin_terminal_env_strip_keys() -> frozenset:
     """Credential env keys owned by plugin-registered terminal backends (Tier-1:
     stripped from every spawned subprocess). Computed at call time because plugins
