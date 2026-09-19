@@ -2178,7 +2178,7 @@ DEFAULT_CONFIG = {
 
     "updates": {
         # Stardust never polls an upstream release authority passively by default.
-        # Explicit `hermes update --check` remains a user-requested comparison path.
+        # This controls passive checks only; the current Stardust CLI updater remains pinned off.
         "check": False,
         # Pre-update backup. quick = snapshot small critical state (pairing JSONs, cron jobs,
         # config.yaml, .env, auth.json, profile DBs) into <HERMES_HOME>/state-snapshots/, skipping
