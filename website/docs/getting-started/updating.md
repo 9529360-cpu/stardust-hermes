@@ -28,7 +28,7 @@ Stardust disables passive CLI version and banner update checks by default. To op
 hermes config set updates.check true
 ```
 
-Set it back to `false` to suppress both cached update notices and passive update-check network requests. Explicit `hermes update --check` remains a user-requested comparison path; this setting does not control the Desktop application's updater.
+Set it back to `false` to suppress both cached update notices and passive update-check network requests. This setting does not enable the currently pinned Stardust CLI updater and does not control the Desktop application's updater.
 
 ### What happens during an update
 
