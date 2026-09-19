@@ -23,6 +23,7 @@ def _make_agent_stub(agent_cls):
     agent.session_id = "sess-123"
     agent.quiet_mode = True
     agent._memory_store = None
+    agent._memory_persistence_enabled = True
     agent._memory_enabled = True
     agent._user_profile_enabled = False
     agent._memory_nudge_interval = 5
@@ -121,6 +122,39 @@ def _make_recorder_class(captured=None, record_on_run=()):
             pass
 
     return _Recorder
+
+
+def test_review_fork_drops_stale_memory_cache_and_tools_when_master_turns_off():
+    """A mid-turn privacy flip wins over same-model cache parity."""
+    import run_agent
+    from agent.background_review import build_cache_parity_fork
+
+    agent = _make_agent_stub(run_agent.AIAgent)
+    agent._memory_store = object()
+    agent.tools = [
+        {"type": "function", "function": {"name": "memory"}},
+        {"type": "function", "function": {"name": "read_file"}},
+    ]
+
+    class _PrivacyRecorder(_make_recorder_class()):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Constructor-owned surface represents the live config snapshot.
+            self.tools = [{"type": "function", "function": {"name": "read_file"}}]
+            self.valid_tool_names = {"read_file"}
+
+    with patch.object(run_agent, "AIAgent", _PrivacyRecorder), \
+         patch("tools.memory_tool.memory_persistence_enabled", return_value=False):
+        fork, _rt, routed = build_cache_parity_fork(agent, max_iterations=5)
+
+    assert routed is False
+    assert fork._memory_persistence_enabled is False
+    assert fork._memory_store is None
+    assert fork._memory_enabled is False
+    assert fork._user_profile_enabled is False
+    assert fork._cached_system_prompt is None
+    assert [tool["function"]["name"] for tool in fork.tools] == ["read_file"]
+    assert "memory" not in fork.valid_tool_names
 
 
 def test_review_fork_inherits_parent_cached_system_prompt():
