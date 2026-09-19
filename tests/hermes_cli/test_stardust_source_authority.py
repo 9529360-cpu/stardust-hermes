@@ -179,3 +179,13 @@ def test_desktop_unsupported_update_routes_to_stardust_source() -> None:
     assert "PRODUCT_REPOSITORY_URL" in source
     assert "https://hermes-agent.nousresearch.com/" not in source
 
+def test_desktop_does_not_surface_nous_diagnostics_upload() -> None:
+    sources = (
+        _read("apps/desktop/src/components/error-boundary.tsx"),
+        _read("apps/desktop/src/components/assistant-ui/thread/assistant-message.tsx"),
+        _read("apps/desktop/src/app/contrib/wiring.tsx"),
+    )
+
+    assert all("requestSendDiagnostics" not in source for source in sources)
+    assert all("SendDiagnosticsHost" not in source for source in sources)
+

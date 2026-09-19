@@ -41,7 +41,6 @@ import {
   Loader2Icon,
   RefreshCwIcon,
   SmilePlusIcon,
-  Upload,
   VolumeXIcon,
   XIcon
 } from '@/lib/icons'
@@ -53,7 +52,6 @@ import { playSpeechText, stopVoicePlayback } from '@/lib/voice-playback'
 import { notifyError } from '@/store/notifications'
 import { startManualProviderOAuth } from '@/store/onboarding'
 import { $activeGatewayProfile, normalizeProfileKey, requestFreshSession } from '@/store/profile'
-import { requestSendDiagnostics } from '@/store/send-diagnostics'
 import { $connection, $currentModel, setModelPickerOpen } from '@/store/session'
 import { sessionTileDelegate } from '@/store/session-states'
 import { notifyThreadEditOpen } from '@/store/thread-scroll'
@@ -742,10 +740,6 @@ const ErrorRecoveryActions: FC = () => {
           {remoteConnection ? copy.errorOpenDesktopLogs : copy.errorOpenLogs}
         </button>
       )}
-      <button className="aui-error-action" onClick={() => requestSendDiagnostics(diagnosticsText())} type="button">
-        <Upload className="size-3" />
-        {copy.errorSendDiagnostics}
-      </button>
       <CopyButton
         appearance="inline"
         className="aui-error-action"
