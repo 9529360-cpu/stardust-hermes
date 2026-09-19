@@ -102,6 +102,75 @@ class TestInitialize:
 
 
     @pytest.mark.asyncio
+    async def test_initialize_unknown_client_is_deny_only_by_default(self, agent, monkeypatch):
+        monkeypatch.setattr(
+            "hermes_cli.config.load_config",
+            lambda: {"approvals": {"acp_trusted_clients": []}},
+        )
+
+        await agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="Buzz", version="1.0"),
+        )
+
+        assert agent._approval_trust.client_name == "Buzz"
+        assert agent._approval_trust.trusted_interactive is False
+
+    @pytest.mark.asyncio
+    async def test_initialize_explicit_client_trust_is_captured_once(self, agent, monkeypatch):
+        config = {"approvals": {"acp_trusted_clients": ["Zed"]}}
+        monkeypatch.setattr("hermes_cli.config.load_config", lambda: config)
+
+        await agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="Zed", version="0.200"),
+        )
+        captured = agent._approval_trust
+        config["approvals"]["acp_trusted_clients"] = []
+
+        assert captured.client_name == "Zed"
+        assert captured.client_version == "0.200"
+        assert captured.trusted_interactive is True
+        assert agent._approval_trust is captured
+
+    @pytest.mark.asyncio
+    async def test_turn_callback_uses_captured_approval_trust(self, agent, monkeypatch):
+        config = {"approvals": {"acp_trusted_clients": ["Interactive Editor"]}}
+        monkeypatch.setattr("hermes_cli.config.load_config", lambda: config)
+        await agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="Interactive Editor", version="1"),
+        )
+
+        captured = {}
+        approval_cb = MagicMock(name="approval_cb")
+
+        def fake_make_approval_callback(*args, **kwargs):
+            captured.update(kwargs)
+            return approval_cb
+
+        monkeypatch.setattr("acp_adapter.server.make_approval_callback", fake_make_approval_callback)
+        state = SimpleNamespace(
+            agent=MagicMock(name="agent"),
+            mode="default",
+            cwd="/tmp",
+            message_ids=None,
+        )
+        conn = MagicMock(name="conn")
+        conn.request_permission = AsyncMock(name="request_permission")
+
+        callbacks = agent._wire_turn_callbacks(
+            state,
+            "session-1",
+            conn,
+            MagicMock(spec=asyncio.AbstractEventLoop),
+        )
+
+        assert callbacks.approval_cb is approval_cb
+        assert captured["trusted_interactive"] is True
+        assert captured["client_name"] == "Interactive Editor"
+
+    @pytest.mark.asyncio
     async def test_initialize_advertises_provider_and_terminal_auth_methods(self, agent, monkeypatch):
         monkeypatch.setattr("acp_adapter.auth.detect_provider", lambda: "openrouter")
         monkeypatch.setattr("acp_adapter.server.detect_provider", lambda: "openrouter")
