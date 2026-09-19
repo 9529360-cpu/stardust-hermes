@@ -36,9 +36,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -uo pipefail
+
+          # A label event is tied to the PR head that existed when the label was added.
+          # The wait below can outlive a later push. Never let a stale label event rerun
+          # an old SHA after the PR has moved: CI concurrency would let that old rerun
+          # cancel validation of the newer head.
+          current_head() {
+            gh pr view "$PR_NUMBER" --repo "$REPO" --json headRefOid --jq '.headRefOid' 2>/dev/null || true
+          }
+
+          CURRENT_HEAD=$(current_head)
+          if [ -z "$CURRENT_HEAD" ] || [ "$CURRENT_HEAD" != "$HEAD_SHA" ]; then
+            echo "PR head moved from $HEAD_SHA to ${CURRENT_HEAD:-unknown}; stale label event will not rerun CI."
+            exit 0
+          fi
 
           # Find the latest CI run for this PR's head SHA.
           RUN_INFO=$(gh run list \
@@ -80,6 +95,14 @@ jobs:
               echo "Run is still $STATUS after wait — giving up."
               exit 0
             fi
+          fi
+
+          # The PR may have advanced while gh run watch was waiting. Re-check at
+          # the destructive boundary so an old run can never preempt current-head CI.
+          CURRENT_HEAD=$(current_head)
+          if [ -z "$CURRENT_HEAD" ] || [ "$CURRENT_HEAD" != "$HEAD_SHA" ]; then
+            echo "PR head moved from $HEAD_SHA to ${CURRENT_HEAD:-unknown} while waiting; stale CI will not be rerun."
+            exit 0
           fi
 
           echo "Run completed. Rerunning all failed jobs..."
