@@ -265,7 +265,8 @@ def test_reenable_restores_configured_external_provider_without_reselecting_it()
 
     assert agent._memory_persistence_enabled is True
     assert agent._memory_manager is not None
-    assert provider.initialized is True
+    assert provider.init_session_id == "privacy-on"
+    assert provider.init_kwargs is not None
     load_memory_provider.assert_called_once_with("recording")
 
 
