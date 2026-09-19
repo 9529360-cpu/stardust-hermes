@@ -362,13 +362,16 @@ class MemoryManager:
         return visible
 
     @staticmethod
-    def _last_user_slice(messages: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
-        """Copy the last user-delimited turn, preserving assistant/tool message shape."""
+    def _last_user_slice(
+        messages: Optional[List[Dict[str, Any]]], *, copy_rows: bool = True
+    ) -> List[Dict[str, Any]]:
+        """Return the last user-delimited turn, preserving assistant/tool message shape."""
         if isinstance(messages, list):
             for index in range(len(messages) - 1, -1, -1):
                 row = messages[index]
                 if isinstance(row, dict) and row.get("role") == "user":
-                    return [dict(item) for item in messages[index:] if isinstance(item, dict)]
+                    rows = [item for item in messages[index:] if isinstance(item, dict)]
+                    return [dict(item) for item in rows] if copy_rows else rows
         return []
 
     @classmethod
@@ -378,10 +381,15 @@ class MemoryManager:
         user_content: str,
         assistant_content: str,
     ) -> List[Dict[str, Any]]:
-        """Copy only the just-completed turn from a full session transcript."""
-        copied = cls._last_user_slice(messages)
-        if copied:
-            return copied
+        """Reference only the just-completed turn from the live transcript.
+
+        The ledger is a privacy projection, not a second transcript owner. Holding the
+        existing row dicts avoids one extra dict allocation per message; provider-facing
+        reads still return shallow copies through _provider_history().
+        """
+        referenced = cls._last_user_slice(messages, copy_rows=False)
+        if referenced:
+            return referenced
         rows: List[Dict[str, Any]] = [{"role": "user", "content": user_content}]
         if assistant_content:
             rows.append({"role": "assistant", "content": assistant_content})
