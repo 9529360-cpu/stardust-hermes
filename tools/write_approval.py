@@ -33,7 +33,8 @@ SKILLS = "skills"
 _SUBSYSTEMS = (MEMORY, SKILLS)
 
 # Per-subsystem config key. Intentionally a single boolean with no "block all writes"
-# state — to disable a subsystem use its own enable flag (e.g. ``memory.memory_enabled``).
+# state — to disable all durable memory persistence use ``memory.enabled``; the
+# per-target built-in flags only control MEMORY.md / USER.md beneath that master switch.
 CONFIG_KEY = "write_approval"
 _TRUTHY_STRINGS = frozenset({"on", "true", "yes", "1", "approve", "enabled"})
 
