@@ -73,6 +73,28 @@ class TestIsCodingContext:
         assert cc.is_coding_context(platform="cli", cwd=tmp_path, config={}) is True
 
 
+    def test_desktop_auto_does_not_infer_coding_intent_from_workspace(self, tmp_path):
+        _git_init(tmp_path)
+        cfg = {"agent": {"coding_context": "auto"}}
+
+        mode = cc.resolve_runtime_mode(platform="desktop", cwd=tmp_path, config=cfg)
+
+        assert mode.is_coding is False
+        assert mode.system_blocks() == []
+        assert mode.toolset_selection(cfg) is None
+
+    @pytest.mark.parametrize("explicit_mode", ["focus", "on"])
+    def test_desktop_explicit_coding_modes_remain_available(self, tmp_path, explicit_mode):
+        _git_init(tmp_path)
+        cfg = {"agent": {"coding_context": explicit_mode}}
+
+        mode = cc.resolve_runtime_mode(platform="desktop", cwd=tmp_path, config=cfg)
+
+        assert mode.is_coding is True
+        if explicit_mode == "focus":
+            assert mode.toolset_selection(cfg)[0] == cc.CODING_TOOLSET
+
+
 # ── toolset substitution ────────────────────────────────────────────────────
 
 class TestCodingSelection:
