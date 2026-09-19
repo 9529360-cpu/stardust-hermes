@@ -1,5 +1,6 @@
 """Tests for cron/jobs.py — schedule parsing, job CRUD, and due-job detection."""
 
+import errno
 import threading
 import pytest
 from datetime import datetime, timedelta, timezone
@@ -26,6 +27,95 @@ from cron.jobs import (
     save_job_output,
     _hermes_now,
 )
+
+
+
+
+# =========================================================================
+# Cross-process jobs lock
+# =========================================================================
+
+class _FakeLockFile:
+    def fileno(self):
+        return 123
+
+
+class _FakeClock:
+    def __init__(self):
+        self.now = 0.0
+        self.sleeps = []
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+class _FakeMsvcrt:
+    LK_NBLCK = 2
+    LK_UNLCK = 0
+
+    def __init__(self, failures):
+        self.failures = list(failures)
+        self.calls = 0
+
+    def locking(self, _fd, mode, _length):
+        assert mode == self.LK_NBLCK
+        self.calls += 1
+        if self.failures:
+            error = self.failures.pop(0)
+            if error is not None:
+                raise error
+
+
+def test_windows_jobs_lock_honors_timeout(monkeypatch):
+    import cron.jobs as jobs
+
+    clock = _FakeClock()
+    win = _FakeMsvcrt([OSError(errno.EACCES, "held")] * 10)
+    monkeypatch.setattr(jobs, "fcntl", None)
+    monkeypatch.setattr(jobs, "msvcrt", win)
+    monkeypatch.setattr(jobs, "time", clock)
+
+    assert jobs._acquire_flock(_FakeLockFile(), 0.25) is False
+    assert win.calls >= 2
+    assert clock.now == pytest.approx(0.25)
+    assert all(delay <= 0.1 for delay in clock.sleeps)
+
+
+def test_windows_jobs_lock_retries_then_acquires(monkeypatch):
+    import cron.jobs as jobs
+
+    clock = _FakeClock()
+    win = _FakeMsvcrt([
+        OSError(errno.EACCES, "held"),
+        OSError(errno.EDEADLK, "held"),
+        None,
+    ])
+    monkeypatch.setattr(jobs, "fcntl", None)
+    monkeypatch.setattr(jobs, "msvcrt", win)
+    monkeypatch.setattr(jobs, "time", clock)
+
+    assert jobs._acquire_flock(_FakeLockFile(), 1.0) is True
+    assert win.calls == 3
+    assert clock.now == pytest.approx(0.2)
+
+
+def test_windows_jobs_lock_does_not_mask_non_contention_errors(monkeypatch):
+    import cron.jobs as jobs
+
+    clock = _FakeClock()
+    win = _FakeMsvcrt([OSError(errno.EBADF, "bad descriptor")])
+    monkeypatch.setattr(jobs, "fcntl", None)
+    monkeypatch.setattr(jobs, "msvcrt", win)
+    monkeypatch.setattr(jobs, "time", clock)
+
+    with pytest.raises(OSError) as caught:
+        jobs._acquire_flock(_FakeLockFile(), 30.0)
+    assert caught.value.errno == errno.EBADF
+    assert clock.sleeps == []
 
 
 # =========================================================================
