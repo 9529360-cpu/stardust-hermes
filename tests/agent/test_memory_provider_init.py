@@ -93,6 +93,81 @@ def test_close_shuts_down_memory_provider():
     agent._memory_manager.shutdown_all.assert_called_once()
 
 
+def test_master_memory_off_skips_builtin_and_external_provider_initialization():
+    cfg = {
+        "memory": {
+            "enabled": False,
+            "memory_enabled": True,
+            "user_profile_enabled": True,
+            "provider": "recording",
+        },
+        "agent": {},
+    }
+
+    with (
+        patch("hermes_cli.config.load_config", return_value=cfg),
+        patch("hermes_cli.config.load_config_readonly", return_value=cfg),
+        patch("plugins.memory.load_memory_provider") as load_memory_provider,
+        patch("agent.model_metadata.get_model_context_length", return_value=204_800),
+        patch("model_tools.get_tool_definitions", return_value=[]),
+        patch("model_tools.check_toolset_requirements", return_value={}),
+        patch("agent.process_bootstrap.OpenAI"),
+    ):
+        from run_agent import AIAgent
+
+        agent = AIAgent(
+            api_key="test-key-1234567890",
+            base_url="https://openrouter.ai/api/v1",
+            quiet_mode=True,
+            skip_context_files=True,
+            skip_memory=False,
+            session_id="privacy-off",
+        )
+
+    assert agent._memory_persistence_enabled is False
+    assert agent._memory_store is None
+    assert agent._memory_manager is None
+    load_memory_provider.assert_not_called()
+
+
+def test_reenable_restores_configured_external_provider_without_reselecting_it():
+    provider = RecordingMemoryProvider()
+    cfg = {
+        "memory": {
+            "enabled": True,
+            "memory_enabled": True,
+            "user_profile_enabled": True,
+            "provider": "recording",
+        },
+        "agent": {},
+    }
+
+    with (
+        patch("hermes_cli.config.load_config", return_value=cfg),
+        patch("hermes_cli.config.load_config_readonly", return_value=cfg),
+        patch("plugins.memory.load_memory_provider", return_value=provider) as load_memory_provider,
+        patch("agent.model_metadata.get_model_context_length", return_value=204_800),
+        patch("model_tools.get_tool_definitions", return_value=[]),
+        patch("model_tools.check_toolset_requirements", return_value={}),
+        patch("agent.process_bootstrap.OpenAI"),
+    ):
+        from run_agent import AIAgent
+
+        agent = AIAgent(
+            api_key="test-key-1234567890",
+            base_url="https://openrouter.ai/api/v1",
+            quiet_mode=True,
+            skip_context_files=True,
+            skip_memory=False,
+            session_id="privacy-on",
+        )
+
+    assert agent._memory_persistence_enabled is True
+    assert agent._memory_manager is not None
+    assert provider.initialized is True
+    load_memory_provider.assert_called_once_with("recording")
+
+
 def test_aiagent_forwards_user_id_alt_to_memory_provider():
     provider = RecordingMemoryProvider()
     cfg = {"memory": {"provider": "recording"}, "agent": {}}
