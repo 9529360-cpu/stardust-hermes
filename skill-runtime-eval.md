@@ -152,3 +152,78 @@ Action taken:
 
 Potential Skill finding:
 none；异常来自工具/编辑操作，未观察到 reference 膨胀或上下文路由进一步退化。
+
+
+## Observation 5
+
+Stage:
+regression debugging → privacy/data integration
+
+Task:
+把 durable memory reset generation 与 memory master privacy 从平行候选收敛成单一依赖链。
+
+Primary owner:
+runtime-regression-debugger / privacy-data lifecycle
+
+Active references:
+- references/causal-debugging-experiment-design.md
+- references/data-consistency-migration-patterns.md
+- references/privacy-data-lifecycle-engineering.md
+
+Deferred references:
+unknown
+
+Reference load:
+active count unknown / active bytes unknown / byte budget 65536
+
+Tool activity:
+按重叠文件集合和 Git tree/blob 身份重放；40 个非冲突文件直接复用已审 blob，3 个 owner 文件定向合并；未全仓复制或重复扫描。
+
+Context behavior:
+checkpoint / compaction
+
+Observed issue:
+并行 #48/#50 同时修改 memory_tool.py、main_agent_cmds.py、memory.md，直接独立合并会覆盖 reset-generation 或 privacy 语义。
+
+Action taken:
+建立 #54 stack 在 #48 精确 head 上，并增加 privacy-off → reset → re-enable 的组合回归；关闭被取代的 #50。
+
+Potential Skill finding:
+none；显式 owner/依赖收敛避免了平行 source-of-truth。
+
+
+## Observation 6
+
+Stage:
+review → security boundary
+
+Task:
+将外部 Desktop plugin 的首次启用从插件自声明默认值改为用户显式信任。
+
+Primary owner:
+runtime-regression-debugger / security
+
+Active references:
+- references/security-multitenancy-patterns.md
+- references/plugin-control-plane.md
+
+Deferred references:
+unknown
+
+Reference load:
+active count 2 / active bytes unknown / byte budget 65536
+
+Tool activity:
+先检查 pluginActive/setPluginEnabled 实际调用链和 scoped AGENTS.md；对旧 #18 做 14 文件 blob-drift 审计，仅 4 个漂移文件进行 current-main 小补丁，其余复用已审 blob。
+
+Context behavior:
+normal
+
+Observed issue:
+旧 PR 的 JS 红中大部分来自共享 main 基线；候选自身只暴露 strict-TS mock tuple 类型错误。创建 PR 时收到 422，随后确认同一分支已有 #55，未重复创建。
+
+Action taken:
+修正候选自身类型错误，重放到当前 main；保持 plugins-store 为唯一 persisted trust owner，未新增第二套权限状态。
+
+Potential Skill finding:
+none；按 failure signature 区分 shared baseline 与 candidate regression 有效。
