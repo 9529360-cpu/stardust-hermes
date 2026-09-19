@@ -19,10 +19,12 @@ class TestHermesAgentHelpGuidance:
         from agent.prompt_builder import HERMES_AGENT_HELP_GUIDANCE
         assert "skill_view(name='hermes-agent')" in HERMES_AGENT_HELP_GUIDANCE
 
-    def test_no_skills_variant_has_no_skill_view_reference(self):
+    def test_no_skills_variant_uses_stardust_authoritative_docs(self):
         from agent.prompt_builder import HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
+
         assert "skill_view" not in HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
-        assert "hermes-agent.nousresearch.com/docs" in HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
+        assert "github.com/9529360-cpu/stardust-hermes" in HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
+        assert "hermes-agent.nousresearch.com/docs" not in HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS
 
 
 class TestExecutionGuidanceText:
