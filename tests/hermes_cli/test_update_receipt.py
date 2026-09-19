@@ -250,7 +250,7 @@ class TestCommandBoundaryFinalization:
             force=False, force_venv=False,
         )
         with pytest.raises(SystemExit) as exc_info:
-            hermes_main.cmd_update(args)
+            hermes_main._run_update_transaction(args)
 
         assert exc_info.value.code == 2  # exit code preserved
         latest = ur.read_latest_receipt()
