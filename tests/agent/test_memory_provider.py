@@ -228,11 +228,15 @@ class TestMemoryManager:
             "visible answer",
         ]
 
-        mgr.on_pre_compress(raw_reenabled)
+        raw_precompress = raw_reenabled + [
+            {"role": "user", "content": "current turn before sync"},
+        ]
+        mgr.on_pre_compress(raw_precompress)
         mgr.on_session_end(raw_reenabled)
         assert [row["content"] for row in provider.pre_compress_messages[-1]] == [
             "visible after re-enable",
             "visible answer",
+            "current turn before sync",
         ]
         assert [row["content"] for row in provider.session_end_messages[-1]] == [
             "visible after re-enable",
@@ -289,6 +293,37 @@ class TestMemoryManager:
         assert forwarded[2]["tool_call_id"] == "call-1"
         assert forwarded[2]["content"] == "README contents"
         assert all(row.get("content") != "older row must not leak" for row in forwarded)
+
+    def test_precompress_does_not_collapse_identical_consecutive_turns(self):
+        state = {"enabled": True}
+
+        class PrecompressProvider(FakeMemoryProvider):
+            def __init__(self):
+                super().__init__("repeat")
+                self.pre_compress_messages = []
+
+            def on_pre_compress(self, messages):
+                self.pre_compress_messages.append(list(messages))
+                return ""
+
+        provider = PrecompressProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("same text", "same answer")
+        mgr.flush_pending(timeout=5)
+
+        mgr.on_pre_compress([
+            {"role": "user", "content": "same text"},
+            {"role": "assistant", "content": "same answer"},
+            {"role": "user", "content": "same text"},
+        ])
+
+        assert [row["content"] for row in provider.pre_compress_messages[-1]] == [
+            "same text",
+            "same answer",
+            "same text",
+        ]
+
 
     def test_queued_session_boundary_rechecks_privacy_before_provider_write(self):
         state = {"enabled": True}
