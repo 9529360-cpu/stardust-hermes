@@ -427,5 +427,6 @@ Session summary requires at least one prior turn in the current Honcho session. 
 | `hermes honcho sync` | Create host blocks for all Hermes profiles that don't have one yet |
 | `hermes honcho migrate` | Step-by-step migration guide from OpenClaw native memory to Hermes + Honcho |
 | `hermes memory setup` | Generic memory provider picker (selecting "honcho" runs the same wizard) |
-| `hermes memory status` | Show active memory provider and config |
-| `hermes memory off` | Disable external memory provider |
+| `hermes memory status` | Show memory privacy state, built-in targets, and provider config |
+| `hermes memory off` | Pause all durable memory while preserving the Honcho selection/config |
+| `hermes memory on` | Resume durable memory with the preserved provider config |
