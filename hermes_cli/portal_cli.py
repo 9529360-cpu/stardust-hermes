@@ -1,6 +1,17 @@
-"""``hermes portal`` — the human-readable entry point for Nous Portal."""
+"""Legacy ``hermes portal`` compatibility surface.
+
+Stardust does not own or operate the Nous Portal account system.  The parser is
+kept temporarily so existing scripts fail with a clear migration message rather
+than an argparse "unknown command" error, but no user-reachable portal command
+may authenticate to Nous, open Nous-owned pages, or change provider/tool routing.
+
+The read-only helpers below are retained temporarily for internal compatibility
+coverage while the wider Nous auth implementation is separated from Stardust.
+They are deliberately not wired into ``portal_command``.
+"""
 from __future__ import annotations
 
+import argparse
 import sys
 import webbrowser
 
@@ -10,7 +21,7 @@ from hermes_cli.config import load_config
 DEFAULT_PORTAL_URL = "https://portal.nousresearch.com"
 SUBSCRIPTION_URL = "https://portal.nousresearch.com/manage-subscription"
 DOCS_URL = "https://hermes-agent.nousresearch.com/docs/user-guide/features/tool-gateway"
-# Static `portal tools` catalog — the partners Tool Gateway routes to today: (key, label, partner).
+# Static legacy catalog retained only for the read-only compatibility helper.
 _CATALOG = [
     ("web", "Web search & extract", "Firecrawl"),
     ("image_gen", "Image generation", "FAL"),
@@ -21,7 +32,7 @@ _CATALOG = [
 
 
 def _feature_state(feat, *, via_nous: str) -> str:
-    """Routing column shared by `portal info` and `portal tools`."""
+    """Routing column for the legacy read-only status helpers."""
     if feat.managed_by_nous:
         return color(via_nous, Colors.GREEN)
     if feat.active:
@@ -36,13 +47,17 @@ def _heading(title: str) -> None:
 
 
 def _cmd_status(args) -> int:
-    """Show Portal auth + Tool Gateway routing summary."""
+    """Legacy read-only Portal auth + Tool Gateway summary.
+
+    Not registered by Stardust's ``portal`` parser.  Kept temporarily for
+    compatibility tests while the upstream account implementation is retired.
+    """
     from hermes_cli.auth import get_nous_auth_status_local
     from hermes_cli.nous_subscription import get_nous_subscription_features
 
     config = load_config() or {}
     try:
-        auth = get_nous_auth_status_local() or {}  # refresh-free snapshot
+        auth = get_nous_auth_status_local() or {}
     except Exception:
         auth = {}
     logged_in = bool(auth.get("logged_in"))
@@ -62,9 +77,8 @@ def _cmd_status(args) -> int:
     else:
         print(f"  Auth:    {color('not logged in', Colors.YELLOW)}")
         print(f"  Sign up: {SUBSCRIPTION_URL}")
-        print("  Login:   hermes portal")
+        print("  Login:   legacy Nous integration only")
 
-    # Provider selection (independent of auth)
     model_cfg = config.get("model") if isinstance(config.get("model"), dict) else {}
     provider = str(model_cfg.get("provider") or "").strip().lower()
     if provider == "nous":
@@ -89,7 +103,7 @@ def _cmd_status(args) -> int:
 
 
 def _cmd_open(args) -> int:
-    """Open the Portal subscription page in the default browser."""
+    """Legacy helper; not registered by Stardust."""
     print(f"Opening {SUBSCRIPTION_URL}")
     try:
         opened = webbrowser.open(SUBSCRIPTION_URL)
@@ -103,7 +117,7 @@ def _cmd_open(args) -> int:
 
 
 def _cmd_tools(args) -> int:
-    """List the Tool Gateway catalog + current routing."""
+    """Legacy helper; not registered by Stardust."""
     from hermes_cli.nous_subscription import get_nous_subscription_features
 
     config = load_config() or {}
@@ -115,7 +129,7 @@ def _cmd_tools(args) -> int:
 
     _heading("Tool Gateway catalog")
     if not features.nous_auth_present:
-        print(color("  Not logged into Nous Portal — sign in with `hermes portal`.", Colors.YELLOW))
+        print(color("  Legacy Nous Portal integration is not signed in.", Colors.YELLOW))
         print()
 
     label_width = max(len(label) for _, label, _ in _CATALOG)
@@ -125,16 +139,13 @@ def _cmd_tools(args) -> int:
         print(f"  {label:<{label_width}}  partner: {partner:<14} {state}")
 
     print()
-    print(color(f"  Manage your subscription: {SUBSCRIPTION_URL}", Colors.DIM))
-    print(color(f"  Docs: {DOCS_URL}", Colors.DIM))
+    print(color(f"  Legacy subscription URL: {SUBSCRIPTION_URL}", Colors.DIM))
+    print(color(f"  Legacy docs: {DOCS_URL}", Colors.DIM))
     return 0
 
 
 def _cmd_login(args) -> int:
-    """One-shot Nous Portal onboarding (login + model + provider + tools).
-
-    Reuses the exact wiring behind ``hermes setup --portal`` so the commands stay in lockstep.
-    """
+    """Legacy helper; not registered by Stardust."""
     from hermes_cli.setup import _run_portal_one_shot
 
     config = load_config() or {}
@@ -147,53 +158,38 @@ def _cmd_login(args) -> int:
     return 0
 
 
-# Default (None/"") is the one-shot onboarding (alias for `hermes auth add nous --type oauth` /
-# `hermes setup --portal`). `status` kept as a back-compat alias for `info`.
-_SUBCOMMANDS = {
-    None: _cmd_login,
-    "": _cmd_login,
-    "login": _cmd_login,
-    "info": _cmd_status,
-    "status": _cmd_status,
-    "open": _cmd_open,
-    "tools": _cmd_tools,
-}
+_RETIRED_MESSAGE = (
+    "Nous Portal is not a built-in Stardust account service. "
+    "This legacy command is retained only for compatibility and performs no login, "
+    "subscription, browser, provider, or Tool Gateway action. "
+    "Configure model providers with `hermes auth` and `hermes model`; "
+    "generic remote gateway credentials remain supported."
+)
 
 
 def portal_command(args) -> int:
-    """Top-level dispatch for `hermes portal <subcommand>`."""
-    sub = getattr(args, "portal_command", None)
-    handler = _SUBCOMMANDS.get(sub)
-    if handler is not None:
-        return handler(args)
-    print(f"Unknown portal subcommand: {sub}", file=sys.stderr)
-    print("Run `hermes portal -h` for usage.", file=sys.stderr)
+    """Fail closed for every legacy ``hermes portal`` invocation."""
+    print(_RETIRED_MESSAGE, file=sys.stderr)
     return 1
 
 
 def add_parser(subparsers) -> None:
-    """Register `hermes portal` on the given argparse subparsers object."""
+    """Register a fail-closed compatibility parser for old ``hermes portal`` scripts."""
     portal_parser = subparsers.add_parser(
         "portal",
-        help="Set up Nous Portal (login, model pick, Tool Gateway); see also `portal info`",
+        help=argparse.SUPPRESS,
         description=(
-            "Run `hermes portal` with no subcommand to log in to Nous Portal "
-            "and set it up — pick a model, set Nous as your provider, and offer "
-            "the Tool Gateway (the human-readable alias for `hermes auth add "
-            "nous --type oauth`, identical to `hermes setup --portal`). "
-            "Subcommands: login (default), info, open, tools."
+            "Legacy Nous Portal compatibility command. The built-in Nous account "
+            "integration is retired in Stardust and no action is performed."
         ),
     )
     portal_sub = portal_parser.add_subparsers(dest="portal_command")
 
-    # `status` is a hidden (no help) back-compat alias; registration order = `hermes portal -h` order.
-    for name, help_text in (
-        ("login", "Log in to Nous Portal + set it up (default; one-shot onboarding)"),
-        ("info", "Show Portal auth + Tool Gateway routing summary"),
-        ("status", None),
-        ("open", "Open the Portal subscription page in your default browser"),
-        ("tools", "List Tool Gateway tools and which are routed via Nous"),
-    ):
-        portal_sub.add_parser(name, **({} if help_text is None else {"help": help_text}))
+    # Parse historical forms so old scripts receive the explicit retirement message
+    # instead of accidentally falling through to another command. None of these
+    # subparsers dispatches to the legacy helper functions above.
+    for name in ("login", "info", "status", "open", "tools"):
+        legacy = portal_sub.add_parser(name, help=argparse.SUPPRESS)
+        legacy.set_defaults(func=portal_command)
 
     portal_parser.set_defaults(func=portal_command)
