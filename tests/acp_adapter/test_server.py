@@ -137,6 +137,21 @@ class TestInitialize:
         assert agent._approval_trust is captured
 
     @pytest.mark.asyncio
+    async def test_initialize_client_trust_name_match_is_exact(self, agent, monkeypatch):
+        monkeypatch.setattr(
+            "tools.approval_context._get_approval_config",
+            lambda: {"acp_trusted_clients": ["Zed"]},
+        )
+
+        await agent.initialize(
+            protocol_version=1,
+            client_info=Implementation(name="zed", version="0.200"),
+        )
+
+        assert agent._approval_trust.client_name == "zed"
+        assert agent._approval_trust.trusted_interactive is False
+
+    @pytest.mark.asyncio
     async def test_turn_callback_uses_captured_approval_trust(self, agent, monkeypatch):
         config = {"approvals": {"acp_trusted_clients": ["Interactive Editor"]}}
         monkeypatch.setattr(
