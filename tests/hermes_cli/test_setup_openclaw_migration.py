@@ -158,7 +158,7 @@ class TestSetupWizardOpenclawIntegration:
             patch("hermes_cli.auth.get_active_provider", return_value=None),
             # User presses Enter to start
             patch("builtins.input", return_value=""),
-            # Select "Full setup" (index 1) so we exercise the full path
+            # Select "Full setup" (index 0 / default) so we exercise the full path
             patch.object(setup_mod, "prompt_choice", return_value=0),
             # Mock the migration offer
             patch.object(
