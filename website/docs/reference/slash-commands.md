@@ -136,13 +136,13 @@ Type `/` in the CLI to open the autocomplete menu. Built-in commands are case-in
 | `/subscription` (alias: `/upgrade`) | **CLI only.** View your Nous plan and change it in the browser. |
 | `/login` | Sign in with a Nous account. Runs off-turn: the consent link and code arrive in the session, and the sign-in settles when you approve it in the browser. |
 | `/insights` | Show usage insights and analytics (last 30 days) |
-| `/update` | Update Hermes Agent to the latest version. |
+| `/update` | Show Stardust's pinned update status. The public source updater is disabled; use the Stardust-owned installer to refresh an installer-managed checkout. |
 | `/platforms` (alias: `/gateway`) | Show gateway/messaging platform status (CLI-only summary view). |
 | `/paste` | Attach a clipboard image |
 | `/copy [number]` | Copy the last assistant response to clipboard (or the Nth-from-last with a number). CLI-only. |
 | `/image <path>` | Attach a local image file for your next prompt. |
 | `/debug` | Upload debug report (system info + logs) and get shareable links. Also available in messaging. |
-| `/update` | Update Hermes Agent to the latest version. |
+| `/update` | Show Stardust's pinned update status. The public source updater is disabled; use the Stardust-owned installer to refresh an installer-managed checkout. |
 | `/profile` | Show active profile name and home directory |
 
 ### Exit
@@ -301,7 +301,7 @@ The messaging gateway supports the following built-in commands inside Telegram, 
 | `/commands [page]` | Browse all commands and skills (paginated). |
 | `/approve [session\|always]` | Approve and execute a pending dangerous command. `session` approves for this session only; `always` adds to permanent allowlist. |
 | `/deny` | Reject a pending dangerous command. |
-| `/update` | Update Hermes Agent to the latest version. |
+| `/update` | Show Stardust's pinned update status. The public source updater is disabled; use the Stardust-owned installer to refresh an installer-managed checkout. |
 | `/restart` | Gracefully restart the gateway after draining active runs. When the gateway comes back online, it sends a confirmation to the requester's chat/thread. |
 | `/debug` | Upload debug report (system info + logs) and get shareable links. |
 | `/help` | Show messaging help. |

@@ -99,7 +99,7 @@ hermes [global-options] <command> [subcommand/options]
 | `hermes profile` | Manage profiles — multiple isolated Hermes instances. |
 | `hermes completion` | Print shell completion scripts (bash/zsh/fish). |
 | `hermes --version` | Show version information. |
-| `hermes update` | Pull latest code and reinstall dependencies. `--check` previews without installing; `--backup` takes a pre-pull `HERMES_HOME` snapshot. |
+| `hermes update` | Compatibility command for Stardust's pinned public updater. It reports the pinned status and does not mutate source; re-run the Stardust-owned installer to refresh an installer-managed checkout. |
 | `hermes uninstall` | Remove Hermes from the system. |
 
 ## `hermes chat`

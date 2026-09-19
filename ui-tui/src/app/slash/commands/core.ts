@@ -89,6 +89,9 @@ export const DASHBOARD_EXIT_DISABLED_MESSAGE =
 export const DASHBOARD_UPDATE_DISABLED_MESSAGE =
   'update is disabled in hosted dashboard chat — the hosted environment is managed separately'
 
+export const STARDUST_UPDATE_PINNED_MESSAGE =
+  'Stardust source updates are pinned off here — re-run the Stardust installer to refresh this installation.'
+
 export const coreCommands: SlashCommand[] = [
   {
     help: 'list commands + hotkeys',
@@ -147,7 +150,7 @@ export const coreCommands: SlashCommand[] = [
   },
 
   {
-    help: 'update Hermes Agent to the latest version (exits TUI)',
+    help: 'show Stardust update status (pinned off)',
     name: 'update',
     run: (_arg, ctx) => {
       if (DASHBOARD_TUI_MODE) {
@@ -156,10 +159,9 @@ export const coreCommands: SlashCommand[] = [
         return
       }
 
-      ctx.transcript.sys('exiting TUI to run update...')
-      // Exit code 42 signals the Python wrapper to exec `hermes update`.
-      // Use dieWithCode for proper cleanup (gateway kill + Ink unmount).
-      setTimeout(() => ctx.session.dieWithCode(42), 100)
+      // Stardust intentionally pins the inherited public updater. Do not tear down
+      // the active TUI just to launch a command that can only report that policy.
+      ctx.transcript.sys(STARDUST_UPDATE_PINNED_MESSAGE)
     }
   },
 
