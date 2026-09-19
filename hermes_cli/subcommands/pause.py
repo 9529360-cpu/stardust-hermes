@@ -30,13 +30,21 @@ def cmd_pause(args: argparse.Namespace) -> int:
 
 def cmd_resume(args: argparse.Namespace) -> int:
     """Disengage the global emergency stop."""
-    from agent.estop import disengage, sentinel_path
+    from agent.estop import disengage_status, sentinel_path
 
-    if disengage():
+    status = disengage_status()
+    if status == "resumed":
         print("▶️  Hermes resumed — dispatch picks up on the next tick.")
-    else:
+        return 0
+    if status == "not_paused":
         print(f"Hermes is not paused (no sentinel at {sentinel_path()}).")
-    return 0
+        return 0
+
+    print(
+        "Resume incomplete — Hermes remains paused. "
+        "Check ESTOP sentinel permissions and retry hermes resume."
+    )
+    return 1
 
 
 def build_pause_parser(subparsers) -> None:
