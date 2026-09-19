@@ -1,6 +1,6 @@
-"""Skills Hub discovery: the centralized Hermes index fetch (cached, stale-
-fallback), the source router, and parallel/unified search across source
-adapters.
+"""Skills Hub discovery: optional centralized-index fetch, the source router,
+and parallel/unified search across source adapters. Stardust defaults to direct
+source adapters until it owns a centralized index publication endpoint.
 
 Split out of ``tools/skills_hub.py``; hub state (cache dir, ``TapsManager``, JSON
 cache reads) is still read from there at call time.
@@ -23,18 +23,23 @@ from tools.skills_hub_sources import BrowseShSource, LobeHubSource, UrlSource, W
 # Log-record parity with the origin module.
 logger = logging.getLogger("tools.skills_hub")
 
-HERMES_INDEX_URL = "https://hermes-agent.nousresearch.com/docs/api/skills-index.json"
+# No Stardust-owned publication endpoint exists yet for this large aggregate.
+# Empty means the existing direct source adapters remain authoritative.
+HERMES_INDEX_URL = ""
 HERMES_INDEX_TTL = 6 * 3600  # 6 hours
 
 
 def _hermes_index_cache_file() -> Path:
     from tools.skills_hub import _index_cache_dir
-    return _index_cache_dir() / "hermes-index.json"
+    # Fence centralized caches written by pre-Stardust builds.
+    return _index_cache_dir() / "stardust-index.json"
 
 
 def _load_hermes_index() -> Optional[dict]:
-    """Fetch the centralized skills index (docs site, rebuilt daily), cached
-    locally for HERMES_INDEX_TTL; on any failure serve the stale cache.
+    """Fetch the optional centralized skills index when Stardust owns one.
+
+    The default empty URL returns ``None`` so direct source adapters stay active;
+    old Hermes centralized-index caches are deliberately not consulted.
 
     Brotli is deliberately NOT negotiated: the index is tens of MB and httpx's
     streaming Brotli decoder (brotlicffi, pinned for Discord attachments) raises
@@ -42,6 +47,9 @@ def _load_hermes_index() -> Optional[dict]:
     Skills Hub. gzip/deflate first; the identity retry covers proxies that
     ignore the header and return Brotli anyway.
     """
+    if not HERMES_INDEX_URL:
+        return None
+
     from tools.skills_hub import _read_json_if_fresh
     cache_file = _hermes_index_cache_file()
     cached = _read_json_if_fresh(cache_file, HERMES_INDEX_TTL)
