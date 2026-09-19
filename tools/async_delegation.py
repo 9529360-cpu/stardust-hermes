@@ -220,6 +220,12 @@ def publish_durable_completion(
         "goal": goal, "context": context, "toolsets": None, "role": role, "model": model,
         **{k: v for k, v in metadata.items() if k in {"cron_job_id", "cron_job_name"}},
     }
+    process_registry = None
+    try:
+        from tools.process_registry import process_registry as _process_registry
+        process_registry = _process_registry
+    except Exception:
+        logger.debug("Durable completion queue is unavailable before persistence", exc_info=True)
     inserted = False
     with _DB_LOCK, _transaction() as conn:
         cur = conn.execute("""INSERT OR IGNORE INTO async_delegations
@@ -233,13 +239,17 @@ def publish_durable_completion(
     if not inserted:
         return False
     _prune_durable_records()
-    try:
-        from tools.process_registry import process_registry
-        process_registry.completion_queue.put(evt)
-    except Exception:
+    if process_registry is None:
         logger.error(
-            "Durable completion %s persisted but queue publication failed; restart recovery will replay it.",
-            delegation_id, exc_info=True)
+            "Durable completion %s persisted but queue publication was unavailable; recovery will replay it.",
+            delegation_id)
+    else:
+        try:
+            process_registry.completion_queue.put(evt)
+        except Exception:
+            logger.error(
+                "Durable completion %s persisted but queue publication failed; recovery will replay it.",
+                delegation_id, exc_info=True)
     return True
 
 def record_unit_child(delegation_id: str, entry: Dict[str, Any]) -> None:
@@ -354,6 +364,41 @@ def restore_undelivered_completions(target_queue) -> int:
             restored += 1
     return restored
 
+
+def restore_matching_undelivered_completions(target_queue, owns_event: Callable[[Dict[str, Any]], bool]) -> int:
+    """Requeue pending terminal completions owned by one newly-live session.
+
+    The process-wide queue may have discarded an in-memory copy while no matching session was
+    live; the durable row stays pending. A session poller calls this once at startup with its
+    existing lineage-aware ownership predicate, so reopening the conversation recovers results
+    without requiring a process restart. Unrelated rows are left untouched.
+    """
+    now, restored = time.time(), 0
+    with _DB_LOCK, _transaction() as conn:
+        rows = conn.execute("""SELECT delegation_id, event_json, completed_at, dispatched_at
+               FROM async_delegations
+               WHERE state != 'running' AND delivery_state='pending' AND event_json IS NOT NULL
+               ORDER BY completed_at, delegation_id""").fetchall()
+        for delegation_id, payload, completed_at, dispatched_at in rows:
+            try:
+                evt = json.loads(payload)
+            except Exception:
+                continue
+            if not isinstance(evt, dict) or not owns_event(evt):
+                continue
+            age_basis = completed_at or dispatched_at
+            if age_basis and (now - age_basis) > _MAX_COMPLETION_REPLAY_AGE_S:
+                conn.execute("""UPDATE async_delegations SET delivery_state='dropped',
+                              delivery_claim=NULL, delivery_claimed_at=NULL, updated_at=?
+                       WHERE delegation_id=? AND delivery_state='pending'""", (now, delegation_id))
+                logger.warning(
+                    "Async completion %s for resumed session is %.1fh old; dropping replay at the %.1fh cap.",
+                    delegation_id, (now - age_basis) / 3600.0, _MAX_COMPLETION_REPLAY_AGE_S / 3600.0)
+                continue
+            evt["restored"] = True
+            target_queue.put(evt)
+            restored += 1
+    return restored
 
 def _update_delivery(sql: str, params: tuple) -> bool:
     """Run one UPDATE on the ledger; True iff exactly one row changed."""
