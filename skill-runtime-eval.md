@@ -114,3 +114,41 @@ Action taken:
 
 Potential Skill finding:
 review 路由和 negative-space 检查对候选回归有效；除 Observation 2 的 debugging signal 未匹配外，未观察到新的 Skill 问题。
+
+
+## Observation 4
+
+Stage:
+review → stabilization implementation
+
+Task:
+从最新 main 拆分共享 CI 基线修复：Windows footgun/握手竞态、pinned updater 内部测试边界、Stardust 迁移后的 stale tests。
+
+Primary owner:
+review (active references retained; no new router invocation)
+
+Active references:
+- references/code-review-patterns.md
+- references/semantic-diff-behavior-change.md
+- references/negative-space-patch-compression.md
+
+Deferred references:
+unchanged / no new router data
+
+Reference load:
+active count 3 / active bytes 21415 / byte budget 65536 (last observed; no new load)
+
+Tool activity:
+继续按失败签名定向读取 CI 日志和具体测试；从 #22 只提取已验证的小修，没有合并大分支或全仓扫描。
+
+Context behavior:
+checkpoint
+
+Observed issue:
+Code Mode 一次触及调用数上限；一次不存在的 GitHub find 动作失败；重复创建已存在 PR 返回 422。均通过现有状态/定向读取继续。一次文本替换写入字面 \\n，立即在提交 PR 前发现并修正。
+
+Action taken:
+建立 #37/#38/#39 三个小 PR，将共享基线问题按 owner 隔离验证；未修改 Skill。
+
+Potential Skill finding:
+none；异常来自工具/编辑操作，未观察到 reference 膨胀或上下文路由进一步退化。
