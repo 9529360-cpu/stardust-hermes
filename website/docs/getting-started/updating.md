@@ -22,13 +22,13 @@ This pulls the latest code from `main`, updates dependencies, and prompts you to
 
 ### Passive update notices
 
-Pinned or noninteractive installations can disable passive CLI version and banner update checks:
+Stardust disables passive CLI version and banner update checks by default. To opt in to background update comparison:
 
 ```bash
-hermes config set updates.check false
+hermes config set updates.check true
 ```
 
-This suppresses both cached update notices and passive update-check network requests. The default is `true`. Explicit `hermes update --check` and `hermes update` still work; this setting does not control the Desktop application's updater.
+Set it back to `false` to suppress both cached update notices and passive update-check network requests. Explicit `hermes update --check` remains a user-requested comparison path; this setting does not control the Desktop application's updater.
 
 ### What happens during an update
 
