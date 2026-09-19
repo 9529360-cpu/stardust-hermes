@@ -151,6 +151,59 @@ class TestMemoryFileLockPermissions:
         assert outside.read_text(encoding="utf-8") == "do not touch"
 
 
+class TestMemoryResetGeneration:
+    def test_reset_blocks_stale_session_write_until_reload(self, store):
+        assert store.add("memory", "fact from before reset")["success"] is True
+        store.load_from_disk()
+        before_generation = store.reset_generation("memory")
+        assert "fact from before reset" in (store.format_for_system_prompt("memory") or "")
+
+        assert MemoryStore.reset_target("memory") is True
+
+        assert store.system_prompt_snapshot_stale() is True
+        assert store.reset_generation("memory") == before_generation
+        blocked = store.add("memory", "stale session tries to relearn it")
+        assert blocked["success"] is False
+        assert blocked["reset_conflict"] is True
+        assert not store._path_for("memory").exists()
+
+        store.load_from_disk()
+        assert store.reset_generation("memory") != before_generation
+        assert store.format_for_system_prompt("memory") is None
+        assert store.add("memory", "fresh post-reset fact")["success"] is True
+
+    def test_empty_reset_still_advances_generation_without_changing_prompt_version(self, store):
+        before_version = store.system_prompt_snapshot_version()
+        before_generation = store.reset_generation("user")
+
+        assert MemoryStore.reset_target("user") is False
+        assert store.system_prompt_snapshot_stale() is True
+
+        store.load_from_disk()
+
+        assert store.system_prompt_snapshot_version() == before_version
+        assert store.reset_generation("user") != before_generation
+        assert store.system_prompt_snapshot_stale() is False
+        assert store.add("user", "post-reset profile fact")["success"] is True
+
+    def test_reset_generation_is_scoped_to_memory_directory(self, tmp_path, monkeypatch):
+        first = tmp_path / "profile-a" / "memories"
+        second = tmp_path / "profile-b" / "memories"
+        first.mkdir(parents=True)
+        second.mkdir(parents=True)
+
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: first)
+        MemoryStore.reset_target("memory")
+        first_marker = first / "MEMORY.md.reset-generation"
+        assert first_marker.exists()
+
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: second)
+        assert not (second / "MEMORY.md.reset-generation").exists()
+        second_store = MemoryStore()
+        second_store.load_from_disk()
+        assert second_store.reset_generation("memory") == ""
+
+
 class TestMemoryStoreAdd:
     def test_add_entry(self, store):
         result = store.add("memory", "Python 3.12 project")
