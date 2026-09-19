@@ -35,11 +35,15 @@ import { createPluginContext, type HermesPlugin } from './plugin'
 import { $pluginRecords, dropPlugin, pluginActive, type PluginKind, publishPlugin } from './plugins-store'
 
 interface LoadOptions {
-  /** Root-level default-enable CAP: `false` ships the plugin opt-in (inventory
-   *  row, off until the user toggles) even if the plugin says otherwise. The
-   *  unified agent-plugin root sets this so `~/.hermes/plugins` keeps its
-   *  installed-but-inert posture (GHSA-mcfc-hp25-cjv7) on the desktop side too. */
+  /** Root-level default-enable CAP after evaluation. External disk/runtime
+   *  sources still require a separate pre-evaluation trust decision. */
   defaultEnabled?: boolean
+  /** Stable identity known before module evaluation (disk folder name). User
+   *  decisions bind here because plugin.id is not trustworthy/known until code runs. */
+  decisionKey?: string
+  /** Callers must prove the user already trusted this external source before
+   *  any ESM import. Default false so future call sites fail closed. */
+  evaluationAuthorized?: boolean
   /** Absolute plugin.js path (disk plugins) — recorded for reveal/inventory. */
   file?: string
   /** `sha256-<base64>` — verified against the source before evaluation. */
@@ -113,6 +117,12 @@ export async function loadRuntimePlugin(
   origin: string,
   options: LoadOptions = {}
 ): Promise<null | string> {
+  if (!options.evaluationAuthorized) {
+    console.warn(`[plugins] refused to evaluate untrusted runtime source (${origin})`)
+
+    return null
+  }
+
   installPluginSdk()
 
   try {
@@ -174,7 +184,8 @@ export async function loadRuntimePlugin(
       kind: options.kind ?? 'disk',
       file: options.file,
       packageName: options.packageName,
-      packageOrigin: options.packageOrigin
+      packageOrigin: options.packageOrigin,
+      decisionKey: options.decisionKey
     }
 
     const activate = () => {
@@ -192,7 +203,12 @@ export async function loadRuntimePlugin(
     // reactivates via the handle above) — it just never registers. A root-level
     // `defaultEnabled: false` caps the plugin's own default: the user's explicit
     // enable still wins, a plugin can't self-enable past its root's posture.
-    if (pluginActive(plugin.id, (plugin.defaultEnabled ?? true) && (options.defaultEnabled ?? true))) {
+    if (
+      pluginActive(
+        options.decisionKey ?? plugin.id,
+        (plugin.defaultEnabled ?? true) && (options.defaultEnabled ?? true)
+      )
+    ) {
       activate()
     }
 
@@ -207,6 +223,7 @@ export async function loadRuntimePlugin(
       file: options.file,
       packageName: options.packageName,
       packageOrigin: options.packageOrigin,
+      decisionKey: options.decisionKey,
       status: 'error',
       error: error instanceof Error ? error.message : String(error)
     })
@@ -325,6 +342,71 @@ function dropOriginRecord(origin: string, except: DiskPlugin): void {
   dropPlugin(origin)
 }
 
+function inertDiskRecordId(entry: DiskPlugin): string {
+  return `disk:${entry.origin}`
+}
+
+function diskPluginTrusted(entry: DiskPlugin): boolean {
+  // Absence is intentionally false. External renderer code is never evaluated
+  // merely because a folder appeared or the plugin exports defaultEnabled=true.
+  return pluginActive(entry.origin, false)
+}
+
+function publishInertDiskPlugin(entry: DiskPlugin): void {
+  const id = inertDiskRecordId(entry)
+
+  publishPlugin(
+    {
+      id,
+      name: entry.packageName ?? entry.origin,
+      kind: 'disk',
+      file: entry.file,
+      packageName: entry.packageName,
+      packageOrigin: entry.packageOrigin,
+      decisionKey: entry.origin,
+      status: 'disabled'
+    },
+    {
+      activate: async () => {
+        // setPluginEnabled persists decisionKey=true before invoking us.
+        if (!diskPluginTrusted(entry)) {
+          return
+        }
+        if (!(await loadDiskPlugin(entry))) {
+          void scanDiskPlugins()
+        }
+      },
+      deactivate: () => {
+        if (entry.id) {
+          unloadRuntimePlugin(entry.id)
+        }
+      }
+    }
+  )
+}
+
+function publishDiskLifecycleHandle(entry: DiskPlugin, id: string): void {
+  const record = $pluginRecords.get()[id]
+
+  if (!record) {
+    return
+  }
+
+  publishPlugin(record, {
+    // Re-enable from the CURRENT file. Disabled hot-edits were intentionally
+    // never evaluated, so reusing a captured module would execute stale code.
+    activate: async () => {
+      if (!diskPluginTrusted(entry)) {
+        return
+      }
+      if (!(await loadDiskPlugin(entry))) {
+        void scanDiskPlugins()
+      }
+    },
+    deactivate: () => unloadRuntimePlugin(id)
+  })
+}
+
 /** A plugin source that could not be read in FULL. Evaluating a truncated
  *  file is never acceptable — half a module can still parse. */
 class PluginSourceOversizeError extends Error {}
@@ -362,10 +444,16 @@ async function loadDiskPlugin(entry: DiskPlugin): Promise<boolean> {
 
     const id = await loadRuntimePlugin(text, entry.origin, {
       defaultEnabled: entry.defaultEnabled,
+      decisionKey: entry.origin,
+      evaluationAuthorized: true,
       file: entry.file,
       packageName: entry.packageName,
       packageOrigin: entry.packageOrigin
     })
+
+    // The inert row exists only until a trusted evaluation can publish either
+    // the real plugin record, an error row, or a bundled-shadow row.
+    dropPlugin(inertDiskRecordId(entry))
 
     // A hot-edit that changes `plugin.id`: loadRuntimePlugin only disposes the
     // NEW id, so unload the previous incarnation here or its contributions +
@@ -383,6 +471,10 @@ async function loadDiskPlugin(entry: DiskPlugin): Promise<boolean> {
       dropOriginRecord(entry.origin, entry)
     }
 
+    if (id) {
+      publishDiskLifecycleHandle(entry, id)
+    }
+
     return true
   } catch (error) {
     // An oversize source is a REAL failure the user must see (the silent
@@ -393,11 +485,15 @@ async function loadDiskPlugin(entry: DiskPlugin): Promise<boolean> {
     if (error instanceof PluginSourceOversizeError) {
       console.error(`[plugins] ${entry.origin}: ${error.message}`)
       notifyError(error, `Plugin "${entry.origin}" failed to load`)
+      dropPlugin(inertDiskRecordId(entry))
       publishPlugin({
         id: entry.origin,
         name: entry.origin,
         kind: 'disk',
         file: entry.file,
+        packageName: entry.packageName,
+        packageOrigin: entry.packageOrigin,
+        decisionKey: entry.origin,
         status: 'error',
         error: error.message
       })
@@ -491,8 +587,9 @@ async function scanDiskPlugins(): Promise<void> {
         const marker = await readPackageMarker(desktop, dir.path)
 
         const record: DiskPlugin = {
-          // A unified package's desktop half ships opt-in, like its agent half.
-          defaultEnabled: marker ? false : undefined,
+          // Every non-bundled Desktop code source is opt-in. Plugin-authored
+          // defaultEnabled can never grant renderer authority by itself.
+          defaultEnabled: false,
           file,
           id: null,
           origin: dir.name,
@@ -502,9 +599,13 @@ async function scanDiskPlugins(): Promise<void> {
         }
 
         disk.set(file, record)
+        publishInertDiskPlugin(record)
 
-        if (!(await loadDiskPlugin(record))) {
+        // Explicit persisted trust may reactivate a known folder on restart.
+        // With no decision we STOP here: no source read, no ESM import.
+        if (diskPluginTrusted(record) && !(await loadDiskPlugin(record))) {
           disk.delete(file)
+          dropPlugin(inertDiskRecordId(record))
 
           continue
         }
@@ -529,6 +630,7 @@ async function scanDiskPlugins(): Promise<void> {
         dropPlugin(record.id)
       }
 
+      dropPlugin(inertDiskRecordId(record))
       dropOriginRecord(record.origin, record)
 
       if (record.watchId) {
@@ -571,6 +673,12 @@ export function watchRuntimePlugins(): void {
 
     for (const record of disk.values()) {
       if (record.watchId === id) {
+        // File watches keep inventory current, but disabled external code must
+        // remain unevaluated until the user explicitly trusts it again.
+        if (!diskPluginTrusted(record)) {
+          return
+        }
+
         void loadDiskPlugin(record).then(readable => {
           if (!readable) {
             void scanDiskPlugins()
