@@ -720,9 +720,9 @@ class MemoryManager:
                  turn_author: Optional[Dict[str, Any]] = None) -> None:
         """Sync a completed turn to all providers on the background worker.
 
-        Never inline: a provider's ``sync_turn`` may block for minutes, which kept ``run_conversation``
-        open after the user saw the response. The single worker also serializes writes (turn N before N+1).
-        ``turn_author`` reaches only providers whose ``sync_turn`` accepts it.
+        Never inline: a provider sync may block for minutes, which kept run_conversation
+        open after the user saw the response. The single worker also serializes writes.
+        turn_author reaches only providers whose sync_turn accepts it.
         """
         if not self._privacy_enabled():
             return
@@ -730,24 +730,36 @@ class MemoryManager:
         clean_user_content = self._strip_skill_scaffolding(user_content) if providers else None
         if not clean_user_content:
             return
-        # Freeze only this completed turn at submission time; the live transcript
-        # may advance before the serialized worker gets to it. Do NOT add it to the
-        # provider-visible ledger yet: memory may be switched off while this task is
-        # queued, in which case the turn must never be backfilled after re-enable.
-        turn_snapshot = [
-            dict(row)
-            for row in self._completed_turn_slice(messages, clean_user_content, assistant_content)
-        ]
+
+        privacy_managed = self._privacy_enabled_check is not None
+        # Production privacy managers freeze just this completed turn now, but do
+        # not authorize it into the provider-visible ledger until the worker live
+        # privacy recheck succeeds. Standalone managers preserve the historical
+        # raw optional-messages contract instead.
+        turn_snapshot = (
+            [
+                dict(row)
+                for row in self._completed_turn_slice(messages, clean_user_content, assistant_content)
+            ]
+            if privacy_managed
+            else None
+        )
 
         def _run_sync() -> None:
             if not self._privacy_enabled():
                 return
-            self._record_provider_visible_turn(
-                clean_user_content,
-                assistant_content,
-                turn_snapshot,
-            )
-            provider_messages = self._provider_history(messages)
+            if privacy_managed:
+                self._record_provider_visible_turn(
+                    clean_user_content,
+                    assistant_content,
+                    turn_snapshot,
+                )
+                provider_messages = self._provider_history(messages)
+            else:
+                # Compatibility: a direct MemoryManager() caller that omitted
+                # messages must still omit that provider keyword rather than
+                # receiving an invented empty/ledger list.
+                provider_messages = messages
             optional_kwargs = {"messages": provider_messages, "turn_author": turn_author}
 
             def _sync(provider: MemoryProvider) -> None:
@@ -760,7 +772,6 @@ class MemoryManager:
             self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
 
         self._submit_background(_run_sync)
-
     def _submit_background(self, fn, *, kind: str = "write") -> None:
         """Queue ``fn`` on the serialized worker (created lazily; None once shutting down) and track its
         durability class. Runs under the caller's contextvars (``ctx_bound``). If the executor is
