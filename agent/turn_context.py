@@ -871,6 +871,19 @@ def _refresh_builtin_memory_snapshot(agent: Any) -> bool:
     previous_enabled = getattr(agent, "_memory_persistence_enabled", True)
     if live_enabled != previous_enabled:
         agent._memory_persistence_enabled = live_enabled
+        if live_enabled and getattr(agent, "_memory_manager", None) is None \
+                and not getattr(agent, "_memory_provider_skip", False):
+            try:
+                from agent.agent_init import _activate_configured_memory_provider
+                from tools.memory_tool import get_builtin_memory_config
+                _activate_configured_memory_provider(
+                    agent,
+                    get_builtin_memory_config(),
+                    getattr(agent, "_memory_platform", "cli"),
+                    memory_persistence_enabled,
+                )
+            except Exception:
+                logger.warning("Failed to activate memory provider after master enable", exc_info=True)
         try:
             from agent.memory_manager import refresh_memory_tool_surface
             refresh_memory_tool_surface(agent, enabled=live_enabled)
