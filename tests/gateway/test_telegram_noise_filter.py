@@ -196,7 +196,8 @@ def test_chat_gateways_redact_secret_in_provider_error(platform):
     assert "sk-ABCDEF" not in sanitized
     assert "HTTP 401" not in sanitized
     # The user gets the safe error category and a command to run instead of the raw body.
-    assert "sign-in" in sanitized.lower() and "/login" in sanitized
+    assert "authentication" in sanitized.lower() and "/model" in sanitized
+    assert "hermes auth" in sanitized and "/login" not in sanitized
 
 
 @pytest.mark.parametrize("platform", ["slack", "matrix"])
@@ -293,8 +294,9 @@ def test_telegram_final_response_redacts_auth_secrets():
 
     sanitized = _sanitize_gateway_final_response(Platform.TELEGRAM, raw)
 
-    assert "sign-in" in sanitized.lower()
-    assert "/login" in sanitized
+    assert "authentication" in sanitized.lower()
+    assert "/model" in sanitized and "hermes auth" in sanitized
+    assert "/login" not in sanitized
     assert "sk-live" not in sanitized
 
 
