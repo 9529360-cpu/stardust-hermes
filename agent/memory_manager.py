@@ -158,6 +158,64 @@ def inject_memory_provider_tools(agent: Any) -> int:
     return added
 
 
+def refresh_memory_tool_surface(agent: Any, *, enabled: bool) -> bool:
+    """Hide/restore the memory tool family on a live agent after a master transition.
+
+    The memory manager owns external-provider schema injection, so keeping the
+    transition logic here avoids a second list of provider tool names in each host.
+    Unrelated tool ordering/state is left untouched.
+    """
+    tools = getattr(agent, "tools", None)
+    if not isinstance(tools, list):
+        return False
+
+    manager = getattr(agent, "_memory_manager", None)
+    registered_provider_names = set()
+    registered = getattr(manager, "registered_tool_names", None)
+    if callable(registered):
+        try:
+            registered_provider_names = set(registered())
+        except Exception:
+            logger.debug("Memory provider tool-name snapshot failed", exc_info=True)
+
+    before_names = {_tool_name(tool) for tool in tools if _tool_name(tool)}
+    memory_names = {"memory"} | registered_provider_names
+
+    if not enabled:
+        agent.tools = [tool for tool in tools if _tool_name(tool) not in memory_names]
+    else:
+        current_names = {_tool_name(tool) for tool in agent.tools if _tool_name(tool)}
+        # A store exists only when this live agent was created with at least one
+        # built-in target enabled. Do not advertise a dead built-in tool on an
+        # agent that started while the master switch was already off.
+        if getattr(agent, "_memory_store", None) is not None and "memory" not in current_names:
+            try:
+                import model_tools
+                definitions = model_tools.get_tool_definitions(
+                    enabled_toolsets=getattr(agent, "enabled_toolsets", None),
+                    disabled_toolsets=getattr(agent, "disabled_toolsets", None),
+                    quiet_mode=True,
+                ) or []
+                memory_schema = next(
+                    (tool for tool in definitions if _tool_name(tool) == "memory"),
+                    None,
+                )
+                if memory_schema is not None:
+                    agent.tools.append(memory_schema)
+            except Exception:
+                logger.warning("Failed to restore built-in memory tool after master enable", exc_info=True)
+        if manager is not None:
+            try:
+                inject_memory_provider_tools(agent)
+            except Exception:
+                logger.warning("Failed to restore external memory tools after master enable", exc_info=True)
+
+    agent.valid_tool_names = {
+        name for name in (_tool_name(tool) for tool in agent.tools) if name
+    }
+    return before_names != set(agent.valid_tool_names)
+
+
 # -- Context fencing helpers --------------------------------------------------
 
 _FENCE_TAG_RE = re.compile(r'</?\s*memory-context\s*>', re.IGNORECASE)
@@ -287,9 +345,24 @@ class MemoryManager:
     swallows per-provider exceptions.
     """
 
-    def __init__(self, *, external_prefetch_timeout: Optional[float] = None) -> None:
+    def __init__(
+        self,
+        *,
+        external_prefetch_timeout: Optional[float] = None,
+        privacy_enabled: Optional[Callable[[], bool]] = None,
+    ) -> None:
         self._providers: List[MemoryProvider] = []
         self._tool_to_provider: Dict[str, MemoryProvider] = {}
+        # Production agents pass a live memory.enabled reader. Direct/test managers
+        # may omit it and retain the historical always-enabled provider contract.
+        self._privacy_enabled_check = privacy_enabled
+        self._provider_visible_history: List[Dict[str, Any]] = []
+        self._provider_visible_history_lock = threading.Lock()
+        # Session boundaries that occur while the master switch is OFF are remembered
+        # host-side only. The latest boundary is replayed to providers after re-enable,
+        # before any provider I/O, so no disabled-session hook call is needed.
+        self._pending_session_switch: Optional[tuple[str, str, bool, bool, Dict[str, Any]]] = None
+        self._pending_session_switch_lock = threading.Lock()
         self._external_prefetch_spill_config: Optional[Dict[str, Any]] = None
         self._has_external: bool = False
         timeout = external_prefetch_timeout
@@ -311,10 +384,158 @@ class MemoryManager:
             "status": "not_started", "abandoned_writes": 0, "abandoned_prefetches": 0, "active_tasks": 0,
         }
 
+    def _privacy_enabled(self) -> bool:
+        """Live master-memory privacy gate; configured readers fail closed."""
+        check = self._privacy_enabled_check
+        if check is None:
+            return True
+        try:
+            return bool(check())
+        except Exception:
+            logger.warning("Memory privacy gate failed; external memory is disabled for this operation", exc_info=True)
+            return False
+
+    def _provider_history(
+        self,
+        raw_messages: Optional[List[Dict[str, Any]]] = None,
+        *,
+        include_current_turn: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """History a provider is allowed to see.
+
+        Production managers retain the original message shape (including tool calls/results)
+        for turns that completed while memory.enabled was on. Turns completed while the
+        master switch was off never enter this exposure ledger, so re-enabling cannot
+        backfill that disabled interval through sync, pre-compress, or session-end hooks.
+
+        Pre-compress is special: it can run before the current turn completes, so callers
+        may opt into the last user-delimited slice from the live transcript. That current
+        turn is authorized by the live master gate without reopening older disabled rows.
+        Standalone managers without a privacy reader keep the historical raw-message contract.
+        """
+        if self._privacy_enabled_check is None:
+            return list(raw_messages or [])
+        with self._provider_visible_history_lock:
+            visible = [dict(message) for message in self._provider_visible_history]
+        if include_current_turn:
+            # Pre-compress runs before this turn's end-of-turn sync, so the live
+            # last-user slice is always the not-yet-recorded current turn. Do not
+            # dedupe by content: two consecutive identical turns are still distinct.
+            visible.extend(self._last_user_slice(raw_messages))
+        return visible
+
+    @staticmethod
+    def _last_user_slice(
+        messages: Optional[List[Dict[str, Any]]], *, copy_rows: bool = True
+    ) -> List[Dict[str, Any]]:
+        """Return the last user-delimited turn, preserving assistant/tool message shape."""
+        if isinstance(messages, list):
+            for index in range(len(messages) - 1, -1, -1):
+                row = messages[index]
+                if isinstance(row, dict) and row.get("role") == "user":
+                    rows = [item for item in messages[index:] if isinstance(item, dict)]
+                    return [dict(item) for item in rows] if copy_rows else rows
+        return []
+
+    @classmethod
+    def _completed_turn_slice(
+        cls,
+        messages: Optional[List[Dict[str, Any]]],
+        user_content: str,
+        assistant_content: str,
+    ) -> List[Dict[str, Any]]:
+        """Reference only the just-completed turn from the live transcript.
+
+        The ledger is a privacy projection, not a second transcript owner. Holding the
+        existing row dicts avoids one extra dict allocation per message; provider-facing
+        reads still return shallow copies through _provider_history().
+        """
+        referenced = cls._last_user_slice(messages, copy_rows=False)
+        if referenced:
+            return referenced
+        rows: List[Dict[str, Any]] = [{"role": "user", "content": user_content}]
+        if assistant_content:
+            rows.append({"role": "assistant", "content": assistant_content})
+        return rows
+
+    def _record_provider_visible_turn(
+        self,
+        user_content: str,
+        assistant_content: str,
+        messages: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
+        if self._privacy_enabled_check is None:
+            return
+        rows = self._completed_turn_slice(messages, user_content, assistant_content)
+        with self._provider_visible_history_lock:
+            self._provider_visible_history.extend(rows)
+
+    def _clear_provider_visible_history(self) -> None:
+        if self._privacy_enabled_check is None:
+            return
+        with self._provider_visible_history_lock:
+            self._provider_visible_history.clear()
+
+    def _apply_pending_session_switch(self) -> bool:
+        """Replay the latest OFF-period boundary before enabled provider I/O.
+
+        Returns False when the binding could not be established. Callers must fail
+        closed in that case rather than writing the new session into a stale provider
+        binding. The pending target is retained for a later retry.
+        """
+        # Hot path: avoid another config read when there is nothing to replay.
+        with self._pending_session_switch_lock:
+            if self._pending_session_switch is None:
+                return True
+        if not self._privacy_enabled():
+            return False
+        # Re-read under the lock so a newer OFF-period boundary wins if it landed
+        # while the live privacy check was running.
+        with self._pending_session_switch_lock:
+            pending = self._pending_session_switch
+            self._pending_session_switch = None
+        if pending is None:
+            return True
+        new_session_id, parent_session_id, reset, rewound, kwargs = pending
+        replay_kwargs = dict(kwargs)
+        if rewound:
+            replay_kwargs["rewound"] = True
+
+        for provider in self._providers:
+            if not self._privacy_enabled():
+                with self._pending_session_switch_lock:
+                    if self._pending_session_switch is None:
+                        self._pending_session_switch = pending
+                return False
+            try:
+                provider.on_session_switch(
+                    new_session_id,
+                    parent_session_id=parent_session_id,
+                    reset=reset,
+                    **replay_kwargs,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Memory provider '%s' deferred on_session_switch failed: %s",
+                    provider.name,
+                    exc,
+                    exc_info=True,
+                )
+                with self._pending_session_switch_lock:
+                    # Never overwrite a newer boundary that arrived while the
+                    # failed replay was in flight.
+                    if self._pending_session_switch is None:
+                        self._pending_session_switch = pending
+                return False
+        return True
+
     def _each_provider(self, label: str, call: Callable[[MemoryProvider], Any], *, level: int = logging.DEBUG,
-                       providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False) -> List[Any]:
+                       providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False,
+                       _skip_pending_session_switch: bool = False) -> List[Any]:
         """Call ``call(provider)`` per provider, logging+swallowing failures; returns successes in order.
         ``label`` completes the log line ``Memory provider '<name>' <label>: <exc>``."""
+        if not _skip_pending_session_switch and not self._apply_pending_session_switch():
+            return []
         results: List[Any] = []
         for provider in self._providers if providers is None else providers:
             try:
@@ -383,6 +604,8 @@ class MemoryManager:
 
     def build_system_prompt(self) -> str:
         """Join every provider's non-empty ``system_prompt_block()`` with blank lines."""
+        if not self._privacy_enabled():
+            return ""
         blocks = self._each_provider("system_prompt_block() failed", lambda p: p.system_prompt_block(),
                                       level=logging.WARNING)
         return "\n\n".join(b for b in blocks if b and b.strip())
@@ -393,6 +616,8 @@ class MemoryManager:
 
     def prefetch_all(self, query: str, *, session_id: str = "") -> str:
         """Merge non-empty prefetch context from all providers (failures are non-fatal)."""
+        if not self._privacy_enabled():
+            return ""
         clean_query = self._strip_skill_scaffolding(query)
         if not clean_query:
             return ""
@@ -410,6 +635,9 @@ class MemoryManager:
         result_box: Dict[str, Any] = {}
 
         def _run() -> None:
+            if not self._privacy_enabled():
+                result_box["value"] = ""
+                return
             try:
                 result_box["value"] = provider.prefetch(query, session_id=session_id) or ""
             except Exception as exc:  # pragma: no cover - re-raised by caller
@@ -450,6 +678,8 @@ class MemoryManager:
     def describe_recall(self) -> str:
         """Deterministic recall indicator line (e.g. ``"🧠 Provider — recalled 3 memories"``); ``""`` if none.
         Call right after :meth:`prefetch_all` so the user SEES memory was used even if the model is silent."""
+        if not self._privacy_enabled():
+            return ""
         segments: List[str] = []
         for status in self._each_provider("recall_status failed (non-fatal)", lambda p: p.recall_status()):
             if status is None:
@@ -462,14 +692,22 @@ class MemoryManager:
 
     def queue_prefetch_all(self, query: str, *, session_id: str = "") -> None:
         """Queue background prefetch on all providers for the next turn (see ``sync_all``)."""
+        if not self._privacy_enabled():
+            return
         providers = list(self._providers)
         clean_query = self._strip_skill_scaffolding(query) if providers else None
         if not clean_query:
             return
-        self._submit_background(lambda: self._each_provider(
-            "queue_prefetch failed (non-fatal)", lambda p: p.queue_prefetch(clean_query, session_id=session_id),
-            providers=providers,
-        ), kind="prefetch")
+
+        def _queued_prefetch() -> None:
+            if not self._privacy_enabled():
+                return
+            self._each_provider(
+                "queue_prefetch failed (non-fatal)", lambda p: p.queue_prefetch(clean_query, session_id=session_id),
+                providers=providers,
+            )
+
+        self._submit_background(_queued_prefetch, kind="prefetch")
 
     @staticmethod
     def _provider_sync_accepts(provider: MemoryProvider, keyword: str) -> bool:
@@ -482,27 +720,58 @@ class MemoryManager:
                  turn_author: Optional[Dict[str, Any]] = None) -> None:
         """Sync a completed turn to all providers on the background worker.
 
-        Never inline: a provider's ``sync_turn`` may block for minutes, which kept ``run_conversation``
-        open after the user saw the response. The single worker also serializes writes (turn N before N+1).
-        ``turn_author`` reaches only providers whose ``sync_turn`` accepts it.
+        Never inline: a provider sync may block for minutes, which kept run_conversation
+        open after the user saw the response. The single worker also serializes writes.
+        turn_author reaches only providers whose sync_turn accepts it.
         """
+        if not self._privacy_enabled():
+            return
         providers = list(self._providers)
         clean_user_content = self._strip_skill_scaffolding(user_content) if providers else None
         if not clean_user_content:
             return
-        optional_kwargs = {"messages": messages, "turn_author": turn_author}
 
-        def _sync(provider: MemoryProvider) -> None:
-            kwargs: Dict[str, Any] = {"session_id": session_id}
-            for keyword, value in optional_kwargs.items():
-                if value is not None and self._provider_sync_accepts(provider, keyword):
-                    kwargs[keyword] = value
-            provider.sync_turn(clean_user_content, assistant_content, **kwargs)
-
-        self._submit_background(
-            lambda: self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
+        privacy_managed = self._privacy_enabled_check is not None
+        # Production privacy managers freeze just this completed turn now, but do
+        # not authorize it into the provider-visible ledger until the worker live
+        # privacy recheck succeeds. Standalone managers preserve the historical
+        # raw optional-messages contract instead.
+        turn_snapshot = (
+            [
+                dict(row)
+                for row in self._completed_turn_slice(messages, clean_user_content, assistant_content)
+            ]
+            if privacy_managed
+            else None
         )
 
+        def _run_sync() -> None:
+            if not self._privacy_enabled():
+                return
+            if privacy_managed:
+                self._record_provider_visible_turn(
+                    clean_user_content,
+                    assistant_content,
+                    turn_snapshot,
+                )
+                provider_messages = self._provider_history(messages)
+            else:
+                # Compatibility: a direct MemoryManager() caller that omitted
+                # messages must still omit that provider keyword rather than
+                # receiving an invented empty/ledger list.
+                provider_messages = messages
+            optional_kwargs = {"messages": provider_messages, "turn_author": turn_author}
+
+            def _sync(provider: MemoryProvider) -> None:
+                kwargs: Dict[str, Any] = {"session_id": session_id}
+                for keyword, value in optional_kwargs.items():
+                    if value is not None and self._provider_sync_accepts(provider, keyword):
+                        kwargs[keyword] = value
+                provider.sync_turn(clean_user_content, assistant_content, **kwargs)
+
+            self._each_provider("sync_turn failed", _sync, level=logging.WARNING, providers=providers)
+
+        self._submit_background(_run_sync)
     def _submit_background(self, fn, *, kind: str = "write") -> None:
         """Queue ``fn`` on the serialized worker (created lazily; None once shutting down) and track its
         durability class. Runs under the caller's contextvars (``ctx_bound``). If the executor is
@@ -561,6 +830,8 @@ class MemoryManager:
     def get_all_tool_schemas(self) -> List[Dict[str, Any]]:
         """Collect deduplicated tool schemas from all providers; reserved core tool names are
         skipped because :meth:`add_provider` refuses to route them."""
+        if not self._privacy_enabled():
+            return []
         from toolsets import _HERMES_CORE_TOOLS
 
         schemas: List[Dict[str, Any]] = []
@@ -582,13 +853,25 @@ class MemoryManager:
         return schemas
 
     def get_all_tool_names(self) -> set:
+        return set(self._tool_to_provider) if self._privacy_enabled() else set()
+
+    def registered_tool_names(self) -> set:
+        """Provider tool names independent of the live privacy gate.
+
+        Used only by host-side surface refresh so a master-off transition can remove
+        schemas that were injected while memory was enabled.
+        """
         return set(self._tool_to_provider)
 
     def has_tool(self, tool_name: str) -> bool:
-        return tool_name in self._tool_to_provider
+        return self._privacy_enabled() and tool_name in self._tool_to_provider
 
     def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
         """Route a tool call to its provider; returns a JSON string (tool_error on failure)."""
+        if not self._privacy_enabled():
+            return tool_error("Memory persistence is disabled by memory.enabled.")
+        if not self._apply_pending_session_switch():
+            return tool_error("Memory provider session rebind is pending; memory I/O is temporarily blocked.")
         provider = self._tool_to_provider.get(tool_name)
         if provider is None:
             return tool_error(f"No memory provider handles tool '{tool_name}'")
@@ -599,6 +882,9 @@ class MemoryManager:
             return tool_error(f"Memory tool '{tool_name}' failed: {e}")
 
     def on_turn_start(self, turn_number: int, message: str, **kwargs) -> None:
+        if not self._privacy_enabled():
+            return
+
         def _tick(p: MemoryProvider) -> None:
             # A provider written before the author kwargs declares (turn_number, message) only; it still gets its tick.
             params = _signature_params(p.on_turn_start)
@@ -607,9 +893,15 @@ class MemoryManager:
 
         self._each_provider("on_turn_start failed", _tick)
 
-    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
-        self._each_provider("on_session_end failed", lambda p: p.on_session_end(messages), level=logging.WARNING,
+    def _notify_session_end_visible(self, visible: List[Dict[str, Any]]) -> None:
+        """Fan out an already privacy-filtered, boundary-frozen history snapshot."""
+        self._each_provider("on_session_end failed", lambda p: p.on_session_end(visible), level=logging.WARNING,
                             exc_info=True)
+
+    def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
+        if not self._privacy_enabled():
+            return
+        self._notify_session_end_visible(self._provider_history(messages))
 
     def commit_session_boundary_async(self, messages: List[Dict[str, Any]], *, new_session_id: str,
                                       parent_session_id: str = "", reason: str = "new_session") -> None:
@@ -630,11 +922,33 @@ class MemoryManager:
         """
         if not self._providers:
             return
-        snapshot = list(messages or [])
+        if not self._privacy_enabled():
+            # Stage the new binding host-side without calling the provider while OFF.
+            self.on_session_switch(
+                new_session_id,
+                parent_session_id=parent_session_id,
+                reset=True,
+                reason=reason,
+            )
+            return
+        snapshot = self._provider_history(messages)
 
-        def _run() -> None:  # both hooks already guard per-provider
+        def _run() -> None:
+            # Config can flip while this FIFO task is waiting behind a provider write.
+            # Re-check at execution time so "off" is fail-closed for queued boundaries.
+            if not self._privacy_enabled():
+                # The switch may have flipped while this FIFO task waited. Preserve
+                # the target binding host-side so re-enable cannot resume on the old
+                # provider session, but do not invoke any provider hook while OFF.
+                self.on_session_switch(
+                    new_session_id,
+                    parent_session_id=parent_session_id,
+                    reset=True,
+                    reason=reason,
+                )
+                return
             try:
-                self.on_session_end(snapshot)
+                self._notify_session_end_visible(snapshot)
             except Exception as e:  # pragma: no cover
                 logger.warning("Session-boundary extraction failed: %s", e)
             try:
@@ -651,12 +965,34 @@ class MemoryManager:
         (``/undo``): same id, truncated transcript."""
         if not new_session_id:
             return
+        if not self._privacy_enabled():
+            self._clear_provider_visible_history()
+            with self._pending_session_switch_lock:
+                # No provider data is sent while OFF, so intermediate disabled-session
+                # boundaries have no provider-visible state to preserve. The newest target
+                # is the only binding needed when persistence resumes.
+                self._pending_session_switch = (
+                    new_session_id,
+                    parent_session_id,
+                    reset,
+                    rewound,
+                    dict(kwargs),
+                )
+            return
+        # A live enabled boundary supersedes any deferred OFF-period target.
+        with self._pending_session_switch_lock:
+            self._pending_session_switch = None
         if rewound:  # forward only when set so it never pollutes providers' **kwargs
             kwargs["rewound"] = True
         self._each_provider(
             "on_session_switch failed",
             lambda p: p.on_session_switch(new_session_id, parent_session_id=parent_session_id, reset=reset, **kwargs),
+            _skip_pending_session_switch=True,
         )
+        # A session boundary starts a fresh provider-visible exposure window. Compression
+        # commits the old window before this hook; /new/resume/branch likewise must not
+        # let the next session-end hook replay prior-session transcript rows.
+        self._clear_provider_visible_history()
 
     @staticmethod
     def _checkpoint_api_version(provider: MemoryProvider) -> Optional[int]:
@@ -668,6 +1004,8 @@ class MemoryManager:
 
     def supports_pre_compress_checkpoint(self, api_version: int = PRE_COMPRESS_CHECKPOINT_API_VERSION) -> bool:
         """Return whether an active provider guarantees checkpoint API support."""
+        if not self._privacy_enabled():
+            return False
         versions = (self._checkpoint_api_version(p) for p in self._providers)
         return any(v is not None and v >= api_version for v in versions)
 
@@ -680,6 +1018,21 @@ class MemoryManager:
         only to checkpoint (v2+) providers. With ``require_checkpoint`` at least one checkpoint provider
         must succeed — its exception propagates so the caller keeps the uncompressed transcript.
         """
+        if not self._privacy_enabled():
+            if require_checkpoint:
+                raise RuntimeError("Memory persistence is disabled by memory.enabled")
+            return ""
+        visible_history = self._provider_history(messages, include_current_turn=True)
+        if evidence_messages is None:
+            visible_evidence = []
+        elif self._privacy_enabled_check is None:
+            visible_evidence = list(evidence_messages)
+        else:
+            # Keep checkpoint-v2's existing normalized-evidence contract after
+            # privacy filtering. Reuse the compression owner instead of duplicating
+            # compaction-summary/tool-message rules here.
+            from agent.conversation_compression import _direct_messages_for_pre_compress_memory
+            visible_evidence = _direct_messages_for_pre_compress_memory(visible_history)
         parts = []
         checkpoint_succeeded = False
         for provider in self._providers:
@@ -688,7 +1041,7 @@ class MemoryManager:
                 version = _LEGACY_PRE_COMPRESS_API_VERSION
             is_checkpoint_provider = version >= checkpoint_api_version
             use_evidence = is_checkpoint_provider and evidence_messages is not None
-            provider_messages = evidence_messages if use_evidence else messages
+            provider_messages = visible_evidence if use_evidence else visible_history
             kwargs: Dict[str, Any] = {}
             # v1 providers and bare-shape v2 providers never see the signal.
             if is_checkpoint_provider and _accepts_require_checkpoint(provider.on_pre_compress):
@@ -720,6 +1073,8 @@ class MemoryManager:
     def on_memory_write(self, action: str, target: str, content: str,
                         metadata: Optional[Dict[str, Any]] = None) -> None:
         """Notify external providers when the built-in memory tool writes (skips builtin, the source)."""
+        if not self._privacy_enabled():
+            return
 
         def _notify(provider: MemoryProvider) -> None:
             mode = self._provider_memory_write_metadata_mode(provider)
@@ -774,6 +1129,8 @@ class MemoryManager:
                 logger.debug("notify_memory_tool_write failed for op %s: %s", action, e)
 
     def on_delegation(self, task: str, result: str, *, child_session_id: str = "", **kwargs) -> None:
+        if not self._privacy_enabled():
+            return
         self._each_provider(
             "on_delegation failed",
             lambda p: p.on_delegation(task, result, child_session_id=child_session_id, **kwargs),
@@ -829,6 +1186,8 @@ class MemoryManager:
 
     def initialize_all(self, session_id: str, **kwargs) -> None:
         """Initialize all providers, injecting ``hermes_home`` so they resolve profile-scoped paths."""
+        if not self._privacy_enabled():
+            return
         if "hermes_home" not in kwargs:
             from hermes_constants import get_hermes_home
             kwargs["hermes_home"] = str(get_hermes_home())
