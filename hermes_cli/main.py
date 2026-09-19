@@ -2318,7 +2318,7 @@ def _update_preflight_handled(args) -> bool:
 
 
 def cmd_update(args):
-    """Public updater entrypoint: pinned off for the Stardust local edition."""
+    """Update Hermes Agent: disabled for the pinned Stardust local edition."""
     print(
         "Stardust local edition is pinned. Upstream update checks and installation are disabled; "
         "the origin URL is retained only as a manual recovery reference."
