@@ -218,3 +218,24 @@ def test_normal_stardust_setup_never_offers_nous_telemetry() -> None:
     assert "sending to Nous" not in tools
     assert "telemetry.nousresearch.com" not in defaults
     assert "telemetry.nousresearch.com" not in example
+
+
+
+def test_runtime_recovery_guidance_stays_on_stardust_source() -> None:
+    constants = _read("hermes_constants.py")
+    assert STARDUST_INSTALL_BASE in constants
+    assert "STARDUST_REPOSITORY_URL" in constants
+    assert "If that also fails, reinstall: https://hermes-agent.nousresearch.com" not in constants
+
+    update = _read("hermes_cli/update_cmd.py")
+    maintenance = _read("hermes_cli/update_cmd_maint.py")
+    zip_update = _read("hermes_cli/update_cmd_zip.py")
+
+    assert "STARDUST_INSTALL_SH_URL" in update
+    assert "hermes-agent.nousresearch.com/install.sh" not in update
+
+    for source in (maintenance, zip_update):
+        assert "STARDUST_INSTALL_" in source
+        assert "hermes-agent.nousresearch.com/install.sh" not in source
+        assert "hermes-agent.nousresearch.com/install.ps1" not in source
+    assert "reinstall from https://hermes-agent.nousresearch.com" not in zip_update
