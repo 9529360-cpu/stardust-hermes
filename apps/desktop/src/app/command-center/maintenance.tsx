@@ -178,7 +178,14 @@ export function MaintenancePanel() {
 
       try {
         const result = await resetMemory(target)
-        notify({ kind: 'success', title: mm.resetDone(result.deleted.join(', ') || label), message: '' })
+        notify({
+          kind: 'success',
+          title: mm.resetDone(
+            result.deleted.join(', ') || label,
+            result.active_session_behavior === 'refresh_on_next_turn'
+          ),
+          message: ''
+        })
         setMemory(await getMemoryStatus())
       } catch (err) {
         notifyError(err, mm.resetFailed)
