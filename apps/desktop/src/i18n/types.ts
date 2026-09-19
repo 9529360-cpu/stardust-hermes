@@ -1875,7 +1875,7 @@ export interface Translations {
       resetUser: string
       resetAll: string
       resetConfirm: (target: string) => string
-      resetDone: (files: string) => string
+      resetDone: (files: string, activeRefresh: boolean) => string
       resetFailed: string
       actionStarted: (name: string) => string
       actionFailed: (name: string) => string
