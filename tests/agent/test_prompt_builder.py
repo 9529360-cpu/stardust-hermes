@@ -694,13 +694,17 @@ class TestStripYamlFrontmatter:
 class TestPromptBuilderConstants:
 
 
-    def test_cli_and_tui_hints_flag_local_only_cron(self):
-        """#51568 — cron jobs from CLI/TUI sessions don't deliver back into
-        the session, so the agent must be told up front not to promise it."""
-        for key in ("cli", "tui"):
+    def test_cli_and_persisted_local_hints_describe_cron_delivery(self):
+        """CLI remains save-only; persisted TUI/Desktop sessions can receive durable returns."""
+        cli_hint = PLATFORM_HINTS["cli"]
+        assert "LOCAL-ONLY" in cli_hint
+        assert "deliver" in cli_hint
+
+        for key in ("tui", "desktop"):
             hint = PLATFORM_HINTS[key]
-            assert "LOCAL-ONLY" in hint
-            assert "deliver" in hint
+            assert "non-silent completion" in hint
+            assert "deliver='local' is save-only" in hint
+            assert "omitted or set to origin" in hint
 
 
 
