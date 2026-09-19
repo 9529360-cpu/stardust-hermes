@@ -188,3 +188,20 @@ def test_desktop_does_not_surface_nous_diagnostics_upload() -> None:
     assert all("requestSendDiagnostics" not in source for source in sources)
     assert all("SendDiagnosticsHost" not in source for source in sources)
 
+def test_desktop_first_run_identity_is_stardust_owned() -> None:
+    source = _read("apps/desktop/src/store/onboarding-script.ts")
+    kickoff = _read("apps/desktop/src/app/contrib/onboarding-kickoff.ts")
+
+    assert "You are Stardust" in source
+    assert "you are Stardust" in source
+    assert "free Nous account" not in source
+    assert "You are Hermes" not in source
+    assert "record.free_tier !== true" not in kickoff
+
+
+def test_desktop_ssh_recovery_installs_stardust_source() -> None:
+    source = _read("apps/desktop/electron/remote-lifecycle.ts")
+
+    assert STARDUST_INSTALL_BASE in source
+    assert UPSTREAM_INSTALL_HOST not in source
+
