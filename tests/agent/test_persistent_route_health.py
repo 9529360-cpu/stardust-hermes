@@ -4,6 +4,8 @@ import multiprocessing
 import os
 import time
 
+import pytest
+
 from agent.error_classifier import FailoverReason
 from agent import route_health
 
@@ -272,6 +274,32 @@ def test_lock_error_classification_retries_only_contention():
     assert route_health._is_lock_contention_errno(OSError(errno.EACCES, "busy"))
     assert not route_health._is_lock_contention_errno(OSError(errno.EMFILE, "too many files"))
     assert not route_health._is_lock_contention_errno(OSError(errno.ENOSPC, "disk full"))
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="host has no no-follow open flag")
+def test_state_lock_refuses_symlink_without_touching_referent(tmp_path):
+    state = tmp_path / "route-health.json"
+    lock = tmp_path / ".route-health.json.lock"
+    outside = tmp_path / "outside-lock"
+    outside.write_bytes(b"do-not-touch")
+    lock.symlink_to(outside)
+
+    with pytest.raises(OSError):
+        with route_health._state_file_lock(state):
+            pass
+
+    assert outside.read_bytes() == b"do-not-touch"
+
+
+@pytest.mark.skipif(os.name == "nt" or not hasattr(os, "fchmod"), reason="POSIX fd mode contract")
+def test_state_lock_tightens_preexisting_permissions(tmp_path):
+    state = tmp_path / "route-health.json"
+    lock = tmp_path / ".route-health.json.lock"
+    lock.write_bytes(b"")
+    lock.chmod(0o666)
+
+    with route_health._state_file_lock(state):
+        assert lock.stat().st_mode & 0o777 == 0o600
 
 
 def test_non_mapping_route_row_does_not_break_health_updates(monkeypatch, tmp_path):

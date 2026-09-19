@@ -176,7 +176,18 @@ def _state_file_lock(path: Path):
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = path.with_name(f".{path.name}.lock")
-    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    flags = os.O_RDWR | os.O_CREAT
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(lock_path, flags, 0o600)
+    try:
+        # A lock left by an older process may be more permissive than the creation
+        # mode. Tighten the opened inode itself so a path swap cannot redirect chmod.
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
+    except Exception:
+        os.close(fd)
+        raise
     windows = os.name == "nt"
     acquired = False
     try:
