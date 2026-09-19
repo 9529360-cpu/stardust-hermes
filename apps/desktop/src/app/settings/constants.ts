@@ -540,11 +540,12 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
     }
   },
   memory: {
-    memoryEnabled: 'Persistent Memory',
-    userProfileEnabled: 'User Profile',
+    enabled: 'Memory Persistence',
+    memoryEnabled: 'Built-in Agent Memory (MEMORY.md)',
+    userProfileEnabled: 'Built-in User Profile (USER.md)',
     memoryCharLimit: 'Memory Budget',
     userCharLimit: 'Profile Budget',
-    provider: 'Memory Provider'
+    provider: 'External Memory Provider'
   },
   context: {
     engine: 'Context Engine'
@@ -615,8 +616,11 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
     enabled: 'Create rollback snapshots before file edits.'
   },
   memory: {
-    memoryEnabled: 'Save durable memories that can help future sessions.',
-    userProfileEnabled: 'Maintain a compact profile of user preferences.'
+    enabled:
+      'Master privacy switch. Off stops built-in memory injection/writes and external provider initialization, sync, prefetch, and tools. Your provider selection and credentials stay configured.',
+    memoryEnabled: 'Advanced: allow built-in MEMORY.md injection and writes while Memory Persistence is on.',
+    userProfileEnabled: 'Advanced: allow built-in USER.md profile injection and writes while Memory Persistence is on.',
+    provider: 'External provider to use while Memory Persistence is on. The selection is retained while memory is off.'
   },
   context: {
     engine: 'Strategy for managing long conversations near the context limit.'
@@ -722,6 +726,7 @@ export const SECTIONS: DesktopConfigSection[] = [
     label: 'Memory & Context',
     icon: Brain,
     keys: [
+      'memory.enabled',
       'memory.memory_enabled',
       'memory.user_profile_enabled',
       'memory.memory_char_limit',
