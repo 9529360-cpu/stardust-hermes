@@ -207,6 +207,40 @@ class TestMemoryResetGeneration:
         assert store.system_prompt_snapshot_stale() is False
         assert store.add("user", "post-reset profile fact")["success"] is True
 
+    def test_reset_partial_erasure_failure_keeps_fence_and_is_retryable(self, store, monkeypatch):
+        import tools.memory_tool_store as memory_store_module
+
+        assert store.add("memory", "sensitive fact that must be forgotten")["success"] is True
+        store.load_from_disk()
+        path = store._path_for("memory")
+        old_generation = store.reset_generation("memory")
+        original_atomic_write = memory_store_module.atomic_write_text
+        failed = {"once": False}
+
+        def fail_target_erase(target, content, *args, **kwargs):
+            if Path(target) == path and content == "" and not failed["once"]:
+                failed["once"] = True
+                raise PermissionError("simulated erase failure")
+            return original_atomic_write(target, content, *args, **kwargs)
+
+        monkeypatch.setattr(memory_store_module, "atomic_write_text", fail_target_erase)
+
+        with pytest.raises(RuntimeError, match="Forget boundary advanced.*retry the reset"):
+            MemoryStore.reset_target("memory")
+
+        marker = store._reset_generation_path(path)
+        assert marker.read_text(encoding="utf-8").strip()
+        assert store.reset_generation("memory") == old_generation
+        assert store.system_prompt_snapshot_stale() is True
+        assert path.read_text(encoding="utf-8")
+        blocked = store.add("memory", "stale session cannot write through partial reset")
+        assert blocked["success"] is False
+        assert blocked["reset_conflict"] is True
+
+        monkeypatch.setattr(memory_store_module, "atomic_write_text", original_atomic_write)
+        assert MemoryStore.reset_target("memory") is True
+        assert not path.exists()
+
     def test_reset_erases_bytes_even_when_unlink_is_unavailable(self, store, monkeypatch):
         path = store._path_for("memory")
         path.write_text("sensitive fact", encoding="utf-8")

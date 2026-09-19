@@ -314,24 +314,36 @@ class MemoryStore:
                 raise RuntimeError(f"Refusing reset-generation symlink: {marker}")
             atomic_write_text(marker, new_generation, mode=0o600, fsync_dir=True)
 
-            if path.is_symlink():
-                path.unlink()
-                fsync_directory(path.parent)
-                return True
+            try:
+                if path.is_symlink():
+                    path.unlink()
+                    fsync_directory(path.parent)
+                    return True
 
-            existed = path.exists()
-            if not existed:
-                return False
-            atomic_write_text(
-                path,
-                "",
-                tmp_prefix=".mem_reset_",
-                preserve_mode=True,
-                fsync_dir=True,
-            )
-            with suppress(OSError):
-                path.unlink()
-            return True
+                existed = path.exists()
+                if not existed:
+                    return False
+                atomic_write_text(
+                    path,
+                    "",
+                    tmp_prefix=".mem_reset_",
+                    preserve_mode=True,
+                    fsync_dir=True,
+                )
+                with suppress(OSError):
+                    path.unlink()
+                return True
+            except OSError as exc:
+                # Marker-first is intentional: if the process crashes after bytes are
+                # erased but before the generation advances, an old live session could
+                # recreate forgotten content. If erasure itself fails, keep the advanced
+                # generation (stale writers stay fenced) and tell the caller that old
+                # bytes may still exist so the reset can be retried safely.
+                raise RuntimeError(
+                    f"Forget boundary advanced for {path.name}, but file erasure did not "
+                    f"complete. Stale sessions are fenced, but old bytes may still be "
+                    f"present; retry the reset. Cause: {exc}"
+                ) from exc
 
     def _entries_for(self, target: str) -> List[str]:
         return self.user_entries if target == "user" else self.memory_entries
