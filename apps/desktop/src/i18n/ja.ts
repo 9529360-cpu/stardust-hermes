@@ -763,11 +763,12 @@ export const ja = defineLocale({
         }
       },
       memory: {
-        memoryEnabled: '永続メモリ',
-        userProfileEnabled: 'ユーザープロファイル',
+        enabled: 'メモリ永続化',
+        memoryEnabled: '内蔵エージェントメモリ (MEMORY.md)',
+        userProfileEnabled: '内蔵ユーザープロファイル (USER.md)',
         memoryCharLimit: 'メモリ予算',
         userCharLimit: 'プロファイル予算',
-        provider: 'メモリプロバイダー'
+        provider: '外部メモリプロバイダー'
       },
       context: {
         engine: 'コンテキストエンジン'
@@ -830,8 +831,11 @@ export const ja = defineLocale({
         enabled: 'ファイル編集前にロールバック用スナップショットを作成します。'
       },
       memory: {
-        memoryEnabled: '将来のセッションに役立つ永続メモリを保存します。',
-        userProfileEnabled: 'ユーザーの好みをまとめた簡潔なプロファイルを維持します。'
+        enabled:
+          'メモリのマスター・プライバシースイッチです。オフにすると内蔵メモリの注入/書き込みと、外部プロバイダーの初期化、同期、プリフェッチ、ツール公開を停止します。選択済みプロバイダーと認証情報は保持されます。',
+        memoryEnabled: '詳細設定: メモリ永続化がオンのときだけ、内蔵 MEMORY.md の注入と書き込みを許可します。',
+        userProfileEnabled: '詳細設定: メモリ永続化がオンのときだけ、内蔵 USER.md の注入と書き込みを許可します。',
+        provider: 'メモリ永続化がオンのときに使う外部プロバイダーです。オフの間も選択は保持されます。'
       },
       context: {
         engine: '長い会話がコンテキスト上限に近づいたときの管理戦略です。'

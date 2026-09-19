@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { atom } from 'nanostores'
 import { createRef } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -78,6 +78,40 @@ function renderConfigSettings(activeSectionId = 'safety') {
 }
 
 describe('ConfigSettings autosave', () => {
+  it('renders and saves the master memory privacy switch', async () => {
+    getHermesConfigRecord.mockResolvedValue({
+      memory: {
+        enabled: true,
+        memory_enabled: true,
+        user_profile_enabled: true,
+        provider: 'honcho'
+      }
+    })
+    // The generic settings surface must still render this key even if an older
+    // backend schema does not know it yet; type inference comes from the config value.
+    getHermesConfigSchema.mockResolvedValue({ fields: {} })
+
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    try {
+      renderConfigSettings('memory')
+
+      expect(await screen.findByText('Memory Persistence')).toBeTruthy()
+      expect(screen.getByText(/Master privacy switch/)).toBeTruthy()
+
+      const memoryRow = screen.getByText('Memory Persistence').closest('[data-tour="field-memory.enabled"]')
+      expect(memoryRow).toBeTruthy()
+      within(memoryRow as HTMLElement).getByRole('switch').click()
+      await vi.advanceTimersByTimeAsync(700)
+
+      await vi.waitFor(() =>
+        expect(saveHermesConfig).toHaveBeenCalledWith({ memory: { enabled: false } }, undefined)
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('renders and saves the Codex compression auto-raise setting', async () => {
     getHermesConfigRecord.mockResolvedValue({
       compression: { codex_gpt55_autoraise: true }

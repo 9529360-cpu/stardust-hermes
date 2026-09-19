@@ -2461,6 +2461,13 @@ class TestBuildSchemaFromConfig:
 
 
 
+    def test_memory_master_privacy_switch_is_boolean_schema_field(self):
+        from hermes_cli.web_server_config import CONFIG_SCHEMA
+
+        entry = CONFIG_SCHEMA["memory.enabled"]
+        assert entry["type"] == "boolean"
+        assert entry["category"] == "memory"
+
     def test_timezone_field_is_searchable_select(self):
         """timezone must ship as a searchable, clearable select of IANA ids.
 

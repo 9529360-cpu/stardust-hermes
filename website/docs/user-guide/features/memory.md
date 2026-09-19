@@ -243,21 +243,31 @@ The same `list` / `delete <id>` / `edit <id>` subcommands work from the in-chat 
 ```yaml
 # In ~/.hermes/config.yaml
 memory:
-  memory_enabled: true
-  user_profile_enabled: true
+  enabled: true             # master privacy switch for built-in + external memory
+  memory_enabled: true      # built-in MEMORY.md target
+  user_profile_enabled: true # built-in USER.md target
   memory_char_limit: 2200   # ~800 tokens
   user_char_limit: 1375     # ~500 tokens
   write_approval: false     # false = write freely (default) | true = require approval
 ```
 
-Setting **both** `memory_enabled` and `user_profile_enabled` to `false` turns the
-built-in stores off completely: the `memory` tool is dropped from the schema and
-its guidance block is dropped from the system prompt, so the model is never told
-about a tool it cannot use. An external provider set via `memory.provider`
-(Hindsight, Mem0, Honcho, …) is unaffected and keeps its own tools — use this
-when you want a third-party memory backend *instead of* the built-in files.
-Listing `memory` under `agent.disabled_toolsets` is the heavier switch: it hides
-external provider tools too.
+`memory.enabled` is the master privacy switch. Set it to `false` (or run
+`hermes memory off`) to stop built-in MEMORY.md / USER.md injection and writes
+**and** external-provider initialization, sync, prefetch, and memory-tool exposure.
+The configured provider name and credentials are retained, so `hermes memory on`
+can restore the same setup. Turns completed while memory is off are not later
+backfilled into the provider.
+
+This switch is intentionally separate from ordinary chat/session persistence:
+messages still go to SessionDB and remain resumable/searchable according to the
+normal session settings. Turning memory off does not erase chat history.
+
+Setting **both** `memory_enabled` and `user_profile_enabled` to `false` disables
+only the two built-in file targets while the master switch remains on. The
+built-in `memory` tool and its guidance are then hidden, while a configured
+external provider may continue running. `agent.disabled_toolsets: [memory]` is
+a tool-surface control, not the privacy master; use `memory.enabled: false`
+when you want durable memory paused across both layers.
 
 With only `memory_enabled: false` (user profile still on), the tool stays —
 it backs the profile store — but the system prompt swaps the full memory
@@ -277,7 +287,7 @@ first, set `memory.write_approval: true`. It's a simple on/off gate applied to
 | `false` (default) | Write freely — the gate is off (the pre-gate behaviour). |
 | `true` | Require approval before anything is saved. In the interactive CLI, foreground writes prompt you inline (entries are small enough to read in full). Everywhere else — messaging platforms, scripts, and the background self-improvement review — writes are **staged** for review with `/memory pending`. |
 
-> To turn memory off entirely (not just gate it), set both `memory_enabled: false` and `user_profile_enabled: false`. When both built-in stores are disabled, the built-in `memory` tool is automatically hidden.
+> To pause all durable memory persistence, set `memory.enabled: false` or run `hermes memory off`. `write_approval` only controls whether writes need review; it is not an off switch.
 
 Review staged writes from the CLI or any messaging platform:
 
@@ -456,11 +466,13 @@ Full details in [Gating agent skill writes](/user-guide/features/skills#gating-a
 
 For deeper, persistent memory that goes beyond MEMORY.md and USER.md, Hermes ships with 8 external memory provider plugins — including Honcho, OpenViking, Mem0, Hindsight, Holographic, RetainDB, ByteRover, and Supermemory.
 
-External providers run **alongside** built-in memory (never replacing it) and add capabilities like knowledge graphs, semantic search, automatic fact extraction, and cross-session user modeling.
+With `memory.enabled: true`, an external provider runs alongside whichever built-in targets are enabled and adds capabilities like knowledge graphs, semantic search, automatic fact extraction, and cross-session user modeling. You can disable both built-in targets and use only the external provider, or pause every memory layer at once with the master switch.
 
 ```bash
 hermes memory setup      # pick a provider and configure it
-hermes memory status     # check what's active
+hermes memory status     # check master, built-in targets, and provider state
+hermes memory off        # pause all durable memory; preserve provider config
+hermes memory on         # resume the preserved configuration
 ```
 
 See the [Memory Providers](./memory-providers.md) guide for full details on each provider, setup instructions, and comparison.

@@ -6,14 +6,15 @@ description: "External memory provider plugins — Honcho, OpenViking, Mem0, Hin
 
 # Memory Providers
 
-Hermes Agent ships with 8 external memory provider plugins that give the agent persistent, cross-session knowledge beyond the built-in MEMORY.md and USER.md. Only **one** external provider can be active at a time — the built-in memory is always active alongside it.
+Hermes Agent ships with 8 external memory provider plugins that give the agent persistent, cross-session knowledge beyond the built-in MEMORY.md and USER.md. Only **one** external provider can be selected at a time. The master `memory.enabled` privacy switch controls both built-in memory and the selected external provider; the two built-in files can still be enabled or disabled independently underneath it.
 
 ## Quick Start
 
 ```bash
-hermes memory setup      # interactive picker + configuration
-hermes memory status     # check what's active
-hermes memory off        # disable external provider
+hermes memory setup      # interactive provider picker + configuration
+hermes memory status     # check master, built-in targets, and provider state
+hermes memory off        # pause all durable memory; keep provider selection/credentials
+hermes memory on         # resume durable memory with the existing configuration
 ```
 
 You can also select the active memory provider via `hermes plugins` → Provider Plugins → Memory Provider.
@@ -22,12 +23,13 @@ Or set manually in `~/.hermes/config.yaml`:
 
 ```yaml
 memory:
+  enabled: true          # master privacy switch
   provider: openviking   # or honcho, mem0, hindsight, holographic, retaindb, byterover, supermemory
 ```
 
 ## How It Works
 
-When a memory provider is active, Hermes automatically:
+When `memory.enabled: true` and a memory provider is selected, Hermes automatically:
 
 1. **Injects provider context** into the system prompt (what the provider knows)
 2. **Prefetches relevant memories** before each turn (background, non-blocking)
@@ -36,7 +38,7 @@ When a memory provider is active, Hermes automatically:
 5. **Mirrors built-in memory writes** to the external provider
 6. **Adds provider-specific tools** so the agent can search, store, and manage memories
 
-The built-in memory (MEMORY.md / USER.md) continues to work exactly as before. The external provider is additive.
+While the master switch is on, the external provider is additive to whichever built-in targets are enabled. Set `memory.memory_enabled: false` and/or `memory.user_profile_enabled: false` to disable only those built-in files. Set `memory.enabled: false` (or run `hermes memory off`) to stop built-in injection/writes and external provider initialization, sync, prefetch, and memory-tool exposure. This **does not delete or disable ordinary chat/session history**; SessionDB persistence is a separate subsystem. Turning memory back on restores the previously selected provider without backfilling turns that occurred while memory was disabled.
 
 ## Available Providers
 

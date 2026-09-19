@@ -296,7 +296,7 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
     # would steer the model at a tool that always answers "Memory is not
     # available"; with only USER.md enabled the narrower block is used.
     memory_guidance = None
-    if "memory" in names:
+    if "memory" in names and getattr(agent, "_memory_persistence_enabled", True):
         memory_guidance = _pb.build_memory_guidance(
             getattr(agent, "_memory_enabled", True),
             getattr(agent, "_user_profile_enabled", True),
@@ -509,7 +509,7 @@ def _memory_parts(agent: Any) -> List[str]:
     the same check ``inject_memory_provider_tools`` uses, so we never advertise
     tools the toolset config gated off)."""
     parts: List[str] = []
-    if agent._memory_store:
+    if getattr(agent, "_memory_persistence_enabled", True) and agent._memory_store:
         for enabled, kind in ((agent._memory_enabled, "memory"), (agent._user_profile_enabled, "user")):
             block = agent._memory_store.format_for_system_prompt(kind) if enabled else None
             if block:
