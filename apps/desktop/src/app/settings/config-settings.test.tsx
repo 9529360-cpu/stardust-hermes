@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import { atom } from 'nanostores'
 import { createRef } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -99,7 +99,9 @@ describe('ConfigSettings autosave', () => {
       expect(await screen.findByText('Memory Persistence')).toBeTruthy()
       expect(screen.getByText(/Master privacy switch/)).toBeTruthy()
 
-      screen.getByRole('switch', { name: /Memory Persistence/i }).click()
+      const memoryRow = screen.getByText('Memory Persistence').closest('[data-tour="field-memory.enabled"]')
+      expect(memoryRow).toBeTruthy()
+      within(memoryRow as HTMLElement).getByRole('switch').click()
       await vi.advanceTimersByTimeAsync(700)
 
       await vi.waitFor(() =>
