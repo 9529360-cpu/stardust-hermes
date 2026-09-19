@@ -1591,6 +1591,10 @@ DEFAULT_CONFIG = {
         "cron_mode": "deny",
         "single_query_mode": "deny",
         "unattended_mode": "deny",
+        # ACP request_permission is only a transport response, not proof a human clicked it.
+        # Exact client_info.name values listed here may authorize dangerous commands through ACP.
+        # Default empty: unknown/unattended clients fail closed. Edit approvals are separate.
+        "acp_trusted_clients": [],
         # Extra rules appended to the smart-approval guardian's SYSTEM prompt, e.g. "Always ESCALATE
         # commands touching /etc".
         "smart_policy": "",
