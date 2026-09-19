@@ -36,6 +36,7 @@ _LOCK_CONTENTION_ERRNOS = frozenset({
     errno.EDEADLK,
 })
 _LOCK = threading.RLock()
+_WARNED_UNSAFE_RELATIVE_PATHS: set[str] = set()
 
 _BASE_COOLDOWNS = {
     FailoverReason.auth: 60 * 60,
@@ -69,15 +70,34 @@ def state_path() -> Path:
     """Profile-scoped route-health path.
 
     An absolute override is honored as an explicit operator choice. Relative overrides
-    are resolved under the active HERMES_HOME rather than the process CWD; otherwise two
-    multiplex profiles with the same relative setting would share one circuit state.
+    are contained under the active HERMES_HOME rather than the process CWD; otherwise
+    multiplex profiles could share circuit state or a traversal could silently escape
+    the profile.
     """
     configured = str(_config().get("health_file") or "").strip()
+    home = get_hermes_home()
+    default = home / "route-health.json"
     if not configured:
-        return get_hermes_home() / "route-health.json"
+        return default
     path = Path(configured).expanduser()
-    return path if path.is_absolute() else get_hermes_home() / path
+    if path.is_absolute():
+        return path
 
+    try:
+        resolved_home = home.expanduser().resolve(strict=False)
+        candidate = (resolved_home / path).resolve(strict=False)
+        candidate.relative_to(resolved_home)
+        return candidate
+    except (OSError, RuntimeError, ValueError):
+        if configured not in _WARNED_UNSAFE_RELATIVE_PATHS:
+            _WARNED_UNSAFE_RELATIVE_PATHS.add(configured)
+            logger.warning(
+                "Ignoring route_failover.health_file=%r because a relative health path "
+                "must stay inside the active HERMES_HOME; use an absolute path for an "
+                "explicit shared/external location.",
+                configured,
+            )
+        return default
 
 def route_identity(provider: str, model: str, base_url: str = "") -> tuple[str, dict[str, str]]:
     provider = str(provider or "").strip().lower()
