@@ -396,6 +396,13 @@ deep links never auto-install, and agent-plugin installs go through the same
 [install-time security scanning](#install-time-security-scanning) as
 `hermes plugins install`.
 
+External Desktop code is installed **inert**. It does not become active merely
+because the files landed on disk. When you later enable that Desktop half in
+**Capabilities → Plugins**, Stardust asks you to trust the code explicitly and
+shows the source plus pinned SHA when known. The dialog also states the real
+authority: enabled Desktop code runs inside Stardust's renderer with the same
+app authority as Stardust itself.
+
 Hybrid repos (agent + desktop halves in one repo) use one link and one
 dialog. The same modal is reachable without a link via **Capabilities →
 Plugins → Install from Git**. Legacy `hermes://plugin-agent/…` and
@@ -464,11 +471,14 @@ A gate is open when *either* the capability is granted *or* the legacy key is
 set — existing configs keep working unchanged.
 
 :::warning Not a sandbox
-Capabilities are a **consent and audit layer**, not isolation. Plugins run as
-regular in-process Python: a malicious plugin can ignore every gate here.
-Granting a capability is a statement of trust in the plugin author — it is
-not a code audit, and Hermes has not reviewed the plugin's code. Only install
-plugins from sources you trust.
+Capabilities are a **consent and audit layer**, not isolation. Agent plugins run
+as regular in-process Python: a malicious plugin can ignore every gate here.
+Desktop plugin declarations are likewise descriptive metadata, not renderer
+isolation: once explicitly enabled, external Desktop code runs with full app
+authority in Stardust's renderer.
+
+Granting a capability or enabling a Desktop half is a statement of trust in the
+plugin author — it is not a code audit. Only enable code from sources you trust.
 :::
 
 ### Platform actions
