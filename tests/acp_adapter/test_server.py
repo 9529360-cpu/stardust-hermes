@@ -104,8 +104,8 @@ class TestInitialize:
     @pytest.mark.asyncio
     async def test_initialize_unknown_client_is_deny_only_by_default(self, agent, monkeypatch):
         monkeypatch.setattr(
-            "hermes_cli.config.load_config",
-            lambda: {"approvals": {"acp_trusted_clients": []}},
+            "tools.approval_context._get_approval_config",
+            lambda: {"acp_trusted_clients": []},
         )
 
         await agent.initialize(
@@ -119,7 +119,10 @@ class TestInitialize:
     @pytest.mark.asyncio
     async def test_initialize_explicit_client_trust_is_captured_once(self, agent, monkeypatch):
         config = {"approvals": {"acp_trusted_clients": ["Zed"]}}
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: config)
+        monkeypatch.setattr(
+            "tools.approval_context._get_approval_config",
+            lambda: config["approvals"],
+        )
 
         await agent.initialize(
             protocol_version=1,
@@ -136,7 +139,10 @@ class TestInitialize:
     @pytest.mark.asyncio
     async def test_turn_callback_uses_captured_approval_trust(self, agent, monkeypatch):
         config = {"approvals": {"acp_trusted_clients": ["Interactive Editor"]}}
-        monkeypatch.setattr("hermes_cli.config.load_config", lambda: config)
+        monkeypatch.setattr(
+            "tools.approval_context._get_approval_config",
+            lambda: config["approvals"],
+        )
         await agent.initialize(
             protocol_version=1,
             client_info=Implementation(name="Interactive Editor", version="1"),
