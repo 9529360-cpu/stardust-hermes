@@ -81,7 +81,17 @@ def test_completion_display_keeps_payload_separate_across_surfaces(monkeypatch, 
         assert server._async_delegation_display_metadata(event)["display_text"] == expected
         assert event == original
 
+    cron_event = {
+        "type": "async_delegation", "role": "cron_run", "delegation_id": "cron_exec-1",
+        "session_key": "display-session", "cron_job_id": "job-1",
+        "cron_job_name": "Morning brief", "goal": "Morning brief",
+        "status": "completed", "summary": "Markets are quiet.",
+    }
+    cron_payload = format_process_notification(cron_event)
+    assert cron_payload.startswith("[CRON JOB COMPLETE - Morning brief (job-1)]")
+    assert "Markets are quiet." in cron_payload
     from tools.process_registry_notifications import async_delegation_display_text
+    assert async_delegation_display_text(cron_event) == "Cron Job Completed: Morning brief"
     grouped = {"group": "Review", "goals": ["First", "Second"],
                "results": [{"task_index": 0, "status": "completed"}, {"task_index": 1, "status": "failed"}]}
     assert async_delegation_display_text(grouped) == "Subagent Tasks Finished with Issues: Review (2 tasks)"
