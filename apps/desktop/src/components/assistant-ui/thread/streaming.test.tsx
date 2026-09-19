@@ -240,28 +240,16 @@ function assistantTerminalMessage(): ThreadMessage {
   } as ThreadMessage
 }
 
-type StreamingPhase = 'complete' | 'first' | 'loading' | 'second'
-
-function StreamingHarness({ phase = 'loading' }: { phase?: StreamingPhase } = {}) {
-  const messages =
-    phase === 'loading'
-      ? [userMessage()]
-      : phase === 'first'
-        ? [userMessage(), assistantMessage('first chunk')]
-        : phase === 'second'
-          ? [userMessage(), assistantMessage('first chunk second chunk')]
-          : [userMessage(), assistantMessage('first chunk second chunk', false)]
-  const isRunning = phase !== 'complete'
-
+function LoadingResponseHarness() {
   const runtime = useExternalStoreRuntime<ThreadMessage>({
-    messages,
-    isRunning,
+    messages: [userMessage()],
+    isRunning: true,
     onNew: async () => {}
   })
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <Thread loading={isRunning && messages.at(-1)?.role !== 'assistant' ? 'response' : undefined} />
+      <Thread loading="response" />
     </AssistantRuntimeProvider>
   )
 }
@@ -435,31 +423,29 @@ describe('assistant-ui streaming renderer', () => {
     $reasoningCollapsedByDefault.set(false)
   })
 
-  it('renders assistant text incrementally before completion', async () => {
-    const { container, rerender } = render(<StreamingHarness phase="loading" />)
+  it('shows response loading before the first assistant chunk, then renders the running chunk', async () => {
+    const loading = render(<LoadingResponseHarness />)
 
     expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
 
-    // Drive the renderer through explicit producer phases. The old harness
-    // advanced through timers/effects, so a saturated CI worker could spend the
-    // entire Testing Library deadline waiting for scheduling rather than
-    // exercising the streaming contract itself.
-    rerender(<StreamingHarness phase="first" />)
+    loading.unmount()
+
+    const { container } = render(
+      <ThreadRuntime messages={[userMessage(), assistantMessage('first chunk')]}>
+        <Thread />
+      </ThreadRuntime>
+    )
+
     await waitFor(() => {
       expect(container.textContent).toContain('first chunk')
-      expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
     })
     expect(container.textContent).not.toContain('second chunk')
+    expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
 
-    rerender(<StreamingHarness phase="second" />)
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk second chunk')
-    })
-
-    rerender(<StreamingHarness phase="complete" />)
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk second chunk')
-    })
+    // Live same-runtime token growth and the running->complete transition are
+    // covered in status-invalidation-scope.test.tsx. Keep this renderer test
+    // focused on the user-visible loading-to-first-chunk states instead of
+    // duplicating that transition through a second async harness.
   })
 
   it('does not render composer clearance for intro-only threads', () => {
