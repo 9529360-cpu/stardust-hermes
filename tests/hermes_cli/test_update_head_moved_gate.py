@@ -134,7 +134,7 @@ def test_update_success_when_head_moves(monkeypatch, tmp_path, capsys):
     args = SimpleNamespace(branch=None, yes=False, force=False, force_venv=False)
     _patch_update_deps(monkeypatch, tmp_path, _make_head_moved_side_effect())
 
-    hermes_main.cmd_update(args)  # completes normally (no SystemExit)
+    hermes_main._run_update_transaction(args)  # completes normally (no SystemExit)
 
     out = capsys.readouterr().out
     assert "✓ Code updated!" in out
@@ -148,7 +148,7 @@ def test_update_fails_loudly_when_head_pinned(monkeypatch, tmp_path, capsys):
     _patch_update_deps(monkeypatch, tmp_path, _make_head_pinned_side_effect())
 
     with pytest.raises(SystemExit) as exc_info:
-        hermes_main.cmd_update(args)
+        hermes_main._run_update_transaction(args)
 
     assert exc_info.value.code == 1
     out = capsys.readouterr().out
