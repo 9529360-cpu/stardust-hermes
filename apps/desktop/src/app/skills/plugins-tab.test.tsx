@@ -1,8 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $pluginRecords } from '@/contrib/plugins-store'
+import { $pluginDecisions, $pluginRecords } from '@/contrib/plugins-store'
 import { $agentPlugins, $agentPluginsStatus } from '@/store/agent-plugins'
+import { $confirmRequest, settleConfirm } from '@/store/confirm'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { $pluginInstallRequest, closePluginInstallRequest } from '@/store/plugin-install-request'
 
@@ -16,15 +17,20 @@ vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
 
 describe('PluginsTab', () => {
   beforeEach(() => {
+    $pluginDecisions.set({})
     $pluginRecords.set({})
     $agentPlugins.set([])
     $agentPluginsStatus.set('ready')
     closePluginInstallRequest()
     setPaneHeightOverride('capabilities-plugin-catalog', undefined)
     requestGateway.mockClear()
+    settleConfirm(false)
   })
 
-  afterEach(cleanup)
+  afterEach(() => {
+    settleConfirm(false)
+    cleanup()
+  })
 
   it('lists the scoped profile agent plugins with toggles', () => {
     $agentPlugins.set([
@@ -84,6 +90,63 @@ describe('PluginsTab', () => {
     expect(screen.getByRole('switch', { name: 'Desktop: Media Studio' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('switch', { name: 'Agent: Media Studio' }).getAttribute('aria-checked')).toBe('false')
     expect(screen.getAllByText('Agent in workbot').length).toBeGreaterThan(0)
+  })
+
+  it('discloses full renderer authority and requires trust confirmation before external Desktop enable', async () => {
+    $pluginRecords.set({
+      'disk:media': {
+        id: 'disk:media',
+        name: 'Media Studio',
+        kind: 'disk',
+        status: 'disabled',
+        decisionKey: 'media',
+        packageName: 'hermes-media-studio',
+        packageOrigin: {
+          repo: 'https://github.com/example/hermes-media-studio',
+          sha: 'abcdef1234567890'
+        }
+      }
+    })
+
+    render(<PluginsTab profile={null} />)
+
+    expect(screen.getByText('full app access')).toBeTruthy()
+    expect(screen.getByText(/same renderer\/app authority as the app itself/)).toBeTruthy()
+    expect(screen.getByText(/Source: https:\/\/github\.com\/example\/hermes-media-studio · pinned abcdef123456/)).toBeTruthy()
+
+    screen.getByRole('switch', { name: 'Desktop: Media Studio' }).click()
+
+    expect($confirmRequest.get()).toMatchObject({
+      confirmLabel: 'Trust & enable',
+      title: 'Trust and enable Media Studio?'
+    })
+    expect($pluginDecisions.get().media).toBeUndefined()
+
+    settleConfirm(true)
+
+    await waitFor(() => expect($pluginDecisions.get().media).toBe(true))
+  })
+
+  it('cancelling external Desktop trust leaves the pre-evaluation decision unset', async () => {
+    $pluginRecords.set({
+      'disk:local-only': {
+        id: 'disk:local-only',
+        name: 'Local Only',
+        kind: 'disk',
+        status: 'disabled',
+        decisionKey: 'local-only'
+      }
+    })
+
+    render(<PluginsTab profile={null} />)
+    expect(screen.getByText('Source: local disk; no catalog/Git origin is recorded.')).toBeTruthy()
+
+    screen.getByRole('switch', { name: 'Desktop: Local Only' }).click()
+    expect($confirmRequest.get()).not.toBeNull()
+    settleConfirm(false)
+
+    await waitFor(() => expect($confirmRequest.get()).toBeNull())
+    expect($pluginDecisions.get()['local-only']).toBeUndefined()
   })
 
   it('offers "Install here" for a desktop half whose agent half is not in the selected profile', async () => {
