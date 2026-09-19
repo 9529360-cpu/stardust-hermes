@@ -19,6 +19,7 @@ import {
   waitForAppReady,
 } from './fixtures'
 import { expectVisualSnapshot } from './visual-snapshot'
+import { PRODUCT_NAME } from '../src/product-brand'
 
 let fixture: MockBackendFixture | null = null
 
@@ -32,9 +33,9 @@ test.afterAll(async () => {
 })
 
 test.describe('dev-mode boot with mock backend', () => {
-  test('window opens with Hermes title', async () => {
+  test('window opens with the current product title', async () => {
     const title = await fixture!.page.title()
-    expect(title).toContain('Hermes')
+    expect(title).toContain(PRODUCT_NAME)
   })
 
   test('renderer mounts and shows DOM content', async () => {
