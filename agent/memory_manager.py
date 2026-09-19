@@ -478,8 +478,14 @@ class MemoryManager:
 
     def _apply_pending_session_switch(self) -> None:
         """Replay the latest OFF-period boundary before the next enabled provider I/O."""
+        # Hot path: avoid another config read when there is nothing to replay.
+        with self._pending_session_switch_lock:
+            if self._pending_session_switch is None:
+                return
         if not self._privacy_enabled():
             return
+        # Re-read under the lock so a newer OFF-period boundary wins if it landed
+        # while the live privacy check was running.
         with self._pending_session_switch_lock:
             pending = self._pending_session_switch
             self._pending_session_switch = None
