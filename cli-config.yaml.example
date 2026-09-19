@@ -1972,7 +1972,7 @@ telemetry:
 updates:
   # Passive CLI/banner update checks are off for Stardust by default.
   # Set true only if you explicitly want background update comparison.
-  # Explicit `hermes update --check` remains available.
+  # This setting does not enable Stardust's currently pinned CLI updater.
   check: false
   # Create a full HERMES_HOME zip before every `hermes update`.
   # Backups land in ~/.hermes/backups/ and can be restored with `hermes import`.
