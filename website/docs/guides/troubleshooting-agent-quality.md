@@ -78,12 +78,12 @@ See [Context Length Detection](/integrations/providers#context-length-detection)
 
 **Symptom:** You asked Hermes to remember something during this session, it confirmed the save, but later in the *same* session it doesn't seem to know it.
 
-**Check:** Nothing is broken — check the timing. Memory saved mid-session is written to disk immediately, but the system prompt won't reflect it until the next session.
+**Check:** Nothing is broken — check the turn boundary. Memory saved during a model turn is written to disk immediately; the current in-flight prompt does not mutate, and the next turn refreshes changed built-in memory.
 
-**What it means:** This is documented, intentional behavior. Memory is injected into the system prompt as a **frozen snapshot at session start**, and that injection never changes mid-session — it preserves the LLM's prefix cache for performance. When the agent adds or removes memory entries during a session, the changes persist to disk right away but appear in the system prompt only when the next session starts. Tool responses always show the live state, so the save itself is confirmed and real.
+**What it means:** The memory block is a **turn-frozen snapshot**. Stardust checks the built-in memory files between turns and rebuilds the cached prompt only when the rendered memory actually changed. Tool responses show the live write result immediately.
 
 :::info
-Frozen snapshot in practice: "remember X" during a session means X is guaranteed available **next** session. Within the current session, the fact still exists in the conversation history itself — the agent forgets it only if that part of the conversation has since been compressed away (see step 7).
+In practice, "remember X" during a turn means the current turn continues with the context it already had, and the updated built-in memory block is available from the next turn onward.
 :::
 
 See [Persistent Memory](/user-guide/features/memory#how-memory-appears-in-the-system-prompt) for the full mechanics.
@@ -139,7 +139,7 @@ See [Context Compression](/user-guide/configuration#context-compression) for the
 | Everything feels less capable | `/model` | Session is on a different model than you think |
 | Long session degrading | `/usage` | Context pressure — compress or start fresh |
 | Limits hit surprisingly early | CLI startup line / `/usage` | Wrong auto-detected context length |
-| Forgot what I said this session | — (by design) | Frozen memory snapshot — appears next session |
+| Saved memory not reflected in the same model turn | — (by design) | Turn-frozen memory snapshot — refreshes next turn |
 | Forgot last week's discussion | ask it to `session_search` | Memory is bounded, curated facts only |
 | Lost a specific ability | `/skills`, `/tools list` | Skill or toolset not loaded this session |
 | Lost old detail after long session | `/usage`, `/context` | Compression summarized older history |
