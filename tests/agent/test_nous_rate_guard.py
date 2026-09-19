@@ -277,7 +277,7 @@ class TestWelcomeRouteCopy:
             log_prefix="",
             _buffer_vprint=buffered.append,
             _buffer_status=statuses.append,
-            _try_activate_fallback=lambda: False,
+            _try_activate_fallback=lambda **_kwargs: False,
             _flush_status_buffer=lambda: None,
             _persist_session=lambda *_args: None,
         )
@@ -305,7 +305,8 @@ class TestWelcomeRouteCopy:
         assert verdict.action == "return"
         assert statuses == [f"⏳ {expected}"]
         assert expected in verdict.result["final_response"]
-        assert "/login" in expected
+        assert "/model" in expected
+        assert "/login" not in expected
         assert "Nous Portal" not in expected
         assert buffered == [f"⏳ {expected} Trying fallback..."]
 

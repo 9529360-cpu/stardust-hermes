@@ -260,17 +260,6 @@ class GatewayStatusCommandsMixin:
             lines.append(t("gateway.status.model_provider", model=fields["model"], provider=fields["provider"]))
         elif fields["model"]:
             lines.append(t("gateway.status.model", model=fields["model"]))
-        try:
-            from hermes_cli.auth import resolve_provider
-            from hermes_cli.anon_auth import guest_carries_inference
-
-            free_tier_active = await self._run_in_executor_with_context(
-                lambda: resolve_provider("auto") == "nous" and guest_carries_inference()
-            )
-            if free_tier_active:
-                lines.append(t("gateway.status.free_tier"))
-        except Exception:
-            pass
         from agent.context_breakdown import context_display_source
         mark = "~" if context_display_source(getattr(status_agent, "context_compressor", None)) != "provider_usage" else ""
         if context_total:

@@ -15,7 +15,7 @@ import sys
 import time as _time
 from pathlib import Path
 from typing import Optional
-from hermes_constants import venv_python_path
+from hermes_constants import STARDUST_INSTALL_PS1_URL, STARDUST_INSTALL_SH_URL, venv_python_path
 
 from hermes_cli.update_cmd_common import _best_effort
 
@@ -49,8 +49,8 @@ _PRE_UPDATE_SNAPSHOT_MAX_FILE_SIZE = 1 << 30  # 1 GiB
 #: Reinstalling through the official installer swaps in a Python whose SQLite is safe; the
 #: one-liner differs per OS (mirrors ``uninstall._REINSTALL_HINT``). windows -> command
 _REINSTALL_ONE_LINER = {
-    True: "iex (irm https://hermes-agent.nousresearch.com/install.ps1)",
-    False: "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
+    True: f"iex (irm {STARDUST_INSTALL_PS1_URL})",
+    False: f"curl -fsSL {STARDUST_INSTALL_SH_URL} | bash",
 }
 
 

@@ -844,6 +844,12 @@ class TestUpdateCheckEndpoint:
     def test_git_install_reports_behind_count(self, monkeypatch):
         import hermes_cli.web_server as ws
 
+        # Stardust manages its live checkout outside the dashboard. Keep the
+        # inherited git-check branch covered explicitly without weakening the
+        # default managed-runtime authority boundary.
+        monkeypatch.setattr(
+            _web_server_files, "_dashboard_local_update_managed_externally", lambda: False
+        )
         monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
         # Stub the shared checker so the contract is deterministic (no network).
         import hermes_cli.banner as banner

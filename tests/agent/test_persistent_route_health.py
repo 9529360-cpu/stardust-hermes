@@ -1,8 +1,12 @@
 import json
+import os
+import subprocess
+import sys
 import time
+from pathlib import Path
 
-from agent.error_classifier import FailoverReason
 from agent import route_health
+from agent.error_classifier import FailoverReason
 
 
 def _home(monkeypatch, tmp_path):
@@ -74,3 +78,62 @@ def test_malformed_state_fails_open(monkeypatch, tmp_path):
     _home(monkeypatch, tmp_path)
     route_health.state_path().write_text("not-json", encoding="utf-8")
     assert route_health.allow_route("p", "m", "https://x.test") == (True, 0, "healthy")
+
+
+def test_half_open_probe_claim_is_cross_process_singleton(monkeypatch, tmp_path):
+    """Different Hermes processes must not all claim the same half-open probe."""
+    _home(monkeypatch, tmp_path)
+    route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+    state = route_health.snapshot()
+    row = next(iter(state["routes"].values()))
+    row["cooldown_until"] = time.time() - 1
+    route_health._write_state(state)
+
+    start = tmp_path / "start-probes"
+    script = r"""
+import json
+import sys
+import time
+from pathlib import Path
+
+from agent import route_health
+
+start = Path(sys.argv[1])
+while not start.exists():
+    time.sleep(0.005)
+
+original_read = route_health._read_state
+
+def slow_read():
+    state = original_read()
+    time.sleep(0.2)
+    return state
+
+route_health._read_state = slow_read
+print(json.dumps(route_health.allow_route("p", "m", "https://x.test")))
+"""
+    env = os.environ.copy()
+    env["HERMES_HOME"] = str(tmp_path)
+    repo_root = Path(__file__).resolve().parents[2]
+    procs = [
+        subprocess.Popen(
+            [sys.executable, "-c", script, str(start)],
+            cwd=repo_root,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        for _ in range(4)
+    ]
+    start.write_text("go", encoding="utf-8")
+
+    results = []
+    for proc in procs:
+        stdout, stderr = proc.communicate(timeout=15)
+        assert proc.returncode == 0, stderr
+        results.append(json.loads(stdout.strip().splitlines()[-1]))
+
+    states = [result[2] for result in results]
+    assert states.count("half_open_probe") == 1
+    assert states.count("half_open_busy") == 3

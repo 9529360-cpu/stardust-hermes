@@ -55,6 +55,7 @@ def test_imported_crash_marker_never_autocontinues(tmp_path):
     schedule = rebind(session_auto_continue._maybe_schedule_auto_continue, {
         "_session_home": lambda session: tmp_path,
         "read_turn_marker": read_turn_marker,
+        "_history_proves_marker_settled": session_auto_continue._history_proves_marker_settled,
     })
     assert schedule("live", {}, "chat") is None
 

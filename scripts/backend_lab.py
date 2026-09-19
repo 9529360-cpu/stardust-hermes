@@ -81,8 +81,8 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 def git(*args: str) -> str:
-    proc = subprocess.run([str(GIT), "-C", str(REPO), *args], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", check=False)
+    proc = subprocess.run([str(GIT), "-C", str(REPO), *args], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          check=False)
     return proc.stdout.strip()
 
 def repo_snapshot() -> dict[str, Any]:
@@ -340,7 +340,7 @@ def pid_alive(pid: int) -> bool:
         ctypes.windll.kernel32.CloseHandle(handle)
         return True
     try:
-        os.kill(pid, 0)
+        os.kill(pid, 0)  # windows-footgun: ok — POSIX-only branch; Windows returned above
         return True
     except OSError:
         return False

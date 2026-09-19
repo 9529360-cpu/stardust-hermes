@@ -12,6 +12,14 @@ import sys
 from contextvars import ContextVar, Token
 from pathlib import Path
 
+STARDUST_REPOSITORY_URL = "https://github.com/9529360-cpu/stardust-hermes"
+STARDUST_INSTALL_SH_URL = (
+    "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh"
+)
+STARDUST_INSTALL_PS1_URL = (
+    "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1"
+)
+
 _profile_fallback_warned: bool = False
 _UNSET = object()
 _HERMES_HOME_OVERRIDE: ContextVar[str | object] = ContextVar("_HERMES_HOME_OVERRIDE", default=_UNSET)
@@ -1279,7 +1287,8 @@ def partial_update_hint(exc: BaseException) -> list[str]:
         "and a related one was not.",
         "Re-run the update to bring the whole tree to the same version:",
         "    hermes update",
-        "If that also fails, reinstall: https://hermes-agent.nousresearch.com",
+        "If that also fails, reinstall from the Stardust repository:",
+        f"    {STARDUST_REPOSITORY_URL}",
     ]
 
 

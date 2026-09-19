@@ -85,7 +85,8 @@ async def test_status_names_the_free_tier_and_the_slash_command_when_the_free_ti
 
     result = await runner._handle_message(_make_event("/status"))
 
-    assert anon_auth.FREE_TIER_STATUS_LINE in result
+    assert anon_auth.FREE_TIER_STATUS_LINE not in result
+    assert "Nous · free tier" not in result
 
 
 @pytest.mark.asyncio
@@ -115,11 +116,6 @@ async def test_a_status_gate_failure_never_breaks_status(monkeypatch):
     assert result == expected
 
 
-def test_the_line_comes_from_the_catalog_in_every_language():
-    assert t("gateway.status.free_tier") == anon_auth.FREE_TIER_STATUS_LINE
-    # Every catalog carries its own translated tier label; route and recovery command stay stable.
-    for lang in ("ja", "de"):
-        line = t("gateway.status.free_tier", lang=lang)
-        assert line != anon_auth.FREE_TIER_STATUS_LINE
-        assert line.startswith("Nous · ") and " · nous/welcome · " in line and line.endswith("/model")
-        assert "/login" not in line
+def test_retained_free_tier_copy_never_points_at_the_retired_login_command():
+    assert "/model" in anon_auth.FREE_TIER_STATUS_LINE
+    assert "/login" not in anon_auth.FREE_TIER_STATUS_LINE

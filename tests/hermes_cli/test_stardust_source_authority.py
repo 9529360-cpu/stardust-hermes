@@ -159,3 +159,97 @@ def test_uninstall_reinstall_guidance_stays_on_stardust() -> None:
     assert STARDUST_INSTALL_BASE in source
     assert UPSTREAM_INSTALL_HOST not in source
     assert "Thank you for using Stardust!" in source
+
+def test_runtime_catalog_sources_belong_to_stardust() -> None:
+    model_catalog = _read("hermes_cli/model_catalog.py")
+    config_defaults = _read("hermes_cli/config_defaults.py")
+    local_catalog = _read("hermes_cli/local_runtime/catalog.py")
+    expected = "raw.githubusercontent.com/9529360-cpu/stardust-hermes/main"
+
+    for source in (model_catalog, config_defaults, local_catalog):
+        assert expected in source
+        assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in source
+        assert "hermes-agent.nousresearch.com/docs/api/" not in source
+
+
+def test_desktop_unsupported_update_routes_to_stardust_source() -> None:
+    source = _read("apps/desktop/src/app/updates-overlay.tsx")
+
+    assert "PRODUCT_REPOSITORY_URL" in source
+    assert "https://hermes-agent.nousresearch.com/" not in source
+
+def test_desktop_does_not_surface_nous_diagnostics_upload() -> None:
+    sources = (
+        _read("apps/desktop/src/components/error-boundary.tsx"),
+        _read("apps/desktop/src/components/assistant-ui/thread/assistant-message.tsx"),
+        _read("apps/desktop/src/app/contrib/wiring.tsx"),
+    )
+
+    assert all("requestSendDiagnostics" not in source for source in sources)
+    assert all("SendDiagnosticsHost" not in source for source in sources)
+
+def test_desktop_first_run_identity_is_stardust_owned() -> None:
+    source = _read("apps/desktop/src/store/onboarding-script.ts")
+    kickoff = _read("apps/desktop/src/app/contrib/onboarding-kickoff.ts")
+
+    assert "You are Stardust" in source
+    assert "you are Stardust" in source
+    assert "free Nous account" not in source
+    assert "You are Hermes" not in source
+    assert "record.free_tier !== true" not in kickoff
+
+
+def test_desktop_ssh_recovery_installs_stardust_source() -> None:
+    source = _read("apps/desktop/electron/remote-lifecycle.ts")
+
+    assert STARDUST_INSTALL_BASE in source
+    assert UPSTREAM_INSTALL_HOST not in source
+
+
+
+
+def test_normal_stardust_setup_never_offers_nous_telemetry() -> None:
+    setup = _read("hermes_cli/setup.py")
+    tools = _read("hermes_cli/tools_config.py")
+    defaults = _read("hermes_cli/config_defaults.py")
+    example = _read("cli-config.yaml.example")
+
+    assert "Send shared metrics to Nous?" not in setup
+    assert "sending to Nous" not in tools
+    assert "telemetry.nousresearch.com" not in defaults
+    assert "telemetry.nousresearch.com" not in example
+
+
+
+def test_runtime_recovery_guidance_stays_on_stardust_source() -> None:
+    constants = _read("hermes_constants.py")
+    assert STARDUST_INSTALL_BASE in constants
+    assert "STARDUST_REPOSITORY_URL" in constants
+    assert "If that also fails, reinstall: https://hermes-agent.nousresearch.com" not in constants
+
+    update = _read("hermes_cli/update_cmd.py")
+    maintenance = _read("hermes_cli/update_cmd_maint.py")
+    zip_update = _read("hermes_cli/update_cmd_zip.py")
+
+    assert "STARDUST_INSTALL_SH_URL" in update
+    assert "hermes-agent.nousresearch.com/install.sh" not in update
+
+    for source in (maintenance, zip_update):
+        assert "STARDUST_INSTALL_" in source
+        assert "hermes-agent.nousresearch.com/install.sh" not in source
+        assert "hermes-agent.nousresearch.com/install.ps1" not in source
+    assert "reinstall from https://hermes-agent.nousresearch.com" not in zip_update
+
+
+
+def test_passive_and_deep_update_authority_is_stardust() -> None:
+    banner = _read("hermes_cli/banner.py")
+    updater = _read("hermes_cli/update_cmd_git.py")
+
+    assert "9529360-cpu/stardust-hermes" in banner
+    assert "repos/9529360-cpu/stardust-hermes/compare/" in banner
+    assert "NousResearch/hermes-agent" not in banner
+    assert "nousresearch/hermes-agent" not in banner
+
+    assert "9529360-cpu/stardust-hermes" in updater
+    assert "NousResearch/hermes-agent" not in updater

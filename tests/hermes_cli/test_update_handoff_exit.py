@@ -22,7 +22,7 @@ import pytest
 
 import hermes_cli.main as main_mod
 from hermes_cli import update_cmd
-from hermes_cli.main import cmd_update
+from hermes_cli.main import _run_update_transaction as cmd_update
 from hermes_cli.update_receipt import COMMAND_BOUNDARY_STOP_REASON
 
 

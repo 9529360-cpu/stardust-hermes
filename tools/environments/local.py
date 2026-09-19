@@ -23,7 +23,7 @@ from hermes_cli._subprocess_compat import windows_hide_flags
 from tools.environments.local_env_policy import (
     _ALWAYS_STRIP_KEYS, _HERMES_PROVIDER_ENV_BLOCKLIST, _HERMES_PROVIDER_ENV_FORCE_PREFIX,
     _is_hermes_internal_secret, _is_terminal_first_party_env,
-    _matches_terminal_first_party_prefix, _plugin_terminal_env_strip_keys)
+    _matches_terminal_first_party_prefix, _plugin_terminal_env_strip_keys, strip_profile_gate_env)
 from tools.environments.local_gitbash_probe import (
     _bash_probe_details_cache, _bash_starts, _git_bash_aslr_help,
     _looks_like_msys_spawn_failure, _mandatory_aslr_enabled)
@@ -364,27 +364,31 @@ def served_profile_child_env(
     return env
 
 
+def _is_routed_home(target_home: "str | Path") -> bool:
+    """True when *target_home* is not the process's launch home."""
+    try:
+        return Path(target_home).resolve() != get_process_hermes_home().resolve()
+    except OSError:
+        return True
+
+
 def strip_launch_profile_env(env: dict, target_home: "str | Path | None" = None) -> dict:
-    """Drop the LAUNCH profile's residue from a child env built for another served profile.
-    ``os.environ`` holds the default profile's ``.env`` and its bridged ``TERMINAL_*`` settings;
-    the secret scrub removes credentials but not settings (``HERMES_MODEL``, ``TERMINAL_ENV``,
-    ``HERMES_LANGUAGE``...), so a standalone ``hermes -p X`` worker and a served one saw different
-    envs. The child re-loads X's own ``.env`` and bridges X's config itself. ``target_home``
-    defaults to the active home override; no-op outside multiplex or when the target IS the
-    launch profile."""
-    from agent.secret_scope import _is_global_env, is_multiplex_active, load_env_file
-    from hermes_constants import get_hermes_home_override, get_process_hermes_home
+    """Drop launch-profile residue from a child env built for another profile.
+
+    The boundary is a routed home, not the gateway-wide multiplex flag: Desktop/dashboard
+    profile routing also installs a HERMES_HOME override without enabling multiplex mode.
+    """
+    from agent.secret_scope import _is_global_env, load_env_file
+    from hermes_constants import get_hermes_home_override
     target = target_home or get_hermes_home_override()
-    if not is_multiplex_active() or not target:
+    if not target or not _is_routed_home(target):
         return env
     launch_home = get_process_hermes_home()
-    if Path(target).resolve() == launch_home.resolve():
-        return env
     from hermes_cli.config import TERMINAL_CONFIG_ENV_MAP
     for key in set(load_env_file(launch_home / ".env")) | set(TERMINAL_CONFIG_ENV_MAP.values()):
         if not _is_global_env(key) or key.startswith("TERMINAL_"):
             env.pop(key, None)
-    return env
+    return strip_profile_gate_env(env)
 
 
 # --- Shell discovery ---

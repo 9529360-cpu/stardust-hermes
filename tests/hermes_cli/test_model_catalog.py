@@ -137,9 +137,9 @@ class TestFallbackChain:
     releases (opus 4.8, etc.) never reach the picker.
     """
 
-    PRIMARY = "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
+    PRIMARY = "https://catalog.example.invalid/model-catalog.json"
     FALLBACK = (
-        "https://raw.githubusercontent.com/NousResearch/hermes-agent"
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
         "/main/website/static/api/model-catalog.json"
     )
 
@@ -187,11 +187,20 @@ class TestFallbackChain:
                 return None
             return manifest
 
-        with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
+        with patch.object(
+            model_catalog,
+            "_load_catalog_config",
+            return_value={
+                "enabled": True,
+                "url": self.PRIMARY,
+                "ttl_hours": 1.0,
+                "providers": {},
+            },
+        ), patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
             result = model_catalog.get_catalog(force_refresh=True)
 
         assert result == manifest
-        assert self.FALLBACK in calls
+        assert calls == [self.PRIMARY, self.FALLBACK]
 
 
 class TestCuratedAccessors:

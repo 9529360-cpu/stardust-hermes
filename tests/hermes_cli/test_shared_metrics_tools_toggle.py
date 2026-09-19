@@ -40,13 +40,16 @@ class TestMenuLabel:
         assert "Nous" not in label
 
     def test_sending_state_names_the_destination(self):
-        label = _shared_metrics_menu_label(_config(enabled=True, send=True))
-        assert "sending to Nous" in label
+        label = _shared_metrics_menu_label(
+            _config(enabled=True, send=True, endpoint="https://operator.test/v1")
+        )
+        assert "remote send requested" in label
+        assert "Nous" not in label
 
 
 class TestToggle:
     def test_enabling_send_persists(self, monkeypatch):
-        config = _config(enabled=True)
+        config = _config(enabled=True, endpoint="https://operator.test/v1")
         saved = {}
         monkeypatch.setattr(
             "hermes_cli.setup.prompt_yes_no", lambda *_a, **_k: True

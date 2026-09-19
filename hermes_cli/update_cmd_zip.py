@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from hermes_cli.update_cmd_common import _best_effort
+from hermes_constants import STARDUST_INSTALL_PS1_URL, STARDUST_INSTALL_SH_URL
 
 # Log-record parity with the origin module.
 logger = logging.getLogger("hermes_cli.update_cmd")
@@ -310,7 +311,12 @@ def _download_and_swap_zip(branch: str, zip_url: str) -> None:
         print(f"✗ ZIP update failed: {e}")
         # Two-phase replace commits all or rolls all back, so no mixed tree here — don't push a needless reinstall.
         print("  Your existing install was left in place.")
-        print("  Re-run `hermes update` to retry; if the agent won't start, reinstall from https://hermes-agent.nousresearch.com")
+        reinstall = (
+            f"iex (irm {STARDUST_INSTALL_PS1_URL})"
+            if sys.platform == "win32"
+            else f"curl -fsSL {STARDUST_INSTALL_SH_URL} | bash"
+        )
+        print(f"  Re-run `hermes update` to retry; if the agent won't start, reinstall with: {reinstall}")
         _m().sys.exit(1)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)

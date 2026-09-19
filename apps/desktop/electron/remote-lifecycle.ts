@@ -236,8 +236,8 @@ async function locateHermes(ssh, remoteHermesPath) {
   }
 
   const err: any = new Error(
-    'Hermes is not installed on the remote host (could not find a `hermes` executable). ' +
-      'Install it on the remote with:  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh  ' +
+    'Stardust is not installed on the remote host (could not find the `hermes` compatibility executable). ' +
+      'Install it on the remote with:  curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash  ' +
       '— or set the Hermes path explicitly in the SSH connection settings.'
   )
 

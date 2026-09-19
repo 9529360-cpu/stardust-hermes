@@ -119,7 +119,7 @@ export function useOnboardingKickoff({
       takeGuideShape()
       await loadMachineProfile()
 
-      const seedMessages = buildChatOnboardingSeedMessages(pickOnboardingGreeting(), record.free_tier !== true)
+      const seedMessages = buildChatOnboardingSeedMessages(pickOnboardingGreeting())
 
       const guideRequest: AmbientGatewayRequest = (method, params, timeout) =>
         requestGatewayForProfile(SETUP_PROFILE, method, params, timeout)

@@ -174,7 +174,8 @@ def test_every_in_chat_free_tier_string_names_the_slash_command(monkeypatch):
         anon_auth.LOGIN_BUSY_ELSEWHERE,
         anon_auth.LOGIN_NOT_ALLOWED,
     )
-    assert all("/login" in text for text in command_copy)
+    assert all("/model" in text for text in command_copy)
+    assert all("/login" not in text for text in command_copy)
     for text in (*command_copy, *refusal_copy):
         # The ruled refusal uses Hermes as the grammatical subject; only that exact product-name
         # phrase is exempt from the broad top-level-command gate.
@@ -284,4 +285,5 @@ def test_cli_chat_status_names_the_free_tier(isolated_store):
     )
     CLISessionMixin._show_session_status(cli)
 
-    assert anon_auth.FREE_TIER_STATUS_LINE in rendered[0]
+    assert anon_auth.FREE_TIER_STATUS_LINE not in rendered[0]
+    assert "Nous · free tier" not in rendered[0]

@@ -355,7 +355,8 @@ test('locateHermes throws a hermes-not-found error with an install hint', async 
     () => locateHermes(ssh, ''),
     (err: any) => {
       assert.equal(err.kind, 'hermes-not-found')
-      assert.match(err.message, /install/i)
+      assert.match(err.message, /install-stardust\.sh/)
+      assert.doesNotMatch(err.message, /hermes-agent\.nousresearch\.com/)
 
       return true
     }
