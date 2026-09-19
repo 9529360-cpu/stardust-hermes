@@ -2735,8 +2735,9 @@ def _publish_local_session_completion(
     origin = d.job.get("local_session_origin")
     if not d.should_deliver or not isinstance(origin, dict):
         return
+    source = str(origin.get("source") or "").strip().lower()
     session_id = str(origin.get("session_id") or "").strip()
-    if not session_id:
+    if source not in {"desktop", "tui"} or not session_id:
         return
     with fence.side_effect_fence() as owns_delivery:
         if not owns_delivery:
