@@ -419,15 +419,21 @@ def _event_delivery(fn, evt: Dict[str, Any], claim_id: str) -> None:
 
 
 def get_durable_delegation(delegation_id: str) -> Optional[Dict[str, Any]]:
+    """Read one durable delegation receipt with the provenance needed for recovery UIs.
+
+    The ledger remains authoritative. The decoded task and event values are views of
+    already-persisted payloads, not a second task record.
+    """
     with _DB_LOCK, _transaction() as conn:
         row = conn.execute("""SELECT origin_session, state, dispatched_at, completed_at,
                       result_json, delivery_state, delivery_attempts,
-                      origin_session_id
+                      origin_session_id, parent_session_id, task_json, event_json
                FROM async_delegations WHERE delegation_id=?""", (delegation_id,)).fetchone()
     return None if row is None else {
         "delegation_id": delegation_id, "origin_session": row[0], "state": row[1], "dispatched_at": row[2],
         "completed_at": row[3], "result": json.loads(row[4]) if row[4] else None, "delivery_state": row[5],
-        "delivery_attempts": row[6], "origin_session_id": row[7] or ""}
+        "delivery_attempts": row[6], "origin_session_id": row[7] or "", "parent_session_id": row[8],
+        "task": json.loads(row[9]) if row[9] else None, "event": json.loads(row[10]) if row[10] else None}
 
 
 # ── In-memory registry queries ──────────────────────────────────────────────

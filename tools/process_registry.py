@@ -516,7 +516,7 @@ _WATCHER_ROUTE_KEYS = ("platform", "chat_id", "user_id", "user_name", "thread_id
 # ``session_id``; ``command`` is redacted and ``owner_task_id`` defaulted on write).
 _CHECKPOINT_FIELDS = (
     "command", "pid", "pid_scope", "host_start_time", "systemd_unit", "cwd",
-    "started_at", "task_id", "owner_task_id", "session_key",
+    "started_at", "task_id", "owner_task_id", "session_key", "handoff_note",
     *(f"watcher_{k}" for k in _WATCHER_ROUTE_KEYS), "watcher_interval",
     "parent_session_id", "notify_on_complete", "watch_patterns")
 _CHECKPOINT_DEFAULTS = {
@@ -2063,8 +2063,15 @@ class ProcessRegistry(ProcessCheckpointMixin):
                 entry.update(watch_patterns=list(s.watch_patterns), watch_hit=s._watch_hits > 0)
             if s.notify_on_complete:
                 entry["notify_on_complete"] = True
+            if s.parent_session_id:
+                entry["parent_session_id"] = s.parent_session_id
+            if s.handoff_note:
+                entry["handoff_note"] = s.handoff_note
             if s.exited:
                 entry["exit_code"] = s.exit_code
+                entry["completion_reason"] = s.completion_reason
+                if s.termination_source:
+                    entry["termination_source"] = s.termination_source
             if s.detached:
                 entry["detached"] = True
             result.append(entry)
