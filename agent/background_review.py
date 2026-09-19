@@ -938,14 +938,19 @@ def build_cache_parity_fork(
     _memory_master_on = memory_persistence_enabled(fail_closed=True)
     _parent_memory_master = bool(getattr(agent, "_memory_persistence_enabled", True))
     review_agent._memory_persistence_enabled = _memory_master_on
-    if _memory_master_on:
+    if _memory_master_on and _parent_memory_master:
+        # Stable ON state: preserve parent cache/store identity exactly.
         review_agent._memory_store = agent._memory_store
         review_agent._memory_enabled = agent._memory_enabled
         review_agent._user_profile_enabled = agent._user_profile_enabled
-    else:
+    elif not _memory_master_on:
+        # OFF is fail-closed even if the constructor/parent carried stale state.
         review_agent._memory_store = None
         review_agent._memory_enabled = False
         review_agent._user_profile_enabled = False
+    # OFF -> ON transition: keep the fork constructor's current-config memory
+    # state. Copying the stale parent's None/False state here would create a
+    # dead advertised memory surface until the parent itself is rebuilt.
     review_agent._memory_nudge_interval = review_agent._skill_nudge_interval = 0
     # _skip_mcp_refresh: the between-turns MCP refresh would add late-connecting MCP tools and
     # break tools[] parity. PERSISTENCE ISOLATION (curator-takeover root cause): sharing the
@@ -989,7 +994,7 @@ def build_cache_parity_fork(
         # _conversation_root_id() falls back to the parent's PHYSICAL id, so after a compression
         # rotation the review's usage was attributed to a different conversation than its parent.
         review_agent._cached_conversation_root = agent._conversation_root_id()
-        if _memory_master_on:
+        if _parent_memory_master == _memory_master_on:
             _inherit_parent_tool_surface(review_agent, agent)
     _detach_fork_compression(review_agent)
     # Compaction bounds a single request; this bounds the WHOLE review (checked in
