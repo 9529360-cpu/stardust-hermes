@@ -295,8 +295,8 @@ def entry_capability_summary(entry: PluginCatalogEntry) -> str:
     bits.append(f"This plugin {'; '.join(parts) if parts else 'declares no tools, hooks, middleware, or env vars'}.")
     bits.append(
         "Declared capabilities are descriptive metadata, not a security boundary. "
-        "If this package includes Desktop code, enabling that code grants the Desktop runtime authority "
-        "shown by Stardust at the enable decision."
+        "If this package includes Desktop code, explicitly enabling that code executes it inside "
+        "Stardust's renderer with full app authority; these declarations do not limit it."
     )
     if entry.platforms:
         bits.append(f"Platforms: {', '.join(entry.platforms)}.")
