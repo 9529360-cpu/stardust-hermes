@@ -2322,8 +2322,11 @@ export const zh = defineLocale({
       resetMemory: '重置记忆',
       resetUser: '重置画像',
       resetAll: '全部重置',
-      resetConfirm: target => `删除 ${target}？此操作不可撤销。`,
-      resetDone: files => `已删除 ${files}。`,
+      resetConfirm: target => `删除 ${target}？此操作不可撤销。当前打开的对话在下一回合前仍可能包含旧的内置记忆。`,
+      resetDone: (files, activeRefresh) =>
+        activeRefresh
+          ? `已删除 ${files}。当前打开的对话会在下一回合移除已重置的内置记忆；重置前暂存的写入也无法再把它恢复回来。`
+          : `已删除 ${files}。当前后端未确认活动对话可自动刷新；请新建对话以彻底移除旧的记忆快照。`,
       resetFailed: '记忆重置失败',
       actionStarted: name => `${name} 已启动 — 正在跟踪日志…`,
       actionFailed: name => `${name} 启动失败`,
