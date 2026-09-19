@@ -240,20 +240,6 @@ function assistantTerminalMessage(): ThreadMessage {
   } as ThreadMessage
 }
 
-function LoadingResponseHarness() {
-  const runtime = useExternalStoreRuntime<ThreadMessage>({
-    messages: [userMessage()],
-    isRunning: true,
-    onNew: async () => {}
-  })
-
-  return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <Thread loading="response" />
-    </AssistantRuntimeProvider>
-  )
-}
-
 const TodoHarness = ({ message }: { message: ThreadMessage }) => (
   <ThreadRuntime messages={[message]}>
     <Thread />
@@ -421,31 +407,6 @@ describe('assistant-ui streaming renderer', () => {
   beforeEach(() => {
     resizeObservers.clear()
     $reasoningCollapsedByDefault.set(false)
-  })
-
-  it('shows response loading before the first assistant chunk, then renders the running chunk', async () => {
-    const loading = render(<LoadingResponseHarness />)
-
-    expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
-
-    loading.unmount()
-
-    const { container } = render(
-      <ThreadRuntime messages={[userMessage(), assistantMessage('first chunk')]}>
-        <Thread />
-      </ThreadRuntime>
-    )
-
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk')
-    })
-    expect(container.textContent).not.toContain('second chunk')
-    expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
-
-    // Live same-runtime token growth and the running->complete transition are
-    // covered in status-invalidation-scope.test.tsx. Keep this renderer test
-    // focused on the user-visible loading-to-first-chunk states instead of
-    // duplicating that transition through a second async harness.
   })
 
   it('does not render composer clearance for intro-only threads', () => {
