@@ -179,10 +179,11 @@ DEFAULT_CONFIG = {
         # wrapping Hermes (sandbox runner, managed platform) can describe proxy/credential/ mount
         # layout without editing SOUL.md. Env HERMES_ENVIRONMENT_HINT overrides it.
         "environment_hint": "",
-        # Coding posture: on interactive coding surfaces (CLI, TUI, desktop, ACP) in a code
-        # workspace, add a coding brief + live git/workspace snapshot to the system prompt
-        # (agent/coding_context.py). "auto" = prompt-only when interactive AND cwd is a code
-        # workspace (toolsets untouched, messaging platforms unaffected); "focus" = auto + collapse
+        # Coding posture: CLI/TUI/ACP may infer a code workspace; Desktop stays neutral under
+        # "auto" because a selected project is context, not user intent. Explicit "focus"/"on"
+        # remain available on Desktop. The posture adds a coding brief + live git/workspace
+        # snapshot (agent/coding_context.py). "auto" is prompt-only where inference is allowed
+        # (toolsets untouched, messaging platforms unaffected); "focus" = auto-style detection + collapse
         # toolset to the lean coding set (+ enabled MCP servers) + demote non-coding skill
         # categories to names-only (explicit opt-in); "on" = force everywhere; "off" = disable.
         "coding_context": "auto",
