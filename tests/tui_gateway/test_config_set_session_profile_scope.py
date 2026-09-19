@@ -1,9 +1,8 @@
 """Session-bound config.set persists into the owning session profile."""
 
+import os
 from pathlib import Path
 from unittest.mock import patch
-
-import os
 
 import pytest
 import yaml
