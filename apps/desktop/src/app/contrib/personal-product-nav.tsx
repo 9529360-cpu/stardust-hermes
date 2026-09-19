@@ -1,3 +1,5 @@
+import './personal-product-nav.css'
+
 import { useStore } from '@nanostores/react'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
@@ -9,16 +11,15 @@ import { exitProjectScope } from '@/store/projects'
 import { $selectedStoredSessionId } from '@/store/session'
 
 import {
+  type AppView,
   CRON_ROUTE,
   NEW_CHAT_ROUTE,
+  sessionRoute,
   SETTINGS_ROUTE,
   SKILLS_ROUTE,
-  STARMAP_ROUTE,
-  type AppView,
-  sessionRoute
+  STARMAP_ROUTE
 } from '../routes'
 import type { SidebarNavItem } from '../types'
-import './personal-product-nav.css'
 
 const PRODUCT_NAV_COPY = {
   ar: { conversation: 'المحادثة', knowledge: 'المعرفة', project: 'المشروع', settings: 'الإعدادات', tasks: 'المهام', tools: 'الأدوات' },
