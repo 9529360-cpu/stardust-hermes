@@ -3217,8 +3217,7 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
         "platforms": ("_show_gateway_status", False), "status": ("_show_session_status", False),
         "context": ("_show_context_breakdown", True), "egress": ("_cmd_egress", True),
         "statusbar": ("_cmd_statusbar", True), "verbose": ("_toggle_verbose", False), "yolo": ("_toggle_yolo", False),
-        "compress": ("_manual_compress", True), "subscription": ("_show_subscription", False),
-        "topup": ("_show_billing", True), "insights": ("_show_insights", True), "update": ("_cmd_update", True),
+        "compress": ("_manual_compress", True), "insights": ("_show_insights", True), "update": ("_cmd_update", True),
         "version": ("_cmd_version", True), "paste": ("_handle_paste_command", False), "reload": ("_cmd_reload", True),
         "reload-mcp": ("_confirm_and_reload_mcp", True), "reload-skills": ("_cmd_reload_skills", True),
         "plugins": ("_cmd_plugins", True), "stop": ("_handle_stop_command", False),
@@ -3265,7 +3264,11 @@ class HermesCLI(CLIProcessNotificationsMixin, CLIAgentSetupMixin, CLICommandsMix
             # See #34584.
             self._pending_resume_sessions = None
 
-        entry = self._slash_handler(canonical)
+        # COMMAND_REGISTRY is the built-in slash authority. Private compatibility
+        # methods must not silently resurrect a command removed from the registry
+        # (e.g. retired Nous account commands). Unregistered names remain available
+        # to quick commands, plugins, bundles and skills through the extension path.
+        entry = self._slash_handler(canonical) if _cmd_def is not None else None
         if entry is None:
             return self._process_unregistered_slash(cmd_original, cmd_lower)
         method_name, pass_arg = entry

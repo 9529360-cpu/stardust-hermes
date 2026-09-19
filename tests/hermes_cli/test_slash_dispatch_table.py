@@ -18,7 +18,7 @@ OLD_CHAIN_COMMANDS = [
     "blueprint", "curator", "kanban", "skills", "learn", "init", "memory",
     "platforms", "status", "context", "egress", "statusbar", "diff", "battery",
     "timestamps", "verbose", "focus", "footer", "yolo", "approvals", "reasoning",
-    "fast", "compress", "usage", "subscription", "topup", "insights", "copy",
+    "fast", "compress", "usage", "insights", "copy",
     "debug", "update", "version", "paste", "image", "reload", "reload-mcp",
     "reload-skills", "bundles", "browser", "plugins", "rollback", "snapshot",
     "export", "import", "stop", "agents", "journey", "bg", "btw", "queue",
@@ -48,8 +48,9 @@ def test_registry_names_resolve_into_the_table():
         assert cmd is not None and HermesCLI._slash_handler(cmd.name) is not None, name
     # registry commands the CLI never handled inline must still fall through
     dispatched = {c.name for c in COMMAND_REGISTRY if HermesCLI._slash_handler(c.name)}
-    # /login has no old branch; it resolves through the naming-convention fallback.
-    assert dispatched == set(OLD_CHAIN_COMMANDS) - {"exit"} | {"quit", "login"}
+    # Retired Nous account commands are intentionally absent from COMMAND_REGISTRY;
+    # private compatibility handlers must not make them part of the active dispatch surface.
+    assert dispatched == set(OLD_CHAIN_COMMANDS) - {"exit"} | {"quit"}
 
 
 def _cli():
@@ -87,6 +88,18 @@ def test_dispatch_return_semantics_and_side_effects():
         assert c.process_command("/update") is False
     with patch.object(HermesCLI, "_handle_update_command", return_value=False):
         assert c.process_command("/update") is True
+
+
+def test_retired_account_handler_cannot_bypass_registry():
+    c = _cli()
+    c._console_print = MagicMock()
+
+    with patch.object(HermesCLI, "_handle_login_command") as login, \
+            patch.object(HermesCLI, "_process_unregistered_slash", return_value=True) as fallback:
+        assert c.process_command("/login") is True
+
+    login.assert_not_called()
+    fallback.assert_called_once_with("/login", "/login")
 
 
 def test_unknown_command_falls_through():
