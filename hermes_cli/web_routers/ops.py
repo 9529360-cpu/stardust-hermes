@@ -482,17 +482,30 @@ async def reset_memory(body: MemoryReset):
     if target not in {"all", "memory", "user"}:
         raise HTTPException(status_code=400, detail="target must be all, memory, or user")
 
-    mem_dir = get_hermes_home() / "memories"
+    from tools.memory_tool import MemoryStore
+
     deleted = []
+    reset_targets = []
     for fname, key in _MEMORY_FILES:
-        path = mem_dir / fname
-        if target in {"all", key} and path.exists():
-            try:
-                path.unlink()
-                deleted.append(fname)
-            except OSError as exc:
-                raise HTTPException(status_code=500, detail=f"Could not delete {fname}: {exc}")
-    return {"ok": True, "deleted": deleted}
+        if target not in {"all", key}:
+            continue
+        try:
+            existed = MemoryStore.reset_target(key)
+        except (OSError, RuntimeError) as exc:
+            completed = f" Earlier targets already reset: {', '.join(reset_targets)}." if reset_targets else ""
+            raise HTTPException(
+                status_code=500,
+                detail=f"Could not reset {fname}: {exc}.{completed}",
+            ) from exc
+        reset_targets.append(fname)
+        if existed:
+            deleted.append(fname)
+    return {
+        "ok": True,
+        "deleted": deleted,
+        "reset": reset_targets,
+        "active_session_behavior": "refresh_on_next_turn",
+    }
 
 
 # --- Operations: long-running text-output commands (doctor, audit, backup,
