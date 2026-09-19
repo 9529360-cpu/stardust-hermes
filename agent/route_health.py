@@ -66,8 +66,17 @@ def enabled() -> bool:
 
 
 def state_path() -> Path:
+    """Profile-scoped route-health path.
+
+    An absolute override is honored as an explicit operator choice. Relative overrides
+    are resolved under the active HERMES_HOME rather than the process CWD; otherwise two
+    multiplex profiles with the same relative setting would share one circuit state.
+    """
     configured = str(_config().get("health_file") or "").strip()
-    return Path(configured).expanduser() if configured else get_hermes_home() / "route-health.json"
+    if not configured:
+        return get_hermes_home() / "route-health.json"
+    path = Path(configured).expanduser()
+    return path if path.is_absolute() else get_hermes_home() / path
 
 
 def route_identity(provider: str, model: str, base_url: str = "") -> tuple[str, dict[str, str]]:
