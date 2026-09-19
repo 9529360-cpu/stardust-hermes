@@ -158,6 +158,64 @@ def inject_memory_provider_tools(agent: Any) -> int:
     return added
 
 
+def refresh_memory_tool_surface(agent: Any, *, enabled: bool) -> bool:
+    """Hide/restore the memory tool family on a live agent after a master transition.
+
+    The memory manager owns external-provider schema injection, so keeping the
+    transition logic here avoids a second list of provider tool names in each host.
+    Unrelated tool ordering/state is left untouched.
+    """
+    tools = getattr(agent, "tools", None)
+    if not isinstance(tools, list):
+        return False
+
+    manager = getattr(agent, "_memory_manager", None)
+    registered_provider_names = set()
+    registered = getattr(manager, "registered_tool_names", None)
+    if callable(registered):
+        try:
+            registered_provider_names = set(registered())
+        except Exception:
+            logger.debug("Memory provider tool-name snapshot failed", exc_info=True)
+
+    before_names = {_tool_name(tool) for tool in tools if _tool_name(tool)}
+    memory_names = {"memory"} | registered_provider_names
+
+    if not enabled:
+        agent.tools = [tool for tool in tools if _tool_name(tool) not in memory_names]
+    else:
+        current_names = {_tool_name(tool) for tool in agent.tools if _tool_name(tool)}
+        # A store exists only when this live agent was created with at least one
+        # built-in target enabled. Do not advertise a dead built-in tool on an
+        # agent that started while the master switch was already off.
+        if getattr(agent, "_memory_store", None) is not None and "memory" not in current_names:
+            try:
+                import model_tools
+                definitions = model_tools.get_tool_definitions(
+                    enabled_toolsets=getattr(agent, "enabled_toolsets", None),
+                    disabled_toolsets=getattr(agent, "disabled_toolsets", None),
+                    quiet_mode=True,
+                ) or []
+                memory_schema = next(
+                    (tool for tool in definitions if _tool_name(tool) == "memory"),
+                    None,
+                )
+                if memory_schema is not None:
+                    agent.tools.append(memory_schema)
+            except Exception:
+                logger.warning("Failed to restore built-in memory tool after master enable", exc_info=True)
+        if manager is not None:
+            try:
+                inject_memory_provider_tools(agent)
+            except Exception:
+                logger.warning("Failed to restore external memory tools after master enable", exc_info=True)
+
+    agent.valid_tool_names = {
+        name for name in (_tool_name(tool) for tool in agent.tools) if name
+    }
+    return before_names != set(agent.valid_tool_names)
+
+
 # -- Context fencing helpers --------------------------------------------------
 
 _FENCE_TAG_RE = re.compile(r'</?\s*memory-context\s*>', re.IGNORECASE)
