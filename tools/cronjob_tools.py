@@ -71,31 +71,6 @@ def _dumps(payload: Dict[str, Any]) -> str:
     return json.dumps(payload, indent=2)
 
 
-def _local_session_origin_for_create(deliver: Optional[str], session_id: Optional[str]) -> Optional[Dict[str, str]]:
-    """Capture a durable return route only for implicit/origin local Desktop/TUI jobs.
-
-    Explicit local means save-only, and explicit messaging targets own their delivery. The durable
-    session id survives window/tab churn; the UI session id deliberately is not persisted.
-    """
-    requested = str(deliver or "").strip().lower()
-    if requested not in {"", "origin"}:
-        return None
-    try:
-        from agent.delegation_context import is_delegated_child_context
-        if is_delegated_child_context():
-            return None
-    except Exception:
-        pass
-    try:
-        from gateway.session_context import get_session_env
-        source = str(get_session_env("HERMES_SESSION_SOURCE", "") or "").strip().lower()
-        durable_session_id = str(get_session_env("HERMES_SESSION_ID", "") or session_id or "").strip()
-    except Exception:
-        return None
-    if source not in {"desktop", "tui"} or not durable_session_id:
-        return None
-    return {"source": source, "session_id": durable_session_id}
-
 def _notify_provider_jobs_changed_safe() -> None:
     """Tell the active scheduler provider the job set changed; best-effort, never raises."""
     try:
@@ -622,7 +597,8 @@ def _action_create(a: Dict[str, Any]) -> str:
         context_from = _apply_continuity(context_from, a["continuity"])
 
     from cron.scheduler import CronSchedulerRegistrationError, create_job_with_scheduler_registration
-    local_session_origin = _local_session_origin_for_create(deliver, a.get("session_id"))
+    from cron.session_return import capture_local_session_origin
+    local_session_origin = capture_local_session_origin(deliver, a.get("session_id"))
     try:
         job = create_job_with_scheduler_registration(
             prompt=prompt or "", schedule=a["schedule"], name=a["name"], repeat=a["repeat"],
