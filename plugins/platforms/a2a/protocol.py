@@ -42,12 +42,18 @@ _DEFAULT_MAX_PINGPONG, _HARD_MAX_PINGPONG = 5, 20
 _RATE_LIMIT_DEFAULT, _RATE_WINDOW = 60, 60.0  # requests per minute, window seconds
 
 
-def _env_int(name: str, default: int) -> int:
-    return _coerce_int(os.getenv(name, default), default)
+_UNSET = object()
 
 
-def max_pingpong_turns() -> int:
-    v = _env_int("A2A_MAX_PINGPONG_TURNS", _DEFAULT_MAX_PINGPONG)
+def _env_int(name: str, default: int, raw: Any = _UNSET) -> int:
+    value = os.getenv(name, default) if raw is _UNSET else raw
+    if value in (None, ""):
+        value = default
+    return _coerce_int(value, default)
+
+
+def max_pingpong_turns(raw: Any = _UNSET) -> int:
+    v = _env_int("A2A_MAX_PINGPONG_TURNS", _DEFAULT_MAX_PINGPONG, raw)
     return max(1, min(v, _HARD_MAX_PINGPONG))
 
 
@@ -58,7 +64,8 @@ def now_iso() -> str:
 
 def build_agent_card(*, name: str, url: str, description: str, skills: Optional[list[dict]] = None,
                      streaming: bool = False, push_notifications: bool = False, auth_required: bool = False,
-                     tenant: str = "") -> dict:
+                     tenant: str = "", provider_organization: Optional[str] = None,
+                     provider_url: Optional[str] = None) -> dict:
     """A2A v1.0 Agent Card. ``tenant`` is the optional multi-tenancy routing key on
     AgentInterface; when present, clients MUST echo it in request params."""
     iface: dict[str, Any] = {"url": url, "protocolBinding": "JSONRPC", "protocolVersion": PROTOCOL_VERSION, **({"tenant": tenant} if tenant else {})}
@@ -67,7 +74,16 @@ def build_agent_card(*, name: str, url: str, description: str, skills: Optional[
         "description": description,
         "url": url,  # convenience for pre-1.0 clients; canonical is supportedInterfaces
         "version": "1.0.0",
-        "provider": {"organization": os.getenv("A2A_PROVIDER_ORG", "Hermes Agent"), "url": os.getenv("A2A_PROVIDER_URL", "") or url},
+        "provider": {
+            "organization": (
+                os.getenv("A2A_PROVIDER_ORG", "Hermes Agent")
+                if provider_organization is None else provider_organization
+            ),
+            "url": (
+                os.getenv("A2A_PROVIDER_URL", "")
+                if provider_url is None else provider_url
+            ) or url,
+        },
         "supportedInterfaces": [iface],
         "capabilities": {"streaming": streaming, "pushNotifications": push_notifications,
                          "stateTransitionHistory": False, "extendedAgentCard": False},
@@ -245,18 +261,18 @@ class TurnTracker:
 class RateLimiter:
     """Sliding-window request limiter, one bucket per authenticated identity."""
 
-    def __init__(self) -> None:
+    def __init__(self, limit: Any = _UNSET) -> None:
         self._buckets: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
+        self._limit = max(1, _env_int("A2A_RATE_LIMIT", _RATE_LIMIT_DEFAULT, limit))
 
     def allow(self, identity: str) -> bool:
         with self._lock:
-            limit = max(1, _env_int("A2A_RATE_LIMIT", _RATE_LIMIT_DEFAULT))
             now = time.time()
             bucket = self._buckets[identity]
             while bucket and now - bucket[0] > _RATE_WINDOW:
                 bucket.popleft()
-            if len(bucket) >= limit:
+            if len(bucket) >= self._limit:
                 return False
             bucket.append(now)
             return True
