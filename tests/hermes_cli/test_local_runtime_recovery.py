@@ -21,6 +21,25 @@ def _wait_for(predicate, timeout=10):
         time.sleep(0.05)
     assert predicate(), "process transition did not complete"
 
+def _wait_for_json(path: Path, timeout=10):
+    """Wait for the test child to publish a complete JSON handshake.
+
+    Path existence alone is racy on Windows: opening with "w" creates a zero-byte
+    file before json.dump() has written the payload.
+    """
+    deadline = time.monotonic() + timeout
+    last_error = None
+    while time.monotonic() < deadline:
+        try:
+            text = path.read_text(encoding="utf-8")
+            if text:
+                return json.loads(text)
+        except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
+            last_error = exc
+        time.sleep(0.05)
+    pytest.fail(f"JSON handshake was not published: {last_error}")
+
+
 
 @pytest.mark.windows_only
 @pytest.mark.parametrize("case", [
@@ -73,8 +92,7 @@ def test_startup_preserves_trees_and_explicit_stop_checks_owner(tmp_path, monkey
     owner_identity = json.loads(owner.stdout.readline())
     processes = []
     try:
-        _wait_for(ready.exists)
-        record = json.loads(ready.read_text())
+        record = _wait_for_json(ready)
         processes = [psutil.Process(record[k]) for k in ("router", "child")]
         if case != "live-owner":
             owner.wait(timeout=10)

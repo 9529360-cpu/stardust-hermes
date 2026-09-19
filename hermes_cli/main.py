@@ -2325,6 +2325,15 @@ def cmd_update(args):
     )
     return
 
+
+def _run_update_transaction(args):
+    """Run the retained transaction engine without exposing it as a CLI update path.
+
+    Stardust keeps the mature lock/receipt/rollback/restart machinery as an internal,
+    regression-tested recovery primitive for a future Stardust-native updater. It is
+    deliberately not reachable from cmd_update and does not weaken the pinned public
+    source-authority boundary.
+    """
     if _update_preflight_handled(args):
         return
     gateway_mode = getattr(args, "gateway", False)
