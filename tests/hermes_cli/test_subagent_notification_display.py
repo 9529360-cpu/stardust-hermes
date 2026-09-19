@@ -106,7 +106,8 @@ def test_completion_display_keeps_payload_separate_across_surfaces(monkeypatch, 
         "status": "completed", "summary": "Markets are quiet.",
     }
     cron_payload = format_process_notification(cron_event)
-    assert cron_payload.startswith("[CRON JOB COMPLETE - Morning brief (job-1)]")
+    assert cron_payload.startswith("[ASYNC DELEGATION COMPLETE — cron_exec-1]")
+    assert "Scheduled cron job: Morning brief (job-1)" in cron_payload
     assert "Markets are quiet." in cron_payload
     from tools.process_registry_notifications import async_delegation_display_text
     assert async_delegation_display_text(cron_event) == "Cron Job Completed: Morning brief"
