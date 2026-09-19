@@ -268,7 +268,13 @@ def _detect_profile(mode: str, platform: str, cwd: Path) -> ContextProfile:
         return GENERAL_PROFILE
     if mode == "on":
         return CODING_PROFILE
-    if platform and platform.strip().lower() not in INTERACTIVE_CODING_PLATFORMS:
+    surface = platform.strip().lower() if platform else ""
+    # Desktop is the general personal-assistant surface: a selected project is context,
+    # not evidence that the user intends coding work. Keep auto neutral there; explicit
+    # focus/on remain available for users who deliberately want the coding posture.
+    if mode == "auto" and surface == "desktop":
+        return GENERAL_PROFILE
+    if surface and surface not in INTERACTIVE_CODING_PLATFORMS:
         return GENERAL_PROFILE
     if _marker_root(cwd) is not None:
         return CODING_PROFILE
