@@ -833,11 +833,13 @@ Every plugin — enabled or not — inventories in **Capabilities → Plugins**,
 user toggles it live (no app restart), reveals its folder, or rescans. The user's
 choice is remembered:
 
-- No choice yet → the plugin's own `defaultEnabled` (default `true`). Set
-  `defaultEnabled: false` to ship an opt-in plugin that stays dark until the user
-  flips it on.
+- No choice yet → **bundled, reviewed in-tree plugins** may use their shipped
+  `defaultEnabled`. External `disk` / `runtime` code stays disabled regardless
+  of its own metadata until the user explicitly enables it.
 - Explicit choice → persisted and honored across restarts. A disabled plugin
-  stays disabled — don't fight it; the user turned you off.
+  stays disabled — don't fight it; the user turned you off. Enabling non-bundled
+  Desktop code first shows a trust confirmation naming the source and pinned SHA
+  when known.
 
 Persist your own state with `ctx.storage`, namespaced to your plugin
 (`hermes.plugin.<id>.*`) so plugins can't read or clobber each other:
@@ -873,12 +875,17 @@ authority** — the React singleton, the whole SDK (`host.request` gateway RPC,
 isolation only**: a plugin can't crash the app (contributions are error-bounded,
 listeners isolated), but it can do anything the app can.
 
-This is acceptable for **local** sources — a disk file can already run code on
-your machine — which is why the disk door only loads local files you (or your
-agent) wrote. The optional `integrity` (`sha256-…`) check only proves the bytes
-match a hash; it does **not** sandbox. A future remote-source door will need a
-real boundary (iframe/worker + CSP + capability gating) before it can land; do
-not treat this pipeline as a trust boundary.
+This is a **full-trust extension model**, not capability isolation. External
+Desktop code is inventoried inert and the user must explicitly trust it before
+activation. **Capabilities → Plugins** distinguishes bundled vs disk/runtime
+code, and the enable confirmation shows the source plus pinned SHA when the
+package recorded one. Declared tools/hooks/capabilities are descriptive metadata
+only; they do not constrain what renderer code can do.
+
+The optional `integrity` (`sha256-…`) check only proves the bytes match a hash;
+it does **not** sandbox. A future remote-source door that wants capability-level
+isolation needs a real boundary (sandboxed iframe/worker/separate process +
+CSP/message mediation); do not treat this pipeline or its metadata as one.
 
 ## Pitfalls
 

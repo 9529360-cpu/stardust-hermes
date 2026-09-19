@@ -509,7 +509,7 @@ export const en: Translations = {
     plugins: {
       title: 'Desktop plugins',
       blurb:
-        'Extend this app, not an agent — installed once for the whole app, whichever profile, gateway, or machine you connect to. Bundled or dropped into the desktop-plugins folder; toggles apply live.',
+        'Extend this app, not an agent — installed once for the whole app. Bundled plugins are reviewed app code; external disk/runtime plugins stay off until you explicitly trust them. When enabled, external Desktop code runs with Stardust app authority.',
       count: n => `${n} installed`,
       openFolder: 'Open plugins folder',
       rescan: 'Rescan',
@@ -518,6 +518,10 @@ export const en: Translations = {
       disable: 'Disable',
       failed: 'failed',
       empty: 'No desktop plugins installed yet.',
+      externalTrustTitle: name => `Trust Desktop code from ${name}?`,
+      externalTrustDescription: (source, pinnedSha) =>
+        `Enabling this external Desktop plugin executes trusted code inside Stardust's renderer with the same app authority as Stardust itself. Declared tools, hooks, middleware, and capabilities are descriptive metadata — they are not a sandbox or enforcement boundary. Source: ${source}.${pinnedSha ? ` Pinned SHA: ${pinnedSha}.` : ' No pinned SHA is recorded for this Desktop copy.'}`,
+      externalTrustConfirm: 'Enable trusted code',
       kinds: { bundled: 'bundled', disk: 'on disk', runtime: 'runtime' },
       agentHalfMissing: 'agent half missing here',
       agentHalfMissingTip:
@@ -546,6 +550,8 @@ export const en: Translations = {
         desktopTarget: "Installs into this app's local desktop-plugins folder",
         desktopTargetFromPackage: 'Loaded into this app from the package above — same for every profile',
         desktopOnlyNote: 'Desktop-only packages do not install a backend agent plugin.',
+        desktopAuthorityWarning:
+          'External Desktop code is installed inert. If you enable it later, it executes inside Stardust\'s renderer with the same app authority as Stardust itself. Declared capabilities are descriptive metadata, not an enforcement boundary.',
         insecureWarning: 'This URL uses an insecure or local scheme. Prefer https:// or git@ for production installs.',
         securityHeading: 'Before you install',
         securityIntro:

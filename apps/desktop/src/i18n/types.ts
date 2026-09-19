@@ -464,6 +464,9 @@ export interface Translations {
       disable: string
       failed: string
       empty: string
+      externalTrustTitle: (name: string) => string
+      externalTrustDescription: (source: string, pinnedSha: string) => string
+      externalTrustConfirm: string
       kinds: { bundled: string; disk: string; runtime: string }
       agentHalfMissing: string
       agentHalfMissingTip: string
@@ -489,6 +492,7 @@ export interface Translations {
         desktopTarget: string
         desktopTargetFromPackage: string
         desktopOnlyNote: string
+        desktopAuthorityWarning: string
         insecureWarning: string
         securityHeading: string
         securityIntro: string

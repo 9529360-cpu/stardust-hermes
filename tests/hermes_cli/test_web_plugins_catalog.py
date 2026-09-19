@@ -61,6 +61,9 @@ def test_catalog_endpoint_merges_installed_state_from_sidecar(client):
     [entry] = data["entries"]
     assert (entry["name"], entry["sha_short"], entry["capabilities"]["provides_tools"]) == ("alpha-plugin", VALID_SHA[:7], ["tool_a"])
     assert "tool_a" in entry["capability_summary"]
+    assert "descriptive metadata, not a security boundary" in entry["capability_summary"]
+    assert "Desktop code" in entry["capability_summary"]
+    assert "full app authority" in entry["capability_summary"]
     assert (entry["installed"], entry["installed_sha"], entry["update_available"]) == (True, OTHER_SHA, True)
     assert entry["runtime_status"] == "inactive"
     assert data["removed"][0]["reason"] == "exfiltrated env vars"
