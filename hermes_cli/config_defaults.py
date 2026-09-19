@@ -2157,7 +2157,7 @@ DEFAULT_CONFIG = {
         "profile_build": "ask",
     },
     # Privacy-safe aggregate metrics in this profile's local telemetry dir. Collection (`enabled`)
-    # and transmission to Nous (`send`) are SEPARATE opt-ins; see
+    # and remote transmission (`send`) are SEPARATE opt-ins; see
     # website/docs/developer-guide/relay-shared-metrics.md Appendix A for consent/retention.
     "telemetry": {
         "shared_metrics": {
@@ -2165,9 +2165,9 @@ DEFAULT_CONFIG = {
             # Requires `enabled` (`send` alone logs an error). A package is sent only if its whole
             # period is inside a recorded consent window.
             "send": False,
-            # Ingest endpoint (override for staging/local). Deliberately NOT env- overridable.
-            # Non-HTTPS refused unless the host is localhost.
-            "endpoint": "https://telemetry.nousresearch.com/v1/telemetry",
+            # No implicit remote telemetry authority in Stardust. Operators may set an explicit
+            # HTTPS endpoint (loopback HTTP is allowed for local testing); never env-overridable.
+            "endpoint": "",
         },
     },
 

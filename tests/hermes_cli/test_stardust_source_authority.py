@@ -205,3 +205,16 @@ def test_desktop_ssh_recovery_installs_stardust_source() -> None:
     assert STARDUST_INSTALL_BASE in source
     assert UPSTREAM_INSTALL_HOST not in source
 
+
+
+
+def test_normal_stardust_setup_never_offers_nous_telemetry() -> None:
+    setup = _read("hermes_cli/setup.py")
+    tools = _read("hermes_cli/tools_config.py")
+    defaults = _read("hermes_cli/config_defaults.py")
+    example = _read("cli-config.yaml.example")
+
+    assert "Send shared metrics to Nous?" not in setup
+    assert "sending to Nous" not in tools
+    assert "telemetry.nousresearch.com" not in defaults
+    assert "telemetry.nousresearch.com" not in example

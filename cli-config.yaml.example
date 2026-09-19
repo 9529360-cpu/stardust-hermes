@@ -1963,7 +1963,7 @@ telemetry:
   shared_metrics:
     enabled: false
     send: false
-    # endpoint: https://telemetry.nousresearch.com/v1/telemetry
+    # endpoint: https://metrics.your-domain.example/v1/telemetry
 
 
 # =============================================================================

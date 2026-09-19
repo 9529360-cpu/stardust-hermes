@@ -496,43 +496,69 @@ def setup_tools(config: dict, first_install: bool = False):
 
 
 _SEND_CONSENT_EXPLAINER = (
-    "", "Sending uploads each daily package to the Nous telemetry",
-    "service. Packages carry your profile-scoped install ID, a",
-    "stable random UUID that identifies this profile across days",
-    "(it contains no personal information and is reset by deleting",
-    "the shared-metrics directory). Only packages whose entire",
-    "collection period falls inside a recorded consent window are",
-    "ever sent — data from before you opt in, or from any gap",
-    "while sending was off, stays on this machine. Sending can be", "turned off again at any time.",
+    "",
+    "Remote sending uploads each daily package only to the HTTPS endpoint",
+    "you explicitly configured. Packages carry your profile-scoped install",
+    "ID, a stable random UUID that identifies this profile across days",
+    "(it contains no personal information and is reset by deleting the",
+    "shared-metrics directory). Only packages whose entire collection",
+    "period falls inside a recorded consent window are ever sent — data",
+    "from before you opt in, or from any gap while sending was off, stays",
+    "on this machine. Sending can be turned off again at any time.",
 )
 
 
+def _configured_shared_metrics_endpoint(shared_metrics: dict) -> str:
+    """A user-owned remote endpoint that Stardust is willing to send to, else empty."""
+    from hermes_cli.observability.shared_metrics_send_config import (
+        LEGACY_UPSTREAM_ENDPOINT,
+        _endpoint_is_safe,
+    )
+
+    endpoint = str(shared_metrics.get("endpoint") or "").strip()
+    if not endpoint or endpoint.rstrip("/") == LEGACY_UPSTREAM_ENDPOINT.rstrip("/"):
+        return ""
+    return endpoint if _endpoint_is_safe(endpoint) else ""
+
+
 def setup_telemetry(config: dict):
-    """Configure the local shared-metrics subscriber and optional sending."""
+    """Configure local shared metrics and, only with an explicit safe endpoint, remote sending."""
     print_header("Shared Metrics")
-    _info("Shared metrics contain only bounded counters and histograms.",
-          "Collection is local. Sending them to Nous is a separate opt-in.")
+    _info(
+        "Shared metrics contain only bounded counters and histograms.",
+        "Collection stays local unless you explicitly configure a remote HTTPS endpoint.",
+    )
     shared_metrics = _sub_dict(_sub_dict(config, "telemetry"), "shared_metrics")
     current = shared_metrics.get("enabled") is True
     shared_metrics["enabled"] = prompt_yes_no("Enable local shared metrics?", default=current)
     if not shared_metrics["enabled"]:
         print_info("Local shared metrics disabled.")
-        # Sending cannot outlive collection (send=true would log an error every run, never send).
         if shared_metrics.get("send") is True:
             shared_metrics["send"] = False
             print_info("Sending shared metrics disabled as well.")
-        # Turning collection off withdraws send consent too. Recorded unconditionally: the send
-        # key may already be false while the consent window is still open, and it must close.
         _record_send_consent_change(enabled=False)
         return
+
     print_success("Local shared metrics enabled.")
+    if not _configured_shared_metrics_endpoint(shared_metrics):
+        shared_metrics["send"] = False
+        _record_send_consent_change(enabled=False)
+        print_info(
+            "Remote sending is disabled. Configure telemetry.shared_metrics.endpoint "
+            "to an operator-owned HTTPS endpoint to enable it; collection stays local."
+        )
+        return
+
     _info(*_SEND_CONSENT_EXPLAINER)
-    shared_metrics["send"] = prompt_yes_no("Send shared metrics to Nous?", default=shared_metrics.get("send") is True)
+    shared_metrics["send"] = prompt_yes_no(
+        "Send shared metrics to the configured endpoint?",
+        default=shared_metrics.get("send") is True,
+    )
     _record_send_consent_change(enabled=shared_metrics["send"])
     if shared_metrics["send"]:
-        print_success("Sending shared metrics enabled.")
+        print_success("Remote shared-metrics sending enabled.")
     else:
-        print_info("Sending shared metrics disabled (collection stays local).")
+        print_info("Remote sending disabled (collection stays local).")
 
 
 def _record_send_consent_change(*, enabled: bool) -> None:

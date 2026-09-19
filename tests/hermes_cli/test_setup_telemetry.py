@@ -80,3 +80,88 @@ def test_setup_parser_accepts_telemetry_section():
 
     assert args.section == "telemetry"
     assert args.func is handler
+
+
+
+def test_remote_metrics_stay_off_without_explicit_endpoint(monkeypatch):
+    prompts = []
+    consent = []
+    config = {}
+
+    def answer(question, default):
+        prompts.append(question)
+        return True
+
+    monkeypatch.setattr("hermes_cli.setup.prompt_yes_no", answer)
+    monkeypatch.setattr(
+        "hermes_cli.setup._record_send_consent_change",
+        lambda *, enabled: consent.append(enabled),
+    )
+
+    setup_telemetry(config)
+
+    shared = config["telemetry"]["shared_metrics"]
+    assert shared == {"enabled": True, "send": False}
+    assert prompts == ["Enable local shared metrics?"]
+    assert consent == [False]
+
+
+def test_remote_metrics_can_target_an_explicit_operator_endpoint(monkeypatch):
+    prompts = []
+    consent = []
+    config = {
+        "telemetry": {
+            "shared_metrics": {
+                "enabled": False,
+                "send": False,
+                "endpoint": "https://metrics.example.test/v1/telemetry",
+            }
+        }
+    }
+
+    def answer(question, default):
+        prompts.append(question)
+        return True
+
+    monkeypatch.setattr("hermes_cli.setup.prompt_yes_no", answer)
+    monkeypatch.setattr(
+        "hermes_cli.setup._record_send_consent_change",
+        lambda *, enabled: consent.append(enabled),
+    )
+
+    setup_telemetry(config)
+
+    shared = config["telemetry"]["shared_metrics"]
+    assert shared["enabled"] is True
+    assert shared["send"] is True
+    assert prompts == [
+        "Enable local shared metrics?",
+        "Send shared metrics to the configured endpoint?",
+    ]
+    assert consent == [True]
+
+
+def test_legacy_upstream_metrics_endpoint_is_never_reenabled(monkeypatch):
+    consent = []
+    config = {
+        "telemetry": {
+            "shared_metrics": {
+                "enabled": True,
+                "send": True,
+                "endpoint": "https://telemetry.nousresearch.com/v1/telemetry",
+            }
+        }
+    }
+
+    monkeypatch.setattr("hermes_cli.setup.prompt_yes_no", lambda _question, default: True)
+    monkeypatch.setattr(
+        "hermes_cli.setup._record_send_consent_change",
+        lambda *, enabled: consent.append(enabled),
+    )
+
+    setup_telemetry(config)
+
+    shared = config["telemetry"]["shared_metrics"]
+    assert shared["enabled"] is True
+    assert shared["send"] is False
+    assert consent == [False]
