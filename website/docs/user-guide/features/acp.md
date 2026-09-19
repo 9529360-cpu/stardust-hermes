@@ -351,10 +351,12 @@ approvals:
 ```
 
 The startup log prints `Initialize from <name>` so you can verify the exact
-name. Trust is captured when the ACP connection initializes and is then fixed
-for that connection/turn; changing the config does not retroactively authorize
-an already-running turn. Unknown clients and known programmatic hosts such as
-Buzz remain deny-only unless explicitly listed.
+name. ACP client names are self-reported by the local host, not cryptographic
+identities, so only trust launch configurations and host software you control.
+Trust is captured when the ACP connection initializes and is then fixed for
+that connection/turn; changing the config does not retroactively authorize an
+already-running turn. Unknown clients and known programmatic hosts such as Buzz
+remain deny-only unless explicitly listed.
 
 For a trusted interactive client, dangerous-command options keep their normal
 semantics:
