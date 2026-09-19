@@ -118,13 +118,13 @@ CATALOG: List[CatalogEntry] = [
 ]
 
 
-# A connected account unlocks only the automations whose required source is unambiguous.
-# Reuse each catalog entry's OWN dedup key so a user who already accepted or dismissed that
-# automation is never nagged again just because the capability became available later.
-_INTEGRATION_CATALOG_KEYS: Dict[str, tuple[str, ...]] = {
-    "gmail": ("catalog:important-mail-monitor",),
-    "outlook": ("catalog:important-mail-monitor",),
-    "googlecalendar": ("catalog:daily-briefing",),
+# A connected account unlocks only automations whose required source is unambiguous.
+# The first item is the existing suggestion dedup key (preserves prior user decisions); the
+# second is the richer Automation Blueprint used to build the actual job with its procedure skill.
+_INTEGRATION_BLUEPRINTS: Dict[str, tuple[tuple[str, str], ...]] = {
+    "gmail": (("catalog:important-mail-monitor", "important-mail"),),
+    "outlook": (("catalog:important-mail-monitor", "important-mail"),),
+    "googlecalendar": (("catalog:daily-briefing", "morning-brief"),),
 }
 
 
@@ -140,21 +140,28 @@ def seed_integration_suggestions(
     if add_fn is None:
         from cron.suggestions import add_suggestion as add_fn  # type: ignore[assignment]
 
+    from cron.blueprint_catalog import fill_blueprint, get_blueprint
+
     by_key = {entry.key: entry for entry in CATALOG}
     created: List[Dict[str, Any]] = []
     offered: set[str] = set()
     for raw in connectors:
         connector = str(raw or "").strip().lower()
-        for key in _INTEGRATION_CATALOG_KEYS.get(connector, ()):
+        for key, blueprint_key in _INTEGRATION_BLUEPRINTS.get(connector, ()):
             if key in offered:
                 continue
             offered.add(key)
             entry = by_key.get(key)
-            if entry is None:
+            blueprint = get_blueprint(blueprint_key)
+            if entry is None or blueprint is None:
                 continue
+            job_spec = fill_blueprint(blueprint, {})
+            # Keep the long-standing suggestion/job display name while gaining the blueprint's
+            # richer prompt + skill procedure. Dedup and user-visible naming therefore stay stable.
+            job_spec["name"] = entry.title
             rec = add_fn(
                 title=entry.title, description=entry.description, source="integration",
-                job_spec=dict(entry.job_spec), dedup_key=entry.key,
+                job_spec=job_spec, dedup_key=entry.key,
             )
             if rec is not None:
                 created.append(rec)
