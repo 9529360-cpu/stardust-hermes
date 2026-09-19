@@ -1560,6 +1560,12 @@ export interface Translations {
       installAgentHereNoOrigin: string
       desktopHalfPending: string
       desktopHalfPendingTip: string
+      desktopFullAccessBadge: string
+      desktopTrustWarning: string
+      desktopTrustTitle: (name: string) => string
+      desktopTrustConfirm: string
+      desktopTrustSource: (repo: string, sha: string) => string
+      desktopTrustLocalSource: string
       emptyAll: string
       empty: string
       emptyHint: string
