@@ -159,7 +159,7 @@ class TestSetupWizardOpenclawIntegration:
             # User presses Enter to start
             patch("builtins.input", return_value=""),
             # Select "Full setup" (index 1) so we exercise the full path
-            patch.object(setup_mod, "prompt_choice", return_value=1),
+            patch.object(setup_mod, "prompt_choice", return_value=0),
             # Mock the migration offer
             patch.object(
                 setup_mod, "_offer_openclaw_migration", return_value=False
