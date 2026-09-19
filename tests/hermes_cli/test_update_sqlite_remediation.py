@@ -62,7 +62,8 @@ def test_summary_withholds_success_when_sqlite_remediation_failed(capsys, monkey
     assert "SQLite (3.46.1)" in out
     assert "WAL" not in out
     assert "venv" not in out
-    assert "install.sh | bash" in out
+    assert "install-stardust.sh" in out
+    assert "install.sh | bash" not in out
     assert "hermes doctor" in out
 
 
@@ -83,10 +84,10 @@ def test_sqlite_partial_message_is_shared_and_names_windows_installer(capsys, mo
 
     for out in (verified_out, summary_out):
         assert "known corruption bug" in out
-        assert "install.ps1" in out
-        assert "install.sh" not in out
+        assert "install-stardust.ps1" in out
+        assert "install-stardust.sh" not in out
         assert "hermes doctor" in out
-    fix_line = next(line for line in verified_out.splitlines() if "install.ps1" in line)
+    fix_line = next(line for line in verified_out.splitlines() if "install-stardust.ps1" in line)
     assert fix_line in summary_out.splitlines()
 
 

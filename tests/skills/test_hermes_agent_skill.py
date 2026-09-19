@@ -1,12 +1,10 @@
-"""The `hermes-agent` skill is what a running Hermes knows about itself.
+"""The `hermes-agent` compatibility skill is a routing hub for Stardust.
 
-`website/` is never packaged, so an installed Hermes has no local copy of the
-user guide; skills ARE synced into `$HERMES_HOME/skills/`. The skill therefore
-does not try to restate the product — it routes to the published `llms.txt`,
-which is generated from the docs tree on every build and so can never be behind
-the feature set. These tests keep that routing honest: the index has to be where
-the skill says it is, and every reference has to be reachable, otherwise a
-shipped feature is invisible and the agent answers "Hermes can't do that."
+`website/` is never packaged, so an installed runtime relies on synced skill
+references plus the live Stardust repository for product documentation. These
+tests keep that routing honest: every local reference must be reachable and the
+catch-all must point at Stardust's authoritative documentation/source rather
+than the retired upstream docs domain.
 """
 
 from __future__ import annotations
@@ -52,18 +50,19 @@ def test_every_reference_is_reachable_from_the_skill(skill_text):
     )
 
 
-def test_unknown_features_route_to_the_published_index(skill_text):
-    """The catch-all is what makes coverage of the whole product possible."""
-    assert "/docs/llms.txt" in skill_text
-    # web_extract can be disabled; terminal never is.
-    assert "curl" in skill_text, "no way to reach the index without web tools"
+def test_unknown_features_route_to_stardust_docs_source(skill_text):
+    """The catch-all must resolve to the current product authority."""
+    docs_tree = "https://github.com/9529360-cpu/stardust-hermes/tree/main/website/docs"
+    assert docs_tree in skill_text
+    assert "hermes-agent.nousresearch.com/docs" not in skill_text
 
 
-def test_the_index_is_published_where_the_skill_says_it_is(skill_text):
-    """A skill pointing at a URL nobody generates is worse than no routing."""
+def test_docs_authority_matches_the_generator(skill_text):
+    """The skill and llms generator must agree on the owning repository."""
     spec = importlib.util.spec_from_file_location("generate_llms_txt", GENERATOR)
     assert spec is not None and spec.loader is not None
     gen = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gen)
 
-    assert f"{gen.SITE_BASE}/llms.txt" in skill_text
+    assert gen.REPO_URL in skill_text
+    assert f"{gen.REPO_URL}/tree/main/website/docs" in skill_text
