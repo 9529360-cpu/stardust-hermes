@@ -256,10 +256,11 @@ def _capture_acp_approval_trust(
 
     trusted_names: set[str] = set()
     try:
-        from hermes_cli.config import load_config
+        # Reuse the approval subsystem's read-only config authority. ACP trust is
+        # an approval decision, not a second config-loading policy.
+        from tools.approval_context import _get_approval_config
 
-        cfg = load_config() or {}
-        approvals = cfg.get("approvals") if isinstance(cfg, dict) else {}
+        approvals = _get_approval_config()
         raw = approvals.get("acp_trusted_clients", []) if isinstance(approvals, dict) else []
         if isinstance(raw, (list, tuple, set)):
             trusted_names = {
