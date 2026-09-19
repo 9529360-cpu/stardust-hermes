@@ -94,6 +94,8 @@ describe('Install from Git entry flow', () => {
             : 'Loaded into this app from the package above — same for every profile'
         )
       ).toBeTruthy()
+      expect(screen.getByText(/External Desktop code is installed inert/)).toBeTruthy()
+      expect(screen.getByText(/same app authority as Stardust itself/)).toBeTruthy()
       expect(requestGateway).not.toHaveBeenCalledWith('plugins.manage', expect.objectContaining({ action: 'install' }))
       expect(installDesktopPlugin).not.toHaveBeenCalled()
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
