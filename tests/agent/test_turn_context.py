@@ -219,6 +219,21 @@ class _RefreshStore:
         self.loaded += 1
 
 
+def test_memory_refresh_invalidates_prompt_when_master_switch_turns_off():
+    agent = _FakeAgent()
+    agent._memory_persistence_enabled = True
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = _RefreshStore(stale=False, before="a" * 16, after="a" * 16)
+
+    with patch("tools.memory_tool.memory_persistence_enabled", return_value=False):
+        assert _refresh_builtin_memory_snapshot(agent) is True
+
+    assert agent._memory_persistence_enabled is False
+    assert agent._memory_store.loaded == 0
+    assert agent._cached_system_prompt is None
+    assert agent._cached_system_prompt_static is None
+
+
 def test_memory_refresh_preserves_prompt_when_disk_is_unchanged():
     agent = _FakeAgent()
     agent._cached_system_prompt_static = "STATIC"
