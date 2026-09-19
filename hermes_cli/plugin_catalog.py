@@ -279,7 +279,12 @@ def get_live_catalog_entry(name: str) -> Optional[PluginCatalogEntry]:
 # ── Human summaries ──────────────────────────────────────────────────────────
 
 def entry_capability_summary(entry: PluginCatalogEntry) -> str:
-    """One paragraph shown at install/enable prompts: what the user is granting."""
+    """Declared package metadata for install/enable prompts.
+
+    These declarations are descriptive, not a security boundary. A package that
+    includes Desktop code receives the Desktop runtime authority described by the
+    host when that code is explicitly enabled, regardless of this metadata.
+    """
     caps = entry.capabilities
     parts = [f"{label} {', '.join(items)}" for label, items in (
         ("registers tool(s):", caps.provides_tools), ("hook(s):", caps.provides_hooks),
@@ -288,6 +293,11 @@ def entry_capability_summary(entry: PluginCatalogEntry) -> str:
     if entry.description:
         bits.append(entry.description)
     bits.append(f"This plugin {'; '.join(parts) if parts else 'declares no tools, hooks, middleware, or env vars'}.")
+    bits.append(
+        "Declared capabilities are descriptive metadata, not a security boundary. "
+        "If this package includes Desktop code, enabling that code grants the Desktop runtime authority "
+        "shown by Stardust at the enable decision."
+    )
     if entry.platforms:
         bits.append(f"Platforms: {', '.join(entry.platforms)}.")
     if entry.requires_hermes:
