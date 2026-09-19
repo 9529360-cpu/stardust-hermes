@@ -422,7 +422,7 @@ def fire_claim_fence(job_id: str, *, expected_owner: str):
 
 # Fields that must never change after creation: ``id`` is a path component under OUTPUT_DIR, so an
 # update could leak ``../escape``/absolute/nested values into output writes/deletes.
-_IMMUTABLE_JOB_FIELDS = frozenset({"id"})
+_IMMUTABLE_JOB_FIELDS = frozenset({"id", "local_session_origin"})
 
 
 def _job_output_dir(job_id: str) -> Path:
@@ -1641,6 +1641,22 @@ def _normalize_failure_deliver(value: Any) -> Optional[str]:
     return _normalize_job_optional_text(value)
 
 
+def _normalize_local_session_origin(value: Any) -> Optional[Dict[str, str]]:
+    """Trusted local conversation return route captured by the cron tool.
+
+    The job store is profile-local, so the durable session id + local surface are sufficient;
+    UI tab ids are intentionally excluded because they die when the window closes. Direct
+    callers cannot smuggle arbitrary route metadata into a scheduled delivery.
+    """
+    if not isinstance(value, dict):
+        return None
+    session_id = str(value.get("session_id") or "").strip()
+    source = str(value.get("source") or "").strip().lower()
+    if not session_id or source not in {"desktop", "tui"}:
+        return None
+    return {"session_id": session_id, "source": source}
+
+
 def _normalize_reasoning_effort(value: Any) -> Optional[str]:
     """Spelling-only validation via the shared parser (cron knob never stricter/looser than
     config.yaml); model capability is deliberately NOT checked (model unknowable at create time,
@@ -1778,6 +1794,7 @@ def create_job(
     repeat: Optional[int] = None,
     deliver: Optional[str] = None,
     origin: Optional[Dict[str, Any]] = None,
+    local_session_origin: Optional[Dict[str, Any]] = None,
     skill: Optional[str] = None,
     skills: Optional[List[str]] = None,
     model: Optional[str] = None,
@@ -1804,6 +1821,7 @@ def create_job(
     injected. workdir: absolute cwd for tools/scripts. monitor_script/monitor_url: cheap monitor
     source run FIRST each tick; unchanged output suppresses the agent run (mutually exclusive,
     incompatible with ``no_agent``). reasoning_effort: per-job pin; capability NOT validated."""
+    local_session_origin = _normalize_local_session_origin(local_session_origin)
     if not isinstance(paused, bool):
         raise ValueError("paused must be a boolean.")
     if paused_reason is not None and not isinstance(paused_reason, str):
@@ -1887,10 +1905,10 @@ def create_job(
     }
     # Optional keys are persisted only when explicitly set: an absent key falls back to global
     # config (attach/reasoning) or to ``deliver`` (failure_deliver), byte-identical to pre-feature
-    # jobs.
+    # jobs. local_session_origin is an internal return route, never a user-editable delivery target.
     for key, value in (
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
-        ("failure_deliver", f["failure_deliver"]),
+        ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
     ):
         if value is not None:
             job[key] = value
