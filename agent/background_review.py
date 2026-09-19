@@ -948,6 +948,8 @@ def build_cache_parity_fork(
         review_agent._memory_store = None
         review_agent._memory_enabled = False
         review_agent._user_profile_enabled = False
+        from agent.memory_manager import refresh_memory_tool_surface
+        refresh_memory_tool_surface(review_agent, enabled=False)
     # OFF -> ON transition: keep the fork constructor's current-config memory
     # state. Copying the stale parent's None/False state here would create a
     # dead advertised memory surface until the parent itself is rebuilt.
