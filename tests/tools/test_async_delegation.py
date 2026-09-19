@@ -122,6 +122,50 @@ def test_connect_preserves_wal_and_applies_macos_durability_barriers(
         conn.close()
 
 
+def test_publish_durable_completion_is_idempotent_and_enqueued(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+    assert ad.publish_durable_completion(
+        delegation_id="cron_exec_1", session_key="desktop-session",
+        parent_session_id="desktop-session", goal="Morning brief", summary="All clear",
+        role="cron_run", event_metadata={"cron_job_id": "job-1", "cron_job_name": "Morning brief"},
+    ) is True
+    event = _drain_for("cron_exec_1")
+    assert event is not None
+    assert event["session_key"] == "desktop-session"
+    assert event["role"] == "cron_run"
+    durable = ad.get_durable_delegation("cron_exec_1")
+    assert durable is not None
+    assert durable["delivery_state"] == "pending"
+    assert durable["result"]["summary"] == "All clear"
+
+    assert ad.publish_durable_completion(
+        delegation_id="cron_exec_1", session_key="desktop-session",
+        parent_session_id="desktop-session", goal="Morning brief", summary="duplicate",
+        role="cron_run",
+    ) is False
+    assert process_registry.completion_queue.empty()
+
+
+def test_restore_matching_completion_recovers_after_in_memory_copy_is_lost(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    ad.publish_durable_completion(
+        delegation_id="cron_exec_2", session_key="closed-session",
+        parent_session_id="closed-session", goal="Watch inbox", summary="New mail", role="cron_run")
+    assert _drain_for("cron_exec_2") is not None  # simulate an unrelated live poller discarding it
+
+    restored = ad.restore_matching_undelivered_completions(
+        process_registry.completion_queue, lambda evt: evt.get("session_key") == "closed-session")
+    assert restored == 1
+    event = _drain_for("cron_exec_2")
+    assert event is not None and event["restored"] is True
+
+    while not process_registry.completion_queue.empty():
+        process_registry.completion_queue.get_nowait()
+    assert ad.restore_matching_undelivered_completions(
+        process_registry.completion_queue, lambda evt: evt.get("session_key") == "some-other-session") == 0
+    assert process_registry.completion_queue.empty()
+
 def test_dispatch_returns_immediately_without_blocking():
     gate = threading.Event()
 
