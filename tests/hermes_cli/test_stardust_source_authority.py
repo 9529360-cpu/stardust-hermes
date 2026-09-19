@@ -153,6 +153,35 @@ def test_llms_index_is_canonical_to_stardust() -> None:
     assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in source
 
 
+def test_runtime_product_catalog_authority_stays_on_stardust() -> None:
+    model = _read("hermes_cli/model_catalog.py")
+    defaults = _read("hermes_cli/config_defaults.py")
+    local_runtime = _read("hermes_cli/local_runtime/catalog.py")
+    plugins = _read("hermes_cli/plugin_catalog.py")
+    skills = _read("tools/skills_hub_search.py")
+
+    stardust_raw = "raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+
+    assert stardust_raw in model
+    assert "hermes-agent.nousresearch.com/docs/api/model-catalog.json" not in model
+    assert "raw.githubusercontent.com/NousResearch/hermes-agent/main/website/static/api/model-catalog.json" not in model
+
+    model_defaults = defaults.split('"model_catalog": {', 1)[1].split("\n    },", 1)[0]
+    assert stardust_raw in model_defaults
+    assert "hermes-agent.nousresearch.com/docs/api/model-catalog.json" not in model_defaults
+
+    assert stardust_raw in local_runtime
+    assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in local_runtime
+
+    assert 'LIVE_CATALOG_URL = ""' in plugins
+    assert "hermes-agent.nousresearch.com/docs/api/plugin-catalog.json" not in plugins
+
+    assert 'HERMES_INDEX_URL = ""' in skills
+    assert "hermes-agent.nousresearch.com/docs/api/skills-index.json" not in skills
+    assert '"stardust-index.json"' in skills
+    assert '"hermes-index.json"' not in skills
+
+
 def test_uninstall_reinstall_guidance_stays_on_stardust() -> None:
     source = _read("hermes_cli/uninstall.py")
 
