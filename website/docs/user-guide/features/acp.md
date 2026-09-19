@@ -259,21 +259,17 @@ change your Hermes-wide default — use `hermes model` for that.
 Buzz creates every agent with **Who can talk to this agent** set to `Owner only`.
 Leave it there when the runtime is Hermes.
 
-Two behaviors combine on this path. The `hermes-acp` toolset includes `terminal`
-and `execute_code`, and Buzz's ACP bridge answers Hermes' permission requests
-itself with `allow_once` rather than surfacing them. A Hermes agent in Buzz
-therefore runs shell commands on the host without prompting. I asked one to run
-`rm -rf` against a scratch directory and it deleted it, no prompt anywhere.
+Buzz's ACP bridge can answer permission requests programmatically instead of
+showing a human approval dialog. Hermes therefore treats Buzz (and every other
+ACP client) as **untrusted for dangerous-command approval by default**. A
+transport-level `allow_once` from an untrusted client is denied before Hermes
+sends the permission RPC, while the local non-bypassable hardline floor remains
+in force regardless of client trust.
 
-Selecting `Anyone` hands that same shell access to every author who can reach
-the channel. Buzz does not warn when you pick it.
-
-Neither of the obvious mitigations works today:
-
-- `approvals.mode: manual` does make Hermes raise the permission request, but
-  Buzz auto-approves it and the command still runs.
-- `platform_toolsets.acp` does not narrow the ACP toolset, so it cannot be used
-  to drop `terminal`.
+Do not add Buzz to `approvals.acp_trusted_clients` unless you explicitly accept
+that its bridge can auto-answer approvals. Keeping Buzz agents owner-only is
+still important: normal prompts can invoke the rest of the ACP toolset even
+when a dangerous shell command is denied.
 
 `!shutdown` from the owner stops the agent in any mode, and Buzz ignores that
 command from everyone else.
