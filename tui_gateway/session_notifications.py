@@ -586,6 +586,16 @@ def _notification_poller_loop(stop_event: threading.Event, sid: str, session: di
     from tools.process_registry_notifications import format_process_notification
     queue = process_registry.completion_queue
     emitted = session.setdefault("_notification_emitted", set())
+    # A durable completion may have finished while this conversation was closed. Another live
+    # session can discard that in-memory queue copy without acknowledging the durable row; replay
+    # only rows this newly-live session can prove it owns (compression lineage included).
+    try:
+        from tools.async_delegation import restore_matching_undelivered_completions
+        with _session_profile_runtime_scope(session):
+            restore_matching_undelivered_completions(
+                queue, lambda evt: _session_owns_notification_event(sid, session, evt))
+    except Exception:
+        logger.warning("Could not restore pending completions for session %s", sid, exc_info=True)
     handle = lambda events, deferred: _notif_handle_ready(  # noqa: E731
         sid, session, events, emitted, process_registry, format_process_notification, deferred)
     last_kanban_poll = last_loop_poll = 0.0
