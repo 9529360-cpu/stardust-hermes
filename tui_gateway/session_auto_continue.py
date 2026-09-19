@@ -107,14 +107,16 @@ def _maybe_schedule_auto_continue(sid: str, session: dict, session_key: str) -> 
     home = _session_home(session)
     if (marker := read_turn_marker(home, session_key)) is None:
         return None
+    if not marker.get("auto_continue", True):
+        # The mailbox/hosted driver owns recovery and receipt identity for imported turns.
+        # Generic resume must neither replay nor retire its marker based on local chat history.
+        return None
     if _history_proves_marker_settled(session, marker):
         # The terminal transcript won but best-effort sidecar cleanup lost. Treat durable conversation state
         # as authoritative and retire the stale marker instead of replaying side effects.
         clear_turn_marker(home, session_key)
         logger.info("discarded stale auto-continue marker for settled session %s", session_key)
         return None
-    if not marker.get("auto_continue", True):
-        return None  # The mailbox owns recovery and receipt identity for imported turns.
     enabled, freshness_secs, max_attempts = _auto_continue_config()
     age = time.time() - marker["started_at"]
     if not enabled or age > freshness_secs or marker["attempts"] >= max_attempts:
