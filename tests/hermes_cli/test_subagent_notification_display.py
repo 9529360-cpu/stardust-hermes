@@ -10,6 +10,24 @@ from tools.process_registry_notifications import format_process_notification
 from tui_gateway import server
 
 
+def test_failed_notification_dispatch_requeues_durable_event(monkeypatch):
+    event = {
+        "type": "async_delegation", "session_key": "owner-session",
+        "delegation_id": "deleg-retry", "goal": "retry me", "status": "completed", "summary": "done",
+    }
+    registry = SimpleNamespace(completion_queue=queue.Queue(), is_completion_consumed=lambda _sid: False)
+    session = {"session_key": "owner-session", "history_lock": threading.RLock()}
+    emitted = set()
+
+    monkeypatch.setattr(server, "_emit", lambda *_args: None)
+    monkeypatch.setattr(server, "_notif_claim_turn", lambda _session: True)
+    monkeypatch.setattr(server, "_notif_dispatch_event", lambda *_args: False)
+
+    assert server._notif_handle_event(
+        "ui-session", session, event, emitted, registry, format_process_notification, None) is True
+    assert emitted == set()
+    assert registry.completion_queue.get_nowait() is event
+
 def test_completion_display_keeps_payload_separate_across_surfaces(monkeypatch, capsys, tmp_path):
     for status, truncated, label in [("completed", False, "Completed"), ("failed", False, "Failed"),
                                       ("cancelled", False, "Cancelled"), ("completed", True, "Incomplete"),
