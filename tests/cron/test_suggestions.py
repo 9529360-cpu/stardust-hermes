@@ -241,6 +241,9 @@ class TestIntegrationSuggestions:
         assert pending[0]["dedup_key"] == "catalog:important-mail-monitor"
         assert pending[0]["job_spec"]["schedule"] == "*/30 * * * *"
         assert pending[0]["job_spec"]["skills"] == ["email-inbox-triage"]
+        assert "connectors__gmail__" in pending[0]["job_spec"]["prompt"]
+        assert "connectors__outlook__" in pending[0]["job_spec"]["prompt"]
+        assert "Do NOT run local Google Workspace OAuth setup" in pending[0]["job_spec"]["prompt"]
         assert pending[0]["job_spec"]["name"] == "Important-mail monitor"
 
     def test_google_calendar_unlocks_daily_briefing(self, store):
@@ -251,9 +254,21 @@ class TestIntegrationSuggestions:
         assert [item["title"] for item in created] == ["Daily briefing"]
         assert created[0]["source"] == "integration"
         assert created[0]["dedup_key"] == "catalog:daily-briefing"
-        assert created[0]["job_spec"]["skills"] == ["google-workspace"]
+        assert created[0]["job_spec"].get("skills") in (None, [])
+        assert "connectors__googlecalendar__" in created[0]["job_spec"]["prompt"]
+        assert "Do NOT run local Google Workspace OAuth" in created[0]["job_spec"]["prompt"]
         assert created[0]["job_spec"]["schedule"] == "0 8 * * *"
         assert created[0]["job_spec"]["name"] == "Daily briefing"
+
+    def test_managed_calendar_suggestion_never_requires_local_google_credentials(self, store):
+        from cron.suggestion_catalog import seed_integration_suggestions
+
+        created = seed_integration_suggestions(["googlecalendar"], add_fn=store.add_suggestion)
+
+        spec = created[0]["job_spec"]
+        assert "google-workspace" not in (spec.get("skills") or [])
+        assert "gws" in spec["prompt"]
+        assert "second Google credential" in spec["prompt"]
 
     def test_mail_connectors_share_one_dedup_decision(self, store):
         from cron.suggestion_catalog import seed_integration_suggestions
