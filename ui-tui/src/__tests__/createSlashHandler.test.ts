@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createSlashHandler } from '../app/createSlashHandler.js'
 import { getOverlayState, resetOverlayState } from '../app/overlayStore.js'
-import { DASHBOARD_EXIT_DISABLED_MESSAGE, DASHBOARD_UPDATE_DISABLED_MESSAGE } from '../app/slash/commands/core.js'
+import {
+  DASHBOARD_EXIT_DISABLED_MESSAGE,
+  DASHBOARD_UPDATE_DISABLED_MESSAGE,
+  STARDUST_UPDATE_PINNED_MESSAGE
+} from '../app/slash/commands/core.js'
 import { getUiState, patchUiState, resetUiState } from '../app/uiStore.js'
 import type * as EnvModule from '../config/env.js'
 import { TUI_SESSION_MODEL_FLAG } from '../domain/slash.js'
@@ -142,19 +146,13 @@ describe('createSlashHandler', () => {
     expect(ctx.session.die).toHaveBeenCalledTimes(1)
   })
 
-  it('handles /update locally and exits with code 42 via dieWithCode', () => {
-    vi.useFakeTimers()
+  it("keeps the TUI alive when /update reports Stardust's pinned updater", () => {
     const ctx = buildCtx()
 
     expect(createSlashHandler(ctx)('/update')).toBe(true)
     expect(ctx.gateway.gw.request).not.toHaveBeenCalled()
-    expect(ctx.transcript.sys).toHaveBeenCalledWith('exiting TUI to run update...')
-
-    // Advance past the 100ms setTimeout
-    vi.advanceTimersByTime(150)
-    expect(ctx.session.dieWithCode).toHaveBeenCalledWith(42)
-
-    vi.useRealTimers()
+    expect(ctx.session.dieWithCode).not.toHaveBeenCalled()
+    expect(ctx.transcript.sys).toHaveBeenCalledWith(STARDUST_UPDATE_PINNED_MESSAGE)
   })
 
   it('refuses /update in hosted dashboard chat instead of killing the PTY', () => {
