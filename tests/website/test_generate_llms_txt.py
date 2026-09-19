@@ -38,8 +38,20 @@ def index(gen) -> str:
     return gen.emit_llms_index()
 
 
+def _linked_entries(gen, index: str) -> list[str]:
+    """Docs slugs represented by the generator's authoritative GitHub source links."""
+    paths = re.findall(rf"\]\({re.escape(gen.DOCS_SOURCE_BASE)}/([^)]+)\)", index)
+    slugs = []
+    for raw in paths:
+        rel = Path(raw).with_suffix("")
+        if rel.name == "index":
+            rel = rel.parent
+        slugs.append(rel.as_posix())
+    return slugs
+
+
 def _linked(gen, index: str) -> set[str]:
-    return set(re.findall(rf"\]\({re.escape(gen.SITE_BASE)}/([^)]+)\)", index))
+    return set(_linked_entries(gen, index))
 
 
 def _pages_on_disk(gen) -> set[str]:
@@ -90,7 +102,7 @@ def test_every_indexed_page_exists(gen, index):
 
 def test_pages_are_listed_once(gen, index):
     """Curating a page must promote it, not duplicate it."""
-    entries = re.findall(rf"^- \[.*?\]\({re.escape(gen.SITE_BASE)}/([^)]+)\)", index, re.MULTILINE)
+    entries = _linked_entries(gen, index)
     duplicated = {slug for slug in entries if entries.count(slug) > 1}
     assert not duplicated, f"listed more than once in llms.txt: {sorted(duplicated)}"
 
