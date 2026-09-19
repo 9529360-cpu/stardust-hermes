@@ -712,6 +712,14 @@ class MemoryManager:
     def get_all_tool_names(self) -> set:
         return set(self._tool_to_provider) if self._privacy_enabled() else set()
 
+    def registered_tool_names(self) -> set:
+        """Provider tool names independent of the live privacy gate.
+
+        Used only by host-side surface refresh so a master-off transition can remove
+        schemas that were injected while memory was enabled.
+        """
+        return set(self._tool_to_provider)
+
     def has_tool(self, tool_name: str) -> bool:
         return self._privacy_enabled() and tool_name in self._tool_to_provider
 
