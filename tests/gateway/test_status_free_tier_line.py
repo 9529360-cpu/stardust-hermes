@@ -79,9 +79,12 @@ def isolated_auth_store(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_status_names_the_free_tier_and_the_slash_command_when_the_free_tier_carries_inference(
+    monkeypatch,
 ):
     runner = _runner()
     _seed_nous(_free_tier_state())
+    monkeypatch.setattr("hermes_cli.auth.resolve_provider", lambda *_args, **_kwargs: "nous")
+    monkeypatch.setattr(anon_auth, "guest_carries_inference", lambda: True)
 
     result = await runner._handle_message(_make_event("/status"))
 
