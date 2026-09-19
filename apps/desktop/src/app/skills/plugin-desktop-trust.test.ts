@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { PluginRecord } from '@/contrib/plugins-store'
+import type { ConfirmRequest } from '@/store/confirm'
 
 import {
   desktopPluginNeedsExplicitTrust,
@@ -54,7 +55,7 @@ describe('Desktop plugin trust ceremony', () => {
   })
 
   it('does not activate external code when the user rejects the trust prompt', async () => {
-    const confirm = vi.fn(async () => false)
+    const confirm = vi.fn(async (_request: ConfirmRequest) => false)
     const setEnabled = vi.fn(async () => undefined)
 
     const changed = await setDesktopPluginEnabledWithTrust(external(), 'External Desktop', true, copy, {
@@ -73,7 +74,7 @@ describe('Desktop plugin trust ceremony', () => {
   })
 
   it('activates external code only after affirmative trust', async () => {
-    const confirm = vi.fn(async () => true)
+    const confirm = vi.fn(async (_request: ConfirmRequest) => true)
     const setEnabled = vi.fn(async () => undefined)
     const record = external({
       packageOrigin: {
@@ -91,7 +92,7 @@ describe('Desktop plugin trust ceremony', () => {
   })
 
   it('does not prompt when disabling or toggling reviewed bundled code', async () => {
-    const confirm = vi.fn(async () => true)
+    const confirm = vi.fn(async (_request: ConfirmRequest) => true)
     const setEnabled = vi.fn(async () => undefined)
 
     await setDesktopPluginEnabledWithTrust(external(), 'External Desktop', false, copy, { confirm, setEnabled })
