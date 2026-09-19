@@ -71,6 +71,17 @@ class TestGuidanceConstants:
         assert "not an instruction to turn ordinary conversation into a coding task" in DEFAULT_AGENT_IDENTITY
         assert "answer/explain, plan/review, or execute" in DEFAULT_AGENT_IDENTITY
         assert "not permission to edit files or run commands" in DEFAULT_AGENT_IDENTITY
+        for mode in (
+            "respond",
+            "execute_foreground",
+            "delegate",
+            "delegate_background",
+            "schedule_or_watch",
+            "clarify",
+        ):
+            assert f"`{mode}`" in DEFAULT_AGENT_IDENTITY
+        assert "never as a promise of restart durability" in DEFAULT_AGENT_IDENTITY
+        assert "must not steal focus" in DEFAULT_AGENT_IDENTITY
         assert "continue" in DEFAULT_AGENT_IDENTITY
         assert "verify the result" in DEFAULT_AGENT_IDENTITY
         assert "built by Nous Research" not in DEFAULT_AGENT_IDENTITY
