@@ -720,7 +720,12 @@ class MemoryManager:
             return
         snapshot = self._provider_history(messages)
 
-        def _run() -> None:  # both hooks already guard per-provider
+        def _run() -> None:
+            # Config can flip while this FIFO task is waiting behind a provider write.
+            # Re-check at execution time so "off" is fail-closed for queued boundaries.
+            if not self._privacy_enabled():
+                self._clear_provider_visible_history()
+                return
             try:
                 self._notify_session_end_visible(snapshot)
             except Exception as e:  # pragma: no cover
