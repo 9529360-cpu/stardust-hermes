@@ -214,7 +214,7 @@ def build_context_files_prompt(cwd=None, skip_soul=False):
 
 ## 记忆快照
 
-本地记忆和用户配置文件数据在会话开始时作为冻结快照注入。会话中途的写入操作会更新磁盘状态，但不会修改已构建的系统 prompt，直到新会话开始或强制重建时才生效。
+本地记忆和用户配置文件数据以回合冻结快照注入。正在执行的回合不会修改已构建的系统 prompt；回合之间会检测 `MEMORY.md` / `USER.md` 的磁盘变化，必要时重新加载，并且只有渲染后的记忆快照实际变化时才重建缓存 prompt。
 
 ## 上下文文件
 
@@ -240,7 +240,7 @@ def build_context_files_prompt(cwd=None, skip_soul=False):
 ### 优先使用这些入口
 
 - `~/.hermes/SOUL.md` — 用自定义 agent 角色和固定行为替换内置默认身份块。
-- `~/.hermes/MEMORY.md` 和 `~/.hermes/USER.md` — 提供应在新会话中快照的持久跨会话事实和用户配置文件数据。
+- `~/.hermes/MEMORY.md` 和 `~/.hermes/USER.md` — 提供持久跨会话事实和用户配置文件数据；首次构建时读取，并在后续回合边界检测到变化时刷新。
 - 项目上下文文件，如 `.hermes.md`、`HERMES.md`、`AGENTS.md`、`CLAUDE.md` 或 `.cursorrules` — 注入仓库特定的工作规则。
 - Skills — 打包可复用的工作流和参考资料，无需编辑核心 prompt 代码。
 - 可选系统 prompt 配置 / API 覆盖 — 添加部署特定的指令文本，无需 fork Hermes。
