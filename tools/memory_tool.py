@@ -245,10 +245,16 @@ def memory_persistence_enabled(
 
 
 def get_builtin_memory_store_flags(config: Optional[Dict[str, Any]] = None) -> Tuple[bool, bool]:
-    """Return enabled built-in targets after the master privacy switch."""
-    if not memory_persistence_enabled(config):
-        return False, False
+    """Return enabled built-in targets from one config snapshot.
+
+    When no explicit config is supplied, get_builtin_memory_config() performs the single
+    readonly load for both the master and target flags. A transient read failure keeps the
+    historical fail-open availability behavior; actual writes still re-check the master
+    with fail_closed=True at the mutation boundary.
+    """
     section = get_builtin_memory_config(config)
+    if not is_truthy_value(section.get("enabled"), default=True):
+        return False, False
     return tuple(is_truthy_value(section.get(k), default=True) for k in ("memory_enabled", "user_profile_enabled"))
 
 
