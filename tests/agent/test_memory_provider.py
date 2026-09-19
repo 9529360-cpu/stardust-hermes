@@ -160,6 +160,114 @@ class TestMemoryManager:
         assert mgr.build_system_prompt() == ""
         assert mgr.prefetch_all("test") == ""
 
+    def test_live_privacy_gate_blocks_provider_io_and_filters_reenabled_history(self):
+        state = {"enabled": True}
+
+        class PrivacyProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("privacy", tools=[
+                    {"name": "privacy_search", "description": "search", "parameters": {}}
+                ])
+                self.session_end_messages = []
+                self.pre_compress_messages = []
+                self._prompt_block = "provider prompt"
+                self._prefetch_result = "provider recall"
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+            def on_pre_compress(self, messages):
+                self.pre_compress_messages.append(list(messages))
+                return ""
+
+        provider = PrivacyProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        state["enabled"] = False
+        assert mgr.build_system_prompt() == ""
+        assert mgr.prefetch_all("secret query") == ""
+        assert mgr.get_all_tool_schemas() == []
+        assert mgr.get_all_tool_names() == set()
+        assert mgr.has_tool("privacy_search") is False
+        assert "disabled by memory.enabled" in mgr.handle_tool_call("privacy_search", "{}")
+
+        raw_disabled = [
+            {"role": "user", "content": "disabled interval secret"},
+            {"role": "assistant", "content": "disabled interval answer"},
+        ]
+        mgr.sync_all(
+            "disabled interval secret",
+            "disabled interval answer",
+            session_id="s1",
+            messages=raw_disabled,
+        )
+        mgr.queue_prefetch_all("disabled queued recall", session_id="s1")
+        mgr.flush_pending(timeout=5)
+        assert provider.synced_turns == []
+        assert provider.prefetch_queries == []
+        assert provider.queued_prefetches == []
+
+        state["enabled"] = True
+        raw_reenabled = raw_disabled + [
+            {"role": "user", "content": "visible after re-enable"},
+            {"role": "assistant", "content": "visible answer"},
+        ]
+        mgr.sync_all(
+            "visible after re-enable",
+            "visible answer",
+            session_id="s1",
+            messages=raw_reenabled,
+        )
+        mgr.flush_pending(timeout=5)
+
+        assert len(provider.synced_turns) == 1
+        forwarded_messages = provider.synced_turns[0][3]
+        assert [row["content"] for row in forwarded_messages] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+
+        mgr.on_pre_compress(raw_reenabled)
+        mgr.on_session_end(raw_reenabled)
+        assert [row["content"] for row in provider.pre_compress_messages[-1]] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+        assert [row["content"] for row in provider.session_end_messages[-1]] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+
+        state["enabled"] = False
+        mgr.on_session_end(raw_reenabled)
+        assert len(provider.session_end_messages) == 1
+
+    def test_privacy_scoped_history_clears_on_session_switch(self):
+        state = {"enabled": True}
+
+        class HistoryProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("history")
+                self.session_end_messages = []
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+        provider = HistoryProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+
+        mgr.on_session_switch("new", parent_session_id="old", reset=True)
+        mgr.on_session_end([
+            {"role": "user", "content": "old user"},
+            {"role": "assistant", "content": "old answer"},
+        ])
+
+        assert provider.session_end_messages == [[]]
+
     def test_add_provider(self):
         mgr = MemoryManager()
         p = FakeMemoryProvider("test1")
