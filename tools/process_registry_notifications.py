@@ -250,8 +250,9 @@ def _format_cron_completion(evt: dict, completed_at: float) -> str:
     summary = str(evt.get("summary") or "").strip()
     error = str(evt.get("error") or "").strip()
     lines = [
-        f"[CRON JOB COMPLETE - {name} ({job_id})]",
-        "A scheduled job created from this conversation finished in the background.",
+        f"[ASYNC DELEGATION COMPLETE — {evt.get('delegation_id', 'unknown')}]",
+        f"Scheduled cron job: {name} ({job_id})",
+        "This job was created from this conversation and finished in the background.",
         f"Status: {status}",
         "--- RESULT ---",
     ]
