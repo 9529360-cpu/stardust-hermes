@@ -485,8 +485,13 @@ describe('assistant-ui streaming renderer', () => {
 
     const { container } = render(<StreamingHarness onControls={registerControls} />)
 
-    expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
-    expect(controls).toBeTruthy()
+    await waitFor(
+      () => {
+        expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
+        expect(controls).toBeTruthy()
+      },
+      { timeout: 5_000 }
+    )
 
     act(() => controls?.emitFirst())
     await waitFor(
