@@ -731,7 +731,15 @@ class MemoryManager:
         if not clean_user_content:
             return
         self._record_provider_visible_turn(clean_user_content, assistant_content, messages)
-        provider_messages = self._provider_history(messages)
+        # Preserve the historical standalone-manager contract exactly: when callers
+        # did not provide messages, providers that accept the optional keyword must
+        # still see it omitted (None), not an invented empty list. Production privacy
+        # managers use the filtered exposure ledger instead.
+        provider_messages = (
+            messages
+            if self._privacy_enabled_check is None
+            else self._provider_history(messages)
+        )
         optional_kwargs = {"messages": provider_messages, "turn_author": turn_author}
 
         def _sync(provider: MemoryProvider) -> None:
