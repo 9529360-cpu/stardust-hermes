@@ -361,7 +361,7 @@ class MemoryManager:
         # Session boundaries that occur while the master switch is OFF are remembered
         # host-side only. The latest boundary is replayed to providers after re-enable,
         # before any provider I/O, so no disabled-session hook call is needed.
-        self._pending_session_switch: Optional[Tuple[str, str, bool, bool, Dict[str, Any]]] = None
+        self._pending_session_switch: Optional[tuple[str, str, bool, bool, Dict[str, Any]]] = None
         self._pending_session_switch_lock = threading.Lock()
         self._external_prefetch_spill_config: Optional[Dict[str, Any]] = None
         self._has_external: bool = False
