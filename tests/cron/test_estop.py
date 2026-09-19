@@ -48,6 +48,44 @@ def test_disengage_removes_sentinel(hermes_home):
     assert estop.disengage() is False
 
 
+class _SentinelDouble:
+    def __init__(self, *, present=True, unlink_error=None, exists_error=None):
+        self.present = present
+        self.unlink_error = unlink_error
+        self.exists_error = exists_error
+
+    def unlink(self):
+        if self.unlink_error is not None:
+            raise self.unlink_error
+        if not self.present:
+            raise FileNotFoundError
+        self.present = False
+
+    def exists(self):
+        if self.exists_error is not None:
+            raise self.exists_error
+        return self.present
+
+
+def test_disengage_reports_incomplete_when_any_sentinel_remains(monkeypatch):
+    profile = _SentinelDouble()
+    fleet = _SentinelDouble(unlink_error=PermissionError("read-only fleet root"))
+    monkeypatch.setattr(estop, "_candidate_sentinel_paths", lambda: [profile, fleet])
+
+    assert estop.disengage_status() == "incomplete"
+    assert profile.present is False
+    assert fleet.present is True
+    # The legacy bool API must fail closed too: partial removal is not resume.
+    assert estop.disengage() is False
+
+
+def test_disengage_reports_incomplete_when_postcheck_cannot_verify_absence(monkeypatch):
+    sentinel = _SentinelDouble(exists_error=OSError("stat denied"))
+    monkeypatch.setattr(estop, "_candidate_sentinel_paths", lambda: [sentinel])
+
+    assert estop.disengage_status() == "incomplete"
+
+
 def test_reason_and_timestamp_stored(hermes_home):
     estop.engage(reason="runaway cron fan-out")
     state = estop.get_state()
@@ -264,6 +302,19 @@ def test_cli_resume_when_not_paused(hermes_home, capsys):
     assert "not paused" in capsys.readouterr().out.lower()
 
 
+def test_cli_resume_incomplete_returns_failure(monkeypatch, capsys):
+    from hermes_cli.subcommands.pause import cmd_resume
+
+    monkeypatch.setattr(estop, "disengage_status", lambda: "incomplete")
+    rc = cmd_resume(argparse.Namespace())
+
+    output = capsys.readouterr().out.lower()
+    assert rc == 1
+    assert "incomplete" in output
+    assert "remains paused" in output
+    assert "resumed" not in output
+
+
 def test_builtin_subcommands_include_pause_resume():
     from hermes_cli.main import _BUILTIN_SUBCOMMANDS
 
@@ -343,6 +394,20 @@ class _FakePauseEvent(_FakeEvent):
 
     def get_command_args(self):
         return self._args
+
+
+@pytest.mark.asyncio
+async def test_gateway_pause_incomplete_resume_stays_paused(monkeypatch):
+    from gateway.run import GatewayRunner
+
+    runner = object.__new__(GatewayRunner)
+    monkeypatch.setattr(estop, "disengage_status", lambda: "incomplete")
+
+    reply = await runner._handle_pause_command(_FakePauseEvent("off"))
+
+    assert "incomplete" in reply.lower()
+    assert "remains paused" in reply.lower()
+    assert "resumed" not in reply.lower()
 
 
 @pytest.mark.asyncio
