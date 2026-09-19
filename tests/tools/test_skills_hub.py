@@ -1847,10 +1847,26 @@ class TestLoadHermesIndex:
 
     @staticmethod
     def _isolate_cache(monkeypatch, tmp_path):
-        """Point the on-disk cache at an empty tmp dir so no real cache leaks in."""
-        cache_file = tmp_path / "hermes-index.json"
-        monkeypatch.setattr("tools.skills_hub_search._hermes_index_cache_file", lambda: cache_file)
+        """Point the on-disk cache at an empty tmp dir and opt into a test-owned URL."""
+        import tools.skills_hub_search as hub_search
+
+        cache_file = tmp_path / "stardust-index.json"
+        monkeypatch.setattr(hub_search, "_hermes_index_cache_file", lambda: cache_file)
+        monkeypatch.setattr(hub_search, "HERMES_INDEX_URL", "https://catalog.example.invalid/skills-index.json")
         return cache_file
+
+    def test_default_without_owned_index_ignores_old_cache_and_network(self, monkeypatch, tmp_path):
+        import tools.skills_hub_search as hub_search
+
+        old_cache = tmp_path / "hermes-index.json"
+        old_cache.write_text(json.dumps({"skills": [{"name": "old-upstream"}]}))
+        monkeypatch.setattr(hub_search, "HERMES_INDEX_URL", "")
+        monkeypatch.setattr(hub_search, "_hermes_index_cache_file", lambda: tmp_path / "stardust-index.json")
+        get = MagicMock(side_effect=AssertionError("network must not run without an owned index URL"))
+        monkeypatch.setattr(hub_search.httpx, "get", get)
+
+        assert hub_search._load_hermes_index() is None
+        get.assert_not_called()
 
     def test_fetch_does_not_request_brotli(self, monkeypatch, tmp_path):
         """The index fetch must not negotiate Brotli (the broken decoder path)."""
