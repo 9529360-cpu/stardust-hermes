@@ -686,12 +686,15 @@ class MemoryManager:
 
         self._each_provider("on_turn_start failed", _tick)
 
+    def _notify_session_end_visible(self, visible: List[Dict[str, Any]]) -> None:
+        """Fan out an already privacy-filtered, boundary-frozen history snapshot."""
+        self._each_provider("on_session_end failed", lambda p: p.on_session_end(visible), level=logging.WARNING,
+                            exc_info=True)
+
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
         if not self._privacy_enabled():
             return
-        visible = self._provider_history(messages)
-        self._each_provider("on_session_end failed", lambda p: p.on_session_end(visible), level=logging.WARNING,
-                            exc_info=True)
+        self._notify_session_end_visible(self._provider_history(messages))
 
     def commit_session_boundary_async(self, messages: List[Dict[str, Any]], *, new_session_id: str,
                                       parent_session_id: str = "", reason: str = "new_session") -> None:
@@ -719,7 +722,7 @@ class MemoryManager:
 
         def _run() -> None:  # both hooks already guard per-provider
             try:
-                self.on_session_end(snapshot)
+                self._notify_session_end_visible(snapshot)
             except Exception as e:  # pragma: no cover
                 logger.warning("Session-boundary extraction failed: %s", e)
             try:
