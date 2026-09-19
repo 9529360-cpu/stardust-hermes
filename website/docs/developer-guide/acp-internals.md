@@ -87,15 +87,24 @@ asyncio.run_coroutine_threadsafe(...)
 
 ### Permission bridge
 
-`acp_adapter/permissions.py` adapts dangerous terminal approval prompts into ACP permission requests.
+`acp_adapter/permissions.py` adapts dangerous terminal approval prompts into
+ACP permission requests only for an explicitly trusted interactive client.
 
-Mapping:
+`initialize()` captures `client_info`, a capability-name snapshot, and the
+exact-name match against `approvals.acp_trusted_clients` into an immutable
+connection posture. Unknown/unlisted clients are deny-only; the bridge returns
+Hermes `deny` without calling the client's `request_permission`.
+
+For a trusted interactive client, mapping is unchanged:
 
 - `allow_once` -> Hermes `once`
+- `allow_session` -> Hermes `session`
 - `allow_always` -> Hermes `always`
 - reject options -> Hermes `deny`
 
-Timeouts and bridge failures deny by default.
+Timeouts and bridge failures deny by default. Edit-approval modes use their
+separate requester and are not governed by this dangerous-command client-trust
+list.
 
 ### Tool rendering helpers
 
