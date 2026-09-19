@@ -627,6 +627,7 @@ def _hydrate_from_history(agent: Any, conversation_history: Optional[List[Any]])
 def _tick_memory_nudge(agent: Any) -> bool:
     """Advance the turn-based memory nudge counter; ``True`` when the review should fire."""
     if (agent._memory_nudge_interval > 0
+            and getattr(agent, "_memory_persistence_enabled", True)
             and "memory" in agent.valid_tool_names
             and agent._memory_store):
         agent._turns_since_memory += 1
@@ -854,6 +855,73 @@ def _persist_turn_start(
     )
 
 
+def _tool_schema_name(tool: Any) -> str:
+    if not isinstance(tool, dict):
+        return ""
+    fn = tool.get("function")
+    return str(fn.get("name") or "") if isinstance(fn, dict) else ""
+
+
+def _refresh_memory_tool_surface(agent: Any, *, enabled: bool) -> bool:
+    """Hide/restore memory schemas when the master switch changes on a live agent.
+
+    Gateway agents are normally rebuilt from their cache signature, but CLI/TUI and
+    other long-lived hosts can survive a config change. Keep the mutation scoped to
+    the memory tool family so unrelated tool ordering/state stays untouched.
+    """
+    tools = getattr(agent, "tools", None)
+    if not isinstance(tools, list):
+        return False
+
+    manager = getattr(agent, "_memory_manager", None)
+    registered_provider_names = set()
+    registered = getattr(manager, "registered_tool_names", None)
+    if callable(registered):
+        try:
+            registered_provider_names = set(registered())
+        except Exception:
+            logger.debug("Memory provider tool-name snapshot failed", exc_info=True)
+
+    before_names = {_tool_schema_name(tool) for tool in tools}
+    memory_names = {"memory"} | registered_provider_names
+
+    if not enabled:
+        agent.tools = [tool for tool in tools if _tool_schema_name(tool) not in memory_names]
+    else:
+        current_names = {_tool_schema_name(tool) for tool in tools}
+        # A store exists only when this live agent was created with at least one
+        # built-in target enabled. Do not advertise a dead built-in tool on agents
+        # that started while the master switch was already off.
+        if getattr(agent, "_memory_store", None) is not None and "memory" not in current_names:
+            try:
+                import model_tools
+                definitions = model_tools.get_tool_definitions(
+                    enabled_toolsets=getattr(agent, "enabled_toolsets", None),
+                    disabled_toolsets=getattr(agent, "disabled_toolsets", None),
+                    quiet_mode=True,
+                ) or []
+                memory_schema = next(
+                    (tool for tool in definitions if _tool_schema_name(tool) == "memory"),
+                    None,
+                )
+                if memory_schema is not None:
+                    agent.tools.append(memory_schema)
+            except Exception:
+                logger.warning("Failed to restore built-in memory tool after master enable", exc_info=True)
+        if manager is not None:
+            try:
+                from agent.memory_manager import inject_memory_provider_tools
+                inject_memory_provider_tools(agent)
+            except Exception:
+                logger.warning("Failed to restore external memory tools after master enable", exc_info=True)
+
+    agent.valid_tool_names = {
+        name for name in (_tool_schema_name(tool) for tool in agent.tools) if name
+    }
+    after_names = set(agent.valid_tool_names)
+    return before_names != after_names
+
+
 def _refresh_builtin_memory_snapshot(agent: Any) -> bool:
     """Refresh the built-in memory prompt at a turn boundary.
 
@@ -870,6 +938,7 @@ def _refresh_builtin_memory_snapshot(agent: Any) -> bool:
     previous_enabled = getattr(agent, "_memory_persistence_enabled", True)
     if live_enabled != previous_enabled:
         agent._memory_persistence_enabled = live_enabled
+        _refresh_memory_tool_surface(agent, enabled=live_enabled)
         agent._cached_system_prompt = None
         agent._cached_system_prompt_static = None
         invalidated = True
@@ -983,6 +1052,11 @@ def build_turn_context(
 
     # Preserve the original user message (no nudge injection).
     original_user_message = persist_user_message if persist_user_message is not None else user_message
+
+    # Refresh the live memory privacy state before any memory-specific trigger is
+    # computed. This also removes memory schemas from a long-lived CLI/TUI agent
+    # immediately after master-off.
+    _refresh_builtin_memory_snapshot(agent)
     should_review_memory = _tick_memory_nudge(agent)
     _emit_reaction(agent, original_user_message)
 
@@ -994,7 +1068,6 @@ def build_turn_context(
 
     # System prompt is cached per session for prefix caching. A real built-in memory change
     # is the one cross-session state change that deliberately invalidates it at a turn boundary.
-    _refresh_builtin_memory_snapshot(agent)
     if agent._cached_system_prompt is None:
         restore_or_build_system_prompt(agent, system_message, conversation_history)
     active_system_prompt = agent._cached_system_prompt
