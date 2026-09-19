@@ -2737,7 +2737,8 @@ def _publish_local_session_completion(
         return
     source = str(origin.get("source") or "").strip().lower()
     session_id = str(origin.get("session_id") or "").strip()
-    if source not in {"desktop", "tui"} or not session_id:
+    delivery_lane = _normalize_deliver_value(_delivery_lane_value(d.job, for_failure=not d.success))
+    if source not in {"desktop", "tui"} or not session_id or delivery_lane not in {"local", "origin"}:
         return
     with fence.side_effect_fence() as owns_delivery:
         if not owns_delivery:
