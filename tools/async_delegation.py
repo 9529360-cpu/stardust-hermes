@@ -230,11 +230,12 @@ def publish_durable_completion(
             logger.debug("Durable completion queue is unavailable before persistence", exc_info=True)
     inserted = False
     with _DB_LOCK, _transaction() as conn:
-        cur = conn.execute("""INSERT OR IGNORE INTO async_delegations
+        cur = conn.execute("""INSERT INTO async_delegations
                (delegation_id, origin_session, origin_ui_session_id, parent_session_id, state,
                 dispatched_at, completed_at, updated_at, event_json, result_json, delivery_state,
                 delivery_attempts, owner_pid, owner_started_at, task_json, origin_session_id)
-               VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, 'pending', 0, NULL, NULL, ?, '')""",
+               VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, 'pending', 0, NULL, NULL, ?, '')
+               ON CONFLICT(delegation_id) DO NOTHING""",
             (delegation_id, session_key, parent_session_id, status, now, now, now,
              json.dumps(evt), json.dumps(result), json.dumps(task_payload)))
         inserted = cur.rowcount == 1
