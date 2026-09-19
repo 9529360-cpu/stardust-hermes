@@ -476,43 +476,66 @@ class MemoryManager:
         with self._provider_visible_history_lock:
             self._provider_visible_history.clear()
 
-    def _apply_pending_session_switch(self) -> None:
-        """Replay the latest OFF-period boundary before the next enabled provider I/O."""
+    def _apply_pending_session_switch(self) -> bool:
+        """Replay the latest OFF-period boundary before enabled provider I/O.
+
+        Returns False when the binding could not be established. Callers must fail
+        closed in that case rather than writing the new session into a stale provider
+        binding. The pending target is retained for a later retry.
+        """
         # Hot path: avoid another config read when there is nothing to replay.
         with self._pending_session_switch_lock:
             if self._pending_session_switch is None:
-                return
+                return True
         if not self._privacy_enabled():
-            return
+            return False
         # Re-read under the lock so a newer OFF-period boundary wins if it landed
         # while the live privacy check was running.
         with self._pending_session_switch_lock:
             pending = self._pending_session_switch
             self._pending_session_switch = None
         if pending is None:
-            return
+            return True
         new_session_id, parent_session_id, reset, rewound, kwargs = pending
         replay_kwargs = dict(kwargs)
         if rewound:
             replay_kwargs["rewound"] = True
-        self._each_provider(
-            "deferred on_session_switch failed",
-            lambda p: p.on_session_switch(
-                new_session_id,
-                parent_session_id=parent_session_id,
-                reset=reset,
-                **replay_kwargs,
-            ),
-            _skip_pending_session_switch=True,
-        )
+
+        for provider in self._providers:
+            if not self._privacy_enabled():
+                with self._pending_session_switch_lock:
+                    if self._pending_session_switch is None:
+                        self._pending_session_switch = pending
+                return False
+            try:
+                provider.on_session_switch(
+                    new_session_id,
+                    parent_session_id=parent_session_id,
+                    reset=reset,
+                    **replay_kwargs,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Memory provider '%s' deferred on_session_switch failed: %s",
+                    provider.name,
+                    exc,
+                    exc_info=True,
+                )
+                with self._pending_session_switch_lock:
+                    # Never overwrite a newer boundary that arrived while the
+                    # failed replay was in flight.
+                    if self._pending_session_switch is None:
+                        self._pending_session_switch = pending
+                return False
+        return True
 
     def _each_provider(self, label: str, call: Callable[[MemoryProvider], Any], *, level: int = logging.DEBUG,
                        providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False,
                        _skip_pending_session_switch: bool = False) -> List[Any]:
         """Call ``call(provider)`` per provider, logging+swallowing failures; returns successes in order.
         ``label`` completes the log line ``Memory provider '<name>' <label>: <exc>``."""
-        if not _skip_pending_session_switch:
-            self._apply_pending_session_switch()
+        if not _skip_pending_session_switch and not self._apply_pending_session_switch():
+            return []
         results: List[Any] = []
         for provider in self._providers if providers is None else providers:
             try:
@@ -823,7 +846,8 @@ class MemoryManager:
         """Route a tool call to its provider; returns a JSON string (tool_error on failure)."""
         if not self._privacy_enabled():
             return tool_error("Memory persistence is disabled by memory.enabled.")
-        self._apply_pending_session_switch()
+        if not self._apply_pending_session_switch():
+            return tool_error("Memory provider session rebind is pending; memory I/O is temporarily blocked.")
         provider = self._tool_to_provider.get(tool_name)
         if provider is None:
             return tool_error(f"No memory provider handles tool '{tool_name}'")
