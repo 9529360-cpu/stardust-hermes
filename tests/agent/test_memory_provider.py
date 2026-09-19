@@ -384,6 +384,58 @@ class TestMemoryManager:
         ]
 
 
+    def test_off_period_session_switch_rebinds_before_first_reenabled_write(self):
+        state = {"enabled": True}
+
+        class RebindProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("rebind")
+                self.events = []
+
+            def on_session_switch(self, new_session_id, *, parent_session_id="", reset=False, **kwargs):
+                self.events.append(("switch", new_session_id, parent_session_id, reset))
+
+            def sync_turn(self, user_content, assistant_content, *, session_id="", messages=None):
+                self.events.append(("sync", session_id, user_content))
+                super().sync_turn(
+                    user_content,
+                    assistant_content,
+                    session_id=session_id,
+                    messages=messages,
+                )
+
+        provider = RebindProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+        assert provider.events == [("sync", "old", "old user")]
+
+        state["enabled"] = False
+        mgr.on_session_switch("new", parent_session_id="old", reset=True)
+        mgr.sync_all("disabled user", "disabled answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        # OFF records the host-side target only; no provider hook/write is routed.
+        assert provider.events == [("sync", "old", "old user")]
+
+        state["enabled"] = True
+        mgr.sync_all("new visible user", "new visible answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        assert provider.events == [
+            ("sync", "old", "old user"),
+            ("switch", "new", "old", True),
+            ("sync", "new", "new visible user"),
+        ]
+        assert all(
+            row[2] != "disabled user"
+            for row in provider.events
+            if row[0] == "sync"
+        )
+
+
     def test_privacy_scoped_history_clears_on_session_switch(self):
         state = {"enabled": True}
 
