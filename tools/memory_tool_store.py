@@ -199,7 +199,9 @@ class MemoryStore:
                     "Could not refresh %s; keeping the previous in-memory snapshot and retrying on a later turn.",
                     path.name,
                 )
-                self._reset_generations[target] = reset_generation
+                # Do not adopt a newer reset generation while retaining the old
+                # prompt snapshot. Keeping the prior generation makes writes fail
+                # closed until a later reload captures both bytes and generation.
                 self._system_prompt_disk_state[target] = None
                 continue
             # Deduplicate (order-preserving, first occurrence wins).
@@ -296,9 +298,10 @@ class MemoryStore:
     def reset_target(cls, target: str) -> bool:
         """Forget one built-in target and advance its write generation under the file lock.
 
-        The generation marker is committed before deletion. If deletion fails, an atomic
-        empty rewrite is the privacy-preserving fallback; old sessions still cannot refill
-        the target because their captured generation no longer matches.
+        The generation marker is committed first, then the target is atomically rewritten
+        empty and fsynced before a best-effort unlink. Even if the directory-entry removal
+        is lost or refused, forgotten bytes cannot reappear after a crash; old sessions also
+        cannot refill the target because their captured generation no longer matches.
         """
         if target not in {"memory", "user"}:
             raise ValueError("target must be memory or user")
