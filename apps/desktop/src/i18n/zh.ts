@@ -1991,6 +1991,13 @@ export const zh = defineLocale({
         '此配置未安装智能体部分，且该包是手动复制的（无目录条目或 Git 远程），无法从此处安装。请将其文件夹复制到该配置或从 Git 重新安装。',
       desktopHalfPending: '复制中…',
       desktopHalfPendingTip: '此包附带的桌面部分尚未复制到应用中。请重新扫描或重启应用。',
+      desktopFullAccessBadge: '完整应用权限',
+      desktopTrustWarning:
+        '外部桌面插件代码会直接运行在 Stardust 中，拥有与应用渲染层/应用本身相同的权限。插件声明的能力只是用途说明，不是沙箱权限边界。',
+      desktopTrustTitle: (name: string) => `信任并启用 ${name}？`,
+      desktopTrustConfirm: '信任并启用',
+      desktopTrustSource: (repo: string, sha: string) => `来源：${repo}${sha ? ` · 固定提交 ${sha}` : ''}`,
+      desktopTrustLocalSource: '来源：本地磁盘；未记录插件目录或 Git 来源。',
       emptyAll: '还没有插件。',
       empty: '此配置尚未安装任何智能体插件。',
       emptyHint: '在下方目录中浏览，一键安装经过审核的插件。',
