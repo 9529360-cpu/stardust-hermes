@@ -120,6 +120,12 @@ jobs:
     if: needs.detect.outputs.rust == 'true'
     uses: ./.github/workflows/rust-tests.yml
 
+  stardust-visual-smoke:
+    name: Stardust Desktop smoke
+    needs: detect
+    if: ${{ needs.detect.outputs.python_prod == 'true' || needs.detect.outputs.frontend == 'true' }}
+    uses: ./.github/workflows/stardust-visual-smoke.yml
+
   e2e-desktop:
     name: Desktop E2E
     needs: detect
@@ -221,8 +227,8 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────
   # Gate: runs after everything. ``if: always()`` ensures it reports a
-  # status even when some deps were skipped. Only actual ``failure``
-  # results cause it to fail; ``skipped`` is treated as success.
+  # status even when some deps were skipped. Expected ``skipped`` lanes are
+  # allowed, but failure/cancellation of a required lane must fail the gate.
   #
   # Branch protection should require ONLY this check.
   #
@@ -239,6 +245,7 @@ jobs:
       - js-tests
       - installer-tests
       - rust-tests
+      - stardust-visual-smoke
       - e2e-desktop
       - docs-site
       - history-check
@@ -278,15 +285,15 @@ jobs:
           print(f'needs-json={json.dumps(compact)}')
           with open('$GITHUB_OUTPUT', 'a') as f:
               f.write(f'needs-json={json.dumps(compact)}\n')
-          failed = [name for name, info in needs.items() if info['result'] == 'failure']
+          blocked = [name for name, info in needs.items() if info['result'] not in ('success', 'skipped')]
           for name, info in sorted(needs.items()):
               result = info['result']
               icon = '✅' if result in ('success', 'skipped') else '❌'
               print(f'{icon} {name}: {result}')
-          if failed:
-              print(f'::error::{len(failed)} job(s) failed: {\", \".join(failed)}')
+          if blocked:
+              print(f'::error::{len(blocked)} required job(s) did not complete successfully: {\", \".join(blocked)}')
               sys.exit(1)
-          print('All checks passed (or were skipped)')
+          print('All required checks passed (or were not applicable)')
           "
 
   # ─────────────────────────────────────────────────────────────────────
