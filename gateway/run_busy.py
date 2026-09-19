@@ -845,9 +845,15 @@ class GatewayBusySessionMixin:
         from agent import estop
         args = (event.get_command_args() or "").strip()
         if args.lower() in {"off", "resume", "stop", "disengage"}:
-            if estop.disengage():
+            status = estop.disengage_status()
+            if status == "resumed":
                 return "▶️ Resumed — new work is accepted again."
-            return "Hermes wasn't paused."
+            if status == "not_paused":
+                return "Hermes wasn't paused."
+            return (
+                "Resume incomplete — Hermes remains paused. "
+                "Check ESTOP sentinel permissions and try again."
+            )
         state = estop.get_state()
         if state is not None and not args:
             suffix = f" (reason: {state.get('reason')})" if state.get("reason") else ""
