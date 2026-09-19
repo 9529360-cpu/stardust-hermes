@@ -634,6 +634,8 @@ class MemoryManager:
     def get_all_tool_schemas(self) -> List[Dict[str, Any]]:
         """Collect deduplicated tool schemas from all providers; reserved core tool names are
         skipped because :meth:`add_provider` refuses to route them."""
+        if not self._privacy_enabled():
+            return []
         from toolsets import _HERMES_CORE_TOOLS
 
         schemas: List[Dict[str, Any]] = []
@@ -655,13 +657,15 @@ class MemoryManager:
         return schemas
 
     def get_all_tool_names(self) -> set:
-        return set(self._tool_to_provider)
+        return set(self._tool_to_provider) if self._privacy_enabled() else set()
 
     def has_tool(self, tool_name: str) -> bool:
-        return tool_name in self._tool_to_provider
+        return self._privacy_enabled() and tool_name in self._tool_to_provider
 
     def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
         """Route a tool call to its provider; returns a JSON string (tool_error on failure)."""
+        if not self._privacy_enabled():
+            return tool_error("Memory persistence is disabled by memory.enabled.")
         provider = self._tool_to_provider.get(tool_name)
         if provider is None:
             return tool_error(f"No memory provider handles tool '{tool_name}'")
@@ -672,6 +676,8 @@ class MemoryManager:
             return tool_error(f"Memory tool '{tool_name}' failed: {e}")
 
     def on_turn_start(self, turn_number: int, message: str, **kwargs) -> None:
+        if not self._privacy_enabled():
+            return
         def _tick(p: MemoryProvider) -> None:
             # A provider written before the author kwargs declares (turn_number, message) only; it still gets its tick.
             params = _signature_params(p.on_turn_start)
@@ -681,7 +687,10 @@ class MemoryManager:
         self._each_provider("on_turn_start failed", _tick)
 
     def on_session_end(self, messages: List[Dict[str, Any]]) -> None:
-        self._each_provider("on_session_end failed", lambda p: p.on_session_end(messages), level=logging.WARNING,
+        if not self._privacy_enabled():
+            return
+        visible = self._provider_history(messages)
+        self._each_provider("on_session_end failed", lambda p: p.on_session_end(visible), level=logging.WARNING,
                             exc_info=True)
 
     def commit_session_boundary_async(self, messages: List[Dict[str, Any]], *, new_session_id: str,
@@ -701,9 +710,9 @@ class MemoryManager:
         share the same worker. If the executor is unavailable, ``_submit_background`` degrades to inline
         execution — the pre-#16454 synchronous behavior, slow but correct.
         """
-        if not self._providers:
+        if not self._providers or not self._privacy_enabled():
             return
-        snapshot = list(messages or [])
+        snapshot = self._provider_history(messages)
 
         def _run() -> None:  # both hooks already guard per-provider
             try:
@@ -724,12 +733,19 @@ class MemoryManager:
         (``/undo``): same id, truncated transcript."""
         if not new_session_id:
             return
+        if not self._privacy_enabled():
+            self._clear_provider_visible_history()
+            return
         if rewound:  # forward only when set so it never pollutes providers' **kwargs
             kwargs["rewound"] = True
         self._each_provider(
             "on_session_switch failed",
             lambda p: p.on_session_switch(new_session_id, parent_session_id=parent_session_id, reset=reset, **kwargs),
         )
+        # A session boundary starts a fresh provider-visible exposure window. Compression
+        # commits the old window before this hook; /new/resume/branch likewise must not
+        # let the next session-end hook replay prior-session transcript rows.
+        self._clear_provider_visible_history()
 
     @staticmethod
     def _checkpoint_api_version(provider: MemoryProvider) -> Optional[int]:
@@ -741,6 +757,8 @@ class MemoryManager:
 
     def supports_pre_compress_checkpoint(self, api_version: int = PRE_COMPRESS_CHECKPOINT_API_VERSION) -> bool:
         """Return whether an active provider guarantees checkpoint API support."""
+        if not self._privacy_enabled():
+            return False
         versions = (self._checkpoint_api_version(p) for p in self._providers)
         return any(v is not None and v >= api_version for v in versions)
 
@@ -753,6 +771,12 @@ class MemoryManager:
         only to checkpoint (v2+) providers. With ``require_checkpoint`` at least one checkpoint provider
         must succeed — its exception propagates so the caller keeps the uncompressed transcript.
         """
+        if not self._privacy_enabled():
+            if require_checkpoint:
+                raise RuntimeError("Memory persistence is disabled by memory.enabled")
+            return ""
+        visible_history = self._provider_history(messages)
+        visible_evidence = self._provider_history(evidence_messages)
         parts = []
         checkpoint_succeeded = False
         for provider in self._providers:
@@ -761,7 +785,7 @@ class MemoryManager:
                 version = _LEGACY_PRE_COMPRESS_API_VERSION
             is_checkpoint_provider = version >= checkpoint_api_version
             use_evidence = is_checkpoint_provider and evidence_messages is not None
-            provider_messages = evidence_messages if use_evidence else messages
+            provider_messages = visible_evidence if use_evidence else visible_history
             kwargs: Dict[str, Any] = {}
             # v1 providers and bare-shape v2 providers never see the signal.
             if is_checkpoint_provider and _accepts_require_checkpoint(provider.on_pre_compress):
@@ -793,6 +817,8 @@ class MemoryManager:
     def on_memory_write(self, action: str, target: str, content: str,
                         metadata: Optional[Dict[str, Any]] = None) -> None:
         """Notify external providers when the built-in memory tool writes (skips builtin, the source)."""
+        if not self._privacy_enabled():
+            return
 
         def _notify(provider: MemoryProvider) -> None:
             mode = self._provider_memory_write_metadata_mode(provider)
@@ -847,6 +873,8 @@ class MemoryManager:
                 logger.debug("notify_memory_tool_write failed for op %s: %s", action, e)
 
     def on_delegation(self, task: str, result: str, *, child_session_id: str = "", **kwargs) -> None:
+        if not self._privacy_enabled():
+            return
         self._each_provider(
             "on_delegation failed",
             lambda p: p.on_delegation(task, result, child_session_id=child_session_id, **kwargs),
@@ -902,6 +930,8 @@ class MemoryManager:
 
     def initialize_all(self, session_id: str, **kwargs) -> None:
         """Initialize all providers, injecting ``hermes_home`` so they resolve profile-scoped paths."""
+        if not self._privacy_enabled():
+            return
         if "hermes_home" not in kwargs:
             from hermes_constants import get_hermes_home
             kwargs["hermes_home"] = str(get_hermes_home())
