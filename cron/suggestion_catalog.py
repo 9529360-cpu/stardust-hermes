@@ -15,7 +15,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-__all__ = ["CatalogEntry", "CATALOG", "seed_catalog_suggestions", "classify_items_script_path"]
+__all__ = [
+    "CatalogEntry", "CATALOG", "seed_catalog_suggestions", "seed_integration_suggestions",
+    "classify_items_script_path",
+]
 
 
 def classify_items_script_path() -> str:
@@ -113,6 +116,49 @@ CATALOG: List[CatalogEntry] = [
         },
     ),
 ]
+
+
+# A connected account unlocks only the automations whose required source is unambiguous.
+# Reuse each catalog entry's OWN dedup key so a user who already accepted or dismissed that
+# automation is never nagged again just because the capability became available later.
+_INTEGRATION_CATALOG_KEYS: Dict[str, tuple[str, ...]] = {
+    "gmail": ("catalog:important-mail-monitor",),
+    "outlook": ("catalog:important-mail-monitor",),
+    "googlecalendar": ("catalog:daily-briefing",),
+}
+
+
+def seed_integration_suggestions(
+    connectors: List[str], *, add_fn: Optional[Callable[..., Optional[Dict[str, Any]]]] = None,
+) -> List[Dict[str, Any]]:
+    """Offer consent-first automations unlocked by newly confirmed connector accounts.
+
+    This never schedules work. It only writes to the existing suggestion store with source
+    ``integration``. Catalog dedup keys are intentionally shared, so prior pending/accepted/
+    dismissed decisions remain authoritative across discovery surfaces.
+    """
+    if add_fn is None:
+        from cron.suggestions import add_suggestion as add_fn  # type: ignore[assignment]
+
+    by_key = {entry.key: entry for entry in CATALOG}
+    created: List[Dict[str, Any]] = []
+    offered: set[str] = set()
+    for raw in connectors:
+        connector = str(raw or "").strip().lower()
+        for key in _INTEGRATION_CATALOG_KEYS.get(connector, ()):
+            if key in offered:
+                continue
+            offered.add(key)
+            entry = by_key.get(key)
+            if entry is None:
+                continue
+            rec = add_fn(
+                title=entry.title, description=entry.description, source="integration",
+                job_spec=dict(entry.job_spec), dedup_key=entry.key,
+            )
+            if rec is not None:
+                created.append(rec)
+    return created
 
 
 def seed_catalog_suggestions(
