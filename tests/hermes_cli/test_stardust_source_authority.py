@@ -159,3 +159,23 @@ def test_uninstall_reinstall_guidance_stays_on_stardust() -> None:
     assert STARDUST_INSTALL_BASE in source
     assert UPSTREAM_INSTALL_HOST not in source
     assert "Thank you for using Stardust!" in source
+
+def test_runtime_catalog_sources_belong_to_stardust() -> None:
+    model_catalog = _read("hermes_cli/model_catalog.py")
+    config_defaults = _read("hermes_cli/config_defaults.py")
+    local_catalog = _read("hermes_cli/local_runtime/catalog.py")
+    plugin_catalog = _read("hermes_cli/plugin_catalog.py")
+    expected = "raw.githubusercontent.com/9529360-cpu/stardust-hermes/main"
+
+    for source in (model_catalog, config_defaults, local_catalog, plugin_catalog):
+        assert expected in source
+        assert "raw.githubusercontent.com/NousResearch/hermes-agent" not in source
+        assert "hermes-agent.nousresearch.com/docs/api/" not in source
+
+
+def test_desktop_unsupported_update_routes_to_stardust_source() -> None:
+    source = _read("apps/desktop/src/app/updates-overlay.tsx")
+
+    assert "PRODUCT_REPOSITORY_URL" in source
+    assert "https://hermes-agent.nousresearch.com/" not in source
+
