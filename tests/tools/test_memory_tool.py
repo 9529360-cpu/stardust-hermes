@@ -186,6 +186,22 @@ class TestMemoryResetGeneration:
         assert store.system_prompt_snapshot_stale() is False
         assert store.add("user", "post-reset profile fact")["success"] is True
 
+    def test_reset_erases_bytes_even_when_unlink_is_unavailable(self, store, monkeypatch):
+        path = store._path_for("memory")
+        path.write_text("sensitive fact", encoding="utf-8")
+        original_unlink = Path.unlink
+
+        def refuse_target_unlink(self, *args, **kwargs):
+            if self == path:
+                raise PermissionError("simulated directory-entry refusal")
+            return original_unlink(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", refuse_target_unlink)
+
+        assert MemoryStore.reset_target("memory") is True
+        assert path.exists()
+        assert path.read_text(encoding="utf-8") == ""
+
     def test_reset_generation_is_scoped_to_memory_directory(self, tmp_path, monkeypatch):
         first = tmp_path / "profile-a" / "memories"
         second = tmp_path / "profile-b" / "memories"
@@ -954,6 +970,7 @@ class TestBackgroundReviewDeleteGate:
         from tools.write_approval import MEMORY, get_pending
         record = get_pending(MEMORY, result["pending_id"])
         assert record["payload"]["action"] == "remove"
+        assert record["payload"]["_reset_generation"] == store.reset_generation("memory")
         assert record["origin"] == "background_review"
 
     def test_replace_staged_in_background_review(self, store, tmp_path, monkeypatch):
