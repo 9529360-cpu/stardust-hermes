@@ -311,12 +311,18 @@ class MemoryStore:
             existed = path.exists()
             if not existed:
                 return False
-            try:
+            # Persist erasure before removing the directory entry. A crash can lose an
+            # un-fsynced unlink on some filesystems; an atomically published empty file
+            # means recovery can at worst resurrect an empty pathname, never forgotten bytes.
+            atomic_write_text(
+                path,
+                "",
+                tmp_prefix=".mem_reset_",
+                preserve_mode=True,
+                fsync_dir=True,
+            )
+            with suppress(OSError):
                 path.unlink()
-            except OSError:
-                # Content erasure is the contract; an empty file is equivalent to absence
-                # for MemoryStore and is safer than reporting failure with old bytes intact.
-                atomic_write_text(path, "", tmp_prefix=".mem_reset_", fsync_dir=True)
             return True
 
     def _entries_for(self, target: str) -> List[str]:
