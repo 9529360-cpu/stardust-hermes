@@ -447,6 +447,40 @@ class TestMemoryManager:
         )
 
 
+    def test_failed_deferred_rebind_blocks_sync_and_retries_later(self):
+        state = {"enabled": True}
+
+        class FlakyRebindProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("flaky-rebind")
+                self.switch_attempts = 0
+
+            def on_session_switch(self, new_session_id, *, parent_session_id="", reset=False, **kwargs):
+                self.switch_attempts += 1
+                if self.switch_attempts == 1:
+                    raise RuntimeError("temporary rebind failure")
+
+        provider = FlakyRebindProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        state["enabled"] = False
+        mgr.on_session_switch("new", parent_session_id="old", reset=True)
+
+        state["enabled"] = True
+        mgr.sync_all("must not land yet", "answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        assert provider.switch_attempts == 1
+        assert provider.synced_turns == []
+
+        mgr.sync_all("safe after retry", "answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        assert provider.switch_attempts == 2
+        assert [turn[0] for turn in provider.synced_turns] == ["safe after retry"]
+
+
     def test_privacy_scoped_history_clears_on_session_switch(self):
         state = {"enabled": True}
 
