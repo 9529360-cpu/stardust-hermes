@@ -189,7 +189,9 @@ describe('desktop slash command curation', () => {
         expect(desktopSlashUnavailableMessage(command)).toBeNull()
       }
 
-      const filtered = catalog ? filterDesktopCommandsCatalog({ ...catalog, pairs: retired.map(command => [command, 'old']) }) : null
+      const filtered = catalog
+        ? filterDesktopCommandsCatalog({ ...catalog, pairs: retired.map(command => [command, 'old'] as [string, string]) })
+        : null
       expect(filtered?.pairs ?? []).toEqual([])
     }
   })
