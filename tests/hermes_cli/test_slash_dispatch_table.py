@@ -90,6 +90,18 @@ def test_dispatch_return_semantics_and_side_effects():
         assert c.process_command("/update") is True
 
 
+def test_retired_account_handler_cannot_bypass_registry():
+    c = _cli()
+    c._console_print = MagicMock()
+
+    with patch.object(HermesCLI, "_handle_login_command") as login, \
+            patch.object(HermesCLI, "_process_unregistered_slash", return_value=True) as fallback:
+        assert c.process_command("/login") is True
+
+    login.assert_not_called()
+    fallback.assert_called_once_with("/login", "/login")
+
+
 def test_unknown_command_falls_through():
     c = _cli()
     c._console_print = MagicMock()
