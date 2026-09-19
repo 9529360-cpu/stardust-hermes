@@ -2108,8 +2108,11 @@ export const en: Translations = {
       resetMemory: 'Reset memory',
       resetUser: 'Reset profile',
       resetAll: 'Reset both',
-      resetConfirm: target => `Delete ${target}? This cannot be undone.`,
-      resetDone: files => `Deleted ${files}.`,
+      resetConfirm: target => `Delete ${target}? This cannot be undone. Open chats may still contain the old built-in memory until their next turn.`,
+      resetDone: (files, activeRefresh) =>
+        activeRefresh
+          ? `Deleted ${files}. Open chats will drop the reset built-in memory on their next turn; pre-reset staged writes can no longer restore it.`
+          : `Deleted ${files}. This older backend did not confirm active-chat refresh; start a new chat to fully drop the old memory snapshot.`,
       resetFailed: 'Memory reset failed',
       actionStarted: name => `${name} started — tailing log...`,
       actionFailed: name => `${name} failed to start`,
