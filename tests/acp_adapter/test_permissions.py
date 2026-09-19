@@ -27,6 +27,7 @@ def _invoke_callback(
     smart_denied=False,
     timeout=60.0,
     use_prompt_path=False,
+    trusted_interactive=True,
 ):
     loop = MagicMock(spec=asyncio.AbstractEventLoop)
     request_permission = AsyncMock(name="request_permission")
@@ -41,7 +42,14 @@ def _invoke_callback(
         return future
 
     with patch("agent.async_utils.asyncio.run_coroutine_threadsafe", side_effect=_schedule):
-        cb = make_approval_callback(request_permission, loop, session_id="s1", timeout=timeout)
+        cb = make_approval_callback(
+            request_permission,
+            loop,
+            session_id="s1",
+            timeout=timeout,
+            trusted_interactive=trusted_interactive,
+            client_name="test-editor",
+        )
         if use_prompt_path:
             result = prompt_dangerous_approval(
                 "rm -rf /",
@@ -66,6 +74,22 @@ def _invoke_callback(
 
 
 class TestApprovalBridge:
+    def test_untrusted_allow_once_is_denied_without_transport_request(self):
+        loop = MagicMock(spec=asyncio.AbstractEventLoop)
+        request_permission = AsyncMock(name="request_permission")
+        cb = make_approval_callback(
+            request_permission,
+            loop,
+            session_id="s1",
+            trusted_interactive=False,
+            client_name="buzz",
+        )
+
+        result = cb("rm -rf ./scratch", "dangerous command")
+
+        assert result == "deny"
+        request_permission.assert_not_called()
+
     def test_bridge_schedules_request_on_the_given_loop(self):
         result, kwargs, scheduled, _, loop = _invoke_callback(
             AllowedOutcome(option_id="allow_once", outcome="selected"),
@@ -191,7 +215,14 @@ class TestSchedulerFailure:
                 "agent.async_utils.asyncio.run_coroutine_threadsafe",
                 side_effect=RuntimeError("scheduler down"),
             ):
-                cb = make_approval_callback(_request_permission, loop, session_id="s1", timeout=0.01)
+                cb = make_approval_callback(
+                    _request_permission,
+                    loop,
+                    session_id="s1",
+                    timeout=0.01,
+                    trusted_interactive=True,
+                    client_name="test-editor",
+                )
                 result = cb("rm -rf /", "dangerous")
             gc.collect()
 
