@@ -63,6 +63,39 @@ def _memory_tool_names():
 
 
 class TestBuiltinMemoryToolAvailability:
+    def test_master_off_hides_tool_even_when_both_builtin_targets_are_on(self, hermes_home):
+        _write_memory_config(
+            hermes_home,
+            enabled=False,
+            memory_enabled=True,
+            user_profile_enabled=True,
+        )
+        assert "memory" not in _memory_tool_names()
+
+    def test_master_off_blocks_write_from_store_created_while_enabled(self, hermes_home):
+        from tools.memory_tool import MemoryStore, memory_tool
+
+        _write_memory_config(
+            hermes_home,
+            enabled=True,
+            memory_enabled=True,
+            user_profile_enabled=True,
+        )
+        store = MemoryStore(memory_enabled=True, user_profile_enabled=True)
+        store.load_from_disk()
+
+        _write_memory_config(
+            hermes_home,
+            enabled=False,
+            memory_enabled=True,
+            user_profile_enabled=True,
+        )
+        result = json.loads(memory_tool(action="add", target="memory", content="must not persist", store=store))
+
+        assert result["success"] is False
+        assert result["memory_disabled"] is True
+        assert not (hermes_home / "memories" / "MEMORY.md").exists()
+
     def test_tool_hidden_when_both_stores_disabled(self, hermes_home):
         _write_memory_config(
             hermes_home, memory_enabled=False, user_profile_enabled=False
