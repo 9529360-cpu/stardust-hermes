@@ -465,7 +465,16 @@ export function canonicalDesktopSlashCommand(command: string): string {
 
 /** Resolve a command (or alias) to its desktop spec, or null for unknown/extension commands. */
 export function resolveDesktopCommand(command: string): DesktopCommandSpec | null {
-  return SPEC_BY_NAME.get(canonicalDesktopSlashCommand(command)) ?? specFromCatalog(command)
+  const normalized = normalizeCommand(command)
+
+  // Product retirement outranks a stale remote catalog. Desktop and backend can
+  // legitimately be different versions/machines; an older gateway advertising
+  // inherited account commands must not re-enable a surface Stardust removed.
+  if (RETIRED_BUILTIN_COMMANDS.has(normalized)) {
+    return null
+  }
+
+  return SPEC_BY_NAME.get(canonicalDesktopSlashCommand(normalized)) ?? specFromCatalog(normalized)
 }
 
 function isKnownHermesSlashCommand(command: string): boolean {
