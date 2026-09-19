@@ -209,6 +209,7 @@ describe('TurnActivityIndicator tail gating (#68634)', () => {
       vi.advanceTimersByTime(5_000)
     })
 
+    expect(screen.getAllByRole('status', { name: 'Hermes is loading a response' })).toHaveLength(1)
     expect(document.querySelectorAll('[data-slot="aui_response-loading"]').length).toBe(1)
     expect(document.querySelectorAll('[data-slot="aui_turn-activity"]').length).toBe(0)
   })
