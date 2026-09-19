@@ -17,7 +17,7 @@ Two files make up the agent's memory:
 | **MEMORY.md** | Agent's personal notes — environment facts, conventions, things learned | 2,200 chars (~800 tokens) |
 | **USER.md** | User profile — your preferences, communication style, expectations | 1,375 chars (~500 tokens) |
 
-Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a frozen snapshot at session start. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
+Both are stored in `~/.hermes/memories/`. The active prompt uses a frozen snapshot for the current turn; if either file changes on disk, Stardust detects that drift at the next turn boundary, reloads the built-in memory, and rebuilds the cached prompt only when the rendered memory content actually changed. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
 
 :::caution One agent per Hermes home
 Don't point two agent processes at the same Hermes home directory. Memory writes are automatic and load back into the system prompt at session start, so two writers sharing one home will compound each other's entries into state neither of them (nor you) authored. Memory is scoped per [profile](/user-guide/profiles) by design — give a second agent its own profile, and if they need shared memory, use an [external memory provider](/user-guide/features/memory-providers) instead.
@@ -35,7 +35,7 @@ content must be shortened (or another entry removed) to fit.
 
 ## How Memory Appears in the System Prompt
 
-At the start of every session, memory entries are loaded from disk and rendered into the system prompt as a frozen block:
+At the first prompt build for a session, memory entries are loaded from disk and rendered into the system prompt as a frozen block:
 
 ```
 ══════════════════════════════════════════════
@@ -54,15 +54,26 @@ The format includes:
 - Individual entries separated by `§` (section sign) delimiters
 - Entries can be multiline
 
-**Frozen snapshot pattern:** The system prompt injection is captured once at session start and never changes mid-session. This is intentional — it preserves the LLM's prefix cache for performance. When the agent adds/removes memory entries during a session, the changes are persisted to disk immediately but won't appear in the system prompt until the next session starts. Tool responses always show the live state.
+**Turn-frozen snapshot pattern:** The memory block does not mutate during an in-flight model turn. Writes persist to disk immediately; at the next turn boundary Stardust checks the file identity/content digest (and reset generation), reloads when needed, and invalidates the cached prompt only if the rendered memory snapshot changed. That keeps the current turn stable while still making normal memory edits visible on the following turn.
 
-## Memory Needs Session Boundaries
+## Memory Refreshes Between Turns
 
-The whole memory system is built around the moment a session **ends**: `MEMORY.md` and `USER.md` carry the essentials into the next session, and `session_search` fills the gaps once the old context is gone. Inside a single session none of that machinery has a reason to run — everything important is still in the live context, so the agent rarely consults `session_search` and mostly compacts memory entries instead of curating them.
+A long-lived messaging chat can remain one session for weeks, but built-in memory changes do not have to wait for `/new`. The next user turn refreshes the memory snapshot when `MEMORY.md` or `USER.md` changed. `session_search` remains the separate mechanism for recalling details that have fallen out of the live conversation.
 
-This matters on messaging platforms (Telegram, Discord, etc.), where a chat is deliberately [one continuous session](/user-guide/sessions#session-continuity) that survives restarts, gateway crashes, and machine reboots. Shutting the machine down overnight does **not** end the session — the next message picks it up exactly where it left off. If you never reset, a chat can run for weeks as a single session: convenient, but it grows expensive (compaction runs repeatedly over an ever-longer history) and the learning loop of *forget → recall from memory → search past sessions* almost never gets to fire. Fresh memory entries also stay invisible to the running session because of the frozen snapshot above.
+**Practice:** still use `/new` at natural boundaries — a finished task, a change of topic, the start of a day — because a fresh session is cheaper and reduces compaction pressure. It is a context-management boundary, not a requirement for ordinary built-in memory edits to become visible.
 
-**Practice:** run `/new` at natural boundaries — a finished task, a change of topic, the start of a day. Each boundary is when memory pays off: the agent re-reads the updated `MEMORY.md`/`USER.md` snapshot, starts from a cheap short context, and reaches for `session_search` when it actually needs history. On the CLI this mostly takes care of itself (every invocation is a new session); on gateways the boundary is yours to create.
+## Reset / Forget Semantics
+
+The Command Center's **Reset memory**, **Reset profile**, and **Reset both** actions affect only the built-in `MEMORY.md` / `USER.md` files. They do **not** delete data from a configured external memory provider.
+
+A reset advances a durable per-target reset generation under the same file lock used by built-in memory writes. That creates a real forget boundary:
+
+- an already-running turn may still contain the old prompt bytes it started with, but its stale `MemoryStore` can no longer write that target back to disk;
+- memory writes staged before the reset are rejected if approved later instead of restoring forgotten facts;
+- the next turn reloads the reset target and drops the deleted built-in memory from the prompt;
+- reset state is profile-scoped because both the files and generation markers live under that profile's `HERMES_HOME`.
+
+If an older backend does not report the turn-refresh contract to Desktop, Desktop tells you to start a new chat after the reset rather than claiming the old session was refreshed.
 
 ## Memory Tool Actions
 
@@ -72,7 +83,7 @@ The agent uses the `memory` tool with these actions:
 - **replace** — Replace an existing entry with updated content (uses substring matching via `old_text`)
 - **remove** — Remove an entry that's no longer relevant (uses substring matching via `old_text`)
 
-There is no `read` action — memory content is automatically injected into the system prompt at session start. The agent sees its memories as part of its conversation context.
+There is no `read` action — built-in memory content is automatically injected into the system prompt and refreshed at turn boundaries when the files change. The agent sees its memories as part of its conversation context.
 
 ### Substring Matching
 
