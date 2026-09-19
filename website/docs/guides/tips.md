@@ -126,7 +126,7 @@ Memory is intentionally bounded (~2,200 chars for MEMORY.md, ~1,375 chars for US
 After a productive session, say "remember this for next time" and the agent will save the key takeaways. You can also be specific: "save to memory that our CI uses GitHub Actions with the `deploy.yml` workflow."
 
 :::warning
-Memory is a frozen snapshot — changes made during a session don't appear in the system prompt until the next session starts. The agent writes to disk immediately, but the prompt cache isn't invalidated mid-session.
+Memory is frozen only for the in-flight turn. Writes land on disk immediately; the next turn detects changed built-in memory and refreshes the prompt snapshot.
 :::
 
 ## Performance & Cost
