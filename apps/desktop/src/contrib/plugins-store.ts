@@ -28,6 +28,10 @@ export interface PluginRecord {
   packageName?: string
   /** Where that package came from (catalog sidecar or git remote), when known. */
   packageOrigin?: { catalogName?: string; repo?: string; sha?: string }
+  /** Pre-evaluation trust identity. Disk/runtime code can have a plugin id that
+   *  differs from its folder name; decisions must bind to the identity known
+   *  before any module code is evaluated. */
+  decisionKey?: string
 }
 
 // Explicit user enable/disable choices, id -> boolean. ABSENCE means "no
@@ -113,7 +117,10 @@ export function dropPlugin(id: string): void {
 
 /** Live toggle: deactivate + remember, or forget + reactivate. */
 export async function setPluginEnabled(id: string, enabled: boolean): Promise<void> {
-  saveDecisions({ ...$pluginDecisions.get(), [id]: enabled })
+  const record = $pluginRecords.get()[id]
+  const decisionKey = record?.decisionKey ?? id
+
+  saveDecisions({ ...$pluginDecisions.get(), [decisionKey]: enabled })
 
   const handle = handles.get(id)
 
