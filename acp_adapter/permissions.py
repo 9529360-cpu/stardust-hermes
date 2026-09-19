@@ -98,14 +98,33 @@ def await_permission(
         return None, False
 
 
-def make_approval_callback(request_permission_fn: Callable, loop: asyncio.AbstractEventLoop,
-                           session_id: str, timeout: float = 60.0) -> Callable[..., str]:
-    """Return a Hermes approval callback (``command, description, **kw`` as used by
-    ``tools.approval.prompt_dangerous_approval()``) that bridges to the ACP
-    connection's ``request_permission`` coroutine on ``loop``; auto-denies after ``timeout`` s."""
+def make_approval_callback(
+    request_permission_fn: Callable,
+    loop: asyncio.AbstractEventLoop,
+    session_id: str,
+    timeout: float = 60.0,
+    *,
+    trusted_interactive: bool = False,
+    client_name: str = "unknown",
+) -> Callable[..., str]:
+    """Return the dangerous-command approval bridge for one ACP connection.
+
+    ACP ``request_permission`` proves only that the transport returned an option; it does not
+    prove a human saw or selected it. Untrusted clients therefore fail closed without sending a
+    permission request. Trusted interactive clients keep the existing once/session/always mapping.
+    """
 
     def _callback(command: str, description: str, *, allow_permanent: bool = True,
                   allow_session: bool = True, smart_denied: bool = False, **_: object) -> str:
+        if not trusted_interactive:
+            logger.warning(
+                "Denied ACP dangerous-command approval for untrusted client %r; "
+                "configure approvals.acp_trusted_clients to trust a client that presents "
+                "permission UI to a human",
+                client_name or "unknown",
+            )
+            return "deny"
+
         options = _build_permission_options(allow_permanent=allow_permanent, allow_session=allow_session,
                                             smart_denied=smart_denied)
         response, timed_out = await_permission(
