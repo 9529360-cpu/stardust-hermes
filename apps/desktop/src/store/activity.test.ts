@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 
 import type { CronJob, SessionInfo } from '@/types/hermes'
 
+import { buildRailTasks, buildTaskCenterTasks } from './activity'
 import type { ComposerStatusItem } from './composer-status'
 import type { SubagentProgress } from './subagents'
-import { buildRailTasks, buildTaskCenterTasks } from './activity'
 
 const session = (overrides: Partial<SessionInfo> = {}): SessionInfo =>
   ({
