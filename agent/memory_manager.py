@@ -332,40 +332,55 @@ class MemoryManager:
             logger.warning("Memory privacy gate failed; external memory is disabled for this operation", exc_info=True)
             return False
 
-    def _provider_history(self, raw_messages: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    def _provider_history(
+        self,
+        raw_messages: Optional[List[Dict[str, Any]]] = None,
+        *,
+        include_current_turn: bool = False,
+    ) -> List[Dict[str, Any]]:
         """History a provider is allowed to see.
 
         Production managers retain the original message shape (including tool calls/results)
         for turns that completed while memory.enabled was on. Turns completed while the
         master switch was off never enter this exposure ledger, so re-enabling cannot
         backfill that disabled interval through sync, pre-compress, or session-end hooks.
+
+        Pre-compress is special: it can run before the current turn completes, so callers
+        may opt into the last user-delimited slice from the live transcript. That current
+        turn is authorized by the live master gate without reopening older disabled rows.
         Standalone managers without a privacy reader keep the historical raw-message contract.
         """
         if self._privacy_enabled_check is None:
             return list(raw_messages or [])
         with self._provider_visible_history_lock:
-            return [dict(message) for message in self._provider_visible_history]
+            visible = [dict(message) for message in self._provider_visible_history]
+        if include_current_turn:
+            current = self._last_user_slice(raw_messages)
+            if current and current != visible[-len(current):]:
+                visible.extend(current)
+        return visible
 
     @staticmethod
-    def _completed_turn_slice(
-        messages: Optional[List[Dict[str, Any]]],
-        user_content: str,
-        assistant_content: str,
-    ) -> List[Dict[str, Any]]:
-        """Copy only the just-completed turn from a full session transcript.
-
-        The last user-role row is the turn boundary in the conversation format; every
-        following assistant/tool row belongs to that turn. This preserves rich provider
-        inputs such as OpenViking tool-call evidence without exposing earlier disabled
-        transcript rows.
-        """
+    def _last_user_slice(messages: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+        """Copy the last user-delimited turn, preserving assistant/tool message shape."""
         if isinstance(messages, list):
             for index in range(len(messages) - 1, -1, -1):
                 row = messages[index]
                 if isinstance(row, dict) and row.get("role") == "user":
-                    copied = [dict(item) for item in messages[index:] if isinstance(item, dict)]
-                    if copied:
-                        return copied
+                    return [dict(item) for item in messages[index:] if isinstance(item, dict)]
+        return []
+
+    @classmethod
+    def _completed_turn_slice(
+        cls,
+        messages: Optional[List[Dict[str, Any]]],
+        user_content: str,
+        assistant_content: str,
+    ) -> List[Dict[str, Any]]:
+        """Copy only the just-completed turn from a full session transcript."""
+        copied = cls._last_user_slice(messages)
+        if copied:
+            return copied
         rows: List[Dict[str, Any]] = [{"role": "user", "content": user_content}]
         if assistant_content:
             rows.append({"role": "assistant", "content": assistant_content})
@@ -814,8 +829,17 @@ class MemoryManager:
             if require_checkpoint:
                 raise RuntimeError("Memory persistence is disabled by memory.enabled")
             return ""
-        visible_history = self._provider_history(messages)
-        visible_evidence = self._provider_history(evidence_messages)
+        visible_history = self._provider_history(messages, include_current_turn=True)
+        if evidence_messages is None:
+            visible_evidence = []
+        elif self._privacy_enabled_check is None:
+            visible_evidence = list(evidence_messages)
+        else:
+            # Keep checkpoint-v2's existing normalized-evidence contract after
+            # privacy filtering. Reuse the compression owner instead of duplicating
+            # compaction-summary/tool-message rules here.
+            from agent.conversation_compression import _direct_messages_for_pre_compress_memory
+            visible_evidence = _direct_messages_for_pre_compress_memory(visible_history)
         parts = []
         checkpoint_succeeded = False
         for provider in self._providers:
