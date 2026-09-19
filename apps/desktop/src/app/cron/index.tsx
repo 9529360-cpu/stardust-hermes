@@ -52,9 +52,9 @@ import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle } from '@/lib/icons'
 import { requestModelOptions } from '@/lib/model-options'
 import { asText } from '@/lib/text'
+import { $activeConnectionId } from '@/store/connections'
 import { $cronFocusJobId, $cronJobs, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
-import { $activeConnectionId } from '@/store/connections'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
 import { $selectedStoredSessionId } from '@/store/session'
@@ -80,8 +80,8 @@ import {
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 import {
-  BlueprintSlotControl,
   blueprintDisplayDescription,
+  BlueprintSlotControl,
   blueprintDisplayFieldHelp,
   blueprintDisplayFieldLabel,
   blueprintDisplayTitle,
