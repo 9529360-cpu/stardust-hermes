@@ -869,7 +869,13 @@ class MemoryManager:
         if not self._providers:
             return
         if not self._privacy_enabled():
-            self._clear_provider_visible_history()
+            # Stage the new binding host-side without calling the provider while OFF.
+            self.on_session_switch(
+                new_session_id,
+                parent_session_id=parent_session_id,
+                reset=True,
+                reason=reason,
+            )
             return
         snapshot = self._provider_history(messages)
 
@@ -877,7 +883,15 @@ class MemoryManager:
             # Config can flip while this FIFO task is waiting behind a provider write.
             # Re-check at execution time so "off" is fail-closed for queued boundaries.
             if not self._privacy_enabled():
-                self._clear_provider_visible_history()
+                # The switch may have flipped while this FIFO task waited. Preserve
+                # the target binding host-side so re-enable cannot resume on the old
+                # provider session, but do not invoke any provider hook while OFF.
+                self.on_session_switch(
+                    new_session_id,
+                    parent_session_id=parent_session_id,
+                    reset=True,
+                    reason=reason,
+                )
                 return
             try:
                 self._notify_session_end_visible(snapshot)
