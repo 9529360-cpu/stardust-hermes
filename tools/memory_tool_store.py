@@ -12,7 +12,7 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils import atomic_write_text, path_signature
+from utils import atomic_write_text, fsync_directory, path_signature
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 logger = logging.getLogger("tools.memory_tool")
@@ -310,7 +310,22 @@ class MemoryStore:
         marker = cls._reset_generation_path(path)
         new_generation = secrets.token_hex(16)
         with cls._file_lock(path):
+            # Generation state is internal authority. Never follow a marker symlink:
+            # atomic_write_text intentionally preserves symlinks, which would let a
+            # crafted marker redirect this security boundary outside HERMES_HOME.
+            if marker.is_symlink():
+                raise RuntimeError(f"Refusing reset-generation symlink: {marker}")
             atomic_write_text(marker, new_generation, mode=0o600, fsync_dir=True)
+
+            # MEMORY.md / USER.md may be user-created symlinks. Resetting built-in
+            # memory must remove that pointer without erasing the external referent.
+            # The old reset endpoint unlinked the path, so preserve that safety
+            # contract while still making the unlink durable.
+            if path.is_symlink():
+                path.unlink()
+                fsync_directory(path.parent)
+                return True
+
             existed = path.exists()
             if not existed:
                 return False
