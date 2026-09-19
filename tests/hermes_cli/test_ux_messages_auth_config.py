@@ -87,7 +87,7 @@ class TestConfigGuardCopy:
 # ── cli-04: no provider configured ───────────────────────────────────────────────────────────
 
 
-def test_no_provider_configured_points_at_model_login_and_auth_add(monkeypatch, tmp_path):
+def test_no_provider_configured_points_at_model_and_auth_add(monkeypatch, tmp_path):
     from hermes_cli.auth import AuthError, resolve_provider
     from hermes_constants import display_hermes_home
 
@@ -99,7 +99,8 @@ def test_no_provider_configured_points_at_model_login_and_auth_add(monkeypatch, 
 
     msg = str(excinfo.value)
     assert excinfo.value.code == "no_provider_configured"
-    assert "`hermes model`" in msg and "`/login`" in msg and "`hermes auth add <provider>`" in msg
+    assert "`hermes model`" in msg and "`hermes auth add <provider>`" in msg
+    assert "`/login`" not in msg
     assert "~/.hermes/.env" not in msg or display_hermes_home() == "~/.hermes"
     assert f"{display_hermes_home()}/.env" in msg
     assert "inference provider" not in msg

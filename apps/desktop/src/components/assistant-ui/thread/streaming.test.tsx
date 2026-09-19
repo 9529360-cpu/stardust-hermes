@@ -247,6 +247,7 @@ function assistantTerminalMessage(): ThreadMessage {
 }
 
 interface StreamingControls {
+  emitFirst: () => void
   emitSecond: () => void
   complete: () => void
 }
@@ -256,12 +257,11 @@ function StreamingHarness({ onControls }: { onControls?: (controls: StreamingCon
   const [isRunning, setIsRunning] = useState(true)
 
   useEffect(() => {
-    const first = window.setTimeout(() => {
-      setMessages([userMessage(), assistantMessage('first chunk')])
-    }, 50)
-
     if (onControls) {
       onControls({
+        emitFirst: () => {
+          setMessages([userMessage(), assistantMessage('first chunk')])
+        },
         emitSecond: () => {
           setMessages([userMessage(), assistantMessage('first chunk second chunk')])
         },
@@ -271,8 +271,12 @@ function StreamingHarness({ onControls }: { onControls?: (controls: StreamingCon
         }
       })
 
-      return () => window.clearTimeout(first)
+      return
     }
+
+    const first = window.setTimeout(() => {
+      setMessages([userMessage(), assistantMessage('first chunk')])
+    }, 50)
 
     const second = window.setTimeout(() => {
       setMessages([userMessage(), assistantMessage('first chunk second chunk')])
@@ -481,27 +485,42 @@ describe('assistant-ui streaming renderer', () => {
 
     const { container } = render(<StreamingHarness onControls={registerControls} />)
 
-    expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
+    await waitFor(
+      () => {
+        expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
+        expect(controls).toBeTruthy()
+      },
+      { timeout: 5_000 }
+    )
 
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk')
-    })
-    expect(container.textContent).not.toContain('second chunk')
-    expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
+    act(() => controls?.emitFirst())
+    await waitFor(
+      () => {
+        expect(container.textContent).toContain('first chunk')
+        expect(container.textContent).not.toContain('second chunk')
+        expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
+      },
+      { timeout: 5_000 }
+    )
 
-    // Producer-gated, not wall-clock-gated: the old test slept 80ms and
-    // assumed a 500ms timer could not fire before the assertion. On a loaded
-    // runner the test thread could be descheduled for >500ms, so both chunks
-    // arrived and this clean behavior test flaked.
+    // Producer-gated and condition-gated, not sleep-gated. React's state update
+    // can finish before assistant-ui/virtualizer has committed the message DOM,
+    // especially on a saturated CI worker, so wait for the observable boundary.
     act(() => controls?.emitSecond())
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk second chunk')
-    })
+    await waitFor(
+      () => {
+        expect(container.textContent).toContain('first chunk second chunk')
+      },
+      { timeout: 5_000 }
+    )
 
     act(() => controls?.complete())
-    await waitFor(() => {
-      expect(container.textContent).toContain('first chunk second chunk')
-    })
+    await waitFor(
+      () => {
+        expect(container.textContent).toContain('first chunk second chunk')
+      },
+      { timeout: 5_000 }
+    )
   })
 
   it('does not render composer clearance for intro-only threads', () => {

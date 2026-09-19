@@ -11,8 +11,8 @@ import { FileTypeIcon } from '@/components/ui/file-type-icon'
 import { useI18n } from '@/i18n'
 import { displayPath } from '@/lib/display-path'
 import { cn } from '@/lib/utils'
-import { setRightContextOpen } from '@/store/right-context'
 import { openReviewForPath, revealReview } from '@/store/review'
+import { setRightContextOpen } from '@/store/right-context'
 
 // ~5 rows. A turn that rewrites twenty files should still read as one card in
 // the transcript, not a wall the user has to scroll past to reach the composer.
