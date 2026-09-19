@@ -3,6 +3,7 @@
 
 import contextlib
 import copy
+import errno
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 import json
@@ -234,25 +235,43 @@ def _jobs_lock_file() -> Path:
     return _current_cron_store().cron_dir / ".jobs.lock"
 
 
-def _acquire_flock(lock_fd, timeout: float) -> Optional[bool]:
-    """Bounded exclusive lock: True when acquired, False on timeout, None when no backend exists. A
-    blocking flock(LOCK_EX) taken under the in-process lock would let a wedged sibling freeze
-    EVERY cron function forever, so poll LOCK_NB against a deadline; the caller picks the
-    degraded mode."""
+def _lock_contention_error(exc: OSError) -> bool:
+    """Whether a non-blocking advisory-lock error means a peer owns the lock."""
+    if exc.errno is None:
+        return False
     if fcntl is not None:
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                return True
-            except (OSError, IOError):
-                if time.monotonic() >= deadline:
-                    return False
-                time.sleep(0.1)
+        return exc.errno in (errno.EWOULDBLOCK, errno.EAGAIN, errno.EACCES)
     if msvcrt is not None:
-        getattr(msvcrt, "locking")(lock_fd.fileno(), getattr(msvcrt, "LK_LOCK"), 1)
-        return True
-    return None
+        return exc.errno in (errno.EACCES, errno.EDEADLK)
+    return False
+
+
+def _acquire_flock(lock_fd, timeout: float) -> Optional[bool]:
+    """Bounded exclusive lock: True when acquired, False on timeout, None when no backend exists.
+
+    Both POSIX and Windows use a non-blocking lock attempt against the same deadline. A blocking
+    lock under the in-process lock would let a wedged sibling freeze every cron function forever.
+    """
+    if fcntl is None and msvcrt is None:
+        return None
+
+    deadline = time.monotonic() + max(0.0, timeout)
+    while True:
+        try:
+            if fcntl is not None:
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            else:
+                getattr(msvcrt, "locking")(
+                    lock_fd.fileno(), getattr(msvcrt, "LK_NBLCK"), 1
+                )
+            return True
+        except (OSError, IOError) as exc:
+            if not _lock_contention_error(exc):
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(0.1, remaining))
 
 
 def _release_flock(lock_fd) -> None:
