@@ -62,6 +62,33 @@ def test_relative_health_file_is_scoped_to_active_profile(monkeypatch, tmp_path)
     assert second_path.read_bytes() != b""
 
 
+def test_relative_health_file_follows_context_scoped_profile_override(monkeypatch, tmp_path):
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "process-default"))
+    monkeypatch.setattr(
+        route_health,
+        "_config",
+        lambda: {"persistent_health": True, "health_file": "runtime/route-health.json"},
+    )
+    first = tmp_path / "profiles" / "first"
+    second = tmp_path / "profiles" / "second"
+
+    first_token = set_hermes_home_override(first)
+    try:
+        route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+        assert route_health.state_path() == (first / "runtime" / "route-health.json").resolve(strict=False)
+    finally:
+        reset_hermes_home_override(first_token)
+
+    second_token = set_hermes_home_override(second)
+    try:
+        assert route_health.state_path() == (second / "runtime" / "route-health.json").resolve(strict=False)
+        assert route_health.allow_route("p", "m", "https://x.test") == (True, 0, "healthy")
+    finally:
+        reset_hermes_home_override(second_token)
+
+
 def test_relative_health_file_cannot_escape_profile(monkeypatch, tmp_path, caplog):
     home = tmp_path / "profile"
     monkeypatch.setenv("HERMES_HOME", str(home))
