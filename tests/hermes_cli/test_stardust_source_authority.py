@@ -239,3 +239,17 @@ def test_runtime_recovery_guidance_stays_on_stardust_source() -> None:
         assert "hermes-agent.nousresearch.com/install.sh" not in source
         assert "hermes-agent.nousresearch.com/install.ps1" not in source
     assert "reinstall from https://hermes-agent.nousresearch.com" not in zip_update
+
+
+
+def test_passive_and_deep_update_authority_is_stardust() -> None:
+    banner = _read("hermes_cli/banner.py")
+    updater = _read("hermes_cli/update_cmd_git.py")
+
+    assert "9529360-cpu/stardust-hermes" in banner
+    assert "repos/9529360-cpu/stardust-hermes/compare/" in banner
+    assert "NousResearch/hermes-agent" not in banner
+    assert "nousresearch/hermes-agent" not in banner
+
+    assert "9529360-cpu/stardust-hermes" in updater
+    assert "NousResearch/hermes-agent" not in updater
