@@ -23,12 +23,13 @@ from utils import atomic_json_write
 logger = logging.getLogger(__name__)
 
 DEFAULT_CATALOG_URL = (
-    "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json")
-# The Docusaurus site sits behind Vercel, which occasionally 403s non-browser clients (bot
-# challenge); the raw GitHub copy is the same manifest and is not bot-gated.
+    "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json")
+# Keep an alternate GitHub route to the same Stardust-owned artifact so a
+# transient raw.githubusercontent.com failure does not freeze the catalog.
 DEFAULT_CATALOG_FALLBACK_URLS: tuple[str, ...] = (
-    "https://raw.githubusercontent.com/NousResearch/hermes-agent/main/website/static/api/model-catalog.json",
+    "https://github.com/9529360-cpu/stardust-hermes/raw/refs/heads/main/website/static/api/model-catalog.json",
 )
+
 DEFAULT_TTL_MINUTES = 20
 # Legacy key, honoured only when the user set it explicitly; ``ttl_minutes`` is the shipped default.
 DEFAULT_TTL_HOURS = DEFAULT_TTL_MINUTES / 60.0
