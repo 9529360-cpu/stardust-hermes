@@ -247,6 +247,7 @@ function assistantTerminalMessage(): ThreadMessage {
 }
 
 interface StreamingControls {
+  emitFirst: () => void
   emitSecond: () => void
   complete: () => void
 }
@@ -256,12 +257,11 @@ function StreamingHarness({ onControls }: { onControls?: (controls: StreamingCon
   const [isRunning, setIsRunning] = useState(true)
 
   useEffect(() => {
-    const first = window.setTimeout(() => {
-      setMessages([userMessage(), assistantMessage('first chunk')])
-    }, 50)
-
     if (onControls) {
       onControls({
+        emitFirst: () => {
+          setMessages([userMessage(), assistantMessage('first chunk')])
+        },
         emitSecond: () => {
           setMessages([userMessage(), assistantMessage('first chunk second chunk')])
         },
@@ -271,8 +271,12 @@ function StreamingHarness({ onControls }: { onControls?: (controls: StreamingCon
         }
       })
 
-      return () => window.clearTimeout(first)
+      return
     }
+
+    const first = window.setTimeout(() => {
+      setMessages([userMessage(), assistantMessage('first chunk')])
+    }, 50)
 
     const second = window.setTimeout(() => {
       setMessages([userMessage(), assistantMessage('first chunk second chunk')])
@@ -483,16 +487,17 @@ describe('assistant-ui streaming renderer', () => {
 
     expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
 
+    act(() => controls?.emitFirst())
     await waitFor(() => {
       expect(container.textContent).toContain('first chunk')
     })
     expect(container.textContent).not.toContain('second chunk')
     expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
 
-    // Producer-gated, not wall-clock-gated: the old test slept 80ms and
-    // assumed a 500ms timer could not fire before the assertion. On a loaded
-    // runner the test thread could be descheduled for >500ms, so both chunks
-    // arrived and this clean behavior test flaked.
+    // Fully producer-gated, not wall-clock-gated: CI can deschedule this test
+    // for seconds without advancing the synthetic stream. Both chunk
+    // boundaries are explicit, so the assertion tests rendering rather than
+    // scheduler timing.
     act(() => controls?.emitSecond())
     await waitFor(() => {
       expect(container.textContent).toContain('first chunk second chunk')
