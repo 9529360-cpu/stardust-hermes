@@ -81,6 +81,12 @@ def _local_session_origin_for_create(deliver: Optional[str], session_id: Optiona
     if requested not in {"", "origin"}:
         return None
     try:
+        from agent.delegation_context import is_delegated_child_context
+        if is_delegated_child_context():
+            return None
+    except Exception:
+        pass
+    try:
         from gateway.session_context import get_session_env
         source = str(get_session_env("HERMES_SESSION_SOURCE", "") or "").strip().lower()
         durable_session_id = str(get_session_env("HERMES_SESSION_ID", "") or session_id or "").strip()
