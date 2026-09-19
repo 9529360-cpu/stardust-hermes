@@ -120,6 +120,12 @@ jobs:
     if: needs.detect.outputs.rust == 'true'
     uses: ./.github/workflows/rust-tests.yml
 
+  stardust-visual-smoke:
+    name: Stardust Desktop smoke
+    needs: detect
+    if: ${{ needs.detect.outputs.python_prod == 'true' || needs.detect.outputs.frontend == 'true' }}
+    uses: ./.github/workflows/stardust-visual-smoke.yml
+
   e2e-desktop:
     name: Desktop E2E
     needs: detect
@@ -239,6 +245,7 @@ jobs:
       - js-tests
       - installer-tests
       - rust-tests
+      - stardust-visual-smoke
       - e2e-desktop
       - docs-site
       - history-check
