@@ -147,6 +147,20 @@ def test_publish_durable_completion_is_idempotent_and_enqueued(tmp_path, monkeyp
     assert process_registry.completion_queue.empty()
 
 
+def test_external_cron_worker_persists_without_process_local_queue(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("_HERMES_CRON_EXTERNAL_WORKER", "exec-worker")
+
+    assert ad.publish_durable_completion(
+        delegation_id="cron_exec_worker", session_key="desktop-worker-session",
+        parent_session_id="desktop-worker-session", goal="Worker task", summary="done", role="cron_run") is True
+    assert process_registry.completion_queue.empty()
+
+    restored = ad.restore_matching_undelivered_completions(
+        process_registry.completion_queue, lambda evt: evt.get("session_key") == "desktop-worker-session")
+    assert restored == 1
+    assert _drain_for("cron_exec_worker") is not None
+
 def test_restore_matching_completion_recovers_after_in_memory_copy_is_lost(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     ad.publish_durable_completion(
