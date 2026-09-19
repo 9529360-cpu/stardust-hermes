@@ -1594,6 +1594,13 @@ export const zhHant = defineLocale({
         '此設定未安裝智能體部分，且套件是手動複製的（沒有目錄條目或 Git 遠端），因此無法從此處安裝。請將資料夾複製到該設定，或從 Git 重新安裝。',
       desktopHalfPending: '複製中…',
       desktopHalfPendingTip: '此套件附帶的桌面部分尚未複製到應用。請重新掃描或重新啟動應用。',
+      desktopFullAccessBadge: '完整應用權限',
+      desktopTrustWarning:
+        '外部桌面外掛程式碼會直接在 Stardust 中執行，擁有與應用渲染層/應用本身相同的權限。外掛宣告的能力只是用途說明，不是沙箱權限邊界。',
+      desktopTrustTitle: (name: string) => `信任並啟用 ${name}？`,
+      desktopTrustConfirm: '信任並啟用',
+      desktopTrustSource: (repo: string, sha: string) => `來源：${repo}${sha ? ` · 固定提交 ${sha}` : ''}`,
+      desktopTrustLocalSource: '來源：本機磁碟；未記錄外掛目錄或 Git 來源。',
       emptyAll: '尚無外掛。',
       empty: '此設定尚未安裝任何智能體外掛。',
       emptyHint: '在下方目錄中瀏覽，一鍵安裝經過審核的外掛。',
