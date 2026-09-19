@@ -1768,6 +1768,14 @@ export const en: Translations = {
       desktopHalfPending: 'copying…',
       desktopHalfPendingTip:
         'This package ships a desktop half that has not been copied into the app yet. Use Rescan, or restart the app.',
+      desktopFullAccessBadge: 'full app access',
+      desktopTrustWarning:
+        'External Desktop code runs inside Stardust with the same renderer/app authority as the app itself. Declared capabilities describe intent; they are not sandbox permissions.',
+      desktopTrustTitle: (name: string) => `Trust and enable ${name}?`,
+      desktopTrustConfirm: 'Trust & enable',
+      desktopTrustSource: (repo: string, sha: string) =>
+        `Source: ${repo}${sha ? ` · pinned ${sha}` : ''}`,
+      desktopTrustLocalSource: 'Source: local disk; no catalog/Git origin is recorded.',
       emptyAll: 'No plugins yet.',
       empty: 'No agent plugins installed for this profile.',
       emptyHint: 'Browse the catalog below and install a reviewed plugin with one click.',
