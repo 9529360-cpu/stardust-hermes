@@ -385,7 +385,7 @@ def test_marker_written_after_pull_cleared_after_successful_restart(
 
     monkeypatch.setattr(update_cmd, "_write_fleet_restart_pending_marker", _spy)
 
-    hermes_main.cmd_update(args)
+    hermes_main._run_update_transaction(args)
 
     assert wrote == [True], "marker must exist immediately after HEAD advances"
     assert not update_cmd._fleet_restart_pending_marker_path().exists()
@@ -412,7 +412,7 @@ def test_clean_update_warns_about_surviving_pre_update_serve_runtime(
         ],
     )
 
-    hermes_main.cmd_update(args)
+    hermes_main._run_update_transaction(args)
 
     out = capsys.readouterr().out
     assert "pid 5555" in out
@@ -469,7 +469,7 @@ def test_clean_update_escalates_surviving_serve_as_unaccounted(
     )
 
     with pytest.raises(SystemExit) as excinfo:
-        hermes_main.cmd_update(args)
+        hermes_main._run_update_transaction(args)
     assert excinfo.value.code == 1
 
     out = capsys.readouterr().out
@@ -496,7 +496,7 @@ def test_interrupt_between_pull_and_restart_leaves_marker(
     monkeypatch.setattr(hermes_main, "_clear_bytecode_cache", _interrupt)
 
     with pytest.raises(KeyboardInterrupt):
-        hermes_main.cmd_update(args)
+        hermes_main._run_update_transaction(args)
 
     marker = update_cmd._fleet_restart_pending_marker_path()
     assert marker.is_file()
@@ -519,7 +519,7 @@ def test_already_up_to_date_runs_pending_restart_when_marker_present(
     monkeypatch.setattr(update_cmd, "_run_pending_fleet_restart", _restart)
     monkeypatch.setattr(update_cmd_fleet, "_run_pending_fleet_restart", _restart)
 
-    hermes_main.cmd_update(args)
+    hermes_main._run_update_transaction(args)
 
     assert seen["ran"] is True
     assert not update_cmd._fleet_restart_pending_marker_path().exists()
@@ -572,7 +572,7 @@ def test_already_up_to_date_runs_pending_restart_when_receipt_skewed(
         lambda: seen.__setitem__("ran", True) or True,
     )
 
-    hermes_main.cmd_update(args)
+    hermes_main._run_update_transaction(args)
 
     assert seen["ran"] is True
     out = capsys.readouterr().out
@@ -597,7 +597,7 @@ def test_already_up_to_date_skips_restart_when_nothing_pending(
         lambda: seen.__setitem__("ran", True) or True,
     )
 
-    hermes_main.cmd_update(args)
+    hermes_main._run_update_transaction(args)
 
     assert seen["ran"] is False
     assert "did not restart running gateways" not in capsys.readouterr().out
