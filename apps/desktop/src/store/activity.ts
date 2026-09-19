@@ -214,6 +214,7 @@ const flattenSubagents = (
 ): TaskCenterTask[] =>
   nodes.flatMap(node => {
     const detail = node.currentTool || node.summary || node.stream.at(-1)?.text || 'Delegated task'
+
     const task: TaskCenterTask = {
       action: node.sessionId ? 'open-session' : undefined,
       artifactRefs: node.filesWritten,
