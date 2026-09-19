@@ -5,9 +5,11 @@ blueprint->suggestion bridge, and the shared command handler. Uses an isolated
 HERMES_HOME so the real suggestions.json is never touched.
 """
 
+from concurrent.futures import ThreadPoolExecutor
 import importlib
 import json
 from pathlib import Path
+import threading
 from unittest.mock import patch
 
 import pytest
@@ -82,6 +84,14 @@ class TestStore:
         assert (profile_b / "cron" / "suggestions.json").exists()
         assert not (profile_a / "cron" / "suggestions.json").exists()
 
+    def test_mutation_fails_closed_without_cross_process_lock_backend(self, store, monkeypatch):
+        import cron.jobs as cron_jobs
+
+        monkeypatch.setattr(cron_jobs, "_acquire_flock", lambda _fd, _timeout: None)
+        with pytest.raises(RuntimeError, match="cross-process suggestion locking is unavailable"):
+            _add(store, key="no-flock")
+        assert store.load_suggestions() == []
+
     def test_add_and_list_pending(self, store):
         rec = _add(store)
         assert rec is not None
@@ -101,6 +111,15 @@ class TestStore:
         assert store.list_pending() == []
         # Re-adding the same key is refused (never re-offer a dismissed one).
         assert _add(store, key="latch") is None
+
+    def test_resolved_accept_cannot_be_overwritten_by_dismiss(self, store):
+        rec = _add(store, key="accepted-immutable")
+        assert rec is not None
+        with patch("cron.jobs.create_job", lambda **kwargs: {"id": "accepted-job", **kwargs}):
+            assert store.accept_suggestion(rec["id"]) is not None
+
+        assert store.dismiss_suggestion(rec["id"]) is False
+        assert store.get_suggestion(rec["id"])["status"] == "accepted"
 
     def test_unknown_source_rejected(self, store):
         with pytest.raises(ValueError):
@@ -168,6 +187,69 @@ class TestStore:
         assert job is not None
         assert created["local_session_origin"] == {
             "source": "desktop", "session_id": "desktop-suggestion-session"}
+
+    def test_accept_uses_prevalidated_local_return_route(self, store):
+        _add(store, key="validated-return", title="Desktop Job")
+        created = {}
+
+        def fake_create_job(**kwargs):
+            created.update(kwargs)
+            return {"id": "job-local", **kwargs}
+
+        with patch("cron.jobs.create_job", fake_create_job):
+            job = store.accept_suggestion(
+                "1", local_session_origin={"source": "desktop", "session_id": "stored-chat"})
+
+        assert job is not None
+        assert created["local_session_origin"] == {"source": "desktop", "session_id": "stored-chat"}
+
+    def test_explicit_external_delivery_does_not_gain_local_return(self, store):
+        rec = store.add_suggestion(
+            title="External", description="desc", source="catalog",
+            job_spec={
+                "prompt": "do it", "schedule": "0 9 * * *", "name": "External",
+                "deliver": "telegram",
+            },
+            dedup_key="external-return",
+        )
+        assert rec is not None
+        created = {}
+
+        def fake_create_job(**kwargs):
+            created.update(kwargs)
+            return {"id": "job-external", **kwargs}
+
+        with patch("cron.jobs.create_job", fake_create_job):
+            job = store.accept_suggestion(
+                rec["id"], local_session_origin={"source": "desktop", "session_id": "stored-chat"})
+
+        assert job is not None
+        assert "local_session_origin" not in created
+
+    def test_concurrent_accept_creates_exactly_one_job(self, store):
+        rec = _add(store, key="accept-race", title="Race Job")
+        assert rec is not None
+        entered = threading.Event()
+        release = threading.Event()
+        calls = []
+
+        def fake_create_job(**kwargs):
+            calls.append(kwargs)
+            entered.set()
+            assert release.wait(5), "test did not release first create"
+            return {"id": "race-job", **kwargs}
+
+        with patch("cron.scheduler.create_job_with_scheduler_registration", fake_create_job):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(store.accept_suggestion, rec["id"])
+                assert entered.wait(5), "first accept did not reach create"
+                second = pool.submit(store.accept_suggestion, rec["id"])
+                release.set()
+                results = [first.result(timeout=5), second.result(timeout=5)]
+
+        assert len(calls) == 1
+        assert sum(result is not None for result in results) == 1
+        assert store.get_suggestion(rec["id"])["status"] == "accepted"
 
     def test_registration_failure_marks_suggestion_accepted(self, store):
         """Retrying an acceptance must not create a duplicate durable job."""

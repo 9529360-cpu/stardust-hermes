@@ -19,7 +19,7 @@ from hermes_cli.config import cfg_get
 from hermes_cli.web_server_cron import (
     _create_cron_job_sync, _cron_optional_text, _cron_string_list, _mutate_cron_for_profile, _normalize_dashboard_cron_script, _raise_if_cron_registration_error, _run_cron_dashboard_io, _validate_dashboard_cron_context_from, _validate_dashboard_cron_effective_job,
 )
-from hermes_cli.web_models import AutomationBlueprintInstantiate, CronJobCreate, CronJobUpdate
+from hermes_cli.web_models import AutomationBlueprintInstantiate, CronJobCreate, CronJobUpdate, CronSuggestionAccept
 from hermes_cli.web_routers._common import log as _log
 
 router = APIRouter()
@@ -30,10 +30,12 @@ _forward_cron_fire_to_gateway = late("_forward_cron_fire_to_gateway", "hermes_cl
 _gateway_intentionally_stopped = late("_gateway_intentionally_stopped", "hermes_cli.web_server_cron")
 _notify_cron_provider_for_profile = late("_notify_cron_provider_for_profile", "hermes_cli.web_server_cron")
 _call_cron_for_profile = late("_call_cron_for_profile", "hermes_cli.web_server_cron")
+_call_suggestions_for_profile = late("_call_suggestions_for_profile", "hermes_cli.web_server_cron")
 load_config = late("load_config", "hermes_cli.config")
 _cron_profile_dicts = late("_cron_profile_dicts", "hermes_cli.web_server_cron")
 _cron_profile_home = late("_cron_profile_home", "hermes_cli.web_server_cron")
 _open_session_db_for_profile = late("_open_session_db_for_profile", "hermes_cli.web_server_sessions")
+
 
 def _job_not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="Job not found")
@@ -202,6 +204,83 @@ def _delete_cron_job_sync(job_id: str, profile: Optional[str] = None):
     return {"ok": True}
 
 
+_SUGGESTION_BLUEPRINT_KEYS = {
+    "catalog:daily-briefing": "morning-brief",
+    "catalog:important-mail-monitor": "important-mail",
+    "catalog:weekly-review": "weekly-review",
+    "catalog:standup-reminder": "workday-start",
+}
+
+_SUGGESTION_RETURN_DENY_SOURCES = frozenset({"cron", "kanban", "subagent", "tool"})
+
+
+def _suggestion_public_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Small renderer-facing projection; the stored prompt/script remain backend-owned."""
+    spec = row.get("job_spec") if isinstance(row.get("job_spec"), dict) else {}
+    dedup_key = str(row.get("dedup_key") or "")
+    return {
+        "id": str(row.get("id") or ""),
+        "title": str(row.get("title") or ""),
+        "description": str(row.get("description") or ""),
+        "source": str(row.get("source") or ""),
+        "created_at": row.get("created_at"),
+        "blueprint_key": _SUGGESTION_BLUEPRINT_KEYS.get(dedup_key),
+        "job_spec": {
+            key: spec.get(key)
+            for key in ("name", "schedule", "deliver", "skills")
+            if spec.get(key) not in (None, "", [])
+        },
+    }
+
+
+def _list_cron_suggestions_sync(profile: Optional[str] = None):
+    profile_name, _home = _cron_profile_home(profile)
+    rows = _call_suggestions_for_profile(profile_name, "list_pending")
+    return {"profile": profile_name, "suggestions": [_suggestion_public_row(row) for row in rows]}
+
+
+def _desktop_suggestion_return_origin(profile: Optional[str], session_id: str) -> Dict[str, str]:
+    """Validate a durable Desktop conversation in the same profile before routing cron output to it."""
+    profile_name, _home = _cron_profile_home(profile)
+    requested = str(session_id or "").strip()
+    if not requested:
+        raise HTTPException(status_code=409, detail="A persisted Desktop conversation is required.")
+
+    db = _open_session_db_for_profile(profile_name, read_only=True)
+    try:
+        tip = db.get_compression_tip(requested) or requested
+        row = db.get_session(tip)
+    finally:
+        db.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Desktop conversation not found in this profile.")
+    if row.get("archived"):
+        raise HTTPException(status_code=409, detail="Archived conversations cannot receive scheduled results.")
+    if row.get("hidden") or str(row.get("source") or "").strip().lower() in _SUGGESTION_RETURN_DENY_SOURCES:
+        raise HTTPException(status_code=409, detail="Automation/internal sessions cannot receive suggested jobs.")
+    # The row's source is historical provenance (it may be Telegram/CLI/etc.); this request is made
+    # from the Desktop review surface, so the durable return route is intentionally Desktop-local.
+    return {"source": "desktop", "session_id": str(row.get("id") or tip)}
+
+
+def _accept_cron_suggestion_sync(ref: str, body: CronSuggestionAccept, profile: Optional[str] = None):
+    profile_name, _home = _cron_profile_home(profile)
+    local_origin = _desktop_suggestion_return_origin(profile_name, body.session_id)
+    job = _call_suggestions_for_profile(
+        profile_name, "accept_suggestion", ref, local_session_origin=local_origin)
+    if job is None:
+        raise HTTPException(status_code=409, detail="Suggestion is no longer pending.")
+    return job
+
+
+def _dismiss_cron_suggestion_sync(ref: str, profile: Optional[str] = None):
+    profile_name, _home = _cron_profile_home(profile)
+    if not _call_suggestions_for_profile(profile_name, "dismiss_suggestion", ref):
+        raise HTTPException(status_code=409, detail="Suggestion is no longer pending.")
+    return {"ok": True, "id": ref}
+
+
 # Retry-After (seconds) on retryable cron-fire 503s: sized to clear a
 # scale-to-zero wake or gateway restart so a scheduler that honors it spaces its
 # next attempt past the outage instead of burning its retry budget in it.
@@ -227,6 +306,20 @@ async def list_cron_job_runs(job_id: str, profile: Optional[str] = None, limit: 
 async def create_cron_job(body: CronJobCreate, profile: Optional[str] = None):
     return await _run_cron_dashboard_io(_create_cron_job_sync, body, profile)
 
+
+@router.get("/api/cron/suggestions")
+async def list_cron_suggestions(profile: Optional[str] = None):
+    return await _run_cron_dashboard_io(_list_cron_suggestions_sync, profile)
+
+
+@router.post("/api/cron/suggestions/{ref}/accept")
+async def accept_cron_suggestion(ref: str, body: CronSuggestionAccept, profile: Optional[str] = None):
+    return await _run_cron_dashboard_io(_accept_cron_suggestion_sync, ref, body, profile)
+
+
+@router.post("/api/cron/suggestions/{ref}/dismiss")
+async def dismiss_cron_suggestion(ref: str, profile: Optional[str] = None):
+    return await _run_cron_dashboard_io(_dismiss_cron_suggestion_sync, ref, profile)
 
 @router.get("/api/cron/delivery-targets")
 async def get_cron_delivery_targets():

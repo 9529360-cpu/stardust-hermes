@@ -30,14 +30,18 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  acceptCronSuggestion,
   type AutomationBlueprint,
   createCronJob,
   type CronDeliveryTarget,
   type CronJob,
+  type CronSuggestion,
   deleteCronJob,
+  dismissCronSuggestion,
   getAutomationBlueprints,
   getCronDeliveryTargets,
   getCronJobRuns,
+  getCronSuggestions,
   instantiateAutomationBlueprint,
   pauseCronJob,
   resumeCronJob,
@@ -50,8 +54,10 @@ import { requestModelOptions } from '@/lib/model-options'
 import { asText } from '@/lib/text'
 import { $cronFocusJobId, $cronJobs, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
+import { $activeConnectionId } from '@/store/connections'
 import { notify, notifyError } from '@/store/notifications'
-import { $profileScope, ALL_PROFILES } from '@/store/profile'
+import { $activeGatewayProfile, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
+import { $selectedStoredSessionId } from '@/store/session'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import {
@@ -298,6 +304,34 @@ function matchesQuery(job: CronJob, q: string): boolean {
   )
 }
 
+function suggestionDisplayTitle(suggestion: CronSuggestion, c: Translations['cron']): string {
+  const key = suggestion.blueprint_key
+
+  return (key ? c.blueprints.catalog[key]?.title : undefined) ?? suggestion.title
+}
+
+function suggestionDisplayDescription(suggestion: CronSuggestion, c: Translations['cron']): string {
+  const key = suggestion.blueprint_key
+
+  return (key ? c.blueprints.catalog[key]?.description : undefined) ?? suggestion.description
+}
+
+function matchesSuggestion(suggestion: CronSuggestion, q: string, c: Translations['cron']): boolean {
+  if (!q) {
+    return true
+  }
+
+  const needle = q.toLowerCase()
+
+  return [
+    suggestionDisplayTitle(suggestion, c),
+    suggestionDisplayDescription(suggestion, c),
+    suggestion.title,
+    suggestion.description,
+    suggestion.job_spec.schedule ?? ''
+  ].some(value => value.toLowerCase().includes(needle))
+}
+
 interface CronViewProps extends React.ComponentProps<'section'> {
   onClose: () => void
   onOpenSession?: (sessionId: string) => void
@@ -353,12 +387,21 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
 
   const [editor, setEditor] = useState<EditorState>({ mode: 'closed' })
   const [pendingDelete, setPendingDelete] = useState<CronJob | null>(null)
+  const [selectedSuggestionId, setSelectedSuggestionId] = useState<null | string>(null)
+  const [busySuggestionId, setBusySuggestionId] = useState<null | string>(null)
 
   // Jobs live per-profile on disk and the list endpoint aggregates 'all' by
   // default — scope the fetch to the sidebar's profile scope so this overlay
   // and the sidebar (which share the $cronJobs atom) agree on what's shown.
   const profileScope = useStore($profileScope)
+  const activeGatewayProfile = useStore($activeGatewayProfile)
+  const activeConnectionId = useStore($activeConnectionId)
+  const selectedStoredSessionId = useStore($selectedStoredSessionId)
   const profile = cronProfileForScope(profileScope)
+  // Consent decisions are profile-local. Even while the jobs view is aggregated,
+  // suggestions belong to the active profile on the active connection.
+  const suggestionProfile =
+    profileScope === ALL_PROFILES ? normalizeProfileKey(activeGatewayProfile) : normalizeProfileKey(profileScope)
 
   const refresh = useCallback(async () => {
     const { refreshError, stale } = await refreshCronJobs(profile)
@@ -396,6 +439,7 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
     const match = jobs.find(job => job.id === focusJobId || jobName(job) === focusJobId)
 
     if (match) {
+      setSelectedSuggestionId(null)
       setSelectedJobId(match.id)
       pendingScrollRef.current = match.id
     }
@@ -406,6 +450,29 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const visibleJobs = useMemo(
     () => jobs.filter(job => matchesQuery(job, query.trim())).sort((a, b) => jobTitle(a).localeCompare(jobTitle(b))),
     [jobs, query]
+  )
+
+  const suggestionsQuery = useQuery({
+    queryKey: ['cron-suggestions', activeConnectionId || 'local', suggestionProfile],
+    queryFn: () => getCronSuggestions(suggestionProfile),
+    retry: false
+  })
+
+  const visibleSuggestions = useMemo(() => {
+    const needle = query.trim()
+
+    return (suggestionsQuery.data ?? []).filter(item => matchesSuggestion(item, needle, c))
+  }, [c, query, suggestionsQuery.data])
+
+  useEffect(() => {
+    setSelectedSuggestionId(null)
+  }, [activeConnectionId, suggestionProfile])
+
+  const selectedSuggestion = useMemo(
+    () =>
+      visibleSuggestions.find(item => item.id === selectedSuggestionId) ??
+      (visibleJobs.length === 0 ? (visibleSuggestions[0] ?? null) : null),
+    [selectedSuggestionId, visibleJobs.length, visibleSuggestions]
   )
 
   // Blueprint recipes render in the same list rail, below the jobs — clicking
@@ -434,8 +501,8 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   // Detail always reflects a concrete job: the explicitly selected one, else the
   // first visible row, so the right pane is never empty while jobs exist.
   const selectedJob = useMemo(
-    () => visibleJobs.find(job => job.id === selectedJobId) ?? visibleJobs[0] ?? null,
-    [visibleJobs, selectedJobId]
+    () => (selectedSuggestion ? null : (visibleJobs.find(job => job.id === selectedJobId) ?? visibleJobs[0] ?? null)),
+    [selectedSuggestion, selectedJobId, visibleJobs]
   )
 
   // Scroll a sidebar-opened job into view once its list row is mounted.
@@ -619,6 +686,64 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
     setEditor({ mode: 'closed' })
   }
 
+  async function handleSuggestionAccept(suggestion: CronSuggestion) {
+    if (!selectedStoredSessionId || busySuggestionId) {
+      return
+    }
+
+    setBusySuggestionId(suggestion.id)
+    try {
+      const { value: job, refreshError, stale } = await mutateAndRefreshCronJobs(profile, () =>
+        acceptCronSuggestion(suggestion.id, suggestionProfile, selectedStoredSessionId)
+      )
+      await suggestionsQuery.refetch()
+
+      if (stale || !job) {
+        return
+      }
+      if (refreshError) {
+        notifyError(refreshError, c.failedLoad)
+      }
+
+      setSelectedSuggestionId(null)
+      setSelectedJobId(job.id)
+      notify({
+        kind: 'success',
+        title: c.suggestions.scheduled,
+        message: truncate(suggestionDisplayTitle(suggestion, c), 60)
+      })
+    } catch (error) {
+      // The action may have committed before a network/reconciliation failure. Re-read both
+      // backend-owned stores before surfacing the error so the UI never invites a duplicate retry.
+      await Promise.allSettled([suggestionsQuery.refetch(), refresh()])
+      notifyError(error, c.suggestions.actionFailed)
+    } finally {
+      setBusySuggestionId(current => (current === suggestion.id ? null : current))
+    }
+  }
+
+  async function handleSuggestionDismiss(suggestion: CronSuggestion) {
+    if (busySuggestionId) {
+      return
+    }
+
+    setBusySuggestionId(suggestion.id)
+    try {
+      await dismissCronSuggestion(suggestion.id, suggestionProfile)
+      await suggestionsQuery.refetch()
+      setSelectedSuggestionId(current => (current === suggestion.id ? null : current))
+      notify({
+        kind: 'success',
+        title: c.suggestions.dismissed,
+        message: truncate(suggestionDisplayTitle(suggestion, c), 60)
+      })
+    } catch (error) {
+      await suggestionsQuery.refetch()
+      notifyError(error, c.suggestions.actionFailed)
+    } finally {
+      setBusySuggestionId(current => (current === suggestion.id ? null : current))
+    }
+  }
   // Blueprint instantiation is a distinct backend path (fills typed slots, then
   // creates the job) so it can't share the raw-cron onSave contract. Merge the
   // created job into $cronJobs like every other create path. A blueprint writes a
@@ -655,9 +780,12 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
     <Panel closeLabel={c.close} onClose={onClose}>
       <PanelHeader subtitle={c.count(totalCount)} title={c.title} />
 
-      {loading && jobs.length === 0 ? (
+      {(loading || suggestionsQuery.isLoading || blueprintsQuery.isLoading) &&
+      jobs.length === 0 &&
+      visibleSuggestions.length === 0 &&
+      visibleBlueprints.length === 0 ? (
         <PageLoader label={c.loading} />
-      ) : totalCount === 0 && visibleBlueprints.length === 0 ? (
+      ) : totalCount === 0 && visibleSuggestions.length === 0 && visibleBlueprints.length === 0 ? (
         <PanelEmpty
           action={
             <Button onClick={() => setEditor({ mode: 'create' })} size="sm">
@@ -691,15 +819,36 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
                   { icon: 'trash', label: t.common.delete, onSelect: () => setPendingDelete(job), tone: 'danger' }
                 ]}
                 menuLabel={c.manage}
-                onSelect={() => setSelectedJobId(job.id)}
+                onSelect={() => {
+                  setSelectedSuggestionId(null)
+                  setSelectedJobId(job.id)
+                }}
               />
             ))}
-            {visibleJobs.length === 0 && (
+            {visibleJobs.length === 0 && visibleSuggestions.length === 0 && visibleBlueprints.length === 0 && (
               <p className="px-2 py-4 text-center text-xs text-muted-foreground">
                 {query.trim() ? c.emptyTitleSearch : c.emptyTitleNew}
               </p>
             )}
             <PanelAddButton label={c.newCron} onClick={() => setEditor({ mode: 'create' })} />
+            {visibleSuggestions.length > 0 && (
+              <>
+                <PanelSectionLabel className="mt-3 px-2">{c.suggestions.tab}</PanelSectionLabel>
+                {visibleSuggestions.map(item => (
+                  <PanelListRow
+                    active={selectedSuggestion?.id === item.id}
+                    icon="lightbulb"
+                    key={item.id}
+                    onSelect={() => {
+                      setSelectedJobId(null)
+                      setSelectedSuggestionId(item.id)
+                    }}
+                    rowKey={`suggestion-${item.id}`}
+                    title={suggestionDisplayTitle(item, c)}
+                  />
+                ))}
+              </>
+            )}
             {visibleBlueprints.length > 0 && (
               <>
                 <PanelSectionLabel className="mt-3 px-2">{c.blueprints.tab}</PanelSectionLabel>
@@ -717,7 +866,16 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
             )}
           </PanelList>
 
-          {selectedJob ? (
+          {selectedSuggestion ? (
+            <CronSuggestionDetail
+              busy={busySuggestionId === selectedSuggestion.id}
+              c={c}
+              canAccept={Boolean(selectedStoredSessionId)}
+              onAccept={() => void handleSuggestionAccept(selectedSuggestion)}
+              onDismiss={() => void handleSuggestionDismiss(selectedSuggestion)}
+              suggestion={selectedSuggestion}
+            />
+          ) : selectedJob ? (
             <CronJobDetail
               busy={busyJobTokens.has(selectedJob.id) || triggeringJobKeys.has(`${profile}:${selectedJob.id}`)}
               c={c}
@@ -768,6 +926,55 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
         title={c.deleteTitle}
       />
     </Panel>
+  )
+}
+
+function CronSuggestionDetail({
+  busy,
+  c,
+  canAccept,
+  onAccept,
+  onDismiss,
+  suggestion
+}: {
+  busy: boolean
+  c: Translations['cron']
+  canAccept: boolean
+  onAccept: () => void
+  onDismiss: () => void
+  suggestion: CronSuggestion
+}) {
+  const schedule = suggestion.job_spec.schedule ?? '—'
+
+  return (
+    <PanelDetail>
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-[0.95rem] font-semibold tracking-tight text-foreground">
+              {suggestionDisplayTitle(suggestion, c)}
+            </h3>
+            <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground/80">
+              {suggestionDisplayDescription(suggestion, c)}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <PanelAction disabled={busy} icon="close" onClick={onDismiss}>
+              {c.suggestions.dismiss}
+            </PanelAction>
+            <PanelAction disabled={busy || !canAccept} icon="check" onClick={onAccept} primary>
+              {busy ? c.suggestions.working : c.suggestions.accept}
+            </PanelAction>
+          </div>
+        </div>
+
+        <PanelMeta rows={[{ label: c.frequencyLabel, value: schedule }]} />
+
+        {!canAccept ? (
+          <p className="text-[0.7rem] leading-relaxed text-muted-foreground">{c.suggestions.needsConversation}</p>
+        ) : null}
+      </header>
+    </PanelDetail>
   )
 }
 

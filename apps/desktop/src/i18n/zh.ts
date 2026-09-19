@@ -2966,7 +2966,17 @@ export const zh = defineLocale({
         'gratitude-journal': { title: '感恩与复盘', description: '晚间温和提醒你回顾一天并记录做得好的事。' },
         'on-this-day': { title: '今日发现', description: '每天带来一个历史事件、趣味事实或每日词条。' }
       }
-    }
+    },
+    suggestions: {
+      tab: '建议的自动化',
+      accept: '设为定时任务',
+      dismiss: '忽略',
+      working: '正在处理…',
+      scheduled: '自动化已排程',
+      dismissed: '已忽略建议',
+      actionFailed: '无法更新自动化建议',
+      needsConversation: '请先打开一个已保存的对话，这样定时任务的结果才有可返回的会话。'
+    },
   },
 
   artifacts: {
