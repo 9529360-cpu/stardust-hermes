@@ -4,7 +4,8 @@ five outbound client tools of the ``a2a`` toolset through the public PluginConte
 from __future__ import annotations
 
 import logging
-import os
+
+from gateway.platforms._shared import get_scoped_secret as _get_scoped_secret
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,16 @@ def validate_config(config) -> bool:
 
 
 def is_connected(config) -> bool:
-    """'Connected' when explicitly enabled (the gateway only instantiates enabled platforms)."""
+    """Return whether A2A is configured for the active profile.
+
+    The standard ``PlatformConfig.enabled`` flag is authoritative for explicit YAML config;
+    ``extra.enabled`` remains a compatibility alias for older/plugin-shaped config snapshots.
+    Under gateway multiplexing, ``os.environ`` belongs to the default profile while a served
+    secondary profile lives in the installed secret scope, so ``A2A_PORT`` must come through
+    the shared scope-aware accessor.
+    """
     extra = getattr(config, "extra", {}) or {}
-    return bool(extra.get("enabled")) or bool(os.getenv("A2A_PORT"))
+    return bool(getattr(config, "enabled", False)) or bool(extra.get("enabled")) or bool(_get_scoped_secret("A2A_PORT"))
 
 
 def interactive_setup() -> None:
