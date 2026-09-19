@@ -160,6 +160,352 @@ class TestMemoryManager:
         assert mgr.build_system_prompt() == ""
         assert mgr.prefetch_all("test") == ""
 
+    def test_live_privacy_gate_blocks_provider_io_and_filters_reenabled_history(self):
+        state = {"enabled": True}
+
+        class PrivacyProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("privacy", tools=[
+                    {"name": "privacy_search", "description": "search", "parameters": {}}
+                ])
+                self.session_end_messages = []
+                self.pre_compress_messages = []
+                self._prompt_block = "provider prompt"
+                self._prefetch_result = "provider recall"
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+            def on_pre_compress(self, messages):
+                self.pre_compress_messages.append(list(messages))
+                return ""
+
+        provider = PrivacyProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        state["enabled"] = False
+        assert mgr.build_system_prompt() == ""
+        assert mgr.prefetch_all("secret query") == ""
+        assert mgr.get_all_tool_schemas() == []
+        assert mgr.get_all_tool_names() == set()
+        assert mgr.has_tool("privacy_search") is False
+        assert "disabled by memory.enabled" in mgr.handle_tool_call("privacy_search", "{}")
+
+        raw_disabled = [
+            {"role": "user", "content": "disabled interval secret"},
+            {"role": "assistant", "content": "disabled interval answer"},
+        ]
+        mgr.sync_all(
+            "disabled interval secret",
+            "disabled interval answer",
+            session_id="s1",
+            messages=raw_disabled,
+        )
+        mgr.queue_prefetch_all("disabled queued recall", session_id="s1")
+        mgr.flush_pending(timeout=5)
+        assert provider.synced_turns == []
+        assert provider.prefetch_queries == []
+        assert provider.queued_prefetches == []
+
+        state["enabled"] = True
+        raw_reenabled = raw_disabled + [
+            {"role": "user", "content": "visible after re-enable"},
+            {"role": "assistant", "content": "visible answer"},
+        ]
+        mgr.sync_all(
+            "visible after re-enable",
+            "visible answer",
+            session_id="s1",
+            messages=raw_reenabled,
+        )
+        mgr.flush_pending(timeout=5)
+
+        assert len(provider.synced_turns) == 1
+        forwarded_messages = provider.synced_turns[0][3]
+        assert [row["content"] for row in forwarded_messages] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+
+        raw_precompress = raw_reenabled + [
+            {"role": "user", "content": "current turn before sync"},
+        ]
+        mgr.on_pre_compress(raw_precompress)
+        mgr.on_session_end(raw_reenabled)
+        assert [row["content"] for row in provider.pre_compress_messages[-1]] == [
+            "visible after re-enable",
+            "visible answer",
+            "current turn before sync",
+        ]
+        assert [row["content"] for row in provider.session_end_messages[-1]] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+
+        state["enabled"] = False
+        mgr.on_session_end(raw_reenabled)
+        assert len(provider.session_end_messages) == 1
+
+    def test_privacy_ledger_preserves_rich_current_turn_shape(self):
+        """Filter old/disabled history without stripping tool evidence from an enabled turn."""
+        state = {"enabled": True}
+        provider = MessagesMemoryProvider("messages")
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        messages = [
+            {"role": "user", "content": "older row must not leak"},
+            {"role": "assistant", "content": "older answer"},
+            {"role": "user", "content": "inspect the repository"},
+            {
+                "role": "assistant",
+                "content": "I'll inspect it.",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "read_file", "arguments": "{\"path\":\"README.md\"}"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-1",
+                "name": "read_file",
+                "content": "README contents",
+            },
+            {"role": "assistant", "content": "final enabled answer"},
+        ]
+
+        mgr.sync_all(
+            "inspect the repository",
+            "final enabled answer",
+            session_id="s1",
+            messages=messages,
+        )
+        mgr.flush_pending(timeout=5)
+
+        forwarded = provider.synced_turns[0][3]
+        assert [row["role"] for row in forwarded] == ["user", "assistant", "tool", "assistant"]
+        assert forwarded[0]["content"] == "inspect the repository"
+        assert forwarded[1]["tool_calls"][0]["function"]["name"] == "read_file"
+        assert forwarded[2]["tool_call_id"] == "call-1"
+        assert forwarded[2]["content"] == "README contents"
+        assert all(row.get("content") != "older row must not leak" for row in forwarded)
+
+    def test_precompress_does_not_collapse_identical_consecutive_turns(self):
+        state = {"enabled": True}
+
+        class PrecompressProvider(FakeMemoryProvider):
+            def __init__(self):
+                super().__init__("repeat")
+                self.pre_compress_messages = []
+
+            def on_pre_compress(self, messages):
+                self.pre_compress_messages.append(list(messages))
+                return ""
+
+        provider = PrecompressProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("same text", "same answer")
+        mgr.flush_pending(timeout=5)
+
+        mgr.on_pre_compress([
+            {"role": "user", "content": "same text"},
+            {"role": "assistant", "content": "same answer"},
+            {"role": "user", "content": "same text"},
+        ])
+
+        assert [row["content"] for row in provider.pre_compress_messages[-1]] == [
+            "same text",
+            "same answer",
+            "same text",
+        ]
+
+
+    def test_queued_session_boundary_rechecks_privacy_before_provider_write(self):
+        state = {"enabled": True}
+
+        class BoundaryProvider(FakeMemoryProvider):
+            def __init__(self):
+                super().__init__("boundary")
+                self.session_end_messages = []
+                self.session_switches = []
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+            def on_session_switch(self, new_session_id, *, parent_session_id="", reset=False, **kwargs):
+                self.session_switches.append((new_session_id, parent_session_id, reset))
+
+        provider = BoundaryProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+
+        queued = []
+        mgr._submit_background = lambda fn, **kwargs: queued.append(fn)
+        mgr.commit_session_boundary_async([], new_session_id="new", parent_session_id="old")
+        assert len(queued) == 1
+
+        state["enabled"] = False
+        queued[0]()
+
+        assert provider.session_end_messages == []
+        assert provider.session_switches == []
+
+        # Re-enable: the first provider-facing operation replays the host-side
+        # binding that was staged while OFF.
+        state["enabled"] = True
+        mgr.build_system_prompt()
+        assert provider.session_switches == [("new", "old", True)]
+
+    def test_session_boundary_uses_frozen_visible_history_snapshot(self):
+        state = {"enabled": True}
+
+        class BoundaryProvider(FakeMemoryProvider):
+            def __init__(self):
+                super().__init__("boundary")
+                self.session_end_messages = []
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+        provider = BoundaryProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+
+        queued = []
+        mgr._submit_background = lambda fn, **kwargs: queued.append(fn)
+        mgr.commit_session_boundary_async([], new_session_id="new", parent_session_id="old")
+        mgr.sync_all("new user", "new answer", session_id="new")
+
+        # sync_all records the new visible turn synchronously, so this reproduces
+        # the old execution-time re-read race before the queued boundary runs.
+        assert len(queued) == 2
+        queued[0]()
+
+        assert [[row["content"] for row in snapshot] for snapshot in provider.session_end_messages] == [
+            ["old user", "old answer"]
+        ]
+
+
+    def test_off_period_session_switch_rebinds_before_first_reenabled_write(self):
+        state = {"enabled": True}
+
+        class RebindProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("rebind")
+                self.events = []
+
+            def on_session_switch(self, new_session_id, *, parent_session_id="", reset=False, **kwargs):
+                self.events.append(("switch", new_session_id, parent_session_id, reset))
+
+            def sync_turn(self, user_content, assistant_content, *, session_id="", messages=None):
+                self.events.append(("sync", session_id, user_content))
+                super().sync_turn(
+                    user_content,
+                    assistant_content,
+                    session_id=session_id,
+                    messages=messages,
+                )
+
+        provider = RebindProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+        assert provider.events == [("sync", "old", "old user")]
+
+        state["enabled"] = False
+        mgr.on_session_switch("new", parent_session_id="old", reset=True)
+        mgr.sync_all("disabled user", "disabled answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        # OFF records the host-side target only; no provider hook/write is routed.
+        assert provider.events == [("sync", "old", "old user")]
+
+        state["enabled"] = True
+        mgr.sync_all("new visible user", "new visible answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        assert provider.events == [
+            ("sync", "old", "old user"),
+            ("switch", "new", "old", True),
+            ("sync", "new", "new visible user"),
+        ]
+        assert all(
+            row[2] != "disabled user"
+            for row in provider.events
+            if row[0] == "sync"
+        )
+
+
+    def test_failed_deferred_rebind_blocks_sync_and_retries_later(self):
+        state = {"enabled": True}
+
+        class FlakyRebindProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("flaky-rebind")
+                self.switch_attempts = 0
+
+            def on_session_switch(self, new_session_id, *, parent_session_id="", reset=False, **kwargs):
+                self.switch_attempts += 1
+                if self.switch_attempts == 1:
+                    raise RuntimeError("temporary rebind failure")
+
+        provider = FlakyRebindProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        state["enabled"] = False
+        mgr.on_session_switch("new", parent_session_id="old", reset=True)
+
+        state["enabled"] = True
+        mgr.sync_all("must not land yet", "answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        assert provider.switch_attempts == 1
+        assert provider.synced_turns == []
+
+        mgr.sync_all("safe after retry", "answer", session_id="new")
+        mgr.flush_pending(timeout=5)
+
+        assert provider.switch_attempts == 2
+        assert [turn[0] for turn in provider.synced_turns] == ["safe after retry"]
+
+
+    def test_privacy_scoped_history_clears_on_session_switch(self):
+        state = {"enabled": True}
+
+        class HistoryProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__("history")
+                self.session_end_messages = []
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+        provider = HistoryProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+        mgr.sync_all("old user", "old answer", session_id="old")
+        mgr.flush_pending(timeout=5)
+
+        mgr.on_session_switch("new", parent_session_id="old", reset=True)
+        mgr.on_session_end([
+            {"role": "user", "content": "old user"},
+            {"role": "assistant", "content": "old answer"},
+        ])
+
+        assert provider.session_end_messages == [[]]
+
     def test_add_provider(self):
         mgr = MemoryManager()
         p = FakeMemoryProvider("test1")
