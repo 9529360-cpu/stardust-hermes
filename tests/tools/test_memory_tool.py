@@ -223,6 +223,30 @@ class TestMemoryResetGeneration:
         assert path.exists()
         assert path.read_text(encoding="utf-8") == ""
 
+    def test_reset_symlink_removes_pointer_without_erasing_referent(self, store, tmp_path):
+        path = store._path_for("memory")
+        outside = tmp_path / "external-memory.md"
+        outside.write_text("must survive reset", encoding="utf-8")
+        path.symlink_to(outside)
+
+        assert MemoryStore.reset_target("memory") is True
+
+        assert not path.exists()
+        assert not path.is_symlink()
+        assert outside.read_text(encoding="utf-8") == "must survive reset"
+
+    def test_reset_generation_marker_symlink_is_refused(self, store, tmp_path):
+        path = store._path_for("memory")
+        outside = tmp_path / "outside-generation"
+        outside.write_text("do not touch", encoding="utf-8")
+        marker = store._reset_generation_path(path)
+        marker.symlink_to(outside)
+
+        with pytest.raises(RuntimeError, match="reset-generation symlink"):
+            MemoryStore.reset_target("memory")
+
+        assert outside.read_text(encoding="utf-8") == "do not touch"
+
     def test_reset_generation_is_scoped_to_memory_directory(self, tmp_path, monkeypatch):
         first = tmp_path / "profile-a" / "memories"
         second = tmp_path / "profile-b" / "memories"
