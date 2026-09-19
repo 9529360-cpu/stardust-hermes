@@ -750,11 +750,12 @@ export const zhHant = defineLocale({
         }
       },
       memory: {
-        memoryEnabled: '持久記憶',
-        userProfileEnabled: '使用者設定檔',
+        enabled: '記憶持久化總開關',
+        memoryEnabled: '內建 Agent 記憶 (MEMORY.md)',
+        userProfileEnabled: '內建使用者設定檔 (USER.md)',
         memoryCharLimit: '記憶預算',
         userCharLimit: '設定檔預算',
-        provider: '記憶提供方'
+        provider: '外部記憶提供方'
       },
       context: {
         engine: '上下文引擎'
@@ -820,8 +821,11 @@ export const zhHant = defineLocale({
         enabled: '在檔案編輯前建立可回復的快照。'
       },
       memory: {
-        memoryEnabled: '儲存有助於未來工作階段的持久記憶。',
-        userProfileEnabled: '維護一份精簡的使用者偏好設定檔。'
+        enabled:
+          '記憶隱私總開關。關閉後停止內建記憶注入/寫入，以及外部記憶提供方的初始化、同步、預取與工具；已選提供方與憑據會保留。',
+        memoryEnabled: '進階設定：僅在記憶持久化開啟時，允許注入與寫入內建 MEMORY.md。',
+        userProfileEnabled: '進階設定：僅在記憶持久化開啟時，允許注入與寫入內建 USER.md 使用者設定檔。',
+        provider: '記憶持久化開啟時使用的外部提供方；關閉總開關後仍保留此選擇。'
       },
       context: {
         engine: '長對話接近上下文上限時的管理策略。'
