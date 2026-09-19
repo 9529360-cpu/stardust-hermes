@@ -108,6 +108,33 @@ def test_cli_memory_approve_without_live_agent_uses_fresh_store(hermes_home, cap
     assert any("remember the launch date" in e for e in reloaded.memory_entries)
 
 
+def test_pre_reset_staged_memory_write_cannot_repopulate_after_approval(hermes_home):
+    from hermes_cli.write_approval_commands import handle_pending_subcommand
+    from tools.memory_tool import MemoryStore, load_on_disk_store, memory_tool
+    from tools import write_approval as wa
+
+    _set_approval("memory", True)
+    staging = MemoryStore()
+    staging.load_from_disk()
+    proposed = json.loads(memory_tool("add", "memory", "forgotten pre-reset fact", store=staging))
+    pending_id = proposed["pending_id"]
+    record = wa.get_pending("memory", pending_id)
+    assert record["payload"]["_reset_generation"] == staging.reset_generation("memory")
+
+    MemoryStore.reset_target("memory")
+    fresh = load_on_disk_store()
+    out = handle_pending_subcommand(
+        wa.MEMORY,
+        ["approve", pending_id],
+        memory_store=fresh,
+    )
+
+    assert "Approved 0 memory write(s)." in out
+    assert "reset" in out.lower()
+    assert wa.get_pending("memory", pending_id) is not None
+    assert not (Path(hermes_home) / "memories" / "MEMORY.md").exists()
+
+
 def test_load_on_disk_store_honors_configured_limits_and_permissions(hermes_home, monkeypatch):
     """Fresh approval stores must match the live agent's limits and target gates."""
     from tools.memory_tool import load_on_disk_store
