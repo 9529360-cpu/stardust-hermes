@@ -537,7 +537,7 @@ export const zh = defineLocale({
     plugins: {
       title: '桌面插件',
       blurb:
-        '加载到此应用中的界面扩展——随构建捆绑，或放入 desktop-plugins 文件夹（包括 Hermes 编写的插件）。禁用会即时卸载插件并在重启后保持。',
+        '加载到此应用中的界面扩展。内置插件属于随应用审核的代码；外部磁盘/运行时插件默认保持关闭，只有你明确授信后才会启用。启用后的外部桌面代码拥有与 Stardust 应用相同的渲染器权限。',
       count: n => `已安装 ${n} 个`,
       openFolder: '打开插件文件夹',
       rescan: '重新扫描',
@@ -546,6 +546,10 @@ export const zh = defineLocale({
       disable: '禁用',
       failed: '失败',
       empty: '尚未安装桌面插件。',
+      externalTrustTitle: name => `信任来自 ${name} 的桌面代码？`,
+      externalTrustDescription: (source, pinnedSha) =>
+        `启用此外部桌面插件会在 Stardust 渲染器中执行受信任代码，并拥有与 Stardust 应用本身相同的权限。插件声明的工具、Hook、中间件和 capability 只是描述性元数据，并不是沙箱或权限边界。来源：${source}。${pinnedSha ? ` 固定 SHA：${pinnedSha}。` : ' 当前桌面副本没有记录固定 SHA。'}`,
+      externalTrustConfirm: '启用受信任代码',
       kinds: { bundled: '内置', disk: '磁盘', runtime: '运行时' },
       agentHalfMissing: '此处缺少 agent 部分',
       agentHalfMissingTip:
@@ -573,6 +577,8 @@ export const zh = defineLocale({
         desktopTarget: '安装到此应用的本地 desktop-plugins 文件夹',
         desktopTargetFromPackage: '从上方的包加载到本应用 — 所有配置相同',
         desktopOnlyNote: '仅桌面包不会安装后端智能体插件。',
+        desktopAuthorityWarning:
+          '外部桌面代码安装后保持未启用状态。以后如果启用，它会在 Stardust 渲染器中执行，并拥有与 Stardust 应用本身相同的权限；声明的 capability 只是描述性元数据，并不是强制权限边界。',
         insecureWarning: '此 URL 使用了不安全的本地 scheme。生产环境请优先使用 https:// 或 git@。',
         securityHeading: '安装前须知',
         securityIntro: '请仅安装你信任的来源 — 如需了解将添加的内容，可先查看下方仓库。',
