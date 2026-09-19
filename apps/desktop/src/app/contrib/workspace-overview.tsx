@@ -6,6 +6,8 @@ import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { registry } from '@/contrib/registry'
+import { Slot } from '@/contrib/react/slot'
+import { TASK_CENTER_AREAS } from '@/contrib/task-center'
 import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { readKey, writeKey } from '@/lib/storage'
@@ -501,6 +503,8 @@ export function WorkspaceOverview() {
             </div>
           </Card>
         )}
+
+        <Slot area={TASK_CENTER_AREAS.sections} />
       </div>
     </aside>
   )
