@@ -543,10 +543,20 @@ def _profile_scoped(handler):
     systemd / ``op run`` injection); once multiplexing is active it binds its own scope from the env
     frozen at activation (``_session_profile_runtime_scope``), never ambient state a secondary context
     might have poisoned (#107422).
+
+    When no explicit ``profile`` is supplied, a live ``session_id`` owns the scope. Desktop and
+    TUI session-bound RPCs commonly send only the session id; ignoring its ``profile_home`` writes
+    settings into the launch profile instead of the focused profile.
     """
     def wrapper(rid, params):
-        home = _profile_home(params.get("profile") if isinstance(params, dict) else None)
-        with _session_profile_runtime_scope({"profile_home": str(home) if home else None}):
+        p = params if isinstance(params, dict) else {}
+        if str(p.get("profile") or "").strip():
+            home = _profile_home(p.get("profile"))
+            profile_home = str(home) if home else None
+        else:
+            session = _sessions.get(str(p.get("session_id") or ""))
+            profile_home = session.get("profile_home") if isinstance(session, dict) else None
+        with _session_profile_runtime_scope({"profile_home": profile_home or None}):
             return handler(rid, params)
     return wrapper
 

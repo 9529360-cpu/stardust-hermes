@@ -411,7 +411,10 @@ def _set_cwd(rid, params, key, value, session):
     if not os.path.isdir(cwd):
         return _err(rid, 4002, f"working directory does not exist: {raw}")
     _write_config_key("terminal.cwd", cwd)
-    os.environ["TERMINAL_CWD"] = cwd
+    # TERMINAL_CWD belongs to the launch process. A profile-bound session persists its
+    # cwd in that profile's config and must not publish it into siblings' process env.
+    if not (isinstance(session, dict) and session.get("profile_home")):
+        os.environ["TERMINAL_CWD"] = cwd
     return _kv(rid, "terminal.cwd", cwd, cwd=cwd, branch=git_probe.branch(cwd))
 
 
