@@ -33,6 +33,7 @@ import {
   toggleAgentPlugin,
   updateAgentPlugin
 } from '@/store/agent-plugins'
+import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { openPluginInstallRequest } from '@/store/plugin-install-request'
@@ -41,6 +42,7 @@ import { PanelEmpty } from '../overlays/panel'
 import { Pill } from '../settings/primitives'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
 
+import { setDesktopPluginEnabledWithTrust } from './plugin-desktop-trust'
 import { mergePluginPackages, type PackageKind, type PluginPackage } from './plugin-packages'
 
 // The REAL Plugin Catalog page (docs site) embedded as a one-click picker —
@@ -296,7 +298,17 @@ function PackageRow({
             checked={desktopOn}
             onCheckedChange={on => {
               triggerHaptic('selection')
-              void setPluginEnabled(desktop.id, on)
+              void setDesktopPluginEnabledWithTrust(
+                desktop,
+                pkg.name,
+                on,
+                {
+                  confirmLabel: d.externalTrustConfirm,
+                  description: d.externalTrustDescription,
+                  title: d.externalTrustTitle
+                },
+                { confirm, setEnabled: setPluginEnabled }
+              )
             }}
           />
         ) : pkg.desktopMissing ? (
