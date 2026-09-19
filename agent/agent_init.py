@@ -1235,6 +1235,7 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
     agent._memory_enabled = False
     agent._user_profile_enabled = False
     agent._memory_nudge_interval = 10
+    agent._memory_persistence_enabled = True
     agent._turns_since_memory = 0
     agent._iters_since_skill = 0
     # skip_memory skips the external *provider*; enabled_toolsets=["memory"] still gets the
@@ -1248,13 +1249,18 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
         "memory" in (agent.enabled_toolsets or [])
         and "memory" not in (agent.disabled_toolsets or [])
     )
+    mem_config = {}
+    memory_persistence_enabled = None
     if not skip_memory or _memory_toolset_requested:
         # Memory is optional — don't break agent init
         with suppress(Exception):
             from tools.memory_tool import (
                 MemoryStore, get_builtin_memory_config, get_builtin_memory_store_flags,
+                memory_persistence_enabled as _memory_persistence_enabled,
             )
+            memory_persistence_enabled = _memory_persistence_enabled
             mem_config = get_builtin_memory_config(_agent_cfg)
+            agent._memory_persistence_enabled = _memory_persistence_enabled(_agent_cfg)
             agent._memory_enabled, agent._user_profile_enabled = get_builtin_memory_store_flags(
                 _agent_cfg
             )
@@ -1270,13 +1276,17 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
 
     # External memory provider plugin (one at a time, alongside built-in): memory.provider.
     agent._memory_manager = None
-    if not skip_memory:
+    if not skip_memory and agent._memory_persistence_enabled:
         try:
+            if memory_persistence_enabled is None:
+                from tools.memory_tool import memory_persistence_enabled
             _mem_provider_name = mem_config.get("provider", "") if mem_config else ""
             if _mem_provider_name and _mem_provider_name.strip():
                 from agent.memory_manager import MemoryManager as _MemoryManager
                 from plugins.memory import load_memory_provider as _load_mem
-                agent._memory_manager = _MemoryManager()
+                agent._memory_manager = _MemoryManager(
+                    privacy_enabled=lambda: memory_persistence_enabled(fail_closed=True)
+                )
                 _mp = _load_mem(_mem_provider_name)
                 if _mp and _mp.is_available():
                     agent._memory_manager.add_provider(_mp)
