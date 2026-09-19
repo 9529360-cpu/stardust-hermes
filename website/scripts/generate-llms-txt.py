@@ -35,6 +35,9 @@ STATIC = WEBSITE / "static"
 
 REPO_URL = "https://github.com/9529360-cpu/stardust-hermes"
 DOCS_SOURCE_BASE = f"{REPO_URL}/blob/main/website/docs"
+RAW_STATIC_BASE = "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static"
+LLMS_INDEX_URL = f"{RAW_STATIC_BASE}/llms.txt"
+LLMS_FULL_URL = f"{RAW_STATIC_BASE}/llms-full.txt"
 STARDUST_INSTALL_COMMAND = (
     "curl -fsSL https://raw.githubusercontent.com/9529360-cpu/"
     "stardust-hermes/main/scripts/install-stardust.sh | bash"
