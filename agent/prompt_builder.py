@@ -593,12 +593,16 @@ _MEDIA_NATIVE = (
     "You can send files natively: write MEDIA:/absolute/path/to/file in your response. "
 )
 
-_LOCAL_CRON_DELIVERY_NOTE = (
-    "Cron jobs scheduled from this session are LOCAL-ONLY: their output is saved (viewable via cronjob "
-    "action='list') but is NOT delivered back into this session — there is no live-delivery channel here. If "
-    "the user wants to be notified when a job runs, the job's `deliver` must target a gateway-connected "
-    "messaging platform (e.g. deliver='telegram' or 'all'). Do not promise that a deliver='origin' or "
-    "default-deliver cron job will message them in this session."
+_CLI_CRON_DELIVERY_NOTE = (
+    "Cron jobs scheduled from this CLI session are LOCAL-ONLY: their output is saved (viewable via cronjob "
+    "action='list') but is NOT delivered back after this process exits. If the user wants a notification, "
+    "deliver must target a gateway-connected messaging platform."
+)
+
+_LOCAL_SESSION_CRON_DELIVERY_NOTE = (
+    "Cron jobs scheduled from this persisted conversation can return their non-silent completion here when "
+    "deliver is omitted or set to origin. Explicit deliver='local' is save-only; an explicit messaging target "
+    "posts there instead. Do not promise a local return when the user explicitly chose another delivery mode."
 )
 
 PLATFORM_HINTS = {
@@ -660,14 +664,14 @@ PLATFORM_HINTS = {
         "literal characters, so write plain text (indentation and blank lines are your only layout tools). Files: "
         "there is no attachment channel and MEDIA:/path tags are NOT intercepted here (they print as literal text) — "
         "deliver a file by stating its absolute path or URL in plain text; the user opens it themselves. "
-        f"{_LOCAL_CRON_DELIVERY_NOTE}"
+        f"{_CLI_CRON_DELIVERY_NOTE}"
     ),
     "tui": (
         # Same file-delivery reality as the CLI: no MEDIA: interception in tui/.
         "You are in the Hermes terminal UI (TUI). Files: there is no attachment channel and MEDIA:/path tags "
         "are NOT intercepted here (they print as literal text) — deliver a file by stating its absolute path "
         "or URL in plain text. "
-        f"{_LOCAL_CRON_DELIVERY_NOTE}"
+        f"{_LOCAL_SESSION_CRON_DELIVERY_NOTE}"
     ),
     "desktop": (
         # Every claim verified against the shipping renderer (inline-preview-directive.tsx). Widget text is
@@ -686,7 +690,8 @@ PLATFORM_HINTS = {
         "height live, width from the content's first measured span — lay content flush left with no centering wrappers "
         "or it measures full-bleed. Widgets talk back: data-hermes-send=\"prompt\" on any clickable element (or "
         "window.hermes.send(\"prompt\")) sends that prompt as a hidden user turn — answer it by updating the widget's "
-        "file, not with prose."
+        "file, not with prose. "
+        f"{_LOCAL_SESSION_CRON_DELIVERY_NOTE}"
     ),
     "sms": (
         "You are communicating via SMS. Keep responses concise and use plain text only — no markdown, no "
