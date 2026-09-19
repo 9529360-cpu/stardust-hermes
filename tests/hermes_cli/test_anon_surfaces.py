@@ -264,10 +264,12 @@ async def test_the_wait_line_is_only_composed_on_the_state(monkeypatch):
         assert "format_wait_line" not in (repo / rel).read_text(encoding="utf-8"), rel
 
 
-def test_cli_chat_status_names_the_free_tier(isolated_store):
+def test_cli_chat_status_names_the_free_tier(isolated_store, monkeypatch):
     from hermes_cli.cli_session_mixin import CLISessionMixin
 
     _write_auth(_guest_state())
+    monkeypatch.setattr("hermes_cli.auth.resolve_provider", lambda *_args, **_kwargs: "nous")
+    monkeypatch.setattr(anon_auth, "guest_carries_inference", lambda: True)
     rendered = []
     cli = SimpleNamespace(
         _session_db=None,
@@ -285,5 +287,4 @@ def test_cli_chat_status_names_the_free_tier(isolated_store):
     )
     CLISessionMixin._show_session_status(cli)
 
-    assert anon_auth.FREE_TIER_STATUS_LINE not in rendered[0]
-    assert "Nous · free tier" not in rendered[0]
+    assert anon_auth.FREE_TIER_STATUS_LINE in rendered[0]
