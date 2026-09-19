@@ -242,12 +242,35 @@ def _process_accounting_lines(r: dict) -> list:
     return lines
 
 
+def _format_cron_completion(evt: dict, completed_at: float) -> str:
+    """Self-contained parent-turn payload for a scheduled cron result."""
+    job_id = str(evt.get("cron_job_id") or evt.get("delegation_id") or "unknown")
+    name = str(evt.get("cron_job_name") or evt.get("goal") or job_id)
+    status = str(evt.get("status") or "completed")
+    summary = str(evt.get("summary") or "").strip()
+    error = str(evt.get("error") or "").strip()
+    lines = [
+        f"[CRON JOB COMPLETE - {name} ({job_id})]",
+        "A scheduled job created from this conversation finished in the background.",
+        f"Status: {status}",
+        "--- RESULT ---",
+    ]
+    if summary:
+        lines.append(summary)
+    elif error:
+        lines.append(error)
+    else:
+        lines.append("(no result body)")
+    return "\n".join(lines)
+
 def _format_async_delegation(evt: dict) -> str:
     """Self-contained re-injection for an async-delegation completion: the FULL
     original task source (goal, context, toolsets, role, model), dispatch time, status
     and result, so an agent deep in unrelated context can act on it or re-dispatch."""
     deleg_id = evt.get("delegation_id", "unknown")
     completed_at = evt.get("completed_at") or time.time()
+    if evt.get("role") == "cron_run":
+        return _format_cron_completion(evt, completed_at)
     if evt.get("task_failure_notice"):
         return _format_task_failure_notice(evt, deleg_id)
     if evt.get("is_batch") or isinstance(evt.get("results"), list):
@@ -282,6 +305,11 @@ def _format_async_delegation(evt: dict) -> str:
 
 def async_delegation_display_text(evt: dict) -> str:
     """Compact UI title; the separate model notification retains all task evidence."""
+    if evt.get("role") == "cron_run":
+        status = str(evt.get("status") or "completed")
+        label = "Completed" if status in _DONE else "Failed"
+        name = " ".join(str(evt.get("cron_job_name") or evt.get("goal") or "Scheduled task").split())
+        return f"Cron Job {label}: {name}"
     raw_results = evt.get("results")
     results = [r for r in raw_results if isinstance(r, dict)] if isinstance(raw_results, list) else []
     results = results or [evt]
