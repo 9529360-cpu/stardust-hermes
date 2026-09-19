@@ -33,6 +33,7 @@ import {
   toggleAgentPlugin,
   updateAgentPlugin
 } from '@/store/agent-plugins'
+import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { openPluginInstallRequest } from '@/store/plugin-install-request'
@@ -243,6 +244,36 @@ function PackageRow({
     desktop?.kind === 'bundled'
       ? (p.bundledDescriptions[desktop.id as keyof typeof p.bundledDescriptions] ?? pkg.description)
       : pkg.description
+  const externalDesktop = Boolean(desktop && desktop.kind !== 'bundled')
+  const desktopTrustSource = desktop?.packageOrigin?.repo
+    ? p.desktopTrustSource(desktop.packageOrigin.repo, desktop.packageOrigin.sha?.slice(0, 12) ?? '')
+    : p.desktopTrustLocalSource
+
+  const onDesktopToggle = async (on: boolean) => {
+    if (!desktop) {
+      return
+    }
+
+    triggerHaptic('selection')
+
+    if (on && externalDesktop) {
+      const trusted = await confirm({
+        confirmLabel: p.desktopTrustConfirm,
+        description: `${p.desktopTrustWarning}\n\n${desktopTrustSource}`,
+        title: p.desktopTrustTitle(displayName)
+      })
+
+      if (!trusted) {
+        return
+      }
+    }
+
+    try {
+      await setPluginEnabled(desktop.id, on)
+    } catch (error) {
+      notifyError(error, p.toggleFailed(displayName))
+    }
+  }
 
   return (
     <div
@@ -260,6 +291,7 @@ function PackageRow({
             <ProvenancePill pkg={pkg} />
             {agent?.portable && <Pill>{p.portableBadge}</Pill>}
             {desktop?.status === 'error' && <Pill tone="primary">{d.failed}</Pill>}
+            {externalDesktop && <Pill>{p.desktopFullAccessBadge}</Pill>}
           </div>
           {(desktop?.status === 'error' ? desktop.error : description) && (
             <div
@@ -269,6 +301,17 @@ function PackageRow({
               )}
             >
               {desktop?.status === 'error' ? desktop.error : description}
+            </div>
+          )}
+          {externalDesktop && (
+            <div
+              className="mt-1 space-y-0.5 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)"
+              data-testid={`desktop-plugin-trust-${desktop?.id}`}
+            >
+              <div>{p.desktopTrustWarning}</div>
+              <div className="break-all font-mono text-[0.65rem] text-(--ui-text-quaternary)">
+                {desktopTrustSource}
+              </div>
             </div>
           )}
         </div>
@@ -294,10 +337,7 @@ function PackageRow({
           <Switch
             aria-label={`${p.halfDesktop}: ${displayName}`}
             checked={desktopOn}
-            onCheckedChange={on => {
-              triggerHaptic('selection')
-              void setPluginEnabled(desktop.id, on)
-            }}
+            onCheckedChange={on => void onDesktopToggle(on)}
           />
         ) : pkg.desktopMissing ? (
           <Tip label={p.desktopHalfPendingTip}>
