@@ -135,6 +135,7 @@ def _notification_event_dedup_key(evt: dict) -> tuple:
 # past them and they can't wedge a later completed/blocked event behind an unclaimed row.
 _KANBAN_NOTIFY_KINDS = ("completed", "blocked", "gave_up", "crashed", "timed_out", "status", "archived", "unblocked")
 _KANBAN_POLL_SECONDS = _LOOP_POLL_SECONDS = 5.0  # /loop and /heartbeat share one idle-poll cadence
+_DURABLE_COMPLETION_POLL_SECONDS = 5.0  # cross-process cron/delegation result pickup
 
 
 def _notif_release_turn(session: dict) -> None:
@@ -586,19 +587,12 @@ def _notification_poller_loop(stop_event: threading.Event, sid: str, session: di
     from tools.process_registry_notifications import format_process_notification
     queue = process_registry.completion_queue
     emitted = session.setdefault("_notification_emitted", set())
-    # A durable completion may have finished while this conversation was closed. Another live
-    # session can discard that in-memory queue copy without acknowledging the durable row; replay
-    # only rows this newly-live session can prove it owns (compression lineage included).
-    try:
-        from tools.async_delegation import restore_matching_undelivered_completions
-        with _session_profile_runtime_scope(session):
-            restore_matching_undelivered_completions(
-                queue, lambda evt: _session_owns_notification_event(sid, session, evt))
-    except Exception:
-        logger.warning("Could not restore pending completions for session %s", sid, exc_info=True)
     handle = lambda events, deferred: _notif_handle_ready(  # noqa: E731
         sid, session, events, emitted, process_registry, format_process_notification, deferred)
     last_kanban_poll = last_loop_poll = 0.0
+    # Start the durable scan after one interval: same-process producers already publish to the
+    # queue immediately, so this delay avoids manufacturing a duplicate before that copy drains.
+    last_durable_completion_poll = time.monotonic()
     while not stop_event.is_set() and not session.get("_finalized"):
         now = time.monotonic()
         try:
@@ -617,6 +611,25 @@ def _notification_poller_loop(stop_event: threading.Event, sid: str, session: di
         if now - last_kanban_poll >= _KANBAN_POLL_SECONDS:
             last_kanban_poll = now
             _notif_poll_kanban(sid, session)
+        # Restart-safe cron workers can finish in a different process: their in-memory queue dies
+        # with the worker, while the async_delegations row remains pending in this profile state.db.
+        # Poll that durable ledger at the existing coarse cadence and enqueue ONLY results this
+        # live session can prove it owns. The emitted key suppresses copies already observed from
+        # same-process publication while a long foreground turn is still busy.
+        if now - last_durable_completion_poll >= _DURABLE_COMPLETION_POLL_SECONDS:
+            last_durable_completion_poll = now
+            try:
+                from tools.async_delegation import restore_matching_undelivered_completions
+                with _session_profile_runtime_scope(session):
+                    restore_matching_undelivered_completions(
+                        queue,
+                        lambda event: (
+                            _session_owns_notification_event(sid, session, event)
+                            and _notification_event_dedup_key(event) not in emitted
+                        ),
+                    )
+            except Exception:
+                logger.warning("Could not restore pending completions for session %s", sid, exc_info=True)
         try:
             evt = queue.get(timeout=0.5)
         except Exception:
