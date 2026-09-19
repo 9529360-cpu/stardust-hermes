@@ -17,6 +17,7 @@ import { $cronJobs, setCronFocusJobId } from '@/store/cron'
 import { applyDesktopLayoutPreset } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
+import { $approvalRequests } from '@/store/prompts'
 import { setRightContextOpen } from '@/store/right-context'
 import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
@@ -174,10 +175,12 @@ export function WorkspaceOverview() {
   const sessions = useStore($sessions)
   const activeSessionId = useStore($activeSessionId)
   const attentionSessionIds = useStore($attentionSessionIds)
+  const approvalRequests = useStore($approvalRequests)
   const backgroundStatusBySession = useStore($backgroundStatusBySession)
   const cronJobs = useStore($cronJobs)
   const desktopActionTasks = useStore($desktopActionTasks)
   const previewServerRestart = useStore($previewServerRestart)
+  const sessionStates = useStore($sessionStates)
   const subagentsBySession = useStore($subagentsBySession)
   const workingSessionIds = useStore($workingSessionIds)
 
@@ -196,12 +199,17 @@ export function WorkspaceOverview() {
     projectScope === ALL_PROJECTS ? '' : projectRootCwd(projectTree.find(project => project.id === projectScope))
   const effectiveCwd = resolveTaskWorkspaceCwd(cwd, session, fallbackTaskSession, scopedProjectCwd)
   const repoStatus = useStore(repoStatusForCwd(effectiveCwd))
-  const fallbackTaskRuntimeId = useStoreSelector($sessionStates, states =>
-    fallbackTaskSession
-      ? findLiveTaskRuntimeId(states, fallbackTaskSession)
-      : fallbackTaskStoredId
-        ? findLiveTaskRuntimeIdByStoredId(states, fallbackTaskStoredId)
-        : null
+  const fallbackTaskRuntimeId = fallbackTaskSession
+    ? findLiveTaskRuntimeId(sessionStates, fallbackTaskSession)
+    : fallbackTaskStoredId
+      ? findLiveTaskRuntimeIdByStoredId(sessionStates, fallbackTaskStoredId)
+      : null
+  const runtimeStoredSessionIds = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(sessionStates).map(([runtimeId, state]) => [runtimeId, state?.storedSessionId ?? null])
+      ),
+    [sessionStates]
   )
   const statusSessionId = selectedStoredSessionId ? activeSessionId : (fallbackTaskRuntimeId ?? activeSessionId)
   const statusItems = useSessionSlice($statusItemsBySession, statusSessionId)
@@ -209,20 +217,24 @@ export function WorkspaceOverview() {
     () =>
       buildTaskCenterTasks({
         actionTasks: desktopActionTasks,
+        approvalRequests,
         attentionSessionIds,
         backgroundBySession: backgroundStatusBySession,
         cronJobs,
         previewRestart: previewServerRestart,
+        runtimeStoredSessionIds,
         sessions,
         subagentsBySession,
         workingSessionIds
       }),
     [
+      approvalRequests,
       attentionSessionIds,
       backgroundStatusBySession,
       cronJobs,
       desktopActionTasks,
       previewServerRestart,
+      runtimeStoredSessionIds,
       sessions,
       subagentsBySession,
       workingSessionIds

@@ -207,4 +207,42 @@ describe('task center projection', () => {
       status: 'error'
     })
   })
+
+  it('replaces a generic waiting row with the concrete approval provenance', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      approvalRequests: {
+        runtime: {
+          command: 'rm -rf /tmp/cache',
+          description: 'Delete cached build output',
+          requestId: 'approval-1',
+          sessionId: 'runtime'
+        }
+      },
+      attentionSessionIds: ['tip'],
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      runtimeStoredSessionIds: { runtime: 'root' },
+      sessions: [session()],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        action: 'open-session',
+        approvalRef: 'approval-1',
+        detail: 'rm -rf /tmp/cache',
+        durability: 'turn',
+        id: 'approval:approval-1',
+        label: 'Delete cached build output',
+        ownerSessionId: 'runtime',
+        rail: 'approval',
+        sessionId: 'tip',
+        status: 'waiting'
+      })
+    ])
+    expect(tasks.some(task => task.id === 'session:tip')).toBe(false)
+  })
 })
