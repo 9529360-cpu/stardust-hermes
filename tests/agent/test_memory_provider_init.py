@@ -130,6 +130,58 @@ def test_master_memory_off_skips_builtin_and_external_provider_initialization():
     load_memory_provider.assert_not_called()
 
 
+def test_master_memory_off_does_not_disable_session_history(tmp_path):
+    from hermes_state import SessionDB
+
+    cfg = {
+        "memory": {
+            "enabled": False,
+            "memory_enabled": True,
+            "user_profile_enabled": True,
+            "provider": "recording",
+        },
+        "agent": {},
+    }
+    db = SessionDB(db_path=tmp_path / "state.db")
+
+    with (
+        patch("hermes_cli.config.load_config", return_value=cfg),
+        patch("hermes_cli.config.load_config_readonly", return_value=cfg),
+        patch("plugins.memory.load_memory_provider") as load_memory_provider,
+        patch("agent.model_metadata.get_model_context_length", return_value=204_800),
+        patch("model_tools.get_tool_definitions", return_value=[]),
+        patch("model_tools.check_toolset_requirements", return_value={}),
+        patch("agent.process_bootstrap.OpenAI"),
+    ):
+        from run_agent import AIAgent
+
+        agent = AIAgent(
+            api_key="test-key-1234567890",
+            base_url="https://openrouter.ai/api/v1",
+            quiet_mode=True,
+            skip_context_files=True,
+            skip_memory=False,
+            session_id="history-still-on",
+            session_db=db,
+        )
+
+    messages = [
+        {"role": "user", "content": "this chat row must persist"},
+        {"role": "assistant", "content": "history is separate from durable memory"},
+    ]
+    assert agent._flush_messages_to_session_db(messages, []) is True
+    rows = db.get_messages("history-still-on")
+
+    assert [row["content"] for row in rows] == [
+        "this chat row must persist",
+        "history is separate from durable memory",
+    ]
+    assert agent._memory_store is None
+    assert agent._memory_manager is None
+    load_memory_provider.assert_not_called()
+    db.close()
+
+
 def test_reenable_restores_configured_external_provider_without_reselecting_it():
     provider = RecordingMemoryProvider()
     cfg = {
