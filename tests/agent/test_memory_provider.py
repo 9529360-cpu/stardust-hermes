@@ -332,9 +332,13 @@ class TestMemoryManager:
             def __init__(self):
                 super().__init__("boundary")
                 self.session_end_messages = []
+                self.session_switches = []
 
             def on_session_end(self, messages):
                 self.session_end_messages.append(list(messages))
+
+            def on_session_switch(self, new_session_id, *, parent_session_id="", reset=False, **kwargs):
+                self.session_switches.append((new_session_id, parent_session_id, reset))
 
         provider = BoundaryProvider()
         mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
@@ -351,6 +355,13 @@ class TestMemoryManager:
         queued[0]()
 
         assert provider.session_end_messages == []
+        assert provider.session_switches == []
+
+        # Re-enable: the first provider-facing operation replays the host-side
+        # binding that was staged while OFF.
+        state["enabled"] = True
+        mgr.build_system_prompt()
+        assert provider.session_switches == [("new", "old", True)]
 
     def test_session_boundary_uses_frozen_visible_history_snapshot(self):
         state = {"enabled": True}
