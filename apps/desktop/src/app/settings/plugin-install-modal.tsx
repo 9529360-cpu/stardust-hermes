@@ -458,6 +458,16 @@ export function PluginInstallModal() {
                   </p>
                 )}
 
+                {probe.desktop && installDesktop && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[length:var(--conversation-caption-font-size)] text-foreground">
+                    <AlertTriangle
+                      aria-hidden
+                      className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+                    />
+                    <span>{m.desktopAuthorityWarning}</span>
+                  </div>
+                )}
+
                 {(probe.insecure || (probe.warnings?.length ?? 0) > 0) && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[length:var(--conversation-caption-font-size)] text-foreground">
                     <AlertTriangle
