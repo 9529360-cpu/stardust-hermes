@@ -317,7 +317,7 @@ const LOCAL_SPEC_NAMES = new Set(DESKTOP_COMMAND_SPECS.flatMap(spec => [spec.nam
  * still recognize them as former built-ins so they cannot fall through as an
  * executable skill/quick-command extension before commands.catalog arrives.
  */
-const RETIRED_BUILTIN_COMMANDS = new Set(['/login', '/subscription', '/topup'])
+const RETIRED_BUILTIN_COMMANDS = new Set(['/billing', '/credits', '/login', '/subscription', '/topup', '/upgrade'])
 
 /** Registry rows with a real unavailability reason. `hidden` (e.g. `/model`) is
  *  a popover flag on an executable command and is read from the live catalog
