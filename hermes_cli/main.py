@@ -2318,78 +2318,12 @@ def _update_preflight_handled(args) -> bool:
 
 
 def cmd_update(args):
-    """Update Hermes Agent: disabled for the pinned Stardust local edition."""
+    """Stardust product update is intentionally pinned until its own updater is enabled."""
     print(
         "Stardust local edition is pinned. Upstream update checks and installation are disabled; "
         "the origin URL is retained only as a manual recovery reference."
     )
     return
-
-    if _update_preflight_handled(args):
-        return
-    gateway_mode = getattr(args, "gateway", False)
-
-    _update_io_state = _install_hangup_protection(gateway_mode=gateway_mode)
-    # Cross-process mutual exclusion: dashboard Update button, Tauri updater
-    # and this command all mutate one checkout; two at once strand it
-    # half-updated. Shares the marker the Tauri/Electron updaters already use.
-    from hermes_cli.update_lock import (
-        UPDATE_EXIT_CONCURRENT,
-        UpdateLock,
-        describe_holder,
-    )
-
-    _update_lock = UpdateLock()
-    if not _update_lock.acquire():
-        print(describe_holder(_update_lock.holder))
-        _finalize_update_output(_update_io_state)
-        sys.exit(UPDATE_EXIT_CONCURRENT)
-
-    # Exit code for the Windows hand-off child's hard exit (see finally); None
-    # = not SystemExit-shaped, so real exceptions keep their traceback.
-    _update_handoff_exit_code: int | None = None
-    from hermes_cli.update_cmd import _cmd_update_impl
-
-    try:
-        _cmd_update_impl(args, gateway_mode=gateway_mode)
-    except SystemExit as _update_exit:
-        # Receipt boundary: the impl has many early sys.exit paths that never
-        # reach an inner finalize. Persist any still-open receipt with the real
-        # exit code (no-op if already finalized), then let the exit proceed.
-        _code = _update_exit.code if isinstance(_update_exit.code, int) else 1
-        _finalize_update_receipt(_code, f"sys.exit({_code})")
-        _update_handoff_exit_code = (
-            _update_exit.code if isinstance(_update_exit.code, int) else 0
-        )
-        raise
-    except BaseException as _update_exc:
-        _finalize_update_receipt(1, f"{type(_update_exc).__name__}: {_update_exc}")
-        raise
-    else:
-        from hermes_cli.update_receipt import COMMAND_BOUNDARY_STOP_REASON
-
-        _finalize_update_receipt(0, COMMAND_BOUNDARY_STOP_REASON)
-        _update_handoff_exit_code = 0
-    finally:
-        _update_lock.release()
-        _finalize_update_output(_update_io_state)
-        # Windows hand-off child: a leftover non-daemon thread from the update
-        # tail would freeze the PowerShell window for minutes after the receipt
-        # is durable. Every durable step is done by now, so on the hand-off
-        # path only (marker env set solely by
-        # _reexec_dependency_sync_off_windows_shim) flush and exit hard.
-        # By this point every durable step is done (receipt finalized above, lock released, stdio restored),
-        # so on the hand-off path only, flush and exit hard instead of waiting for the interpreter to unwind
-        # — the same treatment #79040's cron workaround applies.
-        if _update_handoff_exit_code is not None and os.environ.get(_UPDATE_REEXEC_ENV) == "1":
-            logger.debug(
-                "Update hand-off child %s exiting via os._exit(%s)",
-                os.getpid(), _update_handoff_exit_code,
-            )
-            sys.stdout.flush()
-            sys.stderr.flush()
-            os._exit(_update_handoff_exit_code)
-
 
 def _coalesce_session_name_args(argv: list) -> list:
     """Join unquoted multi-word session names after -c/--continue and -r/--resume.
