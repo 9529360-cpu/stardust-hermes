@@ -173,10 +173,13 @@ describe('desktop slash command curation', () => {
     expect(isDesktopSlashCommand('/pets')).toBe(false)
   })
 
-  it('does not run /login on desktop before the catalog is loaded', () => {
+  it('keeps retired account commands fail closed before the catalog is loaded', () => {
     rememberDesktopCommandsCatalog(undefined)
-    expect(isDesktopSlashCommand('/login')).toBe(false)
-    expect(desktopSlashUnavailableMessage('/login')).toBe('/login is managed from the desktop sidebar.')
+    for (const command of ['/login', '/subscription', '/topup', '/upgrade']) {
+      expect(isDesktopSlashCommand(command)).toBe(false)
+      expect(isDesktopSlashSuggestion(command)).toBe(false)
+      expect(desktopSlashUnavailableMessage(command)).toBe(`${command} is no longer available in Stardust.`)
+    }
   })
 
   it('routes /wake through the desktop wake action instead of the slash worker', () => {

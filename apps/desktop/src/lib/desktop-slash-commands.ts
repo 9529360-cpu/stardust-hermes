@@ -76,7 +76,7 @@ export type DesktopActionId =
 export type DesktopPickerId = 'model' | 'session'
 
 /** Why a known Hermes command has no desktop UI surface. */
-export type DesktopUnavailableReason = 'advanced' | 'composer-voice' | 'messaging' | 'settings' | 'terminal'
+export type DesktopUnavailableReason = 'advanced' | 'composer-voice' | 'messaging' | 'retired' | 'settings' | 'terminal'
 
 /**
  * How the desktop fulfils a command. This is the single discriminator the
@@ -305,6 +305,7 @@ export const TS_ONLY_NO_DESKTOP_SURFACE: Record<DesktopUnavailableReason, readon
   advanced: [],
   'composer-voice': [],
   messaging: [],
+  retired: ['/login', '/subscription', '/topup', '/upgrade'],
   settings: ['/pets'],
   terminal: ['/density', '/details', '/logs', '/mouse']
 }
@@ -376,6 +377,7 @@ function asUnavailableReason(value: string | null | undefined): DesktopUnavailab
     value === 'advanced' ||
     value === 'composer-voice' ||
     value === 'messaging' ||
+    value === 'retired' ||
     value === 'settings' ||
     value === 'terminal'
   ) {
@@ -433,6 +435,7 @@ const UNAVAILABLE_MESSAGE: Record<DesktopUnavailableReason, (command: string) =>
   'composer-voice': () =>
     'Voice chat lives in the composer here: click the microphone button and choose "Start voice chat" (or press Ctrl+B).',
   messaging: command => `${command} is only used from messaging platforms.`,
+  retired: command => `${command} is no longer available in Stardust.`,
   settings: command => `${command} is managed from the desktop sidebar.`,
   terminal: command => `${command} is only available in the terminal interface.`
 }

@@ -220,7 +220,8 @@ class TestIsGenuineNousRateLimit:
             "https://welcome-api.nousresearch.com/v1", monkeypatch
         )
         assert verdict.action == "return"
-        assert "/login" in statuses[0]
+        assert "/login" not in statuses[0]
+        assert "/model" in statuses[0]
 
     def test_bare_429_with_no_headers_is_upstream(self):
         from agent.nous_rate_guard import is_genuine_nous_rate_limit
@@ -305,7 +306,8 @@ class TestWelcomeRouteCopy:
         assert verdict.action == "return"
         assert statuses == [f"⏳ {expected}"]
         assert expected in verdict.result["final_response"]
-        assert "/login" in expected
+        assert "/login" not in expected
+        assert "/model" in expected
         assert "Nous Portal" not in expected
         assert buffered == [f"⏳ {expected} Trying fallback..."]
 
