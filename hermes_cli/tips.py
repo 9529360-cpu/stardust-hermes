@@ -149,7 +149,7 @@ TIPS = [
     "hermes sessions export backup.jsonl exports all sessions for backup or analysis.",
     "hermes -r SESSION_ID resumes any specific past session by its ID.",
     # --- Memory ---
-    "Memory is a frozen snapshot — changes appear in the system prompt only at next session start.",
+    "Built-in memory is frozen per turn — disk changes refresh the prompt snapshot on the next turn.",
     "Memory entries are automatically scanned for prompt injection and exfiltration patterns.",
     "The agent has two memory stores: personal notes (~2200 chars) and user profile (~1375 chars).",
     "Corrections you give the agent (\"no, do it this way\") are often auto-saved to memory.",
