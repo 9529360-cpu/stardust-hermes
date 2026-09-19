@@ -287,9 +287,19 @@ class MemoryManager:
     swallows per-provider exceptions.
     """
 
-    def __init__(self, *, external_prefetch_timeout: Optional[float] = None) -> None:
+    def __init__(
+        self,
+        *,
+        external_prefetch_timeout: Optional[float] = None,
+        privacy_enabled: Optional[Callable[[], bool]] = None,
+    ) -> None:
         self._providers: List[MemoryProvider] = []
         self._tool_to_provider: Dict[str, MemoryProvider] = {}
+        # Production agents pass a live memory.enabled reader. Direct/test managers
+        # may omit it and retain the historical always-enabled provider contract.
+        self._privacy_enabled_check = privacy_enabled
+        self._provider_visible_history: List[Dict[str, Any]] = []
+        self._provider_visible_history_lock = threading.Lock()
         self._external_prefetch_spill_config: Optional[Dict[str, Any]] = None
         self._has_external: bool = False
         timeout = external_prefetch_timeout
@@ -310,6 +320,46 @@ class MemoryManager:
         self._shutdown_drain_state: Dict[str, Any] = {
             "status": "not_started", "abandoned_writes": 0, "abandoned_prefetches": 0, "active_tasks": 0,
         }
+
+    def _privacy_enabled(self) -> bool:
+        """Live master-memory privacy gate; configured readers fail closed."""
+        check = self._privacy_enabled_check
+        if check is None:
+            return True
+        try:
+            return bool(check())
+        except Exception:
+            logger.warning("Memory privacy gate failed; external memory is disabled for this operation", exc_info=True)
+            return False
+
+    def _provider_history(self, raw_messages: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+        """History a provider is allowed to see.
+
+        Production managers expose only direct user/assistant turns that passed through
+        sync_all while memory.enabled was on. This prevents a newly re-enabled provider
+        from receiving transcript rows created during the disabled interval via later
+        session-end or pre-compress hooks. Standalone managers without a privacy reader
+        keep the historical raw-message contract for compatibility.
+        """
+        if self._privacy_enabled_check is None:
+            return list(raw_messages or [])
+        with self._provider_visible_history_lock:
+            return [dict(message) for message in self._provider_visible_history]
+
+    def _record_provider_visible_turn(self, user_content: str, assistant_content: str) -> None:
+        if self._privacy_enabled_check is None:
+            return
+        rows = [{"role": "user", "content": user_content}]
+        if assistant_content:
+            rows.append({"role": "assistant", "content": assistant_content})
+        with self._provider_visible_history_lock:
+            self._provider_visible_history.extend(rows)
+
+    def _clear_provider_visible_history(self) -> None:
+        if self._privacy_enabled_check is None:
+            return
+        with self._provider_visible_history_lock:
+            self._provider_visible_history.clear()
 
     def _each_provider(self, label: str, call: Callable[[MemoryProvider], Any], *, level: int = logging.DEBUG,
                        providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False) -> List[Any]:
