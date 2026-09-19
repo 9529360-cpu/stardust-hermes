@@ -243,6 +243,53 @@ class TestMemoryManager:
         mgr.on_session_end(raw_reenabled)
         assert len(provider.session_end_messages) == 1
 
+    def test_privacy_ledger_preserves_rich_current_turn_shape(self):
+        """Filter old/disabled history without stripping tool evidence from an enabled turn."""
+        state = {"enabled": True}
+        provider = MessagesMemoryProvider("messages")
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        messages = [
+            {"role": "user", "content": "older row must not leak"},
+            {"role": "assistant", "content": "older answer"},
+            {"role": "user", "content": "inspect the repository"},
+            {
+                "role": "assistant",
+                "content": "I'll inspect it.",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {"name": "read_file", "arguments": "{\"path\":\"README.md\"}"},
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-1",
+                "name": "read_file",
+                "content": "README contents",
+            },
+            {"role": "assistant", "content": "final enabled answer"},
+        ]
+
+        mgr.sync_all(
+            "inspect the repository",
+            "final enabled answer",
+            session_id="s1",
+            messages=messages,
+        )
+        mgr.flush_pending(timeout=5)
+
+        forwarded = provider.synced_turns[0][3]
+        assert [row["role"] for row in forwarded] == ["user", "assistant", "tool", "assistant"]
+        assert forwarded[0]["content"] == "inspect the repository"
+        assert forwarded[1]["tool_calls"][0]["function"]["name"] == "read_file"
+        assert forwarded[2]["tool_call_id"] == "call-1"
+        assert forwarded[2]["content"] == "README contents"
+        assert all(row.get("content") != "older row must not leak" for row in forwarded)
+
     def test_queued_session_boundary_rechecks_privacy_before_provider_write(self):
         state = {"enabled": True}
 
