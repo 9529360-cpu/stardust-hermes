@@ -173,13 +173,24 @@ describe('desktop slash command curation', () => {
     expect(isDesktopSlashCommand('/pets')).toBe(false)
   })
 
-  it('does not treat retired account commands as extensions before the catalog is loaded', () => {
-    rememberDesktopCommandsCatalog(undefined)
+  it('keeps retired account commands closed without a catalog and across stale backend catalogs', () => {
+    const retired = ['/billing', '/credits', '/login', '/subscription', '/topup', '/upgrade']
 
-    for (const command of ['/billing', '/credits', '/login', '/subscription', '/topup', '/upgrade']) {
-      expect(isDesktopSlashCommand(command)).toBe(false)
-      expect(isDesktopSlashSuggestion(command)).toBe(false)
-      expect(desktopSlashUnavailableMessage(command)).toBeNull()
+    for (const catalog of [
+      undefined,
+      registryCatalog(Object.fromEntries(retired.map(command => [command, null])) as Record<string, null>)
+    ]) {
+      rememberDesktopCommandsCatalog(catalog)
+
+      for (const command of retired) {
+        expect(resolveDesktopCommand(command)).toBeNull()
+        expect(isDesktopSlashCommand(command)).toBe(false)
+        expect(isDesktopSlashSuggestion(command)).toBe(false)
+        expect(desktopSlashUnavailableMessage(command)).toBeNull()
+      }
+
+      const filtered = catalog ? filterDesktopCommandsCatalog({ ...catalog, pairs: retired.map(command => [command, 'old']) }) : null
+      expect(filtered?.pairs ?? []).toEqual([])
     }
   })
 
