@@ -172,6 +172,27 @@ class TestMemoryResetGeneration:
         assert store.format_for_system_prompt("memory") is None
         assert store.add("memory", "fresh post-reset fact")["success"] is True
 
+    def test_failed_post_reset_reload_keeps_old_generation_and_blocks_writes(self, store, monkeypatch):
+        assert store.add("memory", "old snapshot fact")["success"] is True
+        store.load_from_disk()
+        old_generation = store.reset_generation("memory")
+        old_snapshot = store.format_for_system_prompt("memory")
+        MemoryStore.reset_target("memory")
+
+        original_read = store._read_raw_checked
+        monkeypatch.setattr(store, "_read_raw_checked", lambda path: ("", False))
+        store.load_from_disk()
+
+        assert store.reset_generation("memory") == old_generation
+        assert store.format_for_system_prompt("memory") == old_snapshot
+        blocked = store.add("memory", "must stay blocked")
+        assert blocked["reset_conflict"] is True
+
+        monkeypatch.setattr(store, "_read_raw_checked", original_read)
+        store.load_from_disk()
+        assert store.format_for_system_prompt("memory") is None
+        assert store.reset_generation("memory") != old_generation
+
     def test_empty_reset_still_advances_generation_without_changing_prompt_version(self, store):
         before_version = store.system_prompt_snapshot_version()
         before_generation = store.reset_generation("user")
