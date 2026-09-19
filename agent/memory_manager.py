@@ -358,6 +358,11 @@ class MemoryManager:
         self._privacy_enabled_check = privacy_enabled
         self._provider_visible_history: List[Dict[str, Any]] = []
         self._provider_visible_history_lock = threading.Lock()
+        # Session boundaries that occur while the master switch is OFF are remembered
+        # host-side only. The latest boundary is replayed to providers after re-enable,
+        # before any provider I/O, so no disabled-session hook call is needed.
+        self._pending_session_switch: Optional[Tuple[str, str, bool, bool, Dict[str, Any]]] = None
+        self._pending_session_switch_lock = threading.Lock()
         self._external_prefetch_spill_config: Optional[Dict[str, Any]] = None
         self._has_external: bool = False
         timeout = external_prefetch_timeout
@@ -471,10 +476,37 @@ class MemoryManager:
         with self._provider_visible_history_lock:
             self._provider_visible_history.clear()
 
+    def _apply_pending_session_switch(self) -> None:
+        """Replay the latest OFF-period boundary before the next enabled provider I/O."""
+        if not self._privacy_enabled():
+            return
+        with self._pending_session_switch_lock:
+            pending = self._pending_session_switch
+            self._pending_session_switch = None
+        if pending is None:
+            return
+        new_session_id, parent_session_id, reset, rewound, kwargs = pending
+        replay_kwargs = dict(kwargs)
+        if rewound:
+            replay_kwargs["rewound"] = True
+        self._each_provider(
+            "deferred on_session_switch failed",
+            lambda p: p.on_session_switch(
+                new_session_id,
+                parent_session_id=parent_session_id,
+                reset=reset,
+                **replay_kwargs,
+            ),
+            _skip_pending_session_switch=True,
+        )
+
     def _each_provider(self, label: str, call: Callable[[MemoryProvider], Any], *, level: int = logging.DEBUG,
-                       providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False) -> List[Any]:
+                       providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False,
+                       _skip_pending_session_switch: bool = False) -> List[Any]:
         """Call ``call(provider)`` per provider, logging+swallowing failures; returns successes in order.
         ``label`` completes the log line ``Memory provider '<name>' <label>: <exc>``."""
+        if not _skip_pending_session_switch:
+            self._apply_pending_session_switch()
         results: List[Any] = []
         for provider in self._providers if providers is None else providers:
             try:
@@ -785,6 +817,7 @@ class MemoryManager:
         """Route a tool call to its provider; returns a JSON string (tool_error on failure)."""
         if not self._privacy_enabled():
             return tool_error("Memory persistence is disabled by memory.enabled.")
+        self._apply_pending_session_switch()
         provider = self._tool_to_provider.get(tool_name)
         if provider is None:
             return tool_error(f"No memory provider handles tool '{tool_name}'")
@@ -866,12 +899,27 @@ class MemoryManager:
             return
         if not self._privacy_enabled():
             self._clear_provider_visible_history()
+            with self._pending_session_switch_lock:
+                # No provider data is sent while OFF, so intermediate disabled-session
+                # boundaries have no provider-visible state to preserve. The newest target
+                # is the only binding needed when persistence resumes.
+                self._pending_session_switch = (
+                    new_session_id,
+                    parent_session_id,
+                    reset,
+                    rewound,
+                    dict(kwargs),
+                )
             return
+        # A live enabled boundary supersedes any deferred OFF-period target.
+        with self._pending_session_switch_lock:
+            self._pending_session_switch = None
         if rewound:  # forward only when set so it never pollutes providers' **kwargs
             kwargs["rewound"] = True
         self._each_provider(
             "on_session_switch failed",
             lambda p: p.on_session_switch(new_session_id, parent_session_id=parent_session_id, reset=reset, **kwargs),
+            _skip_pending_session_switch=True,
         )
         # A session boundary starts a fresh provider-visible exposure window. Compression
         # commits the old window before this hook; /new/resume/branch likewise must not
