@@ -239,7 +239,9 @@ class TestIntegrationSuggestions:
         assert len(pending) == 1
         assert pending[0]["source"] == "integration"
         assert pending[0]["dedup_key"] == "catalog:important-mail-monitor"
-        assert pending[0]["job_spec"]["schedule"] == "every 30m"
+        assert pending[0]["job_spec"]["schedule"] == "*/30 * * * *"
+        assert pending[0]["job_spec"]["skills"] == ["email-inbox-triage"]
+        assert pending[0]["job_spec"]["name"] == "Important-mail monitor"
 
     def test_google_calendar_unlocks_daily_briefing(self, store):
         from cron.suggestion_catalog import seed_integration_suggestions
@@ -249,6 +251,9 @@ class TestIntegrationSuggestions:
         assert [item["title"] for item in created] == ["Daily briefing"]
         assert created[0]["source"] == "integration"
         assert created[0]["dedup_key"] == "catalog:daily-briefing"
+        assert created[0]["job_spec"]["skills"] == ["google-workspace"]
+        assert created[0]["job_spec"]["schedule"] == "0 8 * * *"
+        assert created[0]["job_spec"]["name"] == "Daily briefing"
 
     def test_mail_connectors_share_one_dedup_decision(self, store):
         from cron.suggestion_catalog import seed_integration_suggestions
