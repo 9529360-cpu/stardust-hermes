@@ -1,9 +1,9 @@
 /**
  * Kanban — the founding plugin use case, now pure SDK-consumer work: a
- * first-class `/kanban` board page + sidebar nav row + a live statusbar count,
+ * first-class `/kanban` board page + sidebar nav row + Task Center section + a live statusbar count,
  * all reusing the existing `plugins/kanban/dashboard/plugin_api.py` REST router
  * through `ctx.rest` (namespace-scoped to `/api/plugins/kanban`). No new
- * backend, no core edits.
+ * backend. Task Center integration is a renderer contribution; board/query state stays here.
  *
  * Ships OFF by default (`defaultEnabled: false`): it inventories in
  * Capabilities ▸ Plugins and registers nothing until the user flips the switch.
@@ -20,11 +20,13 @@ import {
   KEYBINDS_AREA,
   PALETTE_AREA,
   type PaletteContribution,
+  RowButton,
   type RouteContribution,
   ROUTES_AREA,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
   STATUSBAR_AREAS,
+  TASK_CENTER_AREAS,
   Tip,
   useQuery,
   useValue
@@ -32,12 +34,72 @@ import {
 
 import { $boardSlug, bindApi, boardKey, fetchBoard } from './api'
 import { KanbanBoardPage } from './board'
-import { KANBAN_LOCALES } from './i18n'
+import { KANBAN_LOCALES, columnLabel } from './i18n'
+import { selectKanbanTaskCenterTasks } from './task-center-model'
+import { columnMeta } from './types'
 import { $newTaskLane, useKanban } from './ui'
 
 // Live "N running / ready" pill — one glance at fleet activity from anywhere,
 // clicks through to the board. Shares the board query (one cache, one poll with
 // the page); hidden when nothing is in flight (or unloaded).
+function KanbanTaskCenterSection() {
+  const k = useKanban()
+  const slug = useValue($boardSlug)
+  const { data: board } = useQuery({
+    queryFn: () => fetchBoard(false),
+    queryKey: boardKey(slug, false),
+    refetchInterval: 60_000
+  })
+  const tasks = selectKanbanTaskCenterTasks(board)
+
+  if (tasks.length === 0) {
+    return null
+  }
+
+  return (
+    <section className="border-t border-(--ui-stroke-quaternary) py-3" data-kanban-task-center="">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="text-[0.62rem] font-medium text-(--ui-text-tertiary)">{k.taskCenterTitle}</div>
+        <button
+          className="shrink-0 text-[0.54rem] font-medium text-(--ui-text-tertiary) hover:text-(--ui-text-primary)"
+          onClick={() => host.navigate('/kanban')}
+          type="button"
+        >
+          {k.open}
+        </button>
+      </div>
+      <div className="flex flex-col gap-1">
+        {tasks.map(task => {
+          const meta = columnMeta(task.status)
+
+          return (
+            <RowButton
+              className="flex min-w-0 items-start gap-2 py-1 text-left"
+              key={task.id}
+              onClick={() => host.navigate('/kanban')}
+            >
+              <Codicon className="mt-0.5 shrink-0" name={meta.codicon} size="0.7rem" style={{ color: meta.tone }} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[0.66rem] font-medium text-(--ui-text-secondary)">
+                  {task.title}
+                </span>
+                {task.latest_summary && (
+                  <span className="mt-0.5 block line-clamp-2 text-[0.56rem] leading-4 text-(--ui-text-quaternary)">
+                    {task.latest_summary}
+                  </span>
+                )}
+                <span className="mt-0.5 block text-[0.52rem] text-(--ui-text-quaternary)">
+                  {columnLabel(k, task.status)} · {k.restartDurable}
+                </span>
+              </span>
+            </RowButton>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 function KanbanCount() {
   const k = useKanban()
   const slug = useValue($boardSlug)
@@ -115,6 +177,12 @@ const plugin: HermesPlugin = {
         area: SIDEBAR_NAV_AREA,
         order: 50,
         data: { codicon: 'project', label: 'Kanban', path: '/kanban' } satisfies SidebarNavContribution
+      },
+      {
+        id: 'task-center',
+        area: TASK_CENTER_AREAS.sections,
+        order: 50,
+        render: () => <KanbanTaskCenterSection />
       },
       {
         id: 'count',
