@@ -422,7 +422,7 @@ def fire_claim_fence(job_id: str, *, expected_owner: str):
 
 # Fields that must never change after creation: ``id`` is a path component under OUTPUT_DIR, so an
 # update could leak ``../escape``/absolute/nested values into output writes/deletes.
-_IMMUTABLE_JOB_FIELDS = frozenset({"id", "local_session_origin"})
+_IMMUTABLE_JOB_FIELDS = frozenset({"id"})
 
 
 def _job_output_dir(job_id: str) -> Path:
@@ -1645,8 +1645,7 @@ def _normalize_local_session_origin(value: Any) -> Optional[Dict[str, str]]:
     """Trusted local conversation return route captured by the cron tool.
 
     The job store is profile-local, so the durable session id + local surface are sufficient;
-    UI tab ids are intentionally excluded because they die when the window closes. Direct
-    callers cannot smuggle arbitrary route metadata into a scheduled delivery.
+    UI tab ids are intentionally excluded because they die when the window closes.
     """
     if not isinstance(value, dict):
         return None
@@ -2075,6 +2074,11 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         raise ValueError(f"Cron job field(s) cannot be updated: {', '.join(sorted(bad_fields))}")
 
     def apply(jobs, i, job):
+        # A local return route represents the creation-time implicit/origin delivery choice.
+        # Any later explicit non-origin delivery choice supersedes it. This is done in the
+        # generic update path so REST/CLI/dashboard edits cannot leave a hidden second target.
+        if "deliver" in updates and str(updates.get("deliver") or "").strip().lower() != "origin":
+            updates["local_session_origin"] = None
         _rederive_repeat_for_schedule_change(job, updates)
         _normalize_job_updates(job, updates)
         previous_inference_axes = _normalized_inference_axes(job)
