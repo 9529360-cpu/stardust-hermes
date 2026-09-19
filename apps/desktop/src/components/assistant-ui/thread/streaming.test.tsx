@@ -1,6 +1,6 @@
 import { AssistantRuntimeProvider, type ThreadMessage, useExternalStoreRuntime } from '@assistant-ui/react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $reasoningCollapsedByDefault } from '@/store/reasoning-disclosure'
@@ -246,53 +246,18 @@ function assistantTerminalMessage(): ThreadMessage {
   } as ThreadMessage
 }
 
-interface StreamingControls {
-  emitFirst: () => void
-  emitSecond: () => void
-  complete: () => void
-}
+type StreamingPhase = 'complete' | 'first' | 'loading' | 'second'
 
-function StreamingHarness({ onControls }: { onControls?: (controls: StreamingControls) => void } = {}) {
-  const [messages, setMessages] = useState<ThreadMessage[]>([userMessage()])
-  const [isRunning, setIsRunning] = useState(true)
-
-  useEffect(() => {
-    if (onControls) {
-      onControls({
-        emitFirst: () => {
-          setMessages([userMessage(), assistantMessage('first chunk')])
-        },
-        emitSecond: () => {
-          setMessages([userMessage(), assistantMessage('first chunk second chunk')])
-        },
-        complete: () => {
-          setMessages([userMessage(), assistantMessage('first chunk second chunk', false)])
-          setIsRunning(false)
-        }
-      })
-
-      return
-    }
-
-    const first = window.setTimeout(() => {
-      setMessages([userMessage(), assistantMessage('first chunk')])
-    }, 50)
-
-    const second = window.setTimeout(() => {
-      setMessages([userMessage(), assistantMessage('first chunk second chunk')])
-    }, 500)
-
-    const complete = window.setTimeout(() => {
-      setMessages([userMessage(), assistantMessage('first chunk second chunk', false)])
-      setIsRunning(false)
-    }, 700)
-
-    return () => {
-      window.clearTimeout(first)
-      window.clearTimeout(second)
-      window.clearTimeout(complete)
-    }
-  }, [onControls])
+function StreamingHarness({ phase = 'loading' }: { phase?: StreamingPhase } = {}) {
+  const messages =
+    phase === 'loading'
+      ? [userMessage()]
+      : phase === 'first'
+        ? [userMessage(), assistantMessage('first chunk')]
+        : phase === 'second'
+          ? [userMessage(), assistantMessage('first chunk second chunk')]
+          : [userMessage(), assistantMessage('first chunk second chunk', false)]
+  const isRunning = phase !== 'complete'
 
   const runtime = useExternalStoreRuntime<ThreadMessage>({
     messages,
@@ -477,36 +442,27 @@ describe('assistant-ui streaming renderer', () => {
   })
 
   it('renders assistant text incrementally before completion', async () => {
-    let controls: StreamingControls | undefined
+    const { container, rerender } = render(<StreamingHarness phase="loading" />)
 
-    const registerControls = (next: StreamingControls) => {
-      controls = next
-    }
+    expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
 
-    const { container } = render(<StreamingHarness onControls={registerControls} />)
-
-    await waitFor(() => {
-      expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
-      expect(controls).toBeDefined()
-    })
-    act(() => controls?.emitFirst())
-
+    // Drive the renderer through explicit producer phases. The old harness
+    // advanced through timers/effects, so a saturated CI worker could spend the
+    // entire Testing Library deadline waiting for scheduling rather than
+    // exercising the streaming contract itself.
+    rerender(<StreamingHarness phase="first" />)
     await waitFor(() => {
       expect(container.textContent).toContain('first chunk')
+      expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
     })
     expect(container.textContent).not.toContain('second chunk')
-    expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
 
-    // Producer-gated, not wall-clock-gated: the old test slept 80ms and
-    // assumed a 500ms timer could not fire before the assertion. On a loaded
-    // runner the test thread could be descheduled for >500ms, so both chunks
-    // arrived and this clean behavior test flaked.
-    act(() => controls?.emitSecond())
+    rerender(<StreamingHarness phase="second" />)
     await waitFor(() => {
       expect(container.textContent).toContain('first chunk second chunk')
     })
 
-    act(() => controls?.complete())
+    rerender(<StreamingHarness phase="complete" />)
     await waitFor(() => {
       expect(container.textContent).toContain('first chunk second chunk')
     })
