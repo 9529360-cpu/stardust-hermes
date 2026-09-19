@@ -442,5 +442,6 @@ Honcho 在注入前对 `memory-context` 块进行净化，以防止 prompt 注�
 | `hermes honcho sync` | 为所有尚未拥有 host 块的 Hermes 配置文件创建 host 块 |
 | `hermes honcho migrate` | 从 OpenClaw 原生记忆迁移到 Hermes + Honcho 的分步指南 |
 | `hermes memory setup` | 通用记忆提供商选择器（选择 "honcho" 运行相同向导） |
-| `hermes memory status` | 显示当前活跃的记忆提供商及配置 |
-| `hermes memory off` | 禁用外部记忆提供商 |
+| `hermes memory status` | 显示记忆隐私总开关、内置目标和提供商配置 |
+| `hermes memory off` | 暂停全部持久记忆，同时保留 Honcho 选择与配置 |
+| `hermes memory on` | 使用保留的提供商配置恢复持久记忆 |
