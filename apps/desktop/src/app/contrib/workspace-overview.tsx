@@ -8,20 +8,23 @@ import { Codicon } from '@/components/ui/codicon'
 import { registry } from '@/contrib/registry'
 import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
-import { useSessionSlice, useStoreSelector } from '@/lib/use-session-slice'
+import { useSessionSlice } from '@/lib/use-session-slice'
 import { readKey, writeKey } from '@/lib/storage'
-import { $desktopActionTasks, buildRailTasks } from '@/store/activity'
+import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus } from '@/store/activity'
 import { registerRepoStatusCwd, repoStatusForCwd } from '@/store/coding-status'
-import { $statusItemsBySession } from '@/store/composer-status'
+import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProcess } from '@/store/composer-status'
+import { $cronJobs, setCronFocusJobId } from '@/store/cron'
 import { applyDesktopLayoutPreset } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
+import { $approvalRequests } from '@/store/prompts'
 import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
+import { $subagentsBySession } from '@/store/subagents'
 import { setRightContextOpen } from '@/store/right-context'
-import { isAuxiliaryWindow } from '@/store/windows'
+import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
 
-import { sessionRoute } from '../routes'
+import { CRON_ROUTE, sessionRoute } from '../routes'
 import {
   findLiveTaskRuntimeId,
   findLiveTaskRuntimeIdByStoredId,
@@ -54,8 +57,12 @@ function Metric({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
-function activityIcon(status: 'error' | 'running' | 'success' | 'waiting'): string {
-  if (status === 'waiting') {
+function activityIcon(status: TaskCenterStatus): string {
+  if (status === 'queued') {
+    return 'watch'
+  }
+
+  if (status === 'waiting' || status === 'paused' || status === 'interrupted') {
     return 'warning'
   }
 
@@ -80,11 +87,21 @@ export function WorkspaceOverview() {
           assistantSummary: '这里显示当前对话需要的项目、文件、预览和工具上下文；普通聊天不需要项目。',
           assistantSession: '当前对话已经就绪；需要项目、文件或预览时再展开对应能力。',
           taskProgress: '任务进度',
-          activity: '其他任务活动',
+          activity: '任务中心',
           activityRunning: '执行中',
           activityWaiting: '等待你的输入',
+          activityQueued: '已排队 / 已计划',
+          activityPaused: '已暂停',
+          activityInterrupted: '已中断',
           activityCompleted: '已完成',
           activityFailed: '失败',
+          durabilityTurn: '当前回合',
+          durabilityProcess: '进程内',
+          durabilityRestart: '可跨重启',
+          openTask: '打开',
+          stopTask: '停止',
+          manageTask: '管理',
+          activityFiles: (count: number) => `${count} 个文件`,
           currentStep: '当前步骤',
           needsInput: '等待你的输入',
           attentionSummary: '当前任务正在等待你的确认或补充信息；工作上下文会保留，回复后可以继续。',
@@ -100,11 +117,21 @@ export function WorkspaceOverview() {
             assistantSummary: '這裡顯示目前對話需要的專案、檔案、預覽與工具上下文；一般聊天不需要專案。',
             assistantSession: '目前對話已就緒；需要專案、檔案或預覽時再展開對應能力。',
             taskProgress: '任務進度',
-            activity: '其他任務活動',
+            activity: '任務中心',
             activityRunning: '執行中',
             activityWaiting: '等待你的輸入',
+            activityQueued: '已排隊 / 已排程',
+            activityPaused: '已暫停',
+            activityInterrupted: '已中斷',
             activityCompleted: '已完成',
             activityFailed: '失敗',
+            durabilityTurn: '目前回合',
+            durabilityProcess: '程序內',
+            durabilityRestart: '可跨重啟',
+            openTask: '打開',
+            stopTask: '停止',
+            manageTask: '管理',
+            activityFiles: (count: number) => `${count} 個檔案`,
             currentStep: '目前步驟',
             needsInput: '等待你的輸入',
             attentionSummary: '目前任務正在等待你的確認或補充資訊；工作上下文會保留，回覆後可以繼續。',
@@ -119,11 +146,21 @@ export function WorkspaceOverview() {
             assistantSummary: 'Project, file, preview, and tool context appears here when the current conversation needs it; ordinary chat needs no project.',
             assistantSession: 'The current conversation is ready. Expand project, file, or preview context only when it is useful.',
             taskProgress: 'Task progress',
-            activity: 'Other task activity',
+            activity: 'Task center',
             activityRunning: 'Running',
             activityWaiting: 'Waiting for your input',
+            activityQueued: 'Queued / scheduled',
+            activityPaused: 'Paused',
+            activityInterrupted: 'Interrupted',
             activityCompleted: 'Completed',
             activityFailed: 'Failed',
+            durabilityTurn: 'Current turn',
+            durabilityProcess: 'Process-local',
+            durabilityRestart: 'Restart-durable',
+            openTask: 'Open',
+            stopTask: 'Stop',
+            manageTask: 'Manage',
+            activityFiles: (count: number) => `${count} files`,
             currentStep: 'Current step',
             needsInput: 'Waiting for your input',
             attentionSummary: 'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
@@ -137,8 +174,13 @@ export function WorkspaceOverview() {
   const sessions = useStore($sessions)
   const activeSessionId = useStore($activeSessionId)
   const attentionSessionIds = useStore($attentionSessionIds)
+  const approvalRequests = useStore($approvalRequests)
+  const backgroundStatusBySession = useStore($backgroundStatusBySession)
+  const cronJobs = useStore($cronJobs)
   const desktopActionTasks = useStore($desktopActionTasks)
   const previewServerRestart = useStore($previewServerRestart)
+  const sessionStates = useStore($sessionStates)
+  const subagentsBySession = useStore($subagentsBySession)
   const workingSessionIds = useStore($workingSessionIds)
 
   const session = selectedStoredSessionId
@@ -156,25 +198,46 @@ export function WorkspaceOverview() {
     projectScope === ALL_PROJECTS ? '' : projectRootCwd(projectTree.find(project => project.id === projectScope))
   const effectiveCwd = resolveTaskWorkspaceCwd(cwd, session, fallbackTaskSession, scopedProjectCwd)
   const repoStatus = useStore(repoStatusForCwd(effectiveCwd))
-  const fallbackTaskRuntimeId = useStoreSelector($sessionStates, states =>
-    fallbackTaskSession
-      ? findLiveTaskRuntimeId(states, fallbackTaskSession)
-      : fallbackTaskStoredId
-        ? findLiveTaskRuntimeIdByStoredId(states, fallbackTaskStoredId)
-        : null
+  const fallbackTaskRuntimeId = fallbackTaskSession
+    ? findLiveTaskRuntimeId(sessionStates, fallbackTaskSession)
+    : fallbackTaskStoredId
+      ? findLiveTaskRuntimeIdByStoredId(sessionStates, fallbackTaskStoredId)
+      : null
+  const runtimeStoredSessionIds = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(sessionStates).map(([runtimeId, state]) => [runtimeId, state?.storedSessionId ?? null])
+      ),
+    [sessionStates]
   )
   const statusSessionId = selectedStoredSessionId ? activeSessionId : (fallbackTaskRuntimeId ?? activeSessionId)
   const statusItems = useSessionSlice($statusItemsBySession, statusSessionId)
   const activityTasks = useMemo(
     () =>
-      buildRailTasks(
-        workingSessionIds,
+      buildTaskCenterTasks({
+        actionTasks: desktopActionTasks,
+        approvalRequests,
         attentionSessionIds,
+        backgroundBySession: backgroundStatusBySession,
+        cronJobs,
+        previewRestart: previewServerRestart,
+        runtimeStoredSessionIds,
         sessions,
-        previewServerRestart,
-        desktopActionTasks
-      ),
-    [attentionSessionIds, desktopActionTasks, previewServerRestart, sessions, workingSessionIds]
+        subagentsBySession,
+        workingSessionIds
+      }),
+    [
+      approvalRequests,
+      attentionSessionIds,
+      backgroundStatusBySession,
+      cronJobs,
+      desktopActionTasks,
+      previewServerRestart,
+      runtimeStoredSessionIds,
+      sessions,
+      subagentsBySession,
+      workingSessionIds
+    ]
   )
 
   useEffect(() => registerRepoStatusCwd(effectiveCwd), [effectiveCwd])
@@ -233,6 +296,42 @@ export function WorkspaceOverview() {
   const secondaryActivityTasks = currentActivityTaskId
     ? activityTasks.filter(task => task.id !== currentActivityTaskId)
     : activityTasks
+  const activityStatusLabels: Record<TaskCenterStatus, string> = {
+    error: systemLabels.activityFailed,
+    interrupted: systemLabels.activityInterrupted,
+    paused: systemLabels.activityPaused,
+    queued: systemLabels.activityQueued,
+    running: systemLabels.activityRunning,
+    success: systemLabels.activityCompleted,
+    waiting: systemLabels.activityWaiting
+  }
+  const durabilityLabels = {
+    'process-local': systemLabels.durabilityProcess,
+    'restart-durable': systemLabels.durabilityRestart,
+    turn: systemLabels.durabilityTurn
+  } as const
+  const handleTaskAction = (task: (typeof secondaryActivityTasks)[number]) => {
+    if (task.action === 'open-session' && task.sessionId) {
+      if (task.rail === 'subagent') {
+        void openSessionInNewWindow(task.sessionId, { watch: true })
+      } else {
+        navigate(sessionRoute(task.sessionId))
+      }
+
+      return
+    }
+
+    if (task.action === 'stop-process' && task.ownerSessionId && task.processId) {
+      void stopBackgroundProcess(task.ownerSessionId, task.processId)
+
+      return
+    }
+
+    if (task.action === 'manage-cron') {
+      setCronFocusJobId(task.id.slice('cron:'.length))
+      navigate(CRON_ROUTE)
+    }
+  }
 
   return (
     <aside
@@ -342,13 +441,20 @@ export function WorkspaceOverview() {
         {secondaryActivityTasks.length > 0 && (
           <Card title={systemLabels.activity}>
             <div className="flex flex-col gap-2">
-              {secondaryActivityTasks.slice(0, 6).map(task => (
-                <div className="flex min-w-0 items-start gap-2" data-agent-activity-task="" key={task.id}>
+              {secondaryActivityTasks.slice(0, 10).map(task => (
+                <div
+                  className="flex min-w-0 items-start gap-2"
+                  data-agent-activity-task=""
+                  key={task.id}
+                  style={{ paddingLeft: task.depth ? `${task.depth * 0.65}rem` : undefined }}
+                >
                   <Codicon
                     className={
                       task.status === 'running'
                         ? 'mt-0.5 shrink-0 text-(--theme-primary)'
-                        : task.status === 'waiting' || task.status === 'error'
+                        : task.status === 'waiting' ||
+                            task.status === 'error' ||
+                            task.status === 'interrupted'
                           ? 'mt-0.5 shrink-0 text-(--ui-text-secondary)'
                           : 'mt-0.5 shrink-0 text-(--ui-text-tertiary)'
                     }
@@ -357,16 +463,38 @@ export function WorkspaceOverview() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[0.66rem] font-medium text-(--ui-text-secondary)">{task.label}</div>
-                    <div className="mt-0.5 truncate text-[0.56rem] text-(--ui-text-quaternary)">
-                      {task.status === 'waiting'
-                        ? systemLabels.activityWaiting
-                        : task.status === 'running'
-                          ? systemLabels.activityRunning
-                          : task.status === 'success'
-                            ? systemLabels.activityCompleted
-                            : systemLabels.activityFailed}
+                    <div className="mt-0.5 line-clamp-2 text-[0.56rem] leading-4 text-(--ui-text-quaternary)">
+                      {task.detail}
+                    </div>
+                    <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[0.52rem] text-(--ui-text-quaternary)">
+                      <span>{activityStatusLabels[task.status]}</span>
+                      {task.durability && (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span>{durabilityLabels[task.durability]}</span>
+                        </>
+                      )}
+                      {task.artifactRefs?.length ? (
+                        <>
+                          <span aria-hidden>·</span>
+                          <span>{systemLabels.activityFiles(task.artifactRefs.length)}</span>
+                        </>
+                      ) : null}
                     </div>
                   </div>
+                  {task.action && (
+                    <button
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[0.54rem] font-medium text-(--ui-text-tertiary) hover:bg-(--ui-bg-tertiary) hover:text-(--ui-text-primary)"
+                      onClick={() => handleTaskAction(task)}
+                      type="button"
+                    >
+                      {task.action === 'stop-process'
+                        ? systemLabels.stopTask
+                        : task.action === 'manage-cron'
+                          ? systemLabels.manageTask
+                          : systemLabels.openTask}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import type { SessionInfo } from '@/types/hermes'
+import type { CronJob, SessionInfo } from '@/types/hermes'
 
-import { buildRailTasks } from './activity'
+import { buildRailTasks, buildTaskCenterTasks } from './activity'
+import type { ComposerStatusItem } from './composer-status'
+import type { SubagentProgress } from './subagents'
 
 const session = (overrides: Partial<SessionInfo> = {}): SessionInfo =>
   ({
@@ -61,5 +63,186 @@ describe('activity task projection', () => {
       detail: 'server failed',
       status: 'error'
     })
+  })
+})
+
+
+const subagent = (overrides: Partial<SubagentProgress> = {}): SubagentProgress => ({
+  id: 'worker',
+  parentId: null,
+  goal: 'Inspect repository',
+  status: 'running',
+  taskCount: 1,
+  taskIndex: 0,
+  startedAt: 1_000,
+  updatedAt: 2_000,
+  filesRead: [],
+  filesWritten: [],
+  stream: [],
+  ...overrides
+})
+
+const background = (overrides: Partial<ComposerStatusItem> = {}): ComposerStatusItem => ({
+  id: 'proc-1',
+  state: 'running',
+  title: 'pytest -q',
+  type: 'background',
+  ...overrides
+})
+
+const cron = (overrides: Partial<CronJob> = {}): CronJob => ({
+  enabled: true,
+  id: 'cron-1',
+  name: 'Morning check',
+  state: 'scheduled',
+  ...overrides
+})
+
+describe('task center projection', () => {
+  it('projects owner-specific durability without becoming a second lifecycle owner', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: ['tip'],
+      backgroundBySession: { runtime: [background()] },
+      cronJobs: [cron()],
+      previewRestart: null,
+      sessions: [session()],
+      subagentsBySession: { runtime: [subagent({ sessionId: 'child-1' })] },
+      workingSessionIds: []
+    })
+
+    expect(tasks.map(task => [task.id, task.status, task.durability])).toEqual([
+      ['session:tip', 'waiting', 'turn'],
+      ['subagent:runtime:worker', 'running', 'process-local'],
+      ['process:proc-1', 'running', 'process-local'],
+      ['cron:cron-1', 'queued', 'restart-durable']
+    ])
+  })
+
+  it('preserves subagent hierarchy, child session links, summaries, and artifacts', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: [],
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      sessions: [],
+      subagentsBySession: {
+        runtime: [
+          subagent({
+            filesWritten: ['/workspace/report.md'],
+            id: 'parent',
+            sessionId: 'child-parent',
+            status: 'completed',
+            summary: 'parent report'
+          }),
+          subagent({
+            id: 'nested',
+            parentId: 'parent',
+            goal: 'Verify report',
+            sessionId: 'child-nested',
+            status: 'interrupted',
+            summary: 'backend restarted'
+          })
+        ]
+      },
+      workingSessionIds: []
+    })
+
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        action: 'open-session',
+        depth: 1,
+        id: 'subagent:runtime:nested',
+        sessionId: 'child-nested',
+        status: 'interrupted'
+      }),
+      expect.objectContaining({
+        artifactRefs: ['/workspace/report.md'],
+        depth: 0,
+        id: 'subagent:runtime:parent',
+        sessionId: 'child-parent',
+        status: 'success'
+      })
+    ])
+  })
+
+  it('keeps process stop and cron management as owner actions', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: [],
+      backgroundBySession: {
+        runtime: [
+          background(),
+          background({ id: 'proc-2', state: 'failed', exitCode: 7, title: 'build' })
+        ]
+      },
+      cronJobs: [
+        cron({ enabled: false, id: 'paused', state: 'paused' }),
+        cron({ id: 'failed', last_error: 'network down', state: 'error' })
+      ],
+      previewRestart: null,
+      sessions: [],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks.find(task => task.id === 'process:proc-1')).toMatchObject({
+      action: 'stop-process',
+      ownerSessionId: 'runtime',
+      processId: 'proc-1',
+      status: 'running'
+    })
+    expect(tasks.find(task => task.id === 'process:proc-2')).toMatchObject({
+      action: undefined,
+      status: 'error'
+    })
+    expect(tasks.find(task => task.id === 'cron:paused')).toMatchObject({
+      action: 'manage-cron',
+      durability: 'restart-durable',
+      status: 'paused'
+    })
+    expect(tasks.find(task => task.id === 'cron:failed')).toMatchObject({
+      detail: 'network down',
+      status: 'error'
+    })
+  })
+
+  it('replaces a generic waiting row with the concrete approval provenance', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      approvalRequests: {
+        runtime: {
+          command: 'rm -rf /tmp/cache',
+          description: 'Delete cached build output',
+          requestId: 'approval-1',
+          sessionId: 'runtime'
+        }
+      },
+      attentionSessionIds: ['tip'],
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      runtimeStoredSessionIds: { runtime: 'root' },
+      sessions: [session()],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        action: 'open-session',
+        approvalRef: 'approval-1',
+        detail: 'rm -rf /tmp/cache',
+        durability: 'turn',
+        id: 'approval:approval-1',
+        label: 'Delete cached build output',
+        ownerSessionId: 'runtime',
+        rail: 'approval',
+        sessionId: 'tip',
+        status: 'waiting'
+      })
+    ])
+    expect(tasks.some(task => task.id === 'session:tip')).toBe(false)
   })
 })
