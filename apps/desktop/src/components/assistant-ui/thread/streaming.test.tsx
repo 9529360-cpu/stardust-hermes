@@ -488,25 +488,34 @@ describe('assistant-ui streaming renderer', () => {
     expect(screen.getByRole('status', { name: 'Hermes is loading a response' })).toBeTruthy()
     expect(controls).toBeTruthy()
 
-    await act(async () => {
-      controls?.emitFirst()
-    })
-    expect(container.textContent).toContain('first chunk')
+    act(() => controls?.emitFirst())
+    await waitFor(
+      () => {
+        expect(container.textContent).toContain('first chunk')
+      },
+      { timeout: 5_000 }
+    )
     expect(container.textContent).not.toContain('second chunk')
     expect(screen.queryByRole('status', { name: 'Hermes is loading a response' })).toBeNull()
 
-    // Producer-gated and flush-gated, not wall-clock-gated. A saturated CI
-    // worker may take longer than waitFor's default one-second budget to
-    // render a state update even though no runtime timer is involved.
-    await act(async () => {
-      controls?.emitSecond()
-    })
-    expect(container.textContent).toContain('first chunk second chunk')
+    // Producer-gated and condition-gated, not sleep-gated. React's state update
+    // can finish before assistant-ui/virtualizer has committed the message DOM,
+    // especially on a saturated CI worker, so wait for the observable boundary.
+    act(() => controls?.emitSecond())
+    await waitFor(
+      () => {
+        expect(container.textContent).toContain('first chunk second chunk')
+      },
+      { timeout: 5_000 }
+    )
 
-    await act(async () => {
-      controls?.complete()
-    })
-    expect(container.textContent).toContain('first chunk second chunk')
+    act(() => controls?.complete())
+    await waitFor(
+      () => {
+        expect(container.textContent).toContain('first chunk second chunk')
+      },
+      { timeout: 5_000 }
+    )
   })
 
   it('does not render composer clearance for intro-only threads', () => {
