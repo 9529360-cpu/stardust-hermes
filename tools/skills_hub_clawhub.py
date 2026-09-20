@@ -188,7 +188,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
             # Empty query: paginating catalog walker. A disk-cached full catalog
             # is returned whole (caller paginates); on a cold cache the walk is
             # bounded to `limit` so browse renders page one without walking
-            # 50k+ skills (max_items=0 = unbounded, offline index builder only).
+            # 50k+ skills (max_items=0 = full-catalog mode for the offline builder).
             catalog = self._load_catalog_index(max_items=max(limit, 0))
             if catalog:
                 deduped = _dedupe_results(catalog)
@@ -297,11 +297,11 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         """Walk the ClawHub catalog via cursor pagination.
 
         ``max_items`` stops the walk early once that many distinct skills are
-        gathered (browse's cold-start fallback renders one page); ``0`` walks
-        to exhaustion (offline index builder). Only a COMPLETE walk (cursor
-        exhausted or page cap) is written to the shared ``clawhub_catalog_v1``
-        cache — a walk cut by ``max_items`` or the wall-clock budget would
-        poison it with a partial slice.
+        gathered (browse's cold-start fallback renders one page); ``0`` requests
+        a full offline index walk, still bounded by the larger publisher budget.
+        Only a COMPLETE walk (cursor exhausted or page cap) is written to the shared
+        ``clawhub_catalog_v1`` cache — a walk cut by ``max_items`` or either
+        wall-clock budget would poison it with a partial slice.
         """
         cache_key = "clawhub_catalog_v1"
         cached = _cached_metas(cache_key)
