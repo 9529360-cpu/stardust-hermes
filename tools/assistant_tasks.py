@@ -7,6 +7,7 @@ continue after the current turn or process, and to query the same durable board 
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any, Optional
 
@@ -29,6 +30,15 @@ _APPROVAL_NOTE = (
     "and any material price/recipient/destination details, then stop. Resume the commit only after "
     "the user explicitly approves it."
 )
+
+
+def _owner_idempotency_token(owner_key: str) -> str:
+    """Non-reversible owner component for replay keys.
+
+    The stable owner itself can contain a messaging user id. Keep it out of
+    idempotency_key because board archives preserve that column as task history.
+    """
+    return hashlib.sha256(owner_key.encode("utf-8")).hexdigest()[:16]
 
 
 def _bounded_text(value: Any, limit: int) -> str:
@@ -96,6 +106,7 @@ def _create_tasks(
     scope = str(request_id or "request").strip() or "request"
     sid = str(session_id or "").strip()
     owner = str(owner_key or "").strip()
+    owner_token = _owner_idempotency_token(owner)
     created: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
 
@@ -117,7 +128,7 @@ def _create_tasks(
             "assignee": str(raw.get("assignee") or default_assignee).strip(),
             "priority": raw.get("priority", 0),
             "goal_mode": bool(raw.get("continuous")),
-            "idempotency_key": f"assistant:{owner}:{scope}:{index}",
+            "idempotency_key": f"assistant:{owner_token}:{scope}:{index}",
             "_assistant_owner_key": owner,
         }
         if sid:
