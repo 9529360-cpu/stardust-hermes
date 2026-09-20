@@ -54,10 +54,12 @@ so nothing is lost.
   `resume`, `pin`, `unpin`, `archive`, `restore`, `list-archived`, `prune`,
   `backup`, `rollback`.
 - **Slash:** `/curator <subcommand>` mirrors the CLI.
-- **Scope:** only touches skills with `created_by: "agent"` provenance.
-  Bundled + hub-installed skills are off-limits. **Never deletes** —
-  max destructive action is archive. Pinned skills are exempt from
-  every auto-transition and every LLM review pass.
+- **Scope:** LLM review/consolidation only sees explicitly curator-managed
+  `created_by: "agent"` skills, with pinned skills excluded before review.
+  The deterministic inactivity pass may also archive unused bundled built-ins
+  when `curator.prune_builtins: true`; hub-installed, external-dir, and
+  protected built-ins remain off-limits. **Never auto-deletes** — the maximum
+  automatic destructive action is recoverable archive.
 - **Cost:** the deterministic inactivity/prune sweep runs for free. The
   aux-model "consolidate overlapping skills into umbrellas" pass is on by
   default for curator-managed `created_by: "agent"` skills, but only on the
