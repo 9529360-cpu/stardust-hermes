@@ -1376,6 +1376,8 @@ export const en: Translations = {
       apiKeyPlaceholder: 'Paste API key',
       apiKeyLabel: 'API key',
       apiKeyKeepExisting: 'Leave blank to keep the saved key',
+      apiKeyUpdate: 'Update key',
+      apiKeyUpdating: 'Updating…',
       connectProvider: provider => `Connect ${provider}`,
       setupApiKeyHint: provider => `${provider} needs an API key. Connect it to choose a model.`,
       setupOauthHint: provider => `${provider} signs in through your browser. Stardust continues automatically when sign-in finishes.`,
