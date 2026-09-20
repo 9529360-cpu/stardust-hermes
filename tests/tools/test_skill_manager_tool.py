@@ -553,6 +553,64 @@ class TestSkillManageDispatcher:
         rec = usage.get("test-skill") or {}
         assert rec.get("created_by") in {"learn", None, "", False}
 
+    def test_curator_dry_run_blocks_flat_create_at_tool_boundary(self, tmp_path):
+        from tools.skill_provenance import (
+            BACKGROUND_REVIEW,
+            reset_current_write_origin,
+            reset_review_dry_run,
+            set_current_write_origin,
+            set_review_dry_run,
+        )
+
+        with _skill_dir(tmp_path):
+            origin = set_current_write_origin(BACKGROUND_REVIEW)
+            dry = set_review_dry_run(True)
+            try:
+                result = json.loads(skill_manage(
+                    action="create",
+                    name="dry-run-skill",
+                    content=VALID_SKILL_CONTENT,
+                ))
+            finally:
+                reset_review_dry_run(dry)
+                reset_current_write_origin(origin)
+
+        assert result["success"] is False
+        assert result["_dry_run"] is True
+        assert "read-only" in result["error"]
+        assert not (tmp_path / "dry-run-skill").exists()
+
+    def test_curator_dry_run_blocks_operations_batch_before_any_write(self, tmp_path):
+        from tools.skill_provenance import (
+            BACKGROUND_REVIEW,
+            reset_current_write_origin,
+            reset_review_dry_run,
+            set_current_write_origin,
+            set_review_dry_run,
+        )
+
+        with _skill_dir(tmp_path):
+            origin = set_current_write_origin(BACKGROUND_REVIEW)
+            dry = set_review_dry_run(True)
+            try:
+                result = json.loads(skill_manage(
+                    action="",
+                    name="",
+                    operations=[{
+                        "action": "create",
+                        "name": "dry-run-batch-skill",
+                        "content": VALID_SKILL_CONTENT,
+                    }],
+                ))
+            finally:
+                reset_review_dry_run(dry)
+                reset_current_write_origin(origin)
+
+        assert result["success"] is False
+        assert result["_dry_run"] is True
+        assert "read-only" in result["error"]
+        assert not (tmp_path / "dry-run-batch-skill").exists()
+
     def test_autonomous_create_can_opt_into_curator_management(self, tmp_path):
         with (
             _skill_dir(tmp_path),
