@@ -1,6 +1,6 @@
 """Security checks for user-configured MCP server entries.
 
-Blocks three narrow shapes (see ``validate_mcp_server_entry``), including a hardcoded IOC blocklist
+Blocks four narrow shapes (see ``validate_mcp_server_entry``), including a hardcoded IOC blocklist
 for the June 2026 hermes-0day campaign. Runs BOTH at save time (``_save_mcp_server`` — dashboard API +
 CLI) and at spawn time (``tools.mcp_tool._filter_suspicious_mcp_servers``), so a hand-edited or
 pre-planted ``config.yaml`` entry is caught before it can execute.
@@ -11,6 +11,7 @@ import os
 import re
 import shlex
 from typing import Any
+from urllib.parse import urlparse
 
 _SHELL_INTERPRETERS = frozenset({
     "bash", "sh", "zsh", "dash", "fish", "cmd", "cmd.exe", "powershell", "powershell.exe", "pwsh", "pwsh.exe",
@@ -86,12 +87,42 @@ def _entry_text(entry: dict[str, Any]) -> str:
     return " ".join(parts)
 
 
+def redact_mcp_url_userinfo(value: Any) -> Any:
+    """Return an MCP URL safe for UI/log display without embedded userinfo."""
+    if not isinstance(value, str):
+        return value
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return value
+    if parsed.username is None and parsed.password is None:
+        return value
+    marker = value.find("://")
+    if marker < 0:
+        return "***"
+    authority_start = marker + 3
+    ends = [
+        pos for pos in (
+            value.find("/", authority_start),
+            value.find("?", authority_start),
+            value.find("#", authority_start),
+        ) if pos >= 0
+    ]
+    authority_end = min(ends) if ends else len(value)
+    at = value.rfind("@", authority_start, authority_end)
+    if at < authority_start:
+        return value
+    return value[:authority_start] + "***" + value[at:]
+
+
 def validate_mcp_server_entry(name: str, entry: dict[str, Any]) -> list[str]:
     """Return security warnings for an MCP server entry (empty = not suspicious).
 
-    Intentionally not a whitelist — custom commands, Python scripts, npx, uvx stay legal. Only three
+    Intentionally not a whitelist — custom commands, Python scripts, npx, uvx stay legal. Four
     narrow shapes are blocked: (1) a known IOC anywhere in command/args/env, (2) a shell interpreter
-    with network egress in its inline script, (3) a shell interpreter writing an OS persistence surface.
+    with network egress in its inline script, (3) a shell interpreter writing an OS persistence surface,
+    (4) credentials embedded in an HTTP MCP URL, which would otherwise be persisted and echoed by
+    config/UI surfaces.
 
     * a shell interpreter whose inline script writes to an OS persistence surface (June 2026 hermes-0day
     SSH/PAM/sudoers/cron shape). See #45620.
@@ -100,6 +131,18 @@ def validate_mcp_server_entry(name: str, entry: dict[str, Any]) -> list[str]:
         return []
 
     issues: list[str] = []
+    raw_url = entry.get("url")
+    if isinstance(raw_url, str) and raw_url.strip():
+        try:
+            parsed_url = urlparse(raw_url.strip())
+        except ValueError:
+            parsed_url = None
+        if parsed_url is not None and (parsed_url.username is not None or parsed_url.password is not None):
+            issues.append(
+                f"MCP server '{name}' embeds credentials in its URL; use header/API-key auth or OAuth instead"
+            )
+            return issues
+
     flat = _entry_text(entry)
     for ioc in _IOC_SUBSTRINGS:
         if ioc in flat:

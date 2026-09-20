@@ -135,6 +135,8 @@ def _validate_remote_mcp_url(server_name: str, url: Any) -> str:
         raise _bad(f"missing host ({stripped!r})")
     if not parsed.hostname:  # ``urlparse`` accepts ``http://:8080`` (empty host, explicit port)
         raise _bad(f"missing hostname ({stripped!r})")
+    if parsed.username is not None or parsed.password is not None:
+        raise _bad("embedded URL credentials are not allowed; use header/API-key auth or OAuth instead")
     return stripped
 
 

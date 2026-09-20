@@ -80,6 +80,32 @@ def test_validator_flags_ssh_key_persistence_payload():
 
 
 
+def test_url_userinfo_redaction_covers_ui_summaries():
+    from hermes_cli.mcp_security import redact_mcp_url_userinfo
+    from hermes_cli.web_server_mcp import _mcp_server_summary
+    from tui_gateway.mcp_rpc_helpers import summarize_server
+
+    cfg = {"url": "https://alice:super-secret@example.com/mcp"}
+    expected = "https://***@example.com/mcp"
+
+    assert redact_mcp_url_userinfo(cfg["url"]) == expected
+    assert _mcp_server_summary("private", cfg)["url"] == expected
+    assert summarize_server("private", cfg)["url"] == expected
+
+
+def test_validator_rejects_credentials_embedded_in_http_url():
+    from hermes_cli.mcp_security import validate_mcp_server_entry
+
+    warnings = validate_mcp_server_entry(
+        "private",
+        {"url": "https://alice:super-secret@example.com/mcp"},
+    )
+
+    assert warnings
+    assert "embeds credentials" in warnings[0]
+    assert "super-secret" not in warnings[0]
+
+
 def test_explicit_registration_skips_dangerous_entry_before_connect(monkeypatch):
     import tools.mcp_tool as mcp_tool
     from tools import mcp_tool_discovery as _mcp_discovery
