@@ -23,7 +23,9 @@ from utils import atomic_json_write
 logger = logging.getLogger(__name__)
 
 DEFAULT_CATALOG_URL = (
-    "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json")
+    "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+    "/main/website/static/api/model-catalog.json"
+)
 # An operator may point model_catalog.url at a custom manifest. If that custom source fails,
 # fall back to Stardust's reviewed catalog; when the canonical URL is already primary the
 # fetch helper skips the duplicate instead of issuing the same request twice.
