@@ -307,6 +307,19 @@ Review and recover pull requests.
 
 
 class TestEditSkill:
+    def test_full_rewrite_surfaces_main_file_bloat_warning(self, tmp_path):
+        from tools.skill_linter import _MAIN_SKILL_WARN_CHARS
+
+        filler = "Stable operational detail.\n" * 1200
+        bloated = VALID_SKILL_CONTENT_2 + filler
+        assert len(bloated) > _MAIN_SKILL_WARN_CHARS
+        with _skill_dir(tmp_path):
+            _create_skill("test-skill", VALID_SKILL_CONTENT)
+            result = _edit_skill("test-skill", bloated)
+
+        assert result["success"] is True
+        assert any(row["rule"] == "main-file-bloat" for row in result["lint_warnings"])
+
     def test_edit_existing_skill(self, tmp_path):
         with _skill_dir(tmp_path):
             _create_skill("my-skill", VALID_SKILL_CONTENT)
@@ -358,6 +371,22 @@ class TestEditSkill:
         assert "A test skill" in content
 
 class TestPatchSkill:
+    def test_main_file_patch_surfaces_bloat_warning(self, tmp_path):
+        from tools.skill_linter import _MAIN_SKILL_WARN_CHARS
+
+        filler = "Stable operational detail.\n" * 1200
+        assert len(VALID_SKILL_CONTENT) + len(filler) > _MAIN_SKILL_WARN_CHARS
+        with _skill_dir(tmp_path):
+            _create_skill("test-skill", VALID_SKILL_CONTENT)
+            result = _patch_skill(
+                "test-skill",
+                "Step 1: Do the thing.",
+                "Step 1: Do the thing.\n" + filler,
+            )
+
+        assert result["success"] is True
+        assert any(row["rule"] == "main-file-bloat" for row in result["lint_warnings"])
+
     def test_patch_unique_match(self, tmp_path):
         with _skill_dir(tmp_path):
             _create_skill("my-skill", VALID_SKILL_CONTENT)
