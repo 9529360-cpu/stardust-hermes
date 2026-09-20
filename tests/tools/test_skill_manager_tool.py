@@ -165,6 +165,65 @@ class TestCreateSkill:
         assert result["success"] is False
         assert "already exists" in result["error"]
 
+    def test_create_overlap_returns_merge_candidates(self, tmp_path):
+        existing = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        proposed = """\
+---
+name: github-pr-review
+description: Handle GitHub pull request review and recovery.
+---
+
+# GitHub PR Review
+
+Review and recover pull requests.
+"""
+        with _skill_dir(tmp_path):
+            first = _create_skill("github-pr-workflow", existing)
+            result = _create_skill("github-pr-review", proposed)
+
+        assert first["success"] is True
+        assert result["success"] is False
+        assert "Do not create a parallel skill yet" in result["error"]
+        assert result["merge_candidates"][0]["name"] == "github-pr-workflow"
+        assert not (tmp_path / "github-pr-review").exists()
+
+    def test_create_distinct_bypasses_overlap_after_inspection(self, tmp_path):
+        existing = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        proposed = """\
+---
+name: github-pr-review
+description: Handle GitHub pull request review and recovery.
+---
+
+# GitHub PR Review
+
+Review and recover pull requests.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-pr-workflow", existing)
+            result = _create_skill("github-pr-review", proposed, distinct=True)
+
+        assert result["success"] is True
+        assert (tmp_path / "github-pr-review" / "SKILL.md").exists()
+
     def test_create_rejects_category_traversal(self, tmp_path):
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
