@@ -626,16 +626,18 @@ def _prune_toolsets_stripped_by_disabled(enabled_toolsets: Set[str], disabled_na
 def _recover_platform_native_toolsets(enabled_toolsets: Set[str], platform: str, *, skip: Set[str]) -> None:
     """Add non-configurable platform toolsets (discord, feishu_*) in place: in the default composite but not in
     CONFIGURABLE_TOOLSETS, so never in a checklist or saved list. Runs for BOTH ``_get_platform_tools`` branches."""
-    from toolsets import resolve_toolset, TOOLSETS
+    from toolsets import resolve_toolset, toolset_role, TOOLSETS
 
     platform_tool_universe = set(resolve_toolset(_platform_default_toolset(platform)))
     configurable_tool_universe = {t for ts_key, _, _ in CONFIGURABLE_TOOLSETS for t in resolve_toolset(ts_key)}
     claimed = {t for ts_key in enabled_toolsets for t in resolve_toolset(ts_key)}
-    skip = skip | {k for k in TOOLSETS if k.startswith("hermes-")} | (set(_DEFAULT_OFF_TOOLSETS) - {platform})
+    skip = skip | {
+        k for k, definition in TOOLSETS.items()
+        if toolset_role(k, definition) == "platform_bundle"
+    } | (set(_DEFAULT_OFF_TOOLSETS) - {platform})
     for ts_key, ts_def in TOOLSETS.items():
-        # Posture toolsets (``coding``) are session-level selections made by agent/coding_context.py, not
-        # per-platform capabilities to recover.
-        if ts_key in skip or ts_def.get("includes") or ts_def.get("posture"):
+        # Only ordinary leaf capabilities are eligible for platform-native recovery.
+        if ts_key in skip or toolset_role(ts_key, ts_def) != "capability":
             continue
         # Static membership: a registry-added tool absent from the platform composite must not block recovery
         # of a non-configurable toolset whose authored tools the composite lists.
