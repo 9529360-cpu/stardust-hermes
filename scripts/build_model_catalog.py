@@ -65,7 +65,10 @@ def build_catalog() -> dict:
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
             "source": "stardust-hermes repo",
-            "docs": "https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/reference/model-catalog.md",
+            "docs": (
+                "https://github.com/9529360-cpu/stardust-hermes"
+                "/blob/main/website/docs/reference/model-catalog.md"
+            ),
         },
         "providers": {
             "openrouter": {
