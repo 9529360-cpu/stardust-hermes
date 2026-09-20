@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from typing import Any, Optional
 
 from tools.registry import registry, tool_error
@@ -77,6 +78,36 @@ def _resolve_owner_key() -> Optional[str]:
     if not platform or not principal:
         return None
     return f"messaging:{platform}:{principal}"
+
+
+def _assistant_board_slugs() -> list[str]:
+    """Active Kanban boards, de-duplicated by their physical database.
+
+    Durable assistant ownership is broader than the UI's currently-selected
+    board. Creation stays board-scoped, but later status recall must find the
+    user's work after a board/project switch. HERMES_KANBAN_DB can make
+    multiple slugs alias one DB, so collapse those aliases before querying.
+    """
+    from hermes_cli import kanban_db as kb
+
+    try:
+        boards = kb.list_boards(include_archived=False)
+    except Exception:
+        return [kb.get_current_board()]
+
+    unique: dict[str, str] = {}
+    for meta in boards:
+        slug = str((meta or {}).get("slug") or kb.DEFAULT_BOARD)
+        raw_path = (meta or {}).get("db_path")
+        try:
+            identity = str(
+                (Path(str(raw_path)).expanduser() if raw_path else kb.kanban_db_path(slug))
+                .resolve()
+            )
+        except Exception:
+            identity = f"slug:{slug}"
+        unique.setdefault(identity, slug)
+    return list(unique.values()) or [kb.get_current_board()]
 
 
 def _safe_limit(value: Any) -> int:
@@ -197,50 +228,64 @@ def _list_tasks(
         if str(task_id).strip()
     }
     max_items = _safe_limit(limit)
-    with _board(None) as (kb, conn):
-        # Read a bounded superset, then sort for assistant-facing recency. The board
-        # remains the authority; this adapter keeps no index or task cache of its own.
-        rows = kb.list_tasks(
-            conn,
-            assistant_owner_key=owner_key,
-            include_archived=False,
-            limit=max(200, max_items * 4),
-            order_by="activity",
-        )
-        projected: list[dict[str, Any]] = []
-        for task in rows:
-            if wanted and task.id not in wanted:
-                continue
-            if not include_completed and task.status in _TERMINAL_STATUSES:
-                continue
-            run = kb.latest_run(conn, task.id)
-            detail = _bounded_text(
-                (run.summary if run else None) or task.last_failure_error or task.result,
-                600,
-            )
-            projected.append({
-                "task_id": task.id,
-                "title": task.title,
-                "status": task.status,
-                "assignee": task.assignee,
-                "project_id": task.project_id,
-                "workspace_kind": task.workspace_kind,
-                "workspace_path": task.workspace_path,
-                "created_at": task.created_at,
-                "started_at": task.started_at,
-                "completed_at": task.completed_at,
-                "block_kind": task.block_kind,
-                "needs_attention": task.status in _ATTENTION_STATUSES,
-                "detail": detail,
+    projected: list[dict[str, Any]] = []
+    board_errors: list[dict[str, str]] = []
+    # Creation remains board-scoped, but personal-assistant recall is user-scoped:
+    # switching projects/boards must not make already-handed-off work disappear.
+    for board in _assistant_board_slugs():
+        try:
+            with _board(board) as (kb, conn):
+                # Read a bounded recent superset from every active board, then merge
+                # globally. The Kanban DBs remain authoritative; no shadow index.
+                rows = kb.list_tasks(
+                    conn,
+                    assistant_owner_key=owner_key,
+                    include_archived=False,
+                    limit=max(200, max_items * 4),
+                    order_by="activity",
+                )
+                for task in rows:
+                    if wanted and task.id not in wanted:
+                        continue
+                    if not include_completed and task.status in _TERMINAL_STATUSES:
+                        continue
+                    run = kb.latest_run(conn, task.id)
+                    detail = _bounded_text(
+                        (run.summary if run else None) or task.last_failure_error or task.result,
+                        600,
+                    )
+                    projected.append({
+                        "task_id": task.id,
+                        "board": board,
+                        "title": task.title,
+                        "status": task.status,
+                        "assignee": task.assignee,
+                        "project_id": task.project_id,
+                        "workspace_kind": task.workspace_kind,
+                        "workspace_path": task.workspace_path,
+                        "created_at": task.created_at,
+                        "started_at": task.started_at,
+                        "completed_at": task.completed_at,
+                        "block_kind": task.block_kind,
+                        "needs_attention": task.status in _ATTENTION_STATUSES,
+                        "detail": detail,
+                    })
+        except Exception as exc:
+            # Preserve useful results from healthy boards, but never imply the
+            # snapshot was complete when one authority could not be read.
+            board_errors.append({
+                "board": board,
+                "error": type(exc).__name__,
             })
-        projected.sort(
-            key=lambda row: (
-                int(row.get("completed_at") or row.get("started_at") or row.get("created_at") or 0),
-                str(row.get("task_id") or ""),
-            ),
-            reverse=True,
-        )
-        projected = projected[:max_items]
+
+    projected.sort(
+        key=lambda row: (
+            int(row.get("completed_at") or row.get("started_at") or row.get("created_at") or 0),
+            str(row.get("task_id") or ""),
+        ),
+        reverse=True,
+    )
+    projected = projected[:max_items]
 
     return json.dumps(
         {
@@ -248,6 +293,8 @@ def _list_tasks(
             "tasks": projected,
             "count": len(projected),
             "include_completed": bool(include_completed),
+            "partial": bool(board_errors),
+            "board_errors": board_errors,
         },
         ensure_ascii=False,
     )
