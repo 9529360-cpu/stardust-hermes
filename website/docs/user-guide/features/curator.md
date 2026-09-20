@@ -239,22 +239,23 @@ curator-managed skills: 43 total  (agent-created=43  bundled=0)
   stale       2
   archived    0
 
-unmanaged (no provenance marker): 112 total
-  pre-dates marker    34
-  foreground-created  78
+unmanaged (not curator-managed): 112 total
+  foreground-marked  18
+  origin unknown     94
   never auto-staled or archived — `hermes curator adopt <name>` hands one over
 ```
 
-Those 112 are curation-*eligible* but permanently invisible to the lifecycle,
-for one of two reasons:
+Those 112 are curation-*eligible* but permanently invisible to the lifecycle.
+The status output reports only what the sidecar can actually prove:
 
-- **pre-dates marker** — the record was written before `created_by` existed, so
-  it carries no provenance signal at all. Authorship is genuinely unknowable
-  from the record.
-- **foreground-created** — a foreground `skill_manage(create)` recorded
-  `created_by: learn` (older records: unset). User-requested skills stay in
-  this bucket; autonomous procedural-memory creates can now opt into curator
-  management at creation time with `curator_managed: true`.
+- **foreground-marked** — the record explicitly carries `created_by: learn`,
+  the foreground learning-signal marker. User-requested skills stay in this
+  bucket; autonomous procedural-memory creates can opt into curator management
+  at creation time with `curator_managed: true`.
+- **origin unknown** — `created_by` is null, absent, or otherwise unrecognized.
+  This can include hand-written skills, records from before the marker existed,
+  or legacy foreground creates. Hermes does not guess between them because
+  telemetry activity is not authorship evidence.
 
 A large library can therefore look fully curated while most of it is
 untouchable. `adopt` closes that gap by **declaration**:
