@@ -1,4 +1,4 @@
-"""Plugin catalog — curated, Nous-approved Hermes plugins shipped with the repo.
+"""Plugin catalog — curated Stardust plugins shipped with the repo.
 
 Mirrors the ``optional-mcps/`` MCP-catalog pattern: one YAML file per entry under the in-tree
 ``plugin-catalog/`` directory, pinned to an exact 40-character commit SHA. Presence in the directory IS
@@ -6,10 +6,9 @@ the human-merged approval gate; SHA bumps are new, re-reviewed PRs; ``removed.ya
 (installs of a removed name/repo are refused with the recorded reason). Full policy:
 ``plugin-catalog/README.md``.
 
-Live refresh: the docs build publishes the same data as ONE JSON document
-(``website/scripts/extract-plugins.py`` → ``/docs/api/plugin-catalog.json``, like the skills index), so
-an installed Hermes sees new entries and removals without updating. Any fetch failure falls back to the
-in-tree copy silently.
+Live refresh reads the deterministic reviewed ``website/static/api/plugin-catalog.json`` directly
+from Stardust's raw ``main`` branch, so an installed Stardust sees new entries and removals without a
+product release. Any fetch failure falls back to the Stardust-specific live cache, then the in-tree copy.
 """
 
 from __future__ import annotations
