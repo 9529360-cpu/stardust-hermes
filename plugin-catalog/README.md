@@ -69,6 +69,12 @@ contains only `entries` and `removed`; page freshness timestamps live in
 `plugins-meta.json` and are intentionally excluded so the runtime file stays
 reproducible.
 
+If the committed artifact is missing or stale, the CI job uploads
+`plugin-catalog-runtime-<sha>` before failing the sync check. Download that
+artifact, commit its `plugin-catalog.json` unchanged, and rerun the PR checks.
+This is also the recovery path if a future catalog edit forgets to regenerate
+the committed projection.
+
 ## removed.yaml — the blocklist
 
 When an entry is pulled from the catalog for security or policy reasons, it
