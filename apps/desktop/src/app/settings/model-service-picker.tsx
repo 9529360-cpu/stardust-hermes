@@ -31,6 +31,7 @@ interface ModelServicePickerProps {
   onOpenConnectionView: (view: ModelConnectionView) => void
   onSelectModel: (model: string) => void
   onSelectProvider: (provider: ModelOptionProvider) => void
+  onSetupProvider: () => void
   providers: readonly ModelOptionProvider[]
   selectedModel: string
   selectedProvider: string
@@ -52,6 +53,7 @@ export function ModelServicePicker({
   onOpenConnectionView,
   onSelectModel,
   onSelectProvider,
+  onSetupProvider,
   providers,
   selectedModel,
   selectedProvider,
@@ -158,7 +160,7 @@ export function ModelServicePicker({
                         </div>
                       ) : (
                         <div className="flex flex-wrap items-center gap-2">
-                          <Button onClick={onAddService} size="sm">
+                          <Button onClick={onSetupProvider} size="sm">
                             {m.connectProvider(selectedProviderRow?.name ?? m.provider)}
                           </Button>
                           {selectedProviderRow && (
