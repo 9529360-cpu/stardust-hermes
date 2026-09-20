@@ -1856,7 +1856,7 @@ class TestLoadHermesIndex:
     @staticmethod
     def _isolate_cache(monkeypatch, tmp_path):
         """Point the on-disk cache at an empty tmp dir so no real cache leaks in."""
-        cache_file = tmp_path / "hermes-index.json"
+        cache_file = tmp_path / "stardust-skills-index-v1.json"
         monkeypatch.setattr("tools.skills_hub_search._hermes_index_cache_file", lambda: cache_file)
         return cache_file
 
@@ -1869,6 +1869,7 @@ class TestLoadHermesIndex:
         captured = {}
 
         def fake_get(url, *args, **kwargs):
+            captured["url"] = url
             captured["headers"] = kwargs.get("headers", {})
             resp = MagicMock()
             resp.status_code = 200
@@ -1880,10 +1881,26 @@ class TestLoadHermesIndex:
         data = _load_hermes_index()
         assert data == {"skills": [{"name": "x"}]}
 
+        assert captured["url"] == (
+            "https://github.com/9529360-cpu/stardust-hermes"
+            "/releases/download/stardust-skills-index/skills-index.json"
+        )
         accept = captured["headers"].get("Accept-Encoding", "")
         assert "br" not in [tok.strip() for tok in accept.split(",")], (
             f"index fetch must not request Brotli, got Accept-Encoding={accept!r}"
         )
+
+    def test_default_cache_namespace_is_stardust_specific(
+        self, monkeypatch, tmp_path
+    ):
+        import tools.skills_hub as hub
+        import tools.skills_hub_search as hub_search
+
+        monkeypatch.setattr(hub, "_index_cache_dir", lambda: tmp_path)
+
+        path = hub_search._hermes_index_cache_file()
+        assert path == tmp_path / "stardust-skills-index-v1.json"
+        assert path.name != "hermes-index.json"
 
     def test_persistent_decoding_error_falls_back_to_stale_cache(
         self, monkeypatch, tmp_path
