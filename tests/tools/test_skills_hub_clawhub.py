@@ -502,19 +502,22 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
     @patch("tools.skills_hub._write_index_cache")
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
-    def test_max_items_zero_ignores_wall_clock_budget(
-        self, mock_get, _mock_read_cache, _mock_write_cache
+    def test_max_items_zero_uses_index_build_budget_and_does_not_poison_cache(
+        self, mock_get, _mock_read_cache, mock_write_cache
     ):
-        """Index builder path (max_items=0) must not truncate on the browse budget."""
+        """Index builder walks are large but still need a hard wall-clock bound."""
         page_calls = {"n": 0}
         mock_get.side_effect = self._infinite_pages(page_calls)
 
-        with patch.object(ClawHubSource, "CATALOG_WALK_BUDGET_SECONDS", -1):
+        with (
+            patch.object(ClawHubSource, "CATALOG_WALK_BUDGET_SECONDS", 9999),
+            patch.object(ClawHubSource, "INDEX_BUILD_WALK_BUDGET_SECONDS", -1),
+        ):
             results = self.src._load_catalog_index(max_items=0)
 
-        # No budget -> walks until the 750-page safety cap, not ~14 pages in 12s.
-        self.assertEqual(page_calls["n"], 750)
-        self.assertEqual(len(results), 750)
+        self.assertLess(page_calls["n"], 750)
+        self.assertEqual(results, [])
+        mock_write_cache.assert_not_called()
 
 
     @patch("tools.skills_hub._write_index_cache")
