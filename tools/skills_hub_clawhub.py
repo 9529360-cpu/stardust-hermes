@@ -315,6 +315,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
             # Builder-visible completion signal. Reset before cache lookup so a
             # prior truncated attempt cannot poison a later cached/full result.
             self.index_build_incomplete = False
+            self.index_build_incomplete_reason = ""
         cached = _cached_metas(cache_key)
         if cached is not None:
             return cached
@@ -337,6 +338,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
                 partial = True
                 if max_items == 0:
                     self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "wall-clock budget"
                 logger.warning(
                     "ClawHub catalog walk hit %.0fs budget after %d skills; "
                     "returning partial uncached results",
@@ -351,6 +353,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
                 partial = True
                 if max_items == 0:
                     self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "request failure"
                 logger.warning(
                     "ClawHub catalog walk request failed after %d skills; "
                     "returning partial uncached results",
@@ -363,6 +366,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
                 partial = True
                 if max_items == 0:
                     self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "invalid items payload"
                 logger.warning(
                     "ClawHub catalog walk returned invalid items after %d skills; "
                     "returning partial uncached results",
@@ -378,6 +382,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
                     partial = True
                     if max_items == 0:
                         self.index_build_incomplete = True
+                        self.index_build_incomplete_reason = "empty page with cursor"
                     logger.warning(
                         "ClawHub catalog walk returned an empty page with a cursor "
                         "after %d skills; returning partial uncached results",
@@ -405,6 +410,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
                 partial = True
                 if max_items == 0:
                     self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "page ceiling"
                 logger.warning(
                     "ClawHub catalog walk hit %d-page ceiling after %d skills; "
                     "returning partial uncached results",
