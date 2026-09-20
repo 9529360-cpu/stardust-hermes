@@ -21,7 +21,10 @@ permissions:
 
 concurrency:
   group: stardust-skills-index
-  cancel-in-progress: false
+  # A newer reviewed main commit supersedes an older crawl. Cancelling here is
+  # safe because publication happens only after health verification and the
+  # last healthy release asset remains untouched until promotion succeeds.
+  cancel-in-progress: true
 
 jobs:
   build-publish:
