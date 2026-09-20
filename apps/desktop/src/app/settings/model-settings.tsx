@@ -360,7 +360,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
     return [
       {
-        authenticated: true,
+        authenticated: Boolean(mainModel.model),
         models: mainModel.model ? [mainModel.model] : [],
         name: mainModel.provider,
         slug: mainModel.provider
@@ -686,8 +686,8 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   )
 
   const startProviderSetup = useCallback(() => {
-    const rowSlug = selectedProviderRow?.slug.trim() ?? ''
-    const slug = rowSlug || selectedProvider.trim()
+    const catalogRow = providers.find(provider => provider.slug === selectedProvider)
+    const slug = selectedProvider.trim()
 
     if (!slug) {
       return
@@ -697,14 +697,15 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
     if (lower === 'custom' || lower === 'local' || lower.startsWith('custom:')) {
       startManualLocalEndpoint()
-    } else if (rowSlug) {
-      startManualProviderOAuth(rowSlug)
+    } else if (catalogRow) {
+      startManualProviderOAuth(catalogRow.slug)
     } else {
-      // An absent row has no trustworthy auth metadata. Open the generic
-      // provider picker instead of deep-linking an unknown or stale slug.
+      // A provider missing from the live catalog has no trustworthy auth
+      // metadata. Open the generic provider picker instead of pretending an
+      // OAuth flow exists for a stale or retired id.
       startManualOnboarding()
     }
-  }, [selectedProvider, selectedProviderRow])
+  }, [providers, selectedProvider])
 
   const applyMainModel = useCallback(async () => {
     if (!selectedProvider || !selectedModel) {
