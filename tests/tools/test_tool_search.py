@@ -63,38 +63,44 @@ class TestConfigParsing:
 
 
 # ---------------------------------------------------------------------------
-# Classification — the hard invariant: core tools NEVER defer.
+# Classification — shared defaults are eager unless the effective policy selects them.
 # ---------------------------------------------------------------------------
 
 
 class TestClassification:
-    def test_core_tools_never_defer(self):
-        """The critical invariant from the OpenClaw report."""
+    def test_default_tools_stay_eager_when_defer_set_is_empty(self):
+        """An explicit empty defer set restores the all-eager default platform surface."""
+        from toolsets import _HERMES_DEFAULT_TOOLS
         from tools.tool_search import is_deferrable_tool_name
-        # Sample of core tools from _HERMES_CORE_TOOLS.
-        for core_name in ["terminal", "read_file", "write_file", "patch",
-                          "search_files", "todo", "memory", "browser_navigate",
-                          "web_search", "session_search", "clarify",
-                          "execute_code", "delegate_task", "send_message"]:
-            assert not is_deferrable_tool_name(core_name), (
-                f"Core tool '{core_name}' must NEVER be deferrable"
-            )
+
+        for name in _HERMES_DEFAULT_TOOLS:
+            assert not is_deferrable_tool_name(name, frozenset()), name
+
+    def test_curated_default_can_defer_selected_builtin_tools(self):
+        """The measured default policy may defer selected built-ins without redefining membership."""
+        from toolsets import _HERMES_DEFAULT_TOOLS
+        from tools.tool_search import _DEFAULT_DEFERRED_TOOLS, is_deferrable_tool_name
+
+        selected = set(_HERMES_DEFAULT_TOOLS) & set(_DEFAULT_DEFERRED_TOOLS)
+        assert {"computer_use", "session_search", "image_generate", "todo_list"} <= selected
+        for name in selected:
+            assert is_deferrable_tool_name(name, _DEFAULT_DEFERRED_TOOLS), name
 
     def test_bridge_tools_never_defer(self):
         from tools.tool_search import is_deferrable_tool_name, BRIDGE_TOOL_NAMES
         for name in BRIDGE_TOOL_NAMES:
             assert not is_deferrable_tool_name(name)
 
-    def test_gui_surface_tools_never_defer(self):
-        """Session-gated GUI tools stay direct and stay off the global core list."""
+    def test_gui_surface_tools_stay_direct_without_explicit_selection(self):
+        """Session-gated GUI tools stay direct unless the effective defer set selects them."""
         from tools.registry import discover_builtin_tools
         from tools.tool_search import is_deferrable_tool_name
-        from toolsets import _HERMES_CORE_TOOLS
+        from toolsets import _HERMES_DEFAULT_TOOLS
 
         discover_builtin_tools()
         for name in ("read_window_below", "apply_layout", "project_list"):
             assert not is_deferrable_tool_name(name), name
-            assert name not in _HERMES_CORE_TOOLS
+            assert name not in _HERMES_DEFAULT_TOOLS
 
     def test_gui_surface_defers_by_default(self):
         """2026-08 core-deferral reversal: the curated defer set (GUI surface
@@ -133,10 +139,9 @@ class TestClassification:
         assert not assembled.activated
         assert {td["function"]["name"] for td in assembled.tool_defs} == names
 
-    def test_core_working_set_never_defers_even_with_mcp_active(self):
-        """The bridge activates for MCP, but working-set core tools (terminal,
-        files, memory...) stay direct — the deferral set is the CURATED list,
-        not all of core."""
+    def test_eager_working_set_stays_direct_even_with_mcp_active(self):
+        """The bridge activates for MCP, but the high-frequency working set stays direct;
+        only the measured curated built-ins are deferred by default."""
         from tools.registry import discover_builtin_tools, registry
         from tools.tool_search import (
             BRIDGE_TOOL_NAMES,
