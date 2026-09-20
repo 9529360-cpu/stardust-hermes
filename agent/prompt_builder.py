@@ -239,7 +239,9 @@ SESSION_SEARCH_GUIDANCE = (
 # the compaction-pruning contract lives here — nothing else teaches it.
 SKILLS_GUIDANCE = (
     "When you work out a non-trivial workflow, record it with skill_manage for future reuse.\n"
-    "Prefer patching the existing skill that owns the workflow; create a new skill only when no existing skill has that responsibility.\n\n"
+    "Prefer patching the existing skill that owns the workflow; create a new skill only when no existing skill has that responsibility. "
+    "When you autonomously create one as reusable procedural memory, set curator_managed=true so later curation can consolidate it; "
+    "leave user-requested or user-owned skills unmanaged.\n\n"
     "## Skill Safety Rule\n"
     "A skill placeholder containing `[SKILL_PRUNED]` lost its content in context compression and is inaccessible — "
     "reload it with skill_view(name='...') before acting on anything that depends on it. After reloading, ignore any "
