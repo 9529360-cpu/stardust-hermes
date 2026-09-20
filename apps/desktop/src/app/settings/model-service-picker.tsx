@@ -79,6 +79,7 @@ export function ModelServicePicker({
 
   const ready = isModelServiceReady(selectedProviderRow)
   const apiKeyProvider = selectedProviderRow?.auth_type === 'api_key' && !!selectedProviderRow.key_env
+
   const selectedModels =
     selectedModel && !selectedProviderModels.includes(selectedModel)
       ? [selectedModel, ...selectedProviderModels]
@@ -161,7 +162,7 @@ export function ModelServicePicker({
                       ) : (
                         <div className="flex flex-wrap items-center gap-2">
                           <Button onClick={onSetupProvider} size="sm">
-                            {m.connectProvider(selectedProviderRow?.name ?? m.provider)}
+                            {m.connectProvider(selectedProviderRow?.auth_type ? selectedProviderRow.name : m.provider)}
                           </Button>
                           {selectedProviderRow?.auth_type && (
                             <span className="text-xs text-muted-foreground">
@@ -175,17 +176,32 @@ export function ModelServicePicker({
                     ) : (
                       <>
                         {apiKeyProvider && (
-                          <label className="grid gap-1.5 text-xs text-muted-foreground">
-                            {m.apiKeyLabel}
-                            <Input
-                              autoComplete="off"
-                              className={CONTROL_TEXT}
-                              onChange={event => onApiKeyChange(event.target.value)}
-                              placeholder={m.apiKeyKeepExisting}
-                              type="password"
-                              value={apiKeyDraft}
-                            />
-                          </label>
+                          <div className="grid gap-2 @2xl:grid-cols-[minmax(0,1fr)_auto] @2xl:items-end">
+                            <label className="grid gap-1.5 text-xs text-muted-foreground">
+                              {m.apiKeyLabel}
+                              <Input
+                                autoComplete="off"
+                                className={CONTROL_TEXT}
+                                onChange={event => onApiKeyChange(event.target.value)}
+                                onKeyDown={event => {
+                                  if (isSubmitEnter(event) && apiKeyDraft.trim()) {
+                                    onActivateApiKey()
+                                  }
+                                }}
+                                placeholder={m.apiKeyKeepExisting}
+                                type="password"
+                                value={apiKeyDraft}
+                              />
+                            </label>
+                            <Button
+                              disabled={!apiKeyDraft.trim() || activating}
+                              onClick={onActivateApiKey}
+                              size="sm"
+                              variant="outline"
+                            >
+                              {activating ? m.apiKeyUpdating : m.apiKeyUpdate}
+                            </Button>
+                          </div>
                         )}
                         <div className="flex flex-wrap items-center gap-2">
                           <Select onValueChange={onSelectModel} value={selectedModel}>
