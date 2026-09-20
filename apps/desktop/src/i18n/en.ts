@@ -2697,7 +2697,17 @@ export const en: Translations = {
       fieldHelp: {},
       optionLabels: {},
       catalog: {}
-    }
+    },
+    suggestions: {
+      tab: 'Suggested automations',
+      accept: 'Schedule',
+      dismiss: 'Dismiss',
+      working: 'Working…',
+      scheduled: 'Automation scheduled',
+      dismissed: 'Suggestion dismissed',
+      actionFailed: 'Could not update automation suggestion',
+      needsConversation: 'Open a saved conversation first so scheduled results have a chat to return to.'
+    },
   },
 
   artifacts: {

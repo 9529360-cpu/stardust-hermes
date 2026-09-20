@@ -306,6 +306,9 @@ class CronJobCreate(BaseModel):
 class CronJobUpdate(BaseModel):
     updates: dict
 
+class CronSuggestionAccept(BaseModel):
+    session_id: str
+
 class AutomationBlueprintInstantiate(BaseModel):
     blueprint: str  # blueprint key, e.g. "morning-brief"
     values: Dict[str, Any] = {}  # filled slot values from the form

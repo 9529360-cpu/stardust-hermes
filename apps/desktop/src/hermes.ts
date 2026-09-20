@@ -56,6 +56,7 @@ export type {
   CronJobCreatePayload,
   CronJobSchedule,
   CronJobUpdates,
+  CronSuggestion,
   CuratorStatusResponse,
   CustomEndpoint,
   CustomEndpointsResponse,
