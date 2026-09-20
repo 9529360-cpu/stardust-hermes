@@ -538,3 +538,22 @@ def test_list_reports_partial_snapshot_when_one_board_is_unreadable(monkeypatch)
     assert listed["tasks"][0]["board"] == "healthy"
     assert listed["tasks"][0]["title"] == "Healthy task"
     assert "private local path" not in json.dumps(listed)
+
+
+
+def test_board_recall_respects_explicit_db_pin(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_DB", str(tmp_path / "pinned.db"))
+    monkeypatch.setenv("HERMES_KANBAN_BOARD", "beta")
+    monkeypatch.setattr(
+        kb,
+        "list_boards",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not enumerate under a DB pin")),
+    )
+
+    assert assistant_tasks._assistant_board_slugs() == ["beta"]
