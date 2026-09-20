@@ -286,7 +286,13 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         cached = _cached_metas(cache_key)
         if cached is not None:
             return cached[:limit]
-        catalog = self._load_catalog_index()
+
+        # Interactive search must never bootstrap the expensive full-catalog
+        # walk. Use a previously completed catalog cache when available;
+        # otherwise return a miss so search() falls through to ClawHub's
+        # lightweight listing/search API. The offline index builder is the
+        # only path allowed to populate clawhub_catalog_v1.
+        catalog = _cached_metas("clawhub_catalog_v1")
         if not catalog:
             return []
         results = self._finalize_search_results(query, catalog, limit)
