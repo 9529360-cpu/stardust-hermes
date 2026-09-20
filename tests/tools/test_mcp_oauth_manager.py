@@ -47,6 +47,35 @@ def test_manager_isolates_same_named_servers_by_profile_home(tmp_path, monkeypat
     assert providers[1].context.current_tokens.access_token == "TOKEN_B"
 
 
+def test_manager_rebuilds_provider_when_oauth_config_changes(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from tools.mcp_oauth_manager import MCPOAuthManager
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    manager = MCPOAuthManager()
+    builds = []
+
+    def fake_build(server_name, entry):
+        provider = SimpleNamespace(server_name=server_name, oauth_config=entry.oauth_config)
+        builds.append(provider)
+        return provider
+
+    monkeypatch.setattr(manager, "_build_provider", fake_build)
+    config = {"client_id": "client-a", "scopes": ["read"]}
+
+    first = manager.get_or_build_provider("shared", "https://mcp.example/mcp", config)
+    same = manager.get_or_build_provider("shared", "https://mcp.example/mcp", dict(config))
+    assert same is first
+
+    config["scopes"].append("write")
+    second = manager.get_or_build_provider("shared", "https://mcp.example/mcp", config)
+
+    assert second is not first
+    assert second.oauth_config == {"client_id": "client-a", "scopes": ["read", "write"]}
+    assert len(builds) == 2
+
+
 def test_manager_restore_entry_preserves_newer_concurrent_entry(tmp_path, monkeypatch):
     from tools.mcp_oauth_manager import MCPOAuthManager
 
