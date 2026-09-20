@@ -11,12 +11,21 @@ const getHermesConfigRecord = vi.fn()
 const getHermesConfigSchema = vi.fn()
 const saveHermesConfig = vi.fn()
 const getElevenLabsVoices = vi.fn()
+const getMemoryProviderOAuthStatus = vi.fn()
+const startMemoryProviderOAuth = vi.fn()
+const getMemoryProviderConfig = vi.fn()
+const saveMemoryProviderConfig = vi.fn()
 
 vi.mock('@/hermes', () => ({
   getHermesConfigRecord: () => getHermesConfigRecord(),
   getHermesConfigSchema: () => getHermesConfigSchema(),
   saveHermesConfig: (config: unknown, profile?: string) => saveHermesConfig(config, profile),
   getElevenLabsVoices: () => getElevenLabsVoices(),
+  getMemoryProviderOAuthStatus: (provider: string, profile?: string) => getMemoryProviderOAuthStatus(provider, profile),
+  startMemoryProviderOAuth: (provider: string, profile?: string) => startMemoryProviderOAuth(provider, profile),
+  getMemoryProviderConfig: (provider: string, profile?: string) => getMemoryProviderConfig(provider, profile),
+  saveMemoryProviderConfig: (provider: string, patch: unknown, profile?: string) =>
+    saveMemoryProviderConfig(provider, patch, profile),
   setApiRequestProfile: () => {}
 }))
 
@@ -53,6 +62,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   getElevenLabsVoices.mockResolvedValue({ available: false })
+  getMemoryProviderOAuthStatus.mockRejectedValue(new Error('OAuth not available in config settings test'))
+  getMemoryProviderConfig.mockResolvedValue({ docs_url: '', fields: [], label: 'Honcho', name: 'honcho' })
+  startMemoryProviderOAuth.mockResolvedValue(undefined)
+  saveMemoryProviderConfig.mockResolvedValue(undefined)
   getHermesConfigSchema.mockResolvedValue({ fields: {} })
   saveHermesConfig.mockResolvedValue({ ok: true })
 })
