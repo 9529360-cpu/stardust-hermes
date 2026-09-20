@@ -36,7 +36,9 @@ def capture_local_session_origin(
         if is_delegated_child_context():
             return None
     except Exception:
-        pass
+        # A missing/broken delegation-context check must never widen the return scope.
+        # If we cannot prove this is a top-level human session, fail closed.
+        return None
     try:
         from gateway.session_context import get_session_env
         source = get_session_env("HERMES_SESSION_SOURCE", "")
