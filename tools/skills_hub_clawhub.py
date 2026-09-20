@@ -64,9 +64,11 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
 
     SOURCE_ID = "clawhub"
     BASE_URL = "https://clawhub.ai/api/v1"
-    # Wall-clock budget for a full catalog walk: 50k+ skills, sequential
-    # (~250 requests each under timeout=30), so unbounded it blocks for minutes.
+    # Interactive browse must return quickly. The offline index builder gets a
+    # separate, much larger budget but is still bounded so a slow ClawHub API
+    # cannot outlive the publisher workflow timeout.
     CATALOG_WALK_BUDGET_SECONDS = 12
+    INDEX_BUILD_WALK_BUDGET_SECONDS = 30 * 60
     ZIP_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024
     ZIP_DOWNLOAD_CHUNK_BYTES = 64 * 1024
     _SLUG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -310,13 +312,24 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         seen: set[str] = set()
         # 750 pages * 200/page = 150k ceiling over the ~50k catalog; a safety
         # rail against an infinite-cursor loop, normally ended by nextCursor=None.
-        # Wall-clock budget applies to interactive browse only: the index builder
-        # (max_items=0) must walk everything or it trips the deploy health floor.
-        deadline = time.monotonic() + self.CATALOG_WALK_BUDGET_SECONDS if max_items > 0 else None
+        # Both modes have wall-clock bounds: interactive browse is short, while
+        # the offline publisher gets enough time for a large healthy snapshot.
+        budget_seconds = (
+            self.CATALOG_WALK_BUDGET_SECONDS
+            if max_items > 0
+            else self.INDEX_BUILD_WALK_BUDGET_SECONDS
+        )
+        deadline = time.monotonic() + budget_seconds
         partial = False
         for _ in range(750):
-            if deadline is not None and time.monotonic() > deadline:
+            if time.monotonic() > deadline:
                 partial = True
+                logger.warning(
+                    "ClawHub catalog walk hit %.0fs budget after %d skills; "
+                    "returning partial uncached results",
+                    budget_seconds,
+                    len(results),
+                )
                 break
             params: Dict[str, Any] = {"limit": 200, "cursor": cursor} if cursor else {"limit": 200}
             data = self._get_json(f"{self.BASE_URL}/skills", timeout=30, params=params)
