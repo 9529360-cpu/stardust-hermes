@@ -68,7 +68,11 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
     # separate, much larger budget but is still bounded so a slow ClawHub API
     # cannot outlive the publisher workflow timeout.
     CATALOG_WALK_BUDGET_SECONDS = 12
-    INDEX_BUILD_WALK_BUDGET_SECONDS = 30 * 60
+    # First real Stardust publisher crawl (2026-09-20) needed 3915s
+    # for 76,234 ClawHub skills. 90m leaves production headroom while still
+    # reserving ~30m of the 120m workflow cap for path resolution, enrichment,
+    # health checks, verification, and release publication.
+    INDEX_BUILD_WALK_BUDGET_SECONDS = 90 * 60
     CATALOG_WALK_MAX_PAGES = 750
     ZIP_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024
     ZIP_DOWNLOAD_CHUNK_BYTES = 64 * 1024
