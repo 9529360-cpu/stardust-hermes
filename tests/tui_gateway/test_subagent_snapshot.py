@@ -2,6 +2,7 @@
 
 import json
 import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -75,6 +76,59 @@ def test_snapshot_projects_only_this_sessions_runtime_records(runtime):
         _unregister_subagent("foreign")
         release.set()
         assert finished.wait(10)
+
+
+def test_snapshot_projects_owned_restart_recovery_receipts_without_private_payload(runtime, tmp_path, monkeypatch):
+    from tools import async_delegation as bg
+
+    _server, _owner, _transport, call = runtime
+    monkeypatch.setattr(bg, "_db_path", lambda: tmp_path / "state.db")
+    now = time.time()
+
+    with bg._DB_LOCK, bg._transaction() as conn:
+        for delegation_id, origin_session, origin_ui, goal in (
+            ("owned-recovery", "parent", "ui-owner", "Recover repository audit"),
+            ("foreign-recovery", "foreign-session", "other-ui", "Foreign private task"),
+        ):
+            conn.execute(
+                """INSERT INTO async_delegations (
+                       delegation_id, origin_session, origin_ui_session_id, state,
+                       dispatched_at, completed_at, updated_at, task_json, delivery_state
+                   ) VALUES (?, ?, ?, 'unknown', ?, ?, ?, ?, 'delivered')""",
+                (
+                    delegation_id,
+                    origin_session,
+                    origin_ui,
+                    now - 30,
+                    now - 5,
+                    now - 5,
+                    json.dumps({
+                        "goal": goal,
+                        "goals": ["first", "second"],
+                        "task_indexes": [0, 1],
+                        "context": "PRIVATE HANDOFF",
+                        "model": "private-model",
+                        "toolsets": ["terminal"],
+                    }),
+                ),
+            )
+
+    snapshot = call("subagent.list")["result"]
+    assert snapshot["delegations"] == [{
+        "delegation_id": "owned-recovery",
+        "goal": "Recover repository audit",
+        "task_count": 2,
+        "dispatched_at": pytest.approx(now - 30),
+        "completed_at": pytest.approx(now - 5),
+        "status": "interrupted",
+        "recovery_reason": "process_restart",
+    }]
+    wire = json.dumps(snapshot)
+    assert "foreign-recovery" not in wire
+    assert "Foreign private task" not in wire
+    assert "PRIVATE HANDOFF" not in wire
+    assert "private-model" not in wire
+    assert "terminal" not in wire
 
 
 def test_live_tail_and_steer_share_exact_owner_and_end_with_child(runtime):
