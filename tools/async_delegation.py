@@ -540,6 +540,68 @@ def get_durable_delegation(delegation_id: str) -> Optional[Dict[str, Any]]:
         "delivery_attempts": row[6], "origin_session_id": row[7] or "", "parent_session_id": row[8],
         "task": json.loads(row[9]) if row[9] else None, "event": json.loads(row[10]) if row[10] else None}
 
+_RECOVERY_RECEIPT_MAX_AGE_SECONDS = 24 * 60 * 60
+_RECOVERY_RECEIPT_LIMIT = 20
+
+
+def list_durable_recovery_receipts(
+    *, max_age_seconds: float = _RECOVERY_RECEIPT_MAX_AGE_SECONDS,
+    limit: int = _RECOVERY_RECEIPT_LIMIT,
+) -> List[Dict[str, Any]]:
+    """Recent process-loss receipts for a recovery UI.
+
+    These are read-only projections of the durable ledger, not task records. Only
+    state='unknown' rows are eligible: that state is written by
+    recover_abandoned_delegations() when the process owning a process-local
+    delegation disappeared before a terminal result was recorded.
+
+    Ownership provenance is returned for an in-process caller to authorize the
+    row against its live session, but context, toolsets, model, result payloads,
+    routing metadata and errors are deliberately excluded.
+    """
+    try:
+        bounded_limit = max(1, min(int(limit), 100))
+    except (TypeError, ValueError):
+        bounded_limit = _RECOVERY_RECEIPT_LIMIT
+    try:
+        age = max(0.0, float(max_age_seconds))
+    except (TypeError, ValueError):
+        age = float(_RECOVERY_RECEIPT_MAX_AGE_SECONDS)
+    cutoff = time.time() - age
+
+    with _DB_LOCK, _transaction() as conn:
+        rows = conn.execute(
+            """SELECT delegation_id, origin_session, origin_ui_session_id,
+                      dispatched_at, completed_at, task_json
+               FROM async_delegations
+               WHERE state='unknown' AND completed_at IS NOT NULL
+                 AND completed_at >= ?
+               ORDER BY completed_at DESC, delegation_id DESC
+               LIMIT ?""",
+            (cutoff, bounded_limit),
+        ).fetchall()
+
+    receipts: List[Dict[str, Any]] = []
+    for delegation_id, origin_session, origin_ui_session_id, dispatched_at, completed_at, task_json in rows:
+        try:
+            task = json.loads(task_json or "{}") or {}
+        except (TypeError, json.JSONDecodeError):
+            task = {}
+        goals = task.get("goals") if isinstance(task.get("goals"), list) else []
+        goal = str(task.get("goal") or (goals[0] if goals else "") or "Background delegation").strip()
+        receipts.append(
+            {
+                "delegation_id": str(delegation_id),
+                "origin_session": str(origin_session or ""),
+                "origin_ui_session_id": str(origin_ui_session_id or ""),
+                "goal": goal,
+                "task_count": max(1, len(goals)),
+                "dispatched_at": float(dispatched_at or 0),
+                "completed_at": float(completed_at or 0),
+            }
+        )
+    return receipts
+
 
 # ── In-memory registry queries ──────────────────────────────────────────────
 def _get_executor(max_workers: int) -> ThreadPoolExecutor:
