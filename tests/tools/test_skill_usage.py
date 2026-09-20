@@ -398,6 +398,30 @@ def test_is_agent_created(skills_home):
 # ---------------------------------------------------------------------------
 
 
+def test_unmanaged_report_only_marks_explicit_learn_as_foreground(skills_home):
+    from tools import skill_usage
+
+    skills_dir = skills_home / "skills"
+    for name in ("foreground", "telemetry-only", "bare"):
+        _write_skill(skills_dir, name)
+
+    skill_usage.record_created("foreground", agent_created=False)
+    skill_usage.bump_view("telemetry-only")
+
+    rows = {row["name"]: row for row in skill_usage.unmanaged_report()}
+    assert rows["foreground"]["created_by"] == "learn"
+    assert rows["foreground"]["unmanaged_origin"] == "foreground"
+
+    # Telemetry creates a backfilled created_by:null field. Its mere presence
+    # must never be mistaken for foreground authorship.
+    assert rows["telemetry-only"]["has_provenance_key"] is True
+    assert rows["telemetry-only"]["created_by"] is None
+    assert rows["telemetry-only"]["unmanaged_origin"] == "unknown"
+
+    assert rows["bare"]["has_record"] is False
+    assert rows["bare"]["unmanaged_origin"] == "unknown"
+
+
 # ---------------------------------------------------------------------------
 # Telemetry vs curation — usage is tracked for ALL skills; curation is not
 # ---------------------------------------------------------------------------
