@@ -356,4 +356,3 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
       left.id.localeCompare(right.id)
   )
 }
-
