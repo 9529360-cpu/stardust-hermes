@@ -291,12 +291,37 @@ def list_unmanaged_skill_names() -> List[str]:
         and is_curation_eligible(name, md))
 
 
+def _unmanaged_origin(raw: Any) -> str:
+    """Best available origin signal for an unmanaged skill.
+
+    ``created_by: learn`` is an explicit foreground-learning marker. Null,
+    missing, or any unknown value is not evidence of authorship: telemetry
+    records themselves backfill ``created_by: null``, so key presence cannot
+    distinguish a hand-written skill from a legacy foreground create.
+    """
+    return "foreground" if isinstance(raw, dict) and raw.get("created_by") == "learn" else "unknown"
+
+
 def unmanaged_report() -> List[Dict[str, Any]]:
-    """Rows for :func:`list_unmanaged_skill_names`; ``has_provenance_key`` (False = pre-dates ``created_by``) explains
-    WHY, it is not a signal to adopt on."""
+    """Rows for :func:`list_unmanaged_skill_names`.
+
+    ``unmanaged_origin`` is deliberately conservative: only the explicit
+    ``learn`` marker is reported as foreground; every unmarked/legacy shape is
+    ``unknown``. ``has_provenance_key`` is retained for compatibility and
+    diagnostics only — it must never be interpreted as authorship evidence.
+    """
     usage = load_usage()
-    return [_report_row(n, usage.get(n), has_provenance_key="created_by" in usage.get(n, {}), has_record=n in usage)
-            for n in list_unmanaged_skill_names()]
+    rows = []
+    for name in list_unmanaged_skill_names():
+        raw = usage.get(name)
+        rows.append(_report_row(
+            name,
+            raw,
+            unmanaged_origin=_unmanaged_origin(raw),
+            has_provenance_key=isinstance(raw, dict) and "created_by" in raw,
+            has_record=name in usage,
+        ))
+    return rows
 
 
 def adopt_skill(skill_name: str) -> Tuple[bool, str]:
