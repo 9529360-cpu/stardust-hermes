@@ -703,7 +703,7 @@ def _apply_skill_write_gate(action, name, **payload_kwargs):
 
 
 _FLAT_OP_KEYS = ("content", "category", "file_path", "file_content", "old_string", "new_string",
-                 "distinct", "absorbed_into", "operations")
+                 "distinct", "curator_managed", "absorbed_into", "operations")
 
 
 def _skill_manage_from(payload: Dict[str, Any], **extra) -> str:
@@ -792,8 +792,8 @@ _REQUIRED_ARGS = {
     "remove_file": [("file_path", _MISSING, "file_path is required for 'remove_file'.")]}
 
 
-def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
-                    session_id, ledger_before) -> None:
+def _record_success(action, name, result, *, file_path, absorbed_into, curator_managed,
+                    task_id, session_id, ledger_before) -> None:
     """Best-effort post-mutation side effects (never break the tool): ledger, prompt-cache
     clear, curator telemetry, debounced sync push."""
     with suppress(Exception):
@@ -809,8 +809,10 @@ def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
     with suppress(Exception):
         from agent.prompt_builder import clear_skills_system_prompt_cache
         clear_skills_system_prompt_cache(clear_snapshot=True)
-    # Curator telemetry: only the background review fork marks a skill agent-created
-    # (foreground creates belong to the user). A recoverable curator archive keeps its
+    # Curator telemetry: background-review creates are managed automatically. Foreground
+    # creates remain user-owned by default, but autonomous self-improvement may opt a newly
+    # created procedural-memory skill into curator management with curator_managed=True.
+    # A recoverable curator archive keeps its
     # record as STATE_ARCHIVED (`hermes curator status`/`restore`); only a hard delete forgets.
     with suppress(Exception):
         from tools.skill_usage import bump_patch, forget, record_created
@@ -821,8 +823,12 @@ def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
         # Foreground, user-directed deletes keep their existing hard-delete semantics.
         from tools.skill_provenance import is_background_review
         if action == "create":
-            record_created(name, agent_created=is_background_review(),
-                           task_id=task_id, session_id=session_id)
+            record_created(
+                name,
+                agent_created=is_background_review() or bool(curator_managed),
+                task_id=task_id,
+                session_id=session_id,
+            )
         elif action in {"patch", "edit", "write_file", "remove_file"}:
             bump_patch(name, action=action, task_id=task_id, session_id=session_id)
         elif action == "delete" and not result.get("_archived"):
@@ -835,8 +841,8 @@ def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
 def skill_manage(
     action: str, name: str, content: str = None, category: str = None, file_path: str = None,
     file_content: str = None, old_string: str = None, new_string: str = None,
-    replace_all: bool = False, distinct: bool = False, absorbed_into: str = None, task_id: str = None,
-    session_id: str = None, operations=None) -> str:
+    replace_all: bool = False, distinct: bool = False, curator_managed: bool = False,
+    absorbed_into: str = None, task_id: str = None, session_id: str = None, operations=None) -> str:
     """Dispatch to the action handler -> JSON string. ``operations`` (atomic batch shape,
     see _skill_manage_batch) overrides the flat fields."""
     if operations is not None:
@@ -848,7 +854,7 @@ def skill_manage(
     # of origin; bypassed when replaying an approved staged write.
     args = dict(content=content, category=category, file_path=file_path, file_content=file_content,
                 old_string=old_string, new_string=new_string, replace_all=replace_all,
-                distinct=distinct, absorbed_into=absorbed_into)
+                distinct=distinct, curator_managed=curator_managed, absorbed_into=absorbed_into)
     if (gate_result := _apply_skill_write_gate(action, name, **args)) is not None:
         return gate_result
     # Ledger pre-capture: telemetry, not a gate — failures must NEVER block the mutation. delete
@@ -873,7 +879,8 @@ def skill_manage(
     if result.get("success"):
         _record_success(
             action, name, result, file_path=file_path, absorbed_into=absorbed_into,
-            task_id=task_id, session_id=session_id, ledger_before=_ledger_before)
+            curator_managed=curator_managed, task_id=task_id, session_id=session_id,
+            ledger_before=_ledger_before)
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -888,7 +895,9 @@ def _skill_manage_description(create_dir: str) -> str:
         f"{create_dir}; must precede that skill's other "
         "ops). Create is convergence-first: if likely existing owners are "
         "found, inspect and patch them; retry with distinct=true only for a "
-        "genuinely separate responsibility. patch (targeted old_string/new_string fix — preferred; "
+        "genuinely separate responsibility. For a skill you create autonomously as reusable "
+        "procedural memory, set curator_managed=true so the Curator can consolidate it later; "
+        "leave it false for a user-owned skill. patch (targeted old_string/new_string fix — preferred; "
         "content alone REPLACES the whole file, read it via skill_view() "
         "first), write_file/remove_file (supporting files), delete (sole "
         "op only). Existing skills are modified wherever they live. Keep "
@@ -952,6 +961,14 @@ SKILL_MANAGE_SCHEMA = {
                                 "create only: bypass the overlap guard after you inspected the "
                                 "returned merge_candidates and verified this is a genuinely "
                                 "separate responsibility, not another fragment of an existing skill."
+                            )
+                        },
+                        "curator_managed": {
+                            "type": "boolean",
+                            "description": (
+                                "create only: true when Stardust is autonomously saving reusable "
+                                "procedural memory so Curator may later consolidate/archive it. "
+                                "Leave false when the user explicitly asked to create or owns the skill."
                             )
                         },
                         # patch args: same fuzzy-matching semantics as the

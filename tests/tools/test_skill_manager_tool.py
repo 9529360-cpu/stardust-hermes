@@ -553,6 +553,45 @@ class TestSkillManageDispatcher:
         rec = usage.get("test-skill") or {}
         assert rec.get("created_by") in {"learn", None, "", False}
 
+    def test_autonomous_create_can_opt_into_curator_management(self, tmp_path):
+        with (
+            _skill_dir(tmp_path),
+            patch("tools.skill_provenance.is_background_review", return_value=False),
+            patch("tools.skill_usage.record_created") as record_created,
+        ):
+            result = json.loads(skill_manage(
+                action="create",
+                name="test-skill",
+                content=VALID_SKILL_CONTENT,
+                curator_managed=True,
+                task_id="task-self-learning",
+                session_id="session-self-learning",
+            ))
+
+        assert result["success"] is True
+        record_created.assert_called_once_with(
+            "test-skill",
+            agent_created=True,
+            task_id="task-self-learning",
+            session_id="session-self-learning",
+        )
+
+    def test_user_owned_create_ignores_curator_default_false(self, tmp_path):
+        with (
+            _skill_dir(tmp_path),
+            patch("tools.skill_provenance.is_background_review", return_value=False),
+            patch("tools.skill_usage.record_created") as record_created,
+        ):
+            result = json.loads(skill_manage(
+                action="create",
+                name="test-skill",
+                content=VALID_SKILL_CONTENT,
+            ))
+
+        assert result["success"] is True
+        record_created.assert_called_once()
+        assert record_created.call_args.kwargs["agent_created"] is False
+
     def test_successful_mutations_emit_lifecycle_with_correlation(self, tmp_path):
         with (
             _skill_dir(tmp_path),

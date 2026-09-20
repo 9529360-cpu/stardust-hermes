@@ -54,6 +54,14 @@ class TestSkillManageSchemaDiet(unittest.TestCase):
         self.assertIn("convergence-first", desc)
         self.assertIn("distinct=true", desc)
 
+    def test_create_exposes_curator_ownership_opt_in(self):
+        props = self._op_props()
+        self.assertIn("curator_managed", props)
+        desc = props["curator_managed"]["description"]
+        self.assertIn("autonomously", desc)
+        self.assertIn("Leave false", desc)
+        self.assertIn("curator_managed=true", SKILL_MANAGE_SCHEMA["description"])
+
     def test_description_cuts_hold(self):
         desc = SKILL_MANAGE_SCHEMA["description"]
         # Maintainer-directed: no confirm-with-user coaching.
