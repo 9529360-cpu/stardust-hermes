@@ -205,6 +205,7 @@ def _list_tasks(
             assistant_owner_key=owner_key,
             include_archived=False,
             limit=max(200, max_items * 4),
+            order_by="activity",
         )
         projected: list[dict[str, Any]] = []
         for task in rows:
@@ -234,7 +235,7 @@ def _list_tasks(
             })
         projected.sort(
             key=lambda row: (
-                int(row.get("started_at") or row.get("completed_at") or row.get("created_at") or 0),
+                int(row.get("completed_at") or row.get("started_at") or row.get("created_at") or 0),
                 str(row.get("task_id") or ""),
             ),
             reverse=True,
