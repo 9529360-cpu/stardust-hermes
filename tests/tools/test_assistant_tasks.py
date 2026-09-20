@@ -556,6 +556,7 @@ def test_board_recall_respects_explicit_db_pin(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HERMES_HOME", str(home))
     monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    kb.create_board("beta", name="Beta")
     monkeypatch.setenv("HERMES_KANBAN_DB", str(tmp_path / "pinned.db"))
     monkeypatch.setenv("HERMES_KANBAN_BOARD", "beta")
     monkeypatch.setattr(
