@@ -1078,6 +1078,7 @@ def _run_llm_review(prompt: str, *, dry_run: bool = False) -> Dict[str, Any]:
         # write guards (external/bundled/hub) fire; turn_context binds this onto
         # the write-origin ContextVar at turn start.
         review_agent._memory_write_origin = "background_review"
+        review_agent._review_dry_run = bool(dry_run)
         # Silence the fork's tool-call chatter (CLI synchronous foreground runs).
         with open(os.devnull, "w", encoding="utf-8") as devnull, \
              contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
