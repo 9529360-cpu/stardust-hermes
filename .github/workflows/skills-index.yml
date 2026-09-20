@@ -21,11 +21,15 @@ permissions:
 
 concurrency:
   group: stardust-skills-index
+  # Do not hard-cancel a run during the release-asset rename/promote window.
+  # A freshness gate before publication makes superseded crawls non-publishing.
   cancel-in-progress: false
 
 jobs:
   build-publish:
-    if: github.repository == '9529360-cpu/stardust-hermes'
+    # schedule/push already resolve to main; explicitly constrain manual
+    # workflow_dispatch too so write-permission code never runs from a branch.
+    if: github.repository == '9529360-cpu/stardust-hermes' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -62,7 +66,22 @@ jobs:
           print(f"verified {len(skills)} skills")
           PY
 
+      - name: Refuse stale main publication
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$CURRENT_MAIN" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main advanced from $GITHUB_SHA to $CURRENT_MAIN; keeping this healthy but stale crawl unpublished"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish Stardust-owned catalog asset
+        if: steps.freshness.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -101,6 +120,15 @@ jobs:
           if [ -z "$STAGED_ID" ]; then
             echo "::error::staged skills index asset was not found after upload"
             exit 1
+          fi
+
+          # Main may have advanced while the 40+ MB staged asset uploaded.
+          # Re-check at the last safe point before mutating the canonical name.
+          CURRENT_MAIN="$(gh api "$REPO_API/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$CURRENT_MAIN" != "$GITHUB_SHA" ]; then
+            echo "::notice::main advanced during upload; deleting stale staged asset without touching canonical"
+            gh api -X DELETE "$REPO_API/releases/assets/$STAGED_ID" >/dev/null
+            exit 0
           fi
 
           if [ -z "$CANONICAL_ID" ]; then
