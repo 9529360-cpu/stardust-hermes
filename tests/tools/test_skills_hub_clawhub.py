@@ -515,6 +515,7 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
 
         self.assertLess(page_calls["n"], 750)
         self.assertEqual(results, [])
+        self.assertTrue(self.src.index_build_truncated)
         mock_write_cache.assert_not_called()
 
     @patch("tools.skills_hub._write_index_cache")
