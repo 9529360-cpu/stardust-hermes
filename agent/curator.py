@@ -27,9 +27,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_HOURS, DEFAULT_MIN_IDLE_HOURS = 24 * 7, 2  # 7 days
 DEFAULT_STALE_AFTER_DAYS, DEFAULT_ARCHIVE_AFTER_DAYS = 14, 30
-# The LLM consolidation fork is opt-in; the deterministic inactivity prune
-# (apply_automatic_transitions) always runs when the curator is enabled.
-DEFAULT_CONSOLIDATE = False
+# The LLM consolidation fork is on by default for curator-managed agent skills.
+# The deterministic inactivity prune (apply_automatic_transitions) still runs
+# independently, and an explicit curator.consolidate=false disables the LLM fork.
+DEFAULT_CONSOLIDATE = True
 
 
 # --- .curator_state — persistent scheduler + status ---
@@ -126,7 +127,9 @@ def get_prune_builtins() -> bool:
 
 
 def get_consolidate() -> bool:
-    """LLM consolidation pass — OFF by default (prune only, no aux-model fork); ``hermes curator run --consolidate`` overrides per invocation."""
+    """LLM consolidation pass — ON by default for curator-managed agent skills; explicit
+    ``curator.consolidate: false`` keeps the deterministic prune-only mode. The
+    ``--consolidate`` CLI flag can override a disabled config for one invocation."""
     return bool(_load_config().get("consolidate", DEFAULT_CONSOLIDATE))
 
 
@@ -438,17 +441,6 @@ CURATOR_REVIEW_PROMPT = (
     "summary of clusters processed, patches made, and decisions left alone."
 )
 
-
-CURATOR_PRUNE_BUILTINS_NOTE = (
-    "\n\nPRUNE-BUILTINS MODE IS ON: bundled built-in skills "
-    "ARE included in the candidate list below and MAY be "
-    "archived for staleness/irrelevance, overriding hard "
-    "rule #1 for bundled skills ONLY. Hub-installed skills "
-    "remain strictly off-limits. Treat a stale built-in the "
-    "same as a stale agent-created skill: archive it (never "
-    "delete). It will be restored on `hermes update` only if "
-    "the user explicitly restores it."
-)
 
 # --- Per-run reports — {YYYYMMDD-HHMMSS}/run.json + REPORT.md under logs/curator/ ---
 
@@ -811,13 +803,27 @@ def _render_report_markdown(p: Dict[str, Any]) -> str:
 
 # --- Orchestrator — spawn a forked AIAgent for the LLM review pass ---
 
-def _render_candidate_list() -> str:
-    """Human/agent-readable list of curator-managed skills with usage stats."""
-    rows = skill_usage.curated_report()
+def _llm_candidate_rows() -> List[Dict[str, Any]]:
+    """Skills the opinionated LLM consolidation pass may inspect.
+
+    Keep this narrower than deterministic lifecycle pruning: bundled built-ins may be
+    stale/archived by the time-based transition policy when prune_builtins is enabled,
+    but they are never inputs to autonomous LLM restructuring. Only records explicitly
+    opted into curator ownership (provenance=agent) belong here.
+    """
+    return [
+        row for row in skill_usage.curated_report()
+        if row.get("provenance", "agent") == "agent"
+    ]
+
+
+def _render_candidate_list(rows: Optional[List[Dict[str, Any]]] = None) -> str:
+    """Human/agent-readable list of autonomous consolidation candidates."""
+    rows = _llm_candidate_rows() if rows is None else rows
     if not rows:
-        return "No curator-managed skills to review."
+        return "No curator-managed agent skills to review."
     cron_referenced = _cron_referenced_skills()
-    return "\n".join([f"Curator-managed skills ({len(rows)}):\n"] + [
+    return "\n".join([f"Curator-managed agent skills ({len(rows)}):\n"] + [
         f"- {r['name']}  provenance={r.get('provenance', 'agent')}  state={r['state']}  "
         f"pinned={'yes' if r.get('pinned') else 'no'}  cron={'yes' if r['name'] in cron_referenced else 'no'}  "
         f"activity={r.get('activity_count', 0)}  use={r.get('use_count', 0)}  view={r.get('view_count', 0)}  "
@@ -847,13 +853,13 @@ def _consolidation_pass(prefix: str, auto_summary: str, dry_run: bool, before_na
     """The LLM half of a run: fork (unless no candidates), then append the rename map (`old-name → umbrella`) so users
     needn't dig into REPORT.md. Returns ``(final_summary, llm_meta)``; never raises."""
     try:
-        candidate_list = _render_candidate_list()
-        if "No agent-created skills" in candidate_list:
+        candidates = _llm_candidate_rows()
+        if not candidates:
             final_summary = f"{prefix}{auto_summary}; llm: skipped (no candidates)"
             llm_meta = _llm_meta("skipped (no candidates)")
         else:
-            # With prune-builtins on, bundled skills are candidates too: relax hard rule #1 for them (archive only; hub stays off-limits).
-            prompt = f"{CURATOR_REVIEW_PROMPT}{CURATOR_PRUNE_BUILTINS_NOTE if get_prune_builtins() else ''}\n\n{candidate_list}"
+            candidate_list = _render_candidate_list(candidates)
+            prompt = f"{CURATOR_REVIEW_PROMPT}\n\n{candidate_list}"
             if dry_run:
                 prompt = f"{CURATOR_DRY_RUN_BANNER}\n\n{prompt}"
             llm_meta = _run_llm_review(prompt)
@@ -881,7 +887,8 @@ def run_curator_review(
     """Execute a single curator review pass: (1) automatic state transitions (no LLM); (2) if *consolidate* and there are
     candidates, fork an AIAgent on the review prompt; (3) update .curator_state; (4) call *on_summary*.
     *synchronous* runs the LLM review in the calling thread (default: daemon thread). *consolidate* ``None`` reads
-    ``curator.consolidate`` (OFF by default); when off only the deterministic prune runs — no fork, no aux cost.
+    ``curator.consolidate`` (ON by default for curator-managed agent skills); when explicitly off only the deterministic
+    prune runs — no fork, no aux cost.
     *dry_run* SKIPS the stale/archive transitions and instructs the fork to report only; REPORT.md is still written and
     recorded in ``state.last_report_path`` so users can read what WOULD have happened."""
     consolidate = get_consolidate() if consolidate is None else consolidate
