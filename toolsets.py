@@ -3,28 +3,34 @@
 from typing import Dict, List, Any, Set, Optional, Tuple
 
 
-# Shared tool list for CLI and all messaging platform toolsets (edit once, all
-# platforms follow). Desktop GUI affordances are deliberately NOT here: they live
-# in `desktop_ui`/`project`, enabled per desktop-sourced session by the GUI gateway
-# (tui_gateway/server.py::_load_enabled_toolsets). HA, kanban and computer_use
-# entries are further gated by their tools' check_fns.
-_HERMES_CORE_TOOLS = [
+# Cross-task primitives that form the real narrow waist. These are intentionally
+# provider/domain-neutral building blocks; adding a product/domain capability here
+# should be exceptional.
+_HERMES_FOUNDATION_TOOLS = [
     "web_search", "web_extract",
     "terminal", "process_manage",
     "read_file", "write_file", "patch", "search_files",
-    "vision_analyze", "image_generate",
+    "vision_analyze",
     "skills_list", "skill_view", "skill_manage",
-    "browser_navigate", "browser_snapshot", "browser_click",
-    "browser_type", "browser_scroll", "browser_back",
-    "browser_press", "browser_get_images",
-    "browser_vision", "browser_console", "browser_cdp", "browser_dialog",
-    "browser_vault_list", "browser_vault_unlock", "browser_vault_fill", "browser_vault_save_login", "browser_vault_enter_code",  # ride with the browser
-    "browser_exec",  # replaces the other browser tools when browser.backend is "browser-use"
-    "text_to_speech",
     "todo_list", "memory",
     "session_search",
     "clarify",
     "execute_code", "delegate_task",
+]
+
+# Domain/session capabilities that remain in the historical default platform
+# surface for compatibility. Keeping this separate from the foundation makes the
+# default policy explicit and gives future migrations a safe place to move tools
+# out of the always-present model surface without redefining the narrow waist.
+_HERMES_DEFAULT_EDGE_TOOLS = [
+    "image_generate",
+    "browser_navigate", "browser_snapshot", "browser_click",
+    "browser_type", "browser_scroll", "browser_back",
+    "browser_press", "browser_get_images",
+    "browser_vision", "browser_console", "browser_cdp", "browser_dialog",
+    "browser_vault_list", "browser_vault_unlock", "browser_vault_fill", "browser_vault_save_login", "browser_vault_enter_code",
+    "browser_exec",  # replaces the other browser tools when browser.backend is "browser-use"
+    "text_to_speech",
     "cronjob_manage",
     "ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service",
     "kanban_show", "kanban_list",
@@ -38,6 +44,17 @@ _HERMES_CORE_TOOLS = [
     # Service-gated connector account status and authorization links.
     "manage_connections",
 ]
+
+# Shared default list for CLI and messaging platform bundles. Desktop GUI
+# affordances remain session-scoped in desktop_ui/project. HA, kanban,
+# computer_use, browser, etc. are still present here today for compatibility and
+# remain gated by their normal check/config paths.
+_HERMES_DEFAULT_TOOLS = _HERMES_FOUNDATION_TOOLS + _HERMES_DEFAULT_EDGE_TOOLS
+
+# Historical public/internal import retained for compatibility. New code should
+# choose FOUNDATION vs DEFAULT intentionally instead of treating every default
+# capability as "core".
+_HERMES_CORE_TOOLS = _HERMES_DEFAULT_TOOLS
 
 # Webhook payloads are untrusted third-party content: no file/system execution.
 _HERMES_WEBHOOK_SAFE_TOOLS = ["web_search", "web_extract", "vision_analyze", "clarify"]
@@ -55,18 +72,18 @@ def _ts(description, tools=(), includes=(), **extra):
 
 
 def _bundle(description, extras=()):
-    """A `hermes-*` platform bundle: the shared core tools plus optional platform extras."""
-    return _ts(description, _HERMES_CORE_TOOLS + list(extras))
+    """A `hermes-*` platform bundle: shared default tools plus optional platform extras."""
+    return _ts(description, _HERMES_DEFAULT_TOOLS + list(extras))
 
 
-def _core_without(*excluded, kanban=True):
-    """_HERMES_CORE_TOOLS minus *excluded* (and, unless kanban=True, every kanban_* tool); order preserved."""
-    return [t for t in _HERMES_CORE_TOOLS if t not in excluded and (kanban or not t.startswith("kanban_"))]
+def _default_without(*excluded, kanban=True):
+    """_HERMES_DEFAULT_TOOLS minus exclusions (and optionally kanban_*); order preserved."""
+    return [t for t in _HERMES_DEFAULT_TOOLS if t not in excluded and (kanban or not t.startswith("kanban_"))]
 
 
 # Coding posture: everything you reach for while pairing on code; drops messaging,
 # tts, image_gen, home-assistant, cron, kanban and computer-use.
-_CODING_TOOLS = _core_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", *_HA_TOOLS, kanban=False)
+_CODING_TOOLS = _default_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", *_HA_TOOLS, kanban=False)
 
 # Core toolset definitions: individual tools or references to other toolsets.
 TOOLSETS = {
@@ -110,7 +127,7 @@ TOOLSETS = {
     "browser": _ts(
         "Browser automation for web interaction (navigate, click, type, scroll, "
         "iframes, hold-click)",
-        [t for t in _HERMES_CORE_TOOLS if t.startswith("browser_")],
+        [t for t in _HERMES_DEFAULT_TOOLS if t.startswith("browser_")],
     ),
     "cronjob": _ts(
         "Cronjob management tool - create, list, update, pause, resume, remove, and "
@@ -153,7 +170,7 @@ TOOLSETS = {
         "first-class review (request_review — not a block), return review changes, "
         "block for human input, heartbeat during long ops, comment on threads, attach "
         "files, and (for orchestrators) list, unblock, and fan out tasks.",
-        [t for t in _HERMES_CORE_TOOLS if t.startswith("kanban_")],
+        [t for t in _HERMES_DEFAULT_TOOLS if t.startswith("kanban_")],
     ),
     "discord": _ts("Discord read and participate tools (fetch messages, search members, create threads)", ["discord"]),
     "discord_admin": _ts("Discord server management (list channels/roles, pin messages, assign roles)", ["discord_admin"]),
@@ -192,7 +209,7 @@ TOOLSETS = {
     "hermes-api-server": _ts(
         "OpenAI-compatible API server — full agent tools accessible via HTTP (no "
         "interactive UI tools like clarify or send_message)",
-        _core_without("text_to_speech", "clarify", "computer_use", kanban=False),
+        _default_without("text_to_speech", "clarify", "computer_use", kanban=False),
     ),
     "hermes-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
 
@@ -221,7 +238,7 @@ TOOLSETS = {
     "hermes-wecom-callback": _bundle("WeCom callback toolset - enterprise self-built app messaging (full access)"),
     "hermes-yuanbao": {
         "description": "Yuanbao Bot 元宝消息平台工具集 - 群信息、成员查询、私聊、贴纸表情",
-        "tools": _HERMES_CORE_TOOLS + _YUANBAO_TOOLS,
+        "tools": _HERMES_DEFAULT_TOOLS + _YUANBAO_TOOLS,
         "module": "tools.yuanbao_tools",
         "includes": [],
     },
@@ -308,13 +325,12 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
 
 
 def bundle_non_core_tools(toolset_name: str) -> Set[str]:
-    """A bundle's tools minus _HERMES_CORE_TOOLS (one level of includes).
+    """A bundle's tools minus the shared default platform tools (one include level).
 
-    Disabling a `core + extras` bundle must not strip the core tools every other
-    toolset shares. One `includes` pass suffices (only hermes-gateway nests
-    bundles). Unknown names: full resolution minus core.
+    The function name is retained for compatibility. Disabling a platform bundle
+    must not strip the shared default tools every other platform bundle inherits.
     """
-    core = set(_HERMES_CORE_TOOLS)
+    core = set(_HERMES_DEFAULT_TOOLS)
     ts_def = get_toolset(toolset_name)
     if not (ts_def and "tools" in ts_def):
         return set(resolve_toolset(toolset_name)) - core
@@ -344,7 +360,7 @@ def _plugin_platform_bundle(name: str) -> List[str]:
             return []
     except Exception:
         return []
-    tools = set(_HERMES_CORE_TOOLS)
+    tools = set(_HERMES_DEFAULT_TOOLS)
     try:
         tools.update(e.name for e in _registry_call("get_all_entries", ()) if e.toolset == platform_name)
     except Exception:
