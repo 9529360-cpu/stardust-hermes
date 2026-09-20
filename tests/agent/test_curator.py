@@ -92,23 +92,48 @@ def test_curator_consolidation_default_and_explicit_opt_out(curator_env, monkeyp
     assert c.get_consolidate() is False
 
 
-def test_llm_consolidation_excludes_bundled_and_skips_when_no_agent_candidates(
+def test_llm_candidates_require_authoritative_ownership_and_exclude_pinned(
     curator_env, monkeypatch
 ):
     c = curator_env["curator"]
     u = curator_env["usage"]
-    bundled = {
-        "name": "bundled-example",
-        "provenance": "bundled",
-        "state": "active",
-        "pinned": False,
-        "activity_count": 0,
-        "use_count": 0,
-        "view_count": 0,
-        "patch_count": 0,
-        "last_activity_at": None,
-    }
-    monkeypatch.setattr(u, "curated_report", lambda: [bundled])
+
+    def _row(name, *, provenance="agent", pinned=False):
+        return {
+            "name": name,
+            "provenance": provenance,
+            "state": "active",
+            "pinned": pinned,
+            "activity_count": 0,
+            "use_count": 0,
+            "view_count": 0,
+            "patch_count": 0,
+            "last_activity_at": None,
+        }
+
+    rows = [
+        _row("owned"),
+        _row("pinned-owned", pinned=True),
+        _row("unmanaged-local"),
+        _row("bundled-example", provenance="bundled"),
+    ]
+    monkeypatch.setattr(u, "curated_report", lambda: rows)
+    monkeypatch.setattr(
+        u, "is_curator_managed",
+        lambda name: name in {"owned", "pinned-owned"},
+    )
+
+    assert [row["name"] for row in c._llm_candidate_rows()] == ["owned"]
+
+
+def test_llm_consolidation_skips_when_no_owned_candidates(curator_env, monkeypatch):
+    c = curator_env["curator"]
+    u = curator_env["usage"]
+    monkeypatch.setattr(
+        u, "curated_report",
+        lambda: [{"name": "unmanaged-local", "provenance": "agent", "pinned": True}],
+    )
+    monkeypatch.setattr(u, "is_curator_managed", lambda _name: False)
 
     assert c._llm_candidate_rows() == []
 
