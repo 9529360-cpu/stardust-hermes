@@ -67,9 +67,10 @@ def test_create_splits_independent_work_and_preserves_durable_controls(monkeypat
     ]
     assert calls[0]["session_id"] == "session-7"
     assert calls[0]["assignee"] == "default"
-    assert calls[0]["idempotency_key"] == "assistant:session-7:call-42:0"
-    assert calls[1]["idempotency_key"] == "assistant:session-7:call-42:1"
-    assert calls[2]["idempotency_key"] == "assistant:session-7:call-42:2"
+    assert calls[0]["_assistant_owner_key"] == "local"
+    assert calls[0]["idempotency_key"] == "assistant:local:call-42:0"
+    assert calls[1]["idempotency_key"] == "assistant:local:call-42:1"
+    assert calls[2]["idempotency_key"] == "assistant:local:call-42:2"
     assert calls[2]["goal_mode"] is True
     assert calls[2]["project"] == "stardust"
     assert calls[2]["workspace_kind"] == "worktree"
@@ -108,7 +109,7 @@ def test_create_retry_uses_same_idempotency_keys(monkeypatch):
         )
 
     assert [call["idempotency_key"] for call in calls] == [
-        "assistant:s1:tool-call-stable:0",
+        "assistant:local:tool-call-stable:0",
         "assistant:s1:tool-call-stable:0",
     ]
 
@@ -165,6 +166,7 @@ def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
     class FakeKb:
         @staticmethod
         def list_tasks(conn, **kwargs):
+            assert kwargs["assistant_owner_key"] == "local"
             return rows
 
         @staticmethod
@@ -217,3 +219,143 @@ def test_inline_executor_binds_exact_session_and_tool_call(monkeypatch):
     assert captured["session_id"] == "runtime-session-9"
     assert captured["request_id"] == "call-9"
     assert captured["action"] == "create"
+
+
+
+def test_owner_key_is_local_across_desktop_conversations(monkeypatch):
+    monkeypatch.setattr(
+        "gateway.session_context.session_is_messaging_surface",
+        lambda: False,
+    )
+    assert assistant_tasks._resolve_owner_key() == "local"
+
+
+def test_messaging_owner_key_is_stable_user_not_chat(monkeypatch):
+    values = {
+        "HERMES_SESSION_PLATFORM": "telegram",
+        "HERMES_SESSION_SOURCE": "telegram",
+        "HERMES_SESSION_USER_ID_ALT": "",
+        "HERMES_SESSION_USER_ID": "user-42",
+    }
+    monkeypatch.setattr(
+        "gateway.session_context.session_is_messaging_surface",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "gateway.session_context.get_session_env",
+        lambda name, default="": values.get(name, default),
+    )
+
+    assert assistant_tasks._resolve_owner_key() == "messaging:telegram:user-42"
+
+    values["HERMES_SESSION_USER_ID"] = ""
+    assert assistant_tasks._resolve_owner_key() is None
+
+
+def test_local_owner_survives_origin_session_deletion(tmp_path, monkeypatch):
+    from hermes_state import SessionDB
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+
+    with SessionDB(db_path=home / "state.db") as db:
+        db.create_session("chat-A", source="desktop")
+        db.append_message("chat-A", "user", "start three jobs")
+
+    created = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            owner_key="local",
+            session_id="chat-A",
+            request_id="call-A",
+            tasks=[
+                {
+                    "title": "Convert report to PDF",
+                    "instruction": "Convert report.docx to PDF and verify it opens.",
+                },
+                {
+                    "title": "Prepare Japan flight",
+                    "instruction": "Prepare tomorrow's Japan flight booking.",
+                    "approval_required": True,
+                },
+                {
+                    "title": "Continue Stardust",
+                    "instruction": "Keep developing Stardust until this feature is complete.",
+                    "continuous": True,
+                },
+            ],
+        )
+    )
+    assert created["summary"]["created"] == 3
+
+    with SessionDB(db_path=home / "state.db") as db:
+        assert db.delete_session("chat-A")
+        assert db.get_session("chat-A") is None
+        db.create_session("chat-B", source="desktop")
+        db.append_message("chat-B", "user", "what happened to my three jobs?")
+
+    # B does not need A's transcript or id. The durable owner is the lookup key.
+    recalled = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+        )
+    )
+    assert {task["title"] for task in recalled["tasks"]} == {
+        "Convert report to PDF",
+        "Prepare Japan flight",
+        "Continue Stardust",
+    }
+
+    with kbc.connect() as conn:
+        stored = kb.list_tasks(conn, assistant_owner_key="local", include_archived=True)
+        assert len(stored) == 3
+        assert {task.session_id for task in stored} == {"chat-A"}
+        assert {task.assistant_owner_key for task in stored} == {"local"}
+
+
+def test_task_listing_isolated_by_assistant_owner(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        kb.create_task(
+            conn,
+            title="Alice task",
+            assignee="default",
+            assistant_owner_key="messaging:telegram:alice",
+        )
+        kb.create_task(
+            conn,
+            title="Bob task",
+            assignee="default",
+            assistant_owner_key="messaging:telegram:bob",
+        )
+
+    alice = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="messaging:telegram:alice",
+            include_completed=True,
+        )
+    )
+    bob = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="messaging:telegram:bob",
+            include_completed=True,
+        )
+    )
+    assert [task["title"] for task in alice["tasks"]] == ["Alice task"]
+    assert [task["title"] for task in bob["tasks"]] == ["Bob task"]
