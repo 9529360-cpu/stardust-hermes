@@ -217,6 +217,16 @@ def _background_review_write_guard(
     return None
 
 
+def _background_review_can_inspect_disabled_skill(name: str, skill_dir: Path) -> bool:
+    """A disabled skill may be read by the review fork only when that same fork is
+    already authorized to maintain it. Reuse the write-ownership gate so disabled
+    never becomes a second path into user-owned, pinned, bundled, hub, or external skills.
+    """
+    if not _is_background_review():
+        return False
+    return _background_review_write_guard(name, skill_dir, "inspect") is None
+
+
 def _background_review_read_before_write_guard(
     name: str, target: Path, action: str, file_label: str) -> Optional[Dict[str, Any]]:
     """Require review forks to load the exact target before mutating it."""
