@@ -130,20 +130,16 @@ class TestFetchFailure:
 
 
 class TestFallbackChain:
-    """``_fetch_manifest_with_fallback`` walks ``DEFAULT_CATALOG_FALLBACK_URLS``
-    when the primary URL fails. Regression: the Docusaurus site behind Vercel
-    occasionally returns HTTP 403 + x-vercel-mitigated: challenge for urllib;
-    without a fallback URL the user's disk cache freezes and new model
-    releases (opus 4.8, etc.) never reach the picker.
+    """Custom catalog URLs fall back to Stardust's reviewed catalog.
+
+    When Stardust's canonical raw URL is already primary it must not be fetched
+    twice; the stale disk cache / bundled in-repo lists remain the offline path.
     """
 
-    PRIMARY = "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
-    FALLBACK = (
-        "https://raw.githubusercontent.com/NousResearch/hermes-agent"
-        "/main/website/static/api/model-catalog.json"
-    )
+    STARDUST = "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json"
+    CUSTOM_PRIMARY = "https://catalog.example.test/model-catalog.json"
 
-    def test_uses_primary_when_it_succeeds(self, isolated_home):
+    def test_uses_custom_primary_when_it_succeeds(self, isolated_home):
         from hermes_cli import model_catalog
         calls: list[str] = []
 
@@ -152,46 +148,64 @@ class TestFallbackChain:
             return _valid_manifest()
 
         with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
-            result = model_catalog._fetch_manifest_with_fallback(self.PRIMARY, 5.0)
+            result = model_catalog._fetch_manifest_with_fallback(self.CUSTOM_PRIMARY, 5.0)
 
         assert result is not None
-        assert calls == [self.PRIMARY], "fallback URLs must not be touched on primary success"
+        assert calls == [self.CUSTOM_PRIMARY]
 
-    def test_falls_through_to_raw_github_on_primary_failure(self, isolated_home):
+    def test_custom_primary_falls_through_to_stardust(self, isolated_home):
         from hermes_cli import model_catalog
         calls: list[str] = []
 
         def fake_fetch(url, timeout):
             calls.append(url)
-            if url == self.PRIMARY:
-                return None  # simulate Vercel 403
+            if url == self.CUSTOM_PRIMARY:
+                return None
             return _valid_manifest()
 
         with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
-            result = model_catalog._fetch_manifest_with_fallback(self.PRIMARY, 5.0)
+            result = model_catalog._fetch_manifest_with_fallback(self.CUSTOM_PRIMARY, 5.0)
 
         assert result is not None
-        assert calls == [self.PRIMARY, self.FALLBACK]
+        assert calls == [self.CUSTOM_PRIMARY, self.STARDUST]
 
+    def test_default_stardust_failure_is_not_fetched_twice(self, isolated_home):
+        from hermes_cli import model_catalog
+        calls: list[str] = []
 
-    def test_get_catalog_uses_fallback_chain(self, isolated_home):
-        """End-to-end: ``get_catalog`` routes through the fallback helper so
-        a primary URL failure transparently produces a working catalog."""
+        def fake_fetch(url, timeout):
+            calls.append(url)
+            return None
+
+        with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
+            result = model_catalog._fetch_manifest_with_fallback(self.STARDUST, 5.0)
+
+        assert result is None
+        assert calls == [self.STARDUST]
+
+    def test_get_catalog_custom_primary_uses_stardust_fallback(self, isolated_home):
         from hermes_cli import model_catalog
         manifest = _valid_manifest()
         calls: list[str] = []
 
         def fake_fetch(url, timeout):
             calls.append(url)
-            if url == self.PRIMARY:
+            if url == self.CUSTOM_PRIMARY:
                 return None
             return manifest
 
-        with patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
+        cfg = {
+            "enabled": True,
+            "url": self.CUSTOM_PRIMARY,
+            "ttl_hours": 1.0,
+            "providers": {},
+        }
+        with patch.object(model_catalog, "_load_catalog_config", return_value=cfg), \
+             patch.object(model_catalog, "_fetch_manifest", side_effect=fake_fetch):
             result = model_catalog.get_catalog(force_refresh=True)
 
         assert result == manifest
-        assert self.FALLBACK in calls
+        assert calls == [self.CUSTOM_PRIMARY, self.STARDUST]
 
 
 class TestCuratedAccessors:
