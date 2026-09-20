@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { atom } from 'nanostores'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -27,6 +28,7 @@ const saveHermesConfig = vi.fn()
 const startManualLocalEndpoint = vi.fn()
 const startManualOnboarding = vi.fn()
 const startManualProviderOAuth = vi.fn()
+const desktopOnboarding = atom({ manual: false })
 let profileSwitchHandler: (() => void) | null = null
 
 vi.mock('@/hermes', () => ({
@@ -46,6 +48,7 @@ vi.mock('@/hermes', () => ({
 }))
 
 vi.mock('@/store/onboarding', () => ({
+  $desktopOnboarding: desktopOnboarding,
   startManualLocalEndpoint: () => startManualLocalEndpoint(),
   startManualOnboarding: () => startManualOnboarding(),
   startManualProviderOAuth: (slug: string) => startManualProviderOAuth(slug)
@@ -85,6 +88,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  desktopOnboarding.set({ manual: false })
   profileSwitchHandler = null
 })
 
@@ -143,18 +147,14 @@ describe('ModelSettings profile scope', () => {
 })
 
 describe('ModelSettings', () => {
-  it('loads the current main model and lists configured providers only', async () => {
+  it('shows configured model services as rows instead of a provider dropdown', async () => {
     await renderModelSettings()
 
     await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalled())
     await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalled())
 
-    // Open the provider Select — only configured providers should be listed.
-    const triggers = await screen.findAllByRole('combobox')
-    fireEvent.click(triggers[0])
-
-    // "Nous" shows in both the trigger and the open list.
-    expect((await screen.findAllByText('Nous')).length).toBeGreaterThan(0)
+    expect(await screen.findByRole('button', { name: /Nous/ })).toBeTruthy()
+    expect(screen.getByText('Default')).toBeTruthy()
     expect(screen.queryByText(/DeepSeek/)).toBeNull()
   })
 
@@ -166,9 +166,7 @@ describe('ModelSettings', () => {
 
       await renderModelSettings()
 
-      const providerSelect = (await screen.findAllByRole('combobox'))[0]
-
-      expect(providerSelect.textContent).toContain(provider)
+      expect(await screen.findByText(provider)).toBeTruthy()
       expect(screen.queryByText(/undefined/)).toBeNull()
       expect(screen.queryByText(/signs in through your browser/)).toBeNull()
 
@@ -244,14 +242,14 @@ describe('ModelSettings', () => {
       })
 
     await renderModelSettings()
-    expect((await screen.findAllByRole('combobox'))[0].textContent).toContain('Custom A')
+    expect(await screen.findByRole('button', { name: /Custom A/ })).toBeTruthy()
 
     await act(async () => {
       profileSwitchHandler?.()
     })
 
     await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getAllByRole('combobox')[0].textContent).toContain('Nous'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Nous/ })).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Connect AI service' })).toBeNull()
   })
 
@@ -283,13 +281,8 @@ describe('ModelSettings', () => {
 
     await renderModelSettings()
 
-    const providerSelect = (await screen.findAllByRole('combobox'))[0]
-    fireEvent.click(providerSelect)
-    fireEvent.click(await screen.findByRole('option', { name: 'Ollama' }))
-
-    const modelSelect = (await screen.findAllByRole('combobox'))[1]
-    fireEvent.click(modelSelect)
-    fireEvent.click(await screen.findByRole('option', { name: 'qwen3:latest' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Ollama/ }))
+    expect(await screen.findByText('qwen3:latest')).toBeTruthy()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
 
@@ -301,6 +294,68 @@ describe('ModelSettings', () => {
         base_url: 'http://localhost:11434/v1'
       })
     )
+  })
+
+  it('rotates a saved API key from the provider editor before applying its model', async () => {
+    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'openai', model: 'gpt-5.4' })
+    getGlobalModelOptions.mockResolvedValueOnce({
+      providers: [
+        {
+          name: 'OpenAI',
+          slug: 'openai',
+          models: ['gpt-5.4'],
+          authenticated: true,
+          auth_type: 'api_key',
+          key_env: 'OPENAI_API_KEY'
+        }
+      ]
+    })
+    setModelAssignment.mockResolvedValueOnce({
+      ok: true,
+      provider: 'openai',
+      model: 'gpt-5.4',
+      gateway_tools: []
+    })
+
+    await renderModelSettings()
+
+    const key = await screen.findByPlaceholderText('Leave blank to keep the saved key')
+    fireEvent.change(key, { target: { value: 'sk-replacement' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(setEnvVar).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-replacement'))
+    await waitFor(() =>
+      expect(setModelAssignment).toHaveBeenCalledWith({
+        model: 'gpt-5.4',
+        provider: 'openai',
+        scope: 'main'
+      })
+    )
+    expect(setEnvVar.mock.invocationCallOrder[0]).toBeLessThan(setModelAssignment.mock.invocationCallOrder[0])
+  })
+
+  it('opens the shared provider and custom-service flows from the model page', async () => {
+    await renderModelSettings()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
+    expect(startManualOnboarding).toHaveBeenCalledOnce()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add custom service' }))
+    expect(startManualLocalEndpoint).toHaveBeenCalledOnce()
+  })
+
+  it('refreshes the model-service list after the shared setup flow closes', async () => {
+    await renderModelSettings()
+    await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalledTimes(1))
+
+    await act(async () => {
+      desktopOnboarding.set({ manual: true })
+    })
+    await act(async () => {
+      desktopOnboarding.set({ manual: false })
+    })
+
+    await waitFor(() => expect(getGlobalModelOptions.mock.calls.length).toBeGreaterThan(1))
   })
 
   it('writes the profile default speed (service_tier) as a sparse patch, never the cached snapshot', async () => {
@@ -580,8 +635,8 @@ describe('ModelSettings MoA preset editor', () => {
   it('renders the model-service and MoA chrome in the active Chinese locale', async () => {
     await renderChineseModelSettings()
 
-    expect(await screen.findByText('新对话默认使用')).toBeTruthy()
-    expect(screen.getByText(/选择 Stardust 默认使用的 AI 服务和模型/)).toBeTruthy()
+    expect(await screen.findByText('模型服务')).toBeTruthy()
+    expect(screen.getByText(/选一个服务，需要时填 API Key 或登录/)).toBeTruthy()
     expect(await screen.findByText('参考模型 1')).toBeTruthy()
     expect(screen.getByText(/配置具名预设/)).toBeTruthy()
     expect(screen.getByText('已启用')).toBeTruthy()
