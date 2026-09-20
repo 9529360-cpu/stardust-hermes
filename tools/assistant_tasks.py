@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -90,6 +91,12 @@ def _assistant_board_slugs() -> list[str]:
     multiple slugs alias one DB, so collapse those aliases before querying.
     """
     from hermes_cli import kanban_db as kb
+
+    # Dispatcher workers and explicitly pinned CLI runtimes are intentionally
+    # scoped to one physical board DB. Enumerating metadata while the pin is
+    # active would make every slug resolve to that same DB and mislabel it.
+    if os.environ.get("HERMES_KANBAN_DB", "").strip():
+        return [kb.get_current_board()]
 
     try:
         boards = kb.list_boards(include_archived=False)
