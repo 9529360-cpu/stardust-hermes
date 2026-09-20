@@ -1221,9 +1221,19 @@ export interface Translations {
       model: string
       applying: string
       apiKeyPlaceholder: string
+      apiKeyLabel: string
+      apiKeyKeepExisting: string
       connectProvider: (provider: string) => string
       setupApiKeyHint: (provider: string) => string
       setupOauthHint: (provider: string) => string
+      currentService: string
+      serviceNotConnected: string
+      modelCount: (count: number) => string
+      addService: string
+      addCustomService: string
+      advancedConnections: string
+      advancedConnectionsHide: string
+      noServices: string
       defaultsLabel: string
       reasoning: string
       reasoningOff: string
