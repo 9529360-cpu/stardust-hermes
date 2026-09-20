@@ -30,7 +30,7 @@ If both are true, it spawns a background fork of `AIAgent` — the same pattern 
 :::info First-run behavior
 On a brand-new install (or the first time a pre-curator install ticks after `hermes update`), the curator **does not run immediately**. The first observation seeds `last_run_at` to "now" and defers the first real pass by one full `interval_hours`. This gives you a full interval to review your skill library, pin anything important, or opt out entirely before the curator ever touches it.
 
-If you want to see what the curator *would* do before it runs for real, run `hermes curator run --dry-run` — it produces the same review report without mutating the library.
+If you want to see what the curator *would* do before it runs for real, run `hermes curator run --dry-run` — it produces the same review report without mutating the library. Dry-run is enforced at the skill-tool boundary: even if the review model attempts a mutation, `skill_manage` refuses it before staging or writing anything.
 :::
 
 A run has two phases:
