@@ -167,6 +167,72 @@ describe('task center projection', () => {
     ])
   })
 
+  it('projects restart-lost delegation receipts as read-only interrupted work', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: [],
+      backgroundBySession: {},
+      cronJobs: [],
+      delegationRecoveryBySession: {
+        runtime: [
+          {
+            completed_at: 15,
+            delegation_id: 'deleg-lost',
+            dispatched_at: 10,
+            goal: 'Finish the report',
+            reason: 'owner_exited',
+            task_count: 1
+          }
+        ]
+      },
+      previewRestart: null,
+      runtimeStoredSessionIds: { runtime: 'root' },
+      sessions: [session()],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        action: 'open-session',
+        durability: 'process-local',
+        id: 'delegation-recovery:deleg-lost',
+        label: 'Finish the report',
+        ownerSessionId: 'runtime',
+        rail: 'delegation',
+        sessionId: 'tip',
+        status: 'interrupted',
+        updatedAt: 15_000
+      })
+    ])
+  })
+
+  it('does not duplicate a recovery receipt while its live delegation is still projected', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: [],
+      backgroundBySession: {},
+      cronJobs: [],
+      delegationRecoveryBySession: {
+        runtime: [
+          {
+            completed_at: 15,
+            delegation_id: 'deleg-1',
+            dispatched_at: 10,
+            goal: 'Recovered copy',
+            reason: 'owner_exited',
+            task_count: 1
+          }
+        ]
+      },
+      previewRestart: null,
+      sessions: [],
+      subagentsBySession: { runtime: [subagent({ delegationId: 'deleg-1', status: 'interrupted' })] },
+      workingSessionIds: []
+    })
+
+    expect(tasks.map(task => task.id)).toEqual(['subagent:runtime:worker'])
+  })
   it('keeps process stop and cron management as owner actions', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},
