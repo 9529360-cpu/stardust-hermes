@@ -417,6 +417,82 @@ class TestSkillView:
             allowed = json.loads(skill_view("active-skill"))
         assert allowed["success"] is True
 
+    def test_disabled_curator_owned_skill_is_readable_only_in_background_review(self, tmp_path):
+        from tools.skill_manager_guards import (
+            _background_review_has_read,
+            _reset_background_review_read_marks,
+        )
+        from tools.skill_provenance import (
+            BACKGROUND_REVIEW,
+            reset_current_write_origin,
+            set_current_write_origin,
+        )
+
+        with (
+            patch("tools.skills_tool.SKILLS_DIR", tmp_path),
+            patch("tools.skills_tool._is_skill_disabled", return_value=True),
+            patch("tools.skill_manager_guards._background_review_write_guard", return_value=None),
+            patch("tools.skills_tool._skill_readiness") as readiness,
+        ):
+            skill_dir = _make_skill(tmp_path, "managed-disabled")
+            refs = skill_dir / "references"
+            refs.mkdir()
+            reference = refs / "detail.md"
+            reference.write_text("maintenance detail\n")
+
+            # Disabled remains a hard block in a normal foreground session.
+            foreground = json.loads(skill_view("managed-disabled"))
+            assert foreground["success"] is False
+            readiness.assert_not_called()
+
+            token = set_current_write_origin(BACKGROUND_REVIEW)
+            try:
+                _reset_background_review_read_marks()
+                reviewed = json.loads(skill_view("managed-disabled", preprocess=False))
+                assert reviewed["success"] is True
+                assert reviewed["disabled"] is True
+                assert reviewed["curator_inspection_only"] is True
+                assert _background_review_has_read(skill_dir / "SKILL.md")
+                readiness.assert_not_called()
+
+                linked = json.loads(
+                    skill_view(
+                        "managed-disabled",
+                        file_path="references/detail.md",
+                        preprocess=False,
+                    )
+                )
+                assert linked["success"] is True
+                assert "maintenance detail" in linked["content"]
+                assert _background_review_has_read(reference)
+            finally:
+                reset_current_write_origin(token)
+
+    def test_disabled_background_review_does_not_bypass_curator_ownership(self, tmp_path):
+        from tools.skill_provenance import (
+            BACKGROUND_REVIEW,
+            reset_current_write_origin,
+            set_current_write_origin,
+        )
+
+        with (
+            patch("tools.skills_tool.SKILLS_DIR", tmp_path),
+            patch("tools.skills_tool._is_skill_disabled", return_value=True),
+            patch(
+                "tools.skill_manager_guards._background_review_write_guard",
+                return_value={"success": False, "error": "user-owned"},
+            ),
+        ):
+            _make_skill(tmp_path, "user-owned-disabled")
+            token = set_current_write_origin(BACKGROUND_REVIEW)
+            try:
+                result = json.loads(skill_view("user-owned-disabled", preprocess=False))
+            finally:
+                reset_current_write_origin(token)
+
+        assert result["success"] is False
+        assert "disabled" in result["error"].lower()
+
     def test_view_finds_skill_in_symlinked_category_dir(self, tmp_path):
         external_root = tmp_path / "repo"
         skills_root = tmp_path / "skills"

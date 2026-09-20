@@ -272,6 +272,28 @@ def test_ttfb_does_not_kill_when_events_flow(tmp_path, monkeypatch):
     assert "codex_ttfb_kill" not in closes
 
 
+def test_per_agent_codex_idle_timeout_override_wins_over_env(tmp_path, monkeypatch):
+    """Curator/helper forks can relax only their own Codex idle watchdog."""
+    from agent import chat_completion_helpers as h
+
+    agent = _make_codex_agent(
+        tmp_path,
+        monkeypatch,
+        provider="custom",
+        base_url="https://gateway.example/v1",
+    )
+    monkeypatch.setenv("HERMES_CODEX_EVENT_STALE_TIMEOUT_SECONDS", "2")
+    agent._codex_event_stale_timeout_override = 600.0
+
+    watchdogs = h._resolve_nonstream_watchdogs(
+        agent, {"model": "gpt-5.6-sol", "input": "small"}
+    )
+
+    assert watchdogs.idle_enabled is True
+    assert watchdogs.idle_timeout == 600.0
+    assert watchdogs.idle_requires_progress is False
+
+
 @pytest.mark.parametrize(
     ("provider", "base_url", "input_chars", "idle_env", "idle_enabled", "requires_progress"),
     [

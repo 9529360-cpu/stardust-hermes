@@ -953,6 +953,18 @@ class _ReviewRuntimeBinding(NamedTuple):
     explicit_api_key: Optional[str]
     explicit_base_url: Optional[str]
     request_overrides: Dict[str, Any]
+    timeout: Optional[float]
+
+
+def _positive_timeout(value: Any) -> Optional[float]:
+    """Positive finite timeout in seconds, otherwise None."""
+    if isinstance(value, bool):
+        return None
+    try:
+        timeout = float(value)
+    except (TypeError, ValueError):
+        return None
+    return timeout if 0 < timeout < float("inf") else None
 
 
 def _merge_request_overrides(runtime_overrides: Any, slot_extra_body: Any) -> Dict[str, Any]:
@@ -971,7 +983,11 @@ def _resolve_review_runtime(cfg: Dict[str, Any]) -> _ReviewRuntimeBinding:
     Non-empty slot ``api_key``/``base_url`` are returned as explicit overrides so ``resolve_runtime_provider`` doesn't reuse the main chat credential chain."""
     def _slot(provider: str, model: str, slot: Dict[str, Any]) -> _ReviewRuntimeBinding:
         api_key, base_url = ((str(v).strip() or None) if v is not None else None for v in (slot.get("api_key"), slot.get("base_url")))
-        return _ReviewRuntimeBinding(provider, model, api_key, base_url, _merge_request_overrides({}, slot.get("extra_body")))
+        return _ReviewRuntimeBinding(
+            provider, model, api_key, base_url,
+            _merge_request_overrides({}, slot.get("extra_body")),
+            _positive_timeout(slot.get("timeout")),
+        )
 
     task = _subdict(cfg, "auxiliary", "curator")
     task_provider = (task.get("provider") or "").strip() or None
@@ -983,20 +999,29 @@ def _resolve_review_runtime(cfg: Dict[str, Any]) -> _ReviewRuntimeBinding:
         logger.info("curator: using deprecated curator.auxiliary.{provider,model} config — please migrate to auxiliary.curator.{provider,model}")
         return _slot(str(legacy["provider"]), str(legacy["model"]), legacy)
     main = _subdict(cfg, "model")
-    return _ReviewRuntimeBinding(main.get("provider") or "auto", main.get("default") or main.get("model") or "", None, None, {})
+    return _ReviewRuntimeBinding(
+        main.get("provider") or "auto",
+        main.get("default") or main.get("model") or "",
+        None,
+        None,
+        {},
+        _positive_timeout(task.get("timeout")),
+    )
 
 
 def _resolve_review_provider() -> tuple:
-    """``(runtime_provider, model_name, provider_name, request_overrides)`` resolved the way the CLI does: AIAgent() without
-    explicit provider/model hits an auto-resolution path that fails for OAuth-only providers and pooled credentials
-    (HTTP 400 "No models provided"). Never raises."""
+    """Resolve runtime provider, model, provider name, request overrides, and Curator timeout.
+
+    AIAgent() without an explicit provider/model hits an auto-resolution path that fails for
+    OAuth-only providers and pooled credentials (HTTP 400 "No models provided"). Never raises.
+    """
     rp: Dict[str, Any] = {}
-    overrides, provider, model_name = {}, None, ""
+    overrides, provider, model_name, timeout = {}, None, "", None
     try:
         from hermes_cli.config import load_config_readonly
         from hermes_cli.runtime_provider import resolve_runtime_provider
         binding = _resolve_review_runtime(load_config_readonly())
-        model_name = binding.model
+        model_name, timeout = binding.model, binding.timeout
         rp = resolve_runtime_provider(
             requested=binding.provider, target_model=binding.model,
             explicit_api_key=binding.explicit_api_key, explicit_base_url=binding.explicit_base_url,
@@ -1007,7 +1032,7 @@ def _resolve_review_provider() -> tuple:
             model_name = rp["model"].strip()
     except Exception as e:
         logger.debug("Curator provider resolution failed: %s", e, exc_info=True)
-    return rp, model_name, provider, overrides
+    return rp, model_name, provider, overrides, timeout
 
 
 def _run_llm_review(prompt: str) -> Dict[str, Any]:
@@ -1019,7 +1044,7 @@ def _run_llm_review(prompt: str) -> Dict[str, Any]:
     except Exception as e:
         result_meta["error"] = result_meta["summary"] = f"AIAgent import failed: {e}"
         return result_meta
-    rp, model_name, provider, request_overrides = _resolve_review_provider()
+    rp, model_name, provider, request_overrides, timeout = _resolve_review_provider()
     result_meta["model"], result_meta["provider"] = model_name, provider or ""
     review_agent = None
     try:
@@ -1040,6 +1065,12 @@ def _run_llm_review(prompt: str) -> Dict[str, Any]:
             max_iterations=9999,
             quiet_mode=True, platform="curator", skip_context_files=True, skip_memory=True,
         )
+        # Keep the slot timeout local to this fork. A Curator pass can spend minutes
+        # reasoning between Codex SSE events; global provider/env changes would affect
+        # unrelated foreground sessions sharing the same runtime.
+        if timeout is not None:
+            review_agent._request_timeout_override = timeout
+            review_agent._codex_event_stale_timeout_override = timeout
         # Disable recursive nudges — the curator must never spawn its own review.
         review_agent._memory_nudge_interval = 0
         review_agent._skill_nudge_interval = 0

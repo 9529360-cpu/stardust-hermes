@@ -70,6 +70,13 @@ def test_resolved_api_call_timeout_priority(monkeypatch, tmp_path):
     # Per-model override wins
     assert agent._resolved_api_call_timeout() == 42.0
 
+    # A helper fork may override only its own request timeout without changing
+    # provider config or the process environment.
+    agent._request_timeout_override = 600.0
+    assert agent._resolved_api_call_timeout() == 600.0
+    del agent._request_timeout_override
+    assert agent._resolved_api_call_timeout() == 42.0
+
     # Provider-level (different model, no per-model override)
     agent.model = "some/other-model"
     assert agent._resolved_api_call_timeout() == 77.0

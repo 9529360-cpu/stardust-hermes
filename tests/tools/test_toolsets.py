@@ -207,6 +207,33 @@ class TestRegistryOwnedToolsets:
         assert resolve_toolset("test-live-toolset") == ["test_live_toolset_tool"]
 
 
+class TestDefaultToolSurfaceTaxonomy:
+    def test_foundation_is_narrow_and_domain_neutral(self):
+        foundation = set(toolsets_mod._HERMES_FOUNDATION_TOOLS)
+
+        assert {
+            "web_search", "terminal", "read_file", "skill_view",
+            "memory", "clarify", "execute_code",
+        } <= foundation
+        assert "image_generate" not in foundation
+        assert "text_to_speech" not in foundation
+        assert "cronjob_manage" not in foundation
+        assert "computer_use" not in foundation
+        assert "manage_connections" not in foundation
+        assert not any(name.startswith("browser_") for name in foundation)
+        assert not any(name.startswith("kanban_") for name in foundation)
+        assert not any(name.startswith("ha_") for name in foundation)
+
+    def test_default_surface_preserves_historical_bundle(self):
+        expected = (
+            toolsets_mod._HERMES_FOUNDATION_TOOLS
+            + toolsets_mod._HERMES_DEFAULT_EDGE_TOOLS
+        )
+        assert toolsets_mod._HERMES_DEFAULT_TOOLS == expected
+        assert toolsets_mod._HERMES_CORE_TOOLS == expected
+        assert TOOLSETS["hermes-cli"]["tools"] == expected
+
+
 class TestToolsetConsistency:
     """Verify structural integrity of the built-in TOOLSETS dict."""
 

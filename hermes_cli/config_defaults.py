@@ -1856,9 +1856,10 @@ DEFAULT_CONFIG = {
         "kernel_idle_timeout": 1800,
         "max_session_kernels": 4,
     },
-    # Tool Search: deferrable (MCP / non-core plugin) tools are replaced in the model-facing array
-    # by tool_search / tool_describe / tool_call bridges and surfaced on demand. Core Hermes tools
-    # (terminal, file tools, todo, memory, browser_*, ...) are NEVER deferred.
+    # Tool Search: MCP/plugin tools plus a measured curated set of event-triggered built-ins are
+    # replaced in the model-facing array by tool_search / tool_describe / tool_call and surfaced
+    # on demand. The high-frequency working set stays eager; clarify is intentionally eager
+    # because live A/B testing showed a structured-question regression when it was deferred.
     "tools": {
         "tool_search": {
             # Tiered: tier 0 (no deferrable tools) = everything eager; tier 1 = bridge + a

@@ -203,15 +203,18 @@ are true:
 Currently, only the **background self-improvement review fork** sets this marker
 — when it creates a new umbrella skill during its periodic review pass (~every 10
 agent turns). The background fork runs with a write origin of `"background_review"`
-(via `tools/skill_provenance.py`), which is the only path that triggers the
-`mark_agent_created()` call in `skill_manage`.
+(via `tools/skill_provenance.py`) and is always curator-managed. Foreground
+creation stays user-owned unless the caller explicitly opts an autonomous
+procedural-memory create into curator management.
 
-Skills the foreground agent creates via `skill_manage(action="create")` during a
-conversation (including `/learn`) are **not** marked as agent-created — they are
-recorded as `created_by: learn`, which makes them show up in the
-[learning journey](./memory.md#learning-journey-journey) right away but is not a
-curator opt-in. They are considered user-directed and the curator intentionally
-leaves them alone.
+Skills the foreground agent creates via `skill_manage(action="create")` remain
+user-owned by default: they are recorded as `created_by: learn`, which makes
+them show up in the [learning journey](./memory.md#learning-journey-journey)
+without opting them into curation. When Stardust is autonomously saving a
+reusable workflow as its own procedural memory, it can pass
+`curator_managed: true` on that create; the same creation record is then
+marked `created_by: agent` so future curator passes may consolidate or archive
+it. A user-requested skill should leave `curator_managed` false.
 
 :::warning Your hand-written skills are NOT curated
 If you manually created a `SKILL.md` or pointed Hermes at an external skill
@@ -236,21 +239,23 @@ curator-managed skills: 43 total  (agent-created=43  bundled=0)
   stale       2
   archived    0
 
-unmanaged (no provenance marker): 112 total
-  pre-dates marker    34
-  foreground-created  78
+unmanaged (not curator-managed): 112 total
+  foreground-marked  18
+  origin unknown     94
   never auto-staled or archived — `hermes curator adopt <name>` hands one over
 ```
 
-Those 112 are curation-*eligible* but permanently invisible to the lifecycle,
-for one of two reasons:
+Those 112 are curation-*eligible* but permanently invisible to the lifecycle.
+The status output reports only what the sidecar can actually prove:
 
-- **pre-dates marker** — the record was written before `created_by` existed, so
-  it carries no provenance signal at all. Authorship is genuinely unknowable
-  from the record.
-- **foreground-created** — a foreground `skill_manage(create)` recorded
-  `created_by: learn` (older records: unset) by design, since skills you ask for
-  belong to you.
+- **foreground-marked** — the record explicitly carries `created_by: learn`,
+  the foreground learning-signal marker. User-requested skills stay in this
+  bucket; autonomous procedural-memory creates can opt into curator management
+  at creation time with `curator_managed: true`.
+- **origin unknown** — `created_by` is null, absent, or otherwise unrecognized.
+  This can include hand-written skills, records from before the marker existed,
+  or legacy foreground creates. Hermes does not guess between them because
+  telemetry activity is not authorship evidence.
 
 A large library can therefore look fully curated while most of it is
 untouchable. `adopt` closes that gap by **declaration**:
@@ -298,6 +303,13 @@ Skills that ARE agent-created follow the full lifecycle:
 - `active` → (30d unused) `stale` → (90d unused) `archived`
 - Pinned skills bypass all auto-transitions
 - Archives are recoverable via `hermes curator restore <name>`
+
+Disabling a skill suppresses it from normal agent discovery/use; it does not revoke
+Curator ownership that was already granted to an agent-created skill. The background
+review may inspect a disabled curator-managed skill so read-before-write safety still
+works, but user-owned, pinned, bundled, hub-installed, and external skills remain
+off-limits. Use `hermes curator pin <name>` when you want an agent-created skill kept
+out of autonomous maintenance as well.
 
 If you want to protect a specific skill from ever being touched — for example a
 hand-authored skill you rely on — use `hermes curator pin <name>`. See the next

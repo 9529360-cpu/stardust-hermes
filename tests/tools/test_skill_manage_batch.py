@@ -54,6 +54,17 @@ class TestSkillManageBatch(unittest.TestCase):
         for rel in ("SKILL.md", "references/a.md", "scripts/r.py"):
             self.assertTrue(os.path.exists(os.path.join(base, rel)), rel)
 
+    def test_create_curator_managed_flag_survives_operations_path(self):
+        r = self._call("probe", [{
+            "action": "create",
+            "content": SK.format(n="probe"),
+            "curator_managed": True,
+        }])
+        self.assertTrue(r["success"], r)
+        from tools import skill_usage
+        rec = skill_usage.load_usage().get("probe") or {}
+        self.assertEqual(rec.get("created_by"), "agent")
+
     def test_midbatch_failure_rolls_back_existing_skill(self):
         self._call("probe", [{"action": "create", "content": SK.format(n="probe")}])
         r = self._call("probe", [
@@ -164,7 +175,9 @@ class TestSkillManageBatch(unittest.TestCase):
         r = json.loads(self.smt.skill_manage(action="", name="", operations=[
             {"name": "alpha", "action": "patch",
              "old_string": "Step 1.", "new_string": "Step A."},
-            {"name": "beta", "action": "create", "content": SK.format(n="beta")},
+            # Synthetic fixtures intentionally share the same generic description; tell the
+            # convergence guard these are distinct rollback targets, not duplicate skills.
+            {"name": "beta", "action": "create", "content": SK.format(n="beta"), "distinct": True},
             {"name": "beta", "action": "write_file",
              "file_path": "bad/nope.md", "file_content": "x"},
         ]))
