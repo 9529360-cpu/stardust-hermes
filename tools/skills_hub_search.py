@@ -23,18 +23,23 @@ from tools.skills_hub_sources import BrowseShSource, LobeHubSource, UrlSource, W
 # Log-record parity with the origin module.
 logger = logging.getLogger("tools.skills_hub")
 
-HERMES_INDEX_URL = "https://hermes-agent.nousresearch.com/docs/api/skills-index.json"
+# Compatibility names are retained for callers that import them from tools.skills_hub.
+# The actual product authority is Stardust's verified release asset.
+HERMES_INDEX_URL = (
+    "https://github.com/9529360-cpu/stardust-hermes"
+    "/releases/download/stardust-skills-index/skills-index.json"
+)
 HERMES_INDEX_TTL = 6 * 3600  # 6 hours
 
 
 def _hermes_index_cache_file() -> Path:
     from tools.skills_hub import _index_cache_dir
-    return _index_cache_dir() / "hermes-index.json"
+    return _index_cache_dir() / "stardust-skills-index-v1.json"
 
 
 def _load_hermes_index() -> Optional[dict]:
-    """Fetch the centralized skills index (docs site, rebuilt daily), cached
-    locally for HERMES_INDEX_TTL; on any failure serve the stale cache.
+    """Fetch Stardust's centralized skills index release asset, cached locally
+    for HERMES_INDEX_TTL; on any failure serve the Stardust-provenance stale cache.
 
     Brotli is deliberately NOT negotiated: the index is tens of MB and httpx's
     streaming Brotli decoder (brotlicffi, pinned for Discord attachments) raises
@@ -53,14 +58,14 @@ def _load_hermes_index() -> Optional[dict]:
             resp = httpx.get(HERMES_INDEX_URL, timeout=15, follow_redirects=True,
                              headers={"Accept-Encoding": accept_encoding})
             if resp.status_code != 200:
-                logger.debug("Hermes index fetch returned %d", resp.status_code)
+                logger.debug("Stardust index fetch returned %d", resp.status_code)
                 return _load_stale_index_cache()
             data = resp.json()
             break
         except httpx.DecodingError as e:
-            logger.debug("Hermes index decode failed (Accept-Encoding=%s): %s", accept_encoding, e)
+            logger.debug("Stardust index decode failed (Accept-Encoding=%s): %s", accept_encoding, e)
         except (httpx.HTTPError, json.JSONDecodeError) as e:
-            logger.debug("Hermes index fetch failed: %s", e)
+            logger.debug("Stardust index fetch failed: %s", e)
             return _load_stale_index_cache()
     if not isinstance(data, dict) or "skills" not in data:
         return _load_stale_index_cache()

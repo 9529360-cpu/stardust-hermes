@@ -210,3 +210,23 @@ def test_plugin_catalog_defaults_belong_to_stardust() -> None:
     )
     assert '"plugin-catalog-stardust-v1.json"' in source
 
+
+def test_skills_index_defaults_belong_to_stardust() -> None:
+    from tools import skills_hub_search
+
+    canonical = (
+        "https://github.com/9529360-cpu/stardust-hermes"
+        "/releases/download/stardust-skills-index/skills-index.json"
+    )
+    assert skills_hub_search.HERMES_INDEX_URL == canonical
+    assert skills_hub_search._hermes_index_cache_file().name == (
+        "stardust-skills-index-v1.json"
+    )
+
+    old = "https://hermes-agent.nousresearch.com/docs/api/skills-index.json"
+    for path in ("tools/skills_hub_search.py", "website/scripts/prebuild.mjs"):
+        source = _read(path)
+        assert old not in source
+        assert "9529360-cpu/stardust-hermes" in source
+        assert "stardust-skills-index" in source
+
