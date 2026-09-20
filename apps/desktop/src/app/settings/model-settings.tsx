@@ -1,4 +1,5 @@
 import type { ModelOptionProvider } from '@hermes/shared'
+import { useStore } from '@nanostores/react'
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@hermes/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -32,7 +33,12 @@ import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { setMainModelAssignment } from '@/store/cron-model-impact'
 import { notifyError, readableError } from '@/store/notifications'
-import { startManualLocalEndpoint, startManualOnboarding, startManualProviderOAuth } from '@/store/onboarding'
+import {
+  $desktopOnboarding,
+  startManualLocalEndpoint,
+  startManualOnboarding,
+  startManualProviderOAuth
+} from '@/store/onboarding'
 
 import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '../hooks/use-config-record'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
@@ -242,6 +248,8 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const setConfig = useMemo(() => hermesConfigCacheWriter(scopeProfile), [scopeProfile])
   const [applying, setApplying] = useState(false)
   const [editingAuxTask, setEditingAuxTask] = useState<null | string>(null)
+  const onboardingActive = useStore($desktopOnboarding).manual
+  const onboardingWasActive = useRef(false)
 
   const [auxDraft, setAuxDraft] = useState<{ model: string; provider: string; reasoningEffort: string }>({
     model: '',
@@ -335,6 +343,17 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // Provider setup runs in the shared onboarding overlay. When that flow
+  // closes, refresh the model-service snapshot so a newly connected service
+  // and its models appear without making the user leave/reopen Settings.
+  useEffect(() => {
+    if (onboardingWasActive.current && !onboardingActive) {
+      void refresh()
+    }
+
+    onboardingWasActive.current = onboardingActive
+  }, [onboardingActive, refresh])
 
   // A profile switch swaps the backend under the mounted panel — reload for the
   // new profile (bumping the epoch first so any in-flight A request is discarded).
