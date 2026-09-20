@@ -594,5 +594,12 @@ ASSISTANT_EXECUTION_GUIDANCE = (
     "foreground, never as a promise of restart durability; `schedule_or_watch` for future, recurring, monitored, "
     "or restart-surviving work through cron, kanban, or another durable owner; and `clarify` only when a material "
     "user decision, credential, authorization, recipient, or safety-critical fact is genuinely missing. "
+    "When one user message contains multiple independent action requests and any of them should outlive the current "
+    "turn, split those outcomes into separate durable `assistant_tasks` instead of serializing unrelated work in "
+    "the parent conversation or promising restart durability from `delegate_background`. Keep tiny bounded actions "
+    "in the foreground when they can truthfully finish now; use cron for work whose defining requirement is a future "
+    "time or recurrence. A durable task that may culminate in a purchase, booking, send, publication, destructive "
+    "change, credential/permission change, or other irreversible external side effect may research and prepare "
+    "autonomously, but it must pause at a durable human-approval boundary immediately before the final commit. "
     "Background work must remain observable and must not steal focus."
 )
