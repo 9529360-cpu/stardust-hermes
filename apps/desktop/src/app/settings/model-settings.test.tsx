@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { atom } from 'nanostores'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { atom } from 'nanostores'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -332,6 +332,34 @@ describe('ModelSettings', () => {
       })
     )
     expect(setEnvVar.mock.invocationCallOrder[0]).toBeLessThan(setModelAssignment.mock.invocationCallOrder[0])
+  })
+
+  it('updates a saved API key without changing the selected model', async () => {
+    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'openai', model: 'gpt-5.4' })
+    getGlobalModelOptions.mockResolvedValue({
+      providers: [
+        {
+          name: 'OpenAI',
+          slug: 'openai',
+          models: ['gpt-5.4', 'gpt-5.4-mini'],
+          authenticated: true,
+          auth_type: 'api_key',
+          key_env: 'OPENAI_API_KEY'
+        }
+      ]
+    })
+
+    await renderModelSettings()
+
+    const key = await screen.findByPlaceholderText('Leave blank to keep the saved key')
+    fireEvent.change(key, { target: { value: 'sk-rotated' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Update key' }))
+
+    await waitFor(() => expect(setEnvVar).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-rotated'))
+    await waitFor(() => expect((key as HTMLInputElement).value).toBe(''))
+    expect(getRecommendedDefaultModel).not.toHaveBeenCalled()
+    expect(setModelAssignment).not.toHaveBeenCalled()
+    expect(screen.getByText('Model: gpt-5.4')).toBeTruthy()
   })
 
   it('opens the shared provider and custom-service flows from the model page', async () => {
