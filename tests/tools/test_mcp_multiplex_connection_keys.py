@@ -125,6 +125,78 @@ def test_oauth_server_is_not_adopted_across_profiles(two_profiles):
     assert core._servers[(scope_a, "x")] is srv_a
 
 
+def test_stdio_server_is_not_adopted_across_profiles(two_profiles):
+    """Stdio children inherit profile runtime/secrets, so even identical static config stays profile-owned."""
+    import tools.mcp_tool as core
+    from tools import mcp_tool_discovery as disc
+    from tools import mcp_tool_registration as reg
+    from tools.registry import registry
+
+    cfg = {"command": "demo-mcp", "args": ["--serve"]}
+
+    scope_a = two_profiles("a")
+    srv_a = _server("x", cfg)
+    disc._adopt_server("x", srv_a)
+    srv_a._registered_tool_names = reg._register_server_tools("x", srv_a, cfg)
+
+    scope_b = two_profiles("b")
+    assert reg.register_connected_into_current_scope({"x": dict(cfg)}) == 0
+    assert registry.get_tool_names_for_toolset("mcp-x") == []
+    assert "x" in disc._select_new_servers({"x": dict(cfg)})
+    assert core._servers[(scope_a, "x")] is srv_a
+    assert (scope_b, "x") not in core._servers
+
+
+def test_identity_header_server_is_not_adopted_across_profiles(two_profiles):
+    """A per-profile identity header is resolved at connect time, so the live session is profile-bound."""
+    import tools.mcp_tool as core
+    from tools import mcp_tool_discovery as disc
+    from tools import mcp_tool_registration as reg
+    from tools.registry import registry
+
+    cfg = {
+        "url": "https://mcp.example/x",
+        "identity_header": {"name": "X-Hermes-Profile", "value_from": "profile"},
+    }
+
+    scope_a = two_profiles("a")
+    srv_a = _server("x", cfg)
+    disc._adopt_server("x", srv_a)
+    srv_a._registered_tool_names = reg._register_server_tools("x", srv_a, cfg)
+
+    scope_b = two_profiles("b")
+    assert reg.register_connected_into_current_scope({"x": dict(cfg)}) == 0
+    assert registry.get_tool_names_for_toolset("mcp-x") == []
+    assert "x" in disc._select_new_servers({"x": dict(cfg)})
+    assert core._servers[(scope_a, "x")] is srv_a
+    assert (scope_b, "x") not in core._servers
+
+
+@pytest.mark.parametrize(
+    "cfg_a,cfg_b",
+    [
+        ({"ssl_verify": False}, {"ssl_verify": True}),
+        ({"strict_redirect_headers": False}, {"strict_redirect_headers": True}),
+        ({"cwd": "/workspace/a"}, {"cwd": "/workspace/b"}),
+        (
+            {"identity_header": {"name": "X-User-Id", "value": "alice"}},
+            {"identity_header": {"name": "X-User-Id", "value": "bob"}},
+        ),
+        (
+            {"auth": "oauth", "oauth": {"client_id": "client-a"}},
+            {"auth": "oauth", "oauth": {"client_id": "client-b"}},
+        ),
+    ],
+)
+def test_connection_security_or_identity_change_requires_fresh_connection(cfg_a, cfg_b):
+    from tools import mcp_tool_registration as reg
+
+    base = {"url": "https://mcp.example/x"}
+    old_cfg = {**base, **cfg_a}
+    new_cfg = {**base, **cfg_b}
+    assert reg._same_server_route(_server("x", old_cfg), new_cfg) is False
+
+
 def test_same_named_server_with_other_mtls_identity_is_a_separate_connection(two_profiles):
     from tools import mcp_tool_discovery as disc
     from tools import mcp_tool_registration as reg

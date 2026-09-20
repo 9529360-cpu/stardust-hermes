@@ -147,6 +147,36 @@ def test_hosted_auth_allows_same_server_name_in_different_profiles(tmp_path, mon
 
 
 
+def test_dashboard_oauth_worker_redacts_probe_failure(tmp_path, monkeypatch):
+    from tools.mcp_dashboard_oauth import DashboardOAuthFlow
+    import hermes_cli.mcp_config as mcp_config
+
+    secret = "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789"
+    flow = DashboardOAuthFlow(
+        flow_id="flow-redact",
+        server_name="reports-redact",
+        profile=None,
+        hermes_home=str(tmp_path),
+        redirect_uri="https://agent.example/api/mcp/oauth/callback/reports-redact",
+    )
+
+    def fail_probe(*_args, **_kwargs):
+        raise RuntimeError(
+            f"token exchange failed with X-Api-Key: {secret}"
+        )
+
+    monkeypatch.setattr(mcp_config, "_probe_single_server", fail_probe)
+
+    _web_server_mcp._run_dashboard_mcp_oauth(
+        flow, {"url": "https://mcp.example/mcp", "auth": "oauth"}
+    )
+
+    error = flow.snapshot()["error"] or ""
+    assert secret not in error
+    assert "X-Api-Key: ***" in error
+    assert flow.worker_done is True
+
+
 def test_flow_status_does_not_expose_authorization_code():
     from hermes_cli import web_server
     from tools.mcp_dashboard_oauth import DashboardOAuthFlow

@@ -30,10 +30,17 @@ def config_fingerprint(config: dict) -> str:
     payload = {
         "command": config.get("command"),
         "args": config.get("args") or [],
+        "cwd": config.get("cwd"),
         "url": config.get("url"),
         "transport": config.get("transport"),
         "tools_include": sorted(tools_filter.get("include") or []),
-        "tools_exclude": sorted(tools_filter.get("exclude") or [])}
+        "tools_exclude": sorted(tools_filter.get("exclude") or []),
+        # Utility tools are materialized into the cache too. These flags must
+        # participate or a later lazy start can resurrect resources/prompts
+        # that the user disabled after the cache was written.
+        "tools_resources": tools_filter.get("resources"),
+        "tools_prompts": tools_filter.get("prompts"),
+    }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 

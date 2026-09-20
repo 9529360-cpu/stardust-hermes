@@ -24,6 +24,18 @@ class TestConfigFingerprint:
         assert msc.config_fingerprint(base) != msc.config_fingerprint(
             {**base, "tools": {"include": ["a"]}}
         )
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "cwd": "/workspace/other"}
+        )
+
+    def test_changes_when_cached_utility_policy_changes(self):
+        base = {"url": "https://mcp.example/mcp", "tools": {"resources": True, "prompts": True}}
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "tools": {"resources": False, "prompts": True}}
+        )
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "tools": {"resources": True, "prompts": False}}
+        )
 
     def test_ignores_non_connection_keys(self):
         base = {"command": "npx", "args": []}

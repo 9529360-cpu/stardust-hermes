@@ -140,7 +140,8 @@ def _worker(
                 server_name, exc, server_url=cfg.get("url") if isinstance(cfg, dict) else None
             ) or msg
         if flow is not None:
-            flow.mark_error(msg)
+            from hermes_cli.mcp_config import redact_mcp_probe_text
+            flow.mark_error(redact_mcp_probe_text(msg))
     finally:
         if flow is not None:
             flow.mark_worker_done()

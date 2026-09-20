@@ -412,18 +412,32 @@ def _server_enabled(config: dict) -> bool:
 
 
 def _connection_identity(config: dict) -> tuple:
-    """What makes one live connection reusable for another profile: the route fingerprint PLUS
-    everything that authenticates it (``config_fingerprint`` deliberately excludes credentials so
-    the schema cache survives a token rotation). Two profiles pointing at the same URL with different
-    headers/env/auth/client certificates are two identities; borrowing across them would call tools
-    as the other user."""
+    """What makes one live connection reusable: the route fingerprint PLUS everything that
+    authenticates the connection or changes its transport security/identity policy.
+
+    ``config_fingerprint`` deliberately excludes credentials so the schema cache survives token
+    rotation; live-connection reuse cannot. Headers/env, OAuth client options, mTLS material,
+    identity headers, TLS verification and strict redirect policy all affect who the connection
+    acts as or what security boundary it enforces, so any difference requires a fresh connection.
+    """
     from tools.mcp_schema_cache import config_fingerprint
 
     def _frozen(value):
         return json.dumps(value or {}, sort_keys=True, default=str)
 
-    return (config_fingerprint(config), _frozen(config.get("env")), _frozen(config.get("headers")),
-            _auth_type(config), _frozen(config.get("client_cert")), _frozen(config.get("client_key")))
+    return (
+        config_fingerprint(config),
+        _frozen(config.get("env")),
+        _frozen(config.get("headers")),
+        _auth_type(config),
+        _frozen(config.get("oauth")),
+        _frozen(config.get("client_cert")),
+        _frozen(config.get("client_key")),
+        _frozen(config.get("identity_header")),
+        config.get("cwd"),
+        config.get("ssl_verify", True),
+        bool(config.get("strict_redirect_headers")),
+    )
 
 
 def _auth_type(config: dict) -> str:
@@ -431,15 +445,28 @@ def _auth_type(config: dict) -> str:
 
 
 def _same_server_route(server: Any, config: dict, *, cross_profile: bool = False) -> bool:
-    """Whether *server* matches *config*, with OAuth connections never reusable across profiles.
+    """Whether *server* matches *config* and is safe to reuse.
 
-    OAuth credentials live in the owning profile's token storage rather than the static config,
-    so identical OAuth configs cannot prove that two profiles authenticate as the same account.
+    OAuth credentials live in the owning profile's token storage, so OAuth connections are never
+    reusable across profiles. ``identity_header`` is also resolved at connect time (and may derive
+    from the active profile), so a connection carrying one is profile-bound even when the raw
+    config blocks are byte-identical.
     """
-    if _connection_identity(getattr(server, "_config", {}) or {}) != _connection_identity(config):
+    server_config = getattr(server, "_config", {}) or {}
+    if _connection_identity(server_config) != _connection_identity(config):
         return False
-    # Identities match, so both sides carry the same normalised auth type.
-    return not (cross_profile and _auth_type(config) == "oauth")
+    if cross_profile and (
+        not config.get("url")
+        or not server_config.get("url")
+        or _auth_type(config) == "oauth"
+        or config.get("identity_header") is not None
+        or server_config.get("identity_header") is not None
+    ):
+        # Stdio subprocesses inherit profile-scoped runtime context (cwd plus externally
+        # hydrated secret-source values) that is not fully represented in static config, so
+        # cross-profile equivalence cannot be proven. Keep those connections profile-owned.
+        return False
+    return True
 
 
 def register_connected_into_current_scope(servers: dict) -> int:

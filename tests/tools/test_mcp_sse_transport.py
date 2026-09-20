@@ -207,3 +207,53 @@ class TestSSEOAuthForwarding:
             f"sse_client was called with auth= when no OAuth was configured: "
             f"{patch_sse_client!r}"
         )
+
+
+class TestSSERedirectCredentialBoundary:
+    def test_cross_origin_redirect_strips_configured_api_key(self, patch_sse_client):
+        """SSE uses follow_redirects=True, so its owned client must install the same credential
+        boundary as Streamable HTTP instead of forwarding configured API-key headers cross-origin."""
+        from types import SimpleNamespace
+
+        from tools.mcp_tool import MCPServerTask, sdk_httpx
+
+        server = _build_server_with_sse()
+
+        async def drive():
+            with patch.object(MCPServerTask, "_wait_for_lifecycle_event",
+                              new=AsyncMock(return_value="shutdown")), \
+                 patch.object(MCPServerTask, "_discover_tools", new=AsyncMock()):
+                try:
+                    await asyncio.wait_for(
+                        server._run_http({
+                            "url": "https://origin.example.test/mcp/sse",
+                            "transport": "sse",
+                            "headers": {"X-Api-Key": "secret", "X-Tenant": "tenant-a"},
+                        }),
+                        timeout=2.0,
+                    )
+                except (asyncio.TimeoutError, StopAsyncIteration, Exception):
+                    pass
+
+        asyncio.run(drive())
+        factory = patch_sse_client["httpx_client_factory"]
+        client_kwargs = {}
+
+        class DummyAsyncClient:
+            def __init__(self, **kwargs):
+                client_kwargs.update(kwargs)
+
+        httpx = sdk_httpx()
+        with patch.object(httpx, "AsyncClient", DummyAsyncClient):
+            factory(headers={"X-Api-Key": "secret", "X-Tenant": "tenant-a"})
+
+        hook = client_kwargs["event_hooks"]["response"][0]
+        next_request = httpx.Request(
+            "GET",
+            "https://other.example.test/mcp",
+            headers={"X-Api-Key": "secret", "X-Tenant": "tenant-a"},
+        )
+        asyncio.run(hook(SimpleNamespace(is_redirect=True, next_request=next_request)))
+
+        assert "x-api-key" not in next_request.headers
+        assert next_request.headers["x-tenant"] == "tenant-a"

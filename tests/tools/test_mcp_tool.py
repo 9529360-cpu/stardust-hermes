@@ -3217,19 +3217,27 @@ class TestRedirectHeaderStripper:
         )
         return response, next_request
 
-    def test_default_strips_only_authorization(self):
+    def test_default_strips_credentials_but_keeps_non_secret_config_headers(self):
         import httpx
 
         from tools.mcp_tool_errors import _make_redirect_header_stripper
 
         hook = _make_redirect_header_stripper(
-            httpx.URL("https://origin.example.test/mcp")
+            httpx.URL("https://origin.example.test/mcp"),
+            configured_header_names={"x-api-key", "x-tenant"},
         )
         response, next_request = self._make_response(
-            {"Authorization": "Bearer x", "X-Tenant": "t"}
+            {
+                "Authorization": "Bearer x",
+                "Proxy-Authorization": "Basic y",
+                "X-Api-Key": "secret",
+                "X-Tenant": "t",
+            }
         )
         asyncio.run(hook(response))
         assert "authorization" not in next_request.headers
+        assert "proxy-authorization" not in next_request.headers
+        assert "x-api-key" not in next_request.headers
         assert next_request.headers["x-tenant"] == "t"
 
     def test_strict_strips_configured_headers_cross_origin(self):

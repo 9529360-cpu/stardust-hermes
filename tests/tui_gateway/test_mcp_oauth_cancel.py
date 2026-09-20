@@ -156,6 +156,35 @@ def test_start_flow_setup_failure_releases_reserved_slot(tmp_path, monkeypatch):
     assert sessions._sessions == {}
 
 
+def test_worker_redacts_oauth_failure_before_exposing_flow_error(tmp_path, monkeypatch):
+    secret = "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789"
+    home = str(tmp_path)
+    flow = DashboardOAuthFlow(
+        "redact", "reports", None, home, "http://127.0.0.1:49152/callback"
+    )
+    rec = {
+        "flow": flow,
+        "server_name": "reports",
+        "hermes_home": home,
+        "httpd": None,
+    }
+    monkeypatch.setattr(sessions, "_sessions", {"redact": rec})
+
+    def fail_probe(*_args, **_kwargs):
+        raise RuntimeError(
+            f"token exchange failed with Authorization: Bearer {secret}"
+        )
+
+    monkeypatch.setattr(sessions, "_probe_with_rollback", fail_probe)
+
+    sessions._worker("redact", home, "reports", {"url": "https://mcp.example"}, False)
+
+    error = flow.snapshot()["error"] or ""
+    assert secret not in error
+    assert "Bearer ***" in error
+    assert flow.worker_done is True
+
+
 @pytest.mark.parametrize("operation", ["poll", "callback", "cancel"])
 def test_session_operations_require_resolved_owner(tmp_path, monkeypatch, operation):
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override

@@ -214,10 +214,21 @@ def _apply_identity_header(server_name: str, config: dict, headers: dict) -> dic
 
 def _make_redirect_header_stripper(original_url, *, strict: bool = False,
                                    configured_header_names: "set[str] | frozenset[str]" = frozenset()):
-    """httpx response hook: strips ``Authorization`` when a redirect leaves the original origin;
-    with *strict* (Agent Plugins v1 ``strict_redirect_headers``) every configured header (lowercase
-    names in *configured_header_names*) is stripped too — v1 forbids forwarding them cross-origin."""
+    """httpx response hook for the cross-origin credential boundary.
+
+    ``Authorization`` / ``Proxy-Authorization`` and recognized API-key/token headers are never
+    forwarded to another origin. With *strict* (Agent Plugins v1 ``strict_redirect_headers``),
+    every configured header (lowercase names in *configured_header_names*) is stripped too.
+    """
     origin = (original_url.scheme, original_url.host, original_url.port)
+    from agent.redact import _SECRET_HEADER_NAMES
+
+    credential_name_re = re.compile(rf"^(?:{_SECRET_HEADER_NAMES})$", re.IGNORECASE)
+    default_sensitive = {
+        name.lower()
+        for name in configured_header_names
+        if name.lower() in {"authorization", "proxy-authorization"} or credential_name_re.fullmatch(name)
+    }
 
     async def _strip_on_cross_origin_redirect(response):
         target = response.next_request.url if response.is_redirect and response.next_request else None
@@ -226,7 +237,10 @@ def _make_redirect_header_stripper(original_url, *, strict: bool = False,
         headers = response.next_request.headers
         headers.pop("authorization", None)
         headers.pop("Authorization", None)
-        for _name in configured_header_names if strict else ():
+        headers.pop("proxy-authorization", None)
+        headers.pop("Proxy-Authorization", None)
+        names_to_strip = configured_header_names if strict else default_sensitive
+        for _name in names_to_strip:
             while _name in headers:
                 del headers[_name]
     return _strip_on_cross_origin_redirect
