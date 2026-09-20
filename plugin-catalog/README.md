@@ -1,6 +1,6 @@
-# Hermes Plugin Catalog
+# Stardust Plugin Catalog
 
-Curated, Nous-approved Hermes plugins. Each YAML file in this directory
+Curated Stardust plugins. Each YAML file in this directory
 (except `removed.yaml`) is one catalog entry, discoverable via
 `hermes plugins catalog` / `hermes plugins search` and installable with
 `hermes plugins install <name>`.
@@ -11,7 +11,7 @@ Presence in this directory **is** the trust signal. The rules that keep it
 meaningful:
 
 1. **Human-merged gate.** Entries are added *only* via a PR to the
-   `hermes-agent` repository, reviewed and merged by a maintainer. There is
+   `stardust-hermes` repository, reviewed and merged by a maintainer. There is
    no self-serve registry, no automated ingestion.
 2. **Exact SHA pins are mandatory.** Every entry pins a full 40-character
    commit SHA. Branches, tags, and short SHAs are rejected by the loader.
@@ -55,6 +55,19 @@ capabilities:
   provides_middleware: []
   requires_env: []
 ```
+
+## Runtime catalog artifact
+
+Installed clients consume a deterministic JSON projection committed at
+`website/static/api/plugin-catalog.json`. The source of truth remains the
+reviewed YAML files in this directory; do not edit the JSON by hand.
+
+`website/scripts/extract-plugins.py` regenerates the runtime artifact from
+these YAML files. Plugin Catalog CI uploads the generated JSON as evidence and
+fails when the committed copy differs byte-for-byte. The runtime artifact
+contains only `entries` and `removed`; page freshness timestamps live in
+`plugins-meta.json` and are intentionally excluded so the runtime file stays
+reproducible.
 
 ## removed.yaml — the blocklist
 
