@@ -552,20 +552,35 @@ class TestBridgeDispatch:
             result = json.loads(handle_function_call("tool_call", {}))
         assert "requires 'calls'" in result["error"]
 
-    def test_tool_call_uses_one_defer_policy_snapshot(self):
+    def test_tool_call_keeps_session_surface_when_live_defer_config_changes(self):
         import tools.tool_search as ts
 
-        policy = ts.ToolSearchConfig.from_raw({"defer": ["mcp_x"]})
-        with patch("model_tools.get_tool_definitions", return_value=[]), \
+        # Live config now says todo_list should be deferred, but this session was
+        # assembled with todo_list eager. The existing model-visible surface wins.
+        policy = ts.ToolSearchConfig.from_raw({"defer": ["todo_list"]})
+        todo_def = {
+            "type": "function",
+            "function": {
+                "name": "todo_list",
+                "description": "todo",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+        enabled = ["tool_search", "tool_describe", "tool_call", "todo_list"]
+        with patch("model_tools.get_tool_definitions", return_value=[todo_def]), \
              patch.object(ts, "load_config_readonly", return_value=policy) as load_policy, \
-             patch.object(ts, "resolve_underlying_call", return_value=("mcp_x", {"a": 1}, None)) as resolve, \
+             patch.object(ts, "resolve_underlying_call", return_value=("todo_list", {}, None)) as resolve, \
              patch.object(ts, "scoped_deferrable_names", return_value=frozenset()) as scoped:
-            result = json.loads(handle_function_call("tool_call", {"calls": [{"name": "mcp_x", "arguments": {"a": 1}}]}))
+            result = json.loads(handle_function_call(
+                "tool_call",
+                {"calls": [{"name": "todo_list", "arguments": {}}]},
+                enabled_tools=enabled,
+            ))
 
         assert "not available in this session" in result["error"]
         assert load_policy.call_count == 1
-        assert resolve.call_args.args[1] == policy.effective_defer_tools
-        assert scoped.call_args.args[1] == policy.effective_defer_tools
+        assert resolve.call_args.args[1] == frozenset()
+        assert scoped.call_args.args[1] == frozenset()
 
     def test_tool_call_rejects_out_of_scope_and_unwraps_in_scope(self):
         import tools.tool_search as ts
