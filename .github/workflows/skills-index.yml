@@ -65,12 +65,15 @@ jobs:
         run: |
           set -euo pipefail
           TAG="stardust-skills-index"
-          ASSET="website/static/api/skills-index.json"
+          CANONICAL="skills-index.json"
+          ASSET="website/static/api/$CANONICAL"
+          STAGED="skills-index-${GITHUB_RUN_ID}.json"
+          STAGED_PATH="${RUNNER_TEMP}/$STAGED"
+          REPO_API="repos/$GITHUB_REPOSITORY"
 
           # A fixed prerelease tag gives installed clients one stable,
-          # Stardust-owned URL without turning this generated catalog into a
-          # source-controlled multi-megabyte file. A failed build never reaches
-          # this step, so the previous healthy asset remains recoverable.
+          # Stardust-owned URL without putting this generated multi-megabyte
+          # catalog in Git history.
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
@@ -80,8 +83,42 @@ jobs:
               --prerelease
           fi
 
-          gh release upload "$TAG" "$ASSET#skills-index.json" \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
+          # Never use `gh release upload --clobber`: it deletes the current
+          # asset before uploading the replacement. Stage the healthy file
+          # under a unique name first, then swap names with rollback.
+          cp "$ASSET" "$STAGED_PATH"
+          gh release upload "$TAG" "$STAGED_PATH" --repo "$GITHUB_REPOSITORY"
 
-          echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/skills-index.json"
+          RELEASE_ID="$(gh api "$REPO_API/releases/tags/$TAG" --jq '.id')"
+          STAGED_ID="$(gh api "$REPO_API/releases/$RELEASE_ID/assets?per_page=100" \
+            --jq ".[] | select(.name == \"$STAGED\") | .id" | head -n 1)"
+          CANONICAL_ID="$(gh api "$REPO_API/releases/$RELEASE_ID/assets?per_page=100" \
+            --jq ".[] | select(.name == \"$CANONICAL\") | .id" | head -n 1 || true)"
+
+          if [ -z "$STAGED_ID" ]; then
+            echo "::error::staged skills index asset was not found after upload"
+            exit 1
+          fi
+
+          if [ -z "$CANONICAL_ID" ]; then
+            # First publication: there is no prior healthy asset to protect.
+            gh api -X PATCH "$REPO_API/releases/assets/$STAGED_ID" -f name="$CANONICAL" >/dev/null
+          else
+            BACKUP="skills-index.previous-${GITHUB_RUN_ID}.json"
+            gh api -X PATCH "$REPO_API/releases/assets/$CANONICAL_ID" -f name="$BACKUP" >/dev/null
+
+            if gh api -X PATCH "$REPO_API/releases/assets/$STAGED_ID" -f name="$CANONICAL" >/dev/null; then
+              # The new canonical asset is live. Backup cleanup is best-effort;
+              # a cleanup failure is recoverable and must not roll back success.
+              gh api -X DELETE "$REPO_API/releases/assets/$CANONICAL_ID" >/dev/null 2>&1 || \
+                echo "::warning::published new index but could not delete backup asset $BACKUP"
+            else
+              echo "::error::failed to promote staged skills index; restoring previous canonical asset"
+              if ! gh api -X PATCH "$REPO_API/releases/assets/$CANONICAL_ID" -f name="$CANONICAL" >/dev/null; then
+                echo "::error::rollback failed; previous healthy asset remains recoverable as $BACKUP"
+              fi
+              exit 1
+            fi
+          fi
+
+          echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$CANONICAL"
