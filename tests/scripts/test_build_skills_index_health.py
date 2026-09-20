@@ -31,10 +31,11 @@ def _meta(name, src):
 
 
 class _FakeSource:
-    def __init__(self, src, n, rate_limited=False):
+    def __init__(self, src, n, rate_limited=False, index_build_truncated=False):
         self._src = src
         self._n = n
         self.is_rate_limited = rate_limited
+        self.index_build_truncated = index_build_truncated
 
     def search(self, query, limit=10):
         return [_meta(f"{self._src}-{i}", self._src) for i in range(self._n)]
@@ -45,7 +46,8 @@ class _FakeSource:
 
 
 def _install_fake_sources(monkeypatch, *, github_count,
-                          well_known_count=10, github_rate_limited=False):
+                          well_known_count=10, github_rate_limited=False,
+                          clawhub_truncated=False):
     monkeypatch.setattr(build_mod, "SkillsShSource", lambda auth: _FakeSource("skills.sh", 15000))
     monkeypatch.setattr(build_mod, "OptionalSkillSource", lambda: _FakeSource("official", 95))
     monkeypatch.setattr(build_mod, "WellKnownSkillSource", lambda: _FakeSource("well-known", well_known_count))
@@ -53,7 +55,12 @@ def _install_fake_sources(monkeypatch, *, github_count,
         build_mod, "GitHubSource",
         lambda auth: _FakeSource("github", github_count, rate_limited=github_rate_limited),
     )
-    monkeypatch.setattr(build_mod, "ClawHubSource", lambda: _FakeSource("clawhub", 69000))
+    monkeypatch.setattr(
+        build_mod, "ClawHubSource",
+        lambda: _FakeSource(
+            "clawhub", 69000, index_build_truncated=clawhub_truncated
+        ),
+    )
     monkeypatch.setattr(build_mod, "LobeHubSource", lambda: _FakeSource("lobehub", 500))
     monkeypatch.setattr(build_mod, "BrowseShSource", lambda: _FakeSource("browse-sh", 380))
     monkeypatch.setattr(
@@ -80,6 +87,25 @@ def test_degenerate_crawl_exits_nonzero_and_writes_no_file(tmp_path, monkeypatch
     assert exc.value.code != 0
     # The degenerate index must NOT have been written — extract-skills.py
     # relies on the file's absence to fall back instead of reading garbage.
+    assert not out.exists()
+
+
+def test_truncated_clawhub_crawl_never_publishes_even_above_floor(
+    tmp_path, monkeypatch
+):
+    """A large partial ClawHub snapshot must fail even when it clears 20k."""
+    out = tmp_path / "skills-index.json"
+    monkeypatch.setattr(build_mod, "OUTPUT_PATH", str(out))
+    _install_fake_sources(
+        monkeypatch,
+        github_count=200,
+        clawhub_truncated=True,
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        build_mod.main()
+
+    assert exc.value.code != 0
     assert not out.exists()
 
 
