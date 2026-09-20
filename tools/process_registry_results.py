@@ -20,7 +20,7 @@ RESULT_RETENTION_SECONDS = 7 * 24 * 60 * 60
 MAX_RETAINED_RESULTS = 64
 _RESULT_FIELDS = (
     "id", "command", "cwd", "task_id", "owner_task_id", "session_key",
-    "parent_session_id", "started_at", "exit_code", "completion_reason",
+    "parent_session_id", "handoff_note", "started_at", "exit_code", "completion_reason",
     "termination_source", "notify_on_complete",
 )
 
@@ -105,8 +105,10 @@ def load_completed_results(prefix: str = "") -> dict:
                 continue
             if not _owns_result(owner, record.get("parent_session_id")):
                 continue
+            fields = {key: record[key] for key in _RESULT_FIELDS if key != "handoff_note"}
+            fields["handoff_note"] = record.get("handoff_note", "")
             session = ProcessSession(
-                **{key: record[key] for key in _RESULT_FIELDS},
+                **fields,
                 exited=True, output_buffer=record["output"],
             )
             session._completion_event.set()

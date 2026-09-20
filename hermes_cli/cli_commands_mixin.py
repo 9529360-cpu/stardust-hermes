@@ -914,24 +914,58 @@ class CLICommandsMixin:
 
     def _handle_agents_command(self):
         """Handle /agents — show background processes and agent status."""
+        from agent.assistant_intent import (
+            AssistantTaskState, project_delegation, project_process,
+        )
         from tools.process_registry import format_uptime_short, process_registry
         processes = process_registry.list_sessions()
-        running = [p for p in processes if p.get("status") == "running"]
-        finished = [p for p in processes if p.get("status") != "running"]
+        projected_processes = []
+        for process in processes:
+            try:
+                projected_processes.append((process, project_process(process)))
+            except ValueError:
+                projected_processes.append((process, None))
+        running = [
+            process for process, task in projected_processes
+            if task is not None and task.state is AssistantTaskState.RUNNING
+            or task is None and process.get("status") == "running"
+        ]
+        finished = [process for process in processes if process not in running]
         _cp(f"  Running processes: {len(running)}")
         for p in running:
             up = format_uptime_short(p.get("uptime_seconds", 0))
-            _cp(f"    {p.get('session_id', '?')} · {up} · {p.get('command', '')[:80]}")
+            try:
+                durability = project_process(p).durability.replace("_", "-")
+            except ValueError:
+                durability = "process-local"
+            _cp(f"    {p.get('session_id', '?')} · {up} · {durability} · {p.get('command', '')[:80]}")
         if finished:
             _cp(f"  Recently finished: {len(finished)}")
         # Background (async) delegations — delegate_task(background=true)
         delegations = _probe("tools.async_delegation", "list_async_delegations", [])
         if delegations:
-            running_d = [d for d in delegations if d.get("status") in ("running", "stalling")]
+            projected_delegations = []
+            for delegation in delegations:
+                try:
+                    projected_delegations.append((delegation, project_delegation(delegation)))
+                except ValueError:
+                    projected_delegations.append((delegation, None))
+            running_d = [
+                delegation for delegation, task in projected_delegations
+                if task is not None and task.state is AssistantTaskState.RUNNING
+                or task is None and delegation.get("status") in ("running", "stalling")
+            ]
             _cp(f"  Background delegations: {len(running_d)} running")
             for d in delegations:
                 status = d.get("status", "?")
-                line = f"    {d.get('delegation_id', '?')} · {status} · {(d.get('goal') or '')[:60]}"
+                try:
+                    durability = project_delegation(d).durability.replace("_", "-")
+                except ValueError:
+                    durability = "process-local"
+                line = (
+                    f"    {d.get('delegation_id', '?')} · {status} · {durability} · "
+                    f"{(d.get('goal') or '')[:60]}"
+                )
                 # Live-status detail for in-flight delegations.
                 # See #51690.
                 if status == "stalling":
