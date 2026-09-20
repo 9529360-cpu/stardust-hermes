@@ -72,9 +72,16 @@ jobs:
           # source-controlled multi-megabyte file. A failed build never reaches
           # this step, so the previous healthy asset remains recoverable.
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG"               --repo "$GITHUB_REPOSITORY"               --target "$GITHUB_SHA"               --title "Stardust Skills Index"               --notes "Machine-generated Skills Hub catalog. This is a data publication channel, not a Stardust product release."               --prerelease
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Stardust Skills Index" \
+              --notes "Machine-generated Skills Hub catalog. This is a data publication channel, not a Stardust product release." \
+              --prerelease
           fi
 
-          gh release upload "$TAG" "$ASSET#skills-index.json"             --repo "$GITHUB_REPOSITORY"             --clobber
+          gh release upload "$TAG" "$ASSET#skills-index.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
           echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/skills-index.json"
