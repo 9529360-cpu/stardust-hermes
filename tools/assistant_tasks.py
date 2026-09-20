@@ -45,6 +45,30 @@ def _active_profile_name() -> str:
         return "default"
 
 
+def _resolve_owner_key() -> Optional[str]:
+    """Stable task owner for cross-conversation recall.
+
+    Local surfaces (Desktop/TUI/CLI/API on the user's machine) share one personal
+    owner so profile/session changes do not hide work. Human messaging surfaces
+    require a stable platform user id and fail closed when it is unavailable.
+    """
+    from gateway.session_context import get_session_env, session_is_messaging_surface
+
+    if not session_is_messaging_surface():
+        return "local"
+    platform = (
+        get_session_env("HERMES_SESSION_PLATFORM", "")
+        or get_session_env("HERMES_SESSION_SOURCE", "")
+    ).strip().lower()
+    principal = (
+        get_session_env("HERMES_SESSION_USER_ID_ALT", "")
+        or get_session_env("HERMES_SESSION_USER_ID", "")
+    ).strip()
+    if not platform or not principal:
+        return None
+    return f"messaging:{platform}:{principal}"
+
+
 def _safe_limit(value: Any) -> int:
     try:
         return max(1, min(int(value or 20), MAX_LIST_LIMIT))
@@ -57,6 +81,7 @@ def _create_tasks(
     *,
     session_id: Optional[str],
     request_id: Optional[str],
+    owner_key: str,
 ) -> str:
     if not isinstance(tasks, list) or not tasks:
         return tool_error("assistant_tasks create requires a non-empty tasks list")
@@ -70,6 +95,7 @@ def _create_tasks(
     default_assignee = _active_profile_name()
     scope = str(request_id or "request").strip() or "request"
     sid = str(session_id or "").strip()
+    owner = str(owner_key or "").strip()
     created: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
 
@@ -91,7 +117,8 @@ def _create_tasks(
             "assignee": str(raw.get("assignee") or default_assignee).strip(),
             "priority": raw.get("priority", 0),
             "goal_mode": bool(raw.get("continuous")),
-            "idempotency_key": f"assistant:{sid or 'session'}:{scope}:{index}",
+            "idempotency_key": f"assistant:{owner}:{scope}:{index}",
+            "_assistant_owner_key": owner,
         }
         if sid:
             args["session_id"] = sid
@@ -149,6 +176,7 @@ def _list_tasks(
     include_completed: bool,
     limit: Any,
     task_ids: Any,
+    owner_key: str,
 ) -> str:
     from tools.kanban_tools import _board
 
@@ -163,6 +191,7 @@ def _list_tasks(
         # remains the authority; this adapter keeps no index or task cache of its own.
         rows = kb.list_tasks(
             conn,
+            assistant_owner_key=owner_key,
             include_archived=False,
             limit=max(200, max_items * 4),
         )
@@ -221,16 +250,28 @@ def assistant_tasks_tool(
     task_ids: Any = None,
     session_id: Optional[str] = None,
     request_id: Optional[str] = None,
+    owner_key: Optional[str] = None,
 ) -> str:
     """Create durable independent work or query the durable assistant task queue."""
     action = str(action or "create").strip().lower()
+    owner = str(owner_key or _resolve_owner_key() or "").strip()
+    if not owner:
+        return tool_error(
+            "assistant_tasks requires a stable user identity on human messaging surfaces"
+        )
     if action == "create":
-        return _create_tasks(tasks, session_id=session_id, request_id=request_id)
+        return _create_tasks(
+            tasks,
+            session_id=session_id,
+            request_id=request_id,
+            owner_key=owner,
+        )
     if action == "list":
         return _list_tasks(
             include_completed=bool(include_completed),
             limit=limit,
             task_ids=task_ids,
+            owner_key=owner,
         )
     return tool_error("assistant_tasks action must be 'create' or 'list'")
 
@@ -344,6 +385,7 @@ registry.register(
         task_ids=args.get("task_ids"),
         session_id=kw.get("session_id"),
         request_id=kw.get("tool_call_id") or kw.get("task_id"),
+        owner_key=kw.get("assistant_owner_key"),
     ),
     emoji="🧭",
 )
