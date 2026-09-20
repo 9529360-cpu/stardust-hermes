@@ -635,7 +635,7 @@ _SUBCOMMANDS = (
     ("resume", "Resume a paused curator", _cmd_resume),
     ("pin", "Pin a skill so the curator never auto-transitions it", _cmd_pin, _SKILL),
     ("unpin", "Unpin a skill", _cmd_unpin, _SKILL),
-    ("list-unmanaged", "List curation-eligible skills with no provenance marker",
+    ("list-unmanaged", "List curation-eligible skills not under curator management",
      _cmd_list_unmanaged),
     (
         "adopt", "Hand unmanaged skills to the curator (provenance is a user declaration)",
