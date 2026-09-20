@@ -1,6 +1,7 @@
 import type { ModelOptionProvider } from '@hermes/shared'
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@hermes/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +29,6 @@ import type {
 import { useI18n } from '@/i18n'
 import { isCodeSkewRestartRequired } from '@/lib/code-skew-error'
 import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
-import { isSubmitEnter } from '@/lib/ime'
 import { cn } from '@/lib/utils'
 import { setMainModelAssignment } from '@/store/cron-model-impact'
 import { notifyError, readableError } from '@/store/notifications'
@@ -39,6 +39,11 @@ import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
 import { CONTROL_TEXT } from './constants'
 import { getNested, setNested } from './helpers'
+import {
+  isModelServiceReady,
+  ModelServicePicker,
+  type ModelConnectionView
+} from './model-service-picker'
 import { ListRow, Pill, SectionHeading } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
@@ -94,14 +99,6 @@ const isFastTier = (tier: unknown): boolean =>
       .trim()
       .toLowerCase()
   )
-
-// A provider row is "ready" to pick a model from when it reports models. The
-// backend now surfaces the full `hermes model` universe (every canonical
-// provider), so unconfigured providers come back with `authenticated:false`
-// and an empty `models` list — those need a setup step before a model exists.
-function isProviderReady(p?: ModelOptionProvider): boolean {
-  return !!p && (p.authenticated !== false || (p.models?.length ?? 0) > 0)
-}
 
 // Mirrors `_AUX_TASK_SLOTS` in hermes_cli/web_server.py. Friendly labels and
 // hints make the assignments readable; raw task keys (vision, mcp, …) are
@@ -225,6 +222,8 @@ interface ModelSettingsProps {
 export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.model
+  const navigate = useNavigate()
+  const location = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [skewRestart, setSkewRestart] = useState(false)
@@ -350,18 +349,31 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     void refresh({ replaceSelection: true })
   })
 
-  const providerOptions = providers.length ? providers : NO_PROVIDERS
+  // The main model can point at a user-defined/stale provider that the catalog
+  // no longer returns. Keep that active choice visible as a synthetic service
+  // row so the user can still see and replace it instead of falling into an
+  // empty selector.
+  const serviceProviders = useMemo<ModelOptionProvider[]>(() => {
+    if (!mainModel?.provider || providers.some(provider => provider.slug === mainModel.provider)) {
+      return providers
+    }
 
-  // Radix renders a blank trigger when the controlled value has no matching
-  // item. Keep a missing saved provider visible in the main selector while
-  // leaving it out of the real inventory used for readiness/setup metadata.
-  const mainProviderOptions = useMemo(
-    () =>
-      selectedProvider && !providers.some(provider => provider.slug === selectedProvider)
-        ? [{ name: selectedProvider, slug: selectedProvider, models: [] }, ...providers]
-        : providerOptions,
-    [providerOptions, providers, selectedProvider]
-  )
+    return [
+      {
+        authenticated: true,
+        models: mainModel.model ? [mainModel.model] : [],
+        name: mainModel.provider,
+        slug: mainModel.provider
+      },
+      ...providers
+    ]
+  }, [mainModel, providers])
+
+  // Auxiliary/MoA selectors should offer only services that can actually
+  // produce models. The primary service page may still show an unavailable
+  // active service for recovery, but helper slots must not accept it.
+  const configuredProviders = useMemo(() => providers.filter(isModelServiceReady), [providers])
+  const providerOptions = configuredProviders.length ? configuredProviders : NO_PROVIDERS
 
   // MoA reference/aggregator slots must never be the moa virtual provider —
   // that would create a recursive MoA tree (the backend rejects it on save).
@@ -369,8 +381,8 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const moaSlotProviderOptions = providerOptions.filter(provider => (provider.slug || '').toLowerCase() !== 'moa')
 
   const selectedProviderRow = useMemo(
-    () => providers.find(provider => provider.slug === selectedProvider),
-    [providers, selectedProvider]
+    () => serviceProviders.find(provider => provider.slug === selectedProvider),
+    [selectedProvider, serviceProviders]
   )
 
   const selectedProviderModels = selectedProviderRow?.models ?? []
@@ -378,13 +390,23 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   // An unconfigured provider was picked: no credentials yet, so there are no
   // models to choose. `api_key` providers can be activated inline (paste key);
   // OAuth / external flows hand off to the onboarding sign-in.
-  const needsSetup = !!selectedProvider && !isProviderReady(selectedProviderRow)
+  const needsSetup = !!selectedProvider && !isModelServiceReady(selectedProviderRow)
   const setupIsApiKey = needsSetup && selectedProviderRow?.auth_type === 'api_key' && !!selectedProviderRow?.key_env
 
   // Clear any half-typed key when switching provider so it can't leak across.
   useEffect(() => {
     setApiKeyDraft('')
   }, [selectedProvider])
+
+  const selectMainProvider = useCallback(
+    (provider: ModelOptionProvider) => {
+      setSelectedProvider(provider.slug)
+      setSelectedModel(
+        provider.slug === mainModel?.provider ? mainModel.model : (provider.models?.[0] ?? '')
+      )
+    },
+    [mainModel]
+  )
 
   const auxDraftProviderModels = useMemo(
     () => providers.find(provider => provider.slug === auxDraft.provider)?.models ?? [],
@@ -644,6 +666,25 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   // custom / local endpoint is NOT an OAuth provider, so it gets the dedicated
   // local-endpoint form (URL + optional API key) instead of being dead-ended
   // on the OAuth picker (the original "booted back to the first screen" loop).
+  const openConnectionView = useCallback(
+    (view: ModelConnectionView) => {
+      const params = new URLSearchParams(location.search)
+      params.set('tab', 'providers')
+      params.set('pview', view)
+      const query = params.toString()
+
+      navigate(
+        {
+          hash: location.hash,
+          pathname: location.pathname,
+          search: query ? `?${query}` : ''
+        },
+        { replace: true }
+      )
+    },
+    [location.hash, location.pathname, location.search, navigate]
+  )
+
   const startProviderSetup = useCallback(() => {
     const rowSlug = selectedProviderRow?.slug.trim() ?? ''
     const slug = rowSlug || selectedProvider.trim()
@@ -675,6 +716,23 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     setError('')
 
     try {
+      const keyEnv =
+        selectedProviderRow?.auth_type === 'api_key' && selectedProviderRow.key_env
+          ? selectedProviderRow.key_env
+          : null
+
+      // DSH-style editor semantics: a blank key means "keep the saved key";
+      // entering a new one rotates it before the model choice is applied.
+      if (keyEnv && apiKeyDraft.trim()) {
+        await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile)
+
+        if (profileEpoch.current !== epoch) {
+          return
+        }
+
+        setApiKeyDraft('')
+      }
+
       const result = await setMainModelAssignment(
         {
           model: selectedModel,
@@ -706,6 +764,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       setApplying(false)
     }
   }, [
+    apiKeyDraft,
     m.loadFailed,
     onMainModelChanged,
     refresh,
@@ -855,87 +914,32 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
   return (
     <div className="grid gap-6">
-      <section>
-        <SectionHeading icon={Cpu} title={m.primaryTitle} />
-        <p className="mb-3 text-xs text-muted-foreground">{m.appliesDesc}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select onValueChange={setSelectedProvider} value={selectedProvider}>
-            <SelectTrigger className={cn('min-w-40', CONTROL_TEXT)}>
-              <SelectValue placeholder={m.provider} />
-            </SelectTrigger>
-            <SelectContent>
-              {mainProviderOptions.map(provider => (
-                <SelectItem key={provider.slug || 'none'} value={provider.slug || 'none'}>
-                  {provider.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {needsSetup ? (
-            setupIsApiKey ? (
-              <>
-                <Input
-                  autoComplete="off"
-                  className={cn('min-w-60 flex-1', CONTROL_TEXT)}
-                  onChange={event => setApiKeyDraft(event.target.value)}
-                  onKeyDown={event => {
-                    if (isSubmitEnter(event)) {
-                      void activateApiKeyProvider()
-                    }
-                  }}
-                  placeholder={m.apiKeyPlaceholder}
-                  type="password"
-                  value={apiKeyDraft}
-                />
-                <Button
-                  disabled={!apiKeyDraft.trim() || activating}
-                  onClick={() => void activateApiKeyProvider()}
-                  size="sm"
-                >
-                  {activating && <Loader2 className="size-3.5 animate-spin" />}
-                  {activating ? t.common.connecting : t.common.connect}
-                </Button>
-              </>
-            ) : (
-              <Button onClick={startProviderSetup} size="sm" variant="textStrong">
-                {m.connectProvider(selectedProviderRow?.name ?? m.provider)}
-              </Button>
-            )
-          ) : (
-            <>
-              <Select onValueChange={setSelectedModel} value={selectedModel}>
-                <SelectTrigger className={cn('min-w-60', CONTROL_TEXT)}>
-                  <SelectValue placeholder={m.model} />
-                </SelectTrigger>
-                <SelectContent>
-                  {withActive(selectedProviderModels, selectedModel).map(model => (
-                    <SelectItem key={model} value={model}>
-                      {model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                disabled={!selectedProvider || !selectedModel || applying}
-                onClick={() => void applyMainModel()}
-                size="sm"
-              >
-                {applying && <Loader2 className="size-3.5 animate-spin" />}
-                {applying ? m.applying : t.common.apply}
-              </Button>
-            </>
-          )}
-        </div>
-        {needsSetup && !setupIsApiKey && selectedProviderRow && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {selectedProviderRow?.auth_type === 'api_key'
-              ? m.setupApiKeyHint(selectedProviderRow.name)
-              : m.setupOauthHint(selectedProviderRow.name)}
-          </p>
-        )}
-        {config && mainModel && (reasoningSupported || fastSupported) && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <span className="text-xs text-muted-foreground">{m.defaultsLabel}</span>
+      <ModelServicePicker
+        activating={activating}
+        apiKeyDraft={apiKeyDraft}
+        applying={applying}
+        currentModel={mainModel}
+        onActivateApiKey={() => void activateApiKeyProvider()}
+        onAddCustomService={() => startManualLocalEndpoint(null, scopeProfile)}
+        onAddService={() => startManualOnboarding()}
+        onApiKeyChange={setApiKeyDraft}
+        onApply={() => void applyMainModel()}
+        onOpenConnectionView={openConnectionView}
+        onSelectModel={setSelectedModel}
+        onSelectProvider={selectMainProvider}
+        onSetupProvider={startProviderSetup}
+        providers={serviceProviders}
+        selectedModel={selectedModel}
+        selectedProvider={selectedProvider}
+        selectedProviderModels={selectedProviderModels}
+        selectedProviderRow={selectedProviderRow}
+        setupIsApiKey={setupIsApiKey}
+      />
+
+      {config && mainModel && (reasoningSupported || fastSupported) && (
+        <section>
+          <SectionHeading icon={Cpu} title={m.defaultsLabel} />
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             {reasoningSupported && (
               <div className="flex items-center gap-2 text-xs">
                 {m.reasoning}
@@ -967,34 +971,34 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
               </label>
             )}
           </div>
-        )}
-        {error && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-destructive">
-            <span>{error}</span>
-            {skewRestart && (
-              <Button
-                disabled={restartingBackend}
-                onClick={() => void recycleStaleBackend()}
-                size="sm"
-                variant="textStrong"
-              >
-                {restartingBackend && <Loader2 className="size-3.5 animate-spin" />}
-                {restartingBackend ? m.restartingBackend : m.restartBackend}
-              </Button>
-            )}
-          </div>
-        )}
-        {switchStaleAux.length > 0 && (
-          <div className="mt-2">
-            <StaleAuxWarning
-              applying={applying}
-              onReset={() => void resetAuxiliaryModels()}
-              slots={switchStaleAux}
-              taskLabel={auxiliaryTaskLabel}
-            />
-          </div>
-        )}
-      </section>
+        </section>
+      )}
+
+      {error && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-destructive">
+          <span>{error}</span>
+          {skewRestart && (
+            <Button
+              disabled={restartingBackend}
+              onClick={() => void recycleStaleBackend()}
+              size="sm"
+              variant="textStrong"
+            >
+              {restartingBackend && <Loader2 className="size-3.5 animate-spin" />}
+              {restartingBackend ? m.restartingBackend : m.restartBackend}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {switchStaleAux.length > 0 && (
+        <StaleAuxWarning
+          applying={applying}
+          onReset={() => void resetAuxiliaryModels()}
+          slots={switchStaleAux}
+          taskLabel={auxiliaryTaskLabel}
+        />
+      )}
 
       <section>
         <div className="mb-2.5 flex items-center justify-between">
