@@ -1,10 +1,12 @@
 name: Plugin Catalog CI
 
-# Admission gate for plugin-catalog entries. Fires ONLY on PRs touching
-# plugin-catalog/** so it can never go red on unrelated PRs.
+# Admission and publication gate for Plugin Catalog data. Fires only when
+# catalog source, its runtime artifact, extractor, or this workflow changes.
 #
-# Two gates:
-#   structural            — cheap schema check, no hermes install needed
+# Three gates:
+#   runtime-artifact       — regenerate the deterministic runtime JSON and require the
+#                            reviewed committed artifact to match byte-for-byte
+#   structural             — cheap schema check, no hermes install needed
 #   pinned-source-validate — supply-chain gate: the pinned sha MUST be
 #                            reachable in the entry's repo, and the plugin
 #                            at that exact commit must pass
@@ -14,11 +16,70 @@ on:
   pull_request:
     paths:
       - "plugin-catalog/**"
+      - "website/scripts/extract-plugins.py"
+      - "website/static/api/plugin-catalog.json"
+      - ".github/workflows/plugin-catalog-ci.yml"
 
 permissions:
   contents: read
 
 jobs:
+  runtime-artifact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        uses: ./.github/actions/retry
+        with:
+          command: pip install pyyaml==6.0.2
+
+      - name: Generate deterministic runtime catalog
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/plugin-api"
+          python3 website/scripts/extract-plugins.py --output-dir "$OUT"
+          python3 - "$OUT/plugin-catalog.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              data = json.load(fh)
+          if set(data) != {"entries", "removed"}:
+              raise SystemExit(f"unexpected runtime catalog keys: {sorted(data)}")
+          if not isinstance(data["entries"], list) or not isinstance(data["removed"], list):
+              raise SystemExit("runtime catalog entries/removed must be lists")
+          print(f"generated {len(data['entries'])} plugin entries, {len(data['removed'])} removals")
+          PY
+
+      - name: Upload generated runtime catalog
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: plugin-catalog-runtime-${{ github.sha }}
+          path: ${{ runner.temp }}/plugin-api/plugin-catalog.json
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Verify committed runtime catalog is current
+        run: |
+          set -euo pipefail
+          GENERATED="$RUNNER_TEMP/plugin-api/plugin-catalog.json"
+          COMMITTED="website/static/api/plugin-catalog.json"
+          if [ ! -f "$COMMITTED" ]; then
+            echo "::error::$COMMITTED is missing; download the generated workflow artifact and commit it"
+            exit 1
+          fi
+          if ! cmp -s "$GENERATED" "$COMMITTED"; then
+            echo "::error::$COMMITTED is out of date; regenerate with website/scripts/extract-plugins.py"
+            diff -u "$COMMITTED" "$GENERATED" || true
+            exit 1
+          fi
+
   structural:
     runs-on: ubuntu-latest
     timeout-minutes: 10
