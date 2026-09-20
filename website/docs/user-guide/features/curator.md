@@ -206,12 +206,14 @@ agent turns). The background fork runs with a write origin of `"background_revie
 (via `tools/skill_provenance.py`), which is the only path that triggers the
 `mark_agent_created()` call in `skill_manage`.
 
-Skills the foreground agent creates via `skill_manage(action="create")` during a
-conversation (including `/learn`) are **not** marked as agent-created — they are
-recorded as `created_by: learn`, which makes them show up in the
-[learning journey](./memory.md#learning-journey-journey) right away but is not a
-curator opt-in. They are considered user-directed and the curator intentionally
-leaves them alone.
+Skills the foreground agent creates via `skill_manage(action="create")` remain
+user-owned by default: they are recorded as `created_by: learn`, which makes
+them show up in the [learning journey](./memory.md#learning-journey-journey)
+without opting them into curation. When Stardust is autonomously saving a
+reusable workflow as its own procedural memory, it can pass
+`curator_managed: true` on that create; the same creation record is then
+marked `created_by: agent` so future curator passes may consolidate or archive
+it. A user-requested skill should leave `curator_managed` false.
 
 :::warning Your hand-written skills are NOT curated
 If you manually created a `SKILL.md` or pointed Hermes at an external skill
@@ -249,8 +251,9 @@ for one of two reasons:
   it carries no provenance signal at all. Authorship is genuinely unknowable
   from the record.
 - **foreground-created** — a foreground `skill_manage(create)` recorded
-  `created_by: learn` (older records: unset) by design, since skills you ask for
-  belong to you.
+  `created_by: learn` (older records: unset). User-requested skills stay in
+  this bucket; autonomous procedural-memory creates can now opt into curator
+  management at creation time with `curator_managed: true`.
 
 A large library can therefore look fully curated while most of it is
 untouchable. `adopt` closes that gap by **declaration**:
