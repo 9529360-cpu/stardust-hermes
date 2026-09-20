@@ -1,8 +1,8 @@
 """Progressive tool disclosure ("tool search"): MCP/plugin tools and a curated set of
-event-triggered core tools are replaced in the model-visible array by three bridge tools —
-tool_search / tool_describe / tool_call. Invariants: core tools (``toolsets._HERMES_CORE_TOOLS``)
-and session-gated GUI toolsets never defer unless named in ``defer``; ANY deferrable tool
-activates the bridge (the listing scales with budget, not activation); the catalog is
+event-triggered built-in tools are replaced in the model-visible array by three bridge tools —
+tool_search / tool_describe / tool_call. Shared default platform tools and session-gated GUI
+tools stay eager unless the effective ``defer`` set explicitly selects them; ANY deferrable
+tool activates the bridge (the listing scales with budget, not activation). The catalog is
 stateless — rebuilt from the live tool-defs every assembly (a session-keyed one drifts and
 silently drops tools); bridge calls route through ``model_tools.handle_function_call``."""
 
@@ -45,7 +45,7 @@ class ToolSearchConfig:
     max_search_limit: int
     listing: str = "auto"  # "auto"/"on" = embed the manifest when it fits; "off" = bare bridge
     listing_max_tokens: int = 4000  # budget = min(this, threshold_pct% of context)
-    # None = curated default; an explicit list replaces it wholesale ([] = defer no core tools).
+    # None = curated default; an explicit list replaces it wholesale ([] = defer no built-in tools).
     defer_tools: Optional[frozenset] = None
 
     @property
@@ -113,20 +113,20 @@ load_config = functools.partial(_config_from_loader, "load_config")
 load_config_readonly = functools.partial(_config_from_loader, "load_config_readonly")  # no copy
 
 
-def _core_tool_names() -> frozenset[str]:
-    """Names that never defer by default (lazy: ``toolsets`` imports ``tools.registry``)."""
+def _default_tool_names() -> frozenset[str]:
+    """Shared default platform names (lazy: ``toolsets`` imports ``tools.registry``)."""
     try:
-        from toolsets import _HERMES_CORE_TOOLS
-        return frozenset(_HERMES_CORE_TOOLS)
+        from toolsets import _HERMES_DEFAULT_TOOLS
+        return frozenset(_HERMES_DEFAULT_TOOLS)
     except Exception:
         return frozenset()
 
 
-# Session-gated GUI toolsets: off ``_HERMES_CORE_TOOLS`` so non-GUI clients never pay
-# their schema; once enabled they stay direct unless the deferral list names them.
+# Session-gated GUI toolsets: off the shared platform default so non-GUI clients never
+# pay their schema; once enabled they stay direct unless the deferral list names them.
 _DIRECT_SURFACE_TOOLSETS = frozenset({"desktop_ui", "project"})
 
-# Event-triggered core tools deferred BY DEFAULT (a catalog stub suffices); the ``defer``
+# Event-triggered built-in tools deferred BY DEFAULT (a catalog stub suffices); the ``defer``
 # config replaces this wholesale ([] = everything eager). POST-rename names. ``clarify``
 # is deliberately absent: A/B showed deferring it collapsed structured-clarify usage
 # (18/18 -> 7/18) — the ask-the-user affordance must be ambient, a stub is not enough.
@@ -141,13 +141,13 @@ _DEFAULT_DEFERRED_TOOLS = frozenset({
 
 def is_deferrable_tool_name(name: str, defer_tools: Optional[frozenset] = None) -> bool:
     """True if a tool is *eligible* for deferral: named in ``defer_tools`` (curated set or
-    user override), OR an MCP tool, OR neither core nor a session-gated GUI surface (i.e. a
-    plugin tool). Bridge names never defer."""
+    user override), OR an MCP tool, OR neither a shared default platform tool nor a
+    session-gated GUI surface (i.e. a plugin tool). Bridge names never defer."""
     if name in BRIDGE_TOOL_NAMES:
         return False
     if defer_tools is not None and name in defer_tools:
         return True
-    if name in _core_tool_names():
+    if name in _default_tool_names():
         return False
     toolset = _registry_toolset(name)  # None (unregistered/malformed) never defers
     return toolset is not None and (
@@ -365,7 +365,7 @@ def assemble_tool_defs(tool_defs: List[Dict[str, Any]], *, context_length: Optio
                                  connections_granted=connections_granted)
     tier = 1 if listing_form in ("full", "names", "mixed") else 2
     logger.info(
-        "tool_search activated (tier %d): %d core/visible tools kept, %d deferred "
+        "tool_search activated (tier %d): %d eager/visible tools kept, %d deferred "
         "(~%d tokens), listing %s (budget ~%d tokens)",
         tier, len(visible), len(deferrable), deferrable_tokens, listing_form, listing_budget)
     return AssemblyResult(
