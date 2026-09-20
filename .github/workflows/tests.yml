@@ -82,7 +82,9 @@ jobs:
           NOUS_API_KEY: ""
 
       - name: Save per-file duration cache (main only)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && hashFiles('test_durations.json') != ''
+        # Keep clean first-attempt durations even when another file fails, so a
+        # red main run can still bootstrap timeout data for known-slow files.
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && hashFiles('test_durations.json') != ''
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: test_durations.json
