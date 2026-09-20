@@ -91,7 +91,8 @@ def test_progress_output_tolerates_legacy_stdout_encoding(tmp_path: Path) -> Non
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
+        encoding="cp1252",
+        errors="replace",
         timeout=60,
     )
 
@@ -228,6 +229,95 @@ def test_grandchild_leak_is_killed_by_runner(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only cancellation probe")
+@pytest.mark.live_system_guard_bypass
+def test_runner_sigterm_kills_active_pytest_group(tmp_path: Path) -> None:
+    """Cancelling the runner must not leave its active pytest tree under PID 1."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    runner = repo_root / "scripts" / "run_tests_parallel.py"
+    probe_dir = tmp_path / "cancel-probe"
+    probe_dir.mkdir()
+    probe = probe_dir / "test_cancel_probe.py"
+    nonce = f"cancel-{os.getpid()}-{int(time.time() * 1000)}"
+    handoff = _handoff_path_for(nonce)
+    handoff.unlink(missing_ok=True)
+
+    probe.write_text(
+        textwrap.dedent(
+            f"""
+            import json, os, signal, subprocess, sys, time
+            from pathlib import Path
+
+            HANDOFF = Path({str(handoff)!r})
+
+            def test_blocks_with_grandchild():
+                child = subprocess.Popen(
+                    [
+                        sys.executable, "-c",
+                        "import signal,time; "
+                        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                        "time.sleep(600)",
+                    ],
+                )
+                HANDOFF.write_text(json.dumps({{"pid": child.pid}}))
+                time.sleep(600)
+            """
+        ).strip() + "\n",
+        encoding="utf-8",
+    )
+
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            str(runner),
+            "--paths",
+            str(probe_dir),
+            "-j",
+            "1",
+            "--file-timeout",
+            "900",
+        ],
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        encoding="utf-8",
+        errors="replace",
+    )
+    grandchild_pid = None
+    try:
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline and not handoff.exists():
+            if proc.poll() is not None:
+                output = proc.stdout.read() if proc.stdout else ""
+                pytest.fail(
+                    f"runner exited before cancellation probe started: {proc.returncode}\n{output}"
+                )
+            time.sleep(0.05)
+        assert handoff.exists(), "cancellation probe never reached the blocking test"
+        grandchild_pid = json.loads(handoff.read_text())["pid"]
+
+        proc.terminate()
+        output, _ = proc.communicate(timeout=10)
+        assert proc.returncode != 0, output
+
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and _pid_alive(grandchild_pid):
+            time.sleep(0.05)
+        assert not _pid_alive(grandchild_pid), (
+            f"grandchild PID {grandchild_pid} survived runner SIGTERM; output:\n{output}"
+        )
+    finally:
+        handoff.unlink(missing_ok=True)
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=5)
+        if grandchild_pid is not None and _pid_alive(grandchild_pid):
+            try:
+                os.kill(grandchild_pid, 9)
+            except ProcessLookupError:
+                pass
+
+
 # ── Bare pytest-flag passthrough ─────────────────────────────────────────────
 #
 # The runner routes any token starting with ``-`` that isn't one of its own
@@ -349,7 +439,8 @@ def test_file_retry_self_heals_and_prints_both_attempts(tmp_path: Path) -> None:
         cwd=repo_root,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
     )
 
@@ -360,6 +451,54 @@ def test_file_retry_self_heals_and_prints_both_attempts(tmp_path: Path) -> None:
     assert "retry output" in proc.stdout
 
 
+def test_fail_on_flaky_turns_retry_only_flake_red(tmp_path: Path) -> None:
+    """CI can keep the diagnostic retry while refusing a retry-only green."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    runner = repo_root / "scripts" / "run_tests_parallel.py"
+    marker = tmp_path / "ran-once-strict"
+    probe = tmp_path / "test_flaky_strict_probe.py"
+    probe.write_text(
+        textwrap.dedent(
+            f"""
+            from pathlib import Path
+
+            def test_flaky_once():
+                marker = Path({str(marker)!r})
+                if not marker.exists():
+                    marker.write_text("failed once")
+                    assert False, "simulated strict flake"
+                assert True
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(runner),
+            "--files",
+            str(probe),
+            "--file-retries",
+            "1",
+            "--fail-on-flaky",
+            "-j",
+            "1",
+            "-q",
+        ],
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60,
+    )
+
+    assert proc.returncode == 1, proc.stdout
+    assert "FLAKY file" in proc.stdout
+    assert "simulated strict flake" in proc.stdout
+    assert "retry output" in proc.stdout
+    assert "unrecognized arguments" not in proc.stdout
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +530,7 @@ def test_node_id_selector_runs_the_named_test(tmp_path: Path) -> None:
         [sys.executable, str(repo_root / "scripts" / "run_tests_parallel.py"),
          f"{target}::test_alpha", "-j", "1", "--file-timeout", "30"],
         cwd=repo_root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, timeout=60,
+        encoding="utf-8", errors="replace", timeout=60,
     )
     assert proc.returncode == 0, proc.stdout
     assert "No test files to run" not in proc.stdout
@@ -410,7 +549,7 @@ def test_explicit_k_wins_over_node_id_inference(tmp_path: Path) -> None:
          f"{target}::test_alpha", "-k", "test_beta",
          "-j", "1", "--file-timeout", "30"],
         cwd=repo_root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, timeout=60,
+        encoding="utf-8", errors="replace", timeout=60,
     )
     # -k test_beta wins: one test ran, and it wasn't filtered to nothing.
     assert proc.returncode == 0, proc.stdout
