@@ -445,9 +445,9 @@ def _find_create_merge_candidates(name: str, content: str, *, limit: int = 5) ->
             if len(shared) < 2:
                 continue
             name_shared = requested_name_terms & candidate_name_terms
+            name_term_floor = min(len(requested_name_terms), len(candidate_name_terms))
             name_coverage = (
-                len(name_shared) / min(len(requested_name_terms), len(candidate_name_terms))
-                if requested_name_terms and candidate_name_terms else 0.0
+                len(name_shared) / name_term_floor if name_term_floor >= 2 else 0.0
             )
             topic_coverage = len(shared) / min(len(requested_terms), len(candidate_terms))
             if name_coverage < 0.67 and topic_coverage < 0.60:
@@ -456,7 +456,6 @@ def _find_create_merge_candidates(name: str, content: str, *, limit: int = 5) ->
             candidates.append((score, {
                 "name": candidate_name,
                 "description": candidate_desc,
-                "path": str(skill_dir),
                 "shared_terms": sorted(shared),
             }))
 
