@@ -54,6 +54,17 @@ class TestSkillManageBatch(unittest.TestCase):
         for rel in ("SKILL.md", "references/a.md", "scripts/r.py"):
             self.assertTrue(os.path.exists(os.path.join(base, rel)), rel)
 
+    def test_create_curator_managed_flag_survives_operations_path(self):
+        r = self._call("probe", [{
+            "action": "create",
+            "content": SK.format(n="probe"),
+            "curator_managed": True,
+        }])
+        self.assertTrue(r["success"], r)
+        from tools import skill_usage
+        rec = skill_usage.load_usage().get("probe") or {}
+        self.assertEqual(rec.get("created_by"), "agent")
+
     def test_midbatch_failure_rolls_back_existing_skill(self):
         self._call("probe", [{"action": "create", "content": SK.format(n="probe")}])
         r = self._call("probe", [
