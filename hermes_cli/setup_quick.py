@@ -174,11 +174,11 @@ def _blank_slate_minimal_toolsets(config: dict):
         from hermes_cli.tools_config import CONFIGURABLE_TOOLSETS, _get_plugin_toolset_keys
         all_keys = {k for k, _, _ in CONFIGURABLE_TOOLSETS}
         all_keys.update(_get_plugin_toolset_keys())
-        # Plain TOOLSETS entries catch recovered toolsets like ``kanban``. Skip "hermes-*" platform
-        # composites, "includes" groupings, and posture toolsets (session-level picks by
-        # agent/coding_context.py — disabling them would subtract terminal/read_file).
+        # Plain capability entries catch recovered toolsets like ``kanban``. Platform bundles,
+        # include-based composites, and session postures are not permanent user-facing disables.
+        from toolsets import toolset_role
         for k, tdef in TOOLSETS.items():
-            if k.startswith("hermes-") or (isinstance(tdef, dict) and (tdef.get("includes") or tdef.get("posture"))):
+            if toolset_role(k, tdef) != "capability":
                 continue
             # selections made by agent/coding_context.py — not permanent user-facing disables. Adding them
             # here causes model_tools to subtract their tools (terminal, read_file, …) from the minimal
