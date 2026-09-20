@@ -122,7 +122,9 @@ def _cache_mcp_media_block(block, kind: str, writer: str, ext_for, *, cap_what: 
 
 def _cache_mcp_image_block(block) -> str:
     """Cache an ``ImageContent`` block and return a ``MEDIA:<path>`` tag ("" on any failure)."""
-    return _cache_mcp_media_block(block, "image", "cache_image_from_bytes", _mcp_image_extension_for_mime_type)
+    return _cache_mcp_media_block(
+        block, "image", "cache_image_from_bytes", _mcp_image_extension_for_mime_type,
+        cap_what="image resource")
 
 
 def _cache_mcp_audio_block(block) -> str:
