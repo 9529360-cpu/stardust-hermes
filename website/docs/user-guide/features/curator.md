@@ -38,10 +38,10 @@ A run has two phases:
 1. **Automatic transitions** (deterministic, no LLM). Skills unused for `stale_after_days` (14) become `stale`; skills unused for `archive_after_days` (30) are moved to `~/.hermes/skills/.archive/`. This is the always-on pruning behavior — it runs whenever the curator is enabled, with no aux-model cost.
    - **Pinned skills** and **skills referenced by any cron job** (including paused/disabled jobs) are skipped entirely — treated like pin for auto-transitions so a slow or paused schedule cannot archive a skill out from under a job. Consolidation also rewrites cron skill references when it merges umbrellas.
    - **Never-used skills** (`use_count == 0`) get a grace floor: they are not archived until they are at least `stale_after_days` old. Zero uses is absence of evidence, not proof the skill is disposable.
-2. **LLM consolidation** (single aux-model pass with a high iteration ceiling — a full curation sweep typically takes 50–100 API calls) — **OFF by default**. When `curator.consolidate: true`, the forked agent surveys the agent-created skills, can read any of them with `skill_view`, and decides per-skill whether to keep, patch (via `skill_manage`), consolidate overlapping ones into class-level umbrellas, or archive via the terminal tool. Consolidation treats a skill as a full package: if a skill has `references/`, `templates/`, `scripts/`, `assets/`, or relative links to those paths, the curator must either keep it standalone, re-home the needed support files and rewrite paths, or archive the entire package unchanged — not flatten only `SKILL.md` into another skill's `references/` file.
+2. **LLM consolidation** (single aux-model pass with a high iteration ceiling — a full curation sweep can take 50–100 API calls) — **ON by default for curator-managed agent-created skills**. On the normal low-frequency curator cycle, the fork surveys only skills explicitly owned by the curator (`created_by: "agent"`), reads them with `skill_view`, and decides whether to keep, patch (via `skill_manage`), or consolidate overlapping skills into class-level umbrellas. Bundled skills may still participate in the deterministic inactivity policy when `prune_builtins: true`, but they are never inputs to this LLM restructuring pass. Consolidation treats a skill as a full package: if a skill has `references/`, `templates/`, `scripts/`, `assets/`, or relative links to those paths, the curator must either keep it standalone, re-home the needed support files and rewrite paths, or archive the entire package unchanged — not flatten only `SKILL.md` into another skill's `references/` file.
 
-:::info Consolidation is opt-in
-By default the curator only **prunes** — the deterministic inactivity pass marks skills stale and archives long-unused ones. The opinionated LLM **consolidation** pass (umbrella-building, merging overlapping skills) is off by default because it costs aux-model tokens on every run and makes broad structural changes to your library. Turn it on with `curator.consolidate: true`, or run it once on demand with `hermes curator run --consolidate`.
+:::info Consolidation follows autonomous ownership
+The opinionated LLM **consolidation** pass runs only when the regular curator interval is due; it does not run after every Skill creation. User-owned foreground skills are outside its scope, and when there are no curator-managed agent skills the LLM call is skipped entirely. Set `curator.consolidate: false` to keep deterministic prune-only maintenance with zero consolidation-model cost. You can still force one pass with `hermes curator run --consolidate`.
 :::
 
 Pinned skills are off-limits to both the curator's auto-transitions and the agent's own `skill_manage` tool. See [Pinning a skill](#pinning-a-skill) below.
@@ -57,11 +57,11 @@ curator:
   min_idle_hours: 2
   stale_after_days: 14
   archive_after_days: 30
-  consolidate: false           # LLM umbrella-building pass — opt-in (prune-only by default)
+  consolidate: true            # merge overlapping curator-managed agent skills on curator runs
   prune_builtins: true         # archive unused bundled built-in skills too (hub skills always exempt)
 ```
 
-To disable entirely, set `curator.enabled: false`. To keep the always-on pruning but opt into LLM consolidation, set `curator.consolidate: true`.
+To disable entirely, set `curator.enabled: false`. To keep deterministic pruning but disable the LLM consolidation pass, set `curator.consolidate: false`.
 
 ### Running the review on a cheaper aux model
 
@@ -96,7 +96,7 @@ Earlier releases used a one-off `curator.auxiliary.{provider,model}` block. That
 
 ```bash
 hermes curator status         # last run, counts, pinned list, LRU top 5
-hermes curator run            # trigger a run now (blocks until done). Prune-only unless curator.consolidate: true
+hermes curator run            # trigger a run now (blocks until done). Uses the configured consolidation policy
 hermes curator run --consolidate # force the LLM consolidation pass on for this run, overriding the config default
 hermes curator run --background  # fire-and-forget: start the run in a background thread
 hermes curator run --dry-run  # preview only — report without any mutations
@@ -382,7 +382,7 @@ Every curator run writes a timestamped directory under `~/.hermes/logs/curator/`
 `REPORT.md` is a quick way to see what a given run did — which skills transitioned, what the LLM reviewer said, which skills it patched. Good for auditing without having to grep `agent.log`.
 
 :::note No candidates? Report shows `(not resolved)`
-When the curator has **no agent-created skills** to review, the LLM review pass
+When the curator has **no curator-managed agent skills** to review, the LLM review pass
 is skipped entirely. The report header will show
 `Model: (not resolved) via (not resolved)` with `Duration: 0s` — this does **not**
 indicate a configuration error or model resolution failure. It simply means there
