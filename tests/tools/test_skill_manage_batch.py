@@ -175,7 +175,9 @@ class TestSkillManageBatch(unittest.TestCase):
         r = json.loads(self.smt.skill_manage(action="", name="", operations=[
             {"name": "alpha", "action": "patch",
              "old_string": "Step 1.", "new_string": "Step A."},
-            {"name": "beta", "action": "create", "content": SK.format(n="beta")},
+            # Synthetic fixtures intentionally share the same generic description; tell the
+            # convergence guard these are distinct rollback targets, not duplicate skills.
+            {"name": "beta", "action": "create", "content": SK.format(n="beta"), "distinct": True},
             {"name": "beta", "action": "write_file",
              "file_path": "bad/nope.md", "file_content": "x"},
         ]))
