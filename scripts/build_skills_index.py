@@ -392,10 +392,10 @@ def main():
     }
     health_errors = []
     clawhub_source = sources["clawhub"]
-    if getattr(clawhub_source, "index_build_truncated", False):
-        budget = getattr(clawhub_source, "INDEX_BUILD_WALK_BUDGET_SECONDS", "configured")
+    if getattr(clawhub_source, "index_build_incomplete", False):
+        reason = getattr(clawhub_source, "index_build_incomplete_reason", "unknown")
         health_errors.append(
-            f"  clawhub: full catalog walk exceeded {budget}s budget; "
+            f"  clawhub: full catalog walk incomplete ({reason}); "
             "refusing to publish a partial snapshot"
         )
 
