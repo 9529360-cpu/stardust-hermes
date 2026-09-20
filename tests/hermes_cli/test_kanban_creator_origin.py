@@ -11,7 +11,13 @@ def test_creator_origin_survives_without_dependency_parent(tmp_path, monkeypatch
     monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
     kb.init_db()
     with kbc.connect_closing() as conn:
-        owner = kb.create_task(conn, title="owner", session_id="durable", triage=True)
+        owner = kb.create_task(
+            conn,
+            title="owner",
+            session_id="durable",
+            assistant_owner_key="assistant:user-a",
+            triage=True,
+        )
         kn.add_notify_sub(conn, task_id=owner, platform="telegram", chat_id="chat",
                          delivery_mode="wake", notifier_profile="default")
         if surface == "builtin":
@@ -29,11 +35,22 @@ def test_creator_origin_survives_without_dependency_parent(tmp_path, monkeypatch
             monkeypatch.setenv("HERMES_KANBAN_TASK", owner)
             assert kanban_command(parser.parse_args(["kanban", "create", "child", "--json"])) == 0
             tid = json.loads(capsys.readouterr().out)["id"]
-        assert kb.get_task(conn, tid).session_id == "durable"
+        inherited = kb.get_task(conn, tid)
+        assert inherited.session_id == "durable"
+        assert inherited.assistant_owner_key == "assistant:user-a"
         subs = kn.list_notify_subs(conn, tid)
         assert len(subs) == 1 and subs[0]["delivery_mode"] == "wake"
         assert not conn.execute("SELECT 1 FROM task_links WHERE child_id = ?", (tid,)).fetchone()
         # No ambient identity guessing in the storage API.
         plain = kb.create_task(conn, title="plain", session_id="explicit")
         assert kb.get_task(conn, plain).session_id == "explicit"
+        assert kb.get_task(conn, plain).assistant_owner_key is None
         assert not kn.list_notify_subs(conn, plain)
+
+        explicit_owner = kb.create_task(
+            conn,
+            title="explicit-owner-child",
+            creator_task_id=owner,
+            assistant_owner_key="assistant:user-b",
+        )
+        assert kb.get_task(conn, explicit_owner).assistant_owner_key == "assistant:user-b"
