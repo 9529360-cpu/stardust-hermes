@@ -171,6 +171,23 @@ def classify_tools(tool_defs: List[Dict[str, Any]], defer_tools: Optional[frozen
     return visible, deferrable
 
 
+def defer_tools_for_session_surface(
+    tool_defs: List[Dict[str, Any]], enabled_tools: Iterable[str]
+) -> frozenset[str]:
+    """Infer the session-frozen defer membership from its model-visible tool surface.
+
+    The bridge catalog may discover new MCP/plugin tools without changing prompt bytes, but a
+    built-in tool that was eager when the session was assembled must not move behind the bridge
+    merely because ``tools.tool_search.defer`` changed later. Conversely, a built-in omitted
+    from the model-visible surface remains deferred until the next session.
+    """
+    visible = frozenset(str(name) for name in enabled_tools if name)
+    return frozenset(
+        name for name in _tool_def_names(tool_defs)
+        if name and name not in BRIDGE_TOOL_NAMES and name not in visible
+    )
+
+
 def _deferrable_in(
     tool_defs: List[Dict[str, Any]], defer_tools: Optional[frozenset] = None
 ) -> List[Dict[str, Any]]:
