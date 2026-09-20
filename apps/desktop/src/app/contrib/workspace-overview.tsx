@@ -35,6 +35,7 @@ import {
   resolveTaskWorkspaceCwd
 } from '../workspace/task-session'
 
+import { useDelegationRecovery } from './hooks/use-delegation-recovery'
 import { WORKSPACE_OVERVIEW_COPY } from './workspace-overview-copy'
 
 export const WORKSPACE_OVERVIEW_PANE_ID = 'workspace-overview'
@@ -215,6 +216,7 @@ export function WorkspaceOverview() {
   )
   const statusSessionId = selectedStoredSessionId ? activeSessionId : (fallbackTaskRuntimeId ?? activeSessionId)
   const statusItems = useSessionSlice($statusItemsBySession, statusSessionId)
+  const delegationRecovery = useDelegationRecovery(statusSessionId)
   const activityTasks = useMemo(
     () =>
       buildTaskCenterTasks({
@@ -223,6 +225,7 @@ export function WorkspaceOverview() {
         attentionSessionIds,
         backgroundBySession: backgroundStatusBySession,
         cronJobs,
+        delegationRecoveryBySession: statusSessionId ? { [statusSessionId]: delegationRecovery } : {},
         previewRestart: previewServerRestart,
         runtimeStoredSessionIds,
         sessions,
@@ -234,9 +237,11 @@ export function WorkspaceOverview() {
       attentionSessionIds,
       backgroundStatusBySession,
       cronJobs,
+      delegationRecovery,
       desktopActionTasks,
       previewServerRestart,
       runtimeStoredSessionIds,
+      statusSessionId,
       sessions,
       subagentsBySession,
       workingSessionIds
