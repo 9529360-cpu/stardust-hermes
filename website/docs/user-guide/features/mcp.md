@@ -901,8 +901,8 @@ The MCP server exposes 10 tools, matching OpenClaw's channel bridge surface plus
 | `events_wait` | Long-poll / block until the next event arrives (near-real-time). |
 | `messages_send` | Send a message through a platform (e.g. `telegram:123456`, `discord:#general`). |
 | `channels_list` | List available messaging targets across all platforms. |
-| `permissions_list_open` | List pending approval requests observed during this bridge session. |
-| `permissions_respond` | Allow or deny a pending approval request. |
+| `permissions_list_open` | Compatibility surface. Standalone `hermes mcp serve` cannot observe the gateway process's live approval queue, so this returns `supported: false` instead of a misleading empty list. |
+| `permissions_respond` | Compatibility surface. Returns `resolved: false` until a cross-process approval broker is available; resolve approvals in the owning Hermes UI/gateway. |
 
 ### Event system
 
@@ -916,7 +916,9 @@ events_poll(after_cursor=0)
 events_wait(after_cursor=42, timeout_ms=30000)
 ```
 
-Event types: `message`, `approval_requested`, `approval_resolved`
+Event types: `message`
+
+Gateway approval requests are process-local today and are not emitted by standalone `hermes mcp serve`. The two `permissions_*` tool names remain registered for client compatibility, but they report the limitation explicitly rather than pretending an approval was listed or resolved.
 
 The event queue is in-memory and starts when the bridge connects. Older messages are available through `messages_read`.
 
