@@ -10,6 +10,9 @@ from toolsets import (
     validate_toolset,
     create_custom_toolset,
     get_toolset_info,
+    toolset_role,
+    bundle_non_default_tools,
+    bundle_non_core_tools,
 )
 
 
@@ -23,6 +26,20 @@ def _make_schema(name: str, description: str = "test tool"):
         "description": description,
         "parameters": {"type": "object", "properties": {}},
     }
+
+
+class TestToolsetRole:
+    def test_static_roles_are_owned_by_toolsets_module(self):
+        assert toolset_role("hermes-cli") == "platform_bundle"
+        assert toolset_role("coding") == "posture"
+        assert toolset_role("debugging") == "composite"
+        assert toolset_role("web") == "capability"
+
+    def test_dynamic_platform_name_keeps_platform_bundle_role(self):
+        assert toolset_role("hermes-example-plugin") == "platform_bundle"
+
+    def test_legacy_non_core_helper_matches_new_non_default_name(self):
+        assert bundle_non_core_tools("hermes-discord") == bundle_non_default_tools("hermes-discord")
 
 
 class TestGetToolset:
