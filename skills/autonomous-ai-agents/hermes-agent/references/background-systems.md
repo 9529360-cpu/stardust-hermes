@@ -59,10 +59,12 @@ so nothing is lost.
   max destructive action is archive. Pinned skills are exempt from
   every auto-transition and every LLM review pass.
 - **Cost:** the deterministic inactivity/prune sweep runs for free. The
-  aux-model "consolidate overlapping skills into umbrellas" pass is
-  **off by default** — opt in with `curator.consolidate: true` or
-  `hermes curator run --consolidate`. Routine background curation costs
-  zero tokens.
+  aux-model "consolidate overlapping skills into umbrellas" pass is on by
+  default for curator-managed `created_by: "agent"` skills, but only on the
+  normal low-frequency curator cycle; it is skipped entirely when there are no
+  agent-owned candidates. Set `curator.consolidate: false` for prune-only,
+  zero-LLM maintenance; `hermes curator run --consolidate` can still force
+  one pass.
 - **Telemetry:** sidecar at `~/.hermes/skills/.usage.json` holds
   per-skill `use_count`, `view_count`, `patch_count`,
   `last_activity_at`, `state`, `pinned`.
