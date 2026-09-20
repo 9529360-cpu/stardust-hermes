@@ -1899,7 +1899,10 @@ DEFAULT_CONFIG = {
     # picker lists update without a product release or a separate docs-site authority.
     "model_catalog": {
         "enabled": True,
-        "url": "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json",
+        "url": (
+            "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+            "/main/website/static/api/model-catalog.json"
+        ),
         # Disk cache TTL in minutes. The gateway refreshes in the background on this cadence; the
         # CLI refetches on the next /model or `hermes model` once the cache is older. Network
         # failures silently use the stale cache. Legacy `ttl_hours` is honoured if set.
