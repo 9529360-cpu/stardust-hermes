@@ -122,6 +122,15 @@ jobs:
             exit 1
           fi
 
+          # Main may have advanced while the 40+ MB staged asset uploaded.
+          # Re-check at the last safe point before mutating the canonical name.
+          CURRENT_MAIN="$(gh api "$REPO_API/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$CURRENT_MAIN" != "$GITHUB_SHA" ]; then
+            echo "::notice::main advanced during upload; deleting stale staged asset without touching canonical"
+            gh api -X DELETE "$REPO_API/releases/assets/$STAGED_ID" >/dev/null
+            exit 0
+          fi
+
           if [ -z "$CANONICAL_ID" ]; then
             # First publication: there is no prior healthy asset to protect.
             gh api -X PATCH "$REPO_API/releases/assets/$STAGED_ID" -f name="$CANONICAL" >/dev/null
