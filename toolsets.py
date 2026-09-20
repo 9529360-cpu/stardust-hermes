@@ -280,6 +280,25 @@ def _registry_generation() -> Tuple[int, int]:
     return (id(reg), getattr(reg, "_generation", 0)) if reg is not None else (0, 0)
 
 
+def toolset_role(name: str, definition: Optional[Dict[str, Any]] = None) -> str:
+    """One authoritative structural role for static/dynamic toolsets.
+
+    Roles are intentionally coarse and policy-neutral:
+    - platform_bundle: hermes-<platform> composites (including dynamic plugin platforms)
+    - posture: per-session working posture such as coding
+    - composite: non-platform include-based grouping
+    - capability: ordinary leaf/configurable toolset
+    """
+    if name.startswith("hermes-"):
+        return "platform_bundle"
+    spec = definition if isinstance(definition, dict) else TOOLSETS.get(name)
+    if isinstance(spec, dict) and spec.get("posture"):
+        return "posture"
+    if isinstance(spec, dict) and spec.get("includes"):
+        return "composite"
+    return "capability"
+
+
 def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[str, Any]]:
     """Toolset definition, or None if unknown.
 
@@ -324,21 +343,26 @@ def get_toolset(name: str, *, include_registry: bool = True) -> Optional[Dict[st
     return {"description": description, "tools": registry.get_tool_names_for_toolset(registry_toolset), "includes": []}
 
 
-def bundle_non_core_tools(toolset_name: str) -> Set[str]:
+def bundle_non_default_tools(toolset_name: str) -> Set[str]:
     """A bundle's tools minus the shared default platform tools (one include level).
 
-    The function name is retained for compatibility. Disabling a platform bundle
-    must not strip the shared default tools every other platform bundle inherits.
+    Disabling a platform bundle/posture must not strip shared default tools that
+    other platform bundles inherit.
     """
-    core = set(_HERMES_DEFAULT_TOOLS)
+    default_tools = set(_HERMES_DEFAULT_TOOLS)
     ts_def = get_toolset(toolset_name)
     if not (ts_def and "tools" in ts_def):
-        return set(resolve_toolset(toolset_name)) - core
+        return set(resolve_toolset(toolset_name)) - default_tools
     to_remove = set(ts_def["tools"])
     for inc_def in map(get_toolset, ts_def.get("includes", [])):
         if inc_def and "tools" in inc_def:
             to_remove.update(inc_def["tools"])
-    return to_remove - core
+    return to_remove - default_tools
+
+
+def bundle_non_core_tools(toolset_name: str) -> Set[str]:
+    """Compatibility alias for :func:`bundle_non_default_tools`."""
+    return bundle_non_default_tools(toolset_name)
 
 
 # Memo keyed on (name, include_registry, id(registry), registry generation, profile scope);
@@ -349,9 +373,8 @@ _resolve_toolset_memo: Dict[Tuple[str, bool, int, int, str], List[str]] = {}
 
 
 def _plugin_platform_bundle(name: str) -> List[str]:
-    """Implicit `hermes-<platform>` bundle for a registered plugin platform: core
-    tools plus whatever the plugin registered under the platform name. [] otherwise."""
-    if not name.startswith("hermes-"):
+    """Implicit `hermes-<platform>` bundle: shared defaults plus plugin platform tools."""
+    if toolset_role(name) != "platform_bundle":
         return []
     platform_name = name[len("hermes-"):]
     try:
