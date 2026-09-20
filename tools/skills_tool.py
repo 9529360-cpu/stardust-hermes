@@ -559,8 +559,18 @@ def skill_view(
         if not skill_matches_platform(frontmatter):
             return _fail(f"Skill '{name}' is not supported on this platform.", readiness_status=SkillReadinessStatus.UNSUPPORTED.value)
         resolved_name = frontmatter.get("name", skill_md.parent.name)
+        curator_inspection_only = False
         if _is_skill_disabled(resolved_name):
-            return _fail(f"Skill '{resolved_name}' is disabled. Enable it with `hermes skills` or inspect the files directly on disk.")
+            from tools.skill_manager_guards import _background_review_can_inspect_disabled_skill
+            if not skill_dir or not _background_review_can_inspect_disabled_skill(
+                    resolved_name, skill_dir):
+                return _fail(
+                    f"Skill '{resolved_name}' is disabled. Enable it with `hermes skills` or "
+                    "inspect the files directly on disk.")
+            # Disabled still means unavailable to normal sessions. The curator gets a read-only
+            # inspection path only because its existing ownership guard already authorizes
+            # maintenance; do not run readiness/setup capture for a disabled skill.
+            curator_inspection_only = True
         if file_path and skill_dir:
             return _serve_skill_file(
                 skill_dir, file_path, name, list_available=True, mark_read=True,
@@ -576,7 +586,13 @@ def skill_view(
         except ValueError:  # external skill — relative to its own parent dir
             rel_path = str(skill_md.relative_to(skill_md.parent.parent)) if skill_md.parent.parent else skill_md.name
         skill_name = frontmatter.get("name", skill_md.stem if not skill_dir else skill_dir.name)
-        readiness, readiness_extras = _skill_readiness(frontmatter, skill_name)
+        if curator_inspection_only:
+            readiness, readiness_extras = {}, {
+                "disabled": True,
+                "curator_inspection_only": True,
+            }
+        else:
+            readiness, readiness_extras = _skill_readiness(frontmatter, skill_name)
         rendered_content = content if not preprocess else _preprocess_skill(
             content, skill_dir, task_id, "Could not preprocess skill content for %s", skill_name)
         org_provenance, header = None, ""
