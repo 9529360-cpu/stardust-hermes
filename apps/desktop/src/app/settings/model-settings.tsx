@@ -243,6 +243,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const setConfig = useMemo(() => hermesConfigCacheWriter(scopeProfile), [scopeProfile])
   const [applying, setApplying] = useState(false)
   const [editingAuxTask, setEditingAuxTask] = useState<null | string>(null)
+  const [advancedModelSettingsOpen, setAdvancedModelSettingsOpen] = useState(false)
 
   const [auxDraft, setAuxDraft] = useState<{ model: string; provider: string; reasoningEffort: string }>({
     model: '',
@@ -258,10 +259,13 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [activating, setActivating] = useState(false)
 
+  const revealAdvancedModelSettings = useCallback(() => setAdvancedModelSettingsOpen(true), [])
+
   // Deep link from the vision Capabilities detail (?tab=config:model&aux=vision):
-  // scroll the auxiliary task row into view and flash it once the list loads.
+  // reveal the advanced block before scrolling the auxiliary task row into view.
   useDeepLinkHighlight({
     elementId: task => `aux-task-${task}`,
+    onResolve: revealAdvancedModelSettings,
     param: 'aux',
     ready: task => AUX_TASKS.some(meta => meta.key === task)
   })
@@ -1021,30 +1025,41 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         />
       )}
 
-      <section>
-        <div className="mb-2.5 flex items-center justify-between">
-          <SectionHeading icon={Cpu} title={m.auxiliaryTitle} />
-          <Button
-            disabled={!mainModel || applying}
-            onClick={() => void resetAuxiliaryModels()}
-            size="sm"
-            variant="textStrong"
-          >
-            {m.resetAllToMain}
-          </Button>
-        </div>
-        <p className="mb-2 text-xs text-muted-foreground">{m.auxiliaryDesc}</p>
-        {switchStaleAux.length === 0 && persistentStaleAux.length > 0 && (
-          <div className="mb-2.5">
-            <StaleAuxWarning
-              applying={applying}
-              onReset={() => void resetAuxiliaryModels()}
-              slots={persistentStaleAux}
-              taskLabel={auxiliaryTaskLabel}
-            />
+      {switchStaleAux.length === 0 && persistentStaleAux.length > 0 && (
+        <StaleAuxWarning
+          applying={applying}
+          onReset={() => void resetAuxiliaryModels()}
+          slots={persistentStaleAux}
+          taskLabel={auxiliaryTaskLabel}
+        />
+      )}
+
+      <div>
+        <Button
+          onClick={() => setAdvancedModelSettingsOpen(open => !open)}
+          size="sm"
+          type="button"
+          variant="textStrong"
+        >
+          {advancedModelSettingsOpen ? m.advancedModelSettingsHide : m.advancedModelSettings}
+        </Button>
+        <p className="mt-1 text-xs text-muted-foreground">{m.advancedModelSettingsDesc}</p>
+      </div>
+
+      <section data-slot="advanced-model-settings" hidden={!advancedModelSettingsOpen}>
+          <div className="mb-2.5 flex items-center justify-between">
+            <SectionHeading icon={Cpu} title={m.auxiliaryTitle} />
+            <Button
+              disabled={!mainModel || applying}
+              onClick={() => void resetAuxiliaryModels()}
+              size="sm"
+              variant="textStrong"
+            >
+              {m.resetAllToMain}
+            </Button>
           </div>
-        )}
-        <div className="grid gap-1">
+          <p className="mb-2 text-xs text-muted-foreground">{m.auxiliaryDesc}</p>
+          <div className="grid gap-1">
           {AUX_TASKS.map(meta => {
             const copy = m.tasks[meta.key] ?? { label: meta.key, hint: meta.key }
             const current = auxiliary?.tasks.find(entry => entry.task === meta.key)
@@ -1181,7 +1196,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         </div>
       </section>
       {moa && currentMoaPreset && (
-        <section>
+        <section hidden={!advancedModelSettingsOpen}>
           <SectionHeading icon={Cpu} title={m.moaTitle} />
           <p className="mb-2 text-xs text-muted-foreground">{m.moaDescription}</p>
           <div className="mb-2 flex flex-wrap items-center gap-2">
