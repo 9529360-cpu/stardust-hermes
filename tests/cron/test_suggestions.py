@@ -121,6 +121,28 @@ class TestStore:
         assert store.dismiss_suggestion(rec["id"]) is False
         assert store.get_suggestion(rec["id"])["status"] == "accepted"
 
+    def test_accept_reconciles_job_committed_before_suggestion_resolution(self, store):
+        rec = _add(store, key="crash-window", title="Crash Window")
+        assert rec is not None
+        existing = {
+            "id": "already-durable",
+            "name": "Crash Window",
+            "enabled": True,
+            "source_suggestion_id": rec["id"],
+        }
+
+        with (
+            patch("cron.jobs.load_jobs", return_value=[existing]),
+            patch("cron.scheduler.register_persisted_job", return_value=existing) as register,
+            patch("cron.scheduler.create_job_with_scheduler_registration") as create,
+        ):
+            recovered = store.accept_suggestion(rec["id"])
+
+        assert recovered is existing
+        register.assert_called_once_with(existing)
+        create.assert_not_called()
+        assert store.get_suggestion(rec["id"])["status"] == "accepted"
+
     def test_unknown_source_rejected(self, store):
         with pytest.raises(ValueError):
             store.add_suggestion(title="x", description="d", source="bogus", job_spec={}, dedup_key="k")
@@ -149,7 +171,8 @@ class TestStore:
         assert len(store.list_pending()) == store.MAX_PENDING
 
     def test_accept_creates_job_and_marks_accepted(self, store):
-        _add(store, key="acc", title="My Job")
+        rec = _add(store, key="acc", title="My Job")
+        assert rec is not None
         created = {}
 
         def fake_create_job(**kwargs):
@@ -162,6 +185,7 @@ class TestStore:
         assert job is not None
         assert created["schedule"] == "0 9 * * *"
         assert created["origin"] == {"platform": "telegram", "chat_id": "5"}
+        assert created["source_suggestion_id"] == rec["id"]
         # No longer pending.
         assert store.list_pending() == []
         # And accepting again is a no-op (not pending anymore).

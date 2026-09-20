@@ -3467,19 +3467,28 @@ class CronSchedulerRegistrationError(RuntimeError):
             "retry_create": False}
 
 
-def create_job_with_scheduler_registration(**kwargs) -> dict:
-    """Persist one job and register its first trigger with the active provider."""
-    from cron.jobs import create_job
-    from cron.scheduler_provider import resolve_cron_scheduler
+def register_persisted_job(job: dict) -> dict:
+    """Register an already-durable job with the active provider.
 
-    job = create_job(**kwargs)
+    External providers key registration by the persisted job identity. This is also the
+    reconciliation path for a caller recovering from an unknown create outcome.
+    """
     if not job.get("enabled", True):
         return job
+    from cron.scheduler_provider import resolve_cron_scheduler
+
     try:
         resolve_cron_scheduler().register_job(job)
     except Exception as exc:
         raise CronSchedulerRegistrationError(job, exc) from exc
     return job
+
+
+def create_job_with_scheduler_registration(**kwargs) -> dict:
+    """Persist one job and register its first trigger with the active provider."""
+    from cron.jobs import create_job
+
+    return register_persisted_job(create_job(**kwargs))
 
 
 # Dead-owner reap is throttled (opens the executions ledger). Tests may reset

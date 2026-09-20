@@ -224,6 +224,7 @@ def accept_suggestion(
     """
     from cron.scheduler import (
         CronSchedulerRegistrationError, create_job_with_scheduler_registration,
+        register_persisted_job,
     )
 
     with _suggestions_mutation_lock():
@@ -232,7 +233,31 @@ def accept_suggestion(
         if not s or s.get("status") != _STATUS_PENDING:
             return None
 
+        suggestion_id = str(s.get("id") or "").strip()
+        if not suggestion_id:
+            raise ValueError("suggestion id is required")
+
+        # A process can die after jobs.json commits but before suggestions.json is resolved.
+        # Reconcile that durable job first so retry never creates a second random job id.
+        from cron.jobs import load_jobs
+        existing = next(
+            (
+                job for job in load_jobs()
+                if str(job.get("source_suggestion_id") or "").strip() == suggestion_id
+            ),
+            None,
+        )
+        if existing is not None:
+            try:
+                job = register_persisted_job(existing)
+            except CronSchedulerRegistrationError:
+                _resolve_in_place(suggestions, s, _STATUS_ACCEPTED)
+                raise
+            _resolve_in_place(suggestions, s, _STATUS_ACCEPTED)
+            return job
+
         spec = dict(s.get("job_spec") or {})
+        spec["source_suggestion_id"] = suggestion_id
         if origin is not None and "origin" not in spec:
             spec["origin"] = origin
         from cron.session_return import capture_local_session_origin, local_session_origin as normalize_local_origin

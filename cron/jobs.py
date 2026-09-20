@@ -1794,6 +1794,7 @@ def create_job(
     deliver: Optional[str] = None,
     origin: Optional[Dict[str, Any]] = None,
     local_session_origin: Optional[Dict[str, Any]] = None,
+    source_suggestion_id: Optional[str] = None,
     skill: Optional[str] = None,
     skills: Optional[List[str]] = None,
     model: Optional[str] = None,
@@ -1821,6 +1822,7 @@ def create_job(
     source run FIRST each tick; unchanged output suppresses the agent run (mutually exclusive,
     incompatible with ``no_agent``). reasoning_effort: per-job pin; capability NOT validated."""
     local_session_origin = _normalize_local_session_origin(local_session_origin)
+    source_suggestion_id = _normalize_job_optional_text(source_suggestion_id)
     if not isinstance(paused, bool):
         raise ValueError("paused must be a boolean.")
     if paused_reason is not None and not isinstance(paused_reason, str):
@@ -1908,6 +1910,7 @@ def create_job(
     for key, value in (
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
+        ("source_suggestion_id", source_suggestion_id),
     ):
         if value is not None:
             job[key] = value
