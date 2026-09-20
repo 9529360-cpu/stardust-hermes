@@ -68,10 +68,11 @@ def test_create_splits_independent_work_and_preserves_durable_controls(monkeypat
     assert calls[0]["session_id"] == "session-7"
     assert calls[0]["assignee"] == "default"
     assert calls[0]["_assistant_owner_key"] == "local"
-    assert calls[0]["idempotency_key"].endswith(":call-42:0")
-    assert calls[1]["idempotency_key"].endswith(":call-42:1")
-    assert calls[2]["idempotency_key"].endswith(":call-42:2")
-    assert "local" not in calls[0]["idempotency_key"]
+    keys = [call["idempotency_key"] for call in calls[:3]]
+    assert all(key.startswith("assistant:") for key in keys)
+    assert [key.rsplit(":", 1)[1] for key in keys] == ["0", "1", "2"]
+    assert len({key.rsplit(":", 1)[0] for key in keys}) == 1
+    assert all("local" not in key and "call-42" not in key for key in keys)
     assert calls[2]["goal_mode"] is True
     assert calls[2]["project"] == "stardust"
     assert calls[2]["workspace_kind"] == "worktree"
@@ -109,10 +110,11 @@ def test_create_retry_uses_same_idempotency_keys(monkeypatch):
             request_id="tool-call-stable",
         )
 
-    assert [call["idempotency_key"] for call in calls] == [
-        "assistant:local:tool-call-stable:0",
-        "assistant:s1:tool-call-stable:0",
-    ]
+    assert calls[0]["idempotency_key"] == calls[1]["idempotency_key"]
+    assert calls[0]["idempotency_key"].startswith("assistant:")
+    assert calls[0]["idempotency_key"].endswith(":0")
+    assert "tool-call-stable" not in calls[0]["idempotency_key"]
+    assert "local" not in calls[0]["idempotency_key"]
 
 
 def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
@@ -384,17 +386,23 @@ def test_owner_identity_is_not_embedded_in_idempotency_key(monkeypatch):
     )
 
     owner = "messaging:telegram:user-secret-42"
-    assistant_tasks.assistant_tasks_tool(
-        action="create",
-        owner_key=owner,
-        session_id="chat-A",
-        request_id="call-private",
-        tasks=[{"title": "Private task", "instruction": "Do the private task."}],
-    )
+    for request_id in ("call-private-a", "call-private-b"):
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            owner_key=owner,
+            session_id="chat-A",
+            request_id=request_id,
+            tasks=[{"title": "Private task", "instruction": "Do the private task."}],
+        )
 
     assert calls[0]["_assistant_owner_key"] == owner
-    assert owner not in calls[0]["idempotency_key"]
-    assert "user-secret-42" not in calls[0]["idempotency_key"]
+    assert calls[1]["_assistant_owner_key"] == owner
+    assert calls[0]["idempotency_key"] != calls[1]["idempotency_key"]
+    for call in calls:
+        key = call["idempotency_key"]
+        assert owner not in key
+        assert "user-secret-42" not in key
+        assert "call-private" not in key
 
 
 
