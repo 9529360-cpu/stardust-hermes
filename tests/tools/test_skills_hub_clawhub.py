@@ -338,8 +338,7 @@ class TestClawHubSource(unittest.TestCase):
 
         mock_get.side_effect = side_effect
 
-        # Force the deadline to be in the past immediately. Budget only applies
-        # to bounded browse walks (max_items > 0), not the index builder path.
+        # Force the interactive browse deadline to be in the past immediately.
         with patch.object(ClawHubSource, "CATALOG_WALK_BUDGET_SECONDS", -1):
             results = self.src._load_catalog_index(max_items=10)
 
@@ -443,9 +442,8 @@ class TestClawHubSource(unittest.TestCase):
 
 
 class TestClawHubCatalogWalkBounded(unittest.TestCase):
-    """max_items bounds the walk so browse's cold-start fallback renders one
-    page without walking the entire 50k+ catalog. The offline index builder
-    keeps max_items=0 (unbounded) and walks to exhaustion."""
+    """max_items bounds browse cold-start walks; max_items=0 requests a large
+    offline index walk under its separate publisher wall-clock budget."""
 
     def setUp(self):
         self.src = ClawHubSource()
@@ -518,7 +516,6 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
         self.assertLess(page_calls["n"], 750)
         self.assertEqual(results, [])
         mock_write_cache.assert_not_called()
-
 
     @patch("tools.skills_hub._write_index_cache")
     @patch("tools.skills_hub._read_index_cache", return_value=None)
