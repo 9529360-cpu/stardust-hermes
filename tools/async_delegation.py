@@ -588,6 +588,7 @@ def list_durable_recovery_receipts(
         except (TypeError, json.JSONDecodeError):
             task = {}
         goals = task.get("goals") if isinstance(task.get("goals"), list) else []
+        task_indexes = task.get("task_indexes") if isinstance(task.get("task_indexes"), list) else []
         goal = str(task.get("goal") or (goals[0] if goals else "") or "Background delegation").strip()
         receipts.append(
             {
@@ -595,7 +596,7 @@ def list_durable_recovery_receipts(
                 "origin_session": str(origin_session or ""),
                 "origin_ui_session_id": str(origin_ui_session_id or ""),
                 "goal": goal,
-                "task_count": max(1, len(goals)),
+                "task_count": max(1, len(task_indexes) or len(goals)),
                 "dispatched_at": float(dispatched_at or 0),
                 "completed_at": float(completed_at or 0),
             }
