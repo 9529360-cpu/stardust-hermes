@@ -484,7 +484,7 @@ def _locate_skill(name: str, local_category_name: Optional[str], project_dirs: l
         # ambiguity WITHIN the project tier still refuses.
         candidates = [c for c in candidates if _under_any(c[1], project_dirs)] or candidates
     if len(candidates) > 1:
-        paths = [smd.as_posix() for _, smd in candidates]
+        paths = [str(smd) for _, smd in candidates]
         logger.warning("Skill name collision for '%s': %d candidates — %s", name, len(candidates), "; ".join(paths))
         return _fail(
             f"Ambiguous skill name '{name}': {len(candidates)} skills match across your local skills dir "
