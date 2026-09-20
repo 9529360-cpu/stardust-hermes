@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Build the Hermes Skills Index — a centralized JSON catalog of all skills.
+"""Build the Stardust Skills Index — a centralized JSON catalog of all skills.
 
 This script crawls every skill source (skills.sh, GitHub taps, official,
-clawhub, lobehub) and writes a JSON index with resolved
-GitHub paths. The index is served as a static file on the docs site so that
-`hermes skills search/install` can use it without hitting the GitHub API.
+ClawHub, LobeHub) and writes a JSON index with resolved GitHub paths.
+`.github/workflows/skills-index.yml` publishes a health-checked copy as the
+Stardust-owned `stardust-skills-index` Release asset so installed clients can
+search without fanning out across every upstream API.
 
 Usage:
     # Local (uses gh CLI or GITHUB_TOKEN for auth)
@@ -372,8 +373,8 @@ def main():
     # Health check: catch silent breakage early. Every source listed below
     # has historically returned at least `floor` entries; a zero (or near-
     # zero) result almost certainly means a tap path moved, an API changed,
-    # or rate limiting kicked in.  Failing here forces a human look before
-    # the broken index reaches the live docs.
+    # or rate limiting kicked in. Failing here forces a human look before
+    # the broken index reaches the published runtime asset.
     EXPECTED_FLOORS = {
         # skills.sh now uses the sitemap walker (~20k catalog as of May 2026).
         # Anything under 10k means the sitemap shape changed or fetches failed
@@ -443,7 +444,8 @@ def main():
         # a degenerate file. Writing-then-exiting-2 was the bug that shipped an
         # index with every GitHub-API source dropped to zero: deploy-site.yml
         # swallows the exit code with `|| echo non-fatal`, and the partial file
-        # was already on disk for extract-skills to pick up.
+        # was already on disk for extract-skills to pick up. The current
+        # Release-asset publisher keeps the same write-after-health invariant.
         sys.exit(2)
 
     # Healthy — only now write the index out for the docs build to consume.
