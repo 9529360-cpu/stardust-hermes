@@ -39,8 +39,14 @@ def _background_review_dry_run_guard(action: str) -> Optional[Dict[str, Any]]:
             )
     except Exception:
         # Provenance lookup failure must not weaken a known background-review boundary.
+        # If this is a curator fork and we cannot prove it is writable, deny the mutation.
         if _is_background_review():
             logger.warning("curator dry-run provenance lookup failed", exc_info=True)
+            return _refusal(
+                f"Refusing background curator action='{action}': dry-run provenance "
+                "could not be verified, so the write is denied fail-closed.",
+                _fail_closed=True,
+            )
     return None
 
 
