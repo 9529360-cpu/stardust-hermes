@@ -21,14 +21,15 @@ permissions:
 
 concurrency:
   group: stardust-skills-index
-  # A newer reviewed main commit supersedes an older crawl. Cancelling here is
-  # safe because publication happens only after health verification and the
-  # last healthy release asset remains untouched until promotion succeeds.
-  cancel-in-progress: true
+  # Do not hard-cancel a run during the release-asset rename/promote window.
+  # A freshness gate before publication makes superseded crawls non-publishing.
+  cancel-in-progress: false
 
 jobs:
   build-publish:
-    if: github.repository == '9529360-cpu/stardust-hermes'
+    # schedule/push already resolve to main; explicitly constrain manual
+    # workflow_dispatch too so write-permission code never runs from a branch.
+    if: github.repository == '9529360-cpu/stardust-hermes' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -65,7 +66,22 @@ jobs:
           print(f"verified {len(skills)} skills")
           PY
 
+      - name: Refuse stale main publication
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$CURRENT_MAIN" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main advanced from $GITHUB_SHA to $CURRENT_MAIN; keeping this healthy but stale crawl unpublished"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish Stardust-owned catalog asset
+        if: steps.freshness.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
