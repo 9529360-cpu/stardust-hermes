@@ -856,7 +856,7 @@ def _consolidation_pass(prefix: str, auto_summary: str, dry_run: bool, before_na
             prompt = f"{CURATOR_REVIEW_PROMPT}{CURATOR_PRUNE_BUILTINS_NOTE if get_prune_builtins() else ''}\n\n{candidate_list}"
             if dry_run:
                 prompt = f"{CURATOR_DRY_RUN_BANNER}\n\n{prompt}"
-            llm_meta = _run_llm_review(prompt)
+            llm_meta = _run_llm_review(prompt, dry_run=dry_run)
             final_summary = f"{prefix}{auto_summary}; llm: {llm_meta.get('summary', 'no change')}"
     except Exception as e:
         logger.debug("Curator LLM pass failed: %s", e, exc_info=True)
