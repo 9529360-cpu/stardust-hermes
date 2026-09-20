@@ -1204,6 +1204,8 @@ export const zhHant = defineLocale({
       apiKeyPlaceholder: '貼上 API 金鑰',
       apiKeyLabel: 'API 金鑰',
       apiKeyKeepExisting: '留空則保留已儲存的金鑰',
+      apiKeyUpdate: '更新金鑰',
+      apiKeyUpdating: '正在更新…',
       connectProvider: provider => `連接 ${provider}`,
       setupApiKeyHint: provider => `${provider} 需要 API 金鑰。連接後即可選擇模型。`,
       setupOauthHint: provider => `${provider} 會開啟瀏覽器完成登入。Stardust 會在完成後自動繼續。`,
