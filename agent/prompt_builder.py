@@ -190,8 +190,10 @@ def build_memory_guidance(
     skill_routing = (
         "Skills come first: when you learn something while doing a task — a "
         "procedure, a pitfall, and the user's preferences and corrections "
-        "for that kind of work — record it in the skill you used or built "
-        "for the task (skill_manage), where it loads only when relevant. "
+        "for that kind of work — update the existing skill that owns that "
+        "workflow. Search/load before creating; create a new skill only when "
+        "no existing skill has the responsibility (skill_manage), so procedural "
+        "memory converges instead of fragmenting. "
         if skill_manage_available else
         "Task-specific knowledge — procedures, pitfalls, and the user's preferences "
         "and corrections for that kind of work — belongs in skills, not in memory, "
@@ -236,7 +238,8 @@ SESSION_SEARCH_GUIDANCE = (
 # to save as a skill" and "fix it with skill_manage(action='patch')") and skill_manage's own schema. Only
 # the compaction-pruning contract lives here — nothing else teaches it.
 SKILLS_GUIDANCE = (
-    "When you work out a non-trivial workflow, record it with skill_manage for future reuse.\n\n"
+    "When you work out a non-trivial workflow, preserve it with skill_manage for future reuse: "
+    "prefer patching the existing owning skill, and create only when the workflow has no existing home.\n\n"
     "## Skill Safety Rule\n"
     "A skill placeholder containing `[SKILL_PRUNED]` lost its content in context compression and is inaccessible — "
     "reload it with skill_view(name='...') before acting on anything that depends on it. After reloading, ignore any "
