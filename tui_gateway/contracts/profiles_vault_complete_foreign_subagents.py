@@ -593,6 +593,24 @@ method("subagent.list", params=SessionParams, result=SubagentListResult,
        doc="Live children owned by this session (other sessions' children never leak).")
 
 
+class DelegationRecoveryReceipt(Result):
+    """Sanitized process-loss receipt; never grants control over the retired worker."""
+
+    delegation_id: str
+    goal: str = ""
+    task_count: int = 1
+    dispatched_at: float = 0
+    completed_at: float = 0
+    reason: Literal["owner_exited"] = "owner_exited"
+
+
+class DelegationRecoveryListResult(Result):
+    receipts: list[DelegationRecoveryReceipt] = Field(default_factory=list)
+
+
+method("delegation.recovery.list", params=SessionParams, result=DelegationRecoveryListResult,
+       doc="Recent process-local delegations this session lost when their backend process exited.")
+
 class SubagentIdParams(SessionParams):
     subagent_id: str
 
