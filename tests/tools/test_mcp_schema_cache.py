@@ -28,6 +28,19 @@ class TestConfigFingerprint:
             {**base, "cwd": "/workspace/other"}
         )
 
+    def test_tool_filter_shape_preserves_registration_semantics(self):
+        base = {"url": "https://mcp.example/mcp"}
+        # String means one exact/glob pattern; a list means multiple patterns.
+        assert msc.config_fingerprint(
+            {**base, "tools": {"include": "ab"}}
+        ) != msc.config_fingerprint(
+            {**base, "tools": {"include": ["a", "b"]}}
+        )
+        # Missing include means register all; explicit [] means register nothing.
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "tools": {"include": []}}
+        )
+
     def test_changes_when_cached_utility_policy_changes(self):
         base = {"url": "https://mcp.example/mcp", "tools": {"resources": True, "prompts": True}}
         assert msc.config_fingerprint(base) != msc.config_fingerprint(
