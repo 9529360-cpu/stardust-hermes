@@ -25,7 +25,7 @@ def _(rid, params):
             receipts = list_durable_recovery_receipts()
     except Exception as exc:
         logger.debug("delegation recovery receipt read failed", exc_info=True)
-        return _err(rid, 5027, f"delegation recovery unavailable: {exc}")
+        return _err(rid, 5027, "delegation recovery unavailable")
 
     visible = []
     for receipt in receipts:
