@@ -405,10 +405,11 @@ def test_run_review_records_state(curator_env):
 
 
 def test_dry_run_injects_report_only_banner(curator_env, monkeypatch):
-    """The dry-run prompt must carry a banner instructing the LLM not to
-    call any mutating tool. This is defense in depth — the caller also
-    skips automatic transitions — but the LLM prompt is the only guard
-    against the model calling skill_manage directly."""
+    """The dry-run prompt keeps an explicit report-only banner as defense in depth.
+
+    The authoritative safety boundary is the tool-level dry-run write barrier;
+    the prompt still tells the model what behavior to plan and report.
+    """
     c = curator_env["curator"]
     u = curator_env["usage"]
     skills_dir = curator_env["home"] / "skills"
