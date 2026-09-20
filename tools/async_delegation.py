@@ -190,6 +190,76 @@ def _persist_completion(event: Dict[str, Any], result: Dict[str, Any]) -> None:
              json.dumps(event), json.dumps(result), event["delegation_id"]))
 
 
+def publish_durable_completion(
+    *, delegation_id: str, session_key: str, parent_session_id: Optional[str], goal: str,
+    summary: str, status: str = "completed", error: Optional[str] = None, role: str = "background",
+    model: Optional[str] = None, context: Optional[str] = None, event_metadata: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Persist and enqueue an already-finished background result on the delegation delivery rail.
+
+    This is for durable producers (currently scheduled cron) whose work is owned elsewhere and
+    therefore must not be submitted to the process-local delegation executor. The stable
+    delegation_id is the idempotency key. A committed row survives a queue-publication failure and
+    is replayed on process recovery; duplicate publishers never enqueue a second copy.
+    """
+    delegation_id = str(delegation_id or "").strip()
+    session_key = str(session_key or "").strip()
+    if not delegation_id or not session_key:
+        raise ValueError("publish_durable_completion requires delegation_id and session_key")
+    now = time.time()
+    metadata = dict(event_metadata or {})
+    evt = {
+        "type": "async_delegation", "delegation_id": delegation_id, "session_key": session_key,
+        "origin_ui_session_id": "", "origin_session_id": "", "parent_session_id": parent_session_id,
+        "goal": goal, "context": context, "toolsets": None, "role": role, "model": model,
+        "status": status, "summary": summary, "error": error, "api_calls": 0,
+        "dispatched_at": now, "completed_at": now, **metadata,
+    }
+    result = {"status": status, "summary": summary, "error": error, "api_calls": 0}
+    task_payload = {
+        "goal": goal, "context": context, "toolsets": None, "role": role, "model": model,
+        **{k: v for k, v in metadata.items() if k in {"cron_job_id", "cron_job_name"}},
+    }
+    process_registry = None
+    external_cron_worker = bool(os.environ.get("_HERMES_CRON_EXTERNAL_WORKER"))
+    if not external_cron_worker:
+        try:
+            from tools.process_registry import process_registry as _process_registry
+            process_registry = _process_registry
+        except Exception:
+            logger.debug("Durable completion queue is unavailable before persistence", exc_info=True)
+    inserted = False
+    with _DB_LOCK, _transaction() as conn:
+        cur = conn.execute("""INSERT INTO async_delegations
+               (delegation_id, origin_session, origin_ui_session_id, parent_session_id, state,
+                dispatched_at, completed_at, updated_at, event_json, result_json, delivery_state,
+                delivery_attempts, owner_pid, owner_started_at, task_json, origin_session_id)
+               VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, 'pending', 0, NULL, NULL, ?, '')
+               ON CONFLICT(delegation_id) DO NOTHING""",
+            (delegation_id, session_key, parent_session_id, status, now, now, now,
+             json.dumps(evt), json.dumps(result), json.dumps(task_payload)))
+        inserted = cur.rowcount == 1
+    if not inserted:
+        return False
+    _prune_durable_records()
+    if process_registry is None:
+        if external_cron_worker:
+            logger.debug(
+                "Durable completion %s persisted by restart-safe cron worker; live session pollers will pick it up.",
+                delegation_id)
+        else:
+            logger.error(
+                "Durable completion %s persisted but queue publication was unavailable; recovery will replay it.",
+                delegation_id)
+    else:
+        try:
+            process_registry.completion_queue.put(evt)
+        except Exception:
+            logger.error(
+                "Durable completion %s persisted but queue publication failed; recovery will replay it.",
+                delegation_id, exc_info=True)
+    return True
+
 def record_unit_child(delegation_id: str, entry: Dict[str, Any]) -> None:
     """Durably record ONE finished child of a still-running multi-child unit on the unit's own row, so a crash before
     the unit joins loses only the children that had not finished. Stored in ``result_json`` (overwritten by the real
@@ -302,6 +372,41 @@ def restore_undelivered_completions(target_queue) -> int:
             restored += 1
     return restored
 
+
+def restore_matching_undelivered_completions(target_queue, owns_event: Callable[[Dict[str, Any]], bool]) -> int:
+    """Requeue pending terminal completions owned by one newly-live session.
+
+    The process-wide queue may have discarded an in-memory copy while no matching session was
+    live; the durable row stays pending. A session poller calls this once at startup with its
+    existing lineage-aware ownership predicate, so reopening the conversation recovers results
+    without requiring a process restart. Unrelated rows are left untouched.
+    """
+    now, restored = time.time(), 0
+    with _DB_LOCK, _transaction() as conn:
+        rows = conn.execute("""SELECT delegation_id, event_json, completed_at, dispatched_at
+               FROM async_delegations
+               WHERE state != 'running' AND delivery_state='pending' AND event_json IS NOT NULL
+               ORDER BY completed_at, delegation_id""").fetchall()
+        for delegation_id, payload, completed_at, dispatched_at in rows:
+            try:
+                evt = json.loads(payload)
+            except Exception:
+                continue
+            if not isinstance(evt, dict) or not owns_event(evt):
+                continue
+            age_basis = completed_at or dispatched_at
+            if age_basis and (now - age_basis) > _MAX_COMPLETION_REPLAY_AGE_S:
+                conn.execute("""UPDATE async_delegations SET delivery_state='dropped',
+                              delivery_claim=NULL, delivery_claimed_at=NULL, updated_at=?
+                       WHERE delegation_id=? AND delivery_state='pending'""", (now, delegation_id))
+                logger.warning(
+                    "Async completion %s for resumed session is %.1fh old; dropping replay at the %.1fh cap.",
+                    delegation_id, (now - age_basis) / 3600.0, _MAX_COMPLETION_REPLAY_AGE_S / 3600.0)
+                continue
+            evt["restored"] = True
+            target_queue.put(evt)
+            restored += 1
+    return restored
 
 def _update_delivery(sql: str, params: tuple) -> bool:
     """Run one UPDATE on the ledger; True iff exactly one row changed."""
@@ -419,15 +524,21 @@ def _event_delivery(fn, evt: Dict[str, Any], claim_id: str) -> None:
 
 
 def get_durable_delegation(delegation_id: str) -> Optional[Dict[str, Any]]:
+    """Read one durable delegation receipt with the provenance needed for recovery UIs.
+
+    The ledger remains authoritative. The decoded task and event values are views of
+    already-persisted payloads, not a second task record.
+    """
     with _DB_LOCK, _transaction() as conn:
         row = conn.execute("""SELECT origin_session, state, dispatched_at, completed_at,
                       result_json, delivery_state, delivery_attempts,
-                      origin_session_id
+                      origin_session_id, parent_session_id, task_json, event_json
                FROM async_delegations WHERE delegation_id=?""", (delegation_id,)).fetchone()
     return None if row is None else {
         "delegation_id": delegation_id, "origin_session": row[0], "state": row[1], "dispatched_at": row[2],
         "completed_at": row[3], "result": json.loads(row[4]) if row[4] else None, "delivery_state": row[5],
-        "delivery_attempts": row[6], "origin_session_id": row[7] or ""}
+        "delivery_attempts": row[6], "origin_session_id": row[7] or "", "parent_session_id": row[8],
+        "task": json.loads(row[9]) if row[9] else None, "event": json.loads(row[10]) if row[10] else None}
 
 
 # ── In-memory registry queries ──────────────────────────────────────────────

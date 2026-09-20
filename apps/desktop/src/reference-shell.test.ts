@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { REFERENCE_SHELL, applyReferenceShell, shouldEnableReferenceShell } from './reference-shell'
+import { applyReferenceShell, REFERENCE_SHELL, shouldEnableReferenceShell } from './reference-shell'
 
 describe('reference shell activation', () => {
   it('enables the aurora shell for the primary workspace and secondary session windows', () => {

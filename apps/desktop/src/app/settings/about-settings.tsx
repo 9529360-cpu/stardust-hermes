@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, RefreshCw } from '@/lib/icons'
-import { PRODUCT_DESKTOP_NAME, PRODUCT_NAME, PRODUCT_REPOSITORY_URL } from '@/product-brand'
 import { cn } from '@/lib/utils'
+import { PRODUCT_DESKTOP_NAME, PRODUCT_NAME, PRODUCT_REPOSITORY_URL } from '@/product-brand'
 import {
   $desktopVersion,
   $updateApply,

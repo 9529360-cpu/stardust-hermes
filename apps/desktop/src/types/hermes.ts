@@ -896,6 +896,20 @@ export interface CronJob {
   state?: null | string
 }
 
+export interface CronSuggestion {
+  id: string
+  title: string
+  description: string
+  source: string
+  blueprint_key?: null | string
+  created_at?: null | string
+  job_spec: {
+    deliver?: string
+    name?: string
+    schedule?: string
+    skills?: string[]
+  }
+}
 export interface CronJobCreatePayload {
   deliver?: string
   model?: string

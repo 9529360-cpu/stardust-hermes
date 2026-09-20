@@ -134,6 +134,10 @@ def create_blueprint_job(spec: BlueprintSpec, *, origin: Optional[Dict[str, Any]
     job_spec = blueprint_to_job_spec(spec, name=name)
     if origin is not None:
         job_spec["origin"] = origin
+    from cron.session_return import capture_local_session_origin
+    local_origin = capture_local_session_origin(job_spec.get("deliver"))
+    if local_origin is not None:
+        job_spec["local_session_origin"] = local_origin
     return create_job_with_scheduler_registration(**job_spec)
 
 

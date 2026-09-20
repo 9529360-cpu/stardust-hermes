@@ -31,6 +31,53 @@ NOTE = (
 )
 
 
+def _connected_connector_names(rows: Any) -> List[str]:
+    """Confirmed connector slugs from gateway-list rows or settled operation targets."""
+    out: List[str] = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("connector") or row.get("name") or "").strip().lower()
+        state = str(row.get("state") or "").strip().lower()
+        status = str(row.get("connectionStatus") or "").strip().lower()
+        if name and (row.get("connected") is True or state == "connected" or status == "active"):
+            if name not in out:
+                out.append(name)
+    return out
+
+
+def _suggest_connected_automations(rows: Any) -> List[str]:
+    """Best-effort consent-first automation suggestions for confirmed integrations."""
+    names = _connected_connector_names(rows)
+    if not names:
+        return []
+    try:
+        from cron.suggestion_catalog import seed_integration_suggestions
+
+        created = seed_integration_suggestions(names)
+    except Exception as exc:
+        # Connection success is authoritative; a suggestion-store failure must never roll it back.
+        logger.debug("integration automation suggestion failed for %s: %s", names, exc)
+        return []
+    return [str(item.get("title") or "").strip() for item in created if item.get("title")]
+
+
+def _annotate_automation_suggestions(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Tell the model about newly queued suggestions without changing the RPC result shape."""
+    rows = payload.get("connectors") if isinstance(payload.get("connectors"), list) else payload.get("targets")
+    titles = _suggest_connected_automations(rows)
+    if not titles:
+        return payload
+    suffix = (
+        " Optional automations were added to /suggestions: "
+        + ", ".join(titles)
+        + ". Nothing was scheduled automatically; do not accept one without the user's explicit choice."
+    )
+    key = "hint" if isinstance(payload.get("connectors"), list) else "note"
+    payload[key] = str(payload.get(key) or "").rstrip() + suffix
+    return payload
+
+
 def _default_client():
     from tools.connectors.gateway.client import ConnectorClient
 
@@ -140,7 +187,7 @@ def _off_desktop_result(client: Any, action: str, names: List[str], force: bool,
         "Show each connect_url to the user; they open it in a browser to authorize. Ask them to tell you "
         "when they are done, then check with action 'status'. Do not call connect again for the same app."
     )
-    return json.dumps(payload, ensure_ascii=False)
+    return json.dumps(_annotate_automation_suggestions(payload), ensure_ascii=False)
 
 
 def run_managed_action(
@@ -163,9 +210,10 @@ def run_managed_action(
             if connectors:
                 wanted = set(connectors)
                 items = [i for i in items if str(i.get("connector", "")).lower() in wanted]
-            return json.dumps({"connectors": items, "hint": (
+            payload = {"connectors": items, "hint": (
                 "connected=false means calls to that connector will return CONNECTION_REQUIRED. "
-                "Use action 'connect' to start an authorization.")}, ensure_ascii=False)
+                "Use action 'connect' to start an authorization.")}
+            return json.dumps(_annotate_automation_suggestions(payload), ensure_ascii=False)
         if not connectors:
             return tool_error(
                 f"'{action}' requires 'connectors': the connector slugs to authorize (e.g. [\"gmail\"]). "
@@ -175,12 +223,14 @@ def run_managed_action(
         session_key = operation_session_key(session_id)
         if session_platform() != "desktop" or connection_callback is None:
             return _off_desktop_result(client, action, connectors, force, session_key)
-        return run_operation(
+        raw = run_operation(
             [Target(n, "connector", action) for n in connectors],
             Kind(prepare=_prepare(client, action, force), observe=lambda op: _observe(client, op), note=NOTE),
             session_key=session_key, tool_call_id=tool_call_id,
             connection_callback=connection_callback, with_urls_in_result=False,
         )
+        payload = json.loads(raw)
+        return json.dumps(_annotate_automation_suggestions(payload), ensure_ascii=False)
     except Exception as exc:
         logger.debug("manage_connections %s failed: %s", action, exc)
         return tool_error(

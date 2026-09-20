@@ -10,6 +10,7 @@ nothing auto-creates (consent-first). Storage mirrors ``cron/jobs.py`` (atomic r
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import threading
@@ -23,15 +24,12 @@ from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
-# Per-profile by design (anchored on get_hermes_home(), see cron/jobs.py). Optional test override;
-# production resolves the path at CALL time so multiplexed profile ticks (set_hermes_home_override)
-# cannot leak one profile's suggestions into the import-time home.
-# Per-profile by design (issue #4707): suggestions live alongside the active profile's cron store. Anchor on
-# get_hermes_home() (profile home), not the shared default root. Same pattern as cron/executions.py.
+# Per-profile by design: resolve the path at CALL time so multiplexed profile scopes cannot
+# leak one profile's suggestions into another. Optional explicit path is for isolated tests.
 SUGGESTIONS_FILE: Optional[Path] = None
 
 # Protects load->modify->save cycles (the background review fork and the main agent can both write).
-_suggestions_lock = threading.Lock()
+_suggestions_lock = threading.RLock()
 
 # Cap pending suggestions so the list never becomes a nag wall; when full, new ones are dropped.
 MAX_PENDING = 5
@@ -50,6 +48,41 @@ def _ensure_dir() -> None:
     from cron.jobs import _ensure_cron_dir
 
     _ensure_cron_dir(_current_suggestions_file().parent)
+
+
+@contextlib.contextmanager
+def _suggestions_mutation_lock():
+    """Serialize suggestion decisions across threads and Hermes processes.
+
+    Reuse cron.jobs' bounded, cross-platform flock primitives but keep a distinct lock file:
+    suggestion acceptance may create a job (which takes .jobs.lock), so the two authorities must
+    not alias and accidentally turn that nested create into self-contention.
+    """
+    with _suggestions_lock:
+        _ensure_dir()
+        from cron.jobs import _JOBS_LOCK_TIMEOUT_SECONDS, _acquire_flock, _release_flock
+
+        lock_path = _current_suggestions_file().with_suffix(".lock")
+        lock_fd = None
+        try:
+            lock_fd = open(lock_path, "a+", encoding="utf-8")
+            lock_fd.seek(0)
+            acquired = _acquire_flock(lock_fd, _JOBS_LOCK_TIMEOUT_SECONDS)
+        except Exception as exc:
+            if lock_fd is not None:
+                with contextlib.suppress(Exception):
+                    lock_fd.close()
+            raise RuntimeError(f"suggestion store lock unavailable: {lock_path}") from exc
+        if acquired is False:
+            lock_fd.close()
+            raise RuntimeError(f"timed out waiting for suggestion store lock: {lock_path}")
+        if acquired is None:
+            lock_fd.close()
+            raise RuntimeError(f"cross-process suggestion locking is unavailable: {lock_path}")
+        try:
+            yield
+        finally:
+            _release_flock(lock_fd)
 
 
 def _load_raw() -> Dict[str, Any]:
@@ -102,7 +135,7 @@ def add_suggestion(
     if not title.strip() or not dedup_key.strip():
         raise ValueError("title and dedup_key are required")
 
-    with _suggestions_lock:
+    with _suggestions_mutation_lock():
         suggestions = _load_raw().get("suggestions", [])
         if any(
             existing.get("dedup_key") == dedup_key
@@ -129,71 +162,132 @@ def add_suggestion(
         return record
 
 
-def get_suggestion(ref: str) -> Optional[Dict[str, Any]]:
-    """Resolve a suggestion by id, 1-based pending index, or exact (case-insensitive) title."""
-    suggestions = load_suggestions()
-    for s in suggestions:
-        if s.get("id") == ref:
-            return s
+def _resolve_suggestion(suggestions: List[Dict[str, Any]], ref: str) -> Optional[Dict[str, Any]]:
+    for suggestion in suggestions:
+        if suggestion.get("id") == ref:
+            return suggestion
     if ref.isdigit():
         pending = _pending(suggestions)
         idx = int(ref) - 1
         if 0 <= idx < len(pending):
             return pending[idx]
-    for s in suggestions:
-        if s.get("title", "").lower() == ref.lower():
-            return s
+    lowered = ref.lower()
+    for suggestion in suggestions:
+        if suggestion.get("title", "").lower() == lowered:
+            return suggestion
     return None
 
 
+def get_suggestion(ref: str) -> Optional[Dict[str, Any]]:
+    """Resolve a suggestion by id, 1-based pending index, or exact (case-insensitive) title."""
+    return _resolve_suggestion(load_suggestions(), ref)
+
+
+def _resolve_in_place(
+    suggestions: List[Dict[str, Any]], suggestion: Dict[str, Any], status: str,
+) -> None:
+    suggestion["status"] = status
+    suggestion["resolved_at"] = _hermes_now().isoformat()
+    _save_raw(suggestions)
+
+
 def _set_status(suggestion_id: str, status: str) -> bool:
-    with _suggestions_lock:
+    with _suggestions_mutation_lock():
         suggestions = _load_raw().get("suggestions", [])
-        for s in suggestions:
-            if s.get("id") == suggestion_id:
-                s["status"] = status
-                s["resolved_at"] = _hermes_now().isoformat()
-                _save_raw(suggestions)
-                return True
-        return False
+        suggestion = next((s for s in suggestions if s.get("id") == suggestion_id), None)
+        if suggestion is None:
+            return False
+        _resolve_in_place(suggestions, suggestion, status)
+        return True
 
 
 def dismiss_suggestion(ref: str) -> bool:
-    """Dismiss a suggestion (latched — never re-offered for its dedup_key)."""
-    s = get_suggestion(ref)
-    return bool(s) and _set_status(s["id"], _STATUS_DISMISSED)
+    """Atomically dismiss a pending suggestion; resolved decisions are immutable."""
+    with _suggestions_mutation_lock():
+        suggestions = _load_raw().get("suggestions", [])
+        suggestion = _resolve_suggestion(suggestions, ref)
+        if not suggestion or suggestion.get("status") != _STATUS_PENDING:
+            return False
+        _resolve_in_place(suggestions, suggestion, _STATUS_DISMISSED)
+        return True
 
 
-def accept_suggestion(ref: str, *, origin: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """Accept a suggestion: create the real cron job from its ``job_spec``. Returns the job dict, or
-    None if not found / not pending. ``origin`` (platform/chat) is merged so "origin" delivery
-    routes back to the chat where the user accepted."""
-    s = get_suggestion(ref)
-    if not s or s.get("status") != _STATUS_PENDING:
-        return None
+def accept_suggestion(
+    ref: str, *, origin: Optional[Dict[str, Any]] = None,
+    local_session_origin: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Accept a suggestion and create its real cron job.
 
+    ``origin`` carries messaging delivery. ``local_session_origin`` is accepted only after the
+    caller has validated the durable Desktop/TUI session; turn-context callers keep using the
+    shared capture helper. Nothing here invents a route from client-supplied identifiers.
+    """
     from cron.scheduler import (
         CronSchedulerRegistrationError, create_job_with_scheduler_registration,
+        register_persisted_job,
     )
 
-    spec = dict(s.get("job_spec") or {})
-    if origin is not None and "origin" not in spec:
-        spec["origin"] = origin
+    with _suggestions_mutation_lock():
+        suggestions = _load_raw().get("suggestions", [])
+        s = _resolve_suggestion(suggestions, ref)
+        if not s or s.get("status") != _STATUS_PENDING:
+            return None
 
-    try:
-        job = create_job_with_scheduler_registration(**spec)
-    except CronSchedulerRegistrationError:
-        # The job is already durable: resolve the suggestion so a retry cannot create a second copy.
-        _set_status(s["id"], _STATUS_ACCEPTED)
-        raise
-    _set_status(s["id"], _STATUS_ACCEPTED)
-    return job
+        suggestion_id = str(s.get("id") or "").strip()
+        if not suggestion_id:
+            raise ValueError("suggestion id is required")
+
+        # A process can die after jobs.json commits but before suggestions.json is resolved.
+        # Reconcile that durable job first so retry never creates a second random job id.
+        from cron.jobs import load_jobs
+        existing = next(
+            (
+                job for job in load_jobs()
+                if str(job.get("source_suggestion_id") or "").strip() == suggestion_id
+            ),
+            None,
+        )
+        if existing is not None:
+            try:
+                job = register_persisted_job(existing)
+            except CronSchedulerRegistrationError:
+                _resolve_in_place(suggestions, s, _STATUS_ACCEPTED)
+                raise
+            _resolve_in_place(suggestions, s, _STATUS_ACCEPTED)
+            return job
+
+        spec = dict(s.get("job_spec") or {})
+        spec["source_suggestion_id"] = suggestion_id
+        if origin is not None and "origin" not in spec:
+            spec["origin"] = origin
+        from cron.session_return import capture_local_session_origin, local_session_origin as normalize_local_origin
+        if "local_session_origin" not in spec:
+            local_origin = None
+            if local_session_origin is not None:
+                local_origin = normalize_local_origin(
+                    spec.get("deliver"),
+                    local_session_origin.get("source"),
+                    local_session_origin.get("session_id"),
+                )
+            if local_origin is None:
+                local_origin = capture_local_session_origin(spec.get("deliver"))
+            if local_origin is not None:
+                spec["local_session_origin"] = local_origin
+
+        try:
+            job = create_job_with_scheduler_registration(**spec)
+        except CronSchedulerRegistrationError:
+            # The job is already durable: resolve the suggestion so a retry cannot create a second copy.
+            _resolve_in_place(suggestions, s, _STATUS_ACCEPTED)
+            raise
+        _resolve_in_place(suggestions, s, _STATUS_ACCEPTED)
+        return job
 
 
 def clear_resolved() -> int:
     """Drop ACCEPTED records from disk (they served their purpose once the job exists); dismissed
     records are RETAINED for their dedup_key. Returns the count removed."""
-    with _suggestions_lock:
+    with _suggestions_mutation_lock():
         suggestions = _load_raw().get("suggestions", [])
         kept = [s for s in suggestions if s.get("status") != _STATUS_ACCEPTED]
         removed = len(suggestions) - len(kept)

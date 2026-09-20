@@ -2,12 +2,17 @@ import { atom } from 'nanostores'
 
 import { sessionTitle } from '@/lib/chat-runtime'
 import type { PreviewServerRestart } from '@/store/preview'
-import type { ActionStatusResponse, SessionInfo } from '@/types/hermes'
+import { sessionMatchesStoredId } from '@/store/session'
+import type { ActionStatusResponse, CronJob, SessionInfo } from '@/types/hermes'
+
+import type { ComposerStatusItem } from './composer-status'
+import type { ApprovalRequest } from './prompts'
+import { buildSubagentTree, type SubagentNode, type SubagentProgress } from './subagents'
 
 const HISTORY_LIMIT = 8
 const COMPLETED_TTL_MS = 5 * 60 * 1000
 
-export type RailTaskStatus = 'error' | 'running' | 'success'
+export type RailTaskStatus = 'error' | 'running' | 'success' | 'waiting'
 
 export interface RailTask {
   id: string
@@ -30,23 +35,41 @@ export function upsertDesktopActionTask(status: ActionStatusResponse): void {
 
 export function buildRailTasks(
   workingSessionIds: readonly string[],
+  attentionSessionIds: readonly string[],
   sessions: readonly SessionInfo[],
   previewRestart: PreviewServerRestart | null,
   actionTasks: Record<string, DesktopActionTask>
 ): RailTask[] {
-  const sessionsById = new Map(sessions.map(session => [session.id, session]))
+  const sessionTasks = new Map<string, RailTask>()
 
-  const sessionTasks: RailTask[] = workingSessionIds.map((id, index) => {
-    const session = sessionsById.get(id)
+  const upsertSessionTask = (id: string, status: Extract<RailTaskStatus, 'running' | 'waiting'>) => {
+    const session = sessions.find(candidate => sessionMatchesStoredId(candidate, id))
+    const canonicalId = session?.id ?? id
+    const existing = sessionTasks.get(canonicalId)
 
-    return {
-      id: `session:${id}`,
-      label: session ? sessionTitle(session) : 'Session task',
-      detail: 'Agent task running',
-      status: 'running',
-      updatedAt: session?.last_active || Date.now() - index
+    // A blocking prompt outranks ordinary running state for the same lineage.
+    if (existing?.status === 'waiting' && status === 'running') {
+      return
     }
-  })
+
+    const activitySeconds = session?.last_active || session?.started_at || 0
+
+    sessionTasks.set(canonicalId, {
+      id: `session:${canonicalId}`,
+      label: session ? sessionTitle(session) : 'Session task',
+      detail: status === 'waiting' ? 'Waiting for your input' : 'Agent task running',
+      status,
+      updatedAt: activitySeconds > 0 ? activitySeconds * 1000 : Date.now()
+    })
+  }
+
+  for (const id of workingSessionIds) {
+    upsertSessionTask(id, 'running')
+  }
+
+  for (const id of attentionSessionIds) {
+    upsertSessionTask(id, 'waiting')
+  }
 
   const previewTasks: RailTask[] = previewRestart
     ? [
@@ -69,7 +92,7 @@ export function buildRailTasks(
     updatedAt
   }))
 
-  return [...sessionTasks, ...previewTasks, ...actions].sort((left, right) => right.updatedAt - left.updatedAt)
+  return [...sessionTasks.values(), ...previewTasks, ...actions].sort((left, right) => right.updatedAt - left.updatedAt)
 }
 
 function actionStatus(status: ActionStatusResponse): RailTaskStatus {
@@ -96,5 +119,240 @@ function prune(tasks: Record<string, DesktopActionTask>): Record<string, Desktop
       .filter(([, task]) => task.status.running || now - task.updatedAt <= COMPLETED_TTL_MS)
       .sort(([, left], [, right]) => right.updatedAt - left.updatedAt)
       .slice(0, HISTORY_LIMIT)
+  )
+}
+
+export type TaskCenterStatus = RailTaskStatus | 'interrupted' | 'paused' | 'queued'
+export type TaskDurability = 'process-local' | 'restart-durable' | 'turn'
+export type TaskCenterRail = 'action' | 'approval' | 'cron' | 'preview' | 'process' | 'session' | 'subagent'
+export type TaskCenterAction = 'manage-cron' | 'open-session' | 'stop-process'
+
+export interface TaskCenterTask extends Omit<RailTask, 'status'> {
+  action?: TaskCenterAction
+  approvalRef?: string
+  artifactRefs?: string[]
+  depth?: number
+  durability?: TaskDurability
+  ownerSessionId?: string
+  processId?: string
+  rail: TaskCenterRail
+  sessionId?: string
+  status: TaskCenterStatus
+}
+
+export interface TaskCenterSources {
+  actionTasks: Record<string, DesktopActionTask>
+  approvalRequests?: Record<string, ApprovalRequest>
+  attentionSessionIds: readonly string[]
+  backgroundBySession: Record<string, ComposerStatusItem[]>
+  cronJobs: readonly CronJob[]
+  previewRestart: PreviewServerRestart | null
+  runtimeStoredSessionIds?: Record<string, null | string>
+  sessions: readonly SessionInfo[]
+  subagentsBySession: Record<string, SubagentProgress[]>
+  workingSessionIds: readonly string[]
+}
+
+const TASK_STATUS_PRIORITY: Record<TaskCenterStatus, number> = {
+  waiting: 0,
+  error: 1,
+  interrupted: 2,
+  running: 3,
+  queued: 4,
+  paused: 5,
+  success: 6
+}
+
+const parseTimestamp = (value: null | string | undefined): number => {
+  if (!value) {
+    return 0
+  }
+
+  const parsed = Date.parse(value)
+
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const cronStatus = (job: CronJob): TaskCenterStatus => {
+  const state = String(job.state ?? '').trim().toLowerCase()
+
+  if (state === 'running' || state === 'active') {
+    return 'running'
+  }
+
+  if (state === 'completed') {
+    return 'success'
+  }
+
+  if (state === 'error' || state === 'failed') {
+    return 'error'
+  }
+
+  if (!job.enabled || state === 'paused') {
+    return 'paused'
+  }
+
+  return 'queued'
+}
+
+const subagentStatus = (status: SubagentProgress['status']): TaskCenterStatus => {
+  if (status === 'completed') {
+    return 'success'
+  }
+
+  if (status === 'failed') {
+    return 'error'
+  }
+
+  if (status === 'interrupted') {
+    return 'interrupted'
+  }
+
+  return status
+}
+
+const flattenSubagents = (
+  runtimeSessionId: string,
+  nodes: readonly SubagentNode[],
+  depth = 0
+): TaskCenterTask[] =>
+  nodes.flatMap(node => {
+    const detail = node.currentTool || node.summary || node.stream.at(-1)?.text || 'Delegated task'
+
+    const task: TaskCenterTask = {
+      action: node.sessionId ? 'open-session' : undefined,
+      artifactRefs: node.filesWritten,
+      depth,
+      durability: 'process-local',
+      id: `subagent:${runtimeSessionId}:${node.id}`,
+      label: node.goal,
+      rail: 'subagent',
+      sessionId: node.sessionId,
+      status: subagentStatus(node.status),
+      detail,
+      updatedAt: node.updatedAt
+    }
+
+    return [task, ...flattenSubagents(runtimeSessionId, node.children, depth + 1)]
+  })
+
+/**
+ * Read-only Task Center projection.
+ *
+ * Every row is derived from an existing authoritative owner cache: session
+ * state, subagents, process.list, cron jobs, preview restart, or desktop
+ * actions. This store never writes lifecycle state back into those owners.
+ */
+export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask[] {
+  const approvals = Object.entries(sources.approvalRequests ?? {}).map<TaskCenterTask>(
+    ([runtimeKey, request]) => {
+      const runtimeSessionId = request.sessionId || runtimeKey
+      const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
+      const storedSessionCandidate = mappedStoredSessionId ?? runtimeSessionId
+      const storedSessionId =
+        sources.sessions.find(session => sessionMatchesStoredId(session, storedSessionCandidate))?.id ??
+        mappedStoredSessionId
+
+      return {
+        action: storedSessionId ? 'open-session' : undefined,
+        approvalRef: request.requestId,
+        detail: request.command,
+        durability: 'turn',
+        id: `approval:${request.requestId || runtimeSessionId}`,
+        label: request.description || 'Approval required',
+        ownerSessionId: runtimeSessionId,
+        rail: 'approval',
+        sessionId: storedSessionId ?? undefined,
+        status: 'waiting',
+        updatedAt: 0
+      }
+    }
+  )
+
+  const approvalSessionIds = new Set(approvals.flatMap(task => (task.sessionId ? [task.sessionId] : [])))
+
+  const base = buildRailTasks(
+    sources.workingSessionIds,
+    sources.attentionSessionIds,
+    sources.sessions,
+    sources.previewRestart,
+    sources.actionTasks
+  )
+    .map<TaskCenterTask>(task => {
+      if (task.id.startsWith('session:')) {
+        const sessionId = task.id.slice('session:'.length)
+
+        return {
+          ...task,
+          action: 'open-session',
+          durability: 'turn',
+          rail: 'session',
+          sessionId
+        }
+      }
+
+      return {
+        ...task,
+        durability: 'process-local',
+        rail: task.id.startsWith('preview:') ? 'preview' : 'action'
+      }
+    })
+    .filter(
+      task =>
+        !(
+          task.rail === 'session' &&
+          task.status === 'waiting' &&
+          task.sessionId &&
+          approvalSessionIds.has(task.sessionId)
+        )
+    )
+
+  const subagents = Object.entries(sources.subagentsBySession).flatMap(([runtimeSessionId, items]) =>
+    flattenSubagents(runtimeSessionId, buildSubagentTree(items))
+  )
+
+  const processes = Object.entries(sources.backgroundBySession).flatMap(([runtimeSessionId, items]) =>
+    items
+      .filter(item => item.type === 'background')
+      .map<TaskCenterTask>(item => ({
+        action: item.state === 'running' ? 'stop-process' : undefined,
+        detail:
+          item.state === 'running'
+            ? 'Background process'
+            : item.state === 'failed'
+              ? `Failed (${item.exitCode ?? 'unknown'})`
+              : 'Completed',
+        durability: 'process-local',
+        id: `process:${item.id}`,
+        label: item.title,
+        ownerSessionId: runtimeSessionId,
+        processId: item.id,
+        rail: 'process',
+        status: item.state === 'running' ? 'running' : item.state === 'failed' ? 'error' : 'success',
+        updatedAt: 0
+      }))
+  )
+
+  const cron = sources.cronJobs.map<TaskCenterTask>(job => ({
+    action: 'manage-cron',
+    detail:
+      job.last_error ||
+      job.schedule_display ||
+      job.schedule?.display ||
+      job.next_run_at ||
+      'Scheduled task',
+    durability: 'restart-durable',
+    id: `cron:${job.id}`,
+    label: job.name || job.prompt || job.script || 'Scheduled task',
+    rail: 'cron',
+    status: cronStatus(job),
+    updatedAt: parseTimestamp(job.last_run_at)
+  }))
+
+  return [...approvals, ...base, ...subagents, ...processes, ...cron].sort(
+    (left, right) =>
+      TASK_STATUS_PRIORITY[left.status] - TASK_STATUS_PRIORITY[right.status] ||
+      right.updatedAt - left.updatedAt ||
+      left.id.localeCompare(right.id)
   )
 }

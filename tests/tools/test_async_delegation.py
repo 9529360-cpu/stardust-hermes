@@ -122,6 +122,64 @@ def test_connect_preserves_wal_and_applies_macos_durability_barriers(
         conn.close()
 
 
+def test_publish_durable_completion_is_idempotent_and_enqueued(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+    assert ad.publish_durable_completion(
+        delegation_id="cron_exec_1", session_key="desktop-session",
+        parent_session_id="desktop-session", goal="Morning brief", summary="All clear",
+        role="cron_run", event_metadata={"cron_job_id": "job-1", "cron_job_name": "Morning brief"},
+    ) is True
+    event = _drain_for("cron_exec_1")
+    assert event is not None
+    assert event["session_key"] == "desktop-session"
+    assert event["role"] == "cron_run"
+    durable = ad.get_durable_delegation("cron_exec_1")
+    assert durable is not None
+    assert durable["delivery_state"] == "pending"
+    assert durable["result"]["summary"] == "All clear"
+
+    assert ad.publish_durable_completion(
+        delegation_id="cron_exec_1", session_key="desktop-session",
+        parent_session_id="desktop-session", goal="Morning brief", summary="duplicate",
+        role="cron_run",
+    ) is False
+    assert process_registry.completion_queue.empty()
+
+
+def test_external_cron_worker_persists_without_process_local_queue(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("_HERMES_CRON_EXTERNAL_WORKER", "exec-worker")
+
+    assert ad.publish_durable_completion(
+        delegation_id="cron_exec_worker", session_key="desktop-worker-session",
+        parent_session_id="desktop-worker-session", goal="Worker task", summary="done", role="cron_run") is True
+    assert process_registry.completion_queue.empty()
+
+    restored = ad.restore_matching_undelivered_completions(
+        process_registry.completion_queue, lambda evt: evt.get("session_key") == "desktop-worker-session")
+    assert restored == 1
+    assert _drain_for("cron_exec_worker") is not None
+
+def test_restore_matching_completion_recovers_after_in_memory_copy_is_lost(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    ad.publish_durable_completion(
+        delegation_id="cron_exec_2", session_key="closed-session",
+        parent_session_id="closed-session", goal="Watch inbox", summary="New mail", role="cron_run")
+    assert _drain_for("cron_exec_2") is not None  # simulate an unrelated live poller discarding it
+
+    restored = ad.restore_matching_undelivered_completions(
+        process_registry.completion_queue, lambda evt: evt.get("session_key") == "closed-session")
+    assert restored == 1
+    event = _drain_for("cron_exec_2")
+    assert event is not None and event["restored"] is True
+
+    while not process_registry.completion_queue.empty():
+        process_registry.completion_queue.get_nowait()
+    assert ad.restore_matching_undelivered_completions(
+        process_registry.completion_queue, lambda evt: evt.get("session_key") == "some-other-session") == 0
+    assert process_registry.completion_queue.empty()
+
 def test_dispatch_returns_immediately_without_blocking():
     gate = threading.Event()
 
@@ -198,6 +256,44 @@ def test_completion_event_lands_on_shared_queue_with_session_key():
     assert evt["session_key"] == "agent:main:cli:dm:local"
     assert evt["parent_session_id"] == "20260703_parent_sid"
     assert evt["delegation_id"] == res["delegation_id"]
+
+
+def test_durable_receipt_exposes_parent_task_and_terminal_event_for_recovery(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+
+    def runner():
+        return {
+            "status": "completed",
+            "summary": "terminal report",
+            "api_calls": 1,
+            "duration_seconds": 0.1,
+        }
+
+    res = ad.dispatch_async_delegation(
+        goal="research task",
+        context="project context",
+        toolsets=["web"],
+        role="leaf",
+        model="test-model",
+        session_key="session-route",
+        parent_session_id="parent-session",
+        runner=runner,
+        max_async_children=1,
+    )
+    assert res["status"] == "dispatched"
+
+    evt = _drain_for(res["delegation_id"])
+    assert evt is not None
+
+    receipt = ad.get_durable_delegation(res["delegation_id"])
+    assert receipt is not None
+    assert receipt["parent_session_id"] == "parent-session"
+    assert receipt["task"]["goal"] == "research task"
+    assert receipt["task"]["context"] == "project context"
+    assert receipt["task"]["toolsets"] == ["web"]
+    assert receipt["event"]["status"] == "completed"
+    assert receipt["event"]["summary"] == "terminal report"
+    assert receipt["result"]["summary"] == "terminal report"
 
 
 def test_rich_reinjection_block_is_self_contained():

@@ -2529,10 +2529,12 @@ def _record_fire_ownership_lost(job_id: str, fire_owner: Optional[str], executio
 def _classify_delivery_outcome(
     *, delivery_error, should_deliver: bool, unresolved_origin: bool,
     normalized_deliver: str, incident_acked: bool, success: bool,
-    delivery_queued=None,
+    delivery_queued=None, local_session_delivered: bool = False,
 ) -> str:
     if delivery_error:
         return "failed"
+    if local_session_delivered:
+        return "delivered"
     if should_deliver and delivery_queued:
         return "queued"
     if should_deliver and unresolved_origin:
@@ -2632,6 +2634,8 @@ class _RunDelivery:
     incident_acked: bool = False
     failure_incident_id: Optional[str] = None
     side_effect_ownership_lost: bool = False
+    delivery_content: str = ""
+    local_session_delivered: bool = False
 
 
 def _save_compose_deliver(
@@ -2665,6 +2669,7 @@ def _save_compose_deliver(
     ) = _compose_run_delivery(
         job, success=d.success, error=d.error, final_response=final_response,
         output_file=output_file)
+    d.delivery_content = deliver_content
     # Whitespace-only == empty: skip delivery; the guard below marks it a soft failure.
     d.should_deliver = bool(deliver_content.strip()) and not _silent_alert
     if d.should_deliver and not d.success and job.get("_model_unreachable"):
@@ -2716,6 +2721,53 @@ def _save_compose_deliver(
         d.delivery_error = str(de)
         logger.error("Delivery failed for job %s: %s", job["id"], de)
 
+
+def _publish_local_session_completion(
+    d: _RunDelivery, fence: _FireOwnership, execution_id: str,
+) -> None:
+    """Return a non-silent scheduled result to the local conversation that created the job.
+
+    The result rides the same durable completion ledger and idle-turn admission path as
+    background delegation/manual cron runs. This is a delivery side effect, so it is fenced
+    by the job fire owner and a publish failure is recorded as a delivery failure rather than
+    pretending the scheduled task itself did not run.
+    """
+    origin = d.job.get("local_session_origin")
+    if not d.should_deliver or not isinstance(origin, dict):
+        return
+    source = str(origin.get("source") or "").strip().lower()
+    session_id = str(origin.get("session_id") or "").strip()
+    delivery_lane = _normalize_deliver_value(_delivery_lane_value(d.job, for_failure=not d.success))
+    if source not in {"desktop", "tui"} or not session_id or delivery_lane not in {"local", "origin"}:
+        return
+    with fence.side_effect_fence() as owns_delivery:
+        if not owns_delivery:
+            raise _FireClaimLostDuringSideEffect
+        try:
+            from tools.async_delegation import publish_durable_completion
+            name = str(d.job.get("name") or d.job.get("id") or "Scheduled task")
+            publish_durable_completion(
+                delegation_id=f"cron_{execution_id}",
+                session_key=session_id,
+                parent_session_id=session_id,
+                goal=name,
+                summary=d.delivery_content,
+                status="completed" if d.success else "error",
+                error=d.error,
+                role="cron_run",
+                model=d.job.get("model"),
+                context=f"Scheduled cron job {d.job.get('id', '')} completed in the background.",
+                event_metadata={
+                    "cron_job_id": str(d.job.get("id") or ""),
+                    "cron_job_name": name,
+                },
+            )
+            d.local_session_delivered = True
+            d.delivery_attempted = True
+        except Exception as exc:
+            local_error = f"local session delivery failed: {exc}"
+            d.delivery_error = "; ".join(filter(None, (d.delivery_error, local_error)))
+            logger.error("Job '%s': %s", d.job.get("id"), local_error, exc_info=True)
 
 def _finish_interrupted_run(job: dict, execution_id: str, delivery_error: Optional[str]) -> None:
     """Shutdown already wrote last_status, so mark_job_run is skipped (a second call would skip a
@@ -2772,6 +2824,7 @@ def _finish_completed_run(d: _RunDelivery, fire_owner: Optional[str], execution_
         normalized_deliver=_normalize_deliver_value(_delivery_lane_value(job, for_failure=not d.success)),
         incident_acked=d.incident_acked,
         success=d.success,
+        local_session_delivered=d.local_session_delivered,
     )
     if delivery_outcome in ("delivered", "not_configured") and not d.success:
         # Failure ping left the process (or had a configured target): mark the incident alerted.
@@ -2930,6 +2983,7 @@ def _run_one_job_body(
             _save_compose_deliver(
                 d, fence, final_response, output, adapters=adapters, loop=loop, verbose=verbose,
                 execution_token=execution_token)
+            _publish_local_session_completion(d, fence, execution_id)
         except _FireClaimLostDuringSideEffect:
             d.side_effect_ownership_lost = True
         finally:
@@ -3413,19 +3467,28 @@ class CronSchedulerRegistrationError(RuntimeError):
             "retry_create": False}
 
 
-def create_job_with_scheduler_registration(**kwargs) -> dict:
-    """Persist one job and register its first trigger with the active provider."""
-    from cron.jobs import create_job
-    from cron.scheduler_provider import resolve_cron_scheduler
+def register_persisted_job(job: dict) -> dict:
+    """Register an already-durable job with the active provider.
 
-    job = create_job(**kwargs)
+    External providers key registration by the persisted job identity. This is also the
+    reconciliation path for a caller recovering from an unknown create outcome.
+    """
     if not job.get("enabled", True):
         return job
+    from cron.scheduler_provider import resolve_cron_scheduler
+
     try:
         resolve_cron_scheduler().register_job(job)
     except Exception as exc:
         raise CronSchedulerRegistrationError(job, exc) from exc
     return job
+
+
+def create_job_with_scheduler_registration(**kwargs) -> dict:
+    """Persist one job and register its first trigger with the active provider."""
+    from cron.jobs import create_job
+
+    return register_persisted_job(create_job(**kwargs))
 
 
 # Dead-owner reap is throttled (opens the executions ledger). Tests may reset

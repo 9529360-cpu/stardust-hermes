@@ -44,6 +44,15 @@ function fakePackager(metadata) {
   }
 }
 
+function declaredGitHubRepository(metadata) {
+  const repository = typeof metadata.repository === 'string' ? metadata.repository : metadata.repository?.url
+  const match = String(repository || '').match(/github\.com[/:]([^/]+)\/([^/]+)$/)
+
+  assert.ok(match, 'apps/desktop/package.json must declare a GitHub repository')
+
+  return { owner: match[1], repo: match[2].replace(/\.git$/, '') }
+}
+
 const TOKEN_VARS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GITLAB_TOKEN', 'KEYGEN_TOKEN', 'BITBUCKET_TOKEN']
 let savedEnv
 
@@ -86,10 +95,12 @@ describe('local desktop pack stays out of the publish path', () => {
       /* errorIfCannot */ true
     )
 
+    const expectedRepository = declaredGitHubRepository(desktopPkg)
+
     assert.ok(Array.isArray(configs) && configs.length > 0)
     assert.equal(configs[0].provider, 'github')
-    assert.equal(configs[0].owner, 'NousResearch')
-    assert.equal(configs[0].repo, 'hermes-agent')
+    assert.equal(configs[0].owner, expectedRepository.owner)
+    assert.equal(configs[0].repo, expectedRepository.repo)
   })
 
   test('a package without the repository field is what breaks resolution', async () => {

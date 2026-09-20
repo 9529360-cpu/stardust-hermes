@@ -2129,7 +2129,17 @@ export const ja = defineLocale({
       failedLoad: 'ブレーンプリントの読み込みに失敗しました',
       emptyTitle: '利用できるブレーンプリントはありません',
       emptyDesc: 'このバックエンドで利用できる自動化ブレーンプリントはありません。'
-    }
+    },
+    suggestions: {
+      tab: 'おすすめの自動化',
+      accept: 'スケジュール',
+      dismiss: '却下',
+      working: '処理中…',
+      scheduled: '自動化をスケジュールしました',
+      dismissed: '提案を却下しました',
+      actionFailed: '自動化の提案を更新できませんでした',
+      needsConversation: 'スケジュール結果の返却先を確保するため、先に保存済みの会話を開いてください。'
+    },
   },
 
   artifacts: {

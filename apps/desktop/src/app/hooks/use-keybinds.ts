@@ -41,8 +41,8 @@ import {
   toggleShowAllProfiles
 } from '@/store/profile'
 import { openFolderAsProject } from '@/store/projects'
-import { setRightContextOpen, toggleRightContextOpen } from '@/store/right-context'
 import { toggleReview } from '@/store/review'
+import { setRightContextOpen, toggleRightContextOpen } from '@/store/right-context'
 import { $selectedStoredSessionId, setModelPickerOpen } from '@/store/session'
 import { reopenLastClosedTile } from '@/store/session-states'
 import {

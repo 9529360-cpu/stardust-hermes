@@ -16,7 +16,6 @@
   "/indicator": "terminal",
   "/insights": "advanced",
   "/kanban": "advanced",
-  "/login": "settings",
   "/model": "hidden",
   "/paste": "terminal",
   "/platforms": "terminal",

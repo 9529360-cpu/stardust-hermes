@@ -125,6 +125,27 @@ class TestCreateBlueprintJob:
         assert job["id"] == "abc123"
 
 
+    def test_origin_blueprint_from_tui_captures_local_return(self):
+        from gateway.session_context import clear_session_vars, set_session_vars
+
+        spec = BlueprintSpec(
+            skill_name="morning-brief", schedule="0 8 * * *", deliver="origin", prompt="Brief me.")
+        captured = {}
+
+        def fake_create_job(**kwargs):
+            captured.update(kwargs)
+            return {"id": "abc-local", **kwargs}
+
+        tokens = set_session_vars(source="tui", session_id="tui-blueprint-session")
+        try:
+            with patch("cron.jobs.create_job", fake_create_job):
+                create_blueprint_job(spec)
+        finally:
+            clear_session_vars(tokens)
+
+        assert captured["local_session_origin"] == {
+            "source": "tui", "session_id": "tui-blueprint-session"}
+
 class TestExportBlueprint:
     def test_round_trips_job_to_skill_md(self):
         job = {
