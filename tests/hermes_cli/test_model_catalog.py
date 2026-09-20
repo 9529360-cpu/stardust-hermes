@@ -136,7 +136,10 @@ class TestFallbackChain:
     twice; the stale disk cache / bundled in-repo lists remain the offline path.
     """
 
-    STARDUST = "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json"
+    STARDUST = (
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/website/static/api/model-catalog.json"
+    )
     CUSTOM_PRIMARY = "https://catalog.example.test/model-catalog.json"
 
     def test_uses_custom_primary_when_it_succeeds(self, isolated_home):
