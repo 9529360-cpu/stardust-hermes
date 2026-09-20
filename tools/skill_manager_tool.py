@@ -474,7 +474,11 @@ def _create_skill(
         return _err(err)
     if existing := _find_skill(name):
         return _err(f"A skill named '{name}' already exists at {existing['path']}.")
-    if not distinct and (merge_candidates := _find_create_merge_candidates(name, content)):
+    # The background curator is already inside an explicit consolidation pass with
+    # stricter ownership/read-before-write/archive guards. Re-running the foreground
+    # overlap gate there can block creation of the umbrella it needs to consolidate into.
+    if not distinct and not _is_background_review() and (
+            merge_candidates := _find_create_merge_candidates(name, content)):
         names = ", ".join(f"'{row['name']}'" for row in merge_candidates)
         return _err(
             f"Potential existing skill owner(s) found for '{name}': {names}. "
