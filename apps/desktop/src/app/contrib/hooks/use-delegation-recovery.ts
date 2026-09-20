@@ -33,10 +33,9 @@ export function useDelegationRecovery(sessionId: null | string): DelegationRecov
 
     let cancelled = false
     let pending = false
-    let failures = 0
 
     const refresh = async () => {
-      if (cancelled || pending || failures >= 3) {
+      if (cancelled || pending) {
         return
       }
 
@@ -57,22 +56,21 @@ export function useDelegationRecovery(sessionId: null | string): DelegationRecov
             sessionId
           })
         }
-        failures = 0
       } catch {
-        // Older backends simply have no recovery surface. Retry a few times so
-        // an owner route that appears just after reconnect can still hydrate.
-        failures++
+        // Older backends simply have no recovery surface. A reconnect or focus
+        // event will retry without polling the durable ledger continuously.
       } finally {
         pending = false
       }
     }
 
     void refresh()
-    const timer = window.setInterval(() => void refresh(), 5000)
+    const onFocus = () => void refresh()
+    window.addEventListener('focus', onFocus)
 
     return () => {
       cancelled = true
-      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
     }
   }, [gatewayState, sessionId])
 
