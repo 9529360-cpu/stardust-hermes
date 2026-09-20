@@ -29,10 +29,10 @@ import { visibleClarifyCard } from '@/lib/keybinds/composer-focus-keys'
 import { cn } from '@/lib/utils'
 import {
   bareChoice,
+  clarifyBatchDraft,
   type ClarifyBatchDraft,
   type ClarifyQuestion,
   type ClarifyRequest,
-  clarifyBatchDraft,
   clearClarifyRequest,
   normalizeChoices,
   RECOMMENDED_LABEL,

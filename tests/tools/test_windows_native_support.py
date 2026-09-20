@@ -351,8 +351,8 @@ class TestReadmeNoLongerSaysWindowsUnsupported:
     def test_readme_mentions_powershell_installer(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / "README.md").read_text(encoding="utf-8")
-        assert "install.ps1" in source, (
-            "README.md must point at scripts/install.ps1 for Windows users"
+        assert "install-stardust.ps1" in source, (
+            "README.md must point at scripts/install-stardust.ps1 for Windows users"
         )
 
 

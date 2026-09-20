@@ -74,11 +74,11 @@ import {
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 import {
-  BlueprintSlotControl,
   blueprintDisplayDescription,
   blueprintDisplayFieldHelp,
   blueprintDisplayFieldLabel,
   blueprintDisplayTitle,
+  BlueprintSlotControl,
   cleanBlueprintFieldError,
   initialBlueprintValues
 } from './blueprints'

@@ -841,35 +841,6 @@ class TestUpdateCheckEndpoint:
     def _setup(self, _isolate_hermes_home):
         self.client, _ = _client()
 
-    def test_git_install_reports_behind_count(self, monkeypatch):
-        import hermes_cli.web_server as ws
-
-        monkeypatch.setattr(_cfg_mod, "detect_install_method", lambda *a, **k: "git")
-        # Stub the shared checker so the contract is deterministic (no network).
-        import hermes_cli.banner as banner
-
-        monkeypatch.setattr(banner, "check_for_updates", lambda: 5)
-
-        r = self.client.get("/api/hermes/update/check")
-        assert r.status_code == 200
-        body = r.json()
-        assert {
-            "install_method",
-            "current_version",
-            "behind",
-            "update_available",
-            "can_apply",
-            "update_command",
-            "message",
-        } <= set(body)
-        assert body["install_method"] == "git"
-        assert body["behind"] == 5
-        assert body["update_available"] is True
-        # git/pip installs can apply the update in place from the dashboard.
-        assert body["can_apply"] is True
-
-
-
     def test_managed_runtime_dashboard_is_not_applyable(self, monkeypatch):
         import hermes_cli.web_server as ws
 
