@@ -312,6 +312,39 @@ def _kill_tree(proc: "subprocess.Popen", pgid: int | None = None) -> None:
         pass
 
 
+_active_processes_lock = threading.Lock()
+_active_processes: Dict[int, Tuple["subprocess.Popen", int | None]] = {}
+
+
+def _unregister_active_process(proc: "subprocess.Popen") -> None:
+    with _active_processes_lock:
+        _active_processes.pop(proc.pid, None)
+
+
+def _terminate_active_processes() -> None:
+    """Best-effort cancellation cleanup for every live per-file pytest tree."""
+    with _active_processes_lock:
+        active = list(_active_processes.values())
+    for proc, pgid in active:
+        _kill_tree(proc, pgid=pgid)
+
+
+def _install_termination_handlers() -> None:
+    """Ensure CI cancellation cannot orphan detached pytest process groups."""
+    import signal
+
+    def _handle(signum, _frame) -> None:
+        _terminate_active_processes()
+        # Exit immediately after child cleanup. Waiting for the executor would
+        # allow already-queued files to start after a cancellation request.
+        os._exit(128 + int(signum))
+
+    for name in ("SIGTERM", "SIGINT"):
+        sig = getattr(signal, name, None)
+        if sig is not None:
+            signal.signal(sig, _handle)
+
+
 def _effective_file_timeout(
     file: Path,
     repo_root: Path,
@@ -457,35 +490,34 @@ def _run_one_file_once(
     # One root for each subprocess removes the shared directory that the race
     # needs. The parent deletes the root after the attempt.
     env = os.environ.copy()
-    temproot = tempfile.mkdtemp(prefix="hermes-pytest-tmproot-")
+    # Keep the prefix short: pytest appends the username and test name, while
+    # Linux AF_UNIX socket paths are capped at 108 bytes.
+    temproot = tempfile.mkdtemp(prefix="hpt-")
     env["PYTEST_DEBUG_TEMPROOT"] = temproot
 
     subproc_start = time.monotonic()
-    # launch the pytest process
-    proc = subprocess.Popen(
-        cmd,
-        cwd=repo_root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True, encoding="utf-8", errors="replace",
-        env=env,
-        # POSIX: place the child at the head of its own process group so
-        # _kill_tree can SIGKILL the group atomically.
-        # Windows: this maps to CREATE_NEW_PROCESS_GROUP in CPython 3.12+;
-        # _kill_tree handles the Windows path via taskkill /F /T.
-        start_new_session=True,
-    )
-
-    # Capture the pgid NOW, before the leader can exit and be reaped. Once
-    # the leader is reaped, os.getpgid(proc.pid) raises ProcessLookupError
-    # even though grandchildren in that group are still alive — defeating
-    # the whole cleanup. None on Windows where the pgid concept doesn't apply.
-    pgid: int | None = None
-    if sys.platform != "win32":
-        try:
-            pgid = os.getpgid(proc.pid)
-        except (ProcessLookupError, PermissionError):
-            pgid = None
+    # Spawn + registration are one cancellation-critical section. The signal
+    # handler takes the same lock before snapshotting active children, so TERM
+    # can never land in the Popen-return -> registry-insert gap and orphan a
+    # just-created pytest tree.
+    with _active_processes_lock:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=repo_root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace",
+            env=env,
+            # POSIX: place the child at the head of its own process group so
+            # _kill_tree can SIGKILL the group atomically.
+            # Windows: this maps to CREATE_NEW_PROCESS_GROUP in CPython 3.12+;
+            # _kill_tree handles the Windows path via taskkill /F /T.
+            start_new_session=True,
+        )
+        # start_new_session=True makes the child the leader of a fresh POSIX
+        # process group, so its pid is the pgid immediately.
+        pgid: int | None = proc.pid if sys.platform != "win32" else None
+        _active_processes[proc.pid] = (proc, pgid)
 
     try:
         output, _ = proc.communicate(timeout=file_timeout)
@@ -513,6 +545,7 @@ def _run_one_file_once(
 
         output +=  "\n"
     finally:
+        _unregister_active_process(proc)
         # Delete the temp root for this attempt. Nothing reads it after the
         # subprocess exits. More than 3000 of them fill the disk of the
         # runner over one suite.
@@ -882,6 +915,15 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--fail-on-flaky",
+        action="store_true",
+        help=(
+            "Exit non-zero when any file fails its first attempt but passes a retry. "
+            "Useful for CI: retries keep the diagnostic second attempt without "
+            "turning an unstable run green."
+        ),
+    )
+    parser.add_argument(
         "--slice",
         metavar="I/N",
         help=(
@@ -942,7 +984,7 @@ def main() -> int:
     # (``-k=expr``, ``--tb=long``) are self-contained and need no lookahead.
     OUR_FLAGS = {
         "-j", "--jobs", "--paths", "--include-integration",
-        "--file-timeout", "--file-retries", "--slice", "--generate-slices", "--files",
+        "--file-timeout", "--file-retries", "--fail-on-flaky", "--slice", "--generate-slices", "--files",
     }
     # pytest short flags that consume the NEXT token as their value.
     PYTEST_VALUE_FLAGS = {"-k", "-m", "-p", "-o", "-c", "-r", "-W"}
@@ -1326,8 +1368,14 @@ def main() -> int:
     if no_tests_ran_at_all:
         return 1
 
+    if args.fail_on_flaky and _FLAKY_RESULTS:
+        print()
+        print("=== ✗ RETRY-ONLY FLAKES ARE BLOCKING THIS RUN ===")
+        return 1
+
     return 0
 
 
 if __name__ == "__main__":
+    _install_termination_handlers()
     sys.exit(main())

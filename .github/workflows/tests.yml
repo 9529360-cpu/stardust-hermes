@@ -13,11 +13,10 @@ concurrency:
 jobs:
   test:
     name: Run tests
-    # The upstream organization used a private 96-core runner and hard-coded
-    # 96 pytest file workers. This standalone product runs on the standard
-    # GitHub-hosted fleet, so keep concurrency bounded to the machine we can
-    # actually acquire instead of queueing forever for a missing org runner.
-    runs-on: ubuntu-latest
+    # Trusted Stardust branches use the isolated Leopard self-hosted runner.
+    # External fork PRs stay on GitHub-hosted infrastructure so untrusted code
+    # cannot execute on the personal CI machine.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'stardust-ci' }}
     timeout-minutes: 60
     steps:
       - name: Checkout code
@@ -69,17 +68,27 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
-          scripts/run_tests.sh
+          if [ "${RUNNER_NAME:-}" = "leopard-stardust-ci" ]; then
+            export HOME="${RUNNER_TEMP}/stardust-ci-home"
+            rm -rf "$HOME"
+            install -d -m 700 "$HOME"
+            touch "$HOME/.hushlogin"
+          fi
+          # Replace the Actions step shell with the test runner so cancellation
+          # targets the real parent instead of orphaning it under PID 1.
+          exec scripts/run_tests.sh --fail-on-flaky
         env:
+          # Leopard exposes 8 logical CPUs backed by 4 physical cores. Eight CPU-heavy
+          # pytest workers can more than double slow-file wall time and trip the 300s
+          # per-file safety cap, so match the physical-core budget instead.
           HERMES_TEST_WORKERS: 4
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
 
       - name: Save per-file duration cache (main only)
-        # The runner writes only first-attempt-clean durations. Save those even
-        # when another file failed, or a red main branch can never bootstrap
-        # the cache that gives known-slow files proportional headroom.
+        # Keep clean first-attempt durations even when another file fails, so a
+        # red main run can still bootstrap timeout data for known-slow files.
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && hashFiles('test_durations.json') != ''
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:

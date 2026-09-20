@@ -27,6 +27,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 import pytest
@@ -667,6 +668,16 @@ def _close_leaked_session_dbs():
         return
     for db in list(registry):
         if getattr(db, "_shared_registry_owned", False):
+            continue
+        owner = getattr(db, "_test_instance_owner_thread", None)
+        if (
+            owner is not None
+            and owner is not threading.current_thread()
+            and owner.is_alive()
+        ):
+            # A live worker still owns this handle. Closing it from pytest's
+            # teardown thread can race that worker inside SQLite and crash the
+            # interpreter. Once the owner exits, a later sweep may close it.
             continue
         try:
             db.close()

@@ -142,9 +142,16 @@ _test_instance_registry: "weakref.WeakSet[Any]" = weakref.WeakSet()
 
 
 def _register_test_instance(db: Any) -> None:
-    """Track *db* for suite-level teardown closing (test-isolation runs only)."""
+    """Track *db* for suite-level teardown closing (test-isolation runs only).
+
+    Record the creating thread too. The suite sweep runs on pytest's main
+    thread and must never close a SessionDB still owned by a live worker:
+    pysqlite permits cross-thread handles here, but close-vs-use is unsafe and
+    can segfault inside SQLite rather than raising a Python exception.
+    """
     if os.environ.get(_TEST_ISOLATION_MARKER_ENV):
         try:
+            db._test_instance_owner_thread = threading.current_thread()
             _test_instance_registry.add(db)
         except Exception:  # pragma: no cover — registry must never break init
             pass
