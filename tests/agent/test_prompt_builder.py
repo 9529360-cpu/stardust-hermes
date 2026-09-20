@@ -81,6 +81,9 @@ class TestGuidanceConstants:
         ):
             assert f"`{mode}`" in DEFAULT_AGENT_IDENTITY
         assert "never as a promise of restart durability" in DEFAULT_AGENT_IDENTITY
+        assert "`assistant_tasks`" in DEFAULT_AGENT_IDENTITY
+        assert "multiple independent action requests" in DEFAULT_AGENT_IDENTITY
+        assert "persistent user-approval boundary" in DEFAULT_AGENT_IDENTITY
         assert "must not steal focus" in DEFAULT_AGENT_IDENTITY
         assert "continue" in DEFAULT_AGENT_IDENTITY
         assert "verify the result" in DEFAULT_AGENT_IDENTITY
