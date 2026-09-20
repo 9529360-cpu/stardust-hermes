@@ -155,7 +155,7 @@ def test_keepalive_does_not_start_for_free_tier(isolated_store, monkeypatch):
     monkeypatch.setattr(nous_auth_keepalive, "_keepalive_thread", None)
 
 
-def test_every_in_chat_free_tier_string_names_the_slash_command(monkeypatch):
+def test_every_in_chat_free_tier_string_points_at_model_selection(monkeypatch):
     from gateway.run_notifications import GatewayNotificationsMixin
 
     monkeypatch.setattr("hermes_cli.auth.resolve_provider", lambda _requested: "nous")
@@ -174,7 +174,7 @@ def test_every_in_chat_free_tier_string_names_the_slash_command(monkeypatch):
         anon_auth.LOGIN_BUSY_ELSEWHERE,
         anon_auth.LOGIN_NOT_ALLOWED,
     )
-    assert all("/login" in text for text in command_copy)
+    assert all("/model" in text for text in command_copy)
     for text in (*command_copy, *refusal_copy):
         # The ruled refusal uses Hermes as the grammatical subject; only that exact product-name
         # phrase is exempt from the broad top-level-command gate.
@@ -263,10 +263,12 @@ async def test_the_wait_line_is_only_composed_on_the_state(monkeypatch):
         assert "format_wait_line" not in (repo / rel).read_text(encoding="utf-8"), rel
 
 
-def test_cli_chat_status_names_the_free_tier(isolated_store):
+def test_cli_chat_status_names_the_free_tier(isolated_store, monkeypatch):
     from hermes_cli.cli_session_mixin import CLISessionMixin
 
     _write_auth(_guest_state())
+    monkeypatch.setattr("hermes_cli.auth.resolve_provider", lambda *_args, **_kwargs: "nous")
+    monkeypatch.setattr(anon_auth, "guest_carries_inference", lambda: True)
     rendered = []
     cli = SimpleNamespace(
         _session_db=None,
