@@ -82,6 +82,32 @@ def test_refresh_swaps_in_memory_only(monkeypatch, tmp_path):
     assert packaged_path.read_text(encoding="utf-8") == before
 
 
+def test_refresh_uses_stardust_catalog_authority(monkeypatch):
+    """Live refresh must read Stardust's reviewed main, never the Hermes origin."""
+    doc = _doc_from(lambda models: models)
+    body = json.dumps(doc).encode()
+    seen_urls = []
+
+    class R(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_urlopen(req, timeout):
+        seen_urls.append(req.full_url)
+        return R(body)
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    assert cat.refresh_catalog(force=True) is True
+    assert seen_urls == [
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/hermes_cli/local_runtime/catalog.json"
+    ]
+
+
 def test_refresh_failure_keeps_current_catalog(monkeypatch):
     def boom(*a, **k):
         raise OSError("offline")
