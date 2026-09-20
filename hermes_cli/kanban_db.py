@@ -708,7 +708,10 @@ class Task:
     # done / budget exhausted (-> kanban_block); ``goal_max_turns`` None -> goals default.
     goal_mode: bool = False
     goal_max_turns: Optional[int] = None
-    session_id: Optional[str] = None         # originating HERMES_SESSION_ID; NULL from CLI/dashboard
+    session_id: Optional[str] = None         # provenance only: originating HERMES_SESSION_ID
+    # Stable personal-assistant owner. Unlike session_id this survives chat deletion and
+    # lets a later conversation recover the user's durable task handles.
+    assistant_owner_key: Optional[str] = None
     # VALID_BLOCK_KINDS or None (legacy); kept across unblock so a same-kind re-block reads as a loop.
     block_kind: Optional[str] = None
     block_recurrences: int = 0               # unblock-loop counter, see BLOCK_RECURRENCE_LIMIT
@@ -742,7 +745,7 @@ _TASK_REQUIRED_COLUMNS = (
 _TASK_OPTIONAL_COLUMNS = (
     "branch_name", "project_id", "tenant", "result", "idempotency_key", "worker_pid",
     "max_runtime_seconds", "last_heartbeat_at", "current_run_id", "workflow_template_id",
-    "current_step_key", "max_retries", "session_id", "completion_contract",
+    "current_step_key", "max_retries", "session_id", "assistant_owner_key", "completion_contract",
 )
 # Text columns where "" is stored/read as "not set".
 _TASK_EMPTY_IS_NULL_COLUMNS = (
@@ -931,6 +934,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     -- set the env var. Indexed so per-session list queries stay cheap on
     -- larger boards.
     session_id           TEXT,
+    -- Stable owner for personal-assistant task handles. This is deliberately
+    -- independent from session_id: deleting the originating chat must not orphan
+    -- durable work, while multi-user messaging installs still need isolation.
+    assistant_owner_key  TEXT,
     -- Typed block reason set by ``block_task`` (one of VALID_BLOCK_KINDS, or
     -- NULL for legacy/un-typed blocks). Drives routing: ``dependency`` never
     -- sits in ``blocked`` (goes to ``todo`` for parent-gating); the others go
@@ -1230,7 +1237,8 @@ def create_task(
     max_retries: Optional[int] = None, model_override: Optional[str] = None,
     provider_override: Optional[str] = None, reasoning_effort: Optional[str] = None,
     goal_mode: bool = False, goal_max_turns: Optional[int] = None, initial_status: str = "running",
-    session_id: Optional[str] = None, board: Optional[str] = None, project_id: Optional[str] = None,
+    session_id: Optional[str] = None, assistant_owner_key: Optional[str] = None,
+    board: Optional[str] = None, project_id: Optional[str] = None,
     project_source_task_id: Optional[str] = None,
     creator_task_id: Optional[str] = None,
     completion_contract: Optional[str] = None,
@@ -1333,8 +1341,8 @@ def create_task(
                         max_runtime_seconds,
                         skills, max_retries, model_override, provider_override,
                         reasoning_effort,
-                        goal_mode, goal_max_turns, session_id, completion_contract
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        goal_mode, goal_max_turns, session_id, assistant_owner_key, completion_contract
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task_id, title.strip(), body, assignee, task_status, priority,
@@ -1343,7 +1351,9 @@ def create_task(
                         _opt_int(max_runtime_seconds),
                         json.dumps(skills_list) if skills_list is not None else None,
                         _opt_int(max_retries), model_override, provider_override, reasoning_effort,
-                        1 if goal_mode else 0, _opt_int(goal_max_turns), session_id, completion_contract,
+                        1 if goal_mode else 0, _opt_int(goal_max_turns), session_id,
+                        (str(assistant_owner_key).strip() or None) if assistant_owner_key is not None else None,
+                        completion_contract,
                     ),
                 )
                 for pid in parents:
@@ -1486,7 +1496,8 @@ VALID_SORT_ORDERS: dict[str, str] = {
 
 def list_tasks(
     conn: sqlite3.Connection, *, assignee: Optional[str] = None, status: Optional[str] = None,
-    tenant: Optional[str] = None, session_id: Optional[str] = None, include_archived: bool = False,
+    tenant: Optional[str] = None, session_id: Optional[str] = None,
+    assistant_owner_key: Optional[str] = None, include_archived: bool = False,
     limit: Optional[int] = None, order_by: Optional[str] = None,
     workflow_template_id: Optional[str] = None, current_step_key: Optional[str] = None,
 ) -> list[Task]:
@@ -1496,7 +1507,8 @@ def list_tasks(
     params: list[Any] = []
     for col, val in (
         ("assignee", _canonical_assignee(assignee)), ("status", status), ("tenant", tenant),
-        ("session_id", session_id), ("workflow_template_id", workflow_template_id),
+        ("session_id", session_id), ("assistant_owner_key", assistant_owner_key),
+        ("workflow_template_id", workflow_template_id),
         ("current_step_key", current_step_key),
     ):
         if val is not None:
