@@ -35,13 +35,17 @@ _APPROVAL_NOTE = (
 )
 
 
-def _owner_idempotency_token(owner_key: str) -> str:
-    """Non-reversible owner component for replay keys.
+def _idempotency_scope_token(owner_key: str, request_id: str) -> str:
+    """Replay-stable token without a reusable user fingerprint.
 
-    The stable owner itself can contain a messaging user id. Keep it out of
-    idempotency_key because board archives preserve that column as task history.
+    Board archives preserve idempotency keys. Hashing the owner by itself would
+    leave the same pseudonymous marker on every task from one messaging user
+    (and low-entropy numeric IDs could be dictionary-tested). Bind the owner to
+    the high-entropy tool-call id so retries of one call remain stable while
+    unrelated calls cannot be linked by a persistent owner token.
     """
-    return hashlib.sha256(owner_key.encode("utf-8")).hexdigest()[:16]
+    material = f"{owner_key}\0{request_id}".encode("utf-8")
+    return hashlib.sha256(material).hexdigest()[:32]
 
 
 def _bounded_text(value: Any, limit: int) -> str:
@@ -145,7 +149,7 @@ def _create_tasks(
     scope = str(request_id or "request").strip() or "request"
     sid = str(session_id or "").strip()
     owner = str(owner_key or "").strip()
-    owner_token = _owner_idempotency_token(owner)
+    replay_token = _idempotency_scope_token(owner, scope)
     created: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
 
@@ -167,7 +171,7 @@ def _create_tasks(
             "assignee": str(raw.get("assignee") or default_assignee).strip(),
             "priority": raw.get("priority", 0),
             "goal_mode": bool(raw.get("continuous")),
-            "idempotency_key": f"assistant:{owner_token}:{scope}:{index}",
+            "idempotency_key": f"assistant:{replay_token}:{index}",
             "_assistant_owner_key": owner,
         }
         if sid:
