@@ -387,14 +387,106 @@ def _clip(text: str, n: int, ellipsis: str) -> str:
     return text[:n] + (ellipsis if len(text) > n else "")
 
 
+_CONVERGENCE_STOPWORDS = frozenset({
+    "about", "agent", "and", "for", "from", "guide", "guidance", "hermes",
+    "into", "memory", "process", "reusable", "skill", "stardust", "support",
+    "task", "tasks", "that", "the", "this", "use", "using", "when", "with",
+    "workflow", "workflows",
+})
+
+
+def _convergence_terms(text: str) -> set[str]:
+    """High-signal lowercase terms for conservative create-time overlap checks."""
+    return {
+        token for token in re.findall(r"[a-z0-9]+", (text or "").lower())
+        if len(token) >= 3 and token not in _CONVERGENCE_STOPWORDS
+    }
+
+
+def _find_create_merge_candidates(name: str, content: str, *, limit: int = 5) -> List[Dict[str, Any]]:
+    """Likely existing owners for a proposed new skill.
+
+    This is intentionally conservative: it blocks only when at least two meaningful
+    terms overlap and either the names substantially overlap or the combined
+    name+description topics do. It is a convergence guard, not a semantic classifier.
+    """
+    from agent.skill_utils import get_all_skills_dirs
+
+    requested_name_terms = _convergence_terms(name)
+    requested_terms = requested_name_terms | _convergence_terms(_description_preview(content))
+    if len(requested_terms) < 2:
+        return []
+
+    candidates: List[Tuple[float, Dict[str, Any]]] = []
+    seen_paths: set[str] = set()
+    for skills_root in get_all_skills_dirs():
+        if not skills_root.exists():
+            continue
+        for skill_dir in _iter_skill_dirs(skills_root):
+            skill_md = skill_dir / "SKILL.md"
+            try:
+                path_key = str(skill_md.resolve())
+            except OSError:
+                path_key = str(skill_md)
+            if path_key in seen_paths:
+                continue
+            seen_paths.add(path_key)
+            try:
+                frontmatter, _ = _parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            candidate_name = str(frontmatter.get("name") or skill_dir.name).strip()
+            if not candidate_name or candidate_name == name:
+                continue
+            candidate_name_terms = _convergence_terms(candidate_name)
+            candidate_desc = str(frontmatter.get("description") or "")
+            candidate_terms = candidate_name_terms | _convergence_terms(candidate_desc)
+            shared = requested_terms & candidate_terms
+            if len(shared) < 2:
+                continue
+            name_shared = requested_name_terms & candidate_name_terms
+            name_term_floor = min(len(requested_name_terms), len(candidate_name_terms))
+            name_coverage = (
+                len(name_shared) / name_term_floor if name_term_floor >= 2 else 0.0
+            )
+            topic_coverage = len(shared) / min(len(requested_terms), len(candidate_terms))
+            if name_coverage < 0.67 and topic_coverage < 0.60:
+                continue
+            score = max(name_coverage, topic_coverage)
+            candidates.append((score, {
+                "name": candidate_name,
+                "description": candidate_desc,
+                "shared_terms": sorted(shared),
+            }))
+
+    candidates.sort(key=lambda item: (-item[0], item[1]["name"]))
+    return [row for _, row in candidates[:limit]]
+
+
 # --- Core actions -------------------------------------------------------------
 
-def _create_skill(name: str, content: str, category: str = None) -> Dict[str, Any]:
+def _create_skill(
+    name: str, content: str, category: str = None, *, distinct: bool = False,
+) -> Dict[str, Any]:
     if err := (_validate_name(name) or _validate_category(category)
                or _validate_frontmatter(content, new_skill=True) or _validate_content_size(content)):
         return _err(err)
     if existing := _find_skill(name):
         return _err(f"A skill named '{name}' already exists at {existing['path']}.")
+    # The background curator is already inside an explicit consolidation pass with
+    # stricter ownership/read-before-write/archive guards. Re-running the foreground
+    # overlap gate there can block creation of the umbrella it needs to consolidate into.
+    if not distinct and not _is_background_review() and (
+            merge_candidates := _find_create_merge_candidates(name, content)):
+        names = ", ".join(f"'{row['name']}'" for row in merge_candidates)
+        return _err(
+            f"Potential existing skill owner(s) found for '{name}': {names}. "
+            "Do not create a parallel skill yet. Load these candidates with skill_view and "
+            "patch the one that already owns this workflow. Only if the responsibility is "
+            "genuinely separate should you retry create with distinct=true.",
+            merge_candidates=merge_candidates,
+            hint="Prefer merge/update over create. Use distinct=true only after inspecting the candidates.",
+        )
     skill_dir = _resolve_skill_dir(name, category)
     skill_dir.mkdir(parents=True, exist_ok=True)
     skill_md = skill_dir / "SKILL.md"
@@ -611,7 +703,7 @@ def _apply_skill_write_gate(action, name, **payload_kwargs):
 
 
 _FLAT_OP_KEYS = ("content", "category", "file_path", "file_content", "old_string", "new_string",
-                 "absorbed_into", "operations")
+                 "distinct", "absorbed_into", "operations")
 
 
 def _skill_manage_from(payload: Dict[str, Any], **extra) -> str:
@@ -680,7 +772,8 @@ def _act_patch(a):
 # action -> handler(args dict) returning a result dict, or a tool_error JSON string for
 # argument-shape errors. "edit" is a legacy alias for a full rewrite (not in the schema).
 _ACTION_HANDLERS = {
-    "create": lambda a: _create_skill(a["name"], a["content"], a["category"]),
+    "create": lambda a: _create_skill(
+        a["name"], a["content"], a["category"], distinct=bool(a["distinct"])),
     "edit": lambda a: _edit_skill(a["name"], a["content"]),
     "patch": _act_patch,
     "delete": lambda a: _delete_skill(a["name"], absorbed_into=a["absorbed_into"]),
@@ -742,7 +835,7 @@ def _record_success(action, name, result, *, file_path, absorbed_into, task_id,
 def skill_manage(
     action: str, name: str, content: str = None, category: str = None, file_path: str = None,
     file_content: str = None, old_string: str = None, new_string: str = None,
-    replace_all: bool = False, absorbed_into: str = None, task_id: str = None,
+    replace_all: bool = False, distinct: bool = False, absorbed_into: str = None, task_id: str = None,
     session_id: str = None, operations=None) -> str:
     """Dispatch to the action handler -> JSON string. ``operations`` (atomic batch shape,
     see _skill_manage_batch) overrides the flat fields."""
@@ -755,7 +848,7 @@ def skill_manage(
     # of origin; bypassed when replaying an approved staged write.
     args = dict(content=content, category=category, file_path=file_path, file_content=file_content,
                 old_string=old_string, new_string=new_string, replace_all=replace_all,
-                absorbed_into=absorbed_into)
+                distinct=distinct, absorbed_into=absorbed_into)
     if (gate_result := _apply_skill_write_gate(action, name, **args)) is not None:
         return gate_result
     # Ledger pre-capture: telemetry, not a gate — failures must NEVER block the mutation. delete
@@ -793,7 +886,9 @@ def _skill_manage_description(create_dir: str) -> str:
         "edit is a list of one); it applies atomically — any failure rolls "
         "every touched skill back. Ops: create (full SKILL.md; lands in "
         f"{create_dir}; must precede that skill's other "
-        "ops), patch (targeted old_string/new_string fix — preferred; "
+        "ops). Create is convergence-first: if likely existing owners are "
+        "found, inspect and patch them; retry with distinct=true only for a "
+        "genuinely separate responsibility. patch (targeted old_string/new_string fix — preferred; "
         "content alone REPLACES the whole file, read it via skill_view() "
         "first), write_file/remove_file (supporting files), delete (sole "
         "op only). Existing skills are modified wherever they live. Keep "
@@ -850,6 +945,14 @@ SKILL_MANAGE_SCHEMA = {
                         "category": {
                             "type": "string",
                             "description": "Optional category subdir for create (e.g. 'devops')."
+                        },
+                        "distinct": {
+                            "type": "boolean",
+                            "description": (
+                                "create only: bypass the overlap guard after you inspected the "
+                                "returned merge_candidates and verified this is a genuinely "
+                                "separate responsibility, not another fragment of an existing skill."
+                            )
                         },
                         # patch args: same fuzzy-matching semantics as the
                         # `patch` tool — teach only skill-specific facts here.

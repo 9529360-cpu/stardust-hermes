@@ -165,6 +165,121 @@ class TestCreateSkill:
         assert result["success"] is False
         assert "already exists" in result["error"]
 
+    def test_create_overlap_returns_merge_candidates(self, tmp_path):
+        existing = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        proposed = """\
+---
+name: github-pr-review
+description: Handle GitHub pull request review and recovery.
+---
+
+# GitHub PR Review
+
+Review and recover pull requests.
+"""
+        with _skill_dir(tmp_path):
+            first = _create_skill("github-pr-workflow", existing)
+            result = _create_skill("github-pr-review", proposed)
+
+        assert first["success"] is True
+        assert result["success"] is False
+        assert "Do not create a parallel skill yet" in result["error"]
+        assert result["merge_candidates"][0]["name"] == "github-pr-workflow"
+        assert not (tmp_path / "github-pr-review").exists()
+
+    def test_create_same_vendor_but_different_responsibility_is_not_blocked(self, tmp_path):
+        issues = """\
+---
+name: github-issue-triage
+description: Triage repository issues by severity and ownership.
+---
+
+# GitHub Issue Triage
+
+Classify issues and route them to owners.
+"""
+        releases = """\
+---
+name: github-release-notes
+description: Draft release notes from merged changes and tags.
+---
+
+# GitHub Release Notes
+
+Prepare release notes from repository history.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-issue-triage", issues)
+            result = _create_skill("github-release-notes", releases)
+
+        assert result["success"] is True
+        assert (tmp_path / "github-release-notes" / "SKILL.md").exists()
+
+    def test_create_unrelated_skill_is_not_blocked(self, tmp_path):
+        github = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        calendar = """\
+---
+name: calendar-planning
+description: Plan calendar blocks around daily priorities.
+---
+
+# Calendar Planning
+
+Plan time blocks and daily priorities.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-pr-workflow", github)
+            result = _create_skill("calendar-planning", calendar)
+
+        assert result["success"] is True
+        assert (tmp_path / "calendar-planning" / "SKILL.md").exists()
+
+    def test_create_distinct_bypasses_overlap_after_inspection(self, tmp_path):
+        existing = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        proposed = """\
+---
+name: github-pr-review
+description: Handle GitHub pull request review and recovery.
+---
+
+# GitHub PR Review
+
+Review and recover pull requests.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-pr-workflow", existing)
+            result = _create_skill("github-pr-review", proposed, distinct=True)
+
+        assert result["success"] is True
+        assert (tmp_path / "github-pr-review" / "SKILL.md").exists()
+
     def test_create_rejects_category_traversal(self, tmp_path):
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()

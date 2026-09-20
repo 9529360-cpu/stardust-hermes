@@ -46,6 +46,14 @@ class TestSkillManageSchemaDiet(unittest.TestCase):
         for sub in ("references/", "templates/", "scripts/", "assets/"):
             self.assertIn(sub, desc)
 
+    def test_create_exposes_convergence_escape_hatch(self):
+        props = self._op_props()
+        self.assertIn("distinct", props)
+        self.assertIn("genuinely separate responsibility", props["distinct"]["description"])
+        desc = SKILL_MANAGE_SCHEMA["description"]
+        self.assertIn("convergence-first", desc)
+        self.assertIn("distinct=true", desc)
+
     def test_description_cuts_hold(self):
         desc = SKILL_MANAGE_SCHEMA["description"]
         # Maintainer-directed: no confirm-with-user coaching.
