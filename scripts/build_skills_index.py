@@ -266,8 +266,8 @@ def main():
     # (well above current catalog size) lets the full catalog land in the
     # index instead of being truncated at an arbitrary build-time limit.
     SOURCE_LIMITS = {
-        # 0 = unbounded catalog walk (max_items=0 in ClawHubSource). A positive
-        # limit bounds the walk and also enables the interactive 12s budget.
+        # 0 = full-catalog mode. ClawHubSource still applies its dedicated
+        # offline wall-clock budget so a degraded API cannot outlive CI.
         "clawhub": 0,
         "lobehub": 100_000,
         "browse-sh": 5_000,
