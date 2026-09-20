@@ -57,6 +57,34 @@ def test_hosted_auth_start_returns_public_authorization_url(monkeypatch):
     assert flow.redirect_uri == "https://agent.example/api/mcp/oauth/callback/reports"
 
 
+def test_hosted_auth_worker_start_failure_releases_flow_slot(monkeypatch):
+    """A failed Thread.start must not leave a phantom in-progress flow blocking retries."""
+    import types
+
+    import hermes_cli.web_routers.mcp as mcp_router
+
+    client = _client()
+    client.post(
+        "/api/mcp/servers",
+        json={"name": "reports", "url": "https://mcp.example/mcp", "auth": "oauth"},
+    )
+
+    class _BrokenThread:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(mcp_router, "threading", types.SimpleNamespace(Thread=_BrokenThread))
+
+    response = client.post("/api/mcp/servers/reports/auth")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Unable to start MCP OAuth worker"
+    assert _web_server_mcp._mcp_oauth_flows == {}
+
+
 def test_hosted_callback_bypasses_gated_cookie_auth(monkeypatch):
     import asyncio
 
