@@ -303,6 +303,13 @@ Skills that ARE agent-created follow the full lifecycle:
 - Pinned skills bypass all auto-transitions
 - Archives are recoverable via `hermes curator restore <name>`
 
+Disabling a skill suppresses it from normal agent discovery/use; it does not revoke
+Curator ownership that was already granted to an agent-created skill. The background
+review may inspect a disabled curator-managed skill so read-before-write safety still
+works, but user-owned, pinned, bundled, hub-installed, and external skills remain
+off-limits. Use `hermes curator pin <name>` when you want an agent-created skill kept
+out of autonomous maintenance as well.
+
 If you want to protect a specific skill from ever being touched — for example a
 hand-authored skill you rely on — use `hermes curator pin <name>`. See the next
 section.
