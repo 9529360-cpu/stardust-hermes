@@ -3,7 +3,7 @@
 The flat --file-timeout cap (default 300s) falsely SIGKILL'd
 known-slow large-collection files under CI load, then the automatic
 retry passed — manufacturing FLAKY reports for healthy files
-(tests/test_hermes_state.py, 2026-08-18 on main). The scaler gives a
+(tests/hermes_state/test_hermes_state.py, 2026-08-18 on main). The scaler gives a
 file max(flat_cap, 3 × last observed duration) and never lowers the cap.
 Only first-attempt-clean durations feed the cache, so a hang can never
 compound its own bound.
@@ -47,6 +47,27 @@ def test_slow_file_gets_proportional_headroom() -> None:
     # 205s last run → 615s bound: a load-dilated healthy run survives,
     # a genuine hang is still killed.
     assert mod._effective_file_timeout(f, REPO_ROOT, 300.0, durations) == 615.0
+
+
+def test_cold_cache_large_file_gets_bounded_headroom() -> None:
+    mod = _load_runner()
+    f = REPO_ROOT / "tests" / "hermes_state" / "test_hermes_state.py"
+    unrelated = REPO_ROOT / "tests" / "test_other.py"
+    durations = {mod._format_file(unrelated, REPO_ROOT): 1.0}
+
+    # A cache can be absent entirely, or present without this file after a
+    # path move. Both cases must still let a large healthy file bootstrap.
+    assert mod._effective_file_timeout(
+        f, REPO_ROOT, 300.0, None, approx_test_count=233
+    ) == 699.0
+    assert mod._effective_file_timeout(
+        f, REPO_ROOT, 300.0, durations, approx_test_count=233
+    ) == 699.0
+
+    # The cold-cache fallback stays bounded even for huge files.
+    assert mod._effective_file_timeout(
+        f, REPO_ROOT, 300.0, None, approx_test_count=1_000
+    ) == 900.0
 
 
 def test_only_first_attempt_clean_durations_feed_the_cache() -> None:
