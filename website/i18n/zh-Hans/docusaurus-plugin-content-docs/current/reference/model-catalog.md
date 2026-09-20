@@ -46,7 +46,7 @@ https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/stati
 
 字段说明：
 
-- **`version`** — 整数类型的 schema 版本号。未来的 schema 会递增此值；Hermes 拒绝处理版本号未知的清单，并回退到硬编码快照。
+- **`version`** — 整数类型的 schema 版本号。未来的 schema 会递增此值；Stardust 拒绝处理版本号未知的清单，并回退到硬编码快照。
 - **`metadata`** — 清单、provider 及模型级别的自由格式字典，支持任意键。Stardust 会忽略未知字段，因此你可以为条目添加注解（如 `"tier": "paid"`、`"tags": [...]` 等），无需协调 schema 变更。
 - **`description`** — 仅限 OpenRouter。驱动选择器徽章文本（`"recommended"`、`"free"` 或空字符串）。Nous Portal 不使用此字段。
 - **定价和上下文长度**不在清单中。这些数据在获取时来自各 provider 的实时 API（`/v1/models` 端点、models.dev）。
