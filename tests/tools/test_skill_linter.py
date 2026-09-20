@@ -201,6 +201,21 @@ def test_incident_log_shape_flagged_and_rule_shape_not():
     assert "incident-log-shape" not in _rules(lint_content(rule))
 
 
+def test_main_skill_bloat_warns_only_above_advisory_cap():
+    from tools.skill_linter import _MAIN_SKILL_WARN_CHARS
+
+    at_cap = CLEAN + ("x" * (_MAIN_SKILL_WARN_CHARS - len(CLEAN)))
+    assert len(at_cap) == _MAIN_SKILL_WARN_CHARS
+    assert "main-file-bloat" not in _rules(lint_content(at_cap))
+
+    over_cap = at_cap + "x"
+    findings = lint_content(over_cap)
+    assert "main-file-bloat" in _rules(findings)
+    bloat = next(f for f in findings if f.rule == "main-file-bloat")
+    assert bloat.severity == WARNING
+    assert "references/*.md" in bloat.message
+
+
 def test_references_sprawl_flagged_above_cap(tmp_path):
     from tools.skill_linter import _MAX_REFERENCE_FILES
     skill_dir = tmp_path / "my-skill"
