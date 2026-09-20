@@ -1752,6 +1752,18 @@ export interface SubagentListResult {
   subagents?: SubagentSnapshot[]
   delegations?: Record<string, unknown>[]
 }
+/** Sanitized process-loss receipt; never grants control over the retired worker. */
+export interface DelegationRecoveryReceipt {
+  delegation_id: string
+  goal?: string
+  task_count?: number
+  dispatched_at?: number
+  completed_at?: number
+  reason?: 'owner_exited'
+}
+export interface DelegationRecoveryListResult {
+  receipts?: DelegationRecoveryReceipt[]
+}
 /** ``methods_subagents._SUBAGENT_SNAPSHOT_FIELDS`` projection of one live child record. */
 export interface SubagentSnapshot {
   subagent_id: string
@@ -4241,6 +4253,8 @@ export interface RpcMethods {
   'cron.manage': { params: CronManageParams; result: CronManageResult }
   /** Block/unblock NEW spawns globally (active children keep running); returns the new state. */
   'delegation.pause': { params: DelegationPauseParams; result: DelegationPauseResult }
+  /** Recent process-local delegations this session lost when their backend process exited. */
+  'delegation.recovery.list': { params: SessionParams; result: DelegationRecoveryListResult }
   /** Running subagent tree plus the spawn pause flag and limits. */
   'delegation.status': { params: ProfileParams; result: DelegationStatusResult }
   /** Upload a force-redacted debug bundle to Nous-internal diagnostics storage. */
@@ -4643,6 +4657,7 @@ export const RPC_METHODS = [
   'connectors.operation.status',
   'cron.manage',
   'delegation.pause',
+  'delegation.recovery.list',
   'delegation.status',
   'diagnostics.share_nous',
   'file.attach',
