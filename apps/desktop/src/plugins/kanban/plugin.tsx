@@ -20,8 +20,8 @@ import {
   KEYBINDS_AREA,
   PALETTE_AREA,
   type PaletteContribution,
-  RowButton,
   type RouteContribution,
+  RowButton,
   ROUTES_AREA,
   SIDEBAR_NAV_AREA,
   type SidebarNavContribution,
@@ -34,7 +34,7 @@ import {
 
 import { $boardSlug, bindApi, boardKey, fetchBoard } from './api'
 import { KanbanBoardPage } from './board'
-import { KANBAN_LOCALES, columnLabel } from './i18n'
+import { columnLabel, KANBAN_LOCALES } from './i18n'
 import { selectKanbanTaskCenterTasks } from './task-center-model'
 import { columnMeta } from './types'
 import { $newTaskLane, useKanban } from './ui'
