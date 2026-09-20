@@ -28,7 +28,8 @@ from agent.skill_utils import (
     parse_frontmatter as _parse_frontmatter,
     SKILL_PROMPT_DESC_LIMIT)
 from tools.skill_manager_guards import (
-    _background_review_preflight, _background_review_read_before_write_guard, _background_review_write_guard,
+    _background_review_dry_run_guard, _background_review_preflight,
+    _background_review_read_before_write_guard, _background_review_write_guard,
     _containing_skills_root, _curator_consolidation_delete_guard, _maybe_auto_propose_org_edit,
     _org_mirror_write_guard, _pinned_guard, _validate_delete_target, _is_background_review, _refusal as _err)
 from tools.skill_manager_batch import _skill_manage_batch
@@ -845,6 +846,8 @@ def skill_manage(
     absorbed_into: str = None, task_id: str = None, session_id: str = None, operations=None) -> str:
     """Dispatch to the action handler -> JSON string. ``operations`` (atomic batch shape,
     see _skill_manage_batch) overrides the flat fields."""
+    if (dry_run_refusal := _background_review_dry_run_guard(action or "batch")) is not None:
+        return json.dumps(dry_run_refusal, ensure_ascii=False)
     if operations is not None:
         return _skill_manage_batch(
             operations, default_name=name or None, task_id=task_id, session_id=session_id)
