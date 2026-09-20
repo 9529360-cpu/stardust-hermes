@@ -238,8 +238,8 @@ SESSION_SEARCH_GUIDANCE = (
 # to save as a skill" and "fix it with skill_manage(action='patch')") and skill_manage's own schema. Only
 # the compaction-pruning contract lives here — nothing else teaches it.
 SKILLS_GUIDANCE = (
-    "When you work out a non-trivial workflow, preserve it with skill_manage for future reuse: "
-    "prefer patching the existing owning skill, and create only when the workflow has no existing home.\n\n"
+    "When you work out a non-trivial workflow, record it with skill_manage for future reuse.\n"
+    "Prefer patching the existing skill that owns the workflow; create a new skill only when no existing skill has that responsibility.\n\n"
     "## Skill Safety Rule\n"
     "A skill placeholder containing `[SKILL_PRUNED]` lost its content in context compression and is inaccessible — "
     "reload it with skill_view(name='...') before acting on anything that depends on it. After reloading, ignore any "
