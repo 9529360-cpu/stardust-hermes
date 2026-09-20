@@ -1223,6 +1223,8 @@ export interface Translations {
       apiKeyPlaceholder: string
       apiKeyLabel: string
       apiKeyKeepExisting: string
+      apiKeyUpdate: string
+      apiKeyUpdating: string
       connectProvider: (provider: string) => string
       setupApiKeyHint: (provider: string) => string
       setupOauthHint: (provider: string) => string
