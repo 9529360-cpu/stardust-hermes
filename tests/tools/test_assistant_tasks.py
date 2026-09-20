@@ -565,3 +565,36 @@ def test_board_recall_respects_explicit_db_pin(tmp_path, monkeypatch):
     )
 
     assert assistant_tasks._assistant_board_slugs() == ["beta"]
+
+
+
+def test_missing_request_id_never_creates_a_stable_owner_replay_key(monkeypatch):
+    calls = []
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    monkeypatch.setattr(
+        "tools.kanban_tools._handle_create",
+        lambda args: calls.append(dict(args))
+        or json.dumps({
+            "ok": True,
+            "task_id": f"t_{len(calls)}",
+            "status": "ready",
+            "workspace_kind": "scratch",
+            "project_id": None,
+            "subscribed": True,
+        }),
+    )
+
+    for _ in range(2):
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            owner_key="messaging:telegram:123456",
+            session_id="chat-A",
+            tasks=[{"title": "Task", "instruction": "Do it."}],
+        )
+
+    first, second = (call["idempotency_key"] for call in calls)
+    assert first != second
+    assert "123456" not in first
+    assert "123456" not in second
+    assert "request" not in first
+    assert "request" not in second
