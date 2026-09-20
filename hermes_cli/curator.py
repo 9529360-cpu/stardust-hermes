@@ -55,9 +55,12 @@ def _print_skill_rows(title: str, rows: list) -> None:
 
 
 def _print_unmanaged_summary() -> None:
-    """Report curation-eligible skills that carry no provenance marker: only background-review
-    creations get ``created_by: agent``; older skills and every foreground ``skill_manage(create)``
-    are eligible but unmanaged, so no automatic transition touches them."""
+    """Report curation-eligible skills that are not opted into curator management.
+
+    Only an explicit ``created_by: learn`` marker is described as foreground.
+    Null/missing legacy records remain origin-unknown because telemetry cannot
+    establish authorship.
+    """
     from tools import skill_usage
     try:
         unmanaged = skill_usage.unmanaged_report()
@@ -65,11 +68,11 @@ def _print_unmanaged_summary() -> None:
         return
     if not unmanaged:
         return
-    legacy = sum(1 for r in unmanaged if not r.get("has_provenance_key"))
-    foreground = len(unmanaged) - legacy
-    print(f"\nunmanaged (no provenance marker): {len(unmanaged)} total")
-    print(f"  pre-dates marker    {legacy}")
-    print(f"  foreground-created  {foreground}")
+    foreground = sum(1 for r in unmanaged if r.get("unmanaged_origin") == "foreground")
+    unknown = len(unmanaged) - foreground
+    print(f"\nunmanaged (not curator-managed): {len(unmanaged)} total")
+    print(f"  foreground-marked  {foreground}")
+    print(f"  origin unknown     {unknown}")
     print("  never auto-staled or archived — `hermes curator adopt <name>` hands one over")
 
 
@@ -246,7 +249,11 @@ def _cmd_list_unmanaged(args) -> int:
         return 0
     print(f"unmanaged skills ({len(rows)}):")
     for r in sorted(rows, key=lambda x: x["name"]):
-        why = f"created_by:{r.get('created_by') or 'null'}" if r.get("has_provenance_key") else "no marker"
+        why = (
+            "foreground marker (created_by:learn)"
+            if r.get("unmanaged_origin") == "foreground"
+            else "origin unknown"
+        )
         print(
             f"  {r['name']:44s} activity={r.get('activity_count', 0):4d}  "
             f"last_activity={_fmt_ts(r.get('last_activity_at')):14s}  ({why})")
