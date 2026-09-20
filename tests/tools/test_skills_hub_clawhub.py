@@ -527,7 +527,52 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
 
         self.assertLess(page_calls["n"], 750)
         self.assertEqual(results, [])
-        self.assertTrue(self.src.index_build_truncated)
+        self.assertTrue(self.src.index_build_incomplete)
+        self.assertEqual(self.src.index_build_incomplete_reason, "wall-clock budget")
+        mock_write_cache.assert_not_called()
+
+    @patch("tools.skills_hub._write_index_cache")
+    @patch("tools.skills_hub._read_index_cache", return_value=None)
+    def test_index_build_request_failure_is_incomplete_and_uncached(
+        self, _mock_read_cache, mock_write_cache
+    ):
+        first_page = {
+            "items": [{"slug": "one", "displayName": "One"}],
+            "nextCursor": "next",
+        }
+        with (
+            patch.object(self.src, "_get_json", side_effect=[first_page, None]),
+            patch.object(ClawHubSource, "INDEX_BUILD_WALK_BUDGET_SECONDS", 9999),
+        ):
+            results = self.src._load_catalog_index(max_items=0)
+
+        self.assertEqual([m.identifier for m in results], ["one"])
+        self.assertTrue(self.src.index_build_incomplete)
+        self.assertEqual(self.src.index_build_incomplete_reason, "request failure")
+        mock_write_cache.assert_not_called()
+
+    @patch("tools.skills_hub._write_index_cache")
+    @patch("tools.skills_hub._read_index_cache", return_value=None)
+    def test_index_build_page_ceiling_is_incomplete_and_uncached(
+        self, _mock_read_cache, mock_write_cache
+    ):
+        pages = [
+            {
+                "items": [{"slug": f"skill-{i}", "displayName": f"Skill {i}"}],
+                "nextCursor": f"cursor-{i + 1}",
+            }
+            for i in range(2)
+        ]
+        with (
+            patch.object(self.src, "_get_json", side_effect=pages),
+            patch.object(ClawHubSource, "INDEX_BUILD_WALK_BUDGET_SECONDS", 9999),
+            patch.object(ClawHubSource, "CATALOG_WALK_MAX_PAGES", 2),
+        ):
+            results = self.src._load_catalog_index(max_items=0)
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(self.src.index_build_incomplete)
+        self.assertEqual(self.src.index_build_incomplete_reason, "page ceiling")
         mock_write_cache.assert_not_called()
 
     @patch("tools.skills_hub._write_index_cache")
