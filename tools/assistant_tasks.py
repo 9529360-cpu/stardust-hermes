@@ -2,7 +2,8 @@
 
 This is deliberately a thin adapter over the existing Kanban authority. It does not own
 task lifecycle state. The parent agent uses it to register independent work that should
-continue after the current turn or process, and to query the same durable board later.
+continue after the current turn or process, and to recall the user's durable work later
+across conversation and active-board switches.
 """
 
 from __future__ import annotations
@@ -347,7 +348,8 @@ ASSISTANT_TASKS_SCHEMA = {
         "restart. Create one task per independent outcome instead of serializing unrelated work in "
         "the parent conversation. The existing Kanban dispatcher owns execution, retries, recovery, "
         "blocking, and completion notifications. Use action=list when the user asks what long-running "
-        "work is still running, blocked, waiting for review, or recently completed. Do NOT use this "
+        "work is still running, blocked, waiting for review, or recently completed; the lookup follows "
+        "the stable assistant owner across conversations and active Kanban boards. Do NOT use this "
         "for ordinary answers or tiny foreground actions that can be completed immediately. Set "
         "approval_required=true for any task that may culminate in a purchase, booking, message/send, "
         "publication, destructive change, credential/permission change, or other irreversible "
