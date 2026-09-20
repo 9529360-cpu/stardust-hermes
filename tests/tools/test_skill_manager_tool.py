@@ -196,6 +196,34 @@ Review and recover pull requests.
         assert result["merge_candidates"][0]["name"] == "github-pr-workflow"
         assert not (tmp_path / "github-pr-review").exists()
 
+    def test_create_unrelated_skill_is_not_blocked(self, tmp_path):
+        github = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        calendar = """\
+---
+name: calendar-planning
+description: Plan calendar blocks around daily priorities.
+---
+
+# Calendar Planning
+
+Plan time blocks and daily priorities.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-pr-workflow", github)
+            result = _create_skill("calendar-planning", calendar)
+
+        assert result["success"] is True
+        assert (tmp_path / "calendar-planning" / "SKILL.md").exists()
+
     def test_create_distinct_bypasses_overlap_after_inspection(self, tmp_path):
         existing = """\
 ---
