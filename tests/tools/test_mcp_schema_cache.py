@@ -4,6 +4,8 @@ The module landed in #56832's extraction without its tests; these cover the
 fingerprint keying, read/write round-trip, and invalidation behavior.
 """
 
+import os
+
 import tools.mcp_schema_cache as msc
 from tools import mcp_tool_registration as _mcp_registration
 
@@ -105,7 +107,12 @@ class TestCacheFileLocation:
         assert path == tmp_path / "cache" / "mcp_schema_cache.json"
         msc.write_cache_entry("srv", "fp", tools=[], utility_tools=[])
         assert path.exists()
-        assert (path.stat().st_mode & 0o777) == 0o600
+        assert msc.get_cached_entry("srv", "fp") is not None
+        # Windows does not implement POSIX permission bits faithfully. The
+        # writer contract there is "mode must not crash"; enforce 0600 where
+        # the platform can actually represent it.
+        if os.name != "nt":
+            assert (path.stat().st_mode & 0o777) == 0o600
 
 
 class TestWriteSkip:
