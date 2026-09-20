@@ -2,8 +2,8 @@
   "version": 1,
   "updated_at": "2026-09-10T16:09:08Z",
   "metadata": {
-    "source": "hermes-agent repo",
-    "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog"
+    "source": "stardust-hermes repo",
+    "docs": "https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/reference/model-catalog.md"
   },
   "providers": {
     "openrouter": {
