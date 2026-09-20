@@ -884,6 +884,15 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--fail-on-flaky",
+        action="store_true",
+        help=(
+            "Exit non-zero when any file fails its first attempt but passes a retry. "
+            "Useful for CI: retries keep the diagnostic second attempt without "
+            "turning an unstable run green."
+        ),
+    )
+    parser.add_argument(
         "--slice",
         metavar="I/N",
         help=(
@@ -944,7 +953,7 @@ def main() -> int:
     # (``-k=expr``, ``--tb=long``) are self-contained and need no lookahead.
     OUR_FLAGS = {
         "-j", "--jobs", "--paths", "--include-integration",
-        "--file-timeout", "--file-retries", "--slice", "--generate-slices", "--files",
+        "--file-timeout", "--file-retries", "--fail-on-flaky", "--slice", "--generate-slices", "--files",
     }
     # pytest short flags that consume the NEXT token as their value.
     PYTEST_VALUE_FLAGS = {"-k", "-m", "-p", "-o", "-c", "-r", "-W"}
@@ -1326,6 +1335,11 @@ def main() -> int:
         return 1
 
     if no_tests_ran_at_all:
+        return 1
+
+    if args.fail_on_flaky and _FLAKY_RESULTS:
+        print()
+        print("=== ✗ RETRY-ONLY FLAKES ARE BLOCKING THIS RUN ===")
         return 1
 
     return 0
