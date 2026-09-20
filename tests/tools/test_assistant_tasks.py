@@ -182,7 +182,9 @@ def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
 
     monkeypatch.setattr("tools.kanban_tools._board", fake_board)
 
-    active = json.loads(assistant_tasks.assistant_tasks_tool(action="list"))
+    active = json.loads(
+        assistant_tasks.assistant_tasks_tool(action="list", include_completed=False)
+    )
     assert [row["task_id"] for row in active["tasks"]] == ["t_active", "t_wait"]
     waiting = next(row for row in active["tasks"] if row["task_id"] == "t_wait")
     assert waiting["needs_attention"] is True
