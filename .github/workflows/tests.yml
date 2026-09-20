@@ -76,7 +76,10 @@ jobs:
           fi
           scripts/run_tests.sh
         env:
-          HERMES_TEST_WORKERS: ${{ runner.name == 'leopard-stardust-ci' && '8' || '4' }}
+          # Leopard exposes 8 logical CPUs backed by 4 physical cores. Eight CPU-heavy
+          # pytest workers can more than double slow-file wall time and trip the 300s
+          # per-file safety cap, so match the physical-core budget instead.
+          HERMES_TEST_WORKERS: 4
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
