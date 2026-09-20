@@ -203,8 +203,9 @@ are true:
 Currently, only the **background self-improvement review fork** sets this marker
 — when it creates a new umbrella skill during its periodic review pass (~every 10
 agent turns). The background fork runs with a write origin of `"background_review"`
-(via `tools/skill_provenance.py`), which is the only path that triggers the
-`mark_agent_created()` call in `skill_manage`.
+(via `tools/skill_provenance.py`) and is always curator-managed. Foreground
+creation stays user-owned unless the caller explicitly opts an autonomous
+procedural-memory create into curator management.
 
 Skills the foreground agent creates via `skill_manage(action="create")` remain
 user-owned by default: they are recorded as `created_by: learn`, which makes
