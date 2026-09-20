@@ -50,6 +50,16 @@ describe('Settings i18n', () => {
     expect(screen.getByRole('button', { name: expectedLabel })).toBeTruthy()
   })
 
+  it('keeps the model-service entry and primary-model copy localized in both Chinese variants', () => {
+    expect(TRANSLATIONS.zh.settings.nav.providers).toBe('模型服务')
+    expect(TRANSLATIONS.zh.settings.sections.model).toBe('默认模型')
+    expect(TRANSLATIONS.zh.settings.model.primaryTitle).toBe('新对话默认使用')
+
+    expect(TRANSLATIONS['zh-hant'].settings.nav.providers).toBe('模型服務')
+    expect(TRANSLATIONS['zh-hant'].settings.sections.model).toBe('預設模型')
+    expect(TRANSLATIONS['zh-hant'].settings.model.primaryTitle).toBe('新對話預設使用')
+  })
+
   it('provides reported Chinese field copy without falling through to English', () => {
     const en = TRANSLATIONS.en.settings
 

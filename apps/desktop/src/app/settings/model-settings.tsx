@@ -856,6 +856,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   return (
     <div className="grid gap-6">
       <section>
+        <SectionHeading icon={Cpu} title={m.primaryTitle} />
         <p className="mb-3 text-xs text-muted-foreground">{m.appliesDesc}</p>
         <div className="flex flex-wrap items-center gap-2">
           <Select onValueChange={setSelectedProvider} value={selectedProvider}>
@@ -882,7 +883,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                       void activateApiKeyProvider()
                     }
                   }}
-                  placeholder={`Paste ${selectedProviderRow?.key_env ?? 'API key'}`}
+                  placeholder={m.apiKeyPlaceholder}
                   type="password"
                   value={apiKeyDraft}
                 />
@@ -892,12 +893,12 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                   size="sm"
                 >
                   {activating && <Loader2 className="size-3.5 animate-spin" />}
-                  {activating ? 'Activating...' : 'Activate'}
+                  {activating ? t.common.connecting : t.common.connect}
                 </Button>
               </>
             ) : (
               <Button onClick={startProviderSetup} size="sm" variant="textStrong">
-                Set up {selectedProviderRow?.name ?? 'provider'}
+                {m.connectProvider(selectedProviderRow?.name ?? m.provider)}
               </Button>
             )
           ) : (
@@ -928,8 +929,8 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         {needsSetup && !setupIsApiKey && selectedProviderRow && (
           <p className="mt-2 text-xs text-muted-foreground">
             {selectedProviderRow?.auth_type === 'api_key'
-              ? `${selectedProviderRow?.name} needs an API key — set it up to choose a model.`
-              : `${selectedProviderRow?.name} signs in through your browser — Hermes runs the flow for you.`}
+              ? m.setupApiKeyHint(selectedProviderRow.name)
+              : m.setupOauthHint(selectedProviderRow.name)}
           </p>
         )}
         {config && mainModel && (reasoningSupported || fastSupported) && (

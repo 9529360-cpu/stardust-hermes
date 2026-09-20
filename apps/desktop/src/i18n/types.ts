@@ -773,11 +773,45 @@ export interface Translations {
     }
     customEndpoints: {
       title: string
+      addTitle: string
+      editTitle: string
+      active: string
+      use: string
+      using: string
       deleteEndpoint: string
+      deleteConfirm: (name: string) => string
+      deleteFailed: string
       emptyDescription: string
       emptyTitle: string
+      nameLabel: string
       namePlaceholder: string
+      endpointUrlLabel: string
+      modelLabel: string
+      apiKeyLabel: string
+      apiKeyOptional: string
+      apiKeyKeepExisting: string
+      apiKeySet: string
+      makeDefault: string
+      advanced: string
+      advancedHide: string
+      providerIdLabel: string
+      providerIdHint: string
+      providerIdPlaceholder: string
+      contextLabel: string
       contextPlaceholder: string
+      discoverModels: string
+      test: string
+      testing: string
+      save: string
+      saving: string
+      saved: string
+      newEndpoint: string
+      loadFailed: string
+      saveFailed: string
+      validationReachable: string
+      validationReachableModels: (count: number) => string
+      validationFailed: string
+      activationFailed: string
     }
     computerUse: {
       accessibility: string
@@ -1181,10 +1215,15 @@ export interface Translations {
     }
     model: {
       loading: string
+      primaryTitle: string
       appliesDesc: string
       provider: string
       model: string
       applying: string
+      apiKeyPlaceholder: string
+      connectProvider: (provider: string) => string
+      setupApiKeyHint: (provider: string) => string
+      setupOauthHint: (provider: string) => string
       defaultsLabel: string
       reasoning: string
       reasoningOff: string
