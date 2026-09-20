@@ -49,9 +49,9 @@ vi.mock('@/hermes', () => ({
 
 vi.mock('@/store/onboarding', () => ({
   $desktopOnboarding: desktopOnboarding,
-  startManualLocalEndpoint: () => startManualLocalEndpoint(),
-  startManualOnboarding: () => startManualOnboarding(),
-  startManualProviderOAuth: (slug: string) => startManualProviderOAuth(slug)
+  startManualLocalEndpoint: (reason?: null | string, profile?: string) => startManualLocalEndpoint(reason, profile),
+  startManualOnboarding: (reason?: null | string, profile?: string) => startManualOnboarding(reason, profile),
+  startManualProviderOAuth: (slug: string, profile?: string) => startManualProviderOAuth(slug, profile)
 }))
 
 vi.mock('../hooks/use-on-profile-switch', () => ({
@@ -209,7 +209,7 @@ describe('ModelSettings', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Connect Anthropic' }))
 
-    expect(startManualProviderOAuth).toHaveBeenCalledWith('anthropic')
+    expect(startManualProviderOAuth).toHaveBeenCalledWith('anthropic', undefined)
     expect(startManualLocalEndpoint).not.toHaveBeenCalled()
     expect(startManualOnboarding).not.toHaveBeenCalled()
   })
@@ -335,13 +335,13 @@ describe('ModelSettings', () => {
   })
 
   it('opens the shared provider and custom-service flows from the model page', async () => {
-    await renderModelSettings()
+    await renderModelSettings('research')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
-    expect(startManualOnboarding).toHaveBeenCalledOnce()
+    expect(startManualOnboarding).toHaveBeenCalledWith(null, 'research')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add custom service' }))
-    expect(startManualLocalEndpoint).toHaveBeenCalledOnce()
+    expect(startManualLocalEndpoint).toHaveBeenCalledWith(null, 'research')
   })
 
   it('refreshes the model-service list after the shared setup flow closes', async () => {
