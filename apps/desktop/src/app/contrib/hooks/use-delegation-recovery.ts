@@ -27,7 +27,6 @@ export function useDelegationRecovery(sessionId: null | string): DelegationRecov
 
   useEffect(() => {
     if (!sessionId) {
-      setSnapshot({ receipts: [], sessionId: null })
       return
     }
 
