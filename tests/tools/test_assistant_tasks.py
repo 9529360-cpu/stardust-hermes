@@ -68,9 +68,10 @@ def test_create_splits_independent_work_and_preserves_durable_controls(monkeypat
     assert calls[0]["session_id"] == "session-7"
     assert calls[0]["assignee"] == "default"
     assert calls[0]["_assistant_owner_key"] == "local"
-    assert calls[0]["idempotency_key"] == "assistant:local:call-42:0"
-    assert calls[1]["idempotency_key"] == "assistant:local:call-42:1"
-    assert calls[2]["idempotency_key"] == "assistant:local:call-42:2"
+    assert calls[0]["idempotency_key"].endswith(":call-42:0")
+    assert calls[1]["idempotency_key"].endswith(":call-42:1")
+    assert calls[2]["idempotency_key"].endswith(":call-42:2")
+    assert "local" not in calls[0]["idempotency_key"]
     assert calls[2]["goal_mode"] is True
     assert calls[2]["project"] == "stardust"
     assert calls[2]["workspace_kind"] == "worktree"
@@ -359,3 +360,34 @@ def test_task_listing_isolated_by_assistant_owner(tmp_path, monkeypatch):
     )
     assert [task["title"] for task in alice["tasks"]] == ["Alice task"]
     assert [task["title"] for task in bob["tasks"]] == ["Bob task"]
+
+
+
+def test_owner_identity_is_not_embedded_in_idempotency_key(monkeypatch):
+    calls = []
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    monkeypatch.setattr(
+        "tools.kanban_tools._handle_create",
+        lambda args: calls.append(dict(args))
+        or json.dumps({
+            "ok": True,
+            "task_id": "t_private",
+            "status": "ready",
+            "workspace_kind": "scratch",
+            "project_id": None,
+            "subscribed": True,
+        }),
+    )
+
+    owner = "messaging:telegram:user-secret-42"
+    assistant_tasks.assistant_tasks_tool(
+        action="create",
+        owner_key=owner,
+        session_id="chat-A",
+        request_id="call-private",
+        tasks=[{"title": "Private task", "instruction": "Do the private task."}],
+    )
+
+    assert calls[0]["_assistant_owner_key"] == owner
+    assert owner not in calls[0]["idempotency_key"]
+    assert "user-secret-42" not in calls[0]["idempotency_key"]
