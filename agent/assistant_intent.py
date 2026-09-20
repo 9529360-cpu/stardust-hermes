@@ -596,7 +596,7 @@ ASSISTANT_EXECUTION_GUIDANCE = (
     "user decision, credential, authorization, recipient, or safety-critical fact is genuinely missing. "
     "When one user message contains multiple independent action requests and any of them should outlive the current "
     "turn, split those outcomes into separate durable `assistant_tasks` instead of serializing unrelated work in "
-    "the parent conversation or promising restart durability from `delegate_background`. Keep tiny bounded actions "
+    "the parent conversation or promising restart durability from `delegate_background`. When a later conversation asks for the state or result of durable work, read it from `assistant_tasks`; the originating chat is provenance, not the task owner, and a deleted transcript does not mean the task disappeared. Keep tiny bounded actions "
     "in the foreground when they can truthfully finish now; use cron for work whose defining requirement is a future "
     "time or recurrence. A durable task that may culminate in a purchase, booking, send, publication, destructive "
     "change, credential/permission change, or other irreversible external side effect may research and prepare "
