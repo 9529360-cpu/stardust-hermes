@@ -165,6 +165,121 @@ class TestCreateSkill:
         assert result["success"] is False
         assert "already exists" in result["error"]
 
+    def test_create_overlap_returns_merge_candidates(self, tmp_path):
+        existing = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        proposed = """\
+---
+name: github-pr-review
+description: Handle GitHub pull request review and recovery.
+---
+
+# GitHub PR Review
+
+Review and recover pull requests.
+"""
+        with _skill_dir(tmp_path):
+            first = _create_skill("github-pr-workflow", existing)
+            result = _create_skill("github-pr-review", proposed)
+
+        assert first["success"] is True
+        assert result["success"] is False
+        assert "Do not create a parallel skill yet" in result["error"]
+        assert result["merge_candidates"][0]["name"] == "github-pr-workflow"
+        assert not (tmp_path / "github-pr-review").exists()
+
+    def test_create_same_vendor_but_different_responsibility_is_not_blocked(self, tmp_path):
+        issues = """\
+---
+name: github-issue-triage
+description: Triage repository issues by severity and ownership.
+---
+
+# GitHub Issue Triage
+
+Classify issues and route them to owners.
+"""
+        releases = """\
+---
+name: github-release-notes
+description: Draft release notes from merged changes and tags.
+---
+
+# GitHub Release Notes
+
+Prepare release notes from repository history.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-issue-triage", issues)
+            result = _create_skill("github-release-notes", releases)
+
+        assert result["success"] is True
+        assert (tmp_path / "github-release-notes" / "SKILL.md").exists()
+
+    def test_create_unrelated_skill_is_not_blocked(self, tmp_path):
+        github = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        calendar = """\
+---
+name: calendar-planning
+description: Plan calendar blocks around daily priorities.
+---
+
+# Calendar Planning
+
+Plan time blocks and daily priorities.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-pr-workflow", github)
+            result = _create_skill("calendar-planning", calendar)
+
+        assert result["success"] is True
+        assert (tmp_path / "calendar-planning" / "SKILL.md").exists()
+
+    def test_create_distinct_bypasses_overlap_after_inspection(self, tmp_path):
+        existing = """\
+---
+name: github-pr-workflow
+description: Handle GitHub pull request review workflows.
+---
+
+# GitHub PR Workflow
+
+Review and update pull requests.
+"""
+        proposed = """\
+---
+name: github-pr-review
+description: Handle GitHub pull request review and recovery.
+---
+
+# GitHub PR Review
+
+Review and recover pull requests.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-pr-workflow", existing)
+            result = _create_skill("github-pr-review", proposed, distinct=True)
+
+        assert result["success"] is True
+        assert (tmp_path / "github-pr-review" / "SKILL.md").exists()
+
     def test_create_rejects_category_traversal(self, tmp_path):
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
@@ -192,6 +307,19 @@ class TestCreateSkill:
 
 
 class TestEditSkill:
+    def test_full_rewrite_surfaces_main_file_bloat_warning(self, tmp_path):
+        from tools.skill_linter import _MAIN_SKILL_WARN_CHARS
+
+        filler = "Stable operational detail.\n" * 1200
+        bloated = VALID_SKILL_CONTENT_2 + filler
+        assert len(bloated) > _MAIN_SKILL_WARN_CHARS
+        with _skill_dir(tmp_path):
+            _create_skill("test-skill", VALID_SKILL_CONTENT)
+            result = _edit_skill("test-skill", bloated)
+
+        assert result["success"] is True
+        assert any(row["rule"] == "main-file-bloat" for row in result["lint_warnings"])
+
     def test_edit_existing_skill(self, tmp_path):
         with _skill_dir(tmp_path):
             _create_skill("my-skill", VALID_SKILL_CONTENT)
@@ -243,6 +371,22 @@ class TestEditSkill:
         assert "A test skill" in content
 
 class TestPatchSkill:
+    def test_main_file_patch_surfaces_bloat_warning(self, tmp_path):
+        from tools.skill_linter import _MAIN_SKILL_WARN_CHARS
+
+        filler = "Stable operational detail.\n" * 1200
+        assert len(VALID_SKILL_CONTENT) + len(filler) > _MAIN_SKILL_WARN_CHARS
+        with _skill_dir(tmp_path):
+            _create_skill("test-skill", VALID_SKILL_CONTENT)
+            result = _patch_skill(
+                "test-skill",
+                "Step 1: Do the thing.",
+                "Step 1: Do the thing.\n" + filler,
+            )
+
+        assert result["success"] is True
+        assert any(row["rule"] == "main-file-bloat" for row in result["lint_warnings"])
+
     def test_patch_unique_match(self, tmp_path):
         with _skill_dir(tmp_path):
             _create_skill("my-skill", VALID_SKILL_CONTENT)
@@ -437,6 +581,45 @@ class TestSkillManageDispatcher:
         # entirely (telemetry best-effort).
         rec = usage.get("test-skill") or {}
         assert rec.get("created_by") in {"learn", None, "", False}
+
+    def test_autonomous_create_can_opt_into_curator_management(self, tmp_path):
+        with (
+            _skill_dir(tmp_path),
+            patch("tools.skill_provenance.is_background_review", return_value=False),
+            patch("tools.skill_usage.record_created") as record_created,
+        ):
+            result = json.loads(skill_manage(
+                action="create",
+                name="test-skill",
+                content=VALID_SKILL_CONTENT,
+                curator_managed=True,
+                task_id="task-self-learning",
+                session_id="session-self-learning",
+            ))
+
+        assert result["success"] is True
+        record_created.assert_called_once_with(
+            "test-skill",
+            agent_created=True,
+            task_id="task-self-learning",
+            session_id="session-self-learning",
+        )
+
+    def test_user_owned_create_ignores_curator_default_false(self, tmp_path):
+        with (
+            _skill_dir(tmp_path),
+            patch("tools.skill_provenance.is_background_review", return_value=False),
+            patch("tools.skill_usage.record_created") as record_created,
+        ):
+            result = json.loads(skill_manage(
+                action="create",
+                name="test-skill",
+                content=VALID_SKILL_CONTENT,
+            ))
+
+        assert result["success"] is True
+        record_created.assert_called_once()
+        assert record_created.call_args.kwargs["agent_created"] is False
 
     def test_successful_mutations_emit_lifecycle_with_correlation(self, tmp_path):
         with (

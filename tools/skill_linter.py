@@ -49,6 +49,10 @@ _INCIDENT_REF_PER_KCHAR = 0.5  # the 100k incident-log SKILL.md this targets sat
 # Calibration: a deliberately curated large workflow skill sits near 50 topical files; the hoarding
 # shape this catches was 443 one-per-session files.
 _MAX_REFERENCE_FILES = 60
+# Main SKILL.md should stay as the compact routing/procedure layer. The hard content
+# ceiling is intentionally much higher for compatibility; this warning catches the
+# "knowledge drawer" shape early and nudges detail into topical references instead.
+_MAIN_SKILL_WARN_CHARS = 20_000
 
 ERROR = "error"
 WARNING = "warning"
@@ -193,6 +197,14 @@ def lint_content(content: str, *, skill_dir: Optional[Path] = None) -> List[Lint
     """
     frontmatter, body = parse_frontmatter(content)
     findings = list(_check_frontmatter(frontmatter, skill_dir)) + list(_check_body(body, skill_dir))
+    if len(content) > _MAIN_SKILL_WARN_CHARS:
+        findings.append(_warn(
+            "main-file-bloat",
+            f"SKILL.md is {len(content):,} chars; keep the main file focused on routing and "
+            f"stable procedure (target <= {_MAIN_SKILL_WARN_CHARS:,}) and move deep, "
+            "branch-specific, or incident-derived detail into a small set of topical "
+            "references/*.md files.",
+        ))
     if skill_dir is not None:
         findings += _check_files(frontmatter, skill_dir)
     return findings
