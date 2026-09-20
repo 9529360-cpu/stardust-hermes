@@ -60,16 +60,20 @@ in the `hermes-agent-dev` skill.
 
 ## Curator (skill lifecycle)
 
-Background maintenance that tracks usage on agent-created skills and auto-archives stale ones;
+Background maintenance that primarily tracks agent-created skills and archives stale material;
 archives go to `~/.hermes/skills/.archive/` and are restorable. Core `agent/curator.py` (review
 loop, auto-transitions, LLM review prompt) + `agent/curator_backup.py` (pre-run tar.gz snapshots);
 CLI `hermes_cli/curator.py` → `hermes curator status|run|pause|resume|pin|unpin|archive|restore|
 prune|backup|rollback`; telemetry `tools/skill_usage.py` owns `~/.hermes/skills/.usage.json`
 (`use_count`, `view_count`, `patch_count`, `last_activity_at`, `state` active/stale/archived,
 `pinned`). Config `curator:` — `enabled, interval_hours, min_idle_hours, stale_after_days,
-archive_after_days, backup.*`; its LLM calls route through `auxiliary` (`agent/AGENTS.md`).
+archive_after_days, consolidate, prune_builtins, backup.*`; its LLM calls route through
+`auxiliary` (`agent/AGENTS.md`).
 
-Invariants: touches only `created_by: "agent"` skills (bundled + hub-installed are off-limits);
-never deletes — archive is the maximum; pinned skills are exempt from every auto-transition and
-the LLM review; `skill_manage(action="delete")` refuses pinned skills while patch/edit/write_file/
-remove_file still work so the agent can keep improving them.
+Invariants: the autonomous LLM review may inspect or mutate only explicitly curator-managed
+`created_by: "agent"` skills, and pinned skills are excluded before the LLM sees the candidate
+set. The deterministic inactivity pass may also archive unused bundled built-ins when
+`curator.prune_builtins: true`; hub-installed, external-dir, and protected built-ins remain
+off-limits. Curator maintenance never hard-deletes — archive is the maximum automatic destructive
+action. `skill_manage(action="delete")` refuses pinned skills while patch/edit/write_file/
+remove_file still work so the foreground agent can keep improving them.
