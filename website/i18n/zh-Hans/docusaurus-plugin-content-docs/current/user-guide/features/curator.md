@@ -34,7 +34,7 @@ Curator 由空闲检查触发，而非 cron 守护进程。在 CLI 会话启动�
 1. **自动状态转换**（确定性，无 LLM）。未使用时间超过 `stale_after_days`（14 天）的技能变为 `stale`；未使用时间超过 `archive_after_days`（30 天）的技能被移至 `~/.hermes/skills/.archive/`。已固定技能和被任何 cron job 引用的技能会被跳过。默认 `prune_builtins: true` 时，这条确定性路径也可以归档长期未使用的捆绑内置技能；hub 安装技能始终不受影响。
 2. **LLM 合并审查**（默认开启，但只在正常的低频 curator 周期到期时运行）。候选必须同时满足：本地来源、明确带有 `created_by: "agent"`（或兼容的旧 `agent_created: true`）管理标记、并且未被 pin。手写/前台创建但未 adopt 的技能、捆绑技能、hub 技能和 pinned 技能都不会进入 LLM 候选集。没有符合条件的候选时，辅助模型调用会被完全跳过。一次大型合并审查可能需要数十次工具/API 往返，因此可用 `curator.consolidate: false` 保持纯确定性 prune。
 
-已固定（pinned）的技能对 curator 的自动状态转换和 agent 自身的 `skill_manage` 工具均不可操作。详见下方[固定技能](#pinning-a-skill)。
+已固定（pinned）的技能会跳过 curator 自动状态转换和 LLM 审查；`skill_manage(action="delete")` 也会拒绝删除，但 patch/edit/write_file/remove_file 仍可继续改进内容。详见下方[固定技能](#pinning-a-skill)。
 
 ## 配置
 
@@ -193,7 +193,7 @@ Curator 在 `~/.hermes/skills/.usage.json` 维护一个附属文件，每个技�
 - `use_count`：技能被加载到对话的 prompt 中。
 - `patch_count`：对该技能执行 `skill_manage patch/edit/write_file/remove_file`。
 
-捆绑和 hub 安装的技能被明确排除在遥测写入之外。
+使用遥测本身是纯可观察性数据，会为所有技能记录计数，不以 provenance 作为写入门槛；是否允许自动归档或 LLM 修改仍由 Curator 的 ownership、pin、`prune_builtins` 等独立策略决定。
 
 ## 每次运行的报告
 
