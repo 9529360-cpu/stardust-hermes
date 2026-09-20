@@ -1083,7 +1083,10 @@ class TestCuratorFasterPrune:
 
 class TestModelCatalogAuthorityMigration:
     OLD_URL = "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
-    NEW_URL = "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json"
+    NEW_URL = (
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/website/static/api/model-catalog.json"
+    )
 
     def _run(self, tmp_path, monkeypatch, url):
         from hermes_cli.config_migrations import run_migrations
