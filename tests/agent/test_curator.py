@@ -623,6 +623,25 @@ def test_review_runtime_passes_auxiliary_curator_credentials(curator_env):
     assert binding.explicit_base_url == "http://localhost:11434/v1"
 
 
+def test_review_runtime_carries_curator_timeout_on_main_fallback(curator_env):
+    curator = curator_env["curator"]
+    cfg = {
+        "model": {"provider": "custom:zdzui", "default": "gpt-5.6-sol"},
+        "auxiliary": {
+            "curator": {
+                "provider": "auto",
+                "model": "",
+                "timeout": 600,
+            },
+        },
+    }
+
+    binding = curator._resolve_review_runtime(cfg)
+
+    assert (binding.provider, binding.model) == ("custom:zdzui", "gpt-5.6-sol")
+    assert binding.timeout == 600.0
+
+
 def test_review_runtime_strips_blank_aux_credentials(curator_env):
     curator = curator_env["curator"]
     cfg = {
@@ -764,6 +783,7 @@ def test_review_fork_forwards_runtime_pool_and_overrides(curator_env, monkeypatc
     class _StubAgent:
         def __init__(self, *args, **kwargs):
             captured["kwargs"] = kwargs
+            captured["agent"] = self
             self._memory_write_origin = "assistant_tool"
             self._memory_nudge_interval = 0
             self._skill_nudge_interval = 0
@@ -775,14 +795,14 @@ def test_review_fork_forwards_runtime_pool_and_overrides(curator_env, monkeypatc
         def close(self):
             pass
 
-    monkeypatch.setattr(
-        "hermes_cli.config.load_config",
-        lambda: {"model": {"provider": "custom:hyper-charm", "default": "glm-5.2"}},
-    )
-    monkeypatch.setattr(
-        "hermes_cli.config.load_config_readonly",
-        lambda: {"model": {"provider": "custom:hyper-charm", "default": "glm-5.2"}},
-    )
+    review_cfg = {
+        "model": {"provider": "custom:hyper-charm", "default": "glm-5.2"},
+        "auxiliary": {
+            "curator": {"provider": "auto", "model": "", "timeout": 600},
+        },
+    }
+    monkeypatch.setattr("hermes_cli.config.load_config", lambda: review_cfg)
+    monkeypatch.setattr("hermes_cli.config.load_config_readonly", lambda: review_cfg)
     monkeypatch.setattr(
         "hermes_cli.runtime_provider.resolve_runtime_provider",
         _fake_resolve_runtime_provider,
@@ -794,6 +814,8 @@ def test_review_fork_forwards_runtime_pool_and_overrides(curator_env, monkeypatc
     assert meta.get("error") is None, meta.get("error")
     assert captured["kwargs"]["credential_pool"] is fake_pool
     assert captured["kwargs"]["request_overrides"] == fake_overrides
+    assert captured["agent"]._request_timeout_override == 600.0
+    assert captured["agent"]._codex_event_stale_timeout_override == 600.0
 
 
 def test_review_fork_uses_runtime_model_and_output_cap(curator_env, monkeypatch):
