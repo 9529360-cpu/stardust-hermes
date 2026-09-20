@@ -120,7 +120,7 @@ def test_llm_candidates_require_authoritative_ownership_and_exclude_pinned(
     monkeypatch.setattr(u, "curated_report", lambda: rows)
     monkeypatch.setattr(
         u, "is_curator_managed",
-        lambda name: name in {"owned", "pinned-owned"},
+        lambda name: name in {"owned", "pinned-owned", "bundled-example"},
     )
 
     assert [row["name"] for row in c._llm_candidate_rows()] == ["owned"]
