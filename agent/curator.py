@@ -958,6 +958,8 @@ class _ReviewRuntimeBinding(NamedTuple):
 
 def _positive_timeout(value: Any) -> Optional[float]:
     """Positive finite timeout in seconds, otherwise None."""
+    if isinstance(value, bool):
+        return None
     try:
         timeout = float(value)
     except (TypeError, ValueError):
@@ -1008,9 +1010,11 @@ def _resolve_review_runtime(cfg: Dict[str, Any]) -> _ReviewRuntimeBinding:
 
 
 def _resolve_review_provider() -> tuple:
-    """``(runtime_provider, model_name, provider_name, request_overrides)`` resolved the way the CLI does: AIAgent() without
-    explicit provider/model hits an auto-resolution path that fails for OAuth-only providers and pooled credentials
-    (HTTP 400 "No models provided"). Never raises."""
+    """Resolve runtime provider, model, provider name, request overrides, and Curator timeout.
+
+    AIAgent() without an explicit provider/model hits an auto-resolution path that fails for
+    OAuth-only providers and pooled credentials (HTTP 400 "No models provided"). Never raises.
+    """
     rp: Dict[str, Any] = {}
     overrides, provider, model_name, timeout = {}, None, "", None
     try:
