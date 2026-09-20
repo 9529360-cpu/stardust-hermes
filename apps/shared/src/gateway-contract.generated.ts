@@ -1752,18 +1752,6 @@ export interface SubagentListResult {
   subagents?: SubagentSnapshot[]
   delegations?: Record<string, unknown>[]
 }
-/** Sanitized process-loss receipt; never grants control over the retired worker. */
-export interface DelegationRecoveryReceipt {
-  delegation_id: string
-  goal?: string
-  task_count?: number
-  dispatched_at?: number
-  completed_at?: number
-  reason?: 'owner_exited'
-}
-export interface DelegationRecoveryListResult {
-  receipts?: DelegationRecoveryReceipt[]
-}
 /** ``methods_subagents._SUBAGENT_SNAPSHOT_FIELDS`` projection of one live child record. */
 export interface SubagentSnapshot {
   subagent_id: string
@@ -1780,6 +1768,18 @@ export interface SubagentSnapshot {
 }
 /** Lifecycle of one delegated child (``tools/delegate_tool_child_run.py``); ``failed`` / ``error`` / ``timeout`` / ``interrupted`` / ``completed`` are terminal. */
 export type SubagentStatus = 'queued' | 'running' | 'completed' | 'failed' | 'error' | 'timeout' | 'interrupted'
+export interface DelegationRecoveryListResult {
+  receipts?: DelegationRecoveryReceipt[]
+}
+/** Sanitized process-loss receipt; never grants control over the retired worker. */
+export interface DelegationRecoveryReceipt {
+  delegation_id: string
+  goal?: string
+  task_count?: number
+  dispatched_at?: number
+  completed_at?: number
+  reason?: 'owner_exited'
+}
 export interface SubagentIdParams {
   session_id: string
   profile?: string | null
