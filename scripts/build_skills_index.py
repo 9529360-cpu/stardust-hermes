@@ -391,6 +391,14 @@ def main():
         "browse-sh": 50,
     }
     health_errors = []
+    clawhub_source = sources["clawhub"]
+    if getattr(clawhub_source, "index_build_truncated", False):
+        budget = getattr(clawhub_source, "INDEX_BUILD_WALK_BUDGET_SECONDS", "configured")
+        health_errors.append(
+            f"  clawhub: full catalog walk exceeded {budget}s budget; "
+            "refusing to publish a partial snapshot"
+        )
+
     for src, floor in EXPECTED_FLOORS.items():
         # 'skills-sh' and 'skills.sh' are the same source; both labels exist.
         count = by_source.get(src, 0)
