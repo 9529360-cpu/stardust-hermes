@@ -92,19 +92,23 @@ afterEach(() => {
   profileSwitchHandler = null
 })
 
-async function renderModelSettings(scopeProfile?: string) {
+async function renderModelSettings(scopeProfile?: string, initialEntries: string[] = ['/']) {
   const { ModelSettings } = await import('./model-settings')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
   return render(
     // The aux-task deep-link highlight reads useSearchParams, so the page
     // needs a router context in tests (the app provides HashRouter at root).
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <QueryClientProvider client={client}>
         <ModelSettings scopeProfile={scopeProfile} />
       </QueryClientProvider>
     </MemoryRouter>
   )
+}
+
+async function openAdvancedModelSettings(label = 'Advanced model settings') {
+  fireEvent.click(await screen.findByRole('button', { name: label }))
 }
 
 async function renderChineseModelSettings() {
@@ -422,8 +426,26 @@ describe('ModelSettings', () => {
     expect(screen.queryByRole('switch')).toBeNull()
   })
 
-  it('renders the auxiliary task rows', async () => {
+  it('keeps auxiliary and MoA controls behind advanced settings by default', async () => {
     await renderModelSettings()
+
+    expect(await screen.findByRole('button', { name: 'Advanced model settings' })).toBeTruthy()
+    const advanced = screen.getByText('Auxiliary models').closest('[data-slot="advanced-model-settings"]')
+    expect((advanced as HTMLElement | null)?.hidden).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Set to main' })).toBeNull()
+  })
+
+  it('reveals advanced model settings for an auxiliary-task deep link', async () => {
+    await renderModelSettings(undefined, ['/?tab=config:model&aux=vision'])
+
+    expect(await screen.findByRole('button', { name: 'Hide advanced model settings' })).toBeTruthy()
+    const advanced = screen.getByText('Auxiliary models').closest('[data-slot="advanced-model-settings"]')
+    expect((advanced as HTMLElement | null)?.hidden).toBe(false)
+  })
+
+  it('renders the auxiliary task rows after advanced settings are opened', async () => {
+    await renderModelSettings()
+    await openAdvancedModelSettings()
 
     expect(await screen.findByText('Vision')).toBeTruthy()
     // #97297 — the three canonical slots the backend serves must have rows too.
@@ -440,6 +462,7 @@ describe('ModelSettings', () => {
     })
 
     await renderModelSettings()
+    await openAdvancedModelSettings()
 
     expect(screen.queryByRole('combobox', { name: 'Vision reasoning effort' })).toBeNull()
 
@@ -469,6 +492,7 @@ describe('ModelSettings', () => {
 
   it('assigns an auxiliary task to the main model via setModelAssignment', async () => {
     await renderModelSettings()
+    await openAdvancedModelSettings()
 
     // One "Set to main" button per task slot; the first is Vision.
     const setToMainButtons = await screen.findAllByRole('button', { name: 'Set to main' })
@@ -504,6 +528,7 @@ describe('ModelSettings', () => {
     })
 
     await renderModelSettings()
+    await openAdvancedModelSettings()
 
     const setToMainButtons = await screen.findAllByRole('button', { name: 'Set to main' })
     fireEvent.click(setToMainButtons[0])
@@ -558,6 +583,7 @@ describe('ModelSettings', () => {
     })
 
     await renderModelSettings()
+    await openAdvancedModelSettings()
     await screen.findAllByRole('button', { name: 'Set to main' })
 
     // 'main' is a backend-supported alias that tracks the active main provider
@@ -591,6 +617,7 @@ describe('ModelSettings', () => {
     // The public custom endpoint still bills a provider, so the banner stays —
     // but it names only that one task, not the free LAN pin.
     expect(await screen.findByText(/1 auxiliary task \(/)).toBeTruthy()
+    await openAdvancedModelSettings()
     // The row shows where the pinned task actually points.
     expect(screen.getByText(/http:\/\/byron\.local:11434\/v1/)).toBeTruthy()
   })
@@ -648,6 +675,7 @@ describe('ModelSettings MoA preset editor', () => {
 
   async function openReferenceEditor() {
     await renderModelSettings()
+    await openAdvancedModelSettings()
     expect(await screen.findByText('Reference 1')).toBeTruthy()
   }
 
@@ -665,6 +693,8 @@ describe('ModelSettings MoA preset editor', () => {
 
     expect(await screen.findByText('模型服务')).toBeTruthy()
     expect(screen.getByText(/选一个服务，需要时填 API Key 或登录/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '高级模型设置' })).toBeTruthy()
+    await openAdvancedModelSettings('高级模型设置')
     expect(await screen.findByText('参考模型 1')).toBeTruthy()
     expect(screen.getByText(/配置具名预设/)).toBeTruthy()
     expect(screen.getByText('已启用')).toBeTruthy()
