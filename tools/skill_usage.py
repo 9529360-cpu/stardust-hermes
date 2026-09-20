@@ -283,9 +283,13 @@ def is_curator_managed(skill_name: str) -> bool:
 
 
 def list_unmanaged_skill_names() -> List[str]:
-    """Curation-ELIGIBLE skills without a provenance marker (pre-``created_by`` records, or foreground creates that
-    belong to the user). Invisible to ``curated_report()`` and auto transitions; only ``curator adopt`` hands
-    them over — provenance is declared, never inferred from activity."""
+    """Curation-eligible skills not opted into curator management.
+
+    They may be explicitly foreground-marked (``created_by: learn``) or have
+    unknown origin (null/missing/legacy metadata). Invisible to
+    ``curated_report()`` and auto transitions; only ``curator adopt`` hands
+    them over. Authorship is never inferred from telemetry.
+    """
     return _scan_local_skills(
         lambda name, md, bundled, usage: name not in bundled and not _is_curator_managed_record(usage.get(name))
         and is_curation_eligible(name, md))
