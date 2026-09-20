@@ -393,3 +393,44 @@ def test_owner_identity_is_not_embedded_in_idempotency_key(monkeypatch):
     assert calls[0]["_assistant_owner_key"] == owner
     assert owner not in calls[0]["idempotency_key"]
     assert "user-secret-42" not in calls[0]["idempotency_key"]
+
+
+
+def test_list_keeps_newest_owner_tasks_visible_past_200_rows(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        for index in range(205):
+            task_id = kb.create_task(
+                conn,
+                title=f"task-{index:03d}",
+                assignee="default",
+                assistant_owner_key="local",
+            )
+            conn.execute(
+                "UPDATE tasks SET created_at = ? WHERE id = ?",
+                (1000 + index, task_id),
+            )
+        conn.commit()
+
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+            limit=5,
+        )
+    )
+    assert [task["title"] for task in listed["tasks"]] == [
+        "task-204",
+        "task-203",
+        "task-202",
+        "task-201",
+        "task-200",
+    ]
