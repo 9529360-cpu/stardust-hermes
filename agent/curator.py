@@ -816,7 +816,8 @@ def _llm_candidate_rows() -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for row in skill_usage.curated_report():
         name = row.get("name")
-        if not isinstance(name, str) or not name or row.get("pinned"):
+        if (not isinstance(name, str) or not name or row.get("pinned")
+                or row.get("provenance") != "agent"):
             continue
         try:
             managed = skill_usage.is_curator_managed(name)
