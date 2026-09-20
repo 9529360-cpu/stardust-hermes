@@ -141,13 +141,21 @@ def _print_curator_first_run_notice() -> None:
         hours = curator.get_interval_hours()
     except Exception:
         hours = 24 * 7
+    try:
+        prune_builtins = curator.get_prune_builtins()
+    except Exception:
+        prune_builtins = True
     days = max(1, hours // 24)
+    scope = (
+        "agent-created skills plus unused bundled built-ins"
+        if prune_builtins else "agent-created skills"
+    )
     print()
     print("ℹ Skill curator")
     print(
         f"  Background skill maintenance is enabled. First pass is deferred "
-        f"~{days}d after installation; only agent-created skills are in "
-        f"scope and nothing is ever auto-deleted (archive is recoverable)."
+        f"~{days}d after installation; scope: {scope}. Nothing is ever "
+        f"auto-deleted (archive is recoverable)."
     )
     print("  Preview now:  hermes curator run --dry-run")
     print("  Pause it:     hermes curator pause")
