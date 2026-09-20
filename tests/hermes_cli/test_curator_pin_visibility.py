@@ -78,6 +78,52 @@ def pin_env(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Unmanaged reporting must not invent authorship
+# ---------------------------------------------------------------------------
+
+
+def test_unmanaged_summary_reports_unknown_instead_of_inferred_foreground(monkeypatch, capsys):
+    from hermes_cli import curator as curator_cli
+    from tools import skill_usage
+
+    rows = [
+        {"name": "explicit-learn", "unmanaged_origin": "foreground", "created_by": "learn"},
+        {"name": "null-record", "unmanaged_origin": "unknown", "created_by": None,
+         "has_provenance_key": True},
+        {"name": "no-record", "unmanaged_origin": "unknown", "created_by": None,
+         "has_provenance_key": False},
+    ]
+    monkeypatch.setattr(skill_usage, "unmanaged_report", lambda: rows)
+
+    curator_cli._print_unmanaged_summary()
+    out = capsys.readouterr().out
+
+    assert "unmanaged (not curator-managed): 3 total" in out
+    assert "foreground-marked  1" in out
+    assert "origin unknown     2" in out
+    assert "pre-dates marker" not in out
+    assert "foreground-created" not in out
+
+
+def test_list_unmanaged_labels_only_explicit_learn_as_foreground(monkeypatch, capsys):
+    from hermes_cli import curator as curator_cli
+    from tools import skill_usage
+
+    rows = [
+        {"name": "explicit-learn", "unmanaged_origin": "foreground", "created_by": "learn",
+         "activity_count": 0, "last_activity_at": None},
+        {"name": "null-record", "unmanaged_origin": "unknown", "created_by": None,
+         "activity_count": 1, "last_activity_at": None},
+    ]
+    monkeypatch.setattr(skill_usage, "unmanaged_report", lambda: rows)
+
+    assert curator_cli._cmd_list_unmanaged(Namespace()) == 0
+    out = capsys.readouterr().out
+    assert "foreground marker (created_by:learn)" in out
+    assert "origin unknown" in out
+
+
+# ---------------------------------------------------------------------------
 # Test 1 — pin must fail loudly when the write does not land
 # ---------------------------------------------------------------------------
 
