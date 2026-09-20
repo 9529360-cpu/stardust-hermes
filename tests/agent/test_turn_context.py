@@ -202,6 +202,17 @@ def _build(agent, **overrides):
     return build_turn_context(**kwargs)
 
 
+def test_turn_context_binds_curator_dry_run_policy():
+    agent = _FakeAgent()
+    agent._memory_write_origin = "background_review"
+    agent._review_dry_run = True
+
+    with patch("tools.skill_provenance.set_review_dry_run") as set_dry:
+        _build(agent)
+
+    set_dry.assert_called_once_with(True)
+
+
 class _RefreshStore:
     def __init__(self, *, stale: bool, before: str, after: str):
         self.stale = stale
