@@ -11,7 +11,7 @@ import json
 import re
 import asyncio
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from contextvars import ContextVar
 import logging
 import threading
@@ -699,8 +699,13 @@ def _emit_post_tool_call_hook(
         logger.debug("post_tool_call hook error: %s", _hook_err)
 
 
-def _dispatch_bridge_tool(function_name: str, function_args: Dict[str, Any],
-                          enabled_toolsets: Optional[List[str]], disabled_toolsets: Optional[List[str]]):
+def _dispatch_bridge_tool(
+    function_name: str,
+    function_args: Dict[str, Any],
+    enabled_tools: Optional[List[str]],
+    enabled_toolsets: Optional[List[str]],
+    disabled_toolsets: Optional[List[str]],
+):
     """Handle a Tool Search bridge call (tool_search / tool_describe / tool_call).
 
     None when *function_name* is not a bridge tool; ``(result, None)`` for a
@@ -721,10 +726,19 @@ def _dispatch_bridge_tool(function_name: str, function_args: Dict[str, Any],
     except Exception:
         current_defs = []
     args = function_args or {}
-    # Resolve Tool Search policy once for the whole bridge call. A config reload
-    # between search/describe/unwrap checks must not make the catalog and dispatch
-    # scope disagree within one model action.
+    if enabled_tools is not None and function_name not in enabled_tools:
+        return tool_error(
+            f"'{function_name}' is not available in this session."
+        ), None
+
+    # Tool Search limits/listing may be read live, but eager-vs-deferred membership is
+    # prompt-affecting and therefore belongs to the already-assembled session surface.
+    # This keeps built-ins stable for the conversation while still allowing new
+    # MCP/plugin entries to appear behind the unchanged bridge.
     policy = ts.load_config_readonly()
+    if enabled_tools is not None:
+        session_defer = ts.defer_tools_for_session_surface(current_defs, enabled_tools)
+        policy = replace(policy, defer_tools=session_defer)
     defer_tools = policy.effective_defer_tools
     if function_name == ts.TOOL_SEARCH_NAME:
         return ts.dispatch_tool_search(args, current_tool_defs=current_defs, config=policy), None
@@ -881,10 +895,12 @@ def handle_function_call(
     """Route a tool call through hooks/middleware to the registry; returns a JSON string.
 
     task_id isolates terminal/browser sessions; user_task feeds browser_snapshot.
-    enabled_tools picks execute_code's sandbox tools (default: the process-global
-    ``_last_resolved_tool_names``). skip_pre_tool_call_hook: caller already fired
-    it (single-fire contract). enabled/disabled_toolsets scope the Tool Search
-    bridge catalog to this session's grant (None = unrestricted).
+    enabled_tools is the caller's model-visible tool surface (and picks execute_code's
+    sandbox tools; default: the process-global ``_last_resolved_tool_names``). Tool
+    Search uses it to preserve the session-frozen eager/deferred contract.
+    skip_pre_tool_call_hook: caller already fired it (single-fire contract).
+    enabled/disabled_toolsets scope the Tool Search bridge catalog to this session's
+    grant (None = unrestricted).
     """
     function_args = coerce_tool_args(function_name, function_args)
     if not isinstance(function_args, dict):
@@ -903,7 +919,9 @@ def handle_function_call(
     # Tool Search bridge: tool_search / tool_describe are catalog reads handled
     # inline; tool_call is unwrapped so every downstream hook (pre/post, edit
     # approval, guardrails) sees the real tool name, never the bridge.
-    bridged = _dispatch_bridge_tool(function_name, function_args, enabled_toolsets, disabled_toolsets)
+    bridged = _dispatch_bridge_tool(
+        function_name, function_args, enabled_tools, enabled_toolsets, disabled_toolsets
+    )
     if bridged is not None:
         result, underlying = bridged
         if underlying is None:
