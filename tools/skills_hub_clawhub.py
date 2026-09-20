@@ -306,14 +306,15 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         ``max_items`` stops the walk early once that many distinct skills are
         gathered (browse's cold-start fallback renders one page); ``0`` requests
         a full offline index walk, still bounded by the larger publisher budget.
-        Only a COMPLETE walk (cursor exhausted or page cap) is written to the shared
-        ``clawhub_catalog_v1`` cache — a walk cut by ``max_items`` or either
-        wall-clock budget would poison it with a partial slice.
+        Only a COMPLETE walk whose cursor naturally exhausts is written to the
+        shared ``clawhub_catalog_v1`` cache — a walk cut by ``max_items``,
+        either wall-clock budget, a request failure, or the page ceiling would
+        poison it with a partial slice.
         """
         cache_key = "clawhub_catalog_v1"
         if max_items == 0:
             # Builder-visible completion signal. Reset before cache lookup so a
-            # prior truncated attempt cannot poison a later cached/full result.
+            # prior incomplete attempt cannot poison a later cached/full result.
             self.index_build_incomplete = False
             self.index_build_incomplete_reason = ""
         cached = _cached_metas(cache_key)
@@ -322,8 +323,9 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         cursor: Optional[str] = None
         results: List[SkillMeta] = []
         seen: set[str] = set()
-        # 750 pages * 200/page = 150k ceiling over the ~50k catalog; a safety
-        # rail against an infinite-cursor loop, normally ended by nextCursor=None.
+        # CATALOG_WALK_MAX_PAGES * 200/page is a safety ceiling over the ~50k
+        # catalog, protecting against an infinite-cursor loop. Hitting that
+        # ceiling is incomplete; normal completion is nextCursor=None.
         # Both modes have wall-clock bounds: interactive browse is short, while
         # the offline publisher gets enough time for a large healthy snapshot.
         budget_seconds = (
