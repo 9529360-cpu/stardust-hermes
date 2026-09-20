@@ -513,6 +513,15 @@ class TestRemoveFile:
         assert result["success"] is True
         assert not (tmp_path / "my-skill" / "references" / "api.md").exists()
 
+    def test_remove_missing_lists_portable_relative_paths(self, tmp_path):
+        with _skill_dir(tmp_path):
+            _create_skill("my-skill", VALID_SKILL_CONTENT)
+            _write_file("my-skill", "references/api.md", "content")
+            result = _remove_file("my-skill", "references/missing.md")
+
+        assert result["success"] is False
+        assert result["available_files"] == ["references/api.md"]
+
     def test_remove_symlink_escape_blocked(self, tmp_path):
         outside_dir = tmp_path / "outside"
         outside_dir.mkdir()
