@@ -518,7 +518,9 @@ def _edit_skill(name: str, content: str) -> Dict[str, Any]:
     result = {
         "success": True, "message": f"Skill '{name}' updated (full rewrite).",
         "path": str(skill_dir), "_change": {"description": _description_preview(content)}}
-    return _add_description_prompt_preview(_attach_org_note(result, name, skill_dir), content)
+    result = _add_description_prompt_preview(_attach_org_note(result, name, skill_dir), content)
+    _attach_lint_findings(result, skill_dir / "SKILL.md")
+    return result
 
 
 def _patch_skill(name: str, old_string: str, new_string: str, file_path: str = None,
@@ -571,7 +573,10 @@ def _patch_skill(name: str, old_string: str, new_string: str, file_path: str = N
         "success": True,
         "message": f"Patched {target_label} in skill '{name}' ({match_count} replacement{'s' if match_count > 1 else ''}).",
         "_change": {"old": _clip(old_string, 200, "…"), "new": _clip(new_string, 200, "…")}}
-    return _attach_org_note(result, name, skill_dir)
+    result = _attach_org_note(result, name, skill_dir)
+    if not file_path:
+        _attach_lint_findings(result, target)
+    return result
 
 
 def _delete_skill(name: str, absorbed_into: Optional[str] = None) -> Dict[str, Any]:
