@@ -1236,6 +1236,9 @@ export interface Translations {
       advancedConnections: string
       advancedConnectionsHide: string
       noServices: string
+      advancedModelSettings: string
+      advancedModelSettingsHide: string
+      advancedModelSettingsDesc: string
       defaultsLabel: string
       reasoning: string
       reasoningOff: string
