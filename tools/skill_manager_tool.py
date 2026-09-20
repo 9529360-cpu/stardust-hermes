@@ -495,9 +495,12 @@ def _create_skill(
         shutil.rmtree(skill_dir, ignore_errors=True)
         return _err(scan_error)
     root = _skills_dir()  # display relative under the profile dir; absolute under skills.create_dir
-    display = skill_dir.relative_to(root) if skill_dir.is_relative_to(root) else skill_dir
+    display = (
+        skill_dir.relative_to(root).as_posix()
+        if skill_dir.is_relative_to(root) else str(skill_dir)
+    )
     result = {
-        "success": True, "message": f"Skill '{name}' created.", "path": str(display),
+        "success": True, "message": f"Skill '{name}' created.", "path": display,
         "skill_md": str(skill_md), "_change": {"description": _description_preview(content)},
         **({"category": category} if category else {}),
         "hint": "To add reference files, templates, or scripts, use "
