@@ -54,6 +54,10 @@ def test_clarify_is_reserved_for_material_user_decisions():
 
 def test_prompt_guidance_names_durability_and_focus_boundaries():
     assert "never as a promise of restart durability" in ASSISTANT_EXECUTION_GUIDANCE
+    assert "multiple independent action requests" in ASSISTANT_EXECUTION_GUIDANCE
+    assert "`assistant_tasks`" in ASSISTANT_EXECUTION_GUIDANCE
+    assert "use cron for work whose defining requirement is a future time or recurrence" in ASSISTANT_EXECUTION_GUIDANCE
+    assert "durable human-approval boundary" in ASSISTANT_EXECUTION_GUIDANCE
     assert "must not steal focus" in ASSISTANT_EXECUTION_GUIDANCE
 
 
