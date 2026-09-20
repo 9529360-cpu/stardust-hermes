@@ -179,7 +179,7 @@ def _assistant_tasks(agent, args: dict, ctx: InlineToolContext) -> Any:
     return assistant_tasks_tool(
         action=args.get("action", "create"),
         tasks=args.get("tasks"),
-        include_completed=args.get("include_completed", False),
+        include_completed=args.get("include_completed", True),
         limit=args.get("limit", 20),
         task_ids=args.get("task_ids"),
         session_id=getattr(agent, "session_id", None),
