@@ -163,7 +163,7 @@ export function ModelServicePicker({
                           <Button onClick={onSetupProvider} size="sm">
                             {m.connectProvider(selectedProviderRow?.name ?? m.provider)}
                           </Button>
-                          {selectedProviderRow && (
+                          {selectedProviderRow?.auth_type && (
                             <span className="text-xs text-muted-foreground">
                               {selectedProviderRow.auth_type === 'api_key'
                                 ? m.setupApiKeyHint(selectedProviderRow.name)
