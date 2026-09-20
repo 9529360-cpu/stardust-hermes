@@ -20,6 +20,8 @@ test is actually closed by the suite-level sweep.
 
 from __future__ import annotations
 
+import threading
+
 import hermes_state_guard
 from hermes_state import SessionDB
 
@@ -57,4 +59,52 @@ def test_previously_leaked_instance_was_closed_by_the_sweep():
     # The autouse _close_leaked_session_dbs teardown between the two tests
     # must have closed the leaked instance (writer conn released), which is
     # what bounds fd/RSS growth in single-process runs.
+    assert db._conn is None
+
+
+_thread_owned: list[SessionDB] = []
+_thread_holders: list[threading.Thread] = []
+_thread_ready = threading.Event()
+_thread_release = threading.Event()
+
+
+def test_live_worker_owned_instance_is_left_open_for_its_owner(tmp_path):
+    """Teardown must not close a SessionDB while its creating thread is alive."""
+    _thread_ready.clear()
+    _thread_release.clear()
+
+    def worker():
+        db = SessionDB(db_path=tmp_path / "worker-state.db")
+        db.create_session(session_id="worker-owned", source="cli", model="m")
+        _thread_owned.append(db)
+        _thread_ready.set()
+        _thread_release.wait(timeout=30.0)
+
+    thread = threading.Thread(target=worker, daemon=True, name="sessiondb-owner-probe")
+    _thread_holders.append(thread)
+    thread.start()
+
+    assert _thread_ready.wait(timeout=5.0)
+    assert _thread_owned[-1]._conn is not None
+    # Return with the worker still alive. The autouse leak sweep runs next.
+
+
+def test_live_worker_owned_instance_was_not_cross_thread_closed():
+    assert _thread_owned and _thread_holders
+    db = _thread_owned[-1]
+    thread = _thread_holders[-1]
+    try:
+        assert thread.is_alive()
+        assert db._conn is not None
+    finally:
+        _thread_release.set()
+        thread.join(timeout=5.0)
+    assert not thread.is_alive()
+    # Return with the owner gone. The next teardown may safely close the leak.
+
+
+def test_exited_worker_leak_was_closed_by_the_next_sweep():
+    assert _thread_owned and _thread_holders
+    db = _thread_owned.pop()
+    _thread_holders.pop()
     assert db._conn is None

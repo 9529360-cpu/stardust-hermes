@@ -32,7 +32,9 @@ class _Cli(CLILoopsMixin):
 def test_idle_hook_queues_the_continuation_when_a_timed_barrier_has_elapsed(hermes_home):
     mgr = goals.GoalManager(session_id="resume-idle")
     mgr.set("finish the thing")
-    mgr.wait_for_seconds(1, reason="cooldown")
+    # Keep the initial barrier far from the wall-clock boundary. This test
+    # exercises idle-hook state transitions, not real one-second scheduling.
+    mgr.wait_for_seconds(60, reason="cooldown")
     cli = _Cli(mgr)
     with patch("cli._cprint"), patch("cli._DIM", ""), patch("cli._RST", ""):
         cli._maybe_resume_parked_goal()
