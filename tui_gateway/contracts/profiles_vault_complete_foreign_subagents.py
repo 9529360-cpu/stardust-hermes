@@ -1,10 +1,11 @@
 """Contracts for ``methods_profiles``, ``methods_vault``, ``methods_complete``,
-``methods_session_foreign`` and ``methods_subagents``.
+``methods_session_foreign``, ``methods_subagents`` and ``methods_delegations``.
 
 Profiles are the ws twin of the dashboard's ``/api/profiles``; the vault handlers are the
 Desktop's Settings → Credential Vault door (metadata only — a secret never appears in a result);
 completions feed the composer popovers; ``session.foreign.*`` browses Claude Code / Codex
-histories on the serving backend; ``subagent.*`` is the session-scoped roster of live children.
+histories on the serving backend; ``subagent.*`` is the session-scoped roster of live children;
+``delegation.recovery.*`` exposes sanitized restart-loss receipts only.
 """
 
 from __future__ import annotations
