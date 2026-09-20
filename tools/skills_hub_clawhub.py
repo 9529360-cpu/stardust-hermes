@@ -304,6 +304,10 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         wall-clock budget would poison it with a partial slice.
         """
         cache_key = "clawhub_catalog_v1"
+        if max_items == 0:
+            # Builder-visible completion signal. Reset before cache lookup so a
+            # prior truncated attempt cannot poison a later cached/full result.
+            self.index_build_truncated = False
         cached = _cached_metas(cache_key)
         if cached is not None:
             return cached
@@ -324,6 +328,8 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         for _ in range(750):
             if time.monotonic() > deadline:
                 partial = True
+                if max_items == 0:
+                    self.index_build_truncated = True
                 logger.warning(
                     "ClawHub catalog walk hit %.0fs budget after %d skills; "
                     "returning partial uncached results",
