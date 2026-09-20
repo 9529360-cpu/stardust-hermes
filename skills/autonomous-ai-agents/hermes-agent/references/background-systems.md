@@ -72,7 +72,8 @@ so nothing is lost.
   `last_activity_at`, `state`, `pinned`.
 
 Config: `curator.*` (`enabled`, `interval_hours`, `min_idle_hours`,
-`stale_after_days`, `archive_after_days`, `backup.*`).
+`stale_after_days`, `archive_after_days`, `consolidate`, `prune_builtins`,
+`backup.*`).
 User docs: https://hermes-agent.nousresearch.com/docs/user-guide/features/curator
 
 ### Kanban (multi-agent work queue)
