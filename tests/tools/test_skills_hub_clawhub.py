@@ -255,6 +255,18 @@ class TestClawHubSource(unittest.TestCase):
         self.assertEqual(mock_get.call_count, 2)
         mock_safe_get.assert_not_called()
 
+    @patch("tools.skills_hub_clawhub._cached_metas", return_value=None)
+    def test_nonempty_search_does_not_bootstrap_full_catalog_on_cold_cache(
+        self, _mock_cached
+    ):
+        """Interactive query search falls back to the lightweight API when the
+        completed full-catalog cache is absent."""
+        with patch.object(self.src, "_load_catalog_index") as full_walk:
+            results = self.src._search_catalog("calendar", limit=10)
+
+        self.assertEqual(results, [])
+        full_walk.assert_not_called()
+
     @patch("tools.skills_hub._write_index_cache")
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
