@@ -14,6 +14,39 @@ _SUBAGENT_SNAPSHOT_FIELDS = (
     "started_at", "status", "tool_count", "last_tool", "accepting_steer",
 )
 _SUBAGENT_TAIL_BYTES = 16384
+_DELEGATION_RECOVERY_FIELDS = (
+    "delegation_id", "goal", "task_count", "dispatched_at", "completed_at",
+)
+
+
+def _owned_delegation_recovery_receipts(session_id, owner):
+    """Read recent process-loss receipts from THIS session's profile and fail closed on ownership.
+
+    The async-delegation ledger is authoritative. This is a sanitized projection for UI recovery:
+    no context, toolsets, model, result body, error text, routing metadata, or callbacks cross the wire.
+    """
+    from tools.async_delegation import list_durable_recovery_receipts
+
+    try:
+        with _session_profile_runtime_scope(owner):
+            receipts = list_durable_recovery_receipts()
+            owned = []
+            for receipt in receipts:
+                event = {
+                    "type": "async_delegation",
+                    "origin_ui_session_id": receipt.get("origin_ui_session_id"),
+                    "session_key": receipt.get("origin_session"),
+                }
+                if not _session_owns_notification_event(session_id, owner, event):
+                    continue
+                projected = {key: receipt.get(key) for key in _DELEGATION_RECOVERY_FIELDS}
+                projected.update(status="interrupted", recovery_reason="process_restart")
+                owned.append(projected)
+            return owned
+    except Exception:
+        logger.debug("delegation recovery snapshot failed", exc_info=True)
+        return []
+
 
 
 def _owned_subagent_records(session_id, transport, owner):
@@ -35,7 +68,7 @@ def _(rid, params):
     live = _owned_subagent_records(session_id, transport, owner)
     return _ok(rid, {
         "subagents": [{key: r.get(key) for key in _SUBAGENT_SNAPSHOT_FIELDS} for r in live],
-        "delegations": [],
+        "delegations": _owned_delegation_recovery_receipts(session_id, owner),
     })
 
 
