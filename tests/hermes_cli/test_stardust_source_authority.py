@@ -37,6 +37,15 @@ def test_shell_bootstrap_presents_stardust_identity() -> None:
     assert "s#Download Hermes Agent#Download Stardust#g" in source
 
 
+def test_repository_and_docker_default_soul_match_runtime_seed() -> None:
+    from hermes_cli.default_soul import DEFAULT_SOUL_MD
+
+    for path in ("SOUL.md", "docker/SOUL.md"):
+        source = _read(path).strip()
+        assert source == DEFAULT_SOUL_MD
+        assert "Hermes Agent, built by Nous Research" not in source
+
+
 def test_shell_bootstrap_normalizes_tauri_stage_protocol() -> None:
     source = _read("scripts/install-stardust.sh")
 

@@ -182,6 +182,7 @@ def test_receipts_are_bounded_redacted_and_session_scoped(tmp_path, monkeypatch)
             id=f"proc_{index:012x}", command=f"echo {secret}", task_id=f"owner-{index}",
             owner_task_id=f"owner-{index}", session_key=f"chat-{index}",
             parent_session_id="owner-session",
+            handoff_note=f"handoff-{index}",
             started_at=time.time() - receipts.RESULT_RETENTION_SECONDS * 2,
             output_buffer="x" * MAX_OUTPUT_CHARS + "\n" + secret,
             exited=True, exit_code=index,
@@ -193,11 +194,23 @@ def test_receipts_are_bounded_redacted_and_session_scoped(tmp_path, monkeypatch)
     paths = list((get_hermes_home() / "logs" / "process-results").glob("*.json"))
     assert len(paths) == 2
     assert all(secret not in path.read_text(encoding="utf-8") for path in paths)
+
+    # Additive receipt fields must not invalidate results written by the previous
+    # version. Simulate one retained pre-handoff receipt before the fresh reader.
+    legacy_path = get_hermes_home() / "logs" / "process-results" / f"{sessions[-2].id}.json"
+    legacy_record = json.loads(legacy_path.read_text(encoding="utf-8"))
+    legacy_record.pop("handoff_note")
+    legacy_path.write_text(json.dumps(legacy_record), encoding="utf-8")
+
     fresh = ProcessRegistry()
     assert fresh.get(sessions[0].id) is None
     recovered = fresh.get(sessions[-1].id)
     assert recovered.owner_task_id == sessions[-1].owner_task_id
+    assert recovered.handoff_note == sessions[-1].handoff_note
     assert len(recovered.output_buffer) <= MAX_OUTPUT_CHARS
+    legacy_recovered = fresh.get(sessions[-2].id)
+    assert legacy_recovered is not None
+    assert legacy_recovered.handoff_note == ""
     assert fresh.list_sessions() == []  # Status/liveness scans stay in memory.
     assert [s["session_id"] for s in fresh.list_sessions(
         task_id="owner-2", include_retained=True)] == [recovered.id]
