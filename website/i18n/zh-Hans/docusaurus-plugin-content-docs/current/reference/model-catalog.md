@@ -6,17 +6,17 @@ description: 远程托管的清单文件，驱动 OpenRouter 和 Nous Portal 的
 
 # 模型目录
 
-Hermes 从托管于文档站点旁的 JSON 清单中获取 **OpenRouter** 和 **Nous Portal** 的精选模型列表。这样维护者无需发布新的 `hermes-agent` 版本即可更新选择器列表。
+Stardust 直接从本仓库经审查的 `main` 分支 JSON 清单获取 **OpenRouter** 和 **Nous Portal** 的精选模型列表。这样维护者无需发布新的 Stardust 版本，也无需把运行时目录权威交给单独的文档部署。
 
-当清单不可达时（离线、网络受阻、托管故障），Hermes 会静默回退到随 CLI 一同发布的仓库内置快照。清单永远不会导致选择器崩溃——最坏情况下，你看到的是与已安装版本捆绑的列表。
+当清单不可达时（离线、网络受阻、托管故障），Stardust 会静默回退到随 CLI 一同发布的仓库内置快照。清单永远不会导致选择器崩溃——最坏情况下，你看到的是与已安装版本捆绑的列表。
 
 ## 线上清单 URL
 
 ```
-https://hermes-agent.nousresearch.com/docs/api/model-catalog.json
+https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json
 ```
 
-每次合并到 `main` 时，通过现有的 `deploy-site.yml` GitHub Pages 流水线发布。真实来源位于仓库的 `website/static/api/model-catalog.json`。
+真实来源提交在 `website/static/api/model-catalog.json`。经审查的变更一旦合并到 `main`，上面的 GitHub raw URL 就直接提供该文件；运行时目录权威不依赖单独的文档部署。
 
 ## Schema（模式）
 
@@ -47,7 +47,7 @@ https://hermes-agent.nousresearch.com/docs/api/model-catalog.json
 字段说明：
 
 - **`version`** — 整数类型的 schema 版本号。未来的 schema 会递增此值；Hermes 拒绝处理版本号未知的清单，并回退到硬编码快照。
-- **`metadata`** — 清单、provider 及模型级别的自由格式字典，支持任意键。Hermes 会忽略未知字段，因此你可以为条目添加注解（如 `"tier": "paid"`、`"tags": [...]` 等），无需协调 schema 变更。
+- **`metadata`** — 清单、provider 及模型级别的自由格式字典，支持任意键。Stardust 会忽略未知字段，因此你可以为条目添加注解（如 `"tier": "paid"`、`"tags": [...]` 等），无需协调 schema 变更。
 - **`description`** — 仅限 OpenRouter。驱动选择器徽章文本（`"recommended"`、`"free"` 或空字符串）。Nous Portal 不使用此字段。
 - **定价和上下文长度**不在清单中。这些数据在获取时来自各 provider 的实时 API（`/v1/models` 端点、models.dev）。
 
@@ -68,8 +68,8 @@ https://hermes-agent.nousresearch.com/docs/api/model-catalog.json
 ```yaml
 model_catalog:
   enabled: true
-  url: https://hermes-agent.nousresearch.com/docs/api/model-catalog.json
-  ttl_hours: 1
+  url: https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json
+  ttl_minutes: 20
   providers: {}
 ```
 
@@ -98,6 +98,6 @@ model_catalog:
 python scripts/build_model_catalog.py
 ```
 
-然后将 `website/static/api/model-catalog.json` 的变更提交 PR 到 `main`。文档站点在合并后自动部署，新清单将在几分钟内生效。
+然后将 `website/static/api/model-catalog.json` 的变更提交 PR 到 `main`。合并后，经审查的文件会直接通过 Stardust 的 GitHub raw `main` 地址提供，无需文档部署。
 
 你也可以直接手动编辑 JSON，用于不适合放入仓库内置快照的细粒度元数据变更——生成脚本只是便捷工具，并非唯一的真实来源。
