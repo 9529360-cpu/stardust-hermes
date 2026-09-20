@@ -18,7 +18,7 @@ OLD_CHAIN_COMMANDS = [
     "blueprint", "curator", "kanban", "skills", "learn", "init", "memory",
     "platforms", "status", "context", "egress", "statusbar", "diff", "battery",
     "timestamps", "verbose", "focus", "footer", "yolo", "approvals", "reasoning",
-    "fast", "compress", "usage", "subscription", "topup", "insights", "copy",
+    "fast", "compress", "usage", "insights", "copy",
     "debug", "update", "version", "paste", "image", "reload", "reload-mcp",
     "reload-skills", "bundles", "browser", "plugins", "rollback", "snapshot",
     "export", "import", "stop", "agents", "journey", "bg", "btw", "queue",
@@ -48,8 +48,7 @@ def test_registry_names_resolve_into_the_table():
         assert cmd is not None and HermesCLI._slash_handler(cmd.name) is not None, name
     # registry commands the CLI never handled inline must still fall through
     dispatched = {c.name for c in COMMAND_REGISTRY if HermesCLI._slash_handler(c.name)}
-    # /login has no old branch; it resolves through the naming-convention fallback.
-    assert dispatched == set(OLD_CHAIN_COMMANDS) - {"exit"} | {"quit", "login"}
+    assert dispatched == set(OLD_CHAIN_COMMANDS) - {"exit"}
 
 
 def _cli():

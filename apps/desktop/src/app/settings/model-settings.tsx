@@ -1,6 +1,7 @@
 import type { ModelOptionProvider } from '@hermes/shared'
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@hermes/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,17 +29,22 @@ import type {
 import { useI18n } from '@/i18n'
 import { isCodeSkewRestartRequired } from '@/lib/code-skew-error'
 import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
-import { isSubmitEnter } from '@/lib/ime'
 import { cn } from '@/lib/utils'
 import { setMainModelAssignment } from '@/store/cron-model-impact'
 import { notifyError, readableError } from '@/store/notifications'
-import { startManualLocalEndpoint, startManualOnboarding, startManualProviderOAuth } from '@/store/onboarding'
+import {
+  $desktopOnboarding,
+  startManualLocalEndpoint,
+  startManualOnboarding,
+  startManualProviderOAuth
+} from '@/store/onboarding'
 
 import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '../hooks/use-config-record'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
 import { CONTROL_TEXT } from './constants'
 import { getNested, setNested } from './helpers'
+import { isModelServiceReady, type ModelConnectionView, ModelServicePicker } from './model-service-picker'
 import { ListRow, Pill, SectionHeading } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
@@ -94,14 +100,6 @@ const isFastTier = (tier: unknown): boolean =>
       .trim()
       .toLowerCase()
   )
-
-// A provider row is "ready" to pick a model from when it reports models. The
-// backend now surfaces the full `hermes model` universe (every canonical
-// provider), so unconfigured providers come back with `authenticated:false`
-// and an empty `models` list — those need a setup step before a model exists.
-function isProviderReady(p?: ModelOptionProvider): boolean {
-  return !!p && (p.authenticated !== false || (p.models?.length ?? 0) > 0)
-}
 
 // Mirrors `_AUX_TASK_SLOTS` in hermes_cli/web_server.py. Friendly labels and
 // hints make the assignments readable; raw task keys (vision, mcp, …) are
@@ -225,6 +223,8 @@ interface ModelSettingsProps {
 export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.model
+  const navigate = useNavigate()
+  const location = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [skewRestart, setSkewRestart] = useState(false)
@@ -243,6 +243,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const setConfig = useMemo(() => hermesConfigCacheWriter(scopeProfile), [scopeProfile])
   const [applying, setApplying] = useState(false)
   const [editingAuxTask, setEditingAuxTask] = useState<null | string>(null)
+  const [advancedModelSettingsOpen, setAdvancedModelSettingsOpen] = useState(false)
 
   const [auxDraft, setAuxDraft] = useState<{ model: string; provider: string; reasoningEffort: string }>({
     model: '',
@@ -258,10 +259,13 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [activating, setActivating] = useState(false)
 
+  const revealAdvancedModelSettings = useCallback(() => setAdvancedModelSettingsOpen(true), [])
+
   // Deep link from the vision Capabilities detail (?tab=config:model&aux=vision):
-  // scroll the auxiliary task row into view and flash it once the list loads.
+  // reveal the advanced block before scrolling the auxiliary task row into view.
   useDeepLinkHighlight({
     elementId: task => `aux-task-${task}`,
+    onResolve: revealAdvancedModelSettings,
     param: 'aux',
     ready: task => AUX_TASKS.some(meta => meta.key === task)
   })
@@ -337,6 +341,23 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     void refresh()
   }, [refresh])
 
+  // Provider setup runs in the shared onboarding overlay. Subscribe to the
+  // owner directly so closing that flow refreshes the service list without
+  // mirroring atom state through a render-lagging ref.
+  useEffect(() => {
+    let wasActive = $desktopOnboarding.get().manual
+
+    return $desktopOnboarding.subscribe(state => {
+      const active = state.manual
+
+      if (wasActive && !active) {
+        void refresh()
+      }
+
+      wasActive = active
+    })
+  }, [refresh])
+
   // A profile switch swaps the backend under the mounted panel — reload for the
   // new profile (bumping the epoch first so any in-flight A request is discarded).
   useOnProfileSwitch(() => {
@@ -350,18 +371,31 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     void refresh({ replaceSelection: true })
   })
 
-  const providerOptions = providers.length ? providers : NO_PROVIDERS
+  // The main model can point at a user-defined/stale provider that the catalog
+  // no longer returns. Keep that active choice visible as a synthetic service
+  // row so the user can still see and replace it instead of falling into an
+  // empty selector.
+  const serviceProviders = useMemo<ModelOptionProvider[]>(() => {
+    if (!mainModel?.provider || providers.some(provider => provider.slug === mainModel.provider)) {
+      return providers
+    }
 
-  // Radix renders a blank trigger when the controlled value has no matching
-  // item. Keep a missing saved provider visible in the main selector while
-  // leaving it out of the real inventory used for readiness/setup metadata.
-  const mainProviderOptions = useMemo(
-    () =>
-      selectedProvider && !providers.some(provider => provider.slug === selectedProvider)
-        ? [{ name: selectedProvider, slug: selectedProvider, models: [] }, ...providers]
-        : providerOptions,
-    [providerOptions, providers, selectedProvider]
-  )
+    return [
+      {
+        authenticated: Boolean(mainModel.model),
+        models: mainModel.model ? [mainModel.model] : [],
+        name: mainModel.provider,
+        slug: mainModel.provider
+      },
+      ...providers
+    ]
+  }, [mainModel, providers])
+
+  // Auxiliary/MoA selectors should offer only services that can actually
+  // produce models. The primary service page may still show an unavailable
+  // active service for recovery, but helper slots must not accept it.
+  const configuredProviders = useMemo(() => providers.filter(isModelServiceReady), [providers])
+  const providerOptions = configuredProviders.length ? configuredProviders : NO_PROVIDERS
 
   // MoA reference/aggregator slots must never be the moa virtual provider —
   // that would create a recursive MoA tree (the backend rejects it on save).
@@ -369,8 +403,8 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const moaSlotProviderOptions = providerOptions.filter(provider => (provider.slug || '').toLowerCase() !== 'moa')
 
   const selectedProviderRow = useMemo(
-    () => providers.find(provider => provider.slug === selectedProvider),
-    [providers, selectedProvider]
+    () => serviceProviders.find(provider => provider.slug === selectedProvider),
+    [selectedProvider, serviceProviders]
   )
 
   const selectedProviderModels = selectedProviderRow?.models ?? []
@@ -378,13 +412,21 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   // An unconfigured provider was picked: no credentials yet, so there are no
   // models to choose. `api_key` providers can be activated inline (paste key);
   // OAuth / external flows hand off to the onboarding sign-in.
-  const needsSetup = !!selectedProvider && !isProviderReady(selectedProviderRow)
+  const needsSetup = !!selectedProvider && !isModelServiceReady(selectedProviderRow)
   const setupIsApiKey = needsSetup && selectedProviderRow?.auth_type === 'api_key' && !!selectedProviderRow?.key_env
 
   // Clear any half-typed key when switching provider so it can't leak across.
   useEffect(() => {
     setApiKeyDraft('')
   }, [selectedProvider])
+
+  const selectMainProvider = useCallback(
+    (provider: ModelOptionProvider) => {
+      setSelectedProvider(provider.slug)
+      setSelectedModel(provider.slug === mainModel?.provider ? mainModel.model : (provider.models?.[0] ?? ''))
+    },
+    [mainModel]
+  )
 
   const auxDraftProviderModels = useMemo(
     () => providers.find(provider => provider.slug === auxDraft.provider)?.models ?? [],
@@ -591,9 +633,9 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     [config, m.defaultsFailed, scopeProfile, setConfig]
   )
 
-  // Paste an API key for the selected `api_key` provider, persist it, then
-  // refresh so the now-authenticated provider's models populate. Auto-selects
-  // the recommended default model so the user can Apply in one more click.
+  // Paste or replace the API key for the selected provider. A first-time
+  // connection gets the provider's recommended model; replacing an existing
+  // key keeps the user's current model selection intact.
   const activateApiKeyProvider = useCallback(async () => {
     const keyEnv = selectedProviderRow?.key_env
     const slug = selectedProviderRow?.slug
@@ -603,6 +645,8 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     }
 
     const epoch = profileEpoch.current
+    const wasReady = isModelServiceReady(selectedProviderRow)
+    const previousModel = selectedModel
     setActivating(true)
     setError('')
 
@@ -610,16 +654,20 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile)
       setApiKeyDraft('')
 
-      // Pick a sensible default for the freshly-activated provider (mirrors
-      // `hermes model` curation). Best-effort — fall through to the refreshed
-      // model list if it fails.
-      let nextModel = ''
+      let nextModel = previousModel
 
-      try {
-        const rec = await getRecommendedDefaultModel(slug, scopeProfile)
-        nextModel = rec.model || ''
-      } catch {
+      if (!wasReady) {
+        // Pick a sensible default for a freshly-connected provider (mirrors
+        // `hermes model` curation). Best-effort — fall through to the refreshed
+        // model list if it fails.
         nextModel = ''
+
+        try {
+          const rec = await getRecommendedDefaultModel(slug, scopeProfile)
+          nextModel = rec.model || ''
+        } catch {
+          nextModel = ''
+        }
       }
 
       const options = await getGlobalModelOptions(undefined, scopeProfile)
@@ -631,22 +679,41 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       setProviders(options.providers || [])
       const refreshedRow = options.providers?.find(p => p.slug === slug)
       const fallbackModel = refreshedRow?.models?.[0] ?? ''
-      setSelectedModel(nextModel || fallbackModel)
+      setSelectedModel(wasReady ? previousModel : nextModel || fallbackModel)
     } catch (err) {
       setCaughtError(err, m.loadFailed)
     } finally {
       setActivating(false)
     }
-  }, [apiKeyDraft, m.loadFailed, scopeProfile, selectedProviderRow, setCaughtError])
+  }, [apiKeyDraft, m.loadFailed, scopeProfile, selectedModel, selectedProviderRow, setCaughtError])
 
   // OAuth / external providers can't be activated with a pasted key — hand off
   // to the shared onboarding flow scoped to this provider's real sign-in. The
   // custom / local endpoint is NOT an OAuth provider, so it gets the dedicated
   // local-endpoint form (URL + optional API key) instead of being dead-ended
   // on the OAuth picker (the original "booted back to the first screen" loop).
+  const openConnectionView = useCallback(
+    (view: ModelConnectionView) => {
+      const params = new URLSearchParams(location.search)
+      params.set('tab', 'providers')
+      params.set('pview', view)
+      const query = params.toString()
+
+      navigate(
+        {
+          hash: location.hash,
+          pathname: location.pathname,
+          search: query ? `?${query}` : ''
+        },
+        { replace: true }
+      )
+    },
+    [location.hash, location.pathname, location.search, navigate]
+  )
+
   const startProviderSetup = useCallback(() => {
-    const rowSlug = selectedProviderRow?.slug.trim() ?? ''
-    const slug = rowSlug || selectedProvider.trim()
+    const catalogRow = providers.find(provider => provider.slug === selectedProvider)
+    const slug = selectedProvider.trim()
 
     if (!slug) {
       return
@@ -655,15 +722,16 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     const lower = slug.toLowerCase()
 
     if (lower === 'custom' || lower === 'local' || lower.startsWith('custom:')) {
-      startManualLocalEndpoint()
-    } else if (rowSlug) {
-      startManualProviderOAuth(rowSlug)
+      startManualLocalEndpoint(null, scopeProfile)
+    } else if (catalogRow) {
+      startManualProviderOAuth(catalogRow.slug, scopeProfile)
     } else {
-      // An absent row has no trustworthy auth metadata. Open the generic
-      // provider picker instead of deep-linking an unknown or stale slug.
-      startManualOnboarding()
+      // A provider missing from the live catalog has no trustworthy auth
+      // metadata. Open the generic provider picker instead of pretending an
+      // OAuth flow exists for a stale or retired id.
+      startManualOnboarding(null, scopeProfile)
     }
-  }, [selectedProvider, selectedProviderRow])
+  }, [providers, scopeProfile, selectedProvider])
 
   const applyMainModel = useCallback(async () => {
     if (!selectedProvider || !selectedModel) {
@@ -675,6 +743,21 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     setError('')
 
     try {
+      const keyEnv =
+        selectedProviderRow?.auth_type === 'api_key' && selectedProviderRow.key_env ? selectedProviderRow.key_env : null
+
+      // DSH-style editor semantics: a blank key means "keep the saved key";
+      // entering a new one rotates it before the model choice is applied.
+      if (keyEnv && apiKeyDraft.trim()) {
+        await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile)
+
+        if (profileEpoch.current !== epoch) {
+          return
+        }
+
+        setApiKeyDraft('')
+      }
+
       const result = await setMainModelAssignment(
         {
           model: selectedModel,
@@ -706,6 +789,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       setApplying(false)
     }
   }, [
+    apiKeyDraft,
     m.loadFailed,
     onMainModelChanged,
     refresh,
@@ -855,86 +939,32 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
   return (
     <div className="grid gap-6">
-      <section>
-        <p className="mb-3 text-xs text-muted-foreground">{m.appliesDesc}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select onValueChange={setSelectedProvider} value={selectedProvider}>
-            <SelectTrigger className={cn('min-w-40', CONTROL_TEXT)}>
-              <SelectValue placeholder={m.provider} />
-            </SelectTrigger>
-            <SelectContent>
-              {mainProviderOptions.map(provider => (
-                <SelectItem key={provider.slug || 'none'} value={provider.slug || 'none'}>
-                  {provider.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {needsSetup ? (
-            setupIsApiKey ? (
-              <>
-                <Input
-                  autoComplete="off"
-                  className={cn('min-w-60 flex-1', CONTROL_TEXT)}
-                  onChange={event => setApiKeyDraft(event.target.value)}
-                  onKeyDown={event => {
-                    if (isSubmitEnter(event)) {
-                      void activateApiKeyProvider()
-                    }
-                  }}
-                  placeholder={`Paste ${selectedProviderRow?.key_env ?? 'API key'}`}
-                  type="password"
-                  value={apiKeyDraft}
-                />
-                <Button
-                  disabled={!apiKeyDraft.trim() || activating}
-                  onClick={() => void activateApiKeyProvider()}
-                  size="sm"
-                >
-                  {activating && <Loader2 className="size-3.5 animate-spin" />}
-                  {activating ? 'Activating...' : 'Activate'}
-                </Button>
-              </>
-            ) : (
-              <Button onClick={startProviderSetup} size="sm" variant="textStrong">
-                Set up {selectedProviderRow?.name ?? 'provider'}
-              </Button>
-            )
-          ) : (
-            <>
-              <Select onValueChange={setSelectedModel} value={selectedModel}>
-                <SelectTrigger className={cn('min-w-60', CONTROL_TEXT)}>
-                  <SelectValue placeholder={m.model} />
-                </SelectTrigger>
-                <SelectContent>
-                  {withActive(selectedProviderModels, selectedModel).map(model => (
-                    <SelectItem key={model} value={model}>
-                      {model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                disabled={!selectedProvider || !selectedModel || applying}
-                onClick={() => void applyMainModel()}
-                size="sm"
-              >
-                {applying && <Loader2 className="size-3.5 animate-spin" />}
-                {applying ? m.applying : t.common.apply}
-              </Button>
-            </>
-          )}
-        </div>
-        {needsSetup && !setupIsApiKey && selectedProviderRow && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {selectedProviderRow?.auth_type === 'api_key'
-              ? `${selectedProviderRow?.name} needs an API key — set it up to choose a model.`
-              : `${selectedProviderRow?.name} signs in through your browser — Hermes runs the flow for you.`}
-          </p>
-        )}
-        {config && mainModel && (reasoningSupported || fastSupported) && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <span className="text-xs text-muted-foreground">{m.defaultsLabel}</span>
+      <ModelServicePicker
+        activating={activating}
+        apiKeyDraft={apiKeyDraft}
+        applying={applying}
+        currentModel={mainModel}
+        onActivateApiKey={() => void activateApiKeyProvider()}
+        onAddCustomService={() => startManualLocalEndpoint(null, scopeProfile)}
+        onAddService={() => startManualOnboarding(null, scopeProfile)}
+        onApiKeyChange={setApiKeyDraft}
+        onApply={() => void applyMainModel()}
+        onOpenConnectionView={openConnectionView}
+        onSelectModel={setSelectedModel}
+        onSelectProvider={selectMainProvider}
+        onSetupProvider={startProviderSetup}
+        providers={serviceProviders}
+        selectedModel={selectedModel}
+        selectedProvider={selectedProvider}
+        selectedProviderModels={selectedProviderModels}
+        selectedProviderRow={selectedProviderRow}
+        setupIsApiKey={setupIsApiKey}
+      />
+
+      {config && mainModel && (reasoningSupported || fastSupported) && (
+        <section>
+          <SectionHeading icon={Cpu} title={m.defaultsLabel} />
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             {reasoningSupported && (
               <div className="flex items-center gap-2 text-xs">
                 {m.reasoning}
@@ -966,59 +996,70 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
               </label>
             )}
           </div>
-        )}
-        {error && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-destructive">
-            <span>{error}</span>
-            {skewRestart && (
-              <Button
-                disabled={restartingBackend}
-                onClick={() => void recycleStaleBackend()}
-                size="sm"
-                variant="textStrong"
-              >
-                {restartingBackend && <Loader2 className="size-3.5 animate-spin" />}
-                {restartingBackend ? m.restartingBackend : m.restartBackend}
-              </Button>
-            )}
-          </div>
-        )}
-        {switchStaleAux.length > 0 && (
-          <div className="mt-2">
-            <StaleAuxWarning
-              applying={applying}
-              onReset={() => void resetAuxiliaryModels()}
-              slots={switchStaleAux}
-              taskLabel={auxiliaryTaskLabel}
-            />
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section>
-        <div className="mb-2.5 flex items-center justify-between">
-          <SectionHeading icon={Cpu} title={m.auxiliaryTitle} />
-          <Button
-            disabled={!mainModel || applying}
-            onClick={() => void resetAuxiliaryModels()}
-            size="sm"
-            variant="textStrong"
-          >
-            {m.resetAllToMain}
-          </Button>
+      {error && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-destructive">
+          <span>{error}</span>
+          {skewRestart && (
+            <Button
+              disabled={restartingBackend}
+              onClick={() => void recycleStaleBackend()}
+              size="sm"
+              variant="textStrong"
+            >
+              {restartingBackend && <Loader2 className="size-3.5 animate-spin" />}
+              {restartingBackend ? m.restartingBackend : m.restartBackend}
+            </Button>
+          )}
         </div>
-        <p className="mb-2 text-xs text-muted-foreground">{m.auxiliaryDesc}</p>
-        {switchStaleAux.length === 0 && persistentStaleAux.length > 0 && (
-          <div className="mb-2.5">
-            <StaleAuxWarning
-              applying={applying}
-              onReset={() => void resetAuxiliaryModels()}
-              slots={persistentStaleAux}
-              taskLabel={auxiliaryTaskLabel}
-            />
+      )}
+
+      {switchStaleAux.length > 0 && (
+        <StaleAuxWarning
+          applying={applying}
+          onReset={() => void resetAuxiliaryModels()}
+          slots={switchStaleAux}
+          taskLabel={auxiliaryTaskLabel}
+        />
+      )}
+
+      {switchStaleAux.length === 0 && persistentStaleAux.length > 0 && (
+        <StaleAuxWarning
+          applying={applying}
+          onReset={() => void resetAuxiliaryModels()}
+          slots={persistentStaleAux}
+          taskLabel={auxiliaryTaskLabel}
+        />
+      )}
+
+      <div>
+        <Button
+          onClick={() => setAdvancedModelSettingsOpen(open => !open)}
+          size="sm"
+          type="button"
+          variant="textStrong"
+        >
+          {advancedModelSettingsOpen ? m.advancedModelSettingsHide : m.advancedModelSettings}
+        </Button>
+        <p className="mt-1 text-xs text-muted-foreground">{m.advancedModelSettingsDesc}</p>
+      </div>
+
+      <section data-slot="advanced-model-settings" hidden={!advancedModelSettingsOpen}>
+          <div className="mb-2.5 flex items-center justify-between">
+            <SectionHeading icon={Cpu} title={m.auxiliaryTitle} />
+            <Button
+              disabled={!mainModel || applying}
+              onClick={() => void resetAuxiliaryModels()}
+              size="sm"
+              variant="textStrong"
+            >
+              {m.resetAllToMain}
+            </Button>
           </div>
-        )}
-        <div className="grid gap-1">
+          <p className="mb-2 text-xs text-muted-foreground">{m.auxiliaryDesc}</p>
+          <div className="grid gap-1">
           {AUX_TASKS.map(meta => {
             const copy = m.tasks[meta.key] ?? { label: meta.key, hint: meta.key }
             const current = auxiliary?.tasks.find(entry => entry.task === meta.key)
@@ -1155,7 +1196,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         </div>
       </section>
       {moa && currentMoaPreset && (
-        <section>
+        <section hidden={!advancedModelSettingsOpen}>
           <SectionHeading icon={Cpu} title={m.moaTitle} />
           <p className="mb-2 text-xs text-muted-foreground">{m.moaDescription}</p>
           <div className="mb-2 flex flex-wrap items-center gap-2">

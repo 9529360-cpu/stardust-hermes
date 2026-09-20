@@ -4,6 +4,7 @@ import type {
   CronJob,
   CronJobCreatePayload,
   CronJobUpdates,
+  CronSuggestion,
   SessionInfo
 } from '@/types/hermes'
 
@@ -62,6 +63,35 @@ export async function getCronDeliveryTargets(): Promise<CronDeliveryTarget[]> {
   return targets ?? []
 }
 
+export async function getCronSuggestions(profile: string): Promise<CronSuggestion[]> {
+  const { suggestions } = await hermesApi<{ suggestions: CronSuggestion[] }>({
+    ...profileScoped(),
+    ...connectionScoped(),
+    path: `/api/cron/suggestions?profile=${encodeURIComponent(profile)}`,
+    timeoutMs: STARTUP_REQUEST_TIMEOUT_MS
+  })
+
+  return suggestions ?? []
+}
+
+export function acceptCronSuggestion(ref: string, profile: string, sessionId: string): Promise<CronJob> {
+  return hermesApi<CronJob>({
+    ...profileScoped(),
+    ...connectionScoped(),
+    path: `/api/cron/suggestions/${encodeURIComponent(ref)}/accept?profile=${encodeURIComponent(profile)}`,
+    method: 'POST',
+    body: { session_id: sessionId }
+  })
+}
+
+export function dismissCronSuggestion(ref: string, profile: string): Promise<{ id: string; ok: boolean }> {
+  return hermesApi<{ id: string; ok: boolean }>({
+    ...profileScoped(),
+    ...connectionScoped(),
+    path: `/api/cron/suggestions/${encodeURIComponent(ref)}/dismiss?profile=${encodeURIComponent(profile)}`,
+    method: 'POST'
+  })
+}
 export function createCronJob(body: CronJobCreatePayload): Promise<CronJob> {
   return hermesApi<CronJob>({
     ...profileScoped(),

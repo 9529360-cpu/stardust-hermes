@@ -71,6 +71,17 @@ class TestGuidanceConstants:
         assert "not an instruction to turn ordinary conversation into a coding task" in DEFAULT_AGENT_IDENTITY
         assert "answer/explain, plan/review, or execute" in DEFAULT_AGENT_IDENTITY
         assert "not permission to edit files or run commands" in DEFAULT_AGENT_IDENTITY
+        for mode in (
+            "respond",
+            "execute_foreground",
+            "delegate",
+            "delegate_background",
+            "schedule_or_watch",
+            "clarify",
+        ):
+            assert f"`{mode}`" in DEFAULT_AGENT_IDENTITY
+        assert "never as a promise of restart durability" in DEFAULT_AGENT_IDENTITY
+        assert "must not steal focus" in DEFAULT_AGENT_IDENTITY
         assert "continue" in DEFAULT_AGENT_IDENTITY
         assert "verify the result" in DEFAULT_AGENT_IDENTITY
         assert "built by Nous Research" not in DEFAULT_AGENT_IDENTITY
@@ -694,13 +705,17 @@ class TestStripYamlFrontmatter:
 class TestPromptBuilderConstants:
 
 
-    def test_cli_and_tui_hints_flag_local_only_cron(self):
-        """#51568 — cron jobs from CLI/TUI sessions don't deliver back into
-        the session, so the agent must be told up front not to promise it."""
-        for key in ("cli", "tui"):
+    def test_cli_and_persisted_local_hints_describe_cron_delivery(self):
+        """CLI remains save-only; persisted TUI/Desktop sessions can receive durable returns."""
+        cli_hint = PLATFORM_HINTS["cli"]
+        assert "LOCAL-ONLY" in cli_hint
+        assert "deliver" in cli_hint
+
+        for key in ("tui", "desktop"):
             hint = PLATFORM_HINTS[key]
-            assert "LOCAL-ONLY" in hint
-            assert "deliver" in hint
+            assert "non-silent completion" in hint
+            assert "deliver='local' is save-only" in hint
+            assert "omitted or set to origin" in hint
 
 
 

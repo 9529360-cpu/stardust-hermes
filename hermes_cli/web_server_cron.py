@@ -165,6 +165,14 @@ def _call_cron_for_profile(target_profile: Optional[str], func_name: str, *args,
     return result
 
 
+def _call_suggestions_for_profile(target_profile: Optional[str], func_name: str, *args, **kwargs):
+    """Run a cron.suggestions helper inside the selected profile scope."""
+    _profile_name, home = _cron_profile_home(target_profile)
+    with _cron_store_scope(home):
+        from cron import suggestions as cron_suggestions
+
+        return getattr(cron_suggestions, func_name)(*args, **kwargs)
+
 def _notify_cron_provider_for_profile(target_profile: Optional[str]) -> None:
     """Best-effort provider reconcile against one profile's job store.
 

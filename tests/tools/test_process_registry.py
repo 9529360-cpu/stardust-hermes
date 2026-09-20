@@ -690,6 +690,27 @@ class TestListSessions:
         assert len(result) == 1
         assert result[0]["session_id"] == "proc_1"
 
+    def test_list_exposes_owner_provenance_and_terminal_recovery_reason(self, registry):
+        session = _make_session(
+            sid="proc_lost",
+            task_id="task-1",
+            exited=True,
+            exit_code=-1,
+        )
+        session.parent_session_id = "parent-session"
+        session.handoff_note = "continue the long report build"
+        session.completion_reason = "lost"
+        session.termination_source = "backend_lost"
+        registry._finished[session.id] = session
+
+        (entry,) = registry.list_sessions(task_id="task-1")
+
+        assert entry["parent_session_id"] == "parent-session"
+        assert entry["handoff_note"] == "continue the long report build"
+        assert entry["completion_reason"] == "lost"
+        assert entry["termination_source"] == "backend_lost"
+        assert entry["exit_code"] == -1
+
     def test_session_key_surfaces_cross_task_processes(self, registry):
         """A bg process under the same gateway session but a DIFFERENT task is
         surfaced when session_key is passed, and flagged session_scoped (#29177).
@@ -1376,6 +1397,27 @@ class TestCheckpoint:
 
             data = json.loads(checkpoint.read_text())
             assert data == []
+
+    def test_checkpoint_round_trips_handoff_provenance(self, registry, tmp_path):
+        checkpoint = tmp_path / "procs.json"
+        session = _make_session(sid="proc_handoff", task_id="task-1")
+        session.pid = os.getpid()
+        session.host_start_time = int(time.time())
+        session.handoff_note = "report build delegated to parent"
+        registry._running[session.id] = session
+
+        with patch("tools.process_registry.CHECKPOINT_PATH", checkpoint):
+            registry._write_checkpoint()
+            saved = json.loads(checkpoint.read_text())
+            assert saved[0]["handoff_note"] == "report build delegated to parent"
+
+            fresh = ProcessRegistry()
+            with patch.object(fresh, "_host_pid_is_ours", return_value=True):
+                assert fresh.recover_from_checkpoint() == 1
+
+        recovered = fresh.get("proc_handoff")
+        assert recovered is not None
+        assert recovered.handoff_note == "report build delegated to parent"
 
     def test_checkpoint_redacts_command_with_inline_secret(self, registry, tmp_path):
         """Issue #77484: the checkpoint file persists raw commands; inline

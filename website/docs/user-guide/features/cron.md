@@ -74,6 +74,19 @@ Every morning at 9am, check Hacker News for AI news and send me a summary on Tel
 
 Hermes will use the unified `cronjob` tool internally.
 
+## Reviewing suggested automations
+
+Hermes can propose a recurring workflow without enabling it. Suggestions from connected apps,
+installed blueprints, or usage review stay pending until you explicitly accept or dismiss them.
+
+In Stardust Desktop, open **Scheduled jobs** and look under **Suggested automations**. Select a
+suggestion to review what it does and its schedule, then choose **Schedule** or **Dismiss**.
+Scheduling requires an open saved Desktop conversation so future results have a durable chat to
+return to. Connecting an app by itself never creates the recurring job.
+
+The same backend-owned queue is available in chat with `/suggestions`; decisions made in either
+surface are shared, so an accepted or dismissed suggestion is not offered again under another UI.
+
 ## Pre-dispatch configuration validation
 
 Before constructing any agent machinery for a scheduled run, the scheduler

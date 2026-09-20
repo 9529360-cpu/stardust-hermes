@@ -311,6 +311,14 @@ export const TS_ONLY_NO_DESKTOP_SURFACE: Record<DesktopUnavailableReason, readon
 
 const LOCAL_SPEC_NAMES = new Set(DESKTOP_COMMAND_SPECS.flatMap(spec => [spec.name, ...(spec.aliases ?? [])]))
 
+/**
+ * Commands intentionally retired from Stardust's product surface. They are absent
+ * from the current Python registry/offline projection, but an offline Desktop must
+ * still recognize them as former built-ins so they cannot fall through as an
+ * executable skill/quick-command extension before commands.catalog arrives.
+ */
+const RETIRED_BUILTIN_COMMANDS = new Set(['/login', '/subscription', '/topup'])
+
 /** Registry rows with a real unavailability reason. `hidden` (e.g. `/model`) is
  *  a popover flag on an executable command and is read from the live catalog
  *  by `specFromCatalog`; a local spec always wins over the dump. */
@@ -462,6 +470,10 @@ export function resolveDesktopCommand(command: string): DesktopCommandSpec | nul
 
 function isKnownHermesSlashCommand(command: string): boolean {
   const normalized = normalizeCommand(command)
+
+  if (RETIRED_BUILTIN_COMMANDS.has(normalized)) {
+    return true
+  }
 
   if (SPEC_BY_NAME.has(normalized) || ALIAS_TO_CANONICAL.has(normalized)) {
     return true

@@ -61,12 +61,22 @@ function runUnit(unit) {
     child.stderr.on('data', (c) => chunks.push(c))
     child.on('error', (err) => {
       chunks.push(Buffer.from(`failed to spawn: ${err.message}\n`))
-      resolve({ unit, code: 1, output: Buffer.concat(chunks).toString('utf-8'), ms: Date.now() - started })
+      resolve({
+        unit,
+        code: 1,
+        signal: null,
+        output: Buffer.concat(chunks).toString('utf-8'),
+        ms: Date.now() - started,
+      })
     })
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
+      if (signal) {
+        chunks.push(Buffer.from(`process terminated by signal ${signal}\n`))
+      }
       resolve({
         unit,
         code: code ?? 1,
+        signal: signal ?? null,
         output: Buffer.concat(chunks).toString('utf-8'),
         ms: Date.now() - started,
       })
@@ -101,7 +111,7 @@ async function main() {
   console.log('')
 
   const queue = [...units]
-  /** @type {{unit: {pkg: string, script: string}, code: number, output: string, ms: number}[]} */
+  /** @type {{unit: {pkg: string, script: string}, code: number, signal: string | null, output: string, ms: number}[]} */
   const results = []
 
   async function worker() {
@@ -113,8 +123,9 @@ async function main() {
       const label = `${res.unit.pkg} :: ${res.unit.script}`
       const secs = (res.ms / 1000).toFixed(1)
       const status = res.code === 0 ? 'PASS' : 'FAIL'
-      if (IS_CI) console.log(`::group::${status} ${label} (${secs}s)`)
-      else console.log(`----- ${status} ${label} (${secs}s) -----`)
+      const exitDetail = res.signal ? `; signal ${res.signal}` : ''
+      if (IS_CI) console.log(`::group::${status} ${label} (${secs}s${exitDetail})`)
+      else console.log(`----- ${status} ${label} (${secs}s${exitDetail}) -----`)
       process.stdout.write(res.output.endsWith('\n') ? res.output : res.output + '\n')
       if (IS_CI) console.log('::endgroup::')
     }
@@ -126,12 +137,15 @@ async function main() {
   console.log('\n=== summary ===')
   for (const r of [...results].sort((a, b) => b.ms - a.ms)) {
     console.log(
-      `  ${r.code === 0 ? 'pass' : 'FAIL'}  ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.unit.pkg} :: ${r.unit.script}`,
+      `  ${r.code === 0 ? 'pass' : 'FAIL'}  ${(r.ms / 1000).toFixed(1).padStart(6)}s  ${r.unit.pkg} :: ${r.unit.script}${r.signal ? `  signal=${r.signal}` : ''}`,
     )
   }
 
   if (failed.length > 0) {
-    for (const r of failed) console.error(`::error::${r.unit.pkg} :: ${r.unit.script} failed`)
+    for (const r of failed) {
+      const exitDetail = r.signal ? ` (signal ${r.signal})` : ''
+      console.error(`::error::${r.unit.pkg} :: ${r.unit.script} failed${exitDetail}`)
+    }
     console.error(`::error::${failed.length} of ${results.length} checks failed`)
     process.exit(1)
   }

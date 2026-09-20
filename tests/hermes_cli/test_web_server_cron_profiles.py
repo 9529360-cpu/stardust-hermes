@@ -428,6 +428,122 @@ def test_profile_call_cannot_retarget_ticker_store_mid_write(
 
 
 
+def _seed_suggestion(profile: str, key: str):
+    return _web_server_cron._call_suggestions_for_profile(
+        profile, "add_suggestion", title=f"{profile} suggestion", description="desc",
+        source="integration",
+        job_spec={
+            "prompt": "do it", "schedule": "0 8 * * *",
+            "name": f"{profile} job", "deliver": "origin",
+        },
+        dedup_key=key,
+    )
+
+
+def test_suggestion_store_is_profile_scoped(isolated_profiles):
+    rec = _seed_suggestion("worker_alpha", "worker:suggestion")
+    assert rec is not None
+
+    worker = _rt_cron._list_cron_suggestions_sync("worker_alpha")
+    default = _rt_cron._list_cron_suggestions_sync("default")
+
+    assert [row["id"] for row in worker["suggestions"]] == [rec["id"]]
+    assert worker["profile"] == "worker_alpha"
+    assert default["suggestions"] == []
+    # Renderer projection never ships the full executable prompt or the dedup latch.
+    assert "prompt" not in worker["suggestions"][0]["job_spec"]
+    assert "dedup_key" not in worker["suggestions"][0]
+
+
+def test_catalog_suggestion_projection_exposes_blueprint_locale_key(isolated_profiles):
+    rec = _web_server_cron._call_suggestions_for_profile(
+        "worker_alpha", "add_suggestion", title="Important-mail monitor", description="desc",
+        source="integration",
+        job_spec={"prompt": "private prompt", "schedule": "*/30 * * * *", "deliver": "origin"},
+        dedup_key="catalog:important-mail-monitor",
+    )
+    assert rec is not None
+
+    row = _rt_cron._list_cron_suggestions_sync("worker_alpha")["suggestions"][0]
+    assert row["blueprint_key"] == "important-mail"
+    assert "dedup_key" not in row
+    assert "prompt" not in row["job_spec"]
+
+def test_accept_suggestion_validates_desktop_session_in_same_profile(isolated_profiles, monkeypatch):
+    from hermes_state import SessionDB
+
+    worker_home = isolated_profiles["worker_alpha"]
+    with SessionDB(db_path=worker_home / "state.db") as db:
+        db.create_session("desktop-chat", source="desktop")
+
+    rec = _seed_suggestion("worker_alpha", "worker:accept")
+    assert rec is not None
+    captured = {}
+
+    def fake_create(**kwargs):
+        captured.update(kwargs)
+        return {"id": "job-from-suggestion", **kwargs}
+
+    monkeypatch.setattr("cron.scheduler.create_job_with_scheduler_registration", fake_create)
+    job = _rt_cron._accept_cron_suggestion_sync(
+        rec["id"], _web_models.CronSuggestionAccept(session_id="desktop-chat"), "worker_alpha")
+
+    assert job["id"] == "job-from-suggestion"
+    assert captured["local_session_origin"] == {
+        "source": "desktop", "session_id": "desktop-chat"}
+    assert _rt_cron._list_cron_suggestions_sync("worker_alpha")["suggestions"] == []
+
+
+@pytest.mark.parametrize("source", ["desktop", "tui", "cli", "telegram"])
+def test_desktop_review_accepts_human_conversation_regardless_of_historical_source(isolated_profiles, source):
+    from hermes_state import SessionDB
+
+    worker_home = isolated_profiles["worker_alpha"]
+    with SessionDB(db_path=worker_home / "state.db") as db:
+        db.create_session("human-chat", source=source)
+
+    assert _rt_cron._desktop_suggestion_return_origin("worker_alpha", "human-chat") == {
+        "source": "desktop", "session_id": "human-chat"}
+
+
+@pytest.mark.parametrize("source", ["cron", "kanban", "subagent", "tool"])
+def test_desktop_review_rejects_automation_internal_session(isolated_profiles, source):
+    from hermes_state import SessionDB
+
+    worker_home = isolated_profiles["worker_alpha"]
+    with SessionDB(db_path=worker_home / "state.db") as db:
+        db.create_session("machine-run", source=source)
+
+    with pytest.raises(HTTPException) as exc_info:
+        _rt_cron._desktop_suggestion_return_origin("worker_alpha", "machine-run")
+
+    assert exc_info.value.status_code == 409
+
+
+def test_accept_suggestion_rejects_session_from_another_profile(isolated_profiles):
+    from hermes_state import SessionDB
+
+    with SessionDB(db_path=isolated_profiles["default"] / "state.db") as db:
+        db.create_session("default-chat", source="desktop")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _rt_cron._desktop_suggestion_return_origin("worker_alpha", "default-chat")
+
+    assert exc_info.value.status_code == 404
+
+
+def test_dismiss_suggestion_only_mutates_selected_profile(isolated_profiles):
+    worker = _seed_suggestion("worker_alpha", "worker:dismiss")
+    default = _seed_suggestion("default", "default:dismiss")
+    assert worker is not None and default is not None
+
+    assert _rt_cron._dismiss_cron_suggestion_sync(worker["id"], "worker_alpha") == {
+        "ok": True, "id": worker["id"]}
+
+    assert _rt_cron._list_cron_suggestions_sync("worker_alpha")["suggestions"] == []
+    assert [row["id"] for row in _rt_cron._list_cron_suggestions_sync("default")["suggestions"]] == [
+        default["id"]]
+
 @pytest.mark.asyncio
 async def test_cron_mutation_without_profile_finds_named_profile_job(isolated_profiles):
     from hermes_cli import web_server

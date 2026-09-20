@@ -86,6 +86,25 @@ Keep session-specific tools in named toolsets selected by the session/platform r
 - `window.hermesDesktop`, `hermes://`, executable names, and similar inherited identifiers are compatibility surfaces until a tested Stardust migration replaces them. User-visible copy around them should still say Stardust where safe.
 - Desktop product update affordances update the Stardust client. They must not re-enable the inherited upstream `hermes update` synchronization path.
 
+## Source Authority and Task Workspace Discipline
+
+The remote `origin/main` branch is the **single authoritative product line**. Local clones, worktrees, task branches, CI checkouts, recovery bundles, and developer machines are disposable working copies; none of them may become a second source of truth.
+
+For every feature, bug fix, refactor, CI change, documentation change, or other repository modification:
+
+1. **Start from fresh main.** Fetch `origin`, verify the local base is clean, and fast-forward to the current `origin/main`. Do not start new work from a stale task branch, an old worktree, or a developer-machine snapshot.
+2. **One task, one branch.** Create one descriptively named task branch from the current `origin/main`. Keep one authoritative remote implementation lineage for that task. Do not create replacement branches or PR stacks merely to get a cleaner history or a fresh CI run.
+3. **One task, one working tree per machine.** A developer machine may create a temporary clone or worktree for the active task, but that workspace must track the task branch. Never keep long-lived alternate source trees such as `integration`, `validate`, `new-version`, or machine-specific “development copies” that can diverge from `main`.
+4. **Parallel work stays isolated.** Concurrent developers use separate branches and worktrees. Never share one mutable working tree between tasks. If two tasks overlap, coordinate through the current `main` and explicit PR dependencies rather than copying files between workspaces.
+5. **Avoid moving PR stacks.** If task B truly depends on task A, prefer finishing and merging A into `main`, refreshing from `main`, then continuing B. Do not leave a chain of PRs whose bases keep moving unless there is a concrete integration reason.
+6. **Validate the exact candidate.** Run the relevant repository checks against the exact task head after refreshing its base. A green run on an older head or older base is not merge evidence.
+7. **Merge back to online main.** Once the task satisfies its validation and review gates, merge it into `origin/main`. From that point, `main` is the product state; do not keep using the pre-merge task workspace as an alternate development line.
+8. **Clean up immediately after integration.** Remove the local task worktree, delete the local task branch, delete the merged/closed remote task branch when safe, and prune stale worktree/remote-tracking metadata. A completed task must not leave an active development copy behind.
+9. **Preserve before deleting uncertain work.** If an old workspace contains unique uncommitted or unpushed changes, inspect it before cleanup. Preserve genuinely unique material as a clearly named recovery artifact (for example a verified Git bundle) outside the active source tree, then remove the obsolete workspace. Recovery artifacts are cold backup only and must never be treated as a development source.
+10. **Do not develop directly on `main` by default.** Use the task-branch flow even for small changes. Direct `main` maintenance is an explicit maintainer exception for a specific operation, not a standing shortcut.
+
+Before consequential remote writes, refresh `origin/main` and overlapping PR state so another developer's merge cannot silently invalidate the base you verified. The desired steady state is always: one clean local `main`, zero or a small number of active task worktrees, and no unexplained duplicate Stardust source trees on developer machines.
+
 ## Development Environment
 
 Activate the repository environment before Python work:

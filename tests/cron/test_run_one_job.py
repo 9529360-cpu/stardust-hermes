@@ -43,6 +43,84 @@ def _patch_pipeline(monkeypatch, *, success=True, output="out", final="final res
     return calls
 
 
+def test_local_session_completion_uses_execution_id_as_durable_identity(monkeypatch):
+    published = []
+    monkeypatch.setattr(
+        "tools.async_delegation.publish_durable_completion",
+        lambda **kwargs: published.append(kwargs) or True,
+    )
+    job = {
+        "id": "daily-brief", "name": "Daily brief", "model": "m",
+        "local_session_origin": {"source": "desktop", "session_id": "session-42"},
+    }
+    delivery = s._RunDelivery(
+        job=job, success=True, error=None, should_deliver=True,
+        delivery_content="The brief is ready.",
+    )
+
+    s._publish_local_session_completion(
+        delivery, s._FireOwnership(job, None), "exec-123")
+
+    assert delivery.local_session_delivered is True
+    assert delivery.delivery_attempted is True
+    assert published == [{
+        "delegation_id": "cron_exec-123",
+        "session_key": "session-42",
+        "parent_session_id": "session-42",
+        "goal": "Daily brief",
+        "summary": "The brief is ready.",
+        "status": "completed",
+        "error": None,
+        "role": "cron_run",
+        "model": "m",
+        "context": "Scheduled cron job daily-brief completed in the background.",
+        "event_metadata": {"cron_job_id": "daily-brief", "cron_job_name": "Daily brief"},
+    }]
+
+
+def test_local_session_completion_skips_explicit_external_lane(monkeypatch):
+    published = []
+    monkeypatch.setattr(
+        "tools.async_delegation.publish_durable_completion",
+        lambda **kwargs: published.append(kwargs) or True,
+    )
+    job = {
+        "id": "watcher", "deliver": "slack:C123",
+        "local_session_origin": {"source": "desktop", "session_id": "session-old"},
+    }
+    delivery = s._RunDelivery(
+        job=job, success=True, error=None, should_deliver=True, delivery_content="done")
+
+    s._publish_local_session_completion(delivery, s._FireOwnership(job, None), "exec-external")
+
+    assert published == []
+    assert delivery.local_session_delivered is False
+
+def test_local_session_completion_skips_silent_delivery(monkeypatch):
+    published = []
+    monkeypatch.setattr(
+        "tools.async_delegation.publish_durable_completion",
+        lambda **kwargs: published.append(kwargs) or True,
+    )
+    job = {
+        "id": "watcher", "local_session_origin": {"source": "tui", "session_id": "session-7"},
+    }
+    delivery = s._RunDelivery(
+        job=job, success=True, error=None, should_deliver=False, delivery_content="[SILENT]")
+
+    s._publish_local_session_completion(delivery, s._FireOwnership(job, None), "exec-silent")
+
+    assert published == []
+    assert delivery.local_session_delivered is False
+
+
+def test_local_session_delivery_counts_as_delivered_outcome():
+    assert s._classify_delivery_outcome(
+        delivery_error=None, should_deliver=True, unresolved_origin=False,
+        normalized_deliver="local", incident_acked=False, success=True,
+        local_session_delivered=True,
+    ) == "delivered"
+
 def test_tick_process_job_sequence(monkeypatch):
     """Characterization: a single due job driven through tick() runs the
     sequence run_job → save → deliver → mark, in that order."""
