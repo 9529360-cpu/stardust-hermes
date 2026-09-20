@@ -580,6 +580,32 @@ class TestSkillManageDispatcher:
         assert "read-only" in result["error"]
         assert not (tmp_path / "dry-run-skill").exists()
 
+    def test_curator_write_fails_closed_when_dry_run_provenance_breaks(self, tmp_path):
+        from tools.skill_provenance import (
+            BACKGROUND_REVIEW,
+            reset_current_write_origin,
+            set_current_write_origin,
+        )
+
+        with (
+            _skill_dir(tmp_path),
+            patch("tools.skill_provenance.is_review_dry_run", side_effect=RuntimeError("broken provenance")),
+        ):
+            origin = set_current_write_origin(BACKGROUND_REVIEW)
+            try:
+                result = json.loads(skill_manage(
+                    action="create",
+                    name="unknown-review-mode",
+                    content=VALID_SKILL_CONTENT,
+                ))
+            finally:
+                reset_current_write_origin(origin)
+
+        assert result["success"] is False
+        assert result["_fail_closed"] is True
+        assert "could not be verified" in result["error"]
+        assert not (tmp_path / "unknown-review-mode").exists()
+
     def test_curator_dry_run_blocks_operations_batch_before_any_write(self, tmp_path):
         from tools.skill_provenance import (
             BACKGROUND_REVIEW,
