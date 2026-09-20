@@ -806,15 +806,25 @@ def _render_report_markdown(p: Dict[str, Any]) -> str:
 def _llm_candidate_rows() -> List[Dict[str, Any]]:
     """Skills the opinionated LLM consolidation pass may inspect.
 
-    Keep this narrower than deterministic lifecycle pruning: bundled built-ins may be
-    stale/archived by the time-based transition policy when prune_builtins is enabled,
-    but they are never inputs to autonomous LLM restructuring. Only records explicitly
-    opted into curator ownership (provenance=agent) belong here.
+    Keep this narrower than deterministic lifecycle pruning and status reporting.
+    ``curated_report()`` deliberately includes pinned-but-unmanaged local skills so
+    their pins stay visible in the CLI, and its ``provenance=agent`` label only means
+    "local" — it does not prove curator ownership. Re-check the authoritative
+    ``created_by=agent`` management marker here and drop pinned skills before any
+    autonomous LLM sees the candidate set.
     """
-    return [
-        row for row in skill_usage.curated_report()
-        if row.get("provenance", "agent") == "agent"
-    ]
+    rows: List[Dict[str, Any]] = []
+    for row in skill_usage.curated_report():
+        name = row.get("name")
+        if not isinstance(name, str) or not name or row.get("pinned"):
+            continue
+        try:
+            managed = skill_usage.is_curator_managed(name)
+        except Exception:
+            managed = False
+        if managed:
+            rows.append(row)
+    return rows
 
 
 def _render_candidate_list(rows: Optional[List[Dict[str, Any]]] = None) -> str:
