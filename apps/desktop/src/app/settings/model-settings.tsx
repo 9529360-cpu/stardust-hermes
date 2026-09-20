@@ -715,16 +715,16 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     const lower = slug.toLowerCase()
 
     if (lower === 'custom' || lower === 'local' || lower.startsWith('custom:')) {
-      startManualLocalEndpoint()
+      startManualLocalEndpoint(null, scopeProfile)
     } else if (catalogRow) {
-      startManualProviderOAuth(catalogRow.slug)
+      startManualProviderOAuth(catalogRow.slug, scopeProfile)
     } else {
       // A provider missing from the live catalog has no trustworthy auth
       // metadata. Open the generic provider picker instead of pretending an
       // OAuth flow exists for a stale or retired id.
-      startManualOnboarding()
+      startManualOnboarding(null, scopeProfile)
     }
-  }, [providers, selectedProvider])
+  }, [providers, scopeProfile, selectedProvider])
 
   const applyMainModel = useCallback(async () => {
     if (!selectedProvider || !selectedModel) {
@@ -941,7 +941,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         currentModel={mainModel}
         onActivateApiKey={() => void activateApiKeyProvider()}
         onAddCustomService={() => startManualLocalEndpoint(null, scopeProfile)}
-        onAddService={() => startManualOnboarding()}
+        onAddService={() => startManualOnboarding(null, scopeProfile)}
         onApiKeyChange={setApiKeyDraft}
         onApply={() => void applyMainModel()}
         onOpenConnectionView={openConnectionView}
