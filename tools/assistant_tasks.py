@@ -256,7 +256,7 @@ def assistant_tasks_tool(
     *,
     action: str = "create",
     tasks: Any = None,
-    include_completed: bool = False,
+    include_completed: bool = True,
     limit: Any = 20,
     task_ids: Any = None,
     session_id: Optional[str] = None,
@@ -363,8 +363,11 @@ ASSISTANT_TASKS_SCHEMA = {
             },
             "include_completed": {
                 "type": "boolean",
-                "default": False,
-                "description": "With action=list, include done tasks as well as active/attention tasks.",
+                "default": True,
+                "description": (
+                    "With action=list, include recently done tasks as well as active/attention tasks. "
+                    "Leave true for 'how are my tasks doing?'; set false only for an active-only view."
+                ),
             },
             "limit": {
                 "type": "integer",
@@ -391,7 +394,7 @@ registry.register(
     handler=lambda args, **kw: assistant_tasks_tool(
         action=args.get("action", "create"),
         tasks=args.get("tasks"),
-        include_completed=args.get("include_completed", False),
+        include_completed=args.get("include_completed", True),
         limit=args.get("limit", 20),
         task_ids=args.get("task_ids"),
         session_id=kw.get("session_id"),
