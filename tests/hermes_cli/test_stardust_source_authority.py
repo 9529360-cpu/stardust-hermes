@@ -193,3 +193,20 @@ def test_model_catalog_defaults_belong_to_stardust() -> None:
         for old in forbidden:
             assert old not in source
 
+
+def test_plugin_catalog_defaults_belong_to_stardust() -> None:
+    from hermes_cli import plugin_catalog
+
+    canonical = (
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/website/static/api/plugin-catalog.json"
+    )
+    assert plugin_catalog.LIVE_CATALOG_URL == canonical
+
+    source = _read("hermes_cli/plugin_catalog.py")
+    assert (
+        "https://hermes-agent.nousresearch.com/docs/api/plugin-catalog.json"
+        not in source
+    )
+    assert '"plugin-catalog-stardust-v1.json"' in source
+

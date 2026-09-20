@@ -59,6 +59,48 @@ def test_find_removed_matches_name_or_normalized_repo(tmp_path):
     assert pc.find_removed("https://github.com/x/fine", tmp_path) is None
 
 
+def test_live_catalog_fetches_stardust_authority(tmp_path, monkeypatch):
+    import httpx
+
+    cache = tmp_path / "cache" / "plugin-catalog-stardust-v1.json"
+    seen_urls = []
+    payload = {"entries": [_entry("live-only")], "removed": []}
+
+    class Response:
+        content = json.dumps(payload).encode()
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return payload
+
+    def fake_get(url, **kwargs):
+        seen_urls.append(url)
+        return Response()
+
+    monkeypatch.setattr(pc, "_live_cache_path", lambda: cache)
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    assert pc.fetch_live_catalog(force=True) == payload
+    assert seen_urls == [
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/website/static/api/plugin-catalog.json"
+    ]
+    assert json.loads(cache.read_text(encoding="utf-8")) == payload
+
+
+def test_live_catalog_cache_namespace_does_not_reuse_nous_cache(tmp_path, monkeypatch):
+    import hermes_constants
+
+    monkeypatch.setattr(hermes_constants, "get_hermes_home", lambda: tmp_path)
+
+    assert pc._live_cache_path() == (
+        tmp_path / "cache" / "plugin-catalog-stardust-v1.json"
+    )
+    assert pc._live_cache_path().name != "plugin-catalog.json"
+
+
 def test_live_catalog_falls_back_to_in_tree_and_unions_removals(tmp_path, monkeypatch):
     """Network failure → in-tree entries; a cached live doc contributes entries AND removals."""
     cache = tmp_path / "cache" / "plugin-catalog.json"
