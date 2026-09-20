@@ -363,10 +363,11 @@ def _append_unknown_effect_barrier(
     )
 
 
-def _tool_search_scoped_names(agent, defer_tools: Optional[frozenset] = None) -> frozenset:
+def _tool_search_scoped_names(agent) -> frozenset:
     """Deferrable tool names the session may invoke via ``tool_call``; the unwrap bypasses
     the bridge's scope check in ``model_tools.handle_function_call``, so restricted sessions
-    validate against this set. Cached on the agent by registry, toolsets, and defer policy."""
+    validate against this set. Eager/deferred membership is derived from the session's
+    model-visible tool names, not a live config read."""
     try:
         import model_tools
         from tools import tool_search as _ts
@@ -376,30 +377,24 @@ def _tool_search_scoped_names(agent, defer_tools: Optional[frozenset] = None) ->
 
     enabled = getattr(agent, "enabled_toolsets", None)
     disabled = getattr(agent, "disabled_toolsets", None)
-    if defer_tools is None:
-        try:
-            defer_tools = _ts.load_config_readonly().effective_defer_tools
-        except Exception:
-            return frozenset()
-    defer_tools = frozenset(defer_tools)
+    surface_names = frozenset(getattr(agent, "valid_tool_names", None) or ())
     cache_key = (
         _registry.current_scope_key(),
         getattr(_registry, "_generation", 0),
         frozenset(enabled) if enabled is not None else None,
         frozenset(disabled) if disabled is not None else None,
-        defer_tools,
+        surface_names,
     )
     cached = getattr(agent, "_tool_search_scope_cache", None)
     if cached is not None and cached[0] == cache_key:
         return cached[1]
     try:
-        names = _ts.scoped_deferrable_names(
-            model_tools.get_tool_definitions(
-                enabled_toolsets=enabled, disabled_toolsets=disabled, quiet_mode=True,
-                skip_tool_search_assembly=True,
-            ) or [],
-            defer_tools,
-        )
+        current_defs = model_tools.get_tool_definitions(
+            enabled_toolsets=enabled, disabled_toolsets=disabled, quiet_mode=True,
+            skip_tool_search_assembly=True,
+        ) or []
+        defer_tools = _ts.defer_tools_for_session_surface(current_defs, surface_names)
+        names = _ts.scoped_deferrable_names(current_defs, defer_tools)
     except Exception:
         names = frozenset()
     with contextlib.suppress(Exception):
@@ -432,16 +427,15 @@ def _unwrap_tool_search_call(
         from tools import tool_search as _ts
         if function_name != _ts.TOOL_CALL_NAME:
             return function_name, function_args, None
-        policy = _ts.load_config_readonly()
-        defer_tools = policy.effective_defer_tools
-        underlying, underlying_args, err = _ts.resolve_underlying_call(function_args, defer_tools)
+        scoped_names = _tool_search_scoped_names(agent)
+        underlying, underlying_args, err = _ts.resolve_underlying_call(function_args, scoped_names)
         if err or not underlying:
             return function_name, function_args, None
         if underlying == _ts.CONNECTOR_BATCH_SENTINEL:
             # Both executors retain the wrapper: scope/probe/hooks run per entry
             # in the batch dispatcher, not against a synthetic registry name.
             return function_name, function_args, None
-        if underlying not in _tool_search_scoped_names(agent, defer_tools):
+        if underlying not in scoped_names:
             return function_name, function_args, (
                 f"'{underlying}' is not available in this session. Use tool_search to find tools you can call."
             )
