@@ -68,6 +68,12 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
+          if [ "${RUNNER_NAME:-}" = "leopard-stardust-ci" ]; then
+            export HOME="${RUNNER_TEMP}/stardust-ci-home"
+            rm -rf "$HOME"
+            install -d -m 700 "$HOME"
+            touch "$HOME/.hushlogin"
+          fi
           scripts/run_tests.sh
         env:
           HERMES_TEST_WORKERS: ${{ runner.name == 'leopard-stardust-ci' && '8' || '4' }}
