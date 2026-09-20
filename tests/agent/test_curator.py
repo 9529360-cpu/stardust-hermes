@@ -78,8 +78,73 @@ def test_curator_defaults(curator_env):
     assert c.get_min_idle_hours() == 2
     assert c.get_stale_after_days() == 14
     assert c.get_archive_after_days() == 30
+    assert c.get_consolidate() is True
 
 
+
+
+
+def test_curator_consolidation_default_and_explicit_opt_out(curator_env, monkeypatch):
+    c = curator_env["curator"]
+    assert c.get_consolidate() is True
+
+    monkeypatch.setattr(c, "_load_config", lambda: {"consolidate": False})
+    assert c.get_consolidate() is False
+
+
+def test_llm_candidates_require_authoritative_ownership_and_exclude_pinned(
+    curator_env, monkeypatch
+):
+    c = curator_env["curator"]
+    u = curator_env["usage"]
+
+    def _row(name, *, provenance="agent", pinned=False):
+        return {
+            "name": name,
+            "provenance": provenance,
+            "state": "active",
+            "pinned": pinned,
+            "activity_count": 0,
+            "use_count": 0,
+            "view_count": 0,
+            "patch_count": 0,
+            "last_activity_at": None,
+        }
+
+    rows = [
+        _row("owned"),
+        _row("pinned-owned", pinned=True),
+        _row("unmanaged-local"),
+        _row("bundled-example", provenance="bundled"),
+    ]
+    monkeypatch.setattr(u, "curated_report", lambda: rows)
+    monkeypatch.setattr(
+        u, "is_curator_managed",
+        lambda name: name in {"owned", "pinned-owned", "bundled-example"},
+    )
+
+    assert [row["name"] for row in c._llm_candidate_rows()] == ["owned"]
+
+
+def test_llm_consolidation_skips_when_no_owned_candidates(curator_env, monkeypatch):
+    c = curator_env["curator"]
+    u = curator_env["usage"]
+    monkeypatch.setattr(
+        u, "curated_report",
+        lambda: [{"name": "unmanaged-local", "provenance": "agent", "pinned": True}],
+    )
+    monkeypatch.setattr(u, "is_curator_managed", lambda _name: False)
+
+    assert c._llm_candidate_rows() == []
+
+    def _unexpected_llm(_prompt):
+        raise AssertionError("LLM review must not run without agent-owned candidates")
+
+    monkeypatch.setattr(c, "_run_llm_review", _unexpected_llm)
+    summary, meta = c._consolidation_pass("auto: ", "no changes", False, set())
+
+    assert "skipped (no candidates)" in summary
+    assert meta["summary"] == "skipped (no candidates)"
 
 
 # ---------------------------------------------------------------------------

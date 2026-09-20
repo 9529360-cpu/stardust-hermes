@@ -568,7 +568,7 @@ def scan_skill(skill_path: Path, source: str = "community") -> ScanResult:
         ignore = _load_skill_ignore(skill_path)
         findings.extend(_check_structure(skill_path, ignore=ignore))
         for f in skill_path.rglob("*"):
-            if f.is_file() and not ignore(rel := str(f.relative_to(skill_path))):
+            if f.is_file() and not ignore(rel := f.relative_to(skill_path).as_posix()):
                 findings.extend(scan_file(f, rel))
     elif skill_path.is_file():
         findings.extend(scan_file(skill_path, skill_path.name))
@@ -671,7 +671,7 @@ def _check_structure(skill_dir: Path, ignore=None) -> List[Finding]:
         findings.append(Finding(pid, sev, cat, rel, 0, match, desc))
     file_count = total_size = 0
     for f in skill_dir.rglob("*"):
-        rel = str(f.relative_to(skill_dir))
+        rel = f.relative_to(skill_dir).as_posix()
         if not (f.is_file() or f.is_symlink()) or (ignore is not None and ignore(rel)):
             continue
         file_count += 1

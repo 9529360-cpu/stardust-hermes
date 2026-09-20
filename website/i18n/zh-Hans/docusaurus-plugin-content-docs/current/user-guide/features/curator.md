@@ -6,7 +6,7 @@ description: "Agent 创建的技能的后台维护——使用跟踪、过期检
 
 # Curator
 
-Curator 是针对 **agent 创建的技能**的后台维护流程。它跟踪每个技能被查看、使用和修补的频率，将长期未使用的技能经历 `active → stale → archived` 状态流转，并定期启动一个短暂的辅助模型审查，提出合并或修补漂移的建议。
+Curator 是主要针对 **agent 自主管理技能**的后台维护流程。它跟踪技能被查看、使用和修补的频率，将长期未使用的内容经历 `active → stale → archived` 状态流转，并按低频维护周期运行辅助模型合并审查。确定性的过期归档还可在 `prune_builtins: true` 时处理未使用的捆绑内置技能；LLM 审查则不会接触这些内置技能。
 
 它的存在是为了防止通过[自我改进循环](/user-guide/features/skills#agent-managed-skills-skill_manage-tool)创建的技能无限堆积。每次 agent 解决新问题并保存技能时，该技能都会落入 `~/.hermes/skills/`。若没有维护，最终会出现数十个范围狭窄的近似重复项，污染技能目录并浪费 token（令牌）。
 
@@ -31,10 +31,10 @@ Curator 由空闲检查触发，而非 cron 守护进程。在 CLI 会话启动�
 
 一次运行分为两个阶段：
 
-1. **自动状态转换**（确定性，无 LLM）。未使用时间超过 `stale_after_days`（14 天）的技能变为 `stale`；未使用时间超过 `archive_after_days`（30 天）的技能被移至 `~/.hermes/skills/.archive/`。
-2. **LLM 审查**（单次辅助模型 pass，`max_iterations=8`）。派生的 agent 审查 agent 创建的技能，可通过 `skill_view` 读取任意技能，并逐技能决定是保留、修补（通过 `skill_manage`）、合并重叠项，还是通过终端工具归档。
+1. **自动状态转换**（确定性，无 LLM）。未使用时间超过 `stale_after_days`（14 天）的技能变为 `stale`；未使用时间超过 `archive_after_days`（30 天）的技能被移至 `~/.hermes/skills/.archive/`。已固定技能和被任何 cron job 引用的技能会被跳过。默认 `prune_builtins: true` 时，这条确定性路径也可以归档长期未使用的捆绑内置技能；hub 安装技能始终不受影响。
+2. **LLM 合并审查**（默认开启，但只在正常的低频 curator 周期到期时运行）。候选必须同时满足：本地来源、明确带有 `created_by: "agent"`（或兼容的旧 `agent_created: true`）管理标记、并且未被 pin。手写/前台创建但未 adopt 的技能、捆绑技能、hub 技能和 pinned 技能都不会进入 LLM 候选集。没有符合条件的候选时，辅助模型调用会被完全跳过。一次大型合并审查可能需要数十次工具/API 往返，因此可用 `curator.consolidate: false` 保持纯确定性 prune。
 
-已固定（pinned）的技能对 curator 的自动状态转换和 agent 自身的 `skill_manage` 工具均不可操作。详见下方[固定技能](#pinning-a-skill)。
+已固定（pinned）的技能会跳过 curator 自动状态转换和 LLM 审查；`skill_manage(action="delete")` 也会拒绝删除，但 patch/edit/write_file/remove_file 仍可继续改进内容。详见下方[固定技能](#pinning-a-skill)。
 
 ## 配置
 
@@ -47,9 +47,11 @@ curator:
   min_idle_hours: 2
   stale_after_days: 14
   archive_after_days: 30
+  consolidate: true            # curator-managed agent 技能的 LLM 合并
+  prune_builtins: true         # 确定性归档未使用的捆绑内置技能
 ```
 
-若要完全禁用，设置 `curator.enabled: false`。
+若要完全禁用，设置 `curator.enabled: false`。若只想保留确定性过期归档、不运行 LLM 合并，设置 `curator.consolidate: false`。
 
 ### 在更便宜的辅助模型上运行审查
 
@@ -84,8 +86,9 @@ auxiliary:
 
 ```bash
 hermes curator status         # last run, counts, pinned list, LRU top 5
-hermes curator run            # trigger a review now (blocks until the LLM pass finishes)
-hermes curator run --background  # fire-and-forget: start the LLM pass in a background thread
+hermes curator run            # 立即运行；使用当前配置的合并策略
+hermes curator run --consolidate # 本次强制启用 LLM 合并，即使配置为 false
+hermes curator run --background  # 后台启动本次 curator 运行
 hermes curator run --dry-run  # preview only — report without any mutations
 hermes curator backup         # take a manual snapshot of ~/.hermes/skills/
 hermes curator rollback       # restore from the newest snapshot
@@ -130,30 +133,18 @@ curator:
 
 ## "agent 创建"的含义
 
-若技能名称**不在**以下列表中，则视为 agent 创建：
+Curator 不会通过目录位置猜测作者。自动 LLM 维护的权威 ownership 标记位于 `~/.hermes/skills/.usage.json`：只有明确的 `"created_by": "agent"`（以及兼容旧版本的 `"agent_created": true`）才表示该技能已交给 Curator 管理。
 
-- `~/.hermes/skills/.bundled_manifest`（安装时从仓库复制的技能），以及
-- `~/.hermes/skills/.hub/lock.json`（通过 `hermes skills install` 安装的技能）。
+- 后台自我改进 fork 自主创建的可复用程序性记忆会标记为 `created_by: agent`。
+- 前台 `skill_manage(action="create")` 默认记录为 `created_by: learn`，仍由用户拥有；只有自主保存程序性记忆时显式传入 `curator_managed: true` 才会交给 Curator。
+- 你手写的技能通常没有 ownership 标记（或为 `null`），不会被 LLM 自动接管。
+- external_dirs、hub 安装技能、受保护 built-in 不能被 adopt。捆绑 built-in 的确定性过期归档由 `curator.prune_builtins` 单独控制，而不是靠 `created_by: agent`。
 
-`~/.hermes/skills/` 中的其他所有内容均在 curator 的处理范围内，包括：
+要查看尚未交给 Curator 的本地技能，可运行 `hermes curator list-unmanaged`。确认某个本地技能确实应由后台维护后，再运行 `hermes curator adopt <name>`；批量接管可使用 `hermes curator adopt --all-unmanaged`。
 
-- agent 在对话中通过 `skill_manage(action="create")` 保存的技能。
-- 你手动编写 `SKILL.md` 创建的技能。
-- 通过你指向 Hermes 的外部技能目录添加的技能。
-
-:::warning 你手写的技能与 agent 保存的技能看起来完全相同
-此处的来源判断是**二元的**（捆绑/hub 与其他所有内容）。Curator 无法区分你依赖于私有工作流的手写技能与自我改进循环在会话中途保存的技能。两者都落入"agent 创建"的桶中。
-
-在第一次真正运行之前（默认为安装后 7 天），请花时间：
-
-1. 运行 `hermes curator run --dry-run` 查看 curator 具体会提出什么建议。
-2. 使用 `hermes curator pin <name>` 保护任何你不希望被触碰的内容。
-3. 或者在 `config.yaml` 中设置 `curator.enabled: false`，如果你更愿意自己管理技能库。
-
-归档始终可通过 `hermes curator restore <name>` 恢复，但事先 pin 比事后追查合并结果要容易得多。
+:::warning 手写和用户请求创建的技能默认不会被 LLM 自动整理
+不要因为一个本地技能“看起来像 agent 写的”就推断 ownership。只有明确的管理标记才允许后台 LLM 读取并修改它。若你希望完全关闭合并模型调用，设置 `curator.consolidate: false`；若希望停止整个 Curator，则设置 `curator.enabled: false`。
 :::
-
-如果你想保护某个特定技能不被触碰——例如你依赖的手写技能——请使用 `hermes curator pin <name>`。详见下一节。
 
 ## 固定技能 {#pinning-a-skill}
 
@@ -171,7 +162,7 @@ hermes curator unpin <skill>
 
 该标志以 `"pinned": true` 的形式存储在 `~/.hermes/skills/.usage.json` 中技能对应的条目上，因此跨会话持久有效。
 
-只有 **agent 创建**的技能才能被固定——捆绑和 hub 安装的技能本就不受 curator 变更，若你尝试固定它们，`hermes curator pin` 会拒绝并给出说明。
+捆绑和 hub 安装技能不能通过 `hermes curator pin` 进入普通的 managed/pinned 流程。对尚未 adopt 的本地技能，pin 可以先被记录，但该技能本来就不会参与自动状态转换；只有在明确 `adopt` 后，这个 pin 才成为 Curator 的保护边界。
 
 如果你想要比"禁止删除"更强的保证——例如在 agent 仍可读取技能的同时完全冻结其内容——请直接用编辑器编辑 `~/.hermes/skills/<name>/SKILL.md`。pin 保护的是工具驱动的删除，而非你自己的文件系统访问。
 
@@ -202,7 +193,7 @@ Curator 在 `~/.hermes/skills/.usage.json` 维护一个附属文件，每个技�
 - `use_count`：技能被加载到对话的 prompt 中。
 - `patch_count`：对该技能执行 `skill_manage patch/edit/write_file/remove_file`。
 
-捆绑和 hub 安装的技能被明确排除在遥测写入之外。
+使用遥测本身是纯可观察性数据，会为所有技能记录计数，不以 provenance 作为写入门槛；是否允许自动归档或 LLM 修改仍由 Curator 的 ownership、pin、`prune_builtins` 等独立策略决定。
 
 ## 每次运行的报告
 

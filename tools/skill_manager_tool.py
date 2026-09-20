@@ -495,9 +495,12 @@ def _create_skill(
         shutil.rmtree(skill_dir, ignore_errors=True)
         return _err(scan_error)
     root = _skills_dir()  # display relative under the profile dir; absolute under skills.create_dir
-    display = skill_dir.relative_to(root) if skill_dir.is_relative_to(root) else skill_dir
+    display = (
+        skill_dir.relative_to(root).as_posix()
+        if skill_dir.is_relative_to(root) else str(skill_dir)
+    )
     result = {
-        "success": True, "message": f"Skill '{name}' created.", "path": str(display),
+        "success": True, "message": f"Skill '{name}' created.", "path": display,
         "skill_md": str(skill_md), "_change": {"description": _description_preview(content)},
         **({"category": category} if category else {}),
         "hint": "To add reference files, templates, or scripts, use "
@@ -549,7 +552,7 @@ def _patch_skill(name: str, old_string: str, new_string: str, file_path: str = N
     else:
         target = skill_dir / "SKILL.md"
     if not target.exists():
-        return _err(f"File not found: {target.relative_to(skill_dir)}")
+        return _err(f"File not found: {target.relative_to(skill_dir).as_posix()}")
     if read_guard := _background_review_read_before_write_guard(name, target, "patch", target_label):
         return read_guard
     content = target.read_text(encoding="utf-8")
@@ -658,7 +661,7 @@ def _remove_file(name: str, file_path: str) -> Dict[str, Any]:
     if err:
         return err
     if not target.exists():  # list what IS there so the model can pick the right path
-        available = [str(f.relative_to(skill_dir)) for subdir in ALLOWED_SUBDIRS
+        available = [f.relative_to(skill_dir).as_posix() for subdir in ALLOWED_SUBDIRS
                      if (skill_dir / subdir).exists() for f in (skill_dir / subdir).rglob("*") if f.is_file()]
         return _err(f"File '{file_path}' not found in skill '{name}'.", available_files=available or None)
     if read_guard := _background_review_read_before_write_guard(name, target, "remove_file", file_path):

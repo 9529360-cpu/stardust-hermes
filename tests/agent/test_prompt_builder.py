@@ -338,6 +338,22 @@ class TestBuildSkillsSystemPrompt:
         yield
         clear_skills_system_prompt_cache(clear_snapshot=True)
 
+    def test_loading_policy_requires_clear_relevance(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        skill_dir = tmp_path / "skills" / "tools" / "focused-skill"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: focused-skill\ndescription: Handle focused workflows\n---\n"
+        )
+
+        prompt = build_skills_system_prompt()
+
+        assert "clearly matches the user's task" in prompt
+        assert "loosely related" in prompt
+        assert "smallest set needed" in prompt
+        assert "partially relevant" not in prompt
+        assert "Err on the side" not in prompt
+
 
 
     def test_deduplicates_skills(self, monkeypatch, tmp_path):

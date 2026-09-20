@@ -381,8 +381,9 @@ def _migrate_to_29(results: Dict[str, Any], quiet: bool) -> None:
                 "  ✓ Renamed write_mode → write_approval (boolean gate)")
 
 
-# 29 → 30 (curator.consolidate defaults to false) is schema-default-only: deep-merge supplies it
-# at read time and persisting a default would only bloat a lean config. No registry entry.
+# 29 → 30 introduced curator.consolidate as a schema-default-only setting. Its original default
+# was false; the current default is true. Deep-merge supplies the current default at read time, so
+# no registry migration persists it and an explicit user-written false remains authoritative.
 
 
 def _migrate_to_33(results: Dict[str, Any], quiet: bool) -> None:
