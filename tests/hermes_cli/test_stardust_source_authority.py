@@ -210,6 +210,7 @@ def test_plugin_catalog_defaults_belong_to_stardust() -> None:
     )
     assert '"plugin-catalog-stardust-v1.json"' in source
 
+
 def test_skills_index_defaults_belong_to_stardust() -> None:
     from tools import skills_hub_search
 
