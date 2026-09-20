@@ -74,6 +74,11 @@ def runtime():
 
 
 def _config(**shared):
+    # Sending is opt-in twice in Stardust: the flag AND an explicit operator-owned
+    # destination. Tests that exercise the sender use a harmless HTTPS endpoint;
+    # endpoint-validation itself is covered by shared_metrics_send_config tests.
+    if shared.get("send") is True and "endpoint" not in shared:
+        shared["endpoint"] = "https://operator.test/v1"
     return {"telemetry": {"shared_metrics": shared}}
 
 

@@ -2,7 +2,7 @@
 
 These tests invoke the real CLI paths as subprocesses to verify:
 1. `hermes secrets bitwarden setup --help` works (dispatch path)
-2. `hermes update --check` works (update path)
+2. `hermes update --check` stays crypto-light through the Stardust local-edition policy
 3. `hermes secrets bitwarden disable` works (handler execution)
 4. `hermes secrets onepassword status` works (lazy backend loads on demand)
 
@@ -161,59 +161,30 @@ class TestUpdatePathE2E:
         parser construction happens inside main(). Run main() itself in a
         subprocess, let it execute the update path, then assert sys.modules.
 
-        The check must run before _dispatch_update calls its (potentially
-        lazy) network layer, so we instrument sys.modules immediately after
-        parse_args() and before dispatch returns, using a monkeypatched
-        _cmd_update_check that captures state then short-circuits.
+        Stardust's local edition intentionally refuses inherited upstream
+        update checks before the network handler. The invariant is therefore
+        at the real product boundary: parser + local-edition policy must still
+        avoid loading cryptography._rust.
         """
         script = """
 import sys
-from unittest.mock import patch
-
-crypto_seen_at_dispatch = []
-
-def capture_update_check(*args, **kwargs):
-    # Run just before the real handler would; record crypto state.
-    crypto_seen_at_dispatch.append(
-        'cryptography.hazmat.bindings._rust' in sys.modules
-    )
-    # Short-circuit: don't actually call the network in tests.
-    return 0
 
 sys.argv = ['hermes', 'update', '--check']
 
 import hermes_cli.main as m
 
-# Patch the update handler so main() exercises its parser + dispatch
-# without doing network I/O.  cmd_update (in main.py) calls
-# _self()._cmd_update_check(branch=..., branch_explicit=...) where _self()
-# resolves the hermes_cli.main module's lazily re-exported attribute —
-# so the patch must land on update_cmd._cmd_update_check.
-with patch('hermes_cli.update_cmd._cmd_update_check', capture_update_check):
-    try:
-        m.main()
-    except SystemExit as e:
-        # argparse may sys.exit for --help / bad args; ignore for this probe
-        if e.code not in (0, None):
-            print(f'FAIL: main() exited with code {e.code}')
-            sys.exit(1)
+try:
+    m.main()
+except SystemExit as e:
+    if e.code not in (0, None):
+        print(f'FAIL: main() exited with code {e.code}')
+        sys.exit(1)
 
-# 1. main() must have dispatched into our capture hook
-if not crypto_seen_at_dispatch:
-    print('FAIL: update --check did not dispatch to _cmd_update_check')
-    sys.exit(1)
-
-# 2. At dispatch time, crypto must NOT be loaded
-if crypto_seen_at_dispatch[0]:
-    print('FAIL: cryptography._rust loaded by main() before update dispatch')
-    sys.exit(1)
-
-# 3. After main() returned, crypto must STILL not be loaded
 if 'cryptography.hazmat.bindings._rust' in sys.modules:
-    print('FAIL: cryptography._rust present in sys.modules after main()')
+    print('FAIL: cryptography._rust present after local-edition update policy')
     sys.exit(1)
 
-print('PASS: main() update --check path never loaded cryptography._rust')
+print('PASS: main() local-edition update check never loaded cryptography._rust')
 sys.exit(0)
 """
         repo_root = Path(__file__).parent.parent.parent

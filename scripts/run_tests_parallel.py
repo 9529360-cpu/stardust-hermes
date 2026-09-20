@@ -90,6 +90,15 @@ _SKIP_PARTS = {"integration", "e2e", "docker"}
 # time while keeping a genuinely hung file bounded.
 _DEFAULT_FILE_TIMEOUT_SECONDS = 300.0
 
+# A restored duration is the best timeout signal, but a fresh repository or a
+# red main branch may have no Actions duration cache at all. Large files then
+# fall back to the flat 300s cap and can be killed twice before the cache has
+# any chance to bootstrap. Give cold-cache files a bounded source-size budget:
+# three seconds per directly-declared test, capped at 3x the configured flat
+# timeout. This is only a fallback; observed clean durations still win.
+_COLD_CACHE_SECONDS_PER_TEST = 3.0
+_COLD_CACHE_MAX_MULTIPLIER = 3.0
+
 # One-shot retry of failing test FILES. A file that exits non-zero is re-run
 # once in a fresh subprocess; if the re-run passes, the file counts as passed
 # but is loudly reported as FLAKY so it gets fixed rather than hidden.
@@ -308,29 +317,28 @@ def _effective_file_timeout(
     repo_root: Path,
     file_timeout: float,
     durations: dict[str, float] | None,
+    approx_test_count: int = 0,
 ) -> float:
-    """Scale the per-file timeout for files whose last observed runtime
-    approaches the flat cap.
+    """Scale the per-file timeout without making a duration cache mandatory.
 
-    The flat ``file_timeout`` (default 300s) is sized for the typical file,
-    but a handful of large-collection files (e.g. ``tests/test_hermes_state.py``,
-    239 tests × subprocess-per-test overhead) legitimately run 200s+ on a
-    quiet runner. Under CI load that dilates past the cap, the file is
-    SIGKILL'd mid-run, and the automatic retry then passes — a manufactured
-    FLAKY report for a file that was never broken (seen 2026-08-18 on main:
-    first attempt killed at 300s, retry passed in 205s).
+    The flat file_timeout (default 300s) is sized for the typical file,
+    but a handful of large-collection files legitimately take longer on the
+    standard 4-core CI runner. A restored clean duration is authoritative:
+    give it 3x headroom for shared-runner dilation.
 
-    Rule: a file gets ``max(flat_cap, 3 × last_observed_duration)``. Files
-    without a cache entry keep the flat cap. This only ever *raises* the
-    bound — a genuinely hung file is still killed, just with headroom
-    proportional to its known-good runtime.
+    A cold cache must still be able to bootstrap. For files with no observed
+    duration, use the source-level test count as a bounded fallback:
+    3s x direct test declarations, capped at 3 x flat_cap.
+    This only raises the timeout for unusually large files and still leaves a
+    finite outer kill bound for a genuine hang.
     """
-    if not durations:
-        return file_timeout
-    cached = durations.get(_format_file(file, repo_root))
-    if not cached:
-        return file_timeout
-    return max(file_timeout, float(cached) * 3.0)
+    cached = (durations or {}).get(_format_file(file, repo_root))
+    if cached:
+        return max(file_timeout, float(cached) * 3.0)
+
+    cold_cache_budget = max(0, approx_test_count) * _COLD_CACHE_SECONDS_PER_TEST
+    cold_cache_cap = file_timeout * _COLD_CACHE_MAX_MULTIPLIER
+    return max(file_timeout, min(cold_cache_budget, cold_cache_cap))
 
 
 def _clean_pass_durations(
@@ -1183,7 +1191,11 @@ def main() -> int:
             fut = pool.submit(
                 _run_one_file, file, pytest_passthrough, repo_root,
                 _effective_file_timeout(
-                    file, repo_root, args.file_timeout, timeout_durations
+                    file,
+                    repo_root,
+                    args.file_timeout,
+                    timeout_durations,
+                    test_counts.get(file, 0),
                 ),
                 args.file_retries,
             )

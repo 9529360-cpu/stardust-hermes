@@ -1233,7 +1233,7 @@ function frontmatterTokens(value: string): string[] {
 
       return rhs.split(',')
     })
-    .map(token => token.replace(/^[\s\[\]{"'\`]+|[\s\[\]}"'\`]+$/g, '').trim())
+    .map(token => token.replace(/^[\s[\]{"'`]+|[\s[\]}"'`]+$/g, '').trim())
     .filter(Boolean)
 }
 
@@ -1241,7 +1241,7 @@ function inlineMarkdownText(value: string): string {
   return value
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-    .replace(/[*_~\`]/g, '')
+    .replace(/[*_~`]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -1253,7 +1253,7 @@ function skillBodyOverview(body: string): string {
   for (const rawLine of body.split(/\r?\n/)) {
     const line = rawLine.trim()
 
-    if (/^\`\`\`/.test(line)) {
+    if (/^```/.test(line)) {
       inFence = !inFence
       continue
     }
