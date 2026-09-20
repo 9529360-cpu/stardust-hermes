@@ -1633,6 +1633,7 @@ export type {
  *  `ctx.register` stays the door for permanent contributions. Namespace the
  *  id with your plugin slug (`kanban:board-switcher`). */
 export { Contribute, type ContributeProps } from '@/contrib/react/contribute'
+export { TASK_CENTER_AREAS } from '@/contrib/task-center'
 
 // -- contracts ----------------------------------------------------------------
 
