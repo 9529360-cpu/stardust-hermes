@@ -169,6 +169,7 @@ def test_uninstall_reinstall_guidance_stays_on_stardust() -> None:
     assert UPSTREAM_INSTALL_HOST not in source
     assert "Thank you for using Stardust!" in source
 
+
 def test_model_catalog_defaults_belong_to_stardust() -> None:
     from hermes_cli import model_catalog
     from hermes_cli.config import DEFAULT_CONFIG
