@@ -1,3 +1,5 @@
+import './workspace.css'
+
 import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect } from 'react'
 import { useNavigate } from 'react-router'
@@ -9,11 +11,11 @@ import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { useSessionSlice, useStoreSelector } from '@/lib/use-session-slice'
 import { registerRepoStatusCwd, repoStatusForCwd } from '@/store/coding-status'
-import { $statusItemsBySession, type ComposerStatusItem } from '@/store/composer-status'
 import { openCommandPalette } from '@/store/command-palette'
+import { $statusItemsBySession, type ComposerStatusItem } from '@/store/composer-status'
+import { setSidebarOpen } from '@/store/layout'
 import { revealDesktopPane } from '@/store/pane-focus'
 import { $previewTarget } from '@/store/preview'
-import { setSidebarOpen } from '@/store/layout'
 import { $projectScope, $projectTree, ALL_PROJECTS, openFolderAsProject, projectRootCwd } from '@/store/projects'
 import { openReviewForPath } from '@/store/review'
 import { setRightContextOpen } from '@/store/right-context'
@@ -28,6 +30,7 @@ import {
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
 
 import { sessionRoute } from '../routes'
+
 import {
   findLiveTaskRuntimeId,
   findLiveTaskRuntimeIdByStoredId,
@@ -35,7 +38,6 @@ import {
   findLiveTaskStoredId,
   resolveTaskWorkspaceCwd
 } from './task-session'
-import './workspace.css'
 
 const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
 

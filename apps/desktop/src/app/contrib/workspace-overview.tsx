@@ -8,15 +8,15 @@ import { Codicon } from '@/components/ui/codicon'
 import { registry } from '@/contrib/registry'
 import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
-import { useSessionSlice, useStoreSelector } from '@/lib/use-session-slice'
 import { readKey, writeKey } from '@/lib/storage'
+import { useSessionSlice, useStoreSelector } from '@/lib/use-session-slice'
 import { registerRepoStatusCwd, repoStatusForCwd } from '@/store/coding-status'
 import { $statusItemsBySession } from '@/store/composer-status'
 import { applyDesktopLayoutPreset } from '@/store/pane-focus'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
+import { setRightContextOpen } from '@/store/right-context'
 import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
-import { setRightContextOpen } from '@/store/right-context'
 import { isAuxiliaryWindow } from '@/store/windows'
 
 import { sessionRoute } from '../routes'
@@ -27,6 +27,7 @@ import {
   findLiveTaskStoredId,
   resolveTaskWorkspaceCwd
 } from '../workspace/task-session'
+
 import { WORKSPACE_OVERVIEW_COPY } from './workspace-overview-copy'
 
 export const WORKSPACE_OVERVIEW_PANE_ID = 'workspace-overview'

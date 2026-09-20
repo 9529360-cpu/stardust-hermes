@@ -45,4 +45,11 @@ jobs:
           command: npm ci
 
       - name: Run all workspace checks
-        run: node .github/scripts/run-workspace-checks.mjs
+        # run-workspace-checks was introduced for a private 32-core runner,
+        # where all check units could safely share one machine. On the public
+        # ubuntu-latest runner, each unit (especially Vitest) creates its own
+        # worker pool; running four units together oversubscribes the 4-core
+        # host and has terminated the UI suite without a Vitest failure
+        # summary. Serialize the outer units here so each check gets the full
+        # standard runner, matching the resource isolation of the older matrix.
+        run: node .github/scripts/run-workspace-checks.mjs --concurrency 1
