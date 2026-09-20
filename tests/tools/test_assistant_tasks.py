@@ -182,6 +182,8 @@ def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
 
     monkeypatch.setattr("tools.kanban_tools._board", fake_board)
 
+    monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["default"])
+
     active = json.loads(
         assistant_tasks.assistant_tasks_tool(action="list", include_completed=False)
     )
@@ -434,3 +436,105 @@ def test_list_keeps_newest_owner_tasks_visible_past_200_rows(tmp_path, monkeypat
         "task-201",
         "task-200",
     ]
+
+
+
+def test_list_recalls_owner_tasks_across_active_boards(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    kb.create_board("alpha", name="Alpha")
+    kb.create_board("beta", name="Beta")
+    with kbc.connect_closing(board="alpha") as conn:
+        kb.create_task(
+            conn,
+            title="Alpha durable task",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        kb.create_task(
+            conn,
+            title="Other user's alpha task",
+            assignee="default",
+            assistant_owner_key="messaging:telegram:someone-else",
+        )
+    with kbc.connect_closing(board="beta") as conn:
+        kb.create_task(
+            conn,
+            title="Beta durable task",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+
+    # The later conversation happens after the user switched boards.
+    kb.set_current_board("beta")
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+            limit=10,
+        )
+    )
+
+    assert listed["partial"] is False
+    assert {(task["board"], task["title"]) for task in listed["tasks"]} == {
+        ("alpha", "Alpha durable task"),
+        ("beta", "Beta durable task"),
+    }
+
+
+def test_list_reports_partial_snapshot_when_one_board_is_unreadable(monkeypatch):
+    row = SimpleNamespace(
+        id="t_ok",
+        title="Healthy task",
+        status="running",
+        assignee="default",
+        project_id=None,
+        workspace_kind="scratch",
+        workspace_path=None,
+        created_at=10,
+        started_at=11,
+        completed_at=None,
+        block_kind=None,
+        last_failure_error=None,
+        result=None,
+    )
+
+    class FakeKb:
+        @staticmethod
+        def list_tasks(conn, **kwargs):
+            return [row]
+
+        @staticmethod
+        def latest_run(conn, task_id):
+            return None
+
+    @contextmanager
+    def fake_board(board):
+        if board == "broken":
+            raise OSError("private local path that must not leak")
+        yield FakeKb, object()
+
+    monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["healthy", "broken"])
+    monkeypatch.setattr("tools.kanban_tools._board", fake_board)
+
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+        )
+    )
+
+    assert listed["ok"] is True
+    assert listed["partial"] is True
+    assert listed["board_errors"] == [{"board": "broken", "error": "OSError"}]
+    assert listed["tasks"][0]["board"] == "healthy"
+    assert listed["tasks"][0]["title"] == "Healthy task"
+    assert "private local path" not in json.dumps(listed)
