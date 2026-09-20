@@ -157,35 +157,44 @@ def start_flow(
     from tools.mcp_dashboard_oauth import DashboardOAuthFlow
     if client_redirect_uri is not None:
         client_redirect_uri = _validate_client_redirect_uri(client_redirect_uri)
-    cutoff = time.time() - _SESSION_TTL_SECONDS  # opportunistic GC of expired sessions
-    with _sessions_lock:
-        for sid in [sid for sid, rec in _sessions.items() if rec["created_at"] < cutoff]:
-            _shutdown_listener(_sessions.pop(sid))
-    with _sessions_lock:
-        active = [r for r in _sessions.values() if not r["flow"].worker_done]
-        if len(active) >= _MAX_PENDING:
-            raise RuntimeError("Too many MCP OAuth flows are already in progress")
-        if any(r["server_name"] == server_name and r["hermes_home"] == hermes_home for r in active):
-            raise RuntimeError(f"MCP OAuth for '{server_name}' is already in progress")
-
     session_id = secrets.token_urlsafe(24)
     flow = DashboardOAuthFlow(
         flow_id=session_id, server_name=server_name, profile=None, hermes_home=hermes_home,
         redirect_uri="",  # set below once the loopback port is known
         reconnect_live=reconnect_live)
-    # Client-hosted listener: a 127.0.0.1 port here would be unreachable from the browser.
-    httpd = None if client_redirect_uri else _start_loopback_listener(flow)
-    flow.redirect_uri = (
-        client_redirect_uri or f"http://127.0.0.1:{httpd.server_address[1]}/callback")
     rec = {
         "session_id": session_id, "server_name": server_name, "hermes_home": hermes_home,
-        "flow": flow, "httpd": httpd, "created_at": time.time()}
+        "flow": flow, "httpd": None, "created_at": time.time()}
+
+    # Reserve the per-server/profile slot atomically with the duplicate / capacity checks.
+    # Listener setup can block, and without the reservation two concurrent starts can both pass
+    # these checks, launch duplicate OAuth workers and race the same token storage.
+    cutoff = time.time() - _SESSION_TTL_SECONDS  # opportunistic GC of expired sessions
+    stale = []
     with _sessions_lock:
+        for sid in [sid for sid, existing in _sessions.items() if existing["created_at"] < cutoff]:
+            stale.append(_sessions.pop(sid))
+        active = [r for r in _sessions.values() if not r["flow"].worker_done]
+        if len(active) >= _MAX_PENDING:
+            raise RuntimeError("Too many MCP OAuth flows are already in progress")
+        if any(r["server_name"] == server_name and r["hermes_home"] == hermes_home for r in active):
+            raise RuntimeError(f"MCP OAuth for '{server_name}' is already in progress")
         _sessions[session_id] = rec
-    threading.Thread(
-        target=_worker, args=(session_id, hermes_home, server_name, dict(cfg), reconnect_live),
-        daemon=True, name=f"mcp-oauth-{server_name}").start()
+    # Do not hold the registry lock while shutting down stale HTTPServer instances.
+    for stale_rec in stale:
+        _shutdown_listener(stale_rec)
+
+    worker_started = False
     try:
+        # Client-hosted listener: a 127.0.0.1 port here would be unreachable from the browser.
+        httpd = None if client_redirect_uri else _start_loopback_listener(flow)
+        rec["httpd"] = httpd
+        flow.redirect_uri = (
+            client_redirect_uri or f"http://127.0.0.1:{httpd.server_address[1]}/callback")
+        threading.Thread(
+            target=_worker, args=(session_id, hermes_home, server_name, dict(cfg), reconnect_live),
+            daemon=True, name=f"mcp-oauth-{server_name}").start()
+        worker_started = True
         auth_url = None
         # wait_for_authorization_url is async; run its wait synchronously.
         deadline = time.time() + url_timeout
@@ -199,9 +208,15 @@ def start_flow(
             time.sleep(0.1)
         if not auth_url:
             raise TimeoutError("Timed out waiting for MCP authorization URL")
-    except Exception:
-        flow.mark_error("Timed out waiting for MCP authorization URL")
+    except Exception as exc:
+        flow.mark_error(str(exc) or "MCP OAuth flow failed before authorization")
         _shutdown_listener(rec)
+        if not worker_started:
+            # No worker exists to retire this reservation, and the caller never received
+            # its session_id. Remove it now so setup failures cannot squat on the slot.
+            with _sessions_lock:
+                if _sessions.get(session_id) is rec:
+                    _sessions.pop(session_id, None)
         raise
     # ``flow`` mirrors the provider-OAuth discriminator: open a URL then poll (no user_code).
     return {"session_id": session_id, "auth_url": auth_url, "flow": "pkce"}
