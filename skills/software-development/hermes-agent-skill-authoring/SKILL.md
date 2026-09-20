@@ -105,8 +105,8 @@ POSIX-only signals to search for in `scripts/`: `fcntl`, `termios`, `pty`, `os.f
 
 ## Size Limits
 
-- Full SKILL.md: ≤ 100,000 chars enforced (`MAX_SKILL_CONTENT_CHARS`), but target **~100 lines for a simple skill, ~200 for a complex one**. Peer skills sit at 8-14k chars.
-- Bulky or branch-specific material goes in `references/*.md`, `templates/`, or `scripts/` — pointed to from SKILL.md, not inlined.
+- Full SKILL.md: ≤ 100,000 chars enforced (`MAX_SKILL_CONTENT_CHARS`), but target **~100 lines for a simple skill, ~200 for a complex one**. Peer skills sit at 8-14k chars. The advisory linter warns above 20k chars: that is a convergence signal, not a new hard limit.
+- Bulky, branch-specific, incident-derived, or rarely needed material goes in a **small set of topical** `references/*.md`, `templates/`, or `scripts/` — pointed to from SKILL.md, not inlined. Do not respond to the 20k warning by creating one reference per incident/session.
 - Don't expect the model to inline-write parsers or non-trivial logic every call — ship a helper script in `scripts/` and reference it by path.
 
 ## Body Structure (modern section order)
