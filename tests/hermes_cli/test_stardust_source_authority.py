@@ -168,3 +168,28 @@ def test_uninstall_reinstall_guidance_stays_on_stardust() -> None:
     assert STARDUST_INSTALL_BASE in source
     assert UPSTREAM_INSTALL_HOST not in source
     assert "Thank you for using Stardust!" in source
+
+
+def test_model_catalog_defaults_belong_to_stardust() -> None:
+    from hermes_cli import model_catalog
+    from hermes_cli.config import DEFAULT_CONFIG
+
+    canonical = (
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/website/static/api/model-catalog.json"
+    )
+    assert model_catalog.DEFAULT_CATALOG_URL == canonical
+    assert DEFAULT_CONFIG["model_catalog"]["url"] == canonical
+
+    forbidden = (
+        "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json",
+        (
+            "https://raw.githubusercontent.com/NousResearch/hermes-agent"
+            "/main/website/static/api/model-catalog.json"
+        ),
+    )
+    for path in ("hermes_cli/model_catalog.py", "hermes_cli/config_defaults.py"):
+        source = _read(path)
+        for old in forbidden:
+            assert old not in source
+

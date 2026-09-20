@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Build the Hermes Model Catalog — a centralized JSON manifest of curated models.
+"""Build the Stardust Model Catalog — a centralized JSON manifest of curated models.
 
 This script reads the in-repo hardcoded curated lists (``OPENROUTER_MODELS``,
 ``_PROVIDER_MODELS["nous"]``) and writes them to a JSON manifest that the
-Hermes CLI fetches at runtime. Publishing the catalog through the docs site
-lets maintainers update model lists without shipping a Hermes release.
+Stardust CLI fetches from the reviewed main branch. Updating the committed
+manifest lets maintainers change picker lists without shipping a Stardust release
+or delegating runtime catalog authority to a separate docs deployment.
 
 The runtime fetcher falls back to the same in-repo hardcoded lists if the
 manifest is unreachable, so this script is a convenience for keeping the
@@ -16,8 +17,8 @@ Usage::
 
 Output: ``website/static/api/model-catalog.json``
 
-Live URL (after ``deploy-site.yml`` runs on merge to main):
-``https://hermes-agent.nousresearch.com/docs/api/model-catalog.json``
+Live URL after the reviewed change lands on main:
+``https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json``
 """
 
 from __future__ import annotations
@@ -63,8 +64,11 @@ def build_catalog() -> dict:
         "version": CATALOG_VERSION,
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
-            "source": "hermes-agent repo",
-            "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog",
+            "source": "stardust-hermes repo",
+            "docs": (
+                "https://github.com/9529360-cpu/stardust-hermes"
+                "/blob/main/website/docs/reference/model-catalog.md"
+            ),
         },
         "providers": {
             "openrouter": {
@@ -73,7 +77,7 @@ def build_catalog() -> dict:
                     "note": (
                         "Descriptions drive picker badges. Live /api/v1/models "
                         "filters curated ids by tool-calling support and free pricing. "
-                        'The entry labeled "default": true is the model Hermes '
+                        'The entry labeled "default": true is the model Stardust '
                         "silently lands on when the user never picked one."
                     ),
                 },
@@ -86,7 +90,7 @@ def build_catalog() -> dict:
                 "metadata": {
                     "display_name": "Nous Portal",
                     "note": (
-                        'The entry labeled "default": true is the model Hermes '
+                        'The entry labeled "default": true is the model Stardust '
                         "silently lands on when the user never picked one."
                     ),
                 },
