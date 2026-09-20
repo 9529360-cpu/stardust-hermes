@@ -179,6 +179,11 @@ def accept_suggestion(ref: str, *, origin: Optional[Dict[str, Any]] = None) -> O
     spec = dict(s.get("job_spec") or {})
     if origin is not None and "origin" not in spec:
         spec["origin"] = origin
+    from cron.session_return import capture_local_session_origin
+    if "local_session_origin" not in spec:
+        local_origin = capture_local_session_origin(spec.get("deliver"))
+        if local_origin is not None:
+            spec["local_session_origin"] = local_origin
 
     try:
         job = create_job_with_scheduler_registration(**spec)

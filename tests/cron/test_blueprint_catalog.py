@@ -172,6 +172,22 @@ class TestCommandHandler:
         assert "* * *" in res.agent_seed
 
 
+    def test_inline_blueprint_from_desktop_captures_local_return(self, isolated_home):
+        from gateway.session_context import clear_session_vars, set_session_vars
+        from hermes_cli.blueprint_cmd import handle_blueprint_command
+
+        tokens = set_session_vars(source="desktop", session_id="desktop-blueprint-session")
+        try:
+            res = handle_blueprint_command("morning-brief time=07:30 deliver=origin")
+        finally:
+            clear_session_vars(tokens)
+
+        assert "Scheduled" in res.text
+        jobs = isolated_home.load_jobs()
+        assert len(jobs) == 1
+        assert jobs[0]["local_session_origin"] == {
+            "source": "desktop", "session_id": "desktop-blueprint-session"}
+
     def test_fill_creates_job(self, isolated_home):
         from hermes_cli.blueprint_cmd import handle_blueprint_command
 

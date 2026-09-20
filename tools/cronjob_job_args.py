@@ -43,33 +43,31 @@ def _origin_from_env() -> Optional[Dict[str, str]]:
 
 
 def _local_delivery_notice(job: Dict[str, Any], user_deliver: Optional[str]) -> Optional[str]:
-    """Notice when a created job won't deliver anywhere: CLI/TUI sessions have no capturable
-    origin, so deliver='origin' (or omitted) saves output but never delivers it. None when the
-    user explicitly asked for ``local`` or the job resolves to a real target.
+    """Explain local delivery semantics at create time.
 
-    TUI/CLI sessions cannot be captured as a cron ``origin`` (no ``HERMES_SESSION_PLATFORM``/``CHAT_ID`` is
-    set for them), so a ``deliver="origin"`` request — or an omitted ``deliver`` that defaults to
-    origin-or-local — produces a job that runs and saves output to ``last_output`` but is never delivered
-    back into the session. This is by design (there is no live-delivery channel for local sessions), but
-    silently dropping the user's "tell me when it runs" intent is the trap reported in 51568. Surface it at
-    create time so the agent can relay it instead of promising a delivery that never happens. See #51568.
+    Desktop/TUI jobs created from a live persisted conversation carry an internal durable
+    local session origin and return their completion there. CLI and other local-only callers
+    still have no return channel, so preserve the warning for those surfaces.
     """
+    if job.get("local_session_origin"):
+        return (
+            "This job saves its output locally and its non-silent completion will return to "
+            "the Desktop/TUI conversation that created it as a durable background result.")
     if (user_deliver or "").strip().lower() == "local":
         return None
     try:
         from cron.scheduler import _resolve_delivery_targets
         if _resolve_delivery_targets(job):
             return None
-    except Exception:  # resolution unavailable — fall back to the origin signal
+    except Exception:
         if job.get("origin"):
             return None
     return (
         "This is a local-only cron job: its output is saved (view it with "
         "cronjob(action='list')) but will NOT be delivered back into this "
-        "session — CLI/TUI sessions have no live-delivery channel. To be "
-        "notified when it runs, recreate or update the job with deliver set to "
-        "a gateway-connected platform, e.g. deliver='telegram' or deliver='all'.")
-
+        "session - this caller has no durable local return route. To be "
+        "notified when it runs, create it from a persisted Desktop/TUI conversation "
+        "or set deliver to a gateway-connected platform, e.g. deliver='telegram' or deliver='all'.")
 
 def _mode_guidance_notes(job: Dict[str, Any], user_deliver: Optional[str]) -> List[str]:
     """Mode guidance echoed once in the create/update response (not in the schema, which is

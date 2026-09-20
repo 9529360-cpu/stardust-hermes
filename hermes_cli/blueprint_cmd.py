@@ -222,6 +222,10 @@ def handle_blueprint_command(
 
     try:
         from cron.scheduler import CronSchedulerRegistrationError, create_job_with_scheduler_registration
+        from cron.session_return import capture_local_session_origin
+        local_origin = capture_local_session_origin(spec.get("deliver"))
+        if local_origin is not None:
+            spec["local_session_origin"] = local_origin
         job = create_job_with_scheduler_registration(**spec)
     except CronSchedulerRegistrationError as e:
         return BlueprintCommandResult(e.user_message())

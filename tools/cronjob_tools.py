@@ -597,10 +597,13 @@ def _action_create(a: Dict[str, Any]) -> str:
         context_from = _apply_continuity(context_from, a["continuity"])
 
     from cron.scheduler import CronSchedulerRegistrationError, create_job_with_scheduler_registration
+    from cron.session_return import capture_local_session_origin
+    local_session_origin = capture_local_session_origin(deliver, a.get("session_id"))
     try:
         job = create_job_with_scheduler_registration(
             prompt=prompt or "", schedule=a["schedule"], name=a["name"], repeat=a["repeat"],
-            deliver=_resolve_cron_context_deliver(deliver), origin=_origin_from_env(), skills=canonical_skills,
+            deliver=_resolve_cron_context_deliver(deliver), origin=_origin_from_env(),
+            local_session_origin=local_session_origin, skills=canonical_skills,
             model=_normalize_optional_job_value(a["model"]), provider=_normalize_optional_job_value(a["provider"]),
             base_url=_normalize_optional_job_value(a["base_url"], strip_trailing_slash=True),
             script=_normalize_optional_job_value(script), context_from=context_from,
