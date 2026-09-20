@@ -30,7 +30,10 @@ CATALOG_TIERS = ("official", "community")
 # Browse taxonomy for the catalog page / picker. Entries without one land on the Desktop shelf
 # (the common case for community submissions); "general" is for plugins that fit no shelf.
 CATALOG_CATEGORIES = ("desktop", "memory", "platform", "web", "tools", "voice", "automation", "models", "general")
-LIVE_CATALOG_URL = "https://hermes-agent.nousresearch.com/docs/api/plugin-catalog.json"
+LIVE_CATALOG_URL = (
+    "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+    "/main/website/static/api/plugin-catalog.json"
+)
 LIVE_CATALOG_TTL_SECONDS = 6 * 60 * 60
 _REQUEST_TIMEOUT = 5.0
 _MAX_LIVE_BYTES = 2 * 1024 * 1024
@@ -223,7 +226,7 @@ def find_removed(name_or_repo: str, catalog_dir: Optional[Path] = None) -> Optio
 
 def _live_cache_path() -> Path:
     from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / "plugin-catalog.json"
+    return get_hermes_home() / "cache" / "plugin-catalog-stardust-v1.json"
 
 
 def fetch_live_catalog(*, force: bool = False) -> Optional[Dict[str, Any]]:
