@@ -6,17 +6,17 @@ description: Remotely-hosted manifest driving curated model picker lists for Ope
 
 # Model Catalog
 
-Hermes fetches curated model lists for **OpenRouter** and **Nous Portal** from a JSON manifest hosted alongside the docs site. This lets maintainers update picker lists without shipping a new `hermes-agent` release.
+Stardust fetches curated model lists for **OpenRouter** and **Nous Portal** directly from the reviewed JSON manifest on this repository's `main` branch. This lets maintainers update picker lists without shipping a new Stardust release or delegating runtime authority to a separate docs deployment.
 
-When the manifest is unreachable (offline, network blocked, hosting failure), Hermes silently falls back to the in-repo snapshot that ships with the CLI. The manifest never breaks the picker — worst case you see whatever list was bundled with your installed version.
+When the manifest is unreachable (offline, network blocked, hosting failure), Stardust silently falls back to the in-repo snapshot that ships with the CLI. The manifest never breaks the picker — worst case you see whatever list was bundled with your installed version.
 
 ## Live manifest URL
 
 ```
-https://hermes-agent.nousresearch.com/docs/api/model-catalog.json
+https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json
 ```
 
-Published on every merge to `main` via the existing `deploy-site.yml` GitHub Pages pipeline. The source of truth lives in the repo at `website/static/api/model-catalog.json`.
+The source of truth is committed at `website/static/api/model-catalog.json`. Once a reviewed change lands on `main`, that exact file is available at the raw GitHub URL above; no separate docs deployment controls runtime catalog authority.
 
 ## Schema
 
@@ -72,7 +72,7 @@ Cache location: `~/.hermes/cache/model_catalog.json`.
 ```yaml
 model_catalog:
   enabled: true
-  url: https://hermes-agent.nousresearch.com/docs/api/model-catalog.json
+  url: https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/website/static/api/model-catalog.json
   ttl_minutes: 20
   providers: {}
 ```
@@ -116,6 +116,6 @@ Maintainers:
 python scripts/build_model_catalog.py
 ```
 
-Then PR the resulting change to `website/static/api/model-catalog.json` to `main`. The docs site auto-deploys on merge and the new manifest is live within a few minutes.
+Then PR the resulting change to `website/static/api/model-catalog.json` to `main`. Once merged, the reviewed file is served directly from Stardust's raw `main` branch; no docs deployment is required.
 
 You can also hand-edit the JSON directly for fine-grained metadata changes that don't belong in the in-repo snapshot — the generator script is a convenience, not the single source of truth.
