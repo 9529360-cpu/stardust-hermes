@@ -552,6 +552,15 @@ class TestBridgeDispatch:
             result = json.loads(handle_function_call("tool_call", {}))
         assert "requires 'calls'" in result["error"]
 
+    def test_bridge_rejects_call_when_not_published_to_session(self):
+        with patch("model_tools.get_tool_definitions", return_value=[]):
+            result = json.loads(handle_function_call(
+                "tool_search",
+                {"queries": ["files"]},
+                enabled_tools=["read_file"],
+            ))
+        assert "not available in this session" in result["error"]
+
     def test_tool_call_keeps_session_surface_when_live_defer_config_changes(self):
         import tools.tool_search as ts
 
