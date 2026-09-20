@@ -2,14 +2,14 @@
   "version": 1,
   "updated_at": "2026-09-10T16:09:08Z",
   "metadata": {
-    "source": "hermes-agent repo",
-    "docs": "https://hermes-agent.nousresearch.com/docs/reference/model-catalog"
+    "source": "stardust-hermes repo",
+    "docs": "https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/reference/model-catalog.md"
   },
   "providers": {
     "openrouter": {
       "metadata": {
         "display_name": "OpenRouter",
-        "note": "Descriptions drive picker badges. Live /api/v1/models filters curated ids by tool-calling support and free pricing. The entry labeled \"default\": true is the model Hermes silently lands on when the user never picked one."
+        "note": "Descriptions drive picker badges. Live /api/v1/models filters curated ids by tool-calling support and free pricing. The entry labeled \"default\": true is the model Stardust silently lands on when the user never picked one."
       },
       "models": [
         {
@@ -250,7 +250,7 @@
     "nous": {
       "metadata": {
         "display_name": "Nous Portal",
-        "note": "The entry labeled \"default\": true is the model Hermes silently lands on when the user never picked one."
+        "note": "The entry labeled \"default\": true is the model Stardust silently lands on when the user never picked one."
       },
       "models": [
         {

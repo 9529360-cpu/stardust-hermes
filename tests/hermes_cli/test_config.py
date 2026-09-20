@@ -1081,6 +1081,45 @@ class TestCuratorFasterPrune:
         assert raw["curator"]["archive_after_days"] == 180
 
 
+class TestModelCatalogAuthorityMigration:
+    OLD_URL = "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json"
+    NEW_URL = (
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/website/static/api/model-catalog.json"
+    )
+
+    def _run(self, tmp_path, monkeypatch, url):
+        from hermes_cli.config_migrations import run_migrations
+
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(yaml.safe_dump({
+            "_config_version": 45,
+            "model_catalog": {"url": url},
+        }), encoding="utf-8")
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        run_migrations(45, {"env_added": [], "config_added": [], "warnings": []}, quiet=True)
+        return config_path
+
+    def test_v46_retires_only_the_historical_nous_default(self, tmp_path, monkeypatch):
+        from hermes_cli.config import load_config, read_raw_config
+
+        path = self._run(tmp_path, monkeypatch, self.OLD_URL)
+
+        raw = read_raw_config()
+        assert raw.get("model_catalog", {}).get("url") is None
+        assert self.OLD_URL not in path.read_text(encoding="utf-8")
+        assert load_config()["model_catalog"]["url"] == self.NEW_URL
+
+    def test_v46_preserves_explicit_custom_catalog_url(self, tmp_path, monkeypatch):
+        from hermes_cli.config import load_config, read_raw_config
+
+        custom = "https://catalog.example.test/models.json"
+        self._run(tmp_path, monkeypatch, custom)
+
+        assert read_raw_config()["model_catalog"]["url"] == custom
+        assert load_config()["model_catalog"]["url"] == custom
+
+
 class TestCustomProviderCompatibility:
     """Custom provider compatibility across legacy and v12+ config schemas.
 
