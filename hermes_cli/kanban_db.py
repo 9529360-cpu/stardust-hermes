@@ -1251,8 +1251,9 @@ def create_task(
     instead of a duplicate. ``max_runtime_seconds``: cap before the dispatcher
     SIGTERMs and re-queues. ``model_override``/``provider_override`` pin the
     worker model (provider requires model); ``reasoning_effort`` is independent.
-    ``creator_task_id``: inherit durable session/subscriptions independently of
-    dependency edges; an explicit ``session_id`` still wins.
+    ``creator_task_id``: inherit durable session, assistant owner, and subscriptions
+    independently of dependency edges; explicit ``session_id`` / ``assistant_owner_key``
+    still win.
     ``project_source_task_id``: cross-profile fallback when ``project_id`` is not
     in the active profile's projects.db — see ``_resolve_project_link``.
     ``workspace_kind=None`` (omitted) inherits a project-scoped board's project;
