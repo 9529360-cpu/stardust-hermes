@@ -33,9 +33,12 @@ toggled without touching `tools/` or `toolsets.py` (`plugins/AGENTS.md`).
        handler=lambda args, **kw: example_tool(param=args.get("param", ""), task_id=kw.get("task_id")),
        check_fn=check_requirements, requires_env=["EXAMPLE_API_KEY"])
    ```
-2. `toolsets.py`: add the name to `_HERMES_CORE_TOOLS` (all platforms) or a new toolset. **Required**
-   — discovery registers the schema, but a tool is only exposed if a toolset names it.
-   `_HERMES_CORE_TOOLS` is the default bundle every platform's base toolset inherits, not dead code.
+2. `toolsets.py`: put the tool in the narrowest truthful surface. **Required** — discovery registers
+   the schema, but a tool is only exposed if a toolset names it. Use a dedicated toolset for
+   domain/product capabilities. Add to `_HERMES_FOUNDATION_TOOLS` only for genuinely cross-task,
+   provider-neutral primitives. `_HERMES_DEFAULT_EDGE_TOOLS` is the compatibility default for
+   capabilities that still ship broadly today; do not treat that historical default as the narrow core.
+   `_HERMES_CORE_TOOLS` remains only as a compatibility alias for the current default surface.
 
 Rules for tool code:
 - **Schema descriptions must not name tools from other toolsets** (`browser_navigate` saying "prefer
