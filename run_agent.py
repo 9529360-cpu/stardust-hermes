@@ -529,8 +529,10 @@ class AIAgent(
         return bool(hostname) and (hostname == "api.githubcopilot.com" or hostname.endswith(".githubcopilot.com"))
 
     def _resolved_api_call_timeout(self) -> float:
-        """Per-call request timeout: per-model ``timeout_seconds`` > provider ``request_timeout_seconds`` >
-        ``HERMES_API_TIMEOUT`` > 1800s."""
+        """Per-call request timeout with an optional per-agent override for isolated helper forks."""
+        override = getattr(self, "_request_timeout_override", None)
+        if isinstance(override, (int, float)) and not isinstance(override, bool) and override > 0:
+            return float(override)
         cfg = get_provider_request_timeout(self.provider, self.model)
         return cfg if cfg is not None else env_float("HERMES_API_TIMEOUT", 1800.0)
 
