@@ -1,5 +1,4 @@
 import type { ModelOptionProvider } from '@hermes/shared'
-import { useStore } from '@nanostores/react'
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@hermes/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -45,11 +44,7 @@ import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
 import { CONTROL_TEXT } from './constants'
 import { getNested, setNested } from './helpers'
-import {
-  isModelServiceReady,
-  ModelServicePicker,
-  type ModelConnectionView
-} from './model-service-picker'
+import { isModelServiceReady, type ModelConnectionView, ModelServicePicker } from './model-service-picker'
 import { ListRow, Pill, SectionHeading } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
@@ -248,8 +243,6 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const setConfig = useMemo(() => hermesConfigCacheWriter(scopeProfile), [scopeProfile])
   const [applying, setApplying] = useState(false)
   const [editingAuxTask, setEditingAuxTask] = useState<null | string>(null)
-  const onboardingActive = useStore($desktopOnboarding).manual
-  const onboardingWasActive = useRef(false)
 
   const [auxDraft, setAuxDraft] = useState<{ model: string; provider: string; reasoningEffort: string }>({
     model: '',
@@ -344,16 +337,22 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     void refresh()
   }, [refresh])
 
-  // Provider setup runs in the shared onboarding overlay. When that flow
-  // closes, refresh the model-service snapshot so a newly connected service
-  // and its models appear without making the user leave/reopen Settings.
+  // Provider setup runs in the shared onboarding overlay. Subscribe to the
+  // owner directly so closing that flow refreshes the service list without
+  // mirroring atom state through a render-lagging ref.
   useEffect(() => {
-    if (onboardingWasActive.current && !onboardingActive) {
-      void refresh()
-    }
+    let wasActive = $desktopOnboarding.get().manual
 
-    onboardingWasActive.current = onboardingActive
-  }, [onboardingActive, refresh])
+    return $desktopOnboarding.subscribe(state => {
+      const active = state.manual
+
+      if (wasActive && !active) {
+        void refresh()
+      }
+
+      wasActive = active
+    })
+  }, [refresh])
 
   // A profile switch swaps the backend under the mounted panel — reload for the
   // new profile (bumping the epoch first so any in-flight A request is discarded).
@@ -420,9 +419,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const selectMainProvider = useCallback(
     (provider: ModelOptionProvider) => {
       setSelectedProvider(provider.slug)
-      setSelectedModel(
-        provider.slug === mainModel?.provider ? mainModel.model : (provider.models?.[0] ?? '')
-      )
+      setSelectedModel(provider.slug === mainModel?.provider ? mainModel.model : (provider.models?.[0] ?? ''))
     },
     [mainModel]
   )
@@ -632,9 +629,9 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     [config, m.defaultsFailed, scopeProfile, setConfig]
   )
 
-  // Paste an API key for the selected `api_key` provider, persist it, then
-  // refresh so the now-authenticated provider's models populate. Auto-selects
-  // the recommended default model so the user can Apply in one more click.
+  // Paste or replace the API key for the selected provider. A first-time
+  // connection gets the provider's recommended model; replacing an existing
+  // key keeps the user's current model selection intact.
   const activateApiKeyProvider = useCallback(async () => {
     const keyEnv = selectedProviderRow?.key_env
     const slug = selectedProviderRow?.slug
@@ -644,6 +641,8 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     }
 
     const epoch = profileEpoch.current
+    const wasReady = isModelServiceReady(selectedProviderRow)
+    const previousModel = selectedModel
     setActivating(true)
     setError('')
 
@@ -651,16 +650,20 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile)
       setApiKeyDraft('')
 
-      // Pick a sensible default for the freshly-activated provider (mirrors
-      // `hermes model` curation). Best-effort — fall through to the refreshed
-      // model list if it fails.
-      let nextModel = ''
+      let nextModel = previousModel
 
-      try {
-        const rec = await getRecommendedDefaultModel(slug, scopeProfile)
-        nextModel = rec.model || ''
-      } catch {
+      if (!wasReady) {
+        // Pick a sensible default for a freshly-connected provider (mirrors
+        // `hermes model` curation). Best-effort — fall through to the refreshed
+        // model list if it fails.
         nextModel = ''
+
+        try {
+          const rec = await getRecommendedDefaultModel(slug, scopeProfile)
+          nextModel = rec.model || ''
+        } catch {
+          nextModel = ''
+        }
       }
 
       const options = await getGlobalModelOptions(undefined, scopeProfile)
@@ -672,13 +675,13 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       setProviders(options.providers || [])
       const refreshedRow = options.providers?.find(p => p.slug === slug)
       const fallbackModel = refreshedRow?.models?.[0] ?? ''
-      setSelectedModel(nextModel || fallbackModel)
+      setSelectedModel(wasReady ? previousModel : nextModel || fallbackModel)
     } catch (err) {
       setCaughtError(err, m.loadFailed)
     } finally {
       setActivating(false)
     }
-  }, [apiKeyDraft, m.loadFailed, scopeProfile, selectedProviderRow, setCaughtError])
+  }, [apiKeyDraft, m.loadFailed, scopeProfile, selectedModel, selectedProviderRow, setCaughtError])
 
   // OAuth / external providers can't be activated with a pasted key — hand off
   // to the shared onboarding flow scoped to this provider's real sign-in. The
@@ -737,9 +740,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
     try {
       const keyEnv =
-        selectedProviderRow?.auth_type === 'api_key' && selectedProviderRow.key_env
-          ? selectedProviderRow.key_env
-          : null
+        selectedProviderRow?.auth_type === 'api_key' && selectedProviderRow.key_env ? selectedProviderRow.key_env : null
 
       // DSH-style editor semantics: a blank key means "keep the saved key";
       // entering a new one rotates it before the model choice is applied.
