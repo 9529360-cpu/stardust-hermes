@@ -442,13 +442,14 @@ def main():
         # it absent lets website/scripts/extract-skills.py fall back to the
         # legacy snapshot cache (or skip the unified index) instead of reading
         # a degenerate file. Writing-then-exiting-2 was the bug that shipped an
-        # index with every GitHub-API source dropped to zero: deploy-site.yml
-        # swallows the exit code with `|| echo non-fatal`, and the partial file
-        # was already on disk for extract-skills to pick up. The current
-        # Release-asset publisher keeps the same write-after-health invariant.
+        # index with every GitHub-API source dropped to zero: the historical
+        # deploy-site.yml path swallowed the exit code with `|| echo non-fatal`
+        # after the partial file was already on disk for extract-skills to pick
+        # up. The current Release-asset publisher keeps the same
+        # write-after-health invariant.
         sys.exit(2)
 
-    # Healthy — only now write the index out for the docs build to consume.
+    # Healthy — only now write the local artifact for publisher/docs consumers.
     index = {
         "version": INDEX_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
