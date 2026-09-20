@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
@@ -146,7 +147,10 @@ def _create_tasks(
     from tools.kanban_tools import _handle_create
 
     default_assignee = _active_profile_name()
-    scope = str(request_id or "request").strip() or "request"
+    # Tool runtimes normally provide a stable call id. If an internal/manual
+    # caller does not, use an unlinkable one-shot scope rather than a fixed
+    # fallback that would collapse every later task for the same owner.
+    scope = str(request_id or "").strip() or uuid.uuid4().hex
     sid = str(session_id or "").strip()
     owner = str(owner_key or "").strip()
     replay_token = _idempotency_scope_token(owner, scope)
