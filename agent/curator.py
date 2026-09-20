@@ -1035,7 +1035,7 @@ def _resolve_review_provider() -> tuple:
     return rp, model_name, provider, overrides, timeout
 
 
-def _run_llm_review(prompt: str) -> Dict[str, Any]:
+def _run_llm_review(prompt: str, *, dry_run: bool = False) -> Dict[str, Any]:
     """Spawn an AIAgent fork on the review prompt. Returns ``final`` (untruncated response), ``summary`` (240-char cap),
     ``model``/``provider`` (what ran), ``tool_calls`` ([{name, arguments}], truncated) and ``error``. Never raises."""
     result_meta: Dict[str, Any] = _llm_meta("")
