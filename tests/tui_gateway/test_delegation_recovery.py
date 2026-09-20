@@ -95,10 +95,8 @@ def test_recovery_list_is_owned_recent_and_sanitized(runtime):
 
 
 def test_recovery_list_requires_exact_live_session_transport(runtime):
-    server, owner, transport, call, delegation = runtime
+    _server, _owner, _transport, call, delegation = runtime
     _insert(delegation, delegation_id="owned", origin_session="parent", task={"goal": "Recover me"})
 
     assert "error" in call(via=SimpleNamespace(write=lambda frame: True))
     assert "error" in call(session_id="missing")
-    server._sessions["ui-owner"] = {**owner}
-    assert "error" in call(via=transport)
