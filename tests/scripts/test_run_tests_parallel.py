@@ -229,6 +229,95 @@ def test_grandchild_leak_is_killed_by_runner(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only cancellation probe")
+@pytest.mark.live_system_guard_bypass
+def test_runner_sigterm_kills_active_pytest_group(tmp_path: Path) -> None:
+    """Cancelling the runner must not leave its active pytest tree under PID 1."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    runner = repo_root / "scripts" / "run_tests_parallel.py"
+    probe_dir = tmp_path / "cancel-probe"
+    probe_dir.mkdir()
+    probe = probe_dir / "test_cancel_probe.py"
+    nonce = f"cancel-{os.getpid()}-{int(time.time() * 1000)}"
+    handoff = _handoff_path_for(nonce)
+    handoff.unlink(missing_ok=True)
+
+    probe.write_text(
+        textwrap.dedent(
+            f"""
+            import json, os, signal, subprocess, sys, time
+            from pathlib import Path
+
+            HANDOFF = Path({str(handoff)!r})
+
+            def test_blocks_with_grandchild():
+                child = subprocess.Popen(
+                    [
+                        sys.executable, "-c",
+                        "import signal,time; "
+                        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                        "time.sleep(600)",
+                    ],
+                )
+                HANDOFF.write_text(json.dumps({{"pid": child.pid}}))
+                time.sleep(600)
+            """
+        ).strip() + "\n",
+        encoding="utf-8",
+    )
+
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            str(runner),
+            "--paths",
+            str(probe_dir),
+            "-j",
+            "1",
+            "--file-timeout",
+            "900",
+        ],
+        cwd=repo_root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        encoding="utf-8",
+        errors="replace",
+    )
+    grandchild_pid = None
+    try:
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline and not handoff.exists():
+            if proc.poll() is not None:
+                output = proc.stdout.read() if proc.stdout else ""
+                pytest.fail(
+                    f"runner exited before cancellation probe started: {proc.returncode}\n{output}"
+                )
+            time.sleep(0.05)
+        assert handoff.exists(), "cancellation probe never reached the blocking test"
+        grandchild_pid = json.loads(handoff.read_text())["pid"]
+
+        proc.terminate()
+        output, _ = proc.communicate(timeout=10)
+        assert proc.returncode != 0, output
+
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and _pid_alive(grandchild_pid):
+            time.sleep(0.05)
+        assert not _pid_alive(grandchild_pid), (
+            f"grandchild PID {grandchild_pid} survived runner SIGTERM; output:\n{output}"
+        )
+    finally:
+        handoff.unlink(missing_ok=True)
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=5)
+        if grandchild_pid is not None and _pid_alive(grandchild_pid):
+            try:
+                os.kill(grandchild_pid, 9)
+            except ProcessLookupError:
+                pass
+
+
 # ── Bare pytest-flag passthrough ─────────────────────────────────────────────
 #
 # The runner routes any token starting with ``-`` that isn't one of its own

@@ -312,6 +312,44 @@ def _kill_tree(proc: "subprocess.Popen", pgid: int | None = None) -> None:
         pass
 
 
+_active_processes_lock = threading.Lock()
+_active_processes: Dict[int, Tuple["subprocess.Popen", int | None]] = {}
+
+
+def _register_active_process(proc: "subprocess.Popen", pgid: int | None) -> None:
+    with _active_processes_lock:
+        _active_processes[proc.pid] = (proc, pgid)
+
+
+def _unregister_active_process(proc: "subprocess.Popen") -> None:
+    with _active_processes_lock:
+        _active_processes.pop(proc.pid, None)
+
+
+def _terminate_active_processes() -> None:
+    """Best-effort cancellation cleanup for every live per-file pytest tree."""
+    with _active_processes_lock:
+        active = list(_active_processes.values())
+    for proc, pgid in active:
+        _kill_tree(proc, pgid=pgid)
+
+
+def _install_termination_handlers() -> None:
+    """Ensure CI cancellation cannot orphan detached pytest process groups."""
+    import signal
+
+    def _handle(signum, _frame) -> None:
+        _terminate_active_processes()
+        # Exit immediately after child cleanup. Waiting for the executor would
+        # allow already-queued files to start after a cancellation request.
+        os._exit(128 + int(signum))
+
+    for name in ("SIGTERM", "SIGINT"):
+        sig = getattr(signal, name, None)
+        if sig is not None:
+            signal.signal(sig, _handle)
+
+
 def _effective_file_timeout(
     file: Path,
     repo_root: Path,
@@ -478,16 +516,12 @@ def _run_one_file_once(
         start_new_session=True,
     )
 
-    # Capture the pgid NOW, before the leader can exit and be reaped. Once
-    # the leader is reaped, os.getpgid(proc.pid) raises ProcessLookupError
-    # even though grandchildren in that group are still alive — defeating
-    # the whole cleanup. None on Windows where the pgid concept doesn't apply.
-    pgid: int | None = None
-    if sys.platform != "win32":
-        try:
-            pgid = os.getpgid(proc.pid)
-        except (ProcessLookupError, PermissionError):
-            pgid = None
+    # start_new_session=True makes the child the leader of a fresh POSIX
+    # process group, so its pid is the pgid immediately. Register it without
+    # another syscall: a cancellation arriving in this tiny launch window must
+    # still be able to kill the whole pytest tree before the leader exits.
+    pgid: int | None = proc.pid if sys.platform != "win32" else None
+    _register_active_process(proc, pgid)
 
     try:
         output, _ = proc.communicate(timeout=file_timeout)
@@ -515,6 +549,7 @@ def _run_one_file_once(
 
         output +=  "\n"
     finally:
+        _unregister_active_process(proc)
         # Delete the temp root for this attempt. Nothing reads it after the
         # subprocess exits. More than 3000 of them fill the disk of the
         # runner over one suite.
@@ -1346,4 +1381,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    _install_termination_handlers()
     sys.exit(main())

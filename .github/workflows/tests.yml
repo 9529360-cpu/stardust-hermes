@@ -74,7 +74,9 @@ jobs:
             install -d -m 700 "$HOME"
             touch "$HOME/.hushlogin"
           fi
-          scripts/run_tests.sh --fail-on-flaky
+          # Replace the Actions step shell with the test runner so cancellation
+          # targets the real parent instead of orphaning it under PID 1.
+          exec scripts/run_tests.sh --fail-on-flaky
         env:
           # Leopard exposes 8 logical CPUs backed by 4 physical cores. Eight CPU-heavy
           # pytest workers can more than double slow-file wall time and trip the 300s
