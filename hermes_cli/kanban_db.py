@@ -1492,6 +1492,7 @@ VALID_SORT_ORDERS: dict[str, str] = {
     "assignee": "assignee ASC, created_at ASC",
     "title": "title ASC, id ASC",
     "updated": "started_at DESC NULLS LAST, created_at DESC",
+    "activity": "COALESCE(completed_at, started_at, created_at) DESC, created_at DESC, id DESC",
 }
 
 
