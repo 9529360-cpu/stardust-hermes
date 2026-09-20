@@ -9,6 +9,9 @@ on:
     branches: [main]
     paths:
       - "scripts/build_skills_index.py"
+      - "tools/skills_hub_*.py"
+      - "tools/skills_guard.py"
+      - "optional-skills/**"
       - ".github/workflows/skills-index.yml"
 
 # This workflow only runs trusted code already on main. Write permission is

@@ -889,7 +889,7 @@ class TestOptionalSkillSourceMetadata:
         meta = src.inspect("official/finance/3-statement-model")
 
         assert meta is not None
-        assert meta.repo == "NousResearch/hermes-agent"
+        assert meta.repo == "9529360-cpu/stardust-hermes"
         assert meta.path == "optional-skills/finance/3-statement-model"
 
     def test_scan_all_accepts_install_prefix_but_rejects_nested_support_skills(self, tmp_path):
@@ -1009,6 +1009,14 @@ class TestOptionalSkillSourceLiveRepoFallback:
         # FULL directory arrives — including root-level files GitHubSource.fetch drops
         assert bundle.files["install.sh"] == b"#!/bin/sh\n"
         assert bundle.files["LICENSE"] == b"MIT"
+        # The live fallback is a product-authority path: every repository read
+        # must stay on Stardust, never silently fall back to the Hermes origin.
+        assert src._github._get_repo_tree.call_args.args[0] == "9529360-cpu/stardust-hermes"
+        assert src._github._fetch_file_bytes.call_args_list
+        assert all(
+            c.args[0] == "9529360-cpu/stardust-hermes"
+            for c in src._github._fetch_file_bytes.call_args_list
+        )
 
     def test_fetch_bare_name_resolves_via_remote_tree(self, tmp_path):
         src = self._make_source(tmp_path, ["software-development/ast-grep"])
@@ -1070,7 +1078,7 @@ class TestOptionalSkillSourceLiveRepoFallback:
         meta = src.inspect("official/software-development/ast-grep")
 
         assert meta is not None
-        assert meta.repo == "NousResearch/hermes-agent"
+        assert meta.repo == "9529360-cpu/stardust-hermes"
         assert meta.path == "optional-skills/software-development/ast-grep"
 
     def test_offline_degrades_to_local_only(self, tmp_path):
