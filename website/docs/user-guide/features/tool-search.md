@@ -5,23 +5,27 @@ sidebar_position: 95
 
 # Tool Search
 
-When you have many MCP servers or non-core plugin tools attached to a
-session, their JSON schemas can consume a substantial fraction of the
-context window on every turn — even when only a few of them are relevant
-to what the user actually asked for.
+When you have many tools attached to a session, their JSON schemas can
+consume a substantial fraction of the context window on every turn — even
+when only a few of them are relevant to what the user actually asked for.
 
-**Tool Search** is Hermes' opt-in progressive-disclosure layer for that
-problem. When activated, MCP and plugin tools are replaced in the
-model-visible tools array by three bridge tools, and the model loads each
-specific tool's schema on demand.
+**Tool Search** is Hermes' progressive-disclosure layer for that problem.
+When activated, MCP/plugin tools and a measured set of event-triggered
+built-ins are replaced in the model-visible tools array by three bridge
+tools, and the model loads each specific tool's schema on demand.
 
-:::info Built-in Hermes tools never defer
-The tools that make up Hermes' core capability set (`terminal`,
-`read_file`, `write_file`, `patch`, `search_files`, `todo`, `memory`,
-`browser_*`, `web_search`, `web_extract`, `clarify`, `execute_code`,
-`delegate_task`, `session_search`, and the rest of
-`_HERMES_CORE_TOOLS`) are *always* loaded directly. Only MCP tools and
-non-core plugin tools are eligible for deferral.
+:::info Built-ins use an eager working set plus curated deferral
+High-frequency foundation/default tools such as `terminal`, file tools,
+`memory`, `web_search`, browser navigation, and `clarify` stay directly
+visible. A measured set of event-triggered built-ins — including
+`computer_use`, `session_search`, `image_generate`, `todo_list`,
+`process_manage`, `cronjob_manage`, and selected desktop UI tools — is
+deferred by default through the same bridge used for MCP/plugin tools.
+
+`clarify` is intentionally kept eager: the 288-run core-deferral A/B found
+that hiding its schema caused models to fall back from structured choices to
+plain-text questions. `_HERMES_DEFAULT_TOOLS` describes platform membership;
+it is not a promise that every member is eager on every turn.
 :::
 
 ## How it works
@@ -78,12 +82,13 @@ see the underlying tool, not the bridge.
 ## When does it activate?
 
 Tool Search uses **tiered disclosure**: the presence of *any* deferrable
-(MCP/plugin) tool activates the bridge; what scales with catalog size is
-how much of the catalog stays visible, not whether schemas defer.
+tool (MCP/plugin or a selected built-in) activates the bridge; what scales
+with catalog size is how much of the catalog stays visible, not whether
+schemas defer.
 
 | Tier | Condition | What the model sees |
 | --- | --- | --- |
-| **0** | No MCP/plugin tools | Every tool eager, no bridge. Pass-through. |
+| **0** | No deferrable tools | Every tool eager, no bridge. Pass-through. |
 | **1** | Deferred catalog's listing fits the budget | Bridge + a skills-style manifest of every deferred tool (name + short description, degrading to names-only when over budget). Degradation is **per server**: when one oversized server (Cloudflare) is attached alongside small ones (Linear), the small servers keep their per-tool listings and only the oversized server collapses to a summary line. |
 | **2** | Per-tool listing exceeds the budget even names-only for every server (e.g. Cloudflare's flat API surface alone: ~3,300 tools whose names are ~32K tokens) | Bare bridge + a one-line-per-server summary (server name + tool count), so the model knows which domains are reachable; individual tools are discoverable only through `tool_search`. |
 
