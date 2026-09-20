@@ -1417,9 +1417,10 @@ DEFAULT_CONFIG = {
         "min_idle_hours": 2,  # only run after the agent has been idle this long
         "stale_after_days": 14,  # mark "stale" after this many unused days
         "archive_after_days": 30,  # move to skills/.archive/ (recoverable) after this many
-        # LLM consolidation (umbrella-building) pass. OFF = deterministic inactivity prune only, no
-        # aux-model cost. `hermes curator run --consolidate` overrides once.
-        "consolidate": False,
+        # LLM consolidation (umbrella-building) for curator-managed agent skills. Runs only on the
+        # normal low-frequency curator cycle; false = deterministic inactivity prune only, no aux cost.
+        # `hermes curator run --consolidate` can still force one pass when this is disabled.
+        "consolidate": True,
         # Also prune bundled built-ins (a suppression list stops `hermes update` restoring them);
         # hub-installed skills are NEVER pruned. A built-in's clock starts when the curator first
         # sees it, so never a mass-prune on the first run. false = keep all.
