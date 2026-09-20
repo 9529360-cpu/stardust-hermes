@@ -109,7 +109,7 @@ class TestRunBackgroundTask:
         mock_adapter.send.assert_called_once()
         call_args = mock_adapter.send.call_args
         content = call_args[1].get("content", call_args[0][1] if len(call_args[0]) > 1 else "")
-        assert "couldn't start" in content and "/login" in content
+        assert "couldn't start" in content and "/model" in content and "hermes auth" in content
 
     @pytest.mark.asyncio
     async def test_successful_task_sends_result(self):

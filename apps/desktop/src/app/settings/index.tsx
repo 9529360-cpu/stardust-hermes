@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { codiconIcon } from '@/components/ui/codicon'
 import { KbdCombo } from '@/components/ui/kbd'
 import { Tip } from '@/components/ui/tooltip'
 import { getHermesConfigDefaults, getHermesConfigRecord, saveHermesConfig } from '@/hermes'
@@ -11,7 +10,6 @@ import { triggerHaptic } from '@/lib/haptics'
 import {
   Archive,
   Bell,
-  Cpu,
   Download,
   Globe,
   Info,
@@ -32,7 +30,6 @@ import { $commandPaletteOpen, openCommandPalettePage } from '@/store/command-pal
 import { confirm } from '@/store/confirm'
 import { $activeConnectionId } from '@/store/connections'
 import { bindingsFor } from '@/store/keybinds'
-import { $localModelsEnabled } from '@/store/local-models-flag'
 import { notifyError } from '@/store/notifications'
 import { $settingsScopeProfile } from '@/store/settings-scope'
 
@@ -123,11 +120,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
     [hash, navigate, pathname, search]
   )
 
-  const openProviderView = useCallback(
-    (view: ProviderView) => openSubView('providers', 'pview', view, 'accounts'),
-    [openSubView]
-  )
-
   const openKeysView = useCallback((view: KeysView) => openSubView('keys', 'kview', view, 'tools'), [openSubView])
 
   const importInputRef = useRef<HTMLInputElement | null>(null)
@@ -213,52 +205,11 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onSelect: () => setActiveView('notifications')
       },
       {
+        // DSH-style information architecture: users get one Models entry.
+        // Account/API-key/custom endpoint pages stay reachable from the model
+        // page as advanced/detail flows and legacy deep links, but they no
+        // longer compete as top-level choices.
         active: activeView === 'config:model' || activeView === 'providers',
-        children: [
-          {
-            active: activeView === 'config:model',
-            icon: Cpu,
-            id: 'config:model',
-            label: t.settings.sections.model,
-            onSelect: () => setActiveView('config:model')
-          },
-          {
-            active: activeView === 'providers' && providerView === 'accounts',
-            icon: codiconIcon('account'),
-            id: 'pview:accounts',
-            label: t.settings.nav.providerAccounts,
-            onSelect: () => openProviderView('accounts')
-          },
-          {
-            active: activeView === 'providers' && providerView === 'keys',
-            icon: KeyRound,
-            id: 'pview:keys',
-            label: t.settings.nav.providerApiKeys,
-            onSelect: () => openProviderView('keys')
-          },
-          {
-            active: activeView === 'providers' && providerView === 'custom-endpoints',
-            icon: Globe,
-            id: 'pview:custom-endpoints',
-            label: t.settings.nav.providerCustomEndpoints,
-            onSelect: () => openProviderView('custom-endpoints')
-          },
-          // Local models ships behind the --local launch flag: no flag, no
-          // nav entry (the pane itself also refuses to render, so a stale
-          // ?pview=local deep link falls back to accounts-shaped emptiness
-          // rather than a hidden feature).
-          ...($localModelsEnabled.get()
-            ? [
-                {
-                  active: activeView === 'providers' && providerView === 'local',
-                  icon: Cpu,
-                  id: 'pview:local',
-                  label: t.settings.nav.providerLocalModels,
-                  onSelect: () => openProviderView('local')
-                }
-              ]
-            : [])
-        ],
         gapBefore: true,
         icon: Zap,
         id: 'model-services',
@@ -318,7 +269,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onSelect: () => setActiveView('about')
       }
     ],
-    [activeView, keysView, providerView, t, setActiveView, openProviderView, openKeysView]
+    [activeView, keysView, t, setActiveView, openKeysView]
   )
 
   // Type-to-search: printable keystrokes on the Settings surface (outside any

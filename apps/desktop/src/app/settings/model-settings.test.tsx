@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { atom } from 'nanostores'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -27,6 +28,7 @@ const saveHermesConfig = vi.fn()
 const startManualLocalEndpoint = vi.fn()
 const startManualOnboarding = vi.fn()
 const startManualProviderOAuth = vi.fn()
+const desktopOnboarding = atom({ manual: false })
 let profileSwitchHandler: (() => void) | null = null
 
 vi.mock('@/hermes', () => ({
@@ -46,9 +48,10 @@ vi.mock('@/hermes', () => ({
 }))
 
 vi.mock('@/store/onboarding', () => ({
-  startManualLocalEndpoint: () => startManualLocalEndpoint(),
-  startManualOnboarding: () => startManualOnboarding(),
-  startManualProviderOAuth: (slug: string) => startManualProviderOAuth(slug)
+  $desktopOnboarding: desktopOnboarding,
+  startManualLocalEndpoint: (reason?: null | string, profile?: string) => startManualLocalEndpoint(reason, profile),
+  startManualOnboarding: (reason?: null | string, profile?: string) => startManualOnboarding(reason, profile),
+  startManualProviderOAuth: (slug: string, profile?: string) => startManualProviderOAuth(slug, profile)
 }))
 
 vi.mock('../hooks/use-on-profile-switch', () => ({
@@ -85,22 +88,27 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  desktopOnboarding.set({ manual: false })
   profileSwitchHandler = null
 })
 
-async function renderModelSettings(scopeProfile?: string) {
+async function renderModelSettings(scopeProfile?: string, initialEntries: string[] = ['/']) {
   const { ModelSettings } = await import('./model-settings')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
   return render(
     // The aux-task deep-link highlight reads useSearchParams, so the page
     // needs a router context in tests (the app provides HashRouter at root).
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <QueryClientProvider client={client}>
         <ModelSettings scopeProfile={scopeProfile} />
       </QueryClientProvider>
     </MemoryRouter>
   )
+}
+
+async function openAdvancedModelSettings(label = 'Advanced model settings') {
+  fireEvent.click(await screen.findByRole('button', { name: label }))
 }
 
 async function renderChineseModelSettings() {
@@ -143,18 +151,14 @@ describe('ModelSettings profile scope', () => {
 })
 
 describe('ModelSettings', () => {
-  it('loads the current main model and lists configured providers only', async () => {
+  it('shows configured model services as rows instead of a provider dropdown', async () => {
     await renderModelSettings()
 
     await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalled())
     await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalled())
 
-    // Open the provider Select — only configured providers should be listed.
-    const triggers = await screen.findAllByRole('combobox')
-    fireEvent.click(triggers[0])
-
-    // "Nous" shows in both the trigger and the open list.
-    expect((await screen.findAllByText('Nous')).length).toBeGreaterThan(0)
+    expect(await screen.findByRole('button', { name: /Nous/ })).toBeTruthy()
+    expect(screen.getByText('Default')).toBeTruthy()
     expect(screen.queryByText(/DeepSeek/)).toBeNull()
   })
 
@@ -166,9 +170,7 @@ describe('ModelSettings', () => {
 
       await renderModelSettings()
 
-      const providerSelect = (await screen.findAllByRole('combobox'))[0]
-
-      expect(providerSelect.textContent).toContain(provider)
+      expect(await screen.findByText(provider)).toBeTruthy()
       expect(screen.queryByText(/undefined/)).toBeNull()
       expect(screen.queryByText(/signs in through your browser/)).toBeNull()
 
@@ -211,7 +213,7 @@ describe('ModelSettings', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Connect Anthropic' }))
 
-    expect(startManualProviderOAuth).toHaveBeenCalledWith('anthropic')
+    expect(startManualProviderOAuth).toHaveBeenCalledWith('anthropic', undefined)
     expect(startManualLocalEndpoint).not.toHaveBeenCalled()
     expect(startManualOnboarding).not.toHaveBeenCalled()
   })
@@ -244,14 +246,14 @@ describe('ModelSettings', () => {
       })
 
     await renderModelSettings()
-    expect((await screen.findAllByRole('combobox'))[0].textContent).toContain('Custom A')
+    expect(await screen.findByRole('button', { name: /Custom A/ })).toBeTruthy()
 
     await act(async () => {
       profileSwitchHandler?.()
     })
 
     await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getAllByRole('combobox')[0].textContent).toContain('Nous'))
+    await waitFor(() => expect(screen.getByRole('button', { name: /Nous/ })).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Connect AI service' })).toBeNull()
   })
 
@@ -283,13 +285,8 @@ describe('ModelSettings', () => {
 
     await renderModelSettings()
 
-    const providerSelect = (await screen.findAllByRole('combobox'))[0]
-    fireEvent.click(providerSelect)
-    fireEvent.click(await screen.findByRole('option', { name: 'Ollama' }))
-
-    const modelSelect = (await screen.findAllByRole('combobox'))[1]
-    fireEvent.click(modelSelect)
-    fireEvent.click(await screen.findByRole('option', { name: 'qwen3:latest' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Ollama/ }))
+    expect(await screen.findByText('qwen3:latest')).toBeTruthy()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
 
@@ -301,6 +298,96 @@ describe('ModelSettings', () => {
         base_url: 'http://localhost:11434/v1'
       })
     )
+  })
+
+  it('rotates a saved API key from the provider editor before applying its model', async () => {
+    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'openai', model: 'gpt-5.4' })
+    getGlobalModelOptions.mockResolvedValueOnce({
+      providers: [
+        {
+          name: 'OpenAI',
+          slug: 'openai',
+          models: ['gpt-5.4'],
+          authenticated: true,
+          auth_type: 'api_key',
+          key_env: 'OPENAI_API_KEY'
+        }
+      ]
+    })
+    setModelAssignment.mockResolvedValueOnce({
+      ok: true,
+      provider: 'openai',
+      model: 'gpt-5.4',
+      gateway_tools: []
+    })
+
+    await renderModelSettings()
+
+    const key = await screen.findByPlaceholderText('Leave blank to keep the saved key')
+    fireEvent.change(key, { target: { value: 'sk-replacement' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
+
+    await waitFor(() => expect(setEnvVar).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-replacement'))
+    await waitFor(() =>
+      expect(setModelAssignment).toHaveBeenCalledWith({
+        model: 'gpt-5.4',
+        provider: 'openai',
+        scope: 'main'
+      })
+    )
+    expect(setEnvVar.mock.invocationCallOrder[0]).toBeLessThan(setModelAssignment.mock.invocationCallOrder[0])
+  })
+
+  it('updates a saved API key without changing the selected model', async () => {
+    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'openai', model: 'gpt-5.4' })
+    getGlobalModelOptions.mockResolvedValue({
+      providers: [
+        {
+          name: 'OpenAI',
+          slug: 'openai',
+          models: ['gpt-5.4', 'gpt-5.4-mini'],
+          authenticated: true,
+          auth_type: 'api_key',
+          key_env: 'OPENAI_API_KEY'
+        }
+      ]
+    })
+
+    await renderModelSettings()
+
+    const key = await screen.findByPlaceholderText('Leave blank to keep the saved key')
+    fireEvent.change(key, { target: { value: 'sk-rotated' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Update key' }))
+
+    await waitFor(() => expect(setEnvVar).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-rotated'))
+    await waitFor(() => expect((key as HTMLInputElement).value).toBe(''))
+    expect(getRecommendedDefaultModel).not.toHaveBeenCalled()
+    expect(setModelAssignment).not.toHaveBeenCalled()
+    expect(screen.getByText('Model: gpt-5.4')).toBeTruthy()
+  })
+
+  it('opens the shared provider and custom-service flows from the model page', async () => {
+    await renderModelSettings('research')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
+    expect(startManualOnboarding).toHaveBeenCalledWith(null, 'research')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add custom service' }))
+    expect(startManualLocalEndpoint).toHaveBeenCalledWith(null, 'research')
+  })
+
+  it('refreshes the model-service list after the shared setup flow closes', async () => {
+    await renderModelSettings()
+    await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalledTimes(1))
+
+    await act(async () => {
+      desktopOnboarding.set({ manual: true })
+    })
+    await act(async () => {
+      desktopOnboarding.set({ manual: false })
+    })
+
+    await waitFor(() => expect(getGlobalModelOptions.mock.calls.length).toBeGreaterThan(1))
   })
 
   it('writes the profile default speed (service_tier) as a sparse patch, never the cached snapshot', async () => {
@@ -339,8 +426,26 @@ describe('ModelSettings', () => {
     expect(screen.queryByRole('switch')).toBeNull()
   })
 
-  it('renders the auxiliary task rows', async () => {
+  it('keeps auxiliary and MoA controls behind advanced settings by default', async () => {
     await renderModelSettings()
+
+    expect(await screen.findByRole('button', { name: 'Advanced model settings' })).toBeTruthy()
+    const advanced = screen.getByText('Auxiliary models').closest('[data-slot="advanced-model-settings"]')
+    expect((advanced as HTMLElement | null)?.hidden).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Set to main' })).toBeNull()
+  })
+
+  it('reveals advanced model settings for an auxiliary-task deep link', async () => {
+    await renderModelSettings(undefined, ['/?tab=config:model&aux=vision'])
+
+    expect(await screen.findByRole('button', { name: 'Hide advanced model settings' })).toBeTruthy()
+    const advanced = screen.getByText('Auxiliary models').closest('[data-slot="advanced-model-settings"]')
+    expect((advanced as HTMLElement | null)?.hidden).toBe(false)
+  })
+
+  it('renders the auxiliary task rows after advanced settings are opened', async () => {
+    await renderModelSettings()
+    await openAdvancedModelSettings()
 
     expect(await screen.findByText('Vision')).toBeTruthy()
     // #97297 — the three canonical slots the backend serves must have rows too.
@@ -357,6 +462,7 @@ describe('ModelSettings', () => {
     })
 
     await renderModelSettings()
+    await openAdvancedModelSettings()
 
     expect(screen.queryByRole('combobox', { name: 'Vision reasoning effort' })).toBeNull()
 
@@ -386,6 +492,7 @@ describe('ModelSettings', () => {
 
   it('assigns an auxiliary task to the main model via setModelAssignment', async () => {
     await renderModelSettings()
+    await openAdvancedModelSettings()
 
     // One "Set to main" button per task slot; the first is Vision.
     const setToMainButtons = await screen.findAllByRole('button', { name: 'Set to main' })
@@ -421,6 +528,7 @@ describe('ModelSettings', () => {
     })
 
     await renderModelSettings()
+    await openAdvancedModelSettings()
 
     const setToMainButtons = await screen.findAllByRole('button', { name: 'Set to main' })
     fireEvent.click(setToMainButtons[0])
@@ -475,6 +583,7 @@ describe('ModelSettings', () => {
     })
 
     await renderModelSettings()
+    await openAdvancedModelSettings()
     await screen.findAllByRole('button', { name: 'Set to main' })
 
     // 'main' is a backend-supported alias that tracks the active main provider
@@ -508,6 +617,7 @@ describe('ModelSettings', () => {
     // The public custom endpoint still bills a provider, so the banner stays —
     // but it names only that one task, not the free LAN pin.
     expect(await screen.findByText(/1 auxiliary task \(/)).toBeTruthy()
+    await openAdvancedModelSettings()
     // The row shows where the pinned task actually points.
     expect(screen.getByText(/http:\/\/byron\.local:11434\/v1/)).toBeTruthy()
   })
@@ -565,6 +675,7 @@ describe('ModelSettings MoA preset editor', () => {
 
   async function openReferenceEditor() {
     await renderModelSettings()
+    await openAdvancedModelSettings()
     expect(await screen.findByText('Reference 1')).toBeTruthy()
   }
 
@@ -580,8 +691,10 @@ describe('ModelSettings MoA preset editor', () => {
   it('renders the model-service and MoA chrome in the active Chinese locale', async () => {
     await renderChineseModelSettings()
 
-    expect(await screen.findByText('新对话默认使用')).toBeTruthy()
-    expect(screen.getByText(/选择 Stardust 默认使用的 AI 服务和模型/)).toBeTruthy()
+    expect(await screen.findByText('模型服务')).toBeTruthy()
+    expect(screen.getByText(/选一个服务，需要时填 API Key 或登录/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '高级模型设置' })).toBeTruthy()
+    await openAdvancedModelSettings('高级模型设置')
     expect(await screen.findByText('参考模型 1')).toBeTruthy()
     expect(screen.getByText(/配置具名预设/)).toBeTruthy()
     expect(screen.getByText('已启用')).toBeTruthy()
