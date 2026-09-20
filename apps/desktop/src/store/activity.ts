@@ -124,7 +124,7 @@ function prune(tasks: Record<string, DesktopActionTask>): Record<string, Desktop
 
 export type TaskCenterStatus = RailTaskStatus | 'interrupted' | 'paused' | 'queued'
 export type TaskDurability = 'process-local' | 'restart-durable' | 'turn'
-export type TaskCenterRail = 'action' | 'approval' | 'cron' | 'preview' | 'process' | 'session' | 'subagent'
+export type TaskCenterRail = 'action' | 'approval' | 'cron' | 'delegation' | 'preview' | 'process' | 'session' | 'subagent'
 export type TaskCenterAction = 'manage-cron' | 'open-session' | 'stop-process'
 
 export interface TaskCenterTask extends Omit<RailTask, 'status'> {
@@ -140,12 +140,22 @@ export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   status: TaskCenterStatus
 }
 
+export interface DelegationRecoveryReceipt {
+  completed_at: number
+  delegation_id: string
+  dispatched_at: number
+  goal: string
+  reason: 'owner_exited'
+  task_count: number
+}
+
 export interface TaskCenterSources {
   actionTasks: Record<string, DesktopActionTask>
   approvalRequests?: Record<string, ApprovalRequest>
   attentionSessionIds: readonly string[]
   backgroundBySession: Record<string, ComposerStatusItem[]>
   cronJobs: readonly CronJob[]
+  delegationRecoveryBySession?: Record<string, readonly DelegationRecoveryReceipt[]>
   previewRestart: PreviewServerRestart | null
   runtimeStoredSessionIds?: Record<string, null | string>
   sessions: readonly SessionInfo[]
@@ -311,6 +321,39 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     flattenSubagents(runtimeSessionId, buildSubagentTree(items))
   )
 
+  const liveDelegationIds = new Set(
+    Object.values(sources.subagentsBySession)
+      .flat()
+      .flatMap(item => (item.delegationId ? [item.delegationId] : []))
+  )
+
+  const recoveredDelegations = Object.entries(sources.delegationRecoveryBySession ?? {}).flatMap(
+    ([runtimeSessionId, receipts]) => {
+      const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
+      const storedSessionCandidate = mappedStoredSessionId ?? runtimeSessionId
+      const storedSessionId =
+        sources.sessions.find(session => sessionMatchesStoredId(session, storedSessionCandidate))?.id ??
+        mappedStoredSessionId
+
+      return receipts
+        .filter(receipt => !liveDelegationIds.has(receipt.delegation_id))
+        .map<TaskCenterTask>(receipt => ({
+          action: storedSessionId ? 'open-session' : undefined,
+          detail:
+            receipt.task_count > 1
+              ? `Backend exited before this ${receipt.task_count}-task delegation recorded a final result. Open the conversation to retry.`
+              : 'Backend exited before this background task recorded a final result. Open the conversation to retry.',
+          durability: 'process-local',
+          id: `delegation-recovery:${receipt.delegation_id}`,
+          label: receipt.goal || 'Background delegation',
+          ownerSessionId: runtimeSessionId,
+          rail: 'delegation',
+          sessionId: storedSessionId ?? undefined,
+          status: 'interrupted',
+          updatedAt: receipt.completed_at * 1000
+        }))
+    }
+  )
   const processes = Object.entries(sources.backgroundBySession).flatMap(([runtimeSessionId, items]) =>
     items
       .filter(item => item.type === 'background')
@@ -349,7 +392,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     updatedAt: parseTimestamp(job.last_run_at)
   }))
 
-  return [...approvals, ...base, ...subagents, ...processes, ...cron].sort(
+  return [...approvals, ...base, ...subagents, ...recoveredDelegations, ...processes, ...cron].sort(
     (left, right) =>
       TASK_STATUS_PRIORITY[left.status] - TASK_STATUS_PRIORITY[right.status] ||
       right.updatedAt - left.updatedAt ||
