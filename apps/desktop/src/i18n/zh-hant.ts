@@ -2336,7 +2336,17 @@ export const zhHant = defineLocale({
       failedLoad: '載入藍圖失敗',
       emptyTitle: '沒有可用的藍圖',
       emptyDesc: '此後端上沒有可用的自動化藍圖。'
-    }
+    },
+    suggestions: {
+      tab: '建議的自動化',
+      accept: '設為排程工作',
+      dismiss: '略過',
+      working: '正在處理…',
+      scheduled: '自動化已排程',
+      dismissed: '已略過建議',
+      actionFailed: '無法更新自動化建議',
+      needsConversation: '請先開啟一個已儲存的對話，讓排程結果有可返回的對話。'
+    },
   },
 
   artifacts: {

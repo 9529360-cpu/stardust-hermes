@@ -642,6 +642,53 @@ class TestLocalDeliveryNotice:
         assert "deliver='telegram'" in created["message"]
 
 
+    def test_desktop_implicit_delivery_captures_durable_return_session(self):
+        from cron.jobs import get_job
+        from gateway.session_context import set_session_vars
+
+        set_session_vars(source="desktop", session_id="desktop-origin-1")
+        created = json.loads(
+            cronjob(action="create", prompt="Output the time", schedule="every 2m")
+        )
+
+        assert created["success"] is True
+        stored = get_job(created["job_id"])
+        assert stored is not None
+        assert stored["local_session_origin"] == {
+            "source": "desktop", "session_id": "desktop-origin-1"}
+        assert "completion will return" in created["message"]
+
+    def test_explicit_delivery_update_clears_implicit_local_return(self):
+        from cron.jobs import get_job
+        from gateway.session_context import set_session_vars
+
+        set_session_vars(source="desktop", session_id="desktop-origin-update")
+        created = json.loads(
+            cronjob(action="create", prompt="Output the time", schedule="every 2m")
+        )
+        assert (get_job(created["job_id"]) or {}).get("local_session_origin")
+
+        updated = json.loads(
+            cronjob(action="update", job_id=created["job_id"], deliver="local")
+        )
+        assert updated["success"] is True
+        assert "local_session_origin" not in (get_job(created["job_id"]) or {})
+
+    def test_desktop_explicit_local_remains_save_only(self):
+        from cron.jobs import get_job
+        from gateway.session_context import set_session_vars
+
+        set_session_vars(source="desktop", session_id="desktop-origin-2")
+        created = json.loads(
+            cronjob(action="create", prompt="Output the time", schedule="every 2m", deliver="local")
+        )
+
+        assert created["success"] is True
+        stored = get_job(created["job_id"])
+        assert stored is not None
+        assert "local_session_origin" not in stored
+        assert "completion will return" not in created["message"]
+
     def test_gateway_origin_no_notice(self, monkeypatch):
         # With a captured gateway origin, omitted deliver becomes origin and
         # resolves to that chat — nothing to warn about.

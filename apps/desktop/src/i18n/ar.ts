@@ -1811,7 +1811,17 @@ export const ar = defineLocale({
     optional: 'اختياري',
     promptScheduleRequired: 'الرسالة والجدول مطلوبان',
     saveChanges: 'حفظ التغييرات',
-    createAction: 'إنشاء'
+    createAction: 'إنشاء',
+    suggestions: {
+      tab: 'عمليات الأتمتة المقترحة',
+      accept: 'جدولة',
+      dismiss: 'تجاهل',
+      working: 'جارٍ التنفيذ…',
+      scheduled: 'تمت جدولة الأتمتة',
+      dismissed: 'تم تجاهل الاقتراح',
+      actionFailed: 'تعذر تحديث اقتراح الأتمتة',
+      needsConversation: 'افتح محادثة محفوظة أولا حتى تجد النتائج المجدولة محادثة تعود إليها.'
+    },
   },
   artifacts: {
     search: 'بحث',

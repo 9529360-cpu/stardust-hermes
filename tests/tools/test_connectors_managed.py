@@ -81,9 +81,11 @@ def _desktop_callback(answer=None):
     return cb
 
 
-def _run(args, gw, *, callback=None, tick=0.0, platform="desktop"):
+def _run(args, gw, *, callback=None, tick=0.0, platform="desktop", suggest=None):
+    suggestion_fn = suggest or (lambda _rows: [])
     with patch("tools.connectors.run.WATCH_INTERVAL_SECONDS", tick), \
-         patch("tools.connectors.managed.session_platform", return_value=platform):
+         patch("tools.connectors.managed.session_platform", return_value=platform), \
+         patch("tools.connectors.managed._suggest_connected_automations", side_effect=suggestion_fn):
         return json.loads(manage_connections(
             args, client_factory=lambda: gw, connection_callback=callback, session_id="s1",
         ))
@@ -126,6 +128,35 @@ def test_desktop_connect_mints_once_emits_the_card_and_returns_outcomes_without_
     assert {t["state"] for t in out["targets"]} == {"connected"}
     assert "connect_url" not in json.dumps(out)
     assert live.current("s1") is None  # closed on settle
+
+
+def test_connected_connector_result_announces_consent_first_automation():
+    gw = GatewayFake(flips={"gmail": 2})
+    seen = []
+
+    def suggest(rows):
+        seen.extend(row.get("name") for row in rows if isinstance(row, dict))
+        return ["Important-mail monitor"]
+
+    out = _run(
+        {"action": "connect", "connectors": ["gmail"]}, gw, callback=_desktop_callback(), suggest=suggest)
+
+    assert "gmail" in seen
+    assert "Important-mail monitor" in out["note"]
+    assert "Nothing was scheduled automatically" in out["note"]
+    assert "explicit choice" in out["note"]
+
+
+def test_status_can_surface_new_automation_after_off_desktop_authorization():
+    gw = GatewayFake(connected={"gmail"})
+    out = _run(
+        {"action": "status", "connectors": ["gmail"]}, gw, platform="cli",
+        suggest=lambda _rows: ["Important-mail monitor"],
+    )
+
+    assert out["connectors"][0]["connected"] is True
+    assert "Important-mail monitor" in out["hint"]
+    assert "Nothing was scheduled automatically" in out["hint"]
 
 
 def test_desktop_connect_url_stays_on_the_live_operation_for_the_panel():

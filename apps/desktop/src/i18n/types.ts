@@ -2317,6 +2317,16 @@ export interface Translations {
       jobs: string
       blueprints: string
     }
+    suggestions: {
+      tab: string
+      accept: string
+      dismiss: string
+      working: string
+      scheduled: string
+      dismissed: string
+      actionFailed: string
+      needsConversation: string
+    }
     blueprints: {
       tab: string
       startFrom: string

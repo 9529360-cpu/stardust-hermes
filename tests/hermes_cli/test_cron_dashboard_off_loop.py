@@ -56,6 +56,25 @@ def test_cron_fire_profile_lookup_off_loop(monkeypatch, loop_probe):
     )
 
 
+def test_cron_suggestions_list_off_loop(monkeypatch, loop_probe):
+    seen, probe = loop_probe
+
+    def fake_call(profile, fn, *args, **kwargs):
+        probe("suggestions")
+        assert profile == "default"
+        assert fn == "list_pending"
+        return []
+
+    monkeypatch.setattr(_web_server_cron, "_call_suggestions_for_profile", fake_call)
+    monkeypatch.setattr(web_server, "_has_valid_session_token", lambda req: True)
+
+    client = TestClient(web_server.app)
+    resp = client.get("/api/cron/suggestions?profile=default")
+
+    assert resp.status_code == 200
+    assert resp.json()["suggestions"] == []
+    assert ("suggestions", False) in seen
+
 def test_blueprint_instantiate_create_job_off_loop(monkeypatch, loop_probe):
     seen, probe = loop_probe
 
