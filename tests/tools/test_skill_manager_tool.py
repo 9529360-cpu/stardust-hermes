@@ -196,6 +196,34 @@ Review and recover pull requests.
         assert result["merge_candidates"][0]["name"] == "github-pr-workflow"
         assert not (tmp_path / "github-pr-review").exists()
 
+    def test_create_same_vendor_but_different_responsibility_is_not_blocked(self, tmp_path):
+        issues = """\
+---
+name: github-issue-triage
+description: Triage repository issues by severity and ownership.
+---
+
+# GitHub Issue Triage
+
+Classify issues and route them to owners.
+"""
+        releases = """\
+---
+name: github-release-notes
+description: Draft release notes from merged changes and tags.
+---
+
+# GitHub Release Notes
+
+Prepare release notes from repository history.
+"""
+        with _skill_dir(tmp_path):
+            _create_skill("github-issue-triage", issues)
+            result = _create_skill("github-release-notes", releases)
+
+        assert result["success"] is True
+        assert (tmp_path / "github-release-notes" / "SKILL.md").exists()
+
     def test_create_unrelated_skill_is_not_blocked(self, tmp_path):
         github = """\
 ---
