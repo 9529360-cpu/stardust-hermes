@@ -1571,6 +1571,8 @@ export const zh = defineLocale({
       apiKeyPlaceholder: '粘贴 API 密钥',
       apiKeyLabel: 'API 密钥',
       apiKeyKeepExisting: '留空则保留已保存的密钥',
+      apiKeyUpdate: '更新密钥',
+      apiKeyUpdating: '正在更新…',
       connectProvider: provider => `连接 ${provider}`,
       setupApiKeyHint: provider => `${provider} 需要 API 密钥。连接后即可选择模型。`,
       setupOauthHint: provider => `${provider} 会打开浏览器完成登录。Stardust 会在完成后自动继续。`,
