@@ -316,11 +316,6 @@ _active_processes_lock = threading.Lock()
 _active_processes: Dict[int, Tuple["subprocess.Popen", int | None]] = {}
 
 
-def _register_active_process(proc: "subprocess.Popen", pgid: int | None) -> None:
-    with _active_processes_lock:
-        _active_processes[proc.pid] = (proc, pgid)
-
-
 def _unregister_active_process(proc: "subprocess.Popen") -> None:
     with _active_processes_lock:
         _active_processes.pop(proc.pid, None)
@@ -501,27 +496,28 @@ def _run_one_file_once(
     env["PYTEST_DEBUG_TEMPROOT"] = temproot
 
     subproc_start = time.monotonic()
-    # launch the pytest process
-    proc = subprocess.Popen(
-        cmd,
-        cwd=repo_root,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True, encoding="utf-8", errors="replace",
-        env=env,
-        # POSIX: place the child at the head of its own process group so
-        # _kill_tree can SIGKILL the group atomically.
-        # Windows: this maps to CREATE_NEW_PROCESS_GROUP in CPython 3.12+;
-        # _kill_tree handles the Windows path via taskkill /F /T.
-        start_new_session=True,
-    )
-
-    # start_new_session=True makes the child the leader of a fresh POSIX
-    # process group, so its pid is the pgid immediately. Register it without
-    # another syscall: a cancellation arriving in this tiny launch window must
-    # still be able to kill the whole pytest tree before the leader exits.
-    pgid: int | None = proc.pid if sys.platform != "win32" else None
-    _register_active_process(proc, pgid)
+    # Spawn + registration are one cancellation-critical section. The signal
+    # handler takes the same lock before snapshotting active children, so TERM
+    # can never land in the Popen-return -> registry-insert gap and orphan a
+    # just-created pytest tree.
+    with _active_processes_lock:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=repo_root,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace",
+            env=env,
+            # POSIX: place the child at the head of its own process group so
+            # _kill_tree can SIGKILL the group atomically.
+            # Windows: this maps to CREATE_NEW_PROCESS_GROUP in CPython 3.12+;
+            # _kill_tree handles the Windows path via taskkill /F /T.
+            start_new_session=True,
+        )
+        # start_new_session=True makes the child the leader of a fresh POSIX
+        # process group, so its pid is the pgid immediately.
+        pgid: int | None = proc.pid if sys.platform != "win32" else None
+        _active_processes[proc.pid] = (proc, pgid)
 
     try:
         output, _ = proc.communicate(timeout=file_timeout)
