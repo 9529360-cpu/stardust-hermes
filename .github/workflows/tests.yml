@@ -13,11 +13,10 @@ concurrency:
 jobs:
   test:
     name: Run tests
-    # The upstream organization used a private 96-core runner and hard-coded
-    # 96 pytest file workers. This standalone product runs on the standard
-    # GitHub-hosted fleet, so keep concurrency bounded to the machine we can
-    # actually acquire instead of queueing forever for a missing org runner.
-    runs-on: ubuntu-latest
+    # Trusted Stardust branches use the isolated Leopard self-hosted runner.
+    # External fork PRs stay on GitHub-hosted infrastructure so untrusted code
+    # cannot execute on the personal CI machine.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'stardust-ci' }}
     timeout-minutes: 60
     steps:
       - name: Checkout code
@@ -71,7 +70,7 @@ jobs:
           source .venv/bin/activate
           scripts/run_tests.sh
         env:
-          HERMES_TEST_WORKERS: 4
+          HERMES_TEST_WORKERS: ${{ runner.name == 'leopard-stardust-ci' && '8' || '4' }}
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
