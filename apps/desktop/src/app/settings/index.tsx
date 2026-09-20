@@ -171,6 +171,13 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   const navGroups: OverlayNavGroup[] = useMemo(
     () => [
       ...SECTIONS.flatMap(s => {
+        // Model connection surfaces are grouped below as one user-facing
+        // "Model services" area instead of exposing the backend split between
+        // model selection, provider sign-in, API keys, and custom endpoints.
+        if (s.id === 'model') {
+          return []
+        }
+
         const view = `config:${s.id}` as SettingsViewId
 
         const entry = {
@@ -206,8 +213,15 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onSelect: () => setActiveView('notifications')
       },
       {
-        active: activeView === 'providers',
+        active: activeView === 'config:model' || activeView === 'providers',
         children: [
+          {
+            active: activeView === 'config:model',
+            icon: Cpu,
+            id: 'config:model',
+            label: t.settings.sections.model,
+            onSelect: () => setActiveView('config:model')
+          },
           {
             active: activeView === 'providers' && providerView === 'accounts',
             icon: codiconIcon('account'),
@@ -247,9 +261,9 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         ],
         gapBefore: true,
         icon: Zap,
-        id: 'providers',
+        id: 'model-services',
         label: t.settings.nav.providers,
-        onSelect: () => setActiveView('providers')
+        onSelect: () => setActiveView('config:model')
       },
       {
         active: activeView === 'gateway',

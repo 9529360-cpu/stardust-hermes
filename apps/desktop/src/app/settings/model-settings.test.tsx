@@ -172,7 +172,7 @@ describe('ModelSettings', () => {
       expect(screen.queryByText(/undefined/)).toBeNull()
       expect(screen.queryByText(/signs in through your browser/)).toBeNull()
 
-      fireEvent.click(await screen.findByRole('button', { name: 'Set up provider' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'Connect AI service' }))
 
       expect(startManualLocalEndpoint).toHaveBeenCalledOnce()
       expect(startManualOnboarding).not.toHaveBeenCalled()
@@ -186,7 +186,7 @@ describe('ModelSettings', () => {
 
     await renderModelSettings()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Set up provider' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect AI service' }))
 
     expect(startManualOnboarding).toHaveBeenCalledOnce()
     expect(startManualLocalEndpoint).not.toHaveBeenCalled()
@@ -209,7 +209,7 @@ describe('ModelSettings', () => {
 
     await renderModelSettings()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Set up Anthropic' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Connect Anthropic' }))
 
     expect(startManualProviderOAuth).toHaveBeenCalledWith('anthropic')
     expect(startManualLocalEndpoint).not.toHaveBeenCalled()
@@ -252,7 +252,7 @@ describe('ModelSettings', () => {
 
     await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getAllByRole('combobox')[0].textContent).toContain('Nous'))
-    expect(screen.queryByRole('button', { name: 'Set up provider' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Connect AI service' })).toBeNull()
   })
 
   it('preserves a user-defined provider endpoint when applying the main model', async () => {
@@ -577,9 +577,11 @@ describe('ModelSettings MoA preset editor', () => {
     return { ref1Provider: all.at(-6)!, ref1Model: all.at(-5)! }
   }
 
-  it('renders the MoA editor chrome in the active Chinese locale', async () => {
+  it('renders the model-service and MoA chrome in the active Chinese locale', async () => {
     await renderChineseModelSettings()
 
+    expect(await screen.findByText('新对话默认使用')).toBeTruthy()
+    expect(screen.getByText(/选择 Stardust 默认使用的 AI 服务和模型/)).toBeTruthy()
     expect(await screen.findByText('参考模型 1')).toBeTruthy()
     expect(screen.getByText(/配置具名预设/)).toBeTruthy()
     expect(screen.getByText('已启用')).toBeTruthy()
