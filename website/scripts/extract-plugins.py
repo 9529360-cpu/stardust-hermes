@@ -18,9 +18,9 @@ Outputs (both under website/static/api/, CDN-served at /docs/api/):
 - ``plugins.json``        — list of catalog entries for the page (camelCase)
 - ``plugins-meta.json``   — counts by tier + generatedAt + removedCount
 - ``plugin-catalog.json`` — ``{"entries": [raw YAML mappings], "removed": [...]}`` in the loader's own
-  schema; installed Hermes clients fetch this for live catalog refresh
-  (``hermes_cli.plugin_catalog.LIVE_CATALOG_URL``) so new entries and removals reach them without
-  updating. Emitting it here means the docs deploy IS the publish step — no second pipeline.
+  schema; installed Stardust clients fetch the reviewed committed copy from this repository's
+  raw ``main`` branch via ``hermes_cli.plugin_catalog.LIVE_CATALOG_URL``. The file is
+  deterministic so Plugin Catalog CI can regenerate and compare it byte-for-byte.
 """
 
 from __future__ import annotations
