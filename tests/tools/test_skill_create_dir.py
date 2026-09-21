@@ -146,6 +146,7 @@ class TestCreateRouting:
         # crash (single-op legacy shape surfaces the path field).
         res_flat = json.loads(skill_manage(
             "create", "routed-skill-flat", content=_skill_md("routed-skill-flat"),
+            distinct=True,  # this assertion is about create_dir routing, not convergence policy
         ))
         assert res_flat.get("success"), res_flat
         assert str(brain / "routed-skill-flat") == res_flat["path"]
