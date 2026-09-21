@@ -244,12 +244,9 @@ def test_owner_key_is_local_across_desktop_conversations(monkeypatch):
     assert assistant_tasks._resolve_owner_key() == "local"
 
 
-def test_messaging_owner_key_is_stable_user_not_chat(monkeypatch):
+def test_messaging_owner_key_is_stable_route_not_raw_identity(monkeypatch):
     values = {
-        "HERMES_SESSION_PLATFORM": "telegram",
-        "HERMES_SESSION_SOURCE": "telegram",
-        "HERMES_SESSION_USER_ID_ALT": "",
-        "HERMES_SESSION_USER_ID": "user-42",
+        "HERMES_SESSION_KEY": "agent:main:telegram:dm:chat-7",
     }
     monkeypatch.setattr(
         "gateway.session_context.session_is_messaging_surface",
@@ -260,9 +257,23 @@ def test_messaging_owner_key_is_stable_user_not_chat(monkeypatch):
         lambda name, default="": values.get(name, default),
     )
 
-    assert assistant_tasks._resolve_owner_key() == "messaging:telegram:user-42"
+    first = assistant_tasks._resolve_owner_key()
+    assert first is not None
+    assert first.startswith("messaging-route:")
+    assert "chat-7" not in first
+    assert "telegram" not in first
 
-    values["HERMES_SESSION_USER_ID"] = ""
+    # Same canonical audience across a new transcript/session keeps ownership.
+    assert assistant_tasks._resolve_owner_key() == first
+
+    # Another group/thread/DM route is a different visibility domain.
+    values["HERMES_SESSION_KEY"] = "agent:main:telegram:group:chat-8:user-42"
+    second = assistant_tasks._resolve_owner_key()
+    assert second is not None
+    assert second != first
+    assert "chat-8" not in second
+
+    values["HERMES_SESSION_KEY"] = ""
     assert assistant_tasks._resolve_owner_key() is None
 
 
@@ -348,26 +359,26 @@ def test_task_listing_isolated_by_assistant_owner(tmp_path, monkeypatch):
             conn,
             title="Alice task",
             assignee="default",
-            assistant_owner_key="messaging:telegram:alice",
+            assistant_owner_key="messaging-route:alice-test-owner",
         )
         kb.create_task(
             conn,
             title="Bob task",
             assignee="default",
-            assistant_owner_key="messaging:telegram:bob",
+            assistant_owner_key="messaging-route:bob-test-owner",
         )
 
     alice = json.loads(
         assistant_tasks.assistant_tasks_tool(
             action="list",
-            owner_key="messaging:telegram:alice",
+            owner_key="messaging-route:alice-test-owner",
             include_completed=True,
         )
     )
     bob = json.loads(
         assistant_tasks.assistant_tasks_tool(
             action="list",
-            owner_key="messaging:telegram:bob",
+            owner_key="messaging-route:bob-test-owner",
             include_completed=True,
         )
     )
@@ -392,7 +403,7 @@ def test_owner_identity_is_not_embedded_in_idempotency_key(monkeypatch):
         }),
     )
 
-    owner = "messaging:telegram:user-secret-42"
+    owner = "messaging-route:user-secret-test-owner"
     for request_id in ("call-private-a", "call-private-b"):
         assistant_tasks.assistant_tasks_tool(
             action="create",
@@ -476,7 +487,7 @@ def test_list_recalls_owner_tasks_across_active_boards(tmp_path, monkeypatch):
             conn,
             title="Other user's alpha task",
             assignee="default",
-            assistant_owner_key="messaging:telegram:someone-else",
+            assistant_owner_key="messaging-route:someone-else-test-owner",
         )
     with kbc.connect_closing(board="beta") as conn:
         kb.create_task(
@@ -595,7 +606,7 @@ def test_missing_request_id_never_creates_a_stable_owner_replay_key(monkeypatch)
     for _ in range(2):
         assistant_tasks.assistant_tasks_tool(
             action="create",
-            owner_key="messaging:telegram:123456",
+            owner_key="messaging-route:secret-input-test-owner",
             session_id="chat-A",
             tasks=[{"title": "Task", "instruction": "Do it."}],
         )
@@ -828,14 +839,14 @@ def test_resume_cannot_mutate_another_assistant_owner(tmp_path, monkeypatch):
             conn,
             title="Private other-user task",
             assignee="default",
-            assistant_owner_key="messaging:telegram:bob",
+            assistant_owner_key="messaging-route:bob-test-owner",
         )
         assert kb.block_task(conn, task_id, reason="waiting", kind="needs_input")
 
     denied = json.loads(
         assistant_tasks.assistant_tasks_tool(
             action="resume",
-            owner_key="messaging:telegram:alice",
+            owner_key="messaging-route:alice-test-owner",
             task_id=task_id,
             user_message="Yes, continue.",
         )
