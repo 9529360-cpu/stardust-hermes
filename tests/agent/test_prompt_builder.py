@@ -84,6 +84,8 @@ class TestGuidanceConstants:
         assert "`assistant_tasks`" in DEFAULT_AGENT_IDENTITY
         assert "originating chat" in DEFAULT_AGENT_IDENTITY
         assert "deleted transcript" in DEFAULT_AGENT_IDENTITY
+        assert "blocked durable task" in DEFAULT_AGENT_IDENTITY
+        assert "never infer approval" in DEFAULT_AGENT_IDENTITY
         assert "multiple independent action requests" in DEFAULT_AGENT_IDENTITY
         assert "persistent user-approval boundary" in DEFAULT_AGENT_IDENTITY
         assert "must not steal focus" in DEFAULT_AGENT_IDENTITY
