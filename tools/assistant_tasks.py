@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from tools.registry import registry, tool_error
+from tools.registry import no_cache_check_fn, registry, tool_error
 
 
 MAX_TASKS_PER_CALL = 8
@@ -395,6 +395,7 @@ def assistant_tasks_tool(
     return tool_error("assistant_tasks action must be 'create' or 'list'")
 
 
+@no_cache_check_fn
 def check_assistant_tasks_requirements() -> bool:
     return _assistant_tasks_context_allowed()
 
