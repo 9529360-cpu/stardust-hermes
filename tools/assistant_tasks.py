@@ -86,28 +86,25 @@ def _assistant_tasks_context_allowed() -> bool:
 
 
 def _resolve_owner_key() -> Optional[str]:
-    """Stable task owner for cross-conversation recall.
+    """Stable durable owner without crossing a messaging audience boundary.
 
-    Local surfaces (Desktop/TUI/CLI/API on the user's machine) share one personal
-    owner so conversation/session changes within the active profile do not hide work.
-    Human messaging surfaces
-    require a stable platform user id and fail closed when it is unavailable.
+    Local surfaces (Desktop/TUI/CLI/API on the user's machine) share one owner
+    inside the active profile, so deleting/replacing a conversation does not
+    hide work. Human messaging surfaces instead bind to the gateway's canonical
+    session route key: that is the existing source of truth for DM/group/thread,
+    chat/thread ids, Slack workspace scope, and configured per-user isolation.
+    Only a digest is stored on the Kanban row so route/user identifiers are not
+    duplicated into every durable task.
     """
     from gateway.session_context import get_session_env, session_is_messaging_surface
 
     if not session_is_messaging_surface():
         return "local"
-    platform = (
-        get_session_env("HERMES_SESSION_PLATFORM", "")
-        or get_session_env("HERMES_SESSION_SOURCE", "")
-    ).strip().lower()
-    principal = (
-        get_session_env("HERMES_SESSION_USER_ID_ALT", "")
-        or get_session_env("HERMES_SESSION_USER_ID", "")
-    ).strip()
-    if not platform or not principal:
+    session_key = str(get_session_env("HERMES_SESSION_KEY", "") or "").strip()
+    if not session_key:
         return None
-    return f"messaging:{platform}:{principal}"
+    digest = hashlib.sha256(session_key.encode("utf-8")).hexdigest()[:32]
+    return f"messaging-route:{digest}"
 
 
 def _assistant_board_slugs() -> list[str]:
@@ -529,7 +526,7 @@ def assistant_tasks_tool(
     owner = str(owner_key or _resolve_owner_key() or "").strip()
     if not owner:
         return tool_error(
-            "assistant_tasks requires a stable user identity on human messaging surfaces"
+            "assistant_tasks requires a stable canonical session route on human messaging surfaces"
         )
     if action == "create":
         return _create_tasks(
