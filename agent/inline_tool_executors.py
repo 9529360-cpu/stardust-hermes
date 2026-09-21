@@ -172,6 +172,28 @@ def _setup_mcp_shim(agent, args: dict, ctx: InlineToolContext) -> Any:
     }, ctx)
 
 
+
+def _latest_user_message(messages: Optional[list]) -> str:
+    """Clean text of the current/latest user turn, never assistant-authored approval."""
+    for message in reversed(messages or []):
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            return content.strip()
+        # Defensive support for provider-style multimodal content lists. Only
+        # copy explicit text parts; never stringify image/tool metadata.
+        if isinstance(content, list):
+            texts = []
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("type") in {"text", "input_text"} and isinstance(part.get("text"), str):
+                    texts.append(part["text"])
+            return "\n".join(texts).strip()
+        return ""
+    return ""
+
 def _assistant_tasks(agent, args: dict, ctx: InlineToolContext) -> Any:
     """Durable multi-task intake bound to the exact owning session and tool call."""
     from tools.assistant_tasks import assistant_tasks_tool
@@ -182,6 +204,8 @@ def _assistant_tasks(agent, args: dict, ctx: InlineToolContext) -> Any:
         include_completed=args.get("include_completed", True),
         limit=args.get("limit", 20),
         task_ids=args.get("task_ids"),
+        task_id=args.get("task_id"),
+        user_message=_latest_user_message(ctx.messages),
         session_id=getattr(agent, "session_id", None),
         request_id=ctx.tool_call_id or ctx.effective_task_id,
     )
