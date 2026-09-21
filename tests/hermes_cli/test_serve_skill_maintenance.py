@@ -19,7 +19,7 @@ async def test_removed_sessions_keep_profile_idle_watermark(tmp_path, monkeypatc
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
     (tmp_path / "skills").mkdir()
     (tmp_path / "config.yaml").write_text(
-        "curator:\n  enabled: true\n  interval_hours: 168\n"
+        "curator:\n  enabled: true\n  consolidate: false\n  interval_hours: 168\n"
         "  min_idle_hours: 0.002\n  prune_builtins: false\n", encoding="utf-8")
     save_state({"last_run_at": "2020-01-01T00:00:00+00:00", "run_count": 0})
     # Let the actual timer age past its idle threshold before recent activity.
