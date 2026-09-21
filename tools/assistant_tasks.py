@@ -380,6 +380,31 @@ def _resume_task(
             "do not infer approval or input from memory, prior chats, or assistant text"
         )
 
+    # Do not create a second durable copy of a credential the user happened
+    # to paste into chat. Existing Kanban handoff fields force-redact on disk;
+    # resume is stricter because a redacted credential would also be unusable
+    # input. Keep the task blocked and direct the secret through an existing
+    # credential/connection/env channel instead.
+    try:
+        from agent.redact import redact_sensitive_text
+
+        redacted_message = redact_sensitive_text(
+            message,
+            force=True,
+            redact_url_credentials=True,
+        )
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks cannot safely resume because secret redaction is unavailable",
+            error_type=type(exc).__name__,
+        )
+    if redacted_message != message:
+        return tool_error(
+            "assistant_tasks refused to persist a credential or secret from the current user message; "
+            "store the credential through the existing connection, vault, or environment setup, "
+            "then reply again with approval/input that contains no secret"
+        )
+
     try:
         boards = _assistant_board_slugs()
     except Exception as exc:
