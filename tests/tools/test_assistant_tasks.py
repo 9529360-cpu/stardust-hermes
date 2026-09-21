@@ -986,3 +986,43 @@ def test_forged_user_via_assistant_author_is_not_trusted(tmp_path, monkeypatch):
         verified_context = kb.build_worker_context(conn, task_id)
         assert "verified current-user input relayed by Stardust" in verified_context
         assert "Real current-user input relayed by the trusted assistant path." in verified_context
+
+
+
+def test_resume_refuses_secret_bearing_user_input_without_persisting_it(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Needs credential",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(conn, task_id, reason="Configure the API credential", kind="needs_input")
+
+    secret = "sk-" + ("a" * 48)
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="local",
+            task_id=task_id,
+            user_message=f"Use this key {secret} and continue.",
+        )
+    )
+    assert "credential or secret" in denied["error"]
+    assert secret not in json.dumps(denied)
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+        assert not [
+            event for event in kb.list_events(conn, task_id)
+            if event.kind == "assistant_user_input"
+        ]
