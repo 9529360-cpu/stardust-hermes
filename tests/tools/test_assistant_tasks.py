@@ -708,3 +708,33 @@ def test_assistant_tasks_hidden_from_scoped_workers(monkeypatch):
         )
     )
     assert "lineage-scoped kanban tools" in blocked["error"]
+
+
+
+def test_assistant_tasks_availability_cache_cannot_cross_worker_boundary(monkeypatch):
+    import model_tools
+    from tools.registry import invalidate_check_fn_cache
+
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    invalidate_check_fn_cache()
+    model_tools._clear_tool_defs_cache()
+
+    parent_defs = model_tools.get_tool_definitions(
+        enabled_toolsets=["assistant_tasks"],
+        quiet_mode=True,
+    )
+    assert "assistant_tasks" in {
+        definition["function"]["name"] for definition in parent_defs
+    }
+
+    # The worker probe immediately follows the parent's successful probe. A
+    # profile-wide 30s check_fn cache must not reuse the parent's True verdict.
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "worker-task")
+    model_tools._clear_tool_defs_cache()
+    worker_defs = model_tools.get_tool_definitions(
+        enabled_toolsets=["assistant_tasks"],
+        quiet_mode=True,
+    )
+    assert "assistant_tasks" not in {
+        definition["function"]["name"] for definition in worker_defs
+    }
