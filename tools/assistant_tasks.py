@@ -258,7 +258,7 @@ def _list_tasks(
     task_ids: Any,
     owner_key: str,
 ) -> str:
-    from tools.kanban_tools import _board, _maybe_auto_subscribe
+    from tools.kanban_tools import _board
 
     wanted = {
         str(task_id).strip()
@@ -368,7 +368,7 @@ def _resume_task(
     Mutation is deliberately fail-closed across boards: unlike a read-only list,
     a partial board scan is not safe enough to establish unique ownership.
     """
-    from tools.kanban_tools import _board
+    from tools.kanban_tools import _board, _maybe_auto_subscribe
 
     tid = str(task_id or "").strip()
     if not tid:
