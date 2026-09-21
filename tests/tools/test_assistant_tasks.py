@@ -683,3 +683,30 @@ def test_board_discovery_failure_returns_partial_current_board(tmp_path, monkeyp
     assert listed["board_errors"] == [{"board": "*", "error": "OSError"}]
     assert [task["title"] for task in listed["tasks"]] == ["Still visible"]
     assert "private path" not in json.dumps(listed)
+
+
+
+def test_assistant_tasks_hidden_from_scoped_workers(monkeypatch):
+    from agent.delegation_context import delegated_child_context
+
+    with delegated_child_context():
+        assert assistant_tasks.check_assistant_tasks_requirements() is False
+        blocked = json.loads(
+            assistant_tasks.assistant_tasks_tool(
+                action="list",
+                owner_key="local",
+            )
+        )
+        assert blocked["success"] is False
+        assert "parent user sessions" in blocked["error"]
+
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-worker")
+    assert assistant_tasks.check_assistant_tasks_requirements() is False
+    blocked = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+        )
+    )
+    assert blocked["success"] is False
+    assert "lineage-scoped kanban tools" in blocked["error"]
