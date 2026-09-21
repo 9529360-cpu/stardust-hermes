@@ -738,3 +738,206 @@ def test_assistant_tasks_availability_cache_cannot_cross_worker_boundary(monkeyp
     assert "assistant_tasks" not in {
         definition["function"]["name"] for definition in worker_defs
     }
+
+
+
+def test_resume_records_current_user_turn_before_unblocking(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Approve prepared booking",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(
+            conn,
+            task_id,
+            reason="Approve booking flight NH1 for USD 100 to Tokyo.",
+            kind="needs_input",
+        )
+        assert kb.get_task(conn, task_id).status == "blocked"
+
+    agent = SimpleNamespace(session_id="chat-B")
+    ctx = InlineToolContext(
+        effective_task_id="turn-B",
+        tool_call_id="call-resume",
+        messages=[
+            {"role": "user", "content": "What is the booking waiting for?"},
+            {"role": "assistant", "content": "It is waiting for approval."},
+            {
+                "role": "user",
+                "content": "Yes. Approve exactly flight NH1 for USD 100; do not add extras.",
+            },
+        ],
+    )
+    resumed = json.loads(
+        INLINE_TOOL_EXECUTORS["assistant_tasks"](
+            agent,
+            {"action": "resume", "task_id": task_id},
+            ctx,
+        )
+    )
+
+    assert resumed["ok"] is True
+    assert resumed["task_id"] == task_id
+    assert resumed["input_recorded"] is True
+    with kbc.connect() as conn:
+        task = kb.get_task(conn, task_id)
+        comments = kb.list_comments(conn, task_id)
+        assert task.status == "ready"
+        assert comments[-1].author == "user-via-assistant"
+        assert comments[-1].body == (
+            "Yes. Approve exactly flight NH1 for USD 100; do not add extras."
+        )
+
+
+def test_resume_cannot_mutate_another_assistant_owner(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Private other-user task",
+            assignee="default",
+            assistant_owner_key="messaging:telegram:bob",
+        )
+        assert kb.block_task(conn, task_id, reason="waiting", kind="needs_input")
+
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="messaging:telegram:alice",
+            task_id=task_id,
+            user_message="Yes, continue.",
+        )
+    )
+    assert "current owner" in denied["error"]
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+
+
+def test_resume_requires_current_user_turn_not_assistant_inference(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Needs user input",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(conn, task_id, reason="Need approval", kind="needs_input")
+
+    agent = SimpleNamespace(session_id="chat-B")
+    denied = json.loads(
+        INLINE_TOOL_EXECUTORS["assistant_tasks"](
+            agent,
+            {"action": "resume", "task_id": task_id},
+            InlineToolContext(
+                effective_task_id="turn-B",
+                tool_call_id="call-no-user",
+                messages=[{"role": "assistant", "content": "I think the user would approve."}],
+            ),
+        )
+    )
+    assert "current user message" in denied["error"]
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+
+
+def test_resume_fails_closed_when_board_discovery_is_incomplete(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Blocked task",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(conn, task_id, reason="Need input", kind="needs_input")
+
+    monkeypatch.setattr(
+        kb,
+        "list_boards",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("private local path")),
+    )
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="local",
+            task_id=task_id,
+            user_message="Yes, continue.",
+        )
+    )
+    assert "board discovery is incomplete" in denied["error"]
+    assert denied["error_type"] == "OSError"
+    assert "private local path" not in json.dumps(denied)
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+
+
+def test_resume_rejects_nonblocked_task_without_recording_input(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Already runnable",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        original_status = kb.get_task(conn, task_id).status
+
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="local",
+            task_id=task_id,
+            user_message="Continue.",
+        )
+    )
+    assert "only accepts a blocked task" in denied["error"]
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == original_status
+        assert not kb.list_comments(conn, task_id)
