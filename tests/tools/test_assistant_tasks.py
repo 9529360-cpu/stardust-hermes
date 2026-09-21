@@ -750,6 +750,7 @@ def test_resume_records_current_user_turn_before_unblocking(tmp_path, monkeypatc
     monkeypatch.setenv("HERMES_HOME", str(home))
     monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
     monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    monkeypatch.setenv("HERMES_SESSION_KEY", "chat-B-live-key")
 
     with kbc.connect() as conn:
         task_id = kb.create_task(
@@ -790,9 +791,17 @@ def test_resume_records_current_user_turn_before_unblocking(tmp_path, monkeypatc
     assert resumed["ok"] is True
     assert resumed["task_id"] == task_id
     assert resumed["input_recorded"] is True
+    assert resumed["subscribed"] is True
     with kbc.connect() as conn:
+        from hermes_cli import kanban_db_notify as kbn
+
         task = kb.get_task(conn, task_id)
         comments = kb.list_comments(conn, task_id)
+        subs = kbn.list_notify_subs(conn, task_id)
+        assert any(
+            sub["platform"] == "tui" and sub["chat_id"] == "chat-B-live-key"
+            for sub in subs
+        )
         assert task.status == "ready"
         assert comments[-1].author == "user-via-assistant"
         assert comments[-1].body == (
