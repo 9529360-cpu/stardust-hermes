@@ -715,12 +715,11 @@ MIGRATIONS: Tuple[Tuple[int, Callable[[Dict[str, Any], bool], None]], ...] = (
     (46, _rewrite_stale_default(
         section="model_catalog", key="url",
         old="https://hermes-agent.nousresearch.com/docs/api/model-catalog.json",
-        new=(
-            "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
-            "/main/website/static/api/model-catalog.json"
-        ),
-        added="model_catalog.url moved to Stardust authority",
-        message="  ✓ Model catalog default now follows the Stardust repository authority.")),
+        # Drop the historical explicit default. DEFAULT_CONFIG now owns the Stardust URL;
+        # persisting the replacement would pin users to today's default forever.
+        new=None,
+        added="removed historical Hermes model_catalog.url default",
+        message="  ✓ Model catalog now follows the Stardust repository default.")),
 )
 
 
