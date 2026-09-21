@@ -15,6 +15,7 @@ import importlib
 import sys
 
 import pytest
+import yaml
 
 
 @pytest.fixture(autouse=True)
@@ -66,7 +67,11 @@ def test_update_migration_survives_stale_module_missing_call_time_symbol(tmp_pat
         reset_hermes_home_override(token)
 
     text = (home / "config.yaml").read_text(encoding="utf-8")
-    assert "_config_version: 45" in text, text
+    raw = yaml.safe_load(text)
+    # This regression guards the v45 call-time import. Later migrations are
+    # expected to advance the file beyond 45; prove the v45 effect landed.
+    assert raw["_config_version"] >= 45, text
+    assert "connections" in raw["platform_toolsets"]["telegram"], text
 
 
 def test_update_migration_import_failure_after_purge_prints_fallback(tmp_path, monkeypatch, capsys):
