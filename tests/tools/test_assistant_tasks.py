@@ -173,6 +173,13 @@ def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
             return rows
 
         @staticmethod
+        def get_task(conn, task_id):
+            task = next((row for row in rows if row.id == task_id), None)
+            if task is not None:
+                task.assistant_owner_key = "local"
+            return task
+
+        @staticmethod
         def latest_run(conn, task_id):
             if task_id == "t_wait":
                 return SimpleNamespace(summary="Waiting for approval of the exact itinerary and price.")
@@ -599,3 +606,80 @@ def test_missing_request_id_never_creates_a_stable_owner_replay_key(monkeypatch)
     assert "123456" not in second
     assert "request" not in first
     assert "request" not in second
+
+
+
+def test_specific_task_id_lookup_bypasses_recent_200_cap(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    oldest_id = None
+    with kbc.connect() as conn:
+        for index in range(205):
+            task_id = kb.create_task(
+                conn,
+                title=f"task-{index:03d}",
+                assignee="default",
+                assistant_owner_key="local",
+            )
+            if index == 0:
+                oldest_id = task_id
+            conn.execute(
+                "UPDATE tasks SET created_at = ? WHERE id = ?",
+                (1000 + index, task_id),
+            )
+        conn.commit()
+
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+            limit=1,
+            task_ids=[oldest_id],
+        )
+    )
+    assert listed["partial"] is False
+    assert [task["title"] for task in listed["tasks"]] == ["task-000"]
+
+
+def test_board_discovery_failure_returns_partial_current_board(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        kb.create_task(
+            conn,
+            title="Still visible",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+
+    monkeypatch.setattr(
+        kb,
+        "list_boards",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("private path must not leak")),
+    )
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+        )
+    )
+
+    assert listed["ok"] is True
+    assert listed["partial"] is True
+    assert listed["board_errors"] == [{"board": "*", "error": "OSError"}]
+    assert [task["title"] for task in listed["tasks"]] == ["Still visible"]
+    assert "private path" not in json.dumps(listed)
