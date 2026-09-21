@@ -434,10 +434,9 @@ def _resume_task(
                     board=board,
                     status=current.status,
                 )
-            comment_id = kb.add_comment(
+            comment_id = kb.add_assistant_user_input(
                 conn,
                 tid,
-                "user-via-assistant",
                 message,
             )
             resumed = kb.unblock_task(conn, tid)
