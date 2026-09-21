@@ -67,7 +67,8 @@ def _resolve_owner_key() -> Optional[str]:
     """Stable task owner for cross-conversation recall.
 
     Local surfaces (Desktop/TUI/CLI/API on the user's machine) share one personal
-    owner so profile/session changes do not hide work. Human messaging surfaces
+    owner so conversation/session changes within the active profile do not hide work.
+    Human messaging surfaces
     require a stable platform user id and fail closed when it is unavailable.
     """
     from gateway.session_context import get_session_env, session_is_messaging_surface
@@ -103,10 +104,9 @@ def _assistant_board_slugs() -> list[str]:
     if os.environ.get("HERMES_KANBAN_DB", "").strip():
         return [kb.get_current_board()]
 
-    try:
-        boards = kb.list_boards(include_archived=False)
-    except Exception:
-        return [kb.get_current_board()]
+    # Let enumeration failures reach the caller. Falling back silently to the
+    # current board would make a cross-board snapshot look complete when it is not.
+    boards = kb.list_boards(include_archived=False)
 
     unique: dict[str, str] = {}
     for meta in boards:
@@ -240,7 +240,7 @@ def _list_tasks(
 
     wanted = {
         str(task_id).strip()
-        for task_id in (task_ids if isinstance(task_ids, list) else [])
+        for task_id in (task_ids if isinstance(task_ids, list) else [])[:MAX_LIST_LIMIT]
         if str(task_id).strip()
     }
     max_items = _safe_limit(limit)
@@ -248,18 +248,36 @@ def _list_tasks(
     board_errors: list[dict[str, str]] = []
     # Creation remains board-scoped, but personal-assistant recall is user-scoped:
     # switching projects/boards must not make already-handed-off work disappear.
-    for board in _assistant_board_slugs():
+    try:
+        boards = _assistant_board_slugs()
+    except Exception as exc:
+        # Keep the current board useful, but explicitly mark the snapshot partial.
+        from hermes_cli import kanban_db as kb
+
+        boards = [kb.get_current_board()]
+        board_errors.append({"board": "*", "error": type(exc).__name__})
+    for board in boards:
         try:
             with _board(board) as (kb, conn):
                 # Read a bounded recent superset from every active board, then merge
                 # globally. The Kanban DBs remain authoritative; no shadow index.
-                rows = kb.list_tasks(
-                    conn,
-                    assistant_owner_key=owner_key,
-                    include_archived=False,
-                    limit=max(200, max_items * 4),
-                    order_by="activity",
-                )
+                if wanted:
+                    # Explicit task handles must not disappear merely because they are
+                    # older than the recent-work window. Fetch them directly and prove
+                    # ownership before projecting anything.
+                    rows = []
+                    for task_id in wanted:
+                        task = kb.get_task(conn, task_id)
+                        if task is not None and task.assistant_owner_key == owner_key:
+                            rows.append(task)
+                else:
+                    rows = kb.list_tasks(
+                        conn,
+                        assistant_owner_key=owner_key,
+                        include_archived=False,
+                        limit=max(200, max_items * 4),
+                        order_by="activity",
+                    )
                 for task in rows:
                     if wanted and task.id not in wanted:
                         continue
@@ -442,6 +460,7 @@ ASSISTANT_TASKS_SCHEMA = {
             },
             "task_ids": {
                 "type": "array",
+                "maxItems": MAX_LIST_LIMIT,
                 "items": {"type": "string"},
                 "description": "With action=list, optionally restrict the query to these task ids.",
             },
