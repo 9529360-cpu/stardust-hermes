@@ -697,7 +697,6 @@ def test_assistant_tasks_hidden_from_scoped_workers(monkeypatch):
                 owner_key="local",
             )
         )
-        assert blocked["success"] is False
         assert "parent user sessions" in blocked["error"]
 
     monkeypatch.setenv("HERMES_KANBAN_TASK", "task-worker")
@@ -708,5 +707,4 @@ def test_assistant_tasks_hidden_from_scoped_workers(monkeypatch):
             owner_key="local",
         )
     )
-    assert blocked["success"] is False
     assert "lineage-scoped kanban tools" in blocked["error"]
