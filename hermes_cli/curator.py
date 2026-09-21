@@ -252,7 +252,7 @@ def _cmd_list_unmanaged(args) -> int:
         why = (
             "foreground marker (created_by:learn)"
             if r.get("unmanaged_origin") == "foreground"
-            else "origin unknown"
+            else "origin unknown (created_by:null or missing)"
         )
         print(
             f"  {r['name']:44s} activity={r.get('activity_count', 0):4d}  "
