@@ -258,7 +258,7 @@ def _list_tasks(
     task_ids: Any,
     owner_key: str,
 ) -> str:
-    from tools.kanban_tools import _board
+    from tools.kanban_tools import _board, _maybe_auto_subscribe
 
     wanted = {
         str(task_id).strip()
@@ -439,6 +439,12 @@ def _resume_task(
                 tid,
                 message,
             )
+            # Rebind terminal notifications to the conversation that supplied
+            # the unblock input. The old origin (for example deleted chat A)
+            # may still have a stale subscription until normal archive/GC.
+            # Subscription is best-effort and follows the existing user opt-out;
+            # it must never turn a valid explicit resume into a failure.
+            subscribed = _maybe_auto_subscribe(conn, tid)
             resumed = kb.unblock_task(conn, tid)
             landed = kb.get_task(conn, tid)
     except Exception as exc:
@@ -470,6 +476,7 @@ def _resume_task(
             "status": landed.status if landed else "ready",
             "comment_id": comment_id,
             "input_recorded": True,
+            "subscribed": bool(subscribed),
         },
         ensure_ascii=False,
     )
