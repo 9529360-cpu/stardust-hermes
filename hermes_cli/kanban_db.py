@@ -1741,6 +1741,31 @@ def add_comment(conn: sqlite3.Connection, task_id: str, author: str, body: str) 
         return int(cur.lastrowid or 0)
 
 
+def add_assistant_user_input(
+    conn: sqlite3.Connection, task_id: str, body: str,
+) -> int:
+    """Persist one current-user response with verifiable Kanban provenance.
+
+    The text stays in the normal comment thread; a separate event stores only
+    its comment id. Worker-context rendering trusts the event marker, never an
+    author string that a worker/profile could forge.
+    """
+    with write_txn(conn):
+        comment_id = add_comment(
+            conn,
+            task_id,
+            "user-via-assistant",
+            body,
+        )
+        _append_event(
+            conn,
+            task_id,
+            "assistant_user_input",
+            {"comment_id": comment_id},
+        )
+        return comment_id
+
+
 def _require_task(conn: sqlite3.Connection, task_id: str) -> None:
     if not conn.execute("SELECT 1 FROM tasks WHERE id = ?", (task_id,)).fetchone():
         raise ValueError(f"unknown task {task_id}")
@@ -3742,7 +3767,12 @@ def build_worker_context(conn: sqlite3.Connection, task_id: str) -> str:
     _ctx_prior_attempts(lines, conn, task_id, now)
     _ctx_parent_results(lines, conn, task_id, now)
     _ctx_role_history(lines, conn, task, now)
-    _ctx_comments(lines, list_comments(conn, task_id), now)
+    _ctx_comments(
+        lines,
+        list_comments(conn, task_id),
+        now,
+        verified_user_input_ids=_assistant_user_input_comment_ids(conn, task_id),
+    )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -3916,24 +3946,59 @@ def _ctx_role_history(lines: list[str], conn: sqlite3.Connection, task: Task, no
     lines.append("")
 
 
-def _ctx_comments(lines: list[str], comments: list[Comment], now: int) -> None:
-    """Newest ``_CTX_MAX_COMMENTS`` comments. The explicit "comment from
-    worker" framing stops an operator-controlled HERMES_PROFILE like
-    "hermes-system" being read as a system directive above an
-    attacker-influenceable body (defense-in-depth)."""
+def _assistant_user_input_comment_ids(
+    conn: sqlite3.Connection, task_id: str,
+) -> set[int]:
+    """Comment ids proven to originate from assistant_tasks' current-user relay."""
+    ids: set[int] = set()
+    rows = conn.execute(
+        "SELECT payload FROM task_events "
+        "WHERE task_id = ? AND kind = 'assistant_user_input' ORDER BY id ASC",
+        (task_id,),
+    ).fetchall()
+    for row in rows:
+        payload = _json_dict(_row_get(row, "payload"))
+        try:
+            comment_id = int(payload.get("comment_id"))
+        except (TypeError, ValueError):
+            continue
+        if comment_id > 0:
+            ids.add(comment_id)
+    return ids
+
+
+def _ctx_comments(
+    lines: list[str],
+    comments: list[Comment],
+    now: int,
+    *,
+    verified_user_input_ids: Optional[set[int]] = None,
+) -> None:
+    """Render newest comments without trusting caller-controlled author names.
+
+    Ordinary comments retain the explicit "comment from worker" framing.
+    Only comment ids backed by an ``assistant_user_input`` event are rendered
+    as current-user input; the author string alone never grants that trust.
+    """
     shown, omitted_note = _ctx_tail(comments, _CTX_MAX_COMMENTS, "comment")
     if not shown:
         return
     lines.append("## Comment thread")
     if omitted_note:
         lines.append(omitted_note)
+    trusted = verified_user_input_ids or set()
     for c in shown:
-        # Render author with explicit "comment from worker" framing so operator-controlled HERMES_PROFILE
-        # values like "hermes-system" or "operator" can't be misread by the next worker as a system
-        # directive above the (attacker-influenceable) comment body. Defense-in-depth — the LLM-controlled
-        # author-forgery surface was already closed in #22435. See #22452.
-        safe_author = (c.author or "").replace("`", "")
-        lines.append(f"comment from worker `{safe_author}` at {_ctx_stamp(c.created_at, now)}:")
+        if c.id in trusted:
+            lines.append(
+                "verified current-user input relayed by Stardust "
+                f"at {_ctx_stamp(c.created_at, now)}:"
+            )
+        else:
+            # Render author with explicit "comment from worker" framing so
+            # operator-controlled HERMES_PROFILE values like "hermes-system"
+            # or "user-via-assistant" cannot manufacture trusted provenance.
+            safe_author = (c.author or "").replace("`", "")
+            lines.append(f"comment from worker `{safe_author}` at {_ctx_stamp(c.created_at, now)}:")
         lines.append(_ctx_cap(c.body, _CTX_MAX_COMMENT_BYTES))
         lines.append("")
 
