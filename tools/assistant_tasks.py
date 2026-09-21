@@ -21,6 +21,7 @@ from tools.registry import no_cache_check_fn, registry, tool_error
 MAX_TASKS_PER_CALL = 8
 MAX_TITLE_CHARS = 240
 MAX_INSTRUCTION_CHARS = 16_000
+MAX_RESUME_MESSAGE_CHARS = 16_000
 MAX_LIST_LIMIT = 50
 _ATTENTION_STATUSES = {"blocked", "review", "triage"}
 _TERMINAL_STATUSES = {"done", "archived"}
@@ -355,6 +356,125 @@ def _list_tasks(
     )
 
 
+
+def _resume_task(
+    *,
+    task_id: Any,
+    user_message: Optional[str],
+    owner_key: str,
+) -> str:
+    """Persist the current user's input, then resume one owned blocked task.
+
+    Mutation is deliberately fail-closed across boards: unlike a read-only list,
+    a partial board scan is not safe enough to establish unique ownership.
+    """
+    from tools.kanban_tools import _board
+
+    tid = str(task_id or "").strip()
+    if not tid:
+        return tool_error("assistant_tasks resume requires task_id")
+    message = _bounded_text(user_message, MAX_RESUME_MESSAGE_CHARS)
+    if not message:
+        return tool_error(
+            "assistant_tasks resume requires the current user message; "
+            "do not infer approval or input from memory, prior chats, or assistant text"
+        )
+
+    try:
+        boards = _assistant_board_slugs()
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks cannot safely resume while board discovery is incomplete",
+            error_type=type(exc).__name__,
+        )
+
+    matches: list[tuple[str, Any]] = []
+    for board in boards:
+        try:
+            with _board(board) as (kb, conn):
+                task = kb.get_task(conn, tid)
+                if task is not None and task.assistant_owner_key == owner_key:
+                    matches.append((board, task))
+        except Exception as exc:
+            return tool_error(
+                "assistant_tasks cannot safely resume while a board is unreadable",
+                board=board,
+                error_type=type(exc).__name__,
+            )
+
+    if not matches:
+        return tool_error("assistant_tasks task not found for the current owner")
+    if len(matches) != 1:
+        return tool_error(
+            "assistant_tasks task id is ambiguous across boards; refusing to mutate",
+            boards=[board for board, _task in matches],
+        )
+
+    board, task = matches[0]
+    if task.status != "blocked":
+        return tool_error(
+            "assistant_tasks resume only accepts a blocked task",
+            task_id=tid,
+            board=board,
+            status=task.status,
+        )
+
+    # Persist the human's CURRENT turn before making the task runnable. A worker
+    # may be claimed immediately after unblock; reversing these writes would let
+    # it restart without the approval/input that justified the resume.
+    try:
+        with _board(board) as (kb, conn):
+            current = kb.get_task(conn, tid)
+            if current is None or current.assistant_owner_key != owner_key:
+                return tool_error("assistant_tasks task ownership changed before resume")
+            if current.status != "blocked":
+                return tool_error(
+                    "assistant_tasks task is no longer blocked",
+                    task_id=tid,
+                    board=board,
+                    status=current.status,
+                )
+            comment_id = kb.add_comment(
+                conn,
+                tid,
+                "user-via-assistant",
+                message,
+            )
+            resumed = kb.unblock_task(conn, tid)
+            landed = kb.get_task(conn, tid)
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks could not record user input and resume the task",
+            task_id=tid,
+            board=board,
+            error_type=type(exc).__name__,
+        )
+
+    if not resumed:
+        # The input is still useful durable evidence even if another actor raced
+        # the status transition. Say so explicitly instead of pretending resume
+        # was atomic across the two existing Kanban write APIs.
+        return tool_error(
+            "assistant_tasks recorded the user input but the task could not be resumed",
+            task_id=tid,
+            board=board,
+            comment_id=comment_id,
+            input_recorded=True,
+            status=(landed.status if landed else None),
+        )
+
+    return json.dumps(
+        {
+            "ok": True,
+            "task_id": tid,
+            "board": board,
+            "status": landed.status if landed else "ready",
+            "comment_id": comment_id,
+            "input_recorded": True,
+        },
+        ensure_ascii=False,
+    )
+
 def assistant_tasks_tool(
     *,
     action: str = "create",
@@ -362,6 +482,8 @@ def assistant_tasks_tool(
     include_completed: bool = True,
     limit: Any = 20,
     task_ids: Any = None,
+    task_id: Any = None,
+    user_message: Optional[str] = None,
     session_id: Optional[str] = None,
     request_id: Optional[str] = None,
     owner_key: Optional[str] = None,
@@ -392,7 +514,13 @@ def assistant_tasks_tool(
             task_ids=task_ids,
             owner_key=owner,
         )
-    return tool_error("assistant_tasks action must be 'create' or 'list'")
+    if action == "resume":
+        return _resume_task(
+            task_id=task_id,
+            user_message=user_message,
+            owner_key=owner,
+        )
+    return tool_error("assistant_tasks action must be 'create', 'list', or 'resume'")
 
 
 @no_cache_check_fn
@@ -409,7 +537,10 @@ ASSISTANT_TASKS_SCHEMA = {
         "the parent conversation. The existing Kanban dispatcher owns execution, retries, recovery, "
         "blocking, and completion notifications. Use action=list when the user asks what long-running "
         "work is still running, blocked, waiting for review, or recently completed; the lookup follows "
-        "the stable assistant owner across conversations and active Kanban boards. Do NOT use this "
+        "the stable assistant owner across conversations and active Kanban boards. Use action=resume only "
+        "when the CURRENT user message explicitly supplies the requested input or approval for one blocked "
+        "task; the runtime records that exact user message before resuming. Never infer approval from prior "
+        "chat history, memory, or assistant text. Do NOT use this "
         "for ordinary answers or tiny foreground actions that can be completed immediately. Set "
         "approval_required=true for any task that may culminate in a purchase, booking, message/send, "
         "publication, destructive change, credential/permission change, or other irreversible "
@@ -421,7 +552,7 @@ ASSISTANT_TASKS_SCHEMA = {
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["create", "list"],
+                "enum": ["create", "list", "resume"],
                 "default": "create",
             },
             "tasks": {
@@ -491,6 +622,10 @@ ASSISTANT_TASKS_SCHEMA = {
                 "items": {"type": "string"},
                 "description": "With action=list, optionally restrict the query to these task ids.",
             },
+            "task_id": {
+                "type": "string",
+                "description": "With action=resume, the single owned blocked task to resume from the current user message.",
+            },
         },
         "required": ["action"],
     },
@@ -508,6 +643,8 @@ registry.register(
         include_completed=args.get("include_completed", True),
         limit=args.get("limit", 20),
         task_ids=args.get("task_ids"),
+        task_id=args.get("task_id"),
+        user_message=kw.get("user_message"),
         session_id=kw.get("session_id"),
         request_id=kw.get("tool_call_id") or kw.get("task_id"),
         owner_key=kw.get("assistant_owner_key"),
