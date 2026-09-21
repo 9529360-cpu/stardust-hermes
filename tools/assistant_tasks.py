@@ -63,6 +63,27 @@ def _active_profile_name() -> str:
         return "default"
 
 
+def _assistant_tasks_context_allowed() -> bool:
+    """Only parent/user sessions may access the personal durable-task index.
+
+    Kanban workers already have lineage-scoped `kanban_create` for follow-up
+    work, and delegated children must return results to their parent. Exposing
+    this user-wide intake/index inside either context would let a scoped worker
+    inspect or enqueue unrelated durable work.
+    """
+    from agent.delegation_context import (
+        is_delegated_child_process_context,
+        is_dispatcher_owned_worker_context,
+    )
+
+    if is_delegated_child_process_context():
+        return False
+    return not (
+        os.environ.get("HERMES_KANBAN_TASK")
+        and is_dispatcher_owned_worker_context()
+    )
+
+
 def _resolve_owner_key() -> Optional[str]:
     """Stable task owner for cross-conversation recall.
 
@@ -346,6 +367,11 @@ def assistant_tasks_tool(
     owner_key: Optional[str] = None,
 ) -> str:
     """Create durable independent work or query the durable assistant task queue."""
+    if not _assistant_tasks_context_allowed():
+        return tool_error(
+            "assistant_tasks is only available to parent user sessions; "
+            "scoped workers must return results to their parent or use lineage-scoped kanban tools"
+        )
     action = str(action or "create").strip().lower()
     owner = str(owner_key or _resolve_owner_key() or "").strip()
     if not owner:
@@ -370,7 +396,7 @@ def assistant_tasks_tool(
 
 
 def check_assistant_tasks_requirements() -> bool:
-    return True
+    return _assistant_tasks_context_allowed()
 
 
 ASSISTANT_TASKS_SCHEMA = {
