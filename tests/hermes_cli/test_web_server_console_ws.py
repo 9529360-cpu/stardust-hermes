@@ -151,6 +151,10 @@ def test_console_cancel_stops_forked_agent_request_before_reporting(console_clie
         curator, "_resolve_review_provider",
         lambda: ({"api_key": "test-key", "base_url": blocking_provider["base_url"]}, "test-model", "openai-compat", {}, None),
     )
+    # The hermetic test home starts with an empty skills directory. Force one
+    # curator-owned candidate so this test reaches the blocking provider path
+    # it is specifically intended to cancel.
+    monkeypatch.setattr(curator, "_llm_candidate_rows", lambda: [{"name": "synthetic-candidate"}])
     worker_exited = threading.Event()
     real_execute = chat_ws._execute_console_line
 
