@@ -1322,18 +1322,22 @@ describe('startUpdatePoller', () => {
     vi.useRealTimers()
   })
 
-  it('does not perform passive update checks in the detached Stardust edition', async () => {
+  it('checks Stardust on startup and then on the bounded background cadence', async () => {
     startUpdatePoller()
-    await vi.advanceTimersByTimeAsync(BACKGROUND_UPDATE_CHECK_MS * 2)
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(checkMock).not.toHaveBeenCalled()
-    expect(onProgressMock).not.toHaveBeenCalled()
+    expect(checkMock).toHaveBeenCalledTimes(1)
+    expect(onProgressMock).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(BACKGROUND_UPDATE_CHECK_MS * 2)
+    expect(checkMock).toHaveBeenCalledTimes(3)
   })
 
-  it('does not register focus polling in the detached Stardust edition', () => {
+  it('registers focus polling for the Stardust update source', async () => {
     startUpdatePoller()
+    await vi.advanceTimersByTimeAsync(0)
 
-    expect(listeners).toEqual({})
-    expect(checkMock).not.toHaveBeenCalled()
+    expect(listeners.focus).toBeTypeOf('function')
+    expect(checkMock).toHaveBeenCalledTimes(1)
   })
 })
