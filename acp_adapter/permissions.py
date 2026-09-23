@@ -99,11 +99,13 @@ def capture_approval_trust_posture(
         )
 
     trusted_names = {
-        item.strip().casefold()
+        item.strip()
         for item in configured
         if isinstance(item, str) and item.strip() and item.strip() != "*"
     }
-    trusted = client_name != "unknown" and client_name.casefold() in trusted_names
+    # ACP client_info.name is an identity string for this trust boundary. Match it
+    # case-sensitively so configuration never grants a broader identity than named.
+    trusted = client_name != "unknown" and client_name in trusted_names
     return ApprovalTrustPosture(
         client_name=client_name,
         client_version=client_version,
