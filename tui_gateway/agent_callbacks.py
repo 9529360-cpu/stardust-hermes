@@ -125,7 +125,7 @@ def _agent_cbs(sid: str) -> dict:
     return callbacks
 
 
-def _apply_project_workspace(task_id: str, path: str, _name: str = "") -> None:
+def _apply_project_workspace(task_id: str, path: str, _name: str = "", project_id: str = "") -> None:
     """Intentional workspace move from the project_* tools: re-anchor the live session's cwd
     and push session.info. The ONLY auto-cwd path — an explicit tool call, never a `cd`."""
     if not path:
@@ -142,8 +142,14 @@ def _apply_project_workspace(task_id: str, path: str, _name: str = "") -> None:
         return
     # explicit switch supersedes a settle-adopted cwd
     session.update(cwd=resolved, explicit_cwd=True, cwd_from_settle=False)
+    if project_id:
+        session["project_id"] = project_id
     _register_session_cwd(session)
     _persist_session_cwd_and_schedule_git_meta(session, resolved)
+    if project_id and session.get("session_key"):
+        with contextlib.suppress(Exception), _session_db(session) as db:
+            if db is not None:
+                db.set_session_project(session["session_key"], project_id)
     try:
         agent = session.get("agent")
         info = _session_info(agent, session) if agent is not None else {
