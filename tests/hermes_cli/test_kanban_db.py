@@ -1316,6 +1316,7 @@ def test_migrate_add_optional_columns_tolerates_concurrent_migration(kanban_home
         CREATE TABLE tasks (
             id INTEGER PRIMARY KEY,
             title TEXT NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT 0,
             tenant TEXT,
             result TEXT,
             idempotency_key TEXT,
