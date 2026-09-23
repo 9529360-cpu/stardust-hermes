@@ -95,6 +95,7 @@ _OPTIONAL_PROJECT_COLUMNS = ("board_slug", "primary_path", "icon", "color")
 _OPTIONAL_ROW_FIELDS = ("description", "icon", "color", "board_slug", "primary_path")
 _ACTIVE_META_KEY = "active_id"
 _DISCOVERY_POLICY_META_KEY = "repo_discovery_policy"
+_PROJECT_FACT_SOURCE_KINDS = frozenset({"user", "repository", "session", "tool", "inference", "import"})
 
 
 def _slugify(name: str) -> str:
@@ -346,8 +347,9 @@ def add_project_fact(
     kind = str(source_kind or "").strip().lower()
     if not text:
         raise ValueError("project fact content must not be empty")
-    if not kind:
-        raise ValueError("project fact source_kind must not be empty")
+    if kind not in _PROJECT_FACT_SOURCE_KINDS:
+        allowed = ", ".join(sorted(_PROJECT_FACT_SOURCE_KINDS))
+        raise ValueError(f"project fact source_kind must be one of: {allowed}")
     score = float(confidence)
     if not 0.0 <= score <= 1.0:
         raise ValueError("project fact confidence must be between 0.0 and 1.0")
@@ -356,7 +358,9 @@ def add_project_fact(
     fact_id = "pf_" + secrets.token_hex(6)
     with write_txn(conn):
         conn.execute(
-            "INSERT INTO project_facts (id, project_id, content, source_kind, source_ref, confidence, sensitive, created_at, verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO project_facts "
+            "(id, project_id, content, source_kind, source_ref, confidence, sensitive, created_at, verified_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (fact_id, project_id, text, kind, source_ref, score, 1 if sensitive else 0, _now(), verified_at),
         )
     return fact_id
@@ -367,17 +371,41 @@ def list_project_facts(conn: sqlite3.Connection, project_id: str, *, include_sup
     if not include_superseded:
         sql += " AND superseded_at IS NULL"
     sql += " ORDER BY created_at ASC, id ASC"
-    return [ProjectFact(id=r["id"], project_id=r["project_id"], content=r["content"], source_kind=r["source_kind"], source_ref=r["source_ref"], confidence=float(r["confidence"]), sensitive=bool(r["sensitive"]), created_at=int(r["created_at"]), verified_at=r["verified_at"], superseded_at=r["superseded_at"]) for r in conn.execute(sql, (project_id,)).fetchall()]
+    rows = conn.execute(sql, (project_id,)).fetchall()
+    return [
+        ProjectFact(
+            id=row["id"],
+            project_id=row["project_id"],
+            content=row["content"],
+            source_kind=row["source_kind"],
+            source_ref=row["source_ref"],
+            confidence=float(row["confidence"]),
+            sensitive=bool(row["sensitive"]),
+            created_at=int(row["created_at"]),
+            verified_at=row["verified_at"],
+            superseded_at=row["superseded_at"],
+        )
+        for row in rows
+    ]
 
 
 def verify_project_fact(conn: sqlite3.Connection, fact_id: str, *, verified_at: Optional[int] = None) -> bool:
     when = _now() if verified_at is None else int(verified_at)
-    return _execute_rowcount(conn, "UPDATE project_facts SET verified_at = ?, confidence = 1.0 WHERE id = ? AND superseded_at IS NULL", (when, fact_id)) > 0
+    return _execute_rowcount(
+        conn,
+        "UPDATE project_facts SET verified_at = ?, confidence = 1.0 "
+        "WHERE id = ? AND superseded_at IS NULL",
+        (when, fact_id),
+    ) > 0
 
 
 def supersede_project_fact(conn: sqlite3.Connection, fact_id: str, *, superseded_at: Optional[int] = None) -> bool:
     when = _now() if superseded_at is None else int(superseded_at)
-    return _execute_rowcount(conn, "UPDATE project_facts SET superseded_at = ? WHERE id = ? AND superseded_at IS NULL", (when, fact_id)) > 0
+    return _execute_rowcount(
+        conn,
+        "UPDATE project_facts SET superseded_at = ? WHERE id = ? AND superseded_at IS NULL",
+        (when, fact_id),
+    ) > 0
 
 
 def _execute_rowcount(conn: sqlite3.Connection, sql: str, params) -> int:
