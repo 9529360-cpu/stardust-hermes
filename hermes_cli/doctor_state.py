@@ -156,7 +156,8 @@ def _check_state_authority(should_fix: bool, f: Finding) -> None:
     from hermes_cli.state_authority import StateDomain, authority_for
     for domain in (
         StateDomain.USER_PROFILE, StateDomain.GLOBAL_MEMORY, StateDomain.PROJECT,
-        StateDomain.SESSION, StateDomain.TASK, StateDomain.INFERENCE,
+        StateDomain.SESSION, StateDomain.SESSION_PLAN, StateDomain.DURABLE_TASK,
+        StateDomain.INFERENCE,
     ):
         authority = authority_for(domain)
         check_info(f"{authority.domain.value}: {authority.store} ({authority.scope})")
