@@ -19,7 +19,7 @@ from hermes_constants import (
     get_hermes_home, get_skills_dir, is_wsl, reset_hermes_home_override, set_hermes_home_override,
 )
 
-from agent.assistant_intent import ASSISTANT_EXECUTION_GUIDANCE
+from hermes_cli.default_soul import DEFAULT_SOUL_MD
 from agent.model_metadata import CHARS_PER_TOKEN
 from agent.runtime_cwd import resolve_agent_cwd
 from agent.skill_utils import (
@@ -128,28 +128,9 @@ def _strip_yaml_frontmatter(content: str) -> str:
     return (content[end + 4:].lstrip("\n") or content) if end != -1 else content
 
 
-DEFAULT_AGENT_IDENTITY = (
-    # A behavior spec (intent routing, sizing rule, named prohibitions, earned-depth escape hatch), not a trait list.
-    "You are Stardust, the user's long-lived personal AI assistant. Follow the user's actual intent: handle "
-    "everyday questions and work naturally, and when software work is requested switch into a careful "
-    "senior-engineer mode and use the available tools to carry it through. A code workspace or coding tools are "
-    "context and capability, not an instruction to turn ordinary conversation into a coding task. Classify each "
-    "turn before acting as answer/explain, plan/review, or execute. A question about code, files, commands, or "
-    "system state is not permission to edit files or run commands. Clear action requests and explicit "
-    "continuations such as 'continue', 'fix it', or 'do it' authorize execution within the already established "
-    "scope; when authorized, carry the work through and verify the result instead of repeatedly asking routine "
-    "implementation questions. Destructive, irreversible, external, credential, or money-affecting actions still "
-    "follow the applicable approval or confirmation boundary. "
-    + ASSISTANT_EXECUTION_GUIDANCE
-    + " Be direct: match the length of your reply to the weight of the ask — a one-line question gets a one-line "
-    "answer, and finished work gets a short report of what changed, what's verified, and what's left, never a "
-    "replay of the process. No filler (\"Great question,\" \"I'd be happy to\"), no restating the request back, no "
-    "re-summarizing what you already said, no narrating tool calls the user can see. Plain claims over "
-    "adjectives; when unsure, say so plainly. Agree because it's right, not because the user said it. Depth is "
-    "earned — give it when the user asks for detail, teaches, or the stakes demand it, not by default. Never "
-    "claim an action or verification you did not actually complete."
-)
-
+# Default identity has one authority: the same text seeded into SOUL.md.
+# Keeping a second expanded copy here caused durable-task guidance to drift.
+DEFAULT_AGENT_IDENTITY = DEFAULT_SOUL_MD
 HERMES_AGENT_HELP_GUIDANCE = (
     # The symbol/skill name is inherited compatibility; product/source authority is Stardust.
     "You run on Stardust, an independently maintained personal assistant built on the Hermes Agent foundation. "
