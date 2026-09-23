@@ -140,6 +140,7 @@ def test_explicit_session_project_beats_cwd_project(tmp_path, monkeypatch):
         agent = SimpleNamespace(
             _context_cwd_is_launch_artifact=False,
             _session_db=session_db,
+            _session_project_id=project_b,
             session_id="session-1",
         )
 
@@ -174,6 +175,7 @@ def test_missing_explicit_session_project_does_not_fall_back_to_cwd(tmp_path, mo
         agent = SimpleNamespace(
             _context_cwd_is_launch_artifact=False,
             _session_db=session_db,
+            _session_project_id="p_missing",
             session_id="session-1",
         )
 
@@ -205,6 +207,7 @@ def test_archived_explicit_project_does_not_fall_back_to_cwd(tmp_path, monkeypat
         agent = SimpleNamespace(
             _context_cwd_is_launch_artifact=False,
             _session_db=session_db,
+            _session_project_id=project_id,
             session_id="session-archived",
         )
         assert system_prompt._project_fact_parts(agent) == []
@@ -235,6 +238,7 @@ def test_explicit_project_facts_load_even_from_launch_artifact_cwd(tmp_path, mon
         agent = SimpleNamespace(
             _context_cwd_is_launch_artifact=True,
             _session_db=session_db,
+            _session_project_id=project_id,
             session_id="session-folderless",
         )
 
@@ -244,6 +248,23 @@ def test_explicit_project_facts_load_even_from_launch_artifact_cwd(tmp_path, mon
         assert "Folderless project fact." in block
     finally:
         session_db.close()
+
+
+def test_project_fact_prompt_never_queries_session_db_for_routing(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    session_db = SimpleNamespace(
+        db_path=home / "state.db",
+        get_session=lambda *_: (_ for _ in ()).throw(AssertionError("prompt must not query state.db")),
+    )
+    agent = SimpleNamespace(
+        _context_cwd_is_launch_artifact=True,
+        _session_db=session_db,
+        _session_project_id=None,
+    )
+
+    assert system_prompt._project_fact_parts(agent) == []
 
 
 def test_project_fact_prompt_read_does_not_create_projects_db(tmp_path, monkeypatch):
