@@ -59,3 +59,50 @@ def test_rename_and_archive(tmp_path):
 
 
 
+
+
+def test_project_facts_cli_lifecycle(capsys, tmp_path):
+    assert _run(["create", "Fact App", str(tmp_path)]) == 0
+    capsys.readouterr()
+
+    assert _run([
+        "facts", "fact-app", "add", "Python 3.12 is required.",
+        "--source", "repository", "--source-ref", "pyproject.toml",
+    ]) == 0
+    added = capsys.readouterr().out
+    assert "Added project fact" in added
+
+    with pdb.connect_closing() as conn:
+        project = pdb.get_project(conn, "fact-app")
+        facts = pdb.list_project_facts(conn, project.id)
+        assert len(facts) == 1
+        fact_id = facts[0].id
+        assert facts[0].source_kind == "repository"
+        assert facts[0].source_ref == "pyproject.toml"
+
+    assert _run(["facts", "fact-app", "list"]) == 0
+    listed = capsys.readouterr().out
+    assert fact_id in listed
+    assert "Python 3.12 is required." in listed
+
+    assert _run(["facts", "fact-app", "verify", fact_id]) == 0
+    assert "Verified project fact" in capsys.readouterr().out
+
+    assert _run(["facts", "fact-app", "supersede", fact_id]) == 0
+    assert "Superseded project fact" in capsys.readouterr().out
+
+    assert _run(["facts", "fact-app", "list"]) == 0
+    assert "No project facts." in capsys.readouterr().out
+    assert _run(["facts", "fact-app", "list", "--all"]) == 0
+    assert fact_id in capsys.readouterr().out
+
+
+def test_project_facts_cli_rejects_certain_unverified_inference(capsys, tmp_path):
+    assert _run(["create", "Fact App", str(tmp_path)]) == 0
+    capsys.readouterr()
+
+    assert _run([
+        "facts", "fact-app", "add", "Probably uses squash merges.",
+        "--source", "inference", "--confidence", "1.0",
+    ]) == 2
+    assert "confidence below 1.0" in capsys.readouterr().err
