@@ -301,12 +301,16 @@ class _FolderIndex:
 
     def __init__(self, projects: list[dict]) -> None:
         self._by_path: dict[str, tuple[dict, int]] = {}
+        self._by_id = {str(project.get("id") or ""): project for project in projects if project.get("id")}
         for project in projects:
             for folder in project.get("folders") or []:
                 segs = _comparison_segments(folder.get("path") or "")
                 # Deepest folder wins; ties keep the first project (scan order).
                 if segs and len(segs) > self._by_path.get("/".join(segs), (None, -1))[1]:
                     self._by_path["/".join(segs)] = (project, len(segs))
+
+    def by_id(self, project_id: str) -> Optional[dict]:
+        return self._by_id.get(str(project_id or ""))
 
     def match(self, target: str) -> tuple[Optional[dict], int]:
         """Owning project for ``target`` by longest ancestor folder, + its depth."""
@@ -320,6 +324,11 @@ class _FolderIndex:
 
 def _project_for_session(
         session: dict, index: _FolderIndex, resolve: Optional[Resolve]) -> Optional[dict]:
+    explicit = _field(session, "project_id")
+    if explicit:
+        project = index.by_id(explicit)
+        if project is not None:
+            return project
     cwd = _field(session, "cwd")
     if not cwd:
         return None
@@ -411,7 +420,11 @@ def build_tree(
     unowned: list[dict] = []
     for session in sessions:
         owner = _project_for_session(session, folder_index, resolve)
-        (by_project.setdefault(owner["id"], []) if owner else unowned).append(session)
+        # project_id is backend ownership metadata, not part of the established
+        # ProjectTreeSession wire payload. Strip it after placement.
+        public_session = dict(session)
+        public_session.pop("project_id", None)
+        (by_project.setdefault(owner["id"], []) if owner else unowned).append(public_session)
 
     scoped_ids: list[str] = []
     result: list[dict] = []
