@@ -119,6 +119,16 @@ class TestApprovalTrust:
         assert posture.trusted_interactive is False
         assert posture.reason == "client_not_trusted"
 
+    def test_client_name_match_is_case_sensitive(self):
+        posture = capture_approval_trust_posture(
+            SimpleNamespace(name="zed", version="1"),
+            config={"security": {"approval": {"acp_trusted_clients": ["Zed"]}}},
+        )
+
+        assert posture.trusted_interactive is False
+        assert posture.reason == "client_not_trusted"
+
+
     def test_config_read_failure_denies(self):
         with patch("hermes_cli.config.load_config_readonly", side_effect=RuntimeError("broken config")):
             posture = capture_approval_trust_posture(SimpleNamespace(name="Zed", version="1"))
