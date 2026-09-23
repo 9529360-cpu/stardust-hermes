@@ -110,8 +110,8 @@ class TestCodexAuxiliaryTimeoutFdOwnership:
             if a in {"client.close", "sock.close"} and tid != owner_tid
         ]
         assert not stranger_closes, f"stranger-thread FD release: {stranger_closes}"
-        # The owning thread released the FDs on unwind.
-        assert ("client.close", owner_tid) in events, events
+        # The owning thread released the FDs on unwind exactly once.
+        assert events.count(("client.close", owner_tid)) == 1, events
 
     def test_owner_thread_deadline_hit_closes_directly(self):
         """When the OWNING thread detects the deadline in _check_cancelled,
@@ -157,4 +157,5 @@ class TestCodexAuxiliaryTimeoutFdOwnership:
 
         stranger = [(a, t) for a, t in events if t != owner_tid]
         assert not stranger, f"non-owner activity: {stranger}"
-        assert ("client.close", owner_tid) in events, events
+        # Owner detects the deadline before finally; both paths must share one close.
+        assert events.count(("client.close", owner_tid)) == 1, events

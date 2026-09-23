@@ -146,7 +146,30 @@ class TestRefusalOutsideScope:
 
 class TestSkips:
 
+    def test_quarantine_rename_between_snapshot_and_access_is_not_readonly(self, hermes_home, monkeypatch):
+        """A concurrent quarantine rename after is_file() is absence, not a permission failure."""
+        db = hermes_home / "state.db"
+        moved = hermes_home / "state.db.zeroed-race.bak"
+        _make_db(db)
+        real_access = os.access
+        raced = False
 
+        def racing_access(path, mode):
+            nonlocal raced
+            candidate = Path(path)
+            if candidate == db and not raced:
+                raced = True
+                db.rename(moved)
+                return False
+            return real_access(path, mode)
+
+        monkeypatch.setattr(os, "access", racing_access)
+
+        preflight_db_writability(db, db_label="state.db")
+
+        assert raced is True
+        assert moved.exists()
+        assert not db.exists()
 
     def test_healthy_db_untouched(self, hermes_home):
         db = hermes_home / "state.db"
