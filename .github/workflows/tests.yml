@@ -13,10 +13,10 @@ concurrency:
 jobs:
   test:
     name: Run tests
-    # Trusted Stardust branches use the isolated Leopard self-hosted runner.
-    # External fork PRs stay on GitHub-hosted infrastructure so untrusted code
-    # cannot execute on the personal CI machine.
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'stardust-ci' }}
+    # Full CI is repository infrastructure, not developer-machine workload.
+    # Keep every canonical suite on GitHub-hosted runners so local/runtime
+    # machines never become an implicit availability dependency for merges.
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout code
@@ -68,12 +68,6 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
-          if [ "${RUNNER_NAME:-}" = "leopard-stardust-ci" ]; then
-            export HOME="${RUNNER_TEMP}/stardust-ci-home"
-            rm -rf "$HOME"
-            install -d -m 700 "$HOME"
-            touch "$HOME/.hushlogin"
-          fi
           # Replace the Actions step shell with the test runner so cancellation
           # targets the real parent instead of orphaning it under PID 1.
           exec scripts/run_tests.sh --fail-on-flaky
