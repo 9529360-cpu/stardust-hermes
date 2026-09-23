@@ -95,7 +95,7 @@ _OPTIONAL_PROJECT_COLUMNS = ("board_slug", "primary_path", "icon", "color")
 _OPTIONAL_ROW_FIELDS = ("description", "icon", "color", "board_slug", "primary_path")
 _ACTIVE_META_KEY = "active_id"
 _DISCOVERY_POLICY_META_KEY = "repo_discovery_policy"
-_PROJECT_FACT_SOURCE_KINDS = frozenset({"user", "repository", "session", "tool", "inference", "import"})
+PROJECT_FACT_SOURCE_KINDS = frozenset({"user", "repository", "session", "tool", "inference", "import"})
 
 
 def _slugify(name: str) -> str:
@@ -351,8 +351,8 @@ def add_project_fact(
 
     if threat := _scan_memory_content(text):
         raise ValueError(f"project fact rejected: {threat}")
-    if kind not in _PROJECT_FACT_SOURCE_KINDS:
-        allowed = ", ".join(sorted(_PROJECT_FACT_SOURCE_KINDS))
+    if kind not in PROJECT_FACT_SOURCE_KINDS:
+        allowed = ", ".join(sorted(PROJECT_FACT_SOURCE_KINDS))
         raise ValueError(f"project fact source_kind must be one of: {allowed}")
     score = float(confidence)
     if not 0.0 <= score <= 1.0:
