@@ -413,7 +413,9 @@ async function loadDiskPlugin(entry: DiskPlugin, trustedNow = false): Promise<bo
   // Legacy decisions whose plugin id matched the folder name continue to work;
   // an un-mappable legacy id fails closed and requires one fresh confirmation.
   if (!trustedNow && !pluginActive(entry.decisionId, false)) {
-    publishInertDiskPlugin(entry)
+    if (!entry.id) {
+      publishInertDiskPlugin(entry)
+    }
 
     return true
   }
@@ -598,6 +600,7 @@ async function scanDiskPlugins(): Promise<void> {
         dropPlugin(record.id)
       }
 
+      dropPlugin(record.inventoryId)
       dropOriginRecord(record.origin, record)
 
       if (record.watchId) {
