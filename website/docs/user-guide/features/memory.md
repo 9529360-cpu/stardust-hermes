@@ -6,7 +6,7 @@ description: "How Hermes Agent remembers across sessions — MEMORY.md, USER.md,
 
 # Persistent Memory
 
-Hermes Agent has bounded, curated memory that persists across sessions. This lets it remember your preferences, your projects, your environment, and things it has learned.
+Stardust has bounded, curated memory that persists across sessions. It is the authority for user-profile facts and cross-project assistant knowledge. Project-scoped facts are owned by `projects.db`, session history by `state.db`, and durable task lifecycle by `kanban.db`; those domains are not promoted into global memory just because they appeared in a conversation.
 
 ## How It Works
 
@@ -93,11 +93,13 @@ If the substring matches multiple entries, an error is returned asking for a mor
 
 For information the agent needs to remember about the environment, workflows, and lessons learned:
 
-- Environment facts (OS, tools, project structure)
-- Project conventions and configuration
-- Tool quirks and workarounds discovered
-- Completed task diary entries
-- Skills and techniques that worked
+- Cross-project environment facts (OS, globally available tools)
+- Standing conventions that genuinely apply across projects
+- Tool quirks and workarounds that are not project-specific
+- Durable cross-project lessons
+- Skills and techniques that worked across contexts
+
+Project-specific conventions, versions, architecture facts, and repository decisions belong to the project's structured fact store in `projects.db`. Temporary task progress belongs to the task/session owner, not memory.
 
 ### `user` — User Profile
 
@@ -118,8 +120,9 @@ The agent saves automatically — you don't need to ask. It saves when it learns
 - **User preferences:** "I prefer TypeScript over JavaScript" → save to `user`
 - **Environment facts:** "This server runs Debian 12 with PostgreSQL 16" → save to `memory`
 - **Corrections:** "Don't use `sudo` for Docker commands, user is in docker group" → save to `memory`
-- **Conventions:** "Project uses tabs, 120-char line width, Google-style docstrings" → save to `memory`
-- **Completed work:** "Migrated database from MySQL to PostgreSQL on 2026-01-15" → save to `memory`
+- **Cross-project conventions:** "Use conventional commits in all maintained repositories" → save to `memory`
+- **Project conventions:** "Project A uses tabs and Python 3.12" → save as a project fact in `projects.db`, not global memory
+- **Completed work:** task/session history stays with its task/session unless it produced a durable project fact
 - **Explicit requests:** "Remember that my API key rotation happens monthly" → save to `memory`
 
 ### Skip These
