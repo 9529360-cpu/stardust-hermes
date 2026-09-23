@@ -66,8 +66,9 @@ def test_agent_cannot_promote_its_own_inference_to_certainty(project_home):
     assert result["success"] is False
     assert "confidence below 1.0" in result["error"]
 
-    schema = project_tools.registry.get_tool_schema("desktop_project")
-    actions = schema["parameters"]["properties"]["action"]["enum"]
+    entry = project_tools.registry.get_entry("desktop_project")
+    assert entry is not None
+    actions = entry.schema["parameters"]["properties"]["action"]["enum"]
     assert "fact_verify" not in actions
 
 
