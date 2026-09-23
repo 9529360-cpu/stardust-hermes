@@ -67,7 +67,7 @@ def test_verified_inference_can_enter_project_context(tmp_path, monkeypatch):
             source_kind="inference",
             confidence=0.5,
         )
-        assert pdb.verify_project_fact(conn, fact_id, verified_at=1234)
+        assert pdb.verify_project_fact(conn, fact_id, project_id=project_id, verified_at=1234)
 
     block = system_prompt._project_fact_parts(
         SimpleNamespace(_context_cwd_is_launch_artifact=False)
