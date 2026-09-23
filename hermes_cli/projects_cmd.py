@@ -54,6 +54,25 @@ def build_parser(parent_subparsers: argparse._SubParsersAction) -> argparse.Argu
     project_sub("bind-board", "Bind a kanban board to a project").add_argument(
         "board", nargs="?", default="", help="Board slug (omit to unbind)"
     )
+
+    p_facts = project_sub("facts", "Manage durable facts for a project")
+    fact_sub = p_facts.add_subparsers(dest="fact_action")
+    fact_list = fact_sub.add_parser("list", help="List active project facts")
+    fact_list.add_argument("--all", action="store_true", dest="include_superseded", help="Include superseded facts")
+    fact_add = fact_sub.add_parser("add", help="Add a project fact with provenance")
+    fact_add.add_argument("content", help="Durable project-scoped fact")
+    fact_add.add_argument(
+        "--source", dest="source_kind", required=True,
+        choices=sorted(pdb._PROJECT_FACT_SOURCE_KINDS),
+        help="Where this fact came from",
+    )
+    fact_add.add_argument("--source-ref", default=None, help="Optional source locator or identifier")
+    fact_add.add_argument("--confidence", type=float, default=1.0)
+    fact_add.add_argument("--sensitive", action="store_true", help="Store but never auto-inject into model context")
+    fact_verify = fact_sub.add_parser("verify", help="Mark one fact verified and certain")
+    fact_verify.add_argument("fact_id")
+    fact_supersede = fact_sub.add_parser("supersede", help="Retire an obsolete fact without deleting history")
+    fact_supersede.add_argument("fact_id")
     parser.set_defaults(_project_parser=parser)
     return parser
 
@@ -203,6 +222,43 @@ def _cmd_use(args, conn):
     return f"Active project: {proj.slug}"
 
 
+@_with_project
+def _cmd_facts(args, conn, proj):
+    action = getattr(args, "fact_action", None)
+    if not action:
+        return _err("choose a facts action: list, add, verify, supersede")
+    if action == "list":
+        facts = pdb.list_project_facts(
+            conn, proj.id, include_superseded=bool(getattr(args, "include_superseded", False))
+        )
+        if not facts:
+            return "No project facts."
+        for fact in facts:
+            state = "superseded" if fact.superseded_at is not None else "active"
+            verified = " verified" if fact.verified_at is not None else ""
+            sensitive = " sensitive" if fact.sensitive else ""
+            print(
+                f"{fact.id}  [{fact.source_kind} {fact.confidence:.2f}; {state}{verified}{sensitive}]  "
+                f"{fact.content}"
+            )
+        return 0
+    if action == "add":
+        fact_id = pdb.add_project_fact(
+            conn, proj.id, args.content, source_kind=args.source_kind,
+            source_ref=args.source_ref, confidence=args.confidence, sensitive=args.sensitive,
+        )
+        return f"Added project fact {fact_id} to {proj.slug}"
+    if action == "verify":
+        if not pdb.verify_project_fact(conn, args.fact_id):
+            return _err(f"no active project fact: {args.fact_id}")
+        return f"Verified project fact {args.fact_id}"
+    if action == "supersede":
+        if not pdb.supersede_project_fact(conn, args.fact_id):
+            return _err(f"no active project fact: {args.fact_id}")
+        return f"Superseded project fact {args.fact_id}"
+    return _err(f"unknown facts action: {action}")
+
+
 def _flag_command(op: str, verb: str):
     """Handler for ``pdb.<op>(conn, proj.id)`` followed by ``"<verb> <slug>"``."""
     return _with_project(lambda args, conn, proj: (getattr(pdb, op)(conn, proj.id), f"{verb} {proj.slug}")[1])
@@ -238,4 +294,5 @@ _HANDLERS = {
     "archive": _flag_command("archive_project", "Archived"),
     "restore": _flag_command("restore_project", "Restored"),
     "bind-board": _cmd_bind_board,
+    "facts": _cmd_facts,
 }
