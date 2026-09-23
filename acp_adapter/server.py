@@ -32,7 +32,9 @@ from acp_adapter.events import (
     make_thinking_cb, make_tool_progress_cb,
 )
 from acp_adapter.model_catalog import build_model_state, encode_model_choice
-from acp_adapter.permissions import make_approval_callback
+from acp_adapter.permissions import (
+    ApprovalTrustPosture, capture_approval_trust_posture, make_approval_callback,
+)
 from acp_adapter.provenance import session_provenance_meta
 from acp_adapter.session import SessionManager, SessionState, _expand_acp_enabled_toolsets
 from acp_adapter.tools import build_tool_complete, build_tool_start, coerce_tool_args
@@ -249,12 +251,16 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         super().__init__()
         self.session_manager = session_manager or SessionManager()
         self._conn: Optional[acp.Client] = None
+        self._approval_trust = ApprovalTrustPosture(reason="not_initialized")
+        self._approval_trust_initialized = False
 
     # ---- Connection lifecycle -----------------------------------------------
 
     def on_connect(self, conn: acp.Client) -> None:
-        """Store the client connection for sending session updates."""
+        """Store one client connection and reset its immutable approval trust posture."""
         self._conn = conn
+        self._approval_trust = ApprovalTrustPosture(reason="not_initialized")
+        self._approval_trust_initialized = False
         logger.info("ACP client connected")
 
     async def _send(self, session_id: str, update: Any, *, fail_msg: str, level: int = logging.WARNING) -> bool:
@@ -504,9 +510,20 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
         client_info: Implementation | None = None, **kwargs: Any,
     ) -> InitializeResponse:
         auth_methods = build_auth_methods()
+        if not self._approval_trust_initialized:
+            self._approval_trust = capture_approval_trust_posture(client_info, client_capabilities)
+            self._approval_trust_initialized = True
+        else:
+            logger.warning(
+                "ACP initialize repeated on one connection; preserving original approval trust posture for %s",
+                self._approval_trust.client_name,
+            )
         logger.info(
-            "Initialize from %s (protocol v%s)", client_info.name if client_info else "unknown",
+            "Initialize from %s (protocol v%s; dangerous-approval-trusted=%s; reason=%s)",
+            self._approval_trust.client_name,
             protocol_version if isinstance(protocol_version, int) else acp.PROTOCOL_VERSION,
+            self._approval_trust.trusted_interactive,
+            self._approval_trust.reason,
         )
 
         return InitializeResponse(
@@ -864,7 +881,9 @@ class HermesACPAgent(SlashCommandsMixin, acp.Agent):
                 message_cb(text)
 
             cbs.stream_delta_cb = stream_delta_cb
-            cbs.approval_cb = make_approval_callback(conn.request_permission, loop, session_id)
+            cbs.approval_cb = make_approval_callback(
+                conn.request_permission, loop, session_id, trust_posture=self._approval_trust
+            )
             try:
                 from acp_adapter.edit_approval import make_acp_edit_approval_requester
 

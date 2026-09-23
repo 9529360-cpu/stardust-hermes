@@ -1652,7 +1652,13 @@ DEFAULT_CONFIG = {
         # transport is used only when named explicitly. Transport timeout/error/invalid response
         # DENIES unless transport_fallback is "builtin". Presentation only: plugins cannot detect,
         # suppress, or auto-approve commands outside a correlated human response.
-        "approval": {"transport": "builtin", "transport_fallback": "deny"},
+        # ACP hosts are separately fail-closed because a protocol allow does not prove a human
+        # selected it. Exact client_info.name values must be explicitly trusted; no wildcard.
+        "approval": {
+            "transport": "builtin",
+            "transport_fallback": "deny",
+            "acp_trusted_clients": [],
+        },
         # Writes to agent-instruction files (AGENTS.md/CLAUDE.md/SOUL.md/.cursorrules, project-local
         # .hermes config) always need human approval, even under yolo. Extra patterns are fnmatch
         # globs on the basename (e.g. "*.mdc").
