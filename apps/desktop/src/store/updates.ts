@@ -75,7 +75,7 @@ export const openUpdateOverlayFor = (target: UpdateTarget) => {
 
   $updateOverlayTarget.set(effectiveTarget)
   $updateOverlayOpen.set(true)
-  void (effectiveTarget === 'backend' ? checkBackendUpdates({ force: true }) : checkUpdates({ force: true }))
+  void checkUpdates({ force: true })
 }
 
 export const resetUpdateApplyState = () => {

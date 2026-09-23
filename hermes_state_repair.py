@@ -565,6 +565,15 @@ def preflight_db_writability(db_path: Path, *, db_label: str = "state.db") -> No
         if in_scope and os.access(p, os.R_OK | os.W_OK):
             logger.info("%s preflight: repaired read-only %s (chmod u+rw%s)", db_label, p, x)
             continue
+        if not is_dir:
+            # TOCTOU: another startup may have quarantined/replaced this inode after
+            # the is_file() snapshot above. A vanished path is not a permission error;
+            # the caller's startup/quarantine lock owns the absent-path transition.
+            try:
+                if not p.is_file():
+                    continue
+            except OSError:
+                continue
         wal_note = (" Do NOT delete the -wal file — it contains committed data that "
                     "will be merged into the database once it is writable." if p.name.endswith("-wal") else "")
         raise sqlite3.OperationalError(
