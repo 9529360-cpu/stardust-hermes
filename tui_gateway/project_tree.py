@@ -326,9 +326,9 @@ def _project_for_session(
         session: dict, index: _FolderIndex, resolve: Optional[Resolve]) -> Optional[dict]:
     explicit = _field(session, "project_id")
     if explicit:
-        project = index.by_id(explicit)
-        if project is not None:
-            return project
+        # Explicit session ownership is authoritative. A stale/deleted Project id must
+        # fail closed instead of silently rebinding the conversation by cwd.
+        return index.by_id(explicit)
     cwd = _field(session, "cwd")
     if not cwd:
         return None
@@ -418,13 +418,22 @@ def build_tree(
     folder_index = _FolderIndex(active_projects)
     by_project: dict[str, list[dict]] = {}  # explicit project id -> owned rows
     unowned: list[dict] = []
+    stale_explicit: list[dict] = []
     for session in sessions:
         owner = _project_for_session(session, folder_index, resolve)
         # project_id is backend ownership metadata, not part of the established
         # ProjectTreeSession wire payload. Strip it after placement.
         public_session = dict(session)
+        explicit_project_id = _field(session, "project_id")
         public_session.pop("project_id", None)
-        (by_project.setdefault(owner["id"], []) if owner else unowned).append(public_session)
+        if owner:
+            by_project.setdefault(owner["id"], []).append(public_session)
+        elif explicit_project_id:
+            # Do not let cwd heuristics rewrite an explicit-but-stale owner. Keep the
+            # row visible in Home until the user intentionally rebinds it.
+            stale_explicit.append(public_session)
+        else:
+            unowned.append(public_session)
 
     scoped_ids: list[str] = []
     result: list[dict] = []
@@ -449,6 +458,7 @@ def build_tree(
 
     # Tier 2: auto projects from leftover sessions.
     by_auto_root, homeless = _auto_buckets(unowned, resolve, _junk, _junk_cwd, _exists)
+    homeless.extend(stale_explicit)
     seen: set[str] = set()
     for bucket in by_auto_root.values():
         auto_root, auto_sessions = bucket["root"], bucket["sessions"]
