@@ -1466,13 +1466,15 @@ for paper in results:
 **Project facts / `memory`** — persist project-specific decisions as Project facts when the session is attached to a Project; use `memory` only for reusable cross-project lessons or user/profile facts:
 
 ```
-memory("add", "Paper: autoreason. Venue: NeurIPS 2025 (9 pages). 
-  Contribution: structured refinement works when generation-evaluation gap is wide.
-  Key results: Haiku 42/42, Sonnet 3/5, S4.6 constrained 2/3.
-  Status: Phase 5 — drafting Methods section.")
+desktop_project({
+  "action": "fact_add",
+  "content": "Paper: autoreason. Venue: NeurIPS 2025 (9 pages). Contribution: structured refinement works when generation-evaluation gap is wide. Key results: Haiku 42/42, Sonnet 3/5, S4.6 constrained 2/3. Status: Phase 5 — drafting Methods section.",
+  "source_kind": "session",
+  "confidence": 1.0
+})
 ```
 
-Update memory after major decisions or phase transitions. This persists across sessions.
+Update Project facts after durable project decisions or phase transitions. Use `memory` only for lessons that should follow the user across unrelated projects.
 
 **`todo` tool** — track granular progress:
 
@@ -1487,7 +1489,7 @@ todo("update", id=1, status="completed")
 **Session startup protocol:**
 ```
 1. todo("list")                           # Check current task list
-2. memory("read")                         # Recall key decisions
+2. desktop_project({"action":"fact_list"}) # Recall durable project decisions when attached
 3. terminal("git log --oneline -10")      # Check recent commits
 4. terminal("ps aux | grep python")       # Check running experiments
 5. terminal("ls results/ | tail -20")     # Check for new results
