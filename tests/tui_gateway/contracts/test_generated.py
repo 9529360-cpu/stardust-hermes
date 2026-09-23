@@ -8,6 +8,7 @@ TS-only PR that edits them still runs this test.
 
 from __future__ import annotations
 
+import difflib
 import importlib.util
 import re
 from pathlib import Path
@@ -28,9 +29,27 @@ def gen():
 
 def test_generated_files_are_current(gen):
     """Both committed artefacts equal an in-memory regeneration (byte-for-byte)."""
-    stale = [path.relative_to(REPO) for path, text in gen.render_all().items()
-             if (path.read_text(encoding="utf-8") if path.exists() else None) != text]
-    assert not stale, f"stale generated contract files {stale}: run scripts/gen_gateway_contracts.py"
+    stale = []
+    diffs = []
+    for path, expected in gen.render_all().items():
+        actual = path.read_text(encoding="utf-8") if path.exists() else ""
+        if actual == expected:
+            continue
+        stale.append(path.relative_to(REPO))
+        diff = difflib.unified_diff(
+            actual.splitlines(),
+            expected.splitlines(),
+            fromfile=f"committed/{path.relative_to(REPO)}",
+            tofile=f"generated/{path.relative_to(REPO)}",
+            lineterm="",
+            n=3,
+        )
+        # Keep CI output bounded while still showing the first concrete mismatch.
+        diffs.append("\n".join(list(diff)[:160]))
+    assert not stale, (
+        f"stale generated contract files {stale}: run scripts/gen_gateway_contracts.py"
+        + ("\n\n" + "\n\n".join(diffs) if diffs else "")
+    )
 
 
 # The emitter inventory the old gateway-events.json scan used, kept as the completeness oracle:
