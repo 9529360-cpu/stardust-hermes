@@ -570,6 +570,8 @@ def _project_fact_parts(agent: Any) -> List[str]:
                 with pdb.connect_closing(project_db_path) as conn:
                     if explicit_project_id:
                         project = pdb.get_project(conn, explicit_project_id)
+                        if project is not None and project.archived:
+                            project = None
                     else:
                         project = pdb.project_for_path(conn, str(cwd))
                     facts = pdb.list_project_facts(conn, project.id) if project is not None else []
