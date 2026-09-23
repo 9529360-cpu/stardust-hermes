@@ -98,7 +98,7 @@ See [Persistent Memory](/user-guide/features/memory#how-memory-appears-in-the-sy
 
 For "did we discuss X last week?" recall, the agent has a separate mechanism: `session_search` queries all past sessions (stored in SQLite with full-text search) and can find things discussed weeks ago even when they're not in active memory. Just ask — "search our past sessions for the deploy discussion."
 
-You can also help directly: say "remember this for next time" after a productive session, or "clean up your memory" when it's near capacity so the agent consolidates entries. See [Memory & Skills tips](/guides/tips#memory--skills) and [Capacity Management](/user-guide/features/memory#capacity-management).
+You can also help directly: say "remember this for next time" after a productive session. The agent should route Project-specific facts to `projects.db` and reserve MEMORY.md/USER.md for profile-wide facts. Use "clean up your memory" when the profile memory itself is near capacity. See [Memory & Skills tips](/guides/tips#memory--skills) and [Capacity Management](/user-guide/features/memory#capacity-management).
 
 ## 6. Check that skills and tools are loaded
 
