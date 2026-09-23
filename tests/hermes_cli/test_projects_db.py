@@ -209,3 +209,14 @@ def test_superseded_project_facts_leave_active_projection(conn):
     assert [f.id for f in active] == [new_id]
     history = pdb.list_project_facts(conn, pid, include_superseded=True)
     assert {f.id for f in history} == {old_id, new_id}
+
+
+def test_state_authority_map_keeps_domains_separate():
+    from hermes_cli.state_authority import StateDomain, authority_for
+
+    assert authority_for(StateDomain.USER_PROFILE).store == "memories/USER.md"
+    assert authority_for(StateDomain.GLOBAL_MEMORY).store == "memories/MEMORY.md"
+    assert authority_for(StateDomain.PROJECT).store == "projects.db"
+    assert authority_for(StateDomain.SESSION).store == "state.db"
+    assert authority_for(StateDomain.TASK).store == "kanban.db"
+    assert authority_for(StateDomain.INFERENCE).durable is False
