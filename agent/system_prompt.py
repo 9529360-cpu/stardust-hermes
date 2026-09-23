@@ -555,8 +555,22 @@ def _project_fact_parts(agent: Any) -> List[str]:
             try:
                 from hermes_cli import projects_db as pdb
 
-                with pdb.connect_closing() as conn:
-                    project = pdb.project_for_path(conn, str(cwd))
+                session_db = getattr(agent, "_session_db", None)
+                project_db_path = None
+                explicit_project_id = None
+                if session_db is not None:
+                    db_path = getattr(session_db, "db_path", None)
+                    if db_path is not None:
+                        from pathlib import Path
+                        project_db_path = Path(db_path).parent / "projects.db"
+                    sid = str(getattr(agent, "session_id", None) or "")
+                    if sid:
+                        row = session_db.get_session(sid) or {}
+                        explicit_project_id = str(row.get("project_id") or "").strip() or None
+                with pdb.connect_closing(project_db_path) as conn:
+                    project = pdb.get_project(conn, explicit_project_id) if explicit_project_id else None
+                    if project is None:
+                        project = pdb.project_for_path(conn, str(cwd))
                     facts = pdb.list_project_facts(conn, project.id) if project is not None else []
             except Exception:
                 logger.debug("Could not load project facts for prompt context", exc_info=True)
