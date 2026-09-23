@@ -467,6 +467,18 @@ export interface Translations {
       kinds: { bundled: string; disk: string; runtime: string }
       agentHalfMissing: string
       agentHalfMissingTip: string
+      trustDialog: {
+        title: (name: string) => string
+        description: string
+        authorityHeading: string
+        authorityBody: string
+        sourceHeading: string
+        sourceUnknown: string
+        repository: string
+        pinnedCommit: string
+        localFile: string
+        confirm: string
+      }
       installModal: {
         installFromGit: string
         reviewRepository: string
@@ -489,6 +501,7 @@ export interface Translations {
         desktopTarget: string
         desktopTargetFromPackage: string
         desktopOnlyNote: string
+        desktopTrustNote: string
         insecureWarning: string
         securityHeading: string
         securityIntro: string
