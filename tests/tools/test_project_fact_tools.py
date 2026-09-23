@@ -21,7 +21,7 @@ def project_home(tmp_path):
 
 
 def _call(args: dict, task_id: str = "session-1") -> dict:
-    return json.loads(project_tools._handle_project(args, task_id=task_id))
+    return json.loads(project_tools.registry.dispatch("desktop_project", args, task_id=task_id))
 
 
 def test_agent_project_fact_lifecycle_is_scoped_to_current_session_project(project_home):
