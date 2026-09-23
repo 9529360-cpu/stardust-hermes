@@ -149,6 +149,32 @@ def _check_directory_structure(should_fix: bool, f: Finding) -> None:
             check_info(f"{fname} not created yet (will be created when the agent first writes a memory)")
 
 
+@doctor_check()
+def _check_state_authority(should_fix: bool, f: Finding) -> None:
+    """Report durable state ownership and the current cwd Project resolution."""
+    del should_fix, f
+    from hermes_cli.state_authority import StateDomain, authority_for
+    for domain in (
+        StateDomain.USER_PROFILE, StateDomain.GLOBAL_MEMORY, StateDomain.PROJECT,
+        StateDomain.SESSION, StateDomain.TASK, StateDomain.INFERENCE,
+    ):
+        authority = authority_for(domain)
+        check_info(f"{authority.domain.value}: {authority.store} ({authority.scope})")
+    try:
+        from hermes_cli import projects_db as pdb
+        with pdb.connect_closing() as conn:
+            project = pdb.project_for_path(conn, str(Path.cwd()))
+            active_id = pdb.get_active_id(conn)
+        if project is not None:
+            check_info(f"cwd project: {project.name} ({project.id}) via folder ownership")
+        elif active_id:
+            check_info(f"cwd project: none (active project pointer is {active_id}; not used as session authority)")
+        else:
+            check_info("cwd project: none")
+    except Exception as exc:
+        check_info(f"cwd project: unavailable ({exc})")
+
+
 def _session_count(state_db_path: Path):
     import sqlite3
     # mode=ro: doctor is a reader; a writable open of a gateway-held WAL DB is the second-writer class (#103339).
