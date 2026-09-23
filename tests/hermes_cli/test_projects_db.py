@@ -192,7 +192,7 @@ def test_unverified_inference_cannot_be_promoted_to_certain_fact(conn):
     assert fact.confidence == 0.6
     assert fact.verified_at is None
 
-    assert pdb.verify_project_fact(conn, fact_id, verified_at=1234) is True
+    assert pdb.verify_project_fact(conn, fact_id, project_id=pid, verified_at=1234) is True
     verified = pdb.list_project_facts(conn, pid)[0]
     assert verified.confidence == 1.0
     assert verified.verified_at == 1234
@@ -203,7 +203,7 @@ def test_superseded_project_facts_leave_active_projection(conn):
     old_id = pdb.add_project_fact(conn, pid, "Python 3.11", source_kind="user")
     new_id = pdb.add_project_fact(conn, pid, "Python 3.12", source_kind="user")
 
-    assert pdb.supersede_project_fact(conn, old_id, superseded_at=2000) is True
+    assert pdb.supersede_project_fact(conn, old_id, project_id=pid, superseded_at=2000) is True
 
     active = pdb.list_project_facts(conn, pid)
     assert [f.id for f in active] == [new_id]
