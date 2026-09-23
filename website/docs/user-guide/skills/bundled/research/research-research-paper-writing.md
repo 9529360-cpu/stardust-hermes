@@ -1461,20 +1461,18 @@ for paper in results:
         print(bibtex)
 ```
 
-### State Management with `memory` and `todo`
+### State Management with Project facts and `todo`
 
-**Project facts / `memory`** — persist project-specific decisions as Project facts when the session is attached to a Project; use `memory` only for reusable cross-project lessons or user/profile facts:
+**Project facts** — persist paper-specific decisions in the attached Project, not global `MEMORY.md`. In GUI sessions use `desktop_project` with `fact_add`; from the CLI use `hermes project facts <project> add ...`. Keep `memory` for reusable cross-project lessons or user-wide conventions.
 
-```
-desktop_project({
-  "action": "fact_add",
-  "content": "Paper: autoreason. Venue: NeurIPS 2025 (9 pages). Contribution: structured refinement works when generation-evaluation gap is wide. Key results: Haiku 42/42, Sonnet 3/5, S4.6 constrained 2/3. Status: Phase 5 — drafting Methods section.",
-  "source_kind": "session",
-  "confidence": 1.0
-})
+```text
+desktop_project({"action":"fact_add",
+  "content":"Venue: NeurIPS 2025. Contribution: structured refinement works when the generation-evaluation gap is wide.",
+  "source_kind":"session",
+  "confidence":1.0})
 ```
 
-Update Project facts after durable project decisions or phase transitions. Use `memory` only for lessons that should follow the user across unrelated projects.
+Update Project facts after durable decisions change; use `todo` for current execution progress.
 
 **`todo` tool** — track granular progress:
 
