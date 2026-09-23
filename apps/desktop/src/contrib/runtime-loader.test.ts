@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HermesReadDirResult } from '@/global'
 import type * as HermesModule from '@/hermes'
 
-import { $pluginRecords, publishPlugin, setPluginEnabled } from './plugins-store'
+import { $pluginDecisions, $pluginRecords, publishPlugin, setPluginEnabled } from './plugins-store'
 import { discoverRuntimePlugins, loadRuntimePlugin, watchRuntimePlugins } from './runtime-loader'
 
 // getStatus would supply the connected backend's hermes_home — a REMOTE path in
@@ -25,6 +25,8 @@ const stopPreviewFileWatch = vi.fn<(id: string) => Promise<boolean>>()
 const onPreviewFileChanged = vi.fn()
 
 beforeEach(() => {
+  $pluginDecisions.set({})
+  $pluginRecords.set({})
   desktopPluginsRoot.mockReset()
   readDir.mockReset()
   readFileText.mockReset()
@@ -149,10 +151,15 @@ describe('scanDiskPlugins (#66899)', () => {
     const register = vi.fn()
 
     ;(globalThis as unknown as { __uniRegister: unknown }).__uniRegister = register
+    ;(globalThis as unknown as { __uniTopLevelRuns: number }).__uniTopLevelRuns = 0
     readFileText.mockImplementation(async file =>
       file.endsWith('.hermes-package.json')
         ? { text: JSON.stringify({ package: 'uni-pkg', source: '/x/plugins/uni-pkg/desktop', sourceMtimeMs: 1 }) }
-        : { text: 'export default { id: "uni", register: globalThis.__uniRegister }' }
+        : {
+            text:
+              'globalThis.__uniTopLevelRuns += 1; ' +
+              'export default { id: "uni", register: globalThis.__uniRegister }'
+          }
     )
     watchPreviewFile.mockResolvedValue({ id: 'w-uni' })
 
@@ -185,9 +192,12 @@ describe('scanDiskPlugins (#66899)', () => {
       // the unified posture wins: installed-but-inert until the user toggles.
       expect($pluginRecords.get().uni).toMatchObject({ kind: 'disk', status: 'disabled', packageName: 'uni-pkg' })
       expect(register).not.toHaveBeenCalled()
+      expect((globalThis as unknown as { __uniTopLevelRuns: number }).__uniTopLevelRuns).toBe(0)
 
-      // The user's explicit enable still activates it.
+      // The user's explicit enable is the first point at which the module may
+      // evaluate at all — top-level code has the same renderer authority as register().
       await setPluginEnabled('uni', true)
+      expect((globalThis as unknown as { __uniTopLevelRuns: number }).__uniTopLevelRuns).toBe(1)
       expect(register).toHaveBeenCalledTimes(1)
       expect($pluginRecords.get().uni.status).toBe('loaded')
 
@@ -202,6 +212,7 @@ describe('scanDiskPlugins (#66899)', () => {
       revokeObjectURL.mockRestore()
       vi.stubGlobal('Blob', RealBlob)
       delete (globalThis as unknown as { __uniRegister?: unknown }).__uniRegister
+      delete (globalThis as unknown as { __uniTopLevelRuns?: unknown }).__uniTopLevelRuns
     }
   })
 })
@@ -268,7 +279,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     })
   }
 
-  it('loads the full source via readPluginSource when the shell offers it', async () => {
+  it('inventories standalone full-source plugins inert until the user explicitly enables them', async () => {
     ;(window.hermesDesktop as unknown as { readPluginSource: unknown }).readPluginSource = readPluginSource
     desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
     standaloneRootWith('big')
@@ -278,8 +289,11 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     const register = vi.fn()
 
     ;(globalThis as unknown as { __bigRegister: unknown }).__bigRegister = register
+    ;(globalThis as unknown as { __bigTopLevelRuns: number }).__bigTopLevelRuns = 0
     readPluginSource.mockResolvedValue({
-      text: 'export default { id: "big", register: globalThis.__bigRegister }'
+      text:
+        'globalThis.__bigTopLevelRuns += 1; ' +
+        'export default { id: "big-runtime", register: globalThis.__bigRegister }'
     })
     watchPreviewFile.mockResolvedValue({ id: 'w-big' })
 
@@ -288,13 +302,37 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
-      // The EVALUATED source came from the full read, not the truncated preview.
+      // Discovery is metadata-only: it must not even read/evaluate plugin.js.
+      expect(readPluginSource).not.toHaveBeenCalled()
+      expect(register).not.toHaveBeenCalled()
+      expect((globalThis as unknown as { __bigTopLevelRuns: number }).__bigTopLevelRuns).toBe(0)
+      expect($pluginRecords.get().big).toMatchObject({
+        decisionId: 'big',
+        kind: 'disk',
+        status: 'disabled'
+      })
+
+      await setPluginEnabled('big', true)
+
       expect(readPluginSource).toHaveBeenCalledWith('/local/.hermes/desktop-plugins/big/plugin.js')
+      expect((globalThis as unknown as { __bigTopLevelRuns: number }).__bigTopLevelRuns).toBe(1)
       expect(register).toHaveBeenCalledTimes(1)
-      expect($pluginRecords.get().big).toMatchObject({ kind: 'disk', status: 'loaded' })
+      expect($pluginRecords.get()['big-runtime']).toMatchObject({
+        decisionId: 'big',
+        kind: 'disk',
+        status: 'loaded'
+      })
+      expect($pluginRecords.get().big).toBeUndefined()
+
+      // Toggling by the source-declared runtime id still persists trust against
+      // the stable disk slot, so a rename inside plugin.js cannot mint trust.
+      await setPluginEnabled('big-runtime', false)
+      expect($pluginDecisions.get()).toMatchObject({ big: false })
+      expect($pluginDecisions.get()['big-runtime']).toBeUndefined()
     } finally {
       restore()
       delete (globalThis as unknown as { __bigRegister?: unknown }).__bigRegister
+      delete (globalThis as unknown as { __bigTopLevelRuns?: unknown }).__bigTopLevelRuns
     }
   })
 
@@ -313,7 +351,18 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
-      // No live plugin — an error inventory row names the folder instead.
+      // Discovery is safe metadata-only even on an older shell. The truncating
+      // preview API is not touched until the user explicitly trusts execution.
+      expect(readFileText).not.toHaveBeenCalled()
+      expect($pluginRecords.get().huge).toMatchObject({
+        decisionId: 'huge',
+        kind: 'disk',
+        status: 'disabled',
+        file: '/local/.hermes/desktop-plugins/huge/plugin.js'
+      })
+
+      await setPluginEnabled('huge', true)
+
       expect($pluginRecords.get().huge).toMatchObject({
         kind: 'disk',
         status: 'error',
@@ -325,15 +374,18 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     }
   })
 
-  it('older shell, small plugin (not truncated): still loads through readFileText', async () => {
+  it('older shell inventories a small standalone plugin inert, then explicit enable loads it', async () => {
     desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
     standaloneRootWith('small')
 
     const register = vi.fn()
 
     ;(globalThis as unknown as { __smallRegister: unknown }).__smallRegister = register
+    ;(globalThis as unknown as { __smallTopLevelRuns: number }).__smallTopLevelRuns = 0
     readFileText.mockResolvedValue({
-      text: 'export default { id: "small", register: globalThis.__smallRegister }'
+      text:
+        'globalThis.__smallTopLevelRuns += 1; ' +
+        'export default { id: "small", register: globalThis.__smallRegister }'
     })
     watchPreviewFile.mockResolvedValue({ id: 'w-small' })
 
@@ -342,11 +394,67 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
+      expect(readFileText).not.toHaveBeenCalled()
+      expect(register).not.toHaveBeenCalled()
+      expect((globalThis as unknown as { __smallTopLevelRuns: number }).__smallTopLevelRuns).toBe(0)
+      expect($pluginRecords.get().small).toMatchObject({ kind: 'disk', status: 'disabled' })
+
+      await setPluginEnabled('small', true)
+
+      expect((globalThis as unknown as { __smallTopLevelRuns: number }).__smallTopLevelRuns).toBe(1)
       expect(register).toHaveBeenCalledTimes(1)
       expect($pluginRecords.get().small).toMatchObject({ kind: 'disk', status: 'loaded' })
     } finally {
       restore()
       delete (globalThis as unknown as { __smallRegister?: unknown }).__smallRegister
+      delete (globalThis as unknown as { __smallTopLevelRuns?: unknown }).__smallTopLevelRuns
+    }
+  })
+})
+
+describe('runtime evaluation primitive', () => {
+  it('defers register when its trusted caller supplies an opt-in default', async () => {
+    const register = vi.fn()
+
+    ;(globalThis as unknown as { __directRuntimeRegister: unknown }).__directRuntimeRegister = register
+
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockImplementation(
+        blob =>
+          `data:text/javascript;base64,${Buffer.from((blob as unknown as { parts: string[] }).parts.join('')).toString('base64')}`
+      )
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const RealBlob = globalThis.Blob
+    vi.stubGlobal(
+      'Blob',
+      class {
+        parts: string[]
+        constructor(parts: string[]) {
+          this.parts = parts
+        }
+      }
+    )
+
+    try {
+      const id = await loadRuntimePlugin(
+        'export default { id: "direct-runtime", register: globalThis.__directRuntimeRegister }',
+        'direct-runtime'
+      )
+
+      expect(id).toBe('direct-runtime')
+      expect(register).not.toHaveBeenCalled()
+      expect($pluginRecords.get()['direct-runtime']).toMatchObject({ status: 'disabled' })
+
+      await setPluginEnabled('direct-runtime', true)
+
+      expect(register).toHaveBeenCalledTimes(1)
+      expect($pluginRecords.get()['direct-runtime']).toMatchObject({ status: 'loaded' })
+    } finally {
+      createObjectURL.mockRestore()
+      revokeObjectURL.mockRestore()
+      vi.stubGlobal('Blob', RealBlob)
+      delete (globalThis as unknown as { __directRuntimeRegister?: unknown }).__directRuntimeRegister
     }
   })
 })

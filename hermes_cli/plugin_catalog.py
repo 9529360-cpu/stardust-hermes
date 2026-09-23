@@ -281,7 +281,11 @@ def get_live_catalog_entry(name: str) -> Optional[PluginCatalogEntry]:
 # ── Human summaries ──────────────────────────────────────────────────────────
 
 def entry_capability_summary(entry: PluginCatalogEntry) -> str:
-    """One paragraph shown at install/enable prompts: what the user is granting."""
+    """One paragraph shown at install/enable prompts: what the user is granting.
+
+    Declared tools/hooks are descriptive metadata. Desktop entries execute code in the
+    Desktop renderer realm when enabled, so their real authority must be stated separately.
+    """
     caps = entry.capabilities
     parts = [f"{label} {', '.join(items)}" for label, items in (
         ("registers tool(s):", caps.provides_tools), ("hook(s):", caps.provides_hooks),
@@ -290,6 +294,12 @@ def entry_capability_summary(entry: PluginCatalogEntry) -> str:
     if entry.description:
         bits.append(entry.description)
     bits.append(f"This plugin {'; '.join(parts) if parts else 'declares no tools, hooks, middleware, or env vars'}.")
+    if entry.category == "desktop":
+        bits.append(
+            "Desktop code runs with full Stardust Desktop renderer/app authority when enabled; "
+            "declared capabilities are descriptive metadata, not a sandbox or permission boundary."
+        )
+    bits.append(f"Source: {entry.repo} pinned to {entry.sha}.")
     if entry.platforms:
         bits.append(f"Platforms: {', '.join(entry.platforms)}.")
     if entry.requires_hermes:
