@@ -679,7 +679,7 @@ def test_explicit_session_project_id_beats_cwd_folder_owner():
     assert "project_id" not in beta_session
 
 
-def test_stale_session_project_id_falls_back_to_cwd_owner():
+def test_stale_session_project_id_fails_closed_to_home():
     alpha = _project("p_alpha", "Alpha", ["/alpha"])
     session = _session("/alpha", project_id="p_deleted")
 
@@ -691,4 +691,6 @@ def test_stale_session_project_id_falls_back_to_cwd_owner():
         hydrate=True,
     )
 
-    assert [(p["id"], p["sessionCount"]) for p in tree["projects"]] == [("p_alpha", 1)]
+    counts = {p["id"]: p["sessionCount"] for p in tree["projects"]}
+    assert counts == {pt.NO_PROJECT_ID: 1, "p_alpha": 0}
+    assert _home_session_ids(tree) == [session["id"]]
