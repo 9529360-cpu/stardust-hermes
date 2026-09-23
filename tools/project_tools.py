@@ -11,7 +11,7 @@ from typing import Callable, Optional
 
 from tools.registry import registry
 
-# Set by the GUI gateway: ``(task_id, primary_path, project_name)`` re-anchors that session's
+# Set by the GUI gateway: ``(task_id, primary_path, project_name, project_id)`` re-anchors that session's
 # workspace. ``None`` in CLI/messaging — the DB write still happens, nothing to move.
 _workspace_callback: Optional[Callable[[str, str, str, str], None]] = None
 _project_context_callback: Optional[Callable[[str], Optional[str]]] = None
@@ -82,7 +82,10 @@ def _project_fact_action(args: dict, task_id: Optional[str]) -> str:
         if action == "fact_add":
             source_kind = str(args.get("source_kind") or "").strip().lower()
             if source_kind not in {"user", "repository", "session", "tool", "inference"}:
-                return json.dumps({"success": False, "error": "source_kind must be user, repository, session, tool, or inference."})
+                return json.dumps({
+                "success": False,
+                "error": "source_kind must be user, repository, session, tool, or inference.",
+            })
             try:
                 fact_id = pdb.add_project_fact(
                     conn, proj.id, str(args.get("content") or ""), source_kind=source_kind,
