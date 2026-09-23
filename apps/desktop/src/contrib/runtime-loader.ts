@@ -114,7 +114,9 @@ export function unloadRuntimePlugin(id: string): void {
   loaded.delete(id)
 }
 
-/** Evaluate + register one runtime plugin. Returns its id, or null on failure. */
+/** Evaluate one ALREADY-TRUSTED runtime plugin and optionally register it.
+ * Never call this to discover metadata from untrusted source: ESM import executes
+ * top-level code before plugin.id/defaultEnabled/register can be inspected. */
 export async function loadRuntimePlugin(
   source: string,
   origin: string,
