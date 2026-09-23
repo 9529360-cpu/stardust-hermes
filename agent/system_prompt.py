@@ -539,68 +539,73 @@ def _memory_parts(agent: Any) -> List[str]:
 def _project_fact_parts(agent: Any) -> List[str]:
     """Frozen project-scoped durable facts for the current session.
 
-    Project facts are owned by projects.db, not MEMORY.md. The first prompt
-    build snapshots the active non-sensitive facts; later prompt rebuilds
-    replay the same bytes so memory/compaction invalidation cannot mutate the
-    cached prefix mid-session. reset_session_state clears the snapshot.
+    An explicit state.db session project owner is authoritative even when the
+    launch cwd is a generic desktop artifact. Cwd resolution is only a legacy
+    fallback for sessions that predate project_id. The first prompt build
+    snapshots the eligible facts; later rebuilds replay the same bytes.
     """
     frozen = getattr(agent, "_frozen_project_fact_parts", None)
     if frozen is not None:
         return list(frozen)
 
     parts: List[str] = []
-    if not getattr(agent, "_context_cwd_is_launch_artifact", False):
-        cwd = resolve_context_cwd()
-        if cwd is not None:
-            try:
-                from hermes_cli import projects_db as pdb
+    project = None
+    facts = []
+    try:
+        from pathlib import Path
+        from hermes_cli import projects_db as pdb
 
-                session_db = getattr(agent, "_session_db", None)
-                project_db_path = None
-                explicit_project_id = None
-                if session_db is not None:
-                    db_path = getattr(session_db, "db_path", None)
-                    if db_path is not None:
-                        from pathlib import Path
-                        project_db_path = Path(db_path).parent / "projects.db"
-                    sid = str(getattr(agent, "session_id", None) or "")
-                    if sid:
-                        row = session_db.get_session(sid) or {}
-                        explicit_project_id = str(row.get("project_id") or "").strip() or None
-                with pdb.connect_closing(project_db_path) as conn:
-                    if explicit_project_id:
-                        project = pdb.get_project(conn, explicit_project_id)
-                        if project is not None and project.archived:
-                            project = None
-                    else:
-                        project = pdb.project_for_path(conn, str(cwd))
-                    facts = pdb.list_project_facts(conn, project.id) if project is not None else []
-            except Exception:
-                logger.debug("Could not load project facts for prompt context", exc_info=True)
-                project, facts = None, []
+        session_db = getattr(agent, "_session_db", None)
+        project_db_path = None
+        explicit_project_id = None
+        if session_db is not None:
+            db_path = getattr(session_db, "db_path", None)
+            if db_path is not None:
+                project_db_path = Path(db_path).parent / "projects.db"
+            sid = str(getattr(agent, "session_id", None) or "")
+            if sid:
+                row = session_db.get_session(sid) or {}
+                explicit_project_id = str(row.get("project_id") or "").strip() or None
 
-            if project is not None:
-                lines: List[str] = []
-                used = 0
-                for fact in facts:
-                    if fact.sensitive or fact.confidence < 0.8:
-                        continue
-                    if fact.source_kind == "inference" and fact.verified_at is None:
-                        continue
-                    source_marker = f"[{fact.source_kind}; confidence={fact.confidence:.2f}]"
-                    line = f"- {source_marker} {fact.content}"
-                    if used + len(line) + 1 > _PROJECT_FACT_PROMPT_MAX_CHARS:
-                        break
-                    lines.append(line)
-                    used += len(line) + 1
-                if lines:
-                    parts = [
-                        "## Project facts\n"
-                        f"Project: {project.name} ({project.id})\n"
-                        "Authority: projects.db. These facts are project-scoped; do not promote them "
-                        "to USER.md or MEMORY.md merely because they are in context.\n"
-                        + "\n".join(lines)
-                    ]
+        cwd = None
+        if explicit_project_id is None and not getattr(agent, "_context_cwd_is_launch_artifact", False):
+            cwd = resolve_context_cwd()
+
+        if explicit_project_id is not None or cwd is not None:
+            with pdb.connect_closing(project_db_path) as conn:
+                if explicit_project_id is not None:
+                    project = pdb.get_project(conn, explicit_project_id)
+                    if project is not None and project.archived:
+                        project = None
+                else:
+                    project = pdb.project_for_path(conn, str(cwd))
+                facts = pdb.list_project_facts(conn, project.id) if project is not None else []
+    except Exception:
+        logger.debug("Could not load project facts for prompt context", exc_info=True)
+        project, facts = None, []
+
+    if project is not None:
+        lines: List[str] = []
+        used = 0
+        for fact in facts:
+            if fact.sensitive or fact.confidence < 0.8:
+                continue
+            if fact.source_kind == "inference" and fact.verified_at is None:
+                continue
+            source_marker = f"[{fact.source_kind}; confidence={fact.confidence:.2f}]"
+            line = f"- {source_marker} {fact.content}"
+            if used + len(line) + 1 > _PROJECT_FACT_PROMPT_MAX_CHARS:
+                break
+            lines.append(line)
+            used += len(line) + 1
+        if lines:
+            parts = [
+                "## Project facts\n"
+                f"Project: {project.name} ({project.id})\n"
+                "Authority: projects.db. These facts are project-scoped; do not promote them "
+                "to USER.md or MEMORY.md merely because they are in context.\n"
+                + "\n".join(lines)
+            ]
 
     agent._frozen_project_fact_parts = tuple(parts)
     return list(parts)
