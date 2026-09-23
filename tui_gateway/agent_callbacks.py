@@ -126,30 +126,31 @@ def _agent_cbs(sid: str) -> dict:
 
 
 def _apply_project_workspace(task_id: str, path: str, _name: str = "", project_id: str = "") -> None:
-    """Intentional workspace move from the project_* tools: re-anchor the live session's cwd
-    and push session.info. The ONLY auto-cwd path — an explicit tool call, never a `cd`."""
-    if not path:
-        return
-    # task_id is the durable session_key; _sessions (and desktop event routing) key by sid.
+    """Persist the explicit Project owner and, when present, re-anchor its workspace."""
     key = str(task_id or "")
     with _sessions_lock:
         sid, session = (key, _sessions[key]) if key in _sessions else next(
             ((s, c) for s, c in _sessions.items()
              if c.get("session_key") == key or getattr(c.get("agent"), "session_id", None) == key),
             ("", None))
-    resolved = os.path.abspath(os.path.expanduser(str(path)))
-    if session is None or not os.path.isdir(resolved):
+    if session is None:
         return
-    # explicit switch supersedes a settle-adopted cwd
-    session.update(cwd=resolved, explicit_cwd=True, cwd_from_settle=False)
+
     if project_id:
         session["project_id"] = project_id
+        if session.get("session_key"):
+            with contextlib.suppress(Exception), _session_db(session) as db:
+                if db is not None:
+                    db.set_session_project(session["session_key"], project_id)
+
+    if not path:
+        return
+    resolved = os.path.abspath(os.path.expanduser(str(path)))
+    if not os.path.isdir(resolved):
+        return
+    session.update(cwd=resolved, explicit_cwd=True, cwd_from_settle=False)
     _register_session_cwd(session)
     _persist_session_cwd_and_schedule_git_meta(session, resolved)
-    if project_id and session.get("session_key"):
-        with contextlib.suppress(Exception), _session_db(session) as db:
-            if db is not None:
-                db.set_session_project(session["session_key"], project_id)
     try:
         agent = session.get("agent")
         info = _session_info(agent, session) if agent is not None else {
@@ -158,7 +159,6 @@ def _apply_project_workspace(task_id: str, path: str, _name: str = "", project_i
         _emit("session.info", sid, info)
     except Exception:
         logger.debug("failed to emit session.info after project workspace move", exc_info=True)
-
 
 def _project_id_for_task(task_id: str) -> str | None:
     key = str(task_id or "")
