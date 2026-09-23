@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from agent import system_prompt
 from hermes_cli import projects_db as pdb
+from hermes_state import SessionDB
 
 
 def test_project_facts_prompt_uses_project_authority_and_filters_unsafe_context(tmp_path, monkeypatch):
@@ -111,3 +112,41 @@ def test_project_fact_prompt_is_frozen_for_the_session(tmp_path, monkeypatch):
     agent._frozen_project_fact_parts = None
     next_session = system_prompt._project_fact_parts(agent)
     assert "Later fact." in next_session[0]
+
+
+def test_explicit_session_project_beats_cwd_project(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    cwd_a = tmp_path / "repo-a"
+    cwd_b = tmp_path / "repo-b"
+    cwd_a.mkdir()
+    cwd_b.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd_a)
+
+    with pdb.connect_closing(home / "projects.db") as conn:
+        project_a = pdb.create_project(conn, name="Alpha", folders=[str(cwd_a)])
+        project_b = pdb.create_project(conn, name="Beta", folders=[str(cwd_b)])
+        pdb.add_project_fact(conn, project_a, "Alpha fact.", source_kind="user")
+        pdb.add_project_fact(conn, project_b, "Beta fact.", source_kind="user")
+
+    session_db = SessionDB(db_path=home / "state.db")
+    try:
+        session_db.create_session(
+            "session-1",
+            source="desktop",
+            cwd=str(cwd_a),
+            project_id=project_b,
+        )
+        agent = SimpleNamespace(
+            _context_cwd_is_launch_artifact=False,
+            _session_db=session_db,
+            session_id="session-1",
+        )
+
+        block = system_prompt._project_fact_parts(agent)[0]
+
+        assert "Project: Beta" in block
+        assert "Beta fact." in block
+        assert "Alpha fact." not in block
+    finally:
+        session_db.close()
