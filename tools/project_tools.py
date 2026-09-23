@@ -94,7 +94,7 @@ def _project_fact_action(args: dict, task_id: Optional[str]) -> str:
             return json.dumps({"success": True, "project_id": proj.id, "fact_id": fact_id})
         if action == "fact_supersede":
             fact_id = str(args.get("fact_id") or "").strip()
-            if not fact_id or not pdb.supersede_project_fact(conn, fact_id):
+            if not fact_id or not pdb.supersede_project_fact(conn, fact_id, project_id=proj.id):
                 return json.dumps({"success": False, "error": "No active project fact with that id."})
             return json.dumps({"success": True, "project_id": proj.id, "fact_id": fact_id})
     return json.dumps({"success": False, "error": "unknown project fact action"})
