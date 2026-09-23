@@ -180,3 +180,33 @@ def test_missing_explicit_session_project_does_not_fall_back_to_cwd(tmp_path, mo
         assert system_prompt._project_fact_parts(agent) == []
     finally:
         session_db.close()
+
+
+def test_archived_explicit_project_does_not_fall_back_to_cwd(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    cwd = tmp_path / "repo"
+    cwd.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
+
+    with pdb.connect_closing(home / "projects.db") as conn:
+        project_id = pdb.create_project(conn, name="Archived", folders=[str(cwd)])
+        pdb.add_project_fact(conn, project_id, "Archived fact.", source_kind="user")
+        pdb.archive_project(conn, project_id)
+
+    session_db = SessionDB(db_path=home / "state.db")
+    try:
+        session_db.create_session(
+            "session-archived",
+            source="desktop",
+            cwd=str(cwd),
+            project_id=project_id,
+        )
+        agent = SimpleNamespace(
+            _context_cwd_is_launch_artifact=False,
+            _session_db=session_db,
+            session_id="session-archived",
+        )
+        assert system_prompt._project_fact_parts(agent) == []
+    finally:
+        session_db.close()
