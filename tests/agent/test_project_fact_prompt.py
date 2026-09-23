@@ -150,3 +150,33 @@ def test_explicit_session_project_beats_cwd_project(tmp_path, monkeypatch):
         assert "Alpha fact." not in block
     finally:
         session_db.close()
+
+
+def test_missing_explicit_session_project_does_not_fall_back_to_cwd(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    cwd = tmp_path / "repo"
+    cwd.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
+
+    with pdb.connect_closing(home / "projects.db") as conn:
+        cwd_project = pdb.create_project(conn, name="CwdProject", folders=[str(cwd)])
+        pdb.add_project_fact(conn, cwd_project, "Cwd-only fact.", source_kind="user")
+
+    session_db = SessionDB(db_path=home / "state.db")
+    try:
+        session_db.create_session(
+            "session-1",
+            source="desktop",
+            cwd=str(cwd),
+            project_id="p_missing",
+        )
+        agent = SimpleNamespace(
+            _context_cwd_is_launch_artifact=False,
+            _session_db=session_db,
+            session_id="session-1",
+        )
+
+        assert system_prompt._project_fact_parts(agent) == []
+    finally:
+        session_db.close()
