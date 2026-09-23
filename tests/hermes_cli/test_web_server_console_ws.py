@@ -149,8 +149,17 @@ def test_console_cancel_stops_forked_agent_request_before_reporting(console_clie
 
     monkeypatch.setattr(
         curator, "_resolve_review_provider",
-        lambda: ({"api_key": "test-key", "base_url": blocking_provider["base_url"]}, "test-model", "openai-compat", {}),
+        lambda: (
+            {"api_key": "test-key", "base_url": blocking_provider["base_url"]},
+            "test-model",
+            "openai-compat",
+            {},
+            None,
+        ),
     )
+    # Hosted CI starts with no personal skill library. Force a candidate so this
+    # test reaches the provider request it is specifically meant to cancel.
+    monkeypatch.setattr(curator, "_llm_candidate_rows", lambda: [{"name": "synthetic-candidate"}])
     worker_exited = threading.Event()
     real_execute = chat_ws._execute_console_line
 
