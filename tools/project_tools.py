@@ -77,8 +77,15 @@ def _project_fact_action(args: dict, task_id: Optional[str]) -> str:
             return json.dumps({"success": False, "error": "This session is not attached to a Project."})
         action = str(args.get("action") or "")
         if action == "fact_list":
-            facts = [fact.to_dict() for fact in pdb.list_project_facts(conn, proj.id)]
-            return json.dumps({"success": True, "project_id": proj.id, "facts": facts})
+            all_facts = pdb.list_project_facts(conn, proj.id)
+            facts = [fact.to_dict() for fact in all_facts if not fact.sensitive]
+            hidden_sensitive_count = sum(1 for fact in all_facts if fact.sensitive)
+            return json.dumps({
+                "success": True,
+                "project_id": proj.id,
+                "facts": facts,
+                "hidden_sensitive_count": hidden_sensitive_count,
+            })
         if action == "fact_add":
             source_kind = str(args.get("source_kind") or "").strip().lower()
             if source_kind not in {"user", "repository", "session", "tool", "inference"}:
@@ -203,7 +210,7 @@ registry.register(
                 "name": {"type": "string", "description": "create: human name. switch: name, slug, or id."},
                 "path": {"type": "string", "description": "create: repo/folder to anchor to."},
                 "content": {"type": "string", "description": "fact_add: durable project-scoped fact."},
-                "source_kind": {"type": "string", "enum": ["user", "repository", "session", "tool", "inference"], "description": "fact_add provenance."},
+                "source_kind": {"type": "string", "enum": ["user", "repository", "session", "tool", "inference"], "description": "fact_add provenance: use user only for direct user statements; repository/tool only for observed evidence; inference for model conclusions."},
                 "source_ref": {"type": "string", "description": "fact_add optional source locator."},
                 "confidence": {"type": "number", "minimum": 0, "maximum": 1, "description": "fact_add confidence; unverified inference must be below 1."},
                 "sensitive": {"type": "boolean", "description": "fact_add: persist locally but never auto-inject into model context."},
