@@ -3,6 +3,7 @@
 import asyncio
 import inspect
 from concurrent.futures import Future
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from acp.schema import (
@@ -11,12 +12,25 @@ from acp.schema import (
     RequestPermissionResponse,
 )
 
-from acp_adapter.permissions import make_approval_callback
+from acp_adapter.permissions import (
+    ApprovalTrustPosture,
+    capture_approval_trust_posture,
+    make_approval_callback,
+)
 from tools.approval import prompt_dangerous_approval
 
 
 def _make_response(outcome):
     return RequestPermissionResponse(outcome=outcome)
+
+
+def _trusted_posture():
+    return ApprovalTrustPosture(
+        client_name="test-editor",
+        client_version="1.0",
+        trusted_interactive=True,
+        reason="test_trusted_client",
+    )
 
 
 def _invoke_callback(
@@ -41,7 +55,10 @@ def _invoke_callback(
         return future
 
     with patch("agent.async_utils.asyncio.run_coroutine_threadsafe", side_effect=_schedule):
-        cb = make_approval_callback(request_permission, loop, session_id="s1", timeout=timeout)
+        cb = make_approval_callback(
+            request_permission, loop, session_id="s1", timeout=timeout,
+            trust_posture=_trusted_posture(),
+        )
         if use_prompt_path:
             result = prompt_dangerous_approval(
                 "rm -rf /",
@@ -63,6 +80,51 @@ def _invoke_callback(
     scheduled["coro"].close()
     _, kwargs = request_permission.call_args
     return result, kwargs, scheduled, future, loop
+
+
+class TestApprovalTrust:
+    def test_untrusted_host_cannot_turn_programmatic_allow_into_human_consent(self):
+        loop = MagicMock(spec=asyncio.AbstractEventLoop)
+        request_permission = AsyncMock(name="request_permission")
+        cb = make_approval_callback(
+            request_permission, loop, session_id="s1",
+            trust_posture=ApprovalTrustPosture(
+                client_name="buzz-acp", trusted_interactive=False, reason="client_not_trusted"
+            ),
+        )
+
+        assert cb("rm -rf /tmp/scratch", "dangerous command") == "deny"
+        request_permission.assert_not_called()
+
+    def test_exact_configured_client_is_trusted_with_capability_snapshot(self):
+        info = SimpleNamespace(name="Zed", version="0.209")
+        posture = capture_approval_trust_posture(
+            info,
+            {"terminal": {}, "fs": {}},
+            config={"security": {"approval": {"acp_trusted_clients": ["Zed"]}}},
+        )
+
+        assert posture.trusted_interactive is True
+        assert posture.client_name == "Zed"
+        assert posture.client_version == "0.209"
+        assert posture.capability_names == ("fs", "terminal")
+        assert posture.reason == "configured_trusted_client"
+
+    def test_wildcard_does_not_trust_unknown_acp_hosts(self):
+        posture = capture_approval_trust_posture(
+            SimpleNamespace(name="anything", version="1"),
+            config={"security": {"approval": {"acp_trusted_clients": ["*"]}}},
+        )
+
+        assert posture.trusted_interactive is False
+        assert posture.reason == "client_not_trusted"
+
+    def test_config_read_failure_denies(self):
+        with patch("hermes_cli.config.load_config_readonly", side_effect=RuntimeError("broken config")):
+            posture = capture_approval_trust_posture(SimpleNamespace(name="Zed", version="1"))
+
+        assert posture.trusted_interactive is False
+        assert posture.reason == "config_unavailable"
 
 
 class TestApprovalBridge:
@@ -151,7 +213,10 @@ class TestApprovalBridge:
             return future
 
         with patch("agent.async_utils.asyncio.run_coroutine_threadsafe", side_effect=_schedule):
-            cb = make_approval_callback(request_permission, loop, session_id="s1", timeout=0.01)
+            cb = make_approval_callback(
+                request_permission, loop, session_id="s1", timeout=0.01,
+                trust_posture=_trusted_posture(),
+            )
             result = cb("rm -rf /", "dangerous command")
 
         scheduled["coro"].close()
@@ -191,7 +256,10 @@ class TestSchedulerFailure:
                 "agent.async_utils.asyncio.run_coroutine_threadsafe",
                 side_effect=RuntimeError("scheduler down"),
             ):
-                cb = make_approval_callback(_request_permission, loop, session_id="s1", timeout=0.01)
+                cb = make_approval_callback(
+                    _request_permission, loop, session_id="s1", timeout=0.01,
+                    trust_posture=_trusted_posture(),
+                )
                 result = cb("rm -rf /", "dangerous")
             gc.collect()
 
