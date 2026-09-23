@@ -539,10 +539,11 @@ def _memory_parts(agent: Any) -> List[str]:
 def _project_fact_parts(agent: Any) -> List[str]:
     """Frozen project-scoped durable facts for the current session.
 
-    An explicit state.db session project owner is authoritative even when the
-    launch cwd is a generic desktop artifact. Cwd resolution is only a legacy
-    fallback for sessions that predate project_id. The first prompt build
-    snapshots the eligible facts; later rebuilds replay the same bytes.
+    The session-bound Project owner is authoritative even when the launch cwd is
+    a generic desktop artifact. It is read from state.db only at the session
+    lifecycle boundary, never while building the prompt. Cwd resolution is the
+    compatibility fallback when no explicit owner is bound. The first prompt
+    build snapshots the eligible facts; later rebuilds replay the same bytes.
     """
     frozen = getattr(agent, "_frozen_project_fact_parts", None)
     if frozen is not None:
@@ -557,15 +558,14 @@ def _project_fact_parts(agent: Any) -> List[str]:
 
         session_db = getattr(agent, "_session_db", None)
         project_db_path = None
-        explicit_project_id = None
         if session_db is not None:
             db_path = getattr(session_db, "db_path", None)
             if db_path is not None:
                 project_db_path = Path(db_path).parent / "projects.db"
-            sid = str(getattr(agent, "session_id", None) or "")
-            if sid:
-                row = session_db.get_session(sid) or {}
-                explicit_project_id = str(row.get("project_id") or "").strip() or None
+
+        # Session routing is bound before prompt construction. Do not query state.db here:
+        # prompt builds/rebuilds must be pure over the session snapshot.
+        explicit_project_id = str(getattr(agent, "_session_project_id", "") or "").strip() or None
 
         cwd = None
         if explicit_project_id is None and not getattr(agent, "_context_cwd_is_launch_artifact", False):
