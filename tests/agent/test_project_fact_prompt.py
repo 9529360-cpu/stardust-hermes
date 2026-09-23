@@ -244,3 +244,16 @@ def test_explicit_project_facts_load_even_from_launch_artifact_cwd(tmp_path, mon
         assert "Folderless project fact." in block
     finally:
         session_db.close()
+
+
+def test_project_fact_prompt_read_does_not_create_projects_db(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    cwd = tmp_path / "repo"
+    cwd.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(system_prompt, "resolve_context_cwd", lambda: cwd)
+
+    agent = SimpleNamespace(_context_cwd_is_launch_artifact=False)
+    assert system_prompt._project_fact_parts(agent) == []
+    assert not (home / "projects.db").exists()
