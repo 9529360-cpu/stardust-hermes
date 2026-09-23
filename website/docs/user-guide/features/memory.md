@@ -193,6 +193,21 @@ The memory system automatically rejects exact duplicate entries. If you try to a
 
 Memory entries are scanned for injection and exfiltration patterns before being accepted, since they're injected into the system prompt. Content matching threat patterns (prompt injection, credential exfiltration, SSH backdoors) or containing invisible Unicode characters is blocked.
 
+## Project-Scoped Facts
+
+Project facts are durable, structured state owned by the profile's `projects.db`. They are separate from global memory so one project's versions, architecture decisions, and repository conventions do not leak into unrelated chats.
+
+Use the existing project CLI to manage them:
+
+```bash
+hermes project facts <project> add "Python 3.12 is required." --source repository --source-ref pyproject.toml
+hermes project facts <project> list
+hermes project facts <project> verify <fact-id>
+hermes project facts <project> supersede <fact-id>
+```
+
+Each fact carries provenance, confidence, timestamps, and a sensitivity flag. Unverified model inference cannot be stored as certainty. Sensitive facts are persisted locally but are never automatically injected into model context. Active, non-sensitive, sufficiently trusted facts for the current project are frozen into a new session's project context from `projects.db`; they are not copied into `MEMORY.md` or `USER.md`.
+
 ## Session Search
 
 Beyond MEMORY.md and USER.md, the agent can search its past conversations using the `session_search` tool:
