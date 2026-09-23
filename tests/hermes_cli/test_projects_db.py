@@ -144,3 +144,68 @@ def test_per_profile_isolation(tmp_path):
         b.close()
 
 
+
+
+def test_project_facts_are_project_scoped_with_provenance(conn):
+    a = pdb.create_project(conn, name="Alpha", folders=["/a"])
+    b = pdb.create_project(conn, name="Beta", folders=["/b"])
+
+    fact_id = pdb.add_project_fact(
+        conn,
+        a,
+        "Main branch is protected.",
+        source_kind="repository",
+        source_ref="branch-protection",
+    )
+
+    facts_a = pdb.list_project_facts(conn, a)
+    facts_b = pdb.list_project_facts(conn, b)
+
+    assert [f.id for f in facts_a] == [fact_id]
+    assert facts_a[0].source_kind == "repository"
+    assert facts_a[0].source_ref == "branch-protection"
+    assert facts_a[0].confidence == 1.0
+    assert facts_b == []
+
+
+def test_unverified_inference_cannot_be_promoted_to_certain_fact(conn):
+    pid = pdb.create_project(conn, name="Alpha")
+
+    with pytest.raises(ValueError, match="confidence below 1.0"):
+        pdb.add_project_fact(
+            conn,
+            pid,
+            "The maintainer probably prefers squash merges.",
+            source_kind="inference",
+            confidence=1.0,
+        )
+
+    fact_id = pdb.add_project_fact(
+        conn,
+        pid,
+        "The maintainer probably prefers squash merges.",
+        source_kind="inference",
+        confidence=0.6,
+    )
+    fact = pdb.list_project_facts(conn, pid)[0]
+    assert fact.id == fact_id
+    assert fact.confidence == 0.6
+    assert fact.verified_at is None
+
+    assert pdb.verify_project_fact(conn, fact_id, verified_at=1234) is True
+    verified = pdb.list_project_facts(conn, pid)[0]
+    assert verified.confidence == 1.0
+    assert verified.verified_at == 1234
+
+
+def test_superseded_project_facts_leave_active_projection(conn):
+    pid = pdb.create_project(conn, name="Alpha")
+    old_id = pdb.add_project_fact(conn, pid, "Python 3.11", source_kind="user")
+    new_id = pdb.add_project_fact(conn, pid, "Python 3.12", source_kind="user")
+
+    assert pdb.supersede_project_fact(conn, old_id, superseded_at=2000) is True
+
+    active = pdb.list_project_facts(conn, pid)
+    assert [f.id for f in active] == [new_id]
+    history = pdb.list_project_facts(conn, pid, include_superseded=True)
+    assert {f.id for f in history} == {old_id, new_id}
