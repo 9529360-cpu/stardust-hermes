@@ -54,6 +54,8 @@ def _stored_memory_snapshot_version(prompt: str) -> str:
     match = _MEMORY_SNAPSHOT_MARKER_RE.search(prompt or "")
     return match.group(1) if match else ""
 
+_PROJECT_FACT_PROMPT_MAX_CHARS = 6000
+
 _GATE_WORDS = {**dict.fromkeys(("true", "always", "yes", "on"), True), **dict.fromkeys(("false", "never", "no", "off"), False)}
 
 
@@ -534,6 +536,54 @@ def _memory_parts(agent: Any) -> List[str]:
     return parts
 
 
+def _project_fact_parts(agent: Any) -> List[str]:
+    """Project-scoped durable facts for the current cwd.
+
+    Project facts are owned by projects.db, not MEMORY.md. Only active,
+    non-sensitive facts with sufficiently strong provenance are injected.
+    Inference is never injected until explicitly verified.
+    """
+    if getattr(agent, "_context_cwd_is_launch_artifact", False):
+        return []
+    cwd = resolve_context_cwd()
+    if cwd is None:
+        return []
+    try:
+        from hermes_cli import projects_db as pdb
+
+        with pdb.connect_closing() as conn:
+            project = pdb.project_for_path(conn, str(cwd))
+            if project is None:
+                return []
+            facts = pdb.list_project_facts(conn, project.id)
+    except Exception:
+        logger.debug("Could not load project facts for prompt context", exc_info=True)
+        return []
+
+    lines: List[str] = []
+    used = 0
+    for fact in facts:
+        if fact.sensitive or fact.confidence < 0.8:
+            continue
+        if fact.source_kind == "inference" and fact.verified_at is None:
+            continue
+        source_marker = f"[{fact.source_kind}; confidence={fact.confidence:.2f}]"
+        line = f"- {source_marker} {fact.content}"
+        if used + len(line) + 1 > _PROJECT_FACT_PROMPT_MAX_CHARS:
+            break
+        lines.append(line)
+        used += len(line) + 1
+    if not lines:
+        return []
+    return [
+        "## Project facts\n"
+        f"Project: {project.name} ({project.id})\n"
+        "Authority: projects.db. These facts are project-scoped; do not promote them "
+        "to USER.md or MEMORY.md merely because they are in context.\n"
+        + "\n".join(lines)
+    ]
+
+
 def _identity_parts(agent: Any, ctx_len: Optional[int]) -> Tuple[List[str], bool]:
     """SOUL.md (primary identity; cron keeps the persona while skipping cwd
     instructions, scoped to the agent's OWN home) or the default identity.
@@ -696,6 +746,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     if system_message is not None:
         context_parts.append(system_message)
     context_parts.extend(_context_files_part(agent, _ctx_len, _soul_loaded))
+    context_parts.extend(_project_fact_parts(agent))
     if coding_workspace_parts:
         context_parts.extend([*coding_workspace_parts, *coding_trailing_parts, *post_workspace_parts])
     else:
