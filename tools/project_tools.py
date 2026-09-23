@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Project tools — the agent's INTENTIONAL handle on first-class Projects (per-profile
 ``projects.db``, the desktop sidebar's named workspaces). Creating/switching is an explicit
-tool call, never a side effect of ``cd``. GUI-only: the `project` toolset stays off
+tool call, never a side effect of ``cd``. Durable Project facts are managed through the same
+capability so workspace identity and Project-scoped knowledge keep one owner. GUI-only: the `project` toolset stays off
 ``_HERMES_CORE_TOOLS``; the desktop/TUI gateway folds it in and wires
 ``set_project_workspace_callback`` so the live session's cwd and sidebar follow."""
 
@@ -21,10 +22,10 @@ def set_project_workspace_callback(fn: Optional[Callable[[str, str, str, str], N
     global _workspace_callback
     _workspace_callback = fn
 
+
 def set_project_context_callback(fn: Optional[Callable[[str], Optional[str]]]) -> None:
     global _project_context_callback
     _project_context_callback = fn
-
 
 
 def _primary_path(proj) -> Optional[str]:
