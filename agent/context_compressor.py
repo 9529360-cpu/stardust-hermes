@@ -4454,7 +4454,7 @@ Write only the summary body. Do not include any preamble or prefix."""
             logger.warning(message, n_skipped)
         return True
 
-    _COMPRESSION_NOTE = "[Note: Some earlier conversation turns have been compacted into a handoff summary to preserve context space. The current session state may still reflect earlier work, so build on that summary and state rather than re-doing work. Your persistent memory (MEMORY.md, USER.md) remains fully authoritative regardless of compaction.]"
+    _COMPRESSION_NOTE = "[Note: Some earlier conversation turns have been compacted into a handoff summary to preserve context space. The current session state may still reflect earlier work, so build on that summary and state rather than re-doing work. Your durable state remains authoritative within its own domain regardless of compaction: USER.md for the user profile, MEMORY.md for cross-project knowledge, projects.db for Project facts, and the task/session stores for lifecycle state.]"
 
     def _assemble_head(self, messages: List[Dict[str, Any]], compress_start: int) -> List[Dict[str, Any]]:
         """Protected head with the compaction note on the system prompt and stale handoffs stripped."""
