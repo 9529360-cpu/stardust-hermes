@@ -347,6 +347,10 @@ def add_project_fact(
     kind = str(source_kind or "").strip().lower()
     if not text:
         raise ValueError("project fact content must not be empty")
+    from tools.memory_tool_store import _scan_memory_content
+
+    if threat := _scan_memory_content(text):
+        raise ValueError(f"project fact rejected: {threat}")
     if kind not in _PROJECT_FACT_SOURCE_KINDS:
         allowed = ", ".join(sorted(_PROJECT_FACT_SOURCE_KINDS))
         raise ValueError(f"project fact source_kind must be one of: {allowed}")
