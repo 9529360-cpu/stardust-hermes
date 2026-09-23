@@ -91,7 +91,7 @@ If the substring matches multiple entries, an error is returned asking for a mor
 
 ### `memory` — Agent's Personal Notes
 
-For information the agent needs to remember about the environment, workflows, and lessons learned:
+For information the agent needs across projects about the environment, workflows, and reusable lessons:
 
 - Cross-project environment facts (OS, globally available tools)
 - Standing conventions that genuinely apply across projects
@@ -161,7 +161,7 @@ The agent should then:
 3. Use `replace` to merge related entries into shorter versions
 4. Then `add` the new entry
 
-**Best practice:** When memory is above 80% capacity (visible in the system prompt header), consolidate entries before adding new ones. For example, merge three separate "project uses X" entries into one comprehensive project description entry.
+**Best practice:** When memory is above 80% capacity (visible in the system prompt header), consolidate entries before adding new ones. For example, merge several overlapping cross-project tool/workflow notes into one compact global entry. Project descriptions belong in `projects.db` instead.
 
 ### Practical Examples of Good Memory Entries
 
@@ -171,7 +171,7 @@ The agent should then:
 # Good: Packs multiple related facts
 User runs macOS 14 Sonoma, uses Homebrew, has Docker Desktop and Podman. Shell: zsh with oh-my-zsh. Editor: VS Code with Vim keybindings.
 
-# Good: Specific, actionable convention
+# Not MEMORY.md: this is Project-scoped and belongs in projects.db
 Project ~/code/api uses Go 1.22, sqlc for DB queries, chi router. Run tests with 'make test'. CI via GitHub Actions.
 
 # Good: Lesson learned with context
