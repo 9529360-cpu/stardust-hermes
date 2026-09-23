@@ -1412,8 +1412,9 @@ Compose this skill with other Hermes skills for specific phases:
 | **`web_search`** | Literature discovery: `web_search("transformer attention mechanism 2024")` |
 | **`web_extract`** | Fetch paper content, verify citations: `web_extract("https://arxiv.org/abs/2303.17651")` |
 | **`delegate_task`** | **Parallel section drafting** — spawn isolated subagents for each section. Also for concurrent citation verification. |
-| **`todo`** | Primary state tracker across sessions. Update after every phase transition. |
-| **`memory`** | Persist key decisions across sessions: contribution framing, venue choice, reviewer feedback. |
+| **`todo`** | Session-scoped multi-step plan state. It survives compression/session restoration but is not the durable cross-session task authority. |
+| **`desktop_project` / project facts** | Persist durable paper-specific decisions such as contribution framing, venue choice, and reviewer feedback when a Project is attached. |
+| **`memory`** | Persist only cross-project lessons or user-wide conventions; do not use it as this paper Project state store. |
 | **`cronjob`** | Schedule experiment monitoring, deadline countdowns, automated arXiv checks. |
 | **`clarify`** | Ask the user targeted questions when blocked (venue choice, contribution framing). |
 | **cron `deliver:`** | Notify the user when experiments complete or drafts are ready even if they're not in chat — schedule the check as a cron job with a messaging `deliver:` target (the agent no longer has a `send_message` tool; outbound delivery is handled by cron/`hermes send`). |
