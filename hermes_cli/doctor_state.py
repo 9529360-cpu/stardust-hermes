@@ -162,10 +162,20 @@ def _check_state_authority(should_fix: bool, f: Finding) -> None:
         authority = authority_for(domain)
         check_info(f"{authority.domain.value}: {authority.store} ({authority.scope})")
     try:
+        import sqlite3
         from hermes_cli import projects_db as pdb
-        with pdb.connect_closing() as conn:
+
+        db_path = pdb.projects_db_path()
+        if not db_path.exists():
+            check_info("cwd project: none (projects.db not created)")
+            return
+        conn = sqlite3.connect(read_only_db_uri(db_path), uri=True)
+        conn.row_factory = sqlite3.Row
+        try:
             project = pdb.project_for_path(conn, str(Path.cwd()))
             active_id = pdb.get_active_id(conn)
+        finally:
+            conn.close()
         if project is not None:
             check_info(f"cwd project: {project.name} ({project.id}) via folder ownership")
         elif active_id:
