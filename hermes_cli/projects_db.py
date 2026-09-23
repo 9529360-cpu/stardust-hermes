@@ -394,41 +394,28 @@ def list_project_facts(conn: sqlite3.Connection, project_id: str, *, include_sup
 
 
 def verify_project_fact(
-    conn: sqlite3.Connection, fact_id: str, *, project_id: Optional[str] = None,
+    conn: sqlite3.Connection, fact_id: str, *, project_id: str,
     verified_at: Optional[int] = None,
 ) -> bool:
     when = _now() if verified_at is None else int(verified_at)
-    if project_id:
-        return _execute_rowcount(
-            conn,
-            "UPDATE project_facts SET verified_at = ?, confidence = 1.0 "
-            "WHERE id = ? AND project_id = ? AND superseded_at IS NULL",
-            (when, fact_id, project_id),
-        ) > 0
     return _execute_rowcount(
         conn,
         "UPDATE project_facts SET verified_at = ?, confidence = 1.0 "
-        "WHERE id = ? AND superseded_at IS NULL",
-        (when, fact_id),
+        "WHERE id = ? AND project_id = ? AND superseded_at IS NULL",
+        (when, fact_id, project_id),
     ) > 0
 
 
 def supersede_project_fact(
-    conn: sqlite3.Connection, fact_id: str, *, project_id: Optional[str] = None,
+    conn: sqlite3.Connection, fact_id: str, *, project_id: str,
     superseded_at: Optional[int] = None,
 ) -> bool:
     when = _now() if superseded_at is None else int(superseded_at)
-    if project_id:
-        return _execute_rowcount(
-            conn,
-            "UPDATE project_facts SET superseded_at = ? "
-            "WHERE id = ? AND project_id = ? AND superseded_at IS NULL",
-            (when, fact_id, project_id),
-        ) > 0
     return _execute_rowcount(
         conn,
-        "UPDATE project_facts SET superseded_at = ? WHERE id = ? AND superseded_at IS NULL",
-        (when, fact_id),
+        "UPDATE project_facts SET superseded_at = ? "
+        "WHERE id = ? AND project_id = ? AND superseded_at IS NULL",
+        (when, fact_id, project_id),
     ) > 0
 
 
