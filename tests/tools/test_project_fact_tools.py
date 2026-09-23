@@ -92,3 +92,29 @@ def test_switch_persists_project_identity_even_without_primary_folder(project_ho
     assert result["success"] is True
     assert result["id"] == project_id
     assert calls == [("session-1", "", "Folderless", project_id)]
+
+
+def test_agent_fact_list_hides_sensitive_facts_from_model_context(project_home):
+    with pdb.connect_closing() as conn:
+        project_id = pdb.create_project(conn, name="Current")
+        pdb.add_project_fact(
+            conn,
+            project_id,
+            "Visible repository fact.",
+            source_kind="repository",
+        )
+        pdb.add_project_fact(
+            conn,
+            project_id,
+            "Local-only deployment secret.",
+            source_kind="user",
+            sensitive=True,
+        )
+
+    project_tools.set_project_context_callback(lambda _task_id: project_id)
+
+    listed = _call({"action": "fact_list"})
+
+    assert [fact["content"] for fact in listed["facts"]] == ["Visible repository fact."]
+    assert listed["hidden_sensitive_count"] == 1
+    assert "Local-only deployment secret." not in json.dumps(listed)
