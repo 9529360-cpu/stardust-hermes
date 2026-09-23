@@ -514,6 +514,10 @@ terminal:
 #   approval:
 #     transport: builtin        # Or an explicitly enabled plugin transport name
 #     transport_fallback: deny  # Set builtin to opt into fallback on transport failure
+#     # Exact ACP client_info.name values whose permission UI you have verified is human-facing.
+#     # Empty by default: ACP allow_once/session/always cannot authorize dangerous commands.
+#     # Wildcards are ignored. Do not add unattended or auto-approving bridges.
+#     acp_trusted_clients: []
 
 # =============================================================================
 # Browser Tool Configuration
