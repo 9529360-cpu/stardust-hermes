@@ -42,6 +42,29 @@ def test_category_defaults_to_other_and_unknown_category_is_rejected(tmp_path):
     assert entries["mem"].to_dict()["category"] == "memory"
 
 
+def test_desktop_capability_summary_states_full_authority_and_exact_source_pin():
+    entry = pc.entry_from_mapping(_entry("desktop-ui", category="desktop"), "test")
+    assert entry is not None
+
+    summary = pc.entry_capability_summary(entry)
+
+    assert "full Stardust Desktop renderer/app authority" in summary
+    assert "not a sandbox or permission boundary" in summary
+    assert entry.repo in summary
+    assert entry.sha in summary
+
+
+def test_non_desktop_capability_summary_does_not_claim_renderer_authority():
+    entry = pc.entry_from_mapping(_entry("memory-plugin", category="memory"), "test")
+    assert entry is not None
+
+    summary = pc.entry_capability_summary(entry)
+
+    assert "renderer/app authority" not in summary
+    assert entry.repo in summary
+    assert entry.sha in summary
+
+
 def test_invalid_entries_are_skipped_not_raised(tmp_path):
     (tmp_path / "a.yaml").write_text(yaml.safe_dump(_entry("ok")))
     (tmp_path / "b.yaml").write_text(yaml.safe_dump(_entry("short-sha", sha="abc123")))
