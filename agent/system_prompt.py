@@ -537,52 +537,56 @@ def _memory_parts(agent: Any) -> List[str]:
 
 
 def _project_fact_parts(agent: Any) -> List[str]:
-    """Project-scoped durable facts for the current cwd.
+    """Frozen project-scoped durable facts for the current session.
 
-    Project facts are owned by projects.db, not MEMORY.md. Only active,
-    non-sensitive facts with sufficiently strong provenance are injected.
-    Inference is never injected until explicitly verified.
+    Project facts are owned by projects.db, not MEMORY.md. The first prompt
+    build snapshots the active non-sensitive facts; later prompt rebuilds
+    replay the same bytes so memory/compaction invalidation cannot mutate the
+    cached prefix mid-session. reset_session_state clears the snapshot.
     """
-    if getattr(agent, "_context_cwd_is_launch_artifact", False):
-        return []
-    cwd = resolve_context_cwd()
-    if cwd is None:
-        return []
-    try:
-        from hermes_cli import projects_db as pdb
+    frozen = getattr(agent, "_frozen_project_fact_parts", None)
+    if frozen is not None:
+        return list(frozen)
 
-        with pdb.connect_closing() as conn:
-            project = pdb.project_for_path(conn, str(cwd))
-            if project is None:
-                return []
-            facts = pdb.list_project_facts(conn, project.id)
-    except Exception:
-        logger.debug("Could not load project facts for prompt context", exc_info=True)
-        return []
+    parts: List[str] = []
+    if not getattr(agent, "_context_cwd_is_launch_artifact", False):
+        cwd = resolve_context_cwd()
+        if cwd is not None:
+            try:
+                from hermes_cli import projects_db as pdb
 
-    lines: List[str] = []
-    used = 0
-    for fact in facts:
-        if fact.sensitive or fact.confidence < 0.8:
-            continue
-        if fact.source_kind == "inference" and fact.verified_at is None:
-            continue
-        source_marker = f"[{fact.source_kind}; confidence={fact.confidence:.2f}]"
-        line = f"- {source_marker} {fact.content}"
-        if used + len(line) + 1 > _PROJECT_FACT_PROMPT_MAX_CHARS:
-            break
-        lines.append(line)
-        used += len(line) + 1
-    if not lines:
-        return []
-    return [
-        "## Project facts\n"
-        f"Project: {project.name} ({project.id})\n"
-        "Authority: projects.db. These facts are project-scoped; do not promote them "
-        "to USER.md or MEMORY.md merely because they are in context.\n"
-        + "\n".join(lines)
-    ]
+                with pdb.connect_closing() as conn:
+                    project = pdb.project_for_path(conn, str(cwd))
+                    facts = pdb.list_project_facts(conn, project.id) if project is not None else []
+            except Exception:
+                logger.debug("Could not load project facts for prompt context", exc_info=True)
+                project, facts = None, []
 
+            if project is not None:
+                lines: List[str] = []
+                used = 0
+                for fact in facts:
+                    if fact.sensitive or fact.confidence < 0.8:
+                        continue
+                    if fact.source_kind == "inference" and fact.verified_at is None:
+                        continue
+                    source_marker = f"[{fact.source_kind}; confidence={fact.confidence:.2f}]"
+                    line = f"- {source_marker} {fact.content}"
+                    if used + len(line) + 1 > _PROJECT_FACT_PROMPT_MAX_CHARS:
+                        break
+                    lines.append(line)
+                    used += len(line) + 1
+                if lines:
+                    parts = [
+                        "## Project facts\n"
+                        f"Project: {project.name} ({project.id})\n"
+                        "Authority: projects.db. These facts are project-scoped; do not promote them "
+                        "to USER.md or MEMORY.md merely because they are in context.\n"
+                        + "\n".join(lines)
+                    ]
+
+    agent._frozen_project_fact_parts = tuple(parts)
+    return list(parts)
 
 def _identity_parts(agent: Any, ctx_len: Optional[int]) -> Tuple[List[str], bool]:
     """SOUL.md (primary identity; cron keeps the persona while skipping cwd
