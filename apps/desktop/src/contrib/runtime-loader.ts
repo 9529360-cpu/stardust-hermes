@@ -373,11 +373,12 @@ async function readPluginSourceText(file: string): Promise<string> {
 }
 
 function publishInertDiskPlugin(entry: DiskPlugin): void {
-  const current = $pluginRecords.get()[entry.inventoryId]
+  const recordId = entry.id ?? entry.inventoryId
+  const current = $pluginRecords.get()[recordId]
 
   publishPlugin(
     {
-      id: entry.inventoryId,
+      id: recordId,
       name: current?.name ?? entry.origin,
       description: current?.description,
       kind: 'disk',
@@ -415,9 +416,10 @@ async function loadDiskPlugin(entry: DiskPlugin, trustedNow = false): Promise<bo
   // Legacy decisions whose plugin id matched the folder name continue to work;
   // an un-mappable legacy id fails closed and requires one fresh confirmation.
   if (!trustedNow && !pluginActive(entry.decisionId, false)) {
-    if (!entry.id) {
-      publishInertDiskPlugin(entry)
-    }
+    // If this slot was loaded in the past, keep its user-facing runtime id but
+    // replace the stale module handle with a deferred source reload. Editing a
+    // disabled file neither executes it nor makes the next enable run old code.
+    publishInertDiskPlugin(entry)
 
     return true
   }
