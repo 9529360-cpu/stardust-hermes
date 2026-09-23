@@ -60,7 +60,7 @@ AUTHORITIES = {
     ),
     StateDomain.TASK: StateAuthority(
         StateDomain.TASK,
-        "kanban/task store",
+        "kanban.db",
         "task",
         True,
         "Durable task lifecycle. Session summaries may describe tasks but never own them.",
