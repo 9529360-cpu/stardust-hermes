@@ -522,6 +522,20 @@ export const en: Translations = {
       agentHalfMissing: 'agent half missing here',
       agentHalfMissingTip:
         'This is the desktop half of a bundled plugin, but its agent half is not installed on the currently connected backend/profile. Install it from Capabilities → Plugins.',
+      trustDialog: {
+        title: name => `Trust and enable ${name}?`,
+        description:
+          'This is external Desktop code. Enabling it is a trust decision for this app, not just a feature toggle.',
+        authorityHeading: 'Full Desktop app authority',
+        authorityBody:
+          'The plugin runs inside the Stardust Desktop renderer with the same app authority available to renderer code. Declared plugin capabilities are descriptive metadata, not a sandbox or permission boundary.',
+        sourceHeading: 'Code you are trusting',
+        sourceUnknown: 'No verified repository or pinned commit is recorded for this copy.',
+        repository: 'Repository',
+        pinnedCommit: 'Pinned commit',
+        localFile: 'Local file',
+        confirm: 'Trust & enable'
+      },
       installModal: {
         installFromGit: 'Install from Git',
         reviewRepository: 'Review repository',
@@ -546,6 +560,8 @@ export const en: Translations = {
         desktopTarget: "Installs into this app's local desktop-plugins folder",
         desktopTargetFromPackage: 'Loaded into this app from the package above — same for every profile',
         desktopOnlyNote: 'Desktop-only packages do not install a backend agent plugin.',
+        desktopTrustNote:
+          'Desktop code is installed disabled. Enabling it later grants full Stardust Desktop renderer/app authority; declared capabilities are descriptive metadata, not a sandbox.',
         insecureWarning: 'This URL uses an insecure or local scheme. Prefer https:// or git@ for production installs.',
         securityHeading: 'Before you install',
         securityIntro:
