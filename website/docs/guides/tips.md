@@ -111,7 +111,7 @@ Keep context files focused and concise. Every character counts against your toke
 
 ### Memory vs. Skills: What Goes Where
 
-**Memory** is for facts: your environment, preferences, project locations, and things the agent has learned about you. **Skills** are for procedures: multi-step workflows, tool-specific instructions, and reusable recipes. Use memory for "what," skills for "how."
+**Profile memory** is for facts that apply across Projects: who you are, preferences, global environment details, and reusable lessons. **Project facts** hold repository- or workspace-specific versions, locations, decisions, and conventions. **Skills** are for procedures: multi-step workflows, tool-specific instructions, and reusable recipes.
 
 ### When to Create Skills
 
