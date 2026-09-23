@@ -1538,7 +1538,7 @@
     },
     {
       "name": "mcp.servers.test",
-      "summary": "Connect, list tools, disconnect — an OAuth server with no token on disk is reported as not ok.",
+      "summary": "Connect, list tools, disconnect \u2014 an OAuth server with no token on disk is reported as not ok.",
       "params": [
         {
           "name": "params",
@@ -2276,7 +2276,7 @@
     },
     {
       "name": "projects.discover_repos",
-      "summary": "Repos for the desktop overview: scanned-from-disk (cached) ∪ session-derived.",
+      "summary": "Repos for the desktop overview: scanned-from-disk (cached) \u222a session-derived.",
       "params": [
         {
           "name": "params",
@@ -2438,7 +2438,7 @@
     },
     {
       "name": "projects.tree",
-      "summary": "Project → repo → lane overview with counts and a few preview sessions per project.",
+      "summary": "Project \u2192 repo \u2192 lane overview with counts and a few preview sessions per project.",
       "params": [
         {
           "name": "params",
@@ -2564,7 +2564,7 @@
     },
     {
       "name": "request.answer",
-      "summary": "Answer an open server→client request from a client that never received the frame.",
+      "summary": "Answer an open server\u2192client request from a client that never received the frame.",
       "params": [
         {
           "name": "params",
@@ -3974,7 +3974,7 @@
       },
       "ActiveSubagent": {
         "additionalProperties": true,
-        "description": "One live child from ``tools/delegate_tool_registry.py::list_active_subagents`` (the record\nis extended by the child runner — ``missed_steer`` etc. — so it stays open).",
+        "description": "One live child from ``tools/delegate_tool_registry.py::list_active_subagents`` (the record\nis extended by the child runner \u2014 ``missed_steer`` etc. \u2014 so it stays open).",
         "properties": {
           "subagent_id": {
             "title": "Subagent Id",
@@ -4384,7 +4384,7 @@
       },
       "ApprovalRequestParams": {
         "additionalProperties": true,
-        "description": "``tui_gateway/server.py::_approval_request_payload`` — the command is redacted server-side.",
+        "description": "``tui_gateway/server.py::_approval_request_payload`` \u2014 the command is redacted server-side.",
         "properties": {
           "session_id": {
             "title": "Session Id",
@@ -5084,7 +5084,7 @@
       },
       "BillingChargeResult": {
         "additionalProperties": false,
-        "description": "``202 {chargeId}`` — money is not confirmed yet; poll ``billing.charge_status``.",
+        "description": "``202 {chargeId}`` \u2014 money is not confirmed yet; poll ``billing.charge_status``.",
         "properties": {
           "ok": {
             "title": "Ok",
@@ -6845,7 +6845,7 @@
       },
       "ChangeSignalPayload": {
         "additionalProperties": true,
-        "description": "``change_watcher._CHANGE_WATCHES`` payload fn — ``{}`` for every watch except pet.changed.",
+        "description": "``change_watcher._CHANGE_WATCHES`` payload fn \u2014 ``{}`` for every watch except pet.changed.",
         "properties": {},
         "title": "ChangeSignalPayload",
         "type": "object"
@@ -6887,7 +6887,7 @@
       },
       "ClarifyLockResult": {
         "additionalProperties": false,
-        "description": "``remaining`` lists the qids still unanswered; the lock that empties it resolves the request.\n``expired``: the wait already ended (timeout / cancel) — not an error.",
+        "description": "``remaining`` lists the qids still unanswered; the lock that empties it resolves the request.\n``expired``: the wait already ended (timeout / cancel) \u2014 not an error.",
         "properties": {
           "status": {
             "$ref": "#/components/schemas/ClarifyLockStatus"
@@ -9675,7 +9675,7 @@
       },
       "CronManageResult": {
         "additionalProperties": true,
-        "description": "Pass-through of ``tools/cronjob_tools.py::cronjob`` JSON: ``list`` → ``jobs``/``count``\n(+ ``scoped`` when profile-scoped); ``add`` → the created job's summary + ``job``; ``remove`` →\n``removed_job``; ``pause``/``resume`` → ``job``. A tool-level failure lands in ``error``.",
+        "description": "Pass-through of ``tools/cronjob_tools.py::cronjob`` JSON: ``list`` \u2192 ``jobs``/``count``\n(+ ``scoped`` when profile-scoped); ``add`` \u2192 the created job's summary + ``job``; ``remove`` \u2192\n``removed_job``; ``pause``/``resume`` \u2192 ``job``. A tool-level failure lands in ``error``.",
         "properties": {
           "success": {
             "anyOf": [
@@ -10372,7 +10372,7 @@
       },
       "ErrorPayload": {
         "additionalProperties": false,
-        "description": "Every ``_emit(\"error\", …)`` site sets exactly ``message``.",
+        "description": "Every ``_emit(\"error\", \u2026)`` site sets exactly ``message``.",
         "properties": {
           "message": {
             "title": "Message",
@@ -10387,7 +10387,7 @@
       },
       "ErrorSurface": {
         "additionalProperties": true,
-        "description": "``agent/error_surface.py::_surface`` — advisory {layer, code, retryable} (+ identity, + auth hint).",
+        "description": "``agent/error_surface.py::_surface`` \u2014 advisory {layer, code, retryable} (+ identity, + auth hint).",
         "properties": {
           "layer": {
             "title": "Layer",
@@ -10538,7 +10538,7 @@
       },
       "ForeignSessionRow": {
         "additionalProperties": false,
-        "description": "``hermes_cli/foreign_sessions_browser.py::list_foreign_sessions`` — ``id`` is an opaque\nhandle, never a path.",
+        "description": "``hermes_cli/foreign_sessions_browser.py::list_foreign_sessions`` \u2014 ``id`` is an opaque\nhandle, never a path.",
         "properties": {
           "id": {
             "title": "Id",
@@ -10830,7 +10830,7 @@
       },
       "GoalSnapshot": {
         "additionalProperties": false,
-        "description": "``methods_session_control.py::_safe_goal_snapshot`` — the frontend-safe GoalState subset.",
+        "description": "``methods_session_control.py::_safe_goal_snapshot`` \u2014 the frontend-safe GoalState subset.",
         "properties": {
           "title": {
             "title": "Title",
@@ -11437,7 +11437,7 @@
       },
       "GroupsLogResult": {
         "additionalProperties": false,
-        "description": "``gateway/hosted_rooms.py::read_events`` page — also the ``page`` ``groups.replicate`` ingests.",
+        "description": "``gateway/hosted_rooms.py::read_events`` page \u2014 also the ``page`` ``groups.replicate`` ingests.",
         "properties": {
           "events": {
             "items": {
@@ -12479,7 +12479,7 @@
       },
       "ImageAttachBytesParams": {
         "additionalProperties": false,
-        "description": "``content_base64`` (or the ``data`` alias) carries the bytes; ``filename`` / ``ext`` only hint\nthe extension — magic bytes decide.",
+        "description": "``content_base64`` (or the ``data`` alias) carries the bytes; ``filename`` / ``ext`` only hint\nthe extension \u2014 magic bytes decide.",
         "properties": {
           "session_id": {
             "title": "Session Id",
@@ -13471,7 +13471,7 @@
       },
       "LearningMutationResult": {
         "additionalProperties": false,
-        "description": "``agent.learning_mutations`` — ``ok: false`` carries the reason in ``message``.",
+        "description": "``agent.learning_mutations`` \u2014 ``ok: false`` carries the reason in ``message``.",
         "properties": {
           "ok": {
             "title": "Ok",
@@ -13728,7 +13728,7 @@
       },
       "LoopSnapshot": {
         "additionalProperties": false,
-        "description": "``_safe_loop_snapshot`` — persisted LoopState fields, never its route.",
+        "description": "``_safe_loop_snapshot`` \u2014 persisted LoopState fields, never its route.",
         "properties": {
           "prompt": {
             "title": "Prompt",
@@ -14683,7 +14683,7 @@
       },
       "McpServerSummary": {
         "additionalProperties": false,
-        "description": "``tui_gateway/mcp_rpc_helpers.summarize_server`` — a server's config without secret values.",
+        "description": "``tui_gateway/mcp_rpc_helpers.summarize_server`` \u2014 a server's config without secret values.",
         "properties": {
           "name": {
             "title": "Name",
@@ -15673,7 +15673,7 @@
       },
       "ModelPricing": {
         "additionalProperties": false,
-        "description": "``hermes_cli/inventory.py::_apply_pricing`` — formatted $/Mtok strings (``\"\"`` unknown,\n``\"free\"``); the sale fields are Nous Portal-only.",
+        "description": "``hermes_cli/inventory.py::_apply_pricing`` \u2014 formatted $/Mtok strings (``\"\"`` unknown,\n``\"free\"``); the sale fields are Nous Portal-only.",
         "properties": {
           "input": {
             "title": "Input",
@@ -15892,7 +15892,7 @@
       },
       "OnboardingAnswers": {
         "additionalProperties": true,
-        "description": "``tui_gateway/onboarding_personalization.py`` — the facts agreed during onboarding.",
+        "description": "``tui_gateway/onboarding_personalization.py`` \u2014 the facts agreed during onboarding.",
         "properties": {
           "name": {
             "anyOf": [
@@ -15990,7 +15990,7 @@
       },
       "OpenRequestEntry": {
         "additionalProperties": false,
-        "description": "One unanswered server→client request (``server_requests.Request.snapshot``); the reconnecting\nclient re-delivers it to its request handlers.",
+        "description": "One unanswered server\u2192client request (``server_requests.Request.snapshot``); the reconnecting\nclient re-delivers it to its request handlers.",
         "properties": {
           "id": {
             "title": "Id",
@@ -16561,7 +16561,7 @@
       },
       "PetCellsResult": {
         "additionalProperties": false,
-        "description": "Unicode: ``frames`` is frame → row → cell ``[tr,tg,tb,ta, br,bg,bb,ba]``; kitty (``graphics``\nset): ``frames`` are transmit escapes and ``placeholder`` the text grid.",
+        "description": "Unicode: ``frames`` is frame \u2192 row \u2192 cell ``[tr,tg,tb,ta, br,bg,bb,ba]``; kitty (``graphics``\nset): ``frames`` are transmit escapes and ``placeholder`` the text grid.",
         "properties": {
           "enabled": {
             "title": "Enabled",
@@ -16741,7 +16741,7 @@
       },
       "PetChangedPayload": {
         "additionalProperties": true,
-        "description": "``change_watcher._pet_changed_payload`` — ``pet.info.meta``-shaped; ``{enabled: false}`` when off.",
+        "description": "``change_watcher._pet_changed_payload`` \u2014 ``pet.info.meta``-shaped; ``{enabled: false}`` when off.",
         "properties": {
           "enabled": {
             "title": "Enabled",
@@ -18172,7 +18172,7 @@
       },
       "PluginsManageResult": {
         "additionalProperties": false,
-        "description": "``list`` → ``plugins`` + counts; ``toggle`` → ``ok``/``unchanged``/``name``/``plugin``;\n``install`` → ``hermes_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` →\n``ok``/``unchanged``/``sha``.",
+        "description": "``list`` \u2192 ``plugins`` + counts; ``toggle`` \u2192 ``ok``/``unchanged``/``name``/``plugin``;\n``install`` \u2192 ``hermes_cli.plugins_cmd.dashboard_install_plugin``'s ok payload; ``update`` \u2192\n``ok``/``unchanged``/``sha``.",
         "properties": {
           "plugins": {
             "anyOf": [
@@ -20284,7 +20284,7 @@
       },
       "ProjectFacts": {
         "additionalProperties": false,
-        "description": "``agent/coding_context.py::project_facts_for`` — the system prompt's coding-context detection.",
+        "description": "``agent/coding_context.py::project_facts_for`` \u2014 the system prompt's coding-context detection.",
         "properties": {
           "root": {
             "title": "Root",
@@ -20483,7 +20483,7 @@
       },
       "ProjectInfo": {
         "additionalProperties": false,
-        "description": "``hermes_cli/projects_db.py::Project.to_dict`` — one stored project with its folders.",
+        "description": "``hermes_cli/projects_db.py::Project.to_dict`` \u2014 one stored project with its folders.",
         "properties": {
           "id": {
             "title": "Id",
@@ -21367,7 +21367,7 @@
       },
       "ProjectTreeNode": {
         "additionalProperties": false,
-        "description": "``project_tree._project_node`` — explicit, auto (git root) or the synthetic Home bucket.",
+        "description": "``project_tree._project_node`` \u2014 explicit, auto (git root) or the synthetic Home bucket.",
         "properties": {
           "id": {
             "title": "Id",
@@ -22459,7 +22459,7 @@
       },
       "RepoDiscoveryPolicy": {
         "additionalProperties": false,
-        "description": "``methods_projects._repo_discovery_policy`` — the effective ``desktop.repo_scan_*`` config.",
+        "description": "``methods_projects._repo_discovery_policy`` \u2014 the effective ``desktop.repo_scan_*`` config.",
         "properties": {
           "enabled": {
             "title": "Enabled",
@@ -23768,7 +23768,7 @@
       },
       "SeedMessage": {
         "additionalProperties": true,
-        "description": "One create-time transcript row (``session_history._coerce_seed_history``); ``text`` is the\nlegacy alias of ``content``; only ``display_kind: \"hidden\"`` is accepted from the wire. Clients\nforward stored rows verbatim (``_row_id``, ``timestamp``, …) and the coercer drops what it does\nnot use, so the row stays open.",
+        "description": "One create-time transcript row (``session_history._coerce_seed_history``); ``text`` is the\nlegacy alias of ``content``; only ``display_kind: \"hidden\"`` is accepted from the wire. Clients\nforward stored rows verbatim (``_row_id``, ``timestamp``, \u2026) and the coercer drops what it does\nnot use, so the row stays open.",
         "properties": {
           "role": {
             "title": "Role",
@@ -24671,7 +24671,7 @@
       },
       "SessionControlDispatch": {
         "additionalProperties": false,
-        "description": "``_dispatch_envelope`` — the command result's user-visible envelope, every key always present.",
+        "description": "``_dispatch_envelope`` \u2014 the command result's user-visible envelope, every key always present.",
         "properties": {
           "type": {
             "anyOf": [
@@ -24840,7 +24840,7 @@
       },
       "SessionControlSnapshot": {
         "additionalProperties": false,
-        "description": "``_snapshot_control`` — ``revision`` is a hash of the visible state (``\"\"`` when empty);\n``updated_at`` is the newest persisted timestamp (``0`` when none).",
+        "description": "``_snapshot_control`` \u2014 ``revision`` is a hash of the visible state (``\"\"`` when empty);\n``updated_at`` is the newest persisted timestamp (``0`` when none).",
         "properties": {
           "goal": {
             "anyOf": [
@@ -26046,7 +26046,7 @@
       },
       "SessionLiveInfo": {
         "additionalProperties": true,
-        "description": "``tui_gateway/server.py::_session_info`` — the ``session.info`` event and the ``info`` field of\n``session.create`` / ``session.resume`` / ``session.activate`` results.",
+        "description": "``tui_gateway/server.py::_session_info`` \u2014 the ``session.info`` event and the ``info`` field of\n``session.create`` / ``session.resume`` / ``session.activate`` results.",
         "properties": {
           "model": {
             "default": "",
@@ -28007,7 +28007,7 @@
       },
       "SkillsManageResult": {
         "additionalProperties": false,
-        "description": "Shape follows the action: ``list`` → ``skills`` (category → names); ``search`` → ``results``;\n``install`` → ``installed`` + ``name``; ``browse`` → ``items`` + paging; ``inspect`` → ``info``.",
+        "description": "Shape follows the action: ``list`` \u2192 ``skills`` (category \u2192 names); ``search`` \u2192 ``results``;\n``install`` \u2192 ``installed`` + ``name``; ``browse`` \u2192 ``items`` + paging; ``inspect`` \u2192 ``info``.",
         "properties": {
           "skills": {
             "anyOf": [
@@ -28197,7 +28197,7 @@
       },
       "SkinPayload": {
         "additionalProperties": true,
-        "description": "``tui_gateway/change_watcher.py::resolve_skin`` — the resolved active skin (``HermesSkin``).\n``{}`` when the skin engine failed to load. Colour maps are token → colour string.",
+        "description": "``tui_gateway/change_watcher.py::resolve_skin`` \u2014 the resolved active skin (``HermesSkin``).\n``{}`` when the skin engine failed to load. Colour maps are token \u2192 colour string.",
         "properties": {
           "name": {
             "default": "",
@@ -28294,7 +28294,7 @@
       },
       "SlashExecResult": {
         "additionalProperties": false,
-        "description": "Plain worker/plugin text in ``output`` (+ ``warning``), or — when the command was rerouted to\n``command.dispatch`` — that method's directive fields with ``type`` set.",
+        "description": "Plain worker/plugin text in ``output`` (+ ``warning``), or \u2014 when the command was rerouted to\n``command.dispatch`` \u2014 that method's directive fields with ``type`` set.",
         "properties": {
           "output": {
             "anyOf": [
@@ -28789,7 +28789,7 @@
       },
       "SubagentEventPayload": {
         "additionalProperties": false,
-        "description": "``tool_progress._progress_subagent`` — every ``subagent.*`` frame; identity fields are optional\nbecause older emitters omit them and the TUI spawn tree falls back to flat rendering.",
+        "description": "``tool_progress._progress_subagent`` \u2014 every ``subagent.*`` frame; identity fields are optional\nbecause older emitters omit them and the TUI spawn tree falls back to flat rendering.",
         "properties": {
           "goal": {
             "title": "Goal",
@@ -30392,7 +30392,7 @@
       },
       "TodoUpdatedPayload": {
         "additionalProperties": false,
-        "description": "``tool_progress._normalize_todo_state`` — full task snapshot.",
+        "description": "``tool_progress._normalize_todo_state`` \u2014 full task snapshot.",
         "properties": {
           "todos": {
             "items": {},
@@ -31077,7 +31077,7 @@
       },
       "TranscriptMessage": {
         "additionalProperties": true,
-        "description": "One transcript row as the gateway PROJECTS it for renderers (``session_history._project_history``):\n``text`` (never ``content``), display-only ``timestamp`` / ``display_kind`` / ``display_metadata``, the\ndurable ``row_id`` rewind targets, and for tool rows ``name`` + ``context`` preview + full ``args``.\nAssistant detail sidecars (``reasoning``, …) ride as extra keys.",
+        "description": "One transcript row as the gateway PROJECTS it for renderers (``session_history._project_history``):\n``text`` (never ``content``), display-only ``timestamp`` / ``display_kind`` / ``display_metadata``, the\ndurable ``row_id`` rewind targets, and for tool rows ``name`` + ``context`` preview + full ``args``.\nAssistant detail sidecars (``reasoning``, \u2026) ride as extra keys.",
         "properties": {
           "role": {
             "title": "Role",
@@ -31507,7 +31507,7 @@
       },
       "UsageModel": {
         "additionalProperties": false,
-        "description": "``_serialize_usage_model`` — also embedded as ``usage`` in the billing / subscription states,\nwhere the fail-open form is a bare ``{available: false}`` (no ``ok``).",
+        "description": "``_serialize_usage_model`` \u2014 also embedded as ``usage`` in the billing / subscription states,\nwhere the fail-open form is a bare ``{available: false}`` (no ``ok``).",
         "properties": {
           "ok": {
             "anyOf": [
@@ -32569,7 +32569,7 @@
       },
       "VoiceStatusPayload": {
         "additionalProperties": false,
-        "description": "``methods_voice._vr_on_status``; states come from the recorder (idle / listening / transcribing …).",
+        "description": "``methods_voice._vr_on_status``; states come from the recorder (idle / listening / transcribing \u2026).",
         "properties": {
           "state": {
             "title": "State",
@@ -32991,7 +32991,7 @@
       },
       "WakeInputDevice": {
         "additionalProperties": true,
-        "description": "``tools/wake_word.py::_describe_input_device`` — PortAudio diagnostics for the configured mic.",
+        "description": "``tools/wake_word.py::_describe_input_device`` \u2014 PortAudio diagnostics for the configured mic.",
         "properties": {
           "selector": {
             "anyOf": [
@@ -34215,7 +34215,7 @@
     },
     {
       "name": "request.cancel",
-      "summary": "The backend withdrew an open server→client request; clear the matching card only.",
+      "summary": "The backend withdrew an open server\u2192client request; clear the matching card only.",
       "params": [
         {
           "name": "payload",
@@ -34347,7 +34347,7 @@
     },
     {
       "name": "status.update",
-      "summary": "Transient status line (kind: status, lifecycle, compacting, goal, loop, heartbeat, process, …).",
+      "summary": "Transient status line (kind: status, lifecycle, compacting, goal, loop, heartbeat, process, \u2026).",
       "params": [
         {
           "name": "payload",
