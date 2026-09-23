@@ -249,11 +249,11 @@ def _cmd_facts(args, conn, proj):
         )
         return f"Added project fact {fact_id} to {proj.slug}"
     if action == "verify":
-        if not pdb.verify_project_fact(conn, args.fact_id):
+        if not pdb.verify_project_fact(conn, args.fact_id, project_id=proj.id):
             return _err(f"no active project fact: {args.fact_id}")
         return f"Verified project fact {args.fact_id}"
     if action == "supersede":
-        if not pdb.supersede_project_fact(conn, args.fact_id):
+        if not pdb.supersede_project_fact(conn, args.fact_id, project_id=proj.id):
             return _err(f"no active project fact: {args.fact_id}")
         return f"Superseded project fact {args.fact_id}"
     return _err(f"unknown facts action: {action}")
