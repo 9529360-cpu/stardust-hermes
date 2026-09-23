@@ -65,6 +65,7 @@ CONFIGURABLE_TOOLSETS = [
     ("skills",          "📚 Skills",                    "list, view, manage"),
     ("todo",            "📋 Task Planning",             "todo_list"),
     ("kanban",          "📌 Kanban",                    "opt-in task board tools for this platform"),
+    ("assistant_tasks", "🧭 Durable Assistant Tasks",        "cross-conversation task intake, status, and resume"),
     ("memory",          "💾 Memory",                    "persistent memory across sessions"),
     ("context_engine",  "🧩 Context Engine",            "runtime tools from the active context engine"),
     ("session_search",  "🔎 Session Search",            "search past conversations"),
