@@ -96,6 +96,7 @@ describe('PluginsTab', () => {
         id: 'external',
         name: 'External Tool',
         kind: 'disk',
+        decisionId: 'external-slot',
         status: 'disabled',
         file: '/tmp/desktop-plugins/external/plugin.js',
         packageOrigin: { repo, sha }
@@ -106,7 +107,8 @@ describe('PluginsTab', () => {
 
     fireEvent.click(screen.getByRole('switch', { name: 'Desktop: External Tool' }))
 
-    expect($pluginDecisions.get().external).not.toBe(true)
+    expect($pluginDecisions.get()['external-slot']).not.toBe(true)
+    expect($pluginDecisions.get().external).toBeUndefined()
     expect(screen.getByText('Trust and enable External Tool?')).toBeTruthy()
     expect(screen.getByText(repo)).toBeTruthy()
     expect(screen.getByText(sha)).toBeTruthy()
@@ -114,7 +116,8 @@ describe('PluginsTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Trust & enable' }))
 
-    await waitFor(() => expect($pluginDecisions.get().external).toBe(true))
+    await waitFor(() => expect($pluginDecisions.get()['external-slot']).toBe(true))
+    expect($pluginDecisions.get().external).toBeUndefined()
   })
   it('offers "Install here" for a desktop half whose agent half is not in the selected profile', async () => {
     $pluginRecords.set({
