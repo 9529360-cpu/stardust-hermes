@@ -268,7 +268,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     })
   }
 
-  it('loads the full source via readPluginSource when the shell offers it', async () => {
+  it('inventories standalone full-source plugins inert until the user explicitly enables them', async () => {
     ;(window.hermesDesktop as unknown as { readPluginSource: unknown }).readPluginSource = readPluginSource
     desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
     standaloneRootWith('big')
@@ -288,8 +288,14 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
-      // The EVALUATED source came from the full read, not the truncated preview.
+      // Discovery proves the source can be read in full, but external renderer code
+      // stays inert until the user explicitly grants trust through the toggle.
       expect(readPluginSource).toHaveBeenCalledWith('/local/.hermes/desktop-plugins/big/plugin.js')
+      expect(register).not.toHaveBeenCalled()
+      expect($pluginRecords.get().big).toMatchObject({ kind: 'disk', status: 'disabled' })
+
+      await setPluginEnabled('big', true)
+
       expect(register).toHaveBeenCalledTimes(1)
       expect($pluginRecords.get().big).toMatchObject({ kind: 'disk', status: 'loaded' })
     } finally {
@@ -325,7 +331,7 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     }
   })
 
-  it('older shell, small plugin (not truncated): still loads through readFileText', async () => {
+  it('older shell inventories a small standalone plugin inert, then explicit enable loads it', async () => {
     desktopPluginsRoot.mockResolvedValue('/local/.hermes/desktop-plugins')
     standaloneRootWith('small')
 
@@ -342,11 +348,63 @@ describe('plugin source reads (512 KiB preview-cap bug)', () => {
     try {
       await discoverRuntimePlugins()
 
+      expect(register).not.toHaveBeenCalled()
+      expect($pluginRecords.get().small).toMatchObject({ kind: 'disk', status: 'disabled' })
+
+      await setPluginEnabled('small', true)
+
       expect(register).toHaveBeenCalledTimes(1)
       expect($pluginRecords.get().small).toMatchObject({ kind: 'disk', status: 'loaded' })
     } finally {
       restore()
       delete (globalThis as unknown as { __smallRegister?: unknown }).__smallRegister
+    }
+  })
+})
+
+describe('runtime trust default', () => {
+  it('direct external runtime load is inert unless its caller explicitly marks the root trusted', async () => {
+    const register = vi.fn()
+
+    ;(globalThis as unknown as { __directRuntimeRegister: unknown }).__directRuntimeRegister = register
+
+    const createObjectURL = vi
+      .spyOn(URL, 'createObjectURL')
+      .mockImplementation(
+        blob =>
+          `data:text/javascript;base64,${Buffer.from((blob as unknown as { parts: string[] }).parts.join('')).toString('base64')}`
+      )
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const RealBlob = globalThis.Blob
+    vi.stubGlobal(
+      'Blob',
+      class {
+        parts: string[]
+        constructor(parts: string[]) {
+          this.parts = parts
+        }
+      }
+    )
+
+    try {
+      const id = await loadRuntimePlugin(
+        'export default { id: "direct-runtime", register: globalThis.__directRuntimeRegister }',
+        'direct-runtime'
+      )
+
+      expect(id).toBe('direct-runtime')
+      expect(register).not.toHaveBeenCalled()
+      expect($pluginRecords.get()['direct-runtime']).toMatchObject({ status: 'disabled' })
+
+      await setPluginEnabled('direct-runtime', true)
+
+      expect(register).toHaveBeenCalledTimes(1)
+      expect($pluginRecords.get()['direct-runtime']).toMatchObject({ status: 'loaded' })
+    } finally {
+      createObjectURL.mockRestore()
+      revokeObjectURL.mockRestore()
+      vi.stubGlobal('Blob', RealBlob)
+      delete (globalThis as unknown as { __directRuntimeRegister?: unknown }).__directRuntimeRegister
     }
   })
 })
