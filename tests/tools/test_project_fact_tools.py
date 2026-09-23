@@ -76,3 +76,19 @@ def test_agent_fact_actions_require_session_project(project_home):
     project_tools.set_project_context_callback(lambda _task_id: None)
     result = _call({"action": "fact_list"})
     assert result == {"success": False, "error": "This session is not attached to a Project."}
+
+
+def test_switch_persists_project_identity_even_without_primary_folder(project_home):
+    with pdb.connect_closing() as conn:
+        project_id = pdb.create_project(conn, name="Folderless")
+
+    calls = []
+    project_tools.set_project_workspace_callback(
+        lambda task_id, path, name, pid: calls.append((task_id, path, name, pid))
+    )
+
+    result = json.loads(project_tools.project_switch("Folderless", task_id="session-1"))
+
+    assert result["success"] is True
+    assert result["id"] == project_id
+    assert calls == [("session-1", "", "Folderless", project_id)]
