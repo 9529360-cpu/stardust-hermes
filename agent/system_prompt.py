@@ -572,14 +572,23 @@ def _project_fact_parts(agent: Any) -> List[str]:
             cwd = resolve_context_cwd()
 
         if explicit_project_id is not None or cwd is not None:
-            with pdb.connect_closing(project_db_path) as conn:
-                if explicit_project_id is not None:
-                    project = pdb.get_project(conn, explicit_project_id)
-                    if project is not None and project.archived:
-                        project = None
-                else:
-                    project = pdb.project_for_path(conn, str(cwd))
-                facts = pdb.list_project_facts(conn, project.id) if project is not None else []
+            import sqlite3
+            from hermes_state_holders import read_only_db_uri
+
+            db_path = project_db_path or pdb.projects_db_path()
+            if db_path.exists():
+                conn = sqlite3.connect(read_only_db_uri(db_path), uri=True)
+                conn.row_factory = sqlite3.Row
+                try:
+                    if explicit_project_id is not None:
+                        project = pdb.get_project(conn, explicit_project_id)
+                        if project is not None and project.archived:
+                            project = None
+                    else:
+                        project = pdb.project_for_path(conn, str(cwd))
+                    facts = pdb.list_project_facts(conn, project.id) if project is not None else []
+                finally:
+                    conn.close()
     except Exception:
         logger.debug("Could not load project facts for prompt context", exc_info=True)
         project, facts = None, []
