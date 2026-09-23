@@ -91,9 +91,9 @@ def _project_fact_action(args: dict, task_id: Optional[str]) -> str:
             source_kind = str(args.get("source_kind") or "").strip().lower()
             if source_kind not in {"user", "repository", "session", "tool", "inference"}:
                 return json.dumps({
-                "success": False,
-                "error": "source_kind must be user, repository, session, tool, or inference.",
-            })
+                    "success": False,
+                    "error": "source_kind must be user, repository, session, tool, or inference.",
+                })
             try:
                 fact_id = pdb.add_project_fact(
                     conn, proj.id, str(args.get("content") or ""), source_kind=source_kind,
