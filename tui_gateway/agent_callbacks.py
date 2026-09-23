@@ -160,12 +160,34 @@ def _apply_project_workspace(task_id: str, path: str, _name: str = "", project_i
         logger.debug("failed to emit session.info after project workspace move", exc_info=True)
 
 
+def _project_id_for_task(task_id: str) -> str | None:
+    key = str(task_id or "")
+    with _sessions_lock:
+        _sid, session = (key, _sessions[key]) if key in _sessions else next(
+            ((s, c) for s, c in _sessions.items()
+             if c.get("session_key") == key or getattr(c.get("agent"), "session_id", None) == key),
+            ("", None))
+    if session is None:
+        return None
+    explicit = str(session.get("project_id") or "").strip()
+    if explicit:
+        return explicit
+    with contextlib.suppress(Exception), _session_db(session) as db:
+        if db is not None and session.get("session_key"):
+            row = db.get_session(session["session_key"]) or {}
+            explicit = str(row.get("project_id") or "").strip()
+            if explicit:
+                session["project_id"] = explicit
+                return explicit
+    return _session_project_id(session)
+
+
 def _wire_callbacks(sid: str):
     from tools.terminal_tool import set_sudo_password_callback
     from tools.terminal_tool_sudo import get_sudo_prompt_command
     from gateway.run import _redact_approval_command
     from tools.skills_tool import set_secret_capture_callback
-    from tools.project_tools import set_project_workspace_callback
+    from tools.project_tools import set_project_context_callback, set_project_workspace_callback
 
     def secret_cb(env_var, prompt, metadata=None):
         pl = {"prompt": prompt, "env_var": env_var, **({"metadata": metadata} if metadata else {})}
@@ -178,6 +200,7 @@ def _wire_callbacks(sid: str):
     set_sudo_password_callback(lambda: _ask(
         "sudo", sid, {"command": _redact_approval_command(get_sudo_prompt_command())}, timeout=120))
     set_project_workspace_callback(_apply_project_workspace)
+    set_project_context_callback(_project_id_for_task)
     set_secret_capture_callback(secret_cb)
     # External password-manager unlock: the renderer shows a masked master-password card; the
     # answer is consumed by the manager CLI on stdin and only a session token stays in memory.
