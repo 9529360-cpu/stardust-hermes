@@ -193,6 +193,22 @@ function ProvenancePill({ pkg }: { pkg: PluginPackage }) {
     return <Pill>{pkg.agent.source}</Pill>
   }
 
+  if (pkg.desktop?.packageOrigin?.repo) {
+    const origin = pkg.desktop.packageOrigin
+    const shortSha = origin.sha?.slice(0, 8)
+    const label = origin.sha ? `${origin.repo} @ ${origin.sha}` : origin.repo
+
+    return (
+      <Tip label={label}>
+        <span>
+          <Pill>
+            {shortSha ? <span className="font-mono">{p.pinnedBadge(shortSha)}</span> : t.settings.plugins.kinds[pkg.desktop.kind]}
+          </Pill>
+        </span>
+      </Tip>
+    )
+  }
+
   if (pkg.desktop) {
     return <Pill>{t.settings.plugins.kinds[pkg.desktop.kind]}</Pill>
   }
