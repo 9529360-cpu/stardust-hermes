@@ -13,10 +13,10 @@ from tools.registry import registry
 
 # Set by the GUI gateway: ``(task_id, primary_path, project_name)`` re-anchors that session's
 # workspace. ``None`` in CLI/messaging — the DB write still happens, nothing to move.
-_workspace_callback: Optional[Callable[[str, str, str], None]] = None
+_workspace_callback: Optional[Callable[[str, str, str, str], None]] = None
 
 
-def set_project_workspace_callback(fn: Optional[Callable[[str, str, str], None]]) -> None:
+def set_project_workspace_callback(fn: Optional[Callable[[str, str, str, str], None]]) -> None:
     global _workspace_callback
     _workspace_callback = fn
 
@@ -30,11 +30,11 @@ def _primary_path(proj) -> Optional[str]:
     return proj.folders[0].path if proj.folders else None
 
 
-def _apply_workspace(task_id: Optional[str], path: Optional[str], name: str) -> None:
+def _apply_workspace(task_id: Optional[str], path: Optional[str], name: str, project_id: str) -> None:
     cb = _workspace_callback
     if cb and task_id and path:
         try:
-            cb(task_id, path, name)
+            cb(task_id, path, name, project_id)
         except Exception:
             pass
 
@@ -58,7 +58,7 @@ def _resolve(conn, token: str):
 
 def _activated(proj, task_id: Optional[str]) -> str:
     primary = _primary_path(proj)
-    _apply_workspace(task_id, primary, proj.name)
+    _apply_workspace(task_id, primary, proj.name, proj.id)
     return json.dumps({
         "success": True, "id": proj.id, "slug": proj.slug, "name": proj.name,
         "primary_path": primary})
