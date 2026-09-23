@@ -14,7 +14,7 @@ Two files make up the agent's memory:
 
 | File | Purpose | Char Limit |
 |------|---------|------------|
-| **MEMORY.md** | Agent's personal notes — environment facts, conventions, things learned | 2,200 chars (~800 tokens) |
+| **MEMORY.md** | Cross-project assistant knowledge — global environment facts, standing conventions, reusable tool quirks and lessons | 2,200 chars (~800 tokens) |
 | **USER.md** | User profile — your preferences, communication style, expectations | 1,375 chars (~500 tokens) |
 
 Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a frozen snapshot at session start. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
@@ -41,11 +41,11 @@ At the start of every session, memory entries are loaded from disk and rendered 
 ══════════════════════════════════════════════
 MEMORY (your personal notes) [67% — 1,474/2,200 chars]
 ══════════════════════════════════════════════
-User's project is a Rust web service at ~/code/myapi using Axum + SQLx
+This machine runs Ubuntu 22.04 and has Docker and Podman installed
 §
-This machine runs Ubuntu 22.04, has Docker and Podman installed
+Across maintained repositories, use conventional commits unless the project says otherwise
 §
-User prefers concise responses, dislikes verbose explanations
+The user prefers concise responses and dislikes verbose explanations
 ```
 
 The format includes:
@@ -234,7 +234,7 @@ See [Session Search Tool](/user-guide/sessions#session-search-tool) for the thre
 | **Management** | Manually curated by agent | Automatic — all sessions stored |
 | **Token cost** | Fixed per session (~1,300 tokens) | On-demand (searched when needed) |
 
-**Memory** is for critical facts that should always be in context. **Session search** is for "did we discuss X last week?" queries where the agent needs to recall specifics from past conversations.
+**Memory** is for critical cross-project facts that should always be in context. Project facts belong to `projects.db`. **Session search** is for "did we discuss X last week?" queries where the agent needs to recall specifics from past conversations.
 
 ## Learning Journey (`/journey`)
 
