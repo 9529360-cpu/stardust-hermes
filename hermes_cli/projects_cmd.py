@@ -63,7 +63,7 @@ def build_parser(parent_subparsers: argparse._SubParsersAction) -> argparse.Argu
     fact_add.add_argument("content", help="Durable project-scoped fact")
     fact_add.add_argument(
         "--source", dest="source_kind", required=True,
-        choices=sorted(pdb._PROJECT_FACT_SOURCE_KINDS),
+        choices=sorted(pdb.PROJECT_FACT_SOURCE_KINDS),
         help="Where this fact came from",
     )
     fact_add.add_argument("--source-ref", default=None, help="Optional source locator or identifier")
