@@ -210,3 +210,37 @@ def test_archived_explicit_project_does_not_fall_back_to_cwd(tmp_path, monkeypat
         assert system_prompt._project_fact_parts(agent) == []
     finally:
         session_db.close()
+
+
+def test_explicit_project_facts_load_even_from_launch_artifact_cwd(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(
+        system_prompt,
+        "resolve_context_cwd",
+        lambda: (_ for _ in ()).throw(AssertionError("explicit project must not resolve cwd")),
+    )
+
+    with pdb.connect_closing(home / "projects.db") as conn:
+        project_id = pdb.create_project(conn, name="Folderless")
+        pdb.add_project_fact(conn, project_id, "Folderless project fact.", source_kind="user")
+
+    session_db = SessionDB(db_path=home / "state.db")
+    try:
+        session_db.create_session(
+            "session-folderless",
+            source="desktop",
+            project_id=project_id,
+        )
+        agent = SimpleNamespace(
+            _context_cwd_is_launch_artifact=True,
+            _session_db=session_db,
+            session_id="session-folderless",
+        )
+
+        block = system_prompt._project_fact_parts(agent)[0]
+
+        assert "Project: Folderless" in block
+        assert "Folderless project fact." in block
+    finally:
+        session_db.close()
