@@ -1445,7 +1445,7 @@ for paper in results:
 
 ### State Management with `memory` and `todo`
 
-**`memory` tool** — persist key decisions (bounded: ~2200 chars for MEMORY.md):
+**Project facts / `memory`** — persist project-specific decisions as Project facts when the session is attached to a Project; use `memory` only for reusable cross-project lessons or user/profile facts:
 
 ```
 memory("add", "Paper: autoreason. Venue: NeurIPS 2025 (9 pages). 
