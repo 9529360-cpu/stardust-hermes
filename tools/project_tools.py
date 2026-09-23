@@ -67,7 +67,8 @@ def _current_project(conn, task_id: Optional[str]):
     from hermes_cli import projects_db as pdb
     callback = _project_context_callback
     project_id = callback(str(task_id or "")) if callback and task_id else None
-    return pdb.get_project(conn, project_id) if project_id else None
+    project = pdb.get_project(conn, project_id) if project_id else None
+    return None if project is None or project.archived else project
 
 
 def _project_fact_action(args: dict, task_id: Optional[str]) -> str:
