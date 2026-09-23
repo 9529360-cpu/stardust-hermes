@@ -11,6 +11,14 @@ import {
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { Codicon } from '@/components/ui/codicon'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
@@ -19,7 +27,7 @@ import { discoverRuntimePlugins } from '@/contrib/runtime-loader'
 import type { ProfileScope } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { FolderOpen, Loader2, Monitor, Package, RefreshCw } from '@/lib/icons'
+import { AlertTriangle, FolderOpen, Loader2, Monitor, Package, RefreshCw } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import {
   $agentPluginBusy,
@@ -214,6 +222,104 @@ function Dash() {
   )
 }
 
+function DesktopPluginTrustDialog({
+  plugin,
+  displayName,
+  onClose
+}: {
+  plugin: PluginRecord
+  displayName: string
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const d = t.settings.plugins
+  const copy = d.trustDialog
+  const [enabling, setEnabling] = useState(false)
+  const origin = plugin.packageOrigin
+  const hasRecordedSource = Boolean(origin?.repo || origin?.sha || plugin.file)
+
+  const enable = async () => {
+    if (enabling) {
+      return
+    }
+
+    setEnabling(true)
+
+    try {
+      await setPluginEnabled(plugin.id, true)
+      onClose()
+    } catch (error) {
+      notifyError(error, `Could not enable ${displayName}`)
+      setEnabling(false)
+    }
+  }
+
+  return (
+    <Dialog
+      onOpenChange={open => {
+        if (!open && !enabling) {
+          onClose()
+        }
+      }}
+      open
+    >
+      <DialogContent banner={copy.authorityBody} bannerTone="warn" onOpenAutoFocus={event => event.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle icon={AlertTriangle}>{copy.title(displayName)}</DialogTitle>
+          <DialogDescription>{copy.description}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-bg-quinary) px-3 py-2.5">
+          <div className="text-[length:var(--conversation-caption-font-size)] font-medium text-foreground">
+            {copy.sourceHeading}
+          </div>
+
+          {!hasRecordedSource && (
+            <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+              {copy.sourceUnknown}
+            </p>
+          )}
+
+          {origin?.repo && (
+            <div className="grid gap-1 text-[length:var(--conversation-caption-font-size)] sm:grid-cols-[7rem_minmax(0,1fr)]">
+              <span className="text-(--ui-text-tertiary)">{copy.repository}</span>
+              <code className="break-all text-foreground">{origin.repo}</code>
+            </div>
+          )}
+
+          {origin?.sha && (
+            <div className="grid gap-1 text-[length:var(--conversation-caption-font-size)] sm:grid-cols-[7rem_minmax(0,1fr)]">
+              <span className="text-(--ui-text-tertiary)">{copy.pinnedCommit}</span>
+              <code className="break-all text-foreground">{origin.sha}</code>
+            </div>
+          )}
+
+          {plugin.file && (
+            <div className="grid gap-1 text-[length:var(--conversation-caption-font-size)] sm:grid-cols-[7rem_minmax(0,1fr)]">
+              <span className="text-(--ui-text-tertiary)">{copy.localFile}</span>
+              <code className="break-all text-foreground">{plugin.file}</code>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1 text-[length:var(--conversation-caption-font-size)]">
+          <div className="font-medium text-foreground">{copy.authorityHeading}</div>
+          <p className="text-(--ui-text-secondary)">{copy.authorityBody}</p>
+        </div>
+
+        <DialogFooter>
+          <Button disabled={enabling} onClick={onClose} variant="outline">
+            {t.common.cancel}
+          </Button>
+          <Button disabled={enabling} onClick={() => void enable()}>
+            {enabling ? t.common.loading : copy.confirm}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function PackageRow({
   pkg,
   scope,
@@ -237,6 +343,7 @@ function PackageRow({
   const desktopOn = desktop ? desktop.status !== 'disabled' : false
   const agentOn = agent?.status === 'enabled'
   const agentToggleable = Boolean(agent?.key)
+  const [desktopTrustCandidate, setDesktopTrustCandidate] = useState<PluginRecord | null>(null)
   const displayName =
     desktop?.kind === 'bundled' ? (p.bundledNames[desktop.id as keyof typeof p.bundledNames] ?? pkg.name) : pkg.name
   const description =
@@ -296,6 +403,13 @@ function PackageRow({
             checked={desktopOn}
             onCheckedChange={on => {
               triggerHaptic('selection')
+
+              if (on && desktop.kind !== 'bundled') {
+                setDesktopTrustCandidate(desktop)
+
+                return
+              }
+
               void setPluginEnabled(desktop.id, on)
             }}
           />
@@ -356,6 +470,14 @@ function PackageRow({
           <Dash />
         )}
       </HalfCell>
+
+      {desktopTrustCandidate && (
+        <DesktopPluginTrustDialog
+          displayName={displayName}
+          onClose={() => setDesktopTrustCandidate(null)}
+          plugin={desktopTrustCandidate}
+        />
+      )}
     </div>
   )
 }
