@@ -138,6 +138,11 @@ def _apply_project_workspace(task_id: str, path: str, _name: str = "", project_i
 
     if project_id:
         session["project_id"] = project_id
+        agent = session.get("agent")
+        if agent is not None:
+            # Keep routing state current without mutating the frozen system-prompt
+            # snapshot for this already-running session.
+            agent._session_project_id = project_id
         if session.get("session_key"):
             with contextlib.suppress(Exception), _session_db(session) as db:
                 if db is not None:
