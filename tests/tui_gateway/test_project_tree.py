@@ -657,3 +657,38 @@ def test_equivalent_windows_spellings_derive_one_lane_key():
     b = pt._place_by_heuristic("C:\\work\\notes\\")
     assert a is not None and b is not None
     assert pt._lane_key(a["lane_key"]) == pt._lane_key(b["lane_key"])
+
+
+def test_explicit_session_project_id_beats_cwd_folder_owner():
+    alpha = _project("p_alpha", "Alpha", ["/alpha"])
+    beta = _project("p_beta", "Beta", ["/beta"])
+    session = _session("/alpha", project_id="p_beta")
+
+    tree = pt.build_tree(
+        [alpha, beta],
+        [session],
+        [],
+        resolve=lambda _cwd: None,
+        hydrate=True,
+    )
+
+    counts = {project["id"]: project["sessionCount"] for project in tree["projects"]}
+    assert counts == {"p_alpha": 0, "p_beta": 1}
+    beta_session = _sessions_of(next(p for p in tree["projects"] if p["id"] == "p_beta"))[0]
+    assert beta_session["id"] == session["id"]
+    assert "project_id" not in beta_session
+
+
+def test_stale_session_project_id_falls_back_to_cwd_owner():
+    alpha = _project("p_alpha", "Alpha", ["/alpha"])
+    session = _session("/alpha", project_id="p_deleted")
+
+    tree = pt.build_tree(
+        [alpha],
+        [session],
+        [],
+        resolve=lambda _cwd: None,
+        hydrate=True,
+    )
+
+    assert [(p["id"], p["sessionCount"]) for p in tree["projects"]] == [("p_alpha", 1)]
