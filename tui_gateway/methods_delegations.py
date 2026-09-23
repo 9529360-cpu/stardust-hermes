@@ -49,4 +49,6 @@ def _(rid, params):
 
 
 def register(server):
-    bind_module(globals(), server)
+    # Anonymous handlers are installed from HandlerRegistry; publishing the final
+    # module-global "_" into server.py would collide with methods_subagents._.
+    bind_module(globals(), server, skip=("_",))
