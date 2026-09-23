@@ -220,3 +220,18 @@ def test_state_authority_map_keeps_domains_separate():
     assert authority_for(StateDomain.SESSION).store == "state.db"
     assert authority_for(StateDomain.TASK).store == "kanban.db"
     assert authority_for(StateDomain.INFERENCE).durable is False
+
+
+def test_project_fact_rejects_unknown_provenance(conn):
+    pid = pdb.create_project(conn, name="Alpha")
+
+    with pytest.raises(ValueError, match="source_kind must be one of"):
+        pdb.add_project_fact(conn, pid, "fact", source_kind="guessed")
+
+
+def test_project_delete_cascades_project_facts(conn):
+    pid = pdb.create_project(conn, name="Alpha")
+    pdb.add_project_fact(conn, pid, "fact", source_kind="user")
+
+    assert pdb.delete_project(conn, pid) is True
+    assert pdb.list_project_facts(conn, pid, include_superseded=True) == []
