@@ -38,9 +38,9 @@ def _primary_path(proj) -> Optional[str]:
 
 def _apply_workspace(task_id: Optional[str], path: Optional[str], name: str, project_id: str) -> None:
     cb = _workspace_callback
-    if cb and task_id and path:
+    if cb and task_id and project_id:
         try:
-            cb(task_id, path, name, project_id)
+            cb(task_id, path or "", name, project_id)
         except Exception:
             pass
 
