@@ -99,7 +99,7 @@ For information the agent needs across projects about the environment, workflows
 - Durable cross-project lessons
 - Skills and techniques that worked across contexts
 
-Project-specific conventions, versions, architecture facts, and repository decisions belong to the project's structured fact store in `projects.db`. Temporary task progress belongs to the task/session owner, not memory.
+Project-specific conventions, versions, architecture facts, and repository decisions belong to the project's structured fact store in `projects.db`. Temporary in-session plan state belongs to the session todo snapshot in `state.db`; long-lived autonomous task lifecycle belongs to `kanban.db`, not memory.
 
 ### `user` — User Profile
 
