@@ -118,3 +118,16 @@ def test_agent_fact_list_hides_sensitive_facts_from_model_context(project_home):
     assert [fact["content"] for fact in listed["facts"]] == ["Visible repository fact."]
     assert listed["hidden_sensitive_count"] == 1
     assert "Local-only deployment secret." not in json.dumps(listed)
+
+
+def test_agent_fact_actions_fail_closed_for_archived_project(project_home):
+    with pdb.connect_closing() as conn:
+        project_id = pdb.create_project(conn, name="Archived")
+        pdb.archive_project(conn, project_id)
+
+    project_tools.set_project_context_callback(lambda _task_id: project_id)
+
+    assert _call({"action": "fact_list"}) == {
+        "success": False,
+        "error": "This session is not attached to a Project.",
+    }
