@@ -16,7 +16,8 @@ class StateDomain(str, Enum):
     GLOBAL_MEMORY = "global_memory"
     PROJECT = "project"
     SESSION = "session"
-    TASK = "task"
+    SESSION_PLAN = "session_plan"
+    DURABLE_TASK = "durable_task"
     INFERENCE = "inference"
 
 
@@ -58,12 +59,19 @@ AUTHORITIES = {
         True,
         "Conversation transcript, lineage, compression state, and session metadata.",
     ),
-    StateDomain.TASK: StateAuthority(
-        StateDomain.TASK,
+    StateDomain.SESSION_PLAN: StateAuthority(
+        StateDomain.SESSION_PLAN,
+        "state.db (sessions.model_config._todo_state)",
+        "session",
+        True,
+        "The live session's multi-step todo/plan state; it follows session lineage and compression.",
+    ),
+    StateDomain.DURABLE_TASK: StateAuthority(
+        StateDomain.DURABLE_TASK,
         "kanban.db",
         "task",
         True,
-        "Durable task lifecycle. Session summaries may describe tasks but never own them.",
+        "Long-lived autonomous task lifecycle that must survive chat/session boundaries.",
     ),
     StateDomain.INFERENCE: StateAuthority(
         StateDomain.INFERENCE,
