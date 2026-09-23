@@ -218,7 +218,8 @@ def test_state_authority_map_keeps_domains_separate():
     assert authority_for(StateDomain.GLOBAL_MEMORY).store == "memories/MEMORY.md"
     assert authority_for(StateDomain.PROJECT).store == "projects.db"
     assert authority_for(StateDomain.SESSION).store == "state.db"
-    assert authority_for(StateDomain.TASK).store == "kanban.db"
+    assert authority_for(StateDomain.SESSION_PLAN).store == "state.db (sessions.model_config._todo_state)"
+    assert authority_for(StateDomain.DURABLE_TASK).store == "kanban.db"
     assert authority_for(StateDomain.INFERENCE).durable is False
 
 
