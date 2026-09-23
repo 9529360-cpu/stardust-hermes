@@ -1106,7 +1106,7 @@ class TestModelCatalogAuthorityMigration:
         path = self._run(tmp_path, monkeypatch, self.OLD_URL)
 
         raw = read_raw_config()
-        assert raw.get("model_catalog", {}).get("url") is None
+        assert raw.get("model_catalog", {}).get("url") == self.NEW_URL
         assert self.OLD_URL not in path.read_text(encoding="utf-8")
         assert load_config()["model_catalog"]["url"] == self.NEW_URL
 
