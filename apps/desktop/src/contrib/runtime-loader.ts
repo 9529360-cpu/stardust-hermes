@@ -35,10 +35,11 @@ import { createPluginContext, type HermesPlugin } from './plugin'
 import { $pluginRecords, dropPlugin, pluginActive, type PluginKind, publishPlugin } from './plugins-store'
 
 interface LoadOptions {
-  /** Root-level default-enable CAP: `false` ships the plugin opt-in (inventory
-   *  row, off until the user toggles) even if the plugin says otherwise. The
-   *  unified agent-plugin root sets this so `~/.hermes/plugins` keeps its
-   *  installed-but-inert posture (GHSA-mcfc-hp25-cjv7) on the desktop side too. */
+  /** Root-level enable posture. Runtime code defaults to opt-in (`false`) even
+   *  if the plugin declares `defaultEnabled: true`; only an explicit user
+   *  decision in pluginDecisions may activate external renderer code. A
+   *  trusted caller may pass `true` deliberately, but disk/runtime discovery
+   *  never does. */
   defaultEnabled?: boolean
   /** Absolute plugin.js path (disk plugins) — recorded for reveal/inventory. */
   file?: string
@@ -192,7 +193,7 @@ export async function loadRuntimePlugin(
     // reactivates via the handle above) — it just never registers. A root-level
     // `defaultEnabled: false` caps the plugin's own default: the user's explicit
     // enable still wins, a plugin can't self-enable past its root's posture.
-    if (pluginActive(plugin.id, (plugin.defaultEnabled ?? true) && (options.defaultEnabled ?? true))) {
+    if (pluginActive(plugin.id, (plugin.defaultEnabled ?? true) && (options.defaultEnabled ?? false))) {
       activate()
     }
 
@@ -491,8 +492,11 @@ async function scanDiskPlugins(): Promise<void> {
         const marker = await readPackageMarker(desktop, dir.path)
 
         const record: DiskPlugin = {
-          // A unified package's desktop half ships opt-in, like its agent half.
-          defaultEnabled: marker ? false : undefined,
+          // Every external Desktop code path is full-trust renderer code. First
+          // discovery only inventories it; an explicit user enable decision
+          // is the trust grant. Existing explicit true/false decisions remain
+          // authoritative through pluginActive().
+          defaultEnabled: false,
           file,
           id: null,
           origin: dir.name,
