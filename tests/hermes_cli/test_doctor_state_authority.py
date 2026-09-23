@@ -27,7 +27,8 @@ def test_state_authority_doctor_reports_owners_and_cwd_project(tmp_path, monkeyp
         assert "global_memory: memories/MEMORY.md" in out
         assert "project: projects.db" in out
         assert "session: state.db" in out
-        assert "task: kanban.db" in out
+        assert "session_plan: state.db (sessions.model_config._todo_state)" in out
+        assert "durable_task: kanban.db" in out
         assert "inference: owning domain with provenance" in out
         assert f"cwd project: Stardust ({project_id}) via folder ownership" in out
     finally:
