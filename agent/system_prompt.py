@@ -568,8 +568,9 @@ def _project_fact_parts(agent: Any) -> List[str]:
                         row = session_db.get_session(sid) or {}
                         explicit_project_id = str(row.get("project_id") or "").strip() or None
                 with pdb.connect_closing(project_db_path) as conn:
-                    project = pdb.get_project(conn, explicit_project_id) if explicit_project_id else None
-                    if project is None:
+                    if explicit_project_id:
+                        project = pdb.get_project(conn, explicit_project_id)
+                    else:
                         project = pdb.project_for_path(conn, str(cwd))
                     facts = pdb.list_project_facts(conn, project.id) if project is not None else []
             except Exception:
