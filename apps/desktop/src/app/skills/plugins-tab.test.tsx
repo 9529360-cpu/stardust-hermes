@@ -110,7 +110,7 @@ describe('PluginsTab', () => {
     expect(screen.getByText('Trust and enable External Tool?')).toBeTruthy()
     expect(screen.getByText(repo)).toBeTruthy()
     expect(screen.getByText(sha)).toBeTruthy()
-    expect(screen.getByText(/same app authority/i)).toBeTruthy()
+    expect(screen.getAllByText(/same app authority/i).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'Trust & enable' }))
 
