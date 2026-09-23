@@ -33,3 +33,19 @@ def test_state_authority_doctor_reports_owners_and_cwd_project(tmp_path, monkeyp
         assert f"cwd project: Stardust ({project_id}) via folder ownership" in out
     finally:
         reset_hermes_home_override(token)
+
+
+def test_state_authority_doctor_does_not_create_projects_db(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    home.mkdir()
+    token = set_hermes_home_override(home)
+    try:
+        monkeypatch.chdir(tmp_path)
+
+        finding = doctor_state._check_state_authority(False)
+
+        assert finding.issues == []
+        assert not (home / "projects.db").exists()
+        assert "projects.db not created" in capsys.readouterr().out
+    finally:
+        reset_hermes_home_override(token)
