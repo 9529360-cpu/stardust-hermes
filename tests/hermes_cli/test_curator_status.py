@@ -120,7 +120,7 @@ def test_list_unmanaged_itemizes_and_explains(curator_status_env):
     assert rc == 0
     assert "legacy-one" in out
     assert "managed-one" not in out
-    assert "no marker" in out or "created_by:null" in out
+    assert "origin unknown" in out
     assert "curator adopt" in out
 
 
