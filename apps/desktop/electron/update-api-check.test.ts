@@ -26,7 +26,7 @@ const SHA_A = 'a'.repeat(40)
 const SHA_B = 'b'.repeat(40)
 const HOUR = 60 * 60 * 1000
 
-test('cache serves a passive check for 24h, but not once HEAD or the branch changes', () => {
+test('cache serves a passive check for one hour, but not once HEAD or the branch changes', () => {
   const cached = { fetchedAt: 0, currentSha: SHA_A, branch: 'main', status: { behind: 0 } }
 
   assert.equal(cacheIsFresh(cached, { branch: 'main', currentSha: SHA_A, now: UPDATE_CHECK_TTL_MS - 1 }), true)

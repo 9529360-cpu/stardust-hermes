@@ -65,15 +65,13 @@ export const $backendUpdateChecking = atom<boolean>(false)
 export type UpdateTarget = 'client' | 'backend'
 export const $updateOverlayTarget = atom<UpdateTarget>('client')
 
-const STARDUST_LOCAL_EDITION = true
-
 export const setUpdateOverlayOpen = (open: boolean) => $updateOverlayOpen.set(open)
 
 export const openUpdateOverlayFor = (target: UpdateTarget) => {
   // The legacy overlay can still render backend state for compatibility tests,
   // but Stardust must never expose that inherited updater through a product
   // affordance. Any user-facing update request is for this desktop app.
-  const effectiveTarget = STARDUST_LOCAL_EDITION ? 'client' : target
+  const effectiveTarget: UpdateTarget = 'client'
 
   $updateOverlayTarget.set(effectiveTarget)
   $updateOverlayOpen.set(true)
@@ -269,7 +267,7 @@ export function maybeNotifyUpdateAvailable(status: DesktopUpdateStatus | null, t
  * backend maintenance separately, so all product-facing generic update actions
  * target this desktop client even while connected to a remote backend. */
 function activeUpdateTarget(): UpdateTarget {
-  return STARDUST_LOCAL_EDITION ? 'client' : isRemoteMode() ? 'backend' : 'client'
+  return 'client'
 }
 
 /**
@@ -290,18 +288,10 @@ export function openUpdatesWindow(target: UpdateTarget = activeUpdateTarget()): 
  * engine remains below for compatibility and recovery work, but Stardust's
  * product-facing entrypoint is client-only and cannot call it.
  */
-export function startActiveUpdate(target?: UpdateTarget): void {
-  if (!STARDUST_LOCAL_EDITION && !target && hasMultipleUpdateTargets()) {
-    $updateOverlayOpen.set(true)
-    void applyEverythingUpdate()
-
-    return
-  }
-
-  const effective = STARDUST_LOCAL_EDITION ? 'client' : (target ?? activeUpdateTarget())
-  $updateOverlayTarget.set(effective)
+export function startActiveUpdate(_target?: UpdateTarget): void {
+  $updateOverlayTarget.set('client')
   $updateOverlayOpen.set(true)
-  void (effective === 'backend' ? applyBackendUpdate() : applyUpdates())
+  void applyUpdates()
 }
 
 /**
@@ -862,11 +852,7 @@ export const $updateEverything = atom<UpdateEverythingState>({ running: false })
  * backend/multi-connection updater remains internal until a Stardust-native
  * release and rollback contract replaces it. */
 export function hasMultipleUpdateTargets(): boolean {
-  if (STARDUST_LOCAL_EDITION) {
-    return false
-  }
-
-  return isRemoteMode() || ($connectionsRegistry.get()?.connections.length ?? 0) > 1
+  return false
 }
 
 let updateEverythingInFlight: Promise<void> | null = null
@@ -996,11 +982,12 @@ let backgroundTimer: ReturnType<typeof setInterval> | null = null
 let connectionUnsub: (() => void) | null = null
 let lastConnectionMode: string | undefined
 
-// Passive checks run at most once per day per client. The main process and the
-// backend each keep a 24h cache, so a tick or focus that lands inside the window
-// is answered locally — the interval just decides how often we ask.
-export const BACKGROUND_UPDATE_CHECK_MS = 24 * 60 * 60 * 1000
-// Focus re-checks are bounded by the same day-long cadence, tracked here so a
+// The main process keeps its own bounded cache, so a tick or focus that lands
+// inside the window is answered locally. Hourly checks are frequent enough for
+// a personal-assistant install to notice a freshly merged main without turning
+// focus events into a GitHub request storm.
+export const BACKGROUND_UPDATE_CHECK_MS = 60 * 60 * 1000
+// Focus re-checks are bounded by the same hourly cadence, tracked here so a
 // user who alt-tabs every minute never turns focus into a poll.
 const FOCUS_RECHECK_KEY = 'hermes.updates.last-passive-check'
 
@@ -1018,12 +1005,6 @@ function runPassiveChecks(): void {
 
 /** Wire up background polling + progress streaming. Idempotent. */
 export function startUpdatePoller(): void {
-  // Stardust local edition is intentionally detached from upstream. Keep the update
-  // store/API available for diagnostics, but never initiate passive network checks.
-  if (STARDUST_LOCAL_EDITION) {
-    return
-  }
-
   if (pollerStarted || typeof window === 'undefined') {
     return
   }
