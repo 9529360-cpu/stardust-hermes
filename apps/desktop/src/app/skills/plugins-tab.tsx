@@ -11,6 +11,7 @@ import {
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
+import { Codicon } from '@/components/ui/codicon'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { Codicon } from '@/components/ui/codicon'
 import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { $pluginRecords, type PluginRecord, setPluginEnabled } from '@/contrib/plugins-store'
