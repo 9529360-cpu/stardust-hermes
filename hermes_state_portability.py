@@ -21,7 +21,7 @@ from hermes_state_common import SCHEMA_SQL, _PREVIEW_RAW_SUBQUERY_SQL, _shape_pr
 logger = logging.getLogger("hermes_state")
 
 _IMPORT_SESSION_TEXT_FIELDS = (
-    "source", "user_id", "model", "system_prompt", "end_reason", "cwd", "project_id", "git_branch", "git_repo_root",
+    "source", "user_id", "model", "system_prompt", "end_reason", "cwd", "git_branch", "git_repo_root",
     "billing_provider", "billing_base_url", "billing_mode", "cost_status", "cost_source", "pricing_version", "title",
 )
 # ``role`` is validated separately (non-empty string).
@@ -36,7 +36,7 @@ _IMPORT_SESSION_INSERT_SQL = """INSERT INTO sessions (
                            parent_session_id, started_at, ended_at, end_reason,
                            message_count, tool_call_count, input_tokens, output_tokens,
                            cache_read_tokens, cache_write_tokens, reasoning_tokens,
-                           cwd, project_id, git_branch, git_repo_root,
+                           cwd, git_branch, git_repo_root,
                            billing_provider, billing_base_url, billing_mode,
                            estimated_cost_usd, actual_cost_usd, cost_status, cost_source,
                            pricing_version, title, api_call_count, archived
@@ -46,7 +46,7 @@ _IMPORT_SESSION_INSERT_SQL = """INSERT INTO sessions (
                            NULL, :system_prompt_hash, NULL, :started_at, :ended_at,
                            :end_reason, 0, 0, :input_tokens, :output_tokens,
                            :cache_read_tokens, :cache_write_tokens,
-                           :reasoning_tokens, :cwd, :project_id, :git_branch, :git_repo_root,
+                           :reasoning_tokens, :cwd, :git_branch, :git_repo_root,
                            :billing_provider, :billing_base_url, :billing_mode,
                            :estimated_cost_usd, :actual_cost_usd, :cost_status,
                            :cost_source, :pricing_version, :title,
@@ -54,7 +54,7 @@ _IMPORT_SESSION_INSERT_SQL = """INSERT INTO sessions (
                        )"""
 # Columns copied verbatim from the payload; typed columns are converted below.
 _IMPORT_PASSTHROUGH_COLS = (
-    "user_id", "model", "model_config", "end_reason", "cwd", "project_id", "git_branch", "git_repo_root", "billing_provider",
+    "user_id", "model", "model_config", "end_reason", "cwd", "git_branch", "git_repo_root", "billing_provider",
     "billing_base_url", "billing_mode", "cost_status", "cost_source", "pricing_version", "title",
 )
 _IMPORT_INT_COLS = (
