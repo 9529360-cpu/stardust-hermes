@@ -1394,7 +1394,7 @@ Compose this skill with other Hermes skills for specific phases:
 | **`web_search`** | Literature discovery: `web_search("transformer attention mechanism 2024")` |
 | **`web_extract`** | Fetch paper content, verify citations: `web_extract("https://arxiv.org/abs/2303.17651")` |
 | **`delegate_task`** | **Parallel section drafting** — spawn isolated subagents for each section. Also for concurrent citation verification. |
-| **`todo`** | Primary task-state tracker. Update after every phase transition. |
+| **`todo`** | Session-scoped multi-step plan state. It survives compression/session restoration but is not the durable cross-session task authority. |
 | **`desktop_project` / project facts** | Persist durable project-scoped decisions such as contribution framing, venue choice, and reviewer feedback when a Project is attached. |
 | **`memory`** | Persist only cross-project lessons or user-wide conventions; do not use it as this paper project's state store. |
 | **`cronjob`** | Schedule experiment monitoring, deadline countdowns, automated arXiv checks. |
