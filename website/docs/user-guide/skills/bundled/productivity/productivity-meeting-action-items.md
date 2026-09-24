@@ -82,11 +82,11 @@ Load the user's tracker connector (`notion`, `github-issues`, or whichever syste
 
 ### 5. Prepare the follow-up package
 
-Draft concise minutes with decisions, action table, unresolved questions, and next checkpoint. Prepare proposed tickets/tasks and a follow-up email/chat message, but do not publish yet — drafting is not sending. Done when the user can approve each external effect individually.
+Draft concise minutes with decisions, action table, unresolved questions, and next checkpoint. Prepare proposed tickets/tasks and a follow-up email/chat message. If the user asked only for extraction, review, or drafts, do not publish. If the current-turn instruction explicitly says to create/update the records or send the follow-up, that instruction authorizes those named external effects within its stated scope; do not add a second confirmation merely because the next step is a write or send. Surface unresolved owners, dates, targets, or materially changed content before acting.
 
-### 6. Apply approved changes and verify
+### 6. Apply authorized changes and verify
 
-Create/update only approved records, attaching meeting provenance. Read back assignees, dates, status, and links from the provider. For ambiguous timeouts, search for the provenance marker before retrying — a blind retry duplicates records. Done when each approved item has a verified destination result.
+Create/update records and send messages only within current-turn authorization or a later explicit approval, attaching meeting provenance. Read back assignees, dates, status, and links from the provider. For ambiguous timeouts, search for the provenance marker before retrying — a blind retry duplicates records. Done when each approved item has a verified destination result.
 
 ## Pitfalls
 
@@ -101,5 +101,5 @@ Create/update only approved records, attaching meeting provenance. Read back ass
 - [ ] Every decision and action traces to a quote, timestamp, or note reference.
 - [ ] No owner or due date was invented; unresolved values are visible.
 - [ ] Existing records were searched before any create; creates vs updates distinguished.
-- [ ] No ticket, task, or message was published without explicit approval.
+- [ ] No ticket, task, or message was published outside explicit current-turn authorization or a later approval.
 - [ ] Every approved write was read back from the provider.
