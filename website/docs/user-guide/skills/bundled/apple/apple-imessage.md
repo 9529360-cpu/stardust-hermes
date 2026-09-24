@@ -98,10 +98,10 @@ imsg watch --chat-id 1 --attachments
 
 ## Rules
 
-1. **Always confirm recipient and message content** before sending
-2. **Never send to unknown numbers** without explicit user approval
-3. **Verify file paths** exist before attaching
-4. **Don't spam** — rate-limit yourself
+1. **A clear current-turn send request is authorization.** If the user identifies the recipient and the intended message, send it without asking them to repeat or reconfirm the same details.
+2. **Clarify only real ambiguity.** Ask when the named contact resolves to multiple plausible recipients, the recipient is missing, or the requested message content is materially unclear. A raw number explicitly supplied by the user is not "unknown" for this rule.
+3. **Verify file paths** exist before attaching.
+4. **Don't spam** — bulk or repeated outreach still needs clear user intent and sensible rate limiting.
 
 ## Example Workflow
 
@@ -111,8 +111,8 @@ User: "Text mom that I'll be late"
 # 1. Find mom's chat
 imsg chats --limit 20 --json | jq '.[] | select(.displayName | contains("Mom"))'
 
-# 2. Confirm with user: "Found Mom at +1555123456. Send 'I'll be late' via iMessage?"
-
-# 3. Send after confirmation
+# 2. If the match is unambiguous, send directly — the user's request already authorized it.
 imsg send --to "+1555123456" --text "I'll be late"
 ```
+
+If multiple "Mom" contacts are plausible, ask which one before sending.
