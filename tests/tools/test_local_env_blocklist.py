@@ -976,8 +976,14 @@ class TestPythonpathSelectiveStrip:
             captured["env"] = kwargs.get("env", {})
             captured["staging"] = os.path.dirname(cmd[1])
             proc = MagicMock()
+            # The persistent execute_code kernel drains subprocess pipes via
+            # BufferedReader.read1(), not read(). Match that production
+            # contract so reader threads observe EOF instead of looping on
+            # MagicMock values until the per-file test timeout.
             proc.stdout.read.return_value = b""
+            proc.stdout.read1.return_value = b""
             proc.stderr.read.return_value = b""
+            proc.stderr.read1.return_value = b""
             proc.wait.return_value = 0
             proc.returncode = 0
             proc.poll.return_value = 0
