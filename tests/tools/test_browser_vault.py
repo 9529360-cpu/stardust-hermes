@@ -128,6 +128,32 @@ class TestVaultStore:
         with pytest.raises(VaultError, match="cvc"):
             store.add_item(kind="payment", label="Card", secret={k: v for k, v in _CARD.items() if k != "cvc"})
 
+    def test_delegated_payment_policy_is_metadata_only(self, store):
+        meta = store.add_item(
+            kind="payment",
+            label="Stardust card",
+            secret=_CARD,
+            delegated_payment=True,
+            allow_any_origin=True,
+        )
+        assert meta.delegated_payment is True
+        assert meta.allow_any_origin is True
+        listed = store.list_items()[0].to_dict()
+        assert listed["delegated_payment"] is True
+        assert listed["allow_any_origin"] is True
+        dumped = json.dumps(listed)
+        assert _CARD["card_number"] not in dumped
+        assert _CARD["cvc"] not in dumped
+
+    def test_any_origin_requires_delegated_payment(self, store):
+        with pytest.raises(VaultError, match="requires a delegated payment card"):
+            store.add_item(
+                kind="payment",
+                label="Card",
+                secret=_CARD,
+                allow_any_origin=True,
+            )
+
     def test_unknown_kind_rejected(self, store):
         with pytest.raises(VaultError):
             store.add_item(kind="totp", label="x", secret={})
@@ -607,6 +633,56 @@ class TestBrowserVaultTools:
             assert len(secret_exprs) == 1 and _CARD["card_number"] in secret_exprs[0] and "07/29" in secret_exprs[0]
             assert '"index": 3' not in secret_exprs[0]  # the email box is never a card target
             assert _CARD["card_number"] not in redact.redact_sensitive_text(f"dom says {_CARD['card_number']}")
+        finally:
+            redact.clear_vault_redaction_values()
+
+    def test_delegated_any_origin_payment_skips_redundant_confirmation(self, store):
+        """A dedicated delegated card may fill on the current checkout origin without a second prompt.
+        The write is still bound to that exact origin inside the secret-bearing JS."""
+        from tools import browser_vault_tool
+        from agent import redact
+
+        meta = store.add_item(
+            kind="payment",
+            label="Stardust spend",
+            secret=_CARD,
+            delegated_payment=True,
+            allow_any_origin=True,
+        )
+        controls = [
+            {"autocomplete": "cc-number", "index": 0, "type": "text"},
+            {"label": "Expiry (MM/YY)", "index": 1, "type": "text"},
+            {"label": "CVC", "index": 2, "type": "text"},
+        ]
+
+        def fake_eval(task_id, expression):
+            if "location.href" in expression:
+                return {"success": True, "result": "https://oracle.example/checkout"}
+            return {"success": True, "result": json.dumps(controls)}
+
+        secret_exprs = []
+
+        def fake_eval_secret(task_id, expression):
+            secret_exprs.append(expression)
+            return {"success": True, "result": json.dumps({"filled": 3})}
+
+        try:
+            with patch("agent.vault_store.get_vault_store", return_value=store), \
+                 patch.object(browser_vault_tool, "_eval_js", side_effect=fake_eval), \
+                 patch.object(browser_vault_tool, "_eval_js_secret", side_effect=fake_eval_secret), \
+                 patch("tools.approval_prompt.request_elicitation_consent") as approval:
+                raw = browser_vault_tool.browser_vault_fill(meta.id)
+
+            out = json.loads(raw)
+            assert out["success"] is True
+            assert out["origin"] == "https://oracle.example"
+            assert out["delegated_payment"] is True
+            assert out["allow_any_origin"] is True
+            approval.assert_not_called()
+            assert len(secret_exprs) == 1
+            assert "https://oracle.example" in secret_exprs[0]
+            assert _CARD["card_number"] in secret_exprs[0]
+            assert _CARD["card_number"] not in raw
         finally:
             redact.clear_vault_redaction_values()
 
