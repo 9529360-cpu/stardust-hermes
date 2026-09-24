@@ -1878,6 +1878,7 @@ export const ar = defineLocale({
     missingBody: 'لم يعد هذا الناتج موجودًا في السجل المحلي.'
   },
   sidebar: {
+    recent: 'الأخيرة',
     gatewayGroups: {
       grouping: 'البوابة والملف الشخصي',
       rename: 'إعادة تسمية المجموعة',
@@ -2815,6 +2816,7 @@ export const ar = defineLocale({
     }
   },
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: 'بماذا نبدأ؟', body: 'اسأل مباشرة، أو أعطني مهمة. يظهر سياق المشروع أو الملفات أو المعاينة بجانب المحادثة فقط عند الحاجة.', start: 'ابدأ برسالة', actions: 'استكشف الأوامر' },
     thread: {
       loadingSession: 'جار تحميل الجلسة...',
       showEarlier: 'عرض الرسائل الأقدم',

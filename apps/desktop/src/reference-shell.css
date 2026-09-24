@@ -840,9 +840,7 @@
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-content']
   > div:has(> div > input[type='text'])::before {
-  content: 'RECENT';
-  color: #557890;
-  letter-spacing: 0.15em;
+  content: none;
 }
 
 :root[data-hermes-reference-shell='aurora']
@@ -979,4 +977,115 @@
     min-width: 280px;
     max-width: 360px;
   }
+}
+
+/* Compact workspace: keep the conversation readable instead of allowing the
+   context stage to squeeze the transcript into a third of the window. The
+   pane stays mounted so live tools are not torn down. */
+@media (max-width: 900px) {
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+    min-width: 176px;
+    max-width: 208px;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 2;
+    width: min(86vw, 360px);
+    min-width: 0;
+    max-width: none;
+    box-shadow: -18px 0 36px color-mix(in srgb, var(--ui-bg-chrome) 55%, transparent);
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] {
+    min-width: 0;
+  }
+}
+
+/* One readable conversation grid: transcript, empty state, sync banner, and
+   composer share the same measure instead of each choosing a width. */
+:root[data-hermes-reference-shell='aurora'] {
+  --conversation-column-width: min(52rem, calc(100% - 2rem));
+  --composer-width: var(--conversation-column-width);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='aui_thread-content'],
+:root[data-hermes-reference-shell='aurora'] .assistant-home {
+  width: var(--conversation-column-width);
+  max-width: var(--conversation-column-width);
+  margin-inline: auto;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home {
+  min-height: 40vh;
+  padding: 0 0 3.5rem;
+  text-align: left;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-eyebrow {
+  color: #5c87a1;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home h1 {
+  max-width: 38rem;
+  margin-top: 0.55rem;
+  color: var(--aurora-ink);
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home p {
+  max-width: 38rem;
+  margin-top: 0.65rem;
+  color: var(--aurora-ink-3);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.15rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='composer-dock'] {
+  width: var(--conversation-column-width);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='composer-surface'] {
+  border-color: transparent !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='composer-drag-region'] {
+  border-radius: 0.75rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] [aria-live='polite'] {
+  right: max(1rem, calc((100% - var(--composer-width)) / 2));
+  top: 0.5rem;
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.62rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+
+/* Product copy belongs to i18n-rendered elements. CSS pseudo-content cannot
+   follow the active locale, so retain the spacing but remove shell labels. */
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']::before,
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])::before {
+  content: none;
 }

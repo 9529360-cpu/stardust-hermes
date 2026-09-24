@@ -3089,6 +3089,7 @@ export const zh = defineLocale({
   },
 
   sidebar: {
+    recent: '最近',
     gatewayGroups: {
       grouping: '网关与配置',
       rename: '重命名分组',
@@ -4271,6 +4272,7 @@ export const zh = defineLocale({
   },
 
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: '今天想做什么？', body: '直接问我，或者把一件事交给我。需要项目、文件或预览时，相关上下文会出现在对话右侧。', start: '从一条消息开始', actions: '浏览命令' },
     thread: {
       loadingSession: '正在加载会话',
       showEarlier: '显示更早的消息',
