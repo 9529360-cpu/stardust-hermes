@@ -27,6 +27,7 @@ describe('reference shell activation', () => {
 
   it('leaves palette ownership to the active theme tokens', () => {
     const referenceShellCss = readFileSync(resolve(process.cwd(), 'src/reference-shell.css'), 'utf8')
+
     const colorBearingCss = referenceShellCss
       .split('\n')
       .filter(line => !line.includes('mask-image:'))
