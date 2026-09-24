@@ -540,7 +540,7 @@ export const ja = defineLocale({
         sidebar: 'サイドバーのみ'
       },
       backdropTitle: 'チャット背景',
-      backdropDesc: '会話の背後に表示される淡い彫像の画像。',
+      backdropDesc: '会話の背後に、この端末の画像を表示します。好きな画像を選べ、画像はこの端末内にのみ保持されます。',
       userBubbleTitle: 'メッセージの吹き出し',
       userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で枠線だけが残ります。',
       introSplashTitle: 'イントロ表示',
