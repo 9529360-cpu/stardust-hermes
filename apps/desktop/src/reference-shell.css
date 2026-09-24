@@ -999,3 +999,41 @@
 :root[data-hermes-reference-shell='aurora'] .assistant-home h1 {
   color: var(--ui-text-primary);
 }
+
+/* Window-wide wallpaper ------------------------------------------------------
+   The wallpaper lives behind the complete desktop shell. Aurora keeps its
+   geometry and semantic theme palette, but its full-pane opaque paints become
+   translucent field glass while the wallpaper is enabled. */
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] body,
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] [data-contrib-shell] {
+  background: transparent !important;
+}
+
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] [data-tree-group] {
+  background: var(--ui-chat-surface-background) !important;
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop]
+  [data-tree-group='grp-sessions'],
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] [data-personal-sidebar-shell],
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] .jarvis-product-nav {
+  background: var(--ui-sidebar-surface-background) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop]
+  [data-tree-group='grp-main'] {
+  background: var(--ui-chat-surface-background) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop]
+  [data-tree-group='grp-context'],
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] .jarvis-context-rail {
+  background: var(--ui-panel-surface-background) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'][data-stardust-window-backdrop] [data-panel-header] {
+  background: color-mix(in srgb, var(--ui-bg-chrome) 74%, transparent) !important;
+  backdrop-filter: blur(16px) saturate(1.08);
+}
+
