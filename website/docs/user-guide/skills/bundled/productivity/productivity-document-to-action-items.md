@@ -75,13 +75,13 @@ Cross-check dates, totals, repeated names, table sums, defined terms, and refere
 
 For each actionable obligation create outcome, owner if explicit, due date if explicit, dependency, acceptance condition, risk, and citation. Unknown owners/dates remain `unresolved` — never invented. Done when no proposed task relies on an unsupported inference.
 
-### 6. Review before external writes
+### 6. Resolve the external-write scope
 
-Present structured facts, high-risk clauses, low-confidence fields, and proposed tasks for approval. Drafting is not creating: writing to any external tracker requires the user's explicit scope. Recommend professional review for legal, medical, tax, or safety-critical interpretation. Done when approved fields/actions are unambiguous.
+Present structured facts, high-risk clauses, low-confidence fields, and proposed tasks. Drafting alone is not creating, but a current-turn instruction that explicitly says to create/write the extracted actions to a named or clearly established destination already supplies that external-write scope; do not add a redundant approval step when the destination and action schema still match the request. If the user asked only to analyze, extract, summarize, or draft proposed actions, keep them as proposals and ask before writing. Recommend professional review for legal, medical, tax, or safety-critical interpretation. Done when every write is either covered by current-turn authorization or a later explicit approval and unresolved high-risk interpretation is visible.
 
 ### 7. Create and verify records
 
-Use the user's approved destination — `notion`, a calendar, a spreadsheet via `xlsx`, or another task tracker. Attach document/page provenance and avoid copying unnecessary sensitive text. Read records back from the provider and verify owner/date/link. If a write times out ambiguously, search for the expected record before retrying. Done when every approved action is verified.
+Use the user's authorized destination — `notion`, a calendar, a spreadsheet via `xlsx`, or another task tracker. Attach document/page provenance and avoid copying unnecessary sensitive text. Read records back from the provider and verify owner/date/link. If a write times out ambiguously, search for the expected record before retrying. Done when every approved action is verified.
 
 ## Pitfalls
 
@@ -95,5 +95,5 @@ Use the user's approved destination — `notion`, a calendar, a spreadsheet via 
 
 - [ ] Every surfaced fact or action traces to a file + page/section citation.
 - [ ] Modality ("may"/"should"/"must") and OCR uncertainty preserved in the output.
-- [ ] No external write happened without explicit approval, and every approved write was read back.
+- [ ] No external write happened outside explicit current-turn authorization or a later approval, and every write was read back.
 - [ ] The final response separates extracted facts, proposed tasks, assumptions, and blockers.
