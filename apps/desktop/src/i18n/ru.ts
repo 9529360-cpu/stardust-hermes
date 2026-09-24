@@ -610,7 +610,7 @@ export const ru = defineLocale({
         sidebar: 'Только боковая панель'
       },
       backdropTitle: 'Фон чата',
-      backdropDesc: 'Блёклый силуэт позади диалога.',
+      backdropDesc: 'Показывать локальное изображение за беседой. Можно выбрать любую картинку; она останется только на этом устройстве.',
       userBubbleTitle: 'Пузырь сообщения',
       userBubbleDesc: 'Насколько прозрачны ваши сообщения. 0 — сплошная заливка, 100 — остаётся только контур.',
       introSplashTitle: 'Экран приветствия',
@@ -2456,6 +2456,7 @@ export const ru = defineLocale({
     missingBody: 'Этот артефакт больше нет в локальном реестре.'
   },
   sidebar: {
+    recent: 'Недавние',
     gatewayGroups: {
       grouping: 'Шлюз и профиль',
       rename: 'Переименовать группу',
@@ -3572,6 +3573,7 @@ export const ru = defineLocale({
     }
   },
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: 'С чего начнём?', body: 'Задайте вопрос или поручите задачу. Контекст проекта, файлов или предпросмотра появится рядом с диалогом только при необходимости.', start: 'Начать с сообщения', actions: 'Открыть команды' },
     thread: {
       loadingSession: 'Загрузка сеанса',
       showEarlier: 'Показать ранние сообщения',

@@ -794,7 +794,7 @@ export const en: Translations = {
         sidebar: 'Sidebar only'
       },
       backdropTitle: 'Chat Backdrop',
-      backdropDesc: 'The faint statue image behind the conversation.',
+      backdropDesc: 'Show a local image behind the conversation. Choose any picture; it stays on this device.',
       userBubbleTitle: 'Message Bubble',
       userBubbleDesc: 'How see-through your own messages are. Solid at 0; only the outline remains at 100.',
       introSplashTitle: 'Intro Splash',
@@ -2797,6 +2797,7 @@ export const en: Translations = {
   },
 
   sidebar: {
+    recent: 'Recent',
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',
@@ -4019,6 +4020,13 @@ export const en: Translations = {
   },
 
   assistant: {
+    intro: {
+      eyebrow: 'Stardust',
+      headline: 'What should we work on?',
+      body: 'Ask directly or hand me a task. Project, file, or preview context appears beside the conversation only when it is useful.',
+      start: 'Start with a message',
+      actions: 'Explore commands'
+    },
     thread: {
       loadingSession: 'Loading session',
       showEarlier: 'Show earlier messages',

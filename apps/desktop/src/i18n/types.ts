@@ -2425,6 +2425,7 @@ export interface Translations {
   }
 
   sidebar: {
+    recent: string
     gatewayGroups: {
       grouping: string
       rename: string
@@ -3540,6 +3541,13 @@ export interface Translations {
   }
 
   assistant: {
+    intro: {
+      eyebrow: string
+      headline: string
+      body: string
+      start: string
+      actions: string
+    }
     thread: {
       loadingSession: string
       showEarlier: string

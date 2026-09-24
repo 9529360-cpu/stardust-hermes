@@ -523,7 +523,7 @@ export const zhHant = defineLocale({
         sidebar: '僅側邊欄'
       },
       backdropTitle: '聊天背景',
-      backdropDesc: '對話後方那張淡淡的雕像圖片。',
+      backdropDesc: '在對話後方顯示本機圖片。可選擇任意圖片；圖片只保留在這台裝置上。',
       userBubbleTitle: '訊息氣泡',
       userBubbleDesc: '你自己的訊息有多透明。0 為不透明，100 時只保留邊框。',
       introSplashTitle: '開場標識',
@@ -2405,6 +2405,7 @@ export const zhHant = defineLocale({
   },
 
   sidebar: {
+    recent: '最近',
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -3450,6 +3451,7 @@ export const zhHant = defineLocale({
   },
 
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: '今天想做什麼？', body: '直接問我，或者把一件事交給我。需要專案、檔案或預覽時，相關上下文會出現在對話右側。', start: '從一則訊息開始', actions: '瀏覽命令' },
     thread: {
       loadingSession: '正在載入工作階段',
       showEarlier: '顯示較早的訊息',

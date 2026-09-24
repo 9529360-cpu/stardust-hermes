@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import { applyReferenceShell, REFERENCE_SHELL, shouldEnableReferenceShell } from './reference-shell'
@@ -20,5 +23,18 @@ describe('reference shell activation', () => {
     const utility = document.createElement('html')
     applyReferenceShell('hud', utility)
     expect(utility.dataset.hermesReferenceShell).toBeUndefined()
+  })
+
+  it('leaves palette ownership to the active theme tokens', () => {
+    const referenceShellCss = readFileSync(resolve(process.cwd(), 'src/reference-shell.css'), 'utf8')
+
+    const colorBearingCss = referenceShellCss
+      .split('\n')
+      .filter(line => !line.includes('mask-image:'))
+      .join('\n')
+
+    expect(colorBearingCss).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i)
+    expect(referenceShellCss).toContain('--aurora-blue: var(--ui-accent);')
+    expect(referenceShellCss).toContain('--aurora-glass: var(--ui-bg-chrome);')
   })
 })

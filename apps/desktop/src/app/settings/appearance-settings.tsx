@@ -9,12 +9,13 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import type { DesktopMarketplaceSearchItem } from '@/global'
 import { saveHermesConfig } from '@/hermes'
 import { useI18n } from '@/i18n'
+import { selectDesktopPaths } from '@/lib/desktop-fs'
 import { triggerHaptic } from '@/lib/haptics'
 import { Check, Download, Loader2, Palette, Trash2 } from '@/lib/icons'
 import { selectableCardClass } from '@/lib/selectable-card'
 import { normalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
-import { $backdrop, setBackdrop } from '@/store/backdrop'
+import { $backdrop, $backdropImagePath, setBackdrop, setBackdropImagePath } from '@/store/backdrop'
 import { $composerPopoutGesturesEnabled, setComposerPopoutGesturesEnabled } from '@/store/composer-popout'
 import { $embedAllowed, $embedMode, clearEmbedAllowed, type EmbedMode, setEmbedMode } from '@/store/embed-consent'
 import { $introSplash, setIntroSplash } from '@/store/intro-splash'
@@ -419,6 +420,7 @@ export function AppearanceSettings() {
   const spentTips = useStore($spentTipCount)
   const vibeHeartsEnabled = useStore($vibeHeartsEnabled)
   const backdrop = useStore($backdrop)
+  const backdropImagePath = useStore($backdropImagePath)
   const introSplash = useStore($introSplash)
   const installs = useStore($marketplaceInstalls)
   const profiles = useStore($profiles)
@@ -509,6 +511,37 @@ export function AppearanceSettings() {
   const uiScaleOptions = UI_SCALE_PRESETS.map(preset => ({ id: preset, label: `${preset}%` }))
 
   const matchedScalePreset = matchUiScalePreset(zoomPercent)
+
+  const chooseBackdropImage = async () => {
+    try {
+      const [path] = await selectDesktopPaths({
+        filters: [
+          {
+            extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'],
+            name: 'Images'
+          }
+        ],
+        multiple: false,
+        title: a.backdropTitle
+      })
+
+      if (!path) {
+        return
+      }
+
+      setBackdropImagePath(path)
+      setBackdrop(true)
+      triggerHaptic('crisp')
+    } catch (error) {
+      notifyError(error, a.backdropTitle)
+    }
+  }
+
+  const removeBackdropImage = () => {
+    setBackdropImagePath(null)
+    setBackdrop(false)
+    triggerHaptic('selection')
+  }
 
   return (
     <SettingsContent>
@@ -808,6 +841,23 @@ export function AppearanceSettings() {
                 ]}
                 value={backdrop ? 'on' : 'off'}
               />
+            }
+            below={
+              <div className="mt-2 flex min-w-0 items-center gap-2">
+                <Button onClick={() => void chooseBackdropImage()} size="sm" variant="secondary">
+                  {t.common.choose}
+                </Button>
+                {backdropImagePath && (
+                  <>
+                    <Button onClick={removeBackdropImage} size="sm" variant="text">
+                      {t.common.remove}
+                    </Button>
+                    <span className="min-w-0 truncate text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+                      {backdropImagePath.split(/[\\/]/).pop() || backdropImagePath}
+                    </span>
+                  </>
+                )}
+              </div>
             }
             description={a.backdropDesc}
             id={appearanceSettingElementId(APPEARANCE_SETTING_IDS.backdrop)}
