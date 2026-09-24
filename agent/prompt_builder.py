@@ -182,8 +182,11 @@ def build_memory_guidance(
     )
     return frame + skill_routing + (
         "Memory is the narrow exception for facts that apply to EVERY "
-        "session regardless of task (who the user is, environment facts, "
-        "standing conventions with no task home); it has a hard character "
+        "session regardless of task (who the user is, global environment facts, "
+        "standing conventions with no task or Project home). Project-scoped versions, "
+        "architecture, repository decisions, and conventions do not belong in global memory; "
+        "when Project fact capability is available, persist them on the attached Project instead. "
+        "Memory has a hard character "
         "budget, so when it fills, replace or consolidate stale entries "
         "rather than skipping the save. Write entries as declarative facts, "
         "not instructions to yourself: 'User prefers concise responses' ✓ — "

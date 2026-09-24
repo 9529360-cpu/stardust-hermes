@@ -595,6 +595,9 @@ _SESSION_STATE: Dict[str, Any] = {
     # probed once per session and replayed on every rebuild, so a moving repo can't push the
     # prefix-cache divergence point ahead of the volatile band at a compaction boundary.
     "_frozen_workspace_snapshot": None,
+    # Explicit Project owner bound once at the session lifecycle boundary. Prompt construction
+    # consumes this value but never queries state.db itself (prompt-cache stability).
+    "_session_project_id": None,
     # Whether close() also closes _session_db. False: a caller-supplied handle is usually the
     # SHARED launch handle; callers handing over a DEDICATED handle set True.
     "_owns_session_db": False,
@@ -1142,6 +1145,12 @@ def _init_session_state(agent, session_id, session_db, parent_session_id, reason
     )
 
     agent._session_db = session_db  # optional SQLite store (CLI/gateway-provided)
+    agent._session_project_id = None
+    if session_db is not None:
+        with suppress(Exception):
+            row = session_db.get_session(agent.session_id)
+            if isinstance(row, dict):
+                agent._session_project_id = str(row.get("project_id") or "").strip() or None
     agent._parent_session_id = parent_session_id
     agent._session_init_model_config = {
         "max_iterations": agent.max_iterations,

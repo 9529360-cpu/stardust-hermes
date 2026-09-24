@@ -401,6 +401,19 @@ class AIAgent(
         # The workspace snapshot is pinned per session (agent/system_prompt.py::_coding_parts); a
         # /new, /resume or /branch on the same agent must re-snapshot at its own session start.
         self._frozen_workspace_snapshot = None
+        # Project facts follow the same session-freeze rule: prompt rebuilds replay
+        # the original bytes. A true session boundary re-binds only routing metadata
+        # from state.db; prompt construction never performs that read.
+        self._frozen_project_fact_parts = None
+        self._session_project_id = None
+        try:
+            db = getattr(self, "_session_db", None)
+            sid = str(getattr(self, "session_id", "") or "")
+            row = db.get_session(sid) if db is not None and sid else None
+            if isinstance(row, dict):
+                self._session_project_id = str(row.get("project_id") or "").strip() or None
+        except Exception:
+            logger.debug("session project bind during reset failed", exc_info=True)
 
         # Turn counter (added after reset_session_state was first written — #2635)
         self._user_turn_count = 0

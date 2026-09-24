@@ -820,7 +820,7 @@ Common failure modes + recovery are covered in [Egress proxy → Troubleshooting
 ## `hermes project`
 
 ```bash
-hermes project <create|list|show|add-folder|remove-folder|rename|set-primary|use|archive|restore|bind-board>
+hermes project <create|list|show|add-folder|remove-folder|rename|set-primary|use|archive|restore|bind-board|facts>
 ```
 
 Projects are human-named workspaces that can span multiple folders / repos. They anchor desktop session grouping and, when bound to a kanban board, give tasks a deterministic worktree + branch convention. State is per-profile.
@@ -838,6 +838,18 @@ Projects are human-named workspaces that can span multiple folders / repos. They
 | `archive` | Archive a project (recoverable). |
 | `restore` | Restore an archived project. |
 | `bind-board` | Bind a kanban board to this project. |
+| `facts` | List, add, verify, or supersede durable project-scoped facts with provenance. |
+
+### Project facts
+
+```bash
+hermes project facts <project> list
+hermes project facts <project> add "Python 3.12 is required." --source repository --source-ref pyproject.toml
+hermes project facts <project> verify <fact-id>
+hermes project facts <project> supersede <fact-id>
+```
+
+Project facts are stored in the profile's `projects.db`, not `MEMORY.md`. The CLI exposes `verify` for explicit human/operator confirmation; the agent Project tool deliberately does not expose a verify action for its own inferences.
 
 ## `hermes webhook`
 

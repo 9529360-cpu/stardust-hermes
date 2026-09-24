@@ -259,21 +259,18 @@ change your Hermes-wide default — use `hermes model` for that.
 Buzz creates every agent with **Who can talk to this agent** set to `Owner only`.
 Leave it there when the runtime is Hermes.
 
-Two behaviors combine on this path. The `hermes-acp` toolset includes `terminal`
-and `execute_code`, and Buzz's ACP bridge answers Hermes' permission requests
-itself with `allow_once` rather than surfacing them. A Hermes agent in Buzz
-therefore runs shell commands on the host without prompting. I asked one to run
-`rm -rf` against a scratch directory and it deleted it, no prompt anywhere.
+The `hermes-acp` toolset includes `terminal` and `execute_code`. Buzz's ACP
+bridge may answer permission requests programmatically with `allow_once` rather
+than surfacing them to a human. Hermes therefore treats Buzz and every other ACP
+host as **untrusted for dangerous-command approval by default**: a wire-level
+`allow_once`, `allow_session`, or `allow_always` does not authorize the command
+unless the operator has explicitly trusted that exact ACP client identity.
 
-Selecting `Anyone` hands that same shell access to every author who can reach
-the channel. Buzz does not warn when you pick it.
-
-Neither of the obvious mitigations works today:
-
-- `approvals.mode: manual` does make Hermes raise the permission request, but
-  Buzz auto-approves it and the command still runs.
-- `platform_toolsets.acp` does not narrow the ACP toolset, so it cannot be used
-  to drop `terminal`.
+Keep Buzz agents `Owner only` anyway. The trust gate protects dangerous command
+approval, but channel membership still determines who can ask the agent to use
+all of its other capabilities. Do not add an unattended or auto-approving Buzz
+bridge to `security.approval.acp_trusted_clients`; doing so explicitly restores
+the risk that its programmatic allow response is treated as human consent.
 
 `!shutdown` from the owner stops the agent in any mode, and Buzz ignores that
 command from everyone else.
@@ -340,18 +337,31 @@ ACP sessions bind the editor's cwd to the Hermes task ID so file and terminal to
 
 ## Approvals
 
-Dangerous terminal commands can be routed back to the editor as approval prompts. ACP approval options are simpler than the CLI flow:
+Dangerous terminal commands use a stricter trust boundary than ordinary ACP
+protocol traffic. A host returning an ACP permission outcome proves only that
+software returned a value; it does **not** prove that a human saw a prompt.
 
-- allow once
-- allow always
-- deny
+By default, no ACP client may convert `allow_once`, `allow_session`, or
+`allow_always` into Hermes dangerous-command approval. To enable a verified
+human-facing editor, explicitly list its exact ACP `client_info.name`:
 
-Whether you actually see a prompt is up to the host. A host is free to answer the
-request programmatically instead of showing it to you, in which case these
-options exist on the wire but never reach a human. Buzz Desktop does this, so
-treat that path as unattended execution regardless of your `approvals` setting.
+```yaml
+security:
+  approval:
+    acp_trusted_clients:
+      - "Your ACP Client Name"
+```
 
-On timeout or error, the approval bridge denies the request.
+Hermes captures the client identity and capability snapshot during `initialize`
+and freezes that trust posture for the connection. Changing configuration does
+not upgrade an already-running ACP connection; reconnect after editing the list.
+Wildcards are ignored. Unknown clients, malformed/unreadable trust config,
+timeouts, and errors all deny.
+
+Only add a client after verifying that it actually presents dangerous-command
+permission requests to a human. Do not add unattended or auto-approving bridges
+such as Buzz unless you deliberately accept their programmatic responses as
+human-equivalent authorization.
 
 ### Session-scoped edit auto-approval
 

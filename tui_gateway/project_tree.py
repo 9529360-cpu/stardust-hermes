@@ -301,12 +301,16 @@ class _FolderIndex:
 
     def __init__(self, projects: list[dict]) -> None:
         self._by_path: dict[str, tuple[dict, int]] = {}
+        self._by_id = {str(project.get("id") or ""): project for project in projects if project.get("id")}
         for project in projects:
             for folder in project.get("folders") or []:
                 segs = _comparison_segments(folder.get("path") or "")
                 # Deepest folder wins; ties keep the first project (scan order).
                 if segs and len(segs) > self._by_path.get("/".join(segs), (None, -1))[1]:
                     self._by_path["/".join(segs)] = (project, len(segs))
+
+    def by_id(self, project_id: str) -> Optional[dict]:
+        return self._by_id.get(str(project_id or ""))
 
     def match(self, target: str) -> tuple[Optional[dict], int]:
         """Owning project for ``target`` by longest ancestor folder, + its depth."""
@@ -320,6 +324,11 @@ class _FolderIndex:
 
 def _project_for_session(
         session: dict, index: _FolderIndex, resolve: Optional[Resolve]) -> Optional[dict]:
+    explicit = _field(session, "project_id")
+    if explicit:
+        # Explicit session ownership is authoritative. A stale/deleted Project id must
+        # fail closed instead of silently rebinding the conversation by cwd.
+        return index.by_id(explicit)
     cwd = _field(session, "cwd")
     if not cwd:
         return None
@@ -409,9 +418,22 @@ def build_tree(
     folder_index = _FolderIndex(active_projects)
     by_project: dict[str, list[dict]] = {}  # explicit project id -> owned rows
     unowned: list[dict] = []
+    stale_explicit: list[dict] = []
     for session in sessions:
         owner = _project_for_session(session, folder_index, resolve)
-        (by_project.setdefault(owner["id"], []) if owner else unowned).append(session)
+        # project_id is backend ownership metadata, not part of the established
+        # ProjectTreeSession wire payload. Strip it after placement.
+        public_session = dict(session)
+        explicit_project_id = _field(session, "project_id")
+        public_session.pop("project_id", None)
+        if owner:
+            by_project.setdefault(owner["id"], []).append(public_session)
+        elif explicit_project_id:
+            # Do not let cwd heuristics rewrite an explicit-but-stale owner. Keep the
+            # row visible in Home until the user intentionally rebinds it.
+            stale_explicit.append(public_session)
+        else:
+            unowned.append(public_session)
 
     scoped_ids: list[str] = []
     result: list[dict] = []
@@ -436,6 +458,7 @@ def build_tree(
 
     # Tier 2: auto projects from leftover sessions.
     by_auto_root, homeless = _auto_buckets(unowned, resolve, _junk, _junk_cwd, _exists)
+    homeless.extend(stale_explicit)
     seen: set[str] = set()
     for bucket in by_auto_root.values():
         auto_root, auto_sessions = bucket["root"], bucket["sessions"]

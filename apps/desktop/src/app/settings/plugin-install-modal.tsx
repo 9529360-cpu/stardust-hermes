@@ -448,6 +448,9 @@ export function PluginInstallModal() {
                         {desktopHalfFromPackage ? m.desktopTargetFromPackage : m.desktopTarget}
                         {desktopHalfFromPackage ? '' : probe.desktopName ? ` · ${probe.desktopName}` : ''}
                       </span>
+                      <span className="mt-1 block text-[length:var(--conversation-caption-font-size)] text-(--ui-text-secondary)">
+                        {m.desktopTrustNote}
+                      </span>
                     </span>
                   </label>
                 )}

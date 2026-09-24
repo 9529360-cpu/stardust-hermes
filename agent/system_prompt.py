@@ -54,6 +54,8 @@ def _stored_memory_snapshot_version(prompt: str) -> str:
     match = _MEMORY_SNAPSHOT_MARKER_RE.search(prompt or "")
     return match.group(1) if match else ""
 
+_PROJECT_FACT_PROMPT_MAX_CHARS = 6000
+
 _GATE_WORDS = {**dict.fromkeys(("true", "always", "yes", "on"), True), **dict.fromkeys(("false", "never", "no", "off"), False)}
 
 
@@ -534,6 +536,89 @@ def _memory_parts(agent: Any) -> List[str]:
     return parts
 
 
+def _project_fact_parts(agent: Any) -> List[str]:
+    """Frozen project-scoped durable facts for the current session.
+
+    The session-bound Project owner is authoritative even when the launch cwd is
+    a generic desktop artifact. It is read from state.db only at the session
+    lifecycle boundary, never while building the prompt. Cwd resolution is the
+    compatibility fallback when no explicit owner is bound. The first prompt
+    build snapshots the eligible facts; later rebuilds replay the same bytes.
+    """
+    frozen = getattr(agent, "_frozen_project_fact_parts", None)
+    if frozen is not None:
+        return list(frozen)
+
+    parts: List[str] = []
+    project = None
+    facts = []
+    try:
+        from pathlib import Path
+        from hermes_cli import projects_db as pdb
+
+        session_db = getattr(agent, "_session_db", None)
+        project_db_path = None
+        if session_db is not None:
+            db_path = getattr(session_db, "db_path", None)
+            if db_path is not None:
+                project_db_path = Path(db_path).parent / "projects.db"
+
+        # Session routing is bound before prompt construction. Do not query state.db here:
+        # prompt builds/rebuilds must be pure over the session snapshot.
+        explicit_project_id = str(getattr(agent, "_session_project_id", "") or "").strip() or None
+
+        cwd = None
+        if explicit_project_id is None and not getattr(agent, "_context_cwd_is_launch_artifact", False):
+            cwd = resolve_context_cwd()
+
+        if explicit_project_id is not None or cwd is not None:
+            import sqlite3
+            from hermes_state_holders import read_only_db_uri
+
+            db_path = project_db_path or pdb.projects_db_path()
+            if db_path.exists():
+                conn = sqlite3.connect(read_only_db_uri(db_path), uri=True)
+                conn.row_factory = sqlite3.Row
+                try:
+                    if explicit_project_id is not None:
+                        project = pdb.get_project(conn, explicit_project_id)
+                        if project is not None and project.archived:
+                            project = None
+                    else:
+                        project = pdb.project_for_path(conn, str(cwd))
+                    facts = pdb.list_project_facts(conn, project.id) if project is not None else []
+                finally:
+                    conn.close()
+    except Exception:
+        logger.debug("Could not load project facts for prompt context", exc_info=True)
+        project, facts = None, []
+
+    if project is not None:
+        lines: List[str] = []
+        used = 0
+        for fact in facts:
+            if fact.sensitive or fact.confidence < 0.8:
+                continue
+            if fact.source_kind == "inference" and fact.verified_at is None:
+                continue
+            source_marker = f"[{fact.source_kind}; confidence={fact.confidence:.2f}]"
+            line = f"- {source_marker} {fact.content}"
+            if used + len(line) + 1 > _PROJECT_FACT_PROMPT_MAX_CHARS:
+                break
+            lines.append(line)
+            used += len(line) + 1
+        if lines:
+            parts = [
+                "## Project facts\n"
+                f"Project: {project.name} ({project.id})\n"
+                "Authority: projects.db. These facts are project-scoped; do not promote them "
+                "to USER.md or MEMORY.md merely because they are in context.\n"
+                + "\n".join(lines)
+            ]
+
+    agent._frozen_project_fact_parts = tuple(parts)
+    return list(parts)
+
 def _identity_parts(agent: Any, ctx_len: Optional[int]) -> Tuple[List[str], bool]:
     """SOUL.md (primary identity; cron keeps the persona while skipping cwd
     instructions, scoped to the agent's OWN home) or the default identity.
@@ -696,6 +781,7 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     if system_message is not None:
         context_parts.append(system_message)
     context_parts.extend(_context_files_part(agent, _ctx_len, _soul_loaded))
+    context_parts.extend(_project_fact_parts(agent))
     if coding_workspace_parts:
         context_parts.extend([*coding_workspace_parts, *coding_trailing_parts, *post_workspace_parts])
     else:
