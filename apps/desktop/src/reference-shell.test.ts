@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
-
 import { describe, expect, it } from 'vitest'
 
+import referenceShellCss from './reference-shell.css?raw'
 import { applyReferenceShell, REFERENCE_SHELL, shouldEnableReferenceShell } from './reference-shell'
 
 describe('reference shell activation', () => {
@@ -25,14 +24,13 @@ describe('reference shell activation', () => {
   })
 
   it('leaves palette ownership to the active theme tokens', () => {
-    const css = readFileSync(new URL('./reference-shell.css', import.meta.url), 'utf8')
-    const colorBearingCss = css
+    const colorBearingCss = referenceShellCss
       .split('\n')
       .filter(line => !line.includes('mask-image:'))
       .join('\n')
 
     expect(colorBearingCss).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(/i)
-    expect(css).toContain('--aurora-blue: var(--ui-accent);')
-    expect(css).toContain('--aurora-glass: var(--ui-bg-chrome);')
+    expect(referenceShellCss).toContain('--aurora-blue: var(--ui-accent);')
+    expect(referenceShellCss).toContain('--aurora-glass: var(--ui-bg-chrome);')
   })
 })
