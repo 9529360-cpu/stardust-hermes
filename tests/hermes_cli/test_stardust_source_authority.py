@@ -46,6 +46,17 @@ def test_repository_and_docker_default_soul_match_runtime_seed() -> None:
         assert "Hermes Agent, built by Nous Research" not in source
 
 
+def test_installers_seed_soul_from_canonical_repository_source() -> None:
+    shell = _read("scripts/install.sh")
+    powershell = _read("scripts/install.ps1")
+
+    assert 'cp "$INSTALL_DIR/SOUL.md" "$HERMES_HOME/SOUL.md"' in shell
+    assert '$canonicalSoulPath = "$InstallDir\\SOUL.md"' in powershell
+    assert "Copy-Item -LiteralPath $canonicalSoulPath -Destination $soulPath" in powershell
+    assert "You are Hermes Agent, built by Nous Research" not in shell
+    assert "You are Hermes Agent, built by Nous Research" not in powershell
+
+
 def test_shell_bootstrap_normalizes_tauri_stage_protocol() -> None:
     source = _read("scripts/install-stardust.sh")
 
