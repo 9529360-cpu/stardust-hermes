@@ -98,34 +98,6 @@
 :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
   /* Dark semantic surface values are scoped to the desktop frame. Feature
      components keep consuming the existing design-system tokens. */
-  --ui-text-primary: var(--aurora-ink);
-  --ui-text-secondary: var(--aurora-ink-2);
-  --ui-text-tertiary: var(--aurora-ink-3);
-  --ui-text-quaternary: rgba(126, 145, 179, 0.72);
-  --ui-bg-chrome: var(--aurora-glass);
-  --ui-bg-primary: rgba(18, 31, 58, 0.92);
-  --ui-bg-secondary: rgba(20, 34, 64, 0.82);
-  --ui-bg-tertiary: rgba(26, 42, 75, 0.72);
-  --ui-bg-quaternary: rgba(92, 119, 177, 0.12);
-  --ui-bg-quinary: rgba(99, 127, 190, 0.08);
-  --ui-sidebar-surface-background: var(--aurora-rail);
-  --ui-editor-surface-background: rgba(8, 16, 33, 0.75);
-  --ui-chat-surface-background: rgba(8, 16, 33, 0.66);
-  --ui-panel-surface-background: var(--aurora-panel);
-  --ui-widget-surface-background: rgba(26, 42, 75, 0.58);
-  --ui-terminal-surface-background: rgba(5, 11, 24, 0.93);
-  --ui-control-hover-background: var(--aurora-control-hover);
-  --ui-control-active-background: var(--aurora-control-active);
-  --ui-stroke-primary: rgba(181, 202, 255, 0.22);
-  --ui-stroke-secondary: var(--aurora-stroke);
-  --ui-stroke-tertiary: var(--aurora-stroke-soft);
-  --ui-stroke-quaternary: rgba(177, 199, 255, 0.055);
-  --sidebar: transparent;
-  --sidebar-foreground: var(--aurora-ink);
-  --sidebar-border: var(--aurora-stroke-soft);
-  --sidebar-accent: rgba(123, 151, 220, 0.16);
-  --sidebar-accent-foreground: var(--aurora-ink);
-  --sidebar-edge-border: rgba(172, 196, 255, 0.1);
 
   width: 100% !important;
   height: 100% !important;
@@ -407,72 +379,16 @@
    appearance is light/system. OverlayView and Radix dialogs may render outside
    data-contrib-shell, so those portal surfaces receive the same foundation explicitly. */
 :root[data-hermes-reference-shell='aurora'] :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content']) {
-  --ui-bg-chrome: var(--aurora-glass-strong);
-  --ui-bg-sidebar: var(--aurora-rail);
-  --ui-bg-editor: var(--aurora-panel-strong);
-  --ui-bg-primary: rgba(18, 31, 58, 0.92);
-  --ui-bg-secondary: rgba(20, 34, 64, 0.82);
-  --ui-bg-tertiary: rgba(26, 42, 75, 0.72);
-  --ui-bg-quaternary: rgba(92, 119, 177, 0.12);
-  --ui-bg-quinary: rgba(99, 127, 190, 0.08);
-  --ui-bg-elevated: rgba(17, 31, 58, 0.98);
-  --ui-bg-card: rgba(24, 42, 76, 0.68);
-  --ui-bg-input: rgba(8, 16, 33, 0.96);
-  --ui-chat-bubble-background: rgba(17, 31, 58, 0.98);
-  --ui-chat-bubble-opaque-background: rgba(17, 31, 58, 0.98);
-  --ui-text-primary: var(--aurora-ink);
-  --ui-text-secondary: var(--aurora-ink-2);
-  --ui-text-tertiary: var(--aurora-ink-3);
-  --ui-text-quaternary: rgba(126, 145, 179, 0.72);
-  --ui-control-hover-background: var(--aurora-control-hover);
-  --ui-control-active-background: var(--aurora-control-active);
-  --ui-row-hover-background: rgba(111, 140, 203, 0.12);
-  --ui-row-active-background: rgba(126, 157, 231, 0.2);
-  --ui-stroke-primary: rgba(181, 202, 255, 0.22);
-  --ui-stroke-secondary: var(--aurora-stroke);
-  --ui-stroke-tertiary: var(--aurora-stroke-soft);
-  --ui-stroke-quaternary: rgba(177, 199, 255, 0.055);
 }
 
 :root[data-hermes-reference-shell='aurora'] :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content']) {
-  --ui-sidebar-surface-background: var(--aurora-rail);
-  --ui-chat-surface-background: rgba(8, 16, 33, 0.9);
-  --ui-editor-surface-background: rgba(8, 16, 33, 0.84);
-  --ui-panel-surface-background: var(--aurora-panel);
-  --ui-widget-surface-background: rgba(26, 42, 75, 0.58);
-  --ui-terminal-surface-background: rgba(5, 11, 24, 0.93);
-  --sidebar: transparent;
-  --sidebar-foreground: var(--aurora-ink);
-  --sidebar-border: var(--aurora-stroke-soft);
-  --sidebar-accent: rgba(123, 151, 220, 0.16);
-  --sidebar-accent-foreground: var(--aurora-ink);
-  --sidebar-edge-border: rgba(172, 196, 255, 0.1);
-  --chrome-action-hover: var(--aurora-control-hover);
-  --dt-background: var(--ui-bg-chrome);
-  --dt-foreground: var(--ui-text-primary);
-  --dt-card: var(--ui-bg-editor);
-  --dt-card-foreground: var(--ui-text-primary);
-  --dt-muted: var(--ui-bg-tertiary);
-  --dt-muted-foreground: var(--ui-text-tertiary);
-  --dt-popover: var(--ui-bg-elevated);
-  --dt-popover-foreground: var(--ui-text-primary);
-  --dt-secondary: var(--ui-bg-secondary);
-  --dt-secondary-foreground: var(--ui-text-secondary);
-  --dt-accent: var(--ui-control-active-background);
-  --dt-accent-foreground: var(--ui-text-primary);
-  --dt-border: var(--ui-stroke-secondary);
-  --dt-input: var(--ui-stroke-primary);
-  --dt-ring: var(--ui-stroke-primary);
-  --dt-midground: var(--aurora-ink-3);
-  --dt-sidebar-bg: var(--aurora-rail);
-  --dt-sidebar-border: var(--aurora-stroke-soft);
 }
 
-/* Keep Chromium's native time-picker glyph readable on Aurora's dark overlay surfaces. */
+/* Native controls follow the active light/dark appearance from ThemeProvider. */
 :root[data-hermes-reference-shell='aurora']
   :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content'])
   input[type='time'] {
-  color-scheme: dark;
+  color-scheme: inherit;
 }
 /* Figma/macOS 27 refinement: unified desktop chrome, restrained depth. */
 :root[data-hermes-reference-shell='aurora'] {
@@ -665,21 +581,6 @@
 
 :root[data-hermes-reference-shell='aurora']
   :is([data-contrib-shell], [data-overlay-surface], [data-slot='dialog-content']) {
-  --ui-bg-chrome: #0b1018;
-  --ui-bg-sidebar: #10161f;
-  --ui-bg-editor: #0f151e;
-  --ui-bg-primary: #111824;
-  --ui-bg-secondary: #151d29;
-  --ui-bg-tertiary: #1a2330;
-  --ui-bg-quaternary: rgba(255, 255, 255, 0.05);
-  --ui-bg-quinary: rgba(255, 255, 255, 0.035);
-  --ui-bg-elevated: #151d28;
-  --ui-bg-card: #131b26;
-  --ui-bg-input: #0d131c;
-  --ui-chat-bubble-background: #151d29;
-  --ui-chat-bubble-opaque-background: #151d29;
-  --ui-row-hover-background: rgba(255, 255, 255, 0.05);
-  --ui-row-active-background: rgba(111, 143, 248, 0.13);
 }
 
 /* Keep supporting rails subordinate to the conversation surface. */
@@ -1089,3 +990,137 @@
   > div:has(> div > input[type='text'])::before {
   content: none;
 }
+
+/* Theme pass-through ---------------------------------------------------------
+   The reference shell owns geometry, glass, density, and pane hierarchy only.
+   ThemeProvider remains the single color authority. These late aliases also
+   neutralize older Aurora/Figma presentation rules above without throwing away
+   their layout refinements. */
+:root[data-hermes-reference-shell='aurora'] {
+  --aurora-night-0: var(--theme-background-seed);
+  --aurora-night-1: var(--ui-bg-chrome);
+  --aurora-night-2: var(--ui-bg-primary);
+  --aurora-blue: var(--ui-accent);
+  --aurora-blue-soft: color-mix(in srgb, var(--ui-accent) 58%, var(--ui-text-primary));
+  --aurora-violet: var(--theme-primary);
+  --aurora-cyan: var(--ui-accent);
+  --aurora-ink: var(--ui-text-primary);
+  --aurora-ink-2: var(--ui-text-secondary);
+  --aurora-ink-3: var(--ui-text-tertiary);
+  --aurora-stroke: var(--ui-stroke-secondary);
+  --aurora-stroke-soft: var(--ui-stroke-quaternary);
+  --aurora-glass: var(--ui-bg-chrome);
+  --aurora-glass-strong: var(--ui-bg-elevated);
+  --aurora-rail: var(--ui-sidebar-surface-background);
+  --aurora-panel: var(--ui-panel-surface-background);
+  --aurora-panel-strong: var(--ui-bg-elevated);
+  --aurora-control: var(--ui-bg-quaternary);
+  --aurora-control-hover: var(--ui-control-hover-background);
+  --aurora-control-active: var(--ui-control-active-background);
+}
+
+:root[data-hermes-reference-shell='aurora'] body,
+:root[data-hermes-reference-shell='aurora'] [data-contrib-shell],
+:root[data-hermes-reference-shell='aurora'] [data-tree-group] {
+  background: var(--ui-bg-chrome) !important;
+  color: var(--ui-text-primary) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+  background: var(--ui-sidebar-surface-background) !important;
+  box-shadow: inset -1px 0 0 var(--ui-stroke-quaternary);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+  background: var(--ui-panel-surface-background) !important;
+  box-shadow: inset 1px 0 0 var(--ui-stroke-quaternary);
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav {
+  border-color: var(--ui-stroke-tertiary) !important;
+  background: var(--ui-sidebar-surface-background) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button,
+:root[data-hermes-reference-shell='aurora']
+  [data-personal-conversations]
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-button'] {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button:hover {
+  background: var(--ui-control-hover-background);
+  color: var(--ui-text-secondary);
+}
+
+:root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button[aria-current='page'] {
+  border-color: color-mix(in srgb, var(--ui-accent) 36%, transparent);
+  background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  color: var(--ui-text-primary);
+  box-shadow:
+    inset 2px 0 0 var(--ui-accent),
+    0 0 22px color-mix(in srgb, var(--ui-accent) 8%, transparent);
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] {
+  background:
+    radial-gradient(
+      46rem 25rem at 92% 0%,
+      color-mix(in srgb, var(--ui-accent) 10%, transparent),
+      transparent 68%
+    ),
+    radial-gradient(
+      34rem 20rem at 8% 100%,
+      color-mix(in srgb, var(--theme-primary) 7%, transparent),
+      transparent 72%
+    ),
+    var(--ui-chat-surface-background);
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
+  [data-slot='sidebar-menu-button'] {
+  border-color: var(--ui-stroke-secondary) !important;
+  background: var(--dt-primary-solid) !important;
+  color: var(--dt-primary-solid-foreground) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
+  [data-slot='sidebar-menu-button']:hover {
+  border-color: var(--ui-stroke-primary) !important;
+  background: color-mix(in srgb, var(--dt-primary-solid) 88%, var(--ui-text-primary)) !important;
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])
+  > div:has(> input[type='text']) {
+  border-color: var(--ui-stroke-tertiary);
+  background: var(--ui-bg-input);
+}
+
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])
+  > div:has(> input[type='text']):focus-within {
+  border-color: color-mix(in srgb, var(--ui-accent) 38%, transparent);
+  background: var(--ui-bg-input);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 8%, transparent);
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-eyebrow,
+:root[data-hermes-reference-shell='aurora'] .assistant-home p {
+  color: var(--ui-text-tertiary);
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home h1 {
+  color: var(--ui-text-primary);
+}
+
