@@ -37,6 +37,7 @@ from acp.schema import (
 )
 from acp_adapter.auth import TERMINAL_SETUP_AUTH_METHOD_ID
 from acp_adapter.model_catalog import ACP_MAX_MODELS_PER_PROVIDER
+from acp_adapter.permissions import ApprovalTrustPosture
 from acp_adapter.server import (
     HermesACPAgent,
     HERMES_VERSION,
@@ -92,6 +93,23 @@ async def test_set_config_option_persists_edit_approval_policy_without_advertisi
 
 
 class TestInitialize:
+    @pytest.mark.asyncio
+    async def test_initialize_freezes_approval_trust_for_connection(self, agent):
+        posture = ApprovalTrustPosture(
+            client_name="Zed", client_version="1", trusted_interactive=True,
+            reason="configured_trusted_client",
+        )
+        first = Implementation(name="Zed", version="1")
+        second = Implementation(name="other-host", version="2")
+
+        with patch("acp_adapter.server.capture_approval_trust_posture", return_value=posture) as capture:
+            await agent.initialize(client_info=first)
+            await agent.initialize(client_info=second)
+
+        assert agent._approval_trust is posture
+        assert agent._approval_trust_initialized is True
+        capture.assert_called_once_with(first, None)
+
     @pytest.mark.asyncio
     async def test_initialize_returns_correct_protocol_version(self, agent):
         resp = await agent.initialize(protocol_version=1)
@@ -490,6 +508,36 @@ class TestOnConnect:
         mock_conn = MagicMock(spec=acp.Client)
         agent.on_connect(mock_conn)
         assert agent._conn is mock_conn
+
+    def test_on_connect_resets_approval_trust_for_new_connection(self, agent):
+        agent._approval_trust = ApprovalTrustPosture(
+            client_name="old-editor", trusted_interactive=True, reason="configured_trusted_client"
+        )
+        agent._approval_trust_initialized = True
+        mock_conn = MagicMock(spec=acp.Client)
+
+        agent.on_connect(mock_conn)
+
+        assert agent._approval_trust_initialized is False
+        assert agent._approval_trust.trusted_interactive is False
+        assert agent._approval_trust.reason == "not_initialized"
+
+    def test_turn_callbacks_receive_frozen_approval_trust(self, agent, mock_manager):
+        posture = ApprovalTrustPosture(
+            client_name="trusted-editor", trusted_interactive=True, reason="configured_trusted_client"
+        )
+        agent._approval_trust = posture
+        agent._approval_trust_initialized = True
+        state = mock_manager.create_session(cwd="/tmp")
+        conn = MagicMock(spec=acp.Client)
+        loop = MagicMock(spec=asyncio.AbstractEventLoop)
+
+        with patch("acp_adapter.server.make_approval_callback", return_value=MagicMock()) as make_cb:
+            agent._wire_turn_callbacks(state, "s1", conn, loop)
+
+        make_cb.assert_called_once_with(
+            conn.request_permission, loop, "s1", trust_posture=posture
+        )
 
 
 # ---------------------------------------------------------------------------
