@@ -79,6 +79,27 @@ def test_memory_guidance_respects_available_writes(stores, names, monkeypatch, t
         assert "never target='memory'" in prompt
 
 
+def test_master_memory_off_omits_builtin_block_and_guidance():
+    agent = _make_agent(
+        valid_tool_names=["memory"],
+        skip_context_files=True,
+        _memory_persistence_enabled=False,
+        _memory_enabled=True,
+        _user_profile_enabled=True,
+        _memory_store=SimpleNamespace(
+            format_for_system_prompt=lambda target: f"PRIVATE {target}",
+            system_prompt_snapshot_version=lambda: "abc123",
+        ),
+    )
+
+    prompt = build_system_prompt(agent)
+
+    assert "PRIVATE memory" not in prompt
+    assert "PRIVATE user" not in prompt
+    assert "memory-snapshot" not in prompt
+    assert "Memory is the narrow exception" not in prompt
+
+
 class TestContextFileCwd:
     def test_none_when_terminal_cwd_unset(self, monkeypatch):
         # Unset → None, so discovery falls back to the launch dir inside

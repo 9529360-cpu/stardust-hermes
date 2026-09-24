@@ -954,11 +954,12 @@ export const zh = defineLocale({
         }
       },
       memory: {
-        memoryEnabled: '持久记忆',
-        userProfileEnabled: '用户画像',
+        enabled: '记忆持久化总开关',
+        memoryEnabled: '内置 Agent 记忆 (MEMORY.md)',
+        userProfileEnabled: '内置用户画像 (USER.md)',
         memoryCharLimit: '记忆预算',
         userCharLimit: '画像预算',
-        provider: '记忆提供方'
+        provider: '外部记忆提供方'
       },
       context: {
         engine: '上下文引擎'
@@ -1024,8 +1025,11 @@ export const zh = defineLocale({
         enabled: '在文件编辑前创建可回滚的快照。'
       },
       memory: {
-        memoryEnabled: '保存有助于未来会话的持久记忆。',
-        userProfileEnabled: '维护一份精简的用户偏好画像。'
+        enabled:
+          '记忆隐私总开关。关闭后停止内置记忆注入/写入，以及外部记忆提供方的初始化、同步、预取和工具暴露；已选择的提供方和凭据会保留。',
+        memoryEnabled: '高级设置：仅在记忆持久化开启时，允许注入和写入内置 MEMORY.md。',
+        userProfileEnabled: '高级设置：仅在记忆持久化开启时，允许注入和写入内置 USER.md 用户画像。',
+        provider: '记忆持久化开启时使用的外部提供方；关闭总开关后仍保留此选择。'
       },
       context: {
         engine: '在接近上下文上限时管理长对话的策略。'

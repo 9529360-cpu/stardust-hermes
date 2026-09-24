@@ -902,6 +902,10 @@ prompt_caching:
 # Disabled by default in batch_runner.
 #
 memory:
+  # Master privacy switch for durable memory. false pauses built-in MEMORY.md /
+  # USER.md plus any configured external provider. Session/chat history is separate.
+  enabled: true
+
   # Agent's personal notes: environment facts, conventions, things learned
   memory_enabled: true
   

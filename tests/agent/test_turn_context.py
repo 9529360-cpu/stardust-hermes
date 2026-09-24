@@ -219,6 +219,95 @@ class _RefreshStore:
         self.loaded += 1
 
 
+class _RegisteredMemoryTools:
+    def registered_tool_names(self):
+        return {"provider_search"}
+
+
+def _tool_schema(name):
+    return {
+        "type": "function",
+        "function": {"name": name, "description": name, "parameters": {"type": "object", "properties": {}}},
+    }
+
+
+def test_memory_refresh_master_off_removes_builtin_and_provider_tools():
+    agent = _FakeAgent()
+    agent._memory_persistence_enabled = True
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = _RefreshStore(stale=False, before="a" * 16, after="a" * 16)
+    agent._memory_manager = _RegisteredMemoryTools()
+    agent.tools = [_tool_schema("read_file"), _tool_schema("memory"), _tool_schema("provider_search")]
+    agent.valid_tool_names = {"read_file", "memory", "provider_search"}
+
+    with patch("tools.memory_tool.memory_persistence_enabled", return_value=False):
+        assert _refresh_builtin_memory_snapshot(agent) is True
+
+    assert [tool["function"]["name"] for tool in agent.tools] == ["read_file"]
+    assert agent.valid_tool_names == {"read_file"}
+
+
+def test_memory_refresh_master_on_restores_existing_live_tool_family():
+    agent = _FakeAgent()
+    agent._memory_persistence_enabled = False
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = _RefreshStore(stale=False, before="a" * 16, after="a" * 16)
+    agent._memory_manager = _RegisteredMemoryTools()
+    agent.tools = [_tool_schema("read_file")]
+    agent.valid_tool_names = {"read_file"}
+
+    def restore_provider_tools(target):
+        target.tools.append(_tool_schema("provider_search"))
+        target.valid_tool_names.add("provider_search")
+        return 1
+
+    with (
+        patch("tools.memory_tool.memory_persistence_enabled", return_value=True),
+        patch("model_tools.get_tool_definitions", return_value=[_tool_schema("memory")]),
+        patch("agent.memory_manager.inject_memory_provider_tools", side_effect=restore_provider_tools),
+    ):
+        assert _refresh_builtin_memory_snapshot(agent) is True
+
+    assert [tool["function"]["name"] for tool in agent.tools] == [
+        "read_file",
+        "memory",
+        "provider_search",
+    ]
+    assert agent.valid_tool_names == {"read_file", "memory", "provider_search"}
+    assert agent._memory_persistence_enabled is True
+
+
+def test_turn_master_off_refresh_happens_before_memory_nudge():
+    agent = _FakeAgent()
+    agent._memory_persistence_enabled = True
+    agent._memory_nudge_interval = 1
+    agent._memory_store = _RefreshStore(stale=False, before="a" * 16, after="a" * 16)
+    agent.tools = [_tool_schema("memory")]
+    agent.valid_tool_names = {"memory"}
+
+    with patch("tools.memory_tool.memory_persistence_enabled", return_value=False):
+        ctx = _build(agent)
+
+    assert ctx.should_review_memory is False
+    assert agent._turns_since_memory == 0
+    assert "memory" not in agent.valid_tool_names
+
+
+def test_memory_refresh_invalidates_prompt_when_master_switch_turns_off():
+    agent = _FakeAgent()
+    agent._memory_persistence_enabled = True
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = _RefreshStore(stale=False, before="a" * 16, after="a" * 16)
+
+    with patch("tools.memory_tool.memory_persistence_enabled", return_value=False):
+        assert _refresh_builtin_memory_snapshot(agent) is True
+
+    assert agent._memory_persistence_enabled is False
+    assert agent._memory_store.loaded == 0
+    assert agent._cached_system_prompt is None
+    assert agent._cached_system_prompt_static is None
+
+
 def test_memory_refresh_preserves_prompt_when_disk_is_unchanged():
     agent = _FakeAgent()
     agent._cached_system_prompt_static = "STATIC"

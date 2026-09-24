@@ -88,6 +88,50 @@ def test_install_dependencies_force_reinstalls_versioned_specs(tmp_path, monkeyp
     assert any("mem0ai>=2.0.10,<3" in specs for specs in installed)
 
 
+def test_memory_off_pauses_master_without_erasing_provider(monkeypatch, capsys):
+    from hermes_cli.main_agent_cmds import _cmd_memory_off
+
+    config = {
+        "memory": {
+            "enabled": True,
+            "provider": "honcho",
+            "memory_enabled": True,
+            "user_profile_enabled": False,
+        }
+    }
+    saved = []
+    monkeypatch.setattr("hermes_cli.config.load_config", lambda: config)
+    monkeypatch.setattr("hermes_cli.config.save_config", lambda value: saved.append(value.copy()))
+
+    _cmd_memory_off()
+
+    assert config["memory"]["enabled"] is False
+    assert config["memory"]["provider"] == "honcho"
+    assert config["memory"]["memory_enabled"] is True
+    assert config["memory"]["user_profile_enabled"] is False
+    assert saved
+    out = capsys.readouterr().out
+    assert "Memory persistence: paused" in out
+    assert "External provider 'honcho' remains configured." in out
+    assert "Chat/session history is unchanged." in out
+
+
+def test_memory_on_restores_master_without_reselecting_provider(monkeypatch, capsys):
+    from hermes_cli.main_agent_cmds import _cmd_memory_on
+
+    config = {"memory": {"enabled": False, "provider": "honcho"}}
+    saved = []
+    monkeypatch.setattr("hermes_cli.config.load_config", lambda: config)
+    monkeypatch.setattr("hermes_cli.config.save_config", lambda value: saved.append(value.copy()))
+
+    _cmd_memory_on()
+
+    assert config["memory"]["enabled"] is True
+    assert config["memory"]["provider"] == "honcho"
+    assert saved
+    assert "Memory persistence: enabled" in capsys.readouterr().out
+
+
 def test_cmd_status_memory_tool_gate_disabled(capsys, monkeypatch):
     """When both memory stores are disabled, Memory status reports memory tool as disabled."""
     _cfg = {"memory": {"memory_enabled": False, "user_profile_enabled": False}}

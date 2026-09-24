@@ -17,7 +17,7 @@ Two files make up the agent's memory:
 | **MEMORY.md** | Agent's personal notes — environment facts, conventions, things learned | 2,200 chars (~800 tokens) |
 | **USER.md** | User profile — your preferences, communication style, expectations | 1,375 chars (~500 tokens) |
 
-Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a frozen snapshot at session start. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
+Both are stored in `~/.hermes/memories/`. The current model turn uses a frozen snapshot; between turns Stardust checks the built-in memory files and reloads the snapshot when their rendered content changes. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
 
 :::caution One agent per Hermes home
 Don't point two agent processes at the same Hermes home directory. Memory writes are automatic and load back into the system prompt at session start, so two writers sharing one home will compound each other's entries into state neither of them (nor you) authored. Memory is scoped per [profile](/user-guide/profiles) by design — give a second agent its own profile, and if they need shared memory, use an [external memory provider](/user-guide/features/memory-providers) instead.
@@ -35,7 +35,7 @@ content must be shortened (or another entry removed) to fit.
 
 ## How Memory Appears in the System Prompt
 
-At the start of every session, memory entries are loaded from disk and rendered into the system prompt as a frozen block:
+At the first prompt build for a session, memory entries are loaded from disk and rendered into the system prompt as a frozen block:
 
 ```
 ══════════════════════════════════════════════
@@ -54,15 +54,20 @@ The format includes:
 - Individual entries separated by `§` (section sign) delimiters
 - Entries can be multiline
 
-**Frozen snapshot pattern:** The system prompt injection is captured once at session start and never changes mid-session. This is intentional — it preserves the LLM's prefix cache for performance. When the agent adds/removes memory entries during a session, the changes are persisted to disk immediately but won't appear in the system prompt until the next session starts. Tool responses always show the live state.
+**Turn-frozen snapshot pattern:** The current in-flight model turn never changes underneath the model. Writes persist to disk immediately; at the next turn boundary Stardust checks the file identity/content digest and reloads only when needed. The system-prompt cache is invalidated only when the rendered memory snapshot actually changed.
 
-## Memory Needs Session Boundaries
+## Reset / Forget Semantics
 
-The whole memory system is built around the moment a session **ends**: `MEMORY.md` and `USER.md` carry the essentials into the next session, and `session_search` fills the gaps once the old context is gone. Inside a single session none of that machinery has a reason to run — everything important is still in the live context, so the agent rarely consults `session_search` and mostly compacts memory entries instead of curating them.
+The built-in reset actions affect only `MEMORY.md` / `USER.md`. They do **not** delete data from a configured external memory provider. The master `memory.enabled` switch is separate: turning it off pauses both built-in and external memory activity without deleting either provider configuration or external-provider data.
 
-This matters on messaging platforms (Telegram, Discord, etc.), where a chat is deliberately [one continuous session](/user-guide/sessions#session-continuity) that survives restarts, gateway crashes, and machine reboots. Shutting the machine down overnight does **not** end the session — the next message picks it up exactly where it left off. If you never reset, a chat can run for weeks as a single session: convenient, but it grows expensive (compaction runs repeatedly over an ever-longer history) and the learning loop of *forget → recall from memory → search past sessions* almost never gets to fire. Fresh memory entries also stay invisible to the running session because of the frozen snapshot above.
+A reset advances a durable, profile-scoped generation under the same file lock used by built-in memory writes. That makes reset a real forget boundary:
 
-**Practice:** run `/new` at natural boundaries — a finished task, a change of topic, the start of a day. Each boundary is when memory pays off: the agent re-reads the updated `MEMORY.md`/`USER.md` snapshot, starts from a cheap short context, and reaches for `session_search` when it actually needs history. On the CLI this mostly takes care of itself (every invocation is a new session); on gateways the boundary is yours to create.
+- an in-flight turn may still contain the old prompt bytes it started with, but its stale `MemoryStore` cannot write that target back to disk;
+- a memory write staged before the reset is rejected if it is approved afterward;
+- the next turn reloads the reset target and drops the deleted built-in memory from the prompt;
+- resetting an already-absent file still advances the generation, so an old session cannot recreate it.
+
+**Practice:** `/new` is still useful at natural task/topic boundaries because a fresh session reduces context and compaction pressure, but it is not required for ordinary built-in memory edits or resets to become visible.
 
 ## Memory Tool Actions
 
@@ -72,7 +77,7 @@ The agent uses the `memory` tool with these actions:
 - **replace** — Replace an existing entry with updated content (uses substring matching via `old_text`)
 - **remove** — Remove an entry that's no longer relevant (uses substring matching via `old_text`)
 
-There is no `read` action — memory content is automatically injected into the system prompt at session start. The agent sees its memories as part of its conversation context.
+There is no `read` action — built-in memory is injected into the system prompt and refreshed at turn boundaries when the files change. The agent sees its memories as part of its conversation context.
 
 ### Substring Matching
 
@@ -243,21 +248,31 @@ The same `list` / `delete <id>` / `edit <id>` subcommands work from the in-chat 
 ```yaml
 # In ~/.hermes/config.yaml
 memory:
-  memory_enabled: true
-  user_profile_enabled: true
-  memory_char_limit: 2200   # ~800 tokens
-  user_char_limit: 1375     # ~500 tokens
-  write_approval: false     # false = write freely (default) | true = require approval
+  enabled: true              # master privacy switch for built-in + external memory
+  memory_enabled: true       # built-in MEMORY.md target
+  user_profile_enabled: true # built-in USER.md target
+  memory_char_limit: 2200    # ~800 tokens
+  user_char_limit: 1375      # ~500 tokens
+  write_approval: false      # false = write freely (default) | true = require approval
 ```
 
-Setting **both** `memory_enabled` and `user_profile_enabled` to `false` turns the
-built-in stores off completely: the `memory` tool is dropped from the schema and
-its guidance block is dropped from the system prompt, so the model is never told
-about a tool it cannot use. An external provider set via `memory.provider`
-(Hindsight, Mem0, Honcho, …) is unaffected and keeps its own tools — use this
-when you want a third-party memory backend *instead of* the built-in files.
-Listing `memory` under `agent.disabled_toolsets` is the heavier switch: it hides
-external provider tools too.
+`memory.enabled` is the master privacy switch. Set it to `false` (or run
+`hermes memory off`) to stop built-in MEMORY.md / USER.md injection and writes
+**and** external-provider initialization, sync, prefetch, and memory-tool exposure.
+The configured provider name and credentials are retained, so `hermes memory on`
+can restore the same setup. Turns completed while memory is off are not later
+backfilled into the provider.
+
+This switch is intentionally separate from ordinary chat/session persistence:
+messages still go to SessionDB and remain resumable/searchable according to the
+normal session settings. Turning memory off does not erase chat history.
+
+Setting **both** `memory_enabled` and `user_profile_enabled` to `false` disables
+only the two built-in file targets while the master switch remains on. The
+built-in `memory` tool and its guidance are then hidden, while a configured
+external provider may continue running. `agent.disabled_toolsets: [memory]` is
+a tool-surface control, not the privacy master; use `memory.enabled: false`
+when you want durable memory paused across both layers.
 
 With only `memory_enabled: false` (user profile still on), the tool stays —
 it backs the profile store — but the system prompt swaps the full memory
@@ -277,7 +292,7 @@ first, set `memory.write_approval: true`. It's a simple on/off gate applied to
 | `false` (default) | Write freely — the gate is off (the pre-gate behaviour). |
 | `true` | Require approval before anything is saved. In the interactive CLI, foreground writes prompt you inline (entries are small enough to read in full). Everywhere else — messaging platforms, scripts, and the background self-improvement review — writes are **staged** for review with `/memory pending`. |
 
-> To turn memory off entirely (not just gate it), set both `memory_enabled: false` and `user_profile_enabled: false`. When both built-in stores are disabled, the built-in `memory` tool is automatically hidden.
+> To pause all durable memory persistence, set `memory.enabled: false` or run `hermes memory off`. `write_approval` only controls whether writes need review; it is not an off switch.
 
 Review staged writes from the CLI or any messaging platform:
 
@@ -456,11 +471,13 @@ Full details in [Gating agent skill writes](/user-guide/features/skills#gating-a
 
 For deeper, persistent memory that goes beyond MEMORY.md and USER.md, Hermes ships with 8 external memory provider plugins — including Honcho, OpenViking, Mem0, Hindsight, Holographic, RetainDB, ByteRover, and Supermemory.
 
-External providers run **alongside** built-in memory (never replacing it) and add capabilities like knowledge graphs, semantic search, automatic fact extraction, and cross-session user modeling.
+With `memory.enabled: true`, an external provider runs alongside whichever built-in targets are enabled and adds capabilities like knowledge graphs, semantic search, automatic fact extraction, and cross-session user modeling. You can disable both built-in targets and use only the external provider, or pause every memory layer at once with the master switch.
 
 ```bash
 hermes memory setup      # pick a provider and configure it
-hermes memory status     # check what's active
+hermes memory status     # check master, built-in targets, and provider state
+hermes memory off        # pause all durable memory; preserve provider config
+hermes memory on         # resume the preserved configuration
 ```
 
 See the [Memory Providers](./memory-providers.md) guide for full details on each provider, setup instructions, and comparison.
