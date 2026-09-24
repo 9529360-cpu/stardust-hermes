@@ -341,6 +341,8 @@ class VaultStore:
             raise VaultError("allow_any_origin requires a delegated payment card")
         if kind != "payment" and delegated_payment:
             raise VaultError("delegated_payment is supported only for payment cards")
+        if kind == "payment" and delegated_payment and not allow_any_origin and not origin:
+            raise VaultError("delegated payment cards require a bound origin unless allow_any_origin is enabled")
         if kind == "login":
             if not origin:
                 raise VaultError("origin is required for login items")
