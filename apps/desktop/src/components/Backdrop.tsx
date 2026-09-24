@@ -13,7 +13,7 @@ export function Backdrop() {
   useEffect(() => {
     let canceled = false
 
-    if (!imagePath || !window.hermesDesktop?.readFileDataUrl) {
+    if (!on || !imagePath || !window.hermesDesktop?.readFileDataUrl) {
       setCustomSrc(null)
 
       return () => {
@@ -39,7 +39,7 @@ export function Backdrop() {
     return () => {
       canceled = true
     }
-  }, [imagePath])
+  }, [imagePath, on])
 
   if (!on) {
     return null
