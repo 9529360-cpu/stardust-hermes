@@ -66,6 +66,8 @@ describe('Backdrop', () => {
 
     await waitFor(() => expect(image?.getAttribute('src')).toBe(CUSTOM_IMAGE))
     expect(container.querySelector('[data-custom-backdrop="true"]')).not.toBeNull()
+    expect(container.querySelector('[data-window-backdrop]')).not.toBeNull()
+    await waitFor(() => expect(document.documentElement.dataset.stardustWindowBackdrop).toBe('custom'))
   })
 
   it('falls back to the bundled backdrop when the local image cannot be read', async () => {
@@ -89,5 +91,6 @@ describe('Backdrop', () => {
 
     expect(image?.getAttribute('src')).toContain('ds-assets/filler-bg0.jpg')
     expect(container.querySelector('[data-custom-backdrop="true"]')).toBeNull()
+    await waitFor(() => expect(document.documentElement.dataset.stardustWindowBackdrop).toBe('bundled'))
   })
 })
