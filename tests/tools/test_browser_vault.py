@@ -154,6 +154,15 @@ class TestVaultStore:
                 allow_any_origin=True,
             )
 
+    def test_delegated_merchant_card_requires_origin(self, store):
+        with pytest.raises(VaultError, match="require a bound origin"):
+            store.add_item(
+                kind="payment",
+                label="Card",
+                secret=_CARD,
+                delegated_payment=True,
+            )
+
     def test_unknown_kind_rejected(self, store):
         with pytest.raises(VaultError):
             store.add_item(kind="totp", label="x", secret={})
