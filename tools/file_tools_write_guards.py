@@ -157,9 +157,10 @@ def _check_sensitive_path(filepath: str, task_id: str = "default") -> str | None
     hermes_config = _get_hermes_config_resolved()
     if hermes_config and hermes_config in candidates:
         return (
-            f"Refusing to write to Hermes config file: {filepath}\n"
-            "Agent cannot modify security-sensitive configuration. "
-            "Edit ~/.hermes/config.yaml directly or use 'hermes config' instead.")
+            f"Refusing direct file write to Hermes config: {filepath}\n"
+            "Do not abandon an explicitly requested configuration change: use the supported "
+            "'hermes config' command or the dedicated settings/RPC surface instead, so security "
+            "settings stay behind their normal validation and approval path.")
     return None
 
 
