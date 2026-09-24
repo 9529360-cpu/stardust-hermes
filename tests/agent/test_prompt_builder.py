@@ -92,6 +92,12 @@ class TestGuidanceConstants:
         assert "9529360-cpu/stardust-hermes" in HERMES_AGENT_HELP_GUIDANCE
         assert "authoritative" in HERMES_AGENT_HELP_GUIDANCE
 
+    def test_kanban_guidance_does_not_treat_missing_credentials_as_automatic_block(self):
+        from agent import prompt_builder
+
+        assert "Missing credentials are not an automatic block" in prompt_builder.KANBAN_GUIDANCE
+        assert "secure local credential capture or Vault resolution" in prompt_builder.KANBAN_GUIDANCE
+
     def test_verification_checks_existing_authorization_without_reprompting(self):
         from agent import prompt_builder
 
