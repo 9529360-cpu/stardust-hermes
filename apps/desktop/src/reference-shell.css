@@ -13,26 +13,6 @@
  */
 
 :root[data-hermes-reference-shell='aurora'] {
-  --aurora-night-0: #050914;
-  --aurora-night-1: #081126;
-  --aurora-night-2: #0c1730;
-  --aurora-blue: #5f83ff;
-  --aurora-blue-soft: #8db1ff;
-  --aurora-violet: #806cff;
-  --aurora-cyan: #70d3ff;
-  --aurora-ink: #eef4ff;
-  --aurora-ink-2: #b6c4df;
-  --aurora-ink-3: #7f91b2;
-  --aurora-stroke: rgba(180, 201, 255, 0.16);
-  --aurora-stroke-soft: rgba(180, 201, 255, 0.09);
-  --aurora-glass: rgba(8, 15, 32, 0.88);
-  --aurora-glass-strong: rgba(8, 15, 32, 0.96);
-  --aurora-rail: rgba(13, 24, 48, 0.86);
-  --aurora-panel: rgba(11, 21, 42, 0.74);
-  --aurora-panel-strong: rgba(12, 23, 46, 0.9);
-  --aurora-control: rgba(117, 145, 213, 0.1);
-  --aurora-control-hover: rgba(132, 160, 229, 0.16);
-  --aurora-control-active: rgba(126, 157, 231, 0.2);
 }
 
 :root[data-hermes-reference-shell='aurora'],
@@ -68,13 +48,11 @@
 :root[data-hermes-reference-shell='aurora'] body::before {
   top: -14vh;
   left: 16vw;
-  background: linear-gradient(90deg, rgba(98, 129, 255, 0.15), rgba(142, 117, 255, 0.4), rgba(101, 180, 255, 0.16));
 }
 
 :root[data-hermes-reference-shell='aurora'] body::after {
   right: -12vw;
   bottom: -18vh;
-  background: linear-gradient(90deg, rgba(61, 100, 217, 0.12), rgba(138, 91, 181, 0.34), rgba(215, 124, 155, 0.14));
 }
 
 :root[data-hermes-reference-shell='aurora'] #root {
@@ -118,21 +96,17 @@
 /* Pane chrome: quiet separators and a subtle top-light instead of opaque
    utility gray. The layout tree still owns all resize seams. */
 :root[data-hermes-reference-shell='aurora'] [data-tree-group] {
-  background: rgba(8, 16, 33, 0.52) !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
-  background: linear-gradient(180deg, rgba(19, 33, 63, 0.88), rgba(11, 21, 43, 0.88)) !important;
 }
 
 :root[data-hermes-reference-shell='aurora']
   :is([data-tree-group='grp-review'], [data-tree-group='grp-files'], [data-tree-group='grp-terminal']) {
-  background: linear-gradient(180deg, rgba(17, 30, 57, 0.8), rgba(9, 18, 37, 0.8)) !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-panel-header] {
-  background: rgba(15, 28, 53, 0.78) !important;
-  box-shadow: inset 0 -1px 0 rgba(172, 198, 255, 0.075);
+  box-shadow: inset 0 -1px 0 var(--ui-stroke-quaternary);
   backdrop-filter: blur(18px);
 }
 
@@ -147,7 +121,6 @@
   align-items: center;
   min-height: 42px;
   padding: 7px 10px 3px 46px;
-  color: #dce7ff;
   background-image:
     radial-gradient(circle at 22px 50%, #d8e6ff 0 3px, transparent 3.5px),
     radial-gradient(circle at 22px 50%, #86a9ff 0 9px, #745cff 10px, transparent 11px),
@@ -156,11 +129,9 @@
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.16em;
-  text-shadow: 0 0 20px rgba(118, 151, 255, 0.38);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tour='sessions-sidebar'] {
-  border-color: rgba(173, 198, 255, 0.08) !important;
   background: transparent !important;
 }
 
@@ -173,12 +144,10 @@
   [data-slot='sidebar-menu-button'] {
   height: 42px;
   margin-bottom: 6px;
-  border-color: rgba(203, 217, 255, 0.2) !important;
   border-radius: 11px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 42%),
     linear-gradient(135deg, #7294ff 0%, #716fe9 52%, #526fc8 100%) !important;
-  color: #f7f9ff !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     0 8px 24px rgba(61, 82, 178, 0.32);
@@ -188,7 +157,6 @@
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
   [data-slot='sidebar-menu-button']:hover {
-  border-color: rgba(220, 230, 255, 0.32) !important;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 42%),
     linear-gradient(135deg, #7ca0ff 0%, #7b79ef 52%, #5c79d2 100%) !important;
@@ -220,7 +188,6 @@
   content: attr(data-tools-label);
   display: block;
   margin: 5px 2px 1px;
-  color: rgba(142, 160, 194, 0.66);
   font-size: 0.59rem;
   font-weight: 700;
   letter-spacing: 0.15em;
@@ -256,9 +223,7 @@
   [data-slot='sidebar-menu-button'] {
   height: 32px;
   padding-inline: 8px;
-  border: 1px solid rgba(172, 198, 255, 0.075);
-  background: rgba(89, 116, 176, 0.055);
-  color: rgba(183, 198, 226, 0.78);
+  border: 1px solid var(--ui-stroke-tertiary);
   font-size: 0.7rem;
   font-weight: 500;
 }
@@ -272,8 +237,6 @@
     :has([data-tour='sidebar-nav-cron'])
   )
   [data-slot='sidebar-menu-button']:hover {
-  border-color: rgba(172, 198, 255, 0.14);
-  background: rgba(111, 140, 203, 0.12);
   color: var(--aurora-ink-2);
 }
 
@@ -286,7 +249,7 @@
 :root[data-hermes-reference-shell='aurora']
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-menu-button'][data-active='true'] {
-  box-shadow: inset 0 0 0 1px rgba(171, 197, 255, 0.08);
+  box-shadow: inset 0 0 0 1px var(--ui-stroke-quaternary);
 }
 
 /* The shared SearchField remains the shared primitive; only its rail context
@@ -300,7 +263,6 @@
   content: 'CONVERSATIONS';
   display: block;
   margin: 0 2px 6px;
-  color: rgba(142, 160, 194, 0.66);
   font-size: 0.59rem;
   font-weight: 700;
   letter-spacing: 0.15em;
@@ -314,9 +276,8 @@
   width: 100%;
   min-height: 34px;
   padding-inline: 10px;
-  border: 1px solid rgba(172, 198, 255, 0.12);
+  border: 1px solid var(--ui-stroke-tertiary);
   border-radius: 9px;
-  background: rgba(8, 16, 34, 0.36);
   opacity: 0.78;
 }
 
@@ -325,19 +286,16 @@
   [data-slot='sidebar-content']
   > div:has(> div > input[type='text'])
   > div:has(> input[type='text']):focus-within {
-  border-color: rgba(145, 176, 255, 0.34);
-  background: rgba(10, 20, 42, 0.68);
   opacity: 1;
-  box-shadow: 0 0 0 3px rgba(96, 126, 220, 0.08);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 8%, transparent);
 }
 
 /* Composer: the reference uses a contained command field floating above the
    transcript rather than a hard bottom edge. Keep all existing composer
    behavior; just strengthen its surface. */
 :root[data-hermes-reference-shell='aurora'] [data-tour='composer'] {
-  border: 1px solid rgba(173, 199, 255, 0.14) !important;
+  border: 1px solid var(--ui-stroke-tertiary);
   border-radius: 14px !important;
-  background: linear-gradient(180deg, rgba(20, 34, 63, 0.9), rgba(10, 20, 40, 0.9)) !important;
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.26),
     inset 0 1px 0 rgba(231, 238, 255, 0.055) !important;
@@ -392,30 +350,9 @@
 }
 /* Figma/macOS 27 refinement: unified desktop chrome, restrained depth. */
 :root[data-hermes-reference-shell='aurora'] {
-  --aurora-night-0: #090d14;
-  --aurora-night-1: #0b1018;
-  --aurora-night-2: #111824;
-  --aurora-blue: #6f8ff8;
-  --aurora-blue-soft: #9ab0ff;
-  --aurora-violet: #7b86f6;
-  --aurora-cyan: #7bb8da;
-  --aurora-ink: #f1f4f8;
-  --aurora-ink-2: #c3cad5;
-  --aurora-ink-3: #7f8998;
-  --aurora-stroke: rgba(255, 255, 255, 0.09);
-  --aurora-stroke-soft: rgba(255, 255, 255, 0.055);
-  --aurora-glass: #0b1018;
-  --aurora-glass-strong: #101620;
-  --aurora-rail: #10161f;
-  --aurora-panel: #0f151e;
-  --aurora-panel-strong: #111923;
-  --aurora-control: rgba(255, 255, 255, 0.045);
-  --aurora-control-hover: rgba(255, 255, 255, 0.075);
-  --aurora-control-active: rgba(111, 143, 248, 0.16);
 }
 
 :root[data-hermes-reference-shell='aurora'] body {
-  background: #090d14;
 }
 :root[data-hermes-reference-shell='aurora'] body::before,
 :root[data-hermes-reference-shell='aurora'] body::after {
@@ -429,25 +366,20 @@
 :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
   border: 0;
   border-radius: 0;
-  background: #0b1018 !important;
   box-shadow: none;
   backdrop-filter: none;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group] {
-  background: #0b1018 !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
-  background: #10161f !important;
 }
 
 :root[data-hermes-reference-shell='aurora']
   :is([data-tree-group='grp-review'], [data-tree-group='grp-files'], [data-tree-group='grp-terminal']) {
-  background: #0f151e !important;
 }
 :root[data-hermes-reference-shell='aurora'] [data-panel-header] {
-  background: rgba(16, 22, 31, 0.96) !important;
   box-shadow: inset 0 -1px 0 var(--aurora-stroke-soft);
   backdrop-filter: none;
 }
@@ -457,8 +389,6 @@
   [data-slot='sidebar-content']::before {
   min-height: 36px;
   padding: 6px 10px 2px 30px;
-  color: #d9dee8;
-  background-image: radial-gradient(circle at 14px 50%, #7f9cf7 0 3px, transparent 3.5px);
   font-size: 0.68rem;
   font-weight: 650;
   letter-spacing: 0.13em;
@@ -484,10 +414,7 @@
   [data-slot='sidebar-menu-button'] {
   height: 36px;
   margin-bottom: 8px;
-  border-color: rgba(111, 143, 248, 0.28) !important;
   border-radius: 8px;
-  background: rgba(63, 94, 196, 0.7) !important;
-  color: #f7f9ff !important;
   box-shadow: none;
 }
 
@@ -495,8 +422,6 @@
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-new-session'])
   [data-slot='sidebar-menu-button']:hover {
-  border-color: rgba(130, 158, 248, 0.42) !important;
-  background: rgba(72, 104, 211, 0.82) !important;
   transform: none;
 }
 
@@ -523,7 +448,6 @@
   padding-inline: 9px;
   border-color: transparent !important;
   background: transparent !important;
-  color: rgba(195, 202, 213, 0.78);
   font-size: 0.72rem;
 }
 
@@ -545,7 +469,6 @@
   [data-slot='sidebar-content']
   > div:has(> div > input[type='text'])::before {
   margin-bottom: 5px;
-  color: rgba(127, 137, 152, 0.78);
   font-size: 0.56rem;
   letter-spacing: 0.13em;
 }
@@ -558,7 +481,6 @@
   min-height: 32px;
   border-color: transparent;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.045);
   opacity: 1;
 }
 
@@ -567,14 +489,10 @@
   [data-slot='sidebar-content']
   > div:has(> div > input[type='text'])
   > div:has(> input[type='text']):focus-within {
-  border-color: rgba(111, 143, 248, 0.24);
-  background: rgba(255, 255, 255, 0.065);
-  box-shadow: 0 0 0 2px rgba(111, 143, 248, 0.06);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 6%, transparent);
 }
 :root[data-hermes-reference-shell='aurora'] [data-tour='composer'] {
-  border-color: rgba(255, 255, 255, 0.085) !important;
   border-radius: 12px !important;
-  background: #111821 !important;
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.18) !important;
   backdrop-filter: none;
 }
@@ -654,76 +572,43 @@
 
 /* JARVIS workspace refinement — selected Stardust product direction. */
 :root[data-hermes-reference-shell='aurora'] {
-  --aurora-night-0: #020711;
-  --aurora-night-1: #040b15;
-  --aurora-night-2: #071321;
-  --aurora-blue: #45bdff;
-  --aurora-blue-soft: #9edfff;
-  --aurora-violet: #5c95ff;
-  --aurora-cyan: #62d2ff;
-  --aurora-ink: #e8f5ff;
-  --aurora-ink-2: #acc5d6;
-  --aurora-ink-3: #6f8ca1;
-  --aurora-stroke: rgba(88, 190, 255, 0.18);
-  --aurora-stroke-soft: rgba(88, 190, 255, 0.09);
-  --aurora-glass: #050d18;
-  --aurora-glass-strong: #07111e;
-  --aurora-rail: #06101d;
-  --aurora-panel: #081523;
-  --aurora-panel-strong: #091827;
-  --aurora-control: rgba(76, 177, 239, 0.055);
-  --aurora-control-hover: rgba(76, 177, 239, 0.09);
-  --aurora-control-active: rgba(52, 151, 222, 0.16);
 }
 
 :root[data-hermes-reference-shell='aurora'] body {
-  background: #020711;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-contrib-shell] {
-  background: #040b15 !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group] {
-  background: #040b15 !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
   min-width: 176px;
   max-width: 202px;
-  background: #06101d !important;
-  box-shadow: inset -1px 0 0 rgba(83, 184, 247, 0.12);
+  box-shadow: inset -1px 0 0 var(--ui-stroke-quaternary);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
   min-width: 242px;
   max-width: 274px;
-  background: #050e19 !important;
-  box-shadow: inset 1px 0 0 rgba(83, 184, 247, 0.1);
+  box-shadow: inset 1px 0 0 var(--ui-stroke-quaternary);
 }
 
 :root[data-hermes-reference-shell='aurora'] .jarvis-product-nav {
-  background: linear-gradient(180deg, rgba(5, 15, 27, 0.98), rgba(6, 16, 29, 0.96)) !important;
-  border-color: rgba(80, 180, 244, 0.11) !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button {
   min-height: 32px;
   border: 1px solid transparent;
   border-radius: 7px;
-  color: #8fa9bc;
   font-size: 0.72rem;
 }
 
 :root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button:hover {
-  background: rgba(69, 174, 240, 0.07);
-  color: #d4eaff;
 }
 
 :root[data-hermes-reference-shell='aurora'] .jarvis-product-nav button[aria-current='page'] {
-  border-color: rgba(92, 197, 255, 0.3);
-  background: linear-gradient(90deg, rgba(34, 132, 207, 0.18), rgba(29, 81, 129, 0.09));
-  color: #dff4ff;
   box-shadow:
     inset 2px 0 0 #5acbff,
     0 0 22px rgba(41, 155, 226, 0.08);
@@ -749,7 +634,6 @@
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-menu-button'] {
   border-radius: 6px;
-  color: #879faf;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-jarvis-workspace] {
@@ -926,7 +810,6 @@
 }
 
 :root[data-hermes-reference-shell='aurora'] .assistant-home-eyebrow {
-  color: #5c87a1;
   font-size: 0.62rem;
   font-weight: 650;
   letter-spacing: 0.16em;
@@ -976,7 +859,7 @@
   border-radius: 0.4rem;
   padding: 0.25rem 0.55rem;
   font-size: 0.62rem;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Product copy belongs to i18n-rendered elements. CSS pseudo-content cannot
