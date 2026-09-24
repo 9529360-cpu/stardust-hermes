@@ -593,15 +593,15 @@ export const en: Translations = {
     vault: {
       title: 'Vault',
       blurb:
-        'Say "log into GitHub" and the agent signs in for you. The first time it meets a sign-in page it asks you for the login right there; after that it just works. Passwords are encrypted on this machine and filled straight into the page — the model never sees them.',
+        'Store logins, payment cards and addresses for Stardust to use on your behalf. Secret values stay encrypted on this machine and are injected directly into forms — the model never sees them.',
       count: n => `${n} saved`,
       loadFailed: 'Could not load vault items',
       empty: 'Nothing saved yet',
       emptyDesc:
-        "You don't have to add anything here. Ask the agent to sign into a site and it will ask you for the login once, on the spot. Use Add if you prefer to enter one ahead of time.",
+        "Save a login when Stardust first needs it, or add a dedicated low-limit payment card and address here for purchases you ask it to make.",
       add: 'Add',
       addTitle: 'Add a login, card or address',
-      addDescription: 'Stored encrypted on this machine. The agent never sees the password.',
+      addDescription: 'Stored encrypted on this machine. Stardust never sees passwords, card numbers or CVCs.',
       added: 'Saved.',
       adding: 'Saving…',
       addConfirm: 'Save',
