@@ -545,8 +545,8 @@ export const ja = defineLocale({
         window: 'ウィンドウ全体',
         sidebar: 'サイドバーのみ'
       },
-      backdropTitle: 'チャット背景',
-      backdropDesc: '会話の背後に、この端末の画像を表示します。好きな画像を選べ、画像はこの端末内にのみ保持されます。',
+      backdropTitle: 'ウィンドウ背景',
+      backdropDesc: 'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
       userBubbleTitle: 'メッセージの吹き出し',
       userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で枠線だけが残ります。',
       introSplashTitle: 'イントロ表示',
