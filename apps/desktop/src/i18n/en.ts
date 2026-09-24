@@ -794,7 +794,7 @@ export const en: Translations = {
         sidebar: 'Sidebar only'
       },
       backdropTitle: 'Chat Backdrop',
-      backdropDesc: 'The faint statue image behind the conversation.',
+      backdropDesc: 'Show a local image behind the conversation. Choose any picture; it stays on this device.',
       userBubbleTitle: 'Message Bubble',
       userBubbleDesc: 'How see-through your own messages are. Solid at 0; only the outline remains at 100.',
       introSplashTitle: 'Intro Splash',
