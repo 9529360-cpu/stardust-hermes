@@ -2194,6 +2194,7 @@ export const ja = defineLocale({
   },
 
   sidebar: {
+    recent: '最近',
     gatewayGroups: {
       grouping: 'ゲートウェイとプロファイル',
       rename: 'グループ名を変更',
@@ -3269,6 +3270,7 @@ export const ja = defineLocale({
   },
 
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: '今日は何を進めますか？', body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。', start: 'メッセージを始める', actions: 'コマンドを見る' },
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',

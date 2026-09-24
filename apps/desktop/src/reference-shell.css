@@ -840,9 +840,7 @@
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-content']
   > div:has(> div > input[type='text'])::before {
-  content: 'RECENT';
-  color: #557890;
-  letter-spacing: 0.15em;
+  content: none;
 }
 
 :root[data-hermes-reference-shell='aurora']
@@ -1009,19 +1007,20 @@
 /* One readable conversation grid: transcript, empty state, sync banner, and
    composer share the same measure instead of each choosing a width. */
 :root[data-hermes-reference-shell='aurora'] {
-  --composer-width: min(52rem, calc(100% - 2rem));
+  --conversation-column-width: min(52rem, calc(100% - 2rem));
+  --composer-width: var(--conversation-column-width);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-slot='aui_thread-content'],
 :root[data-hermes-reference-shell='aurora'] .assistant-home {
-  width: min(var(--composer-width), 100%);
-  max-width: var(--composer-width);
+  width: var(--conversation-column-width);
+  max-width: var(--conversation-column-width);
   margin-inline: auto;
 }
 
 :root[data-hermes-reference-shell='aurora'] .assistant-home {
   min-height: 40vh;
-  padding: 0 0 2.75rem;
+  padding: 0 0 3.5rem;
   text-align: left;
 }
 
@@ -1058,33 +1057,12 @@
   margin-top: 1.15rem;
 }
 
-:root[data-hermes-reference-shell='aurora'] .assistant-home-action {
-  min-height: 2rem;
-  padding: 0.35rem 0.75rem;
-  border: 1px solid rgba(104, 173, 215, 0.16);
-  border-radius: 0.5rem;
-  background: rgba(255, 255, 255, 0.035);
-  color: var(--aurora-ink-2);
-  font-size: 0.7rem;
-}
-
-:root[data-hermes-reference-shell='aurora'] .assistant-home-action:hover {
-  border-color: rgba(104, 190, 242, 0.34);
-  background: rgba(72, 155, 211, 0.1);
-}
-
-:root[data-hermes-reference-shell='aurora'] .assistant-home-action-primary {
-  border-color: rgba(83, 190, 255, 0.34);
-  background: rgba(37, 126, 205, 0.2);
-  color: #dff5ff;
-}
-
 :root[data-hermes-reference-shell='aurora'] [data-slot='composer-dock'] {
-  width: min(var(--composer-width), calc(100% - 2rem));
+  width: var(--conversation-column-width);
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-slot='composer-surface'] {
-  border-color: rgba(104, 190, 242, 0.2) !important;
+  border-color: transparent !important;
 }
 
 :root[data-hermes-reference-shell='aurora'] [data-slot='composer-drag-region'] {

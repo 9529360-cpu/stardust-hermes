@@ -2405,6 +2405,7 @@ export const zhHant = defineLocale({
   },
 
   sidebar: {
+    recent: '最近',
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -3450,6 +3451,7 @@ export const zhHant = defineLocale({
   },
 
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: '今天想做什麼？', body: '直接問我，或者把一件事交給我。需要專案、檔案或預覽時，相關上下文會出現在對話右側。', start: '從一則訊息開始', actions: '瀏覽命令' },
     thread: {
       loadingSession: '正在載入工作階段',
       showEarlier: '顯示較早的訊息',
