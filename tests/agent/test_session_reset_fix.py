@@ -46,8 +46,9 @@ def _make_minimal_agent() -> AIAgent:
     agent.session_cost_status = "unknown"
     agent.session_cost_source = "none"
 
-    # The two fields under test
+    # Session-scoped prompt snapshots under test.
     agent._user_turn_count = 0
+    agent._frozen_project_fact_parts = ("stale project facts",)
     agent.context_compressor = None  # will be set per-test as needed
 
     return agent
@@ -90,3 +91,11 @@ class TestResetSessionState:
         )
 
 
+
+def test_project_fact_snapshot_cleared_on_reset():
+    agent = _make_minimal_agent()
+    assert agent._frozen_project_fact_parts
+
+    agent.reset_session_state()
+
+    assert agent._frozen_project_fact_parts is None

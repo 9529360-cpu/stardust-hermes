@@ -6,7 +6,7 @@ description: "How Hermes Agent remembers across sessions — MEMORY.md, USER.md,
 
 # Persistent Memory
 
-Hermes Agent has bounded, curated memory that persists across sessions. This lets it remember your preferences, your projects, your environment, and things it has learned.
+Stardust has bounded, curated memory that persists across sessions. It is the authority for user-profile facts and cross-project assistant knowledge. Project-scoped facts are owned by `projects.db`, session history by `state.db`, and durable task lifecycle by `kanban.db`; those domains are not promoted into global memory just because they appeared in a conversation.
 
 ## How It Works
 
@@ -14,7 +14,7 @@ Two files make up the agent's memory:
 
 | File | Purpose | Char Limit |
 |------|---------|------------|
-| **MEMORY.md** | Agent's personal notes — environment facts, conventions, things learned | 2,200 chars (~800 tokens) |
+| **MEMORY.md** | Cross-project assistant knowledge — global environment facts, standing conventions, reusable tool quirks and lessons | 2,200 chars (~800 tokens) |
 | **USER.md** | User profile — your preferences, communication style, expectations | 1,375 chars (~500 tokens) |
 
 Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a frozen snapshot at session start. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
@@ -41,11 +41,11 @@ At the start of every session, memory entries are loaded from disk and rendered 
 ══════════════════════════════════════════════
 MEMORY (your personal notes) [67% — 1,474/2,200 chars]
 ══════════════════════════════════════════════
-User's project is a Rust web service at ~/code/myapi using Axum + SQLx
+This machine runs Ubuntu 22.04 and has Docker and Podman installed
 §
-This machine runs Ubuntu 22.04, has Docker and Podman installed
+Across maintained repositories, use conventional commits unless the project says otherwise
 §
-User prefers concise responses, dislikes verbose explanations
+The user prefers concise responses and dislikes verbose explanations
 ```
 
 The format includes:
@@ -91,13 +91,15 @@ If the substring matches multiple entries, an error is returned asking for a mor
 
 ### `memory` — Agent's Personal Notes
 
-For information the agent needs to remember about the environment, workflows, and lessons learned:
+For information the agent needs across projects about the environment, workflows, and reusable lessons:
 
-- Environment facts (OS, tools, project structure)
-- Project conventions and configuration
-- Tool quirks and workarounds discovered
-- Completed task diary entries
-- Skills and techniques that worked
+- Cross-project environment facts (OS, globally available tools)
+- Standing conventions that genuinely apply across projects
+- Tool quirks and workarounds that are not project-specific
+- Durable cross-project lessons
+- Skills and techniques that worked across contexts
+
+Project-specific conventions, versions, architecture facts, and repository decisions belong to the project's structured fact store in `projects.db`. Temporary in-session plan state belongs to the session todo snapshot in `state.db`; long-lived autonomous task lifecycle belongs to `kanban.db`, not memory.
 
 ### `user` — User Profile
 
@@ -118,8 +120,9 @@ The agent saves automatically — you don't need to ask. It saves when it learns
 - **User preferences:** "I prefer TypeScript over JavaScript" → save to `user`
 - **Environment facts:** "This server runs Debian 12 with PostgreSQL 16" → save to `memory`
 - **Corrections:** "Don't use `sudo` for Docker commands, user is in docker group" → save to `memory`
-- **Conventions:** "Project uses tabs, 120-char line width, Google-style docstrings" → save to `memory`
-- **Completed work:** "Migrated database from MySQL to PostgreSQL on 2026-01-15" → save to `memory`
+- **Cross-project conventions:** "Use conventional commits in all maintained repositories" → save to `memory`
+- **Project conventions:** "Project A uses tabs and Python 3.12" → save as a project fact in `projects.db`, not global memory
+- **Completed work:** task/session history stays with its task/session unless it produced a durable project fact
 - **Explicit requests:** "Remember that my API key rotation happens monthly" → save to `memory`
 
 ### Skip These
@@ -158,7 +161,7 @@ The agent should then:
 3. Use `replace` to merge related entries into shorter versions
 4. Then `add` the new entry
 
-**Best practice:** When memory is above 80% capacity (visible in the system prompt header), consolidate entries before adding new ones. For example, merge three separate "project uses X" entries into one comprehensive project description entry.
+**Best practice:** When memory is above 80% capacity (visible in the system prompt header), consolidate entries before adding new ones. For example, merge several overlapping cross-project tool/workflow notes into one compact global entry. Project descriptions belong in `projects.db` instead.
 
 ### Practical Examples of Good Memory Entries
 
@@ -168,7 +171,7 @@ The agent should then:
 # Good: Packs multiple related facts
 User runs macOS 14 Sonoma, uses Homebrew, has Docker Desktop and Podman. Shell: zsh with oh-my-zsh. Editor: VS Code with Vim keybindings.
 
-# Good: Specific, actionable convention
+# Not MEMORY.md: this is Project-scoped and belongs in projects.db
 Project ~/code/api uses Go 1.22, sqlc for DB queries, chi router. Run tests with 'make test'. CI via GitHub Actions.
 
 # Good: Lesson learned with context
@@ -189,6 +192,21 @@ The memory system automatically rejects exact duplicate entries. If you try to a
 ## Security Scanning
 
 Memory entries are scanned for injection and exfiltration patterns before being accepted, since they're injected into the system prompt. Content matching threat patterns (prompt injection, credential exfiltration, SSH backdoors) or containing invisible Unicode characters is blocked.
+
+## Project-Scoped Facts
+
+Project facts are durable, structured state owned by the profile's `projects.db`. They are separate from global memory so one project's versions, architecture decisions, and repository conventions do not leak into unrelated chats.
+
+Use the existing project CLI to manage them:
+
+```bash
+hermes project facts <project> add "Python 3.12 is required." --source repository --source-ref pyproject.toml
+hermes project facts <project> list
+hermes project facts <project> verify <fact-id>
+hermes project facts <project> supersede <fact-id>
+```
+
+Each fact carries provenance, confidence, timestamps, and a sensitivity flag. Unverified model inference cannot be stored as certainty. Sensitive facts are persisted locally but are never automatically injected into model context. Active, non-sensitive, sufficiently trusted facts for the current project are frozen into a new session's project context from `projects.db`; they are not copied into `MEMORY.md` or `USER.md`.
 
 ## Session Search
 
@@ -216,7 +234,7 @@ See [Session Search Tool](/user-guide/sessions#session-search-tool) for the thre
 | **Management** | Manually curated by agent | Automatic — all sessions stored |
 | **Token cost** | Fixed per session (~1,300 tokens) | On-demand (searched when needed) |
 
-**Memory** is for critical facts that should always be in context. **Session search** is for "did we discuss X last week?" queries where the agent needs to recall specifics from past conversations.
+**Memory** is for critical cross-project facts that should always be in context. Project facts belong to `projects.db`. **Session search** is for "did we discuss X last week?" queries where the agent needs to recall specifics from past conversations.
 
 ## Learning Journey (`/journey`)
 
