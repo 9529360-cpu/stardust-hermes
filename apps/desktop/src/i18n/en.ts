@@ -801,8 +801,8 @@ export const en: Translations = {
         window: 'Whole window',
         sidebar: 'Sidebar only'
       },
-      backdropTitle: 'Chat Backdrop',
-      backdropDesc: 'Show a local image behind the conversation. Choose any picture; it stays on this device.',
+      backdropTitle: 'Window Background',
+      backdropDesc: 'Show one local image behind the entire Stardust window — sidebar, conversation and tool panes. The image stays on this device.',
       userBubbleTitle: 'Message Bubble',
       userBubbleDesc: 'How see-through your own messages are. Solid at 0; only the outline remains at 100.',
       introSplashTitle: 'Intro Splash',
