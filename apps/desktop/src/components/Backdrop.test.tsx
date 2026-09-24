@@ -30,6 +30,23 @@ describe('Backdrop', () => {
     expect(container.querySelector('img')).toBeNull()
   })
 
+  it('does not read a saved local image while the backdrop is disabled', async () => {
+    const readFileDataUrl = vi.fn(async () => CUSTOM_IMAGE)
+
+    Object.defineProperty(window, 'hermesDesktop', {
+      configurable: true,
+      value: { readFileDataUrl }
+    })
+
+    setBackdropImagePath('C:\\Pictures\\wallpaper.jpg')
+    setBackdrop(false)
+
+    const { container } = render(<Backdrop />)
+
+    await waitFor(() => expect(container.querySelector('img')).toBeNull())
+    expect(readFileDataUrl).not.toHaveBeenCalled()
+  })
+
   it('reads a custom background only through the local Electron file bridge', async () => {
     const readFileDataUrl = vi.fn(async () => CUSTOM_IMAGE)
 
