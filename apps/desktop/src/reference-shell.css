@@ -1006,6 +1006,100 @@
   }
 }
 
+/* One readable conversation grid: transcript, empty state, sync banner, and
+   composer share the same measure instead of each choosing a width. */
+:root[data-hermes-reference-shell='aurora'] {
+  --composer-width: min(52rem, calc(100% - 2rem));
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='aui_thread-content'],
+:root[data-hermes-reference-shell='aurora'] .assistant-home {
+  width: min(var(--composer-width), 100%);
+  max-width: var(--composer-width);
+  margin-inline: auto;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home {
+  min-height: 40vh;
+  padding: 0 0 2.75rem;
+  text-align: left;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-eyebrow {
+  color: #5c87a1;
+  font-size: 0.62rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home h1 {
+  max-width: 38rem;
+  margin-top: 0.55rem;
+  color: var(--aurora-ink);
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home p {
+  max-width: 38rem;
+  margin-top: 0.65rem;
+  color: var(--aurora-ink-3);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.15rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-action {
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(104, 173, 215, 0.16);
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--aurora-ink-2);
+  font-size: 0.7rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-action:hover {
+  border-color: rgba(104, 190, 242, 0.34);
+  background: rgba(72, 155, 211, 0.1);
+}
+
+:root[data-hermes-reference-shell='aurora'] .assistant-home-action-primary {
+  border-color: rgba(83, 190, 255, 0.34);
+  background: rgba(37, 126, 205, 0.2);
+  color: #dff5ff;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='composer-dock'] {
+  width: min(var(--composer-width), calc(100% - 2rem));
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='composer-surface'] {
+  border-color: rgba(104, 190, 242, 0.2) !important;
+}
+
+:root[data-hermes-reference-shell='aurora'] [data-slot='composer-drag-region'] {
+  border-radius: 0.75rem;
+}
+
+:root[data-hermes-reference-shell='aurora'] [aria-live='polite'] {
+  right: max(1rem, calc((100% - var(--composer-width)) / 2));
+  top: 0.5rem;
+  border-radius: 0.4rem;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.62rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+}
+
 /* Product copy belongs to i18n-rendered elements. CSS pseudo-content cannot
    follow the active locale, so retain the spacing but remove shell labels. */
 :root[data-hermes-reference-shell='aurora']
