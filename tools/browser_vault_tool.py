@@ -476,6 +476,12 @@ def browser_vault_fill(handle: str, task_id: Optional[str] = None) -> str:
         # We still bind the actual write to the CURRENT origin so a navigation race
         # cannot move the card values to another site between inspection and fill.
         page_origin = _current_page_origin(effective_task_id)
+        if page_origin and not page_origin.startswith("https://"):
+            return json.dumps({
+                "success": False,
+                "error_type": "insecure_payment_origin",
+                "error": "Delegated any-site payment cards are filled only on HTTPS checkout origins.",
+            })
         allowed = [page_origin] if page_origin else []
     else:
         for candidate in allowed:
