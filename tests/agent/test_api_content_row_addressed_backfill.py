@@ -30,6 +30,22 @@ from hermes_state import SessionDB
 from tests.agent.test_api_content_sidecar import _FakeAgent, _build
 
 
+@pytest.fixture(autouse=True)
+def _disable_unrelated_auto_title_worker(monkeypatch):
+    """Persistence tests must not leak the fire-and-forget title worker.
+
+    ``build_turn_context`` normally starts ``maybe_auto_title`` for the first
+    user turn. These tests exercise row-addressed persistence, not title
+    generation; letting that daemon outlive the file can leave native client
+    imports running during interpreter shutdown and abort an otherwise-green
+    pytest process.
+    """
+    monkeypatch.setattr(
+        "agent.title_generator.maybe_auto_title",
+        lambda *_args, **_kwargs: None,
+    )
+
+
 class TestSetMessageApiContent:
     """The store primitive: addressed by row id, guarded on the rest."""
 
