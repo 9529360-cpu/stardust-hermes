@@ -176,7 +176,7 @@ export function useSettingsSearchCatalog(enabled: boolean) {
       description: appearance.backdropDesc,
       icon: Palette,
       id: `setting:${APPEARANCE_SETTING_IDS.backdrop}`,
-      keywords: ['background', 'blur'],
+      keywords: ['background', 'wallpaper', 'image', 'photo'],
       label: appearance.backdropTitle,
       target: { setting: APPEARANCE_SETTING_IDS.backdrop, view: 'config:appearance' }
     },
