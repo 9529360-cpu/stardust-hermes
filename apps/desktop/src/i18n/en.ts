@@ -504,7 +504,7 @@ export const en: Translations = {
       about: 'About',
       billing: 'Billing',
       notifications: 'Notifications',
-      vault: 'Passwords & Logins'
+      vault: 'Vault'
     },
     plugins: {
       title: 'Desktop plugins',
@@ -591,7 +591,7 @@ export const en: Translations = {
       }
     },
     vault: {
-      title: 'Passwords & Logins',
+      title: 'Vault',
       blurb:
         'Say "log into GitHub" and the agent signs in for you. The first time it meets a sign-in page it asks you for the login right there; after that it just works. Passwords are encrypted on this machine and filled straight into the page — the model never sees them.',
       count: n => `${n} saved`,
@@ -625,6 +625,14 @@ export const en: Translations = {
       expMonthField: 'Exp. month',
       expYearField: 'Exp. year',
       cvcField: 'CVC',
+      delegatedPaymentLabel: 'Stardust spending card',
+      delegatedPaymentDescription:
+        'Purchases you explicitly ask Stardust to make can use this card without another card-fill confirmation.',
+      allowAnyOriginLabel: 'Allow on any checkout site',
+      allowAnyOriginDescription:
+        'Best for a dedicated low-limit, prepaid, or virtual card. The card balance or issuer limit remains the hard spending cap.',
+      delegatedPaymentBadge: 'Agent spend',
+      anySiteBadge: 'Any site',
       postalField: 'Postal code',
       addressLine1Field: 'Address line 1',
       addressLine2Field: 'Address line 2',
