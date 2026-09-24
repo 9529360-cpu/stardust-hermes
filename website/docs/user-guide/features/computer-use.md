@@ -343,7 +343,9 @@ Hermes applies multi-layer guardrails:
 - Destructive actions (click, type, drag, scroll, key, focus_app)
   require approval through the same gate as dangerous shell commands —
   interactively via the CLI dialog or the messaging-platform approval
-  buttons. Session/always grants are keyed by action (`cua:<action>`) in
+  buttons. In `approvals.mode: smart`, the shared guardian may auto-approve a
+  low-risk desktop action; `manual` still asks every time a grant is absent.
+  Session/always grants are keyed by action (`cua:<action>`) in
   the shared session/`command_allowlist` store, so a driver-directed switch
   from background to foreground delivery does not ask again for the same
   action. `bring_to_front` remains its own scope because persistent focus is
