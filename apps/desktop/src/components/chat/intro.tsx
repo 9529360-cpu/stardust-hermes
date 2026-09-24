@@ -1,7 +1,7 @@
-import { openCommandPalette } from '@/store/command-palette'
 import { requestComposerFocus } from '@/app/chat/composer/focus'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
+import { openCommandPalette } from '@/store/command-palette'
 
 export type IntroProps = {
   personality?: string
