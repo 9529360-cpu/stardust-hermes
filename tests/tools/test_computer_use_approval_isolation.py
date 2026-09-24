@@ -107,6 +107,47 @@ def test_always_grant_lands_in_the_shared_store(monkeypatch):
             approval._permanent_set().discard("cua:click")
 
 
+def test_smart_mode_can_autoapprove_low_risk_desktop_action(monkeypatch):
+    from tools import approval, approval_context
+    from tools.approval_context import reset_current_session_key, set_current_session_key
+    from tools.computer_use import tool as cu_tool
+
+    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
+    monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: "smart")
+    monkeypatch.setattr(approval, "_smart_verdict", lambda *args, **kwargs: "approve")
+    prompts = []
+    cu_tool.set_approval_callback(lambda command, description, **kw: prompts.append(command) or "once")
+    token = set_current_session_key("cua-smart-session")
+    try:
+        assert cu_tool._request_approval("click", {"element": 3}) is None
+        assert prompts == []
+    finally:
+        cu_tool.set_approval_callback(None)
+        reset_current_session_key(token)
+        approval.clear_session("cua-smart-session")
+
+
+def test_manual_mode_still_prompts_for_desktop_action(monkeypatch):
+    from tools import approval, approval_context
+    from tools.approval_context import reset_current_session_key, set_current_session_key
+    from tools.computer_use import tool as cu_tool
+
+    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", False)
+    monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: "manual")
+    prompts = []
+    cu_tool.set_approval_callback(lambda command, description, **kw: prompts.append(command) or "once")
+    token = set_current_session_key("cua-manual-session")
+    try:
+        assert cu_tool._request_approval("click", {"element": 3}) is None
+        assert len(prompts) == 1
+    finally:
+        cu_tool.set_approval_callback(None)
+        reset_current_session_key(token)
+        approval.clear_session("cua-manual-session")
+
+
 def test_a_forgets_a_poisoned_approval_callback():
     """Simulates the polluter: installs a raising callback and deliberately does not reset it."""
     from tools.computer_use import tool as cu_tool
