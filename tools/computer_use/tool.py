@@ -349,6 +349,7 @@ def _request_approval(action: str, args: Dict[str, Any]) -> Optional[str]:
         fail_closed_when_no_human=True,
         no_human_block_message=(f"BLOCKED: computer_use `{action}` requires approval but no interactive user or "
                                 "gateway is present to approve it."),
+        respect_smart_mode=True,
     )
     if result.get("approved"):
         return None
