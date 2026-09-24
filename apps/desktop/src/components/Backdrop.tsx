@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 
 import { $backdrop, $backdropImagePath } from '@/store/backdrop'
 
-const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\\/+/, '')}`
+const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
 
 export function Backdrop() {
   const on = useStore($backdrop)
