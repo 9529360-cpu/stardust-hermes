@@ -47,7 +47,7 @@ Don't use for: newsletter campaigns, or when the user only asks to retrieve one 
 
 ### 1. Set the inbox scope
 
-Resolve the account, folders/labels, half-open time window, unread/all status, maximum thread count, and allowed actions. Default to read + draft, not send/delete — "handle my inbox" does not imply permission to send or delete. Done when the retrieval query and mutation boundary are explicit.
+Resolve the account, folders/labels, half-open time window, unread/all status, maximum thread count, and allowed actions. Default to read + draft, not send/delete — "handle my inbox" does not imply permission to send or delete. But an explicit current-turn instruction such as "reply to these", "send the replies", "archive these", or "delete these" authorizes those named actions within the stated scope; do not add a redundant confirmation step when recipient/thread/action remain unchanged. Done when the retrieval query and mutation boundary are explicit.
 
 ### 2. Retrieve complete threads
 
@@ -79,13 +79,13 @@ Before drafting the first reply of a run, calibrate on evidence instead of guess
 
 Then draft: answer every material question, match the calibrated voice (not a generic-professional one), avoid invented commitments, and state uncertainty. Resolve attachment/link facts before referencing them. Done when each sentence can be checked against the thread or an explicit user preference, and each draft's tone can be traced to the calibration notes.
 
-### 5. Present an approval batch
+### 5. Resolve the mutation boundary
 
-For each proposed mutation show account, recipient/thread, action, draft summary, deadline, and risk. Let the user approve individually or as a clearly defined batch. Done when approval maps unambiguously to provider actions.
+For mutations that were **not already authorized by the user's current-turn instruction**, show account, recipient/thread, action, draft summary, deadline, and risk, then let the user approve individually or as a clearly defined batch. Do not ask again for a send/archive/delete that the user explicitly requested in the current turn when the exact target and content/action still match that request. Done when every provider mutation maps either to current-turn authorization or to a later explicit approval.
 
 ### 6. Apply and verify
 
-Send, label, archive, or create follow-ups only within approval. For ambiguous send errors, inspect Sent before retrying — SMTP may have succeeded while save-to-Sent failed, and a blind retry duplicates the mail. Read back message/draft/label state and provide provider-confirmed results. Done when each approved action is verified or explicitly failed.
+Send, label, archive, or create follow-ups only within the resolved authorization boundary. For ambiguous send errors, inspect Sent before retrying — SMTP may have succeeded while save-to-Sent failed, and a blind retry duplicates the mail. Read back message/draft/label state and provide provider-confirmed results. Done when each approved action is verified or explicitly failed.
 
 ## Output Shape
 
@@ -110,6 +110,6 @@ Send, label, archive, or create follow-ups only within approval. For ambiguous s
 - [ ] The requested folders and time window were fully covered, or gaps are stated.
 - [ ] Every disposition has a reason traceable to thread content.
 - [ ] Drafts were calibrated against the user's sent replies, or the fallback was stated.
-- [ ] No send/delete/archive happened outside the approved batch.
+- [ ] No send/delete/archive happened outside explicit current-turn authorization or a later approved batch.
 - [ ] Every approved mutation was read back from the provider.
 - [ ] The final response separates completed actions, drafts awaiting approval, and blockers.
