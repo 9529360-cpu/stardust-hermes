@@ -63,6 +63,8 @@ interface VaultItem {
   identifier_type?: null | string
   backend?: VaultSourceName
   has_otp?: boolean
+  delegated_payment?: boolean
+  allow_any_origin?: boolean
 }
 
 /** Add-dialog prefill from a deep link (`/settings?tab=vault&kind=…`). NEVER secrets. */
@@ -99,6 +101,8 @@ const EMPTY_FORM = {
   expMonth: '',
   expYear: '',
   cvc: '',
+  delegatedPayment: false,
+  allowAnyOrigin: false,
   postal: '',
   line1: '',
   line2: '',
@@ -307,7 +311,13 @@ export function VaultSettings() {
   const invalidate = useCallback(() => queryClient.invalidateQueries({ queryKey: VAULT_QUERY_KEY }), [queryClient])
 
   const addMutation = useMutation({
-    mutationFn: async (payload: { kind: VaultKind; label: string; origin?: string }) => {
+    mutationFn: async (payload: {
+      kind: VaultKind
+      label: string
+      origin?: string
+      delegated_payment?: boolean
+      allow_any_origin?: boolean
+    }) => {
       const secret = pendingSecret.current
       pendingSecret.current = null
 
@@ -333,10 +343,14 @@ export function VaultSettings() {
       return
     }
 
-    // Every kind is filled only on the origin it was saved for; a card without an origin is unfillable.
     const origin = form.origin.trim()
+    const delegatedAnyOrigin =
+      form.kind === 'payment' && form.delegatedPayment && form.allowAnyOrigin
 
-    if (!isValidOrigin(origin)) {
+    // Login/address items and merchant-bound cards still require an exact
+    // origin. A deliberately delegated "any checkout site" card is the one
+    // exception; the runtime binds each actual fill to the current origin.
+    if (!delegatedAnyOrigin && !isValidOrigin(origin)) {
       setFormError(v.originInvalid)
 
       return
@@ -352,7 +366,13 @@ export function VaultSettings() {
     addMutation.mutate({
       kind: form.kind,
       label: form.label.trim(),
-      ...(origin ? { origin } : {})
+      ...(origin ? { origin } : {}),
+      ...(form.kind === 'payment'
+        ? {
+            delegated_payment: form.delegatedPayment,
+            allow_any_origin: form.delegatedPayment && form.allowAnyOrigin
+          }
+        : {})
     })
   }, [addMutation, form, v.labelRequired, v.loginFieldsRequired, v.originInvalid])
 
@@ -442,6 +462,8 @@ export function VaultSettings() {
               <span className="truncate">{item.label}</span>
               <Pill tone={item.kind === 'login' ? 'primary' : 'muted'}>{kindLabel(item.kind)}</Pill>
               {item.has_otp && <Pill tone="muted">{v.twoFactorBadge}</Pill>}
+              {item.delegated_payment && <Pill tone="primary">{v.delegatedPaymentBadge}</Pill>}
+              {item.allow_any_origin && <Pill tone="muted">{v.anySiteBadge}</Pill>}
             </span>
           }
         />
@@ -605,7 +627,51 @@ export function VaultSettings() {
               </Field>
             </div>
 
-            <Field htmlFor="vault-origin" label={v.originField}>
+            {form.kind === 'payment' && (
+              <div className="grid gap-3 rounded-xl border border-(--ui-border) bg-(--ui-surface-subtle) p-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{v.delegatedPaymentLabel}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-(--ui-text-tertiary)">
+                      {v.delegatedPaymentDescription}
+                    </p>
+                  </div>
+                  <Switch
+                    aria-label={v.delegatedPaymentLabel}
+                    checked={form.delegatedPayment}
+                    onCheckedChange={checked =>
+                      setForm(f => ({
+                        ...f,
+                        delegatedPayment: checked,
+                        allowAnyOrigin: checked ? f.allowAnyOrigin : false
+                      }))
+                    }
+                  />
+                </div>
+                {form.delegatedPayment && (
+                  <div className="flex items-start justify-between gap-4 border-t border-(--ui-border) pt-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{v.allowAnyOriginLabel}</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-(--ui-text-tertiary)">
+                        {v.allowAnyOriginDescription}
+                      </p>
+                    </div>
+                    <Switch
+                      aria-label={v.allowAnyOriginLabel}
+                      checked={form.allowAnyOrigin}
+                      onCheckedChange={checked => setForm(f => ({ ...f, allowAnyOrigin: checked }))}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <Field
+              htmlFor="vault-origin"
+              label={v.originField}
+              optional={form.kind === 'payment' && form.delegatedPayment && form.allowAnyOrigin}
+              optionalLabel={v.optional}
+            >
               <Input
                 id="vault-origin"
                 inputMode="url"
