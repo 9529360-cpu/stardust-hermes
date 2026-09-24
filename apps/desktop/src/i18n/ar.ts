@@ -575,7 +575,7 @@ export const ar = defineLocale({
         sidebar: 'الشريط الجانبي فقط'
       },
       backdropTitle: 'خلفية النافذة',
-      backdropDesc: 'اختيار مقدار مزج خلفية سطح المكتب مع سطح Hermes.',
+      backdropDesc: 'اعرض صورة محلية خلف المحادثة. يمكنك اختيار أي صورة؛ وتبقى على هذا الجهاز فقط.',
       userBubbleTitle: 'فقاعة الرسالة',
       userBubbleDesc: 'مدى شفافية رسائلك. معتمة عند 0؛ يبقى الإطار فقط عند 100.',
       introSplashTitle: 'شاشة المقدمة',
