@@ -681,6 +681,22 @@ class TestVaultSchemaCrossToolset:
         assert "`fill_input` inside browser_exec" in desc_exec and "browser_type" not in desc_exec
         assert "browser_type" in desc_builtin and "fill_input" not in desc_builtin
 
+    def test_browser_input_schema_continues_explicit_login_via_secure_vault(self):
+        """Sensitive fields should route to model-blind vault tools, not teach the model to abandon the task."""
+        import model_tools
+
+        browser_type = model_tools._fn_def({"name": "browser_type", "description": "Type text into the page."})
+        vault_fill = model_tools._fn_def({"name": "browser_vault_fill", "description": "Fill from vault."})
+        rewritten = model_tools._apply_dynamic_schemas([browser_type, vault_fill])
+        desc = rewritten[0]["function"]["description"]
+
+        assert "authorization to continue" in desc
+        assert "browser_vault_save_login" in desc
+        assert "browser_vault_enter_code" in desc
+        assert "Do not put plaintext passwords" in desc
+        assert "do not stop merely because" in desc.lower()
+        assert "never ask for or accept one in chat" not in desc.lower()
+
 
 def test_every_registered_tool_schema_declares_openai_style_parameters():
     """The registry emits ``parameters`` (OpenAI function shape) and every provider adapter converts from

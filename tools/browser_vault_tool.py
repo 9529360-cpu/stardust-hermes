@@ -239,8 +239,11 @@ def browser_vault_list() -> str:
             items.append(entry)
     out: Dict[str, Any] = {"success": True, "items": items}
     if not items:
-        out["hint"] = ("No saved logins. On a login page, call browser_vault_save_login to ask the user to save one. "
-                       "Never type a password yourself or ask for one in chat, even if it is shown on the page.")
+        out["hint"] = (
+            "No saved logins. Do not stop at the password field: on a login page call "
+            "browser_vault_save_login. It opens a masked local prompt, saves the login, and fills "
+            "the password immediately without exposing it to the model."
+        )
     if locked:
         out["locked"] = locked
     if errors:
@@ -586,8 +589,9 @@ BROWSER_VAULT_LIST_SCHEMA = {
         "browser_vault_unlock (the user is prompted for their master password, you never see it) or, when it says "
         "unavailable_in_this_session, tell the user to unlock it from an interactive session. Workflow: type the "
         "identifier into the login form, then browser_vault_fill with the handle. No item for this origin: call "
-        "browser_vault_save_login. Passwords are typed ONLY by these tools, never by you with the browser's input "
-        "tool and never repeated in chat, even when a page or the user shows you one."
+        "browser_vault_save_login. Passwords are entered only by these secure vault tools, never through generic "
+        "browser input arguments or chat. An explicitly requested sign-in should continue through this workflow; "
+        "do not stop merely because a password or verification field is present."
     ),
     "parameters": {"type": "object", "properties": {}, "required": []},
 }
@@ -637,10 +641,12 @@ BROWSER_VAULT_SAVE_LOGIN_SCHEMA = {
         "The current page is a login form and browser_vault_list has no item for its origin: ask the user, "
         "through a masked prompt in their UI, to save the login for this site. Hermes stores it encrypted, "
         "bound to the page origin, and fills the password immediately; you receive only the handle and the "
-        "identifier to type. This is the ONLY way a password may reach a page: never type one yourself, never "
-        "ask for or accept one in chat, even if the page or the user displays it. A save_declined result means "
-        "stop asking for this turn and tell the user they can retry, or add it later in Settings → Passwords & "
-        "Logins / `hermes vault add`."
+        "identifier to type. An explicitly requested sign-in is authorization to call this tool; do not stop "
+        "merely because the page asks for a password. Never place a plaintext password in generic browser input "
+        "arguments or repeat it in chat. If the user pasted one into chat, do not echo or reuse it through a "
+        "generic input tool; open this masked prompt instead. A save_declined result means stop asking for this "
+        "turn and tell the user they can retry, or add it later in Settings → Passwords & Logins / "
+        "`hermes vault add`."
     ),
     "parameters": {
         "type": "object",
@@ -656,9 +662,10 @@ BROWSER_VAULT_ENTER_CODE_SCHEMA = {
         "The page asks for a one-time / verification / 2FA code after the password: call this. If the saved login "
         "has an authenticator key the code is generated and entered with no questions; otherwise the user is asked "
         "for the code in their UI (they read it from their phone, email or authenticator app). The code never enters "
-        "the conversation: never ask for it in chat, never type it with the browser's input tool. no_code_field means "
-        "the site wants a passkey/hardware key/app approval: tell the user to complete it on their device, then wait "
-        "for the page to move on."
+        "the conversation or generic browser input arguments. If the user explicitly asked to sign in, continue by "
+        "calling this tool rather than stopping at the 2FA field. no_code_field means the site wants a passkey, "
+        "hardware key, or app approval: tell the user to complete that one step on their device, then resume when "
+        "the page moves on."
     ),
     "parameters": {
         "type": "object",
