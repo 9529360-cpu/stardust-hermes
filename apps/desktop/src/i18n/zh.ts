@@ -460,10 +460,10 @@ export const zh = defineLocale({
       about: '关于',
       billing: '账单',
       notifications: '通知',
-      vault: '密码与登录'
+      vault: '保管箱'
     },
     vault: {
-      title: '密码与登录',
+      title: '保管箱',
       blurb:
         '说一句“登录 GitHub”，智能体就会代你登录。第一次遇到登录页时它会当场向你要登录信息，之后就自动完成。密码在本机加密保存并直接填入页面——模型永远看不到。',
       count: n => `已保存 ${n} 项`,
@@ -496,6 +496,12 @@ export const zh = defineLocale({
       expMonthField: '到期月份',
       expYearField: '到期年份',
       cvcField: 'CVC',
+      delegatedPaymentLabel: 'Stardust 消费卡',
+      delegatedPaymentDescription: '你明确让 Stardust 购买或付款时，可直接使用此卡，不再重复弹出填卡确认。',
+      allowAnyOriginLabel: '允许用于任意结账站点',
+      allowAnyOriginDescription: '适合专门准备的低额度、预付或虚拟卡。真实余额或发卡行限额仍是硬性消费上限。',
+      delegatedPaymentBadge: '委托支付',
+      anySiteBadge: '任意站点',
       postalField: '邮政编码',
       addressLine1Field: '地址第 1 行',
       addressLine2Field: '地址第 2 行',
