@@ -980,3 +980,40 @@
     max-width: 360px;
   }
 }
+
+/* Compact workspace: keep the conversation readable instead of allowing the
+   context stage to squeeze the transcript into a third of the window. The
+   pane stays mounted so live tools are not torn down. */
+@media (max-width: 900px) {
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-sessions'] {
+    min-width: 176px;
+    max-width: 208px;
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-context'] {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    z-index: 2;
+    width: min(86vw, 360px);
+    min-width: 0;
+    max-width: none;
+    box-shadow: -18px 0 36px color-mix(in srgb, var(--ui-bg-chrome) 55%, transparent);
+  }
+
+  :root[data-hermes-reference-shell='aurora'] [data-tree-group='grp-main'] {
+    min-width: 0;
+  }
+}
+
+/* Product copy belongs to i18n-rendered elements. CSS pseudo-content cannot
+   follow the active locale, so retain the spacing but remove shell labels. */
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']::before,
+:root[data-hermes-reference-shell='aurora']
+  [data-tour='sessions-sidebar']
+  [data-slot='sidebar-content']
+  > div:has(> div > input[type='text'])::before {
+  content: none;
+}
