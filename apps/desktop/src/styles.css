@@ -624,7 +624,7 @@
     --ui-chat-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 64%, transparent);
     --ui-sidebar-surface-background: color-mix(in srgb, var(--ui-bg-sidebar) 72%, transparent);
     --ui-editor-surface-background: color-mix(in srgb, var(--ui-bg-editor) 70%, transparent);
-    --ui-panel-surface-background: color-mix(in srgb, var(--ui-bg-panel) 70%, transparent);
+    --ui-panel-surface-background: color-mix(in srgb, var(--ui-bg-editor) 70%, transparent);
   }
 
   :root[data-stardust-window-backdrop] [data-contrib-shell],
@@ -638,7 +638,7 @@
     --ui-chat-surface-background: var(--ui-bg-chrome);
     --ui-editor-surface-background: var(--ui-bg-editor);
     --ui-sidebar-surface-background: var(--ui-bg-sidebar);
-    --ui-panel-surface-background: var(--ui-bg-panel);
+    --ui-panel-surface-background: var(--ui-bg-editor);
   }
 
   /* ── Window glass (Settings → Appearance → Window Translucency: Glass) ──
