@@ -1394,8 +1394,9 @@ Compose this skill with other Hermes skills for specific phases:
 | **`web_search`** | Literature discovery: `web_search("transformer attention mechanism 2024")` |
 | **`web_extract`** | Fetch paper content, verify citations: `web_extract("https://arxiv.org/abs/2303.17651")` |
 | **`delegate_task`** | **Parallel section drafting** — spawn isolated subagents for each section. Also for concurrent citation verification. |
-| **`todo`** | Primary state tracker across sessions. Update after every phase transition. |
-| **`memory`** | Persist key decisions across sessions: contribution framing, venue choice, reviewer feedback. |
+| **`todo`** | Session-scoped multi-step plan state. It survives compression/session restoration but is not the durable cross-session task authority. |
+| **`desktop_project` / project facts** | Persist durable project-scoped decisions such as contribution framing, venue choice, and reviewer feedback when a Project is attached. |
+| **`memory`** | Persist only cross-project lessons or user-wide conventions; do not use it as this paper project's state store. |
 | **`cronjob`** | Schedule experiment monitoring, deadline countdowns, automated arXiv checks. |
 | **`clarify`** | Ask the user targeted questions when blocked (venue choice, contribution framing). |
 | **cron `deliver:`** | Notify the user when experiments complete or drafts are ready even if they're not in chat — schedule the check as a cron job with a messaging `deliver:` target (the agent no longer has a `send_message` tool; outbound delivery is handled by cron/`hermes send`). |
@@ -1443,18 +1444,18 @@ for paper in results:
         print(bibtex)
 ```
 
-### State Management with `memory` and `todo`
+### State Management with Project facts and `todo`
 
-**`memory` tool** — persist key decisions (bounded: ~2200 chars for MEMORY.md):
+**Project facts** — persist paper-specific decisions in the attached Project, not global `MEMORY.md`. In GUI sessions use `desktop_project` with `fact_add`; from the CLI use `hermes project facts <project> add ...`. Keep `memory` for reusable cross-project lessons or user-wide conventions.
 
+```text
+desktop_project({"action":"fact_add",
+  "content":"Venue: NeurIPS 2025. Contribution: structured refinement works when the generation-evaluation gap is wide.",
+  "source_kind":"session",
+  "confidence":1.0})
 ```
-memory("add", "Paper: autoreason. Venue: NeurIPS 2025 (9 pages). 
-  Contribution: structured refinement works when generation-evaluation gap is wide.
-  Key results: Haiku 42/42, Sonnet 3/5, S4.6 constrained 2/3.
-  Status: Phase 5 — drafting Methods section.")
-```
 
-Update memory after major decisions or phase transitions. This persists across sessions.
+Update Project facts after durable decisions change; use `todo` for current execution progress.
 
 **`todo` tool** — track granular progress:
 
@@ -1468,11 +1469,11 @@ todo("update", id=1, status="completed")
 
 **Session startup protocol:**
 ```
-1. todo("list")                           # Check current task list
-2. memory("read")                         # Recall key decisions
-3. terminal("git log --oneline -10")      # Check recent commits
-4. terminal("ps aux | grep python")       # Check running experiments
-5. terminal("ls results/ | tail -20")     # Check for new results
+1. todo("list")                            # Check current task list
+2. desktop_project({"action":"fact_list"}) # Recall durable project decisions when attached
+3. terminal("git log --oneline -10")       # Check recent commits
+4. terminal("ps aux | grep python")        # Check running experiments
+5. terminal("ls results/ | tail -20")      # Check for new results
 6. Report status to user, ask for direction
 ```
 

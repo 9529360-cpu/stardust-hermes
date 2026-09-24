@@ -91,6 +91,30 @@ def _persisted_session_cwd(session: dict) -> str | None:
     return str(session.get("cwd") or "") or None  # the session's OWN dir, never _session_cwd's gateway-wide fallback
 
 
+def _session_project_id(session: dict) -> str | None:
+    """Explicit session Project id, else a one-time cwd compatibility resolution."""
+    explicit = str(session.get("project_id") or "").strip()
+    if explicit:
+        return explicit
+    cwd = _persisted_session_cwd(session)
+    if not cwd:
+        return None
+    try:
+        from pathlib import Path
+        from hermes_cli import projects_db as pdb
+
+        home = str(session.get("profile_home") or "").strip()
+        db_path = Path(home) / "projects.db" if home else None
+        with pdb.connect_closing(db_path) as conn:
+            project = pdb.project_for_path(conn, cwd)
+        if project is not None:
+            session["project_id"] = project.id
+            return project.id
+    except Exception:
+        logger.debug("failed to resolve session project from cwd", exc_info=True)
+    return None
+
+
 def _heal_dead_cwd(cwd: str) -> str:
     """Resolve a session cwd inside a now-deleted directory (e.g. a removed linked worktree, which probes to no branch
     while the sidebar folds it to the main lane): walk up to the first existing ancestor and take its common git root.
@@ -269,6 +293,7 @@ def _ensure_session_db_row(session: dict) -> bool:
             db.create_session(
                 key, source=_session_source(session), model=row_model, model_config=model_config or None,
                 parent_session_id=session.get("parent_session_id") or None, cwd=_persisted_session_cwd(session),
+                project_id=_session_project_id(session),
                 # Self-describing rows: aggregators merging several profile DBs can't rely on which file a row came
                 # from; a NULL is only repaired by the one-shot backfill.
                 # Stamp the launch profile explicitly instead of leaving NULL — NULL is exactly what the
