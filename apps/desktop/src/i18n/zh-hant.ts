@@ -523,7 +523,7 @@ export const zhHant = defineLocale({
         sidebar: '僅側邊欄'
       },
       backdropTitle: '聊天背景',
-      backdropDesc: '對話後方那張淡淡的雕像圖片。',
+      backdropDesc: '在對話後方顯示本機圖片。可選擇任意圖片；圖片只保留在這台裝置上。',
       userBubbleTitle: '訊息氣泡',
       userBubbleDesc: '你自己的訊息有多透明。0 為不透明，100 時只保留邊框。',
       introSplashTitle: '開場標識',
