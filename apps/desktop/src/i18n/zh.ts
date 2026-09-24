@@ -732,8 +732,8 @@ export const zh = defineLocale({
         window: '整个窗口',
         sidebar: '仅侧边栏'
       },
-      backdropTitle: '聊天背景',
-      backdropDesc: '在对话后方显示本机图片。可选择任意图片；图片只保留在这台设备上。',
+      backdropTitle: '整窗背景',
+      backdropDesc: '在整个 Stardust 窗口后方显示一张本机图片，覆盖侧栏、对话区和工具面板。图片只保留在这台设备上。',
       userBubbleTitle: '消息气泡',
       userBubbleDesc: '你自己的消息有多透明。0 为不透明，100 时只保留边框。',
       introSplashTitle: '开场标识',
