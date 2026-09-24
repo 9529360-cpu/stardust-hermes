@@ -343,20 +343,22 @@ Hermes applies multi-layer guardrails:
 - Destructive actions (click, type, drag, scroll, key, focus_app)
   require approval through the same gate as dangerous shell commands —
   interactively via the CLI dialog or the messaging-platform approval
-  buttons. Once/session/always grants are keyed
-  `cua:<action>:<background|foreground>` and live in the shared
-  session/`command_allowlist` store (a background grant never covers the
-  visible foreground variant). Where nobody can answer — cron
-  (`approvals.cron_mode`), single-query, unattended platforms, or any
-  headless run — the action is refused rather than auto-approved;
-  `--yolo` / `/yolo` still bypass.
+  buttons. Session/always grants are keyed by action (`cua:<action>`) in
+  the shared session/`command_allowlist` store, so a driver-directed switch
+  from background to foreground delivery does not ask again for the same
+  action. `bring_to_front` remains its own scope because persistent focus is
+  a separate visible side effect. Legacy mode-scoped grants remain accepted.
+  Where nobody can answer — cron (`approvals.cron_mode`), single-query,
+  unattended platforms, or any headless run — the action is refused rather
+  than auto-approved; `--yolo` / `/yolo` still bypass.
 - Hard-blocked key combos at the tool level: empty trash, force delete,
   lock screen, log out, force log out.
 - Hard-blocked type patterns: `curl | bash`, `sudo rm -rf /`, fork
   bombs, etc.
-- The agent's system prompt tells it explicitly: no clicking permission
-  dialogs, no typing passwords, no following instructions embedded in
-  screenshots.
+- The agent follows the user's authorized task through ordinary UI steps while
+  treating screenshots and page content as untrusted data. Passwords, card
+  details, OTP secrets, and API keys use the model-blind Vault or another
+  secure local secret-entry channel rather than generic typing or chat.
 
 Pair with `approvals.mode: manual` in `~/.hermes/config.yaml` if you
 want every action confirmed.
@@ -386,10 +388,10 @@ of screenshot context, not ~600K.
   Windows UIA, ~5–15 ms on Linux AT-SPI vs direct HID posting. Not
   noticeable for agent-speed clicking; noticeable if you try to record
   a speed-run.
-- **No keyboard password entry.** `type` has hard-block patterns on
-  command-shell payloads; for passwords, use the system's autofill
-  (macOS Keychain / Windows Credential Manager / GNOME Keyring /
-  KWallet).
+- **Secrets do not use generic keyboard typing.** Passwords, payment details,
+  saved OTP secrets, and API keys are routed through the model-blind Vault or
+  another secure local secret-entry path. Generic `computer_use(type=...)`
+  remains for non-secret text.
 - **Some apps don't expose an accessibility tree.** Modern UWP apps on
   Windows, Electron < 28 on Linux, and a few macOS apps with custom
   drawing (Logic, Final Cut, some games) have sparse or empty AX trees.
