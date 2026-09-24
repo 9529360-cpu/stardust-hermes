@@ -171,6 +171,10 @@ class VaultItemMeta:
     # ``origin`` is the first/primary one). Fill matching stays exact-origin against
     # this list — no wildcard or subdomain inference is ever derived from it.
     allowed_origins: tuple = ()
+    # Local payment-card delegation policy. These are metadata only; the card
+    # number/CVC remain inside the encrypted secret payload.
+    delegated_payment: bool = False
+    allow_any_origin: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         out = {
@@ -187,6 +191,9 @@ class VaultItemMeta:
             out["has_otp"] = True
         if len(self.allowed_origins) > 1:
             out["allowed_origins"] = list(self.allowed_origins)
+        if self.kind == "payment":
+            out["delegated_payment"] = bool(self.delegated_payment)
+            out["allow_any_origin"] = bool(self.allow_any_origin)
         return out
 
 
@@ -300,6 +307,8 @@ class VaultStore:
         label: str,
         secret: Dict[str, Any],
         origin: Optional[str] = None,
+        delegated_payment: bool = False,
+        allow_any_origin: bool = False,
     ) -> VaultItemMeta:
         """Add an item. ``secret`` is the sensitive payload (encrypted at rest).
 
@@ -309,6 +318,13 @@ class VaultStore:
         (the agent may see and type the identifier itself); only
         ``password`` stays in the encrypted secret payload. ``payment`` and
         ``address`` payloads remain fully secret.
+
+        Payment cards may opt into delegated use. ``delegated_payment`` means
+        an explicit user purchase request may use the card without a second
+        per-fill confirmation. ``allow_any_origin`` is a stronger user opt-in
+        for a dedicated low-limit/virtual card and allows checkout on the
+        current HTTPS/HTTP origin instead of binding the card to one merchant.
+        Neither flag exposes card values to the model.
         """
         if kind not in VAULT_KINDS:
             raise VaultError(f"unknown vault kind {kind!r} (expected one of {VAULT_KINDS})")
@@ -319,6 +335,12 @@ class VaultStore:
         identifier: Optional[str] = None
         identifier_type: Optional[str] = None
         secret = dict(secret)
+        delegated_payment = bool(delegated_payment)
+        allow_any_origin = bool(allow_any_origin)
+        if allow_any_origin and (kind != "payment" or not delegated_payment):
+            raise VaultError("allow_any_origin requires a delegated payment card")
+        if kind != "payment" and delegated_payment:
+            raise VaultError("delegated_payment is supported only for payment cards")
         if kind == "login":
             if not origin:
                 raise VaultError("origin is required for login items")
@@ -354,6 +376,8 @@ class VaultStore:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "identifier_type": identifier_type,
             "identifier": identifier,
+            "delegated_payment": delegated_payment if kind == "payment" else False,
+            "allow_any_origin": allow_any_origin if kind == "payment" else False,
             "secret": dict(secret),
         }
         with self._locked():
@@ -414,6 +438,8 @@ class VaultStore:
             identifier_type=rec.get("identifier_type") if identifier else None,
             identifier=identifier or None,
             has_otp=bool((rec.get("secret") or {}).get("otp_secret")),
+            delegated_payment=bool(rec.get("delegated_payment")) if rec.get("kind") == "payment" else False,
+            allow_any_origin=bool(rec.get("allow_any_origin")) if rec.get("kind") == "payment" else False,
         )
 
 
