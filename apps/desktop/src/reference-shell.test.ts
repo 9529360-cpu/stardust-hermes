@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import referenceShellCss from './reference-shell.css?raw'
 import { applyReferenceShell, REFERENCE_SHELL, shouldEnableReferenceShell } from './reference-shell'
 
 describe('reference shell activation', () => {
@@ -24,6 +26,7 @@ describe('reference shell activation', () => {
   })
 
   it('leaves palette ownership to the active theme tokens', () => {
+    const referenceShellCss = readFileSync(resolve(process.cwd(), 'src/reference-shell.css'), 'utf8')
     const colorBearingCss = referenceShellCss
       .split('\n')
       .filter(line => !line.includes('mask-image:'))
