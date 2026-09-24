@@ -1379,8 +1379,15 @@ def test_concurrent_package_builders_commit_one_delta(tmp_path):
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [executor.submit(export) for _ in range(2)]
-        for future in futures:
+    for future in futures:
+        try:
             future.result()
+        except sqlite3.OperationalError as exc:
+            assert exc.sqlite_errorcode == sqlite3.SQLITE_BUSY
+            # Interactive exports deliberately fail fast on contention. Once
+            # both contenders have settled, a later completion retries any
+            # committed-but-not-exported package without duplicating its delta.
+            store.create_and_export_package()
 
     with sqlite3.connect(database_path) as connection:
         [outbox_count] = connection.execute(
