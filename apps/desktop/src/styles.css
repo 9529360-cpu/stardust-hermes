@@ -615,6 +615,32 @@
     --ui-widget-surface-background: color-mix(in srgb, var(--ui-bg-editor) 88%, #000);
   }
 
+  /* ── Window-wide custom backdrop ────────────────────────────────────
+     The image itself is mounted once at the desktop shell. Field surfaces
+     become tinted glass so the same wallpaper is visible behind the sessions
+     rail, conversation and context/tool panes instead of stopping at the chat
+     column. Raised/masking surfaces keep their normal fills for readability. */
+  :root[data-stardust-window-backdrop] {
+    --ui-chat-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 64%, transparent);
+    --ui-sidebar-surface-background: color-mix(in srgb, var(--ui-bg-sidebar) 72%, transparent);
+    --ui-editor-surface-background: color-mix(in srgb, var(--ui-bg-editor) 70%, transparent);
+    --ui-panel-surface-background: color-mix(in srgb, var(--ui-bg-panel) 70%, transparent);
+  }
+
+  :root[data-stardust-window-backdrop] [data-contrib-shell],
+  :root[data-stardust-window-backdrop] [data-slot='sidebar-wrapper'] {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  :root[data-stardust-window-backdrop] [data-glass-opaque],
+  :root[data-stardust-window-backdrop] [data-glass-raised] {
+    --ui-chat-surface-background: var(--ui-bg-chrome);
+    --ui-editor-surface-background: var(--ui-bg-editor);
+    --ui-sidebar-surface-background: var(--ui-bg-sidebar);
+    --ui-panel-surface-background: var(--ui-bg-panel);
+  }
+
   /* ── Window glass (Settings → Appearance → Window Translucency: Glass) ──
      Set on <html> by store/translucency.ts; chat windows on a glass-capable
      OS (macOS vibrancy, Windows 11 DWM acrylic/mica). The native material
