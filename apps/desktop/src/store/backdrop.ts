@@ -5,11 +5,11 @@ import { persistBoolean, persistString, storedBoolean, storedString } from '@/li
 const KEY = 'hermes.desktop.backdrop.v1'
 const IMAGE_KEY = 'stardust.desktop.backdrop-image.v1'
 
-/** Whether the optional image backdrop renders behind the chat transcript. */
+/** Whether the optional image backdrop renders behind the desktop window. */
 export const $backdrop = atom(storedBoolean(KEY, false))
 
 /**
- * Device-local image path for the chat backdrop.
+ * Device-local image path for the window backdrop.
  *
  * Only the path is persisted. The renderer reads the bytes through Electron on
  * this machine when it paints; the image is never sent to the gateway, model,
