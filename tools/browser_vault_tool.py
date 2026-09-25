@@ -657,8 +657,9 @@ BROWSER_VAULT_FILL_SCHEMA = {
     "name": "browser_vault_fill",
     "description": (
         "Fill the CURRENT browser page from a vault handle (see browser_vault_list): a login item fills ONLY "
-        "the password field; a payment item fills card number/name/expiry/CVC; an address item fills address "
-        "fields. Values are resolved server-side and never appear in the conversation. A delegated payment card "
+        "the password field. For login items, type the identifier with the browser's input tool before this fill; "
+        "a payment item fills card number/name/expiry/CVC; an address item fills address fields. Values are resolved "
+        "server-side and never appear in the conversation. A delegated payment card "
         "is the user's standing authorization to use that card for purchases they explicitly request, so do not "
         "ask for a second card-fill confirmation. If allow_any_origin=true, the card may fill on the current "
         "checkout origin; the write is still atomically bound to that exact origin to stop navigation races. "
