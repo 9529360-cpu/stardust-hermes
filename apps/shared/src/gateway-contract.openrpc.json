@@ -31623,6 +31623,30 @@
             "default": null,
             "title": "Origin"
           },
+          "delegated_payment": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Delegated Payment"
+          },
+          "allow_any_origin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Allow Any Origin"
+          },
           "secret": {
             "anyOf": [
               {
@@ -31760,6 +31784,30 @@
             ],
             "default": null,
             "title": "Has Otp"
+          },
+          "delegated_payment": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Delegated Payment"
+          },
+          "allow_any_origin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Allow Any Origin"
           },
           "backend": {
             "title": "Backend",
