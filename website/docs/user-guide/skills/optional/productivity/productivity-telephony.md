@@ -57,7 +57,7 @@ It does **not** turn Hermes into a real-time inbound phone gateway. Inbound SMS 
 
 ## Safety rules — mandatory
 
-1. Always confirm before placing a call or sending a text.
+1. A clear current-turn request to call or text a named recipient or explicit phone number is authorization to place that call or send that text. Do not add a second confirmation just to repeat the same recipient, purpose, or message. Clarify only when the recipient, purpose, or message is materially ambiguous or the requested scope changes.
 2. Never dial emergency numbers.
 3. Never use telephony for harassment, spam, impersonation, or anything illegal.
 4. Treat third-party phone numbers as sensitive operational data:
