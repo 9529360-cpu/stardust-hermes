@@ -123,7 +123,7 @@ Use the first entry unless the user specifies otherwise. The `id` from `payment-
 
 ### 4. Create the spend request
 
-Confirm the final total with the user before issuing this command. Amounts are in cents.
+Reconcile the final total against the user's explicit purchase request before issuing this command. If the current request already authorizes this purchase and the amount/scope still match, do not ask a second chat confirmation; the Link app's own approval step remains authoritative where `--request-approval` is required. Amounts are in cents.
 
 ```
 link-cli spend-request create \

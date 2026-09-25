@@ -916,14 +916,17 @@ def _run_approval_gate(
     advice: str = "Find an alternative approach that avoids this action.",
     cron_deny_message: str = "", single_query_deny_message: str = "", unattended_deny_message: str = "",
     autoapprove_log_prefix: str, fail_closed_when_no_human: bool = False, no_human_block_message: str = "",
+    respect_smart_mode: bool = False,
 ) -> dict:
     """Shared human-approval gate for a flagged action (tool call or write): decision core for
     :func:`request_tool_approval` and the file-tool write gates.
 
     Order: yolo bypass → session-cache short-circuit → interactive/gateway/unattended branch →
     prompt → persistence. Input-shape checks (hardline, allowlist, pattern detection) are the
-    caller's job. ``fail_closed_when_no_human``: a non-interactive, non-gateway, non-cron
-    context BLOCKS instead of auto-approving, so a plugin-flagged action never runs ungated.
+    caller's job. ``respect_smart_mode`` is opt-in: generic plugin/file action gates keep their
+    historical explicit-human behavior, while callers such as computer_use may ask the shared guardian to auto-resolve
+    low-risk actions when ``approvals.mode: smart``. ``fail_closed_when_no_human``: a non-interactive, non-gateway,
+    non-cron context BLOCKS instead of auto-approving, so a plugin-flagged action never runs ungated.
     Unattended deny text is ``ctx.block_message(subject, noun, advice)`` unless the caller passes
     an explicit ``*_deny_message`` (the file-tool write gates word their own).
     """
@@ -979,6 +982,7 @@ def _run_approval_gate(
         _ACTION_GATE, command=display_target, description=description, pattern_key=pattern_key,
         pattern_keys=[pattern_key], warnings=[(pattern_key, None, False)], session_key=session_key,
         approval_callback=approval_callback, is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask,
+        smart=respect_smart_mode and approval_context._get_approval_mode() == "smart",
     )
 
 
