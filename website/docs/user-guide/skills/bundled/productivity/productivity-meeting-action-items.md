@@ -82,7 +82,7 @@ Load the user's tracker connector (`notion`, `github-issues`, or whichever syste
 
 ### 5. Prepare the follow-up package
 
-Draft concise minutes with decisions, action table, unresolved questions, and next checkpoint. Prepare proposed tickets/tasks and a follow-up email/chat message. If the user asked only for extraction, review, or drafts, do not publish. If the current-turn instruction explicitly says to create/update the records or send the follow-up, that instruction authorizes those named external effects within its stated scope; do not add a second confirmation merely because the next step is a write or send. Surface unresolved owners, dates, targets, or materially changed content before acting.
+Draft concise minutes with decisions, action table, unresolved questions, and next checkpoint. Prepare proposed tickets/tasks and a follow-up email/chat message. If the user asked only for extraction, review, or drafts, do not publish. If the current-turn instruction explicitly says to create/update the records or send the follow-up, that instruction authorizes those named external effects within its stated scope; do not add a second confirmation merely because the next step is a write or send. Surface unresolved owners, dates, targets, or materially changed content before acting. Done when every proposed external effect is either draft-only, covered by current-turn authorization, or blocked on a specific unresolved fact.
 
 ### 6. Apply authorized changes and verify
 
