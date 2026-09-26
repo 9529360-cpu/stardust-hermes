@@ -160,6 +160,137 @@ class TestMemoryManager:
         assert mgr.build_system_prompt() == ""
         assert mgr.prefetch_all("test") == ""
 
+    def test_live_privacy_gate_blocks_provider_io_and_filters_reenabled_history(self):
+        state = {"enabled": True}
+
+        class PrivacyProvider(MessagesMemoryProvider):
+            def __init__(self):
+                super().__init__(
+                    "privacy",
+                    tools=[{"name": "privacy_search", "description": "search", "parameters": {}}],
+                )
+                self.session_end_messages = []
+                self.pre_compress_messages = []
+                self._prompt_block = "provider prompt"
+                self._prefetch_result = "provider recall"
+
+            def on_session_end(self, messages):
+                self.session_end_messages.append(list(messages))
+
+            def on_pre_compress(self, messages):
+                self.pre_compress_messages.append(list(messages))
+                return ""
+
+        provider = PrivacyProvider()
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        state["enabled"] = False
+        assert mgr.build_system_prompt() == ""
+        assert mgr.prefetch_all("secret query") == ""
+        assert mgr.get_all_tool_schemas() == []
+        assert mgr.get_all_tool_names() == set()
+        assert mgr.has_tool("privacy_search") is False
+        assert "disabled by memory.enabled" in mgr.handle_tool_call("privacy_search", {})
+
+        disabled = [
+            {"role": "user", "content": "disabled interval secret"},
+            {"role": "assistant", "content": "disabled interval answer"},
+        ]
+        mgr.sync_all(
+            "disabled interval secret",
+            "disabled interval answer",
+            session_id="s1",
+            messages=disabled,
+        )
+        mgr.queue_prefetch_all("disabled queued recall", session_id="s1")
+        mgr.flush_pending(timeout=5)
+
+        assert provider.synced_turns == []
+        assert provider.prefetch_queries == []
+        assert provider.queued_prefetches == []
+
+        state["enabled"] = True
+        reenabled = disabled + [
+            {"role": "user", "content": "visible after re-enable"},
+            {"role": "assistant", "content": "visible answer"},
+        ]
+        mgr.sync_all(
+            "visible after re-enable",
+            "visible answer",
+            session_id="s1",
+            messages=reenabled,
+        )
+        mgr.flush_pending(timeout=5)
+
+        assert len(provider.synced_turns) == 1
+        forwarded = provider.synced_turns[0][3]
+        assert [row["content"] for row in forwarded] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+
+        mgr.on_pre_compress(reenabled + [{"role": "user", "content": "current turn before sync"}])
+        mgr.on_session_end(reenabled)
+
+        assert [row["content"] for row in provider.pre_compress_messages[-1]] == [
+            "visible after re-enable",
+            "visible answer",
+            "current turn before sync",
+        ]
+        assert [row["content"] for row in provider.session_end_messages[-1]] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+
+    def test_queued_sync_cancelled_by_privacy_off_is_never_backfilled(self):
+        state = {"enabled": True}
+        provider = MessagesMemoryProvider("privacy-queue")
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        queued = []
+        mgr._submit_background = lambda fn, **kwargs: queued.append(fn)
+
+        first_messages = [
+            {"role": "user", "content": "queued before privacy off"},
+            {"role": "assistant", "content": "must never reach provider"},
+        ]
+        mgr.sync_all(
+            "queued before privacy off",
+            "must never reach provider",
+            session_id="s1",
+            messages=first_messages,
+        )
+        assert len(queued) == 1
+
+        state["enabled"] = False
+        queued.pop(0)()
+        assert provider.synced_turns == []
+
+        state["enabled"] = True
+        second_messages = first_messages + [
+            {"role": "user", "content": "visible after re-enable"},
+            {"role": "assistant", "content": "visible answer"},
+        ]
+        mgr.sync_all(
+            "visible after re-enable",
+            "visible answer",
+            session_id="s1",
+            messages=second_messages,
+        )
+        assert len(queued) == 1
+        queued.pop(0)()
+
+        assert len(provider.synced_turns) == 1
+        forwarded = provider.synced_turns[0][3]
+        assert [row["content"] for row in forwarded] == [
+            "visible after re-enable",
+            "visible answer",
+        ]
+        assert all(row.get("content") != "queued before privacy off" for row in forwarded)
+
+
     def test_add_provider(self):
         mgr = MemoryManager()
         p = FakeMemoryProvider("test1")

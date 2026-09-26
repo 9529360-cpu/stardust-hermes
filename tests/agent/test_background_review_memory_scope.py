@@ -23,9 +23,17 @@ if _REPO_ROOT not in sys.path:
 import agent.background_review as bg  # noqa: E402
 
 
-def _review_agent(memory_enabled=True, user_profile_enabled=False) -> SimpleNamespace:
-    """The whitelist only reads the profile's memory flags off the fork."""
-    return SimpleNamespace(_memory_enabled=memory_enabled, _user_profile_enabled=user_profile_enabled)
+def _review_agent(
+    memory_enabled=True,
+    user_profile_enabled=False,
+    memory_persistence_enabled=True,
+) -> SimpleNamespace:
+    """The whitelist reads the master privacy posture plus per-target memory flags off the fork."""
+    return SimpleNamespace(
+        _memory_enabled=memory_enabled,
+        _user_profile_enabled=user_profile_enabled,
+        _memory_persistence_enabled=memory_persistence_enabled,
+    )
 
 
 class TestReviewToolWhitelistScope:
@@ -37,6 +45,18 @@ class TestReviewToolWhitelistScope:
     def test_memory_review_keeps_memory_tool(self):
         whitelist, _extra = bg._review_tool_whitelist(_review_agent(), None, review_memory=True)
         assert "memory" in whitelist
+
+    def test_master_memory_off_dominates_stale_target_flags(self):
+        whitelist, _extra = bg._review_tool_whitelist(
+            _review_agent(
+                memory_enabled=True,
+                user_profile_enabled=True,
+                memory_persistence_enabled=False,
+            ),
+            None,
+            review_memory=True,
+        )
+        assert "memory" not in whitelist
 
     def test_memory_disabled_profile_stays_memory_free(self):
         whitelist, _extra = bg._review_tool_whitelist(

@@ -8,6 +8,9 @@ from pathlib import Path
 
 from tools.memory_tool import (
     MemoryStore,
+    apply_memory_pending,
+    get_builtin_memory_store_flags,
+    memory_persistence_enabled,
     memory_tool,
     _scan_memory_content,
 )
@@ -409,6 +412,33 @@ class TestMemoryToolDispatcher:
         result = json.loads(memory_tool(action="add", content="test"))
         assert result["success"] is False
         assert "not available" in result["error"]
+
+
+    def test_master_privacy_blocks_live_and_staged_writes(self, store, monkeypatch):
+        config = {
+            "memory": {
+                "enabled": False,
+                "memory_enabled": True,
+                "user_profile_enabled": True,
+            }
+        }
+        monkeypatch.setattr("hermes_cli.config.load_config_readonly", lambda: config)
+
+        assert memory_persistence_enabled() is False
+        assert get_builtin_memory_store_flags(config) == (False, False)
+
+        live = json.loads(memory_tool(action="add", content="must not persist", store=store))
+        staged = apply_memory_pending(
+            {"action": "add", "target": "memory", "content": "staged must not persist"},
+            store,
+        )
+
+        assert live["success"] is False
+        assert live["memory_disabled"] is True
+        assert staged["success"] is False
+        assert staged["memory_disabled"] is True
+        assert store.memory_entries == []
+        assert not store._path_for("memory").exists()
 
 
     def test_replace_missing_content_still_distinct_error(self, store):
