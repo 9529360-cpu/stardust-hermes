@@ -41,6 +41,20 @@ export function Backdrop() {
     }
   }, [imagePath, on])
 
+  useEffect(() => {
+    const root = document.documentElement
+
+    if (!on) {
+      delete root.dataset.stardustWindowBackdrop
+    } else {
+      root.dataset.stardustWindowBackdrop = customSrc ? 'custom' : 'bundled'
+    }
+
+    return () => {
+      delete root.dataset.stardustWindowBackdrop
+    }
+  }, [customSrc, on])
+
   if (!on) {
     return null
   }
@@ -50,23 +64,27 @@ export function Backdrop() {
   return (
     <div
       aria-hidden
-      className={
-        custom
-          ? 'pointer-events-none absolute inset-0 z-2 overflow-hidden opacity-[0.34]'
-          : 'pointer-events-none absolute inset-0 z-2 opacity-[0.025] mix-blend-difference'
-      }
+      className="pointer-events-none absolute inset-0 z-[-1] overflow-hidden"
       data-custom-backdrop={custom ? 'true' : undefined}
+      data-window-backdrop=""
     >
       <img
         alt=""
         className={
           custom
             ? 'h-full w-full object-cover object-center'
-            : 'h-[160dvh] w-auto min-w-dvw object-cover object-left-top [filter:invert(var(--backdrop-invert-mul,1))]'
+            : 'h-[160dvh] w-auto min-w-dvw object-cover object-left-top opacity-[0.025] mix-blend-difference [filter:invert(var(--backdrop-invert-mul,1))]'
         }
         fetchPriority="low"
         src={customSrc ?? assetPath('ds-assets/filler-bg0.jpg')}
       />
+      {custom && (
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[color-mix(in_srgb,var(--ui-bg-chrome)_14%,transparent)]"
+          data-window-backdrop-tint=""
+        />
+      )}
     </div>
   )
 }
