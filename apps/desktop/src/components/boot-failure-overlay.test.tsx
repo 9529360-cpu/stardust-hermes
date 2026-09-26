@@ -147,19 +147,15 @@ describe('BootFailureOverlay', () => {
     }
   })
 
-  it('recovers a cloud connection through the portal cascade instead of native OAuth', async () => {
+  // Stardust no longer ships a built-in "Hermes Cloud" (Nous Portal
+  // discovery/login) mode. A connection an older install saved under
+  // mode: 'cloud' is remote-shaped already (a gateway URL + OAuth), so its
+  // reauth recovers through the same generic embedded OAuth flow as any
+  // other remote gateway — no `desktop.cloud` portal-session bridge call.
+  it('recovers a saved cloud-mode connection through generic OAuth, not a portal cascade', async () => {
     const gatewayUrl = 'https://agent-1.agents.nousresearch.com'
     const logout = vi.fn().mockResolvedValue({ ok: true, connected: false })
-    const nativeLogin = vi.fn().mockResolvedValue({ ok: true, connected: false })
-    const cloudStatus = vi.fn().mockResolvedValue({ portalBaseUrl: 'https://portal.nousresearch.com', signedIn: false })
-
-    const cloudLogin = vi.fn().mockResolvedValue({
-      ok: true,
-      portalBaseUrl: 'https://portal.nousresearch.com',
-      signedIn: true
-    })
-
-    const cloudAgentSignIn = vi.fn().mockResolvedValue({ baseUrl: gatewayUrl, connected: false })
+    const nativeLogin = vi.fn().mockResolvedValue({ ok: true, connected: true })
 
     const restore = stubDesktop(
       {
@@ -171,7 +167,6 @@ describe('BootFailureOverlay', () => {
         remoteUrl: gatewayUrl
       },
       {
-        cloud: { status: cloudStatus, login: cloudLogin, agentSignIn: cloudAgentSignIn },
         oauthLoginConnectionConfig: nativeLogin,
         oauthLogoutConnectionConfig: logout,
         probeConnectionConfig: vi.fn().mockResolvedValue({ providers: [{ id: 'nous', type: 'oauth' }] })
@@ -182,11 +177,9 @@ describe('BootFailureOverlay', () => {
       render(<BootFailureOverlay />)
       fireEvent.click(await screen.findByRole('button', { name: /sign in/i }))
 
-      await waitFor(() => expect(cloudAgentSignIn).toHaveBeenCalledWith(gatewayUrl))
+      await waitFor(() => expect(nativeLogin).toHaveBeenCalledWith(gatewayUrl))
       expect(logout).toHaveBeenCalledWith(gatewayUrl)
-      expect(cloudStatus).toHaveBeenCalledTimes(1)
-      expect(cloudLogin).toHaveBeenCalledTimes(1)
-      expect(nativeLogin).not.toHaveBeenCalled()
+      expect((window.hermesDesktop as any).cloud).toBeUndefined()
     } finally {
       restore()
     }
