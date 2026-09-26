@@ -63,13 +63,17 @@ def load_on_disk_store() -> "MemoryStore":
     return store
 
 
-def _gate_or_stage(summary: str, detail: str, payload: Dict[str, Any]) -> Optional[str]:
+def _gate_or_stage(
+    summary: str, detail: str, payload: Dict[str, Any], store: "MemoryStore"
+) -> Optional[str]:
     """JSON tool-result string when the write must NOT proceed (blocked or staged
     for approval), None to proceed. Fails open if the gate module can't load."""
     try:
         from tools import write_approval as wa
     except Exception:
         return None
+    payload = dict(payload)
+    payload["_reset_generation"] = store.reset_generation(payload.get("target", "memory"))
     decision = wa.evaluate_gate(wa.MEMORY, inline_summary=summary, inline_detail=detail)
     if decision.allow:
         return None
@@ -98,16 +102,28 @@ def _batch_op_line(op: Dict[str, Any]) -> str:
     return f"- replace: {old} -> {content}" if act == "replace" else f"- {act}: {content}"
 
 
-def _apply_write_gate(action: str, target: str, content: Optional[str], old_text: Optional[str],
-                      operations: Optional[List[Dict[str, Any]]] = None) -> Optional[str]:
+def _apply_write_gate(
+    action: str,
+    target: str,
+    content: Optional[str],
+    old_text: Optional[str],
+    store: "MemoryStore",
+    operations: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[str]:
     """Gate one mutating op, or (``operations`` set) a whole batch as a single unit."""
     label = "user profile" if target == "user" else "memory"
     if operations is not None:
-        return _gate_or_stage(f"apply {len(operations)} op(s) to {label}",
-                              "\n".join(_batch_op_line(op) for op in operations),
-                              {"action": "batch", "target": target, "operations": operations})
-    return _gate_or_stage(*_STORE_ACTIONS[action][1](label, content, old_text),
-                          {"action": action, "target": target, "content": content, "old_text": old_text})
+        return _gate_or_stage(
+            f"apply {len(operations)} op(s) to {label}",
+            "\n".join(_batch_op_line(op) for op in operations),
+            {"action": "batch", "target": target, "operations": operations},
+            store,
+        )
+    return _gate_or_stage(
+        *_STORE_ACTIONS[action][1](label, content, old_text),
+        {"action": action, "target": target, "content": content, "old_text": old_text},
+        store,
+    )
 
 
 def _validate_single_op(store, action, target, content, old_text) -> Optional[str]:
@@ -131,7 +147,9 @@ def _validate_single_op(store, action, target, content, old_text) -> Optional[st
 _BG_DELETE_ACTIONS = ("replace", "remove")
 
 
-def _background_delete_gate(action, operations, target="memory", content=None, old_text=None) -> Optional[str]:
+def _background_delete_gate(
+    action, operations, target="memory", content=None, old_text=None, store: Optional["MemoryStore"] = None
+) -> Optional[str]:
     """Fail-closed operation gate for unattended background-review forks (#105921): ``add``
     stays available (it is all any review prompt asks for), while ``replace``/``remove`` —
     single or inside a batch — are never applied unattended. The op is staged in the pending
@@ -149,6 +167,8 @@ def _background_delete_gate(action, operations, target="memory", content=None, o
     payload = ({"action": "batch", "target": target, "operations": operations}
                if operations is not None else
                {"action": action, "target": target, "content": content, "old_text": old_text})
+    if store is not None:
+        payload["_reset_generation"] = store.reset_generation(target)
     detail = ("; ".join(_batch_op_line(op) for op in operations) if operations is not None
               else _batch_op_line({"action": action, "content": content, "old_text": old_text}))
     try:
@@ -189,19 +209,19 @@ def memory_tool(action: str = None, target: str = "memory", content: str = None,
     if operations:
         if not isinstance(operations, list):
             return tool_error("operations must be a list of {action, content?, old_text?} objects.", success=False)
-        denied = _background_delete_gate(action, operations, target)
+        denied = _background_delete_gate(action, operations, target, store=store)
         if denied is not None:
             return denied
         # Approval gate: stages (background/gateway) or prompts inline (CLI); off by default.
-        gate_result = _apply_write_gate("batch", target, None, None, operations)
+        gate_result = _apply_write_gate("batch", target, None, None, store, operations)
         if gate_result is not None:
             return gate_result
         return json.dumps(store.apply_batch(target, operations), ensure_ascii=False)
     if action not in _STORE_ACTIONS:
         return tool_error(f"Unknown action '{action}'. Use: add, replace, remove", success=False)
     invalid = (_validate_single_op(store, action, target, content, old_text)
-               or _background_delete_gate(action, None, target, content, old_text)
-               or _apply_write_gate(action, target, content, old_text))
+               or _background_delete_gate(action, None, target, content, old_text, store)
+               or _apply_write_gate(action, target, content, old_text, store))
     if invalid is not None:
         return invalid
     return json.dumps(_STORE_ACTIONS[action][0](store, target, content, old_text), ensure_ascii=False)
@@ -285,11 +305,24 @@ def _memory_target_error(store: "MemoryStore", target: str) -> Optional[Dict[str
 
 
 def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[str, Any]:
-    """Replay a staged write against the store, bypassing the gate (/memory approve)."""
+    """Replay a staged write against the store, bypassing the gate (/memory approve).
+
+    A staged write carries the reset generation of the session that proposed it.
+    Once a reset happens, older or legacy unstamped proposals fail closed instead
+    of re-populating facts the user explicitly forgot.
+    """
     action, target = payload.get("action"), payload.get("target", "memory")
     target_error = _memory_target_error(store, target)
     if target_error is not None:
         return target_error
+    current_generation = store.reset_generation(target)
+    if current_generation is None:
+        return store._reset_conflict(target)
+    if "_reset_generation" in payload:
+        if payload.get("_reset_generation") != current_generation:
+            return store._reset_conflict(target)
+    elif current_generation:
+        return store._reset_conflict(target)
     if action == "batch":
         return store.apply_batch(target, payload.get("operations") or [])
     if action not in _STORE_ACTIONS:

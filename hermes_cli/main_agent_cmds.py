@@ -32,24 +32,37 @@ def _cmd_memory_on():
 
 
 def _cmd_memory_reset(args):
-    from hermes_constants import get_hermes_home, display_hermes_home
-    mem_dir = get_hermes_home() / "memories"
+    from hermes_constants import display_hermes_home
+    from tools.memory_tool import MemoryStore
+
     target = getattr(args, "target", "all")
-    files_to_reset = []
+    targets = []
     if target in {"all", "memory"}:
-        files_to_reset.append(("MEMORY.md", "agent notes"))
+        targets.append(("memory", "MEMORY.md", "agent notes"))
     if target in {"all", "user"}:
-        files_to_reset.append(("USER.md", "user profile"))
+        targets.append(("user", "USER.md", "user profile"))
 
-    existing = [(f, desc) for f, desc in files_to_reset if (mem_dir / f).exists()]
-    if not existing:
-        print(f"\n  Nothing to reset — no memory files found in {display_hermes_home()}/memories/\n")
-        return
+    existing = []
+    for key, fname, desc in targets:
+        path = MemoryStore._path_for(key)
+        if path.exists() or path.is_symlink():
+            existing.append((key, fname, desc, path))
 
-    print("\n  This will permanently erase the following memory files:")
-    for f, desc in existing:
-        size = (mem_dir / f).stat().st_size
-        print(f"    ◆ {f} ({desc}) — {size:,} bytes")
+    if existing:
+        print("\n  This will permanently erase the following built-in memory files:")
+        for _key, fname, desc, path in existing:
+            try:
+                size = path.stat().st_size
+                size_text = f" — {size:,} bytes"
+            except OSError:
+                size_text = ""
+            print(f"    ◆ {fname} ({desc}){size_text}")
+    else:
+        print(
+            "\n  No built-in memory files are currently present. "
+            "Reset will still advance the forget generation so stale sessions "
+            "and pre-reset staged writes cannot restore old memory."
+        )
 
     if not getattr(args, "yes", False):
         try:
@@ -61,11 +74,25 @@ def _cmd_memory_reset(args):
             print("  Cancelled.\n")
             return
 
-    for f, desc in existing:
-        (mem_dir / f).unlink()
-        print(f"  ✓ Deleted {f} ({desc})")
+    completed = []
+    for key, fname, desc in targets:
+        try:
+            existed = MemoryStore.reset_target(key)
+        except (OSError, RuntimeError) as exc:
+            suffix = f" Already reset: {', '.join(completed)}." if completed else ""
+            print(f"\n  ✗ Could not reset {fname}: {exc}.{suffix}\n", file=sys.stderr)
+            raise SystemExit(1) from exc
+        completed.append(fname)
+        if existed:
+            print(f"  ✓ Deleted {fname} ({desc})")
+        else:
+            print(f"  ✓ Advanced forget boundary for {fname} ({desc}); no file bytes were present")
 
-    print("\n  Memory reset complete. New sessions will start with a blank slate.")
+    print(
+        "\n  Memory reset complete. Existing sessions refresh built-in memory on their "
+        "next turn; pre-reset writes cannot restore forgotten entries."
+    )
+    print("  Start a new session now if you want the old prompt snapshot gone immediately.")
     print(f"  Files were in: {display_hermes_home()}/memories/\n")
 
 
