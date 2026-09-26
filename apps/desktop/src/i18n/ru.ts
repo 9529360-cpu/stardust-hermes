@@ -2219,7 +2219,8 @@ export const ru = defineLocale({
     nameLabel: 'Имя',
     cloneFrom: 'Клонировать из',
     cloneFromNone: 'Нет (пустой)',
-    cloneFromDesc: 'Копирует настройки, навыки и SOUL.md из выбранного исходного профиля.',
+    cloneFromDesc:
+      'Копирует настройки, подключённые модели и API-ключи, навыки и SOUL.md из выбранного профиля — повторно подключать их не придётся.',
     cloneFromDefault: 'Клонировать из профиля по умолчанию',
     cloneFromDefaultDesc: 'Скопируйте настройки, навыки и SOUL.md из вашего профиля по умолчанию.',
     invalidName: hint => `Некорректное имя. ${hint}`,

@@ -2173,7 +2173,7 @@ export const zhHant = defineLocale({
     nameLabel: '名稱',
     cloneFrom: '複製來源',
     cloneFromNone: '無（空白）',
-    cloneFromDesc: '從選取的來源設定檔複製設定、技能和 SOUL.md。',
+    cloneFromDesc: '從選取的設定檔複製設定、已連接的模型與 API Key、技能以及 SOUL.md——不需要重新連接。',
     cloneFromDefault: '從預設設定檔複製設定',
     cloneFromDefaultDesc: '從您的預設設定檔複製設定、技能和 SOUL.md。',
     invalidName: hint => `設定檔名稱無效。${hint}`,

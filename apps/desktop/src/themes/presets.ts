@@ -331,6 +331,18 @@ export const nousAltTheme: DesktopTheme = {
 }
 
 /**
+ * Stardust — the product's own identity: warm paper and ink in light, deep
+ * indigo in dark, one gold accent throughout. First-party, hand-authored;
+ * do not re-derive it from a marketplace theme.
+ */
+export const stardustTheme: DesktopTheme = {
+  name: 'stardust',
+  label: 'Stardust',
+  description: 'Warm paper and ink, one gold accent',
+  ...THEME_PRESET_PALETTES.stardust
+}
+
+/**
  * Midnight — deep blue-violet, near-monotone. Dark only: it has no light
  * palette because the whole idea is the dark end of the spectrum.
  */
@@ -389,6 +401,7 @@ export const slateTheme: DesktopTheme = {
 
 export const BUILTIN_THEMES: Record<string, DesktopTheme> = {
   nous: nousTheme,
+  stardust: stardustTheme,
   github: githubTheme,
   catppuccin: catppuccinTheme,
   everforest: everforestTheme,

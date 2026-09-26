@@ -1959,7 +1959,8 @@ export const ja = defineLocale({
     nameLabel: '名前',
     cloneFrom: '複製元',
     cloneFromNone: 'なし（空）',
-    cloneFromDesc: '選択したプロファイルから設定、スキル、SOUL.md をコピーします。',
+    cloneFromDesc:
+      '選択したプロファイルから設定、接続済みのモデルと API キー、スキル、SOUL.md をコピーします。再度接続し直す必要はありません。',
     cloneFromDefault: 'デフォルトプロファイルから設定を複製',
     cloneFromDefaultDesc: 'デフォルトプロファイルから設定、スキル、SOUL.md をコピーします。',
     invalidName: hint => `無効なプロファイル名。${hint}`,

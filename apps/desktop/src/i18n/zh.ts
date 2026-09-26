@@ -2762,7 +2762,7 @@ export const zh = defineLocale({
     nameLabel: '名称',
     cloneFrom: '克隆来源',
     cloneFromNone: '无（空白）',
-    cloneFromDesc: '从选中的来源配置档案复制配置、技能和 SOUL.md。',
+    cloneFromDesc: '从选中的档案复制配置、已连接的模型和 API Key、技能以及 SOUL.md——不需要重新连接。',
     cloneFromDefault: '从默认档案克隆',
     cloneFromDefaultDesc: '从你的默认配置档案复制配置、技能和 SOUL.md。',
     invalidName: hint => `名称无效。${hint}`,

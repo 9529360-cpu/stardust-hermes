@@ -2555,7 +2555,7 @@ export const en: Translations = {
     nameLabel: 'Name',
     cloneFrom: 'Clone from',
     cloneFromNone: 'None (blank)',
-    cloneFromDesc: 'Copies config, skills, and SOUL.md from the selected source profile.',
+    cloneFromDesc: "Copies config, connected models and API keys, skills, and SOUL.md from the selected profile — you won't need to reconnect them.",
     cloneFromDefault: 'Clone from default',
     cloneFromDefaultDesc: 'Copy config, skills, and SOUL.md from your default profile.',
     invalidName: hint => `Invalid name. ${hint}`,
