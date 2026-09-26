@@ -558,7 +558,9 @@ def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False):
             return
         from hermes_cli.banner import _github_compare_behind
         # counted == 0 means local-ahead, not behind; None means the API could not count.
-        _print_update_check_result(_github_compare_behind(head_sha, target_sha), compare_branch)
+        repo_slug = _remote_repo_slug(git_cmd, compare_branch.split("/", 1)[0])
+        behind = _github_compare_behind(head_sha, target_sha, repo_slug) if repo_slug else None
+        _print_update_check_result(behind, compare_branch)
         return
 
     rev_result = _git_run(git_cmd, ["rev-list", f"HEAD..{compare_branch}", "--count"], check=True)
@@ -580,6 +582,19 @@ def _is_shallow_checkout(git_cmd) -> bool:
 def _tip_shas(git_cmd, target_ref: str) -> tuple[str, str]:
     """``(HEAD sha, <target_ref> sha)`` as printed by rev-parse ("" when unresolvable)."""
     return tuple(_git_run(git_cmd, ["rev-parse", ref]).stdout.strip() for ref in ("HEAD", target_ref))
+
+
+def _remote_repo_slug(git_cmd, remote_name: str) -> str | None:
+    """GitHub ``owner/repo`` for a configured remote, or None (unset / not GitHub).
+
+    The compare API is repo-scoped, so callers must resolve THIS checkout's actual
+    remote rather than assuming a fixed repo — ``upstream`` and ``origin`` can each
+    point anywhere (a fork's ``origin`` is not Stardust's canonical repo).
+    """
+    from hermes_cli.banner import _canonical_github_remote
+    url = _git_run(git_cmd, ["remote", "get-url", remote_name]).stdout.strip()
+    canonical = _canonical_github_remote(url)
+    return canonical.removeprefix("github.com/") if canonical.startswith("github.com/") else None
 
 
 def _print_update_check_result(behind: int | None, compare_branch: str) -> None:
@@ -927,7 +942,8 @@ def _prepare_checkout_for_update(
     apply_is_shallow = _is_shallow_checkout(git_cmd)
     if commit_count > 0 and apply_is_shallow:
         from hermes_cli.banner import _github_compare_behind
-        counted = _github_compare_behind(*_tip_shas(git_cmd, f"origin/{branch}"))
+        repo_slug = _remote_repo_slug(git_cmd, "origin")
+        counted = _github_compare_behind(*_tip_shas(git_cmd, f"origin/{branch}"), repo_slug) if repo_slug else None
         # counted == 0 means local-ahead: falls through to the up-to-date path.
         commit_count = counted if counted is not None else -1
 
