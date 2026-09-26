@@ -1061,6 +1061,50 @@ class TestDiscoverAndRegister:
             for record in caplog.records
         )
 
+    def test_lazy_cache_matches_live_native_utility_collision_policy(self, caplog):
+        """Lazy cache registration must resolve native/utility collisions exactly like live discovery."""
+        from tools.mcp_tool_registration import _register_from_cache_sync
+        from tools.mcp_tool_schema import _build_utility_schemas
+        from tools.registry import ToolRegistry
+
+        entry = {
+            "tools": [
+                {
+                    "name": "read_resource",
+                    "description": "Native read-resource tool",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                    },
+                },
+                {
+                    "name": "safe_tool",
+                    "description": "Safe tool",
+                    "inputSchema": {"type": "object", "properties": {}},
+                },
+            ],
+            "utility_tools": [
+                row for row in _build_utility_schemas("srv")
+                if row["handler_key"] == "read_resource"
+            ],
+        }
+        registry = ToolRegistry()
+
+        with patch("tools.registry.registry", registry), \
+             patch("tools.mcp_tool_registration._track_mcp_tool_server"), \
+             caplog.at_level(logging.INFO, logger="tools.mcp_tool"):
+            registered = _register_from_cache_sync("srv", {}, entry)
+
+        assert "mcp__srv__read_resource" in registered
+        assert "mcp__srv__safe_tool" in registered
+        native = registry.get_entry("mcp__srv__read_resource")
+        assert native is not None
+        assert native.description == "Native read-resource tool"
+        assert any(
+            "keeping the native tool and dropping the utility" in record.message
+            for record in caplog.records
+        )
+
 # ---------------------------------------------------------------------------
 # MCPServerTask (run / start / shutdown)
 # ---------------------------------------------------------------------------
@@ -3217,19 +3261,27 @@ class TestRedirectHeaderStripper:
         )
         return response, next_request
 
-    def test_default_strips_only_authorization(self):
+    def test_default_strips_credentials_but_keeps_non_secret_config_headers(self):
         import httpx
 
         from tools.mcp_tool_errors import _make_redirect_header_stripper
 
         hook = _make_redirect_header_stripper(
-            httpx.URL("https://origin.example.test/mcp")
+            httpx.URL("https://origin.example.test/mcp"),
+            configured_header_names={"x-api-key", "x-tenant"},
         )
         response, next_request = self._make_response(
-            {"Authorization": "Bearer x", "X-Tenant": "t"}
+            {
+                "Authorization": "Bearer x",
+                "Proxy-Authorization": "Basic y",
+                "X-Api-Key": "secret",
+                "X-Tenant": "t",
+            }
         )
         asyncio.run(hook(response))
         assert "authorization" not in next_request.headers
+        assert "proxy-authorization" not in next_request.headers
+        assert "x-api-key" not in next_request.headers
         assert next_request.headers["x-tenant"] == "t"
 
     def test_strict_strips_configured_headers_cross_origin(self):

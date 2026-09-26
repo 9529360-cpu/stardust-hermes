@@ -252,7 +252,23 @@ async def auth_mcp_server(name: str, request: Request, profile: Optional[str] = 
         if any(f.server_name == name and f.hermes_home == flow_home for f in live):
             raise HTTPException(status_code=409, detail=f"MCP OAuth for '{name}' is already in progress")
         _mcp_oauth_flows[flow_id] = flow
-    threading.Thread(target=_run_dashboard_mcp_oauth, args=(flow, cfg), daemon=True, name=f"mcp-oauth-{name}").start()
+    try:
+        threading.Thread(
+            target=_run_dashboard_mcp_oauth,
+            args=(flow, cfg),
+            daemon=True,
+            name=f"mcp-oauth-{name}",
+        ).start()
+    except Exception as exc:
+        # Registration happens before the worker starts so duplicate/capacity checks are atomic.
+        # If the OS refuses the thread, roll that reservation back immediately: there is no
+        # worker that can ever retire it, and leaving it behind makes every retry 409 until TTL.
+        flow.mark_error("MCP OAuth worker could not start")
+        with _mcp_oauth_flows_lock:
+            if _mcp_oauth_flows.get(flow_id) is flow:
+                _mcp_oauth_flows.pop(flow_id, None)
+        _log.exception("Failed to start dashboard MCP OAuth worker for %s", name)
+        raise HTTPException(status_code=503, detail="Unable to start MCP OAuth worker") from exc
     try:
         await flow.wait_for_authorization_url(timeout=30)
     except Exception as exc:

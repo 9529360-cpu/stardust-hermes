@@ -17,7 +17,7 @@ from hermes_cli.config import (
 )
 from hermes_cli.colors import Colors, color
 from hermes_constants import display_hermes_home
-from hermes_cli.mcp_security import validate_mcp_server_entry
+from hermes_cli.mcp_security import redact_mcp_url_userinfo, validate_mcp_server_entry
 from tools.mcp_tool_config import _ENV_VAR_PATTERN
 from tools.mcp_tool_common import _env_ref_name
 
@@ -712,7 +712,7 @@ def cmd_mcp_list(args=None):
 
     for name, cfg in servers.items():
         if "url" in cfg:
-            transport = cfg["url"]
+            transport = redact_mcp_url_userinfo(cfg["url"])
         elif "command" in cfg:
             transport = cfg["command"]
             cmd_args = cfg.get("args", [])
@@ -767,7 +767,7 @@ def cmd_mcp_test(args):
     print()
     print(color(f"  Testing '{name}'...", Colors.CYAN))
     if "url" in cfg:
-        _info(f"Transport: HTTP → {cfg['url']}")
+        _info(f"Transport: HTTP → {redact_mcp_url_userinfo(cfg['url'])}")
     else:
         _info(f"Transport: stdio → {cfg.get('command', '?')}")
 

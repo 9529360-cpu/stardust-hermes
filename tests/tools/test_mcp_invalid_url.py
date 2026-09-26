@@ -62,6 +62,22 @@ class TestInvalidUrlsRejected:
             _validate_remote_mcp_url("ctx", 8080)
 
 
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://alice:secret@example.com/mcp",
+            "https://alice@example.com/mcp",
+            "https://:secret@example.com/mcp",
+        ],
+    )
+    def test_embedded_credentials_rejected_without_echoing_secret(self, url):
+        with pytest.raises(InvalidMcpUrlError) as exc_info:
+            _validate_remote_mcp_url("private", url)
+        message = str(exc_info.value)
+        assert "embedded URL credentials are not allowed" in message
+        assert "secret" not in message
+        assert "alice@" not in message
+
     def test_error_mentions_server_name(self):
         # So users can find the bad entry when there are multiple configured.
         with pytest.raises(InvalidMcpUrlError, match="my-weird-server"):

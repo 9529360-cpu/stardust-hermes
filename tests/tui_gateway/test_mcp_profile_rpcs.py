@@ -362,6 +362,30 @@ def test_default_profile_add_when_profile_omitted(hermes_root):
     )
 
 
+def test_test_redacts_probe_errors_before_returning_them_over_rpc(hermes_root, monkeypatch):
+    import hermes_cli.mcp_config as mcp_config
+
+    _result(
+        _call(
+            "mcp.servers.add",
+            {"profile": "work", "name": "secret-probe", "config": {"url": "https://mcp.example.com"}},
+        )
+    )
+    secret = "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789"
+
+    def fake_probe(*_args, **_kwargs):
+        raise RuntimeError(
+            f"request failed with headers {{'Authorization': 'Bearer {secret}', 'X-Api-Key': '{secret}'}}"
+        )
+
+    monkeypatch.setattr(mcp_config, "_probe_single_server", fake_probe)
+    result = _result(_call("mcp.servers.test", {"profile": "work", "name": "secret-probe"}))
+
+    assert result["ok"] is False
+    assert secret not in str(result)
+    assert "***" in result["error"]
+
+
 def test_test_resolves_env_refs_from_requested_profile_secret_scope(hermes_root, monkeypatch):
     """``mcp.servers.test`` for a secondary must expand its ``${VAR}`` header from THAT profile's
     secret scope, not the launch process's ``os.environ`` (the default profile's value) — the

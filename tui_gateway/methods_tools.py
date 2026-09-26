@@ -1311,7 +1311,11 @@ def _(rid, params: dict) -> dict:
         tools = mc._probe_single_server(name, cfg, details=details)
         token_present = mc._oauth_tokens_present(name) if needs_oauth_token else True
     except Exception as exc:
-        return failure(str(exc), needs_oauth_token, mc._oauth_tokens_present(name) if needs_oauth_token else None)
+        return failure(
+            mc.redact_mcp_probe_text(exc),
+            needs_oauth_token,
+            mc._oauth_tokens_present(name) if needs_oauth_token else None,
+        )
     if not token_present:
         return failure("OAuth authentication required — no token found.", True, False)
     return _ok(rid, {
