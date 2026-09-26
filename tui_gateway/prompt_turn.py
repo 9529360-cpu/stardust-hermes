@@ -962,8 +962,13 @@ def _run_prompt_submit(
             # still run its turn, but its stamp stays (#106459).
             if registered is session:
                 _reopen_routed_session_row(routing_db, sid, session)
-            session["_run_thread"] = run_thread
+            # Start before publishing: a reader (e.g. compute_host._run_real_turn) that observes
+            # this thread via `_run_thread` must never see one that has not actually begun yet —
+            # `is_alive()` is False both before `start()` and after the thread finishes, so
+            # publishing the handle first would let a reader mistake "not started" for "already
+            # done" and end the turn early.
             run_thread.start()
+            session["_run_thread"] = run_thread
     if not can_start:
         with session["history_lock"]:
             session["running"] = False

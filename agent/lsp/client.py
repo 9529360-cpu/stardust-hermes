@@ -326,7 +326,22 @@ class LSPClient:
             for t in live:
                 t.cancel()
             await asyncio.gather(*live, return_exceptions=True)
-            if proc is None or proc.returncode is not None:
+            if proc is None:
+                return
+            if proc.returncode is None:
+                # The reader loop can call this the instant the child exits (e.g. a crashing
+                # server), racing asyncio's own exit bookkeeping: the child watcher reaps the pid
+                # on its own thread and only updates ``Process.returncode`` via a callback
+                # scheduled back onto the loop. If that callback hasn't landed yet, ``returncode``
+                # reads None even though the pid is already gone — and once the OS hands a just-
+                # reaped pid to an unrelated process, terminate()/kill() below would signal that
+                # stranger instead of our (already-dead) child. Give the callback one short,
+                # bounded chance to land before deciding the process is still alive.
+                try:
+                    await asyncio.wait_for(asyncio.shield(proc.wait()), timeout=0.05)
+                except asyncio.TimeoutError:
+                    pass
+            if proc.returncode is not None:
                 return
             try:
                 proc.terminate()
