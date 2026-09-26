@@ -38,4 +38,15 @@ if (typeof window !== 'undefined') {
       persistString(KEY, String(value))
     }
   })
+
+  // Cross-window sync (same pattern as store/translucency, the lever this one
+  // explicitly mirrors): each desktop window is its own renderer with its own
+  // copy of this atom, seeded once at load — without this, dragging the lever
+  // in one window left every other open window's bubbles at the old fill
+  // until reloaded.
+  window.addEventListener('storage', event => {
+    if (event.key === KEY) {
+      $userBubbleTransparency.set(clampIntensity(storedString(KEY)))
+    }
+  })
 }
