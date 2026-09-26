@@ -81,6 +81,7 @@ def _scrub_local_state(conn: sqlite3.Connection) -> None:
                current_run_id       = NULL,
                last_heartbeat_at    = NULL,
                session_id           = NULL,
+               assistant_owner_key   = NULL,
                project_id           = NULL,
                consecutive_failures = 0,
                last_failure_error   = NULL
