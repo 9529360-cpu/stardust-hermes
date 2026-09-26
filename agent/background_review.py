@@ -931,9 +931,28 @@ def build_cache_parity_fork(
         _warn_ignored_reasoning_effort(agent, task_cfg)
     review_agent = AIAgent(**_fork_init_kwargs(agent, _rt, _routed, max_iterations, task_cfg))
     review_agent._memory_write_origin = review_agent._memory_write_context = write_origin
-    review_agent._memory_store = agent._memory_store
-    review_agent._memory_enabled = agent._memory_enabled
-    review_agent._user_profile_enabled = agent._user_profile_enabled
+    # The fork normally reuses the parent's built-in store for cache parity, but privacy
+    # changes can happen while the parent is mid-turn. Resolve the master live: OFF must
+    # not inherit old MEMORY.md/USER.md bytes or advertise a stale memory tool surface.
+    from tools.memory_tool import memory_persistence_enabled
+    _memory_master_on = memory_persistence_enabled(fail_closed=True)
+    _parent_memory_master = bool(getattr(agent, "_memory_persistence_enabled", True))
+    review_agent._memory_persistence_enabled = _memory_master_on
+    if _memory_master_on and _parent_memory_master:
+        # Stable ON state: preserve parent cache/store identity exactly.
+        review_agent._memory_store = agent._memory_store
+        review_agent._memory_enabled = agent._memory_enabled
+        review_agent._user_profile_enabled = agent._user_profile_enabled
+    elif not _memory_master_on:
+        # OFF is fail-closed even if the constructor/parent carried stale state.
+        review_agent._memory_store = None
+        review_agent._memory_enabled = False
+        review_agent._user_profile_enabled = False
+        from agent.memory_manager import refresh_memory_tool_surface
+        refresh_memory_tool_surface(review_agent, enabled=False)
+    # OFF -> ON transition: keep the fork constructor's current-config memory
+    # state. Copying the stale parent's None/False state here would create a
+    # dead advertised memory surface until the parent itself is rebuilt.
     review_agent._memory_nudge_interval = review_agent._skill_nudge_interval = 0
     # _skip_mcp_refresh: the between-turns MCP refresh would add late-connecting MCP tools and
     # break tools[] parity. PERSISTENCE ISOLATION (curator-takeover root cause): sharing the
@@ -956,8 +975,11 @@ def build_cache_parity_fork(
     # model the parent's cached prompt is for the wrong model/cache key and would miss anyway, so let the
     # routed fork build its own.
     if not _routed:
-        review_agent._cached_system_prompt = agent._cached_system_prompt
-        review_agent.session_start = agent.session_start
+        # A live master transition makes the parent's cached prompt privacy-stale. Take
+        # one cold review request instead of copying bytes that may still contain memory.
+        if _parent_memory_master == _memory_master_on:
+            review_agent._cached_system_prompt = agent._cached_system_prompt
+            review_agent.session_start = agent.session_start
         # Cache-scope parity (#109964): the fork shares the parent's physical session_id and
         # byte-identical prefix, but is _persist_disabled (declared scope fails closed) and
         # _session_db=None (lineage walk skipped) — so BOTH cache-identity resolvers keyed it
@@ -974,7 +996,8 @@ def build_cache_parity_fork(
         # _conversation_root_id() falls back to the parent's PHYSICAL id, so after a compression
         # rotation the review's usage was attributed to a different conversation than its parent.
         review_agent._cached_conversation_root = agent._conversation_root_id()
-        _inherit_parent_tool_surface(review_agent, agent)
+        if _parent_memory_master == _memory_master_on:
+            _inherit_parent_tool_surface(review_agent, agent)
     _detach_fork_compression(review_agent)
     # Compaction bounds a single request; this bounds the WHOLE review (checked in
     # conversation_loop via _review_input_budget_exhausted).
@@ -1028,10 +1051,15 @@ def _review_tool_whitelist(
     """``(whitelist, configured_extra_tools)`` for the review fork — DISPATCH-side only, so the
     advertised ``tools[]`` stays byte-identical to the parent's (prompt-cache parity)."""
     from model_tools import get_tool_definitions
-    # Gate the built-in memory tool on BOTH the profile's memory flags and the trigger that fired
-    # (#105921): a skill-nudge review never gets the memory tool, so an unattended fork cannot
-    # act on the memory tool's "consolidate now" hint and delete entries no one reviewed.
-    memory_on = review_agent._memory_enabled or review_agent._user_profile_enabled
+    # Gate the built-in memory tool on the master privacy posture, the per-target
+    # flags, AND the trigger that fired. Long-lived parents can outlive a config flip, so
+    # the master bit must dominate stale _memory_enabled/_user_profile_enabled values.
+    # (#105921): a skill-nudge review never gets the memory tool, so an unattended fork
+    # cannot act on the memory tool's "consolidate now" hint and delete entries no one reviewed.
+    memory_on = (
+        getattr(review_agent, "_memory_persistence_enabled", True)
+        and (review_agent._memory_enabled or review_agent._user_profile_enabled)
+    )
     review_toolsets = ["memory", "skills"] if memory_on and review_memory else ["skills"]
     whitelist = {t["function"]["name"] for t in get_tool_definitions(enabled_toolsets=review_toolsets, quiet_mode=True)}
     # Read-only file tools: denying read_file/search_files caused a per-review denial storm that

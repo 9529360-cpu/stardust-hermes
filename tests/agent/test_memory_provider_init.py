@@ -39,8 +39,40 @@ def test_shutdown_memory_provider_is_idempotent():
     agent.shutdown_memory_provider([{"role": "user", "content": "one"}])
     agent.shutdown_memory_provider([{"role": "user", "content": "two"}])
 
+    manager.flush_pending.assert_called_once_with(timeout=10)
     manager.on_session_end.assert_called_once()
     manager.shutdown_all.assert_called_once()
+
+
+def test_shutdown_drains_sync_before_session_end():
+    from run_agent import AIAgent
+
+    events = []
+
+    class Manager:
+        def flush_pending(self, timeout=None):
+            events.append(("flush", timeout))
+            return True
+
+        def on_session_end(self, messages):
+            events.append(("session_end", list(messages)))
+
+        def shutdown_all(self):
+            events.append(("shutdown", None))
+
+    agent = object.__new__(AIAgent)
+    agent._memory_manager = Manager()
+    agent.context_compressor = None
+    agent.session_id = "session-order"
+
+    transcript = [{"role": "user", "content": "last turn"}]
+    agent.shutdown_memory_provider(transcript)
+
+    assert events == [
+        ("flush", 10),
+        ("session_end", transcript),
+        ("shutdown", None),
+    ]
 
 
 def test_blank_memory_provider_does_not_auto_enable_honcho():
@@ -91,6 +123,84 @@ def test_close_shuts_down_memory_provider():
     agent.close()
 
     agent._memory_manager.shutdown_all.assert_called_once()
+
+
+def test_master_memory_off_keeps_builtin_store_inert_and_skips_external_provider_initialization():
+    cfg = {
+        "memory": {
+            "enabled": False,
+            "memory_enabled": True,
+            "user_profile_enabled": True,
+            "provider": "recording",
+        },
+        "agent": {},
+    }
+
+    with (
+        patch("hermes_cli.config.load_config", return_value=cfg),
+        patch("hermes_cli.config.load_config_readonly", return_value=cfg),
+        patch("plugins.memory.load_memory_provider") as load_memory_provider,
+        patch("agent.model_metadata.get_model_context_length", return_value=204_800),
+        patch("model_tools.get_tool_definitions", return_value=[]),
+        patch("model_tools.check_toolset_requirements", return_value={}),
+        patch("agent.process_bootstrap.OpenAI"),
+    ):
+        from run_agent import AIAgent
+
+        agent = AIAgent(
+            api_key="test-key-1234567890",
+            base_url="https://openrouter.ai/api/v1",
+            quiet_mode=True,
+            skip_context_files=True,
+            skip_memory=False,
+            session_id="privacy-off",
+        )
+
+    assert agent._memory_persistence_enabled is False
+    assert agent._memory_store is not None
+    assert agent._memory_store.format_for_system_prompt("memory") is None
+    assert agent._memory_store.format_for_system_prompt("user") is None
+    assert agent._memory_manager is None
+    load_memory_provider.assert_not_called()
+
+
+def test_master_memory_on_restores_configured_external_provider_without_reselection():
+    provider = RecordingMemoryProvider()
+    cfg = {
+        "memory": {
+            "enabled": True,
+            "memory_enabled": True,
+            "user_profile_enabled": True,
+            "provider": "recording",
+        },
+        "agent": {},
+    }
+
+    with (
+        patch("hermes_cli.config.load_config", return_value=cfg),
+        patch("hermes_cli.config.load_config_readonly", return_value=cfg),
+        patch("plugins.memory.load_memory_provider", return_value=provider) as load_memory_provider,
+        patch("agent.model_metadata.get_model_context_length", return_value=204_800),
+        patch("model_tools.get_tool_definitions", return_value=[]),
+        patch("model_tools.check_toolset_requirements", return_value={}),
+        patch("agent.process_bootstrap.OpenAI"),
+    ):
+        from run_agent import AIAgent
+
+        agent = AIAgent(
+            api_key="test-key-1234567890",
+            base_url="https://openrouter.ai/api/v1",
+            quiet_mode=True,
+            skip_context_files=True,
+            skip_memory=False,
+            session_id="privacy-on",
+        )
+
+    assert agent._memory_persistence_enabled is True
+    assert agent._memory_manager is not None
+    assert provider.init_session_id == "privacy-on"
+    assert provider.init_kwargs is not None
+    load_memory_provider.assert_called_once_with("recording")
 
 
 def test_aiagent_forwards_user_id_alt_to_memory_provider():

@@ -198,17 +198,11 @@ def test_new_session_delivers_context_engine_boundary_synchronously(tmp_path):
     assert engine_calls == [(old_session_id, [{"role": "user", "content": "hello"}])]
 
 
-def test_run_cleanup_flushes_pending_memory_manager_work(tmp_path):
-    """A '/new then quit' must not drop the queued old-session extraction.
-
-    _run_cleanup gives the manager's serialized worker a bounded drain via
-    flush_pending() before shutdown_all()'s short-fuse drain runs."""
+def test_run_cleanup_delegates_memory_drain_to_shutdown_owner(tmp_path):
+    """CLI cleanup forwards the transcript and lets AIAgent own drain ordering."""
     import cli as _cli_mod
 
     agent = MagicMock()
-    mm = MagicMock()
-    mm.flush_pending.return_value = True
-    agent._memory_manager = mm
     agent._session_messages = []
 
     old_ref = _cli_mod._active_agent_ref
@@ -220,7 +214,7 @@ def test_run_cleanup_flushes_pending_memory_manager_work(tmp_path):
         _cli_mod._cleanup_done = True
         _cli_mod._active_agent_ref = old_ref
 
-    mm.flush_pending.assert_called_once_with(timeout=10)
+    agent.shutdown_memory_provider.assert_called_once_with([])
 
 
 

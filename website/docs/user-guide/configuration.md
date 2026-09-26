@@ -803,12 +803,20 @@ When on, skill writes are staged under `~/.hermes/pending/skills/` and reviewed 
 
 ```yaml
 memory:
-  memory_enabled: true
+  enabled: true             # master durable-memory privacy switch
+  memory_enabled: true      # built-in MEMORY.md
   user_profile_enabled: true
   memory_char_limit: 2200   # ~800 tokens
   user_char_limit: 1375     # ~500 tokens
   write_approval: false     # true = require approval before any memory write
 ```
+
+Set `memory.enabled: false` (or run `hermes memory off`) to pause all
+durable memory while preserving the selected external provider and credentials.
+Built-in writes and external-provider activity stop; turns from the disabled
+interval are not backfilled after re-enable. This switch does not delete or
+disable ordinary chat/session history. Start a new session to refresh an
+already-frozen system-prompt memory snapshot.
 
 With `memory.write_approval: true`, memory writes need your approval before they land: interactive CLI turns prompt inline; messaging sessions and the background self-improvement review stage the write for `/memory pending` → `/memory approve <id>` / `/memory reject <id>` review. Toggle at runtime with `/memory approval on|off`. See [Controlling memory writes](/user-guide/features/memory#controlling-memory-writes-write_approval).
 

@@ -261,21 +261,31 @@ The same `list` / `delete <id>` / `edit <id>` subcommands work from the in-chat 
 ```yaml
 # In ~/.hermes/config.yaml
 memory:
-  memory_enabled: true
+  enabled: true           # master durable-memory privacy switch
+  memory_enabled: true    # built-in MEMORY.md
   user_profile_enabled: true
   memory_char_limit: 2200   # ~800 tokens
   user_char_limit: 1375     # ~500 tokens
   write_approval: false     # false = write freely (default) | true = require approval
 ```
 
-Setting **both** `memory_enabled` and `user_profile_enabled` to `false` turns the
-built-in stores off completely: the `memory` tool is dropped from the schema and
-its guidance block is dropped from the system prompt, so the model is never told
-about a tool it cannot use. An external provider set via `memory.provider`
-(Hindsight, Mem0, Honcho, …) is unaffected and keeps its own tools — use this
-when you want a third-party memory backend *instead of* the built-in files.
-Listing `memory` under `agent.disabled_toolsets` is the heavier switch: it hides
-external provider tools too.
+`memory.enabled` is the master privacy switch for durable memory. Set it to
+`false` (or run `hermes memory off`) to stop built-in memory writes and
+external-provider initialization, sync, prefetch, hooks, and memory-tool I/O.
+The configured provider and credentials are retained, so `hermes memory on`
+restores the same setup. Turns completed while memory is off are not backfilled
+to the external provider after re-enabling.
+
+Chat/session history is separate and continues to be stored normally. Turning
+durable memory off does not delete MEMORY.md, USER.md, provider data, or session
+history. Because the system prompt is frozen for prompt-cache stability, an
+already-running session may still contain its session-start memory snapshot in
+the cached prompt; start a new session to refresh prompt context and tool
+exposure. Persistence/provider I/O is blocked immediately.
+
+The per-target `memory_enabled` and `user_profile_enabled` flags remain
+advanced controls for the two built-in files while the master switch is on.
+With both built-in targets off, an external provider can still run.
 
 With only `memory_enabled: false` (user profile still on), the tool stays —
 it backs the profile store — but the system prompt swaps the full memory
@@ -295,7 +305,7 @@ first, set `memory.write_approval: true`. It's a simple on/off gate applied to
 | `false` (default) | Write freely — the gate is off (the pre-gate behaviour). |
 | `true` | Require approval before anything is saved. In the interactive CLI, foreground writes prompt you inline (entries are small enough to read in full). Everywhere else — messaging platforms, scripts, and the background self-improvement review — writes are **staged** for review with `/memory pending`. |
 
-> To turn memory off entirely (not just gate it), set both `memory_enabled: false` and `user_profile_enabled: false`. When both built-in stores are disabled, the built-in `memory` tool is automatically hidden.
+> To turn all durable memory off (not just gate writes), set `memory.enabled: false` or run `hermes memory off`. The provider selection is preserved and ordinary chat/session history is unchanged.
 
 Review staged writes from the CLI or any messaging platform:
 

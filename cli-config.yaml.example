@@ -902,6 +902,10 @@ prompt_caching:
 # Disabled by default in batch_runner.
 #
 memory:
+  # Master privacy switch. false pauses built-in memory and external-provider
+  # activity without deleting chat/session history or clearing provider config.
+  enabled: true
+
   # Cross-project notes only: global environment facts, standing conventions,
   # reusable tool quirks and lessons. Project-specific facts live in projects.db.
   memory_enabled: true

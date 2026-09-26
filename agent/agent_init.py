@@ -1239,33 +1239,34 @@ def _memory_provider_init_kwargs(agent, platform) -> Dict[str, Any]:
 
 
 def _init_memory(agent, _agent_cfg, skip_memory, platform):
-    # Persistent memory (MEMORY.md + USER.md) — loaded from disk
+    # Persistent memory (MEMORY.md + USER.md) — loaded only when master persistence is on.
     agent._memory_store = None
     agent._memory_enabled = False
     agent._user_profile_enabled = False
     agent._memory_nudge_interval = 10
+    agent._memory_persistence_enabled = True
     agent._turns_since_memory = 0
     agent._iters_since_skill = 0
-    # skip_memory skips the external *provider*; enabled_toolsets=["memory"] still gets the
-    # built-in store so the memory tool never sees store=None.
-    # Flush/background agents can still pass enabled_toolsets=["memory"] so the built-in file store exists
-    # and the memory tool does not fail with store=None (#65429). A toolset on disabled_toolsets is not a
-    # request: a caller that denylists memory while its default toolset still names it must not get
-    # MEMORY.md loaded by an enabled-only check. (Cron agents now run with skip_memory=False and take the
-    # normal path here.)
+
     _memory_toolset_requested = (
         "memory" in (agent.enabled_toolsets or [])
         and "memory" not in (agent.disabled_toolsets or [])
     )
+    mem_config = {}
+    memory_persistence_enabled = None
     if not skip_memory or _memory_toolset_requested:
-        # Memory is optional — don't break agent init
         with suppress(Exception):
             from tools.memory_tool import (
-                MemoryStore, get_builtin_memory_config, get_builtin_memory_store_flags,
+                MemoryStore,
+                get_builtin_memory_config,
+                memory_persistence_enabled as _memory_persistence_enabled,
             )
+            memory_persistence_enabled = _memory_persistence_enabled
             mem_config = get_builtin_memory_config(_agent_cfg)
-            agent._memory_enabled, agent._user_profile_enabled = get_builtin_memory_store_flags(
-                _agent_cfg
+            agent._memory_persistence_enabled = _memory_persistence_enabled(_agent_cfg)
+            agent._memory_enabled, agent._user_profile_enabled = tuple(
+                is_truthy_value(mem_config.get(key), default=True)
+                for key in ("memory_enabled", "user_profile_enabled")
             )
             agent._memory_nudge_interval = int(mem_config.get("nudge_interval", 10))
             if agent._memory_enabled or agent._user_profile_enabled:
@@ -1275,38 +1276,42 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
                     memory_enabled=agent._memory_enabled,
                     user_profile_enabled=agent._user_profile_enabled,
                 )
-                agent._memory_store.load_from_disk()
+                if agent._memory_persistence_enabled:
+                    agent._memory_store.load_from_disk()
 
-    # External memory provider plugin (one at a time, alongside built-in): memory.provider.
     agent._memory_manager = None
-    if not skip_memory:
+    if not skip_memory and agent._memory_persistence_enabled:
         try:
-            _mem_provider_name = mem_config.get("provider", "") if mem_config else ""
-            if _mem_provider_name and _mem_provider_name.strip():
+            provider_name = mem_config.get("provider", "") if mem_config else ""
+            if provider_name and provider_name.strip():
                 from agent.memory_manager import MemoryManager as _MemoryManager
                 from plugins.memory import load_memory_provider as _load_mem
-                agent._memory_manager = _MemoryManager()
-                _mp = _load_mem(_mem_provider_name)
-                if _mp and _mp.is_available():
-                    agent._memory_manager.add_provider(_mp)
-                elif _mp is not None and _mem_provider_name not in _warned_unavailable_providers:
-                    # unavailable_reason() reads config/probes importlib — skip it once warned.
-                    _unavailable_reason = ""
+                if memory_persistence_enabled is None:
+                    from tools.memory_tool import memory_persistence_enabled
+                agent._memory_manager = _MemoryManager(
+                    privacy_enabled=lambda: memory_persistence_enabled(fail_closed=True)
+                )
+                provider = _load_mem(provider_name)
+                if provider and provider.is_available():
+                    agent._memory_manager.add_provider(provider)
+                elif provider is not None and provider_name not in _warned_unavailable_providers:
+                    unavailable_reason = ""
                     with suppress(Exception):
-                        _unavailable_reason = _mp.unavailable_reason()
-                    _warn_memory_provider_unavailable(_mem_provider_name, _unavailable_reason)
+                        unavailable_reason = provider.unavailable_reason()
+                    _warn_memory_provider_unavailable(provider_name, unavailable_reason)
                 if agent._memory_manager.providers:
                     agent._memory_manager.initialize_all(**_memory_provider_init_kwargs(agent, platform))
-                    _ra().logger.info("Memory provider '%s' activated", _mem_provider_name)
+                    _ra().logger.info("Memory provider '%s' activated", provider_name)
                 else:
-                    _ra().logger.debug("Memory provider '%s' not found or not available", _mem_provider_name)
+                    _ra().logger.debug("Memory provider '%s' not found or not available", provider_name)
                     agent._memory_manager = None
-        except Exception as _mpe:
-            _ra().logger.warning("Memory provider plugin init failed: %s", _mpe)
+        except Exception as exc:
+            _ra().logger.warning("Memory provider plugin init failed: %s", exc)
             agent._memory_manager = None
 
     from agent.memory_manager import inject_memory_provider_tools
     inject_memory_provider_tools(agent)
+
 
 
 def _apply_agent_section(agent, _agent_cfg):

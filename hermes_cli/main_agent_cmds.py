@@ -7,15 +7,28 @@ are imported lazily inside the functions that use them (avoids an import cycle).
 import sys
 
 
-def _cmd_memory_off():
+def _set_memory_master(enabled: bool):
     from hermes_cli.config import load_config, save_config
     config = load_config()
     if not isinstance(config.get("memory"), dict):
         config["memory"] = {}
-    config["memory"]["provider"] = ""
+    config["memory"]["enabled"] = bool(enabled)
     save_config(config)
-    print("\n  ✓ Memory provider: built-in only")
+    state = "enabled" if enabled else "paused"
+    print(f"\n  ✓ Memory persistence: {state}")
+    if not enabled and config["memory"].get("provider"):
+        print(f"  External provider '{config['memory']['provider']}' remains configured.")
+    print("  Chat/session history is unchanged.")
+    print("  Start a new session to refresh memory context and tool exposure.")
     print("  Saved to config.yaml\n")
+
+
+def _cmd_memory_off():
+    _set_memory_master(False)
+
+
+def _cmd_memory_on():
+    _set_memory_master(True)
 
 
 def _cmd_memory_reset(args):
@@ -60,6 +73,8 @@ def cmd_memory(args):
     sub = getattr(args, "memory_command", None)
     if sub == "off":
         _cmd_memory_off()
+    elif sub == "on":
+        _cmd_memory_on()
     elif sub == "reset":
         _cmd_memory_reset(args)
     else:
