@@ -27,6 +27,10 @@ def test_runtime_status_probes_running_venv_outside_checkout(tmp_path, monkeypat
 
 
 def test_summary_withholds_success_when_sqlite_remediation_failed(capsys, monkeypatch):
+    # Pin the platform: the fix command differs by OS (see
+    # test_sqlite_partial_message_is_shared_and_names_windows_installer), and this test's
+    # assertions below are specifically about the POSIX one-liner.
+    monkeypatch.setattr(update_cmd._m(), "_is_windows", lambda: False)
     monkeypatch.setattr(
         update_cmd,
         "_post_update_sqlite_runtime_status",
@@ -62,7 +66,7 @@ def test_summary_withholds_success_when_sqlite_remediation_failed(capsys, monkey
     assert "SQLite (3.46.1)" in out
     assert "WAL" not in out
     assert "venv" not in out
-    assert "install.sh | bash" in out
+    assert "install-stardust.sh | bash" in out
     assert "hermes doctor" in out
 
 
@@ -83,10 +87,10 @@ def test_sqlite_partial_message_is_shared_and_names_windows_installer(capsys, mo
 
     for out in (verified_out, summary_out):
         assert "known corruption bug" in out
-        assert "install.ps1" in out
-        assert "install.sh" not in out
+        assert "install-stardust.ps1" in out
+        assert "install-stardust.sh" not in out
         assert "hermes doctor" in out
-    fix_line = next(line for line in verified_out.splitlines() if "install.ps1" in line)
+    fix_line = next(line for line in verified_out.splitlines() if "install-stardust.ps1" in line)
     assert fix_line in summary_out.splitlines()
 
 

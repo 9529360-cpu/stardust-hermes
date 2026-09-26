@@ -157,6 +157,24 @@ def test_legacy_nous_upstream_is_not_accepted_as_authority(monkeypatch) -> None:
     assert update_cmd_git._has_upstream_remote(["git"], ROOT) is False
 
 
+def test_sqlite_remediation_reinstall_hint_targets_stardust() -> None:
+    """The post-update SQLite-remediation reinstall command, specifically — NOT every
+    string in this file: a separate, still-unresolved docs-link migration (issue tracked
+    outside this test) also touches update_cmd_maint.py and is out of scope here."""
+    from hermes_cli import update_cmd_maint
+
+    assert update_cmd_maint._REINSTALL_ONE_LINER == {
+        True: (
+            "iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+            "/main/scripts/install-stardust.ps1)"
+        ),
+        False: (
+            "curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+            "/main/scripts/install-stardust.sh | bash"
+        ),
+    }
+
+
 def test_legacy_upstream_is_repaired_to_stardust(monkeypatch) -> None:
     from hermes_cli import update_cmd_git
 
@@ -171,6 +189,88 @@ def test_legacy_upstream_is_repaired_to_stardust(monkeypatch) -> None:
         "upstream",
         "https://github.com/9529360-cpu/stardust-hermes.git",
     ]]
+
+
+def test_banner_update_check_authority_is_stardust() -> None:
+    from hermes_cli import banner
+
+    assert banner._OFFICIAL_REPO_URL == "https://github.com/9529360-cpu/stardust-hermes.git"
+    assert banner._OFFICIAL_REPO_CANONICAL == "github.com/9529360-cpu/stardust-hermes"
+    assert banner._RELEASE_URL_BASE == "https://github.com/9529360-cpu/stardust-hermes/releases/tag"
+
+    source = _read("hermes_cli/banner.py")
+    assert "NousResearch/hermes-agent" not in source
+    assert "nousresearch/hermes-agent" not in source
+
+
+def test_banner_compare_api_is_scoped_to_the_checkouts_own_repo(monkeypatch) -> None:
+    """The exact-behind-count compare call must target whichever repo the two tips came
+    from, never a hardcoded repo — a stale hardcode 404s on any post-fork Stardust SHA
+    (or worse, silently compares against an unrelated repo's history)."""
+    import urllib.request
+
+    from hermes_cli import banner
+
+    captured = {}
+
+    def fake_urlopen(req, timeout=10):
+        captured["url"] = req.full_url
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self):
+                return b'{"ahead_by": 3}'
+
+        return _Resp()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    banner._compare_payload_cache.clear()
+
+    sha_a, sha_b = "a" * 40, "b" * 40
+    behind = banner._tips_behind(sha_a, sha_b, repo_slug="9529360-cpu/stardust-hermes")
+
+    assert behind == 3
+    assert captured["url"] == (
+        f"https://api.github.com/repos/9529360-cpu/stardust-hermes/compare/{sha_a}...{sha_b}"
+    )
+
+
+def test_banner_compare_skips_api_call_without_a_repo_slug(monkeypatch) -> None:
+    """A non-GitHub origin has no repo slug to compare against; this must degrade to the
+    honest no-count sentinel instead of querying some other (wrong) repo by default."""
+    import urllib.request
+
+    from hermes_cli import banner
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise AssertionError("must not call the GitHub compare API without a repo_slug")
+
+    monkeypatch.setattr(urllib.request, "urlopen", fail_urlopen)
+
+    behind = banner._tips_behind("a" * 40, "b" * 40, repo_slug=None)
+
+    assert behind == banner.UPDATE_AVAILABLE_NO_COUNT
+
+
+def test_zip_fallback_archive_url_targets_stardust_repo() -> None:
+    from hermes_cli import update_cmd_git, update_cmd_zip
+
+    assert update_cmd_zip._zip_archive_url("main") == (
+        "https://github.com/9529360-cpu/stardust-hermes/archive/refs/heads/main.zip"
+    )
+    # Same authority as the primary git update path — not a second, independently drifting literal.
+    assert update_cmd_zip._zip_archive_url("main").startswith(
+        update_cmd_git.OFFICIAL_REPO_URL.removesuffix(".git")
+    )
+
+    source = _read("hermes_cli/update_cmd_zip.py")
+    assert "NousResearch/hermes-agent" not in source
+    assert "hermes-agent.nousresearch.com" not in source
 
 
 def test_security_reports_belong_to_stardust() -> None:
