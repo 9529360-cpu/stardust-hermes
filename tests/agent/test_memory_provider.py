@@ -243,6 +243,22 @@ class TestMemoryManager:
             "visible answer",
         ]
 
+    def test_prefetch_result_is_discarded_when_privacy_turns_off_mid_call(self):
+        state = {"enabled": True}
+
+        class FlipProvider(FakeMemoryProvider):
+            def prefetch(self, query, *, session_id=""):
+                self.prefetch_queries.append(query)
+                state["enabled"] = False
+                return "late recalled secret"
+
+        provider = FlipProvider("external")
+        mgr = MemoryManager(privacy_enabled=lambda: state["enabled"])
+        mgr.add_provider(provider)
+
+        assert mgr.prefetch_all("query", session_id="s1") == ""
+        assert provider.prefetch_queries == ["query"]
+
     def test_queued_sync_cancelled_by_privacy_off_is_never_backfilled(self):
         state = {"enabled": True}
         provider = MessagesMemoryProvider("privacy-queue")

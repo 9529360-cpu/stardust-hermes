@@ -531,13 +531,18 @@ class MemoryManager:
 
     def _each_provider(self, label: str, call: Callable[[MemoryProvider], Any], *, level: int = logging.DEBUG,
                        providers: Optional[List[MemoryProvider]] = None, exc_info: bool = False,
-                       _skip_pending_session_switch: bool = False) -> List[Any]:
+                       _skip_pending_session_switch: bool = False,
+                       _skip_privacy: bool = False) -> List[Any]:
         """Call ``call(provider)`` per provider, logging+swallowing failures; returns successes in order.
         ``label`` completes the log line ``Memory provider '<name>' <label>: <exc>``."""
+        if not _skip_privacy and not self._privacy_enabled():
+            return []
         if not _skip_pending_session_switch and not self._apply_pending_session_switch():
             return []
         results: List[Any] = []
         for provider in self._providers if providers is None else providers:
+            if not _skip_privacy and not self._privacy_enabled():
+                break
             try:
                 results.append(call(provider))
             except Exception as e:
@@ -608,6 +613,8 @@ class MemoryManager:
             return ""
         blocks = self._each_provider("system_prompt_block() failed", lambda p: p.system_prompt_block(),
                                       level=logging.WARNING)
+        if not self._privacy_enabled():
+            return ""
         return "\n\n".join(b for b in blocks if b and b.strip())
 
     # A /skill or /bundle turn embeds the whole skill body in the model-facing message;
@@ -624,13 +631,16 @@ class MemoryManager:
         parts = self._each_provider(
             "prefetch failed (non-fatal)", lambda p: self._prefetch_provider(p, clean_query, session_id=session_id),
         )
+        if not self._privacy_enabled():
+            return ""
         return "\n\n".join(p for p in parts if p and p.strip())
 
     def _prefetch_provider(self, provider: MemoryProvider, query: str, *, session_id: str = "") -> str:
         """Run one provider's prefetch; external providers are bounded by a timeout. A stuck external
         call keeps running on its daemon thread and the provider is skipped on later turns until it returns."""
         if provider.name == "builtin":
-            return provider.prefetch(query, session_id=session_id)
+            result = provider.prefetch(query, session_id=session_id)
+            return result if self._privacy_enabled() else ""
 
         result_box: Dict[str, Any] = {}
 
@@ -663,6 +673,8 @@ class MemoryManager:
         with self._external_prefetch_lock:
             if self._external_prefetch_threads.get(provider.name) is thread:
                 self._external_prefetch_threads.pop(provider.name, None)
+        if not self._privacy_enabled():
+            return ""
         if "error" in result_box:
             raise result_box["error"]
         result = result_box.get("value", "")
@@ -688,6 +700,8 @@ class MemoryManager:
             detail = ("recalled 1 memory" if status.count == 1 else f"recalled {status.count} memories"
                       if status.count > 1 else "recalled relevant memory")
             segments.append(f"{status.glyph} {status.provider_label} — {detail}")
+        if not self._privacy_enabled():
+            return ""
         return "  ".join(segments)
 
     def queue_prefetch_all(self, query: str, *, session_id: str = "") -> None:
@@ -1145,6 +1159,7 @@ class MemoryManager:
             level=logging.WARNING,
             providers=self._providers[::-1],
             _skip_pending_session_switch=True,
+            _skip_privacy=True,
         )
 
     @property
