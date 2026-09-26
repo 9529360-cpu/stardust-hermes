@@ -16,7 +16,7 @@ vi.mock('@/hermes', async importOriginal => ({
   getMemoryStatus: vi.fn(() =>
     Promise.resolve({
       active: '',
-      available: [],
+      providers: [],
       builtin_files: { memory: 12, user: 8 }
     })
   ),
@@ -43,7 +43,7 @@ describe('Command Center memory reset forget boundary', () => {
     vi.clearAllMocks()
     vi.mocked(getMemoryStatus).mockResolvedValue({
       active: '',
-      available: [],
+      providers: [],
       builtin_files: { memory: 12, user: 8 }
     })
   })
