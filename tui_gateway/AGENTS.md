@@ -58,7 +58,6 @@ New event = `event("<type>", Payload)` in `contracts/events.py`; the emitter is 
 | Slash commands | local handler + fallthrough | `slash.exec` → `_SlashWorker`; `command.dispatch` |
 | Completions | `useCompletion` hook | `complete.slash`, `complete.path` |
 | Theming | `theme.ts` + `branding.tsx` | `gateway.ready` carries skin data |
-| Plugin compat notice | — | `plugins.compat_report` (see `plugins/AGENTS.md`) |
 | Connection operations (desktop card) | desktop `store/connection-request.ts` | `connection.request` → `connection.update`* → `connection.respond {op_id}`; `connectors.operation.status`. The op lives in `tools/connectors/live.py`; the card never parks the tool thread (`methods_connectors.py`). |
 
 ## Shared subagent snapshots
