@@ -46,21 +46,27 @@ const writePreviews = (sid: string, items: PreviewArtifact[]) => {
  * Record a detected artifact, newest last, capped. Idempotent: a target already
  * in the list keeps its slot (the tool row re-registers on every render, so this
  * must not churn the atom or reorder rows).
+ *
+ * Returns whether `target` was newly added (vs. already tracked), so a caller
+ * can gate a one-time action (e.g. auto-opening it) on genuine novelty rather
+ * than firing again on every re-render of the same tool row.
  */
-export function recordPreviewArtifact(sid: string, target: string, cwd: string) {
+export function recordPreviewArtifact(sid: string, target: string, cwd: string): boolean {
   const raw = target.trim()
 
   if (!sid || !raw) {
-    return
+    return false
   }
 
   const list = $previewStatusBySession.get()[sid] ?? []
 
   if (list.some(item => item.id === raw)) {
-    return
+    return false
   }
 
   writePreviews(sid, [...list, { cwd, id: raw, label: previewName(raw), target: raw }].slice(-MAX_PER_SESSION))
+
+  return true
 }
 
 export function dismissPreviewArtifact(sid: string, id: string) {

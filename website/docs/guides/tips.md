@@ -111,7 +111,7 @@ Keep context files focused and concise. Every character counts against your toke
 
 ### Memory vs. Skills: What Goes Where
 
-**Memory** is for facts: your environment, preferences, project locations, and things the agent has learned about you. **Skills** are for procedures: multi-step workflows, tool-specific instructions, and reusable recipes. Use memory for "what," skills for "how."
+**Profile memory** is for facts that apply across Projects: who you are, preferences, global environment details, and reusable lessons. **Project facts** hold repository- or workspace-specific versions, locations, decisions, and conventions. **Skills** are for procedures: multi-step workflows, tool-specific instructions, and reusable recipes.
 
 ### When to Create Skills
 
@@ -123,7 +123,7 @@ Memory is intentionally bounded (~2,200 chars for MEMORY.md, ~1,375 chars for US
 
 ### Let the Agent Remember
 
-After a productive session, say "remember this for next time" and the agent will save the key takeaways. You can also be specific: "save to memory that our CI uses GitHub Actions with the `deploy.yml` workflow."
+After a productive session, say "remember this for next time" and the agent will route durable information to its owner. Global/user facts go to profile memory; Project-specific facts such as a repository's CI workflow belong to that Project's structured facts. For example: "remember that this Project uses GitHub Actions with the `deploy.yml` workflow."
 
 :::warning
 Memory is a frozen snapshot — changes made during a session don't appear in the system prompt until the next session starts. The agent writes to disk immediately, but the prompt cache isn't invalidated mid-session.

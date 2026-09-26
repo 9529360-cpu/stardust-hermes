@@ -460,19 +460,19 @@ export const zh = defineLocale({
       about: '关于',
       billing: '账单',
       notifications: '通知',
-      vault: '密码与登录'
+      vault: '保管箱'
     },
     vault: {
-      title: '密码与登录',
+      title: '保管箱',
       blurb:
-        '说一句“登录 GitHub”，智能体就会代你登录。第一次遇到登录页时它会当场向你要登录信息，之后就自动完成。密码在本机加密保存并直接填入页面——模型永远看不到。',
+        '在这里保存登录信息、银行卡和地址，供 Stardust 按你的指令代为使用。秘密信息只在本机加密保存并直接注入表单——模型永远看不到。',
       count: n => `已保存 ${n} 项`,
       loadFailed: '无法加载保险库条目',
       empty: '尚未保存任何内容',
-      emptyDesc: '这里不必手动添加。让智能体登录某个网站时，它会当场向你询问一次登录信息。若想提前录入，可点“添加”。',
+      emptyDesc: '登录信息可以在 Stardust 第一次需要时再保存；也可以在这里提前放一张专用低额度银行卡和地址，供它按你的购买指令使用。',
       add: '添加',
       addTitle: '添加登录信息、银行卡或地址',
-      addDescription: '加密保存在本机。代理永远不会看到密码。',
+      addDescription: '加密保存在本机。Stardust 永远看不到密码、卡号或 CVC。',
       added: '已保存。',
       adding: '保存中…',
       addConfirm: '保存',
@@ -496,6 +496,12 @@ export const zh = defineLocale({
       expMonthField: '到期月份',
       expYearField: '到期年份',
       cvcField: 'CVC',
+      delegatedPaymentLabel: 'Stardust 消费卡',
+      delegatedPaymentDescription: '你明确让 Stardust 购买或付款时，可直接使用此卡，不再重复弹出填卡确认。',
+      allowAnyOriginLabel: '允许用于任意结账站点',
+      allowAnyOriginDescription: '适合专门准备的低额度、预付或虚拟卡。真实余额或发卡行限额仍是硬性消费上限。',
+      delegatedPaymentBadge: '委托支付',
+      anySiteBadge: '任意站点',
       postalField: '邮政编码',
       addressLine1Field: '地址第 1 行',
       addressLine2Field: '地址第 2 行',
@@ -726,8 +732,8 @@ export const zh = defineLocale({
         window: '整个窗口',
         sidebar: '仅侧边栏'
       },
-      backdropTitle: '聊天背景',
-      backdropDesc: '对话后方那张淡淡的雕像图片。',
+      backdropTitle: '整窗背景',
+      backdropDesc: '在整个 Stardust 窗口后方显示一张本机图片，覆盖侧栏、对话区和工具面板。图片只保留在这台设备上。',
       userBubbleTitle: '消息气泡',
       userBubbleDesc: '你自己的消息有多透明。0 为不透明，100 时只保留边框。',
       introSplashTitle: '开场标识',
@@ -2377,7 +2383,15 @@ export const zh = defineLocale({
       resetUser: '重置画像',
       resetAll: '全部重置',
       resetConfirm: target => `删除 ${target}？此操作不可撤销。`,
+      resetConfirmDetail:
+        '现有聊天可能仍带着旧的冻结记忆快照。重置边界会阻止这些聊天和重置前的待审批写入把已忘记内容重新保存回来。',
       resetDone: files => `已删除 ${files}。`,
+      resetCurrentChats: '现有聊天会在下一轮刷新内置记忆；如果想立刻去掉旧提示词快照，请新建会话。',
+      resetFreshTitle: '现在开始一个新会话？',
+      resetFreshDescription:
+        '新会话不会带入刚删除的内置记忆。继续当前聊天也是安全的，但旧快照可能会保留到下一轮刷新。',
+      startFreshSession: '开始新会话',
+      keepCurrentSession: '继续当前聊天',
       resetFailed: '记忆重置失败',
       actionStarted: name => `${name} 已启动 — 正在跟踪日志…`,
       actionFailed: name => `${name} 启动失败`,
@@ -2756,9 +2770,9 @@ export const zh = defineLocale({
     nameLabel: '名称',
     cloneFrom: '克隆来源',
     cloneFromNone: '无（空白）',
-    cloneFromDesc: '从选中的来源配置档案复制配置、技能和 SOUL.md。',
+    cloneFromDesc: '从选中的来源档案复制配置、.env 中的密钥、技能、SOUL.md，以及精选记忆（MEMORY.md 和 USER.md）。会话和定时任务不会复制。',
     cloneFromDefault: '从默认档案克隆',
-    cloneFromDefaultDesc: '从你的默认配置档案复制配置、技能和 SOUL.md。',
+    cloneFromDefaultDesc: '从默认档案复制配置、.env 中的密钥、技能、SOUL.md，以及精选记忆（MEMORY.md 和 USER.md）。会话和定时任务不会复制。',
     invalidName: hint => `名称无效。${hint}`,
     nameRequired: '名称为必填项。',
     creating: '创建中…',
@@ -3089,6 +3103,7 @@ export const zh = defineLocale({
   },
 
   sidebar: {
+    recent: '最近',
     gatewayGroups: {
       grouping: '网关与配置',
       rename: '重命名分组',
@@ -4271,6 +4286,7 @@ export const zh = defineLocale({
   },
 
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: '今天想做什么？', body: '直接问我，或者把一件事交给我。需要项目、文件或预览时，相关上下文会出现在对话右侧。', start: '从一条消息开始', actions: '浏览命令' },
     thread: {
       loadingSession: '正在加载会话',
       showEarlier: '显示更早的消息',

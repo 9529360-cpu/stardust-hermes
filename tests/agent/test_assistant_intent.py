@@ -55,6 +55,8 @@ def test_clarify_is_reserved_for_material_user_decisions():
 def test_prompt_guidance_names_durability_and_focus_boundaries():
     assert "never as a promise of restart durability" in ASSISTANT_EXECUTION_GUIDANCE
     assert "must not steal focus" in ASSISTANT_EXECUTION_GUIDANCE
+    assert "secure local credential capture or Vault resolution" in ASSISTANT_EXECUTION_GUIDANCE
+    assert "user decision, credential, authorization" not in ASSISTANT_EXECUTION_GUIDANCE
 
 
 def test_modes_map_only_to_existing_runtime_owners():

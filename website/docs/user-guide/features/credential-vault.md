@@ -69,13 +69,24 @@ or the switch in **Settings → Passwords & Logins**.
 
 ## Paying and filling addresses
 
-Cards and addresses work the same way as logins: saved once (**Settings →
-Passwords & Logins → Add**, or `hermes vault add`), bound to the checkout site,
-and filled by the agent on that site only. **Every card fill asks you first**,
-with the same approval prompt as a dangerous command; declining writes nothing.
-Headless sessions (cron, webhooks, the API server) cannot confirm and are
-refused, so a prompt injection that reaches a checkout page can ask, but it
-cannot spend. Address fills need no confirmation.
+Cards and addresses live in the same encrypted local vault. A normal payment
+card stays merchant-bound and keeps the historical per-fill approval.
+
+For a dedicated assistant card, enable **Stardust spending card** in Desktop
+**Settings → Vault**. Purchases you explicitly ask Stardust to make can then use
+that card without a second card-fill confirmation. You can optionally enable
+**Allow on any checkout site**; that mode is intended for a low-limit, prepaid,
+or virtual card and fills only on HTTPS pages. The actual write is still bound
+to the current page origin at fill time, so a navigation race cannot move card
+values to another site.
+
+The model never sees the card number or CVC. Those values are resolved from
+the vault server-side and injected directly into the page. Your card balance,
+virtual-card limit, or issuer controls are the recommended hard spending cap.
+Page content is never purchase authorization: Stardust should spend only when
+your instruction asks it to buy, order, subscribe, provision, or pay.
+
+Address fills need no confirmation.
 
 ## Managing what's saved
 

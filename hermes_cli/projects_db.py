@@ -56,6 +56,22 @@ CREATE TABLE IF NOT EXISTS project_meta (
     value  TEXT
 );
 
+CREATE TABLE IF NOT EXISTS project_facts (
+    id             TEXT PRIMARY KEY,
+    project_id     TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    content        TEXT NOT NULL,
+    source_kind    TEXT NOT NULL,
+    source_ref     TEXT,
+    confidence     REAL NOT NULL DEFAULT 1.0,
+    sensitive      INTEGER NOT NULL DEFAULT 0,
+    created_at     INTEGER NOT NULL,
+    verified_at    INTEGER,
+    superseded_at  INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_facts_active
+    ON project_facts(project_id, superseded_at, created_at);
+
 -- Git repos found by scanning the filesystem (desktop "repo-first" discovery).
 -- Cached here so the overview is instant after the first scan instead of
 -- re-walking the disk every time the Projects view opens.
@@ -79,6 +95,7 @@ _OPTIONAL_PROJECT_COLUMNS = ("board_slug", "primary_path", "icon", "color")
 _OPTIONAL_ROW_FIELDS = ("description", "icon", "color", "board_slug", "primary_path")
 _ACTIVE_META_KEY = "active_id"
 _DISCOVERY_POLICY_META_KEY = "repo_discovery_policy"
+PROJECT_FACT_SOURCE_KINDS = frozenset({"user", "repository", "session", "tool", "inference", "import"})
 
 
 def _slugify(name: str) -> str:
@@ -154,6 +171,29 @@ class ProjectFolder:
 
     def to_dict(self) -> dict:
         return {"path": self.path, "label": self.label, "is_primary": bool(self.is_primary), "added_at": self.added_at}
+
+
+@dataclass
+class ProjectFact:
+    id: str
+    project_id: str
+    content: str
+    source_kind: str
+    source_ref: Optional[str]
+    confidence: float
+    sensitive: bool
+    created_at: int
+    verified_at: Optional[int] = None
+    superseded_at: Optional[int] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "project_id": self.project_id, "content": self.content,
+            "source_kind": self.source_kind, "source_ref": self.source_ref,
+            "confidence": self.confidence, "sensitive": self.sensitive,
+            "created_at": self.created_at, "verified_at": self.verified_at,
+            "superseded_at": self.superseded_at,
+        }
 
 
 @dataclass
@@ -293,6 +333,90 @@ def update_project(
         return False
     sets = ", ".join(f"{col} = ?" for col, _, _ in fields)
     return _execute_rowcount(conn, f"UPDATE projects SET {sets} WHERE id = ?", [f[2] for f in fields] + [project_id]) > 0
+
+
+def add_project_fact(
+    conn: sqlite3.Connection, project_id: str, content: str, *, source_kind: str,
+    source_ref: Optional[str] = None, confidence: float = 1.0, sensitive: bool = False,
+    verified_at: Optional[int] = None,
+) -> str:
+    """Persist one project-scoped fact with explicit provenance."""
+    if get_project(conn, project_id) is None:
+        raise ValueError(f"no such project: {project_id}")
+    text = str(content or "").strip()
+    kind = str(source_kind or "").strip().lower()
+    if not text:
+        raise ValueError("project fact content must not be empty")
+    from tools.threat_patterns import first_threat_message
+
+    if threat := first_threat_message(text, scope="strict"):
+        raise ValueError(f"project fact rejected: {threat}")
+    if kind not in PROJECT_FACT_SOURCE_KINDS:
+        allowed = ", ".join(sorted(PROJECT_FACT_SOURCE_KINDS))
+        raise ValueError(f"project fact source_kind must be one of: {allowed}")
+    score = float(confidence)
+    if not 0.0 <= score <= 1.0:
+        raise ValueError("project fact confidence must be between 0.0 and 1.0")
+    if kind == "inference" and score >= 1.0 and verified_at is None:
+        raise ValueError("unverified inferred project facts must use confidence below 1.0")
+    fact_id = "pf_" + secrets.token_hex(6)
+    with write_txn(conn):
+        conn.execute(
+            "INSERT INTO project_facts "
+            "(id, project_id, content, source_kind, source_ref, confidence, sensitive, created_at, verified_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (fact_id, project_id, text, kind, source_ref, score, 1 if sensitive else 0, _now(), verified_at),
+        )
+    return fact_id
+
+
+def list_project_facts(conn: sqlite3.Connection, project_id: str, *, include_superseded: bool = False) -> List[ProjectFact]:
+    sql = "SELECT * FROM project_facts WHERE project_id = ?"
+    if not include_superseded:
+        sql += " AND superseded_at IS NULL"
+    sql += " ORDER BY created_at ASC, id ASC"
+    rows = conn.execute(sql, (project_id,)).fetchall()
+    return [
+        ProjectFact(
+            id=row["id"],
+            project_id=row["project_id"],
+            content=row["content"],
+            source_kind=row["source_kind"],
+            source_ref=row["source_ref"],
+            confidence=float(row["confidence"]),
+            sensitive=bool(row["sensitive"]),
+            created_at=int(row["created_at"]),
+            verified_at=row["verified_at"],
+            superseded_at=row["superseded_at"],
+        )
+        for row in rows
+    ]
+
+
+def verify_project_fact(
+    conn: sqlite3.Connection, fact_id: str, *, project_id: str,
+    verified_at: Optional[int] = None,
+) -> bool:
+    when = _now() if verified_at is None else int(verified_at)
+    return _execute_rowcount(
+        conn,
+        "UPDATE project_facts SET verified_at = ?, confidence = 1.0 "
+        "WHERE id = ? AND project_id = ? AND superseded_at IS NULL",
+        (when, fact_id, project_id),
+    ) > 0
+
+
+def supersede_project_fact(
+    conn: sqlite3.Connection, fact_id: str, *, project_id: str,
+    superseded_at: Optional[int] = None,
+) -> bool:
+    when = _now() if superseded_at is None else int(superseded_at)
+    return _execute_rowcount(
+        conn,
+        "UPDATE project_facts SET superseded_at = ? "
+        "WHERE id = ? AND project_id = ? AND superseded_at IS NULL",
+        (when, fact_id, project_id),
+    ) > 0
 
 
 def _execute_rowcount(conn: sqlite3.Connection, sql: str, params) -> int:

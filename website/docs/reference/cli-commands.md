@@ -81,7 +81,7 @@ hermes [global-options] <command> [subcommand/options]
 | `hermes bundles` | Group several skills under a single `/<name>` slash command. See [Skill Bundles](../user-guide/features/skills.md#skill-bundles). |
 | `hermes curator` | Background skill maintenance — status, run, pause, pin. See [Curator](../user-guide/features/curator.md). |
 | `hermes journey` (aliases `learning`, `memory-graph`) | Timeline of learned skills + memories over time. |
-| `hermes memory` | Configure external memory provider. Plugin-specific subcommands (e.g. `hermes honcho`) register automatically when their provider is active. |
+| `hermes memory` | Configure durable memory privacy and external providers. Plugin-specific subcommands (e.g. `hermes honcho`) register automatically when their provider is active. |
 | `hermes acp` | Run Hermes as an ACP server for editor integration. |
 | `hermes mcp` | Manage MCP server configurations and run Hermes as an MCP server. |
 | `hermes plugins` | Manage Hermes Agent plugins (install, enable, disable, remove). |
@@ -820,7 +820,7 @@ Common failure modes + recovery are covered in [Egress proxy → Troubleshooting
 ## `hermes project`
 
 ```bash
-hermes project <create|list|show|add-folder|remove-folder|rename|set-primary|use|archive|restore|bind-board>
+hermes project <create|list|show|add-folder|remove-folder|rename|set-primary|use|archive|restore|bind-board|facts>
 ```
 
 Projects are human-named workspaces that can span multiple folders / repos. They anchor desktop session grouping and, when bound to a kanban board, give tasks a deterministic worktree + branch convention. State is per-profile.
@@ -838,6 +838,18 @@ Projects are human-named workspaces that can span multiple folders / repos. They
 | `archive` | Archive a project (recoverable). |
 | `restore` | Restore an archived project. |
 | `bind-board` | Bind a kanban board to this project. |
+| `facts` | List, add, verify, or supersede durable project-scoped facts with provenance. |
+
+### Project facts
+
+```bash
+hermes project facts <project> list
+hermes project facts <project> add "Python 3.12 is required." --source repository --source-ref pyproject.toml
+hermes project facts <project> verify <fact-id>
+hermes project facts <project> supersede <fact-id>
+```
+
+Project facts are stored in the profile's `projects.db`, not `MEMORY.md`. The CLI exposes `verify` for explicit human/operator confirmation; the agent Project tool deliberately does not expose a verify action for its own inferences.
 
 ## `hermes webhook`
 
@@ -1445,15 +1457,17 @@ See [Hooks](../user-guide/features/hooks.md) for event signatures and payload sh
 hermes memory <subcommand>
 ```
 
-Set up and manage external memory provider plugins. Available providers: honcho, openviking, mem0, hindsight, holographic, retaindb, byterover, supermemory. Only one external provider can be active at a time. Built-in memory (MEMORY.md/USER.md) is always active.
+Control durable-memory privacy and configure external memory provider plugins. Available providers: honcho, openviking, mem0, hindsight, holographic, retaindb, byterover, supermemory. Only one external provider can be selected at a time.
 
 Subcommands:
 
 | Subcommand | Description |
 |------------|-------------|
 | `setup` | Interactive provider selection and configuration. |
-| `status` | Show current memory provider config. |
-| `off` | Disable external provider (built-in only). |
+| `status` | Show the master privacy state, built-in targets, and provider config. |
+| `on` | Resume durable memory with the existing provider selection. |
+| `off` | Pause all durable memory without clearing provider config or chat history. |
+| `reset` | Erase built-in MEMORY.md / USER.md content (separate from the on/off privacy switch). |
 
 :::info Provider-specific subcommands
 When an external memory provider is active, it may register its own top-level `hermes <provider>` command for provider-specific management (e.g. `hermes honcho` when Honcho is active). Inactive providers do not expose their subcommands. Run `hermes --help` to see what's currently wired in.

@@ -67,7 +67,26 @@ _SCHEMA_OVERRIDES: Dict[str, Dict[str, Any]] = {
         "IANA timezone (e.g. America/New_York). Blank uses the system timezone.",
         *_timezone_options(), searchable=True, clearable=True,
     ),
-    "memory.provider": _select("Memory provider plugin", *_memory_provider_options()),
+    "memory.enabled": {
+        "type": "boolean",
+        "description": (
+            "Master durable-memory privacy switch. Off stops built-in memory writes and "
+            "external provider activity immediately; new sessions omit memory context/tools. "
+            "Chat/session history is separate and unchanged."
+        ),
+        "category": "security",
+    },
+    "memory.memory_enabled": {
+        "type": "boolean",
+        "description": "Advanced: allow built-in MEMORY.md while memory persistence is on.",
+        "category": "security",
+    },
+    "memory.user_profile_enabled": {
+        "type": "boolean",
+        "description": "Advanced: allow built-in USER.md while memory persistence is on.",
+        "category": "security",
+    },
+    "memory.provider": _select("External memory provider used while memory persistence is on", *_memory_provider_options()),
     "model": {
         "type": "string",
         "description": "Default model (e.g. anthropic/claude-sonnet-4.6)",

@@ -422,6 +422,12 @@ export const ar = defineLocale({
       expMonthField: 'شهر الانتهاء',
       expYearField: 'سنة الانتهاء',
       cvcField: 'CVC',
+      delegatedPaymentLabel: 'بطاقة إنفاق Stardust',
+      delegatedPaymentDescription: 'يمكن استخدام هذه البطاقة مباشرةً للمشتريات أو الدفعات التي تطلب من Stardust تنفيذها صراحةً، من دون تأكيد إضافي لتعبئة البطاقة.',
+      allowAnyOriginLabel: 'السماح في أي موقع دفع',
+      allowAnyOriginDescription: 'يفضل استخدام بطاقة مخصصة منخفضة الحد أو مسبقة الدفع أو افتراضية. يظل رصيد البطاقة أو حد الجهة المصدرة هو سقف الإنفاق الفعلي.',
+      delegatedPaymentBadge: 'دفع مفوض',
+      anySiteBadge: 'أي موقع',
       postalField: 'الرمز البريدي',
       addressLine1Field: 'سطر العنوان 1',
       addressLine2Field: 'سطر العنوان 2',
@@ -575,7 +581,7 @@ export const ar = defineLocale({
         sidebar: 'الشريط الجانبي فقط'
       },
       backdropTitle: 'خلفية النافذة',
-      backdropDesc: 'اختيار مقدار مزج خلفية سطح المكتب مع سطح Hermes.',
+      backdropDesc: 'اعرض صورة محلية خلف نافذة Stardust بالكامل، بما في ذلك الشريط الجانبي والمحادثة ولوحات الأدوات. تبقى الصورة على هذا الجهاز فقط.',
       userBubbleTitle: 'فقاعة الرسالة',
       userBubbleDesc: 'مدى شفافية رسائلك. معتمة عند 0؛ يبقى الإطار فقط عند 100.',
       introSplashTitle: 'شاشة المقدمة',
@@ -1668,9 +1674,9 @@ export const ar = defineLocale({
     nameLabel: 'الاسم',
     cloneFrom: 'استنساخ من',
     cloneFromNone: 'لا شيء (فارغ)',
-    cloneFromDesc: 'ينسخ الإعدادات والمهارات وSOUL.md من الملف الشخصي المصدر المحدد.',
+    cloneFromDesc: 'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي المحدد. لا يتم نسخ الجلسات أو المهام المجدولة.',
     cloneFromDefault: 'نسخ إعداد الافتراضي',
-    cloneFromDefaultDesc: 'ابدأ من إعدادات الملف الافتراضي.',
+    cloneFromDefaultDesc: 'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي الافتراضي. لا يتم نسخ الجلسات أو المهام المجدولة.',
     invalidName: hint => `اسم غير صالح: ${hint}`,
     nameRequired: 'الاسم مطلوب',
     creating: 'جار الإنشاء...',
@@ -1878,6 +1884,7 @@ export const ar = defineLocale({
     missingBody: 'لم يعد هذا الناتج موجودًا في السجل المحلي.'
   },
   sidebar: {
+    recent: 'الأخيرة',
     gatewayGroups: {
       grouping: 'البوابة والملف الشخصي',
       rename: 'إعادة تسمية المجموعة',
@@ -2815,6 +2822,7 @@ export const ar = defineLocale({
     }
   },
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: 'بماذا نبدأ؟', body: 'اسأل مباشرة، أو أعطني مهمة. يظهر سياق المشروع أو الملفات أو المعاينة بجانب المحادثة فقط عند الحاجة.', start: 'ابدأ برسالة', actions: 'استكشف الأوامر' },
     thread: {
       loadingSession: 'جار تحميل الجلسة...',
       showEarlier: 'عرض الرسائل الأقدم',

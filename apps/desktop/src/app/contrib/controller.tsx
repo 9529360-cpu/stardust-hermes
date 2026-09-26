@@ -8,6 +8,7 @@ import { PALETTE_AREA, type PaletteContribution, paletteToggle } from '@/app/com
 import { type StatusbarItem } from '@/app/shell/statusbar-controls'
 import { AskDirective } from '@/components/assistant-ui/ask-directive'
 import { InlinePreviewDirective } from '@/components/assistant-ui/inline-preview-directive'
+import { Backdrop } from '@/components/Backdrop'
 import { IdleMount } from '@/components/idle-mount'
 import { OnboardingChatDirective } from '@/components/onboarding-chat/directive'
 import { $layoutEditMode, toggleLayoutEditMode } from '@/components/pane-shell/edit-mode'
@@ -806,7 +807,7 @@ export function ContribController() {
       <ContribWiring>
         <AppContextMenu />
         <div
-          className="flex h-screen min-h-0 w-screen flex-col bg-(--ui-bg-chrome) text-(--ui-text-primary)"
+          className="relative isolate flex h-screen min-h-0 w-screen flex-col overflow-hidden bg-(--ui-bg-chrome) text-(--ui-text-primary)"
           // Window-glass hook: this div and the sidebar-wrapper above it are
           // the app shell's two full-window opaque painters; the
           // [data-hermes-glass] rules in styles.css clear them so the tint
@@ -815,6 +816,7 @@ export function ContribController() {
           data-contrib-shell=""
           style={{ '--titlebar-height': '0px' } as CSSProperties}
         >
+          <Backdrop />
           <LayoutTreeRoot titlebar />
 
           {/* "Close running tab?" — the busy/input-blocked tile close gate. */}

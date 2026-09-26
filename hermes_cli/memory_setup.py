@@ -386,19 +386,30 @@ def cmd_status(args) -> None:
     mem_config = config.get("memory", {})
     provider_name = mem_config.get("provider", "")
 
-    # Memory tool enablement for the CLI platform via the canonical resolver, respecting the
-    # check_fn gate when both stores are disabled.
+    # Memory tool enablement for the CLI platform via the canonical resolver, respecting
+    # both the master privacy switch and per-target built-in controls.
     from hermes_cli.tools_config import _get_platform_tools
-    from tools.memory_tool import check_memory_requirements
+    from tools.memory_tool import (
+        check_memory_requirements,
+        get_builtin_memory_store_flags,
+        memory_persistence_enabled,
+    )
+    master_enabled = memory_persistence_enabled(config)
+    builtin_memory_enabled, user_profile_enabled = get_builtin_memory_store_flags(config)
     cli_tools = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
     memory_tool_enabled = ("memory" in cli_tools) and check_memory_requirements()
 
     print("\nMemory status\n" + "─" * 40)
+    print(f"  Memory persistence:  {_mark(master_enabled)}")
+    print("  Chat/session history: separate — unchanged by the memory switch")
     print("  Built-in (MEMORY.md / USER.md):")
-    print(f"    Memory injection:   {_mark(mem_config.get('memory_enabled', True))}")
-    print(f"    User profile:       {_mark(mem_config.get('user_profile_enabled', True))}")
+    print(f"    Memory injection:   {_mark(builtin_memory_enabled)}")
+    print(f"    User profile:       {_mark(user_profile_enabled)}")
     print(f"    Memory tool:        {_mark(memory_tool_enabled)}")
-    print(f"  Provider:  {provider_name or '(none — built-in only)'}")
+    provider_display = provider_name or "(none — built-in only)"
+    if provider_name and not master_enabled:
+        provider_display += " (configured, paused)"
+    print(f"  External provider:  {provider_display}")
 
     providers = _get_available_providers()
     match = _find_provider(providers, provider_name)

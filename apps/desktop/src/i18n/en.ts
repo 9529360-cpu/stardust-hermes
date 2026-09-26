@@ -504,7 +504,7 @@ export const en: Translations = {
       about: 'About',
       billing: 'Billing',
       notifications: 'Notifications',
-      vault: 'Passwords & Logins'
+      vault: 'Vault'
     },
     plugins: {
       title: 'Desktop plugins',
@@ -522,6 +522,20 @@ export const en: Translations = {
       agentHalfMissing: 'agent half missing here',
       agentHalfMissingTip:
         'This is the desktop half of a bundled plugin, but its agent half is not installed on the currently connected backend/profile. Install it from Capabilities → Plugins.',
+      trustDialog: {
+        title: name => `Trust and enable ${name}?`,
+        description:
+          'This is external Desktop code. Enabling it is a trust decision for this app, not just a feature toggle.',
+        authorityHeading: 'Full Desktop app authority',
+        authorityBody:
+          'The plugin runs inside the Stardust Desktop renderer with the same app authority available to renderer code. Declared plugin capabilities are descriptive metadata, not a sandbox or permission boundary.',
+        sourceHeading: 'Code you are trusting',
+        sourceUnknown: 'No verified repository or pinned commit is recorded for this copy.',
+        repository: 'Repository',
+        pinnedCommit: 'Pinned commit',
+        localFile: 'Local file',
+        confirm: 'Trust & enable'
+      },
       installModal: {
         installFromGit: 'Install from Git',
         reviewRepository: 'Review repository',
@@ -546,6 +560,8 @@ export const en: Translations = {
         desktopTarget: "Installs into this app's local desktop-plugins folder",
         desktopTargetFromPackage: 'Loaded into this app from the package above — same for every profile',
         desktopOnlyNote: 'Desktop-only packages do not install a backend agent plugin.',
+        desktopTrustNote:
+          'Desktop code is installed disabled. Enabling it later grants full Stardust Desktop renderer/app authority; declared capabilities are descriptive metadata, not a sandbox.',
         insecureWarning: 'This URL uses an insecure or local scheme. Prefer https:// or git@ for production installs.',
         securityHeading: 'Before you install',
         securityIntro:
@@ -575,17 +591,17 @@ export const en: Translations = {
       }
     },
     vault: {
-      title: 'Passwords & Logins',
+      title: 'Vault',
       blurb:
-        'Say "log into GitHub" and the agent signs in for you. The first time it meets a sign-in page it asks you for the login right there; after that it just works. Passwords are encrypted on this machine and filled straight into the page — the model never sees them.',
+        'Store logins, payment cards and addresses for Stardust to use on your behalf. Secret values stay encrypted on this machine and are injected directly into forms — the model never sees them.',
       count: n => `${n} saved`,
       loadFailed: 'Could not load vault items',
       empty: 'Nothing saved yet',
       emptyDesc:
-        "You don't have to add anything here. Ask the agent to sign into a site and it will ask you for the login once, on the spot. Use Add if you prefer to enter one ahead of time.",
+        "Save a login when Stardust first needs it, or add a dedicated low-limit payment card and address here for purchases you ask it to make.",
       add: 'Add',
       addTitle: 'Add a login, card or address',
-      addDescription: 'Stored encrypted on this machine. The agent never sees the password.',
+      addDescription: 'Stored encrypted on this machine. Stardust never sees passwords, card numbers or CVCs.',
       added: 'Saved.',
       adding: 'Saving…',
       addConfirm: 'Save',
@@ -609,6 +625,14 @@ export const en: Translations = {
       expMonthField: 'Exp. month',
       expYearField: 'Exp. year',
       cvcField: 'CVC',
+      delegatedPaymentLabel: 'Stardust spending card',
+      delegatedPaymentDescription:
+        'Purchases you explicitly ask Stardust to make can use this card without another card-fill confirmation.',
+      allowAnyOriginLabel: 'Allow on any checkout site',
+      allowAnyOriginDescription:
+        'Best for a dedicated low-limit, prepaid, or virtual card. The card balance or issuer limit remains the hard spending cap.',
+      delegatedPaymentBadge: 'Agent spend',
+      anySiteBadge: 'Any site',
       postalField: 'Postal code',
       addressLine1Field: 'Address line 1',
       addressLine2Field: 'Address line 2',
@@ -777,8 +801,8 @@ export const en: Translations = {
         window: 'Whole window',
         sidebar: 'Sidebar only'
       },
-      backdropTitle: 'Chat Backdrop',
-      backdropDesc: 'The faint statue image behind the conversation.',
+      backdropTitle: 'Window Background',
+      backdropDesc: 'Show one local image behind the entire Stardust window — sidebar, conversation and tool panes. The image stays on this device.',
       userBubbleTitle: 'Message Bubble',
       userBubbleDesc: 'How see-through your own messages are. Solid at 0; only the outline remains at 100.',
       introSplashTitle: 'Intro Splash',
@@ -2163,7 +2187,16 @@ export const en: Translations = {
       resetUser: 'Reset profile',
       resetAll: 'Reset both',
       resetConfirm: target => `Delete ${target}? This cannot be undone.`,
+      resetConfirmDetail:
+        'Existing chats may still contain the old frozen memory snapshot. The reset fence prevents those chats and pre-reset approvals from saving forgotten entries back.',
       resetDone: files => `Deleted ${files}.`,
+      resetCurrentChats:
+        'Existing chats refresh built-in memory on their next turn. Start a new session to drop the old prompt snapshot immediately.',
+      resetFreshTitle: 'Start a fresh session now?',
+      resetFreshDescription:
+        'A fresh session starts without the deleted built-in memory. Keeping this chat is safe, but its old snapshot may remain visible until the next turn refresh.',
+      startFreshSession: 'Start new session',
+      keepCurrentSession: 'Keep current chat',
       resetFailed: 'Memory reset failed',
       actionStarted: name => `${name} started — tailing log...`,
       actionFailed: name => `${name} failed to start`,
@@ -2531,9 +2564,9 @@ export const en: Translations = {
     nameLabel: 'Name',
     cloneFrom: 'Clone from',
     cloneFromNone: 'None (blank)',
-    cloneFromDesc: 'Copies config, skills, and SOUL.md from the selected source profile.',
+    cloneFromDesc: 'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from the selected profile. Sessions and scheduled jobs stay separate.',
     cloneFromDefault: 'Clone from default',
-    cloneFromDefaultDesc: 'Copy config, skills, and SOUL.md from your default profile.',
+    cloneFromDefaultDesc: 'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from your default profile. Sessions and scheduled jobs stay separate.',
     invalidName: hint => `Invalid name. ${hint}`,
     nameRequired: 'Name is required.',
     creating: 'Creating...',
@@ -2781,6 +2814,7 @@ export const en: Translations = {
   },
 
   sidebar: {
+    recent: 'Recent',
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',
@@ -4003,6 +4037,13 @@ export const en: Translations = {
   },
 
   assistant: {
+    intro: {
+      eyebrow: 'Stardust',
+      headline: 'What should we work on?',
+      body: 'Ask directly or hand me a task. Project, file, or preview context appears beside the conversation only when it is useful.',
+      start: 'Start with a message',
+      actions: 'Explore commands'
+    },
     thread: {
       loadingSession: 'Loading session',
       showEarlier: 'Show earlier messages',

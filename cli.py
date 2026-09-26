@@ -756,12 +756,8 @@ def _shutdown_agent_memory_provider(agent) -> None:
     """Memory-provider shutdown (on_session_end + shutdown_all) at the real session boundary."""
     if not (agent and hasattr(agent, 'shutdown_memory_provider')):
         return
-    # A /new shortly before exit leaves an LLM-bound boundary task queued; shutdown_all()'s
-    # ~5s drain would cancel it, so give it a bounded head start (watchdog is the backstop).
-    _mm = getattr(agent, '_memory_manager', None)
-    if _mm is not None and hasattr(_mm, 'flush_pending'):
-        with suppress(Exception):
-            _mm.flush_pending(timeout=10)
+    # AIAgent.shutdown_memory_provider owns the ordered pending-work drain before
+    # on_session_end; this wrapper only supplies the real transcript.
     # Forward the agent's transcript so on_session_end hooks see the real conversation;
     # no-arg fallback for stubs / partially-initialised agents.
     _session_msgs = getattr(agent, '_session_messages', None)

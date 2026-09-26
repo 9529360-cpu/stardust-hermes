@@ -1177,20 +1177,8 @@ class GatewayShutdownMixin:
             return
         with suppress(Exception):
             if hasattr(agent, "shutdown_memory_provider"):
-                # Drain queued memory writes BEFORE teardown (shutdown_all() gives the worker only ~5s, so a
-                # /reset or rotation could drop them). Bounded; a failure never blocks teardown.
-                # The memory manager persists per-turn sync and end-of-session extraction on a single
-                # serialized background worker. shutdown_memory_provider() -> shutdown_all() only gives that
-                # worker a ~5s bounded drain and abandons (cancels) anything still queued past it, so a
-                # /reset — or any gateway session rotation that reaches this cleanup path — could silently
-                # drop writes the session had already handed off. The next session then loads stale memory
-                # (#73297). Give pending work a bounded head start through the manager's own barrier first,
-                # mirroring the CLI exit path (cli.py). Best-effort: a flush failure must never block
-                # teardown.
-                _mm = getattr(agent, "_memory_manager", None)
-                if _mm is not None and hasattr(_mm, "flush_pending"):
-                    with suppress(Exception):
-                        _mm.flush_pending(timeout=10)
+                # AIAgent.shutdown_memory_provider owns the bounded pending-work drain before
+                # final extraction (#73297). This host wrapper only supplies the real transcript.
                 # Pass the real transcript so ``on_session_end`` hooks don't see the empty default.
                 # ``_session_messages`` may be absent on ``object.__new__`` test stubs, hence getattr.
                 # ``_session_messages`` is set on ``AIAgent`` (run_agent.py:1518) and refreshed at the end

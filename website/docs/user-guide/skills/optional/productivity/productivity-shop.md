@@ -182,7 +182,7 @@ When the item is visual (clothing, shoes, accessories, furniture, decor, art) **
 
 ## Checkout
 - Complete only via the agent flow on the merchant domain. **Never** fall back to browser checkout to bypass an agent-flow error.
-- Before completing, verify sign-in and confirm with the user: purchase intent, variant(s), quantity, price, shipping address, shipping method, and total. `checkout complete` requires `--confirm`, so completing is always a deliberate, separate step — pass `--confirm` only after that confirmation.
+- Before completing, verify sign-in and reconcile purchase intent, variant(s), quantity, price, shipping address, shipping method, and total against the user's request. A clear current-turn request such as "buy it", "order this", "pay for it", or "subscribe/provision this plan" is already the user's confirmation when the checkout matches that scope; do not ask a second time merely because `checkout complete` requires `--confirm`. Ask only if a material detail is missing or changed, the total exceeds the stated/established range, or checkout introduces an unexpected recurring commitment, quantity, merchant, or shipping choice.
 
 **Reading the `checkout create` / `update` response:**
 - Inspect `status`, `email`, addresses, `continue_url`, and `payment.instruments`.
@@ -195,7 +195,7 @@ Then take one of two paths:
 - `budget_available: true` — you have a delegated budget but this store didn't issue a payment instrument, so it doesn't accept Shop agent payments yet. Search for similar alternatives and message the user about relevant options. Do NOT offer a budget.
 - `budget_available: false` — present `continue_url` as a [Finish in Shop](https://github.com/NousResearch/hermes-agent/blob/main/optional-skills/productivity\shop/url) link (format nicely; don't print the raw URL) AND (IMPORTANT) immediately after, offer a spending budget (below) — a budget lets you complete purchases on stores that accept Shop agent payments.
 
-**B. Delegated-budget checkout.** If `status` is `ready_for_complete` and `payment.instruments` is present, you may complete — but **only** with explicit user permission after confirming the details above. Feed the `checkout create` response JSON straight into `shop checkout complete --checkout-stdin --confirm`; the CLI re-sends the merchant-issued instrument id as both the instrument `id` and `credential.token`. Use a fresh idempotency key per distinct purchase intent; reuse it only when retrying the same purchase.
+**B. Delegated-budget checkout.** If `status` is `ready_for_complete` and `payment.instruments` is present, complete when the user's current instruction already contains clear purchase intent and the checkout still matches it; no extra final-payment prompt is required. If the user only asked to research, compare, or build a cart, do not complete. Feed the `checkout create` response JSON straight into `shop checkout complete --checkout-stdin --confirm`; the CLI re-sends the merchant-issued instrument id as both the instrument `id` and `credential.token`. Use a fresh idempotency key per distinct purchase intent; reuse it only when retrying the same purchase.
 
 ### Spending budget
 Offer to set up a budget when **either**:
@@ -216,7 +216,7 @@ Never narrate tool usage or API parameters. Never fabricate URLs or information;
 
 ## Security — CRITICAL, follow all of these
 **Payments**
-- Require clear user purchase intent before any action that moves money, including order completion. A UCP-returned payment token means the user already granted this agent payment in Shop — do not ask for a second payment-auth step, but never buy items the user did not ask for.
+- Require clear user purchase intent before any action that moves money, including order completion. The user's explicit current-turn instruction to buy/order/pay/subscribe counts as that intent and must not be followed by a redundant "are you sure?" prompt when the checkout matches it. A UCP-returned payment token or configured delegated budget is a payment capability, not separate purchase intent; never buy items the user did not ask for.
 - Use a fresh idempotency key per distinct purchase intent; reuse it only when retrying the same intent; never reuse across different carts or orders.
 
 **Secrets**

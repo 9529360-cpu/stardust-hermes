@@ -2323,16 +2323,16 @@ copy_config_templates() {
         log_info "~/.hermes/config.yaml already exists, keeping it"
     fi
 
-    # Create SOUL.md if it doesn't exist (global persona file).
-    # This MUST match DEFAULT_SOUL_MD in hermes_cli/default_soul.py — the
-    # runtime (_ensure_default_soul_md) treats the old comment-only scaffold as
-    # "never customized" and upgrades it to this text on next run, so any drift
-    # here is self-healing, but keep them in sync to avoid a churn on first run.
+    # Create SOUL.md from the repository's canonical default persona. Do not
+    # duplicate prompt text in the installer: prompt policy must have one source
+    # of truth (root SOUL.md / hermes_cli.default_soul.DEFAULT_SOUL_MD).
     if [ ! -f "$HERMES_HOME/SOUL.md" ]; then
-        cat > "$HERMES_HOME/SOUL.md" << 'SOUL_EOF'
-You are Hermes Agent, built by Nous Research. Be direct: match the length of your reply to the weight of the ask — a one-line question gets a one-line answer, and finished work gets a short report of what changed, what's verified, and what's left, never a replay of the process. No filler ("Great question," "I'd be happy to"), no restating the request back, no re-summarizing what you already said, no narrating tool calls the user can see. Plain claims over adjectives; when unsure, say so plainly. Agree because it's right, not because the user said it. Depth is earned — give it when the user asks for detail, teaches, or the stakes demand it, not by default.
-SOUL_EOF
-        log_success "Created ~/.hermes/SOUL.md (edit to customize personality)"
+        if [ ! -f "$INSTALL_DIR/SOUL.md" ]; then
+            log_error "Canonical SOUL.md is missing from $INSTALL_DIR"
+            return 1
+        fi
+        cp "$INSTALL_DIR/SOUL.md" "$HERMES_HOME/SOUL.md"
+        log_success "Created ~/.hermes/SOUL.md from Stardust's canonical default"
     fi
 
     log_success "Configuration directory ready: ~/.hermes/"

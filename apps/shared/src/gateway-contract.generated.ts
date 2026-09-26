@@ -1644,6 +1644,8 @@ export interface VaultItem {
   identifier?: string | null
   identifier_type?: string | null
   has_otp?: boolean | null
+  delegated_payment?: boolean | null
+  allow_any_origin?: boolean | null
   backend: string
 }
 export interface VaultSourcesResult {
@@ -1689,6 +1691,8 @@ export interface VaultAddParams {
   kind?: VaultKind | null
   label?: string | null
   origin?: string | null
+  delegated_payment?: boolean | null
+  allow_any_origin?: boolean | null
   secret?: Record<string, unknown> | null
 }
 export type VaultKind = 'login' | 'payment' | 'address'

@@ -48,11 +48,11 @@ Load `humanizer` for voice; generate visuals with the `image_generate` tool wher
 
 ### 6. Run editorial and risk review
 
-Check factual accuracy, tone, repetition, rights/permissions, accessibility, disclosures, link destination, date relevance, and crisis sensitivity. Mark `draft`, `needs review`, or `approved`; do not publish from draft. Done when every post has a disposition and owner.
+Check factual accuracy, tone, repetition, rights/permissions, accessibility, disclosures, link destination, date relevance, and crisis sensitivity. Mark `draft`, `needs review`, or `approved`; do not publish from draft. A current-turn instruction that explicitly asks to publish or schedule the campaign counts as publishing authorization for the named platforms/accounts and resolved timing, so qualifying posts may be marked `approved` after this review without asking the user to restate the same instruction. Material claim, rights, account, timing, or scope ambiguity still requires clarification. Done when every post has a disposition and owner.
 
 ### 7. Schedule or hand off
 
-Present the approval batch. Publish/schedule only approved posts using available platform skills (`xurl` for X); for platforms without a connector, deliver the approved package (copy, assets, timing) for the user's scheduling tool and mark those slots handed-off, not published. Read back scheduled time, account, content preview, and provider post/job ID for anything actually published. Done when the calendar reflects verified publishing or handoff status per slot.
+For any posts not already authorized by the current-turn request, present an approval batch. Publish/schedule only posts covered by current-turn publishing authorization or a later approval using available platform skills (`xurl` for X); for platforms without a connector, deliver the authorized package (copy, assets, timing) for the user's scheduling tool and mark those slots handed-off, not published. Read back scheduled time, account, content preview, and provider post/job ID for anything actually published. Done when the calendar reflects verified publishing or handoff status per slot.
 
 ## Pitfalls
 

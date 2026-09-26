@@ -6,12 +6,13 @@ in ``tools.memory_tool`` and is read lazily."""
 import hashlib
 import logging
 import os
+import secrets
 import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils import atomic_write_text, path_signature
+from utils import atomic_write_text, fsync_directory, path_signature
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 logger = logging.getLogger("tools.memory_tool")
@@ -85,6 +86,10 @@ class MemoryStore:
         self.memory_enabled, self.user_profile_enabled = memory_enabled, user_profile_enabled
         self._system_prompt_snapshot: Dict[str, str] = {"memory": "", "user": ""}
         self._system_prompt_disk_state: Dict[str, Optional[tuple]] = {}
+        # A reset advances a durable per-target generation. Sessions capture it with the
+        # prompt snapshot; an older generation may still answer from its cached context,
+        # but it must never write those forgotten facts back to disk.
+        self._reset_generations: Dict[str, Optional[str]] = {"memory": "", "user": ""}
         self._consolidation_failures = 0  # per turn; reset by reset_consolidation_failures()
 
     # Per-turn counter of failed at-capacity consolidation attempts; reset at each turn boundary by
@@ -139,7 +144,11 @@ class MemoryStore:
         for target in ("memory", "user"):
             if not self.target_enabled(target):
                 continue
-            current = self._disk_state(self._path_for(target))
+            path = self._path_for(target)
+            current_generation = self._read_reset_generation(path)
+            if current_generation != self._reset_generations.get(target):
+                return True
+            current = self._disk_state(path)
             if current is not None and current != self._system_prompt_disk_state.get(target):
                 return True
         return False
@@ -173,15 +182,26 @@ class MemoryStore:
         for target in ("memory", "user"):
             path = self._path_for(target)
             path.parent.mkdir(parents=True, exist_ok=True)
-            # Capture state BEFORE the read. If an atomic writer swaps the file between these
-            # operations, the next turn sees the newer state and safely reloads once more.
-            disk_state = self._disk_state(path)
-            raw, read_ok = self._read_raw_checked(path)
+            # Reset and normal writes share this lock. Capture the reset generation, file
+            # identity, and bytes as one ordered snapshot so a concurrent reset cannot pair
+            # old prompt bytes with the new write authority (or vice versa).
+            with self._file_lock(path):
+                reset_generation = self._read_reset_generation(path)
+                disk_state = self._disk_state(path)
+                raw, read_ok = self._read_raw_checked(path)
+            if reset_generation is None:
+                logger.warning(
+                    "Could not read the reset generation for %s; writes stay fail-closed until a later reload.",
+                    path.name,
+                )
             if not read_ok:
                 logger.warning(
                     "Could not refresh %s; keeping the previous in-memory snapshot and retrying on a later turn.",
                     path.name,
                 )
+                # Do not adopt a newer reset generation while retaining the old
+                # prompt snapshot. Keeping the prior generation makes writes fail
+                # closed until a later reload captures both bytes and generation.
                 self._system_prompt_disk_state[target] = None
                 continue
             # Deduplicate (order-preserving, first occurrence wins).
@@ -195,6 +215,7 @@ class MemoryStore:
                                "further additions are blocked until it is back under the limit.",
                                path.name, count, limit)
             self._system_prompt_snapshot[target] = self._render_block(target, [_sanitize(e, path.name) for e in entries])
+            self._reset_generations[target] = reset_generation
             self._system_prompt_disk_state[target] = disk_state
 
     @staticmethod
@@ -243,6 +264,87 @@ class MemoryStore:
         from tools import memory_tool  # get_memory_dir is monkeypatched there
         return memory_tool.get_memory_dir() / ("USER.md" if target == "user" else "MEMORY.md")
 
+    @staticmethod
+    def _reset_generation_path(path: Path) -> Path:
+        return path.with_suffix(path.suffix + ".reset-generation")
+
+    @classmethod
+    def _read_reset_generation(cls, path: Path) -> Optional[str]:
+        """Durable reset token; empty means the profile has never reset this target."""
+        marker = cls._reset_generation_path(path)
+        try:
+            return marker.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            return ""
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    def reset_generation(self, target: str) -> Optional[str]:
+        """Generation captured with this store's frozen prompt snapshot."""
+        return self._reset_generations.get(target)
+
+    @staticmethod
+    def _reset_conflict(target: str) -> Dict[str, Any]:
+        label = "USER.md" if target == "user" else "MEMORY.md"
+        return _error(
+            f"Refusing to write {label}: built-in memory was reset after this session's "
+            "snapshot was loaded. Nothing was saved. Retry on the next turn after the "
+            "memory snapshot refreshes.",
+            target=target,
+            reset_conflict=True,
+        )
+
+    @classmethod
+    def reset_target(cls, target: str) -> bool:
+        """Forget one built-in target and advance its write generation under the file lock.
+
+        The generation marker is committed first, then the target is atomically rewritten
+        empty and fsynced before a best-effort unlink. Even if the directory-entry removal
+        is lost or refused, forgotten bytes cannot reappear after a crash; old sessions also
+        cannot refill the target because their captured generation no longer matches.
+        """
+        if target not in {"memory", "user"}:
+            raise ValueError("target must be memory or user")
+        path = cls._path_for(target)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        marker = cls._reset_generation_path(path)
+        new_generation = secrets.token_hex(16)
+        with cls._file_lock(path):
+            if marker.is_symlink():
+                raise RuntimeError(f"Refusing reset-generation symlink: {marker}")
+            atomic_write_text(marker, new_generation, mode=0o600, fsync_dir=True)
+
+            try:
+                if path.is_symlink():
+                    path.unlink()
+                    fsync_directory(path.parent)
+                    return True
+
+                existed = path.exists()
+                if not existed:
+                    return False
+                atomic_write_text(
+                    path,
+                    "",
+                    tmp_prefix=".mem_reset_",
+                    preserve_mode=True,
+                    fsync_dir=True,
+                )
+                with suppress(OSError):
+                    path.unlink()
+                return True
+            except OSError as exc:
+                # Marker-first is intentional: if the process crashes after bytes are
+                # erased but before the generation advances, an old live session could
+                # recreate forgotten content. If erasure itself fails, keep the advanced
+                # generation (stale writers stay fenced) and tell the caller that old
+                # bytes may still exist so the reset can be retried safely.
+                raise RuntimeError(
+                    f"Forget boundary advanced for {path.name}, but file erasure did not "
+                    f"complete. Stale sessions are fenced, but old bytes may still be "
+                    f"present; retry the reset. Cause: {exc}"
+                ) from exc
+
     def _entries_for(self, target: str) -> List[str]:
         return self.user_entries if target == "user" else self.memory_entries
 
@@ -276,6 +378,9 @@ class MemoryStore:
         a failed second read used to count as "no drift"."""
         path = self._path_for(target)
         with self._file_lock(path):
+            current_generation = self._read_reset_generation(path)
+            if current_generation is None or current_generation != self._reset_generations.get(target):
+                return self._reset_conflict(target)
             raw, read_ok = self._read_raw_checked(path)
             if not read_ok:
                 return _read_failed_error(path)

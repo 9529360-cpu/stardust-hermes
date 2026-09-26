@@ -1164,6 +1164,10 @@ class _CodexStreamGuard:
         self._attempt_stream: Any = None
         # The request-driving thread owns the transport FDs — see _close_client_on_timeout.
         self._owner_tid = threading.get_ident()
+        # Timeout detection can happen on the owner thread itself, then finish() runs on the
+        # same unwind path. The shared client must release its transport FDs exactly once.
+        self._client_close_lock = threading.Lock()
+        self._client_closed = False
 
     def effective_deadline(self) -> float:
         with self._deadline_lock:
@@ -1207,6 +1211,16 @@ class _CodexStreamGuard:
             "Codex auxiliary Responses stream stalled: no new output "
             f"for {float(self.no_progress_timeout):.1f}s ({elapsed:.1f}s elapsed)")
 
+    def _close_client_once(self, failure_note: str) -> None:
+        """Owner-thread shared-client close, idempotent across timeout + finally paths."""
+        if threading.get_ident() != self._owner_tid:
+            raise RuntimeError("shared Codex auxiliary client close attempted from non-owner thread")
+        with self._client_close_lock:
+            if self._client_closed:
+                return
+            self._client_closed = True
+        _close_quietly(self._client, failure_note)
+
     def _close_client_on_timeout(self) -> None:
         begin_timeout_cleanup = getattr(self._protected_cancel_check, "begin_timeout_cleanup", None)
         if callable(begin_timeout_cleanup):
@@ -1232,7 +1246,7 @@ class _CodexStreamGuard:
         # ``finally`` below, which is where the FD release belongs. See #70773.
         self.timeout_release_pending.set()
         if threading.get_ident() == self._owner_tid:
-            _close_quietly(self._client, "client close during timeout failed")
+            self._close_client_once("client close during timeout failed")
         else:
             try:
                 from agent.agent_runtime_helpers import force_close_tcp_sockets
@@ -1320,7 +1334,7 @@ class _CodexStreamGuard:
         # Gated on timeout_release_pending, NOT timed_out: after a hard-cancel the shared
         # client must stay usable for other sessions.
         if self.timeout_release_pending.is_set():
-            _close_quietly(self._client, "owner-thread close after timeout failed")
+            self._close_client_once("owner-thread close after timeout failed")
 
 
 class _CodexCompletionsAdapter:

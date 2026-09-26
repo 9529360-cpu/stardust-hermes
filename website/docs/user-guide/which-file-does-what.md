@@ -13,8 +13,9 @@ description: "SOUL.md vs USER.md vs MEMORY.md vs AGENTS.md — a one-page map of
 | File | What it holds | Who writes it | When the agent sees it | Where it lives |
 |------|---------------|---------------|------------------------|----------------|
 | **SOUL.md** | The agent's primary identity — personality, tone, communication style, what to avoid stylistically | You. Hermes seeds a starter file automatically if one doesn't exist; existing files are never overwritten | Slot #1 of the system prompt, at session start | `~/.hermes/SOUL.md` (or `$HERMES_HOME/SOUL.md` with a custom home) — never the working directory |
-| **USER.md** | User profile — your name, role, preferences, communication style, expectations | The agent, via the `memory` tool (you can gate saves with `write_approval`, or edit entries via `hermes journey edit`) | Injected into the system prompt as a frozen snapshot at session start | `~/.hermes/memories/` |
-| **MEMORY.md** | Agent's personal notes — environment facts, project conventions, tool quirks, things learned | The agent, via the `memory` tool (same gating and editing options as USER.md) | Injected into the system prompt as a frozen snapshot at session start | `~/.hermes/memories/` |
+| **USER.md** | User profile — your name, role, preferences, communication style, expectations | The agent, via the `memory` tool (you can gate saves with `write_approval`, or edit entries via `hermes journey edit`) | Turn-stable system-prompt snapshot; refreshes at the next turn when the file or reset generation changes | `~/.hermes/memories/` |
+| **MEMORY.md** | Cross-project assistant knowledge — global environment facts, standing conventions, reusable tool quirks and lessons | The agent, via the `memory` tool (same gating and editing options as USER.md) | Turn-stable system-prompt snapshot; refreshes at the next turn when the file or reset generation changes | `~/.hermes/memories/` |
+| **projects.db** | Project identity plus durable project-scoped facts and decisions, with provenance and confidence | The agent through the Project tool, or you through `hermes project facts` | Active trusted facts are frozen into that Project session's context | `$HERMES_HOME/projects.db` |
 | **AGENTS.md** | Project instructions, conventions, architecture — commands, ports, paths, repo-specific workflows | You (or whoever authors the project) | Loaded into the system prompt at startup from your working directory; nested copies are discovered progressively as the agent navigates subdirectories | Project working directory + subdirectories |
 | **.hermes.md** / **HERMES.md** | Project instructions, like AGENTS.md but Hermes-specific and highest priority | You | Loaded into the system prompt at startup (first match wins over AGENTS.md) | Your project — discovery walks up to the git root |
 
@@ -26,8 +27,9 @@ A useful shorthand:
 
 - **SOUL.md** is who the agent *is* — if it should follow you everywhere, it belongs here.
 - **USER.md** is who *you* are — the agent maintains it for you.
-- **MEMORY.md** is what the agent has *learned* — it maintains this itself too.
-- **AGENTS.md** (or `.hermes.md`) is what the *project* needs — if it belongs to a project, it belongs here.
+- **MEMORY.md** is what the agent has learned that applies *across projects*.
+- **projects.db** is what a particular Project has durably established — versions, decisions, and repository facts.
+- **AGENTS.md** (or `.hermes.md`) is what the *project instructs the agent to do* — rules and workflows belong here.
 
 ## "Why did it forget what I just said?"
 
@@ -45,7 +47,8 @@ If the agent saved your name to memory, the save worked — check with the `memo
 
 :::tip Quick decision guide
 - Want to change how the agent **talks**? Edit `~/.hermes/SOUL.md` — [Personality & SOUL.md](/user-guide/features/personality).
-- Want the agent to **remember a fact**? Just tell it — it saves to memory itself. [Persistent Memory](/user-guide/features/memory).
+- Want the agent to **remember a global/user fact**? Just tell it — it saves to the appropriate profile memory. [Persistent Memory](/user-guide/features/memory).
+- Want it to **remember a Project fact or decision**? In a Project session, it stores that in `projects.db`; inspect it with `hermes project facts <project> list`.
 - Want to set **project rules**? Put an `AGENTS.md` (or `.hermes.md`) in the project — [Context Files](/user-guide/features/context-files).
 - Need a **temporary** personality change? Use `/personality` — it's a session-level overlay, no file edits needed.
 :::

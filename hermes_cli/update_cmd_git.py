@@ -20,7 +20,7 @@ _ORPHAN_RESCUE_REF_MAX_AGE_DAYS = 30
 
 _GIT_TEXT_KW = dict(capture_output=True, text=True, encoding="utf-8", errors="replace")
 _BAR = "=" * 68
-_UPSTREAM_ADD_CMD = "git remote add upstream https://github.com/NousResearch/hermes-agent.git"
+_UPSTREAM_ADD_CMD = "git remote add upstream https://github.com/9529360-cpu/stardust-hermes.git"
 
 
 def _git_ok(git_cmd, args, cwd, **kw) -> bool:
@@ -169,12 +169,12 @@ def _print_parked_branch_kept_notice(current_branch: str, target_branch: str, un
 
 
 OFFICIAL_REPO_URLS = {
-    "https://github.com/NousResearch/hermes-agent.git",
-    "git@github.com:NousResearch/hermes-agent.git",
-    "https://github.com/NousResearch/hermes-agent",
-    "git@github.com:NousResearch/hermes-agent",
+    "https://github.com/9529360-cpu/stardust-hermes.git",
+    "git@github.com:9529360-cpu/stardust-hermes.git",
+    "https://github.com/9529360-cpu/stardust-hermes",
+    "git@github.com:9529360-cpu/stardust-hermes",
 }
-OFFICIAL_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
+OFFICIAL_REPO_URL = "https://github.com/9529360-cpu/stardust-hermes.git"
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
 
 
@@ -183,26 +183,33 @@ def _get_origin_url(git_cmd: list[str], cwd: Path) -> Optional[str]:
     return _git_stdout(git_cmd, ["remote", "get-url", "origin"], cwd)
 
 
+def _norm_repo_url(url: str) -> str:
+    """Normalize a repository URL for authority comparisons."""
+    url = url.rstrip("/")
+    return url[:-4] if url.endswith(".git") else url
+
+
+def _is_official_repo(url: Optional[str]) -> bool:
+    return bool(url) and _norm_repo_url(url) in {_norm_repo_url(official) for official in OFFICIAL_REPO_URLS}
+
+
 def _is_fork(origin_url: Optional[str]) -> bool:
     """Check if the origin remote points to a fork (not the official repo)."""
-    if not origin_url:
-        return False
-
-    def _norm(url: str) -> str:
-        url = url.rstrip("/")
-        return url[:-4] if url.endswith(".git") else url
-
-    return _norm(origin_url) not in {_norm(official) for official in OFFICIAL_REPO_URLS}
+    return bool(origin_url) and not _is_official_repo(origin_url)
 
 
 def _has_upstream_remote(git_cmd: list[str], cwd: Path) -> bool:
-    """Check if an 'upstream' remote already exists."""
-    return _git_ok(git_cmd, ["remote", "get-url", "upstream"], cwd)
+    """True only when 'upstream' exists and points at Stardust's authority."""
+    return _is_official_repo(_git_stdout(git_cmd, ["remote", "get-url", "upstream"], cwd))
 
 
 def _add_upstream_remote(git_cmd: list[str], cwd: Path) -> bool:
-    """Add the official repo as the 'upstream' remote. Returns True on success."""
-    return _git_ok(git_cmd, ["remote", "add", "upstream", OFFICIAL_REPO_URL], cwd)
+    """Add or repair 'upstream' so it points at Stardust's repository authority."""
+    existing = _git_stdout(git_cmd, ["remote", "get-url", "upstream"], cwd)
+    action = ["remote", "set-url", "upstream", OFFICIAL_REPO_URL] if existing is not None else [
+        "remote", "add", "upstream", OFFICIAL_REPO_URL
+    ]
+    return _git_ok(git_cmd, action, cwd)
 
 
 def _count_commits_between(git_cmd: list[str], cwd: Path, base: str, head: str) -> int:
@@ -238,8 +245,8 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
     ``--yes`` means "don't block", not "mutate my remotes", so a non-interactive skip is NOT persisted."""
     from hermes_cli.update_cmd import _add_upstream_remote, _mark_skip_upstream_prompt
     print(
-        "\nℹ Your fork is not tracking the official Hermes repository.\n"
-        "  This means you may miss updates from NousResearch/hermes-agent.\n"
+        "\nℹ Your fork is not tracking the official Stardust repository.\n"
+        "  This means you may miss updates from 9529360-cpu/stardust-hermes.\n"
     )
     if assume_yes or (input_fn is None and not (sys.stdin.isatty() and sys.stdout.isatty())):
         print(f"  Skipping upstream setup (non-interactive run).\n  Add it later with: {_UPSTREAM_ADD_CMD}")
@@ -260,7 +267,7 @@ def _offer_upstream_remote(git_cmd: list[str], cwd: Path, *, assume_yes: bool, i
     if not _add_upstream_remote(git_cmd, cwd):
         print("  ✗ Failed to add upstream remote. Skipping upstream sync.")
         return False
-    print("  ✓ Added upstream: https://github.com/NousResearch/hermes-agent.git")
+    print("  ✓ Added upstream: https://github.com/9529360-cpu/stardust-hermes.git")
     return True
 
 

@@ -6,14 +6,15 @@ description: "外部记忆提供者插件 — Honcho、OpenViking、Mem0、Hinds
 
 # Memory Providers
 
-Hermes Agent 内置 8 个外部记忆提供者插件，为 Agent 提供跨会话的持久化知识，超越内置的 MEMORY.md 和 USER.md。同一时间只能激活**一个**外部提供者——内置记忆始终与其并行工作。
+Hermes Agent 内置 8 个外部记忆提供者插件，为 Agent 提供超越内置 MEMORY.md 和 USER.md 的跨会话持久化知识。同一时间只能选择**一个**外部提供者；`memory.enabled` 是内置与外部持久记忆的总开关。
 
 ## 快速开始
 
 ```bash
 hermes memory setup      # 交互式选择器 + 配置
-hermes memory status     # 查看当前激活状态
-hermes memory off        # 禁用外部提供者
+hermes memory status     # 查看总开关、内置目标和 provider 状态
+hermes memory off        # 暂停全部持久记忆；保留 provider 配置
+hermes memory on         # 使用原配置恢复持久记忆
 ```
 
 也可以通过 `hermes plugins` → Provider Plugins → Memory Provider 选择激活的记忆提供者。
@@ -22,12 +23,13 @@ hermes memory off        # 禁用外部提供者
 
 ```yaml
 memory:
+  enabled: true
   provider: openviking   # 或 honcho, mem0, hindsight, holographic, retaindb, byterover, supermemory
 ```
 
 ## 工作原理
 
-当记忆提供者激活时，Hermes 会自动：
+当 `memory.enabled: true` 且已选择外部记忆提供者时，Hermes 会自动：
 
 1. **注入提供者上下文**到系统 prompt（提示词）中（提供者已知的内容）
 2. **在每轮对话前预取相关记忆**（后台非阻塞）
@@ -36,7 +38,7 @@ memory:
 5. **将内置记忆写入镜像**到外部提供者
 6. **添加提供者专属工具**，使 Agent 能够搜索、存储和管理记忆
 
-内置记忆（MEMORY.md / USER.md）继续按原有方式工作。外部提供者是增量叠加的。
+总开关开启时，外部提供者会叠加在当前启用的内置目标之上。设置 `memory.enabled: false`（或运行 `hermes memory off`）会停止内置持久化以及 provider 初始化、同步、预取、hook 和记忆工具 I/O，但不会清除 provider 选择或凭据。普通聊天/会话历史是独立子系统；重新开启后也不会补传关闭期间的对话轮次。
 
 ## 可用提供者
 

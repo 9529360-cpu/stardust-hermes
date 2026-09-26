@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { $pluginRecords } from '@/contrib/plugins-store'
+import { $pluginDecisions, $pluginRecords } from '@/contrib/plugins-store'
 import { $agentPlugins, $agentPluginsStatus } from '@/store/agent-plugins'
 import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { $pluginInstallRequest, closePluginInstallRequest } from '@/store/plugin-install-request'
@@ -16,6 +16,7 @@ vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
 
 describe('PluginsTab', () => {
   beforeEach(() => {
+    $pluginDecisions.set({})
     $pluginRecords.set({})
     $agentPlugins.set([])
     $agentPluginsStatus.set('ready')
@@ -86,6 +87,38 @@ describe('PluginsTab', () => {
     expect(screen.getAllByText('Agent in workbot').length).toBeGreaterThan(0)
   })
 
+  it('requires explicit trust before enabling external Desktop code and shows recorded provenance', async () => {
+    const sha = 'a'.repeat(40)
+    const repo = 'https://github.com/example/external-desktop.git'
+
+    $pluginRecords.set({
+      external: {
+        id: 'external',
+        name: 'External Tool',
+        kind: 'disk',
+        decisionId: 'external-slot',
+        status: 'disabled',
+        file: '/tmp/desktop-plugins/external/plugin.js',
+        packageOrigin: { repo, sha }
+      }
+    })
+
+    render(<PluginsTab profile={null} />)
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Desktop: External Tool' }))
+
+    expect($pluginDecisions.get()['external-slot']).not.toBe(true)
+    expect($pluginDecisions.get().external).toBeUndefined()
+    expect(screen.getByText('Trust and enable External Tool?')).toBeTruthy()
+    expect(screen.getByText(repo)).toBeTruthy()
+    expect(screen.getByText(sha)).toBeTruthy()
+    expect(screen.getAllByText(/same app authority/i).length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trust & enable' }))
+
+    await waitFor(() => expect($pluginDecisions.get()['external-slot']).toBe(true))
+    expect($pluginDecisions.get().external).toBeUndefined()
+  })
   it('offers "Install here" for a desktop half whose agent half is not in the selected profile', async () => {
     $pluginRecords.set({
       media: {

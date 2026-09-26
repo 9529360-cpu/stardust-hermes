@@ -358,6 +358,12 @@ export const zhHant = defineLocale({
       expMonthField: '到期月份',
       expYearField: '到期年份',
       cvcField: 'CVC',
+      delegatedPaymentLabel: 'Stardust 消費卡',
+      delegatedPaymentDescription: '你明確要求 Stardust 購買或付款時，可直接使用此卡，不再重複要求填卡確認。',
+      allowAnyOriginLabel: '允許用於任何結帳網站',
+      allowAnyOriginDescription: '適合專門準備的低額度、預付或虛擬卡。實際餘額或發卡行限額仍是硬性消費上限。',
+      delegatedPaymentBadge: '委託付款',
+      anySiteBadge: '任何網站',
       postalField: '郵遞區號',
       addressLine1Field: '地址第 1 行',
       addressLine2Field: '地址第 2 行',
@@ -522,8 +528,8 @@ export const zhHant = defineLocale({
         window: '整個視窗',
         sidebar: '僅側邊欄'
       },
-      backdropTitle: '聊天背景',
-      backdropDesc: '對話後方那張淡淡的雕像圖片。',
+      backdropTitle: '全視窗背景',
+      backdropDesc: '在整個 Stardust 視窗後方顯示一張本機圖片，涵蓋側欄、對話區與工具面板。圖片只保留在這台裝置上。',
       userBubbleTitle: '訊息氣泡',
       userBubbleDesc: '你自己的訊息有多透明。0 為不透明，100 時只保留邊框。',
       introSplashTitle: '開場標識',
@@ -2167,9 +2173,9 @@ export const zhHant = defineLocale({
     nameLabel: '名稱',
     cloneFrom: '複製來源',
     cloneFromNone: '無（空白）',
-    cloneFromDesc: '從選取的來源設定檔複製設定、技能和 SOUL.md。',
+    cloneFromDesc: '從選取的來源設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
     cloneFromDefault: '從預設設定檔複製設定',
-    cloneFromDefaultDesc: '從您的預設設定檔複製設定、技能和 SOUL.md。',
+    cloneFromDefaultDesc: '從預設設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
     invalidName: hint => `設定檔名稱無效。${hint}`,
     nameRequired: '名稱為必填',
     creating: '建立中…',
@@ -2405,6 +2411,7 @@ export const zhHant = defineLocale({
   },
 
   sidebar: {
+    recent: '最近',
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -3450,6 +3457,7 @@ export const zhHant = defineLocale({
   },
 
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: '今天想做什麼？', body: '直接問我，或者把一件事交給我。需要專案、檔案或預覽時，相關上下文會出現在對話右側。', start: '從一則訊息開始', actions: '瀏覽命令' },
     thread: {
       loadingSession: '正在載入工作階段',
       showEarlier: '顯示較早的訊息',

@@ -20,8 +20,9 @@
  * the whole SDK (`host.request` gateway RPC, `ctx.rest`, storage, `navigate`).
  * The isolation here is *error* isolation only (ContribBoundary, isolated
  * listeners) — a plugin can't crash the app, but it can do anything the app
- * can. That's acceptable for local sources (disk files can already run code),
- * and `integrity` only proves the bytes match a hash — it does NOT sandbox.
+ * can. Disk sources are therefore trust-gated BEFORE this evaluation
+ * primitive is called: reading/inventorying a plugin is not permission to
+ * import it. `integrity` only proves the bytes match a hash — it does NOT sandbox.
  * A remote source (https + allowlist) must NOT reuse this pipeline as-is:
  * it needs a real boundary (iframe/worker + CSP + capability gating) before
  * it can land. The `{ integrity }` option is the transport seam, not the
@@ -35,11 +36,17 @@ import { createPluginContext, type HermesPlugin } from './plugin'
 import { $pluginRecords, dropPlugin, pluginActive, type PluginKind, publishPlugin } from './plugins-store'
 
 interface LoadOptions {
-  /** Root-level default-enable CAP: `false` ships the plugin opt-in (inventory
-   *  row, off until the user toggles) even if the plugin says otherwise. The
-   *  unified agent-plugin root sets this so `~/.hermes/plugins` keeps its
-   *  installed-but-inert posture (GHSA-mcfc-hp25-cjv7) on the desktop side too. */
+  /** Root-level enable posture. Runtime code defaults to opt-in (`false`) even
+   *  if the plugin declares `defaultEnabled: true`; only an explicit user
+   *  decision in pluginDecisions may activate external renderer code. A
+   *  trusted caller may pass `true` deliberately, but disk/runtime discovery
+   *  never does. */
   defaultEnabled?: boolean
+  /** Stable user-trust identity. For disk plugins this comes from the trusted
+   *  disk slot, never from source-declared metadata learned by evaluation. */
+  decisionId?: string
+  /** Inventory id to use when evaluation fails before plugin.id is known. */
+  fallbackRecordId?: string
   /** Absolute plugin.js path (disk plugins) — recorded for reveal/inventory. */
   file?: string
   /** `sha256-<base64>` — verified against the source before evaluation. */
@@ -107,7 +114,9 @@ export function unloadRuntimePlugin(id: string): void {
   loaded.delete(id)
 }
 
-/** Evaluate + register one runtime plugin. Returns its id, or null on failure. */
+/** Evaluate one ALREADY-TRUSTED runtime plugin and optionally register it.
+ * Never call this to discover metadata from untrusted source: ESM import executes
+ * top-level code before plugin.id/defaultEnabled/register can be inspected. */
 export async function loadRuntimePlugin(
   source: string,
   origin: string,
@@ -172,6 +181,7 @@ export async function loadRuntimePlugin(
       name: plugin.name ?? plugin.id,
       description: plugin.description,
       kind: options.kind ?? 'disk',
+      decisionId: options.decisionId,
       file: options.file,
       packageName: options.packageName,
       packageOrigin: options.packageOrigin
@@ -192,7 +202,8 @@ export async function loadRuntimePlugin(
     // reactivates via the handle above) — it just never registers. A root-level
     // `defaultEnabled: false` caps the plugin's own default: the user's explicit
     // enable still wins, a plugin can't self-enable past its root's posture.
-    if (pluginActive(plugin.id, (plugin.defaultEnabled ?? true) && (options.defaultEnabled ?? true))) {
+    const decisionId = options.decisionId ?? plugin.id
+    if (pluginActive(decisionId, (plugin.defaultEnabled ?? true) && (options.defaultEnabled ?? false))) {
       activate()
     }
 
@@ -201,9 +212,10 @@ export async function loadRuntimePlugin(
     console.error(`[plugins] runtime load failed (${origin})`, error)
     notifyError(error, `Plugin "${origin}" failed to load`)
     publishPlugin({
-      id: origin,
+      id: options.fallbackRecordId ?? origin,
       name: origin,
       kind: options.kind ?? 'disk',
+      decisionId: options.decisionId,
       file: options.file,
       packageName: options.packageName,
       packageOrigin: options.packageOrigin,
@@ -293,9 +305,13 @@ async function readPackageMarker(desktop: Window['hermesDesktop'], folder: strin
 }
 
 interface DiskPlugin {
+  /** Stable trust key derived from the disk slot before source evaluation. */
+  decisionId: string
   /** Root posture, forwarded on every (re)load of this entry. */
   defaultEnabled?: boolean
   file: string
+  /** Inventory id used before source-declared plugin.id is safe to learn. */
+  inventoryId: string
   /** Agent package this folder is the desktop half of (unified packages). */
   packageName?: string
   packageOrigin?: PackageMarker['origin']
@@ -316,6 +332,11 @@ let scanning = false
  *  of ANOTHER disk entry (two roots can carry same-named folders; a broken one
  *  must not clobber its healthy namesake's inventory row). */
 function dropOriginRecord(origin: string, except: DiskPlugin): void {
+  // Never let deleting a stale disk copy remove the real bundled registration.
+  if ($pluginRecords.get()[origin]?.kind === 'bundled') {
+    return
+  }
+
   for (const other of disk.values()) {
     if (other !== except && other.id === origin) {
       return
@@ -351,17 +372,65 @@ async function readPluginSourceText(file: string): Promise<string> {
   return result.text
 }
 
+function publishInertDiskPlugin(entry: DiskPlugin): void {
+  const recordId = entry.id ?? entry.inventoryId
+  const current = $pluginRecords.get()[recordId]
+
+  publishPlugin(
+    {
+      id: recordId,
+      name: current?.name ?? entry.origin,
+      description: current?.description,
+      kind: 'disk',
+      decisionId: entry.decisionId,
+      file: entry.file,
+      packageName: entry.packageName,
+      packageOrigin: entry.packageOrigin,
+      status: 'disabled'
+    },
+    {
+      // This is the trust boundary: only an explicit enable decision reaches
+      // source read + module import. Discovery never evaluates plugin.js.
+      activate: async () => {
+        if (!(await loadDiskPlugin(entry, true))) {
+          throw new Error(`Plugin "${entry.origin}" disappeared before it could be enabled`)
+        }
+      },
+      deactivate: () => {
+        if (entry.id) {
+          unloadRuntimePlugin(entry.id)
+        }
+      }
+    }
+  )
+}
+
 /** Returns false when the entry file could not be read (vanished mid-read) so
  *  the caller can reconcile/unload the registration instead of retaining a
  *  live ghost for a missing entry. */
-async function loadDiskPlugin(entry: DiskPlugin): Promise<boolean> {
+async function loadDiskPlugin(entry: DiskPlugin, trustedNow = false): Promise<boolean> {
   const prevId = entry.id
+
+  // Never import an external module merely to discover its source-declared id.
+  // Trust is bound to the disk slot name, which is known without executing code.
+  // Legacy decisions whose plugin id matched the folder name continue to work;
+  // an un-mappable legacy id fails closed and requires one fresh confirmation.
+  if (!trustedNow && !pluginActive(entry.decisionId, false)) {
+    // If this slot was loaded in the past, keep its user-facing runtime id but
+    // replace the stale module handle with a deferred source reload. Editing a
+    // disabled file neither executes it nor makes the next enable run old code.
+    publishInertDiskPlugin(entry)
+
+    return true
+  }
 
   try {
     const text = await readPluginSourceText(entry.file)
 
     const id = await loadRuntimePlugin(text, entry.origin, {
+      decisionId: entry.decisionId,
       defaultEnabled: entry.defaultEnabled,
+      fallbackRecordId: entry.inventoryId,
       file: entry.file,
       packageName: entry.packageName,
       packageOrigin: entry.packageOrigin
@@ -377,6 +446,10 @@ async function loadDiskPlugin(entry: DiskPlugin): Promise<boolean> {
 
     entry.id = id ?? entry.id
 
+    if (id && id !== entry.inventoryId) {
+      dropPlugin(entry.inventoryId)
+    }
+
     // A fixing save under a different plugin id — drop the folder-named
     // error record so the inventory shows one row, not a ghost.
     if (id && id !== entry.origin) {
@@ -385,18 +458,16 @@ async function loadDiskPlugin(entry: DiskPlugin): Promise<boolean> {
 
     return true
   } catch (error) {
-    // An oversize source is a REAL failure the user must see (the silent
-    // shape was the bug: a truncated file evaluated as a syntax error, or
-    // worse, as half a plugin). It is a completed read of an existing file,
-    // so report it and keep the registration (true) — everything else is a
-    // file vanishing mid-read, where false lets the caller reconcile/unload.
+    // This path is reachable only AFTER trust, so oversize/truncation errors
+    // are reported when the user actually asks to execute the source.
     if (error instanceof PluginSourceOversizeError) {
       console.error(`[plugins] ${entry.origin}: ${error.message}`)
       notifyError(error, `Plugin "${entry.origin}" failed to load`)
       publishPlugin({
-        id: entry.origin,
+        id: entry.inventoryId,
         name: entry.origin,
         kind: 'disk',
+        decisionId: entry.decisionId,
         file: entry.file,
         status: 'error',
         error: error.message
@@ -490,11 +561,15 @@ async function scanDiskPlugins(): Promise<void> {
 
         const marker = await readPackageMarker(desktop, dir.path)
 
+        const occupied = $pluginRecords.get()[dir.name]
         const record: DiskPlugin = {
-          // A unified package's desktop half ships opt-in, like its agent half.
-          defaultEnabled: marker ? false : undefined,
+          // The folder is renderer-owned metadata and can be known without
+          // evaluating attacker-controlled plugin.js. Bind trust to that slot.
+          decisionId: dir.name,
+          defaultEnabled: false,
           file,
           id: null,
+          inventoryId: occupied?.kind === 'bundled' ? `${dir.name}:disk-untrusted` : dir.name,
           origin: dir.name,
           packageName: marker?.package,
           packageOrigin: marker?.origin,
@@ -529,6 +604,7 @@ async function scanDiskPlugins(): Promise<void> {
         dropPlugin(record.id)
       }
 
+      dropPlugin(record.inventoryId)
       dropOriginRecord(record.origin, record)
 
       if (record.watchId) {

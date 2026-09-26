@@ -316,17 +316,32 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
         return json.dumps({"error": f"{action} failed: {e}"})
 
 def _request_approval(action: str, args: Dict[str, Any]) -> Optional[str]:
-    """None if approved, else a JSON error string. The decision (yolo bypass, session/permanent grants, CLI prompt,
-    gateway pending, cron/unattended policy, fail-closed with nobody to ask) is ``tools.approval``'s shared gate,
-    so a computer_use grant is one store entry like any terminal pattern. Scope key ``cua:<action>:<mode>``:
-    foreground delivery is a visible focus change, so a background ``session`` grant must NOT cover it (#67052).
-    """
-    from tools.approval import _run_approval_gate
+    """None if approved, else a JSON error string.
 
-    mode = "foreground" if args.get("delivery_mode") == "foreground" else "background"
+    Approval is scoped to the user-visible desktop action, not the transport
+    rung used to deliver it. A session/permanent grant for ``cua:click`` covers
+    both background and foreground delivery of clicks; foreground is merely a
+    fallback transport when the driver reports that background input did not
+    land. ``bring_to_front`` remains its own action/scope because a persistent
+    focus change is a distinct visible side effect.
+
+    Legacy ``cua:<action>:background|foreground`` grants remain accepted so an
+    upgrade does not invalidate an existing command_allowlist.
+    """
+    from tools.approval import _run_approval_gate, is_approved
+    from tools.approval_context import get_current_session_key
+
+    pattern_key = f"cua:{action}"
+    session_key = get_current_session_key(default="")
+    if any(
+        is_approved(session_key, legacy)
+        for legacy in (f"{pattern_key}:background", f"{pattern_key}:foreground")
+    ):
+        return None
+
     description = f"Allow computer_use to perform `{action}`?"
     result = _run_approval_gate(
-        pattern_key=f"cua:{action}:{mode}", description=description,
+        pattern_key=pattern_key, description=description,
         display_target=f"computer_use: {_summarize_action(action, args)}", approval_callback=_approval_callback,
         subject=f"computer_use `{action}` requires approval", noun="desktop actions",
         advice="Find an alternative approach that avoids driving the desktop.",
@@ -334,6 +349,7 @@ def _request_approval(action: str, args: Dict[str, Any]) -> Optional[str]:
         fail_closed_when_no_human=True,
         no_human_block_message=(f"BLOCKED: computer_use `{action}` requires approval but no interactive user or "
                                 "gateway is present to approve it."),
+        respect_smart_mode=True,
     )
     if result.get("approved"):
         return None
@@ -461,7 +477,7 @@ def _classify_action_result(res: ActionResult) -> Dict[str, Any]:
         return {"decision": "escalate", **({"recommended": res.escalation.get("recommended")}
                                            if isinstance(res.escalation, dict) else {}), "hint": (
             "The input likely did not land. Climb one rung following `recommended`: 'px' → re-issue by coordinate; "
-            "'foreground' (or a failed pixel click) → re-issue with delivery_mode='foreground' (separate approval). "
+            "'foreground' (or a failed pixel click) → re-issue with delivery_mode='foreground'. "
             "Do not predict the rung from the app being Electron/Chromium — react to this signal.")}
     return {"decision": "verify_fresh_state",  # transport success without semantic proof is not proof of effect
             "hint": "Transport succeeded but the effect is unproven. Re-capture and confirm before continuing."}

@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils'
 import { upsertDesktopActionTask } from '@/store/activity'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
+import { requestFreshSession } from '@/store/profile'
 import type { ActionStatusResponse } from '@/types/hermes'
 
 const ACTION_POLL_MS = 1200
@@ -170,18 +171,64 @@ export function MaintenancePanel() {
 
   const doResetMemory = useCallback(
     async (target: 'all' | 'memory' | 'user', label: string) => {
-      if (!(await confirm({ destructive: true, title: mm.resetConfirm(label) }))) {
+      if (
+        !(await confirm({
+          destructive: true,
+          description: mm.resetConfirmDetail,
+          title: mm.resetConfirm(label)
+        }))
+      ) {
         return
       }
 
       setMemoryBusy(true)
 
       try {
-        const result = await resetMemory(target)
-        notify({ kind: 'success', title: mm.resetDone(result.deleted.join(', ') || label), message: '' })
-        setMemory(await getMemoryStatus())
-      } catch (err) {
-        notifyError(err, mm.resetFailed)
+        let result
+
+        try {
+          result = await resetMemory(target)
+        } catch (err) {
+          notifyError(err, mm.resetFailed)
+          return
+        }
+
+        // The reset is the authoritative irreversible effect. A follow-up status
+        // refresh must never turn a committed delete into a false "reset failed"
+        // message. Project the known result immediately, then refresh best-effort.
+        notify({
+          kind: 'success',
+          title: mm.resetDone(result.deleted.join(', ') || label),
+          message: mm.resetCurrentChats
+        })
+        setMemory(current => {
+          if (!current) {
+            return current
+          }
+
+          return {
+            ...current,
+            builtin_files: {
+              memory: target === 'all' || target === 'memory' ? 0 : current.builtin_files.memory,
+              user: target === 'all' || target === 'user' ? 0 : current.builtin_files.user
+            }
+          }
+        })
+        void getMemoryStatus()
+          .then(next => setMemory(next))
+          .catch(() => undefined)
+
+        if (
+          result.active_session_behavior === 'refresh_on_next_turn' &&
+          (await confirm({
+            cancelLabel: mm.keepCurrentSession,
+            confirmLabel: mm.startFreshSession,
+            description: mm.resetFreshDescription,
+            title: mm.resetFreshTitle
+          }))
+        ) {
+          requestFreshSession()
+        }
       } finally {
         setMemoryBusy(false)
       }

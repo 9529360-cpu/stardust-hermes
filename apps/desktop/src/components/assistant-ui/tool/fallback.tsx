@@ -48,6 +48,7 @@ import { isOnboardingEnabled } from '@/lib/onboarding-enabled'
 import { toolResultRecord } from '@/lib/tool-result-metadata'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
+import { openPreviewFromToolResult } from '@/store/preview'
 import { recordPreviewArtifact } from '@/store/preview-status'
 import { sessionApprovalRequest } from '@/store/prompts'
 import { $toolInlineDiff } from '@/store/tool-diffs'
@@ -62,6 +63,7 @@ import {
   CONNECTION_CARD_KEY,
   countDiffLineStats,
   inlineDiffFromResult,
+  isAutoOpenTarget,
   isCardTool,
   isFileEditTool,
   isPreviewableTarget,
@@ -427,8 +429,20 @@ function ToolEntry({ part }: ToolEntryProps) {
     // or cwd change.
     const sessionId = $sessionRuntimeId.get()
 
-    if (sessionId) {
-      recordPreviewArtifact(sessionId, previewTarget, $sessionCwd.get() || '')
+    if (!sessionId) {
+      return
+    }
+
+    const cwd = $sessionCwd.get() || ''
+    const isNewArtifact = recordPreviewArtifact(sessionId, previewTarget, cwd)
+
+    // Auto-open only a genuinely new web page or PDF (never plain source), and
+    // only once — a re-render of the same tool row must not re-yank the rail
+    // open after the user has closed it. This row is only mounted while its
+    // session's transcript is on screen, so there is no separate visibility
+    // gate to check here.
+    if (isNewArtifact && isAutoOpenTarget(previewTarget)) {
+      void openPreviewFromToolResult(previewTarget, cwd)
     }
   }, [$sessionCwd, $sessionRuntimeId, isPending, previewTarget])
 

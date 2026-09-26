@@ -24,6 +24,9 @@ export interface PluginRecord {
   error?: string
   /** Absolute plugin.js path (disk plugins) — powers "Reveal in Finder". */
   file?: string
+  /** Stable user-trust key. External disk plugins bind trust to their disk slot,
+   *  never to a source-declared plugin id that is unknown before evaluation. */
+  decisionId?: string
   /** Agent package this is the desktop half of (unified agent+desktop packages). */
   packageName?: string
   /** Where that package came from (catalog sidecar or git remote), when known. */
@@ -112,8 +115,9 @@ export function dropPlugin(id: string): void {
 }
 
 /** Live toggle: deactivate + remember, or forget + reactivate. */
-export async function setPluginEnabled(id: string, enabled: boolean): Promise<void> {
-  saveDecisions({ ...$pluginDecisions.get(), [id]: enabled })
+export async function setPluginEnabled(id: string, enabled: boolean, decisionId?: string): Promise<void> {
+  const decisionKey = decisionId ?? $pluginRecords.get()[id]?.decisionId ?? id
+  saveDecisions({ ...$pluginDecisions.get(), [decisionKey]: enabled })
 
   const handle = handles.get(id)
 

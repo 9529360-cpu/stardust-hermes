@@ -47,7 +47,7 @@ def test_reload_config_modules_restores_missing_tools_config_symbol():
 def test_update_migration_survives_stale_module_missing_call_time_symbol(tmp_path, monkeypatch):
     """The reporter's exact shape: the cached ``tools_config`` predates ``_configurable_keys`` while
     the on-disk v45 step imports it at call time. The updater's migration entry must still land
-    v44 → v45 instead of printing "Config format update failed"."""
+    v44 → the current schema instead of printing "Config format update failed"."""
     home = tmp_path / "flat-home"
     home.mkdir()
     (home / "config.yaml").write_text(
@@ -66,7 +66,7 @@ def test_update_migration_survives_stale_module_missing_call_time_symbol(tmp_pat
         reset_hermes_home_override(token)
 
     text = (home / "config.yaml").read_text(encoding="utf-8")
-    assert "_config_version: 45" in text, text
+    assert "_config_version: 46" in text, text
 
 
 def test_update_migration_import_failure_after_purge_prints_fallback(tmp_path, monkeypatch, capsys):

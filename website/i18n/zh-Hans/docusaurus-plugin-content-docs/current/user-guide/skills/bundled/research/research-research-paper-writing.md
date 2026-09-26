@@ -2162,11 +2162,12 @@ ACL 系列会议有不同的投稿类型：
 | **`web_search`** | 文献发现：`web_search("transformer attention mechanism 2024")` |
 | **`web_extract`** | 获取论文内容，核实引用：`web_extract("https://arxiv.org/abs/2303.17651")` |
 | **`delegate_task`** | **并行章节起草**——为每个章节生成隔离的子 agent。也用于并发引用核实。 |
-| **`todo`** | 跨会话的主要状态追踪器。每次阶段转换后更新。 |
-| **`memory`** | 跨会话持久化关键决策：贡献框架、会议选择、审稿反馈。 |
+| **`todo`** | 会话范围的多步骤计划状态；可跨压缩/会话恢复，但不是长期后台任务的权威来源。 |
+| **`desktop_project` / Project facts** | 当会话绑定 Project 时，持久化论文专属决策，例如贡献框架、会议选择和审稿反馈。 |
+| **`memory`** | 仅保存跨项目复用的经验或用户级约定；不要把当前论文 Project 的状态写入全局记忆。 |
 | **`cronjob`** | 调度实验监控、截止日期倒计时、自动 arXiv 检查。 |
 | **`clarify`** | 在真正受阻时向用户提出针对性问题（会议选择、贡献框架）。 |
-| **`send_message`** | 即使用户不在聊天中，也在实验完成或草稿准备好时通知用户。 |
+| **cron `deliver:`** | 用户不在聊天中时，通过带 `deliver:` 目标的 cron 任务通知实验完成或草稿就绪。 |
 
 ### 工具使用模式
 
@@ -2177,7 +2178,7 @@ terminal("ps aux | grep <pattern>")
 → terminal("ls results/")
 → execute_code("analyze results JSON, compute metrics")
 → terminal("git add -A && git commit -m '<descriptive message>' && git push")
-→ send_message("Experiment complete: <summary>")
+→ （最终回复自动交付；无人值守时使用带 `deliver:` 目标的 cron 调度检查）
 ```
 
 **并行章节起草**（使用委派）：
@@ -2211,18 +2212,18 @@ for paper in results:
         print(bibtex)
 ```
 
-### 使用 `memory` 和 `todo` 进行状态管理
+### 使用 Project facts 和 `todo` 进行状态管理
 
-**`memory` 工具**——持久化关键决策（有限：MEMORY.md 约 2200 字符）：
+**Project facts**——把论文专属的持久决策写入当前绑定的 Project，而不是全局 `MEMORY.md`。GUI 会话可使用 `desktop_project` 的 `fact_add`；CLI 可使用 `hermes project facts <project> add ...`。只有真正跨项目复用的经验或用户级约定才进入 `memory`。
 
+```text
+desktop_project({"action":"fact_add",
+  "content":"Venue: NeurIPS 2025. Contribution: structured refinement works when the generation-evaluation gap is wide.",
+  "source_kind":"session",
+  "confidence":1.0})
 ```
-memory("add", "Paper: autoreason. Venue: NeurIPS 2025 (9 pages). 
-  Contribution: structured refinement works when generation-evaluation gap is wide.
-  Key results: Haiku 42/42, Sonnet 3/5, S4.6 constrained 2/3.
-  Status: Phase 5 — drafting Methods section.")
-```
 
-在重大决策或阶段转换后更新记忆。这会跨会话持久化。
+持久决策变化时更新 Project facts；当前执行进度继续由 `todo` 管理。
 
 **`todo` 工具**——追踪细粒度进度：
 
@@ -2237,7 +2238,7 @@ todo("update", id=1, status="completed")
 **会话启动协议：**
 ```
 1. todo("list")                           # Check current task list
-2. memory("read")                         # Recall key decisions
+2. desktop_project({"action":"fact_list"}) # Recall durable project decisions when attached
 3. terminal("git log --oneline -10")      # Check recent commits
 4. terminal("ps aux | grep python")       # Check running experiments
 5. terminal("ls results/ | tail -20")     # Check for new results

@@ -391,6 +391,8 @@ class VaultItem(Result):
     identifier: str | None = None
     identifier_type: str | None = None
     has_otp: bool | None = None
+    delegated_payment: bool | None = None
+    allow_any_origin: bool | None = None
     backend: str
 
 
@@ -467,6 +469,8 @@ class VaultAddParams(ProfileParams):
     kind: VaultKind | None = None
     label: str | None = None
     origin: str | None = None
+    delegated_payment: bool | None = None
+    allow_any_origin: bool | None = None
     secret: dict[str, JsonValue] | None = None
 
 

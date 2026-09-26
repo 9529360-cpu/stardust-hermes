@@ -1,25 +1,19 @@
-"""Tests for the `hermes memory reset` CLI command.
+"""Tests for the `hermes memory reset` CLI command."""
 
-Covers:
-- Reset both stores (MEMORY.md + USER.md)
-- Reset individual stores (--target memory / --target user)
-- Skip confirmation with --yes
-- Graceful handling when no memory files exist
-- Profile-scoped reset (uses HERMES_HOME)
-"""
+from types import SimpleNamespace
 
 import pytest
+
+from hermes_cli.main_agent_cmds import _cmd_memory_reset
+from tools.memory_tool import MemoryStore
 
 
 @pytest.fixture
 def memory_env(tmp_path, monkeypatch):
-    """Set up a fake HERMES_HOME with memory files."""
     hermes_home = tmp_path / ".hermes"
     memories = hermes_home / "memories"
     memories.mkdir(parents=True)
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-
-    # Create sample memory files
     (memories / "MEMORY.md").write_text(
         "§\nHermes repo is at ~/.hermes/hermes-agent\n§\nUser prefers dark themes",
         encoding="utf-8",
@@ -31,65 +25,63 @@ def memory_env(tmp_path, monkeypatch):
     return hermes_home, memories
 
 
-def _run_memory_reset(target="all", yes=False, monkeypatch=None, confirm_input="no"):
-    """Invoke the memory reset logic from cmd_memory in main.py.
-
-    Simulates what happens when `hermes memory reset` is run.
-    """
-    from hermes_constants import get_hermes_home
-
-    mem_dir = get_hermes_home() / "memories"
-    files_to_reset = []
-    if target in {"all", "memory"}:
-        files_to_reset.append(("MEMORY.md", "agent notes"))
-    if target in {"all", "user"}:
-        files_to_reset.append(("USER.md", "user profile"))
-
-    existing = [(f, desc) for f, desc in files_to_reset if (mem_dir / f).exists()]
-    if not existing:
-        return "nothing"
-
-    if not yes:
-        if confirm_input != "yes":
-            return "cancelled"
-
-    for f, desc in existing:
-        (mem_dir / f).unlink()
-
-    return "deleted"
+def _reset(target="all", yes=True):
+    _cmd_memory_reset(SimpleNamespace(target=target, yes=yes))
 
 
 class TestMemoryReset:
-    """Tests for `hermes memory reset` subcommand."""
-
     def test_reset_all_with_yes_flag(self, memory_env):
-        """--yes flag should skip confirmation and delete both files."""
-        hermes_home, memories = memory_env
-        assert (memories / "MEMORY.md").exists()
-        assert (memories / "USER.md").exists()
+        _home, memories = memory_env
 
-        result = _run_memory_reset(target="all", yes=True)
-        assert result == "deleted"
+        _reset("all")
+
         assert not (memories / "MEMORY.md").exists()
         assert not (memories / "USER.md").exists()
+        assert (memories / "MEMORY.md.reset-generation").read_text(encoding="utf-8").strip()
+        assert (memories / "USER.md.reset-generation").read_text(encoding="utf-8").strip()
 
-
-    def test_reset_no_files_exist(self, tmp_path, monkeypatch):
-        """Should return 'nothing' when no memory files exist."""
+    def test_reset_no_files_still_advances_forget_generation(self, tmp_path, monkeypatch, capsys):
         hermes_home = tmp_path / ".hermes"
-        (hermes_home / "memories").mkdir(parents=True)
+        memories = hermes_home / "memories"
+        memories.mkdir(parents=True)
         monkeypatch.setenv("HERMES_HOME", str(hermes_home))
 
-        result = _run_memory_reset(target="all", yes=True)
-        assert result == "nothing"
+        _reset("all")
 
+        out = capsys.readouterr().out
+        assert "No built-in memory files are currently present" in out
+        assert (memories / "MEMORY.md.reset-generation").read_text(encoding="utf-8").strip()
+        assert (memories / "USER.md.reset-generation").read_text(encoding="utf-8").strip()
 
-    def test_reset_partial_files(self, memory_env):
-        """Reset should work when only one memory file exists."""
-        hermes_home, memories = memory_env
+    def test_reset_partial_files_advances_both_requested_targets(self, memory_env):
+        _home, memories = memory_env
         (memories / "USER.md").unlink()
 
-        result = _run_memory_reset(target="all", yes=True)
-        assert result == "deleted"
-        assert not (memories / "MEMORY.md").exists()
+        _reset("all")
 
+        assert not (memories / "MEMORY.md").exists()
+        assert (memories / "MEMORY.md.reset-generation").exists()
+        assert (memories / "USER.md.reset-generation").exists()
+
+    def test_cancel_does_not_advance_generation(self, memory_env, monkeypatch):
+        _home, memories = memory_env
+        monkeypatch.setattr("builtins.input", lambda *_args, **_kwargs: "no")
+
+        _reset("memory", yes=False)
+
+        assert (memories / "MEMORY.md").exists()
+        assert not (memories / "MEMORY.md.reset-generation").exists()
+
+    def test_cli_reset_fences_already_loaded_store(self, memory_env):
+        _home, memories = memory_env
+        store = MemoryStore()
+        store.load_from_disk()
+        before = store.reset_generation("memory")
+
+        _reset("memory")
+
+        assert store.reset_generation("memory") == before
+        blocked = store.add("memory", "stale session write")
+        assert blocked["success"] is False
+        assert blocked["reset_conflict"] is True
+        assert not (memories / "MEMORY.md").exists()

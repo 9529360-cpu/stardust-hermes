@@ -255,6 +255,18 @@ class TestClawHubSource(unittest.TestCase):
         self.assertEqual(mock_get.call_count, 2)
         mock_safe_get.assert_not_called()
 
+    @patch("tools.skills_hub_clawhub._cached_metas", return_value=None)
+    def test_nonempty_search_does_not_bootstrap_full_catalog_on_cold_cache(
+        self, _mock_cached
+    ):
+        """Interactive query search falls back to the lightweight API when the
+        completed full-catalog cache is absent."""
+        with patch.object(self.src, "_load_catalog_index") as full_walk:
+            results = self.src._search_catalog("calendar", limit=10)
+
+        self.assertEqual(results, [])
+        full_walk.assert_not_called()
+
     @patch("tools.skills_hub._write_index_cache")
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
@@ -338,8 +350,7 @@ class TestClawHubSource(unittest.TestCase):
 
         mock_get.side_effect = side_effect
 
-        # Force the deadline to be in the past immediately. Budget only applies
-        # to bounded browse walks (max_items > 0), not the index builder path.
+        # Force the interactive browse deadline to be in the past immediately.
         with patch.object(ClawHubSource, "CATALOG_WALK_BUDGET_SECONDS", -1):
             results = self.src._load_catalog_index(max_items=10)
 
@@ -443,9 +454,8 @@ class TestClawHubSource(unittest.TestCase):
 
 
 class TestClawHubCatalogWalkBounded(unittest.TestCase):
-    """max_items bounds the walk so browse's cold-start fallback renders one
-    page without walking the entire 50k+ catalog. The offline index builder
-    keeps max_items=0 (unbounded) and walks to exhaustion."""
+    """max_items bounds browse cold-start walks; max_items=0 requests a large
+    offline index walk under its separate publisher wall-clock budget."""
 
     def setUp(self):
         self.src = ClawHubSource()
@@ -502,20 +512,68 @@ class TestClawHubCatalogWalkBounded(unittest.TestCase):
     @patch("tools.skills_hub._write_index_cache")
     @patch("tools.skills_hub._read_index_cache", return_value=None)
     @patch("tools.skills_hub.httpx.get")
-    def test_max_items_zero_ignores_wall_clock_budget(
-        self, mock_get, _mock_read_cache, _mock_write_cache
+    def test_max_items_zero_uses_index_build_budget_and_does_not_poison_cache(
+        self, mock_get, _mock_read_cache, mock_write_cache
     ):
-        """Index builder path (max_items=0) must not truncate on the browse budget."""
+        """Index builder walks are large but still need a hard wall-clock bound."""
         page_calls = {"n": 0}
         mock_get.side_effect = self._infinite_pages(page_calls)
 
-        with patch.object(ClawHubSource, "CATALOG_WALK_BUDGET_SECONDS", -1):
+        with (
+            patch.object(ClawHubSource, "CATALOG_WALK_BUDGET_SECONDS", 9999),
+            patch.object(ClawHubSource, "INDEX_BUILD_WALK_BUDGET_SECONDS", -1),
+        ):
             results = self.src._load_catalog_index(max_items=0)
 
-        # No budget -> walks until the 750-page safety cap, not ~14 pages in 12s.
-        self.assertEqual(page_calls["n"], 750)
-        self.assertEqual(len(results), 750)
+        self.assertLess(page_calls["n"], 750)
+        self.assertEqual(results, [])
+        self.assertTrue(self.src.index_build_incomplete)
+        self.assertEqual(self.src.index_build_incomplete_reason, "wall-clock budget")
+        mock_write_cache.assert_not_called()
 
+    @patch("tools.skills_hub._write_index_cache")
+    @patch("tools.skills_hub._read_index_cache", return_value=None)
+    def test_index_build_request_failure_is_incomplete_and_uncached(
+        self, _mock_read_cache, mock_write_cache
+    ):
+        first_page = {
+            "items": [{"slug": "one", "displayName": "One"}],
+            "nextCursor": "next",
+        }
+        with (
+            patch.object(self.src, "_get_json", side_effect=[first_page, None]),
+            patch.object(ClawHubSource, "INDEX_BUILD_WALK_BUDGET_SECONDS", 9999),
+        ):
+            results = self.src._load_catalog_index(max_items=0)
+
+        self.assertEqual([m.identifier for m in results], ["one"])
+        self.assertTrue(self.src.index_build_incomplete)
+        self.assertEqual(self.src.index_build_incomplete_reason, "request failure")
+        mock_write_cache.assert_not_called()
+
+    @patch("tools.skills_hub._write_index_cache")
+    @patch("tools.skills_hub._read_index_cache", return_value=None)
+    def test_index_build_page_ceiling_is_incomplete_and_uncached(
+        self, _mock_read_cache, mock_write_cache
+    ):
+        pages = [
+            {
+                "items": [{"slug": f"skill-{i}", "displayName": f"Skill {i}"}],
+                "nextCursor": f"cursor-{i + 1}",
+            }
+            for i in range(2)
+        ]
+        with (
+            patch.object(self.src, "_get_json", side_effect=pages),
+            patch.object(ClawHubSource, "INDEX_BUILD_WALK_BUDGET_SECONDS", 9999),
+            patch.object(ClawHubSource, "CATALOG_WALK_MAX_PAGES", 2),
+        ):
+            results = self.src._load_catalog_index(max_items=0)
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(self.src.index_build_incomplete)
+        self.assertEqual(self.src.index_build_incomplete_reason, "page ceiling")
+        mock_write_cache.assert_not_called()
 
     @patch("tools.skills_hub._write_index_cache")
     @patch("tools.skills_hub._read_index_cache", return_value=None)

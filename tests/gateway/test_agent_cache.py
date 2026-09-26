@@ -186,6 +186,30 @@ class TestExtractCacheBustingConfig:
         assert out["compression.codex_app_server_auto"] == "hermes"
 
 
+    def test_reads_memory_construction_policy(self):
+        from gateway.run import GatewayRunner
+
+        out = GatewayRunner._extract_cache_busting_config({
+            "memory": {
+                "enabled": False,
+                "memory_enabled": True,
+                "user_profile_enabled": False,
+                "memory_char_limit": 321,
+                "user_char_limit": 654,
+                "nudge_interval": 7,
+                "provider": "holographic",
+            }
+        })
+
+        assert out["memory.enabled"] is False
+        assert out["memory.memory_enabled"] is True
+        assert out["memory.user_profile_enabled"] is False
+        assert out["memory.memory_char_limit"] == 321
+        assert out["memory.user_char_limit"] == 654
+        assert out["memory.nudge_interval"] == 7
+        assert out["memory.provider"] == "holographic"
+
+
     def test_missing_keys_yield_none(self):
         """Absent config keys must produce None values (still contribute to signature)."""
         from gateway.run import GatewayRunner

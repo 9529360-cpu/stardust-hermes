@@ -143,7 +143,8 @@ def _(rid, params: dict) -> dict:
     """Add a vault item. ``secret`` values go straight into the encrypted store.
 
     Params: ``kind`` (login|payment|address), ``label``, ``origin?``,
-    ``secret`` (dict). Result: ``{id}`` — metadata only. Exception text is
+    ``delegated_payment?``, ``allow_any_origin?``, ``secret`` (dict).
+    Result: ``{id}`` — metadata only. Exception text is
     scrubbed of secret values before it can reach a response or a log line.
     """
     from agent.vault_store import (
@@ -160,6 +161,8 @@ def _(rid, params: dict) -> dict:
             kind=str(params.get("kind") or ""),
             label=str(params.get("label") or ""),
             origin=(str(params.get("origin")) if params.get("origin") else None),
+            delegated_payment=bool(params.get("delegated_payment")),
+            allow_any_origin=bool(params.get("allow_any_origin")),
             secret=secret,
         )
         return _ok(rid, {"id": meta.id})
