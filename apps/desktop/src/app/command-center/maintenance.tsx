@@ -184,13 +184,39 @@ export function MaintenancePanel() {
       setMemoryBusy(true)
 
       try {
-        const result = await resetMemory(target)
+        let result
+
+        try {
+          result = await resetMemory(target)
+        } catch (err) {
+          notifyError(err, mm.resetFailed)
+          return
+        }
+
+        // The reset is the authoritative irreversible effect. A follow-up status
+        // refresh must never turn a committed delete into a false "reset failed"
+        // message. Project the known result immediately, then refresh best-effort.
         notify({
           kind: 'success',
           title: mm.resetDone(result.deleted.join(', ') || label),
           message: mm.resetCurrentChats
         })
-        setMemory(await getMemoryStatus())
+        setMemory(current => {
+          if (!current) {
+            return current
+          }
+
+          return {
+            ...current,
+            builtin_files: {
+              memory: target === 'all' || target === 'memory' ? 0 : current.builtin_files.memory,
+              user: target === 'all' || target === 'user' ? 0 : current.builtin_files.user
+            }
+          }
+        })
+        void getMemoryStatus()
+          .then(next => setMemory(next))
+          .catch(() => undefined)
 
         if (
           result.active_session_behavior === 'refresh_on_next_turn' &&
@@ -203,8 +229,6 @@ export function MaintenancePanel() {
         ) {
           requestFreshSession()
         }
-      } catch (err) {
-        notifyError(err, mm.resetFailed)
       } finally {
         setMemoryBusy(false)
       }

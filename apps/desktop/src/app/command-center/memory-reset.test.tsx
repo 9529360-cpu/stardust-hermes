@@ -71,6 +71,25 @@ describe('Command Center memory reset forget boundary', () => {
     expect(requestFreshSession).toHaveBeenCalledTimes(1)
   })
 
+  it('does not report a committed reset as failed when the status refresh fails', async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+    vi.mocked(getMemoryStatus)
+      .mockResolvedValueOnce({
+        active: '',
+        providers: [],
+        builtin_files: { memory: 12, user: 8 }
+      })
+      .mockRejectedValueOnce(new Error('status refresh unavailable'))
+
+    render(<MaintenancePanel />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset memory' }))
+
+    await waitFor(() => expect(resetMemory).toHaveBeenCalledWith('memory'))
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(2))
+    expect(requestFreshSession).toHaveBeenCalledTimes(1)
+  })
+
   it('does not reset when the destructive confirmation is declined', async () => {
     vi.mocked(confirm).mockResolvedValueOnce(false)
 
