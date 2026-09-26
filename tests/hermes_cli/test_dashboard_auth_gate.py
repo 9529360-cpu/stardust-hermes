@@ -77,8 +77,8 @@ def test_empty_provider_login_page_shows_supported_auth_paths():
     assert "SSH tunnel" in html
     assert "Tailscale" in html
     assert (
-        'href="https://hermes-agent.nousresearch.com/docs/'
-        'user-guide/features/web-dashboard#authentication-gated-mode"'
+        'href="https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/'
+        'user-guide/features/web-dashboard.md#authentication-gated-mode"'
     ) in html
 
 
