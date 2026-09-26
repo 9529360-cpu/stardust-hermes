@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
+  Tip,
   useI18n,
   useValue
 } from '@hermes/plugin-sdk'
@@ -1340,11 +1341,17 @@ export function CreateGroupChatDialog({ open, roster, onClose, onCreated }: Crea
           <Button onClick={onClose} variant="secondary">
             {t.common.cancel}
           </Button>
-          <Button
-            disabled={!canCreate}
-            onClick={create}
-            title={selected.length < 2 ? 'Pick at least 2 bots' : undefined}
-          >{`Create Group${selected.length ? ` (${selected.length})` : ''}`}</Button>
+          {canCreate ? (
+            <Button onClick={create}>{`Create Group${selected.length ? ` (${selected.length})` : ''}`}</Button>
+          ) : (
+            <Tip label="Pick at least 2 bots">
+              <span className="inline-flex">
+                <Button disabled onClick={create}>
+                  Create Group
+                </Button>
+              </span>
+            </Tip>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
