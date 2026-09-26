@@ -873,6 +873,18 @@ class AIAgent(
             return
         self._memory_provider_shutdown = True
         if self._memory_manager:
+            # One shutdown owner: every host (CLI, gateway, one-shot, direct close)
+            # drains completed-turn sync before final extraction. This is required by
+            # the privacy ledger too: provider-visible history is committed by the
+            # serialized sync worker, so on_session_end must not race ahead of it.
+            try:
+                if not self._memory_manager.flush_pending(timeout=10):
+                    logger.warning(
+                        "Memory provider pending work did not drain before session end; "
+                        "continuing bounded shutdown"
+                    )
+            except Exception as e:
+                logger.warning("Memory provider pre-shutdown drain failed: %s", e, exc_info=True)
             try:
                 self._memory_manager.on_session_end(messages or [])
             except Exception as e:
