@@ -701,9 +701,13 @@ def _(rid, params: dict) -> dict:
         target=lambda: _run_after_agent_ready(
             rid, sid, session, text, display_kind, hosted_terminal_callback, turn_author),
         daemon=True)
+    # Start before publishing: a reader (e.g. compute_host._run_real_turn) that observes this
+    # thread via `_run_thread` must never see one that has not actually begun yet — `is_alive()`
+    # is False both before `start()` and after the thread finishes, so publishing the handle
+    # first would let a reader mistake "not started" for "already done" and end the turn early.
+    run_thread.start()
     # Handle lets session.interrupt tell a live turn from a stuck `running` flag.
     session["_run_thread"] = run_thread
-    run_thread.start()
     return _ok(rid, {"status": "streaming", **survivor_fields})
 
 
