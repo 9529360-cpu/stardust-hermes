@@ -14,17 +14,26 @@ Guard design rules (to stay CI-stable):
    measured-good and measured-bad values with ≥2x separation on both sides.
 3. min-of-K timing samples to reject scheduler noise.
 
-Baseline measurements (2026-08-28, macOS arm64, Python 3.12):
-- streamed-text accumulation on main: 4N/N ratio ≈ 9.6 (superlinear —
-  ``+=`` through the attribute copies the whole reply per delta).
-  With PR #92166 (parts list + join): ratio ≈ 4 (linear).
-- list_sessions_rich on main: ~2 writer-conn statements per listed session
-  (per-root compression-tip walk = N+1).  With PR #95380 (batched edge
-  query): bounded constant.
+Historical baseline (2026-08-28, macOS arm64, Python 3.12), before both fixes below landed:
+- streamed-text accumulation: 4N/N ratio ≈ 9.6 (superlinear — ``+=`` through
+  the attribute copies the whole reply per delta). Fixed shape: parts list +
+  join, ratio ≈ 4 (linear).
+- list_sessions_rich: ~2 writer-conn statements per listed session (per-root
+  compression-tip walk = N+1). Fixed shape: batched edge query, bounded
+  constant.
 
-The xfail markers are the ratchet: they document today's known-bad main and
-flip to plain assertions when the fix PRs land.  Remove a marker in the same
-PR that merges its fix (or immediately after).
+Both fixes have landed (confirmed 2026-09-27: both guards below pass as
+plain assertions, not xfail-and-pass) — the upstream PR numbers cited in the
+guards themselves (#92166, #95380) predate this fork's independent history
+and don't resolve to anything in this repo, so whichever change actually
+carried the fix here isn't tied to those numbers.
+
+The xfail markers were the ratchet: they documented known-bad-on-main and
+were meant to flip to plain assertions the moment the fix landed. Remove a
+marker in the same PR that merges its fix (or immediately after) — an
+xfail(strict=False) that quietly XPASSes stops being a ratchet and starts
+being a blind spot: a real regression back to the old scaling shape would
+just read as "expected failure" again instead of failing CI.
 """
 
 from __future__ import annotations
@@ -46,7 +55,7 @@ def _min_time(fn, *, repeat: int = 5) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Guard 1 — streamed assistant text accumulation must be linear (#92166).
+# Guard 1 — streamed assistant text accumulation must be linear.
 # ---------------------------------------------------------------------------
 
 
@@ -61,7 +70,8 @@ class TestStreamedTextAccumulationLinear:
     N_SMALL = 4_000
     N_LARGE = 16_000  # 4x — linear ratio ≈ 4, quadratic ≈ 16
     DELTA = "x" * 50
-    # main measured 9.6; parts-list impl measured ~4.  Midpoint with margin.
+    # Historical quadratic baseline measured 9.6; the fixed (parts-list) shape
+    # measures ~4. Midpoint with margin.
     MAX_RATIO = 7.0
 
     def _accumulate(self, n: int) -> None:
@@ -74,11 +84,6 @@ class TestStreamedTextAccumulationLinear:
         # The accumulated value must be faithful regardless of representation.
         assert len(agent._current_streamed_assistant_text) == n * len(self.DELTA)
 
-    @pytest.mark.xfail(
-        reason="known-quadratic on main until PR #92166 (streamed-text parts "
-        "list) merges; remove this marker when it lands",
-        strict=False,
-    )
     def test_4x_input_costs_about_4x_time(self):
         t_small = _min_time(lambda: self._accumulate(self.N_SMALL))
         t_large = _min_time(lambda: self._accumulate(self.N_LARGE))
@@ -86,12 +91,13 @@ class TestStreamedTextAccumulationLinear:
         assert ratio < self.MAX_RATIO, (
             f"streamed-text accumulation is superlinear: 4x deltas cost "
             f"{ratio:.1f}x time (linear ≈ 4, quadratic ≈ 16). The reply is "
-            f"being recopied per delta — see PR #92166 for the fix shape."
+            f"being recopied per delta — accumulate into a parts list and "
+            f"join once instead of `+=`."
         )
 
 
 # ---------------------------------------------------------------------------
-# Guard 2 — list_sessions_rich must not issue O(N) per-row queries (#95380).
+# Guard 2 — list_sessions_rich must not issue O(N) per-row queries.
 # ---------------------------------------------------------------------------
 
 
@@ -106,7 +112,7 @@ class TestListSessionsRichQueryBound:
 
     N_CHAINS = 12
     # Batched implementation needs a small constant number of statements.
-    # main measures ~2 per session (26 for 12 chains, 50 for 24).
+    # The historical N+1 shape measured ~2 per session (26 for 12 chains, 50 for 24).
     MAX_STATEMENTS = 8
 
     @pytest.fixture()
@@ -137,11 +143,6 @@ class TestListSessionsRichQueryBound:
             db._conn.set_trace_callback(None)
         return rows, statements
 
-    @pytest.mark.xfail(
-        reason="known N+1 on main until PR #95380 (batched compression-edge "
-        "query) merges; remove this marker when it lands",
-        strict=False,
-    )
     def test_statement_count_bounded_regardless_of_session_count(self, chain_db):
         rows, statements = self._count_writer_statements(chain_db)
 
@@ -149,9 +150,9 @@ class TestListSessionsRichQueryBound:
         assert len(statements) <= self.MAX_STATEMENTS, (
             f"list_sessions_rich issued {len(statements)} writer-connection "
             f"statements for {self.N_CHAINS} sessions (bound: "
-            f"{self.MAX_STATEMENTS}). Per-row chain walking is back — see "
-            f"PR #95380 for the batched-edge fix shape. Captured SQL: "
-            f"{[s[:80] for s in statements[:10]]}"
+            f"{self.MAX_STATEMENTS}). Per-row chain walking is back — batch "
+            f"the compression-edge query instead of walking one per session. "
+            f"Captured SQL: {[s[:80] for s in statements[:10]]}"
         )
 
     def test_statement_count_does_not_scale_with_sessions(self, chain_db):
