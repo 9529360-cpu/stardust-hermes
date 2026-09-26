@@ -58,7 +58,8 @@ def load_on_disk_store() -> "MemoryStore":
                             memory_enabled=memory_enabled, user_profile_enabled=user_profile_enabled)
     except Exception:
         store = MemoryStore()  # config optional — fall back to defaults rather than break /memory
-    store.load_from_disk()
+    if memory_persistence_enabled(fail_closed=True):
+        store.load_from_disk()
     return store
 
 
@@ -220,9 +221,38 @@ def get_builtin_memory_config(config: Optional[Dict[str, Any]] = None) -> Dict[s
     return section if isinstance(section, dict) else {}
 
 
+def memory_persistence_enabled(
+    config: Optional[Dict[str, Any]] = None, *, fail_closed: bool = False
+) -> bool:
+    """Return the master durable-memory privacy state.
+
+    Missing ``memory.enabled`` remains backward-compatible (enabled). Mutation and
+    provider boundaries request fail-closed reads so a transient config failure cannot
+    silently resume persistence after the user paused it.
+    """
+    if config is None:
+        try:
+            from hermes_cli.config import load_config_readonly
+            config = load_config_readonly()
+        except Exception:
+            if fail_closed:
+                logger.warning(
+                    "Could not verify memory.enabled; failing closed for memory persistence",
+                    exc_info=True,
+                )
+                return False
+            return True
+    section = config.get("memory") if isinstance(config, dict) else None
+    if not isinstance(section, dict):
+        return True
+    return is_truthy_value(section.get("enabled"), default=True)
+
+
 def get_builtin_memory_store_flags(config: Optional[Dict[str, Any]] = None) -> Tuple[bool, bool]:
-    """Return ``(memory_enabled, user_profile_enabled)`` from resolved config."""
+    """Return enabled built-in targets from one config snapshot."""
     section = get_builtin_memory_config(config)
+    if not is_truthy_value(section.get("enabled"), default=True):
+        return False, False
     return tuple(is_truthy_value(section.get(k), default=True) for k in ("memory_enabled", "user_profile_enabled"))
 
 
@@ -236,7 +266,14 @@ def check_memory_requirements() -> bool:
 
 
 def _memory_target_error(store: "MemoryStore", target: str) -> Optional[Dict[str, Any]]:
-    """Return a shared validation error for an invalid or disabled target."""
+    """Return a shared validation error for an invalid, disabled, or privacy-blocked target."""
+    if not memory_persistence_enabled(fail_closed=True):
+        return {
+            "success": False,
+            "error": "Memory persistence is disabled by memory.enabled. Nothing was saved.",
+            "target": target,
+            "memory_disabled": True,
+        }
     if target not in {"memory", "user"}:
         from tools.registry import _bound_error_text
         return {"success": False,

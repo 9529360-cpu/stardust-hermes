@@ -1234,12 +1234,15 @@ DEFAULT_CONFIG = {
             "info_log_min_delta_mb": 0.0,
         },
     },
-    "memory": {  # Persistent memory — bounded curated memory injected into the system prompt
+    "memory": {  # Persistent memory — built-in files plus one optional external provider
+        # Master privacy switch. false = no built-in injection/writes and no external
+        # provider init/sync/prefetch/tools. Provider selection/credentials stay configured.
+        "enabled": True,
         "memory_enabled": True,
         "user_profile_enabled": True,
         # Approval gate for memory writes on BOTH foreground turns and the background review fork.
         # true = foreground writes prompt inline; background writes are staged (/memory
-        # pending|approve <id>|reject <id>). To disable memory: memory_enabled.
+        # pending|approve <id>|reject <id>). To disable ALL persistence: enabled.
         "write_approval": False,
         "memory_char_limit": 2200,   # ~800 tokens at 2.75 chars/token
         "user_char_limit": 1375,     # ~500 tokens at 2.75 chars/token
