@@ -162,7 +162,7 @@ _PROPERTIES: Dict[str, Any] = {
         "description": (
             "For input actions (click, type, key, drag, scroll). `background` (DEFAULT) delivers "
             "without raising the window or stealing focus. `foreground` briefly fronts the window "
-            "then restores focus — a visible change needing its own approval; use it only when a "
+            "then restores focus. It uses the same action approval scope as background delivery; use it only when a "
             "result's verdict tells you to escalate there. Each result's `verdict` carries the "
             "next step; follow it rather than guessing."
         ),
@@ -192,8 +192,8 @@ COMPUTER_USE_SCHEMA: Dict[str, Any] = {
         "Windows, and Linux. Input is background-FIRST, not background-only: the default delivery "
         "routes to the target window without stealing the user's cursor or focus (works even on "
         "hidden/minimized windows), and when a result's `verdict` says to escalate you climb — "
-        "pixel coordinates, or delivery_mode='foreground' (briefly fronts the window; separate "
-        "approval). Each result carries a `verdict` with the next step; follow it — never repeat "
+        "pixel coordinates, or delivery_mode='foreground' (briefly fronts the window using the same action "
+        "approval scope). Each result carries a `verdict` with the next step; follow it — never repeat "
         "confirmed input, and re-capture to verify an unverifiable one before retrying. Workflow: "
         "action='capture' (mode='som' gives numbered element overlays), then click by `element` "
         "index; re-capture after state-changing actions (or pass capture_after=true). Image "

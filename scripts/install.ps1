@@ -3378,26 +3378,16 @@ function Copy-ConfigTemplates {
         Write-Info "$configPath already exists, keeping it"
     }
     
-    # Create SOUL.md if it doesn't exist (global persona file).
-    # IMPORTANT: write without a BOM.  Windows PowerShell 5.1's
-    # ``Set-Content -Encoding UTF8`` writes UTF-8 WITH a byte-order-mark
-    # (the default PS5 behaviour), and Hermes's prompt-injection scanner
-    # flags the BOM as an invisible unicode character and refuses to
-    # load the file.  PS7's ``-Encoding utf8NoBOM`` fixes that but we
-    # don't control which PowerShell version the user has.  Go direct
-    # to .NET with an explicit UTF8Encoding($false) -- BOM-free on every
-    # PowerShell version.
+    # Create SOUL.md from the repository's canonical default persona instead
+    # of maintaining another hard-coded prompt copy in the installer.
     $soulPath = "$HermesHome\SOUL.md"
     if (-not (Test-Path $soulPath)) {
-        # MUST match DEFAULT_SOUL_MD in hermes_cli/default_soul.py. The runtime
-        # upgrades the old comment-only scaffold to this text on next run, so
-        # drift is self-healing, but keep them in sync to avoid first-run churn.
-        $soulContent = @"
-You are Hermes Agent, built by Nous Research. Be direct: match the length of your reply to the weight of the ask -- a one-line question gets a one-line answer, and finished work gets a short report of what changed, what's verified, and what's left, never a replay of the process. No filler ("Great question," "I'd be happy to"), no restating the request back, no re-summarizing what you already said, no narrating tool calls the user can see. Plain claims over adjectives; when unsure, say so plainly. Agree because it's right, not because the user said it. Depth is earned -- give it when the user asks for detail, teaches, or the stakes demand it, not by default.
-"@
-        $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-        [System.IO.File]::WriteAllText($soulPath, $soulContent, $utf8NoBom)
-        Write-Success "Created $soulPath (edit to customize personality)"
+        $canonicalSoulPath = "$InstallDir\SOUL.md"
+        if (-not (Test-Path $canonicalSoulPath)) {
+            throw "Canonical SOUL.md is missing from $InstallDir"
+        }
+        Copy-Item -LiteralPath $canonicalSoulPath -Destination $soulPath
+        Write-Success "Created $soulPath from Stardust's canonical default"
     }
     
     Write-Success "Configuration directory ready: $HermesHome"

@@ -561,6 +561,12 @@ export interface Translations {
       expMonthField: string
       expYearField: string
       cvcField: string
+      delegatedPaymentLabel: string
+      delegatedPaymentDescription: string
+      allowAnyOriginLabel: string
+      allowAnyOriginDescription: string
+      delegatedPaymentBadge: string
+      anySiteBadge: string
       postalField: string
       addressLine1Field: string
       addressLine2Field: string

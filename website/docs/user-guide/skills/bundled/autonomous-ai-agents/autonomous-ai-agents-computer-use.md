@@ -150,10 +150,11 @@ Walk it in order:
 4. **Foreground.** After `effect:"suspected_noop"`,
    `code:"background_unavailable"`, or a verified pixel no-op,
    re-issue the SAME action with `delivery_mode="foreground"`. This briefly
-   raises the window and restores focus after; pair with `bring_to_front=True`
-   for a short sequence to avoid per-call flashes. It needs its own approval
-   (it's a visible focus change) and is only appropriate when the user isn't
-   actively working. Classic cases: Electron/Chromium consent dialogs (e.g.
+   raises the window and restores focus after. Foreground delivery uses the
+   same approval scope as the underlying action, so a session/always grant for
+   that click/type/scroll does not prompt again merely because the driver had
+   to escalate transport. Use `bring_to_front=True` only when a persistent
+   focus change is actually needed; that remains a separate approval scope. Classic cases: Electron/Chromium consent dialogs (e.g.
    tldraw offline's "Run Script"), DirectInput games, raw-input canvases.
 5. **Keystrokes verified-lost on a KDE/Qt editor → use the app's own I/O.**
    Some Qt text components (KTextEditor: Kate, KWrite, KDevelop) discard

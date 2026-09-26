@@ -151,7 +151,7 @@ EXECUTION_CONTRACTS = (
         AssistantExecutionMode.CLARIFY,
         "turn",
         False,
-        "Ask only when a material user decision, missing credential, authorization, recipient, or other safety-critical fact blocks progress.",
+        "Ask only when a material user decision, authorization, recipient, or other safety-critical fact blocks progress; resolve missing secrets through secure local credential capture first when available.",
     ),
 )
 
@@ -593,6 +593,7 @@ ASSISTANT_EXECUTION_GUIDANCE = (
     "remains the orchestrator; `delegate_background` for process-local work that can run without holding the "
     "foreground, never as a promise of restart durability; `schedule_or_watch` for future, recurring, monitored, "
     "or restart-surviving work through cron, kanban, or another durable owner; and `clarify` only when a material "
-    "user decision, credential, authorization, recipient, or safety-critical fact is genuinely missing. "
-    "Background work must remain observable and must not steal focus."
+    "user decision, authorization, recipient, or safety-critical fact is genuinely missing. Missing passwords, "
+    "payment details, OTP seeds, or API secrets should use secure local credential capture or Vault resolution "
+    "before chat clarification whenever that path exists. Background work must remain observable and must not steal focus."
 )
