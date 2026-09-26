@@ -1,6 +1,8 @@
 import { atom, computed } from 'nanostores'
 
+import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { persistentAtom } from '@/lib/persisted'
+import { reachablePreviewUrl } from '@/lib/preview-reach'
 import { readKey } from '@/lib/storage'
 import { normalize } from '@/lib/text'
 
@@ -396,6 +398,25 @@ export function openPreview(target: PreviewTarget, source: PreviewRecordSource =
   setRightContextOpen(true)
   $previewTabs.set(index === -1 ? [...current, tab] : current.map((item, i) => (i === index ? tab : item)))
   selectRightRailTab(id)
+}
+
+/**
+ * Resolve a raw path/URL a tool just produced and open it, same as an
+ * explicit `preview.open` gateway event — for the one case that IS meant to
+ * auto-reveal the rail unprompted: a freshly-seen web page or PDF (see
+ * `isAutoOpenTarget`). Never called for plain source/code output.
+ */
+export async function openPreviewFromToolResult(rawTarget: string, cwd?: null | string) {
+  const resolved = await normalizeOrLocalPreviewTarget(rawTarget, cwd || undefined)
+
+  if (!resolved) {
+    return
+  }
+
+  const url = resolved.kind === 'url' ? await reachablePreviewUrl(resolved.url) : resolved.url
+  const reached = url === resolved.url ? resolved : { ...resolved, url }
+
+  openPreview(reached, 'tool-result')
 }
 
 const blankPage = (): PreviewTarget => ({ kind: 'url', label: 'Browser', source: 'about:blank', url: 'about:blank' })
