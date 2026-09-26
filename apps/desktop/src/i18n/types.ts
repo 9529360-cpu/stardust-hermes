@@ -1948,7 +1948,13 @@ export interface Translations {
       resetUser: string
       resetAll: string
       resetConfirm: (target: string) => string
+      resetConfirmDetail: string
       resetDone: (files: string) => string
+      resetCurrentChats: string
+      resetFreshTitle: string
+      resetFreshDescription: string
+      startFreshSession: string
+      keepCurrentSession: string
       resetFailed: string
       actionStarted: (name: string) => string
       actionFailed: (name: string) => string

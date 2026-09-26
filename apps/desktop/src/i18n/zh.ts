@@ -2383,7 +2383,15 @@ export const zh = defineLocale({
       resetUser: '重置画像',
       resetAll: '全部重置',
       resetConfirm: target => `删除 ${target}？此操作不可撤销。`,
+      resetConfirmDetail:
+        '现有聊天可能仍带着旧的冻结记忆快照。重置边界会阻止这些聊天和重置前的待审批写入把已忘记内容重新保存回来。',
       resetDone: files => `已删除 ${files}。`,
+      resetCurrentChats: '现有聊天会在下一轮刷新内置记忆；如果想立刻去掉旧提示词快照，请新建会话。',
+      resetFreshTitle: '现在开始一个新会话？',
+      resetFreshDescription:
+        '新会话不会带入刚删除的内置记忆。继续当前聊天也是安全的，但旧快照可能会保留到下一轮刷新。',
+      startFreshSession: '开始新会话',
+      keepCurrentSession: '继续当前聊天',
       resetFailed: '记忆重置失败',
       actionStarted: name => `${name} 已启动 — 正在跟踪日志…`,
       actionFailed: name => `${name} 启动失败`,

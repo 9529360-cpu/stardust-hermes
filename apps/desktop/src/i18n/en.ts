@@ -2187,7 +2187,16 @@ export const en: Translations = {
       resetUser: 'Reset profile',
       resetAll: 'Reset both',
       resetConfirm: target => `Delete ${target}? This cannot be undone.`,
+      resetConfirmDetail:
+        'Existing chats may still contain the old frozen memory snapshot. The reset fence prevents those chats and pre-reset approvals from saving forgotten entries back.',
       resetDone: files => `Deleted ${files}.`,
+      resetCurrentChats:
+        'Existing chats refresh built-in memory on their next turn. Start a new session to drop the old prompt snapshot immediately.',
+      resetFreshTitle: 'Start a fresh session now?',
+      resetFreshDescription:
+        'A fresh session starts without the deleted built-in memory. Keeping this chat is safe, but its old snapshot may remain visible until the next turn refresh.',
+      startFreshSession: 'Start new session',
+      keepCurrentSession: 'Keep current chat',
       resetFailed: 'Memory reset failed',
       actionStarted: name => `${name} started — tailing log...`,
       actionFailed: name => `${name} failed to start`,
