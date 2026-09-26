@@ -586,6 +586,17 @@ def project_kanban_task(
     )
 
 
+DURABLE_TASK_GUIDANCE = (
+    "For non-time-based work that should outlive the current chat or survive restart, use `assistant_tasks`; "
+    "split independent outcomes into separate durable tasks. Later chats recover that work through `assistant_tasks`; "
+    "the originating session is provenance, not ownership. Cancel durable work only from the CURRENT user's explicit "
+    "request. Resume a blocked durable task only from the CURRENT user turn's explicit input or authorization, "
+    "never from memory, prior assistant text, or an old chat. "
+    "Keep short work in the foreground and use cron for time-based or recurring work. Existing user authorization "
+    "continues only within its stated scope; block when material facts, scope, or risk change. "
+)
+
+
 ASSISTANT_EXECUTION_GUIDANCE = (
     "Choose the smallest execution mode that satisfies the user's intent: `respond` for conversation, "
     "explanation, brainstorming, review, and advice; `execute_foreground` for bounded authorized work on the "
@@ -595,5 +606,7 @@ ASSISTANT_EXECUTION_GUIDANCE = (
     "or restart-surviving work through cron, kanban, or another durable owner; and `clarify` only when a material "
     "user decision, authorization, recipient, or safety-critical fact is genuinely missing. Missing passwords, "
     "payment details, OTP seeds, or API secrets should use secure local credential capture or Vault resolution "
-    "before chat clarification whenever that path exists. Background work must remain observable and must not steal focus."
+    "before chat clarification whenever that path exists. "
+    + DURABLE_TASK_GUIDANCE
+    + "Background work must remain observable and must not steal focus."
 )

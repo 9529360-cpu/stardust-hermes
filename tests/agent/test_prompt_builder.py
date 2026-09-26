@@ -81,6 +81,9 @@ class TestGuidanceConstants:
         ):
             assert f"`{mode}`" in DEFAULT_AGENT_IDENTITY
         assert "never as a promise of restart durability" in DEFAULT_AGENT_IDENTITY
+        assert "`assistant_tasks`" in DEFAULT_AGENT_IDENTITY
+        assert "originating session is provenance, not ownership" in DEFAULT_AGENT_IDENTITY
+        assert "Existing user authorization continues only within its stated scope" in DEFAULT_AGENT_IDENTITY
         assert "must not steal focus" in DEFAULT_AGENT_IDENTITY
         assert "continue" in DEFAULT_AGENT_IDENTITY
         assert "verify the result" in DEFAULT_AGENT_IDENTITY

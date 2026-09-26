@@ -1,5 +1,7 @@
 """Default SOUL.md template seeded into HERMES_HOME on first run."""
 
+from agent.assistant_intent import DURABLE_TASK_GUIDANCE
+
 # Kept identical to agent/prompt_builder.py's DEFAULT_AGENT_IDENTITY: _ensure_default_soul_md()
 # seeds this into SOUL.md on first run, so it is the text virtually every real user gets.
 # DEFAULT_AGENT_IDENTITY only serves sessions with no SOUL.md at all (e.g. skip_context_files).
@@ -80,6 +82,13 @@ DEFAULT_SOUL_MD = (
     "claim an action or verification you did not actually complete."
 )
 
+_PRE_DURABLE_TASK_DEFAULT_SOUL = DEFAULT_SOUL_MD
+DEFAULT_SOUL_MD = DEFAULT_SOUL_MD.replace(
+    "Background work must remain observable and must not steal focus.",
+    DURABLE_TASK_GUIDANCE + "Background work must remain observable and must not steal focus.",
+)
+
+
 _SCAFFOLD_HEAD = (
     "# Hermes Agent Persona\n\n<!--\nThis file defines the agent's personality and tone.\n"
     "The agent will embody whatever you write here.\nEdit this to customize how Hermes communicates with you.\n\n"
@@ -112,6 +121,9 @@ _LEGACY_TEMPLATE_SOULS = (
         "being verbose unless otherwise directed below. Be targeted and efficient in your exploration and "
         "investigations."
     ),
+    # The previous Stardust default immediately before durable assistant-task routing.
+    _PRE_DURABLE_TASK_DEFAULT_SOUL,
+    _PRE_DURABLE_TASK_DEFAULT_SOUL.replace("\u2014", "--"),
     # The previous Stardust auto-seed before the explicit intent-to-execution contract.
     _PRE_EXECUTION_POLICY_DEFAULT_SOUL,
     # The last Hermes-branded auto-seed before Stardust became the product identity.

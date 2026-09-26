@@ -116,6 +116,30 @@ class TestEnsureHermesHome:
             ensure_hermes_home()
             assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
 
+    def test_upgrades_previous_durable_task_free_stardust_default(self, tmp_path):
+        from hermes_cli.default_soul import DEFAULT_SOUL_MD, _PRE_DURABLE_TASK_DEFAULT_SOUL
+
+        assert _PRE_DURABLE_TASK_DEFAULT_SOUL != DEFAULT_SOUL_MD
+        assert "assistant_tasks" not in _PRE_DURABLE_TASK_DEFAULT_SOUL
+
+        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+            soul_path = tmp_path / "SOUL.md"
+            soul_path.write_text(_PRE_DURABLE_TASK_DEFAULT_SOUL, encoding="utf-8")
+            ensure_hermes_home()
+            assert soul_path.read_text(encoding="utf-8") == DEFAULT_SOUL_MD
+
+    def test_does_not_upgrade_customized_previous_durable_task_free_default(self, tmp_path):
+        from hermes_cli.default_soul import DEFAULT_SOUL_MD, _PRE_DURABLE_TASK_DEFAULT_SOUL
+
+        customized = _PRE_DURABLE_TASK_DEFAULT_SOUL + " Always call me Captain."
+
+        with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+            soul_path = tmp_path / "SOUL.md"
+            soul_path.write_text(customized, encoding="utf-8")
+            ensure_hermes_home()
+            assert soul_path.read_text(encoding="utf-8") == customized
+            assert customized != DEFAULT_SOUL_MD
+
     def test_does_not_upgrade_customized_previous_stardust_default(self, tmp_path):
         from hermes_cli.default_soul import DEFAULT_SOUL_MD, _PRE_EXECUTION_POLICY_DEFAULT_SOUL
 

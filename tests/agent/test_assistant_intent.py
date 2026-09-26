@@ -2,6 +2,7 @@ import pytest
 
 from agent.assistant_intent import (
     ASSISTANT_EXECUTION_GUIDANCE,
+    DURABLE_TASK_GUIDANCE,
     ATTENTION_TASK_STATES,
     EXECUTION_CONTRACTS,
     TERMINAL_TASK_STATES,
@@ -56,6 +57,9 @@ def test_prompt_guidance_names_durability_and_focus_boundaries():
     assert "never as a promise of restart durability" in ASSISTANT_EXECUTION_GUIDANCE
     assert "must not steal focus" in ASSISTANT_EXECUTION_GUIDANCE
     assert "secure local credential capture or Vault resolution" in ASSISTANT_EXECUTION_GUIDANCE
+    assert "`assistant_tasks`" in DURABLE_TASK_GUIDANCE
+    assert "originating session is provenance, not ownership" in DURABLE_TASK_GUIDANCE
+    assert "Existing user authorization continues only within its stated scope" in DURABLE_TASK_GUIDANCE
     assert "user decision, credential, authorization" not in ASSISTANT_EXECUTION_GUIDANCE
 
 
