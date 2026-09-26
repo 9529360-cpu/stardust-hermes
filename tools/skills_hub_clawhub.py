@@ -64,9 +64,16 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
 
     SOURCE_ID = "clawhub"
     BASE_URL = "https://clawhub.ai/api/v1"
-    # Wall-clock budget for a full catalog walk: 50k+ skills, sequential
-    # (~250 requests each under timeout=30), so unbounded it blocks for minutes.
+    # Interactive browse must return quickly. The offline index builder gets a
+    # separate, much larger budget but is still bounded so a slow ClawHub API
+    # cannot outlive the publisher workflow timeout.
     CATALOG_WALK_BUDGET_SECONDS = 12
+    # First real Stardust publisher crawl (2026-09-20) needed 3915s
+    # for 76,234 ClawHub skills. 90m leaves production headroom while still
+    # reserving ~30m of the 120m workflow cap for path resolution, enrichment,
+    # health checks, verification, and release publication.
+    INDEX_BUILD_WALK_BUDGET_SECONDS = 90 * 60
+    CATALOG_WALK_MAX_PAGES = 750
     ZIP_DOWNLOAD_MAX_BYTES = 25 * 1024 * 1024
     ZIP_DOWNLOAD_CHUNK_BYTES = 64 * 1024
     _SLUG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -186,7 +193,7 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
             # Empty query: paginating catalog walker. A disk-cached full catalog
             # is returned whole (caller paginates); on a cold cache the walk is
             # bounded to `limit` so browse renders page one without walking
-            # 50k+ skills (max_items=0 = unbounded, offline index builder only).
+            # 50k+ skills (max_items=0 = full-catalog mode for the offline builder).
             catalog = self._load_catalog_index(max_items=max(limit, 0))
             if catalog:
                 deduped = _dedupe_results(catalog)
@@ -284,7 +291,13 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         cached = _cached_metas(cache_key)
         if cached is not None:
             return cached[:limit]
-        catalog = self._load_catalog_index()
+
+        # Interactive search must never bootstrap the expensive full-catalog
+        # walk. Use a previously completed catalog cache when available;
+        # otherwise return a miss so search() falls through to ClawHub's
+        # lightweight listing/search API. The offline index builder is the
+        # only path allowed to populate clawhub_catalog_v1.
+        catalog = _cached_metas("clawhub_catalog_v1")
         if not catalog:
             return []
         results = self._finalize_search_results(query, catalog, limit)
@@ -295,34 +308,94 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
         """Walk the ClawHub catalog via cursor pagination.
 
         ``max_items`` stops the walk early once that many distinct skills are
-        gathered (browse's cold-start fallback renders one page); ``0`` walks
-        to exhaustion (offline index builder). Only a COMPLETE walk (cursor
-        exhausted or page cap) is written to the shared ``clawhub_catalog_v1``
-        cache — a walk cut by ``max_items`` or the wall-clock budget would
+        gathered (browse's cold-start fallback renders one page); ``0`` requests
+        a full offline index walk, still bounded by the larger publisher budget.
+        Only a COMPLETE walk whose cursor naturally exhausts is written to the
+        shared ``clawhub_catalog_v1`` cache — a walk cut by ``max_items``,
+        either wall-clock budget, a request failure, or the page ceiling would
         poison it with a partial slice.
         """
         cache_key = "clawhub_catalog_v1"
+        if max_items == 0:
+            # Builder-visible completion signal. Reset before cache lookup so a
+            # prior incomplete attempt cannot poison a later cached/full result.
+            self.index_build_incomplete = False
+            self.index_build_incomplete_reason = ""
         cached = _cached_metas(cache_key)
         if cached is not None:
             return cached
         cursor: Optional[str] = None
         results: List[SkillMeta] = []
         seen: set[str] = set()
-        # 750 pages * 200/page = 150k ceiling over the ~50k catalog; a safety
-        # rail against an infinite-cursor loop, normally ended by nextCursor=None.
-        # Wall-clock budget applies to interactive browse only: the index builder
-        # (max_items=0) must walk everything or it trips the deploy health floor.
-        deadline = time.monotonic() + self.CATALOG_WALK_BUDGET_SECONDS if max_items > 0 else None
+        # CATALOG_WALK_MAX_PAGES * 200/page is a safety ceiling over the ~50k
+        # catalog, protecting against an infinite-cursor loop. Hitting that
+        # ceiling is incomplete; normal completion is nextCursor=None.
+        # Both modes have wall-clock bounds: interactive browse is short, while
+        # the offline publisher gets enough time for a large healthy snapshot.
+        budget_seconds = (
+            self.CATALOG_WALK_BUDGET_SECONDS
+            if max_items > 0
+            else self.INDEX_BUILD_WALK_BUDGET_SECONDS
+        )
+        deadline = time.monotonic() + budget_seconds
         partial = False
-        for _ in range(750):
-            if deadline is not None and time.monotonic() > deadline:
+        for _ in range(self.CATALOG_WALK_MAX_PAGES):
+            if time.monotonic() > deadline:
                 partial = True
+                if max_items == 0:
+                    self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "wall-clock budget"
+                logger.warning(
+                    "ClawHub catalog walk hit %.0fs budget after %d skills; "
+                    "returning partial uncached results",
+                    budget_seconds,
+                    len(results),
+                )
                 break
+
             params: Dict[str, Any] = {"limit": 200, "cursor": cursor} if cursor else {"limit": 200}
             data = self._get_json(f"{self.BASE_URL}/skills", timeout=30, params=params)
-            items = data.get("items", []) if isinstance(data, dict) else []
-            if not isinstance(items, list) or not items:
+            if not isinstance(data, dict):
+                partial = True
+                if max_items == 0:
+                    self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "request failure"
+                logger.warning(
+                    "ClawHub catalog walk request failed after %d skills; "
+                    "returning partial uncached results",
+                    len(results),
+                )
                 break
+
+            items = data.get("items")
+            if not isinstance(items, list):
+                partial = True
+                if max_items == 0:
+                    self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "invalid items payload"
+                logger.warning(
+                    "ClawHub catalog walk returned invalid items after %d skills; "
+                    "returning partial uncached results",
+                    len(results),
+                )
+                break
+            if not items:
+                # Empty page without another cursor is a normal end-of-catalog.
+                # An empty page that still advertises a cursor is inconsistent
+                # and must not be treated as a complete snapshot.
+                next_cursor = data.get("nextCursor")
+                if isinstance(next_cursor, str) and next_cursor:
+                    partial = True
+                    if max_items == 0:
+                        self.index_build_incomplete = True
+                        self.index_build_incomplete_reason = "empty page with cursor"
+                    logger.warning(
+                        "ClawHub catalog walk returned an empty page with a cursor "
+                        "after %d skills; returning partial uncached results",
+                        len(results),
+                    )
+                break
+
             for item in items:
                 slug = item.get("slug")
                 if isinstance(slug, str) and slug and slug not in seen:
@@ -330,12 +403,27 @@ class ClawHubSource(GuardedFetchMixin, SkillSource):
                     meta = self._item_to_meta(item)
                     if meta:
                         results.append(meta)
-            cursor = data.get("nextCursor") if isinstance(data, dict) else None
+            cursor = data.get("nextCursor")
             if not isinstance(cursor, str) or not cursor:
                 break
             if max_items > 0 and len(results) >= max_items:
                 partial = True
                 break
+        else:
+            # Hitting the page ceiling while a cursor is still live means the
+            # safety rail, not the source, ended the walk.
+            if isinstance(cursor, str) and cursor:
+                partial = True
+                if max_items == 0:
+                    self.index_build_incomplete = True
+                    self.index_build_incomplete_reason = "page ceiling"
+                logger.warning(
+                    "ClawHub catalog walk hit %d-page ceiling after %d skills; "
+                    "returning partial uncached results",
+                    self.CATALOG_WALK_MAX_PAGES,
+                    len(results),
+                )
+
         if not partial:
             _cache_metas(cache_key, results)
         return results

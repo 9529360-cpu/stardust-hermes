@@ -6,7 +6,7 @@ description: "How Hermes Agent remembers across sessions — MEMORY.md, USER.md,
 
 # Persistent Memory
 
-Hermes Agent has bounded, curated memory that persists across sessions. This lets it remember your preferences, your projects, your environment, and things it has learned.
+Stardust has bounded, curated memory that persists across sessions. It is the authority for user-profile facts and cross-project assistant knowledge. Project-scoped facts are owned by `projects.db`, session history by `state.db`, and durable task lifecycle by `kanban.db`; those domains are not promoted into global memory just because they appeared in a conversation.
 
 ## How It Works
 
@@ -14,10 +14,10 @@ Two files make up the agent's memory:
 
 | File | Purpose | Char Limit |
 |------|---------|------------|
-| **MEMORY.md** | Agent's personal notes — environment facts, conventions, things learned | 2,200 chars (~800 tokens) |
+| **MEMORY.md** | Cross-project assistant knowledge — global environment facts, standing conventions, reusable tool quirks and lessons | 2,200 chars (~800 tokens) |
 | **USER.md** | User profile — your preferences, communication style, expectations | 1,375 chars (~500 tokens) |
 
-Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a frozen snapshot at session start. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
+Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a turn-stable snapshot. The snapshot stays byte-stable during a turn, then refreshes at the next turn boundary if the built-in files or their reset generation changed. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
 
 :::caution One agent per Hermes home
 Don't point two agent processes at the same Hermes home directory. Memory writes are automatic and load back into the system prompt at session start, so two writers sharing one home will compound each other's entries into state neither of them (nor you) authored. Memory is scoped per [profile](/user-guide/profiles) by design — give a second agent its own profile, and if they need shared memory, use an [external memory provider](/user-guide/features/memory-providers) instead.
@@ -41,11 +41,11 @@ At the start of every session, memory entries are loaded from disk and rendered 
 ══════════════════════════════════════════════
 MEMORY (your personal notes) [67% — 1,474/2,200 chars]
 ══════════════════════════════════════════════
-User's project is a Rust web service at ~/code/myapi using Axum + SQLx
+This machine runs Ubuntu 22.04 and has Docker and Podman installed
 §
-This machine runs Ubuntu 22.04, has Docker and Podman installed
+Across maintained repositories, use conventional commits unless the project says otherwise
 §
-User prefers concise responses, dislikes verbose explanations
+The user prefers concise responses and dislikes verbose explanations
 ```
 
 The format includes:
@@ -54,7 +54,27 @@ The format includes:
 - Individual entries separated by `§` (section sign) delimiters
 - Entries can be multiline
 
-**Frozen snapshot pattern:** The system prompt injection is captured once at session start and never changes mid-session. This is intentional — it preserves the LLM's prefix cache for performance. When the agent adds/removes memory entries during a session, the changes are persisted to disk immediately but won't appear in the system prompt until the next session starts. Tool responses always show the live state.
+**Turn-stable snapshot pattern:** The system-prompt memory block does not mutate inside a turn. Between turns, Hermes checks the tiny built-in stores for an identity/generation change; if one changed, it reloads the snapshot before the next request. Unchanged memory keeps the prefix cache stable, while a real built-in memory change intentionally refreshes that prefix. Tool responses always show the live state.
+
+## Resetting Built-in Memory Is a Durable Forget Boundary
+
+`hermes memory reset` and the Desktop/Web reset controls only reset the built-in
+`MEMORY.md` / `USER.md` targets; they do not erase external-provider data or
+ordinary chat/session history.
+
+Each built-in target has a profile-scoped reset generation stored beside the file.
+A running session captures that generation with its memory snapshot. When reset
+advances it:
+
+- the file is erased (or rewritten empty if unlinking is unavailable);
+- a pre-reset session is fenced from writing through its stale generation;
+- pre-reset staged/approval writes are rejected instead of restoring forgotten facts;
+- the next turn detects the new generation and refreshes the built-in snapshot;
+- a brand-new session starts without the deleted snapshot immediately.
+
+If file erasure fails after the generation advances, Hermes reports the reset as
+incomplete and tells you to retry. The advanced generation is intentionally kept,
+so stale sessions remain unable to recreate the data while you recover.
 
 ## Memory Needs Session Boundaries
 
@@ -91,13 +111,15 @@ If the substring matches multiple entries, an error is returned asking for a mor
 
 ### `memory` — Agent's Personal Notes
 
-For information the agent needs to remember about the environment, workflows, and lessons learned:
+For information the agent needs across projects about the environment, workflows, and reusable lessons:
 
-- Environment facts (OS, tools, project structure)
-- Project conventions and configuration
-- Tool quirks and workarounds discovered
-- Completed task diary entries
-- Skills and techniques that worked
+- Cross-project environment facts (OS, globally available tools)
+- Standing conventions that genuinely apply across projects
+- Tool quirks and workarounds that are not project-specific
+- Durable cross-project lessons
+- Skills and techniques that worked across contexts
+
+Project-specific conventions, versions, architecture facts, and repository decisions belong to the project's structured fact store in `projects.db`. Temporary in-session plan state belongs to the session todo snapshot in `state.db`; long-lived autonomous task lifecycle belongs to `kanban.db`, not memory.
 
 ### `user` — User Profile
 
@@ -118,8 +140,9 @@ The agent saves automatically — you don't need to ask. It saves when it learns
 - **User preferences:** "I prefer TypeScript over JavaScript" → save to `user`
 - **Environment facts:** "This server runs Debian 12 with PostgreSQL 16" → save to `memory`
 - **Corrections:** "Don't use `sudo` for Docker commands, user is in docker group" → save to `memory`
-- **Conventions:** "Project uses tabs, 120-char line width, Google-style docstrings" → save to `memory`
-- **Completed work:** "Migrated database from MySQL to PostgreSQL on 2026-01-15" → save to `memory`
+- **Cross-project conventions:** "Use conventional commits in all maintained repositories" → save to `memory`
+- **Project conventions:** "Project A uses tabs and Python 3.12" → save as a project fact in `projects.db`, not global memory
+- **Completed work:** task/session history stays with its task/session unless it produced a durable project fact
 - **Explicit requests:** "Remember that my API key rotation happens monthly" → save to `memory`
 
 ### Skip These
@@ -158,7 +181,7 @@ The agent should then:
 3. Use `replace` to merge related entries into shorter versions
 4. Then `add` the new entry
 
-**Best practice:** When memory is above 80% capacity (visible in the system prompt header), consolidate entries before adding new ones. For example, merge three separate "project uses X" entries into one comprehensive project description entry.
+**Best practice:** When memory is above 80% capacity (visible in the system prompt header), consolidate entries before adding new ones. For example, merge several overlapping cross-project tool/workflow notes into one compact global entry. Project descriptions belong in `projects.db` instead.
 
 ### Practical Examples of Good Memory Entries
 
@@ -168,7 +191,7 @@ The agent should then:
 # Good: Packs multiple related facts
 User runs macOS 14 Sonoma, uses Homebrew, has Docker Desktop and Podman. Shell: zsh with oh-my-zsh. Editor: VS Code with Vim keybindings.
 
-# Good: Specific, actionable convention
+# Not MEMORY.md: this is Project-scoped and belongs in projects.db
 Project ~/code/api uses Go 1.22, sqlc for DB queries, chi router. Run tests with 'make test'. CI via GitHub Actions.
 
 # Good: Lesson learned with context
@@ -189,6 +212,21 @@ The memory system automatically rejects exact duplicate entries. If you try to a
 ## Security Scanning
 
 Memory entries are scanned for injection and exfiltration patterns before being accepted, since they're injected into the system prompt. Content matching threat patterns (prompt injection, credential exfiltration, SSH backdoors) or containing invisible Unicode characters is blocked.
+
+## Project-Scoped Facts
+
+Project facts are durable, structured state owned by the profile's `projects.db`. They are separate from global memory so one project's versions, architecture decisions, and repository conventions do not leak into unrelated chats.
+
+Use the existing project CLI to manage them:
+
+```bash
+hermes project facts <project> add "Python 3.12 is required." --source repository --source-ref pyproject.toml
+hermes project facts <project> list
+hermes project facts <project> verify <fact-id>
+hermes project facts <project> supersede <fact-id>
+```
+
+Each fact carries provenance, confidence, timestamps, and a sensitivity flag. Unverified model inference cannot be stored as certainty. Sensitive facts are persisted locally but are never automatically injected into model context. Active, non-sensitive, sufficiently trusted facts for the current project are frozen into a new session's project context from `projects.db`; they are not copied into `MEMORY.md` or `USER.md`.
 
 ## Session Search
 
@@ -216,7 +254,7 @@ See [Session Search Tool](/user-guide/sessions#session-search-tool) for the thre
 | **Management** | Manually curated by agent | Automatic — all sessions stored |
 | **Token cost** | Fixed per session (~1,300 tokens) | On-demand (searched when needed) |
 
-**Memory** is for critical facts that should always be in context. **Session search** is for "did we discuss X last week?" queries where the agent needs to recall specifics from past conversations.
+**Memory** is for critical cross-project facts that should always be in context. Project facts belong to `projects.db`. **Session search** is for "did we discuss X last week?" queries where the agent needs to recall specifics from past conversations.
 
 ## Learning Journey (`/journey`)
 
@@ -243,21 +281,31 @@ The same `list` / `delete <id>` / `edit <id>` subcommands work from the in-chat 
 ```yaml
 # In ~/.hermes/config.yaml
 memory:
-  memory_enabled: true
+  enabled: true           # master durable-memory privacy switch
+  memory_enabled: true    # built-in MEMORY.md
   user_profile_enabled: true
   memory_char_limit: 2200   # ~800 tokens
   user_char_limit: 1375     # ~500 tokens
   write_approval: false     # false = write freely (default) | true = require approval
 ```
 
-Setting **both** `memory_enabled` and `user_profile_enabled` to `false` turns the
-built-in stores off completely: the `memory` tool is dropped from the schema and
-its guidance block is dropped from the system prompt, so the model is never told
-about a tool it cannot use. An external provider set via `memory.provider`
-(Hindsight, Mem0, Honcho, …) is unaffected and keeps its own tools — use this
-when you want a third-party memory backend *instead of* the built-in files.
-Listing `memory` under `agent.disabled_toolsets` is the heavier switch: it hides
-external provider tools too.
+`memory.enabled` is the master privacy switch for durable memory. Set it to
+`false` (or run `hermes memory off`) to stop built-in memory writes and
+external-provider initialization, sync, prefetch, hooks, and memory-tool I/O.
+The configured provider and credentials are retained, so `hermes memory on`
+restores the same setup. Turns completed while memory is off are not backfilled
+to the external provider after re-enabling.
+
+Chat/session history is separate and continues to be stored normally. Turning
+durable memory off does not delete MEMORY.md, USER.md, provider data, or session
+history. Because the system prompt is frozen for prompt-cache stability, an
+already-running session may still contain its session-start memory snapshot in
+the cached prompt; start a new session to refresh prompt context and tool
+exposure. Persistence/provider I/O is blocked immediately.
+
+The per-target `memory_enabled` and `user_profile_enabled` flags remain
+advanced controls for the two built-in files while the master switch is on.
+With both built-in targets off, an external provider can still run.
 
 With only `memory_enabled: false` (user profile still on), the tool stays —
 it backs the profile store — but the system prompt swaps the full memory
@@ -277,7 +325,7 @@ first, set `memory.write_approval: true`. It's a simple on/off gate applied to
 | `false` (default) | Write freely — the gate is off (the pre-gate behaviour). |
 | `true` | Require approval before anything is saved. In the interactive CLI, foreground writes prompt you inline (entries are small enough to read in full). Everywhere else — messaging platforms, scripts, and the background self-improvement review — writes are **staged** for review with `/memory pending`. |
 
-> To turn memory off entirely (not just gate it), set both `memory_enabled: false` and `user_profile_enabled: false`. When both built-in stores are disabled, the built-in `memory` tool is automatically hidden.
+> To turn all durable memory off (not just gate writes), set `memory.enabled: false` or run `hermes memory off`. The provider selection is preserved and ordinary chat/session history is unchanged.
 
 Review staged writes from the CLI or any messaging platform:
 

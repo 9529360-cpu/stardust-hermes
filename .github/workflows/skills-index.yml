@@ -1,0 +1,155 @@
+name: Build Stardust Skills Index
+
+on:
+  schedule:
+    # Keep the runtime catalog reasonably fresh without coupling it to docs deploys.
+    - cron: "0 6,18 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/build_skills_index.py"
+      - "tools/skills_hub_*.py"
+      - "tools/skills_guard.py"
+      - "optional-skills/**"
+      - ".github/workflows/skills-index.yml"
+
+# This workflow only runs trusted code already on main. Write permission is
+# limited to publishing the generated catalog as a release asset in this repo.
+permissions:
+  contents: write
+
+concurrency:
+  group: stardust-skills-index
+  # Do not hard-cancel a run during the release-asset rename/promote window.
+  # A freshness gate before publication makes superseded crawls non-publishing.
+  cancel-in-progress: false
+
+jobs:
+  build-publish:
+    # schedule/push already resolve to main; explicitly constrain manual
+    # workflow_dispatch too so write-permission code never runs from a branch.
+    if: github.repository == '9529360-cpu/stardust-hermes' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.11"
+
+      - name: Install index dependencies
+        uses: ./.github/actions/retry
+        with:
+          command: pip install httpx==0.28.1 pyyaml==6.0.3
+
+      - name: Build healthy skills index
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/build_skills_index.py
+
+      - name: Verify generated index
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("website/static/api/skills-index.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          skills = data.get("skills")
+          count = data.get("skill_count")
+          if not isinstance(skills, list) or not skills:
+              raise SystemExit("generated skills index has no skills array")
+          if count != len(skills):
+              raise SystemExit(f"skill_count mismatch: {count!r} != {len(skills)}")
+          print(f"verified {len(skills)} skills")
+          PY
+
+      - name: Refuse stale main publication
+        id: freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$CURRENT_MAIN" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::main advanced from $GITHUB_SHA to $CURRENT_MAIN; keeping this healthy but stale crawl unpublished"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish Stardust-owned catalog asset
+        if: steps.freshness.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="stardust-skills-index"
+          CANONICAL="skills-index.json"
+          ASSET="website/static/api/$CANONICAL"
+          STAGED="skills-index-${GITHUB_RUN_ID}.json"
+          STAGED_PATH="${RUNNER_TEMP}/$STAGED"
+          REPO_API="repos/$GITHUB_REPOSITORY"
+
+          # A fixed prerelease tag gives installed clients one stable,
+          # Stardust-owned URL without putting this generated multi-megabyte
+          # catalog in Git history.
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Stardust Skills Index" \
+              --notes "Machine-generated Skills Hub catalog. This is a data publication channel, not a Stardust product release." \
+              --prerelease
+          fi
+
+          # Never use `gh release upload --clobber`: it deletes the current
+          # asset before uploading the replacement. Stage the healthy file
+          # under a unique name first, then swap names with rollback.
+          cp "$ASSET" "$STAGED_PATH"
+          gh release upload "$TAG" "$STAGED_PATH" --repo "$GITHUB_REPOSITORY"
+
+          RELEASE_ID="$(gh api "$REPO_API/releases/tags/$TAG" --jq '.id')"
+          STAGED_ID="$(gh api "$REPO_API/releases/$RELEASE_ID/assets?per_page=100" \
+            --jq ".[] | select(.name == \"$STAGED\") | .id" | head -n 1)"
+          CANONICAL_ID="$(gh api "$REPO_API/releases/$RELEASE_ID/assets?per_page=100" \
+            --jq ".[] | select(.name == \"$CANONICAL\") | .id" | head -n 1 || true)"
+
+          if [ -z "$STAGED_ID" ]; then
+            echo "::error::staged skills index asset was not found after upload"
+            exit 1
+          fi
+
+          # Main may have advanced while the 40+ MB staged asset uploaded.
+          # Re-check at the last safe point before mutating the canonical name.
+          CURRENT_MAIN="$(gh api "$REPO_API/git/ref/heads/main" --jq '.object.sha')"
+          if [ "$CURRENT_MAIN" != "$GITHUB_SHA" ]; then
+            echo "::notice::main advanced during upload; deleting stale staged asset without touching canonical"
+            gh api -X DELETE "$REPO_API/releases/assets/$STAGED_ID" >/dev/null
+            exit 0
+          fi
+
+          if [ -z "$CANONICAL_ID" ]; then
+            # First publication: there is no prior healthy asset to protect.
+            gh api -X PATCH "$REPO_API/releases/assets/$STAGED_ID" -f name="$CANONICAL" >/dev/null
+          else
+            BACKUP="skills-index.previous-${GITHUB_RUN_ID}.json"
+            gh api -X PATCH "$REPO_API/releases/assets/$CANONICAL_ID" -f name="$BACKUP" >/dev/null
+
+            if gh api -X PATCH "$REPO_API/releases/assets/$STAGED_ID" -f name="$CANONICAL" >/dev/null; then
+              # The new canonical asset is live. Backup cleanup is best-effort;
+              # a cleanup failure is recoverable and must not roll back success.
+              gh api -X DELETE "$REPO_API/releases/assets/$CANONICAL_ID" >/dev/null 2>&1 || \
+                echo "::warning::published new index but could not delete backup asset $BACKUP"
+            else
+              echo "::error::failed to promote staged skills index; restoring previous canonical asset"
+              if ! gh api -X PATCH "$REPO_API/releases/assets/$CANONICAL_ID" -f name="$CANONICAL" >/dev/null; then
+                echo "::error::rollback failed; previous healthy asset remains recoverable as $BACKUP"
+              fi
+              exit 1
+            fi
+          fi
+
+          echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$CANONICAL"

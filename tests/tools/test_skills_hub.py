@@ -889,7 +889,7 @@ class TestOptionalSkillSourceMetadata:
         meta = src.inspect("official/finance/3-statement-model")
 
         assert meta is not None
-        assert meta.repo == "NousResearch/hermes-agent"
+        assert meta.repo == "9529360-cpu/stardust-hermes"
         assert meta.path == "optional-skills/finance/3-statement-model"
 
     def test_scan_all_accepts_install_prefix_but_rejects_nested_support_skills(self, tmp_path):
@@ -1009,6 +1009,14 @@ class TestOptionalSkillSourceLiveRepoFallback:
         # FULL directory arrives — including root-level files GitHubSource.fetch drops
         assert bundle.files["install.sh"] == b"#!/bin/sh\n"
         assert bundle.files["LICENSE"] == b"MIT"
+        # The live fallback is a product-authority path: every repository read
+        # must stay on Stardust, never silently fall back to the Hermes origin.
+        assert src._github._get_repo_tree.call_args.args[0] == "9529360-cpu/stardust-hermes"
+        assert src._github._fetch_file_bytes.call_args_list
+        assert all(
+            c.args[0] == "9529360-cpu/stardust-hermes"
+            for c in src._github._fetch_file_bytes.call_args_list
+        )
 
     def test_fetch_bare_name_resolves_via_remote_tree(self, tmp_path):
         src = self._make_source(tmp_path, ["software-development/ast-grep"])
@@ -1070,7 +1078,7 @@ class TestOptionalSkillSourceLiveRepoFallback:
         meta = src.inspect("official/software-development/ast-grep")
 
         assert meta is not None
-        assert meta.repo == "NousResearch/hermes-agent"
+        assert meta.repo == "9529360-cpu/stardust-hermes"
         assert meta.path == "optional-skills/software-development/ast-grep"
 
     def test_offline_degrades_to_local_only(self, tmp_path):
@@ -1848,7 +1856,7 @@ class TestLoadHermesIndex:
     @staticmethod
     def _isolate_cache(monkeypatch, tmp_path):
         """Point the on-disk cache at an empty tmp dir so no real cache leaks in."""
-        cache_file = tmp_path / "hermes-index.json"
+        cache_file = tmp_path / "stardust-skills-index-v1.json"
         monkeypatch.setattr("tools.skills_hub_search._hermes_index_cache_file", lambda: cache_file)
         return cache_file
 
@@ -1861,6 +1869,7 @@ class TestLoadHermesIndex:
         captured = {}
 
         def fake_get(url, *args, **kwargs):
+            captured["url"] = url
             captured["headers"] = kwargs.get("headers", {})
             resp = MagicMock()
             resp.status_code = 200
@@ -1872,10 +1881,26 @@ class TestLoadHermesIndex:
         data = _load_hermes_index()
         assert data == {"skills": [{"name": "x"}]}
 
+        assert captured["url"] == (
+            "https://github.com/9529360-cpu/stardust-hermes"
+            "/releases/download/stardust-skills-index/skills-index.json"
+        )
         accept = captured["headers"].get("Accept-Encoding", "")
         assert "br" not in [tok.strip() for tok in accept.split(",")], (
             f"index fetch must not request Brotli, got Accept-Encoding={accept!r}"
         )
+
+    def test_default_cache_namespace_is_stardust_specific(
+        self, monkeypatch, tmp_path
+    ):
+        import tools.skills_hub as hub
+        import tools.skills_hub_search as hub_search
+
+        monkeypatch.setattr(hub, "_index_cache_dir", lambda: tmp_path)
+
+        path = hub_search._hermes_index_cache_file()
+        assert path == tmp_path / "stardust-skills-index-v1.json"
+        assert path.name != "hermes-index.json"
 
     def test_persistent_decoding_error_falls_back_to_stale_cache(
         self, monkeypatch, tmp_path

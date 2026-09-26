@@ -368,6 +368,12 @@ export const ja = defineLocale({
       expMonthField: '有効期限（月）',
       expYearField: '有効期限（年）',
       cvcField: 'CVC',
+      delegatedPaymentLabel: 'Stardust 支払いカード',
+      delegatedPaymentDescription: 'Stardust に購入や支払いを明示的に依頼した場合、このカードを追加確認なしで使用できます。',
+      allowAnyOriginLabel: '任意のチェックアウトサイトで使用',
+      allowAnyOriginDescription: '専用の低限度額・プリペイド・バーチャルカード向けです。残高や発行会社の限度額が実際の上限になります。',
+      delegatedPaymentBadge: '委任支払い',
+      anySiteBadge: '任意サイト',
       postalField: '郵便番号',
       addressLine1Field: '住所 1 行目',
       addressLine2Field: '住所 2 行目',
@@ -539,8 +545,8 @@ export const ja = defineLocale({
         window: 'ウィンドウ全体',
         sidebar: 'サイドバーのみ'
       },
-      backdropTitle: 'チャット背景',
-      backdropDesc: '会話の背後に表示される淡い彫像の画像。',
+      backdropTitle: 'ウィンドウ背景',
+      backdropDesc: 'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
       userBubbleTitle: 'メッセージの吹き出し',
       userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で枠線だけが残ります。',
       introSplashTitle: 'イントロ表示',
@@ -1953,9 +1959,9 @@ export const ja = defineLocale({
     nameLabel: '名前',
     cloneFrom: '複製元',
     cloneFromNone: 'なし（空）',
-    cloneFromDesc: '選択したプロファイルから設定、スキル、SOUL.md をコピーします。',
+    cloneFromDesc: '選択したプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     cloneFromDefault: 'デフォルトプロファイルから設定を複製',
-    cloneFromDefaultDesc: 'デフォルトプロファイルから設定、スキル、SOUL.md をコピーします。',
+    cloneFromDefaultDesc: 'デフォルトプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     invalidName: hint => `無効なプロファイル名。${hint}`,
     nameRequired: '名前は必須です',
     creating: '作成中...',
@@ -2194,6 +2200,7 @@ export const ja = defineLocale({
   },
 
   sidebar: {
+    recent: '最近',
     gatewayGroups: {
       grouping: 'ゲートウェイとプロファイル',
       rename: 'グループ名を変更',
@@ -3269,6 +3276,7 @@ export const ja = defineLocale({
   },
 
   assistant: {
+    intro: { eyebrow: 'Stardust', headline: '今日は何を進めますか？', body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。', start: 'メッセージを始める', actions: 'コマンドを見る' },
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',

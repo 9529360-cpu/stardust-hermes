@@ -1234,12 +1234,15 @@ DEFAULT_CONFIG = {
             "info_log_min_delta_mb": 0.0,
         },
     },
-    "memory": {  # Persistent memory — bounded curated memory injected into the system prompt
+    "memory": {  # Persistent memory — built-in files plus one optional external provider
+        # Master privacy switch. false = no built-in injection/writes and no external
+        # provider init/sync/prefetch/tools. Provider selection/credentials stay configured.
+        "enabled": True,
         "memory_enabled": True,
         "user_profile_enabled": True,
         # Approval gate for memory writes on BOTH foreground turns and the background review fork.
         # true = foreground writes prompt inline; background writes are staged (/memory
-        # pending|approve <id>|reject <id>). To disable memory: memory_enabled.
+        # pending|approve <id>|reject <id>). To disable ALL persistence: enabled.
         "write_approval": False,
         "memory_char_limit": 2200,   # ~800 tokens at 2.75 chars/token
         "user_char_limit": 1375,     # ~500 tokens at 2.75 chars/token
@@ -1417,9 +1420,10 @@ DEFAULT_CONFIG = {
         "min_idle_hours": 2,  # only run after the agent has been idle this long
         "stale_after_days": 14,  # mark "stale" after this many unused days
         "archive_after_days": 30,  # move to skills/.archive/ (recoverable) after this many
-        # LLM consolidation (umbrella-building) pass. OFF = deterministic inactivity prune only, no
-        # aux-model cost. `hermes curator run --consolidate` overrides once.
-        "consolidate": False,
+        # LLM consolidation (umbrella-building) for curator-managed agent skills. Runs only on the
+        # normal low-frequency curator cycle; false = deterministic inactivity prune only, no aux cost.
+        # `hermes curator run --consolidate` can still force one pass when this is disabled.
+        "consolidate": True,
         # Also prune bundled built-ins (a suppression list stops `hermes update` restoring them);
         # hub-installed skills are NEVER pruned. A built-in's clock starts when the curator first
         # sees it, so never a mass-prune on the first run. false = keep all.
@@ -1651,7 +1655,13 @@ DEFAULT_CONFIG = {
         # transport is used only when named explicitly. Transport timeout/error/invalid response
         # DENIES unless transport_fallback is "builtin". Presentation only: plugins cannot detect,
         # suppress, or auto-approve commands outside a correlated human response.
-        "approval": {"transport": "builtin", "transport_fallback": "deny"},
+        # ACP hosts are separately fail-closed because a protocol allow does not prove a human
+        # selected it. Exact client_info.name values must be explicitly trusted; no wildcard.
+        "approval": {
+            "transport": "builtin",
+            "transport_fallback": "deny",
+            "acp_trusted_clients": [],
+        },
         # Writes to agent-instruction files (AGENTS.md/CLAUDE.md/SOUL.md/.cursorrules, project-local
         # .hermes config) always need human approval, even under yolo. Extra patterns are fnmatch
         # globs on the basename (e.g. "*.mdc").
@@ -1893,12 +1903,15 @@ DEFAULT_CONFIG = {
         "max_size_mb": 5,      # max size per log file before rotation
         "backup_count": 3,     # rotated backups to keep
     },
-    # Remote model-catalog manifest: curated OpenRouter / Nous Portal model lists fetched from this
-    # URL (falls back to the in-repo snapshot on network failure), so picker lists update without a
-    # release. Default URL is served by the docs-site GitHub Pages deploy.
+    # Remote model-catalog manifest: curated OpenRouter / Nous Portal model lists fetched from
+    # Stardust's reviewed main branch (falls back to the in-repo snapshot on network failure), so
+    # picker lists update without a product release or a separate docs-site authority.
     "model_catalog": {
         "enabled": True,
-        "url": "https://hermes-agent.nousresearch.com/docs/api/model-catalog.json",
+        "url": (
+            "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+            "/main/website/static/api/model-catalog.json"
+        ),
         # Disk cache TTL in minutes. The gateway refreshes in the background on this cadence; the
         # CLI refetches on the next /model or `hermes model` once the cache is older. Network
         # failures silently use the stale cache. Legacy `ttl_hours` is honoured if set.
@@ -2460,7 +2473,7 @@ DEFAULT_CONFIG = {
         # Extra ports detection probes for an external llama-server (besides 8080).
         "detect_ports": [],
     },
-    "_config_version": 45,  # Config schema version - bump this when adding new required fields
+    "_config_version": 46,  # Config schema version - bump this when adding new required fields
 }
 
 

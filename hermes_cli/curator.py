@@ -101,7 +101,7 @@ def _print_curator_config(curator) -> None:
     consolidate = curator.get_consolidate()
     print(
         f"  consolidate:    {'on' if consolidate else 'off'}"
-        f"{'' if consolidate else ' (prune-only; LLM merge pass opt-in)'}")
+        f"{'' if consolidate else ' (prune-only; LLM merge pass disabled by config)'}")
 
 
 def _cmd_status(args) -> int:
@@ -161,7 +161,7 @@ def _cmd_run(args) -> int:
         else "curator: running review pass...")
     if consolidate is None and not curator.get_consolidate():
         print(
-            "curator: consolidation is off — running prune-only "
+            "curator: consolidation is disabled by config — running prune-only "
             "(deterministic stale/archive). Pass --consolidate or set "
             "`curator.consolidate: true` to enable the LLM merge pass.")
     result = curator.run_curator_review(

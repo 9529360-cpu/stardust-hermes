@@ -310,7 +310,7 @@
       var(--theme-neutral-card)
     );
     --ui-bg-card: color-mix(in srgb, var(--ui-accent) 4%, color-mix(in srgb, var(--ui-base) 4%, transparent));
-    --ui-bg-input: #fcfcfc;
+    --ui-bg-input: var(--ui-bg-card);
     --ui-bg-primary: color-mix(
       in srgb,
       var(--ui-accent) var(--theme-fill-primary-accent-mix),
@@ -613,6 +613,32 @@
        touch — still clearly a surface, no longer the brightest thing in the
        transcript. Derived from the card so every skin follows its own seed. */
     --ui-widget-surface-background: color-mix(in srgb, var(--ui-bg-editor) 88%, #000);
+  }
+
+  /* ── Window-wide custom backdrop ────────────────────────────────────
+     The image itself is mounted once at the desktop shell. Field surfaces
+     become tinted glass so the same wallpaper is visible behind the sessions
+     rail, conversation and context/tool panes instead of stopping at the chat
+     column. Raised/masking surfaces keep their normal fills for readability. */
+  :root[data-stardust-window-backdrop] {
+    --ui-chat-surface-background: color-mix(in srgb, var(--ui-bg-chrome) 64%, transparent);
+    --ui-sidebar-surface-background: color-mix(in srgb, var(--ui-bg-sidebar) 72%, transparent);
+    --ui-editor-surface-background: color-mix(in srgb, var(--ui-bg-editor) 70%, transparent);
+    --ui-panel-surface-background: color-mix(in srgb, var(--ui-bg-editor) 70%, transparent);
+  }
+
+  :root[data-stardust-window-backdrop] [data-contrib-shell],
+  :root[data-stardust-window-backdrop] [data-slot='sidebar-wrapper'] {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  :root[data-stardust-window-backdrop] [data-glass-opaque],
+  :root[data-stardust-window-backdrop] [data-glass-raised] {
+    --ui-chat-surface-background: var(--ui-bg-chrome);
+    --ui-editor-surface-background: var(--ui-bg-editor);
+    --ui-sidebar-surface-background: var(--ui-bg-sidebar);
+    --ui-panel-surface-background: var(--ui-bg-editor);
   }
 
   /* ── Window glass (Settings → Appearance → Window Translucency: Glass) ──

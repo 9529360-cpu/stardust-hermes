@@ -17,7 +17,6 @@ import {
   type HFFileGroup,
   type HFSearchHit,
   listHFRepoFiles,
-  quickstartLocalModels,
   searchHFModels,
   setLocalServer,
   sideloadLocalModel
@@ -39,11 +38,13 @@ import {
   Zap
 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { confirm } from '@/store/confirm'
 import {
   $localRuntimeInstallStarting,
   $localRuntimeJobs,
   runningDownloadFor,
   runningRuntimeInstall,
+  startLocalQuickstart,
   startLocalRuntimeInstall,
   watchLocalRuntimeJobs
 } from '@/store/local-runtime-jobs'
@@ -166,12 +167,7 @@ export function LocalModelsSettings() {
   }, [refresh, runningCount])
 
   async function handleQuickstart() {
-    try {
-      await quickstartLocalModels()
-      watchLocalRuntimeJobs()
-    } catch (err) {
-      notifyError(err, copy.quickstartFailed)
-    }
+    await startLocalQuickstart()
   }
 
   async function handleDownload(model: LocalCatalogModel) {
@@ -233,7 +229,13 @@ export function LocalModelsSettings() {
   }
 
   async function handleDelete(target: string, rowId: string) {
-    if (!window.confirm(copy.deleteConfirm(target))) {
+    const ok = await confirm({
+      confirmLabel: copy.deleteAction,
+      destructive: true,
+      title: copy.deleteConfirm(target)
+    })
+
+    if (!ok) {
       return
     }
 
@@ -304,7 +306,7 @@ export function LocalModelsSettings() {
 
   const failedInstall = jobs.some(job => job.kind === 'runtime-install' && job.status === 'error')
 
-  if (qJob || (needsSetup && !configure && heroModel && !installStarting && !rJob && !failedInstall)) {
+  if (qJob || (needsSetup && !configure && heroModel && !rJob && !failedInstall)) {
     // Stage rail derived from the job phase: engine -> model -> finish.
     const phase = qJob?.phase ?? ''
 
@@ -327,7 +329,7 @@ export function LocalModelsSettings() {
         <div className="flex min-h-[60dvh] items-center justify-center">
           <div className="w-full max-w-md text-center">
             <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-primary/10">
-              {qJob ? (
+              {qJob || installStarting ? (
                 <Loader2 className="size-7 animate-spin text-primary" />
               ) : (
                 <Cpu className="size-7 text-primary" />
@@ -370,6 +372,8 @@ export function LocalModelsSettings() {
                   ))}
                 </div>
               </>
+            ) : installStarting ? (
+              <p className="mt-2 min-h-10 text-[0.8rem] leading-5 text-muted-foreground">{copy.installing}</p>
             ) : heroModel ? (
               <>
                 <p className="mt-2 text-[0.8rem] leading-5 text-muted-foreground">

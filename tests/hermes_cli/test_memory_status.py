@@ -26,12 +26,13 @@ def _run_cmd_status(capfd, mem_config=None, memory_tools=None):
         memory_tools = {"memory"}
 
     with patch("hermes_cli.config.load_config", return_value=config):
-        with patch("hermes_cli.memory_setup._get_available_providers", return_value=[]):
-            with patch(
-                "hermes_cli.tools_config._get_platform_tools",
-                return_value=memory_tools,
-            ):
-                cmd_status(args=None)
+        with patch("hermes_cli.config.load_config_readonly", return_value=config):
+            with patch("hermes_cli.memory_setup._get_available_providers", return_value=[]):
+                with patch(
+                    "hermes_cli.tools_config._get_platform_tools",
+                    return_value=memory_tools,
+                ):
+                    cmd_status(args=None)
 
     captured = capfd.readouterr()
     return captured.out
@@ -46,6 +47,24 @@ class TestMemoryStatusLabels:
         out = _run_cmd_status(capfd)
         assert "Memory injection:" in out
         assert "enabled ✓" in out
+
+    def test_master_off_disables_memory_without_touching_chat_history(self, capfd):
+        out = _run_cmd_status(
+            capfd,
+            mem_config={
+                "enabled": False,
+                "memory_enabled": True,
+                "user_profile_enabled": True,
+                "provider": "honcho",
+            },
+        )
+
+        assert "Memory persistence:  disabled" in out
+        assert "Chat/session history: separate" in out
+        assert "Memory injection:   disabled" in out
+        assert "User profile:       disabled" in out
+        assert "Memory tool:        disabled" in out
+        assert "External provider:  honcho (configured, paused)" in out
 
     def test_shows_memory_injection_disabled(self, capfd):
         """When memory_enabled is false, status reflects it."""

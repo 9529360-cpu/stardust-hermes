@@ -42,6 +42,29 @@ def test_category_defaults_to_other_and_unknown_category_is_rejected(tmp_path):
     assert entries["mem"].to_dict()["category"] == "memory"
 
 
+def test_desktop_capability_summary_states_full_authority_and_exact_source_pin():
+    entry = pc.entry_from_mapping(_entry("desktop-ui", category="desktop"), "test")
+    assert entry is not None
+
+    summary = pc.entry_capability_summary(entry)
+
+    assert "full Stardust Desktop renderer/app authority" in summary
+    assert "not a sandbox or permission boundary" in summary
+    assert entry.repo in summary
+    assert entry.sha in summary
+
+
+def test_non_desktop_capability_summary_does_not_claim_renderer_authority():
+    entry = pc.entry_from_mapping(_entry("memory-plugin", category="memory"), "test")
+    assert entry is not None
+
+    summary = pc.entry_capability_summary(entry)
+
+    assert "renderer/app authority" not in summary
+    assert entry.repo in summary
+    assert entry.sha in summary
+
+
 def test_invalid_entries_are_skipped_not_raised(tmp_path):
     (tmp_path / "a.yaml").write_text(yaml.safe_dump(_entry("ok")))
     (tmp_path / "b.yaml").write_text(yaml.safe_dump(_entry("short-sha", sha="abc123")))
@@ -57,6 +80,48 @@ def test_find_removed_matches_name_or_normalized_repo(tmp_path):
     assert pc.find_removed("evil", tmp_path).reason == "malware"
     assert pc.find_removed("https://github.com/x/EVIL/", tmp_path) is not None
     assert pc.find_removed("https://github.com/x/fine", tmp_path) is None
+
+
+def test_live_catalog_fetches_stardust_authority(tmp_path, monkeypatch):
+    import httpx
+
+    cache = tmp_path / "cache" / "plugin-catalog-stardust-v1.json"
+    seen_urls = []
+    payload = {"entries": [_entry("live-only")], "removed": []}
+
+    class Response:
+        content = json.dumps(payload).encode()
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return payload
+
+    def fake_get(url, **kwargs):
+        seen_urls.append(url)
+        return Response()
+
+    monkeypatch.setattr(pc, "_live_cache_path", lambda: cache)
+    monkeypatch.setattr(httpx, "get", fake_get)
+
+    assert pc.fetch_live_catalog(force=True) == payload
+    assert seen_urls == [
+        "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+        "/main/website/static/api/plugin-catalog.json"
+    ]
+    assert json.loads(cache.read_text(encoding="utf-8")) == payload
+
+
+def test_live_catalog_cache_namespace_does_not_reuse_nous_cache(tmp_path, monkeypatch):
+    import hermes_constants
+
+    monkeypatch.setattr(hermes_constants, "get_hermes_home", lambda: tmp_path)
+
+    assert pc._live_cache_path() == (
+        tmp_path / "cache" / "plugin-catalog-stardust-v1.json"
+    )
+    assert pc._live_cache_path().name != "plugin-catalog.json"
 
 
 def test_live_catalog_falls_back_to_in_tree_and_unions_removals(tmp_path, monkeypatch):

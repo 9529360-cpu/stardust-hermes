@@ -9,6 +9,7 @@ import type { LocalRuntimeJob } from '@/types/hermes'
 import {
   $localRuntimeInstallStarting,
   $localRuntimeJobs,
+  startLocalQuickstart,
   startLocalRuntimeInstall,
   watchLocalRuntimeJobs
 } from './local-runtime-jobs'
@@ -70,6 +71,35 @@ afterEach(async () => {
   vi.clearAllTimers()
   vi.useRealTimers()
 })
+it('serializes quickstart until its first authoritative jobs read settles', async () => {
+  const post = deferred<{ job_id: string }>()
+  const read = deferred<{ jobs: LocalRuntimeJob[] }>()
+
+  const quickstartJob: LocalRuntimeJob = {
+    ...job,
+    job_id: 'quickstart',
+    kind: 'quickstart',
+    target: 'Qwen3.6 27B',
+    model_id: 'qwen3.6-27b'
+  }
+
+  api.mockImplementation(request => (request.method === 'POST' ? post.promise : read.promise))
+  const first = startLocalQuickstart()
+  await flush()
+  const second = startLocalQuickstart()
+  await flush()
+  expect(posts()).toHaveLength(1)
+  expect($localRuntimeInstallStarting.get()).toBe(true)
+  post.resolve({ job_id: quickstartJob.job_id })
+  await flush()
+  expect($localRuntimeInstallStarting.get()).toBe(true)
+  read.resolve({ jobs: [quickstartJob] })
+  await Promise.all([first, second])
+  expect(posts()).toHaveLength(1)
+  expect($localRuntimeJobs.get()).toEqual([quickstartJob])
+  expect($localRuntimeInstallStarting.get()).toBe(false)
+})
+
 it.each(['connection', 'profile'])('retains late install acceptance after a %s round trip', async context => {
   const post = deferred<{ job_id: string }>()
   api.mockImplementation(request => (request.method === 'POST' ? post.promise : Promise.resolve({ jobs: [job] })))

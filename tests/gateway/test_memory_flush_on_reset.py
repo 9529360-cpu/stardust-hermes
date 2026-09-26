@@ -9,12 +9,9 @@ bounded (~5s) drain and abandons whatever is still queued past it, so a
 /reset could silently drop writes the session had already handed off — the
 next session then loaded stale memory.
 
-The CLI exit path already drains via ``MemoryManager.flush_pending`` before
-shutdown (cli.py); these tests pin the same contract on the gateway path.
-
-The fix: in ``_cleanup_agent_resources``, call
-``agent._memory_manager.flush_pending(timeout=10)`` BEFORE
-``shutdown_memory_provider``.
+The durable ordering now belongs to ``AIAgent.shutdown_memory_provider``:
+drain queued sync, run final extraction, then shut providers down. CLI,
+gateway, one-shot, and direct close all delegate to that same owner.
 """
 import time
 from types import SimpleNamespace
@@ -78,23 +75,20 @@ class _RecordingProvider(MemoryProvider):
 
 
 def _make_agent(mgr: MemoryManager) -> SimpleNamespace:
-    """Build a minimal agent wired to a real MemoryManager.
+    """Build a minimal agent that executes the real AIAgent shutdown owner."""
+    from run_agent import AIAgent
 
-    ``shutdown_memory_provider`` mirrors ``AIAgent.shutdown_memory_provider``
-    (run_agent.py): end-of-session notification then ``shutdown_all``. The
-    memory manager is the live one carrying the queued writes, so the gateway
-    cleanup path exercises the real flush -> shutdown ordering.
-    """
-
-    def _shutdown_memory_provider(messages=None):
-        mgr.on_session_end(messages or [])
-        mgr.shutdown_all()
-
-    return SimpleNamespace(
+    agent = SimpleNamespace(
         _memory_manager=mgr,
+        _memory_provider_shutdown=False,
         _session_messages=[{"role": "user", "content": "earlier turn"}],
-        shutdown_memory_provider=_shutdown_memory_provider,
+        context_compressor=None,
+        session_id="sess-old",
     )
+    agent.shutdown_memory_provider = (
+        lambda messages=None: AIAgent.shutdown_memory_provider(agent, messages)
+    )
+    return agent
 
 
 def test_cleanup_flushes_pending_writes_before_shutdown(monkeypatch):
@@ -130,8 +124,8 @@ def test_cleanup_flushes_pending_writes_before_shutdown(monkeypatch):
 
     agent = _make_agent(mgr)
 
-    # Run the gateway cleanup path the /reset handler runs. No explicit flush
-    # here — the contract is that cleanup itself flushes before shutdown.
+    # Run the gateway cleanup path the /reset handler runs. The gateway does
+    # not own a separate flush; shutdown_memory_provider performs it.
     GatewayRunner._cleanup_agent_resources(object(), agent)
 
     disk_state_after_reset = provider.recorded

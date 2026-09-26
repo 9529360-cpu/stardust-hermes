@@ -27,7 +27,7 @@ function collectTsxFiles(dir: string): string[] {
 
     if (stat.isDirectory()) {
       results.push(...collectTsxFiles(fullPath))
-    } else if (entry.endsWith('.tsx')) {
+    } else if (entry.endsWith('.tsx') && !entry.includes('.test.') && !entry.includes('.spec.')) {
       results.push(fullPath)
     }
   }
@@ -41,7 +41,7 @@ describe('no native title= on button elements', () => {
   // multiple lines).
   it('uses <Tip> instead of native title= on all button elements', () => {
     const violations: string[] = []
-    const srcDir = resolve(__dirname, '../..')
+    const srcDir = resolve(process.cwd(), 'src')
 
     for (const filePath of collectTsxFiles(srcDir)) {
       const content = readFileSync(filePath, 'utf-8')

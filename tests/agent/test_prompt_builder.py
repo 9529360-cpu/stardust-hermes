@@ -84,9 +84,27 @@ class TestGuidanceConstants:
         assert "must not steal focus" in DEFAULT_AGENT_IDENTITY
         assert "continue" in DEFAULT_AGENT_IDENTITY
         assert "verify the result" in DEFAULT_AGENT_IDENTITY
+        assert "buy, order, subscribe, provision a paid service" in DEFAULT_AGENT_IDENTITY
+        assert "do not add a redundant final payment confirmation" in DEFAULT_AGENT_IDENTITY
+        assert "moves money or completes a purchase" not in DEFAULT_AGENT_IDENTITY
+        assert "secure local credential capture or Vault resolution" in DEFAULT_AGENT_IDENTITY
         assert "built by Nous Research" not in DEFAULT_AGENT_IDENTITY
         assert "9529360-cpu/stardust-hermes" in HERMES_AGENT_HELP_GUIDANCE
         assert "authoritative" in HERMES_AGENT_HELP_GUIDANCE
+
+    def test_kanban_guidance_does_not_treat_missing_credentials_as_automatic_block(self):
+        from agent import prompt_builder
+
+        assert "Missing credentials are not an automatic block" in prompt_builder.KANBAN_GUIDANCE
+        assert "secure local credential capture or Vault resolution" in prompt_builder.KANBAN_GUIDANCE
+
+    def test_verification_checks_existing_authorization_without_reprompting(self):
+        from agent import prompt_builder
+
+        source = Path(prompt_builder.__file__).read_text(encoding="utf-8")
+        assert "verify that the user's existing authorization covers it" in source
+        assert "do not re-ask merely because the step has side effects" in source
+        assert "confirm scope before executing" not in source
 
     def test_memory_guidance_keeps_form_rule_and_routing(self):
         """Dieted (#95681): WHAT belongs in memory is the memory tool
@@ -337,6 +355,22 @@ class TestBuildSkillsSystemPrompt:
         clear_skills_system_prompt_cache(clear_snapshot=True)
         yield
         clear_skills_system_prompt_cache(clear_snapshot=True)
+
+    def test_loading_policy_requires_clear_relevance(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        skill_dir = tmp_path / "skills" / "tools" / "focused-skill"
+        skill_dir.mkdir(parents=True)
+        (skill_dir / "SKILL.md").write_text(
+            "---\nname: focused-skill\ndescription: Handle focused workflows\n---\n"
+        )
+
+        prompt = build_skills_system_prompt()
+
+        assert "clearly matches the user's task" in prompt
+        assert "loosely related" in prompt
+        assert "smallest set needed" in prompt
+        assert "partially relevant" not in prompt
+        assert "Err on the side" not in prompt
 
 
 

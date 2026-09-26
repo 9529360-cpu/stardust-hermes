@@ -11,6 +11,7 @@ import json
 import os
 import tempfile
 import shutil
+from pathlib import Path
 
 import pytest
 
@@ -106,6 +107,77 @@ def test_cli_memory_approve_without_live_agent_uses_fresh_store(hermes_home, cap
     # The approved write landed in a freshly loaded on-disk store (MEMORY.md).
     reloaded = MemoryStore(); reloaded.load_from_disk()
     assert any("remember the launch date" in e for e in reloaded.memory_entries)
+
+
+def test_pre_reset_staged_memory_write_cannot_repopulate_after_approval(hermes_home):
+    from hermes_cli.write_approval_commands import handle_pending_subcommand
+    from tools.memory_tool import MemoryStore, load_on_disk_store, memory_tool
+    from tools import write_approval as wa
+
+    _set_approval("memory", True)
+    staging = MemoryStore()
+    staging.load_from_disk()
+    proposed = json.loads(memory_tool("add", "memory", "forgotten pre-reset fact", store=staging))
+    pending_id = proposed["pending_id"]
+    record = wa.get_pending("memory", pending_id)
+    assert record["payload"]["_reset_generation"] == staging.reset_generation("memory")
+
+    MemoryStore.reset_target("memory")
+    fresh = load_on_disk_store()
+    out = handle_pending_subcommand(
+        wa.MEMORY,
+        ["approve", pending_id],
+        memory_store=fresh,
+    )
+
+    assert "Approved 0 memory write(s)." in out
+    assert "reset" in out.lower()
+    assert wa.get_pending("memory", pending_id) is not None
+    assert not (Path(hermes_home) / "memories" / "MEMORY.md").exists()
+
+
+def test_master_off_then_reset_keeps_old_pending_write_fenced(hermes_home):
+    from hermes_cli.write_approval_commands import handle_pending_subcommand
+    import hermes_cli.config as cfg
+    from tools.memory_tool import MemoryStore, load_on_disk_store, memory_tool
+    from tools import write_approval as wa
+
+    _set_approval("memory", True)
+    staging = MemoryStore()
+    staging.load_from_disk()
+    proposed = json.loads(memory_tool("add", "memory", "must stay forgotten", store=staging))
+    pending_id = proposed["pending_id"]
+
+    config = cfg.load_config()
+    config.setdefault("memory", {})["enabled"] = False
+    cfg.save_config(config)
+
+    paused = load_on_disk_store()
+    paused_out = handle_pending_subcommand(
+        wa.MEMORY,
+        ["approve", pending_id],
+        memory_store=paused,
+    )
+    assert "Approved 0 memory write(s)." in paused_out
+    assert "disabled by memory.enabled" in paused_out
+    assert wa.get_pending("memory", pending_id) is not None
+
+    MemoryStore.reset_target("memory")
+
+    config = cfg.load_config()
+    config.setdefault("memory", {})["enabled"] = True
+    cfg.save_config(config)
+
+    resumed = load_on_disk_store()
+    reset_out = handle_pending_subcommand(
+        wa.MEMORY,
+        ["approve", pending_id],
+        memory_store=resumed,
+    )
+    assert "Approved 0 memory write(s)." in reset_out
+    assert "reset" in reset_out.lower()
+    assert wa.get_pending("memory", pending_id) is not None
+    assert not (Path(hermes_home) / "memories" / "MEMORY.md").exists()
 
 
 def test_load_on_disk_store_honors_configured_limits_and_permissions(hermes_home, monkeypatch):

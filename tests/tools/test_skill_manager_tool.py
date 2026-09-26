@@ -165,6 +165,14 @@ class TestCreateSkill:
         assert result["success"] is False
         assert "already exists" in result["error"]
 
+    def test_create_returns_portable_relative_path_but_native_absolute_skill_md(self, tmp_path):
+        with _skill_dir(tmp_path):
+            result = _create_skill("my-skill", VALID_SKILL_CONTENT, category="nested")
+
+        assert result["success"] is True
+        assert result["path"] == "nested/my-skill"
+        assert result["skill_md"] == str(tmp_path / "nested" / "my-skill" / "SKILL.md")
+
     def test_create_overlap_returns_merge_candidates(self, tmp_path):
         existing = """\
 ---
@@ -512,6 +520,15 @@ class TestRemoveFile:
             result = _remove_file("my-skill", "references/api.md")
         assert result["success"] is True
         assert not (tmp_path / "my-skill" / "references" / "api.md").exists()
+
+    def test_remove_missing_lists_portable_relative_paths(self, tmp_path):
+        with _skill_dir(tmp_path):
+            _create_skill("my-skill", VALID_SKILL_CONTENT)
+            _write_file("my-skill", "references/api.md", "content")
+            result = _remove_file("my-skill", "references/missing.md")
+
+        assert result["success"] is False
+        assert result["available_files"] == ["references/api.md"]
 
     def test_remove_symlink_escape_blocked(self, tmp_path):
         outside_dir = tmp_path / "outside"

@@ -1,4 +1,4 @@
-"""Plugin catalog — curated, Nous-approved Hermes plugins shipped with the repo.
+"""Plugin catalog — curated Stardust plugins shipped with the repo.
 
 Mirrors the ``optional-mcps/`` MCP-catalog pattern: one YAML file per entry under the in-tree
 ``plugin-catalog/`` directory, pinned to an exact 40-character commit SHA. Presence in the directory IS
@@ -6,10 +6,9 @@ the human-merged approval gate; SHA bumps are new, re-reviewed PRs; ``removed.ya
 (installs of a removed name/repo are refused with the recorded reason). Full policy:
 ``plugin-catalog/README.md``.
 
-Live refresh: the docs build publishes the same data as ONE JSON document
-(``website/scripts/extract-plugins.py`` → ``/docs/api/plugin-catalog.json``, like the skills index), so
-an installed Hermes sees new entries and removals without updating. Any fetch failure falls back to the
-in-tree copy silently.
+Live refresh reads the deterministic reviewed ``website/static/api/plugin-catalog.json`` directly
+from Stardust's raw ``main`` branch, so an installed Stardust sees new entries and removals without a
+product release. Any fetch failure falls back to the Stardust-specific live cache, then the in-tree copy.
 """
 
 from __future__ import annotations
@@ -30,7 +29,10 @@ CATALOG_TIERS = ("official", "community")
 # Browse taxonomy for the catalog page / picker. Entries without one land on the Desktop shelf
 # (the common case for community submissions); "general" is for plugins that fit no shelf.
 CATALOG_CATEGORIES = ("desktop", "memory", "platform", "web", "tools", "voice", "automation", "models", "general")
-LIVE_CATALOG_URL = "https://hermes-agent.nousresearch.com/docs/api/plugin-catalog.json"
+LIVE_CATALOG_URL = (
+    "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+    "/main/website/static/api/plugin-catalog.json"
+)
 LIVE_CATALOG_TTL_SECONDS = 6 * 60 * 60
 _REQUEST_TIMEOUT = 5.0
 _MAX_LIVE_BYTES = 2 * 1024 * 1024
@@ -223,7 +225,7 @@ def find_removed(name_or_repo: str, catalog_dir: Optional[Path] = None) -> Optio
 
 def _live_cache_path() -> Path:
     from hermes_constants import get_hermes_home
-    return get_hermes_home() / "cache" / "plugin-catalog.json"
+    return get_hermes_home() / "cache" / "plugin-catalog-stardust-v1.json"
 
 
 def fetch_live_catalog(*, force: bool = False) -> Optional[Dict[str, Any]]:
@@ -279,7 +281,11 @@ def get_live_catalog_entry(name: str) -> Optional[PluginCatalogEntry]:
 # ── Human summaries ──────────────────────────────────────────────────────────
 
 def entry_capability_summary(entry: PluginCatalogEntry) -> str:
-    """One paragraph shown at install/enable prompts: what the user is granting."""
+    """One paragraph shown at install/enable prompts: what the user is granting.
+
+    Declared tools/hooks are descriptive metadata. Desktop entries execute code in the
+    Desktop renderer realm when enabled, so their real authority must be stated separately.
+    """
     caps = entry.capabilities
     parts = [f"{label} {', '.join(items)}" for label, items in (
         ("registers tool(s):", caps.provides_tools), ("hook(s):", caps.provides_hooks),
@@ -288,6 +294,12 @@ def entry_capability_summary(entry: PluginCatalogEntry) -> str:
     if entry.description:
         bits.append(entry.description)
     bits.append(f"This plugin {'; '.join(parts) if parts else 'declares no tools, hooks, middleware, or env vars'}.")
+    if entry.category == "desktop":
+        bits.append(
+            "Desktop code runs with full Stardust Desktop renderer/app authority when enabled; "
+            "declared capabilities are descriptive metadata, not a sandbox or permission boundary."
+        )
+    bits.append(f"Source: {entry.repo} pinned to {entry.sha}.")
     if entry.platforms:
         bits.append(f"Platforms: {', '.join(entry.platforms)}.")
     if entry.requires_hermes:

@@ -1,7 +1,7 @@
 import { atom } from 'nanostores'
 
 import { getApiRequestConnection } from '@/api/client'
-import { getLocalModelsJobs, installLocalRuntime } from '@/hermes'
+import { getLocalModelsJobs, installLocalRuntime, quickstartLocalModels } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { $activeGatewayRoute } from '@/store/gateway'
 import { $localModelsEnabled } from '@/store/local-models-flag'
@@ -31,7 +31,10 @@ export function localRuntimeInstallBusy(): boolean {
   )
 }
 
-export async function startLocalRuntimeInstall(): Promise<void> {
+async function startTrackedSetupJob(
+  start: () => Promise<{ job_id: string }>,
+  failureMessage: string
+): Promise<void> {
   if (localRuntimeInstallBusy()) {
     return
   }
@@ -41,7 +44,7 @@ export async function startLocalRuntimeInstall(): Promise<void> {
   $localRuntimeInstallStarting.set(true)
 
   try {
-    const { job_id } = await installLocalRuntime()
+    const { job_id } = await start()
     owner.acceptedIds.add(job_id)
     owner.postPending = false
     owner.readPending = true
@@ -62,7 +65,7 @@ export async function startLocalRuntimeInstall(): Promise<void> {
     await poll()
   } catch (error) {
     if (owner === activeContext) {
-      notifyError(error, translateNow('settings.localModels.installFailed'))
+      notifyError(error, failureMessage)
     }
   } finally {
     owner.postPending = false
@@ -71,6 +74,14 @@ export async function startLocalRuntimeInstall(): Promise<void> {
       $localRuntimeInstallStarting.set(false)
     }
   }
+}
+
+export function startLocalRuntimeInstall(): Promise<void> {
+  return startTrackedSetupJob(installLocalRuntime, translateNow('settings.localModels.installFailed'))
+}
+
+export function startLocalQuickstart(): Promise<void> {
+  return startTrackedSetupJob(quickstartLocalModels, translateNow('settings.localModels.quickstartFailed'))
 }
 
 const POLL_ACTIVE_MS = 700

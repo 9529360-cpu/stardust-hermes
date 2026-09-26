@@ -213,21 +213,34 @@ hermes sessions list    # 浏览过去的会话
 ```yaml
 # In ~/.hermes/config.yaml
 memory:
-  memory_enabled: true
+  enabled: true             # 持久记忆隐私总开关
+  memory_enabled: true      # 内置 MEMORY.md
   user_profile_enabled: true
   memory_char_limit: 2200   # ~800 tokens
   user_char_limit: 1375     # ~500 tokens
 ```
 
+`memory.enabled` 是持久记忆总开关。设置为 `false`（或运行
+`hermes memory off`）会停止内置记忆写入以及外部提供者的初始化、同步、
+预取、hook 和记忆工具 I/O，同时保留 provider 选择与凭据。重新开启后不会
+把关闭期间完成的对话轮次补传给外部提供者。
+
+普通聊天/会话历史是独立子系统，不会因为关闭持久记忆而删除或停用。
+为了保持 prompt cache 稳定，已经运行中的会话可能仍在冻结的系统 prompt
+里带有会话开始时的记忆快照；新建会话即可刷新 prompt 与工具暴露，而持久化
+I/O 会在关闭后立即受阻。
+
 ## 外部记忆提供商
 
 对于超出 MEMORY.md 和 USER.md 范围的更深层持久化记忆，Hermes 内置了 8 个外部记忆提供商插件——包括 Honcho、OpenViking、Mem0、Hindsight、Holographic、RetainDB、ByteRover 和 Supermemory。
 
-外部提供商与内置记忆**并行**运行（而非替代），并增加了知识图谱、语义搜索、自动事实提取和跨会话用户建模等能力。
+总开关开启时，外部提供商会与当前启用的内置记忆目标并行运行，并增加知识图谱、语义搜索、自动事实提取和跨会话用户建模等能力。
 
 ```bash
 hermes memory setup      # 选择并配置提供商
-hermes memory status     # 查看当前激活状态
+hermes memory status     # 查看总开关、内置目标和 provider 状态
+hermes memory off        # 暂停全部持久记忆，保留 provider 配置
+hermes memory on         # 使用原配置恢复持久记忆
 ```
 
 有关每个提供商的完整详情、设置说明和对比，请参阅[记忆提供商](./memory-providers.md)指南。

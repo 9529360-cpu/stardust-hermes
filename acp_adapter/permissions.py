@@ -5,12 +5,114 @@ from __future__ import annotations
 import asyncio
 import logging
 from concurrent.futures import TimeoutError as FutureTimeout
+from dataclasses import dataclass
 from itertools import count
-from typing import Callable
+from typing import Any, Callable
 
 from acp.schema import AllowedOutcome, PermissionOption
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ApprovalTrustPosture:
+    """Immutable trust decision for dangerous-command approvals on one ACP connection.
+
+    ACP proves only that a client returned a permission outcome. It does not prove that
+    a human saw or selected that outcome. Client identity/capabilities are captured once
+    at initialize time for observability; trust comes only from the operator's explicit
+    security.approval.acp_trusted_clients allowlist.
+    """
+
+    client_name: str = "unknown"
+    client_version: str = ""
+    capability_names: tuple[str, ...] = ()
+    trusted_interactive: bool = False
+    reason: str = "untrusted"
+
+
+def _capability_names(client_capabilities: object) -> tuple[str, ...]:
+    """Stable top-level capability names for the immutable connection snapshot."""
+    if client_capabilities is None:
+        return ()
+    try:
+        if hasattr(client_capabilities, "model_dump"):
+            raw = client_capabilities.model_dump(by_alias=True, exclude_none=True)
+        elif isinstance(client_capabilities, dict):
+            raw = client_capabilities
+        else:
+            raw = vars(client_capabilities)
+    except Exception:
+        return ()
+    return tuple(sorted(str(key) for key in raw)) if isinstance(raw, dict) else ()
+
+
+def capture_approval_trust_posture(
+    client_info: object = None,
+    client_capabilities: object = None,
+    *,
+    config: dict[str, Any] | None = None,
+) -> ApprovalTrustPosture:
+    """Resolve the per-connection ACP dangerous-command trust posture once, fail-closed.
+
+    Client identity is not inferred to be interactive. The exact ACP client_info.name
+    must be explicitly allowlisted. Wildcards are intentionally unsupported.
+    """
+    client_name = str(getattr(client_info, "name", "") or "").strip() or "unknown"
+    client_version = str(getattr(client_info, "version", "") or "").strip()
+    capability_names = _capability_names(client_capabilities)
+
+    if config is None:
+        try:
+            from hermes_cli.config import load_config_readonly
+
+            config = load_config_readonly() or {}
+        except Exception:
+            logger.warning(
+                "Could not read ACP approval trust config; dangerous-command approvals will deny",
+                exc_info=True,
+            )
+            return ApprovalTrustPosture(
+                client_name=client_name,
+                client_version=client_version,
+                capability_names=capability_names,
+                reason="config_unavailable",
+            )
+
+    security = config.get("security") if isinstance(config, dict) else None
+    approval = security.get("approval") if isinstance(security, dict) else None
+    raw_trusted = approval.get("acp_trusted_clients", []) if isinstance(approval, dict) else []
+
+    if isinstance(raw_trusted, str):
+        configured = [raw_trusted]
+    elif isinstance(raw_trusted, (list, tuple, set)):
+        configured = list(raw_trusted)
+    else:
+        logger.warning(
+            "Invalid security.approval.acp_trusted_clients; dangerous-command approvals will deny"
+        )
+        return ApprovalTrustPosture(
+            client_name=client_name,
+            client_version=client_version,
+            capability_names=capability_names,
+            reason="invalid_trust_config",
+        )
+
+    trusted_names = {
+        item.strip()
+        for item in configured
+        if isinstance(item, str) and item.strip() and item.strip() != "*"
+    }
+    # ACP client_info.name is an identity string for this trust boundary. Match it
+    # case-sensitively so configuration never grants a broader identity than named.
+    trusted = client_name != "unknown" and client_name in trusted_names
+    return ApprovalTrustPosture(
+        client_name=client_name,
+        client_version=client_version,
+        capability_names=capability_names,
+        trusted_interactive=trusted,
+        reason="configured_trusted_client" if trusted else "client_not_trusted",
+    )
 
 # ACP permission option id -> Hermes approval result. Ids are stable across the
 # ``allow_permanent=True`` and ``False`` paths even though the option list differs.
@@ -98,14 +200,33 @@ def await_permission(
         return None, False
 
 
-def make_approval_callback(request_permission_fn: Callable, loop: asyncio.AbstractEventLoop,
-                           session_id: str, timeout: float = 60.0) -> Callable[..., str]:
-    """Return a Hermes approval callback (``command, description, **kw`` as used by
-    ``tools.approval.prompt_dangerous_approval()``) that bridges to the ACP
-    connection's ``request_permission`` coroutine on ``loop``; auto-denies after ``timeout`` s."""
+def make_approval_callback(
+    request_permission_fn: Callable,
+    loop: asyncio.AbstractEventLoop,
+    session_id: str,
+    timeout: float = 60.0,
+    *,
+    trust_posture: ApprovalTrustPosture | None = None,
+) -> Callable[..., str]:
+    """Bridge dangerous-command approval only for an explicitly trusted ACP host.
+
+    A wire-level ACP allow is accepted only when the operator trusted this connection's
+    client identity at initialize time. Unknown or untrusted clients deny without even
+    sending a permission request because their response cannot prove a human was present.
+    """
+    posture = trust_posture or ApprovalTrustPosture(reason="missing_trust_posture")
 
     def _callback(command: str, description: str, *, allow_permanent: bool = True,
                   allow_session: bool = True, smart_denied: bool = False, **_: object) -> str:
+        if not posture.trusted_interactive:
+            logger.warning(
+                "Denied ACP dangerous-command approval: client=%s version=%s reason=%s",
+                posture.client_name,
+                posture.client_version or "unknown",
+                posture.reason,
+            )
+            return "deny"
+
         options = _build_permission_options(allow_permanent=allow_permanent, allow_session=allow_session,
                                             smart_denied=smart_denied)
         response, timed_out = await_permission(

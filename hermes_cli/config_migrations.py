@@ -381,8 +381,9 @@ def _migrate_to_29(results: Dict[str, Any], quiet: bool) -> None:
                 "  ✓ Renamed write_mode → write_approval (boolean gate)")
 
 
-# 29 → 30 (curator.consolidate defaults to false) is schema-default-only: deep-merge supplies it
-# at read time and persisting a default would only bloat a lean config. No registry entry.
+# 29 → 30 introduced curator.consolidate as a schema-default-only setting. Its original default
+# was false; the current default is true. Deep-merge supplies the current default at read time, so
+# no registry migration persists it and an explicit user-written false remains authoritative.
 
 
 def _migrate_to_33(results: Dict[str, Any], quiet: bool) -> None:
@@ -709,6 +710,17 @@ MIGRATIONS: Tuple[Tuple[int, Callable[[Dict[str, Any], bool], None]], ...] = (
             "skills/.archive/ (recoverable with `hermes curator restore`). Set it back to 90 to keep the old window."))),
     # 44 → 45: saved platform_toolsets lists predate the connections toolset (see _migrate_to_45).
     (45, _migrate_to_45),
+    # 45 → 46: the historical model-catalog default pointed at the Hermes docs deployment.
+    # Rewrite only that exact old default. Any operator-supplied catalog URL remains authoritative.
+    (46, _rewrite_stale_default(
+        section="model_catalog", key="url",
+        old="https://hermes-agent.nousresearch.com/docs/api/model-catalog.json",
+        new=(
+            "https://raw.githubusercontent.com/9529360-cpu/stardust-hermes"
+            "/main/website/static/api/model-catalog.json"
+        ),
+        added="model_catalog.url moved to Stardust authority",
+        message="  ✓ Model catalog default now follows the Stardust repository authority.")),
 )
 
 

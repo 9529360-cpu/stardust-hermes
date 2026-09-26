@@ -467,6 +467,18 @@ export interface Translations {
       kinds: { bundled: string; disk: string; runtime: string }
       agentHalfMissing: string
       agentHalfMissingTip: string
+      trustDialog: {
+        title: (name: string) => string
+        description: string
+        authorityHeading: string
+        authorityBody: string
+        sourceHeading: string
+        sourceUnknown: string
+        repository: string
+        pinnedCommit: string
+        localFile: string
+        confirm: string
+      }
       installModal: {
         installFromGit: string
         reviewRepository: string
@@ -489,6 +501,7 @@ export interface Translations {
         desktopTarget: string
         desktopTargetFromPackage: string
         desktopOnlyNote: string
+        desktopTrustNote: string
         insecureWarning: string
         securityHeading: string
         securityIntro: string
@@ -548,6 +561,12 @@ export interface Translations {
       expMonthField: string
       expYearField: string
       cvcField: string
+      delegatedPaymentLabel: string
+      delegatedPaymentDescription: string
+      allowAnyOriginLabel: string
+      allowAnyOriginDescription: string
+      delegatedPaymentBadge: string
+      anySiteBadge: string
       postalField: string
       addressLine1Field: string
       addressLine2Field: string
@@ -1929,7 +1948,13 @@ export interface Translations {
       resetUser: string
       resetAll: string
       resetConfirm: (target: string) => string
+      resetConfirmDetail: string
       resetDone: (files: string) => string
+      resetCurrentChats: string
+      resetFreshTitle: string
+      resetFreshDescription: string
+      startFreshSession: string
+      keepCurrentSession: string
       resetFailed: string
       actionStarted: (name: string) => string
       actionFailed: (name: string) => string
@@ -2412,6 +2437,7 @@ export interface Translations {
   }
 
   sidebar: {
+    recent: string
     gatewayGroups: {
       grouping: string
       rename: string
@@ -3527,6 +3553,13 @@ export interface Translations {
   }
 
   assistant: {
+    intro: {
+      eyebrow: string
+      headline: string
+      body: string
+      start: string
+      actions: string
+    }
     thread: {
       loadingSession: string
       showEarlier: string

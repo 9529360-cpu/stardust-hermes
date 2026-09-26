@@ -16,10 +16,10 @@
 
 import { canonicalGitHubRemote } from './update-remote'
 
-export const UPDATE_CHECK_TTL_MS = 24 * 60 * 60 * 1000
+export const UPDATE_CHECK_TTL_MS = 60 * 60 * 1000
 // A failed check (offline, 403 rate-limit) is retried sooner than a good one,
-// but never on every poller tick.
-export const UPDATE_CHECK_FAILURE_TTL_MS = 60 * 60 * 1000
+// but never on every focus/poller tick.
+export const UPDATE_CHECK_FAILURE_TTL_MS = 15 * 60 * 1000
 
 export interface CachedUpdateCheck {
   fetchedAt: number
@@ -47,7 +47,7 @@ export function compareApiUrl(slug: string, currentSha: string, targetSha: strin
 /**
  * Whether a cached result still answers a passive check. The cache is keyed on
  * the local HEAD and branch: applying an update or switching branches changes
- * HEAD and invalidates it immediately, so a 24h TTL never shows a stale
+ * HEAD and invalidates it immediately, so the hourly TTL never shows a stale
  * "update available" after the user just updated.
  */
 export function cacheIsFresh(
