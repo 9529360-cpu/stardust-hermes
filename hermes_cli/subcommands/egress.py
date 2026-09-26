@@ -12,7 +12,7 @@ def build_egress_parser(subparsers) -> None:
         description="Manage iron-proxy, the optional TLS-intercepting egress firewall "
             "that swaps proxy tokens for real API credentials before outbound "
             "requests leave a sandbox.  Disabled by default.  See: "
-            "https://hermes-agent.nousresearch.com/docs/user-guide/egress/iron-proxy")
+            "https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/egress/iron-proxy.md")
 
     from hermes_cli import proxy_cli as _proxy_cli
     _proxy_cli.register_cli(egress_parser)
