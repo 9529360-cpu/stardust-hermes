@@ -129,6 +129,7 @@ beforeEach(() => {
   mocked.getLocalCatalog.mockResolvedValue({ models: [FITTING_MODEL, SPILLED_MODEL, REFUSED_MODEL] })
   mocked.getLocalModelsJobs.mockResolvedValue({ jobs: [] })
   $localRuntimeJobs.set([])
+  $localRuntimeInstallStarting.set(false)
 })
 
 afterEach(() => {
@@ -489,6 +490,7 @@ describe('quickstart', () => {
         error: null
       }
     ])
+    mocked.getLocalModelsJobs.mockResolvedValue({ jobs: [...$localRuntimeJobs.get()] })
     renderPane()
 
     expect(await screen.findByText('Qwen3.6 27B — 17.6 GB')).toBeTruthy()
