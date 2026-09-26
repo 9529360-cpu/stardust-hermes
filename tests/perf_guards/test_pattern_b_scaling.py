@@ -22,11 +22,33 @@ Historical baseline (2026-08-28, macOS arm64, Python 3.12), before both fixes be
   compression-tip walk = N+1). Fixed shape: batched edge query, bounded
   constant.
 
-Both fixes have landed (confirmed 2026-09-27: both guards below pass as
-plain assertions, not xfail-and-pass) — the upstream PR numbers cited in the
-guards themselves (#92166, #95380) predate this fork's independent history
-and don't resolve to anything in this repo, so whichever change actually
-carried the fix here isn't tied to those numbers.
+The streamed-text fix has landed cleanly (confirmed 2026-09-27: plain
+assertion, not xfail-and-pass). The upstream PR numbers cited in both guards
+(#92166, #95380) predate this fork's independent history and don't resolve
+to anything in this repo, so whichever change actually carried each fix here
+isn't tied to those numbers.
+
+The list_sessions_rich guard needed a different correction than "the marker
+went stale": ``_project_compression_tips`` walks ``get_compression_chain``
+per compression-root row, which reads through ``hermes_state.py::_read_ctx()``
+— a real reader-pool connection (untraced by this guard) UNLESS
+``self._wal_active`` is false, which falls back to the locked writer
+connection this guard traces. ``self._wal_active`` is false exactly when the
+linked SQLite build carries the WAL-reset corruption bug (see
+``tests/conftest.py::_wal_is_usable()`` — the same fork-wide mechanism
+behind the ``requires_wal`` marker): on such a build Hermes deliberately
+falls back to ``journal_mode=DELETE``, so this guard's O(1) shape simply
+does not hold there — every read goes through the locked writer connection
+by design, not by regression. This is exactly the "same test passes on one
+interpreter's linked SQLite and fails on another's" case
+``_wal_is_usable()``'s own docstring describes; on 2026-09-26, CI's
+interpreter linked a vulnerable build (measured 26 statements against this
+test's bound of 8) while the local interpreter that found the XPASS did
+not. Marked ``@pytest.mark.requires_wal`` rather than re-adding an xfail —
+this isn't "known-broken, tracked for a future fix", it is "not a
+meaningful guard on a build that never takes the fast path", exactly what
+that marker exists for. Its sibling test below (weaker O(N) budget, not
+O(1)) still holds regardless of WAL support.
 
 The xfail markers were the ratchet: they documented known-bad-on-main and
 were meant to flip to plain assertions the moment the fix landed. Remove a
@@ -143,6 +165,7 @@ class TestListSessionsRichQueryBound:
             db._conn.set_trace_callback(None)
         return rows, statements
 
+    @pytest.mark.requires_wal
     def test_statement_count_bounded_regardless_of_session_count(self, chain_db):
         rows, statements = self._count_writer_statements(chain_db)
 
