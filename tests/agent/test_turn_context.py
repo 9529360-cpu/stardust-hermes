@@ -22,6 +22,7 @@ from agent.turn_context import (
     build_turn_context,
 )
 from hermes_state import SessionDB
+from tools.memory_tool import MemoryStore
 
 
 class _FakeTodoStore:
@@ -250,6 +251,37 @@ def test_memory_refresh_invalidates_prompt_when_rendered_snapshot_changes():
     assert agent._memory_store.loaded == 1
     assert agent._cached_system_prompt is None
     assert agent._cached_system_prompt_static is None
+
+def test_reset_generation_refreshes_loaded_memory_on_next_turn(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "memories"
+    memory_dir.mkdir()
+    monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memory_dir)
+
+    store = MemoryStore()
+    store.load_from_disk()
+    assert store.add("memory", "fact that will be forgotten")["success"] is True
+    store.load_from_disk()
+    before_generation = store.reset_generation("memory")
+    assert "fact that will be forgotten" in (store.format_for_system_prompt("memory") or "")
+
+    agent = _FakeAgent()
+    agent._cached_system_prompt_static = "STATIC"
+    agent._memory_store = store
+
+    assert MemoryStore.reset_target("memory") is True
+    assert store.reset_generation("memory") == before_generation
+    assert store.system_prompt_snapshot_stale() is True
+
+    assert _refresh_builtin_memory_snapshot(agent) is True
+    assert store.reset_generation("memory") != before_generation
+    assert store.format_for_system_prompt("memory") is None
+    assert store.system_prompt_snapshot_stale() is False
+    assert agent._cached_system_prompt is None
+    assert agent._cached_system_prompt_static is None
+
+    # The reset generation has now been adopted, so the following turn is stable.
+    assert _refresh_builtin_memory_snapshot(agent) is False
+
 
 def test_returns_turn_context_with_user_message_appended():
     agent = _FakeAgent()

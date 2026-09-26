@@ -17,7 +17,7 @@ Two files make up the agent's memory:
 | **MEMORY.md** | Cross-project assistant knowledge — global environment facts, standing conventions, reusable tool quirks and lessons | 2,200 chars (~800 tokens) |
 | **USER.md** | User profile — your preferences, communication style, expectations | 1,375 chars (~500 tokens) |
 
-Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a frozen snapshot at session start. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
+Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a turn-stable snapshot. The snapshot stays byte-stable during a turn, then refreshes at the next turn boundary if the built-in files or their reset generation changed. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
 
 :::caution One agent per Hermes home
 Don't point two agent processes at the same Hermes home directory. Memory writes are automatic and load back into the system prompt at session start, so two writers sharing one home will compound each other's entries into state neither of them (nor you) authored. Memory is scoped per [profile](/user-guide/profiles) by design — give a second agent its own profile, and if they need shared memory, use an [external memory provider](/user-guide/features/memory-providers) instead.
@@ -54,7 +54,27 @@ The format includes:
 - Individual entries separated by `§` (section sign) delimiters
 - Entries can be multiline
 
-**Frozen snapshot pattern:** The system prompt injection is captured once at session start and never changes mid-session. This is intentional — it preserves the LLM's prefix cache for performance. When the agent adds/removes memory entries during a session, the changes are persisted to disk immediately but won't appear in the system prompt until the next session starts. Tool responses always show the live state.
+**Turn-stable snapshot pattern:** The system-prompt memory block does not mutate inside a turn. Between turns, Hermes checks the tiny built-in stores for an identity/generation change; if one changed, it reloads the snapshot before the next request. Unchanged memory keeps the prefix cache stable, while a real built-in memory change intentionally refreshes that prefix. Tool responses always show the live state.
+
+## Resetting Built-in Memory Is a Durable Forget Boundary
+
+`hermes memory reset` and the Desktop/Web reset controls only reset the built-in
+`MEMORY.md` / `USER.md` targets; they do not erase external-provider data or
+ordinary chat/session history.
+
+Each built-in target has a profile-scoped reset generation stored beside the file.
+A running session captures that generation with its memory snapshot. When reset
+advances it:
+
+- the file is erased (or rewritten empty if unlinking is unavailable);
+- a pre-reset session is fenced from writing through its stale generation;
+- pre-reset staged/approval writes are rejected instead of restoring forgotten facts;
+- the next turn detects the new generation and refreshes the built-in snapshot;
+- a brand-new session starts without the deleted snapshot immediately.
+
+If file erasure fails after the generation advances, Hermes reports the reset as
+incomplete and tells you to retry. The advanced generation is intentionally kept,
+so stale sessions remain unable to recreate the data while you recover.
 
 ## Memory Needs Session Boundaries
 
