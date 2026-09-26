@@ -86,7 +86,8 @@ def _claim(task_id: str, slug: str = "alpha") -> None:
             conn.execute(
                 "UPDATE tasks SET status='running', claim_lock='lock-1', "
                 "claim_expires=?, worker_pid=4242, last_heartbeat_at=?, "
-                "session_id='sess-xyz', consecutive_failures=2 WHERE id=?",
+                "session_id='sess-xyz', assistant_owner_key='messaging:telegram:12345', "
+                "consecutive_failures=2 WHERE id=?",
                 (int(time.time()) + 600, int(time.time()), task_id),
             )
 
@@ -200,6 +201,7 @@ def test_claimed_task_arrives_unclaimed_and_queued(kanban_root, tmp_path):
     assert task["last_heartbeat_at"] is None
     assert task["current_run_id"] is None
     assert task["session_id"] is None
+    assert task["assistant_owner_key"] is None
     assert task["consecutive_failures"] == 0
 
 

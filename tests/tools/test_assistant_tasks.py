@@ -1,0 +1,1284 @@
+import json
+from contextlib import contextmanager
+from types import SimpleNamespace
+
+from agent.inline_tool_executors import INLINE_TOOL_EXECUTORS, InlineToolContext
+from tools import assistant_tasks
+
+
+def test_schema_stays_bounded_and_does_not_restore_stale_confirmation_policy():
+    encoded = json.dumps(assistant_tasks.ASSISTANT_TASKS_SCHEMA, separators=(",", ":"))
+
+    assert len(encoded) < 1600
+    assert "assistant_tasks" in encoded
+    assert "approval_required" not in encoded
+
+
+def test_create_splits_independent_work_and_preserves_durable_controls(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+
+    def fake_create(args):
+        calls.append(dict(args))
+        if args["title"] == "Broken sibling":
+            return json.dumps({"success": False, "error": "bad task"})
+        return json.dumps(
+            {
+                "ok": True,
+                "task_id": f"t_{len(calls)}",
+                "status": "ready",
+                "workspace_kind": args.get("workspace_kind") or "scratch",
+                "workspace_path": args.get("workspace_path"),
+                "project_id": args.get("project"),
+                "subscribed": True,
+            }
+        )
+
+    monkeypatch.setattr("tools.kanban_tools._handle_create", fake_create)
+
+    result = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            session_id="session-7",
+            request_id="call-42",
+            tasks=[
+                {
+                    "title": "Convert report to PDF",
+                    "instruction": "Convert the desktop report.docx to PDF and verify the PDF opens.",
+                },
+                {
+                    "title": "Prepare Japan flight",
+                    "instruction": "Find a suitable flight to Japan tomorrow and prepare the booking.",
+                },
+                {
+                    "title": "Continue Stardust",
+                    "instruction": "Continue the Stardust project until the requested feature is complete.",
+                    "continuous": True,
+                    "project": "stardust",
+                    "workspace_kind": "worktree",
+                },
+                {
+                    "title": "Broken sibling",
+                    "instruction": "This one fails without cancelling its siblings.",
+                },
+            ],
+        )
+    )
+
+    assert result["summary"] == {"requested": 4, "created": 3, "failed": 1}
+    assert [row["title"] for row in result["created"]] == [
+        "Convert report to PDF",
+        "Prepare Japan flight",
+        "Continue Stardust",
+    ]
+    assert calls[0]["session_id"] == "session-7"
+    assert calls[0]["assignee"] == "default"
+    assert calls[0]["_assistant_owner_key"] == "local"
+    keys = [call["idempotency_key"] for call in calls[:3]]
+    assert all(key.startswith("assistant:") for key in keys)
+    assert [key.rsplit(":", 1)[1] for key in keys] == ["0", "1", "2"]
+    assert len({key.rsplit(":", 1)[0] for key in keys}) == 1
+    assert all("local" not in key and "call-42" not in key for key in keys)
+    assert calls[2]["goal_mode"] is True
+    assert calls[2]["project"] == "stardust"
+    assert calls[2]["workspace_kind"] == "worktree"
+
+    assert calls[0]["body"] == "Convert the desktop report.docx to PDF and verify the PDF opens."
+    assert calls[1]["body"] == "Find a suitable flight to Japan tomorrow and prepare the booking."
+    assert "User-control boundary" not in calls[1]["body"]
+
+
+def test_create_refuses_secret_bearing_durable_fields(monkeypatch):
+    calls = []
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    monkeypatch.setattr("tools.kanban_tools._handle_create", lambda args: calls.append(dict(args)) or "{}")
+
+    secret = "sk-" + ("a" * 48)
+    result = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            owner_key="local",
+            request_id="secret-create",
+            tasks=[{"title": "Configure provider", "instruction": f"Use {secret} and finish setup."}],
+        )
+    )
+
+    assert result["summary"] == {"requested": 1, "created": 0, "failed": 1}
+    assert "credential or secret" in result["failed"][0]["error"]
+    assert secret not in json.dumps(result)
+    assert calls == []
+
+
+def test_create_retry_uses_same_idempotency_keys(monkeypatch):
+    calls = []
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    monkeypatch.setattr(
+        "tools.kanban_tools._handle_create",
+        lambda args: calls.append(dict(args))
+        or json.dumps(
+            {
+                "ok": True,
+                "task_id": "t_same",
+                "status": "ready",
+                "workspace_kind": "scratch",
+                "project_id": None,
+                "subscribed": True,
+            }
+        ),
+    )
+
+    payload = [{"title": "Long task", "instruction": "Keep working until done."}]
+    for _ in range(2):
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            tasks=payload,
+            session_id="s1",
+            request_id="tool-call-stable",
+        )
+
+    assert calls[0]["idempotency_key"] == calls[1]["idempotency_key"]
+    assert calls[0]["idempotency_key"].startswith("assistant:")
+    assert calls[0]["idempotency_key"].endswith(":0")
+    assert "tool-call-stable" not in calls[0]["idempotency_key"]
+    assert "local" not in calls[0]["idempotency_key"]
+
+
+def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
+    rows = [
+        SimpleNamespace(
+            id="t_active",
+            title="Continue project",
+            status="running",
+            assignee="default",
+            project_id="project-1",
+            workspace_kind="worktree",
+            workspace_path="/repo/.worktrees/t_active",
+            created_at=100,
+            started_at=110,
+            completed_at=None,
+            block_kind=None,
+            last_failure_error=None,
+            result=None,
+        ),
+        SimpleNamespace(
+            id="t_wait",
+            title="Book flight",
+            status="blocked",
+            assignee="default",
+            project_id=None,
+            workspace_kind="scratch",
+            workspace_path=None,
+            created_at=90,
+            started_at=95,
+            completed_at=None,
+            block_kind="needs_input",
+            last_failure_error=None,
+            result=None,
+        ),
+        SimpleNamespace(
+            id="t_done",
+            title="Convert PDF",
+            status="done",
+            assignee="default",
+            project_id=None,
+            workspace_kind="scratch",
+            workspace_path=None,
+            created_at=80,
+            started_at=81,
+            completed_at=85,
+            block_kind=None,
+            last_failure_error=None,
+            result="saved report.pdf",
+        ),
+    ]
+
+    class FakeKb:
+        @staticmethod
+        def list_tasks(conn, **kwargs):
+            assert kwargs["assistant_owner_key"] == "local"
+            return rows
+
+        @staticmethod
+        def get_task(conn, task_id):
+            task = next((row for row in rows if row.id == task_id), None)
+            if task is not None:
+                task.assistant_owner_key = "local"
+            return task
+
+        @staticmethod
+        def latest_run(conn, task_id):
+            if task_id == "t_wait":
+                return SimpleNamespace(summary="Waiting for approval of the exact itinerary and price.")
+            return None
+
+        @staticmethod
+        def list_attachments(conn, task_id):
+            return []
+
+    @contextmanager
+    def fake_board(_board):
+        yield FakeKb, object()
+
+    monkeypatch.setattr("tools.kanban_tools._board", fake_board)
+
+    monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["default"])
+
+    active = json.loads(
+        assistant_tasks.assistant_tasks_tool(action="list", include_completed=False)
+    )
+    assert [row["task_id"] for row in active["tasks"]] == ["t_active", "t_wait"]
+    waiting = next(row for row in active["tasks"] if row["task_id"] == "t_wait")
+    assert waiting["needs_attention"] is True
+    assert waiting["block_kind"] == "needs_input"
+    assert "approval" in waiting["detail"].lower()
+
+    all_rows = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            include_completed=True,
+            task_ids=["t_done"],
+        )
+    )
+    assert [row["task_id"] for row in all_rows["tasks"]] == ["t_done"]
+
+
+def test_inline_executor_binds_exact_session_and_tool_call(monkeypatch):
+    captured = {}
+
+    def fake_tool(**kwargs):
+        captured.update(kwargs)
+        return json.dumps({"ok": True})
+
+    monkeypatch.setattr("tools.assistant_tasks.assistant_tasks_tool", fake_tool)
+    agent = SimpleNamespace(session_id="runtime-session-9")
+    ctx = InlineToolContext(effective_task_id="turn-task", tool_call_id="call-9")
+
+    result = INLINE_TOOL_EXECUTORS["assistant_tasks"](
+        agent,
+        {"action": "create", "tasks": [{"title": "A", "instruction": "B"}]},
+        ctx,
+    )
+
+    assert json.loads(result)["ok"] is True
+    assert captured["session_id"] == "runtime-session-9"
+    assert captured["request_id"] == "call-9"
+    assert captured["action"] == "create"
+
+
+
+def test_inline_executor_without_call_id_does_not_reuse_turn_id_as_replay_scope(monkeypatch):
+    captured = []
+    monkeypatch.setattr(
+        assistant_tasks,
+        "assistant_tasks_tool",
+        lambda **kwargs: captured.append(dict(kwargs)) or json.dumps({"ok": True}),
+    )
+
+    agent = SimpleNamespace(session_id="runtime-session-9")
+    ctx = InlineToolContext(
+        effective_task_id="same-turn-task",
+        tool_call_id=None,
+        messages=[{"role": "user", "content": "Create both durable jobs."}],
+    )
+
+    for title in ("first", "second"):
+        result = INLINE_TOOL_EXECUTORS["assistant_tasks"](
+            agent,
+            {
+                "action": "create",
+                "tasks": [{"title": title, "instruction": f"Do {title}."}],
+            },
+            ctx,
+        )
+        assert json.loads(result)["ok"] is True
+
+    assert [row["request_id"] for row in captured] == [None, None]
+    assert all(row["session_id"] == "runtime-session-9" for row in captured)
+
+
+def test_owner_key_is_local_across_desktop_conversations(monkeypatch):
+    monkeypatch.setattr(
+        "gateway.session_context.session_is_messaging_surface",
+        lambda: False,
+    )
+    assert assistant_tasks._resolve_owner_key() == "local"
+
+
+def test_messaging_owner_key_is_stable_route_not_raw_identity(monkeypatch):
+    values = {
+        "HERMES_SESSION_KEY": "agent:main:telegram:dm:chat-7",
+    }
+    monkeypatch.setattr(
+        "gateway.session_context.session_is_messaging_surface",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "gateway.session_context.get_session_env",
+        lambda name, default="": values.get(name, default),
+    )
+
+    first = assistant_tasks._resolve_owner_key()
+    assert first is not None
+    assert first.startswith("messaging-route:")
+    assert "chat-7" not in first
+    assert "telegram" not in first
+
+    # Same canonical audience across a new transcript/session keeps ownership.
+    assert assistant_tasks._resolve_owner_key() == first
+
+    # Another group/thread/DM route is a different visibility domain.
+    values["HERMES_SESSION_KEY"] = "agent:main:telegram:group:chat-8:user-42"
+    second = assistant_tasks._resolve_owner_key()
+    assert second is not None
+    assert second != first
+    assert "chat-8" not in second
+
+    values["HERMES_SESSION_KEY"] = ""
+    assert assistant_tasks._resolve_owner_key() is None
+
+
+def test_local_owner_survives_origin_session_deletion(tmp_path, monkeypatch):
+    from hermes_state import SessionDB
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+
+    with SessionDB(db_path=home / "state.db") as db:
+        db.create_session("chat-A", source="desktop")
+        db.append_message("chat-A", "user", "start three jobs")
+
+    created = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            owner_key="local",
+            session_id="chat-A",
+            request_id="call-A",
+            tasks=[
+                {
+                    "title": "Convert report to PDF",
+                    "instruction": "Convert report.docx to PDF and verify it opens.",
+                },
+                {
+                    "title": "Prepare Japan flight",
+                    "instruction": "Prepare tomorrow's Japan flight booking.",
+                },
+                {
+                    "title": "Continue Stardust",
+                    "instruction": "Keep developing Stardust until this feature is complete.",
+                    "continuous": True,
+                },
+            ],
+        )
+    )
+    assert created["summary"]["created"] == 3
+
+    with SessionDB(db_path=home / "state.db") as db:
+        assert db.delete_session("chat-A")
+        assert db.get_session("chat-A") is None
+        db.create_session("chat-B", source="desktop")
+        db.append_message("chat-B", "user", "what happened to my three jobs?")
+
+    # B does not need A's transcript or id. The durable owner is the lookup key.
+    recalled = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+        )
+    )
+    assert {task["title"] for task in recalled["tasks"]} == {
+        "Convert report to PDF",
+        "Prepare Japan flight",
+        "Continue Stardust",
+    }
+
+    with kbc.connect() as conn:
+        stored = kb.list_tasks(conn, assistant_owner_key="local", include_archived=True)
+        assert len(stored) == 3
+        assert {task.session_id for task in stored} == {"chat-A"}
+        assert {task.assistant_owner_key for task in stored} == {"local"}
+
+
+def test_task_listing_isolated_by_assistant_owner(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        kb.create_task(
+            conn,
+            title="Alice task",
+            assignee="default",
+            assistant_owner_key="messaging-route:alice-test-owner",
+        )
+        kb.create_task(
+            conn,
+            title="Bob task",
+            assignee="default",
+            assistant_owner_key="messaging-route:bob-test-owner",
+        )
+
+    alice = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="messaging-route:alice-test-owner",
+            include_completed=True,
+        )
+    )
+    bob = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="messaging-route:bob-test-owner",
+            include_completed=True,
+        )
+    )
+    assert [task["title"] for task in alice["tasks"]] == ["Alice task"]
+    assert [task["title"] for task in bob["tasks"]] == ["Bob task"]
+
+
+
+def test_cancel_requires_current_user_turn_and_matching_owner(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Owned work",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+
+    missing_turn = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="cancel",
+            task_id=task_id,
+            owner_key="local",
+            user_message=None,
+        )
+    )
+    assert "error" in missing_turn
+    assert "current user message" in missing_turn["error"]
+
+    wrong_owner = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="cancel",
+            task_id=task_id,
+            owner_key="messaging-route:someone-else",
+            user_message="Cancel it.",
+        )
+    )
+    assert "error" in wrong_owner
+    assert "not found for the current owner" in wrong_owner["error"]
+
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status != "archived"
+
+
+def test_cancel_archives_owned_task_but_preserves_result_evidence(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    artifact = tmp_path / "result.txt"
+    artifact.write_text("evidence", encoding="utf-8")
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Cancelable work",
+            body="Do durable work.",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        kb.add_comment(conn, task_id, "worker", "Partial result is preserved.")
+        kb.add_attachment(
+            conn,
+            task_id,
+            filename="result.txt",
+            stored_path=str(artifact),
+            content_type="text/plain",
+            size=artifact.stat().st_size,
+            uploaded_by="worker",
+        )
+
+    cancelled = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="cancel",
+            task_id=task_id,
+            owner_key="local",
+            user_message="Cancel that task.",
+        )
+    )
+    assert cancelled["ok"] is True
+    assert cancelled["status"] == "archived"
+    assert cancelled["already_cancelled"] is False
+
+    repeated = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="cancel",
+            task_id=task_id,
+            owner_key="local",
+            user_message="Yes, keep it cancelled.",
+        )
+    )
+    assert repeated["ok"] is True
+    assert repeated["already_cancelled"] is True
+
+    recalled = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+            task_ids=[task_id],
+        )
+    )
+    assert recalled["count"] == 1
+    row = recalled["tasks"][0]
+    assert row["status"] == "archived"
+    assert row["attachments"] == [{
+        "filename": "result.txt",
+        "path": str(artifact),
+        "content_type": "text/plain",
+        "size": len("evidence"),
+    }]
+
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "archived"
+        assert kb.list_comments(conn, task_id)[-1].body == "Partial result is preserved."
+        assert kb.list_attachments(conn, task_id)[0].filename == "result.txt"
+
+
+def test_owner_identity_is_not_embedded_in_idempotency_key(monkeypatch):
+    calls = []
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    monkeypatch.setattr(
+        "tools.kanban_tools._handle_create",
+        lambda args: calls.append(dict(args))
+        or json.dumps({
+            "ok": True,
+            "task_id": "t_private",
+            "status": "ready",
+            "workspace_kind": "scratch",
+            "project_id": None,
+            "subscribed": True,
+        }),
+    )
+
+    owner = "messaging-route:user-secret-test-owner"
+    for request_id in ("call-private-a", "call-private-b"):
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            owner_key=owner,
+            session_id="chat-A",
+            request_id=request_id,
+            tasks=[{"title": "Private task", "instruction": "Do the private task."}],
+        )
+
+    assert calls[0]["_assistant_owner_key"] == owner
+    assert calls[1]["_assistant_owner_key"] == owner
+    assert calls[0]["idempotency_key"] != calls[1]["idempotency_key"]
+    for call in calls:
+        key = call["idempotency_key"]
+        assert owner not in key
+        assert "user-secret-42" not in key
+        assert "call-private" not in key
+
+
+
+def test_list_keeps_newest_owner_tasks_visible_past_200_rows(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        for index in range(205):
+            task_id = kb.create_task(
+                conn,
+                title=f"task-{index:03d}",
+                assignee="default",
+                assistant_owner_key="local",
+            )
+            conn.execute(
+                "UPDATE tasks SET created_at = ? WHERE id = ?",
+                (1000 + index, task_id),
+            )
+        conn.commit()
+
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+            limit=5,
+        )
+    )
+    assert [task["title"] for task in listed["tasks"]] == [
+        "task-204",
+        "task-203",
+        "task-202",
+        "task-201",
+        "task-200",
+    ]
+
+
+
+def test_list_recalls_owner_tasks_across_active_boards(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    kb.create_board("alpha", name="Alpha")
+    kb.create_board("beta", name="Beta")
+    with kbc.connect_closing(board="alpha") as conn:
+        kb.create_task(
+            conn,
+            title="Alpha durable task",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        kb.create_task(
+            conn,
+            title="Other user's alpha task",
+            assignee="default",
+            assistant_owner_key="messaging-route:someone-else-test-owner",
+        )
+    with kbc.connect_closing(board="beta") as conn:
+        kb.create_task(
+            conn,
+            title="Beta durable task",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+
+    # The later conversation happens after the user switched boards.
+    kb.set_current_board("beta")
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+            limit=10,
+        )
+    )
+
+    assert listed["partial"] is False
+    assert {(task["board"], task["title"]) for task in listed["tasks"]} == {
+        ("alpha", "Alpha durable task"),
+        ("beta", "Beta durable task"),
+    }
+
+
+def test_list_reports_partial_snapshot_when_one_board_is_unreadable(monkeypatch):
+    row = SimpleNamespace(
+        id="t_ok",
+        title="Healthy task",
+        status="running",
+        assignee="default",
+        project_id=None,
+        workspace_kind="scratch",
+        workspace_path=None,
+        created_at=10,
+        started_at=11,
+        completed_at=None,
+        block_kind=None,
+        last_failure_error=None,
+        result=None,
+    )
+
+    class FakeKb:
+        @staticmethod
+        def list_tasks(conn, **kwargs):
+            return [row]
+
+        @staticmethod
+        def latest_run(conn, task_id):
+            return None
+
+        @staticmethod
+        def list_attachments(conn, task_id):
+            return []
+
+    @contextmanager
+    def fake_board(board):
+        if board == "broken":
+            raise OSError("private local path that must not leak")
+        yield FakeKb, object()
+
+    monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["healthy", "broken"])
+    monkeypatch.setattr("tools.kanban_tools._board", fake_board)
+
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+        )
+    )
+
+    assert listed["ok"] is True
+    assert listed["partial"] is True
+    assert listed["board_errors"] == [{"board": "broken", "error": "OSError"}]
+    assert listed["tasks"][0]["board"] == "healthy"
+    assert listed["tasks"][0]["title"] == "Healthy task"
+    assert "private local path" not in json.dumps(listed)
+
+
+
+def test_board_recall_respects_explicit_db_pin(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    kb.create_board("beta", name="Beta")
+    monkeypatch.setenv("HERMES_KANBAN_DB", str(tmp_path / "pinned.db"))
+    monkeypatch.setenv("HERMES_KANBAN_BOARD", "beta")
+    monkeypatch.setattr(
+        kb,
+        "list_boards",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not enumerate under a DB pin")),
+    )
+
+    assert assistant_tasks._assistant_board_slugs() == ["beta"]
+
+
+
+def test_missing_request_id_never_creates_a_stable_owner_replay_key(monkeypatch):
+    calls = []
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    monkeypatch.setattr(
+        "tools.kanban_tools._handle_create",
+        lambda args: calls.append(dict(args))
+        or json.dumps({
+            "ok": True,
+            "task_id": f"t_{len(calls)}",
+            "status": "ready",
+            "workspace_kind": "scratch",
+            "project_id": None,
+            "subscribed": True,
+        }),
+    )
+
+    for _ in range(2):
+        assistant_tasks.assistant_tasks_tool(
+            action="create",
+            owner_key="messaging-route:secret-input-test-owner",
+            session_id="chat-A",
+            tasks=[{"title": "Task", "instruction": "Do it."}],
+        )
+
+    first, second = (call["idempotency_key"] for call in calls)
+    assert first != second
+    assert "123456" not in first
+    assert "123456" not in second
+    assert "request" not in first
+    assert "request" not in second
+
+
+
+def test_specific_task_id_lookup_bypasses_recent_200_cap(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    oldest_id = None
+    with kbc.connect() as conn:
+        for index in range(205):
+            task_id = kb.create_task(
+                conn,
+                title=f"task-{index:03d}",
+                assignee="default",
+                assistant_owner_key="local",
+            )
+            if index == 0:
+                oldest_id = task_id
+            conn.execute(
+                "UPDATE tasks SET created_at = ? WHERE id = ?",
+                (1000 + index, task_id),
+            )
+        conn.commit()
+
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+            limit=1,
+            task_ids=[oldest_id],
+        )
+    )
+    assert listed["partial"] is False
+    assert [task["title"] for task in listed["tasks"]] == ["task-000"]
+
+
+def test_board_discovery_failure_returns_partial_current_board(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        kb.create_task(
+            conn,
+            title="Still visible",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+
+    monkeypatch.setattr(
+        kb,
+        "list_boards",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("private path must not leak")),
+    )
+    listed = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+            include_completed=True,
+        )
+    )
+
+    assert listed["ok"] is True
+    assert listed["partial"] is True
+    assert listed["board_errors"] == [{"board": "*", "error": "OSError"}]
+    assert [task["title"] for task in listed["tasks"]] == ["Still visible"]
+    assert "private path" not in json.dumps(listed)
+
+
+
+def test_assistant_tasks_hidden_from_scoped_workers(monkeypatch):
+    from agent.delegation_context import delegated_child_context
+
+    with delegated_child_context():
+        assert assistant_tasks.check_assistant_tasks_requirements() is False
+        blocked = json.loads(
+            assistant_tasks.assistant_tasks_tool(
+                action="list",
+                owner_key="local",
+            )
+        )
+        assert "interactive parent/user sessions" in blocked["error"]
+
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "task-worker")
+    assert assistant_tasks.check_assistant_tasks_requirements() is False
+    blocked = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="list",
+            owner_key="local",
+        )
+    )
+    assert "scoped Kanban workers" in blocked["error"]
+
+
+def test_assistant_tasks_hidden_from_cron_contextvar(monkeypatch):
+    from gateway.session_context import clear_session_vars, set_session_vars
+
+    monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
+    tokens = set_session_vars(source="cli", cron_session="1")
+    try:
+        assert assistant_tasks.check_assistant_tasks_requirements() is False
+        blocked = json.loads(
+            assistant_tasks.assistant_tasks_tool(
+                action="list",
+                owner_key="local",
+            )
+        )
+        assert "cron" in blocked["error"]
+    finally:
+        clear_session_vars(tokens)
+
+
+def test_assistant_tasks_hidden_from_unattended_programmatic_surfaces(monkeypatch):
+    from gateway.session_context import clear_session_vars, set_session_vars
+
+    for surface in ("api_server", "webhook", "msgraph_webhook", "tool"):
+        tokens = set_session_vars(platform=surface, source=surface)
+        try:
+            assert assistant_tasks.check_assistant_tasks_requirements() is False
+        finally:
+            clear_session_vars(tokens)
+
+
+
+def test_assistant_tasks_availability_cache_cannot_cross_cron_boundary(monkeypatch):
+    import model_tools
+    from gateway.session_context import clear_session_vars, set_session_vars
+    from tools.registry import invalidate_check_fn_cache
+
+    monkeypatch.delenv("HERMES_CRON_SESSION", raising=False)
+    invalidate_check_fn_cache()
+    model_tools._clear_tool_defs_cache()
+
+    parent_defs = model_tools.get_tool_definitions(
+        enabled_toolsets=["assistant_tasks"],
+        quiet_mode=True,
+    )
+    assert "assistant_tasks" in {
+        definition["function"]["name"] for definition in parent_defs
+    }
+
+    tokens = set_session_vars(source="cli", cron_session="1")
+    try:
+        model_tools._clear_tool_defs_cache()
+        cron_defs = model_tools.get_tool_definitions(
+            enabled_toolsets=["assistant_tasks"],
+            quiet_mode=True,
+        )
+        assert "assistant_tasks" not in {
+            definition["function"]["name"] for definition in cron_defs
+        }
+    finally:
+        clear_session_vars(tokens)
+
+
+def test_assistant_tasks_availability_cache_cannot_cross_worker_boundary(monkeypatch):
+    import model_tools
+    from tools.registry import invalidate_check_fn_cache
+
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    invalidate_check_fn_cache()
+    model_tools._clear_tool_defs_cache()
+
+    parent_defs = model_tools.get_tool_definitions(
+        enabled_toolsets=["assistant_tasks"],
+        quiet_mode=True,
+    )
+    assert "assistant_tasks" in {
+        definition["function"]["name"] for definition in parent_defs
+    }
+
+    # The worker probe immediately follows the parent's successful probe. A
+    # profile-wide 30s check_fn cache must not reuse the parent's True verdict.
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "worker-task")
+    model_tools._clear_tool_defs_cache()
+    worker_defs = model_tools.get_tool_definitions(
+        enabled_toolsets=["assistant_tasks"],
+        quiet_mode=True,
+    )
+    assert "assistant_tasks" not in {
+        definition["function"]["name"] for definition in worker_defs
+    }
+
+
+
+def test_resume_records_current_user_turn_before_unblocking(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    monkeypatch.setenv("HERMES_SESSION_KEY", "chat-B-live-key")
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Approve prepared booking",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(
+            conn,
+            task_id,
+            reason="Approve booking flight NH1 for USD 100 to Tokyo.",
+            kind="needs_input",
+        )
+        assert kb.get_task(conn, task_id).status == "blocked"
+
+    agent = SimpleNamespace(session_id="chat-B")
+    ctx = InlineToolContext(
+        effective_task_id="turn-B",
+        tool_call_id="call-resume",
+        messages=[
+            {"role": "user", "content": "What is the booking waiting for?"},
+            {"role": "assistant", "content": "It is waiting for approval."},
+            {
+                "role": "user",
+                "content": "Yes. Approve exactly flight NH1 for USD 100; do not add extras.",
+            },
+        ],
+    )
+    resumed = json.loads(
+        INLINE_TOOL_EXECUTORS["assistant_tasks"](
+            agent,
+            {"action": "resume", "task_id": task_id},
+            ctx,
+        )
+    )
+
+    assert resumed["ok"] is True
+    assert resumed["task_id"] == task_id
+    assert resumed["input_recorded"] is True
+    assert resumed["subscribed"] is True
+    with kbc.connect() as conn:
+        from hermes_cli import kanban_db_notify as kbn
+
+        task = kb.get_task(conn, task_id)
+        comments = kb.list_comments(conn, task_id)
+        subs = kbn.list_notify_subs(conn, task_id)
+        assert any(
+            sub["platform"] == "tui" and sub["chat_id"] == "chat-B-live-key"
+            for sub in subs
+        )
+        assert task.status == "ready"
+        assert comments[-1].author == "user-via-assistant"
+        assert comments[-1].body == (
+            "Yes. Approve exactly flight NH1 for USD 100; do not add extras."
+        )
+        worker_context = kb.build_worker_context(conn, task_id)
+        assert "Scope: personal-assistant durable work" in worker_context
+        assert "verified current-user input relayed by Stardust" in worker_context
+        assert "Yes. Approve exactly flight NH1 for USD 100; do not add extras." in worker_context
+        assert "comment from worker `user-via-assistant`" not in worker_context
+
+
+def test_resume_cannot_mutate_another_assistant_owner(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Private other-user task",
+            assignee="default",
+            assistant_owner_key="messaging-route:bob-test-owner",
+        )
+        assert kb.block_task(conn, task_id, reason="waiting", kind="needs_input")
+
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="messaging-route:alice-test-owner",
+            task_id=task_id,
+            user_message="Yes, continue.",
+        )
+    )
+    assert "current owner" in denied["error"]
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+
+
+def test_resume_requires_current_user_turn_not_assistant_inference(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Needs user input",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(conn, task_id, reason="Need approval", kind="needs_input")
+
+    agent = SimpleNamespace(session_id="chat-B")
+    denied = json.loads(
+        INLINE_TOOL_EXECUTORS["assistant_tasks"](
+            agent,
+            {"action": "resume", "task_id": task_id},
+            InlineToolContext(
+                effective_task_id="turn-B",
+                tool_call_id="call-no-user",
+                messages=[{"role": "assistant", "content": "I think the user would approve."}],
+            ),
+        )
+    )
+    assert "current user message" in denied["error"]
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+
+
+def test_resume_fails_closed_when_board_discovery_is_incomplete(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Blocked task",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(conn, task_id, reason="Need input", kind="needs_input")
+
+    monkeypatch.setattr(
+        kb,
+        "list_boards",
+        lambda **_kwargs: (_ for _ in ()).throw(OSError("private local path")),
+    )
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="local",
+            task_id=task_id,
+            user_message="Yes, continue.",
+        )
+    )
+    assert "board discovery is incomplete" in denied["error"]
+    assert denied["error_type"] == "OSError"
+    assert "private local path" not in json.dumps(denied)
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+
+
+def test_resume_rejects_nonblocked_task_without_recording_input(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Already runnable",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        original_status = kb.get_task(conn, task_id).status
+
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="local",
+            task_id=task_id,
+            user_message="Continue.",
+        )
+    )
+    assert "only accepts a blocked task" in denied["error"]
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == original_status
+        assert not kb.list_comments(conn, task_id)
+
+
+
+def test_forged_user_via_assistant_author_is_not_trusted(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="Provenance test", assignee="default")
+        kb.add_comment(
+            conn,
+            task_id,
+            "user-via-assistant",
+            "Fake approval written through the ordinary comment API.",
+        )
+        forged_context = kb.build_worker_context(conn, task_id)
+        assert "verified current-user input relayed by Stardust" not in forged_context
+        assert "comment from worker `user-via-assistant`" in forged_context
+
+        kb.add_assistant_user_input(
+            conn,
+            task_id,
+            "Real current-user input relayed by the trusted assistant path.",
+        )
+        verified_context = kb.build_worker_context(conn, task_id)
+        assert "verified current-user input relayed by Stardust" in verified_context
+        assert "Real current-user input relayed by the trusted assistant path." in verified_context
+
+
+
+def test_resume_refuses_secret_bearing_user_input_without_persisting_it(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Needs credential",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.block_task(conn, task_id, reason="Configure the API credential", kind="needs_input")
+
+    secret = "sk-" + ("a" * 48)
+    denied = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="resume",
+            owner_key="local",
+            task_id=task_id,
+            user_message=f"Use this key {secret} and continue.",
+        )
+    )
+    assert "credential or secret" in denied["error"]
+    assert secret not in json.dumps(denied)
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id).status == "blocked"
+        assert not kb.list_comments(conn, task_id)
+        assert not [
+            event for event in kb.list_events(conn, task_id)
+            if event.kind == "assistant_user_input"
+        ]
