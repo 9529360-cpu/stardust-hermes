@@ -9,6 +9,8 @@ import sys
 import importlib
 from unittest.mock import MagicMock, patch
 
+from tests.hermes_cli._module_stubs import patch_modules_only
+
 
 # Module-level reference to the cli module (set by _make_cli on first call)
 _cli_mod = None
@@ -46,7 +48,7 @@ def _make_cli(tool_progress="all", verbose=_UNSET):
         "prompt_toolkit.formatted_text": MagicMock(),
         "prompt_toolkit.auto_suggest": MagicMock(),
     }
-    with patch.dict(sys.modules, prompt_toolkit_stubs), \
+    with patch_modules_only(prompt_toolkit_stubs), \
          patch.dict("os.environ", clean_env, clear=False):
         import cli as mod
         mod = importlib.reload(mod)
