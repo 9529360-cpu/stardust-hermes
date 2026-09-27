@@ -42,7 +42,24 @@ vi.mock('@/store/notifications', () => ({
 }))
 
 vi.mock('../hooks/use-config-record', () => ({
-  hermesConfigCacheWriter: () => (config: Record<string, unknown>) => mocks.cache(config),
+  hermesConfigCacheWriter:
+    () =>
+    (
+      next:
+        | Record<string, unknown>
+        | undefined
+        | ((
+            current: Record<string, unknown> | undefined
+          ) => Record<string, unknown> | undefined)
+    ) => {
+      const resolved = typeof next === 'function' ? next(mocks.loadedConfig) : next
+
+      if (resolved) {
+        mocks.loadedConfig = resolved
+      }
+
+      mocks.cache(resolved)
+    },
   useHermesConfigRecord: () => ({ data: mocks.loadedConfig })
 }))
 
@@ -91,16 +108,41 @@ describe('BrowserRealProfilePanel', () => {
     expect(mocks.save).toHaveBeenCalledWith({ browser: { use_real_profile: false } }, undefined)
   })
 
-  it('rolls the optimistic cache write back when the save fails', async () => {
-    mocks.save.mockRejectedValue(new Error('boom'))
+  it('rolls back only the target field and preserves newer cache changes', async () => {
+    let rejectSave!: (reason?: unknown) => void
+    mocks.save.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectSave = reject
+      })
+    )
     render(<BrowserRealProfilePanel />)
 
     await act(async () => {
       fireEvent.click(screen.getByRole('switch', { name: 'Use My Real Browser Profile' }))
+      await Promise.resolve()
     })
 
-    // Last cache write restores the original record.
-    expect(mocks.cache).toHaveBeenLastCalledWith(mocks.loadedConfig)
+    expect(mocks.loadedConfig).toEqual({
+      browser: { allow_private_urls: false, use_real_profile: true },
+      model: { provider: 'nous' }
+    })
+
+    // Simulate another settings surface publishing a newer shared-cache value
+    // while this sparse save is still in flight.
+    mocks.loadedConfig = {
+      browser: { allow_private_urls: true, use_real_profile: true },
+      model: { provider: 'openai' }
+    }
+
+    await act(async () => {
+      rejectSave(new Error('boom'))
+      await Promise.resolve()
+    })
+
+    expect(mocks.cache).toHaveBeenLastCalledWith({
+      browser: { allow_private_urls: true, use_real_profile: false },
+      model: { provider: 'openai' }
+    })
     expect(mocks.notifyError).toHaveBeenCalled()
   })
 })
