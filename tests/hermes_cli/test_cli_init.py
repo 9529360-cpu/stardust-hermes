@@ -10,6 +10,7 @@ import pytest
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
+
 def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
     """Create a HermesCLI instance with minimal mocking."""
     import importlib
@@ -69,6 +70,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
         import cli as _cli_restore
         importlib.reload(_cli_restore)
 
+
 class TestMaxTurnsResolution:
     """max_turns must always resolve to a positive integer, never None."""
 
@@ -85,9 +87,14 @@ class TestMaxTurnsResolution:
         cli = _make_cli(max_turns=25)
         assert cli.max_turns == 25
 
+
+
+
     def test_legacy_root_max_turns_is_used_when_agent_key_exists_without_value(self):
         cli_obj = _make_cli(config_overrides={"agent": {}, "max_turns": 77})
         assert cli_obj.max_turns == 77
+
+
 
 class TestVerboseAndToolProgress:
     def test_default_verbose_is_bool(self):
@@ -98,6 +105,7 @@ class TestVerboseAndToolProgress:
         cli = _make_cli()
         assert isinstance(cli.tool_progress_mode, str)
         assert cli.tool_progress_mode in {"off", "new", "all", "verbose"}
+
 
 class TestFallbackChainInit:
     def test_merges_new_and_legacy_fallback_config(self):
@@ -112,6 +120,7 @@ class TestFallbackChainInit:
             {"provider": "nous", "model": "Hermes-4"},
         ]
 
+
 class TestBusyInputMode:
     def test_default_busy_input_mode_is_interrupt(self):
         cli = _make_cli()
@@ -120,6 +129,7 @@ class TestBusyInputMode:
     def test_busy_input_mode_queue_is_honored(self):
         cli = _make_cli(config_overrides={"display": {"busy_input_mode": "queue"}})
         assert cli.busy_input_mode == "queue"
+
 
     def test_queue_command_works_while_busy(self):
         """When agent is running, /queue should still put the prompt in _pending_input."""
@@ -178,6 +188,9 @@ class TestBusyInputMode:
         cli.process_command("/queue move 1 9")
         assert cli._pending_input_items() == ["only item"]
 
+
+
+
     def test_interrupt_mode_routes_busy_enter_to_interrupt(self):
         """In interrupt mode (default), Enter while busy goes to _interrupt_queue."""
         cli = _make_cli()
@@ -189,6 +202,7 @@ class TestBusyInputMode:
             cli._interrupt_queue.put(text)
         assert cli._interrupt_queue.get_nowait() == "redirect"
         assert cli._pending_input.empty()
+
 
 class TestPromptToolkitTerminalCompatibility:
     def test_lf_enter_binding_respects_multiline_shortcuts(self):
@@ -286,6 +300,8 @@ class TestPromptToolkitTerminalCompatibility:
 
         assert renderer.cpr_not_supported_callback is None
 
+
+
     def test_cpr_gating_posix_suppresses_without_ssh(self, monkeypatch):
         """POSIX suppresses CPR without SSH.
 
@@ -304,6 +320,7 @@ class TestPromptToolkitTerminalCompatibility:
         monkeypatch.setenv("PROMPT_TOOLKIT_NO_CPR", "1")
         assert _terminal_may_leak_cpr() is True
 
+
 class TestSingleQueryState:
     def test_voice_and_interrupt_state_initialized_before_run(self):
         """Single-query mode calls chat() without going through run()."""
@@ -313,6 +330,7 @@ class TestSingleQueryState:
         assert cli._voice_tts_done.is_set()
         assert hasattr(cli, "_interrupt_queue")
         assert hasattr(cli, "_pending_input")
+
 
 class TestHistoryDisplay:
     def test_history_numbers_only_visible_messages_and_summarizes_tools(self, capsys):
@@ -345,6 +363,7 @@ class TestHistoryDisplay:
         assert "A" * 250 in output
         assert "A" * 250 + "..." not in output
 
+
     def test_resume_without_target_lists_recent_sessions(self, capsys):
         cli = _make_cli()
         cli.session_id = "current"
@@ -371,6 +390,8 @@ class TestHistoryDisplay:
         assert "Checking Running Hermes Agent" in output
         assert "Use /resume" in output
         assert "session title" in output
+
+
 
     def test_sessions_command_no_args_lists_recent_sessions(self, capsys):
         """/sessions with no args prints the recent-sessions table (TUI parity).
@@ -402,6 +423,7 @@ class TestHistoryDisplay:
         assert "Checking Running Hermes Agent" in output
         assert "20260401_201329_d85961" in output
 
+
     def test_sessions_with_target_delegates_to_resume(self):
         """/sessions <id_or_title> behaves identically to /resume <id_or_title>.
 
@@ -416,6 +438,7 @@ class TestHistoryDisplay:
         mock_resume.assert_called_once_with(
             "/resume Checking Running Hermes Agent"
         )
+
 
 class TestNestedDictModelDefaultPairing:
     """A dict-valued ``model.default`` must keep its nested provider paired.
@@ -511,6 +534,7 @@ class TestNestedDictModelDefaultPairing:
 
         assert cli.model == "deepseek-v4-pro"
         assert cli.requested_provider == "nous"
+
 
 class TestRootLevelProviderOverride:
     """Root-level provider/base_url in config.yaml must NOT override model.provider."""
@@ -641,10 +665,16 @@ class TestRootLevelProviderOverride:
         assert result["model"]["provider"] == "correct-provider"
         assert "provider" not in result  # root key still cleaned up
 
+
+
+
+
+
     # --- model-id alias canonicalization (issue #34500) -------------------
     # ``model.name`` / ``model.model`` must canonicalize to ``model.default``
     # so the runtime resolver (and ~14 other readers) never sends an empty
     # ``model=`` to the backend. Precedence: default > model > name.
+
 
     def test_normalize_model_alias_to_default(self):
         """model.model becomes model.default."""
@@ -654,6 +684,8 @@ class TestRootLevelProviderOverride:
         assert result["model"]["default"] == "via-model-key"
         assert "model" not in result["model"]
 
+
+
     def test_normalize_model_wins_over_name(self):
         """Precedence: model > name when both are aliases and default is empty."""
         from hermes_cli.config import _normalize_root_model_keys
@@ -661,6 +693,7 @@ class TestRootLevelProviderOverride:
         result = _normalize_root_model_keys({"model": {"model": "m-key", "name": "n-key"}})
         assert result["model"]["default"] == "m-key"
         assert "model" not in result["model"] and "name" not in result["model"]
+
 
     # --- dict-valued model.default flattening (PR #83902 follow-up) --------
     # ``model.default: {provider: ..., model: ...}`` must flatten into a string
@@ -729,4 +762,6 @@ class TestRootLevelProviderOverride:
         })
         assert result["model"]["default"] == "flat-default-model"
         assert result["model"]["provider"] == "auto"
+
+
 

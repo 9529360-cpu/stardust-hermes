@@ -20,6 +20,7 @@ import pytest
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
+
 def _make_cli(**kwargs):
     """Create a HermesCLI with prompt_toolkit stubbed out."""
     _clean_config = {
@@ -61,9 +62,11 @@ def _make_cli(**kwargs):
         ):
             return _cli_mod.HermesCLI(**kwargs)
 
+
 @pytest.fixture(scope="module")
 def cli():
     return _make_cli()
+
 
 class TestStashStateInit:
     def test_cli_has_prompt_stash(self, cli):
@@ -87,6 +90,7 @@ class TestStashStateInit:
         a._prompt_stash.stash("only in a")
         assert len(a._prompt_stash) == 1
         assert len(b._prompt_stash) == 0
+
 
 class TestKeybindingRegistration:
     """Behavioral coverage for the stash keybinding surface.
@@ -113,6 +117,7 @@ class TestKeybindingRegistration:
         kb = KeyBindings()
         assert cli._register_extra_tui_keybindings(kb, input_area=None) is None
         assert kb.bindings == []
+
 
 class TestLayoutSlot:
     def test_layout_includes_stash_panel_when_present(self, cli):
@@ -157,6 +162,7 @@ class TestLayoutSlot:
             completions_menu="completions-menu",
         )
         assert None not in children
+
 
 class TestRenderStashPanel:
     """Contributor's panel renderer, now measured in display cells."""
@@ -235,6 +241,7 @@ class TestRenderStashPanel:
         text = "".join(t for _, t in frags)
         assert "(0 items)" in text
 
+
 class TestStatusBarIndicator:
     def test_no_indicator_when_stash_empty(self, cli):
         cli._prompt_stash.clear()
@@ -270,6 +277,7 @@ class TestStatusBarIndicator:
         cli._prompt_stash.pop()
         text = "".join(t for _, t in cli._get_status_bar_fragments())
         assert "📌" not in text
+
 
 class TestFmtStashAge:
     def test_age_buckets(self, cli):
