@@ -325,7 +325,7 @@ def record_agent_success(agent) -> None:
     agent._rate_limited_until = 0
     try:
         agent._emit_status(
-            f"鉁?Primary model recovered: {agent.model} via {agent.provider}; "
+            f"✅ Primary model recovered: {agent.model} via {agent.provider}; "
             f"fallback {previous_model} via {previous_provider} is no longer active."
         )
     except Exception:
