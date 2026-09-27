@@ -985,6 +985,43 @@ class TestSaveLoginPrompt:
         [meta] = store.list_items()
         assert meta.origin == "https://acme.test" and meta.identifier == "tek@acme.test"
 
+    def test_legacy_second_positional_argument_remains_task_id(self, store, monkeypatch):
+        from agent.vault_backends import unlock as unlock_mod
+        from tools import browser_vault_tool
+
+        seen = {}
+        unlock_mod.set_save_login_prompt_callback(
+            lambda origin, site: {"identifier": "legacy@acme.test", "password": "legacy-secret"}
+        )
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_focus_bound_origin",
+            lambda task_id, origin, kind: seen.setdefault("focus", (task_id, kind)),
+        )
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_current_page_origin",
+            lambda task_id: seen.setdefault("origin_task", task_id) and "https://acme.test",
+        )
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "browser_vault_fill",
+            lambda handle, task_id=None, purpose="login": (
+                seen.setdefault("fill_task", task_id)
+                and json.dumps({"success": True, "filled_fields": 1})
+            ),
+        )
+        try:
+            with patch("agent.vault_store.get_vault_store", return_value=store),                  patch("agent.vault_backends.unlock.can_prompt_here", return_value=True):
+                out = json.loads(browser_vault_tool.browser_vault_save_login("Acme", "legacy-task"))
+        finally:
+            unlock_mod.set_save_login_prompt_callback(None)
+
+        assert out["success"] is True
+        assert seen["focus"] == ("legacy-task", "login")
+        assert seen["origin_task"] == "legacy-task"
+        assert seen["fill_task"] == "legacy-task"
+
     def test_generated_signup_password_is_saved_and_filled_without_prompt_or_echo(self, store, monkeypatch):
         from tools import browser_vault_tool
 

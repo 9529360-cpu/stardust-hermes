@@ -396,9 +396,10 @@ def _signup_password_length_for_page(task_id: str) -> Dict[str, Any]:
 
 def browser_vault_save_login(
     label: str = "",
+    task_id: Optional[str] = None,
+    *,
     identifier: str = "",
     generate_password: bool = False,
-    task_id: Optional[str] = None,
 ) -> str:
     """Save a login for the current page and fill its password model-blind.
 
