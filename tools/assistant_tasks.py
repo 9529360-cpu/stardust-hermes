@@ -23,6 +23,8 @@ MAX_TITLE_CHARS = 240
 MAX_INSTRUCTION_CHARS = 16_000
 MAX_RESUME_MESSAGE_CHARS = 16_000
 MAX_LIST_LIMIT = 50
+MAX_INSPECT_EVENTS = 60
+MAX_INSPECT_RUNS = 20
 _ATTENTION_STATUSES = {"blocked", "review", "triage"}
 _TERMINAL_STATUSES = {"done", "archived"}
 _NON_USER_TASK_SURFACES = frozenset({
@@ -50,6 +52,22 @@ def _idempotency_scope_token(owner_key: str, request_id: str) -> str:
 def _bounded_text(value: Any, limit: int) -> str:
     text = str(value or "").strip()
     return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _inspect_text(redact, value: Any, limit: int = 1200) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    redacted = redact(text, force=True, redact_url_credentials=True)
+    return _bounded_text(redacted, limit)
+
+
+def _inspect_json(redact, value: Any, limit: int = 2400) -> str:
+    try:
+        raw = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        raw = str(value)
+    return _inspect_text(redact, raw, limit)
 
 
 def _active_profile_name() -> str:
@@ -393,6 +411,136 @@ def _list_tasks(
     )
 
 
+def _inspect_task(*, task_id: Any, owner_key: str) -> str:
+    """Read one owned durable task's authoritative event/run history."""
+    from tools.kanban_tools import _board
+
+    tid = str(task_id or "").strip()
+    if not tid:
+        return tool_error("assistant_tasks inspect requires task_id")
+
+    try:
+        from agent.redact import redact_sensitive_text
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks cannot safely inspect because secret redaction is unavailable",
+            error_type=type(exc).__name__,
+        )
+
+    try:
+        boards = _assistant_board_slugs()
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks cannot safely inspect while board discovery is incomplete",
+            error_type=type(exc).__name__,
+        )
+
+    matches: list[str] = []
+    for board in boards:
+        try:
+            with _board(board) as (kb, conn):
+                task = kb.get_task(conn, tid)
+                if task is not None and task.assistant_owner_key == owner_key:
+                    matches.append(board)
+        except Exception as exc:
+            return tool_error(
+                "assistant_tasks cannot safely inspect while a board is unreadable",
+                board=board,
+                error_type=type(exc).__name__,
+            )
+
+    if not matches:
+        return tool_error("assistant_tasks task not found for the current owner")
+    if len(matches) != 1:
+        return tool_error(
+            "assistant_tasks task id is ambiguous across boards; refusing to inspect",
+            boards=matches,
+        )
+
+    board = matches[0]
+    try:
+        with _board(board) as (kb, conn):
+            task = kb.get_task(conn, tid)
+            if task is None or task.assistant_owner_key != owner_key:
+                return tool_error("assistant_tasks task ownership changed before inspect")
+            all_events = kb.list_events(conn, tid)
+            all_runs = kb.list_runs(conn, tid)
+            attachments = kb.list_attachments(conn, tid)
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks could not inspect the task",
+            task_id=tid,
+            board=board,
+            error_type=type(exc).__name__,
+        )
+
+    events = [
+        {
+            "id": event.id,
+            "kind": event.kind,
+            "created_at": event.created_at,
+            "run_id": event.run_id,
+            "payload_json": _inspect_json(redact_sensitive_text, event.payload),
+        }
+        for event in all_events[-MAX_INSPECT_EVENTS:]
+    ]
+    runs = [
+        {
+            "id": run.id,
+            "profile": run.profile,
+            "step_key": run.step_key,
+            "status": run.status,
+            "outcome": run.outcome,
+            "started_at": run.started_at,
+            "ended_at": run.ended_at,
+            "summary": _inspect_text(redact_sensitive_text, run.summary),
+            "error": _inspect_text(redact_sensitive_text, run.error),
+            "metadata_json": _inspect_json(redact_sensitive_text, run.metadata),
+        }
+        for run in all_runs[-MAX_INSPECT_RUNS:]
+    ]
+
+    return json.dumps(
+        {
+            "ok": True,
+            "task": {
+                "task_id": task.id,
+                "board": board,
+                "title": _inspect_text(redact_sensitive_text, task.title, 600),
+                "status": task.status,
+                "assignee": task.assignee,
+                "project_id": task.project_id,
+                "workspace_kind": task.workspace_kind,
+                "workspace_path": task.workspace_path,
+                "created_at": task.created_at,
+                "started_at": task.started_at,
+                "completed_at": task.completed_at,
+                "block_kind": task.block_kind,
+                "needs_attention": task.status in _ATTENTION_STATUSES,
+                "result": _inspect_text(redact_sensitive_text, task.result),
+                "last_failure_error": _inspect_text(redact_sensitive_text, task.last_failure_error),
+            },
+            "events": events,
+            "event_count": len(all_events),
+            "events_truncated": len(all_events) > len(events),
+            "runs": runs,
+            "run_count": len(all_runs),
+            "runs_truncated": len(all_runs) > len(runs),
+            "attachments": [
+                {
+                    "filename": item.filename,
+                    "path": item.stored_path,
+                    "content_type": item.content_type,
+                    "size": item.size,
+                    "created_at": item.created_at,
+                }
+                for item in attachments[-8:]
+            ],
+            "comments_omitted": True,
+        },
+        ensure_ascii=False,
+    )
+
 
 def _cancel_task(
     *,
@@ -664,7 +812,7 @@ def assistant_tasks_tool(
     request_id: Optional[str] = None,
     owner_key: Optional[str] = None,
 ) -> str:
-    """Create, recall, cancel, or resume durable personal-assistant work."""
+    """Create, recall, inspect, cancel, or resume durable personal-assistant work."""
     if not _assistant_tasks_context_allowed():
         return tool_error(
             "assistant_tasks is only available to interactive parent/user sessions; "
@@ -691,6 +839,11 @@ def assistant_tasks_tool(
             task_ids=task_ids,
             owner_key=owner,
         )
+    if action == "inspect":
+        return _inspect_task(
+            task_id=task_id,
+            owner_key=owner,
+        )
     if action == "cancel":
         return _cancel_task(
             task_id=task_id,
@@ -703,7 +856,7 @@ def assistant_tasks_tool(
             user_message=user_message,
             owner_key=owner,
         )
-    return tool_error("assistant_tasks action must be 'create', 'list', 'cancel', or 'resume'")
+    return tool_error("assistant_tasks action must be 'create', 'list', 'inspect', 'cancel', or 'resume'")
 
 
 @no_cache_check_fn
@@ -714,16 +867,17 @@ def check_assistant_tasks_requirements() -> bool:
 ASSISTANT_TASKS_SCHEMA = {
     "name": "assistant_tasks",
     "description": (
-        "Create, list, cancel, or resume restart-durable personal work stored in the existing Kanban authority. "
+        "Create, list, inspect, cancel, or resume restart-durable personal work stored in the existing Kanban authority. "
         "Use create only for action work that should outlive the current chat/process; split independent outcomes. "
-        "Use list to recall the user's durable work across chats. Use cancel only for an explicit CURRENT user cancellation. ""Use resume only when the CURRENT user turn supplies "
+        "Use list to recall work across chats; use inspect for one task's event/run history before explaining why it is stuck. "
+        "Use cancel only for an explicit CURRENT user cancellation. ""Use resume only when the CURRENT user turn supplies "
         "the input or authorization requested by one blocked task. Keep short foreground work in the current turn, "
         "use cron for time/recurring work, and never put credentials or raw secrets in durable task fields."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "list", "cancel", "resume"], "default": "create"},
+            "action": {"type": "string", "enum": ["create", "list", "inspect", "cancel", "resume"], "default": "create"},
             "tasks": {
                 "type": "array", "maxItems": MAX_TASKS_PER_CALL,
                 "items": {
