@@ -456,8 +456,8 @@ def _same_server_route(server: Any, config: dict, *, cross_profile: bool = False
     if _connection_identity(server_config) != _connection_identity(config):
         return False
     if cross_profile and (
-        not config.get("url")
-        or not server_config.get("url")
+        config.get("command")
+        or server_config.get("command")
         or _auth_type(config) == "oauth"
         or config.get("identity_header") is not None
         or server_config.get("identity_header") is not None
@@ -465,6 +465,10 @@ def _same_server_route(server: Any, config: dict, *, cross_profile: bool = False
         # Stdio subprocesses inherit profile-scoped runtime context (cwd plus externally
         # hydrated secret-source values) that is not fully represented in static config, so
         # cross-profile equivalence cannot be proven. Keep those connections profile-owned.
+        # Keyed on `command` (the actual stdio-transport marker — tools/mcp_tool_transport.py
+        # requires it) rather than `url` absence: an HTTP/SSE config represented without a
+        # literal `url` key (e.g. before enrichment) is not stdio and carries none of that
+        # unprovable runtime context, so it must not be refused sharing on that basis alone.
         return False
     return True
 
