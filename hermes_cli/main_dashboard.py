@@ -472,8 +472,8 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
             "    hermes dashboard register\n"
             "  It provisions a Nous Portal OAuth client and writes "
             "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env for you.\n"
-            "  Docs: https://hermes-agent.nousresearch.com/docs/"
-            "user-guide/features/web-dashboard#authentication-gated-mode"
+            "  Docs: https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/"
+            "user-guide/features/web-dashboard.md#authentication-gated-mode"
         )
         sys.exit(0)
 
