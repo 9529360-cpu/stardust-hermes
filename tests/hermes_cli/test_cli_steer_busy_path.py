@@ -26,7 +26,6 @@ from unittest.mock import MagicMock, patch
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
-
 def _make_cli():
     """Create a HermesCLI instance with prompt_toolkit stubbed out."""
     _clean_config = {
@@ -68,7 +67,6 @@ def _make_cli():
         ):
             return _cli_mod.HermesCLI()
 
-
 class TestSteerInlineDetector:
     """_should_handle_steer_command_inline gates the busy-path fast dispatch."""
 
@@ -102,7 +100,6 @@ class TestSteerInlineDetector:
         cli = _make_cli()
         cli._agent_running = True
         assert cli._should_handle_steer_command_inline("/steer text", has_images=True) is False
-
 
 class TestSteerBusyPathDispatch:
     """When the detector fires, process_command('/steer ...') must call
@@ -139,7 +136,6 @@ class TestSteerBusyPathDispatch:
         cli.agent.steer.assert_not_called()
         # It puts the payload in the queue as a normal next-turn message
         cli._pending_input.put.assert_called_once_with("would-be-next-turn")
-
 
 if __name__ == "__main__":  # pragma: no cover
     import pytest

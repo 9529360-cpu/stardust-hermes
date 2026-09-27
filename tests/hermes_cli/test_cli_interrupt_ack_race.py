@@ -32,7 +32,6 @@ from unittest.mock import MagicMock, patch
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
-
 def _make_cli():
     """Build a HermesCLI with prompt_toolkit stubbed (same pattern as
     test_cli_interrupt_drain_regression.py)."""
@@ -74,7 +73,6 @@ def _make_cli():
             _cli_mod.__dict__, {"CLI_CONFIG": _clean_config}
         ):
             return _cli_mod.HermesCLI()
-
 
 class _StubAgent:
     """Agent whose turn completes WITHOUT acknowledging the interrupt."""
@@ -121,7 +119,6 @@ class _StubAgent:
         self._interrupt_requested = False
         self._interrupt_message = None
 
-
 def test_unacknowledged_interrupt_message_is_requeued_not_dropped():
     cli = _make_cli()
     agent = _StubAgent(cli.session_id)
@@ -153,9 +150,6 @@ def test_unacknowledged_interrupt_message_is_requeued_not_dropped():
     # instantly self-abort at its first _interrupt_requested check.
     assert agent._interrupt_requested is False
     assert agent.clear_calls >= 1
-
-
-
 
 def test_chat_persists_clean_input_when_a_queued_note_changes_api_message():
     """Queued notes remain API-local and preserve close-handoff marker identity."""
@@ -194,7 +188,6 @@ def test_chat_persists_clean_input_when_a_queued_note_changes_api_message():
     assert agent.captured is not None
     assert agent.captured["user_message"] == "[MODEL SWITCH NOTE]\n\nclean prompt"
     assert agent.captured["persist_user_message"] == "clean prompt"
-
 
 def test_chat_preserves_clean_multimodal_input_when_note_changes_api_message():
     """A queued note forwards original native parts as the persistence override."""
@@ -240,7 +233,6 @@ def test_chat_preserves_clean_multimodal_input_when_note_changes_api_message():
     api_parts = agent.captured["user_message"]
     assert api_parts[0]["text"] == "[MODEL SWITCH NOTE]\n\nDescribe this screenshot"
     assert api_parts[1] == clean_parts[1]
-
 
 def test_chat_multimodal_note_persists_clean_input_once(tmp_path, monkeypatch):
     """The real CLI-to-agent path stores clean image parts, never the queued note."""
@@ -368,7 +360,6 @@ def test_chat_multimodal_note_persists_clean_input_once(tmp_path, monkeypatch):
         "Describe this screenshot\n[screenshot]"
     ]
 
-
 def test_chat_clears_previous_turn_persistence_override_before_staging():
     """A close before the next worker starts cannot reuse a stale override."""
     cli = _make_cli()
@@ -414,9 +405,6 @@ def test_chat_clears_previous_turn_persistence_override_before_staging():
     assert agent.staged_message["role"] == "user"
     assert agent.staged_message["content"] == "new prompt"
     assert isinstance(agent.staged_message["timestamp"], float)
-
-
-
 
 def test_close_waits_for_atomic_cli_staging_before_snapshot(tmp_path, monkeypatch):
     """Close cannot retain the mutable pre-append history as its DB baseline."""

@@ -34,7 +34,6 @@ from unittest.mock import MagicMock, patch
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
-
 def _make_cli():
     """Build a HermesCLI instance with prompt_toolkit stubbed out.
 
@@ -78,7 +77,6 @@ def _make_cli():
             _cli_mod.__dict__, {"CLI_CONFIG": _clean_config}
         ):
             return _cli_mod.HermesCLI()
-
 
 class TestInterruptQueueDrain:
     """``_drain_interrupt_queue_to_pending_input`` re-queues stray messages."""

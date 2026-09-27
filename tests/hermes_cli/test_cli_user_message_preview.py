@@ -3,10 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
-
-
 _cli_mod = None
-
 
 def _make_cli(user_message_preview=None):
     global _cli_mod
@@ -49,7 +46,6 @@ def _make_cli(user_message_preview=None):
         _cli_mod = mod
         with patch.object(mod, "get_tool_definitions", return_value=[]), patch.dict(mod.__dict__, {"CLI_CONFIG": clean_config}):
             return mod.HermesCLI()
-
 
 class TestSubmittedUserMessagePreview:
     def test_default_preview_shows_first_two_lines_and_last_two_lines(self):

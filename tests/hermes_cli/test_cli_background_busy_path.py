@@ -25,7 +25,6 @@ from unittest.mock import MagicMock, patch
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
-
 def _make_cli():
     """Create a HermesCLI instance with prompt_toolkit stubbed out."""
     _clean_config = {
@@ -66,7 +65,6 @@ def _make_cli():
             _cli_mod.__dict__, {"CLI_CONFIG": _clean_config}
         ):
             return _cli_mod.HermesCLI()
-
 
 class TestBackgroundInlineDetector:
     def test_detects_background_when_agent_running(self):
@@ -121,7 +119,6 @@ class TestBackgroundInlineDetector:
         cli = _make_cli()
         cli._agent_running = True
         assert cli._should_handle_background_command_inline("/BG do work") is True
-
 
 class TestBackgroundBusyPolicyContract:
     """The registry already declares the intent this detector implements."""

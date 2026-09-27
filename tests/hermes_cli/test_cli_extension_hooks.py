@@ -12,10 +12,9 @@ from __future__ import annotations
 import importlib
 from unittest.mock import MagicMock, patch
 
-from tests.hermes_cli._module_stubs import patch_modules_only
-
 from prompt_toolkit.key_binding import KeyBindings
 
+from tests.hermes_cli._module_stubs import patch_modules_only
 
 def _make_cli(**kwargs):
     """Create a HermesCLI with prompt_toolkit stubs (same pattern as test_cli_init)."""
@@ -58,7 +57,6 @@ def _make_cli(**kwargs):
         ):
             return _cli_mod.HermesCLI(**kwargs)
 
-
 class TestExtensionHookDefaults:
     def test_extra_tui_widgets_default_empty(self):
         cli = _make_cli()
@@ -94,7 +92,6 @@ class TestExtensionHookDefaults:
             "spacer", "status", "top-rule", "image-bar", "input-area",
             "bottom-rule", "voice-status", "completions-menu",
         ]
-
 
 class TestExtensionHookSubclass:
     def test_extra_widgets_inserted_before_status_bar(self):

@@ -11,11 +11,9 @@ from unittest.mock import MagicMock, patch
 
 from tests.hermes_cli._module_stubs import patch_modules_only
 
-
 # Module-level reference to the cli module (set by _make_cli on first call)
 _cli_mod = None
 _UNSET = object()
-
 
 def _make_cli(tool_progress="all", verbose=_UNSET):
     """Create a HermesCLI instance with minimal mocking."""
@@ -66,7 +64,6 @@ def _make_cli(tool_progress="all", verbose=_UNSET):
     sys.modules["cli"] = mod
     return inst
 
-
 class TestToolProgressScrollback:
     """Stacked scrollback lines for 'all' and 'new' modes."""
 
@@ -97,8 +94,6 @@ class TestToolProgressScrollback:
 
         assert mock_print.call_count == 2
 
-
-
     def test_off_mode_no_scrollback(self):
         """In 'off' mode, no stacked lines are printed."""
         cli = _make_cli(tool_progress="off")
@@ -107,9 +102,6 @@ class TestToolProgressScrollback:
             cli._on_tool_progress("tool.completed", "terminal", None, None, duration=0.5, is_error=False)
 
         mock_print.assert_not_called()
-
-
-
 
     def test_concurrent_tools_produce_stacked_lines(self):
         """Multiple tool.started followed by multiple tool.completed all produce lines."""
@@ -123,7 +115,6 @@ class TestToolProgressScrollback:
             cli._on_tool_progress("tool.completed", "web_search", None, None, duration=1.5, is_error=False)
 
         assert mock_print.call_count == 2
-
 
     def test_verbose_mode_commits_every_call(self):
         """In 'verbose' mode, consecutive same-tool calls each commit a line.
@@ -139,9 +130,6 @@ class TestToolProgressScrollback:
             cli._on_tool_progress("tool.completed", "terminal", None, None, duration=0.1, is_error=False)
 
         assert mock_print.call_count == 2
-
-
-
 
     def test_pending_info_stores_on_started(self):
         """tool.started stores args for later use by tool.completed."""
@@ -162,7 +150,6 @@ class TestToolProgressScrollback:
         # First entry consumed, second remains
         assert len(cli._pending_tool_info.get("terminal", [])) == 1
         assert cli._pending_tool_info["terminal"][0] == {"command": "pwd"}
-
 
 class TestMoAReferenceBlocks:
     """moa.reference renders a labelled thinking-style block; moa.aggregating

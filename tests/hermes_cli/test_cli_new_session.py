@@ -8,13 +8,12 @@ import sys
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-from tests.hermes_cli._module_stubs import patch_modules_only
-
 import pytest
 
 from hermes_state import SessionDB
 from tools.todo_tool import TodoStore
 
+from tests.hermes_cli._module_stubs import patch_modules_only
 
 class _FakeCompressor:
     """Minimal stand-in for ContextCompressor."""
@@ -25,7 +24,6 @@ class _FakeCompressor:
         self.last_total_tokens = 700
         self.compression_count = 3
         self._context_probed = True
-
 
 class _FakeAgent:
     def __init__(self, session_id: str, session_start):
@@ -76,7 +74,6 @@ class _FakeAgent:
             self.context_compressor.compression_count = 0
             self.context_compressor._context_probed = False
 
-
 def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
     """Create a HermesCLI instance with minimal mocking."""
     _clean_config = {
@@ -122,7 +119,6 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
         ):
             return _cli_mod.HermesCLI(**kwargs)
 
-
 def _prepare_cli_with_active_session(tmp_path):
     cli = _make_cli()
     cli._session_db = SessionDB(db_path=tmp_path / "state.db")
@@ -141,7 +137,6 @@ def _prepare_cli_with_active_session(tmp_path):
     cli._confirm_destructive_slash = lambda *_a, **_kw: "once"
     return cli
 
-
 @pytest.fixture(autouse=True)
 def _reset_session_id_context():
     from gateway.session_context import _UNSET, _VAR_MAP
@@ -149,7 +144,6 @@ def _reset_session_id_context():
     yield
     os.environ.pop("HERMES_SESSION_ID", None)
     _VAR_MAP["HERMES_SESSION_ID"].set(_UNSET)
-
 
 def test_new_command_creates_real_fresh_session_and_resets_agent_state(tmp_path):
     cli = _prepare_cli_with_active_session(tmp_path)
@@ -176,11 +170,6 @@ def test_new_command_creates_real_fresh_session_and_resets_agent_state(tmp_path)
     assert cli.agent.session_start == cli.session_start
     cli.agent._invalidate_system_prompt.assert_called_once()
 
-
-
-
-
-
 def test_new_session_delivers_context_engine_boundary_synchronously(tmp_path):
     """The context-engine on_session_end must fire during /new itself.
 
@@ -198,7 +187,6 @@ def test_new_session_delivers_context_engine_boundary_synchronously(tmp_path):
     cli.process_command("/new")
 
     assert engine_calls == [(old_session_id, [{"role": "user", "content": "hello"}])]
-
 
 def test_run_cleanup_delegates_memory_drain_to_shutdown_owner(tmp_path):
     """CLI cleanup forwards the transcript and lets AIAgent own drain ordering."""
@@ -218,11 +206,6 @@ def test_run_cleanup_delegates_memory_drain_to_shutdown_owner(tmp_path):
 
     agent.shutdown_memory_provider.assert_called_once_with([])
 
-
-
-
-
-
 def test_clear_command_starts_new_session_before_redrawing(tmp_path):
     cli = _prepare_cli_with_active_session(tmp_path)
     cli.console = MagicMock()
@@ -237,7 +220,6 @@ def test_clear_command_starts_new_session_before_redrawing(tmp_path):
     cli.console.clear.assert_called_once()
     cli.show_banner.assert_called_once()
     assert cli.conversation_history == []
-
 
 def test_new_session_resets_token_counters(tmp_path):
     """Regression test for #2099: /new must zero all token counters."""
@@ -273,7 +255,6 @@ def test_new_session_resets_token_counters(tmp_path):
     assert comp.compression_count == 0
     assert comp._context_probed is False
 
-
 def test_new_session_with_title(capsys):
     """new_session(title=...) creates a session and sets the title."""
     cli = _make_cli()
@@ -291,5 +272,4 @@ def test_new_session_with_title(capsys):
 
     captured = capsys.readouterr()
     assert "My Test Session" in captured.out
-
 
