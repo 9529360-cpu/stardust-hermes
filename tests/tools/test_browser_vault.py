@@ -552,6 +552,27 @@ class TestBrowserVaultTools:
         assert '"index": 0' not in secret_exprs[0]
         assert "user@example.com" not in secret_exprs[0]
 
+    def test_signup_focus_uses_signup_specific_probe(self, monkeypatch):
+        from tools import browser_vault_tool
+
+        seen = {}
+
+        class _Supervisor:
+            def focus_page(self, origin, accept=None):
+                seen["origin"] = origin
+                seen["accept"] = accept
+                return {"ok": True, "url": origin + "/signup"}
+
+        monkeypatch.setattr(browser_vault_tool, "_ensure_supervisor", lambda task_id: _Supervisor())
+        focused = browser_vault_tool._focus_bound_origin("signup-task", "https://example.com", "signup")
+
+        assert focused == "https://example.com"
+        assert seen["origin"] == "https://example.com"
+        assert seen["accept"] == browser_vault_tool._SIGNUP_TAB_PROBE
+        assert seen["accept"] != browser_vault_tool._TAB_PROBES["login"]
+        assert "new-password" in seen["accept"]
+        assert "count >= 2" in seen["accept"]
+
     def test_signup_fill_targets_new_and_confirm_password_only(self, store):
         from tools import browser_vault_tool
 

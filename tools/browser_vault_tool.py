@@ -182,9 +182,26 @@ def _current_page_origin(task_id: str) -> Optional[str]:
 
 
 # Per kind: a JS probe that is truthy on a tab holding the form this kind fills.
+_SIGNUP_TAB_PROBE = r"""(() => {
+  const fields = [...document.querySelectorAll('input[type=password]')];
+  const text = (el) => [
+    el.autocomplete || '', el.name || '', el.id || '', el.placeholder || '',
+    el.getAttribute('aria-label') || ''
+  ].join(' ').toLowerCase();
+  if (fields.some((el) => text(el).includes('new-password'))) return true;
+  if (fields.some((el) => /(?:confirm|repeat|retype|verify|new|create|choose|set)[ _-]*password/.test(text(el)))) return true;
+  const byForm = new Map();
+  for (const el of fields) {
+    const key = el.form || document.body;
+    byForm.set(key, (byForm.get(key) || 0) + 1);
+  }
+  return [...byForm.values()].some((count) => count >= 2);
+})()"""
+
+
 _TAB_PROBES = {
     "login": "!!document.querySelector('input[type=password]')",
-    "signup": "!!document.querySelector('input[type=password]')",
+    "signup": _SIGNUP_TAB_PROBE,
     "payment": "!!document.querySelector('input[autocomplete^=cc-], [name*=card i], [placeholder*=card i], [name*=cvc i], [name*=cvv i]')",
     "address": "!!document.querySelector('input[autocomplete^=address-], [autocomplete=postal-code], [name*=address i], [name*=zip i], [name*=postal i]')",
 }
