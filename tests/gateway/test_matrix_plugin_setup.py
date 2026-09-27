@@ -81,3 +81,31 @@ class TestMatrixHomeChannelClear:
         assert "MATRIX_HOME_ROOM" not in saved
 
 
+def test_missing_matrix_deps_use_lazy_installer(monkeypatch, tmp_path):
+    """The Matrix setup owner installs its declared dependency group when needed."""
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    saved, removed = {}, []
+    _patch_setup_io(
+        monkeypatch,
+        _PROMPTS_NONEMPTY,
+        _YES_NO,
+        saved,
+        removed,
+        existing={},
+    )
+    calls = []
+    monkeypatch.setattr(
+        lazy_deps_mod,
+        "feature_missing",
+        lambda feature: ("mautrix",) if feature == "platform.matrix" else (),
+    )
+    monkeypatch.setattr(
+        lazy_deps_mod,
+        "ensure",
+        lambda feature, *, prompt: calls.append((feature, prompt)),
+    )
+
+    interactive_setup()
+
+    assert calls == [("platform.matrix", False)]
+
