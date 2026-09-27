@@ -172,12 +172,52 @@ def _setup_mcp_shim(agent, args: dict, ctx: InlineToolContext) -> Any:
     }, ctx)
 
 
+
+def _latest_user_message(messages: Optional[list]) -> str:
+    """Clean text of the current/latest user turn, never assistant-authored approval."""
+    for message in reversed(messages or []):
+        if not isinstance(message, dict) or message.get("role") != "user":
+            continue
+        content = message.get("content")
+        if isinstance(content, str):
+            return content.strip()
+        # Defensive support for provider-style multimodal content lists. Only
+        # copy explicit text parts; never stringify image/tool metadata.
+        if isinstance(content, list):
+            texts = []
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                if part.get("type") in {"text", "input_text"} and isinstance(part.get("text"), str):
+                    texts.append(part["text"])
+            return "\n".join(texts).strip()
+        return ""
+    return ""
+
+def _assistant_tasks(agent, args: dict, ctx: InlineToolContext) -> Any:
+    """Durable multi-task intake bound to the exact owning session and tool call."""
+    from tools.assistant_tasks import assistant_tasks_tool
+
+    return assistant_tasks_tool(
+        action=args.get("action", "create"),
+        tasks=args.get("tasks"),
+        include_completed=args.get("include_completed", True),
+        limit=args.get("limit", 20),
+        task_ids=args.get("task_ids"),
+        task_id=args.get("task_id"),
+        user_message=_latest_user_message(ctx.messages),
+        session_id=getattr(agent, "session_id", None),
+        request_id=ctx.tool_call_id,
+    )
+
+
 # Order is the historical if/elif order of ``execute_tool_calls_sequential``.
 INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
     "todo_list": _tool(
         "tools.todo_tool", "todo_tool", ("todos", "todos"), ("merge", "merge", False),
         store=lambda agent, ctx: agent._todo_store,
     ),
+    "assistant_tasks": _assistant_tasks,
     # Bot Mode teammate DM is injected, not registered: only a canonical Bot
     # Chat session carries the schema, and the tool re-gates on the title.
     "message_agent": _tool(
