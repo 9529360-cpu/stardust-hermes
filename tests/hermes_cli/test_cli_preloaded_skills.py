@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import importlib
 import os
-import sys
 from unittest.mock import MagicMock, patch
+
+from tests.hermes_cli._module_stubs import patch_modules_only
 
 import pytest
 
@@ -36,7 +37,7 @@ def _make_real_cli(**kwargs):
         "prompt_toolkit.completion": MagicMock(),
         "prompt_toolkit.formatted_text": MagicMock(),
     }
-    with patch.dict(sys.modules, prompt_toolkit_stubs), patch.dict(
+    with patch_modules_only(prompt_toolkit_stubs), patch.dict(
         "os.environ", clean_env, clear=False
     ):
         import cli as cli_mod

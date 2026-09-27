@@ -8,6 +8,8 @@ import sys
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+from tests.hermes_cli._module_stubs import patch_modules_only
+
 import pytest
 
 from hermes_state import SessionDB
@@ -109,7 +111,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
         "prompt_toolkit.formatted_text": MagicMock(),
         "prompt_toolkit.auto_suggest": MagicMock(),
     }
-    with patch.dict(sys.modules, prompt_toolkit_stubs), patch.dict(
+    with patch_modules_only(prompt_toolkit_stubs), patch.dict(
         "os.environ", clean_env, clear=False
     ):
         import cli as _cli_mod

@@ -6,6 +6,8 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from tests.hermes_cli._module_stubs import patch_modules_only
+
 import pytest
 
 
@@ -47,7 +49,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
         "prompt_toolkit.auto_suggest": MagicMock(),
     }
     try:
-        with patch.dict(sys.modules, prompt_toolkit_stubs), \
+        with patch_modules_only(prompt_toolkit_stubs), \
              patch.dict("os.environ", clean_env, clear=False):
             import cli as _cli_mod
             _cli_mod = importlib.reload(_cli_mod)
