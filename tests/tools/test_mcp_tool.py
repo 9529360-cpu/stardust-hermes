@@ -1061,6 +1061,77 @@ class TestDiscoverAndRegister:
             for record in caplog.records
         )
 
+    def test_lazy_cache_matches_live_native_utility_collision_policy(self, caplog):
+        """Lazy cache registration must resolve native/utility collisions exactly like live discovery.
+
+        ``_register_from_cache_sync`` writes server "srv" into module-global ledgers
+        (``_lazy_server_configs`` and friends) that outlive this test unless cleared —
+        a later test in the same file/process (e.g. one calling the real
+        ``discover_mcp_tools()``) would otherwise pick up "srv" via
+        ``register_connected_into_current_scope()`` and see a stale, unexpected server.
+        Same save/clear/restore pattern as ``two_profiles`` in
+        tests/tools/test_mcp_multiplex_connection_keys.py.
+        """
+        import tools.mcp_tool as core
+        from tools.mcp_tool_registration import _register_from_cache_sync
+        from tools.mcp_tool_schema import _build_utility_schemas
+        from tools.registry import ToolRegistry
+
+        ledgers = (
+            "_servers", "_server_scope_keys", "_server_tool_scopes", "_server_connecting",
+            "_server_connect_errors", "_server_connect_retry_after", "_server_connect_failures",
+            "_server_error_counts", "_server_breaker_opened_at", "_lazy_server_configs",
+            "_lazy_server_fingerprints", "_lazy_server_tool_names",
+            "_mcp_tool_server_names", "_orphaned_adopters", "_parallel_safe_servers",
+            "_server_trust_levels", "_tool_read_only_hints",
+        )
+        saved = {n: type(getattr(core, n))(getattr(core, n)) for n in ledgers}
+        for n in ledgers:
+            getattr(core, n).clear()
+
+        try:
+            entry = {
+                "tools": [
+                    {
+                        "name": "read_resource",
+                        "description": "Native read-resource tool",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {"path": {"type": "string"}},
+                        },
+                    },
+                    {
+                        "name": "safe_tool",
+                        "description": "Safe tool",
+                        "inputSchema": {"type": "object", "properties": {}},
+                    },
+                ],
+                "utility_tools": [
+                    row for row in _build_utility_schemas("srv")
+                    if row["handler_key"] == "read_resource"
+                ],
+            }
+            registry = ToolRegistry()
+
+            with patch("tools.registry.registry", registry), \
+                 patch("tools.mcp_tool_registration._track_mcp_tool_server"), \
+                 caplog.at_level(logging.INFO, logger="tools.mcp_tool"):
+                registered = _register_from_cache_sync("srv", {}, entry)
+
+            assert "mcp__srv__read_resource" in registered
+            assert "mcp__srv__safe_tool" in registered
+            native = registry.get_entry("mcp__srv__read_resource")
+            assert native is not None
+            assert native.description == "Native read-resource tool"
+            assert any(
+                "keeping the native tool and dropping the utility" in record.message
+                for record in caplog.records
+            )
+        finally:
+            for n in ledgers:
+                getattr(core, n).clear()
+                getattr(core, n).update(saved[n])
+
 # ---------------------------------------------------------------------------
 # MCPServerTask (run / start / shutdown)
 # ---------------------------------------------------------------------------
@@ -3217,19 +3288,27 @@ class TestRedirectHeaderStripper:
         )
         return response, next_request
 
-    def test_default_strips_only_authorization(self):
+    def test_default_strips_credentials_but_keeps_non_secret_config_headers(self):
         import httpx
 
         from tools.mcp_tool_errors import _make_redirect_header_stripper
 
         hook = _make_redirect_header_stripper(
-            httpx.URL("https://origin.example.test/mcp")
+            httpx.URL("https://origin.example.test/mcp"),
+            configured_header_names={"x-api-key", "x-tenant"},
         )
         response, next_request = self._make_response(
-            {"Authorization": "Bearer x", "X-Tenant": "t"}
+            {
+                "Authorization": "Bearer x",
+                "Proxy-Authorization": "Basic y",
+                "X-Api-Key": "secret",
+                "X-Tenant": "t",
+            }
         )
         asyncio.run(hook(response))
         assert "authorization" not in next_request.headers
+        assert "proxy-authorization" not in next_request.headers
+        assert "x-api-key" not in next_request.headers
         assert next_request.headers["x-tenant"] == "t"
 
     def test_strict_strips_configured_headers_cross_origin(self):

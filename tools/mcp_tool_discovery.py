@@ -478,38 +478,69 @@ def discover_mcp_tools(allowed_mcp_names: Optional[List[str]] = None) -> List[st
 
 
 def reconcile_mcp_servers_with_config() -> Dict[str, List[str]]:
-    """Bring the live server set in step with ``mcp_servers`` as it is on disk NOW: tear down
-    servers that were removed from config or set ``enabled: false`` (a parked server keeps
-    self-probing forever otherwise — for hours after the user deleted its entry), then connect
-    anything newly configured via :func:`discover_mcp_tools`. Scoped to the current registry
-    scope (one multiplexed profile's config prunes only its own connections). A lazily registered
-    (schema-cache) server loses its cached tools; one still mid-connect cannot be torn down yet and
-    is reported under ``"pending"`` so the caller retries. Returns
-    ``{"removed": [...], "added": [...], "pending": [...]}``; a no-op when nothing changed."""
+    """Bring the live server set in step with ``mcp_servers`` as it is on disk NOW.
+
+    Removed/disabled entries are torn down, but so are live or lazy registrations whose config
+    changed: keeping those would leave the old URL, credentials, TLS/identity policy, tool filter,
+    trust tier or lifecycle settings active until process restart. Changed names are returned in
+    both ``removed`` and ``added`` because reconciliation replaces their runtime instance.
+    A server still mid-connect is reported under ``pending`` so the caller retries once the
+    in-flight start has settled. Scoped to the current registry scope.
+    """
     servers = _config._load_mcp_config()
     wanted = {name for name, cfg in servers.items() if _enabled(cfg)}
     scope = _core._mcp_registry_scope()
     with _core._lock:
         owned = [key for key, owner in _core._server_scope_keys.items() if owner == scope]
-        live = {_key_name(key) for key in owned if key in _core._servers}
+        live_by_name = {
+            _key_name(key): _core._servers[key]
+            for key in owned
+            if key in _core._servers
+        }
         connecting = {_key_name(key) for key in owned if key in _core._server_connecting}
-        lazy = {key for key in _core._lazy_server_configs
-                if _key_scope(key) == scope and _key_name(key) not in wanted}
-    stale = sorted(live - wanted)
+        lazy = {
+            key for key, cfg in _core._lazy_server_configs.items()
+            if _key_scope(key) == scope
+            and (
+                _key_name(key) not in wanted
+                or cfg != servers.get(_key_name(key))
+            )
+        }
+
+    stale = sorted(
+        name for name, server in live_by_name.items()
+        if name not in wanted or (getattr(server, "_config", {}) or {}) != servers.get(name)
+    )
     if stale:
-        logger.info("MCP server(s) %s no longer in config (or disabled); disconnecting", ", ".join(stale))
+        logger.info(
+            "MCP server(s) %s removed, disabled, or changed in config; disconnecting",
+            ", ".join(stale),
+        )
         _lifecycle.shutdown_mcp_servers(scope=scope, names=set(stale))
     for key in lazy:
         _forget_lazy_server(key)
+
     with _core._lock:
-        known = {_key_name(key) for key, owner in _core._server_scope_keys.items()
-                 if owner == scope and (key in _core._servers or key in _core._server_connecting)}
-        known |= {_key_name(key) for key in _core._lazy_server_configs}
+        known = {
+            _key_name(key)
+            for key, owner in _core._server_scope_keys.items()
+            if owner == scope and (key in _core._servers or key in _core._server_connecting)
+        }
+        known |= {
+            _key_name(key)
+            for key in _core._lazy_server_configs
+            if _key_scope(key) == scope
+        }
     added = sorted(wanted - known)
     if added:
         discover_mcp_tools()
-    return {"removed": stale + sorted(_key_name(k) for k in lazy), "added": added,
-            "pending": sorted(connecting - wanted)}
+    return {
+        "removed": stale + sorted(_key_name(k) for k in lazy),
+        "added": added,
+        # A config edit can race an in-flight start. Retry after it settles so any changed
+        # config is compared against the server's bound _config and replaced if needed.
+        "pending": sorted(connecting),
+    }
 
 
 def _forget_lazy_server(key) -> None:

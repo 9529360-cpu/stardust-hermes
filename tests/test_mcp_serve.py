@@ -121,6 +121,12 @@ def populated_sessions_dir(sessions_dir, sample_sessions):
     return sessions_dir
 
 
+def _advance_mtime(path):
+    """Move *path*'s mtime forward deterministically across coarse filesystems."""
+    current = path.stat().st_mtime
+    os.utime(path, (current + 1.0, current + 1.0))
+
+
 def _create_test_db(db_path, session_id, messages):
     """Create a minimal SQLite DB mimicking hermes_state schema."""
     conn = sqlite3.connect(str(db_path))
@@ -497,25 +503,6 @@ class TestEventBridge:
         assert not errors
         assert len(b._queue) == 500
         assert b._cursor == 500
-
-    def test_approvals_lifecycle(self):
-        from mcp_serve import EventBridge
-        b = EventBridge()
-        b._pending_approvals["a1"] = {
-            "id": "a1", "kind": "exec",
-            "description": "rm -rf /tmp",
-            "session_key": "test", "created_at": "2026-03-29T12:00:00",
-        }
-        assert len(b.list_pending_approvals()) == 1
-        result = b.respond_to_approval("a1", "deny")
-        assert result["resolved"] is True
-        assert len(b.list_pending_approvals()) == 0
-
-    def test_respond_nonexistent(self):
-        from mcp_serve import EventBridge
-        r = EventBridge().respond_to_approval("nope", "deny")
-        assert "error" in r
-
 
 # ---------------------------------------------------------------------------
 # 3. END-TO-END TESTS — call MCP tools through the MCP server
@@ -908,53 +895,34 @@ class TestE2EChannelsList:
 
 
 class TestE2EPermissions:
-    def test_list_empty(self, mcp_server_e2e, _event_loop):
+    def test_list_reports_cross_process_limit_explicitly(self, mcp_server_e2e, _event_loop):
         server, _ = mcp_server_e2e
         result = _run_tool(server, "permissions_list_open")
+        assert result["supported"] is False
         assert result["count"] == 0
         assert result["approvals"] == []
+        assert "gateway process" in result["error"]
 
-    def test_list_with_approvals(self, mcp_server_e2e, _event_loop):
-        server, bridge = mcp_server_e2e
-        bridge._pending_approvals["a1"] = {
-            "id": "a1", "kind": "exec",
-            "description": "sudo rm -rf /",
-            "session_key": "test",
-            "created_at": "2026-03-29T12:00:00",
-        }
-        result = _run_tool(server, "permissions_list_open")
-        assert result["count"] == 1
-        assert result["approvals"][0]["id"] == "a1"
-
-    def test_respond_allow(self, mcp_server_e2e, _event_loop):
-        server, bridge = mcp_server_e2e
-        bridge._pending_approvals["a1"] = {"id": "a1", "kind": "exec"}
-        result = _run_tool(server, "permissions_respond",
-                          {"id": "a1", "decision": "allow-once"})
-        assert result["resolved"] is True
-        assert result["decision"] == "allow-once"
-        # Should be gone now
-        check = _run_tool(server, "permissions_list_open")
-        assert check["count"] == 0
-
-    def test_respond_deny(self, mcp_server_e2e, _event_loop):
-        server, bridge = mcp_server_e2e
-        bridge._pending_approvals["a2"] = {"id": "a2", "kind": "plugin"}
-        result = _run_tool(server, "permissions_respond",
-                          {"id": "a2", "decision": "deny"})
-        assert result["resolved"] is True
+    @pytest.mark.parametrize("decision", ["allow-once", "allow-always", "deny"])
+    def test_respond_never_claims_standalone_approval_was_resolved(
+        self, mcp_server_e2e, _event_loop, decision
+    ):
+        server, _ = mcp_server_e2e
+        result = _run_tool(
+            server,
+            "permissions_respond",
+            {"id": "a1", "decision": decision},
+        )
+        assert result["supported"] is False
+        assert result["resolved"] is False
+        assert result["approval_id"] == "a1"
+        assert result["decision"] == decision
+        assert "gateway process" in result["error"]
 
     def test_respond_invalid_decision(self, mcp_server_e2e, _event_loop):
-        server, bridge = mcp_server_e2e
-        bridge._pending_approvals["a3"] = {"id": "a3", "kind": "exec"}
-        result = _run_tool(server, "permissions_respond",
-                          {"id": "a3", "decision": "maybe"})
-        assert "error" in result
-
-    def test_respond_nonexistent(self, mcp_server_e2e, _event_loop):
         server, _ = mcp_server_e2e
         result = _run_tool(server, "permissions_respond",
-                          {"id": "nope", "decision": "deny"})
+                          {"id": "a3", "decision": "maybe"})
         assert "error" in result
 
 
@@ -1258,8 +1226,8 @@ class TestEventBridgePollE2E:
         )
         conn.commit()
         conn.close()
-        # Touch the DB file to update mtime (WAL mode may not update mtime on small writes)
-        os.utime(db_path, None)
+        # Move mtime forward explicitly; same-tick os.utime(..., None) is not reliable on all filesystems.
+        _advance_mtime(db_path)
 
         # Update sessions.json updated_at to trigger re-check
         sessions_data["agent:main:telegram:dm:new"]["updated_at"] = "2026-03-29T15:00:10"
@@ -1324,7 +1292,7 @@ class TestEventBridgePollE2E:
         # Bridge has never seen this db state (mtime differs) and has an
         # empty cached index — exactly the state after a new conversation's
         # first write.
-        bridge._state_db_mtime = 0.0
+        bridge._state_db_fingerprint = (None, None)
         assert bridge._cached_sessions_index == {}
 
         bridge._poll_once(DB())
@@ -1333,6 +1301,63 @@ class TestEventBridgePollE2E:
         assert len(result["events"]) == 1
         assert result["events"][0]["session_key"] == "agent:main:telegram:dm:late"
         assert result["events"][0]["content"].startswith("Hello from a freshly")
+
+    def test_wal_only_change_opens_poll_gate(self, tmp_path, monkeypatch):
+        """A committed WAL-only change must wake the bridge even when state.db itself is untouched."""
+        import mcp_serve
+
+        db_path = tmp_path / "state.db"
+        db_path.write_bytes(b"main-db")
+        wal_path = tmp_path / "state.db-wal"
+        wal_path.write_bytes(b"frame-1")
+        session_id = "20260329_150000_wal"
+        monkeypatch.setattr(
+            mcp_serve,
+            "_load_sessions_index",
+            lambda: {
+                "agent:main:telegram:dm:wal": {
+                    "session_id": session_id,
+                    "platform": "telegram",
+                    "origin": {"platform": "telegram", "chat_id": "wal"},
+                }
+            },
+        )
+        store = [{
+            "id": 1,
+            "role": "user",
+            "content": "before baseline",
+            "timestamp": "2026-03-29T15:00:00",
+        }]
+
+        class DB:
+            def get_messages(self, sid):
+                assert sid == session_id
+                return list(store)
+
+            def close(self):
+                return None
+
+        monkeypatch.setattr(mcp_serve, "_get_session_db", lambda: DB())
+        bridge = mcp_serve.EventBridge()
+        bridge._establish_baseline()
+        baseline = bridge._state_db_fingerprint
+        main_before = mcp_serve._stat_fingerprint(db_path)
+
+        store.append({
+            "id": 2,
+            "role": "assistant",
+            "content": "committed in wal",
+            "timestamp": "2026-03-29T15:05:00",
+        })
+        wal_path.write_bytes(b"frame-1-frame-2")
+        _advance_mtime(wal_path)
+
+        assert mcp_serve._stat_fingerprint(db_path) == main_before
+        assert mcp_serve._read_state_db_fingerprint() != baseline
+        bridge._poll_once(DB())
+
+        events = bridge.poll_events(after_cursor=0)["events"]
+        assert [event["content"] for event in events] == ["committed in wal"]
 
     def test_startup_baseline_suppresses_historical_replay(self, tmp_path, monkeypatch):
         """start()'s baseline records existing history without emitting it, so a
@@ -1374,7 +1399,7 @@ class TestEventBridgePollE2E:
             "id": 2, "role": "assistant", "content": "arrived after start",
             "timestamp": "2026-03-29T15:05:00",
         })
-        os.utime(db_path, None)  # bump mtime so the poll gate opens
+        _advance_mtime(db_path)  # bump mtime so the poll gate opens
         bridge._poll_once(DB())
         events = bridge.poll_events(after_cursor=0)["events"]
         assert len(events) == 1
@@ -1412,7 +1437,7 @@ class TestEventBridgePollE2E:
             "id": 1, "role": "user", "content": "hello after baseline",
             "timestamp": "2026-03-29T15:10:00",
         }]
-        os.utime(db_path, None)
+        _advance_mtime(db_path)
         bridge._poll_once(DB())
 
         events = bridge.poll_events(after_cursor=0)["events"]

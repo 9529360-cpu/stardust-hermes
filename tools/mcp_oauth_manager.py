@@ -8,6 +8,7 @@ than an await + refresh round-trip."""
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import re
 import threading
@@ -279,16 +280,27 @@ class MCPOAuthManager:
         self._inflight_tasks: set[asyncio.Task] = set()
 
     def get_or_build_provider(self, server_name: str, server_url: str, oauth_config: Optional[dict]) -> Optional[Any]:
-        """Cached OAuth provider for ``server_name``, built on first use (rebuilt when ``server_url`` changes);
-        None if the MCP SDK's OAuth support is unavailable."""
+        """Cached OAuth provider for ``server_name``, rebuilt when endpoint or OAuth config changes.
+
+        Store a deep snapshot rather than the caller's dict: reload paths may mutate config objects
+        in place, and aliasing that dict would hide a later identity change from the cache check.
+        None if the MCP SDK's OAuth support is unavailable.
+        """
         key = self._key(server_name)
+        config_snapshot = copy.deepcopy(oauth_config) if isinstance(oauth_config, dict) else None
         with self._entries_lock:
             entry = self._entries.get(key)
-            if entry is not None and entry.server_url != server_url:
-                logger.info("MCP OAuth '%s': URL changed from %s to %s, discarding cache", server_name, entry.server_url, server_url)
+            if entry is not None and (
+                entry.server_url != server_url or entry.oauth_config != config_snapshot
+            ):
+                reason = "URL" if entry.server_url != server_url else "OAuth config"
+                logger.info("MCP OAuth '%s': %s changed, discarding provider cache", server_name, reason)
                 entry = None
             if entry is None:
-                entry = self._entries[key] = _ProviderEntry(server_url=server_url, oauth_config=oauth_config)
+                entry = self._entries[key] = _ProviderEntry(
+                    server_url=server_url,
+                    oauth_config=config_snapshot,
+                )
             if entry.provider is None:
                 entry.provider = self._build_provider(server_name, entry)
                 if entry.provider is not None:

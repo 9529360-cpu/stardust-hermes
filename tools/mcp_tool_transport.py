@@ -354,9 +354,13 @@ class MCPServerTransportMixin:
         # installs the wire-body cap and layers TLS on the inner transport (client-level verify/cert are
         # inert once a custom transport= is passed). Client MUST come from the SDK's httpx (httpx2 on mcp >= 2.0).
         _httpx_mod = _core.sdk_httpx()
+        configured_header_names = {str(key).lower() for key in headers}
+        _strip_credentials_on_cross_origin_redirect = _make_redirect_header_stripper(
+            _httpx_mod.URL(url), configured_header_names=configured_header_names)
         sse_kwargs["httpx_client_factory"] = lambda headers=None, timeout=None, auth=None: _httpx_mod.AsyncClient(
             follow_redirects=True,
             timeout=timeout if timeout is not None else _httpx_mod.Timeout(30.0, read=300.0),
+            event_hooks={"response": [_strip_credentials_on_cross_origin_redirect]},
             transport=_make_mcp_body_cap_transport(
                 _httpx_mod, _httpx_mod.AsyncHTTPTransport(verify=ssl_verify, **_present(cert=client_cert))),
             **_present(headers=headers, auth=auth))
@@ -403,10 +407,11 @@ class MCPServerTransportMixin:
                               "Upgrade the mcp package to get HTTP support.")
         url = config["url"]
         headers = dict(config.get("headers") or {})
-        # Agent Plugins v1 strict_redirect_headers: configured headers MUST NOT follow a cross-origin
-        # redirect — capture their names BEFORE client-generated headers are merged in.
-        configured_header_names = {key.lower() for key in headers}
         headers = _apply_identity_header(self.name, config, headers)  # explicit same-name headers win
+        # Agent Plugins v1 strict_redirect_headers: every config-derived header (including
+        # identity_header) MUST NOT follow a cross-origin redirect. Capture after identity injection,
+        # but before client/protocol-generated headers are merged in.
+        configured_header_names = {key.lower() for key in headers}
         # Seed MCP-Protocol-Version (user override wins) from the HANDSHAKE version, not the latest: a
         # 2026-07-28 header routes the handshake-era ``initialize()`` onto the envelope ladder, which rejects it.
         if not any(key.lower() == "mcp-protocol-version" for key in headers):

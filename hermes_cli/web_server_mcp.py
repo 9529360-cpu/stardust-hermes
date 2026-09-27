@@ -82,6 +82,8 @@ def _redact_mcp_env(env: Dict[str, Any]) -> Dict[str, str]:
 
 
 def _mcp_server_summary(name: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
+    from hermes_cli.mcp_security import redact_mcp_url_userinfo
+
     transport = "http" if cfg.get("url") else ("stdio" if cfg.get("command") else "unknown")
     auth = cfg.get("auth")
     headers = cfg.get("headers") or {}
@@ -90,7 +92,7 @@ def _mcp_server_summary(name: str, cfg: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "name": name,
         "transport": transport,
-        "url": cfg.get("url"),
+        "url": redact_mcp_url_userinfo(cfg.get("url")),
         "command": cfg.get("command"),
         "args": list(cfg.get("args") or []),
         "env": _redact_mcp_env(cfg.get("env") or {}),
@@ -171,6 +173,7 @@ def _run_dashboard_mcp_oauth(flow, cfg: dict) -> None:
                 msg = humanized
         except Exception:
             pass
-        flow.mark_error(msg)
+        from hermes_cli.mcp_config import redact_mcp_probe_text
+        flow.mark_error(redact_mcp_probe_text(msg))
     finally:
         flow.mark_worker_done()
