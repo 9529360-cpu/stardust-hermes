@@ -337,6 +337,24 @@ class TestRateLimit:
         )
         assert good.status_code == 429
 
+    def test_untrusted_x_forwarded_for_cannot_rotate_rate_limit_bucket(self, gated_app):
+        # TestClient is a direct peer, so raw forwarding headers are untrusted.
+        # Rotating X-Forwarded-For must not mint a fresh brute-force budget.
+        for attempt in range(10):
+            resp = gated_app.post(
+                "/auth/password-login",
+                headers={"x-forwarded-for": f"198.51.100.{attempt + 1}"},
+                json={"provider": "testpw", "username": "admin", "password": "WRONG"},
+            )
+            assert resp.status_code == 401
+
+        blocked = gated_app.post(
+            "/auth/password-login",
+            headers={"x-forwarded-for": "203.0.113.250"},
+            json={"provider": "testpw", "username": "admin", "password": "hunter2"},
+        )
+        assert blocked.status_code == 429
+
 
 # ---------------------------------------------------------------------------
 # Login page rendering
