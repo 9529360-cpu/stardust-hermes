@@ -204,6 +204,9 @@ def record_failure(provider: str, model: str, base_url: str = "", reason: Failov
     """Persist a route failure and return its exponential cooldown in seconds."""
     if not enabled() or not provider or not model:
         return 0
+    base = _base_cooldown(reason)
+    if base is None:
+        return 0
     now = time.time()
     key, identity = route_identity(provider, model, base_url)
     with _LOCK:
@@ -212,9 +215,6 @@ def record_failure(provider: str, model: str, base_url: str = "", reason: Failov
                 state = _read_state()
                 previous = state["routes"].get(key) or {}
                 failures = max(0, int(previous.get("consecutive_failures") or 0)) + 1
-                base = _base_cooldown(reason)
-                if base is None:
-                    return 0
                 cooldown = min(base * (2 ** min(failures - 1, 8)), _MAX_COOLDOWN_S) if base else 0
                 state["routes"][key] = {
                     **identity,
@@ -325,7 +325,7 @@ def record_agent_success(agent) -> None:
     agent._rate_limited_until = 0
     try:
         agent._emit_status(
-            f"✅ Primary model recovered: {agent.model} via {agent.provider}; "
+            f"鉁?Primary model recovered: {agent.model} via {agent.provider}; "
             f"fallback {previous_model} via {previous_provider} is no longer active."
         )
     except Exception:
