@@ -26,6 +26,30 @@ export function readUseRealProfile(record: Record<string, unknown> | undefined):
   return false
 }
 
+export function withUseRealProfile(
+  record: Record<string, unknown>,
+  enabled: boolean
+): Record<string, unknown> {
+  const browser =
+    record.browser && typeof record.browser === 'object' && !Array.isArray(record.browser)
+      ? (record.browser as Record<string, unknown>)
+      : {}
+
+  return { ...record, browser: { ...browser, use_real_profile: enabled } }
+}
+
+export function rollbackUseRealProfileIfCurrent(
+  current: Record<string, unknown> | undefined,
+  attempted: boolean,
+  previous: boolean
+): Record<string, unknown> | undefined {
+  if (!current || readUseRealProfile(current) !== attempted) {
+    return current
+  }
+
+  return withUseRealProfile(current, previous)
+}
+
 /**
  * The `browser.use_real_profile` consent toggle, rendered at the top of the
  * Capabilities → Tools → Browser detail pane (above the backend/provider
@@ -54,15 +78,10 @@ export function BrowserRealProfilePanel({ profile }: BrowserRealProfilePanelProp
         return
       }
 
-      const browser =
-        config.browser && typeof config.browser === 'object' && !Array.isArray(config.browser)
-          ? (config.browser as Record<string, unknown>)
-          : {}
-
-      const next = { ...config, browser: { ...browser, use_real_profile: on } }
+      const previousEnabled = enabled
 
       setBusy(true)
-      setConfig(next)
+      setConfig(current => (current ? withUseRealProfile(current, on) : current))
 
       try {
         // Sparse patch: PUT /api/config deep-merges, and echoing the cached
@@ -74,13 +93,15 @@ export function BrowserRealProfilePanel({ profile }: BrowserRealProfilePanelProp
           message: on ? copy.enabledMessage : copy.disabledMessage
         })
       } catch (err) {
-        setConfig(config)
+        setConfig(current =>
+          rollbackUseRealProfileIfCurrent(current, on, previousEnabled)
+        )
         notifyError(err, copy.failedSave)
       } finally {
         setBusy(false)
       }
     },
-    [config, copy, profile, setConfig]
+    [config, copy, enabled, profile, setConfig]
   )
 
   return (
