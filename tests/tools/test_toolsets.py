@@ -213,7 +213,7 @@ class TestDefaultToolSurfaceTaxonomy:
 
         assert {
             "web_search", "terminal", "read_file", "skill_view",
-            "memory", "clarify", "execute_code",
+            "memory", "assistant_tasks", "clarify", "execute_code",
         } <= foundation
         assert "image_generate" not in foundation
         assert "text_to_speech" not in foundation

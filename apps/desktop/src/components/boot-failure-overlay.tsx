@@ -165,9 +165,12 @@ export function BootFailureOverlay() {
   }
 
   // Clear this gateway's stale auth first, then re-establish it through the
-  // connection's owning login flow. Hermes Cloud must reuse its portal session
-  // and per-agent cascade; generic remote gateways use native/embedded OAuth.
-  // Reload after success so boot mints a fresh ticket against the new session.
+  // connection's owning login flow. A connection saved under the retired
+  // built-in "Hermes Cloud" mode is remote-shaped already (a gateway URL +
+  // OAuth), so it re-authenticates through the same generic embedded OAuth
+  // flow as any other remote gateway — no first-party Nous Portal session is
+  // involved. Reload after success so boot mints a fresh ticket against the
+  // new session.
   const signInRemote = async () => {
     if (!remoteReauth) {
       return
@@ -180,35 +183,9 @@ export function BootFailureOverlay() {
 
       await desktop?.oauthLogoutConnectionConfig?.(remoteReauth.url)
 
-      let result: { connected?: boolean } | undefined
-
-      if (connectionConfig?.mode === 'cloud' && desktop?.cloud) {
-        const status = await desktop.cloud.status()
-
-        if (!status.signedIn) {
-          const login = await desktop.cloud.login()
-
-          if (!login.signedIn) {
-            notify({
-              kind: 'warning',
-              title: t.boot.failure.signInIncompleteTitle,
-              message: t.boot.failure.signInIncompleteMessage
-            })
-
-            return
-          }
-        }
-
-        result = await desktop.cloud.agentSignIn(remoteReauth.url)
-      } else {
-        result = await desktop?.oauthLoginConnectionConfig(remoteReauth.url)
-      }
+      const result = await desktop?.oauthLoginConnectionConfig(remoteReauth.url)
 
       if (result?.connected) {
-        if (connectionConfig?.mode === 'cloud') {
-          await desktop?.resetBootstrap().catch(() => undefined)
-        }
-
         notify({ kind: 'success', title: t.boot.failure.signedInTitle, message: t.boot.failure.signedInMessage })
         window.location.reload()
 

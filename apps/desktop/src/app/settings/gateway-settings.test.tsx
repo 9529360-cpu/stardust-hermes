@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Collect the component graph before the behavioral test deadline starts.
@@ -32,7 +32,6 @@ const saveConnectionConfig = vi.fn()
 vi.mock('./managed-updates-section', () => ({ ManagedUpdatesSection: () => null }))
 
 const localConnection = {
-  cloudOrg: '',
   envOverride: false,
   mode: 'local',
   remoteAuthMode: 'token',
@@ -57,68 +56,28 @@ afterEach(() => {
 })
 
 describe('GatewaySettings', () => {
-  it('keeps saved Cloud instances usable without discovery and marks the live source, not the default', async () => {
+  // Stardust no longer ships a built-in "Hermes Cloud" (Nous Portal
+  // discovery/login) mode. A connection an older install saved under
+  // mode: 'cloud' is remote-shaped already (a gateway URL + OAuth), so
+  // Settings renders it as an ordinary Remote connection — no first-party
+  // Nous discovery/sign-in UI, and no `desktop.cloud` bridge call.
+  it('renders a saved Cloud connection as Remote, with no built-in Nous discovery UI', async () => {
     getConnectionConfig.mockResolvedValue({ ...localConnection, mode: 'cloud', remoteUrl: 'https://a.example' })
-    registry.value = {
-      connections: [
-        { id: 'saved-a', kind: 'cloud', label: 'Research', url: 'https://a.example', authMode: 'oauth' },
-        { id: 'saved-b', kind: 'cloud', label: 'Writing', url: 'https://b.example', authMode: 'oauth' }
-      ]
-    }
-    const agentSignIn = vi.fn()
-    const applyConnectionConfig = vi.fn()
-    Object.assign(window.hermesDesktop, {
-      applyConnectionConfig,
-      cloud: {
-        status: vi.fn().mockResolvedValue({ signedIn: false }),
-        agentSignIn
-      }
-    })
-    render(<GatewaySettings embedded />)
-    const research = await screen.findByText('Research')
-    const row = research.closest('[data-slot]') ?? research.parentElement!.parentElement!
-    fireEvent.click(within(row as HTMLElement).getByRole('button', { name: 'Use gateway' }))
-    await waitFor(() => expect(selectConnection).toHaveBeenCalledWith('saved-a'))
-    expect(screen.getByText('Active in this window')).toBeTruthy()
-    expect(agentSignIn).not.toHaveBeenCalled()
-    expect(applyConnectionConfig).not.toHaveBeenCalled()
     registry.value = null
+    render(<GatewaySettings embedded />)
+
+    const remoteCard = (await screen.findByText('Remote gateway')).closest('button')!
+
+    expect(remoteCard.className).toContain('border-primary')
+    expect(screen.queryByText('Hermes Cloud')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Connect', exact: true })).toBeNull()
+    expect((window.hermesDesktop as any).cloud).toBeUndefined()
   })
-  it('authenticates and saves only the chosen discovered instance with its friendly name', async () => {
-    registry.value = null
-    getConnectionConfig.mockResolvedValue({ ...localConnection, mode: 'cloud' })
-    const agentSignIn = vi.fn().mockResolvedValue({ connected: true })
-    const applyConnectionConfig = vi.fn().mockResolvedValue({ ...localConnection, mode: 'cloud' })
-    Object.assign(window.hermesDesktop, {
-      applyConnectionConfig,
-      cloud: {
-        status: vi.fn().mockResolvedValue({ signedIn: true }),
-        agentSignIn,
-        discover: vi.fn().mockResolvedValue({
-          agents: [
-            { id: 'new-a', name: 'Research Bot', dashboardUrl: 'https://new-a.example' },
-            { id: 'new-b', name: 'Writing Bot', dashboardUrl: 'https://new-b.example' }
-          ],
-          org: { id: 'org-a' }
-        })
-      }
-    })
+  it('does not offer a Cloud mode tile', async () => {
     render(<GatewaySettings embedded />)
-    const buttons = await screen.findAllByRole('button', { name: 'Connect', exact: true })
-    expect(agentSignIn).not.toHaveBeenCalled()
-    expect(applyConnectionConfig).not.toHaveBeenCalled()
-    fireEvent.click(buttons[0])
-    await waitFor(() =>
-      expect(applyConnectionConfig).toHaveBeenCalledWith({
-        mode: 'cloud',
-        remoteAuthMode: 'oauth',
-        remoteUrl: 'https://new-a.example',
-        cloudOrg: 'org-a',
-        cloudName: 'Research Bot'
-      })
-    )
-    expect(agentSignIn).toHaveBeenCalledExactlyOnceWith('https://new-a.example')
-    expect(applyConnectionConfig).toHaveBeenCalledTimes(1)
+    await screen.findByText('Local gateway')
+
+    expect(screen.queryByText('Hermes Cloud')).toBeNull()
   })
   it('loads the machine-level connection config (no profile scoping)', async () => {
     render(<GatewaySettings />)

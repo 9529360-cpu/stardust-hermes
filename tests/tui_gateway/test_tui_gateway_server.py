@@ -13769,6 +13769,50 @@ def test_run_prompt_submit_registers_turn_thread_for_interrupt(monkeypatch):
         server._sessions.pop("sid", None)
 
 
+def test_run_prompt_submit_starts_turn_thread_before_publishing_it(monkeypatch):
+    """``_run_thread`` must never be visible to a reader before the thread it names has
+    actually started.
+
+    ``Thread.is_alive()`` is False both before ``start()`` and after the thread has finished, so
+    a reader like ``compute_host._run_real_turn`` (or ``session.interrupt``) that observes a
+    not-yet-started thread via ``session["_run_thread"]`` cannot tell it apart from one that
+    already completed, and will wrongly treat the turn as done. Publishing the handle before
+    calling ``start()`` reproduced this as a real (if narrow) race; this test fails deterministically
+    if that ordering ever regresses, instead of relying on a timing window.
+    """
+    published_before_start = []
+
+    class _OrderCheckingThread:
+        def __init__(self, target=None, daemon=None):
+            self.target = target
+
+        def start(self):
+            published_before_start.append(session.get("_run_thread") is self)
+
+        def is_alive(self):
+            return True
+
+    agent = types.SimpleNamespace(
+        interrupt=lambda: None,
+        run_conversation=lambda *args, **kwargs: {},
+    )
+    session = _session(agent=agent, running=True)
+    server._sessions["sid"] = session
+
+    try:
+        monkeypatch.setattr(server.threading, "Thread", _OrderCheckingThread)
+        monkeypatch.setattr(server, "_emit", lambda *args, **kwargs: None)
+
+        server._run_prompt_submit("1", "sid", session, "hello")
+
+        assert published_before_start == [False], (
+            "session['_run_thread'] was set to the new thread before start() was called"
+        )
+        assert session.get("_run_thread") is not None
+    finally:
+        server._sessions.pop("sid", None)
+
+
 def test_hosted_interrupt_rejects_stale_execution_generation():
     """A stale hosted Stop must not interrupt a retried generation that reused the same task_id."""
     calls = {"interrupted": False}

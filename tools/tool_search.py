@@ -171,9 +171,29 @@ def classify_tools(tool_defs: List[Dict[str, Any]], defer_tools: Optional[frozen
     return visible, deferrable
 
 
-def _deferrable_in(tool_defs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Deferrable subset of pre-assembly ``tool_defs`` under the read-only user config."""
-    return classify_tools(tool_defs, load_config_readonly().effective_defer_tools)[1]
+def defer_tools_for_session_surface(
+    tool_defs: List[Dict[str, Any]], enabled_tools: Iterable[str]
+) -> frozenset[str]:
+    """Infer the session-frozen defer membership from its model-visible tool surface.
+
+    The bridge catalog may discover new MCP/plugin tools without changing prompt bytes, but a
+    built-in tool that was eager when the session was assembled must not move behind the bridge
+    merely because ``tools.tool_search.defer`` changed later. Conversely, a built-in omitted
+    from the model-visible surface remains deferred until the next session.
+    """
+    visible = frozenset(str(name) for name in enabled_tools if name)
+    return frozenset(
+        name for name in _tool_def_names(tool_defs)
+        if name and name not in BRIDGE_TOOL_NAMES and name not in visible
+    )
+
+
+def _deferrable_in(
+    tool_defs: List[Dict[str, Any]], defer_tools: Optional[frozenset] = None
+) -> List[Dict[str, Any]]:
+    """Deferrable subset of pre-assembly ``tool_defs`` under one policy snapshot."""
+    effective = load_config_readonly().effective_defer_tools if defer_tools is None else defer_tools
+    return classify_tools(tool_defs, effective)[1]
 
 
 def estimate_tokens_from_schemas(tool_defs: Iterable[Dict[str, Any]]) -> int:
@@ -447,7 +467,7 @@ def dispatch_tool_search(args: Dict[str, Any], *, current_tool_defs: List[Dict[s
     raw_limit = args.get("limit")
     limit = (config.search_default_limit if raw_limit is None
              else _clamped_int(raw_limit, config.search_default_limit, 1, config.max_search_limit))
-    catalog = build_catalog(_deferrable_in(current_tool_defs))
+    catalog = build_catalog(_deferrable_in(current_tool_defs, config.effective_defer_tools))
     remote_entries: List[List[CatalogEntry]] = [[] for _ in queries]
     if connections_in_scope(current_tool_defs):
         remote_entries = connector_entries_by_group(queries, connector_search=connector_search)
@@ -486,7 +506,7 @@ def dispatch_tool_describe(args: Dict[str, Any], *, current_tool_defs: List[Dict
         retry_hint="Retry with fewer names per call.")
     if err:
         return err
-    deferrable = _deferrable_in(current_tool_defs)
+    deferrable = _deferrable_in(current_tool_defs, config.effective_defer_tools)
     by_name = {name: _fn(td) for td, name in zip(deferrable, _tool_def_names(deferrable)) if name}
     remote_schemas = remote_schemas_for(names, current_tool_defs, connector_describe)
 
@@ -505,7 +525,7 @@ def dispatch_tool_describe(args: Dict[str, Any], *, current_tool_defs: List[Dict
         elif is_connector_name(name):
             not_found.append(name)
         elif _registry_entry(name) is not None and not is_deferrable_tool_name(
-            name, load_config_readonly().effective_defer_tools):
+            name, config.effective_defer_tools):
             # Registered but bridge/core/GUI-surface: a real name, wrong door.
             errors[name] = (
                 f"'{name}' is not a deferrable tool. If you see it in the tools list "
@@ -521,16 +541,20 @@ def dispatch_tool_describe(args: Dict[str, Any], *, current_tool_defs: List[Dict
     return json.dumps(result, ensure_ascii=False)
 
 
-def scoped_deferrable_names(tool_defs: List[Dict[str, Any]]) -> frozenset[str]:
+def scoped_deferrable_names(
+    tool_defs: List[Dict[str, Any]], defer_tools: Optional[frozenset] = None
+) -> frozenset[str]:
     """Deferrable names in the *pre-assembly* ``tool_defs`` of the session scope — the
     universe ``tool_call`` may reach. Gates bridge dispatch AND the executor unwrap so a
     restricted session cannot invoke an out-of-scope tool via the bridge."""
-    defer_tools = load_config_readonly().effective_defer_tools
+    effective = load_config_readonly().effective_defer_tools if defer_tools is None else defer_tools
     return frozenset(n for n in _tool_def_names(tool_defs)
-                     if n and is_deferrable_tool_name(n, defer_tools))
+                     if n and is_deferrable_tool_name(n, effective))
 
 
-def resolve_underlying_call(args: Dict[str, Any]) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
+def resolve_underlying_call(
+    args: Dict[str, Any], defer_tools: Optional[frozenset] = None
+) -> Tuple[Optional[str], Dict[str, Any], Optional[str]]:
     """Parse a ``tool_call`` invocation into (underlying_name, args, error_msg).
 
     Used by:
@@ -559,7 +583,8 @@ def resolve_underlying_call(args: Dict[str, Any]) -> Tuple[Optional[str], Dict[s
 
     name = entries[0]["name"]
     raw_args = entries[0]["arguments"]
-    if not is_deferrable_tool_name(name, load_config_readonly().effective_defer_tools):
+    effective = load_config_readonly().effective_defer_tools if defer_tools is None else defer_tools
+    if not is_deferrable_tool_name(name, effective):
         return None, {}, (
             f"'{name}' is not a deferrable tool. If it appears in the model-facing tools "
             "list already, call it directly instead of via tool_call."

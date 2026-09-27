@@ -6568,7 +6568,7 @@ def interactive_setup() -> None:
     for line in _SETUP_STEPS:
         print_info(line)
     print()
-    print_info("   Full guide: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/slack/")
+    print_info("   Full guide: https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/messaging/slack.md")
     print()
     # Write the manifest up-front for the "Create from manifest" flow.
     _write_slack_manifest_and_instruct()

@@ -34,6 +34,8 @@ def _git_responder(*, shallow: bool, count: str):
             return MagicMock(returncode=0, stdout=f"{SHA_A}\n", stderr="")
         if "rev-parse origin/main" in joined:
             return MagicMock(returncode=0, stdout=f"{SHA_B}\n", stderr="")
+        if "remote get-url origin" in joined:
+            return MagicMock(returncode=0, stdout="https://github.com/9529360-cpu/stardust-hermes.git\n", stderr="")
         return MagicMock(returncode=0, stdout="", stderr="")
 
     return fake_run
@@ -63,13 +65,18 @@ def _run_count_block(*, shallow: bool, raw_count: str, api_count):
                 == "true"
             )
             if commit_count > 0 and apply_is_shallow:
-                from hermes_cli.banner import _github_compare_behind
+                from hermes_cli.banner import _canonical_github_remote, _github_compare_behind
 
                 head_sha = sub.run(git_cmd + ["rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
                 target_sha = sub.run(
                     git_cmd + ["rev-parse", "origin/main"], capture_output=True, text=True
                 ).stdout.strip()
-                counted = _github_compare_behind(head_sha, target_sha)
+                origin_url = sub.run(
+                    git_cmd + ["remote", "get-url", "origin"], capture_output=True, text=True
+                ).stdout.strip()
+                canonical = _canonical_github_remote(origin_url)
+                repo_slug = canonical.removeprefix("github.com/") if canonical.startswith("github.com/") else None
+                counted = _github_compare_behind(head_sha, target_sha, repo_slug) if repo_slug else None
                 commit_count = counted if counted is not None else -1
     return commit_count
 

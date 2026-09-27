@@ -36,7 +36,7 @@ _IN_NIX_BUILD = os.environ.get("HERMES_NIX_BUILD") == "1"
 _BLOCK_MESSAGE = (
     "Building wheels or sdists for hermes-agent is not supported.\n"
     "Hermes is distributed via the shell installer, Docker image, or Nix.\n"
-    "See: https://hermes-agent.nousresearch.com/docs/getting-started/installation\n"
+    "See: https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/getting-started/installation.md\n"
     "\n"
     "If you are developing, use an editable install instead:\n"
     "  uv sync          # or: uv pip install -e .\n"
