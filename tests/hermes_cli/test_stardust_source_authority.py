@@ -409,6 +409,8 @@ def test_cli_docs_urls_point_to_stardust_repository() -> None:
         "hermes_cli/tools_config.py",
         "hermes_cli/update_cmd_maint.py",
         "hermes_cli/web_server_oauth.py",
+        "plugins/kanban/dashboard/dist/index.js",
+        "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
         "plugins/platforms/discord/adapter.py",
         "plugins/platforms/slack/adapter.py",
         "setup.py",
@@ -429,7 +431,12 @@ def test_cli_docs_urls_point_to_stardust_repository() -> None:
         "user-guide/features/fallback-providers.md": (
             "hermes_cli/fallback_cmd.py", "hermes_cli/subcommands/fallback.py",
         ),
-        "user-guide/features/kanban.md": ("hermes_cli/kanban_parser.py",),
+        "user-guide/features/kanban.md": (
+            "hermes_cli/kanban_parser.py",
+            "plugins/kanban/dashboard/dist/index.js",
+            "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
+        ),
+        "user-guide/features/kanban-tutorial.md": ("plugins/kanban/dashboard/dist/index.js",),
         "user-guide/features/tool-gateway.md": ("hermes_cli/portal_cli.py",),
         "user-guide/configuration.md": ("hermes_cli/setup.py",),
         "user-guide/messaging/webhooks.md": (
