@@ -29,12 +29,13 @@ no separate edit surface.
 
 ### 1b. Runtime code tied to the same identity
 
-- `apps/desktop/electron/main.ts:925` — `APP_NAME = process.env.HERMES_DESKTOP_APP_NAME || 'Hermes'`, then `app.setName(APP_NAME)` (`main.ts:1328`). This is the line that actually **determines the default Electron `userData` directory** for an unpackaged/dev build and any packaged build that doesn't get `productName` from electron-builder's own resolution — i.e. this default is load-bearing for where `connection.json`, `connections.json`, `active-profile.json`, `native-oauth-tokens.json`, and ~25 other state files (`main.ts:853-18322`) live on disk.
-- `main.ts:1338` — `app.setAppUserModelId('com.nousresearch.hermes')` (Windows), with an in-repo comment that it must stay in sync with `package.json`'s `appId` because electron-builder derives the Start Menu/notification AUMID from it.
-- `main.ts:17946-17948` — `HERMES_PROTOCOL = DEV_SERVER ? 'hermes-dev' : 'hermes'`, `DEEPLINK_SCHEMES = [HERMES_PROTOCOL]`. Consumed by `registerDeepLinkProtocol()` (`main.ts:18031-18048`, calls `app.setAsDefaultProtocolClient`), `handleDeepLink()` (`main.ts:17985`), and the `hermes:deep-link-ready` IPC round-trip (`main.ts:18018-18029`). Renderer-side consumers that hardcode the `hermes://` string or the protocol constant: `src/lib/hermes-open-target.ts`, `src/lib/mcp-deeplink.ts`, `src/lib/mcp-servers.ts`, `src/app/contrib/hooks/use-desktop-integrations.ts`, `src/app/contrib/mcp-install-deeplink-dialog.tsx`, `src/app/settings/vault-settings.tsx`, `src/store/native-notifications.ts`, `src/store/mcp-deeplink-install.ts`, plus the plugin SDK doc comment in `src/contrib/plugin.ts:49`.
-- `apps/desktop/electron/desktop-uninstall.ts` — uninstall-path detection pattern-matches the literal install-directory name `Hermes` (`/[\\/]Hermes$/i`, line 98) and the Linux unpacked binary name `hermes` (line 110). This is how Stardust's own uninstaller currently *finds itself* on disk; it is a second, independent place the name `Hermes` is load-bearing beyond electron-builder's own generated artifacts.
-- `hermes_cli/doctor_platform.py`, `hermes_cli/main_desktop.py`, `hermes_cli/update_cmd_maint.py` — all shell out to `tccutil reset ... com.nousresearch.hermes` for macOS permission resets (also documented for end users in `website/docs/user-guide/desktop.md:550,646,684`). `hermes_cli/main_desktop.py` also has a `--setup-tcc-identity` default self-signed code-signing identity literally named `"Hermes Local Signing"`.
-- `hermes_cli/managed_uv.py:38` — a **separate** identifier, `com.nousresearch.hermes.managed-python`, for a managed Python install. Distinct from the Electron bundle id; do not conflate the two if `appId` ever changes — this one has its own migration cost.
+- `apps/desktop/electron/main.ts` keeps `APP_NAME = process.env.HERMES_DESKTOP_APP_NAME || 'Hermes'`, then calls `app.setName(APP_NAME)`. That default is load-bearing because Electron derives the default `userData` location from the application name; desktop-local connection/config state lives under that directory.
+- The Windows AUMID is still set explicitly to `com.nousresearch.hermes` and must stay aligned with `apps/desktop/package.json` `build.appId` until a coordinated migration exists.
+- Deep links are still a compatibility surface. Packaged builds use `HERMES_PROTOCOL = 'hermes'`; dev builds use `hermes-dev`. `DEEPLINK_SCHEMES` accepts both `hermes-dev` and `hermes` in dev, and only `hermes` when packaged, while OS registration still registers the current primary `HERMES_PROTOCOL`. A future Stardust scheme therefore needs additive dual-registration and parsing, not a string replacement.
+- `apps/desktop/electron/desktop-uninstall.ts` still recognizes an install directory named `Hermes` and the inherited Linux binary naming. That detection must keep recognizing old installs for any future visible install-name migration.
+- `hermes_cli/doctor_platform.py`, `hermes_cli/main_desktop.py`, `hermes_cli/update_cmd_maint.py`, and the desktop user guide still use `com.nousresearch.hermes` for macOS TCC resets. They must move only with the real bundle id.
+- `hermes_cli/main_desktop.py` / `hermes_cli/subcommands/gui.py` still expose the self-signed identity name `Hermes Local Signing`; this is operational compatibility, not product copy to rename casually.
+- `hermes_cli/managed_uv.py` uses the separate identifier `com.nousresearch.hermes.managed-python` for managed Python. It is independent from the Electron bundle id and has its own migration cost.
 
 ### 1c. Update mechanism (not electron-builder autoUpdate)
 
@@ -75,14 +76,10 @@ Out of scope for this PR, flagged but *not* touched, because each is either
 load-bearing or part of a much larger surface than "one string":
 
 - `APP_NAME` default and the About panel's `applicationName`/`copyright`
-  (`main.ts:925, 1328, 1345-1348, 17595-17601`) — changing the default
+  (the `APP_NAME` default, `app.setName`, About-panel metadata, and dependent window state) — changing the default
   changes the userData directory (§1b) and the copyright line is a legal/
   attribution call, not a pure rename.
-- `'Sign in to Hermes Cloud'` / `'Renewing Hermes Cloud session…'`
-  (`main.ts:8506, 8611`) — these name the *feature* under active
-  reconsideration in issue #10 (built-in Nous account surface), not just
-  the product; renaming the string without deciding the feature's fate
-  would be premature.
+- The built-in Hermes Cloud / Nous Portal desktop mode was retired on current `main` (#147). Remaining `Hermes Cloud` / `Nous Portal` strings are either persisted-connection compatibility labels, provider-auth terminology, tests, or dormant localization copy. They are not install-identity fields and should be handled under the product-independence/provider-compatibility work, not by renaming OS identity strings in this migration.
 - `src/i18n/en.ts` (and the `zh`/`zh-hant`/`ru`/`ja` locale files) contain
   ~10 more "Hermes couldn't…" user-facing strings. This is a real, sizeable
   i18n copy pass across five locale files with its own review surface — it
@@ -131,8 +128,7 @@ app as different, or orphans data):**
 **Needs a compatibility shim regardless of which option is chosen:**
 
 - The `hermes://` protocol handler already has the right shape for this:
-  `DEEPLINK_SCHEMES` (`main.ts:17948`) is already an array, and dev builds
-  already register two schemes (`hermes-dev`, `hermes`) side by side. Adding
+  `DEEPLINK_SCHEMES` is already an array; dev builds accept both `hermes-dev` and `hermes` while registering `hermes-dev` as the primary OS handler. Adding
   a new primary scheme is additive to this exact mechanism — register
   `stardust` as primary going forward while keeping `hermes` (and
   `hermes-dev`) in `DEEPLINK_SCHEMES` so an old saved link, another
@@ -226,10 +222,7 @@ nothing in the current evidence requires it.
   *engineering* work (the array already exists) but must ship as one
   coordinated change across `main.ts`'s registration/parsing/reconstruction
   call sites (§1b) and the renderer consumers that hardcode the scheme
-  string, with the deep-link test suite (`hermes-open-target.test.ts`,
-  `use-desktop-integrations.test.tsx`, `native-notifications.test.ts`,
-  `windows-sandbox-fallback.test.ts`, `updater-process.test.ts`) updated to
-  assert both schemes resolve.
+  string, with renderer coverage in `src/lib/hermes-open-target.test.ts`, `src/app/contrib/hooks/use-desktop-integrations.test.tsx`, and `src/store/native-notifications.test.ts`, plus a main-process registration/delivery test that proves both schemes resolve.
 - `desktop-uninstall.ts`'s uninstall-summary regex would need a second
   pattern once/if any directory-name-facing string changes — currently
   nothing does, so no code change is needed yet, but this is the tripwire
