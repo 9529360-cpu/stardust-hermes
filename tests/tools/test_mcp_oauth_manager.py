@@ -7,8 +7,6 @@ cache. See `tools/mcp_oauth_manager.py` for design rationale.
 import json
 import os
 import time
-from unittest.mock import MagicMock
-
 import pytest
 
 
@@ -98,9 +96,9 @@ pytest.importorskip(
 
 
 def _set_interactive_stdin(monkeypatch, *, is_tty: bool = True) -> None:
-    mock_stdin = MagicMock()
-    mock_stdin.isatty.return_value = is_tty
-    monkeypatch.setattr("tools.mcp_oauth.sys.stdin", mock_stdin)
+    # Windows verifies a real console handle in addition to isatty(). Patch the
+    # production seam directly so this helper models interactivity portably.
+    monkeypatch.setattr("tools.mcp_oauth._stdin_is_console", lambda: is_tty)
 
 
 def test_hermes_provider_subclass_exists():
