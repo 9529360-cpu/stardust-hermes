@@ -1282,3 +1282,185 @@ def test_resume_refuses_secret_bearing_user_input_without_persisting_it(tmp_path
             event for event in kb.list_events(conn, task_id)
             if event.kind == "assistant_user_input"
         ]
+
+
+def test_inspect_returns_owned_authoritative_history_and_redacts_secrets(monkeypatch):
+    secret = "sk-" + ("a" * 48)
+    task = SimpleNamespace(
+        id="t_inspect",
+        assistant_owner_key="local",
+        title="Investigate task",
+        status="blocked",
+        assignee="default",
+        project_id="project-1",
+        workspace_kind="worktree",
+        workspace_path="/repo/.worktrees/t_inspect",
+        created_at=100,
+        started_at=110,
+        completed_at=None,
+        block_kind="needs_input",
+        result=f"partial {secret}",
+        last_failure_error=f"failed with {secret}",
+    )
+    events = [
+        SimpleNamespace(
+            id=1,
+            kind="blocked",
+            payload={"reason": f"Need user input {secret}"},
+            created_at=120,
+            run_id=7,
+        )
+    ]
+    runs = [
+        SimpleNamespace(
+            id=7,
+            profile="default",
+            step_key="step-1",
+            status="closed",
+            outcome="blocked",
+            started_at=111,
+            ended_at=120,
+            summary=f"Reached approval boundary {secret}",
+            error=None,
+            metadata={"token": secret, "attempt": 1},
+        )
+    ]
+    attachments = [
+        SimpleNamespace(
+            filename="report.txt",
+            stored_path="/tmp/report.txt",
+            content_type="text/plain",
+            size=42,
+            created_at=121,
+        )
+    ]
+
+    class FakeKb:
+        @staticmethod
+        def get_task(conn, task_id):
+            assert task_id == "t_inspect"
+            return task
+
+        @staticmethod
+        def list_events(conn, task_id):
+            return events
+
+        @staticmethod
+        def list_runs(conn, task_id):
+            return runs
+
+        @staticmethod
+        def list_attachments(conn, task_id):
+            return attachments
+
+    @contextmanager
+    def fake_board(board):
+        assert board == "default"
+        yield FakeKb, object()
+
+    monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["default"])
+    monkeypatch.setattr("tools.kanban_tools._board", fake_board)
+
+    result = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="inspect",
+            task_id="t_inspect",
+            owner_key="local",
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["task"]["status"] == "blocked"
+    assert result["task"]["block_kind"] == "needs_input"
+    assert result["task"]["needs_attention"] is True
+    assert result["events"][0]["kind"] == "blocked"
+    assert result["runs"][0]["outcome"] == "blocked"
+    assert result["attachments"][0]["filename"] == "report.txt"
+    assert result["comments_omitted"] is True
+    assert secret not in json.dumps(result)
+
+
+def test_inspect_fails_closed_when_any_board_is_unreadable(monkeypatch):
+    task = SimpleNamespace(id="t_inspect", assistant_owner_key="local")
+
+    class FakeKb:
+        @staticmethod
+        def get_task(conn, task_id):
+            return task
+
+    @contextmanager
+    def fake_board(board):
+        if board == "broken":
+            raise RuntimeError("unreadable")
+        yield FakeKb, object()
+
+    monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["default", "broken"])
+    monkeypatch.setattr("tools.kanban_tools._board", fake_board)
+
+    result = assistant_tasks.assistant_tasks_tool(
+        action="inspect",
+        task_id="t_inspect",
+        owner_key="local",
+    )
+
+    assert "cannot safely inspect while a board is unreadable" in result
+
+
+def test_inspect_does_not_cross_owner_boundary(monkeypatch):
+    task = SimpleNamespace(id="t_other", assistant_owner_key="someone-else")
+
+    class FakeKb:
+        @staticmethod
+        def get_task(conn, task_id):
+            return task
+
+    @contextmanager
+    def fake_board(_board):
+        yield FakeKb, object()
+
+    monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["default"])
+    monkeypatch.setattr("tools.kanban_tools._board", fake_board)
+
+    result = assistant_tasks.assistant_tasks_tool(
+        action="inspect",
+        task_id="t_other",
+        owner_key="local",
+    )
+
+    assert "task not found for the current owner" in result
+
+
+def test_inspect_reads_real_kanban_events_without_comment_bodies(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Durable inspection",
+            body="Inspect the authoritative task history.",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        kb.add_comment(conn, task_id, "worker", "private scratch note must stay out of inspect")
+        assert kb.block_task(conn, task_id, reason="Need an explicit user decision", kind="needs_input")
+
+    result = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="inspect",
+            task_id=task_id,
+            owner_key="local",
+        )
+    )
+
+    assert result["ok"] is True
+    assert result["task"]["status"] == "blocked"
+    assert result["task"]["block_kind"] == "needs_input"
+    assert any(event["kind"] == "blocked" for event in result["events"])
+    assert result["comments_omitted"] is True
+    assert "private scratch note" not in json.dumps(result)

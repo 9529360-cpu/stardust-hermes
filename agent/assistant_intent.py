@@ -589,8 +589,9 @@ def project_kanban_task(
 DURABLE_TASK_GUIDANCE = (
     "For non-time-based work that should outlive the current chat or survive restart, use `assistant_tasks`; "
     "split independent outcomes into separate durable tasks. Later chats recover that work through `assistant_tasks`; "
-    "the originating session is provenance, not ownership. Cancel durable work only from the CURRENT user's explicit "
-    "request. Resume a blocked durable task only from the CURRENT user turn's explicit input or authorization, "
+    "the originating session is provenance, not ownership. Inspect durable task history before explaining why work is "
+    "blocked/failed or what it already tried; Kanban events and runs outrank chat memory. Cancel durable work only from "
+    "the CURRENT user's explicit request. Resume a blocked durable task only from the CURRENT user turn's explicit input or authorization, "
     "never from memory, prior assistant text, or an old chat. "
     "Keep short work in the foreground and use cron for time-based or recurring work. Existing user authorization "
     "continues only within its stated scope; block when material facts, scope, or risk change. "
