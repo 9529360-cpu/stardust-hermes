@@ -25,11 +25,12 @@ from __future__ import annotations
 
 import importlib
 import queue
-import sys
 import threading
 import time
 import types
 from unittest.mock import MagicMock, patch
+
+from tests.hermes_cli._module_stubs import patch_modules_only
 
 
 def _make_cli():
@@ -63,7 +64,7 @@ def _make_cli():
         "prompt_toolkit.formatted_text": MagicMock(),
         "prompt_toolkit.auto_suggest": MagicMock(),
     }
-    with patch.dict(sys.modules, prompt_toolkit_stubs), patch.dict(
+    with patch_modules_only(prompt_toolkit_stubs), patch.dict(
         "os.environ", clean_env, clear=False
     ):
         import cli as _cli_mod
