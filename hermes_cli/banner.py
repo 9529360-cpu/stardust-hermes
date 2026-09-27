@@ -138,14 +138,16 @@ def get_available_skills() -> Dict[str, List[str]]:
 # so a flaky line can't turn every startup into a request (nor stay wrong for a day).
 _UPDATE_CHECK_CACHE_SECONDS = 24 * 3600
 _UPDATE_CHECK_FAILURE_CACHE_SECONDS = 3600
-# Upstream tip seen by the most recent check; recorded in the cache file for the changelog.
+# Target tip seen by the most recent check, and which GitHub repo it came from; both recorded in
+# the cache file for the changelog (the compare API is repo-scoped — see ``_github_compare``).
 _last_target_rev: Optional[str] = None
+_last_repo_slug: Optional[str] = None
 
 # Returned when an update is known to exist but commits can't be counted (e.g. nix builds).
 UPDATE_AVAILABLE_NO_COUNT = -1
 
-_UPSTREAM_REPO_URL = "https://github.com/NousResearch/hermes-agent.git"
-_OFFICIAL_REPO_CANONICAL = "github.com/nousresearch/hermes-agent"
+_OFFICIAL_REPO_URL = "https://github.com/9529360-cpu/stardust-hermes.git"
+_OFFICIAL_REPO_CANONICAL = "github.com/9529360-cpu/stardust-hermes"
 
 
 def _canonical_github_remote(url: str | None) -> str:
@@ -224,19 +226,21 @@ def _is_full_sha(value: Optional[str]) -> bool:
 _compare_payload_cache: Dict[tuple, dict] = {}
 
 
-def _github_compare(current_rev: str, target_rev: str) -> Optional[dict]:
-    """Compare payload for ``current...target`` from the GitHub API; memoized per process.
+def _github_compare(current_rev: str, target_rev: str, repo_slug: str) -> Optional[dict]:
+    """Compare payload for ``current...target`` from the GitHub API for ``repo_slug``; memoized per process.
 
     Shallow installer clones and API-only probes know the two tip SHAs but have no local history
     to run ``rev-list --count`` or ``git log`` across; the payload carries both the count
-    (``ahead_by``) and the commit list the dashboard/desktop render as "what's changed".
+    (``ahead_by``) and the commit list the dashboard/desktop render as "what's changed". The
+    compare endpoint is repo-scoped: passing the wrong ``repo_slug`` 404s on any tip that only
+    exists in the checkout's real repo, so callers must pass the SAME slug the tips came from.
     """
-    if not (_is_full_sha(current_rev) and _is_full_sha(target_rev)):
+    if not repo_slug or not (_is_full_sha(current_rev) and _is_full_sha(target_rev)):
         return None
-    key = (current_rev, target_rev)
+    key = (repo_slug, current_rev, target_rev)
     if key in _compare_payload_cache:
         return _compare_payload_cache[key]
-    url = f"https://api.github.com/repos/nousresearch/hermes-agent/compare/{current_rev}...{target_rev}"
+    url = f"https://api.github.com/repos/{repo_slug}/compare/{current_rev}...{target_rev}"
 
     def _fetch():
         import urllib.request
@@ -252,9 +256,9 @@ def _github_compare(current_rev: str, target_rev: str) -> Optional[dict]:
     return payload
 
 
-def _github_compare_behind(current_rev: str, target_rev: str) -> Optional[int]:
+def _github_compare_behind(current_rev: str, target_rev: str, repo_slug: str) -> Optional[int]:
     """Exact behind-count via the GitHub compare API for uncountable graphs."""
-    payload = _github_compare(current_rev, target_rev)
+    payload = _github_compare(current_rev, target_rev, repo_slug)
     ahead = payload.get("ahead_by") if payload else None
     return ahead if isinstance(ahead, int) and not isinstance(ahead, bool) and ahead >= 0 else None
 
@@ -262,14 +266,14 @@ def _github_compare_behind(current_rev: str, target_rev: str) -> Optional[int]:
 def upstream_commits_behind(n: int = 20) -> List[Dict[str, Any]]:
     """Commits between the last checked HEAD and upstream tip, newest first; [] when unknown.
 
-    Reads the tips recorded by ``check_for_updates`` so it costs no extra request when the
-    compare payload is already memoized for this process.
+    Reads the tips (and the repo they belong to) recorded by ``check_for_updates`` so it costs no
+    extra request when the compare payload is already memoized for this process.
     """
     cached = _read_json(get_hermes_home() / ".update_check") or {}
-    head_rev, target_rev = cached.get("head"), cached.get("target")
-    if not head_rev or not target_rev or head_rev == target_rev:
+    head_rev, target_rev, repo_slug = cached.get("head"), cached.get("target"), cached.get("repo")
+    if not head_rev or not target_rev or not repo_slug or head_rev == target_rev:
         return []
-    payload = _github_compare(head_rev, target_rev)
+    payload = _github_compare(head_rev, target_rev, repo_slug)
     rows: List[Dict[str, Any]] = []
     for entry in (payload or {}).get("commits", []) if isinstance(payload, dict) else []:
         commit = entry.get("commit") or {}
@@ -289,20 +293,22 @@ def upstream_commits_behind(n: int = 20) -> List[Dict[str, Any]]:
     return rows[:n]
 
 
-def _tips_behind(head_rev: Optional[str], target_rev: Optional[str], repo_dir: Optional[Path] = None) -> Optional[int]:
+def _tips_behind(head_rev: Optional[str], target_rev: Optional[str], repo_dir: Optional[Path] = None,
+                  *, repo_slug: Optional[str] = None) -> Optional[int]:
     """Behind-count from two tip SHAs: None if either is unknown, 0 when equal, else count/sentinel.
 
     With ``repo_dir``, a target that is already an ancestor of HEAD (local-ahead checkout) is 0 too.
     ``ahead_by == 0`` with differing tips means the remote tip is reachable from our HEAD — NOT
     behind. A local-only HEAD 404s on the API, which degrades to ``UPDATE_AVAILABLE_NO_COUNT`` —
-    never a fabricated 1.
+    never a fabricated 1. ``repo_slug`` is the GitHub ``owner/repo`` the two tips actually came
+    from; without it (a non-GitHub origin) the exact count can't be recovered, same as a 404.
     """
     if not head_rev or not target_rev:
         return None
     if head_rev == target_rev or (repo_dir is not None and _git_ok(
             ["merge-base", "--is-ancestor", target_rev, "HEAD"], cwd=repo_dir)):
         return 0
-    counted = _github_compare_behind(head_rev, target_rev)
+    counted = _github_compare_behind(head_rev, target_rev, repo_slug) if repo_slug else None
     return counted if counted is not None else UPDATE_AVAILABLE_NO_COUNT
 
 
@@ -322,22 +328,23 @@ def _github_branch_tip(repo_slug: str, branch: str) -> Optional[str]:
     return sha if _is_full_sha(sha) else None
 
 
-def _upstream_main_sha() -> Optional[str]:
-    """Tip SHA of upstream main; API first, HTTPS ``ls-remote`` (no auth, no prompts) as fallback."""
+def _official_main_sha() -> Optional[str]:
+    """Tip SHA of the canonical Stardust repo's main; API first, HTTPS ``ls-remote`` (no auth, no prompts) as fallback."""
     sha = _github_branch_tip(_OFFICIAL_REPO_CANONICAL.removeprefix("github.com/"), "main")
     if sha:
         return sha
-    result = _git_run(["ls-remote", _UPSTREAM_REPO_URL, "refs/heads/main"], timeout=10, network=True)
+    result = _git_run(["ls-remote", _OFFICIAL_REPO_URL, "refs/heads/main"], timeout=10, network=True)
     if result is None or result.returncode != 0 or not result.stdout:
         return None
     return result.stdout.split()[0] or None
 
 
 def _check_via_rev(local_rev: str) -> Optional[int]:
-    """Compare an embedded git revision to upstream main via the API (see ``_tips_behind``)."""
-    global _last_target_rev
-    _last_target_rev = _upstream_main_sha()
-    return _tips_behind(local_rev, _last_target_rev)
+    """Compare an embedded git revision to the canonical Stardust main via the API (see ``_tips_behind``)."""
+    global _last_target_rev, _last_repo_slug
+    _last_target_rev = _official_main_sha()
+    _last_repo_slug = _OFFICIAL_REPO_CANONICAL.removeprefix("github.com/")
+    return _tips_behind(local_rev, _last_target_rev, repo_slug=_last_repo_slug)
 
 
 def _check_via_local_git(repo_dir: Path) -> Optional[int]:
@@ -356,18 +363,21 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     if not head_rev:
         return None
     canonical = _canonical_github_remote(origin_url)
-    if canonical.startswith("github.com/"):
-        target_rev = _github_branch_tip(canonical.removeprefix("github.com/"), "main")
+    repo_slug = canonical.removeprefix("github.com/") if canonical.startswith("github.com/") else None
+    if repo_slug:
+        target_rev = _github_branch_tip(repo_slug, "main")
     else:
         # Non-GitHub origin: one ls-remote for the tip (ref advertisement only, no pack transfer).
+        # No GitHub repo slug either, so the exact-count compare API below is skipped for it too.
         result = _git_run(["ls-remote", "origin", "refs/heads/main"], cwd=repo_dir, timeout=10, network=True)
         target_rev = result.stdout.split()[0] if result is not None and result.returncode == 0 and result.stdout else None
-    global _last_target_rev
+    global _last_target_rev, _last_repo_slug
     _last_target_rev = target_rev
+    _last_repo_slug = repo_slug
     # Tip SHAs alone can't distinguish "behind" from a local commit AHEAD of origin/main, and
     # misreporting an ahead checkout nudges the user into `hermes update`, which can wipe carried
     # work — hence the ancestor check inside _tips_behind, against the FRESH upstream SHA.
-    return _tips_behind(head_rev, target_rev, repo_dir)
+    return _tips_behind(head_rev, target_rev, repo_dir, repo_slug=repo_slug)
 
 
 def _read_json(path: Path) -> Optional[dict]:
@@ -419,7 +429,7 @@ def check_for_updates(*, passive: bool = False) -> Optional[int]:
         behind = _check_via_local_git(repo_dir) if repo_dir is not None else None
     _quiet(lambda: cache_file.write_text(
         json.dumps({"ts": now, "behind": behind, "rev": embedded_rev, "ver": VERSION,
-                    "head": head_rev or embedded_rev, "target": _last_target_rev}),
+                    "head": head_rev or embedded_rev, "target": _last_target_rev, "repo": _last_repo_slug}),
         encoding="utf-8"))
     return behind
 
@@ -468,13 +478,13 @@ def _compute_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]
     return {"upstream": upstream, "local": local, "ahead": max(ahead, 0)}
 
 
-_RELEASE_URL_BASE = "https://github.com/NousResearch/hermes-agent/releases/tag"
+_RELEASE_URL_BASE = "https://github.com/9529360-cpu/stardust-hermes/releases/tag"
 
 
 def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
     """Return ``(tag, release_url)`` for the latest local git tag, or None (a miss is cached too).
 
-    Release URL always points at the canonical NousResearch/hermes-agent repo (forks get no link).
+    Release URL always points at the canonical Stardust repo (forks get no link).
     """
     def _compute():
         rd = repo_dir or _resolve_repo_dir()

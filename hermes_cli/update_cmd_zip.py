@@ -23,6 +23,18 @@ _ZIP_STAGING_ARTIFACT_SUFFIXES = ".hermes-update-staging", ".hermes-update-old"
 # Single source of truth for entries the ZIP swap preserves — used by the dirty-tree filter and the swap loop.
 _ZIP_PRESERVED_TOP_LEVEL = {"venv", "node_modules", ".git", ".env"}
 
+
+def _zip_archive_url(branch: str) -> str:
+    """Archive-download URL for the ZIP-fallback update.
+
+    Resolves through the same repo authority as the git update path (``update_cmd_git.OFFICIAL_REPO_URL``)
+    rather than a separately hardcoded literal, so this fallback can never drift onto a different
+    repository than ``hermes update``'s primary git path.
+    """
+    from hermes_cli.update_cmd_git import OFFICIAL_REPO_URL
+    return f"{OFFICIAL_REPO_URL.removesuffix('.git')}/archive/refs/heads/{branch}.zip"
+
+
 _STASH_HINT = "  Stash or commit your changes, then rerun `hermes update`."
 
 
@@ -310,7 +322,8 @@ def _download_and_swap_zip(branch: str, zip_url: str) -> None:
         print(f"✗ ZIP update failed: {e}")
         # Two-phase replace commits all or rolls all back, so no mixed tree here — don't push a needless reinstall.
         print("  Your existing install was left in place.")
-        print("  Re-run `hermes update` to retry; if the agent won't start, reinstall from https://hermes-agent.nousresearch.com")
+        print("  Re-run `hermes update` to retry; if the agent won't start, reinstall with:")
+        print("  iex (irm https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.ps1)")
         _m().sys.exit(1)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -379,7 +392,7 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False) -> boo
         )
         _m().sys.exit(1)
     _abort_zip_update_if_dirty_tree()
-    _download_and_swap_zip(branch, f"https://github.com/NousResearch/hermes-agent/archive/refs/heads/{branch}.zip")
+    _download_and_swap_zip(branch, _zip_archive_url(branch))
     _sweep_bytecode_after_update(branch)
     # Self-lock deferral: the code swap is committed; defer only the dependency sync when this process
     # holds a native extension the sync must rewrite.

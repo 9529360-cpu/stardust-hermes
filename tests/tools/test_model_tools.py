@@ -552,6 +552,45 @@ class TestBridgeDispatch:
             result = json.loads(handle_function_call("tool_call", {}))
         assert "requires 'calls'" in result["error"]
 
+    def test_bridge_rejects_call_when_not_published_to_session(self):
+        with patch("model_tools.get_tool_definitions", return_value=[]):
+            result = json.loads(handle_function_call(
+                "tool_search",
+                {"queries": ["files"]},
+                enabled_tools=["read_file"],
+            ))
+        assert "not available in this session" in result["error"]
+
+    def test_tool_call_keeps_session_surface_when_live_defer_config_changes(self):
+        import tools.tool_search as ts
+
+        # Live config now says todo_list should be deferred, but this session was
+        # assembled with todo_list eager. The existing model-visible surface wins.
+        policy = ts.ToolSearchConfig.from_raw({"defer": ["todo_list"]})
+        todo_def = {
+            "type": "function",
+            "function": {
+                "name": "todo_list",
+                "description": "todo",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        }
+        enabled = ["tool_search", "tool_describe", "tool_call", "todo_list"]
+        with patch("model_tools.get_tool_definitions", return_value=[todo_def]), \
+             patch.object(ts, "load_config_readonly", return_value=policy) as load_policy, \
+             patch.object(ts, "resolve_underlying_call", return_value=("todo_list", {}, None)) as resolve, \
+             patch.object(ts, "scoped_deferrable_names", return_value=frozenset()) as scoped:
+            result = json.loads(handle_function_call(
+                "tool_call",
+                {"calls": [{"name": "todo_list", "arguments": {}}]},
+                enabled_tools=enabled,
+            ))
+
+        assert "not available in this session" in result["error"]
+        assert load_policy.call_count == 1
+        assert resolve.call_args.args[1] == frozenset()
+        assert scoped.call_args.args[1] == frozenset()
+
     def test_tool_call_rejects_out_of_scope_and_unwraps_in_scope(self):
         import tools.tool_search as ts
         with patch("model_tools.get_tool_definitions", return_value=[]), \

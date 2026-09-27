@@ -23,6 +23,7 @@ import hermes_cli.banner as banner
 
 SHA_A = "a" * 40
 SHA_B = "b" * 40
+REPO_SLUG = "9529360-cpu/stardust-hermes"
 
 
 def _compare_payload(ahead):
@@ -65,25 +66,25 @@ def _fresh_compare_cache():
 
 def test_compare_behind_returns_ahead_by():
     with _patch_urlopen({"ahead_by": 61, "status": "ahead"}):
-        assert banner._github_compare_behind(SHA_A, SHA_B) == 61
+        assert banner._github_compare_behind(SHA_A, SHA_B, REPO_SLUG) == 61
 
 
 def test_compare_behind_zero_means_local_ahead():
     with _patch_urlopen({"ahead_by": 0, "status": "behind"}):
-        assert banner._github_compare_behind(SHA_A, SHA_B) == 0
+        assert banner._github_compare_behind(SHA_A, SHA_B, REPO_SLUG) == 0
 
 
 def test_compare_behind_rejects_short_shas_without_network():
     with patch("urllib.request.urlopen") as mock_open:
-        assert banner._github_compare_behind("abc123", SHA_B) is None
-        assert banner._github_compare_behind(SHA_A, "") is None
-        assert banner._github_compare_behind(None, SHA_B) is None
+        assert banner._github_compare_behind("abc123", SHA_B, REPO_SLUG) is None
+        assert banner._github_compare_behind(SHA_A, "", REPO_SLUG) is None
+        assert banner._github_compare_behind(None, SHA_B, REPO_SLUG) is None
     mock_open.assert_not_called()
 
 
 def test_compare_behind_network_failure_returns_none():
     with patch("urllib.request.urlopen", side_effect=OSError("offline")):
-        assert banner._github_compare_behind(SHA_A, SHA_B) is None
+        assert banner._github_compare_behind(SHA_A, SHA_B, REPO_SLUG) is None
 
 
 @pytest.mark.parametrize(
@@ -98,7 +99,7 @@ def test_compare_behind_network_failure_returns_none():
 )
 def test_compare_behind_rejects_malformed_payloads(payload):
     with _patch_urlopen(payload):
-        assert banner._github_compare_behind(SHA_A, SHA_B) is None
+        assert banner._github_compare_behind(SHA_A, SHA_B, REPO_SLUG) is None
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +114,7 @@ def _upstream_tip(sha):
 def test_check_via_rev_recovers_exact_count():
     with _upstream_tip(SHA_B), patch.object(banner, "_github_compare_behind", return_value=61) as compare:
         assert banner._check_via_rev(SHA_A) == 61
-    compare.assert_called_once_with(SHA_A, SHA_B)
+    compare.assert_called_once_with(SHA_A, SHA_B, REPO_SLUG)
 
 
 def test_check_via_rev_falls_back_to_sentinel_offline():
@@ -142,7 +143,7 @@ def test_check_via_rev_local_ahead_reports_up_to_date():
 def _local_git(head_sha):
     def fake_run(cmd, **kwargs):
         if cmd[:4] == ["git", "remote", "get-url", "origin"]:
-            return MagicMock(returncode=0, stdout="https://github.com/NousResearch/hermes-agent.git\n")
+            return MagicMock(returncode=0, stdout="https://github.com/9529360-cpu/stardust-hermes.git\n")
         if cmd[:3] == ["git", "rev-parse", "HEAD"]:
             return MagicMock(returncode=0, stdout=f"{head_sha}\n")
         if cmd[:3] == ["git", "merge-base", "--is-ancestor"]:
