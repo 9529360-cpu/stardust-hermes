@@ -1,8 +1,51 @@
 import json
+from pathlib import Path
+import subprocess
+import sys
 import time
 
 from agent.error_classifier import FailoverReason
 from agent import route_health
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _spawn_route_health_child(expression: str) -> subprocess.Popen:
+    code = (
+        "import json, sys\n"
+        "from agent import route_health\n"
+        "from agent.error_classifier import FailoverReason\n"
+        "print('ready', flush=True)\n"
+        "sys.stdin.readline()\n"
+        f"print(json.dumps({expression}), flush=True)\n"
+    )
+    return subprocess.Popen(
+        [sys.executable, "-c", code],
+        cwd=_REPO_ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
+def _start_blocked_children(children: list[subprocess.Popen]) -> None:
+    for proc in children:
+        assert proc.stdout is not None
+        assert proc.stdout.readline().strip() == "ready"
+    for proc in children:
+        assert proc.stdin is not None
+        proc.stdin.write("\n")
+        proc.stdin.flush()
+
+
+def _child_result(proc: subprocess.Popen):
+    stdout, stderr = proc.communicate(timeout=10)
+    assert proc.returncode == 0, stderr
+    lines = [line for line in stdout.splitlines() if line.strip()]
+    assert lines, stderr
+    return json.loads(lines[-1])
 
 
 def _home(monkeypatch, tmp_path):
@@ -58,6 +101,67 @@ def test_expired_open_route_allows_one_half_open_probe(monkeypatch, tmp_path):
     assert allowed is False
     assert retry_after > 0
     assert status == "half_open_busy"
+
+
+def test_cross_process_half_open_probe_has_one_lease(monkeypatch, tmp_path):
+    _home(monkeypatch, tmp_path)
+    route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+    state = route_health.snapshot()
+    row = next(iter(state["routes"].values()))
+    row["cooldown_until"] = time.time() - 1
+    route_health._write_state(state)
+
+    children = [
+        _spawn_route_health_child(
+            "route_health.allow_route('p', 'm', 'https://x.test')"
+        )
+        for _ in range(2)
+    ]
+    try:
+        with route_health._state_file_lock(timeout=1.0):
+            _start_blocked_children(children)
+            # Let both children reach allow_route while this process owns the
+            # cross-process lock. Neither may read/claim the lease yet.
+            time.sleep(0.15)
+            assert all(proc.poll() is None for proc in children)
+        results = [_child_result(proc) for proc in children]
+    finally:
+        for proc in children:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+    assert sorted(result[2] for result in results) == [
+        "half_open_busy",
+        "half_open_probe",
+    ]
+
+
+def test_cross_process_failure_counts_do_not_overwrite(monkeypatch, tmp_path):
+    _home(monkeypatch, tmp_path)
+    children = [
+        _spawn_route_health_child(
+            "route_health.record_failure("
+            "'p', 'm', 'https://x.test', "
+            "FailoverReason.timeout)"
+        )
+        for _ in range(2)
+    ]
+    try:
+        with route_health._state_file_lock(timeout=1.0):
+            _start_blocked_children(children)
+            time.sleep(0.15)
+            assert all(proc.poll() is None for proc in children)
+        results = [_child_result(proc) for proc in children]
+    finally:
+        for proc in children:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait(timeout=5)
+
+    assert sorted(results) == [30, 60]
+    row = next(iter(route_health.snapshot()["routes"].values()))
+    assert row["consecutive_failures"] == 2
 
 
 def test_success_closes_circuit(monkeypatch, tmp_path):

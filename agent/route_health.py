@@ -8,8 +8,10 @@ unwritable health file can never make the agent unavailable.
 from __future__ import annotations
 
 import contextlib
+import errno
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -25,7 +27,14 @@ logger = logging.getLogger(__name__)
 _STATE_VERSION = 1
 _DEFAULT_PROBE_LEASE_S = 45
 _MAX_COOLDOWN_S = 24 * 60 * 60
+_FILE_LOCK_TIMEOUT_S = 2.0
 _LOCK = threading.RLock()
+_LOCK_CONTENTION_ERRNOS = frozenset({
+    errno.EWOULDBLOCK,
+    errno.EAGAIN,
+    errno.EACCES,
+    errno.EDEADLK,
+})
 
 _BASE_COOLDOWNS = {
     FailoverReason.auth: 60 * 60,
@@ -58,6 +67,74 @@ def enabled() -> bool:
 def state_path() -> Path:
     configured = str(_config().get("health_file") or "").strip()
     return Path(configured).expanduser() if configured else get_hermes_home() / "route-health.json"
+
+
+def _state_lock_path() -> Path:
+    path = state_path()
+    return path.with_name(f"{path.name}.lock")
+
+
+def _is_lock_contention(exc: OSError) -> bool:
+    return exc.errno in _LOCK_CONTENTION_ERRNOS
+
+
+@contextlib.contextmanager
+def _state_file_lock(*, timeout: float = _FILE_LOCK_TIMEOUT_S):
+    """Serialize route-health read/modify/write transactions across processes.
+
+    The lock lives beside the JSON rather than on the JSON itself because atomic_json_write()
+    replaces that file. Advisory-lock failures are surfaced to callers, which deliberately fail
+    open because route health is availability guidance rather than authoritative user data.
+    """
+    path = _state_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + max(0.0, float(timeout))
+    fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+    windows = os.name == "nt"
+    acquired = False
+    try:
+        if windows:
+            import msvcrt
+
+            if os.fstat(fd).st_size == 0:
+                os.write(fd, b"\0")
+                os.fsync(fd)
+            while True:
+                try:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                    acquired = True
+                    break
+                except OSError as exc:
+                    if not _is_lock_contention(exc):
+                        raise
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("timed out waiting for route-health file lock")
+                    time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
+        else:
+            import fcntl
+
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                    break
+                except OSError as exc:
+                    if not _is_lock_contention(exc):
+                        raise
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("timed out waiting for route-health file lock")
+                    time.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
+        yield
+    finally:
+        if acquired:
+            with contextlib.suppress(OSError):
+                if windows:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                    msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def route_identity(provider: str, model: str, base_url: str = "") -> tuple[str, dict[str, str]]:
@@ -130,28 +207,33 @@ def record_failure(provider: str, model: str, base_url: str = "", reason: Failov
     now = time.time()
     key, identity = route_identity(provider, model, base_url)
     with _LOCK:
-        state = _read_state()
-        previous = state["routes"].get(key) or {}
-        failures = max(0, int(previous.get("consecutive_failures") or 0)) + 1
-        base = _base_cooldown(reason)
-        if base is None:
-            return 0
-        cooldown = min(base * (2 ** min(failures - 1, 8)), _MAX_COOLDOWN_S) if base else 0
-        state["routes"][key] = {
-            **identity,
-            "status": "open" if cooldown else "healthy",
-            "reason": _reason_value(reason),
-            "consecutive_failures": failures,
-            "cooldown_until": now + cooldown,
-            "probe_until": 0,
-            "last_failure_at": now,
-            "last_success_at": previous.get("last_success_at"),
-        }
         try:
-            _write_state(state)
-        except Exception as exc:
-            logger.warning("Could not persist route failure health: %s", exc)
-    return cooldown
+            with _state_file_lock():
+                state = _read_state()
+                previous = state["routes"].get(key) or {}
+                failures = max(0, int(previous.get("consecutive_failures") or 0)) + 1
+                base = _base_cooldown(reason)
+                if base is None:
+                    return 0
+                cooldown = min(base * (2 ** min(failures - 1, 8)), _MAX_COOLDOWN_S) if base else 0
+                state["routes"][key] = {
+                    **identity,
+                    "status": "open" if cooldown else "healthy",
+                    "reason": _reason_value(reason),
+                    "consecutive_failures": failures,
+                    "cooldown_until": now + cooldown,
+                    "probe_until": 0,
+                    "last_failure_at": now,
+                    "last_success_at": previous.get("last_success_at"),
+                }
+                try:
+                    _write_state(state)
+                except Exception as exc:
+                    logger.warning("Could not persist route failure health: %s", exc)
+                return cooldown
+        except (OSError, TimeoutError) as exc:
+            logger.warning("Could not lock route failure health; failing open: %s", exc)
+            return 0
 
 
 def allow_route(provider: str, model: str, base_url: str = "", *, claim_probe: bool = True) -> tuple[bool, int, str]:
@@ -166,25 +248,32 @@ def allow_route(provider: str, model: str, base_url: str = "", *, claim_probe: b
     now = time.time()
     key, identity = route_identity(provider, model, base_url)
     with _LOCK:
-        state = _read_state()
-        row = state["routes"].get(key)
-        if not isinstance(row, dict):
-            return True, 0, "healthy"
-        cooldown_until = float(row.get("cooldown_until") or 0)
-        if cooldown_until > now:
-            return False, max(1, int(cooldown_until - now + 0.999)), "open"
-        probe_until = float(row.get("probe_until") or 0)
-        if probe_until > now:
-            return False, max(1, int(probe_until - now + 0.999)), "half_open_busy"
-        if not claim_probe or row.get("status") == "healthy":
-            return True, 0, "healthy"
-        lease = max(5, int(_config().get("probe_lease_seconds") or _DEFAULT_PROBE_LEASE_S))
-        state["routes"][key] = {**row, **identity, "status": "half_open", "probe_until": now + lease}
         try:
-            _write_state(state)
-        except Exception as exc:
-            logger.warning("Could not claim route health probe; failing open: %s", exc)
-        return True, 0, "half_open_probe"
+            with _state_file_lock():
+                state = _read_state()
+                row = state["routes"].get(key)
+                if not isinstance(row, dict):
+                    return True, 0, "healthy"
+                cooldown_until = float(row.get("cooldown_until") or 0)
+                if cooldown_until > now:
+                    return False, max(1, int(cooldown_until - now + 0.999)), "open"
+                probe_until = float(row.get("probe_until") or 0)
+                if probe_until > now:
+                    return False, max(1, int(probe_until - now + 0.999)), "half_open_busy"
+                if not claim_probe or row.get("status") == "healthy":
+                    return True, 0, "healthy"
+                lease = max(5, int(_config().get("probe_lease_seconds") or _DEFAULT_PROBE_LEASE_S))
+                state["routes"][key] = {
+                    **row, **identity, "status": "half_open", "probe_until": now + lease,
+                }
+                try:
+                    _write_state(state)
+                except Exception as exc:
+                    logger.warning("Could not claim route health probe; failing open: %s", exc)
+                return True, 0, "half_open_probe"
+        except (OSError, TimeoutError) as exc:
+            logger.warning("Could not lock route health probe state; failing open: %s", exc)
+            return True, 0, "healthy"
 
 
 def record_success(provider: str, model: str, base_url: str = "") -> None:
@@ -194,22 +283,26 @@ def record_success(provider: str, model: str, base_url: str = "") -> None:
     now = time.time()
     key, identity = route_identity(provider, model, base_url)
     with _LOCK:
-        state = _read_state()
-        previous = state["routes"].get(key) or {}
-        state["routes"][key] = {
-            **identity,
-            "status": "healthy",
-            "reason": None,
-            "consecutive_failures": 0,
-            "cooldown_until": 0,
-            "probe_until": 0,
-            "last_failure_at": previous.get("last_failure_at"),
-            "last_success_at": now,
-        }
         try:
-            _write_state(state)
-        except Exception as exc:
-            logger.warning("Could not persist route recovery health: %s", exc)
+            with _state_file_lock():
+                state = _read_state()
+                previous = state["routes"].get(key) or {}
+                state["routes"][key] = {
+                    **identity,
+                    "status": "healthy",
+                    "reason": None,
+                    "consecutive_failures": 0,
+                    "cooldown_until": 0,
+                    "probe_until": 0,
+                    "last_failure_at": previous.get("last_failure_at"),
+                    "last_success_at": now,
+                }
+                try:
+                    _write_state(state)
+                except Exception as exc:
+                    logger.warning("Could not persist route recovery health: %s", exc)
+        except (OSError, TimeoutError) as exc:
+            logger.warning("Could not lock route recovery health; failing open: %s", exc)
 
 
 def record_agent_success(agent) -> None:
@@ -246,6 +339,9 @@ def snapshot() -> dict[str, Any]:
 
 
 def reset_for_tests() -> None:
-    """Remove the active profile's health state; test-only convenience."""
-    with _LOCK, contextlib.suppress(FileNotFoundError):
-        state_path().unlink()
+    """Remove the active profile's health state and lock file; test-only convenience."""
+    with _LOCK:
+        with contextlib.suppress(FileNotFoundError):
+            state_path().unlink()
+        with contextlib.suppress(FileNotFoundError, PermissionError):
+            _state_lock_path().unlink()

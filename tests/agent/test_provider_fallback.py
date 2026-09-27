@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agent import chat_completion_helpers
+from agent import chat_completion_helpers, route_health
 from agent.error_classifier import FailoverReason
 from run_agent import AIAgent, _pool_may_recover_from_rate_limit
 
@@ -111,6 +111,36 @@ class TestFallbackChainAdvancement:
             assert agent._fallback_index == 1
             assert agent.model == "gpt-4o"
             assert agent._fallback_activated is True
+
+    def test_explicit_base_url_prechecks_normalized_route_health(self, monkeypatch, tmp_path):
+        url = "https://openrouter.ai/api/v1"
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        route_health.reset_for_tests()
+        route_health.record_failure(
+            "openrouter", "openai/gpt-5.6-sol", url, FailoverReason.timeout,
+        )
+
+        agent = _make_agent(
+            fallback_model={
+                "provider": "openrouter",
+                "model": "gpt-5.6-sol",
+                "base_url": url,
+            },
+        )
+        agent.provider = "zai"
+        agent.model = "glm-4.7"
+        agent.base_url = "https://api.z.ai/v1"
+
+        with (
+            patch(
+                "agent.chat_completion_helpers._fallback_entry_unavailable_without_network",
+                return_value=None,
+            ),
+            patch("agent.auxiliary_client.resolve_provider_client") as resolve,
+        ):
+            assert agent._try_activate_fallback() is False
+
+        resolve.assert_not_called()
 
     @patch("time.monotonic", return_value=1000.0)
     def test_records_user_visible_switch_with_reason(self, _clock):
