@@ -12,7 +12,7 @@ schedule via the `cronjob` tool; users via `hermes cron list|add|edit|pause|resu
 `skills`, `model`/`provider` overrides, `script` (pre-run data-collection script whose stdout is
 injected into the prompt; `no_agent=True` makes the script the whole job), `context_from` (chain job
 A's last output into job B's prompt), `workdir` (run with that directory's `AGENTS.md`/`CLAUDE.md`
-loaded), multi-platform delivery, and `approval_mode` (`inherit|approve|deny`) for durable job-scoped approval authority. `approve` is a delegated capability: model-facing creation/update must obtain an explicit live human approval, while operator CLI flags count as direct consent. Transient YOLO/off posture and autonomous parent cron authority must never be converted into a new durable grant.
+loaded), `stop_when_done` (opt-in goal-oriented recurring job that retires through the existing `completed` state only after a successful run emits a standalone `[DONE]` edge marker), multi-platform delivery, and `approval_mode` (`inherit|approve|deny`) for durable job-scoped approval authority. `approve` is a delegated capability: model-facing creation/update must obtain an explicit live human approval, while operator CLI flags count as direct consent. Transient YOLO/off posture and autonomous parent cron authority must never be converted into a new durable grant.
 
 Session handoff: model-facing create/update with `attach_to_session=true` snapshots a bounded
 recent user/assistant text tail from the owning profile's existing SessionDB into internal
@@ -32,6 +32,10 @@ Hardening invariants — each guards a real failure; don't weaken without answer
   skips past-grace misses with a logged reason. Never drop a slot silently (#107485).
 - File lock `~/.hermes/cron/.tick.lock` prevents duplicate ticks across processes.
 - Cron sessions pass `skip_memory=True`; memory providers intentionally do not run during cron.
+- `stop_when_done` is a scheduler-owned terminal transition, not self-deletion: only explicit opt-in
+  jobs interpret `[DONE]`, the final result is delivered first, then `mark_job_run(...,
+  terminal_complete=True)` reuses `_complete_job_record`. Delivery failure must not reschedule an
+  already-satisfied real-world goal; preserve `last_status=delivery_failed` on the completed record.
 - Cron execution has its own session. Eligible continuable deliveries may mirror or seed the
   reply-facing conversation: origin, origin-less home fallback, user-written bare-platform home,
   or opted-in explicit targets. `all` expansions do not gain home mirror eligibility. Mirrored

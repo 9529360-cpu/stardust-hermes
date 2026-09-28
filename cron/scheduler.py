@@ -445,6 +445,34 @@ from cron.executions import (
 
 # Response marker that suppresses delivery (output is still saved locally for audit).
 SILENT_MARKER = "[SILENT]"
+# Opt-in terminal marker for goal-oriented recurring jobs. Unlike SILENT, this is
+# only interpreted when the stored job explicitly has stop_when_done=true.
+DONE_MARKER = "[DONE]"
+
+
+def _extract_cron_done_response(text: str) -> tuple[str, bool]:
+    """Strip a standalone [DONE] first/last line and report terminal completion.
+
+    Mid-sentence mentions are ordinary content. A marker-only response becomes a
+    small user-facing completion notice so successful terminal jobs never fall
+    into the empty-response soft-failure path.
+    """
+    lines = str(text or "").splitlines()
+    nonempty = [i for i, line in enumerate(lines) if line.strip()]
+    if not nonempty:
+        return str(text or ""), False
+    marker_indexes = {
+        i for i in (nonempty[0], nonempty[-1])
+        if lines[i].strip().upper() == DONE_MARKER
+    }
+    if not marker_indexes:
+        return str(text or ""), False
+    cleaned = "\n".join(line for i, line in enumerate(lines) if i not in marker_indexes).strip()
+    # Completion must remain user-visible even if the model accidentally combines
+    # the terminal marker with the ordinary silence marker.
+    if cleaned and _is_cron_silence_response(cleaned):
+        cleaned = ""
+    return cleaned or "Task completed.", True
 
 
 def _is_cron_silence_response(text: str) -> bool:
@@ -2648,6 +2676,7 @@ class _RunDelivery:
     side_effect_ownership_lost: bool = False
     delivery_content: str = ""
     local_session_delivered: bool = False
+    terminal_complete: bool = False
 
 
 def _save_compose_deliver(
@@ -2819,6 +2848,8 @@ def _finish_completed_run(d: _RunDelivery, fire_owner: Optional[str], execution_
         mark_kwargs["expected_fire_owner"] = fire_owner
     if d.blocked_config:
         mark_kwargs["status"] = "blocked_config"
+    if d.terminal_complete:
+        mark_kwargs["terminal_complete"] = True
     # A run that removed its own record has nothing left to mark; the delivery above is its result.
     marked = self_removal_delivery_allowed(job["id"]) or mark_job_run(
         job["id"], d.success, d.error, **mark_kwargs)
@@ -2988,9 +3019,14 @@ def _run_one_job_body(
             _record_fire_ownership_lost(job["id"], fire_owner, execution_id)
             return True
 
+        terminal_complete = False
+        if success and job.get("stop_when_done"):
+            final_response, terminal_complete = _extract_cron_done_response(final_response)
+
         # Agent is still live through delivery; wrap ALL of save/compose/deliver in try/finally so a
         # raise anywhere still tears the deferred agent down.
-        d = _RunDelivery(job=job, success=success, error=error)
+        d = _RunDelivery(
+            job=job, success=success, error=error, terminal_complete=terminal_complete)
         try:
             _save_compose_deliver(
                 d, fence, final_response, output, adapters=adapters, loop=loop, verbose=verbose,
