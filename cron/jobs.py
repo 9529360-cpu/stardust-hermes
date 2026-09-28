@@ -1913,7 +1913,8 @@ def create_job(
     for key, value in (
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
-        ("source_suggestion_id", source_suggestion_id), ("handoff_context", f["handoff_context"]),
+        ("source_suggestion_id", source_suggestion_id),
+        ("handoff_context", f["handoff_context"] if normalized_attach is True else None),
     ):
         if value is not None:
             job[key] = value
@@ -2091,7 +2092,12 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         updated = _apply_skill_fields({**job, **updates})
         if updated.get("local_session_origin") is None:
             updated.pop("local_session_origin", None)
-        if updated.get("handoff_context") is None:
+        # Session handoff is meaningful only for an explicitly attached job.
+        # Keep this invariant in the store so REST/CLI/direct callers cannot
+        # manufacture detached hidden context by bypassing cronjob_manage.
+        if updated.get("attach_to_session") is not True:
+            updated.pop("handoff_context", None)
+        elif updated.get("handoff_context") is None:
             updated.pop("handoff_context", None)
         _reject_terminal_activation(job, updated, job_id)
         # Re-check on the MERGED record; scoped to changed fields so legacy records keep loading.
