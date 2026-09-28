@@ -176,6 +176,56 @@ def test_connect_migrates_legacy_db_before_optional_column_indexes(tmp_path):
 
 
 
+def test_worker_context_warns_about_active_tasks_sharing_dir_workspace(kanban_home, tmp_path):
+    shared = tmp_path / "shared-project"
+    shared.mkdir()
+
+    with kbc.connect() as conn:
+        current = kb.create_task(
+            conn, title="edit backend", assignee="backend",
+            workspace_kind="dir", workspace_path=str(shared),
+        )
+        peer = kb.create_task(
+            conn, title="edit desktop", assignee="desktop",
+            workspace_kind="dir", workspace_path=str(shared),
+        )
+        done_peer = kb.create_task(
+            conn, title="finished cleanup", assignee="cleanup",
+            workspace_kind="dir", workspace_path=str(shared),
+        )
+        conn.execute("UPDATE tasks SET status = 'done' WHERE id = ?", (done_peer,))
+        conn.commit()
+
+        ctx = kb.build_worker_context(conn, current)
+
+    assert "## Shared workspace concurrency" in ctx
+    assert "advisory warning, not a file lock" in ctx
+    assert peer in ctx
+    assert "edit desktop" in ctx
+    assert "@desktop" in ctx
+    assert done_peer not in ctx
+    assert "finished cleanup" not in ctx
+
+
+def test_worker_context_does_not_warn_for_isolated_worktree_workspace(kanban_home, tmp_path):
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+
+    with kbc.connect() as conn:
+        current = kb.create_task(
+            conn, title="worktree A", assignee="a",
+            workspace_kind="worktree", workspace_path=str(repo),
+        )
+        kb.create_task(
+            conn, title="worktree B", assignee="b",
+            workspace_kind="worktree", workspace_path=str(repo),
+        )
+
+        ctx = kb.build_worker_context(conn, current)
+
+    assert "## Shared workspace concurrency" not in ctx
+
+
 # ---------------------------------------------------------------------------
 # Links + dependency resolution
 # ---------------------------------------------------------------------------
