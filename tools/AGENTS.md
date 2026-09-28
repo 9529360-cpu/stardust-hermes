@@ -93,7 +93,12 @@ task reports alone as it finishes. Units of one call share ONE pool slot (`slot_
 and the stall clock arms when the runner starts, so a queued unit is never judged stalled. Roles: `leaf` (default;
 no `delegate_task`, `clarify`, `memory`, `send_message`; keeps `execute_code` and inherits `cronjob` when the parent has it) and
 `orchestrator` (keeps `delegate_task`; gated by `delegation.orchestrator_enabled`, bounded by
-`delegation.max_spawn_depth`, default 2). Config knobs under `delegation:`:
+`delegation.max_spawn_depth`, default 2). **Personal-context inheritance:** children still run with
+`skip_memory=True` and no `memory` tool, so they cannot initialize memory providers or mutate shared memory.
+When the child inherits the parent's exact inference/privacy route (provider, endpoint, model, credential,
+fallback route, request-routing overrides, ACP transport), the child prompt may include the parent's already
+frozen and threat-sanitized built-in `USER.md` / `MEMORY.md` snapshot as read-only context. Any route
+difference fails closed and omits that snapshot. Config knobs under `delegation:`:
 `max_concurrent_children, independent_completions, max_spawn_depth, child_timeout_seconds, orchestrator_enabled,
 subagent_auto_approve, inherit_mcp_toolsets, max_iterations`. **Child processes:** a child's background
 processes are killed at its teardown and their notices are suppressed in the parent; `process_manage(action="handoff")`
