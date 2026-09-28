@@ -25,6 +25,7 @@ def _parent():
         base_url="https://openrouter.ai/api/v1",
         model="anthropic/claude-sonnet-4",
         api_key="same-key",
+        _fallback_chain=None,
         acp_command=None,
         acp_args=[],
         _memory_store=_SnapshotStore(),
@@ -46,6 +47,25 @@ def test_same_inference_boundary_inherits_frozen_snapshot():
     snapshot = _read_only_parent_memory_snapshot(parent, runtime)
 
     assert snapshot == "USER SNAPSHOT\n\nMEMORY SNAPSHOT"
+
+
+def test_same_canonical_fallback_chain_still_inherits_personal_context():
+    parent = _parent()
+    parent._fallback_chain = [
+        {"provider": "openrouter", "model": "anthropic/claude-haiku-4.5"}
+    ]
+    runtime = {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
+        "fallback_model": list(parent._fallback_chain),
+        "acp_command": None,
+        "acp_args": [],
+    }
+
+    assert _same_inference_privacy_boundary(parent, runtime) is True
+    assert "USER SNAPSHOT" in _read_only_parent_memory_snapshot(parent, runtime)
 
 
 def test_different_provider_or_endpoint_does_not_inherit_personal_context():
@@ -140,7 +160,7 @@ def test_child_gets_snapshot_as_read_only_prompt_but_memory_runtime_stays_disabl
     parent = _make_mock_parent(depth=0)
     parent.acp_command = None
     parent.acp_args = []
-    parent.fallback_model = None
+    parent._fallback_chain = None
     parent.request_overrides = {}
     parent._memory_store = _SnapshotStore(
         user="USER PROFILE: prefers quiet restaurants",
