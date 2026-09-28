@@ -199,13 +199,23 @@ def _create_lightpanda_session(task_id: str) -> Dict[str, Any]:
 
 
 def _local_backend_process_dead(session_info: Dict[str, Any]) -> bool:
-    """True for a Lightpanda session whose ``lightpanda serve`` is gone."""
-    if not (session_info.get("features") or {}).get("lightpanda"):
-        return False
-    from tools.browser_lightpanda import get_server
+    """True when a local backend process that was already started is gone."""
+    features = session_info.get("features") or {}
+    if features.get("lightpanda"):
+        from tools.browser_lightpanda import get_server
 
-    server = get_server(session_info.get("session_name", ""))
-    return server is None or not server.is_alive()
+        server = get_server(session_info.get("session_name", ""))
+        return server is None or not server.is_alive()
+    if session_info.get("cdp_url") or session_info.get("bb_session_id"):
+        return False
+    if not session_info.get("_daemon_expected"):
+        return False
+    session_name = str(session_info.get("session_name") or "")
+    if not session_name:
+        return False
+    socket_dir = os.path.join(_bt._socket_safe_tmpdir(), f"agent-browser-{session_name}")
+    daemon_pid = _read_browser_daemon_pid(socket_dir, session_name)
+    return daemon_pid is None or not _lifecycle._pid_exists(daemon_pid)
 
 
 def _create_cdp_session(task_id: str, cdp_url: str) -> Dict[str, str]:
@@ -338,18 +348,20 @@ def _discard_timed_out_browser_session(task_id: str, session_info: Dict[str, Any
         daemon_pid = _read_browser_daemon_pid(task_socket_dir, session_name)
         if daemon_pid is None:  # corrupt pid file
             _bt.logger.debug("Could not kill timed-out browser daemon for %s", session_name)
-            return
-        if not _lifecycle._verify_reapable_browser_daemon(daemon_pid, task_socket_dir, session_name):
-            return
-        try:
-            # Tree-kill: terminating only the daemon PID leaks the Chromium tree.
-            # See #68139.
-            from agent import deadline as _deadline
+        elif _lifecycle._verify_reapable_browser_daemon(
+            daemon_pid, task_socket_dir, session_name
+        ):
+            try:
+                # Preserve the established timeout contract: the verified daemon owns
+                # a process tree, and the timeout path kills that tree immediately.
+                from agent import deadline as _deadline
 
-            _deadline.kill_process_tree(daemon_pid)
-        except (ProcessLookupError, PermissionError, OSError):
-            _bt.logger.debug("Could not kill timed-out browser daemon for %s", session_name)
-            return
+                _deadline.kill_process_tree(daemon_pid)
+            except (ProcessLookupError, PermissionError, OSError):
+                _bt.logger.debug("Could not kill timed-out browser daemon for %s", session_name)
+    # agent-browser can detach Chrome even when its daemon tree is already gone. The
+    # managed per-session profile gives us an exact second ownership boundary.
+    _lifecycle._terminate_managed_profile_chrome(task_socket_dir)
     shutil.rmtree(task_socket_dir, ignore_errors=True)
 
 
@@ -504,6 +516,26 @@ def _browser_command_preflight() -> Dict[str, Any]:
     return {"browser_cmd": browser_cmd}
 
 
+_FATAL_LOCAL_OPEN_MARKERS = (
+    "auto-launch failed",
+    "chrome exited early",
+    "chrome exited before providing devtools",
+    "devtoolsactiveport",
+)
+
+
+def _fatal_local_open_failure(
+    command: str, result: Dict[str, Any], session_info: Dict[str, Any], engine: str
+) -> bool:
+    """Whether a failed first-party local open means the browser runtime is unusable."""
+    if command != "open" or result.get("success") or engine == "lightpanda":
+        return False
+    if session_info.get("cdp_url") or session_info.get("bb_session_id"):
+        return False
+    error = str(result.get("error") or "").lower()
+    return any(marker in error for marker in _FATAL_LOCAL_OPEN_MARKERS)
+
+
 def _spawn_and_collect(
     task_id: str, session_info: Dict[str, Any], cmd_parts: List[str],
     command: str, engine: str, timeout: int,
@@ -513,6 +545,13 @@ def _spawn_and_collect(
     _bt.logger.debug("browser cmd=%s task=%s socket_dir=%s (%d chars)",
                  command, task_id, task_socket_dir, len(task_socket_dir))
     browser_env = _agent_browser_command_env(task_socket_dir)
+    if (engine != "lightpanda" and not session_info.get("cdp_url")
+            and not session_info.get("bb_session_id")):
+        # Make Chrome ownership explicit. Upstream agent-browser otherwise creates random
+        # agent-browser-chrome-* profiles that cannot be mapped back to a Stardust session
+        # after its daemon crashes. A managed per-session profile gives cleanup a precise
+        # user-data-dir identity and preserves isolation between tasks.
+        browser_env["AGENT_BROWSER_PROFILE"] = _lifecycle._managed_chrome_profile_dir(task_socket_dir)
 
     # Lightpanda rejects Chromium-only launch flags: strip current and legacy vars;
     # Chrome commands and fallback use the shared Chromium policy.
@@ -547,7 +586,16 @@ def _spawn_and_collect(
     with open(stderr_path, "r", encoding="utf-8") as f:
         stderr = f.read()
     _unlink_command_output_files(stdout_path, stderr_path)
-    return _interpret_browser_command_output(command, stdout, stderr, proc.returncode)
+    result = _interpret_browser_command_output(command, stdout, stderr, proc.returncode)
+    if _fatal_local_open_failure(command, result, session_info, engine):
+        _discard_timed_out_browser_session(task_id, session_info, task_socket_dir)
+        return result
+    if (result.get("success") and engine != "lightpanda"
+            and not session_info.get("cdp_url") and not session_info.get("bb_session_id")):
+        session_name = str(session_info.get("session_name") or "")
+        if session_name and _read_browser_daemon_pid(task_socket_dir, session_name) is not None:
+            session_info["_daemon_expected"] = True
+    return result
 
 
 def _run_browser_command(
