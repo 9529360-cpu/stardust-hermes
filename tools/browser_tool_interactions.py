@@ -11,6 +11,7 @@ this generic interaction surface.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, Optional
 
 from tools.browser_tool_origin import origin_module as _origin
@@ -70,9 +71,12 @@ BROWSER_INTERACT_SCHEMA: Dict[str, Any] = {
                 "type": "string",
                 "description": "Text substring to wait for when action=wait_text.",
             },
-            "url_pattern": {
+            "url_contains": {
                 "type": "string",
-                "description": "URL glob/pattern to wait for when action=wait_url, e.g. **/dashboard.",
+                "description": (
+                    "Literal URL substring to wait for when action=wait_url, e.g. /dashboard. "
+                    "This intentionally avoids backend-specific glob semantics."
+                ),
             },
             "load_state": {
                 "type": "string",
@@ -153,7 +157,7 @@ def _command_for(
     target_ref: Optional[str],
     values: Optional[list[str]],
     text: Optional[str],
-    url_pattern: Optional[str],
+    url_contains: Optional[str],
     load_state: Optional[str],
     state: Optional[str],
 ) -> tuple[str, list[str], Dict[str, Any], bool]:
@@ -196,8 +200,15 @@ def _command_for(
         return "wait", ["--text", expected], {"waited_for": "text", "text": expected}, True
 
     if action == "wait_url":
-        pattern = _require_text(url_pattern, "url_pattern", action)
-        return "wait", ["--url", pattern], {"waited_for": "url", "url_pattern": pattern}, True
+        needle = _require_text(url_contains, "url_contains", action)
+        # agent-browser ^0.26.0 documents glob matching for --url but that
+        # release line actually treats '*' literally. Build the condition
+        # ourselves with JSON string escaping so Stardust has one stable
+        # substring contract independent of that backend regression.
+        expression = f"window.location.href.includes({json.dumps(needle)})"
+        return "wait", ["--fn", expression], {
+            "waited_for": "url", "url_contains": needle
+        }, True
 
     if action == "wait_load":
         load = load_state or "load"
@@ -218,7 +229,7 @@ def browser_interact(
     target_ref: Optional[str] = None,
     values: Optional[list[str]] = None,
     text: Optional[str] = None,
-    url_pattern: Optional[str] = None,
+    url_contains: Optional[str] = None,
     load_state: Optional[str] = None,
     state: Optional[str] = "visible",
     task_id: Optional[str] = None,
@@ -237,7 +248,7 @@ def browser_interact(
             target_ref=target_ref,
             values=values,
             text=text,
-            url_pattern=url_pattern,
+            url_contains=url_contains,
             load_state=load_state,
             state=state,
         )
