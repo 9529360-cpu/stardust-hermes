@@ -542,6 +542,7 @@ def _project_for_display(messages: list, *, inline_images: bool = True) -> list:
         projected_messages.append(projected)
     return projected_messages
 
+
 @manage_router.get("/api/sessions/{session_id}/messages")
 async def get_session_messages(
     session_id: str, profile: Optional[str] = None, limit: Optional[int] = Query(None, ge=0),
