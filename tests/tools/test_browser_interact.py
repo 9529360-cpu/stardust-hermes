@@ -197,13 +197,10 @@ def test_wait_url_escapes_user_text_as_data_not_javascript(browser_modules, monk
     )
 
     assert result["success"] is True
-    assert calls == [
-        (
-            "life-task",
-            "wait",
-            ["--fn", 'window.location.href.includes("x\\\"); globalThis.pwned = true; //")'],
-        )
-    ]
+    expected = f"window.location.href.includes({json.dumps(needle)})"
+    assert calls == [("life-task", "wait", ["--fn", expected])]
+    assert "globalThis.pwned = true" in expected
+    assert expected.count("includes(") == 1
 
 
 def test_backend_gate_hides_interactions_when_state_cannot_be_preserved(monkeypatch):
