@@ -3,7 +3,7 @@
 Proves problem (1) of the #106480 re-review is fixed: on the default browser backend the login page lives in
 a tab browser_exec opened, the supervisor is attached by browser_exec itself, browser_vault_fill focuses the
 tab on the bound origin and injects the password over the supervisor's CDP WebSocket, and the secret is absent
-from every model-facing result. Also exercises a payment fill (confirm gate, card fields, decline = no write).
+from every model-facing result. Also exercises generated account-signup credentials and a payment fill (confirm gate, card fields, decline = no write).
 
 Run: HERMES_E2E_BROWSER=1 <venv>/bin/python evals/vault_fill_live_e2e.py
 """
@@ -25,6 +25,11 @@ os.environ["HERMES_HOME"] = str(HOME)
 PAGES = {
     "/login": b"""<!doctype html><title>login</title>
 <form><input name=email type=email autocomplete=username><input name=pw type=password autocomplete=current-password>
+<input type=submit></form>""",
+    "/signup": b"""<!doctype html><title>signup</title>
+<form><input name=email type=email autocomplete=email>
+<input name=newpw type=password autocomplete=new-password minlength=12 maxlength=32>
+<input name=confirm type=password autocomplete=new-password minlength=12 maxlength=32>
 <input type=submit></form>""",
     "/checkout": b"""<!doctype html><title>checkout</title>
 <form><input name=cardnum placeholder="Card number"><input name=exp placeholder="Expiry (MM/YY)">
@@ -64,6 +69,7 @@ def main() -> int:
         # browser_exec opens its own tabs; the login page is deliberately NOT the first one.
         _exec("new_tab('about:blank')")
         _exec(f"new_tab({origin + '/login'!r}); wait_for_load()")
+        _exec(f"new_tab({origin + '/signup'!r}); wait_for_load()")
         _exec(f"new_tab({origin + '/checkout'!r}); wait_for_load(); print(page_info()['url'])")
 
         sup = SUPERVISOR_REGISTRY.get(TASK)
@@ -126,6 +132,29 @@ def main() -> int:
         dom = sup.evaluate_runtime("location.pathname + ' ' + document.querySelector('input[name=pw]').value")
         assert dom["result"] == "/login pw-SAVE-5150", dom
         print("save_login: found the login tab from a blank default page, bound to its origin, filled")
+
+        # sign-up: login + sign-up tabs share the same origin. The sign-up path must focus the
+        # new-password tab, generate one secret locally, store it, and fill both password controls.
+        raw = bvt.browser_vault_save_login(
+            identifier="signup@b.c",
+            generate_password=True,
+            task_id=TASK,
+        )
+        out = json.loads(raw)
+        print("signup save/fill:", out)
+        assert out["success"] and out["generated_password"] and out["fill"]["filled_fields"] == 2, out
+        assert out["fill"]["purpose"] == "signup", out
+        secret = store.resolve_secret(out["handle"])["password"]
+        assert secret not in raw
+        assert sup.focus_page(origin, accept=bvt._TAB_PROBES["signup"])["ok"]
+        dom = sup.evaluate_runtime(
+            "location.pathname + ' ' + document.querySelector('input[name=newpw]').value + '|' + "
+            "document.querySelector('input[name=confirm]').value"
+        )
+        assert dom["result"] == f"/signup {secret}|{secret}", dom
+        assert secret not in json.dumps(_redact_cdp_output({"result": {"value": dom["result"]}}))
+        print("signup: generated password stored model-blind and filled new+confirm fields on the signup tab")
+        del secret
 
         redact.clear_vault_redaction_values()
         print("E2E OK")

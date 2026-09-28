@@ -175,6 +175,9 @@ class VaultItemMeta:
     # number/CVC remain inside the encrypted secret payload.
     delegated_payment: bool = False
     allow_any_origin: bool = False
+    # Appended to preserve the positional field order of the pre-existing metadata contract.
+    # True only for a password Stardust generated locally for an explicitly requested account sign-up.
+    generated_for_signup: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         out = {
@@ -189,6 +192,8 @@ class VaultItemMeta:
             out["identifier_type"] = self.identifier_type
         if self.has_otp:
             out["has_otp"] = True
+        if self.generated_for_signup:
+            out["generated_for_signup"] = True
         if len(self.allowed_origins) > 1:
             out["allowed_origins"] = list(self.allowed_origins)
         if self.kind == "payment":
@@ -309,6 +314,7 @@ class VaultStore:
         origin: Optional[str] = None,
         delegated_payment: bool = False,
         allow_any_origin: bool = False,
+        generated_for_signup: bool = False,
     ) -> VaultItemMeta:
         """Add an item. ``secret`` is the sensitive payload (encrypted at rest).
 
@@ -317,7 +323,8 @@ class VaultStore:
         identifier fields are NOT secret — they are moved into item metadata
         (the agent may see and type the identifier itself); only
         ``password`` stays in the encrypted secret payload. ``payment`` and
-        ``address`` payloads remain fully secret.
+        ``address`` payloads remain fully secret. ``generated_for_signup`` is metadata only and may be set
+        for login items whose password Stardust generated for an explicitly requested registration.
 
         Payment cards may opt into delegated use. ``delegated_payment`` means
         an explicit user purchase request may use the card without a second
@@ -337,6 +344,9 @@ class VaultStore:
         secret = dict(secret)
         delegated_payment = bool(delegated_payment)
         allow_any_origin = bool(allow_any_origin)
+        generated_for_signup = bool(generated_for_signup)
+        if generated_for_signup and kind != "login":
+            raise VaultError("generated_for_signup is supported only for login items")
         if allow_any_origin and (kind != "payment" or not delegated_payment):
             raise VaultError("allow_any_origin requires a delegated payment card")
         if kind != "payment" and delegated_payment:
@@ -378,6 +388,7 @@ class VaultStore:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "identifier_type": identifier_type,
             "identifier": identifier,
+            "generated_for_signup": generated_for_signup if kind == "login" else False,
             "delegated_payment": delegated_payment if kind == "payment" else False,
             "allow_any_origin": allow_any_origin if kind == "payment" else False,
             "secret": dict(secret),
@@ -440,6 +451,7 @@ class VaultStore:
             identifier_type=rec.get("identifier_type") if identifier else None,
             identifier=identifier or None,
             has_otp=bool((rec.get("secret") or {}).get("otp_secret")),
+            generated_for_signup=bool(rec.get("generated_for_signup")) if rec.get("kind") == "login" else False,
             delegated_payment=bool(rec.get("delegated_payment")) if rec.get("kind") == "payment" else False,
             allow_any_origin=bool(rec.get("allow_any_origin")) if rec.get("kind") == "payment" else False,
         )

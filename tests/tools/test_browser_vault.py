@@ -30,7 +30,10 @@ from agent.vault_login_classifier import (  # noqa: E402
     LoginControl,
     build_fill_js,
     classify_login_control,
+    classify_signup_password_control,
     select_password_fill,
+    select_signup_password_controls,
+    select_signup_password_fills,
 )
 from agent.vault_store import (  # noqa: E402
     VaultError,
@@ -45,7 +48,13 @@ def store(tmp_path):
     return VaultStore(base_dir=tmp_path / "vault")
 
 
-def _add_login(store, origin="https://example.com", password="s3cret-pw"):
+def _add_login(
+    store,
+    origin="https://example.com",
+    password="s3cret-pw",
+    *,
+    generated_for_signup=False,
+):
     return store.add_item(
         kind="login",
         label="Example login",
@@ -56,6 +65,7 @@ def _add_login(store, origin="https://example.com", password="s3cret-pw"):
             "password": password,
             "origin": origin,
         },
+        generated_for_signup=generated_for_signup,
     )
 
 
@@ -163,6 +173,19 @@ class TestVaultStore:
                 delegated_payment=True,
             )
 
+    def test_generated_for_signup_is_login_only_metadata(self, store):
+        meta = _add_login(store, generated_for_signup=True)
+        assert meta.generated_for_signup is True
+        assert meta.to_dict()["generated_for_signup"] is True
+        assert "password" not in meta.to_dict()
+        with pytest.raises(VaultError, match="generated_for_signup"):
+            store.add_item(
+                kind="address",
+                label="Home",
+                secret=_ADDRESS,
+                generated_for_signup=True,
+            )
+
     def test_unknown_kind_rejected(self, store):
         with pytest.raises(VaultError):
             store.add_item(kind="totp", label="x", secret={})
@@ -211,6 +234,66 @@ class TestClassifier:
         assert classify_login_control(
             _ctrl(autocomplete="new-password", type="password")
         ) is None
+
+    def test_signup_classifier_accepts_new_password_without_changing_login_semantics(self):
+        control = _ctrl(
+            autocomplete="new-password",
+            type="password",
+            label="Create password",
+            index=4,
+        )
+        assert classify_login_control(control) is None
+        signup = classify_signup_password_control(control)
+        assert signup is not None
+        assert signup.token == "new-password"
+        assert signup.score == 100
+
+    def test_signup_selector_fills_new_and_confirm_but_never_current_password(self):
+        controls = [
+            _ctrl(autocomplete="current-password", type="password", label="Current password", index=0),
+            _ctrl(autocomplete="new-password", type="password", label="New password", index=1),
+            _ctrl(autocomplete="new-password", type="password", label="Confirm password", index=2),
+        ]
+        classified = [c for raw in controls if (c := classify_signup_password_control(raw)) is not None]
+        selected = select_signup_password_controls(classified)
+        assert [c.control.index for c in selected] == [1, 2]
+        assert select_signup_password_fills(classified, "generated-secret") == [
+            {"index": 1, "token": "new-password", "value": "generated-secret"},
+            {"index": 2, "token": "new-password", "value": "generated-secret"},
+        ]
+
+    def test_signup_selector_keeps_password_and_confirmation_in_one_form(self):
+        classified = [
+            classify_signup_password_control(
+                _ctrl(autocomplete="new-password", type="password", form_index=0, index=1)
+            ),
+            classify_signup_password_control(
+                _ctrl(type="password", label="Confirm password", form_index=0, index=2)
+            ),
+            classify_signup_password_control(
+                _ctrl(autocomplete="new-password", type="password", form_index=1, index=9)
+            ),
+        ]
+        selected = select_signup_password_controls([c for c in classified if c is not None])
+        assert [c.control.index for c in selected] == [1, 2]
+
+    def test_signup_selector_refuses_equally_plausible_generic_forms(self):
+        classified = [
+            classify_signup_password_control(_ctrl(type="password", form_index=0, index=1)),
+            classify_signup_password_control(_ctrl(type="password", form_index=1, index=8)),
+        ]
+        assert select_signup_password_controls([c for c in classified if c is not None]) == []
+
+    def test_inspection_control_parses_password_length_constraints(self):
+        control = LoginControl.from_dict({
+            "autocomplete": "new-password",
+            "type": "password",
+            "index": 1,
+            "minLength": 14,
+            "maxLength": 30,
+        })
+        assert control.min_length == 14
+        assert control.max_length == 30
 
     def test_one_time_code_excluded(self):
         assert classify_login_control(_ctrl(autocomplete="one-time-code")) is None
@@ -275,7 +358,8 @@ class TestClassifier:
         assert "data-vault-secret" not in js
         assert "elements[f.index]" not in js
         assert "[data-hermes-vault-slot=" in js and "nonce + ':' + f.index" in js
-        assert 'f.token === "current-password" && el.type !== "password"' in js  # a password fill never lands in a text box
+        assert 'f.token === "current-password" || f.token === "new-password"' in js
+        assert 'passwordToken && el.type !== "password"' in js  # no vault password ever lands in a text box
         assert js.index('removeAttribute("data-hermes-vault-slot")') > js.index("setter.set.call")
 
     def test_build_fill_js_asserts_origin_before_any_write(self):
@@ -467,6 +551,71 @@ class TestBrowserVaultTools:
         assert "s3cret-pw" in secret_exprs[0]
         assert '"index": 0' not in secret_exprs[0]
         assert "user@example.com" not in secret_exprs[0]
+
+    def test_signup_focus_uses_signup_specific_probe(self, monkeypatch):
+        from tools import browser_vault_tool
+
+        seen = {}
+
+        class _Supervisor:
+            def focus_page(self, origin, accept=None):
+                seen["origin"] = origin
+                seen["accept"] = accept
+                return {"ok": True, "url": origin + "/signup"}
+
+        monkeypatch.setattr(browser_vault_tool, "_ensure_supervisor", lambda task_id: _Supervisor())
+        focused = browser_vault_tool._focus_bound_origin("signup-task", "https://example.com", "signup")
+
+        assert focused == "https://example.com"
+        assert seen["origin"] == "https://example.com"
+        assert seen["accept"] == browser_vault_tool._SIGNUP_TAB_PROBE
+        assert seen["accept"] != browser_vault_tool._TAB_PROBES["login"]
+        assert "new-password" in seen["accept"]
+        assert "count >= 2" in seen["accept"]
+
+    def test_signup_fill_targets_new_and_confirm_password_only(self, store):
+        from tools import browser_vault_tool
+
+        password = "Signup-only-secret-42!"
+        meta = _add_login(
+            store,
+            origin="https://example.com",
+            password=password,
+            generated_for_signup=True,
+        )
+        controls = [
+            {"autocomplete": "current-password", "formIndex": 0, "index": 0, "label": "Current password", "name": "old", "type": "password"},
+            {"autocomplete": "new-password", "formIndex": 0, "index": 1, "label": "Create password", "name": "new", "type": "password"},
+            {"autocomplete": "new-password", "formIndex": 0, "index": 2, "label": "Confirm password", "name": "confirm", "type": "password"},
+        ]
+
+        def fake_eval(task_id, expression):
+            if "location.href" in expression:
+                return {"success": True, "result": "https://example.com/signup"}
+            return {"success": True, "result": json.dumps(controls)}
+
+        secret_exprs = []
+
+        def fake_eval_secret(task_id, expression):
+            secret_exprs.append(expression)
+            return {"success": True, "result": json.dumps({"filled": 2})}
+
+        with patch("agent.vault_store.get_vault_store", return_value=store), \
+             patch.object(browser_vault_tool, "_focus_bound_origin", return_value=None), \
+             patch.object(browser_vault_tool, "_eval_js", side_effect=fake_eval), \
+             patch.object(browser_vault_tool, "_eval_js_secret", side_effect=fake_eval_secret):
+            raw = browser_vault_tool.browser_vault_fill(meta.id, purpose="signup")
+
+        out = json.loads(raw)
+        assert out["success"] is True
+        assert out["filled_fields"] == 2
+        assert out["purpose"] == "signup"
+        assert password not in raw
+        assert len(secret_exprs) == 1
+        assert secret_exprs[0].count(password) == 2
+        assert '"index": 0' not in secret_exprs[0]
+        assert '"index": 1' in secret_exprs[0]
+        assert '"index": 2' in secret_exprs[0]
 
     def test_fill_toctou_navigation_writes_nothing(self, store):
         """P1-2 schedule regression: inspection passes on the allowed origin,
@@ -776,11 +925,23 @@ class TestVaultSchemaCrossToolset:
         desc = rewritten[0]["function"]["description"]
 
         assert "authorization to continue" in desc
+        assert "create/register an account" in desc
         assert "browser_vault_save_login" in desc
+        assert "generate_password=true" in desc
         assert "browser_vault_enter_code" in desc
         assert "Do not put plaintext passwords" in desc
         assert "do not stop merely because" in desc.lower()
         assert "never ask for or accept one in chat" not in desc.lower()
+
+
+def test_signup_vault_schema_exposes_generated_password_and_signup_fill_mode():
+    from tools.browser_vault_tool import BROWSER_VAULT_FILL_SCHEMA, BROWSER_VAULT_SAVE_LOGIN_SCHEMA
+
+    save_props = BROWSER_VAULT_SAVE_LOGIN_SCHEMA["parameters"]["properties"]
+    assert save_props["generate_password"]["type"] == "boolean"
+    assert save_props["identifier"]["type"] == "string"
+    fill_purpose = BROWSER_VAULT_FILL_SCHEMA["parameters"]["properties"]["purpose"]
+    assert fill_purpose["enum"] == ["login", "signup"]
 
 
 def test_every_registered_tool_schema_declares_openai_style_parameters():
@@ -812,7 +973,7 @@ class TestSaveLoginPrompt:
         unlock_mod.set_save_login_prompt_callback(prompt)
         monkeypatch.setattr(browser_vault_tool, "_current_page_origin", lambda task_id: "https://acme.test")
         monkeypatch.setattr(browser_vault_tool, "browser_vault_fill",
-                            lambda handle, task_id=None: json.dumps({"success": True, "filled_fields": 1}))
+                            lambda handle, task_id=None, purpose="login": json.dumps({"success": True, "filled_fields": 1}))
         with patch("agent.vault_store.get_vault_store", return_value=store), \
              patch("agent.vault_backends.unlock.can_prompt_here", return_value=True):
             out = json.loads(browser_vault_tool.browser_vault_save_login(task_id="t1"))
@@ -823,6 +984,261 @@ class TestSaveLoginPrompt:
         assert seen == {"origin": "https://acme.test", "site": "acme.test"}
         [meta] = store.list_items()
         assert meta.origin == "https://acme.test" and meta.identifier == "tek@acme.test"
+
+    def test_legacy_second_positional_argument_remains_task_id(self, store, monkeypatch):
+        from agent.vault_backends import unlock as unlock_mod
+        from tools import browser_vault_tool
+
+        seen = {}
+        unlock_mod.set_save_login_prompt_callback(
+            lambda origin, site: {"identifier": "legacy@acme.test", "password": "legacy-secret"}
+        )
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_focus_bound_origin",
+            lambda task_id, origin, kind: seen.setdefault("focus", (task_id, kind)),
+        )
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_current_page_origin",
+            lambda task_id: seen.setdefault("origin_task", task_id) and "https://acme.test",
+        )
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "browser_vault_fill",
+            lambda handle, task_id=None, purpose="login": (
+                seen.setdefault("fill_task", task_id)
+                and json.dumps({"success": True, "filled_fields": 1})
+            ),
+        )
+        try:
+            with patch("agent.vault_store.get_vault_store", return_value=store),                  patch("agent.vault_backends.unlock.can_prompt_here", return_value=True):
+                out = json.loads(browser_vault_tool.browser_vault_save_login("Acme", "legacy-task"))
+        finally:
+            unlock_mod.set_save_login_prompt_callback(None)
+
+        assert out["success"] is True
+        assert seen["focus"] == ("legacy-task", "login")
+        assert seen["origin_task"] == "legacy-task"
+        assert seen["fill_task"] == "legacy-task"
+
+    def test_generated_signup_password_is_saved_and_filled_without_prompt_or_echo(self, store, monkeypatch):
+        from tools import browser_vault_tool
+
+        generated = "Generated-only-Password-42!"
+        fill_calls = []
+        monkeypatch.setattr(browser_vault_tool, "_current_page_origin", lambda task_id: "https://acme.test")
+        monkeypatch.setattr(browser_vault_tool, "_focus_bound_origin", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_signup_password_length_for_page",
+            lambda task_id: {"success": True, "length": len(generated), "fields": 2},
+        )
+        monkeypatch.setattr(browser_vault_tool, "_generate_signup_password", lambda length: generated)
+
+        def fake_fill(handle, task_id=None, purpose="login"):
+            fill_calls.append((handle, task_id, purpose))
+            return json.dumps({"success": True, "filled_fields": 2, "purpose": purpose})
+
+        monkeypatch.setattr(browser_vault_tool, "browser_vault_fill", fake_fill)
+        with patch("agent.vault_store.get_vault_store", return_value=store), \
+             patch("agent.vault_backends.unlock.get_save_login_prompt_callback") as prompt:
+            raw = browser_vault_tool.browser_vault_save_login(
+                identifier="tek@acme.test",
+                generate_password=True,
+                task_id="signup-1",
+            )
+
+        out = json.loads(raw)
+        prompt.assert_not_called()
+        assert out["success"] is True
+        assert out["generated_password"] is True
+        assert out["identifier"] == "tek@acme.test"
+        assert generated not in raw
+        [meta] = store.list_items()
+        assert meta.origin == "https://acme.test"
+        assert meta.identifier == "tek@acme.test"
+        assert meta.generated_for_signup is True
+        assert meta.to_dict()["generated_for_signup"] is True
+        assert store.resolve_secret(meta.id) == {"password": generated}
+        assert fill_calls == [(meta.id, "signup-1", "signup")]
+
+    def test_generated_signup_scrubs_password_from_vault_write_errors(self, store, monkeypatch):
+        from tools import browser_vault_tool
+
+        generated = "Never-leak-this-Password-42!"
+        monkeypatch.setattr(browser_vault_tool, "_current_page_origin", lambda task_id: "https://acme.test")
+        monkeypatch.setattr(browser_vault_tool, "_focus_bound_origin", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_signup_password_length_for_page",
+            lambda task_id: {"success": True, "length": len(generated), "fields": 2},
+        )
+        monkeypatch.setattr(browser_vault_tool, "_generate_signup_password", lambda length: generated)
+        with patch("agent.vault_store.get_vault_store", return_value=store), \
+             patch.object(store, "add_item", side_effect=RuntimeError(f"failed while saving {generated}")):
+            raw = browser_vault_tool.browser_vault_save_login(
+                identifier="tek@acme.test",
+                generate_password=True,
+            )
+
+        out = json.loads(raw)
+        assert out["success"] is False
+        assert out["error_type"] == "save_failed"
+        assert generated not in raw
+        assert "[REDACTED]" in out["error"]
+
+    def test_signup_fill_refuses_external_manager_without_unlock_prompt(self):
+        from tools import browser_vault_tool
+
+        class _LockedManager:
+            name = "bitwarden"
+            display_name = "Bitwarden"
+            needs_unlock = True
+
+            def is_unlocked(self):
+                return False
+
+        with patch("agent.vault_backends.backend_for_handle", return_value=_LockedManager()), \
+             patch.object(browser_vault_tool, "browser_vault_unlock") as unlock:
+            out = json.loads(browser_vault_tool.browser_vault_fill("bw:abc", purpose="signup"))
+
+        assert out["success"] is False
+        assert out["error_type"] == "signup_generated_credential_required"
+        unlock.assert_not_called()
+
+    def test_signup_fill_refuses_reusing_normal_saved_password(self, store):
+        from tools import browser_vault_tool
+
+        meta = _add_login(store, origin="https://acme.test", password="existing-secret")
+        with patch("agent.vault_store.get_vault_store", return_value=store):
+            out = json.loads(browser_vault_tool.browser_vault_fill(meta.id, purpose="signup"))
+
+        assert out["success"] is False
+        assert out["error_type"] == "signup_generated_credential_required"
+        assert "existing-secret" not in json.dumps(out)
+
+    def test_generated_signup_retry_reuses_generated_credential_without_new_password(self, store, monkeypatch):
+        from tools import browser_vault_tool
+
+        meta = _add_login(
+            store,
+            origin="https://acme.test",
+            password="generated-before-retry",
+            generated_for_signup=True,
+        )
+        fill_calls = []
+        monkeypatch.setattr(browser_vault_tool, "_current_page_origin", lambda task_id: "https://acme.test")
+        monkeypatch.setattr(browser_vault_tool, "_focus_bound_origin", lambda *args, **kwargs: None)
+
+        def fake_fill(handle, task_id=None, purpose="login"):
+            fill_calls.append((handle, task_id, purpose))
+            return json.dumps({"success": True, "filled_fields": 2, "purpose": purpose})
+
+        monkeypatch.setattr(browser_vault_tool, "browser_vault_fill", fake_fill)
+        with patch("agent.vault_store.get_vault_store", return_value=store), \
+             patch.object(browser_vault_tool, "_generate_signup_password") as generate, \
+             patch.object(browser_vault_tool, "_signup_password_length_for_page") as inspect:
+            out = json.loads(browser_vault_tool.browser_vault_save_login(
+                identifier="user@example.com",
+                generate_password=True,
+                task_id="retry-signup",
+            ))
+
+        assert out["success"] is True
+        assert out["reused_existing"] is True
+        assert out["handle"] == meta.id
+        assert fill_calls == [(meta.id, "retry-signup", "signup")]
+        generate.assert_not_called()
+        inspect.assert_not_called()
+        assert len(store.list_items()) == 1
+
+    def test_generated_signup_does_not_duplicate_existing_origin_identifier(self, store, monkeypatch):
+        from tools import browser_vault_tool
+
+        _add_login(store, origin="https://acme.test", password="existing-secret")
+        monkeypatch.setattr(browser_vault_tool, "_current_page_origin", lambda task_id: "https://acme.test")
+        monkeypatch.setattr(browser_vault_tool, "_focus_bound_origin", lambda *args, **kwargs: None)
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_signup_password_length_for_page",
+            lambda task_id: {"success": True, "length": 24, "fields": 2},
+        )
+        with patch("agent.vault_store.get_vault_store", return_value=store), \
+             patch.object(browser_vault_tool, "_generate_signup_password") as generate:
+            out = json.loads(browser_vault_tool.browser_vault_save_login(
+                identifier="user@example.com",
+                generate_password=True,
+            ))
+
+        assert out["success"] is False
+        assert out["error_type"] == "signup_login_exists"
+        assert len(store.list_items()) == 1
+        generate.assert_not_called()
+
+    def test_signup_password_plan_respects_page_length_constraints(self, monkeypatch):
+        from tools import browser_vault_tool
+
+        controls = [
+            {
+                "autocomplete": "new-password",
+                "formIndex": 0,
+                "index": 0,
+                "type": "password",
+                "minLength": 28,
+                "maxLength": 32,
+            },
+            {
+                "autocomplete": "new-password",
+                "formIndex": 0,
+                "index": 1,
+                "type": "password",
+                "minLength": 28,
+                "maxLength": 32,
+            },
+        ]
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_eval_js",
+            lambda task_id, expression: {"success": True, "result": json.dumps(controls)},
+        )
+        assert browser_vault_tool._signup_password_length_for_page("signup") == {
+            "success": True,
+            "length": 28,
+            "fields": 2,
+        }
+
+    def test_signup_password_plan_rejects_page_max_below_security_floor(self, monkeypatch):
+        from tools import browser_vault_tool
+
+        controls = [
+            {
+                "autocomplete": "new-password",
+                "formIndex": 0,
+                "index": 0,
+                "type": "password",
+                "maxLength": 10,
+            }
+        ]
+        monkeypatch.setattr(
+            browser_vault_tool,
+            "_eval_js",
+            lambda task_id, expression: {"success": True, "result": json.dumps(controls)},
+        )
+        out = browser_vault_tool._signup_password_length_for_page("signup")
+        assert out["success"] is False
+        assert out["error_type"] == "signup_password_constraints_unsupported"
+
+    def test_generated_password_contains_each_required_character_class(self):
+        from tools import browser_vault_tool
+
+        password = browser_vault_tool._generate_signup_password(24)
+        assert len(password) == 24
+        assert any(c.islower() for c in password)
+        assert any(c.isupper() for c in password)
+        assert any(c.isdigit() for c in password)
+        assert any(c in browser_vault_tool._GENERATED_PASSWORD_SYMBOLS for c in password)
+        assert not set(password) & set("IOl01")
 
     def test_declined_or_headless_stores_nothing(self, store, monkeypatch):
         from agent.vault_backends import unlock as unlock_mod
