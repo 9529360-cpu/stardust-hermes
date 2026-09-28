@@ -79,6 +79,63 @@ describe('partitionDroppedFiles', () => {
   it('returns empty groups for an empty drop', () => {
     expect(partitionDroppedFiles([])).toEqual({ inAppRefs: [], osDrops: [] })
   })
+
+
+  it('keeps a local non-image OS drop as an inline ref but still stages images and path-less files', () => {
+    const finderPdf = osDrop('/Users/mahmoud/Downloads/DEVIS_signed.pdf')
+    const screenshot = osDrop('/var/folders/tmp/shot.png')
+    const pathless = { file: new File(['x'], 'notes.txt'), path: '' } as DroppedFile
+
+    const result = partitionDroppedFiles([finderPdf, screenshot, pathless], {
+      backendCwd: '/Users/mahmoud/projects/app',
+      remote: false,
+      terminalBackend: 'local'
+    })
+
+    expect(result.inAppRefs).toEqual([finderPdf])
+    expect(result.osDrops).toEqual([screenshot, pathless])
+  })
+
+  it('still stages an OS file for remote and container backends', () => {
+    const finderPdf = osDrop('/Users/mahmoud/Downloads/DEVIS_signed.pdf')
+
+    expect(
+      partitionDroppedFiles([finderPdf], {
+        backendCwd: '/home/gateway/app',
+        remote: true,
+        terminalBackend: 'local'
+      })
+    ).toEqual({ inAppRefs: [], osDrops: [finderPdf] })
+
+    expect(
+      partitionDroppedFiles([finderPdf], {
+        backendCwd: '/workspace',
+        remote: false,
+        terminalBackend: 'docker'
+      })
+    ).toEqual({ inAppRefs: [], osDrops: [finderPdf] })
+  })
+
+  it('stages a Windows host path when the local backend cwd is POSIX', () => {
+    const report = {
+      file: new File(['x'], 'report.txt'),
+      path: 'C:\\Users\\al\\Downloads\\report.txt'
+    } as DroppedFile
+
+    const result = partitionDroppedFiles([report], {
+      backendCwd: '/home/gateway/app',
+      remote: false,
+      terminalBackend: 'local'
+    })
+
+    expect(result).toEqual({ inAppRefs: [], osDrops: [report] })
+  })
+
+  it('keeps legacy safe staging when no backend context is provided', () => {
+    const report = osDrop('/abs/report.pdf')
+
+    expect(partitionDroppedFiles([report])).toEqual({ inAppRefs: [], osDrops: [report] })
+  })
 })
 
 // Minimal DataTransfer stand-in. A real OS drop populates BOTH `items` (which
