@@ -219,6 +219,7 @@ def test_list_splits_comma_chain_custom_provider_model(monkeypatch):
     ]
     assert row["total_models"] == 4
 
+
 def test_list_authenticated_providers_can_skip_custom_provider_live_probe(monkeypatch):
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
     monkeypatch.setattr(providers_mod, "HERMES_OVERLAYS", {})
