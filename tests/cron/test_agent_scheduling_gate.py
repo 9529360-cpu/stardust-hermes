@@ -93,6 +93,29 @@ class TestGateOn:
         assert "cronjob" not in disabled
 
 
+class TestDelegatedJobScheduling:
+    def test_approved_job_lifts_loop_prevention_gate(self):
+        disabled = _resolve_cron_disabled_toolsets(
+            {}, {"approval_mode": "approve"}
+        )
+        assert "cronjob" not in disabled
+        for name in ALWAYS_DISABLED:
+            assert name in disabled
+
+    @pytest.mark.parametrize("mode", [None, "inherit", "deny"])
+    def test_nonapproved_job_keeps_default_gate(self, mode):
+        disabled = _resolve_cron_disabled_toolsets(
+            {}, {"approval_mode": mode}
+        )
+        assert "cronjob" in disabled
+
+    def test_user_denylist_still_wins_for_approved_job(self):
+        cfg = {"agent": {"disabled_toolsets": ["cronjob"]}}
+        disabled = _resolve_cron_disabled_toolsets(
+            cfg, {"approval_mode": "approve"}
+        )
+        assert "cronjob" in disabled
+
 class TestUserLayerUnchanged:
     def test_user_denylist_still_layers_when_gate_off(self):
         cfg = {"agent": {"disabled_toolsets": ["browser", "cronjob"]}}
