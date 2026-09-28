@@ -1530,7 +1530,8 @@ _TOOL_RESULT_SUMMARIZERS = {
     "search_files": _sum_search_files,
     "patch": _sum_template("[patch] {mode} in {path} ({content_len:,} chars result)", mode="replace", path="?"),
     **dict.fromkeys(
-        ("browser_navigate", "browser_click", "browser_snapshot", "browser_type", "browser_scroll", "browser_vision"),
+        ("browser_navigate", "browser_click", "browser_snapshot", "browser_type", "browser_interact",
+         "browser_scroll", "browser_vision"),
         _sum_browser,
     ),
     "web_search": _sum_template("[web_search] query='{query}' ({content_len:,} chars result)", query="?"),

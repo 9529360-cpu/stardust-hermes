@@ -73,12 +73,27 @@ replaces the other browser tools when `browser.backend` is `browser-use`.
 
 Several tools front pluggable backends: terminal environments in `tools/environments/` (local,
 docker, ssh, modal, daytona, singularity; `terminal_tool_backends.py`, `tool_backend_helpers.py`),
-browser (`browser_tool_*.py`: cdp, cloud, install, lifecycle, session, real_profile, vision), MCP
+browser (`browser_tool_*.py`: cdp, cloud, install, lifecycle, session, real_profile, interactions, vision), MCP
 client (`mcp_tool_*.py`: config, discovery, transport, registration, content, errors), TTS
 (`tts_tool_providers.py`, `tts_command_provider.py`), skills hub sources (`skills_hub_official.py`
 `OptionalSkillSource`). Adding a backend = a new sibling or provider entry in the existing table,
 never an `elif` on a backend name (root shape rules). Remote-backend file visibility problems are
 fixed at the mount, not by adding a tool.
+
+**Browser transaction interactions:** `browser_interact` is one compact surface for advanced
+state-preserving form actions (hover/select/check/uncheck/drag/scroll-into-view) plus safe
+condition waits. It maps to the existing agent-browser session; do not emulate these actions in a
+temporary fallback browser because the resulting page state would be lost. URL waits deliberately
+use an internally escaped `window.location.href.includes(...)` condition rather than agent-browser
+`wait --url`: the pinned `^0.26.0` line has broken glob matching, so Stardust's maintained
+contract is a literal substring until the dependency floor is deliberately upgraded. The same pinned
+line also lacks `wait <selector> --state hidden`; hidden waits must use a CSS selector and an internally
+escaped `wait --fn` visibility condition, while snapshot refs remain valid only for visible waits.
+Built-in Lightpanda and Camofox therefore do not advertise this surface today; Browser Use mode uses `browser_exec`.
+File upload/download is deliberately outside `browser_interact` and must use the browser artifact
+transport/provenance boundary rather than accepting arbitrary host paths. A bound browser-controller
+lane remains authoritative: unsupported interaction capability fails closed instead of falling back
+to a different browser.
 
 ## Delegation (`tools/delegate_tool.py`)
 
