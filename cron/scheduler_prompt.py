@@ -209,6 +209,22 @@ _CRON_HINT = (
 )
 
 
+def _goal_completion_hint(job: dict) -> str:
+    """Runtime protocol for opt-in goal-oriented recurring jobs."""
+    if not job.get("stop_when_done"):
+        return ""
+    return (
+        "[GOAL COMPLETION: This recurring job should stop once its requested real-world "
+        "goal is actually satisfied. If and only if you have evidence that the goal is complete, "
+        "put the literal ASCII token \"[DONE]\" on its own FIRST line, followed by a concise "
+        "user-facing completion summary. Do not emit [DONE] merely because this run succeeded, "
+        "you made progress, or there is nothing new yet. While the goal is still pending, report "
+        "new information normally or use [SILENT] when there is genuinely nothing new. The "
+        "scheduler will preserve the final run and retire the existing job automatically; do not "
+        "remove, pause, create, or update cron jobs yourself to stop it.]\n\n"
+    )
+
+
 def _build_job_prompt(
     job: dict, prerun_script: Optional[tuple] = None, extra_prompt: Optional[str] = None) -> str:
     """Build the effective prompt for a cron job, optionally loading skills first.
@@ -255,7 +271,7 @@ def _build_job_prompt(
         prompt = f"{notepad_section}{prompt}"
         has_injected_data = True
 
-    prompt = _CRON_HINT + prompt
+    prompt = _CRON_HINT + _goal_completion_hint(job) + prompt
     skill_names = _job_skill_names(job)
     if not skill_names:
         return _scan_assembled_cron_prompt(
