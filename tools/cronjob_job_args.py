@@ -362,6 +362,8 @@ def _format_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "model": job.get("model"),
         "provider": job.get("provider"),
         "base_url": job.get("base_url"),
+        # Missing is the backward-compatible inherit state.
+        "approval_mode": job.get("approval_mode") or "inherit",
         "schedule": job.get("schedule_display") or "?",
         "repeat": _repeat_display(job),
         "deliver": job.get("deliver", "local"),

@@ -1,17 +1,16 @@
 """Behavior contract for the cron.allow_agent_scheduling config gate.
 
 ``_resolve_cron_disabled_toolsets`` decides which toolsets a cron-spawned
-agent must never receive. Historically ``cronjob`` was hard-denied there as
-loop-prevention policy. The ``cron.allow_agent_scheduling`` gate (config.yaml,
-default off) makes that denial opt-out-able:
+agent must never receive. ``cronjob`` is a loop-prevention policy gate, not a
+security boundary. It is lifted either by the fleet-wide
+``cron.allow_agent_scheduling`` setting or by an explicit per-job
+``approval_mode=approve`` delegation:
 
-  - gate off / absent: byte-exact current behavior — ``cronjob`` denied.
-  - gate on: ``cronjob`` dropped from the base denylist; ``messaging`` and
-    ``clarify`` (interactivity constraints) are ALWAYS denied regardless of
-    the gate.
-  - user-level ``agent.disabled_toolsets`` still layers on top, so a user who
-    denies ``cronjob`` globally keeps it denied even with the gate on
-    (per-job enabled_toolsets can never widen past the config denylist).
+  - gate off / absent + ordinary job: ``cronjob`` denied.
+  - fleet gate on OR approved job: ``cronjob`` dropped from the base denylist;
+    ``messaging`` and ``clarify`` remain denied.
+  - user-level ``agent.disabled_toolsets`` still layers on top, so an explicit
+    user deny of ``cronjob`` wins over both delegation paths.
 """
 
 import pytest
@@ -92,6 +91,29 @@ class TestGateOn:
         assert "browser" in disabled
         assert "cronjob" not in disabled
 
+
+class TestDelegatedJobScheduling:
+    def test_approved_job_lifts_loop_prevention_gate(self):
+        disabled = _resolve_cron_disabled_toolsets(
+            {}, {"approval_mode": "approve"}
+        )
+        assert "cronjob" not in disabled
+        for name in ALWAYS_DISABLED:
+            assert name in disabled
+
+    @pytest.mark.parametrize("mode", [None, "inherit", "deny"])
+    def test_nonapproved_job_keeps_default_gate(self, mode):
+        disabled = _resolve_cron_disabled_toolsets(
+            {}, {"approval_mode": mode}
+        )
+        assert "cronjob" in disabled
+
+    def test_user_denylist_still_wins_for_approved_job(self):
+        cfg = {"agent": {"disabled_toolsets": ["cronjob"]}}
+        disabled = _resolve_cron_disabled_toolsets(
+            cfg, {"approval_mode": "approve"}
+        )
+        assert "cronjob" in disabled
 
 class TestUserLayerUnchanged:
     def test_user_denylist_still_layers_when_gate_off(self):
