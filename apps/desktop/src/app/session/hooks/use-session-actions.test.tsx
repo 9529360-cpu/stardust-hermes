@@ -155,16 +155,24 @@ function Harness({
   navigate = vi.fn(),
   onReady,
   requestGateway,
+  runtimeIdByStoredSessionIdRef: runtimeIdByStoredSessionIdRefOverride,
   selectedStoredSessionId = null,
-  selectedStoredSessionIdRef: selectedStoredSessionIdRefOverride
+  selectedStoredSessionIdRef: selectedStoredSessionIdRefOverride,
+  updateSessionState: updateSessionStateOverride
 }: {
   activeSessionId?: null | string
   activeSessionIdRef?: MutableRefObject<null | string>
   navigate?: ReturnType<typeof vi.fn>
   onReady: (handle: HarnessHandle) => void
   requestGateway: <T>(method: string, params?: Record<string, unknown>) => Promise<T>
+  runtimeIdByStoredSessionIdRef?: MutableRefObject<Map<string, string>>
   selectedStoredSessionId?: null | string
   selectedStoredSessionIdRef?: MutableRefObject<null | string>
+  updateSessionState?: (
+    sessionId: string,
+    updater: (state: ClientSessionState) => ClientSessionState,
+    storedSessionId?: null | string
+  ) => ClientSessionState
 }) {
   const ref = <T,>(value: T): MutableRefObject<T> => ({ current: value })
 
@@ -179,12 +187,12 @@ function Harness({
     navigate: navigate as never,
     requestGateway,
     resetViewSync: vi.fn(),
-    runtimeIdByStoredSessionIdRef: ref(new Map<string, string>()),
+    runtimeIdByStoredSessionIdRef: runtimeIdByStoredSessionIdRefOverride ?? ref(new Map<string, string>()),
     selectedStoredSessionId,
     selectedStoredSessionIdRef: selectedStoredSessionIdRefOverride ?? ref(selectedStoredSessionId),
     sessionStateByRuntimeIdRef: ref(new Map<string, ClientSessionState>()),
     syncSessionStateToView: vi.fn(),
-    updateSessionState: () => ({}) as ClientSessionState
+    updateSessionState: updateSessionStateOverride ?? (() => ({}) as ClientSessionState)
   })
 
   useEffect(() => {
@@ -405,6 +413,113 @@ describe('connection-qualified session deletion', () => {
     })
     expect(selectedStoredSessionIdRef.current).toBeNull()
     expect(activeSessionIdRef.current).toBeNull()
+  })
+
+  it('interrupts and closes a non-selected session resolved from the runtime map', async () => {
+    const requestGateway = vi.fn().mockResolvedValue({})
+    const runtimeIdByStoredSessionIdRef: MutableRefObject<Map<string, string>> = {
+      current: new Map([['background-session', 'runtime-bg']])
+    }
+    const updateSessionState = vi.fn(
+      (_sessionId: string, updater: (state: ClientSessionState) => ClientSessionState) =>
+        updater({ interrupted: false, needsInput: true } as ClientSessionState)
+    )
+    let actions: HarnessHandle | null = null
+
+    setSessions([
+      storedSession({
+        connection_id: 'source-a',
+        id: 'background-session',
+        profile: 'worker'
+      })
+    ])
+    vi.mocked(deleteSession).mockResolvedValue({ ok: true })
+    vi.mocked(requestGatewayForAgent).mockResolvedValue({} as never)
+
+    render(
+      <Harness
+        activeSessionId="runtime-foreground"
+        onReady={value => {
+          actions = value
+        }}
+        requestGateway={requestGateway}
+        runtimeIdByStoredSessionIdRef={runtimeIdByStoredSessionIdRef}
+        selectedStoredSessionId="foreground-session"
+        updateSessionState={updateSessionState}
+      />
+    )
+    await waitFor(() => expect(actions).not.toBeNull())
+
+    await act(async () => {
+      await actions?.removeSession('background-session')
+    })
+
+    expect(requestGatewayForAgent).toHaveBeenCalledWith('source-a', 'worker', 'session.interrupt', {
+      session_id: 'runtime-bg'
+    })
+    expect(requestGatewayForAgent).toHaveBeenCalledWith('source-a', 'worker', 'session.close', {
+      session_id: 'runtime-bg'
+    })
+    expect(requestGatewayForAgent).not.toHaveBeenCalledWith('source-a', 'worker', 'session.interrupt', {
+      session_id: 'runtime-foreground'
+    })
+    expect(updateSessionState.mock.results[0].value).toMatchObject({ interrupted: true, needsInput: false })
+    expect(updateSessionState.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(requestGatewayForAgent).mock.invocationCallOrder[0]
+    )
+  })
+
+  it('rolls deletion back when interrupting the runtime fails', async () => {
+    const requestGateway = vi.fn().mockResolvedValue({})
+    const updateSessionState = vi.fn(
+      (_sessionId: string, updater: (state: ClientSessionState) => ClientSessionState) =>
+        updater({ interrupted: false, needsInput: true } as ClientSessionState)
+    )
+    let actions: HarnessHandle | null = null
+
+    setSessions([
+      storedSession({
+        connection_id: 'source-a',
+        id: 'background-session',
+        profile: 'worker'
+      })
+    ])
+    vi.mocked(deleteSession).mockResolvedValue({ ok: true })
+    vi.mocked(requestGatewayForAgent).mockImplementation(
+      (async (_connectionId: string, _profile: string, method: string) => {
+        if (method === 'session.interrupt') {
+          throw new Error('gateway unreachable')
+        }
+
+        return {} as never
+      }) as never
+    )
+
+    render(
+      <Harness
+        activeSessionId="runtime-foreground"
+        onReady={value => {
+          actions = value
+        }}
+        requestGateway={requestGateway}
+        runtimeIdByStoredSessionIdRef={{ current: new Map([['background-session', 'runtime-bg']]) }}
+        selectedStoredSessionId="foreground-session"
+        updateSessionState={updateSessionState}
+      />
+    )
+    await waitFor(() => expect(actions).not.toBeNull())
+
+    await act(async () => {
+      await actions?.removeSession('background-session')
+    })
+
+    expect(requestGatewayForAgent).not.toHaveBeenCalledWith('source-a', 'worker', 'session.close', expect.anything())
+    expect(deleteSession).not.toHaveBeenCalled()
+    expect(updateSessionState.mock.results.at(-1)?.value).toMatchObject({
+      interrupted: false,
+      needsInput: true
+    })
+    expect($sessions.get().some(session => session.id === 'background-session')).toBe(true)
   })
 })
 

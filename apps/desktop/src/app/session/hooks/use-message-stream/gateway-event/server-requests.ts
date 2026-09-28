@@ -1,3 +1,5 @@
+import { JSON_RPC_INTERNAL_ERROR } from '@hermes/shared'
+
 import { readActivePreview } from '@/app/chat/right-rail/preview-reader'
 import { readActiveTerminal } from '@/app/right-sidebar/terminal/buffer'
 import { pendingClarifyToolPayload } from '@/app/session/hooks/use-session-actions/restore-pending-clarify'
@@ -59,6 +61,17 @@ const markNeedsInput = (ctx: ServerRequestContext) => {
   if (ctx.sessionId) {
     ctx.deps.updateSessionState(ctx.sessionId, state => ({ ...state, needsInput: true }))
   }
+}
+
+/** A stopped/deleted runtime cannot consent to a new blocking request. */
+const declineIfSessionStopped = (ctx: ServerRequestContext): boolean => {
+  if (!ctx.sessionId || !ctx.deps.sessionInterrupted(ctx.sessionId)) {
+    return false
+  }
+
+  ctx.request.fail(JSON_RPC_INTERNAL_ERROR, 'session interrupted')
+
+  return true
 }
 
 const notifyInput = (ctx: ServerRequestContext, body: string) => {
@@ -177,6 +190,10 @@ const approval: Handler = ctx => {
   const command = str(p.command)
   const description = str(p.description) || 'dangerous command'
 
+  if (declineIfSessionStopped(ctx)) {
+    return
+  }
+
   rememberServerRequest(request)
   void receiveApprovalRequest(null, {
     // false only when a tirith warning forbids it; backend omits the field otherwise.
@@ -207,6 +224,10 @@ const approval: Handler = ctx => {
 }
 
 const sudo: Handler = ctx => {
+  if (declineIfSessionStopped(ctx)) {
+    return
+  }
+
   rememberServerRequest(ctx.request)
   setSudoRequest({
     command: str(ctx.request.params.command),
@@ -222,6 +243,10 @@ const secret: Handler = ctx => {
   const envVar = str(p.env_var)
   const promptText = str(p.prompt)
 
+  if (declineIfSessionStopped(ctx)) {
+    return
+  }
+
   rememberServerRequest(ctx.request)
   setSecretRequest({ envVar, prompt: promptText, requestId: ctx.request.id, sessionId: ctx.sessionId || null })
   markNeedsInput(ctx)
@@ -231,6 +256,10 @@ const secret: Handler = ctx => {
 const vaultCode: Handler = ctx => {
   const p = ctx.request.params
   const site = str(p.site)
+
+  if (declineIfSessionStopped(ctx)) {
+    return
+  }
 
   rememberServerRequest(ctx.request)
   setVaultCodeRequest({ hint: str(p.hint), requestId: ctx.request.id, sessionId: ctx.sessionId || null, site })
@@ -243,6 +272,10 @@ const vaultSaveLogin: Handler = ctx => {
   const origin = str(p.origin)
   const site = str(p.site) || origin
 
+  if (declineIfSessionStopped(ctx)) {
+    return
+  }
+
   rememberServerRequest(ctx.request)
   setVaultSaveLoginRequest({ origin, requestId: ctx.request.id, sessionId: ctx.sessionId || null, site })
   markNeedsInput(ctx)
@@ -253,6 +286,10 @@ const vaultUnlockPrompt: Handler = ctx => {
   const p = ctx.request.params
   const backend = str(p.backend)
   const displayName = str(p.display_name) || backend
+
+  if (declineIfSessionStopped(ctx)) {
+    return
+  }
 
   rememberServerRequest(ctx.request)
   setVaultUnlockRequest({ backend, displayName, requestId: ctx.request.id, sessionId: ctx.sessionId || null })
