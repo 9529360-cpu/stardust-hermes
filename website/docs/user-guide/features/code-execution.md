@@ -29,6 +29,21 @@ print(summary)
 
 **Available tools inside scripts:** `web_search`, `web_extract`, `read_file`, `write_file`, `search_files`, `patch`, `terminal` (foreground only).
 
+For dynamic workflows, `hermes_tools` also exposes `available_tools()` and
+`call_tool(name, **kwargs)`. The first reports the whitelist active for that
+execution; the second dispatches a runtime-selected name through the same RPC,
+approval, and whitelist checks as the named wrappers. It does not make any
+additional tool available.
+
+```python
+from hermes_tools import available_tools, call_tool
+
+for name in available_tools():
+    if name == "terminal":
+        result = call_tool(name, command="python --version")
+        print(result)
+```
+
 ## When the Agent Uses This
 
 The agent uses `execute_code` when there are:
