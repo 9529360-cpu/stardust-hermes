@@ -121,8 +121,9 @@ def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]
     """Whether parent and child send model context to the same inference boundary.
 
     Read-only personal context may follow delegated work only when provider,
-    endpoint, model route, credential, and ACP transport are unchanged. An
-    operator-routed child outside that boundary must not receive it implicitly.
+    endpoint, model route, credential, fallback route, and ACP transport are
+    unchanged. An operator-routed child outside that boundary must not receive
+    it implicitly.
     """
     parent_provider = str(getattr(parent_agent, "provider", "") or "").strip().lower()
     child_provider = str(child_runtime.get("provider") or "").strip().lower()
@@ -147,6 +148,18 @@ def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]
     if not parent_api_key and hasattr(parent_agent, "_client_kwargs"):
         parent_api_key = (getattr(parent_agent, "_client_kwargs", {}) or {}).get("api_key")
     if parent_api_key != child_runtime.get("api_key"):
+        return False
+
+    def _fallback_route(value: Any) -> tuple[str, ...]:
+        if isinstance(value, str):
+            return (value.strip(),) if value.strip() else ()
+        if isinstance(value, (list, tuple)):
+            return tuple(str(item).strip() for item in value if str(item).strip())
+        return ()
+
+    if _fallback_route(getattr(parent_agent, "fallback_model", None)) != _fallback_route(
+        child_runtime.get("fallback_model")
+    ):
         return False
 
     parent_command = str(getattr(parent_agent, "acp_command", "") or "").strip()
