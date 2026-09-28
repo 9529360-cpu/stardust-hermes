@@ -1026,7 +1026,7 @@ CRONJOB_SCHEMA = {
 
 'resnap' adopts the CURRENT global inference resolution for an unpinned job (job_id) or all unpinned jobs (all=true) WITHOUT pinning it, so it keeps tracking future global changes — use after deliberately changing the default model.
 
-Jobs run in a fresh session. Normally they have no current-chat context, so prompts must be self-contained. With attach_to_session=true, Hermes also snapshots a bounded recent user/assistant tail at create/update time and supplies it as background context on future runs; it is a snapshot, not a live transcript link. The agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. Prefer updating an existing job over creating near-duplicates.""",
+Jobs run in a fresh session. Normally they have no current-chat context, so prompts must be self-contained. If future work depends on the current conversation, set attach_to_session=true: Hermes snapshots a bounded recent user/assistant tail at create/update time and supplies it as background context on future runs, instead of making you manually restate every piece of task context. It is a snapshot, not a live transcript link, so keep critical identifiers in the stored prompt. The agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. Prefer updating an existing job over creating near-duplicates.""",
     "parameters": {
         "type": "object",
         "properties": {
