@@ -23,6 +23,8 @@ def _parent():
     return SimpleNamespace(
         provider="openrouter",
         base_url="https://openrouter.ai/api/v1",
+        model="anthropic/claude-sonnet-4",
+        api_key="same-key",
         acp_command=None,
         acp_args=[],
         _memory_store=_SnapshotStore(),
@@ -34,6 +36,8 @@ def test_same_inference_boundary_inherits_frozen_snapshot():
     runtime = {
         "provider": "openrouter",
         "base_url": "https://openrouter.ai/api/v1/",
+        "model": parent.model,
+        "api_key": parent.api_key,
         "acp_command": None,
         "acp_args": [],
     }
@@ -50,6 +54,8 @@ def test_different_provider_or_endpoint_does_not_inherit_personal_context():
     assert _read_only_parent_memory_snapshot(parent, {
         "provider": "custom",
         "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
         "acp_command": None,
         "acp_args": [],
     }) is None
@@ -57,6 +63,30 @@ def test_different_provider_or_endpoint_does_not_inherit_personal_context():
     assert _read_only_parent_memory_snapshot(parent, {
         "provider": parent.provider,
         "base_url": "https://other.example/v1",
+        "model": parent.model,
+        "api_key": parent.api_key,
+        "acp_command": None,
+        "acp_args": [],
+    }) is None
+
+
+def test_different_model_or_credential_does_not_inherit_personal_context():
+    parent = _parent()
+
+    assert _read_only_parent_memory_snapshot(parent, {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": "google/gemini-2.5-pro",
+        "api_key": parent.api_key,
+        "acp_command": None,
+        "acp_args": [],
+    }) is None
+
+    assert _read_only_parent_memory_snapshot(parent, {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": "different-key",
         "acp_command": None,
         "acp_args": [],
     }) is None
@@ -70,6 +100,8 @@ def test_different_acp_transport_does_not_inherit_personal_context():
     assert _read_only_parent_memory_snapshot(parent, {
         "provider": parent.provider,
         "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
         "acp_command": "parent-acp",
         "acp_args": ["--profile", "other"],
     }) is None
@@ -115,6 +147,8 @@ def test_missing_or_broken_parent_store_is_non_blocking():
     runtime = {
         "provider": parent.provider,
         "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
         "acp_command": None,
         "acp_args": [],
     }
