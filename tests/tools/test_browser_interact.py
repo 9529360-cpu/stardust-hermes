@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
@@ -122,8 +123,11 @@ def test_select_tolerates_single_string_from_schema_weak_clients(browser_modules
         or {"success": True, "data": {}},
     )
 
+    weak_client_values: Any = "Quiet"
     result = json.loads(
-        bt.browser_interact(action="select", ref="@e2", values="Quiet", task_id="life-task")
+        bt.browser_interact(
+            action="select", ref="@e2", values=weak_client_values, task_id="life-task"
+        )
     )
 
     assert result["success"] is True
