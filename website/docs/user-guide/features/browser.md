@@ -658,7 +658,7 @@ It keeps these operations on the **same active browser session**:
 - `check` / `uncheck` — set checkbox or radio-style controls
 - `drag` — drag one referenced element onto another
 - `scroll_into_view` — bring a referenced element into the viewport
-- `wait_element`, `wait_text`, `wait_url`, `wait_load` — wait for the condition that proves a page-changing action finished
+- `wait_element`, `wait_text`, `wait_url`, `wait_load` — wait for the condition that proves a page-changing action finished. `wait_url` uses a literal URL substring (for example `/dashboard`), not a glob.
 
 Use snapshot refs such as `@e5` for element actions. For `wait_element`, a CSS selector is also
 accepted. Prefer `wait_text`, `wait_url`, or a specific element over repeatedly taking snapshots.
