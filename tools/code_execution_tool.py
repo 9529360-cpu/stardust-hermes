@@ -192,13 +192,41 @@ def _sandbox_failure_hint(stderr_text: str, enabled_tools=None) -> Optional[str]
 
 def generate_hermes_tools_module(enabled_tools: List[str],
                                  transport: str = "uds") -> str:
-    """Source of the hermes_tools.py stub module for SANDBOX_ALLOWED_TOOLS ∩ *enabled_tools*.
-    ``transport``: ``"uds"`` (local socket client) or ``"file"`` (file RPC, remote backends)."""
+    """Source of the hermes_tools.py module for this execute_code run.
+
+    Named wrappers preserve the existing ergonomic API. ``available_tools()`` and
+    ``call_tool()`` add bounded dynamic dispatch for programs that choose a tool name at
+    runtime; both are restricted to the same explicit SANDBOX_ALLOWED_TOOLS whitelist.
+    ``transport``: ``"uds"`` (local socket client) or ``"file"`` (file RPC, remote backends).
+    """
     header = _FILE_TRANSPORT_HEADER if transport == "file" else _UDS_TRANSPORT_HEADER
-    return header + "\n".join(
+    enabled = sorted(SANDBOX_ALLOWED_TOOLS & set(enabled_tools or ()))
+    helper_source = f"""
+_ENABLED_TOOLS = {tuple(enabled)!r}
+
+def available_tools():
+    \"\"\"Return the tool names enabled for this execute_code run.\"\"\"
+    return _ENABLED_TOOLS
+
+def call_tool(name: str, **kwargs):
+    \"\"\"Call one enabled Hermes tool by name.
+
+    Prefer the named wrappers when the tool is known statically; this helper is for loops,
+    routing tables, and other cases where the tool name is chosen at runtime.
+    \"\"\"
+    if name not in _ENABLED_TOOLS:
+        raise ValueError(
+            f"Tool {{name!r}} is not available in this execute_code run. "
+            f"Available: {{', '.join(_ENABLED_TOOLS)}}"
+        )
+    return _call(name, kwargs)
+
+"""
+    wrappers = "\n".join(
         f"def {name}({sig}):\n    {doc}\n    return _call({name!r}, {args_expr})\n"
-        for name, (sig, doc, args_expr) in sorted(_TOOL_STUBS.items()) if name in set(enabled_tools)
+        for name, (sig, doc, args_expr) in sorted(_TOOL_STUBS.items()) if name in enabled
     )
+    return header + helper_source + wrappers
 
 
 # ---- Shared helpers section (embedded in both transport headers) ----------
@@ -858,7 +886,10 @@ def build_execute_code_schema(enabled_sandbox_tools: set = None,
         "Limits: 5-minute timeout, max 50 tool calls per call. Stdout over "
         "50KB shows head/tail inline; the FULL text is auto-saved to a file whose path rides in the result.\n\n"
         f"{cwd_note}\n\n"
-        "Helpers require imports: `from hermes_tools import json_parse, shell_quote, retry`. "
+        "Dynamic dispatch helpers: `available_tools()` returns the tools enabled for this run; "
+        "`call_tool(name, **kwargs)` calls one of those tools by runtime-selected name through the "
+        "same RPC whitelist and approval path. Prefer named wrappers when the tool is known. "
+        "Other helpers require imports: `from hermes_tools import json_parse, shell_quote, retry`. "
         "json_parse(text) — tolerant "
         "json.loads for terminal() output; shell_quote(s) — shlex.quote for "
         "dynamic shell args; retry(fn, max_attempts=3, delay=2) — exponential backoff."
