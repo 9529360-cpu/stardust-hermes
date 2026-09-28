@@ -24,8 +24,8 @@ interface UseComposerDropArgs {
 /**
  * Drag-and-drop attachment engine. Splits drops by origin: in-app drags
  * (project tree / gutter) stay inline `@file:`/`@line:` refs the gateway
- * resolves directly; OS/Finder drops (absolute local paths a remote gateway
- * can't read, image bytes vision needs) route through the upload pipeline.
+ * resolves directly. OS/Finder drops stage only when the backend cannot read
+ * this machine's path directly (or vision needs an image staged gateway-side).
  * Off the keystroke path; consumes `insertInlineRefs` + the attach handler.
  */
 export function useComposerDrop({
@@ -103,8 +103,8 @@ export function useComposerDrop({
 
     // In-app drags (project tree / gutter) are workspace-relative paths the
     // gateway resolves directly, so they stay inline @file:/@line: refs. OS
-    // drops are absolute local paths a remote gateway can't read (and images
-    // need byte upload for vision), so route them through the upload pipeline.
+    // drops keep their original path when this backend shares the Desktop
+    // filesystem; remote/container/cross-filesystem drops and images stage.
     const { inAppRefs, osDrops } = partitionDroppedFiles(candidates, osDropStaging())
     const refs = droppedFileInlineRefs(inAppRefs, cwd)
 
@@ -148,9 +148,9 @@ export function useComposerDrop({
     resetDragState()
 
     // Dropping straight onto the text box used to inline-ref *every* file —
-    // including OS/Finder drops, whose absolute local path a remote gateway
-    // can't read and whose image bytes never reached vision. Split by origin:
-    // in-app drags stay inline refs; OS drops go through the upload pipeline.
+    // including OS/Finder drops a remote/container backend cannot read and
+    // images whose bytes must reach vision. Split by actual staging need:
+    // shared-local non-images stay inline; unsafe paths/images stage.
     // (When no upload handler is wired, fall back to inline refs for all.)
     const attach = onAttachDroppedItems
     const { inAppRefs, osDrops } = partitionDroppedFiles(candidates, osDropStaging())
