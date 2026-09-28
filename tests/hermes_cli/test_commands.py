@@ -95,6 +95,7 @@ class TestResolveCommandAliases:
     def test_s_resolves_to_steer(self):
         cmd = resolve_command("s")
         assert cmd is not None and cmd.name == "steer"
+        assert "s" in GATEWAY_KNOWN_COMMANDS
 
     def test_exact_names_still_win_over_one_letter_alias(self):
         assert resolve_command("sessions").name == "sessions"
@@ -132,6 +133,7 @@ class TestDerivedDicts:
         assert "/bg" in COMMANDS
         assert "/reset" in COMMANDS
         assert "/q" in COMMANDS
+        assert "/s" in COMMANDS
         assert "/exit" in COMMANDS
         assert "/reload_mcp" in COMMANDS
         assert "/gateway" in COMMANDS
