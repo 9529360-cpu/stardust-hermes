@@ -65,6 +65,15 @@ PROGRESS_RESET_TOOL_NAMES = frozenset({
     "cronjob_manage", "todo", "todo_list", "memory", "skill_manage",
 })
 
+
+def _browser_interact_is_wait(args: Mapping[str, Any] | None) -> bool:
+    """Mixed browser_interact calls: waits observe state; the other actions mutate it."""
+    return (
+        isinstance(args, Mapping)
+        and str(args.get("action") or "").strip().lower().startswith("wait_")
+    )
+
+
 _BOOL_FIELDS = ("warnings_enabled", "hard_stop_enabled", "non_interactive_hard_stop_enabled")
 # Threshold field -> (nested section, nested key). The flat legacy key is the field name itself.
 _THRESHOLD_SOURCES: dict[str, tuple[str, str]] = {
@@ -358,7 +367,7 @@ class ToolCallGuardrailController:
         exact_count = 0 if self._progress_since_failure.get(signature) else self._exact_failure_counts.get(signature, 0)
         if exact_count >= self.config.exact_failure_block_after:
             return self._decide("block", "repeated_exact_failure_block", tool_name, exact_count, signature)
-        record = self._no_progress.get(signature) if self._is_idempotent(tool_name) else None
+        record = self._no_progress.get(signature) if self._is_idempotent(tool_name, args) else None
         if record is not None and record[1] >= self.config.no_progress_block_after:
             return self._decide("block", "idempotent_no_progress_block", tool_name, record[1], signature)
         return allow
@@ -408,10 +417,14 @@ class ToolCallGuardrailController:
         self._same_tool_failure_counts.pop(tool_name, None)
         # A successful mutation is progress for every failing signature still counted
         # this turn. Pure loops never mutate between attempts, so the replay detector keeps its teeth.
-        if tool_name in PROGRESS_RESET_TOOL_NAMES or file_mutation_result_landed(tool_name, result):
+        call_marks_progress = (
+            tool_name in PROGRESS_RESET_TOOL_NAMES
+            and not (tool_name == "browser_interact" and _browser_interact_is_wait(args))
+        )
+        if call_marks_progress or file_mutation_result_landed(tool_name, result):
             self._progress_since_failure.update(dict.fromkeys(self._exact_failure_counts, True))
             self._same_tool_failure_counts.clear()
-        if not self._is_idempotent(tool_name):
+        if not self._is_idempotent(tool_name, args):
             self._no_progress.pop(signature, None)
             return ToolGuardrailDecision(tool_name=tool_name, signature=signature)
 
@@ -423,7 +436,9 @@ class ToolCallGuardrailController:
             return self._decide("warn", "idempotent_no_progress_warning", tool_name, repeat_count, signature)
         return ToolGuardrailDecision(tool_name=tool_name, count=repeat_count, signature=signature)
 
-    def _is_idempotent(self, tool_name: str) -> bool:
+    def _is_idempotent(self, tool_name: str, args: Mapping[str, Any] | None = None) -> bool:
+        if tool_name == "browser_interact":
+            return _browser_interact_is_wait(args)
         return tool_name not in self.config.mutating_tools and tool_name in self.config.idempotent_tools
 
     def observe_call(
