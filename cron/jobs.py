@@ -1718,12 +1718,14 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "no_agent": bool,
     "context_from": _normalize_context_from,
     "failure_deliver": _normalize_failure_deliver,
+    "handoff_context": _normalize_job_optional_text,
     "approval_mode": _normalize_job_approval_mode,
     "stop_when_done": _normalize_optional_bool,
 }
 _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "approval_mode": _normalize_job_approval_mode,
     "stop_when_done": _normalize_optional_bool,
+    "handoff_context": _normalize_job_optional_text,
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
@@ -1841,6 +1843,7 @@ def create_job(
     workdir: Optional[str] = None,
     no_agent: bool = False,
     attach_to_session: Optional[bool] = None,
+    handoff_context: Optional[str] = None,
     stop_when_done: Optional[bool] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
@@ -1950,6 +1953,7 @@ def create_job(
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
         ("source_suggestion_id", source_suggestion_id), ("approval_mode", f["approval_mode"]),
+        ("handoff_context", f["handoff_context"] if normalized_attach is True else None),
         ("stop_when_done", True if f["stop_when_done"] else None),
     ):
         if value is not None:
@@ -2134,6 +2138,10 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
             updated.pop("approval_mode", None)
         if not updated.get("stop_when_done"):
             updated.pop("stop_when_done", None)
+        # Hidden session handoff belongs only to explicitly attached jobs. A failed
+        # explicit refresh stores no stale transcript snapshot.
+        if updated.get("attach_to_session") is not True or updated.get("handoff_context") is None:
+            updated.pop("handoff_context", None)
         _reject_terminal_activation(job, updated, job_id)
         # Re-check on the MERGED record; scoped to changed fields so legacy records keep loading.
         if {"monitor_script", "monitor_url", "no_agent", "script", "stop_when_done"}.intersection(updates):

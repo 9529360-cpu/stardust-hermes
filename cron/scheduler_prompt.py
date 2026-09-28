@@ -61,6 +61,24 @@ _UPSTREAM_CONTEXT_INTRO = (
     "The following is the most recent output from a preceding cron job. Use it as context for "
     "your analysis."
 )
+_SESSION_HANDOFF_INTRO = (
+    "The following is a bounded snapshot of the recent user/assistant conversation from when "
+    "this attached cron job was created or refreshed. Use it only as background for the stored "
+    "job instruction below. It is intentionally not a live transcript and may be older than "
+    "other runtime context."
+)
+
+
+def _inject_session_handoff(job: dict, prompt: str) -> tuple[str, bool]:
+    """Inject a persisted creation-time session snapshot when one exists."""
+    body = str(job.get("handoff_context") or "").strip()
+    if not body:
+        return prompt, False
+    if len(body) > _MAX_CONTEXT_CHARS:
+        body = body[:_MAX_CONTEXT_CHARS].rstrip() + "\n\n[... handoff truncated ...]"
+    return _prepend_context_block(
+        prompt, "Creation-time task handoff", _SESSION_HANDOFF_INTRO, body
+    ), True
 
 
 def _inject_context_from(job: dict, prompt: str) -> tuple[str, bool]:
@@ -260,6 +278,9 @@ def _build_job_prompt(
         )
         prompt = _prepend_context_block(prompt, heading, intro, script_output)
         has_injected_data = True
+
+    prompt, _handoff_injected = _inject_session_handoff(job, prompt)
+    has_injected_data = has_injected_data or _handoff_injected
 
     prompt, _ctx_injected = _inject_context_from(job, prompt)
     has_injected_data = has_injected_data or _ctx_injected
