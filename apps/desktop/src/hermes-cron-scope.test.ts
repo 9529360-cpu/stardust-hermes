@@ -104,4 +104,49 @@ describe('cron helpers are profile-scoped', () => {
     void getCronJobs()
     expect(api.mock.calls.at(-1)?.[0].path).toBe('/api/cron/jobs')
   })
+
+
+  it('stamps the active registry connection onto returned cron run rows', async () => {
+    setApiRequestProfile('research')
+    setApiRequestConnection('gw-tailscale')
+    api.mockResolvedValueOnce({
+      runs: [{ id: 'cron-nightly-1', profile: 'research', source: 'cron' }]
+    } as never)
+
+    const rows = await getCronJobRuns('job-1')
+
+    expect(rows[0]).toMatchObject({
+      connection_id: 'gw-tailscale',
+      id: 'cron-nightly-1',
+      profile: 'research'
+    })
+  })
+
+  it('leaves local cron run rows untagged', async () => {
+    api.mockResolvedValueOnce({
+      runs: [{ id: 'cron-local-1', profile: 'default', source: 'cron' }]
+    } as never)
+
+    const rows = await getCronJobRuns('job-1')
+
+    expect(rows[0]?.connection_id).toBeUndefined()
+  })
+
+  it('does not overwrite an owner already present on a cron run row', async () => {
+    setApiRequestConnection('gw-tailscale')
+    api.mockResolvedValueOnce({
+      runs: [
+        {
+          connection_id: 'gw-homelab',
+          id: 'cron-remote-1',
+          profile: 'research',
+          source: 'cron'
+        }
+      ]
+    } as never)
+
+    const rows = await getCronJobRuns('job-1')
+
+    expect(rows[0]?.connection_id).toBe('gw-homelab')
+  })
 })
