@@ -197,4 +197,69 @@ describe('session transcript pagination ownership', () => {
     expect(transcriptTailState('stored-session', { connectionId: 'source-a', profile: 'default' })).toBe(defaultA)
     expect(transcriptTailState('stored-session', ownerB)).toBe(defaultB)
   })
+  it('reads the complete transcript instead of adopting an oldest page from an orderless backend', async () => {
+    setApiRequestConnection(null)
+    const owner = { connectionId: 'local', profile: 'default' }
+    const oldest = Array.from({ length: LATEST_SESSION_MESSAGES_LIMIT }, (_, index) => row(index + 1))
+    api.mockResolvedValueOnce({
+      session_id: 'stored-session',
+      messages: oldest,
+      pagination: { limit: LATEST_SESSION_MESSAGES_LIMIT, offset: 0, returned: oldest.length }
+    })
+    const all = Array.from({ length: 400 }, (_, index) => row(index + 1))
+    api.mockResolvedValueOnce({
+      session_id: 'stored-session',
+      messages: all,
+      pagination: { limit: 500, offset: 0, returned: all.length }
+    })
+
+    const authoritative = await getLatestSessionMessages('stored-session')
+
+    expect(authoritative.messages.map(message => message.id)).toEqual(all.map(message => message.id))
+    expect(authoritative.pagination).toBeUndefined()
+    expect(transcriptBackfillAvailable('stored-session', owner)).toBe(false)
+    expect(api).toHaveBeenLastCalledWith({
+      path: '/api/sessions/stored-session/messages?limit=500&offset=0&order=oldest&include_compacted=true'
+    })
+  })
+
+  it('keeps a passive tail read passive during the compatibility fallback', async () => {
+    setApiRequestConnection(null)
+    const oldest = Array.from({ length: LATEST_SESSION_MESSAGES_LIMIT }, (_, index) => row(index + 1))
+    api.mockResolvedValueOnce({
+      session_id: 'stored-session',
+      messages: oldest,
+      pagination: { limit: LATEST_SESSION_MESSAGES_LIMIT, offset: 0, returned: oldest.length }
+    })
+    api.mockResolvedValueOnce({ session_id: 'stored-session', messages: oldest })
+
+    await getLatestSessionMessages('stored-session', undefined, { passive: true })
+
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(api).toHaveBeenLastCalledWith({
+      path: '/api/sessions/stored-session/messages?limit=500&offset=0&order=oldest&include_compacted=true',
+      passive: true
+    })
+  })
+
+  it.each([
+    ['a short orderless page', { limit: LATEST_SESSION_MESSAGES_LIMIT, offset: 0, returned: 3 }],
+    ['a page without pagination metadata', undefined]
+  ])('adopts %s as a complete transcript without a second read', async (_label, pagination) => {
+    setApiRequestConnection(null)
+    const owner = { connectionId: 'local', profile: 'default' }
+    const all = [row(1), row(2), row(3)]
+    api.mockResolvedValueOnce({
+      session_id: 'stored-session',
+      messages: all,
+      ...(pagination ? { pagination } : {})
+    })
+
+    const authoritative = await getLatestSessionMessages('stored-session')
+
+    expect(api).toHaveBeenCalledTimes(1)
+    expect(authoritative.messages.map(message => message.id)).toEqual([1, 2, 3])
+    expect(authoritative.pagination).toBeUndefined()
+    expect(transcriptBackfillAvailable('stored-session', owner)).toBe(false)
+  })
 })
