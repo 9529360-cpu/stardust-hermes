@@ -468,6 +468,10 @@ def _extract_cron_done_response(text: str) -> tuple[str, bool]:
     if not marker_indexes:
         return str(text or ""), False
     cleaned = "\n".join(line for i, line in enumerate(lines) if i not in marker_indexes).strip()
+    # Completion must remain user-visible even if the model accidentally combines
+    # the terminal marker with the ordinary silence marker.
+    if cleaned and _is_cron_silence_response(cleaned):
+        cleaned = ""
     return cleaned or "Task completed.", True
 
 
