@@ -152,16 +152,15 @@ def _same_inference_privacy_boundary(
     if parent_api_key != child_runtime.get("api_key"):
         return False
 
-    def _fallback_route(value: Any) -> tuple[str, ...]:
-        if isinstance(value, str):
-            return (value.strip(),) if value.strip() else ()
-        if isinstance(value, (list, tuple)):
-            return tuple(str(item).strip() for item in value if str(item).strip())
-        return ()
-
-    if _fallback_route(getattr(parent_agent, "fallback_model", None)) != _fallback_route(
-        child_runtime.get("fallback_model")
-    ):
+    # _fallback_chain is the parent's canonical resolved fallback owner; the
+    # child runtime's fallback_model carries that same normalized list forward.
+    parent_fallback = getattr(parent_agent, "_fallback_chain", None)
+    if not isinstance(parent_fallback, list):
+        parent_fallback = None
+    child_fallback = child_runtime.get("fallback_model")
+    if not isinstance(child_fallback, list):
+        child_fallback = None
+    if parent_fallback != child_fallback:
         return False
 
     parent_request_overrides = dict(getattr(parent_agent, "request_overrides", {}) or {})
