@@ -124,6 +124,7 @@ def _session_attachments_workspace(session: dict) -> Path | None:
             return workspace
     return None
 
+
 def _session_images_dir(session: dict) -> Path:
     return _session_home_dir(session, "images")
 
