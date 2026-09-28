@@ -120,9 +120,9 @@ _CHILD_MEMORY_SNAPSHOT_MAX_CHARS = 8_000
 def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]) -> bool:
     """Whether parent and child send model context to the same inference boundary.
 
-    Read-only personal context may follow delegated work within the same provider
-    endpoint, but an operator-routed child on another provider/endpoint must not
-    receive it implicitly.
+    Read-only personal context may follow delegated work only when provider,
+    endpoint, model route, credential, and ACP transport are unchanged. An
+    operator-routed child outside that boundary must not receive it implicitly.
     """
     parent_provider = str(getattr(parent_agent, "provider", "") or "").strip().lower()
     child_provider = str(child_runtime.get("provider") or "").strip().lower()
@@ -133,6 +133,20 @@ def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]
         return str(value or "").strip().rstrip("/")
 
     if _endpoint(getattr(parent_agent, "base_url", None)) != _endpoint(child_runtime.get("base_url")):
+        return False
+
+    # A different model may represent a different downstream inference vendor
+    # even behind the same gateway endpoint (for example OpenRouter). Treat it
+    # as a new privacy boundary rather than silently forwarding personal data.
+    parent_model = str(getattr(parent_agent, "model", "") or "").strip()
+    child_model = str(child_runtime.get("model") or "").strip()
+    if parent_model != child_model:
+        return False
+
+    parent_api_key = getattr(parent_agent, "api_key", None)
+    if not parent_api_key and hasattr(parent_agent, "_client_kwargs"):
+        parent_api_key = (getattr(parent_agent, "_client_kwargs", {}) or {}).get("api_key")
+    if parent_api_key != child_runtime.get("api_key"):
         return False
 
     parent_command = str(getattr(parent_agent, "acp_command", "") or "").strip()
