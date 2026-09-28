@@ -69,7 +69,7 @@ def test_schema_keeps_advanced_actions_compact_and_excludes_file_transfer():
         (
             {"action": "wait_element", "ref": "#spinner", "state": "hidden"},
             "wait",
-            ["#spinner", "--state", "hidden"],
+            ["--fn", "(() => { const el = document.querySelector(\"#spinner\"); if (!el) return true; const s = getComputedStyle(el); return s.display === 'none' || s.visibility === 'hidden' || s.visibility === 'collapse' || el.getClientRects().length === 0; })()"],
             {"waited_for": "element", "selector": "#spinner", "state": "hidden"},
         ),
         (
@@ -145,6 +145,10 @@ def test_select_tolerates_single_string_from_schema_weak_clients(browser_modules
         ({"action": "wait_text"}, "requires non-empty text"),
         ({"action": "wait_url"}, "requires non-empty url_contains"),
         ({"action": "wait_load", "load_state": "idle-ish"}, "load_state must be"),
+        (
+            {"action": "wait_element", "ref": "@e9", "state": "hidden"},
+            "state='hidden' requires a CSS selector",
+        ),
         ({"action": "not-a-real-action"}, "Unknown browser_interact action"),
     ],
 )
@@ -179,6 +183,31 @@ def test_wait_rechecks_private_page_after_condition_completes(browser_modules, m
     )
 
     assert result == {"success": False, "error": "private page blocked"}
+
+
+def test_hidden_wait_escapes_css_selector_as_data(browser_modules, monkeypatch):
+    bt, _interactions = browser_modules
+    calls = []
+    monkeypatch.setattr(
+        bt._session,
+        "_run_browser_command",
+        lambda task_id, cmd, args: calls.append((task_id, cmd, args))
+        or {"success": True, "data": {}},
+    )
+
+    selector = '#spinner"); globalThis.pwned = true; //'
+    result = json.loads(
+        bt.browser_interact(
+            action="wait_element", ref=selector, state="hidden", task_id="life-task"
+        )
+    )
+
+    assert result["success"] is True
+    expression = calls[0][2][1]
+    assert calls[0][:2] == ("life-task", "wait")
+    assert calls[0][2][0] == "--fn"
+    assert json.dumps(selector) in expression
+    assert expression.count("querySelector(") == 1
 
 
 def test_wait_url_escapes_user_text_as_data_not_javascript(browser_modules, monkeypatch):
