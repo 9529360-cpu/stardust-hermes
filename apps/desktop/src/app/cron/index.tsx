@@ -1011,7 +1011,7 @@ interface CronJobDetailProps {
   c: Translations['cron']
   job: CronJob
   onEdit: () => void
-  onOpenSession?: (sessionId: string) => void
+  onOpenSession?: (sessionId: string, session?: SessionInfo) => void
   onPauseResume: () => void
   onTrigger: () => void
 }
