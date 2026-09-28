@@ -86,8 +86,10 @@ condition waits. It maps to the existing agent-browser session; do not emulate t
 temporary fallback browser because the resulting page state would be lost. URL waits deliberately
 use an internally escaped `window.location.href.includes(...)` condition rather than agent-browser
 `wait --url`: the pinned `^0.26.0` line has broken glob matching, so Stardust's maintained
-contract is a literal substring until the dependency floor is deliberately upgraded. Built-in Lightpanda and
-Camofox therefore do not advertise this surface today; Browser Use mode uses `browser_exec`.
+contract is a literal substring until the dependency floor is deliberately upgraded. The same pinned
+line also lacks `wait <selector> --state hidden`; hidden waits must use a CSS selector and an internally
+escaped `wait --fn` visibility condition, while snapshot refs remain valid only for visible waits.
+Built-in Lightpanda and Camofox therefore do not advertise this surface today; Browser Use mode uses `browser_exec`.
 File upload/download is deliberately outside `browser_interact` and must use the browser artifact
 transport/provenance boundary rather than accepting arbitrary host paths. A bound browser-controller
 lane remains authoritative: unsupported interaction capability fails closed instead of falling back
