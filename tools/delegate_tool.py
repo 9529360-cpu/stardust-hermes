@@ -114,7 +114,69 @@ def _apply_child_cache_ttl(child) -> None:
         child._cache_ttl = "5m"
 
 _CHILD_CAP_MIN = 16_000  # below this a child compresses on every call; treat as a config error
+_CHILD_MEMORY_SNAPSHOT_MAX_CHARS = 8_000
 
+
+def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]) -> bool:
+    """Whether parent and child send model context to the same inference boundary.
+
+    Read-only personal context may follow delegated work within the same provider
+    endpoint, but an operator-routed child on another provider/endpoint must not
+    receive it implicitly.
+    """
+    parent_provider = str(getattr(parent_agent, "provider", "") or "").strip().lower()
+    child_provider = str(child_runtime.get("provider") or "").strip().lower()
+    if parent_provider != child_provider:
+        return False
+
+    def _endpoint(value: Any) -> str:
+        return str(value or "").strip().rstrip("/")
+
+    if _endpoint(getattr(parent_agent, "base_url", None)) != _endpoint(child_runtime.get("base_url")):
+        return False
+
+    parent_command = str(getattr(parent_agent, "acp_command", "") or "").strip()
+    child_command = str(child_runtime.get("acp_command") or "").strip()
+    if parent_command != child_command:
+        return False
+    if parent_command:
+        parent_args = list(getattr(parent_agent, "acp_args", []) or [])
+        child_args = list(child_runtime.get("acp_args") or [])
+        if parent_args != child_args:
+            return False
+    return True
+
+
+def _read_only_parent_memory_snapshot(parent_agent, child_runtime: Dict[str, Any]) -> Optional[str]:
+    """Return the parent frozen builtin memory snapshot for a same-boundary child.
+
+    The child still runs with skip_memory=True and no memory tool, so this is
+    context inheritance only: it cannot initialize providers, sync child turns,
+    or write shared MEMORY.md/USER.md.
+    """
+    if not _same_inference_privacy_boundary(parent_agent, child_runtime):
+        return None
+    store = getattr(parent_agent, "_memory_store", None)
+    formatter = getattr(store, "format_for_system_prompt", None)
+    if not callable(formatter):
+        return None
+
+    blocks: list[str] = []
+    for target in ("user", "memory"):
+        try:
+            block = formatter(target)
+        except Exception:
+            logger.debug("subagent: failed to read parent %s snapshot", target, exc_info=True)
+            continue
+        if isinstance(block, str) and block.strip():
+            blocks.append(block.strip())
+    if not blocks:
+        return None
+
+    snapshot = "\n\n".join(blocks)
+    if len(snapshot) > _CHILD_MEMORY_SNAPSHOT_MAX_CHARS:
+        snapshot = snapshot[:_CHILD_MEMORY_SNAPSHOT_MAX_CHARS].rstrip() + "\n[... parent memory snapshot truncated ...]"
+    return snapshot
 
 def _child_compression_cap_tokens(raw) -> "int | None":
     """Validated ``delegation.compression_threshold_tokens``: an int >= 16000, or None for "no cap".
@@ -200,10 +262,6 @@ def _build_child_agent(
     # as auxiliary.review.
     delegation_cfg = _load_config()
     child_toolsets, child_disabled_toolsets = _resolve_child_toolsets(parent_agent, toolsets, effective_role)
-    child_prompt = _build_child_system_prompt(
-        goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
-        max_spawn_depth=max_spawn, child_depth=child_depth,
-    )
     parent_api_key = getattr(parent_agent, "api_key", None)
     if (not parent_api_key) and hasattr(parent_agent, "_client_kwargs"):
         parent_api_key = parent_agent._client_kwargs.get("api_key")
@@ -222,6 +280,11 @@ def _build_child_agent(
         override_acp_command=override_acp_command,
         override_acp_args=override_acp_args,
         routing_cfg=routing_cfg,
+    )
+    child_prompt = _build_child_system_prompt(
+        goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
+        max_spawn_depth=max_spawn, child_depth=child_depth,
+        parent_memory_context=_read_only_parent_memory_snapshot(parent_agent, rt),
     )
     if override_request_overrides is not None:
         # honored whenever set, incl. the inherit branch where
