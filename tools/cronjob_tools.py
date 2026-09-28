@@ -609,6 +609,7 @@ def _action_create(a: Dict[str, Any]) -> str:
             script=_normalize_optional_job_value(script), context_from=context_from,
             enabled_toolsets=a["enabled_toolsets"] or None, workdir=_normalize_optional_job_value(a["workdir"]),
             no_agent=_no_agent, attach_to_session=a["attach_to_session"],
+            stop_when_done=a["stop_when_done"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             # CLI-only lane: absent from CRONJOB_SCHEMA and the model dispatch (models don't pick models).
@@ -809,11 +810,13 @@ def _update_context_from(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[s
 
 
 def _update_run_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str, Any]) -> Optional[str]:
-    """enabled_toolsets / attach_to_session / workdir / no_agent / repeat / schedule."""
+    """enabled_toolsets / attach_to_session / stop_when_done / workdir / no_agent / repeat / schedule."""
     if a["enabled_toolsets"] is not None:
         updates["enabled_toolsets"] = a["enabled_toolsets"] or None
     if a["attach_to_session"] is not None:
         updates["attach_to_session"] = bool(a["attach_to_session"])
+    if a["stop_when_done"] is not None:
+        updates["stop_when_done"] = bool(a["stop_when_done"])
     if a["workdir"] is not None:
         # Empty string clears; otherwise update_job() validates/normalizes.
         updates["workdir"] = _normalize_optional_job_value(a["workdir"]) or None
@@ -954,6 +957,7 @@ def cronjob(
     workdir: Optional[str] = None,
     no_agent: Optional[bool] = None,
     attach_to_session: Optional[bool] = None,
+    stop_when_done: Optional[bool] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
@@ -1077,6 +1081,10 @@ Jobs run in a fresh session with no current-chat context, so prompts must be sel
                 "type": "boolean",
                 "description": "True = each run sees the job's own previous output, so it can dedupe and continue where it left off (scouts, monitors, incremental digests). Default false. On update, false turns it off."
             },
+            "stop_when_done": {
+                "type": "boolean",
+                "description": "Optional goal-task mode for recurring agent jobs. True means the job should keep checking/working until its real-world goal is actually satisfied, then emit the runtime [DONE] marker and automatically enter the existing completed terminal state after delivering the final result. Use for bounded follow-ups such as 'track this package until delivered' or 'watch this refund until received', not perpetual reports/briefings. On update, false turns it off. Incompatible with no_agent."
+            },
             "enabled_toolsets": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -1118,7 +1126,7 @@ def check_cronjob_requirements() -> bool:
 _HANDLER_FORWARDED_ARGS = (
     "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver", "skill", "skills", "reason",
     "script", "context_from", "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
-    "paused_reason", "all")
+    "stop_when_done", "paused_reason", "all")
 
 
 def _cronjob_handler(args, **kw):
