@@ -119,6 +119,22 @@ def test_same_or_narrower_job_mode_change_does_not_request_approval(monkeypatch)
     ) is None
 
 
+def test_explicit_operator_grant_does_not_reprompt(monkeypatch):
+    import tools.approval as approval
+    from tools.cronjob_tools import _approval_mode_change_error
+
+    monkeypatch.setattr(
+        approval,
+        "request_tool_approval",
+        lambda *_a, **_kw: pytest.fail("explicit CLI grant must not prompt again"),
+    )
+    assert _approval_mode_change_error(
+        current_mode="inherit",
+        requested_mode="approve",
+        job_label="job",
+        preapproved=True,
+    ) is None
+
 def test_model_schema_and_job_view_expose_approval_mode():
     from tools.cronjob_job_args import _format_job
     from tools.cronjob_tools import CRONJOB_SCHEMA
