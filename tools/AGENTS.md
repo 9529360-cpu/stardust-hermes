@@ -83,7 +83,10 @@ fixed at the mount, not by adding a tool.
 **Browser transaction interactions:** `browser_interact` is one compact surface for advanced
 state-preserving form actions (hover/select/check/uncheck/drag/scroll-into-view) plus safe
 condition waits. It maps to the existing agent-browser session; do not emulate these actions in a
-temporary fallback browser because the resulting page state would be lost. Built-in Lightpanda and
+temporary fallback browser because the resulting page state would be lost. URL waits deliberately
+use an internally escaped `window.location.href.includes(...)` condition rather than agent-browser
+`wait --url`: the pinned `^0.26.0` line has broken glob matching, so Stardust's maintained
+contract is a literal substring until the dependency floor is deliberately upgraded. Built-in Lightpanda and
 Camofox therefore do not advertise this surface today; Browser Use mode uses `browser_exec`.
 File upload/download is deliberately outside `browser_interact` and must use the browser artifact
 transport/provenance boundary rather than accepting arbitrary host paths. A bound browser-controller
