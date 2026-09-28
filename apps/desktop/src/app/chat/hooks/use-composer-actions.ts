@@ -5,6 +5,7 @@ import { droppedFileInlineRef } from '@/app/chat/composer/inline-refs'
 import { pasteSizeLabel } from '@/app/chat/composer/large-paste'
 import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { useI18n } from '@/i18n'
+import { attachmentPathNeedsUpload } from '@/lib/attachment-upload-policy'
 import { attachmentId, contextPath, pathLabel } from '@/lib/chat-runtime'
 import { readDesktopFileDataUrlLocalFirst, selectDesktopPaths } from '@/lib/desktop-fs'
 import { desktopGit } from '@/lib/desktop-git'
@@ -287,17 +288,59 @@ function droppedLinkUrls(transfer: DataTransfer): string[] {
 }
 
 /**
- * Split dropped entries by origin. OS/Finder drops carry a native `File`
- * handle; in-app drags (project tree, gutter line refs) are path-only.
- *
- * The distinction is load-bearing: an in-app path is workspace-relative and
- * resolves on the gateway as-is, so it stays an inline `@file:`/`@line:` ref.
- * An OS drop is an absolute path on *this* machine — the gateway can't read it
- * in remote mode, and an image needs its bytes uploaded to get vision either
- * way. So OS drops must go through the attachment/upload pipeline rather than
- * leaking a local path into the prompt text.
+ * Runtime facts needed to decide whether an OS drop can keep its original
+ * path or must cross the Desktop/backend boundary as bytes.
  */
-export function partitionDroppedFiles(candidates: DroppedFile[]): {
+export interface OsDropStagingContext {
+  backendCwd?: null | string
+  remote?: boolean
+  terminalBackend?: null | string
+}
+
+function osDropNeedsStaging(candidate: DroppedFile, staging?: OsDropStagingContext): boolean {
+  // Callers that do not know the backend context retain the historical safe
+  // behavior: every native File goes through the staging pipeline.
+  if (!staging) {
+    return true
+  }
+
+  // A path-less native File cannot become an inline @file ref. Keep it on
+  // the attach path so the user sees a real attach failure rather than a drop
+  // that silently disappears.
+  if (!candidate.path) {
+    return true
+  }
+
+  // Vision needs image bytes gateway-side even when the path itself is
+  // directly readable by a local backend.
+  const file = candidate.file
+
+  if (file && (file.type.startsWith('image/') || isImagePath(file.name))) {
+    return true
+  }
+
+  if (isImagePath(candidate.path)) {
+    return true
+  }
+
+  return (
+    Boolean(staging.remote) ||
+    attachmentPathNeedsUpload(candidate.path, staging.backendCwd, staging.terminalBackend)
+  )
+}
+
+/**
+ * Split dropped entries into direct inline refs versus staged uploads.
+ *
+ * In-app paths are already gateway-resolvable. Native OS files normally
+ * stage too, but a non-image drop can keep its original path when the active
+ * backend is local and shares this filesystem. Remote/container/cross-OS
+ * backends, images, and path-less files still stage.
+ */
+export function partitionDroppedFiles(
+  candidates: DroppedFile[],
+  staging?: OsDropStagingContext
+): {
   osDrops: DroppedFile[]
   inAppRefs: DroppedFile[]
 } {
@@ -305,7 +348,7 @@ export function partitionDroppedFiles(candidates: DroppedFile[]): {
   const inAppRefs: DroppedFile[] = []
 
   for (const candidate of candidates) {
-    if (candidate.file) {
+    if (candidate.file && osDropNeedsStaging(candidate, staging)) {
       osDrops.push(candidate)
     } else {
       inAppRefs.push(candidate)
