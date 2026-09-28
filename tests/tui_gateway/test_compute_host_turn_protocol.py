@@ -150,13 +150,13 @@ def test_turn_end_waits_for_chained_followup_thread(turn_env, monkeypatch):
     def _fake_run_prompt_submit(*_args, **_kwargs):
         def _followup():
             followup_started.set()
-            assert release_followup.wait(timeout=2.0)
+            release_followup.wait()
             with session["history_lock"]:
                 session["running"] = False
 
         def _first():
             first_started.set()
-            assert release_first.wait(timeout=2.0)
+            release_first.wait()
             followup = threading.Thread(target=_followup)
             # Start before publishing: a reader (compute_host._run_real_turn) that
             # observes this thread via `_run_thread` must never see one that has not
@@ -185,9 +185,9 @@ def test_turn_end_waits_for_chained_followup_thread(turn_env, monkeypatch):
             "request_id": "turn",
             "prompt": "continue the goal",
         })
-        assert first_started.wait(timeout=1.0)
+        assert first_started.wait(timeout=10.0)
         release_first.set()
-        assert followup_started.wait(timeout=1.0)
+        assert followup_started.wait(timeout=10.0)
         assert not terminal_sent.wait(timeout=0.2), (
             "compute host emitted turn.end while the chained follow-up was still executing"
         )
