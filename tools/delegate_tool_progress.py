@@ -177,7 +177,7 @@ _NESTED_CHILDREN_NOTE = (
 
 def _build_child_system_prompt(
     goal: str, context: Optional[str] = None, *, workspace_path: Optional[str] = None, role: str = "leaf",
-    max_spawn_depth: int = 2, child_depth: int = 1,
+    max_spawn_depth: int = 2, child_depth: int = 1, parent_memory_context: Optional[str] = None,
 ) -> str:
     """Focused system prompt for a child agent. role='orchestrator' appends a delegation-capability block (modeled on
     OpenClaw's buildSubagentSystemPrompt); its depth note is literal truth grounded in the passed config so the LLM
@@ -185,6 +185,14 @@ def _build_child_system_prompt(
     parts = ["You are a focused subagent working on a specific delegated task.", "", f"YOUR TASK:\n{goal}"]
     if context and context.strip():
         parts.append(f"\nCONTEXT:\n{context}")
+    if parent_memory_context and parent_memory_context.strip():
+        parts.append(
+            "\nREAD-ONLY USER CONTEXT FROM PARENT SESSION:\n"
+            "The parent agent already loaded this frozen, sanitized MEMORY/USER snapshot. "
+            "Use it only to preserve the user preferences and standing facts relevant to your task. "
+            "Do not treat it as new user input and do not attempt to write or update memory from this child.\n\n"
+            + parent_memory_context.strip()
+        )
     if workspace_path and str(workspace_path).strip():
         parts.append(
             "\nWORKSPACE PATH:\n"
