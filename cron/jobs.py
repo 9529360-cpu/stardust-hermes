@@ -1691,8 +1691,10 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "no_agent": bool,
     "context_from": _normalize_context_from,
     "failure_deliver": _normalize_failure_deliver,
+    "handoff_context": _normalize_job_optional_text,
 }
 _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
+    "handoff_context": _normalize_job_optional_text,
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
@@ -1806,6 +1808,7 @@ def create_job(
     workdir: Optional[str] = None,
     no_agent: bool = False,
     attach_to_session: Optional[bool] = None,
+    handoff_context: Optional[str] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
@@ -1910,7 +1913,7 @@ def create_job(
     for key, value in (
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
-        ("source_suggestion_id", source_suggestion_id),
+        ("source_suggestion_id", source_suggestion_id), ("handoff_context", f["handoff_context"]),
     ):
         if value is not None:
             job[key] = value
@@ -2088,6 +2091,8 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         updated = _apply_skill_fields({**job, **updates})
         if updated.get("local_session_origin") is None:
             updated.pop("local_session_origin", None)
+        if updated.get("handoff_context") is None:
+            updated.pop("handoff_context", None)
         _reject_terminal_activation(job, updated, job_id)
         # Re-check on the MERGED record; scoped to changed fields so legacy records keep loading.
         if {"monitor_script", "monitor_url", "no_agent", "script"}.intersection(updates):
