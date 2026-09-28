@@ -100,3 +100,65 @@ def test_stop_when_done_rejects_no_agent_mode(tmp_cron_store):
             script="poll.py",
             stop_when_done=True,
         )
+
+
+def test_finish_completed_run_forwards_terminal_completion(monkeypatch):
+    import cron.scheduler as scheduler
+
+    marked = []
+    finished = []
+
+    monkeypatch.setattr(
+        scheduler,
+        "mark_job_run",
+        lambda *args, **kwargs: marked.append((args, kwargs)) or True,
+    )
+    monkeypatch.setattr(
+        scheduler,
+        "finish_execution",
+        lambda *args, **kwargs: finished.append((args, kwargs)),
+    )
+
+    delivery = scheduler._RunDelivery(
+        job={"id": "goal-1", "deliver": "local"},
+        success=True,
+        error=None,
+        should_deliver=True,
+        delivery_content="Package delivered.",
+        terminal_complete=True,
+    )
+
+    assert scheduler._finish_completed_run(delivery, None, "exec-goal-1") is True
+    assert marked == [
+        (
+            ("goal-1", True, None),
+            {"delivery_error": None, "terminal_complete": True},
+        )
+    ]
+    assert finished == [
+        (
+            ("exec-goal-1",),
+            {"success": True, "error": None, "delivery_outcome": "suppressed"},
+        )
+    ]
+
+
+def test_delivery_failure_does_not_reschedule_a_completed_real_world_goal(tmp_cron_store):
+    jobs = tmp_cron_store
+
+    job = jobs.create_job(
+        prompt="Track the repair until resolved.",
+        schedule="every 1h",
+        stop_when_done=True,
+    )
+    assert jobs.mark_job_run(
+        job["id"],
+        True,
+        delivery_error="notification transport unavailable",
+        terminal_complete=True,
+    ) is True
+
+    stored = jobs.get_job(job["id"])
+    assert stored["state"] == "completed"
+    assert stored["next_run_at"] is None
+    assert stored["last_status"] == "delivery_failed"
