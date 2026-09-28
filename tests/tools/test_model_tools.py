@@ -643,6 +643,32 @@ class TestBrowserRetrievalHints:
         assert "web_extract" not in rendered
 
 
+
+class TestDelegateTaskCapabilityHints:
+    def test_description_does_not_claim_cron_is_child_blocked(self):
+        from tools.delegate_tool import _build_top_level_description
+
+        desc = _build_top_level_description(independent_completions=False)
+        assert "cannot call clarify, memory, or cronjob" not in desc
+        assert "cannot call delegate_task, clarify, memory, or cronjob" not in desc
+
+    def test_rewriter_still_hides_unavailable_blocked_tools(self):
+        from model_tools import _rewrite_delegate_task
+
+        td = {
+            "type": "function",
+            "function": {
+                "name": "delegate_task",
+                "description": "- Children cannot call delegate_task, clarify, or memory.\n",
+            },
+        }
+        out = _rewrite_delegate_task(td, {"delegate_task", "clarify", "cronjob_manage"})
+        rendered = out["function"]["description"]
+        assert "memory" not in rendered
+        assert "cronjob" not in rendered
+        assert "delegate_task or clarify" in rendered
+
+
 def test_tool_defs_cache_key_sees_config_replacement_with_pinned_mtime(tmp_path):
     """#111105: a same-size config.yaml swapped in with the old mtime must change the memo key."""
     import os
