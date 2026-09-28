@@ -106,3 +106,29 @@ def test_build_job_prompt_injects_creation_time_handoff():
     assert "## Creation-time task handoff" in prompt
     assert "washing machine repair is still pending" in prompt
     assert "Check whether the repair company replied" in prompt
+
+
+def test_job_store_only_persists_handoff_for_attached_jobs(tmp_path, monkeypatch):
+    import cron.jobs as jobs
+
+    monkeypatch.setattr(jobs, "CRON_DIR", tmp_path / "cron")
+    monkeypatch.setattr(jobs, "JOBS_FILE", tmp_path / "cron" / "jobs.json")
+    monkeypatch.setattr(jobs, "OUTPUT_DIR", tmp_path / "cron" / "output")
+
+    detached = jobs.create_job(
+        prompt="Follow up later.",
+        schedule="every 1h",
+        handoff_context="USER: hidden detached context",
+    )
+    assert "handoff_context" not in detached
+
+    attached = jobs.create_job(
+        prompt="Follow up later.",
+        schedule="every 1h",
+        attach_to_session=True,
+        handoff_context="USER: attached context",
+    )
+    assert attached["handoff_context"] == "USER: attached context"
+
+    updated = jobs.update_job(detached["id"], {"handoff_context": "USER: still hidden"})
+    assert "handoff_context" not in updated
