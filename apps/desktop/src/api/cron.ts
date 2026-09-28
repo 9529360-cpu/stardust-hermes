@@ -1,3 +1,5 @@
+import { stampRowsWithOwningConnection } from '@/lib/session-owner-stamp'
+
 import type {
   AutomationBlueprint,
   CronDeliveryTarget,
@@ -7,7 +9,6 @@ import type {
   CronSuggestion,
   SessionInfo
 } from '@/types/hermes'
-import { stampRowsWithOwningConnection } from '@/lib/session-owner-stamp'
 
 import {
   connectionScoped,
