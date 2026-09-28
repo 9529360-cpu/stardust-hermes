@@ -660,6 +660,16 @@ cron:
   mirror_delivery: false   # set true to make cron deliveries continuable
 ```
 
+When an agent creates or updates a job with `attach_to_session: true`, Hermes also
+takes a **bounded creation-time handoff snapshot** from that session: recent user
+and assistant text only (no tool results or system messages). The future cron run
+still starts as a fresh session, but this snapshot is injected as background so a
+request such as "continue following up on this tomorrow" does not lose the task's
+immediate context. The snapshot is fixed at create/update time rather than being a
+live link to the conversation, so later unrelated chat does not silently change the
+scheduled task. Keep critical IDs, addresses, deadlines, and other must-not-guess
+details in the cron prompt itself.
+
 Behaviour is **thread-preferred**, scoped to the job's own conversation:
 
 - **Thread-capable platforms** (Telegram topics, Discord/Slack threads): each
@@ -1261,7 +1271,10 @@ The storage uses atomic file writes so interrupted writes do not leave a partial
 ## Self-contained prompts still matter
 
 :::warning Important
-Cron jobs run in a completely fresh agent session. The prompt must contain everything the agent needs that is not already provided by attached skills.
+Cron jobs still run in a completely fresh agent session. A per-job
+`attach_to_session: true` handoff can provide a bounded creation-time conversation
+snapshot, but it is supplemental background rather than a live transcript. The prompt
+should still contain critical details the agent must not infer.
 :::
 
 **BAD:** `"Check on that server issue"`
