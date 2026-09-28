@@ -60,7 +60,7 @@ def test_schema_keeps_advanced_actions_compact_and_excludes_file_transfer():
             {"scrolled_into_view": "@e7"},
         ),
         (
-            {"action": "wait_element", "ref": "@e8"},
+            {"action": "wait_element", "ref": "e8"},
             "wait",
             ["@e8"],
             {"waited_for": "element", "selector": "@e8", "state": "visible"},
@@ -124,6 +124,25 @@ def test_interactions_map_to_state_preserving_agent_browser_commands(
         ({"action": "not-a-real-action"}, "Unknown browser_interact action"),
     ],
 )
+def test_select_tolerates_single_string_from_schema_weak_clients(browser_modules, monkeypatch):
+    bt, _interactions = browser_modules
+    calls = []
+    monkeypatch.setattr(
+        bt._session,
+        "_run_browser_command",
+        lambda task_id, cmd, args: calls.append((task_id, cmd, args))
+        or {"success": True, "data": {}},
+    )
+
+    result = json.loads(
+        bt.browser_interact(action="select", ref="@e2", values="Quiet", task_id="life-task")
+    )
+
+    assert result["success"] is True
+    assert result["selected"] == ["Quiet"]
+    assert calls == [("life-task", "select", ["@e2", "Quiet"])]
+
+
 def test_invalid_interaction_never_touches_browser(browser_modules, monkeypatch, kwargs, error_fragment):
     bt, _interactions = browser_modules
     calls = []
