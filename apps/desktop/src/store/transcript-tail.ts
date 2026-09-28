@@ -84,12 +84,24 @@ function matchingTailEntries(storedSessionId: string): Array<[string, Transcript
   })
 }
 
+/** True only when the response proves the backend honoured order=latest. */
+export function pageHonorsLatestOrder(page: TailPage): boolean {
+  return page.pagination?.order === 'latest'
+}
+
 function tailStateFromPage(page: TailPage, profile?: TranscriptProfileScope): TranscriptTailState {
   const pagination = page.pagination
 
   // No pagination metadata is a legacy backend that ignored the paging query
   // and returned the full transcript: nothing is truncated.
   if (!pagination || pagination.limit <= 0) {
+    return { nextOffset: page.messages.length, possiblyTruncated: false, profile }
+  }
+
+  // Older backends silently ignore the order query and page from the oldest
+  // row. Never arm newest-relative backfill from a page that cannot prove it
+  // actually came from the newest end.
+  if (!pageHonorsLatestOrder(page)) {
     return { nextOffset: page.messages.length, possiblyTruncated: false, profile }
   }
 

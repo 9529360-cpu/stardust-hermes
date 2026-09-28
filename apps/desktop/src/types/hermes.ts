@@ -625,7 +625,9 @@ export interface SessionMessagesResponse {
   pagination?: {
     limit: number
     offset: number
-    order: 'latest' | 'oldest'
+    /** Order the backend actually applied. Missing on older backends that
+     * silently ignored the `order` query parameter and served oldest-first. */
+    order?: 'latest' | 'oldest'
     returned: number
   }
   session_id: string
