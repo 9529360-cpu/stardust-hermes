@@ -327,13 +327,14 @@ properties are:
 - **One flat, user-owned table.** Jobs created from a cron run land in the
   same `jobs.json` as every other job with no special ownership — you can
   list, edit, or remove them exactly as if you had created them yourself.
-- **Approval authority can follow the task.** `cronjob_manage` can set a job's
+- **Approval authority can follow the task without becoming contagious.** `cronjob_manage` can set a job's
   `approval_mode` to `approve`, `deny`, or `inherit`. Raising a job to `approve`
-  uses the normal approval flow once; if the creating session or parent cron is
-  already authorized, that authority is inherited without another prompt.
-  Future runs then keep that delegated authority across restarts. `inherit`
-  follows the profile-wide `approvals.cron_mode`; `deny` explicitly narrows the
-  job. Hardline command blocks and explicit user deny rules still apply.
+  requires an explicit operator action or a live human approval for that durable
+  grant. A transient YOLO/off session and an already-approved parent cron cannot
+  silently mint a new approved child job. Future runs of the specifically approved
+  job keep that delegated authority across restarts. `inherit` follows the
+  profile-wide `approvals.cron_mode`; `deny` explicitly narrows the job. Hardline
+  command blocks and explicit user deny rules still apply.
 - **No dangling delivery.** A cron run is ephemeral, so `deliver: origin`
   from inside one is resolved **at create time** to the creating job's own
   concrete target (`platform:chat_id[:thread_id]`, or `local` if the creating
