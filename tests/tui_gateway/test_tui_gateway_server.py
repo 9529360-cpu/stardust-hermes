@@ -11610,6 +11610,101 @@ def test_file_attach_quotes_ref_with_spaces(monkeypatch, tmp_path):
         server._sessions.pop("sid", None)
 
 
+def test_file_attach_workspace_storage_follows_owning_profile_config(monkeypatch, tmp_path):
+    """One gateway can serve profiles with different attachment staging policies."""
+    workspace_a = tmp_path / "work-a"
+    workspace_a.mkdir()
+    home_a = tmp_path / "home-a"
+    home_a.mkdir()
+    (home_a / "config.yaml").write_text(
+        "attachments:\n  storage: workspace\n", encoding="utf-8"
+    )
+
+    workspace_b = tmp_path / "work-b"
+    workspace_b.mkdir()
+    home_b = tmp_path / "home-b"
+    home_b.mkdir()
+
+    fake_cli = types.ModuleType("cli")
+    fake_cli._detect_file_drop = lambda raw: None
+    fake_cli._split_path_input = lambda raw: (raw, "")
+    fake_cli._resolve_attachment_path = lambda raw: None
+    monkeypatch.setitem(sys.modules, "cli", fake_cli)
+
+    def attach(sid):
+        return server.handle_request(
+            {
+                "id": sid,
+                "method": "file.attach",
+                "params": {
+                    "session_id": sid,
+                    "path": "/Users/alice/Downloads/report.txt",
+                    "name": "report.txt",
+                    "data_url": "data:text/plain;base64,aGVsbG8=",
+                },
+            }
+        )
+
+    try:
+        server._sessions["sid-a"] = _session(cwd=str(workspace_a), profile_home=str(home_a))
+        result_a = attach("sid-a")["result"]
+        staged_a = workspace_a / ".hermes" / "attachments" / "report.txt"
+        assert result_a["attached"] is True
+        assert result_a["path"] == str(staged_a)
+        assert result_a["ref_text"] == "@file:.hermes/attachments/report.txt"
+        assert staged_a.read_text(encoding="utf-8") == "hello"
+        assert not (home_a / "attachments").exists()
+
+        server._sessions["sid-b"] = _session(cwd=str(workspace_b), profile_home=str(home_b))
+        result_b = attach("sid-b")["result"]
+        staged_b = home_b / "attachments" / "report.txt"
+        assert result_b["path"] == str(staged_b)
+        assert staged_b.read_text(encoding="utf-8") == "hello"
+        assert not (workspace_b / ".hermes").exists()
+    finally:
+        server._sessions.pop("sid-a", None)
+        server._sessions.pop("sid-b", None)
+
+
+def test_file_attach_workspace_storage_falls_back_for_ssh_profile(monkeypatch, tmp_path):
+    """An SSH cwd belongs to the execution host even if the same path exists locally."""
+    workspace = tmp_path / "same-looking-remote-workspace"
+    workspace.mkdir()
+    home = tmp_path / "ssh-home"
+    home.mkdir()
+    (home / "config.yaml").write_text(
+        "attachments:\n  storage: workspace\nterminal:\n  backend: ssh\n",
+        encoding="utf-8",
+    )
+
+    fake_cli = types.ModuleType("cli")
+    fake_cli._detect_file_drop = lambda raw: None
+    fake_cli._split_path_input = lambda raw: (raw, "")
+    fake_cli._resolve_attachment_path = lambda raw: None
+    monkeypatch.setitem(sys.modules, "cli", fake_cli)
+    server._sessions["sid"] = _session(cwd=str(workspace), profile_home=str(home))
+
+    try:
+        resp = server.handle_request(
+            {
+                "id": "1",
+                "method": "file.attach",
+                "params": {
+                    "session_id": "sid",
+                    "name": "report.txt",
+                    "data_url": "data:text/plain;base64,aGVsbG8=",
+                },
+            }
+        )
+        stored = home / "attachments" / "report.txt"
+        assert resp["result"]["path"] == str(stored)
+        assert resp["result"]["ref_text"] == f"@file:{stored}"
+        assert stored.read_text(encoding="utf-8") == "hello"
+        assert not (workspace / ".hermes").exists()
+    finally:
+        server._sessions.pop("sid", None)
+
+
 def test_commands_catalog_surfaces_quick_commands(monkeypatch):
     monkeypatch.setattr(
         server,
