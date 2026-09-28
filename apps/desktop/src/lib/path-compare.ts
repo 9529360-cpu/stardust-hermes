@@ -8,6 +8,9 @@
 /** POSIX-style spelling: one separator, no trailing slash. */
 export const cleanPath = (path: string): string => path.trim().replace(/\\/g, '/').replace(/\/+$/, '') || '/'
 
+/** True when a path is an absolute Windows drive or UNC path. */
+export const isWindowsAbsolutePath = (path: string): boolean => /^(?:[A-Za-z]:[\\/]|\\\\)/.test(path.trim())
+
 /** Case-folded comparison key. Windows drive/UNC paths are case-insensitive;
  *  POSIX paths are not, and callers that display a path want its real spelling,
  *  so fold only the key. Expects an already-`cleanPath`ed value. */
