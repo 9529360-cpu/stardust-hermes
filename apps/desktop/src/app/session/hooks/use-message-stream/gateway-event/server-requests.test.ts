@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createClientSessionState } from '@/lib/chat-runtime'
+import { hasOpenServerRequest, resetServerRequestsForTests } from '@/store/server-requests'
 import { $toursEnabled } from '@/store/tours'
 
 import { handleServerRequest } from './server-requests'
@@ -83,3 +84,41 @@ describe('tour request routing', () => {
     })
   })
 })
+
+describe('blocking-input guard for interrupted sessions', () => {
+  const depsWith = (interrupted: boolean) =>
+    ({ ...deps, sessionInterrupted: () => interrupted }) as ServerRequestContext['deps']
+
+  const approvalRequest = (id: string) => ({
+    fail: vi.fn(),
+    id,
+    method: 'approval',
+    params: { command: 'rm -rf /', description: 'dangerous', request_id: 'r1', session_id: 'session-a' },
+    profile: 'default',
+    respond: vi.fn()
+  })
+
+  afterEach(() => {
+    resetServerRequestsForTests()
+  })
+
+  it('fails an approval request for an interrupted session instead of parking it', () => {
+    const request = approvalRequest('srq-dead')
+
+    expect(handleServerRequest(request, depsWith(true), 'session-a')).toBe(true)
+
+    expect(hasOpenServerRequest('srq-dead')).toBe(false)
+    expect(request.fail).toHaveBeenCalledWith(expect.any(Number), 'session interrupted')
+    expect(request.respond).not.toHaveBeenCalled()
+  })
+
+  it('still parks an approval request for a live session', () => {
+    const request = approvalRequest('srq-live')
+
+    handleServerRequest(request, depsWith(false), 'session-a')
+
+    expect(hasOpenServerRequest('srq-live')).toBe(true)
+    expect(request.fail).not.toHaveBeenCalled()
+  })
+})
+

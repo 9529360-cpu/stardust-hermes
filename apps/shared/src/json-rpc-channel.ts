@@ -66,6 +66,9 @@ export class JsonRpcGatewayError extends Error {
   }
 }
 
+/** JSON-RPC "internal error" — use when a known request can no longer be fulfilled. */
+export const JSON_RPC_INTERNAL_ERROR = -32603
+
 /** JSON-RPC "method not found" (tui_gateway/server.py::dispatch `_err(rid, -32601, …)`). */
 export const JSON_RPC_METHOD_NOT_FOUND = -32601
 
