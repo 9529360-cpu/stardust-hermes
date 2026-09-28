@@ -1,3 +1,4 @@
+import { stampRowsWithOwningConnection } from '@/lib/session-owner-stamp'
 import type {
   AutomationBlueprint,
   CronDeliveryTarget,
@@ -8,7 +9,13 @@ import type {
   SessionInfo
 } from '@/types/hermes'
 
-import { connectionScoped, hermesApi, profileScoped, STARTUP_REQUEST_TIMEOUT_MS } from './client'
+import {
+  connectionScoped,
+  getApiRequestConnection,
+  hermesApi,
+  profileScoped,
+  STARTUP_REQUEST_TIMEOUT_MS
+} from './client'
 
 // The cron trigger endpoint intentionally waits for the whole job so its
 // response reflects the persisted execution result. Agent jobs can run far
@@ -47,7 +54,10 @@ export async function getCronJobRuns(jobId: string, limit = 20): Promise<Session
     path: `/api/cron/jobs/${encodeURIComponent(jobId)}/runs?limit=${limit}`
   })
 
-  return runs ?? []
+  // A run is a stored session. Preserve the backend half of its owner so
+  // opening the row later can resume against the connection that actually
+  // served it (especially SSH/remote registry connections).
+  return stampRowsWithOwningConnection(runs ?? [], getApiRequestConnection())
 }
 
 // The single source of truth for cron delivery targets (local + configured
