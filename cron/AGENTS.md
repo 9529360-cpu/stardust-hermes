@@ -14,6 +14,14 @@ injected into the prompt; `no_agent=True` makes the script the whole job), `cont
 A's last output into job B's prompt), `workdir` (run with that directory's `AGENTS.md`/`CLAUDE.md`
 loaded), multi-platform delivery, and `approval_mode` (`inherit|approve|deny`) for durable job-scoped approval authority. `approve` is a delegated capability: model-facing creation/update must obtain an explicit live human approval, while operator CLI flags count as direct consent. Transient YOLO/off posture and autonomous parent cron authority must never be converted into a new durable grant.
 
+Session handoff: model-facing create/update with `attach_to_session=true` snapshots a bounded
+recent user/assistant text tail from the owning profile's existing SessionDB into internal
+`handoff_context`. Prompt assembly injects that fixed creation/update-time snapshot as runtime
+background. It is not a live transcript link, never includes tool/system payloads, is not
+echoed by cron list views, and disabling `attach_to_session` clears it. Snapshot failure must
+not block scheduling; an explicit refresh that cannot capture a new snapshot clears any stale
+handoff rather than presenting old conversation as newly refreshed context.
+
 Hardening invariants — each guards a real failure; don't weaken without answering for it:
 - **3-minute hard interrupt** on cron sessions: runaway loops cannot monopolise the scheduler.
 - Catch-up window = half the period, clamped to 120s–2h; 120s grace for missed one-shots.
