@@ -79,11 +79,16 @@ Keep schemas forgiving: require only the fields you will actually read. Tasks wi
 
 ## How Subagent Context Works
 
-:::warning Critical: Subagents Know Nothing
-Subagents start with a **completely fresh conversation**. They have zero knowledge of the parent's conversation history, prior tool calls, or anything discussed before delegation. The subagent's only context comes from the `goal` and `context` fields the parent agent populates when it calls `delegate_task`.
+:::warning Critical: Fresh conversation, not a copy of the parent
+Subagents start with a **fresh conversation**. They do not receive the parent's conversation history or prior tool-call transcript, so task-specific facts still belong in the `goal` and `context` fields supplied to `delegate_task`.
 :::
 
-One exception: when the parent has a resolved workspace directory, every subagent's system prompt embeds that workspace's **project context files** (`.hermes.md` > AGENTS.md chain > CLAUDE.md > `.cursorrules` — the same discovery, priority, and size caps as the main agent's system prompt; SOUL.md is excluded). Subagents working in a repo operate under the repo's own conventions without having to rediscover them.
+There are two bounded read-only context exceptions:
+
+- When the parent has a resolved workspace directory, every subagent's system prompt embeds that workspace's **project context files** (`.hermes.md` > AGENTS.md chain > CLAUDE.md > `.cursorrules` — the same discovery, priority, and size caps as the main agent's system prompt; SOUL.md is excluded).
+- When the child uses the parent's **exact same inference/privacy route**, it also receives the parent's already-frozen and threat-sanitized built-in `USER.md` / `MEMORY.md` snapshot as read-only background. The child still runs with `skip_memory=True` and no `memory` tool, so it cannot write shared memory or initialize memory-provider plugins. If provider, endpoint, model, credential, fallback route, request-routing policy, or ACP transport differs, that personal snapshot is omitted.
+
+This lets a same-route child preserve standing preferences such as language, scheduling, or household conventions without copying the parent's live chat or granting memory-write authority.
 
 This means the parent agent must pass **everything** the subagent needs in the call:
 
@@ -565,7 +570,8 @@ For **durable execution** that must survive session closure or process restart, 
 - Each subagent gets its **own terminal session** (separate from the parent)
 - Subagents inherit the parent's enabled toolsets; the model cannot select or widen them per call
 - **Nested delegation is opt-in** — only `role="orchestrator"` children can delegate further, and only when `max_spawn_depth` is raised from its default of 1 (flat). Disable globally with `orchestrator_enabled: false`.
-- Leaf subagents **cannot** call: `delegate_task`, `clarify`, `memory`, `send_message`, `cronjob`. Orchestrator subagents retain `delegate_task` but keep the other blocks. Both roles retain `execute_code` (programmatic tool calling) so children can batch mechanical work instead of burning reasoning iterations.
+- Leaf subagents **cannot** call: `delegate_task`, `clarify`, `memory`, or `send_message`. Orchestrator subagents retain `delegate_task` but keep the other blocks. `cronjob` follows ordinary parent capability inheritance: a child can use it only when the parent already has it. Both roles retain `execute_code` (programmatic tool calling) so children can batch mechanical work instead of burning reasoning iterations.
+- Built-in personal memory is **read-only context, not a child capability**: same-route children may receive the parent's frozen `USER.md` / `MEMORY.md` snapshot, while memory writes and memory-provider initialization remain disabled.
 - **Cancellation follows ownership** — `/stop` or closing/resetting the owning session cancels its background children; synchronous descendants under orchestrators follow their parent's interrupt state
 - Only the final summary enters the parent's context, keeping token usage efficient
 - Subagents inherit the parent's **API key, provider configuration, and credential pool** (enabling key rotation on rate limits)
