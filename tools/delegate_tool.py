@@ -117,13 +117,15 @@ _CHILD_CAP_MIN = 16_000  # below this a child compresses on every call; treat as
 _CHILD_MEMORY_SNAPSHOT_MAX_CHARS = 8_000
 
 
-def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]) -> bool:
+def _same_inference_privacy_boundary(
+    parent_agent, child_runtime: Dict[str, Any], child_request_overrides: Optional[Dict[str, Any]] = None
+) -> bool:
     """Whether parent and child send model context to the same inference boundary.
 
     Read-only personal context may follow delegated work only when provider,
-    endpoint, model route, credential, fallback route, and ACP transport are
-    unchanged. An operator-routed child outside that boundary must not receive
-    it implicitly.
+    endpoint, model route, credential, fallback route, request-routing policy,
+    and ACP transport are unchanged. An operator-routed child outside that
+    boundary must not receive it implicitly.
     """
     parent_provider = str(getattr(parent_agent, "provider", "") or "").strip().lower()
     child_provider = str(child_runtime.get("provider") or "").strip().lower()
@@ -162,6 +164,10 @@ def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]
     ):
         return False
 
+    parent_request_overrides = dict(getattr(parent_agent, "request_overrides", {}) or {})
+    if parent_request_overrides != dict(child_request_overrides or {}):
+        return False
+
     parent_command = str(getattr(parent_agent, "acp_command", "") or "").strip()
     child_command = str(child_runtime.get("acp_command") or "").strip()
     if parent_command != child_command:
@@ -174,14 +180,18 @@ def _same_inference_privacy_boundary(parent_agent, child_runtime: Dict[str, Any]
     return True
 
 
-def _read_only_parent_memory_snapshot(parent_agent, child_runtime: Dict[str, Any]) -> Optional[str]:
+def _read_only_parent_memory_snapshot(
+    parent_agent, child_runtime: Dict[str, Any], child_request_overrides: Optional[Dict[str, Any]] = None
+) -> Optional[str]:
     """Return the parent frozen builtin memory snapshot for a same-boundary child.
 
     The child still runs with skip_memory=True and no memory tool, so this is
     context inheritance only: it cannot initialize providers, sync child turns,
     or write shared MEMORY.md/USER.md.
     """
-    if not _same_inference_privacy_boundary(parent_agent, child_runtime):
+    if not _same_inference_privacy_boundary(
+        parent_agent, child_runtime, child_request_overrides=child_request_overrides
+    ):
         return None
     store = getattr(parent_agent, "_memory_store", None)
     formatter = getattr(store, "format_for_system_prompt", None)
@@ -308,17 +318,18 @@ def _build_child_agent(
         override_acp_args=override_acp_args,
         routing_cfg=routing_cfg,
     )
-    child_prompt = _build_child_system_prompt(
-        goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
-        max_spawn_depth=max_spawn, child_depth=child_depth,
-        parent_memory_context=_read_only_parent_memory_snapshot(parent_agent, rt),
-    )
     if override_request_overrides is not None:
         # honored whenever set, incl. the inherit branch where
         # _resolve_delegation_credentials already merged OVER the parent's
         request_overrides = dict(override_request_overrides)
     else:
         request_overrides = {} if override_provider else dict(getattr(parent_agent, "request_overrides", {}) or {})
+    child_prompt = _build_child_system_prompt(
+        goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
+        max_spawn_depth=max_spawn, child_depth=child_depth,
+        parent_memory_context=_read_only_parent_memory_snapshot(
+            parent_agent, rt, child_request_overrides=request_overrides),
+    )
     parent_sid = getattr(parent_agent, "session_id", None)
     child_session_db = _open_child_session_db(parent_agent)
     with delegated_child_context():
