@@ -2,6 +2,7 @@
 (schema/context bloat avoided); `cronjob()` stays callable for direct Python callers."""
 
 import contextlib
+import hashlib
 import json
 import logging
 import sys
@@ -89,21 +90,43 @@ def _approval_mode_change_error(
     *, current_mode: Optional[str], requested_mode: Optional[str], job_label: str,
     preapproved: bool = False,
 ) -> Optional[str]:
-    """Authorize only an escalation to approve; same/narrower changes need no prompt.
+    """Authorize only an escalation to durable approval authority.
 
-    The existing approval gate supplies the inheritance semantics we want: an
-    already-authorized session or approved parent cron resolves immediately,
-    while an untrusted cron cannot bootstrap itself into a stronger posture.
+    A persistent cron grant must come from an explicit operator action or a live
+    human approval surface. It must never be inferred from a transient YOLO/off
+    session or recursively minted by an already-approved cron run.
     """
     if preapproved or requested_mode != "approve" or (current_mode or "inherit") == "approve":
         return None
-    from tools.approval import request_tool_approval
 
-    decision = request_tool_approval(
+    from tools import approval as approval_mod
+    from tools import approval_context
+
+    # Durable authority is stronger than the current turn/session posture. Do
+    # not silently convert transient bypasses into future unattended approval.
+    if approval_mod._yolo_active() or approval_context._get_approval_mode() == "off":
+        return (
+            "BLOCKED: durable cron approval cannot be inferred from YOLO or "
+            "approvals.mode=off. Grant it explicitly with an operator action "
+            "(for example --approval-mode approve) or use a normal human approval flow."
+        )
+
+    _callback, is_cli, is_gateway, is_ask = approval_mod._presence(None)
+    if not (is_cli or is_gateway or is_ask):
+        return (
+            "BLOCKED: durable cron approval requires a live human confirmation. "
+            "An autonomous cron run cannot grant approval_mode=approve to itself "
+            "or another job."
+        )
+
+    # Scope cached/session approval to this target label so consent for one
+    # autonomous job cannot silently authorize unrelated jobs.
+    label_key = hashlib.sha256(str(job_label).encode("utf-8")).hexdigest()[:12]
+    decision = approval_mod.request_tool_approval(
         "cronjob_manage",
-        (f"Delegate the current task approval authority to cron job {job_label!r} "
-         "so future runs can continue approved work autonomously without asking again."),
-        rule_key=_CRON_APPROVAL_DELEGATION_RULE,
+        (f"Delegate durable approval authority to cron job {job_label!r} "
+         "so its future runs can continue approved work autonomously."),
+        rule_key=f"{_CRON_APPROVAL_DELEGATION_RULE}:{label_key}",
     )
     if decision.get("approved"):
         return None
