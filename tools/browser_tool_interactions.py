@@ -138,6 +138,10 @@ def _require_text(value: Any, field: str, action: str) -> str:
 def _element_target(value: Any, field: str, action: str, *, allow_selector: bool = False) -> str:
     raw = _require_text(value, field, action)
     if allow_selector and not raw.startswith("@"):
+        # Accept the common bare snapshot ref spelling ("e12") without
+        # confusing it with a CSS selector; everything else stays a selector.
+        if raw.startswith("e") and raw[1:].isdigit():
+            return _origin()._at_ref(raw)
         return raw
     return _origin()._at_ref(raw)
 
@@ -160,7 +164,8 @@ def _command_for(
 
     if action == "select":
         element = _element_target(ref, "ref", action)
-        selected = [str(v).strip() for v in (values or []) if str(v).strip()]
+        raw_values = [values] if isinstance(values, str) else (values or [])
+        selected = [str(v).strip() for v in raw_values if str(v).strip()]
         if not selected:
             raise ValueError("select requires at least one non-empty value in values.")
         return "select", [element, *selected], {"element": element, "selected": selected}, False
