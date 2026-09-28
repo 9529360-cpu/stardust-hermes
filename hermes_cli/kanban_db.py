@@ -3857,8 +3857,17 @@ def _ctx_shared_dir_workspace(
     if task.workspace_kind != "dir" or not task.workspace_path:
         return
     raw_path = str(task.workspace_path)
-    expanded_path = str(Path(raw_path).expanduser())
-    paths = (raw_path,) if expanded_path == raw_path else (raw_path, expanded_path)
+    expanded = Path(raw_path).expanduser()
+    path_aliases = {raw_path, str(expanded)}
+    # A running task has already had ``~/...`` expanded by resolve_workspace/set_workspace_path,
+    # while a ready sibling may still carry the original tilde form. Add that lexical alias
+    # without resolving symlinks or touching the filesystem.
+    try:
+        rel_home = expanded.relative_to(Path.home())
+        path_aliases.add("~/" + rel_home.as_posix())
+    except (ValueError, OSError):
+        pass
+    paths = tuple(sorted(path_aliases))
     placeholders = ", ".join("?" for _ in paths)
     rows = conn.execute(
         "SELECT id, title, assignee, status FROM tasks "
