@@ -112,18 +112,6 @@ def test_interactions_map_to_state_preserving_agent_browser_commands(
         assert result[key] == value
 
 
-@pytest.mark.parametrize(
-    "kwargs,error_fragment",
-    [
-        ({"action": "hover"}, "requires non-empty ref"),
-        ({"action": "select", "ref": "@e1", "values": []}, "at least one non-empty value"),
-        ({"action": "drag", "ref": "@e1"}, "requires non-empty target_ref"),
-        ({"action": "wait_text"}, "requires non-empty text"),
-        ({"action": "wait_url"}, "requires non-empty url_pattern"),
-        ({"action": "wait_load", "load_state": "idle-ish"}, "load_state must be"),
-        ({"action": "not-a-real-action"}, "Unknown browser_interact action"),
-    ],
-)
 def test_select_tolerates_single_string_from_schema_weak_clients(browser_modules, monkeypatch):
     bt, _interactions = browser_modules
     calls = []
@@ -143,6 +131,19 @@ def test_select_tolerates_single_string_from_schema_weak_clients(browser_modules
     assert calls == [("life-task", "select", ["@e2", "Quiet"])]
 
 
+
+@pytest.mark.parametrize(
+    "kwargs,error_fragment",
+    [
+        ({"action": "hover"}, "requires non-empty ref"),
+        ({"action": "select", "ref": "@e1", "values": []}, "at least one non-empty value"),
+        ({"action": "drag", "ref": "@e1"}, "requires non-empty target_ref"),
+        ({"action": "wait_text"}, "requires non-empty text"),
+        ({"action": "wait_url"}, "requires non-empty url_pattern"),
+        ({"action": "wait_load", "load_state": "idle-ish"}, "load_state must be"),
+        ({"action": "not-a-real-action"}, "Unknown browser_interact action"),
+    ],
+)
 def test_invalid_interaction_never_touches_browser(browser_modules, monkeypatch, kwargs, error_fragment):
     bt, _interactions = browser_modules
     calls = []
