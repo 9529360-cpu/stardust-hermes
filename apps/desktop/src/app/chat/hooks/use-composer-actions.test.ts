@@ -80,7 +80,6 @@ describe('partitionDroppedFiles', () => {
     expect(partitionDroppedFiles([])).toEqual({ inAppRefs: [], osDrops: [] })
   })
 
-
   it('keeps a local non-image OS drop as an inline ref but still stages images and path-less files', () => {
     const finderPdf = osDrop('/Users/mahmoud/Downloads/DEVIS_signed.pdf')
     const screenshot = osDrop('/var/folders/tmp/shot.png')
