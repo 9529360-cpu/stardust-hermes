@@ -897,6 +897,16 @@ _UPDATE_STEPS = (_update_core_fields, _update_script_fields, _update_context_fro
 def _action_update(job: Dict[str, Any], a: Dict[str, Any]) -> str:
     updates: Dict[str, Any] = {}
     requested_approval_mode = _normalize_requested_approval_mode(a["approval_mode"])
+    if requested_approval_mode is not None:
+        updates["approval_mode"] = requested_approval_mode
+    # Validate every ordinary field before asking for an authority escalation, so
+    # the operator is never prompted for an update that would fail anyway.
+    for step in _UPDATE_STEPS:
+        error = step(job, a, updates)
+        if error:
+            return tool_error(error, success=False)
+    if not updates:
+        return tool_error("No updates provided.", success=False)
     approval_error = _approval_mode_change_error(
         current_mode=job.get("approval_mode"),
         requested_mode=requested_approval_mode,
@@ -905,14 +915,6 @@ def _action_update(job: Dict[str, Any], a: Dict[str, Any]) -> str:
     )
     if approval_error:
         return tool_error(approval_error, success=False)
-    if requested_approval_mode is not None:
-        updates["approval_mode"] = requested_approval_mode
-    for step in _UPDATE_STEPS:
-        error = step(job, a, updates)
-        if error:
-            return tool_error(error, success=False)
-    if not updates:
-        return tool_error("No updates provided.", success=False)
     updated = update_job(job["id"], updates)
     _notify_provider_jobs_changed_safe()
     # An update can switch modes or delivery — echo the same guidance as create.
