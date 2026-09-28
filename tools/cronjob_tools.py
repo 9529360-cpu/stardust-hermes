@@ -1158,7 +1158,7 @@ Jobs run in a fresh session with no current-chat context, so prompts must be sel
             "approval_mode": {
                 "type": "string",
                 "enum": ["inherit", "approve", "deny"],
-                "description": "Optional job-scoped autonomy: inherit follows the profile cron policy; approve delegates the current task authority to future runs so they can continue without repeated prompts; deny explicitly narrows the job. Raising to approve goes through the normal approval gate once unless the current task is already authorized. It never bypasses hardline blocks or explicit user deny rules."
+                "description": "Optional job-scoped autonomy: inherit follows the profile cron policy; approve gives this specific job durable authority for future runs; deny explicitly narrows the job. Raising to approve requires explicit operator consent or a live human approval and is never inferred from YOLO/off mode or another cron job. It never bypasses hardline blocks or explicit user deny rules."
             },
             "context_from": {
                 "type": "array",
