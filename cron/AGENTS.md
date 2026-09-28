@@ -14,6 +14,12 @@ injected into the prompt; `no_agent=True` makes the script the whole job), `cont
 A's last output into job B's prompt), `workdir` (run with that directory's `AGENTS.md`/`CLAUDE.md`
 loaded), multi-platform delivery.
 
+Session handoff: model-facing create/update with `attach_to_session=true` snapshots a bounded
+recent user/assistant text tail from the owning profile's existing SessionDB into internal
+`handoff_context`. Prompt assembly injects that fixed creation/update-time snapshot as runtime
+background. It is not a live transcript link, never includes tool/system payloads, is not
+echoed by cron list views, and disabling `attach_to_session` clears it. Snapshot failure must
+not block scheduling.
 Hardening invariants — each guards a real failure; don't weaken without answering for it:
 - **3-minute hard interrupt** on cron sessions: runaway loops cannot monopolise the scheduler.
 - Catch-up window = half the period, clamped to 120s–2h; 120s grace for missed one-shots.
