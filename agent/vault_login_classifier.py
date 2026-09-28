@@ -73,11 +73,13 @@ class LoginControl:
     name: str
     type: str
     max_length: Optional[int] = None
+    min_length: Optional[int] = None
 
     @classmethod
     def from_dict(cls, raw: Dict[str, Any]) -> "LoginControl":
         form_index = raw.get("formIndex", raw.get("form_index"))
         max_length = raw.get("maxLength", raw.get("max_length"))
+        min_length = raw.get("minLength", raw.get("min_length"))
         return cls(
             autocomplete=str(raw.get("autocomplete") or ""),
             form_index=int(form_index) if form_index is not None else None,
@@ -86,6 +88,7 @@ class LoginControl:
             name=str(raw.get("name") or ""),
             type=str(raw.get("type") or ""),
             max_length=int(max_length) if max_length is not None else None,
+            min_length=int(min_length) if min_length is not None else None,
         )
 
 
@@ -179,6 +182,81 @@ def select_password_fill(
     ]
 
 
+_SIGNUP_EXCLUDED_AUTOCOMPLETE = {"current-password", "one-time-code"}
+_RE_CURRENT_PASSWORD = re.compile(r"\b(?:current|old|existing)\s*password\b")
+_RE_CONFIRM_PASSWORD = re.compile(r"\b(?:confirm|repeat|retype|verify)\s*(?:new\s*)?password\b")
+_RE_NEW_PASSWORD = re.compile(r"\b(?:new|create|choose|set)\s*password\b")
+
+
+def classify_signup_password_control(control: LoginControl) -> Optional[ClassifiedLoginControl]:
+    """Classify a password field for an explicitly requested account sign-up.
+
+    This path is intentionally separate from normal login autofill: existing credentials must never
+    be sprayed into ``new-password`` fields, while a generated sign-up credential needs to fill both
+    the new-password and confirmation controls without exposing the password to the model.
+    """
+    if control.type != "password":
+        return None
+    autocomplete_tokens = [t for t in control.autocomplete.lower().split() if t]
+    if any(t in _SIGNUP_EXCLUDED_AUTOCOMPLETE for t in autocomplete_tokens):
+        return None
+
+    searchable = _normalize_text(" ".join(part for part in (control.name, control.label) if part))
+    if _RE_CURRENT_PASSWORD.search(searchable):
+        return None
+    if "new-password" in autocomplete_tokens:
+        return ClassifiedLoginControl(control, 100, "new-password")
+    if _RE_CONFIRM_PASSWORD.search(searchable):
+        return ClassifiedLoginControl(control, 95, "new-password")
+    if _RE_NEW_PASSWORD.search(searchable):
+        return ClassifiedLoginControl(control, 90, "new-password")
+    # Registration pages in the wild often omit autocomplete/labels entirely. The caller invokes
+    # this classifier only for the explicit sign-up purpose, so a plain visible password field is a
+    # bounded fallback rather than a general login heuristic.
+    return ClassifiedLoginControl(control, 60, "new-password")
+
+
+def select_signup_password_controls(
+    classified: List[ClassifiedLoginControl],
+) -> List[ClassifiedLoginControl]:
+    """Pick up to two same-form new-password controls (password + confirmation)."""
+    candidates = [c for c in classified if c.token == "new-password"]
+    if not candidates:
+        return []
+    by_form: Dict[Optional[int], List[ClassifiedLoginControl]] = {}
+    for candidate in candidates:
+        by_form.setdefault(candidate.control.form_index, []).append(candidate)
+
+    def _rank(group: List[ClassifiedLoginControl]) -> tuple[int, int, int]:
+        strongest = max(c.score for c in group)
+        strong_count = sum(c.score >= 90 for c in group)
+        return strongest, strong_count, min(len(group), 2)
+
+    best_rank = max(_rank(group) for group in by_form.values())
+    winners = [group for group in by_form.values() if _rank(group) == best_rank]
+    if len(winners) != 1:
+        # Do not guess between equally plausible forms (e.g. side-by-side login and sign-up forms
+        # whose password fields omitted autocomplete/labels). The agent can navigate to the dedicated
+        # registration surface and retry.
+        return []
+    chosen = winners[0]
+    best = sorted(chosen, key=lambda c: (-c.score, c.control.index))[:2]
+    return sorted(best, key=lambda c: c.control.index)
+
+
+def select_signup_password_fills(
+    classified: List[ClassifiedLoginControl],
+    password: str,
+) -> List[Dict[str, Any]]:
+    """Fill the selected sign-up password and confirmation fields with one generated secret."""
+    if not password:
+        return []
+    return [
+        {"index": c.control.index, "token": "new-password", "value": password}
+        for c in select_signup_password_controls(classified)
+    ]
+
+
 def classify_checkout_control(control: LoginControl) -> Optional[ClassifiedLoginControl]:
     """Classify one control as a payment/address fill target (autocomplete token exact match 100,
     label/name heuristic 70), or None. Password/email inputs are never checkout targets."""
@@ -266,6 +344,7 @@ _LOGIN_CONTROL_INSPECTION_JS_TEMPLATE = """(() => {
       formIndex: resolvedFormIndex >= 0 ? resolvedFormIndex : null,
       index,
       maxLength: element.maxLength > 0 ? element.maxLength : null,
+      minLength: element.minLength > 0 ? element.minLength : null,
       label: [
         ...labels,
         element.getAttribute("aria-label") || "",
@@ -311,7 +390,8 @@ _FILL_JS_TEMPLATE = """(() => {
   const norm = (t) => String(t || "").trim().toLowerCase();
   for (const f of fills) {
     const el = document.querySelector('[data-hermes-vault-slot="' + nonce + ':' + f.index + '"]');
-    if (!el || (f.token === "current-password" && el.type !== "password")) continue;
+    const passwordToken = f.token === "current-password" || f.token === "new-password";
+    if (!el || (passwordToken && el.type !== "password")) continue;
     try {
       if (el.tagName === "SELECT") {
         const want = norm(f.value);

@@ -434,13 +434,15 @@ def _rewrite_browser_vault(td: Dict[str, Any], available: set) -> Optional[Dict[
 
 
 _VAULT_NO_PASSWORD_NOTE = (
-    " Vault note: a user request to sign in, fill credentials, or enter a verification code is authorization "
-    "to continue through the secure vault flow; do not stop merely because the next field is sensitive. On a "
-    "login/checkout form call browser_vault_list first, then browser_vault_fill, or browser_vault_save_login "
-    "when nothing is saved for the site (it opens a masked UI prompt and fills immediately). For a one-time / "
-    "2FA code call browser_vault_enter_code. Do not put plaintext passwords, card numbers, CVCs, or verification "
-    "codes in this tool's arguments or repeat them in chat. If the user pasted a secret in chat, do not echo or "
-    "copy it into this tool; route through the secure vault prompt instead."
+    " Vault note: a user request to sign in, create/register an account, fill credentials, or enter a verification "
+    "code is authorization to continue through the matching secure vault flow; do not stop merely because the next "
+    "field is sensitive. On a login/checkout form call browser_vault_list first, then browser_vault_fill, or "
+    "browser_vault_save_login when nothing is saved for the site. For an explicitly requested sign-up, call "
+    "browser_vault_save_login with generate_password=true and the non-secret identifier; Stardust generates, saves, "
+    "and fills the new password without showing it to the model. For a one-time / 2FA code call "
+    "browser_vault_enter_code. Do not put plaintext passwords, card numbers, CVCs, or verification codes in this "
+    "tool's arguments or repeat them in chat. If the user pasted a secret in chat, do not echo or copy it into this "
+    "tool; route through the secure vault flow instead."
 )
 
 
