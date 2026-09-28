@@ -27,7 +27,7 @@ IDEMPOTENT_TOOL_NAMES = frozenset({
 
 MUTATING_TOOL_NAMES = frozenset({
     "terminal", "execute_code", "write_file", "patch", "todo_list", "memory", "skill_manage",
-    "browser_click", "browser_type", "browser_press", "browser_scroll", "browser_navigate",
+    "browser_click", "browser_type", "browser_interact", "browser_press", "browser_scroll", "browser_navigate",
     "send_message", "cronjob_manage", "delegate_task", "process_manage",
 })
 
@@ -60,7 +60,7 @@ FAILURE_TOLERANT_TOOL_NAMES = frozenset({
 # A successful call to one of these marks progress for every failing signature still counted
 # this turn: the next retry is a new experiment (edit -> re-run), not a replay.
 PROGRESS_RESET_TOOL_NAMES = frozenset({
-    "write_file", "patch", "terminal", "execute_code", "browser_click", "browser_type", "browser_press",
+    "write_file", "patch", "terminal", "execute_code", "browser_click", "browser_type", "browser_interact", "browser_press",
     "browser_navigate", "process_manage", "process", "delegate_task", "send_message", "cronjob",
     "cronjob_manage", "todo", "todo_list", "memory", "skill_manage",
 })
