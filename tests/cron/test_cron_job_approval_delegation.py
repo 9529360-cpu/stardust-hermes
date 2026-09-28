@@ -56,7 +56,7 @@ def _isolate_approval_gate(monkeypatch):
     monkeypatch.setattr(approval_context, "_binary_approval_mode", lambda _key: "deny")
 
 
-def test_approved_parent_cron_can_delegate_authority_without_reprompt(monkeypatch):
+def test_approved_parent_cron_keeps_own_authority_but_cannot_delegate_it(monkeypatch):
     from cron.scheduler import _CronRunScope
     from tools import approval_context
     from tools.cronjob_tools import _approval_mode_change_error
@@ -66,20 +66,17 @@ def test_approved_parent_cron_can_delegate_authority_without_reprompt(monkeypatc
     try:
         scope.enter()
         assert approval_context._get_cron_approval_mode() == "approve"
-        # Delegated workers receive the same ContextVar snapshot.
         copied = contextvars.copy_context()
         assert copied.run(approval_context._get_cron_approval_mode) == "approve"
-        # Creating a future autonomous job from this trusted parent does not
-        # ask again: request_tool_approval resolves from the inherited cron mode.
-        assert _approval_mode_change_error(
+        error = _approval_mode_change_error(
             current_mode=None, requested_mode="approve", job_label="child"
-        ) is None
+        )
     finally:
         scope.exit()
 
-    # The grant is run-scoped, not process-global.
+    assert error is not None
+    assert "live human confirmation" in error.lower()
     assert approval_context._get_cron_approval_mode() == "deny"
-
 
 def test_denied_parent_cron_cannot_bootstrap_itself_to_approve(monkeypatch):
     from cron.scheduler import _CronRunScope
@@ -98,6 +95,42 @@ def test_denied_parent_cron_cannot_bootstrap_itself_to_approve(monkeypatch):
     assert error is not None
     assert "cron" in error.lower()
 
+
+def test_yolo_session_cannot_silently_become_durable_cron_approval(monkeypatch):
+    import tools.approval as approval
+    from tools import approval_context
+    from tools.cronjob_tools import _approval_mode_change_error
+
+    monkeypatch.setattr(approval, "_yolo_active", lambda: True)
+    monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: "manual")
+    error = _approval_mode_change_error(
+        current_mode="inherit", requested_mode="approve", job_label="job"
+    )
+    assert error is not None
+    assert "yolo" in error.lower()
+
+
+def test_interactive_grant_uses_job_scoped_approval_rule(monkeypatch):
+    import tools.approval as approval
+    from tools import approval_context
+    from tools.cronjob_tools import _approval_mode_change_error
+
+    captured = {}
+    monkeypatch.setattr(approval, "_yolo_active", lambda: False)
+    monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: "manual")
+    monkeypatch.setattr(approval, "_presence", lambda _cb=None: (None, True, False, False))
+
+    def approve(tool_name, reason, **kwargs):
+        captured.update(tool_name=tool_name, reason=reason, **kwargs)
+        return {"approved": True}
+
+    monkeypatch.setattr(approval, "request_tool_approval", approve)
+    assert _approval_mode_change_error(
+        current_mode="inherit", requested_mode="approve", job_label="job-a"
+    ) is None
+    assert captured["tool_name"] == "cronjob_manage"
+    assert captured["rule_key"].startswith("cron:delegate-approval-authority:")
+    assert "future runs" in captured["reason"]
 
 def test_same_or_narrower_job_mode_change_does_not_request_approval(monkeypatch):
     import tools.approval as approval
