@@ -1951,11 +1951,11 @@ def test_voice_record_start_cuts_inflight_tts_before_arming_mic(monkeypatch):
         ),
     )
     monkeypatch.setattr(server, "_load_cfg", lambda: {"voice": {}})
-    monkeypatch.setattr(
-        server,
-        "_tts_stream_stop",
-        lambda user_barge=True: (tts_calls.append(user_barge), order.append("tts_stop")),
-    )
+    def fake_tts_stop(user_barge=True):
+        tts_calls.append(user_barge)
+        order.append("tts_stop")
+
+    monkeypatch.setattr(server, "_tts_stream_stop", fake_tts_stop)
     monkeypatch.setenv("HERMES_VOICE", "1")
 
     resp = _dispatch_sync(
