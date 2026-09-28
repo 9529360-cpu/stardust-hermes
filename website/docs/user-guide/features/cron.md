@@ -304,19 +304,25 @@ the job. It is not a security boundary against an operator who can run jobs.
 
 ## Agent-managed scheduling (cron jobs that manage cron jobs)
 
-By default, agents launched *by* the scheduler cannot use the `cronjob` tool —
-a scheduled job cannot create, edit, or remove other jobs. Opt in via
-`config.yaml`:
+Ordinary scheduled agents (`approval_mode: inherit` or `deny`) keep the old loop-prevention
+gate and do not receive the `cronjob` tool by default. There are now two ways to let a task
+manage follow-up scheduling:
+
+- grant that specific job `approval_mode: approve`; this is the preferred task-scoped path and
+  automatically gives that approved job the cron tool so it can schedule/update follow-up work;
+- or enable scheduling fleet-wide in `config.yaml`:
 
 ```yaml
 cron:
   allow_agent_scheduling: true   # default: false
 ```
 
-When enabled, a scheduled agent can manage the cron table like any chat
+With either path, a scheduled agent can manage the cron table like any chat
 session: schedule follow-up one-shots from within scheduled work, tune its own
 cadence, or run a "cron librarian" job that reconciles the whole table
-(list, then update/remove/create as needed). Two properties keep this sane:
+(list, then update/remove/create as needed). An explicit user-level
+`agent.disabled_toolsets: [cronjob]` still wins over both paths. The important
+properties are:
 
 - **One flat, user-owned table.** Jobs created from a cron run land in the
   same `jobs.json` as every other job with no special ownership — you can
