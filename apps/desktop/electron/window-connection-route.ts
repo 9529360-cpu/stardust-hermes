@@ -1,4 +1,4 @@
-import { backendScopeKey, type ConnectionRegistry } from './connection-registry'
+import { backendScopeKey, type ConnectionRegistry, LOCAL_CONNECTION_ID } from './connection-registry'
 
 export interface WindowConnectionRoute {
   connectionId: null | string
@@ -38,6 +38,26 @@ export function registrySshScopeForWindowRoute(
   }
 
   return backendScopeKey(route.connectionId, route.profile)
+}
+
+/**
+ * Route a window must publish after a successful GLOBAL primary connection apply.
+ *
+ * The renderer re-dials profile-less after the apply event. If the window keeps
+ * its previous registry-scoped route, main resolves that re-dial back to the
+ * source the user just left. A registry primary stays pinned to its exact
+ * connection id; This device becomes unscoped so the v1 primary config is read.
+ */
+export function appliedPrimaryWindowRoute(
+  registry: ConnectionRegistry,
+  profile: null | string | undefined
+): WindowConnectionRoute {
+  const normalizedProfile = String(profile ?? '').trim() || 'default'
+  const primary = String(registry?.primary ?? '').trim()
+
+  return primary && primary !== LOCAL_CONNECTION_ID
+    ? { connectionId: primary, profile: normalizedProfile, registryScoped: true }
+    : { connectionId: null, profile: normalizedProfile, registryScoped: false }
 }
 
 export interface RegistrySshPoolEntry {
