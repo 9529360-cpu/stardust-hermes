@@ -122,6 +122,7 @@ describe('resolveDoubleEscAction — draft wins and empty busy turns can stop', 
     expect(resolveDoubleEscAction({ busy: false, hasDraft: true, hasSession: true })).toBe('clear')
   })
 })
+
 describe('handleIdleHotkeyExit', () => {
   it('exits in normal terminals', () => {
     const actions = { die: vi.fn(), sys: vi.fn() }
