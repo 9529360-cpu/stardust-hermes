@@ -12,7 +12,7 @@ schedule via the `cronjob` tool; users via `hermes cron list|add|edit|pause|resu
 `skills`, `model`/`provider` overrides, `script` (pre-run data-collection script whose stdout is
 injected into the prompt; `no_agent=True` makes the script the whole job), `context_from` (chain job
 A's last output into job B's prompt), `workdir` (run with that directory's `AGENTS.md`/`CLAUDE.md`
-loaded), multi-platform delivery.
+loaded), multi-platform delivery, and `approval_mode` (`inherit|approve|deny`) for durable job-scoped approval authority. `approve` is a delegated capability: model-facing creation/update must obtain it through the existing approval gate unless the current session/parent cron already carries equivalent authority.
 
 Hardening invariants — each guards a real failure; don't weaken without answering for it:
 - **3-minute hard interrupt** on cron sessions: runaway loops cannot monopolise the scheduler.
