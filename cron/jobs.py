@@ -1656,6 +1656,24 @@ def _normalize_local_session_origin(value: Any) -> Optional[Dict[str, str]]:
     return {"session_id": session_id, "source": source}
 
 
+def _normalize_job_approval_mode(value: Any) -> Optional[str]:
+    """Normalize a durable job-scoped approval posture.
+
+    None/blank/inherit keeps the historical profile-wide approvals.cron_mode
+    behavior. approve delegates approval authority to this job's future runs;
+    deny explicitly narrows it. The scheduler still applies hardline blocks and
+    explicit user deny rules before this recoverable approval layer.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if not text or text == "inherit":
+        return None
+    if text not in {"approve", "deny"}:
+        raise ValueError(
+            f"Invalid approval_mode {value!r}. Valid values: inherit, approve, deny.")
+    return text
+
 def _normalize_reasoning_effort(value: Any) -> Optional[str]:
     """Spelling-only validation via the shared parser (cron knob never stricter/looser than
     config.yaml); model capability is deliberately NOT checked (model unknowable at create time,
@@ -1691,8 +1709,10 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "no_agent": bool,
     "context_from": _normalize_context_from,
     "failure_deliver": _normalize_failure_deliver,
+    "approval_mode": _normalize_job_approval_mode,
 }
 _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
+    "approval_mode": _normalize_job_approval_mode,
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
@@ -1812,6 +1832,7 @@ def create_job(
     failure_deliver: Optional[str] = None,
     paused: bool = False,
     paused_reason: Optional[str] = None,
+    approval_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a new cron job and return the stored record.
 
@@ -1910,7 +1931,7 @@ def create_job(
     for key, value in (
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
-        ("source_suggestion_id", source_suggestion_id),
+        ("source_suggestion_id", source_suggestion_id), ("approval_mode", f["approval_mode"]),
     ):
         if value is not None:
             job[key] = value
@@ -2088,6 +2109,10 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         updated = _apply_skill_fields({**job, **updates})
         if updated.get("local_session_origin") is None:
             updated.pop("local_session_origin", None)
+        # inherit normalizes to None and is represented by absence so old
+        # jobs stay byte-compatible and continue following approvals.cron_mode.
+        if updated.get("approval_mode") is None:
+            updated.pop("approval_mode", None)
         _reject_terminal_activation(job, updated, job_id)
         # Re-check on the MERGED record; scoped to changed fields so legacy records keep loading.
         if {"monitor_script", "monitor_url", "no_agent", "script"}.intersection(updates):
