@@ -192,8 +192,25 @@ def _command_for(
         wait_state = state or "visible"
         if wait_state not in {"visible", "hidden"}:
             raise ValueError("wait_element state must be 'visible' or 'hidden'.")
-        args = [selector] if wait_state == "visible" else [selector, "--state", "hidden"]
-        return "wait", args, {"waited_for": "element", "selector": selector, "state": wait_state}, True
+        if wait_state == "visible":
+            return "wait", [selector], {
+                "waited_for": "element", "selector": selector, "state": wait_state
+            }, True
+        if selector.startswith("@"):
+            raise ValueError(
+                "wait_element state='hidden' requires a CSS selector on the pinned browser driver; "
+                "snapshot refs such as @e5 can only be used for visible waits."
+            )
+        encoded = json.dumps(selector)
+        expression = (
+            "(() => { const el = document.querySelector(" + encoded + "); "
+            "if (!el) return true; const s = getComputedStyle(el); "
+            "return s.display === 'none' || s.visibility === 'hidden' || "
+            "s.visibility === 'collapse' || el.getClientRects().length === 0; })()"
+        )
+        return "wait", ["--fn", expression], {
+            "waited_for": "element", "selector": selector, "state": wait_state
+        }, True
 
     if action == "wait_text":
         expected = _require_text(text, "text", action)
