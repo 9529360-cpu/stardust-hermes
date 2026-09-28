@@ -92,6 +92,35 @@ def test_different_model_or_credential_does_not_inherit_personal_context():
     }) is None
 
 
+def test_different_fallback_or_request_routing_does_not_inherit_personal_context():
+    parent = _parent()
+
+    assert _read_only_parent_memory_snapshot(parent, {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
+        "fallback_model": ["other-provider/other-model"],
+        "acp_command": None,
+        "acp_args": [],
+    }) is None
+
+    parent.request_overrides = {"extra_body": {"provider": {"sort": "price"}}}
+    runtime = {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
+        "acp_command": None,
+        "acp_args": [],
+    }
+    assert _read_only_parent_memory_snapshot(
+        parent,
+        runtime,
+        child_request_overrides={"extra_body": {"provider": {"sort": "throughput"}}},
+    ) is None
+
+
 def test_different_acp_transport_does_not_inherit_personal_context():
     parent = _parent()
     parent.acp_command = "parent-acp"
@@ -111,6 +140,8 @@ def test_child_gets_snapshot_as_read_only_prompt_but_memory_runtime_stays_disabl
     parent = _make_mock_parent(depth=0)
     parent.acp_command = None
     parent.acp_args = []
+    parent.fallback_model = None
+    parent.request_overrides = {}
     parent._memory_store = _SnapshotStore(
         user="USER PROFILE: prefers quiet restaurants",
         memory="MEMORY: usually avoids late appointments",
