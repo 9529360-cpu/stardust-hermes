@@ -1193,7 +1193,7 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
             },
             "stop_when_done": {
                 "type": "boolean",
-                "description": "Optional goal-task mode for recurring agent jobs. True means the job should keep checking/working until its real-world goal is actually satisfied, then emit the runtime [DONE] marker and automatically enter the existing completed terminal state after delivering the final result. Use for bounded follow-ups such as 'track this package until delivered' or 'watch this refund until received', not perpetual reports/briefings. On update, false turns it off. Incompatible with no_agent."
+                "description": "Optional goal-task mode for bounded recurring follow-ups. True means the job should keep checking/working until its real-world goal is actually satisfied, then emit the runtime [DONE] marker and automatically enter the existing completed terminal state after delivering the final result. Use for bounded follow-ups such as 'track this package until delivered' or 'watch this refund until received', not perpetual reports/briefings. On update, false turns it off. Incompatible with no_agent."
             },
             "enabled_toolsets": {
                 "type": "array",
