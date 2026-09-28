@@ -341,16 +341,20 @@ class CronPromptInjectionBlocked(Exception):
     """
 
 
-def _resolve_cron_disabled_toolsets(cfg: dict) -> list[str]:
+def _resolve_cron_disabled_toolsets(cfg: dict, job: Optional[dict] = None) -> list[str]:
     """Toolsets a cron-spawned agent must never receive: ``messaging``/``clarify`` always
-    (interactive); ``cronjob`` by default (loop prevention, not a security boundary —
-    ``cron.allow_agent_scheduling: true`` lifts only that); ``agent.disabled_toolsets`` layered on
-    top so per-job ``enabled_toolsets`` cannot widen past config.yaml's denylist.
+    (interactive); ``cronjob`` by default (loop prevention, not a security boundary).
+    Global ``cron.allow_agent_scheduling: true`` lifts that loop-prevention gate, and so does
+    a durable per-job ``approval_mode=approve`` grant: once the operator has explicitly
+    delegated autonomous authority to a task, it may schedule/update follow-up work without
+    a second unrelated config switch. ``agent.disabled_toolsets`` remains the user-owned hard
+    ceiling, so an explicit ``cronjob`` deny there still wins.
 
     See #25752.
     """
     cron_cfg = (cfg or {}).get("cron") or {}
-    if cron_cfg.get("allow_agent_scheduling"):
+    delegated_scheduling = (job or {}).get("approval_mode") == "approve"
+    if cron_cfg.get("allow_agent_scheduling") or delegated_scheduling:
         disabled = ["messaging", "clarify"]
     else:
         disabled = ["cronjob", "messaging", "clarify"]
@@ -363,7 +367,6 @@ def _resolve_cron_disabled_toolsets(cfg: dict) -> list[str]:
         if name and name not in disabled:
             disabled.append(name)
     return disabled
-
 
 def _merge_mcp_into_per_job_toolsets(per_job: list[str], cfg: dict) -> list[str]:
     """Layer enabled MCP servers onto a per-job ``enabled_toolsets`` allowlist (else a per-job list
@@ -2187,7 +2190,7 @@ def _construct_cron_agent(AIAgent, job: dict, _cfg: dict, setup: _CronAgentSetup
         provider_sort=pr.get("sort"),
         openrouter_min_coding_score=(_cfg.get("openrouter") or {}).get("min_coding_score"),
         enabled_toolsets=_resolve_cron_enabled_toolsets(job, _cfg),
-        disabled_toolsets=_resolve_cron_disabled_toolsets(_cfg),
+        disabled_toolsets=_resolve_cron_disabled_toolsets(_cfg, job),
         quiet_mode=True,
         # Project context files only with a configured workdir; SOUL.md always.
         skip_context_files=not bool(workdir),
