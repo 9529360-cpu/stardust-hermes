@@ -9,6 +9,7 @@ Run with:  python -m pytest tests/test_delegate.py -v
    or:     python tests/test_delegate.py
 """
 
+import contextvars
 import json
 import os
 import threading
@@ -166,6 +167,39 @@ class TestStripBlockedTools(unittest.TestCase):
         self.assertIn("file", result)
         self.assertIn("web", result)
         self.assertNotIn("cronjob_manage", DELEGATE_BLOCKED_TOOLS)
+
+    def test_cron_child_inherits_tool_but_cannot_mint_durable_approval(self):
+        """Delegation copies the parent ContextVars, so a cron child keeps the
+        cron approval boundary while inheriting the parent's scheduling tool.
+        """
+        from cron.scheduler import _CronRunScope
+        from tools.cronjob_tools import _approval_mode_change_error
+
+        parent = _make_mock_parent()
+        parent.enabled_toolsets = ["terminal", "cronjob"]
+        parent.disabled_toolsets = []
+        enabled, _disabled = _resolve_child_toolsets(parent, None, "leaf")
+        self.assertIn("cronjob", enabled)
+
+        scope = _CronRunScope({"approval_mode": "approve"}, "parent", None)
+        try:
+            scope.enter()
+            with (
+                patch("tools.approval._yolo_active", return_value=False),
+                patch("tools.approval_context._get_approval_mode", return_value="manual"),
+            ):
+                child_ctx = contextvars.copy_context()
+                error = child_ctx.run(
+                    _approval_mode_change_error,
+                    current_mode=None,
+                    requested_mode="approve",
+                    job_label="child-followup",
+                )
+        finally:
+            scope.exit()
+
+        self.assertIsNotNone(error)
+        self.assertIn("live human confirmation", error.lower())
 
     def test_child_cannot_gain_cronjob_when_parent_lacks_it(self):
         parent = _make_mock_parent()
