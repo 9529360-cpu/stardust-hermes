@@ -86,7 +86,8 @@ def _normalize_requested_approval_mode(value: Any) -> Optional[str]:
 
 
 def _approval_mode_change_error(
-    *, current_mode: Optional[str], requested_mode: Optional[str], job_label: str
+    *, current_mode: Optional[str], requested_mode: Optional[str], job_label: str,
+    preapproved: bool = False,
 ) -> Optional[str]:
     """Authorize only an escalation to approve; same/narrower changes need no prompt.
 
@@ -94,7 +95,7 @@ def _approval_mode_change_error(
     already-authorized session or approved parent cron resolves immediately,
     while an untrusted cron cannot bootstrap itself into a stronger posture.
     """
-    if requested_mode != "approve" or (current_mode or "inherit") == "approve":
+    if preapproved or requested_mode != "approve" or (current_mode or "inherit") == "approve":
         return None
     from tools.approval import request_tool_approval
 
@@ -638,6 +639,7 @@ def _action_create(a: Dict[str, Any]) -> str:
         current_mode=None,
         requested_mode=requested_approval_mode,
         job_label=a["name"] or (prompt or "cron job")[:50],
+        preapproved=bool(a.get("approval_mode_confirmed")),
     )
     if approval_error:
         return tool_error(approval_error, success=False)
@@ -899,6 +901,7 @@ def _action_update(job: Dict[str, Any], a: Dict[str, Any]) -> str:
         current_mode=job.get("approval_mode"),
         requested_mode=requested_approval_mode,
         job_label=job.get("name") or job.get("id") or "cron job",
+        preapproved=bool(a.get("approval_mode_confirmed")),
     )
     if approval_error:
         return tool_error(approval_error, success=False)
@@ -1020,7 +1023,8 @@ def cronjob(
     session_id: Optional[str] = None,
     paused: bool = False,
     paused_reason: Optional[str] = None,
-    approval_mode: Optional[str] = None) -> str:
+    approval_mode: Optional[str] = None,
+    approval_mode_confirmed: bool = False) -> str:
     """Unified cron job management tool."""
     a = dict(locals())
     del a["task_id"]  # unused but kept for handler signature compatibility
