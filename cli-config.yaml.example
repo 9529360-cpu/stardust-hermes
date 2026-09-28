@@ -28,6 +28,19 @@ database:
   # synchronous: FULL
 
 # =============================================================================
+# Attachments
+# =============================================================================
+# Where the TUI/Desktop gateway stages uploaded files and pasted text.
+# Read per profile, so a multiplexed gateway keeps each profile's policy.
+#   hermes-home (default) <profile home>/attachments. Keeps compatibility with
+#               container/remote mount and sync behavior.
+#   workspace   <session workspace>/.hermes/attachments. Keeps @file refs
+#               inside the workspace boundary. SSH workspaces fall back to
+#               hermes-home because their cwd lives on another host.
+attachments:
+  storage: "hermes-home"
+
+# =============================================================================
 # Runtime Limits
 # =============================================================================
 # Long-running Hermes server processes raise their RLIMIT_NOFILE soft limit to
