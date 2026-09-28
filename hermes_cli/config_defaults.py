@@ -55,6 +55,12 @@ DEFAULT_CONFIG = {
     },
     # Soft fd limit for long-running server processes; clamped to OS hard limit. 0/false/null = off.
     "runtime": {"nofile_soft_limit": 4096},
+
+    # File attachment staging. Profile-home is the compatibility/default path and
+    # remains the safe fallback for SSH workspaces. Workspace opt-in stages under
+    # <session cwd>/.hermes/attachments so restricted workspace agents can read
+    # the files the user attached without widening file-reference roots.
+    "attachments": {"storage": "hermes-home"},
     # Global active chat session cap across CLI, TUI/dashboard, and messaging. None/0 = unbounded.
     "max_concurrent_sessions": None,
     # Soft LRU cap on in-memory TUI/desktop/dashboard sessions. Above it the gateway evicts the
