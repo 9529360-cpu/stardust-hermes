@@ -36,6 +36,12 @@ def test_marker_only_still_has_user_facing_completion_copy():
     assert _extract_cron_done_response("[DONE]") == ("Task completed.", True)
 
 
+def test_done_plus_silent_still_notifies_completion():
+    from cron.scheduler import _extract_cron_done_response
+
+    assert _extract_cron_done_response("[DONE]\n[SILENT]") == ("Task completed.", True)
+
+
 def test_goal_hint_is_opt_in():
     from cron.scheduler_prompt import _build_job_prompt
 
