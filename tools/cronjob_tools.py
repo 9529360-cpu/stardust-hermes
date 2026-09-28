@@ -71,6 +71,43 @@ def _dumps(payload: Dict[str, Any]) -> str:
     return json.dumps(payload, indent=2)
 
 
+_CRON_APPROVAL_DELEGATION_RULE = "cron:delegate-approval-authority"
+
+
+def _normalize_requested_approval_mode(value: Any) -> Optional[str]:
+    """Model/tool spelling for job-scoped autonomy. None means no change."""
+    if value is None:
+        return None
+    text = str(value).strip().lower() or "inherit"
+    if text not in {"inherit", "approve", "deny"}:
+        raise ValueError(
+            f"Invalid approval_mode {value!r}. Valid values: inherit, approve, deny.")
+    return text
+
+
+def _approval_mode_change_error(
+    *, current_mode: Optional[str], requested_mode: Optional[str], job_label: str
+) -> Optional[str]:
+    """Authorize only an escalation to approve; same/narrower changes need no prompt.
+
+    The existing approval gate supplies the inheritance semantics we want: an
+    already-authorized session or approved parent cron resolves immediately,
+    while an untrusted cron cannot bootstrap itself into a stronger posture.
+    """
+    if requested_mode != "approve" or (current_mode or "inherit") == "approve":
+        return None
+    from tools.approval import request_tool_approval
+
+    decision = request_tool_approval(
+        "cronjob_manage",
+        (f"Delegate the current task approval authority to cron job {job_label!r} "
+         "so future runs can continue approved work autonomously without asking again."),
+        rule_key=_CRON_APPROVAL_DELEGATION_RULE,
+    )
+    if decision.get("approved"):
+        return None
+    return str(decision.get("message") or "Approval authority delegation was not approved.")
+
 def _notify_provider_jobs_changed_safe() -> None:
     """Tell the active scheduler provider the job set changed; best-effort, never raises."""
     try:
@@ -596,6 +633,15 @@ def _action_create(a: Dict[str, Any]) -> str:
     if a["continuity"] is not None:
         context_from = _apply_continuity(context_from, a["continuity"])
 
+    requested_approval_mode = _normalize_requested_approval_mode(a["approval_mode"])
+    approval_error = _approval_mode_change_error(
+        current_mode=None,
+        requested_mode=requested_approval_mode,
+        job_label=a["name"] or (prompt or "cron job")[:50],
+    )
+    if approval_error:
+        return tool_error(approval_error, success=False)
+
     from cron.scheduler import CronSchedulerRegistrationError, create_job_with_scheduler_registration
     from cron.session_return import capture_local_session_origin
     local_session_origin = capture_local_session_origin(deliver, a.get("session_id"))
@@ -614,6 +660,7 @@ def _action_create(a: Dict[str, Any]) -> str:
             # CLI-only lane: absent from CRONJOB_SCHEMA and the model dispatch (models don't pick models).
             reasoning_effort=a["reasoning_effort"],
             failure_deliver=_resolve_cron_context_deliver(_normalize_deliver_param(a["failure_deliver"])),
+            approval_mode=requested_approval_mode,
             **({"paused": a["paused"], "paused_reason": a["paused_reason"]}
                if a["paused"] is not False or a["paused_reason"] is not None else {}))
     except CronSchedulerRegistrationError as exc:
@@ -847,6 +894,16 @@ _UPDATE_STEPS = (_update_core_fields, _update_script_fields, _update_context_fro
 
 def _action_update(job: Dict[str, Any], a: Dict[str, Any]) -> str:
     updates: Dict[str, Any] = {}
+    requested_approval_mode = _normalize_requested_approval_mode(a["approval_mode"])
+    approval_error = _approval_mode_change_error(
+        current_mode=job.get("approval_mode"),
+        requested_mode=requested_approval_mode,
+        job_label=job.get("name") or job.get("id") or "cron job",
+    )
+    if approval_error:
+        return tool_error(approval_error, success=False)
+    if requested_approval_mode is not None:
+        updates["approval_mode"] = requested_approval_mode
     for step in _UPDATE_STEPS:
         error = step(job, a, updates)
         if error:
@@ -962,7 +1019,8 @@ def cronjob(
     task_id: str = None,
     session_id: Optional[str] = None,
     paused: bool = False,
-    paused_reason: Optional[str] = None) -> str:
+    paused_reason: Optional[str] = None,
+    approval_mode: Optional[str] = None) -> str:
     """Unified cron job management tool."""
     a = dict(locals())
     del a["task_id"]  # unused but kept for handler signature compatibility
@@ -1068,6 +1126,11 @@ Jobs run in a fresh session with no current-chat context, so prompts must be sel
                 "default": False,
                 "description": "True = no LLM: the scheduler runs `script` (required) on schedule and delivers its stdout verbatim; empty stdout sends nothing (watchdog pattern). Use for script-only pings with fixed output; keep False for anything needing reasoning."
             },
+            "approval_mode": {
+                "type": "string",
+                "enum": ["inherit", "approve", "deny"],
+                "description": "Optional job-scoped autonomy: inherit follows the profile cron policy; approve delegates the current task authority to future runs so they can continue without repeated prompts; deny explicitly narrows the job. Raising to approve goes through the normal approval gate once unless the current task is already authorized. It never bypasses hardline blocks or explicit user deny rules."
+            },
             "context_from": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -1118,7 +1181,7 @@ def check_cronjob_requirements() -> bool:
 _HANDLER_FORWARDED_ARGS = (
     "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver", "skill", "skills", "reason",
     "script", "context_from", "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
-    "paused_reason", "all")
+    "approval_mode", "paused_reason", "all")
 
 
 def _cronjob_handler(args, **kw):
