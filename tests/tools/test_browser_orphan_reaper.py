@@ -68,6 +68,27 @@ class TestReapOrphanedBrowserSessions:
             _reap_orphaned_browser_sessions()
         assert not d.exists()
 
+    def test_dead_owner_without_daemon_pid_reaps_managed_chrome_immediately(
+        self, fake_tmpdir, monkeypatch
+    ):
+        """A dead owner removes the creator-race ambiguity even when the daemon pid is gone."""
+        from tools.browser_tool_lifecycle import _reap_orphaned_browser_sessions
+
+        d = _make_socket_dir(fake_tmpdir, "h_deadnopid01", owner_pid=99999)
+        (d / "chrome-profile").mkdir()
+        terminated = []
+        monkeypatch.setattr(
+            bt_lifecycle,
+            "_terminate_managed_profile_chrome",
+            lambda socket_dir: terminated.append(socket_dir) or 1,
+        )
+
+        with patch("gateway.status._pid_exists", return_value=False):
+            _reap_orphaned_browser_sessions()
+
+        assert terminated == [str(d)]
+        assert not d.exists()
+
     def test_fresh_dir_without_pid_file_survives_creator_race(self, fake_tmpdir):
         """A concurrent reaper must not delete a session still starting."""
         from tools.browser_tool_lifecycle import _reap_orphaned_browser_sessions
@@ -110,6 +131,69 @@ class TestReapOrphanedBrowserSessions:
 
         assert 12345 in terminate_calls
         assert not d.exists()
+
+    def test_live_owner_dead_tracked_daemon_reaps_detached_managed_chrome(
+        self, fake_tmpdir, monkeypatch
+    ):
+        """A live Hermes process must not make a crashed local browser daemon immortal."""
+        import tools.browser_tool as bt
+        from tools.browser_tool_lifecycle import _reap_orphaned_browser_sessions
+
+        session_name = "h_deadtracked1"
+        d = _make_socket_dir(
+            fake_tmpdir, session_name, pid=4242, owner_pid=os.getpid()
+        )
+        (d / "chrome-profile").mkdir()
+        bt._active_sessions["task-dead"] = {
+            "session_name": session_name,
+            "bb_session_id": None,
+            "features": {"local": True},
+            "_daemon_expected": True,
+        }
+        bt._session_last_activity["task-dead"] = time.time()
+        terminated = []
+
+        def _pid_exists(pid):
+            return pid == os.getpid()
+
+        monkeypatch.setattr(
+            bt_lifecycle,
+            "_terminate_managed_profile_chrome",
+            lambda socket_dir: terminated.append(socket_dir) or 1,
+        )
+        monkeypatch.setattr("tools.browser_tool_cdp._stop_cdp_supervisor", lambda _task: None)
+        with patch("gateway.status._pid_exists", side_effect=_pid_exists):
+            _reap_orphaned_browser_sessions()
+
+        assert terminated == [str(d)]
+        assert "task-dead" not in bt._active_sessions
+        assert "task-dead" not in bt._session_last_activity
+        assert not d.exists()
+
+    def test_live_real_profile_owner_is_not_force_reaped_as_empty_task(
+        self, fake_tmpdir, monkeypatch
+    ):
+        """The protected shared real-profile daemon has no ordinary task id."""
+        import tools.browser_tool as bt
+        from tools.browser_tool_lifecycle import _reap_orphaned_browser_sessions
+
+        session_name = bt._REAL_PROFILE_SESSION
+        d = _make_socket_dir(
+            fake_tmpdir, session_name, pid=4242, owner_pid=os.getpid()
+        )
+        calls = []
+        monkeypatch.setattr(
+            bt_lifecycle, "_force_reap_browser_session", lambda task_id: calls.append(task_id)
+        )
+
+        def _pid_exists(pid):
+            return pid == os.getpid()
+
+        with patch("gateway.status._pid_exists", side_effect=_pid_exists):
+            _reap_orphaned_browser_sessions()
+
+        assert calls == []
+        assert d.exists()
 
     def test_real_profile_attach_daemon_is_reaped_when_owner_is_dead(self, fake_tmpdir):
         """#100855: the shared ``hermes-real-profile`` attach daemon is not ``<prefix>_<hex>``
@@ -624,3 +708,42 @@ class TestPeriodicOrphanReap:
         expected = len([c for c in range(cycles_to_run) if c % every == 0])
         assert len(reap_calls) == expected
         assert len(reap_calls) > 1, "startup-only reap would give exactly 1"
+
+
+class TestManagedChromeProfileCleanup:
+    def test_terminates_only_root_holder_for_exact_managed_profile(
+        self, tmp_path, monkeypatch
+    ):
+        socket_dir = tmp_path / "agent-browser-h_owned123"
+        profile = socket_dir / "chrome-profile"
+        profile.mkdir(parents=True)
+
+        class _Proc:
+            def __init__(self, pid, parent=None):
+                self.pid = pid
+                self._parent = parent
+
+            def parent(self):
+                return self._parent
+
+        root = _Proc(7001)
+        child = _Proc(7002, root)
+        seen_profiles = []
+        kills = []
+
+        def _holders(path):
+            seen_profiles.append(path)
+            return iter([root, child])
+
+        monkeypatch.setattr("hermes_cli.browser_connect._processes_holding_profile", _holders)
+        monkeypatch.setattr("gateway.status.get_process_start_time", lambda pid: float(pid))
+        monkeypatch.setattr(
+            "tools.process_registry.ProcessRegistry._terminate_host_pid",
+            lambda pid, started: kills.append((pid, started)),
+        )
+
+        count = bt_lifecycle._terminate_managed_profile_chrome(str(socket_dir))
+
+        assert seen_profiles == [str(profile)]
+        assert count == 1
+        assert kills == [(7001, 7001.0)]

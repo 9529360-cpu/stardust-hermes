@@ -291,7 +291,69 @@ def _terminate_verified_daemon(daemon_pid: int, session_name: str, log) -> bool:
     return True
 
 
-def _reap_socket_dir(socket_dir: str, session_name: str, tracked_names: set) -> bool:
+def _managed_chrome_profile_dir(socket_dir: str) -> str:
+    """Stardust-owned Chrome profile for one local agent-browser session."""
+    return os.path.join(socket_dir, "chrome-profile")
+
+
+def _terminate_managed_profile_chrome(socket_dir: str) -> int:
+    """Terminate Chrome processes bound to this session's exact managed profile.
+
+    ``agent-browser`` can leave Chrome detached after its daemon exits or a launch fails.
+    The profile path is Stardust-owned and session-specific, so the existing exact
+    user-data-dir holder matcher is a stronger identity boundary than process names or
+    broad ``chrome.exe`` sweeps. Returns the number of root holders targeted.
+    """
+    profile_dir = _managed_chrome_profile_dir(socket_dir)
+    try:
+        from hermes_cli.browser_connect import _processes_holding_profile
+        import psutil
+    except ImportError:
+        return 0
+
+    holders = list(_processes_holding_profile(profile_dir))
+    if not holders:
+        return 0
+    holder_pids = {proc.pid for proc in holders}
+    roots = []
+    for proc in holders:
+        try:
+            parent = proc.parent()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+            parent = None
+        if parent is None or parent.pid not in holder_pids:
+            roots.append(proc)
+
+    from gateway.status import get_process_start_time
+    from tools.process_registry import ProcessRegistry
+
+    targeted = 0
+    for proc in roots:
+        started = get_process_start_time(proc.pid)
+        if started is None:
+            _bt.logger.warning(
+                "Refusing to terminate managed browser PID %s: no start-time fingerprint",
+                proc.pid,
+            )
+            continue
+        try:
+            ProcessRegistry._terminate_host_pid(proc.pid, started)
+            targeted += 1
+        except (ProcessLookupError, PermissionError, OSError) as exc:
+            _bt.logger.debug("Managed browser PID %s already exited or could not be killed: %s", proc.pid, exc)
+    return targeted
+
+
+def _release_local_session_artifacts(socket_dir: str, session_name: str) -> None:
+    """Release daemon + detached Chrome + socket/profile files for one local session."""
+    _kill_verified_daemon(socket_dir, session_name)
+    killed = _terminate_managed_profile_chrome(socket_dir)
+    if killed:
+        _bt.logger.info("Terminated %d managed Chrome root process(es) for session %s", killed, session_name)
+    shutil.rmtree(socket_dir, ignore_errors=True)
+
+
+def _reap_socket_dir(socket_dir: str, session_name: str, tracked_sessions: dict[str, Optional[str]]) -> bool:
     """Reap one ``agent-browser-<session>`` dir if orphaned; True when a daemon was killed.
 
     A live ``owner_pid`` means another hermes process owns it — leave it UNLESS untracked
@@ -301,8 +363,25 @@ def _reap_socket_dir(socket_dir: str, session_name: str, tracked_names: set) -> 
     creator's first stdout open). The PID is identity-verified before any tree-kill.
     """
     owner_pid, owner_alive = _owner_pid_alive(socket_dir, session_name)
+    tracked = session_name in tracked_sessions
+    tracked_task_id = tracked_sessions.get(session_name)
+    pid_file = os.path.join(socket_dir, f"{session_name}.pid")
+    daemon_pid = _read_pid_file(pid_file) if os.path.isfile(pid_file) else None
+    from gateway.status import _pid_exists
+
     if owner_alive is True:
-        if session_name in tracked_names:
+        if tracked:
+            # A live Hermes owner does not imply its agent-browser daemon survived. If the
+            # daemon PID is known-dead, force-reap the tracked session now so detached Chrome
+            # cannot sit around until process exit. Missing pid files are left alone because
+            # the reaper can race first startup before agent-browser writes the file.
+            if tracked_task_id and daemon_pid is not None and not _pid_exists(daemon_pid):
+                _bt.logger.warning(
+                    "Tracked browser session %s has a dead daemon PID %s; force-reaping",
+                    session_name, daemon_pid,
+                )
+                _force_reap_browser_session(tracked_task_id)
+                return True
             return False
         idle_s = _socket_dir_idle_seconds(socket_dir)
         if idle_s is None or idle_s < _bt.BROWSER_ORPHAN_GRACE_SECONDS:
@@ -312,21 +391,26 @@ def _reap_socket_dir(socket_dir: str, session_name: str, tracked_names: set) -> 
             "and idle for %ds (grace %ds) — treating as leaked and reaping",
             session_name, owner_pid, int(idle_s),
             _bt.BROWSER_ORPHAN_GRACE_SECONDS)
-    elif owner_alive is None and session_name in tracked_names:
+    elif owner_alive is None and tracked:
         return False
 
-    pid_file = os.path.join(socket_dir, f"{session_name}.pid")
     if not os.path.isfile(pid_file):
+        # If the owning Hermes process is definitely dead, the session cannot still be
+        # starting. Reap its exact managed Chrome profile immediately; waiting on socket
+        # directory mtimes can make a detached Chrome immortal because profile files keep
+        # changing while the browser is alive. Legacy/unowned dirs retain the grace window.
+        if owner_alive is False:
+            _release_local_session_artifacts(socket_dir, session_name)
+            return False
         idle_s = _socket_dir_idle_seconds(socket_dir)
         if idle_s is None or idle_s < _bt.BROWSER_ORPHAN_GRACE_SECONDS:
             return False
-        shutil.rmtree(socket_dir, ignore_errors=True)
+        _release_local_session_artifacts(socket_dir, session_name)
         return False
 
     daemon_pid = _read_pid_file(pid_file)
-    from gateway.status import _pid_exists
     if daemon_pid is None or not _pid_exists(daemon_pid):
-        shutil.rmtree(socket_dir, ignore_errors=True)
+        _release_local_session_artifacts(socket_dir, session_name)
         return False
 
     if not _verify_reapable_browser_daemon(daemon_pid, socket_dir, session_name):
@@ -341,6 +425,7 @@ def _reap_socket_dir(socket_dir: str, session_name: str, tracked_names: set) -> 
         reaped = True
     except (ProcessLookupError, PermissionError, OSError):
         pass
+    _terminate_managed_profile_chrome(socket_dir)
     shutil.rmtree(socket_dir, ignore_errors=True)
     return reaped
 
@@ -368,16 +453,20 @@ def _reap_orphaned_browser_sessions():
         return
 
     with _bt._cleanup_lock:
-        tracked_names = {info.get("session_name") for info in _bt._active_sessions.values() if info.get("session_name")}
+        tracked_sessions = {
+            str(info.get("session_name")): task_id
+            for task_id, info in _bt._active_sessions.items()
+            if info.get("session_name")
+        }
     # Browsing on the shared real-profile daemon runs through per-task ``rp_*`` sessions
     # (``--cdp``), so its own dir never shows activity; the idle escape hatch would misfire
     # under a live user. Owner liveness alone gates it — a dead owner still gets reaped.
-    tracked_names.add(_bt._REAL_PROFILE_SESSION)
+    tracked_sessions.setdefault(_bt._REAL_PROFILE_SESSION, None)
 
     reaped = 0
     for socket_dir in socket_dirs:
         session_name = os.path.basename(socket_dir).removeprefix("agent-browser-")
-        if session_name and _reap_socket_dir(socket_dir, session_name, tracked_names):
+        if session_name and _reap_socket_dir(socket_dir, session_name, tracked_sessions):
             reaped += 1
 
     if reaped:
@@ -612,8 +701,7 @@ def _release_session_resources(task_id: str, session_info: Dict[str, Any]) -> No
     if session_name:
         socket_dir = os.path.join(_bt._socket_safe_tmpdir(), f"agent-browser-{session_name}")
         if os.path.exists(socket_dir):
-            _kill_verified_daemon(socket_dir, session_name)
-            shutil.rmtree(socket_dir, ignore_errors=True)
+            _release_local_session_artifacts(socket_dir, session_name)
 
 
 def _force_reap_browser_session(task_id: str) -> None:
@@ -668,6 +756,8 @@ def _cleanup_single_browser_session(task_id: str) -> None:
             _bt.logger.warning("lightpanda stop failed for task %s: %s", task_id, e)
     elif _session_has_expired(session_info):
         _bt.logger.debug("Skipping agent-browser close for expired session %s", task_id)
+    elif _session._local_backend_process_dead(session_info):
+        _bt.logger.debug("Skipping agent-browser close for dead local daemon %s", task_id)
     else:
         try:
             _session._run_browser_command(task_id, "close", [], timeout=10)
