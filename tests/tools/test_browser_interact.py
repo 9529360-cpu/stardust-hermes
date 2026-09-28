@@ -79,10 +79,10 @@ def test_schema_keeps_advanced_actions_compact_and_excludes_file_transfer():
             {"waited_for": "text", "text": "Confirmed"},
         ),
         (
-            {"action": "wait_url", "url_pattern": "**/receipt"},
+            {"action": "wait_url", "url_contains": "/receipt"},
             "wait",
-            ["--url", "**/receipt"],
-            {"waited_for": "url", "url_pattern": "**/receipt"},
+            ["--fn", 'window.location.href.includes("/receipt")'],
+            {"waited_for": "url", "url_contains": "/receipt"},
         ),
         (
             {"action": "wait_load", "load_state": "domcontentloaded"},
@@ -143,7 +143,7 @@ def test_select_tolerates_single_string_from_schema_weak_clients(browser_modules
         ({"action": "select", "ref": "@e1", "values": []}, "at least one non-empty value"),
         ({"action": "drag", "ref": "@e1"}, "requires non-empty target_ref"),
         ({"action": "wait_text"}, "requires non-empty text"),
-        ({"action": "wait_url"}, "requires non-empty url_pattern"),
+        ({"action": "wait_url"}, "requires non-empty url_contains"),
         ({"action": "wait_load", "load_state": "idle-ish"}, "load_state must be"),
         ({"action": "not-a-real-action"}, "Unknown browser_interact action"),
     ],
@@ -175,10 +175,35 @@ def test_wait_rechecks_private_page_after_condition_completes(browser_modules, m
     )
 
     result = json.loads(
-        bt.browser_interact(action="wait_url", url_pattern="**/done", task_id="life-task")
+        bt.browser_interact(action="wait_url", url_contains="/done", task_id="life-task")
     )
 
     assert result == {"success": False, "error": "private page blocked"}
+
+
+def test_wait_url_escapes_user_text_as_data_not_javascript(browser_modules, monkeypatch):
+    bt, _interactions = browser_modules
+    calls = []
+    monkeypatch.setattr(
+        bt._session,
+        "_run_browser_command",
+        lambda task_id, cmd, args: calls.append((task_id, cmd, args))
+        or {"success": True, "data": {}},
+    )
+
+    needle = 'x"); globalThis.pwned = true; //'
+    result = json.loads(
+        bt.browser_interact(action="wait_url", url_contains=needle, task_id="life-task")
+    )
+
+    assert result["success"] is True
+    assert calls == [
+        (
+            "life-task",
+            "wait",
+            ["--fn", 'window.location.href.includes("x\\\"); globalThis.pwned = true; //")'],
+        )
+    ]
 
 
 def test_backend_gate_hides_interactions_when_state_cannot_be_preserved(monkeypatch):
