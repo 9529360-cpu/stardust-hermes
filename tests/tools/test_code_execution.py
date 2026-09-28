@@ -133,6 +133,25 @@ class TestHermesToolsGeneration(unittest.TestCase):
         self.assertNotIn("def terminal(", src)
         self.assertIn("def _call(", src)  # infrastructure still present
 
+    def test_dynamic_dispatch_helpers_are_scoped_to_enabled_tools(self):
+        src = generate_hermes_tools_module(["terminal", "read_file"])
+        namespace = {}
+        exec(src, namespace)
+
+        self.assertEqual(namespace["available_tools"](), ("read_file", "terminal"))
+
+        calls = []
+        namespace["_call"] = lambda name, args: calls.append((name, args)) or {"ok": True}
+        self.assertEqual(
+            namespace["call_tool"]("terminal", command="echo hi"),
+            {"ok": True},
+        )
+        self.assertEqual(calls, [("terminal", {"command": "echo hi"})])
+
+        with self.assertRaisesRegex(ValueError, "web_search"):
+            namespace["call_tool"]("web_search", query="stardust")
+        self.assertEqual(calls, [("terminal", {"command": "echo hi"})])
+
 
     def test_file_transport_uses_tempfile_fallback_for_rpc_dir(self):
         src = generate_hermes_tools_module(["terminal"], transport="file")
@@ -293,6 +312,19 @@ print(result.get("output", ""))
         result = self._run(code)
         self.assertEqual(result["status"], "success")
         self.assertIn("mock output for: echo hello", result["output"])
+        self.assertEqual(result["tool_calls_made"], 1)
+
+    def test_dynamic_tool_call_uses_same_rpc_path(self):
+        """Runtime-selected tool names stay inside the normal RPC dispatch path."""
+        code = """
+from hermes_tools import available_tools, call_tool
+assert "terminal" in available_tools()
+result = call_tool("terminal", command="echo dynamic")
+print(result.get("output", ""))
+"""
+        result = self._run(code, enabled_tools=["terminal"])
+        self.assertEqual(result["status"], "success")
+        self.assertIn("mock output for: echo dynamic", result["output"])
         self.assertEqual(result["tool_calls_made"], 1)
 
 
