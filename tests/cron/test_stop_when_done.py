@@ -168,3 +168,80 @@ def test_delivery_failure_does_not_reschedule_a_completed_real_world_goal(tmp_cr
     assert stored["state"] == "completed"
     assert stored["next_run_at"] is None
     assert stored["last_status"] == "delivery_failed"
+
+
+
+def test_run_body_strips_done_before_delivery_and_marks_terminal(monkeypatch):
+    import agent.secret_scope as secret_scope
+    import cron.scheduler as scheduler
+    import tools.terminal_scope as terminal_scope
+
+    observed = {}
+
+    monkeypatch.setattr(scheduler, "claim_dispatch", lambda _job_id: True)
+    monkeypatch.setattr(scheduler, "mark_execution_running", lambda _execution_id: {})
+    monkeypatch.setattr(
+        scheduler,
+        "run_job",
+        lambda *_args, **_kwargs: (
+            True,
+            "raw audit output",
+            "[DONE]\nPackage delivered at the front desk.",
+            None,
+        ),
+    )
+    monkeypatch.setattr(scheduler, "_consume_interrupted_flag", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        secret_scope,
+        "build_profile_secret_scope",
+        lambda _home: object(),
+    )
+    monkeypatch.setattr(secret_scope, "set_secret_scope", lambda _scope: "secret-token")
+    monkeypatch.setattr(
+        secret_scope,
+        "reset_secret_scope",
+        lambda token: observed.setdefault("secret_reset", token),
+    )
+    monkeypatch.setattr(
+        terminal_scope,
+        "install_profile_terminal_scope",
+        lambda _home: "terminal-token",
+    )
+    monkeypatch.setattr(
+        terminal_scope,
+        "reset_terminal_scope",
+        lambda token: observed.setdefault("terminal_reset", token),
+    )
+
+    def fake_save_compose(delivery, _fence, final_response, _output, **_kwargs):
+        observed["final_response"] = final_response
+        delivery.should_deliver = True
+        delivery.delivery_content = final_response
+
+    monkeypatch.setattr(scheduler, "_save_compose_deliver", fake_save_compose)
+    monkeypatch.setattr(
+        scheduler,
+        "_publish_local_session_completion",
+        lambda *_args, **_kwargs: None,
+    )
+
+    def fake_finish(delivery, _owner, execution_id):
+        observed["terminal_complete"] = delivery.terminal_complete
+        observed["execution_id"] = execution_id
+        return True
+
+    monkeypatch.setattr(scheduler, "_finish_completed_run", fake_finish)
+
+    job = {
+        "id": "goal-run",
+        "name": "Track package",
+        "execution_id": "exec-goal-run",
+        "stop_when_done": True,
+    }
+    assert scheduler._run_one_job_body(job) is True
+
+    assert observed["final_response"] == "Package delivered at the front desk."
+    assert observed["terminal_complete"] is True
+    assert observed["execution_id"] == "exec-goal-run"
+    assert observed["secret_reset"] == "secret-token"
+    assert observed["terminal_reset"] == "terminal-token"
