@@ -89,6 +89,8 @@ def test_absorb_entry_models_splits_declared_chain_and_deduplicates_members():
         "model-c",
         "model-a",
     ]
+    assert grp["has_explicit_models"] is True
+
 
 def test_passthrough_kwargs_to_base(monkeypatch):
     """All kwargs must be forwarded to ``list_authenticated_providers`` unchanged.
