@@ -175,3 +175,131 @@ class TestBrowserNavigateOpenTimeout:
 
         bt.browser_navigate("https://example.com", task_id="task-1")
         assert captured["timeout"] == 120
+
+
+class TestManagedLocalChromeFailureCleanup:
+    def test_local_open_binds_profile_and_reaps_fatal_launch_failure(
+        self, tmp_path, monkeypatch
+    ):
+        session_info = {
+            "session_name": "h_managed123",
+            "bb_session_id": None,
+            "cdp_url": None,
+            "features": {"local": True},
+        }
+        captured = {}
+        discarded = []
+
+        class _Proc:
+            returncode = 1
+
+            def wait(self, timeout=None):
+                return 1
+
+        def _popen(argv, env, socket_dir, tag):
+            captured["env"] = dict(env)
+            captured["socket_dir"] = socket_dir
+            (tmp_path / f"_stdout_{tag}").write_text(
+                '{"success":false,"error":"Chrome exited early without writing DevToolsActivePort"}',
+                encoding="utf-8",
+            )
+            (tmp_path / f"_stderr_{tag}").write_text("", encoding="utf-8")
+            return _Proc()
+
+        monkeypatch.setattr(bt_session, "_prepare_session_socket_dir", lambda _name: str(tmp_path))
+        monkeypatch.setattr(bt_session, "_agent_browser_command_env", lambda _dir: {})
+        monkeypatch.setattr(bt_session, "_apply_chromium_sandbox_args", lambda _env: None)
+        monkeypatch.setattr(bt_session, "_popen_agent_browser", _popen)
+        monkeypatch.setattr(
+            bt_session,
+            "_discard_timed_out_browser_session",
+            lambda task, info, socket_dir: discarded.append((task, info, socket_dir)),
+        )
+
+        result = bt_session._spawn_and_collect(
+            "managed-task", session_info, ["agent-browser"], "open", "auto", 5
+        )
+
+        assert result["success"] is False
+        assert "_daemon_expected" not in session_info
+        assert captured["env"]["AGENT_BROWSER_PROFILE"] == str(tmp_path / "chrome-profile")
+        assert discarded == [("managed-task", session_info, str(tmp_path))]
+
+    def test_normal_navigation_error_does_not_discard_local_session(self):
+        session_info = {
+            "session_name": "h_healthy123",
+            "bb_session_id": None,
+            "cdp_url": None,
+            "features": {"local": True},
+        }
+
+        assert bt_session._fatal_local_open_failure(
+            "open",
+            {"success": False, "error": "net::ERR_NAME_NOT_RESOLVED"},
+            session_info,
+            "auto",
+        ) is False
+
+    def test_cloud_session_does_not_receive_managed_local_profile(self, tmp_path, monkeypatch):
+        session_info = {
+            "session_name": "cloud-session",
+            "bb_session_id": "bb-1",
+            "cdp_url": None,
+        }
+        captured = {}
+
+        class _Proc:
+            returncode = 0
+
+            def wait(self, timeout=None):
+                return 0
+
+        def _popen(argv, env, socket_dir, tag):
+            captured["env"] = dict(env)
+            (tmp_path / f"_stdout_{tag}").write_text(
+                '{"success":true,"data":{}}', encoding="utf-8"
+            )
+            (tmp_path / f"_stderr_{tag}").write_text("", encoding="utf-8")
+            return _Proc()
+
+        monkeypatch.setattr(bt_session, "_prepare_session_socket_dir", lambda _name: str(tmp_path))
+        monkeypatch.setattr(bt_session, "_agent_browser_command_env", lambda _dir: {})
+        monkeypatch.setattr(bt_session, "_apply_chromium_sandbox_args", lambda _env: None)
+        monkeypatch.setattr(bt_session, "_popen_agent_browser", _popen)
+
+        result = bt_session._spawn_and_collect(
+            "cloud-task", session_info, ["agent-browser"], "open", "auto", 5
+        )
+
+        assert result["success"] is True
+        assert "AGENT_BROWSER_PROFILE" not in captured["env"]
+
+    def test_cloud_open_failure_never_uses_local_fatal_cleanup(self):
+        session_info = {
+            "session_name": "cloud-session",
+            "bb_session_id": "bb-1",
+            "cdp_url": "ws://cloud.invalid/devtools/browser/1",
+        }
+
+        assert bt_session._fatal_local_open_failure(
+            "open",
+            {"success": False, "error": "Chrome exited early without DevToolsActivePort"},
+            session_info,
+            "auto",
+        ) is False
+
+    def test_started_local_session_detects_dead_daemon(self, tmp_path, monkeypatch):
+        session_name = "h_dead123"
+        socket_dir = tmp_path / f"agent-browser-{session_name}"
+        socket_dir.mkdir()
+        (socket_dir / f"{session_name}.pid").write_text("4242", encoding="utf-8")
+        monkeypatch.setattr(bt, "_socket_safe_tmpdir", lambda: str(tmp_path))
+        monkeypatch.setattr(bt_lifecycle, "_pid_exists", lambda pid: False)
+
+        assert bt_session._local_backend_process_dead({
+            "session_name": session_name,
+            "bb_session_id": None,
+            "cdp_url": None,
+            "features": {"local": True},
+            "_daemon_expected": True,
+        }) is True
