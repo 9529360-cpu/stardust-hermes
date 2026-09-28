@@ -660,8 +660,11 @@ It keeps these operations on the **same active browser session**:
 - `scroll_into_view` — bring a referenced element into the viewport
 - `wait_element`, `wait_text`, `wait_url`, `wait_load` — wait for the condition that proves a page-changing action finished. `wait_url` uses a literal URL substring (for example `/dashboard`), not a glob.
 
-Use snapshot refs such as `@e5` for element actions. For `wait_element`, a CSS selector is also
-accepted. Prefer `wait_text`, `wait_url`, or a specific element over repeatedly taking snapshots.
+Use snapshot refs such as `@e5` for element actions. For a visible `wait_element`, either a
+snapshot ref or CSS selector works. Hidden-element waits require a CSS selector on the pinned browser
+driver; Stardust implements that state through an internally escaped condition because the current
+`^0.26.0` CLI does not support `wait <selector> --state hidden`. Prefer `wait_text`, `wait_url`,
+or a specific element over repeatedly taking snapshots.
 Use `networkidle` only for pages that are known to become quiet; long-lived WebSockets, SSE, or
 polling can keep it pending forever.
 
