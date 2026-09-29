@@ -151,6 +151,34 @@ def _effective_terminal_backend() -> str:
     return backend or "local"
 
 
+def _profile_terminal_policy(profile_home) -> dict:
+    """Effective TERMINAL_* policy for the session's named profile, or {} when unavailable."""
+    if not profile_home:
+        return {}
+    from tools.terminal_scope import TerminalPolicyUnavailable, build_profile_terminal_scope
+    try:
+        return build_profile_terminal_scope(Path(profile_home))
+    except TerminalPolicyUnavailable:
+        return {}
+
+
+def _bound_terminal_backend(profile_home) -> str:
+    """Terminal backend for the profile that owns an early session RPC."""
+    if not profile_home:
+        return _effective_terminal_backend()
+    policy = _profile_terminal_policy(profile_home)
+    return str(policy.get("TERMINAL_ENV") or "").strip().lower() or "local"
+
+
+def _cwd_is_remote(profile_home) -> bool:
+    """True when this profile's workspace lives on another host.
+
+    SSH cwd values cannot be vouched for with host filesystem checks. Docker and
+    other sandbox backends mount or copy host paths, so they remain host-checkable.
+    """
+    return _bound_terminal_backend(profile_home) == "ssh"
+
+
 def _display_session_cwd(session: dict | None) -> str:
     """Session cwd for display/probe surfaces, healed past deleted worktrees (healed value persisted back; local only)."""
     cwd = _session_cwd(session)
