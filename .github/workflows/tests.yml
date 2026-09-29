@@ -11,13 +11,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan-tests:
+    name: Plan test shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Restore per-file duration cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: test_durations.json
+          key: test-durations-never-exact
+          restore-keys: |
+            test-durations-
+
+      - name: Build balanced shard matrix
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The canonical runner already owns LPT slicing. Plan once so every
+          # shard sees the exact same partition even if cache state changes.
+          matrix="$(python3 scripts/run_tests_parallel.py --generate-slices 4)"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+
   test:
-    name: Run tests
+    name: Run tests (slice ${{ matrix.slice.index }}/4)
+    needs: plan-tests
     # Full CI is repository infrastructure, not developer-machine workload.
-    # Keep every canonical suite on GitHub-hosted runners so local/runtime
-    # machines never become an implicit availability dependency for merges.
+    # Keep every canonical suite on GitHub-hosted runners. Four LPT-balanced
+    # slices preserve the exact same file coverage while cutting wall time.
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.plan-tests.outputs.matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -66,24 +99,89 @@ jobs:
             test-durations-
 
       - name: Run tests
-        run: |
-          source .venv/bin/activate
-          # Replace the Actions step shell with the test runner so cancellation
-          # targets the real parent instead of orphaning it under PID 1.
-          exec scripts/run_tests.sh --fail-on-flaky
         env:
-          # Leopard exposes 8 logical CPUs backed by 4 physical cores. Eight CPU-heavy
-          # pytest workers can more than double slow-file wall time and trip the 300s
-          # per-file safety cap, so match the physical-core budget instead.
+          TEST_FILES: ${{ matrix.slice.files }}
+          # Leopard exposes 8 logical CPUs backed by 4 physical cores. Keep
+          # per-runner pressure at the proven physical-core budget.
           HERMES_TEST_WORKERS: 4
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""
+        run: |
+          source .venv/bin/activate
+          # Replace the Actions step shell with the test runner so cancellation
+          # targets the real parent instead of orphaning it under PID 1.
+          exec scripts/run_tests.sh --files "$TEST_FILES" --fail-on-flaky
 
-      - name: Save per-file duration cache (main only)
-        # Keep clean first-attempt durations even when another file fails, so a
-        # red main run can still bootstrap timeout data for known-slow files.
+      - name: Record shard membership
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          TEST_FILES: ${{ matrix.slice.files }}
+        run: printf '%s' "$TEST_FILES" > test-slice-files.txt
+
+      - name: Upload duration shard (main only)
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && hashFiles('test_durations.json') != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: test-durations-${{ matrix.slice.index }}
+          path: |
+            test_durations.json
+            test-slice-files.txt
+          retention-days: 1
+
+  save-test-durations:
+    name: Save merged test durations
+    needs: test
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download duration shards
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: test-durations-*
+          path: duration-shards
+
+      - name: Merge clean per-file durations
+        if: steps.download.outcome == 'success'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          roots = sorted(Path("duration-shards").glob("test-durations-*"))
+          if not roots:
+              raise SystemExit(0)
+
+          # Each shard starts from the same restored global cache. Seed from
+          # one copy to retain old timings for files that did not run cleanly,
+          # then overwrite only the exact files owned by each shard.
+          first = roots[0] / "test_durations.json"
+          merged = json.loads(first.read_text(encoding="utf-8")) if first.is_file() else {}
+
+          for root in roots:
+              data_path = root / "test_durations.json"
+              files_path = root / "test-slice-files.txt"
+              if not data_path.is_file() or not files_path.is_file():
+                  continue
+              data = json.loads(data_path.read_text(encoding="utf-8"))
+              for name in files_path.read_text(encoding="utf-8").split(":"):
+                  if name and name in data:
+                      merged[name] = data[name]
+
+          Path("test_durations.json").write_text(
+              json.dumps(merged, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Save merged duration cache
+        if: hashFiles('test_durations.json') != ''
+        continue-on-error: true
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: test_durations.json
