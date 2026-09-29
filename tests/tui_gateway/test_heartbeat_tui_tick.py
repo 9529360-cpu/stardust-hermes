@@ -67,9 +67,11 @@ def test_notification_poller_fires_due_heartbeat_when_idle(server, session):
     sid, key, s = session
     _arm_due(key)
     dispatched: list[str] = []
+    submit_kwargs: list[dict] = []
 
     def submit(rid, sid_, session_, text, **kw):
         dispatched.append(text)
+        submit_kwargs.append(kw)
         return True
 
     stop = threading.Event()
@@ -86,6 +88,7 @@ def test_notification_poller_fires_due_heartbeat_when_idle(server, session):
     from hermes_cli.heartbeat import load_heartbeat
 
     assert len(dispatched) == 1 and "report backend health" in dispatched[0]
+    assert submit_kwargs == [{"display_kind": "internal_notification"}]
     assert s["running"] is True  # claimed for the heartbeat turn
     assert load_heartbeat(key).fire_count == 1 and not load_heartbeat(key).is_due()
 
