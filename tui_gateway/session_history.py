@@ -94,21 +94,25 @@ def _content_display_text(content: Any) -> str:
     return "" if content is None else str(content)
 
 
-def _coerce_message_text(content: Any) -> str:
-    """Render ``message['content']`` (str, parts list, or one structured dict) as a plain string. Image parts
-    keep their URL inline so the desktop's ``extractEmbeddedImages`` and the resume payload agree with the
-    cached message (else the inline image flashed, then vanished); other shapes become a placeholder."""
+def _coerce_message_text(content: Any, *, image_urls: bool = True) -> str:
+    """Render ``message['content']`` (str, parts list, or one structured dict) as plain text.
+
+    Image parts keep their URL inline by default so existing Desktop/history consumers retain
+    today's rendering. Callers that only need a lightweight transcript can pass
+    ``image_urls=False``, which preserves the image position as ``[image]`` without
+    retransmitting a potentially large data URI.
+    """
     if isinstance(content, list):
         chunks: list[str] = []
         for part in content:
             if isinstance(part, str) or (isinstance(part, dict) and isinstance(part.get("text"), str)):
                 chunks.append(part if isinstance(part, str) else part["text"])
             elif isinstance(part, dict) and part.get("type"):
-                rendered = _history_dict_text(part, image_urls=True)
+                rendered = _history_dict_text(part, image_urls=image_urls)
                 chunks.append(rendered if part["type"] in _HISTORY_TEXT_KINDS else f"\n{rendered}")
         return "".join(chunks)
     if isinstance(content, dict):
-        return _history_dict_text(content, image_urls=True)
+        return _history_dict_text(content, image_urls=image_urls)
     return "" if content is None else str(content)
 
 
