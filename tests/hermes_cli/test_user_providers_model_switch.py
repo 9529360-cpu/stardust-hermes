@@ -213,6 +213,39 @@ def test_list_authenticated_providers_accepts_base_url_and_singular_model(monkey
     assert custom["total_models"] == 3
 
 
+
+def test_list_authenticated_providers_splits_comma_default_model_chain(monkeypatch):
+    """A providers: default_model fallback chain is selectable one model at a time."""
+    monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr("hermes_cli.providers.HERMES_OVERLAYS", {})
+
+    user_providers = {
+        "volcengine-agent-plan": {
+            "name": "VOLCENGINE-AGENT-PLAN",
+            "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+            "default_model": "deepseek-v4-flash, deepseek-v4-pro, glm-5.2, deepseek-v4-flash",
+        }
+    }
+
+    providers = list_authenticated_providers(
+        current_provider="volcengine-agent-plan",
+        user_providers=user_providers,
+        custom_providers=[],
+        max_models=50,
+    )
+
+    row = next(
+        p for p in providers
+        if p.get("is_user_defined") and p["slug"] == "volcengine-agent-plan"
+    )
+    assert row["models"] == [
+        "deepseek-v4-flash, deepseek-v4-pro, glm-5.2, deepseek-v4-flash",
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+        "glm-5.2",
+    ]
+    assert row["total_models"] == 4
+
 def test_list_authenticated_providers_dedupes_when_user_and_custom_overlap(monkeypatch):
     """When the same slug appears in both ``providers:`` dict and
     ``custom_providers:`` list, emit exactly one row (providers: dict wins

@@ -60,6 +60,36 @@ def _make_provider(slug, name=None, models=None, *, is_current=False,
 
 
 
+
+def test_absorb_entry_models_splits_active_fallback_chain_without_losing_raw_default():
+    grp = {"models": [], "has_explicit_models": False}
+
+    model_switch_providers._absorb_entry_models(grp, {}, "model-a, model-b,model-c")
+
+    assert grp["models"] == [
+        "model-a, model-b,model-c",
+        "model-a",
+        "model-b",
+        "model-c",
+    ]
+
+
+def test_absorb_entry_models_splits_declared_chain_and_deduplicates_members():
+    grp = {"models": [], "has_explicit_models": False}
+    entry = {"models": ["model-a, model-b", "model-b", "model-c"]}
+
+    model_switch_providers._absorb_entry_models(grp, entry, "primary")
+
+    assert grp["models"] == [
+        "primary",
+        "model-a, model-b",
+        "model-b",
+        "model-c",
+        "model-a",
+    ]
+    assert grp["has_explicit_models"] is True
+
+
 def test_passthrough_kwargs_to_base(monkeypatch):
     """All kwargs must be forwarded to ``list_authenticated_providers`` unchanged.
 
