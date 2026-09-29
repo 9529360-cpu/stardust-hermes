@@ -414,6 +414,7 @@ import { fetchMarketplaceThemes, searchMarketplaceThemes } from './vscode-market
 import { createWakeIndicatorWindowController } from './wake-indicator-window'
 import { enumerateWindowsFrontToBack, enumerationFailed, readWindowBelow } from './window-below'
 import {
+  appliedPrimaryWindowRoute,
   registrySshPoolScopeByConnectionId,
   registrySshScopeForWindowRoute,
   WindowConnectionRouteRegistry
@@ -15510,6 +15511,37 @@ ipcMain.handle('hermes:connection-config:apply', async (_event, payload) => {
   const scope = key || ''
   const nextRegistry = key ? previousRegistry : reconcileAppliedGlobalConnection(previousRegistry, config)
 
+  // A successful GLOBAL apply changes the primary backend, but this window's
+  // recorded route still names the source it just left. The renderer's apply
+  // event triggers a profile-less re-dial, which main resolves from that route;
+  // update the route first so the re-dial cannot bounce back to the old source.
+  // Profile-scoped applies do not change the registry primary and must not
+  // re-home a window that is intentionally viewing another registered source.
+  const applyPrimaryWindowRoute = () => {
+    const win = mainWindow
+
+    if (win && !win.isDestroyed() && win.webContents && !win.webContents.isDestroyed()) {
+      const id = win.webContents.id
+      const previous = windowConnectionRoutes.get(id)
+      const next = windowConnectionRoutes.set(
+        id,
+        appliedPrimaryWindowRoute(nextRegistry, previous?.profile ?? primaryProfileKey())
+      )
+
+      if (
+        previous?.connectionId !== next?.connectionId ||
+        previous?.profile !== next?.profile ||
+        previous?.registryScoped !== next?.registryScoped
+      ) {
+        void resetPreviewReach(id)
+      }
+    }
+
+    sendConnectionApplied()
+  }
+
+  const notifyApplied = key ? sendConnectionApplied : applyPrimaryWindowRoute
+
   await applyConnectionConfigAtomically({
     previousConfig,
     previousRegistry,
@@ -15533,12 +15565,12 @@ ipcMain.handle('hermes:connection-config:apply', async (_event, payload) => {
               bootstrapFailure = null
             },
             mode: config.mode,
-            notifyConnectionApplied: sendConnectionApplied,
+            notifyConnectionApplied: notifyApplied,
             resumeFirstRunRemote: abandonFirstRunSetupChoiceForRemoteApply,
             teardownPrimaryBackend: teardownPrimaryBackendAndWait
           }),
         scope,
-        sendApplied: sendConnectionApplied,
+        sendApplied: notifyApplied,
         stopPool: stopPoolBackend,
         teardownPrimary: () => teardownPrimaryBackendAndWait({ soft: true }),
         teardownSsh: value => teardownSshConnection(value || null)

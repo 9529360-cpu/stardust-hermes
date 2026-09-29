@@ -335,7 +335,8 @@ Certain tools are blocked for subagents even when the parent has them:
 - `clarify` — subagents cannot interact with the user
 - `memory` — no writes to shared persistent memory
 - `send_message` — no cross-platform side effects
-- `cronjob` — no scheduling more work in the parent's name
+
+`cronjob` is not a special child-only deny anymore: a child inherits it only when the parent already has it, and an explicit parent `disabled_toolsets: [cronjob]` still wins. The cron tool's own approval rules remain authoritative, so inheriting the tool does not let a child mint durable `approval_mode=approve` authority without the required operator confirmation.
 
 Both roles retain `execute_code` (programmatic tool calling) so children can batch mechanical work.
 

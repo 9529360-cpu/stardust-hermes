@@ -57,7 +57,7 @@ Two layers, split by a real capability boundary:
 |---|---|---|
 | Use for | DETERMINISTIC work: fetch N URLs, parse N files, run N commands, template N outputs, build manifests, merge outputs | LLM-JUDGMENT work: classify, review, decide, write, refute, refactor one unit |
 | Holds | loop, branching, intermediate variables | nothing; one call with `tasks=[...]`, each task its own isolated agent |
-| Tools | the sandbox set above; it can NOT call `delegate_task` | the parent's toolsets, inherited unchanged (no per-task narrowing); children lose `delegate_task`, `clarify`, `memory`, `send_message`, `cronjob_manage` |
+| Tools | the sandbox set above; it can NOT call `delegate_task` | the parent's toolsets, inherited unchanged (no per-task narrowing); children lose `delegate_task`, `clarify`, `memory`, `send_message`; `cronjob_manage` is inherited only when the parent already has it |
 | Concurrency | yours (`ThreadPoolExecutor`, batches) | bounded by `delegation.max_concurrent_children` |
 | Cost | tool calls only | one full agent tree per task; multiplies linearly |
 
