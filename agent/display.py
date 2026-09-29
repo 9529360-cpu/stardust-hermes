@@ -353,7 +353,8 @@ def _browser_exec_step_label(args: dict, max_chars: int = 80) -> str | None:
 _PRIMARY_ARGS = {
     "terminal": "command", "web_search": "query", "web_extract": "urls", "read_file": "path",
     "write_file": "path", "patch": "path", "search_files": "pattern", "browser_navigate": "url",
-    "browser_click": "ref", "browser_type": "text", "image_generate": "prompt", "text_to_speech": "text",
+    "browser_click": "ref", "browser_type": "text", "browser_interact": "action",
+    "image_generate": "prompt", "text_to_speech": "text",
     "vision_analyze": "question", "skill_view": "name", "skills_list": "category", "cronjob_manage": "action",
     "execute_code": "code", "browser_exec": "code", "delegate_task": "goal", "clarify": "question",
     "skill_manage": "name",
@@ -1059,6 +1060,7 @@ _CUTE_LINES = {
     "browser_snapshot": lambda a, r: f"┊ 📸 snapshot  {'full' if a.get('full') else 'compact'}",
     "browser_click": lambda a, r: f"┊ 👆 click     {a.get('ref', '?')}",
     "browser_type": lambda a, r: f"┊ ⌨️  type      \"{_cute_trunc(a.get('text', ''))}\"",
+    "browser_interact": lambda a, r: f"┊ 🖱️  interact  {a.get('action', '?')}",
     "browser_scroll": lambda a, r: f"┊ {_SCROLL_ARROWS.get(a.get('direction', 'down'), '↓')}  scroll    {a.get('direction', 'down')}",
     "browser_back": lambda a, r: "┊ ◀️  back    ",
     "browser_press": lambda a, r: f"┊ ⌨️  press     {a.get('key', '?')}",

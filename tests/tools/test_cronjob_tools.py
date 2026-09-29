@@ -608,6 +608,95 @@ class TestRegisteredHandlerForwardsAttachToSession:
         assert "attach_to_session" not in formatted
 
 
+    def test_attached_create_snapshots_current_session_without_exposing_raw_context(self, monkeypatch):
+        from cron.jobs import get_job
+        from tools.registry import registry
+
+        seen = []
+        monkeypatch.setattr(
+            "cron.session_handoff.capture_session_handoff",
+            lambda session_id: seen.append(session_id) or (
+                "USER: Keep following up on the repair.\n\n"
+                "ASSISTANT: Waiting for the technician."
+            ),
+        )
+
+        created = json.loads(
+            registry.dispatch(
+                "cronjob_manage",
+                {
+                    "action": "create",
+                    "schedule": "1h",
+                    "prompt": "Continue the repair follow-up.",
+                    "attach_to_session": True,
+                },
+                session_id="parent-session",
+            )
+        )
+
+        assert created["success"] is True
+        assert seen == ["parent-session"]
+        stored = get_job(created["job_id"])
+        assert stored["handoff_context"].startswith("USER: Keep following up")
+        # Internal handoff data must not be echoed through list/create job views.
+        assert "handoff_context" not in created["job"]
+        listing = json.loads(registry.dispatch("cronjob_manage", {"action": "list"}))
+        listed = next(j for j in listing["jobs"] if j["job_id"] == created["job_id"])
+        assert "handoff_context" not in listed
+
+    def test_attach_update_refreshes_snapshot_and_detach_clears_it(self, monkeypatch):
+        from cron.jobs import get_job
+        from tools.registry import registry
+
+        created = json.loads(
+            registry.dispatch(
+                "cronjob_manage",
+                {"action": "create", "schedule": "1h", "prompt": "Continue later."},
+            )
+        )
+        job_id = created["job_id"]
+
+        monkeypatch.setattr(
+            "cron.session_handoff.capture_session_handoff",
+            lambda session_id: f"USER: refreshed from {session_id}",
+        )
+        attached = json.loads(
+            registry.dispatch(
+                "cronjob_manage",
+                {"action": "update", "job_id": job_id, "attach_to_session": True},
+                session_id="refresh-session",
+            )
+        )
+        assert attached["success"] is True
+        assert get_job(job_id)["handoff_context"] == "USER: refreshed from refresh-session"
+
+        detached = json.loads(
+            registry.dispatch(
+                "cronjob_manage",
+                {"action": "update", "job_id": job_id, "attach_to_session": False},
+                session_id="refresh-session",
+            )
+        )
+        assert detached["success"] is True
+        assert "handoff_context" not in get_job(job_id)
+
+    def test_unattached_create_does_not_read_session_history(self, monkeypatch):
+        from tools.registry import registry
+
+        monkeypatch.setattr(
+            "cron.session_handoff.capture_session_handoff",
+            lambda _session_id: pytest.fail("unattached cron must not snapshot chat history"),
+        )
+        created = json.loads(
+            registry.dispatch(
+                "cronjob_manage",
+                {"action": "create", "schedule": "1h", "prompt": "Fire and forget."},
+                session_id="parent-session",
+            )
+        )
+        assert created["success"] is True
+
+
 class TestLocalDeliveryNotice:
     """#51568 — TUI/CLI cron jobs are local-only; surface that at create time
     so the agent doesn't promise a delivery that never happens."""

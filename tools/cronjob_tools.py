@@ -667,6 +667,11 @@ def _action_create(a: Dict[str, Any]) -> str:
     if approval_error:
         return tool_error(approval_error, success=False)
 
+    handoff_context = None
+    if a["attach_to_session"] is True and not _no_agent:
+        from cron.session_handoff import capture_session_handoff
+        handoff_context = capture_session_handoff(a.get("session_id"))
+
     from cron.scheduler import CronSchedulerRegistrationError, create_job_with_scheduler_registration
     from cron.session_return import capture_local_session_origin
     local_session_origin = capture_local_session_origin(deliver, a.get("session_id"))
@@ -680,6 +685,7 @@ def _action_create(a: Dict[str, Any]) -> str:
             script=_normalize_optional_job_value(script), context_from=context_from,
             enabled_toolsets=a["enabled_toolsets"] or None, workdir=_normalize_optional_job_value(a["workdir"]),
             no_agent=_no_agent, attach_to_session=a["attach_to_session"],
+            handoff_context=handoff_context, stop_when_done=a["stop_when_done"],
             monitor_script=_normalize_optional_job_value(a["monitor_script"]),
             monitor_url=_normalize_optional_job_value(a["monitor_url"]),
             # CLI-only lane: absent from CRONJOB_SCHEMA and the model dispatch (models don't pick models).
@@ -881,11 +887,26 @@ def _update_context_from(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[s
 
 
 def _update_run_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str, Any]) -> Optional[str]:
-    """enabled_toolsets / attach_to_session / workdir / no_agent / repeat / schedule."""
+    """enabled_toolsets / attach_to_session / stop_when_done / workdir / no_agent / repeat / schedule."""
     if a["enabled_toolsets"] is not None:
         updates["enabled_toolsets"] = a["enabled_toolsets"] or None
     if a["attach_to_session"] is not None:
-        updates["attach_to_session"] = bool(a["attach_to_session"])
+        attached = bool(a["attach_to_session"])
+        updates["attach_to_session"] = attached
+        if not attached:
+            updates["handoff_context"] = None
+        else:
+            target_no_agent = (
+                bool(a["no_agent"]) if a["no_agent"] is not None
+                else bool(job.get("no_agent"))
+            )
+            if not target_no_agent:
+                from cron.session_handoff import capture_session_handoff
+                # Explicit attach=True means refresh now. If capture fails, clear
+                # any old snapshot rather than silently presenting stale context.
+                updates["handoff_context"] = capture_session_handoff(a.get("session_id"))
+    if a["stop_when_done"] is not None:
+        updates["stop_when_done"] = bool(a["stop_when_done"])
     if a["workdir"] is not None:
         # Empty string clears; otherwise update_job() validates/normalizes.
         updates["workdir"] = _normalize_optional_job_value(a["workdir"]) or None
@@ -1039,6 +1060,7 @@ def cronjob(
     workdir: Optional[str] = None,
     no_agent: Optional[bool] = None,
     attach_to_session: Optional[bool] = None,
+    stop_when_done: Optional[bool] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
@@ -1094,7 +1116,7 @@ CRONJOB_SCHEMA = {
 
 'resnap' adopts the CURRENT global inference resolution for an unpinned job (job_id) or all unpinned jobs (all=true) WITHOUT pinning it, so it keeps tracking future global changes — use after deliberately changing the default model.
 
-Jobs run in a fresh session with no current-chat context, so prompts must be self-contained, and the agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. Prefer updating an existing job over creating near-duplicates.""",
+Jobs run in a fresh session. Normally they have no current-chat context, so prompts must be self-contained. If future work depends on the current conversation, set attach_to_session=true: Hermes snapshots a bounded recent user/assistant tail at create/update time and supplies it as background context on future runs, instead of making you manually restate every piece of task context. It is a snapshot, not a live transcript link, so keep critical identifiers in the stored prompt. The agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. For bounded recurring follow-ups whose purpose ends when a real-world condition becomes true (package delivered, refund received, repair resolved, application decided), set stop_when_done=true so the existing job can retire itself into state=completed when the runtime confirms the goal. Prefer updating an existing job over creating near-duplicates.""",
     "parameters": {
         "type": "object",
         "properties": {
@@ -1169,6 +1191,10 @@ Jobs run in a fresh session with no current-chat context, so prompts must be sel
                 "type": "boolean",
                 "description": "True = each run sees the job's own previous output, so it can dedupe and continue where it left off (scouts, monitors, incremental digests). Default false. On update, false turns it off."
             },
+            "stop_when_done": {
+                "type": "boolean",
+                "description": "Optional goal-task mode for bounded recurring follow-ups. True means the job should keep checking/working until its real-world goal is actually satisfied, then emit the runtime [DONE] marker and automatically enter the existing completed terminal state after delivering the final result. Use for bounded follow-ups such as 'track this package until delivered' or 'watch this refund until received', not perpetual reports/briefings. On update, false turns it off. Incompatible with no_agent."
+            },
             "enabled_toolsets": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -1180,7 +1206,7 @@ Jobs run in a fresh session with no current-chat context, so prompts must be sel
             },
             "attach_to_session": {
                 "type": "boolean",
-                "description": "True = the job's delivery is CONTINUABLE — the user can reply and the agent has the brief in context (threads on thread-capable platforms, mirrored into the DM elsewhere). Use for conversational recurring jobs (briefings); leave unset for fire-and-forget alerts. Scope: the job's own conversation only — the origin chat, the home-channel fallback when deliver='origin' captured no origin (script-created jobs), a user-written bare platform target (deliver='slack' — that platform's home channel), or the job's single explicit platform:chat target (this flag is the only way to attach an explicit target). Broadcast targets are never attached; no effect when deliver='local'."
+                "description": "True = make this job CONTINUABLE in both directions: snapshot a bounded recent user/assistant tail from the current session as creation-time background for the future fresh cron session, and attach the job's delivery so the user can reply with the brief in context (threads on thread-capable platforms, mirrored into the DM elsewhere). The snapshot is fixed at create/update time, not a live transcript link; keep critical identifiers in the job prompt. Use for follow-up work and conversational recurring jobs; leave unset for fire-and-forget alerts. Scope: the job's own conversation only — the origin chat, the home-channel fallback when deliver='origin' captured no origin (script-created jobs), a user-written bare platform target (deliver='slack' — that platform's home channel), or the job's single explicit platform:chat target. Broadcast targets are never attached. With deliver='local', the creation-time handoff still supplies background to the cron run, but there is no reply-facing delivery to attach."
             },
         },
         "required": ["action"]
@@ -1210,7 +1236,7 @@ def check_cronjob_requirements() -> bool:
 _HANDLER_FORWARDED_ARGS = (
     "job_id", "prompt", "schedule", "name", "repeat", "deliver", "failure_deliver", "skill", "skills", "reason",
     "script", "context_from", "continuity", "enabled_toolsets", "workdir", "no_agent", "attach_to_session",
-    "approval_mode", "paused_reason", "all")
+    "stop_when_done", "approval_mode", "paused_reason", "all")
 
 
 def _cronjob_handler(args, **kw):

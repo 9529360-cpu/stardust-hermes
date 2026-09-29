@@ -214,6 +214,7 @@ def _read_only_parent_memory_snapshot(
         snapshot = snapshot[:_CHILD_MEMORY_SNAPSHOT_MAX_CHARS].rstrip() + "\n[... parent memory snapshot truncated ...]"
     return snapshot
 
+
 def _child_compression_cap_tokens(raw) -> "int | None":
     """Validated ``delegation.compression_threshold_tokens``: an int >= 16000, or None for "no cap".
 
@@ -327,7 +328,8 @@ def _build_child_agent(
         goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
         max_spawn_depth=max_spawn, child_depth=child_depth,
         parent_memory_context=_read_only_parent_memory_snapshot(
-            parent_agent, rt, child_request_overrides=request_overrides),
+            parent_agent, rt, child_request_overrides=request_overrides
+        ),
     )
     parent_sid = getattr(parent_agent, "session_id", None)
     child_session_db = _open_child_session_db(parent_agent)
