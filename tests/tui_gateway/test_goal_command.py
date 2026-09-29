@@ -169,6 +169,26 @@ def _compression_failure():
     }
 
 
+def test_automatic_goal_followup_is_internal_machinery(server, session, monkeypatch):
+    sid, _session_key, s = session
+    captured = {}
+
+    def submit(_rid, _sid, _session, prompt, **kwargs):
+        captured["prompt"] = prompt
+        captured["kwargs"] = kwargs
+        return True
+
+    monkeypatch.setattr(server, "_run_prompt_submit", submit)
+    monkeypatch.setattr(server, "_emit", lambda *_args, **_kwargs: None)
+
+    server._dispatch_followup_turn(
+        "rid", sid, s, "[Continuing toward your standing goal] next step",
+        "goal continuation dispatch",
+    )
+
+    assert captured["prompt"].startswith("[Continuing toward your standing goal]")
+    assert captured["kwargs"] == {"display_kind": "internal_notification"}
+
 # ── command.dispatch /goal ────────────────────────────────────────────
 
 
