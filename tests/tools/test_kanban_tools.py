@@ -274,6 +274,93 @@ def test_block_happy_path(worker_env):
         conn.close()
 
 
+def test_worker_transient_block_self_retries_once_then_triages(monkeypatch, worker_env):
+    """A real dispatcher worker keeps one flaky failure in-process.
+
+    The first transient report must not park the card or free it for a second
+    worker while this process is still alive. The second report uses the
+    existing recurrence breaker and routes to triage instead of looping.
+    """
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+    from tools import kanban_tools as kt
+
+    with kbc.connect_closing() as conn:
+        row = conn.execute(
+            "SELECT current_run_id FROM tasks WHERE id = ?", (worker_env,),
+        ).fetchone()
+        run_id = int(row["current_run_id"])
+    monkeypatch.setenv("HERMES_KANBAN_RUN_ID", str(run_id))
+
+    first = json.loads(kt._handle_block({
+        "reason": "upstream returned 503",
+        "kind": "transient",
+    }))
+    assert first["ok"] is True
+    assert first["status"] == "running"
+    assert first["transient_retry"] is True
+    assert first["retry_now"] is True
+    assert "Retry the operation now" in first["message"]
+
+    with kbc.connect_closing() as conn:
+        row = conn.execute(
+            "SELECT status, current_run_id, block_kind, block_recurrences "
+            "FROM tasks WHERE id = ?",
+            (worker_env,),
+        ).fetchone()
+        assert row["status"] == "running"
+        assert int(row["current_run_id"]) == run_id
+        assert row["block_kind"] == "transient"
+        assert int(row["block_recurrences"]) == 1
+        retries = [event for event in kb.list_events(conn, worker_env)
+                   if event.kind == "transient_retry"]
+        assert len(retries) == 1
+        assert retries[0].payload["reason"] == "upstream returned 503"
+
+    second = json.loads(kt._handle_block({
+        "reason": "upstream still returns 503",
+        "kind": "transient",
+    }))
+    assert second["ok"] is True
+    assert second["status"] == "triage"
+
+    with kbc.connect_closing() as conn:
+        row = conn.execute(
+            "SELECT status, block_kind, block_recurrences FROM tasks WHERE id = ?",
+            (worker_env,),
+        ).fetchone()
+        assert row["status"] == "triage"
+        assert row["block_kind"] == "transient"
+        assert int(row["block_recurrences"]) == kb.BLOCK_RECURRENCE_LIMIT
+        escalations = [event for event in kb.list_events(conn, worker_env)
+                       if event.kind == "block_loop_detected"]
+        assert len(escalations) == 1
+        assert escalations[0].payload["kind"] == "transient"
+
+
+def test_orchestrator_transient_block_still_parks_for_explicit_attention(monkeypatch, worker_env):
+    """Only a trusted worker run gets the soft retry; operator semantics stay explicit."""
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+    from tools import kanban_tools as kt
+
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    monkeypatch.delenv("HERMES_KANBAN_RUN_ID", raising=False)
+    out = json.loads(kt._handle_block({
+        "task_id": worker_env,
+        "reason": "operator wants this parked",
+        "kind": "transient",
+    }))
+    assert out["ok"] is True
+    assert out["status"] == "blocked"
+
+    with kbc.connect_closing() as conn:
+        assert kb.get_task(conn, worker_env).status == "blocked"
+        assert not any(
+            event.kind == "transient_retry" for event in kb.list_events(conn, worker_env)
+        )
+
+
 def _make_goal_mode_worker_env(monkeypatch, tmp_path):
     """Set up an isolated HERMES_HOME with one claimed goal_mode task,
     matching the pattern used by the kanban_complete judge gate tests."""

@@ -189,9 +189,11 @@ KANBAN_BLOCK_SCHEMA = _schema(
             "type": "string",
             "enum": ["dependency", "needs_input", "capability", "transient"],
             "description": (
-                "Why you're blocked. 'dependency' waits in todo and "
-                "resumes automatically; the others surface to a human. "
-                "Omit only if none apply."
+                "Why you're blocked. 'dependency' waits in todo and resumes automatically; "
+                "'needs_input' and 'capability' surface to a human. For a dispatcher worker, "
+                "'transient' keeps the first flaky failure in the current run and asks you to "
+                "retry with available tools; repeating the same transient blocker trips the "
+                "existing circuit breaker to triage. Omit only if none apply."
             ),
         },
     },
