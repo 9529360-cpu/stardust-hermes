@@ -2664,6 +2664,7 @@ def _terminate_displaced_transition_worker(
             run_id=run_id,
         )
 
+
 def complete_task(
     conn: sqlite3.Connection, task_id: str, *, result: Optional[str] = None,
     summary: Optional[str] = None, metadata: Optional[dict] = None,
