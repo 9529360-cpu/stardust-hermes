@@ -174,24 +174,42 @@ def _setup_mcp_shim(agent, args: dict, ctx: InlineToolContext) -> Any:
 
 
 def _latest_user_message(messages: Optional[list]) -> str:
-    """Clean text of the current/latest user turn, never assistant-authored approval."""
-    for message in reversed(messages or []):
-        if not isinstance(message, dict) or message.get("role") != "user":
-            continue
-        content = message.get("content")
-        if isinstance(content, str):
-            return content.strip()
-        # Defensive support for provider-style multimodal content lists. Only
-        # copy explicit text parts; never stringify image/tool metadata.
-        if isinstance(content, list):
-            texts = []
-            for part in content:
-                if not isinstance(part, dict):
-                    continue
-                if part.get("type") in {"text", "input_text"} and isinstance(part.get("text"), str):
-                    texts.append(part["text"])
-            return "\n".join(texts).strip()
+    """Clean text only when the CURRENT user row is genuinely human-authored.
+
+    Tool execution happens after assistant/tool rows have been appended, so find
+    the nearest user row but never skip a synthetic current row to reuse older
+    human text. Operational wakes are deliberately role=user for provider
+    alternation; their display_kind is the durable authority boundary.
+    """
+    current_user = next(
+        (
+            message for message in reversed(messages or [])
+            if isinstance(message, dict) and message.get("role") == "user"
+        ),
+        None,
+    )
+    if current_user is None:
         return ""
+
+    from agent.context_compressor import user_originated_turn_view
+
+    live_view = user_originated_turn_view(current_user)
+    if live_view is None:
+        return ""
+
+    content = live_view.get("content")
+    if isinstance(content, str):
+        return content.strip()
+    # Defensive support for provider-style multimodal content lists. Only copy
+    # explicit text parts; never stringify image/tool metadata.
+    if isinstance(content, list):
+        texts = []
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") in {"text", "input_text"} and isinstance(part.get("text"), str):
+                texts.append(part["text"])
+        return "\n".join(texts).strip()
     return ""
 
 def _assistant_tasks(agent, args: dict, ctx: InlineToolContext) -> Any:
