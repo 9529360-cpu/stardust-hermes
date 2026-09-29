@@ -3723,11 +3723,28 @@ def delete_task(conn: sqlite3.Connection, task_id: str) -> bool:
 
 def schedule_task(
     conn: sqlite3.Connection, task_id: str, *, reason: Optional[str] = None,
-    expected_run_id: Optional[int] = None,
+    expected_run_id: Optional[int] = None, signal_fn=None,
 ) -> bool:
-    """Park in ``scheduled`` (waiting on time, not a human; not dispatchable)
-    until ``unblock_task`` re-gates it."""
+    """Park a task in ``scheduled`` and stop any live host-local worker.
+
+    Scheduling used to clear ``worker_pid``/claim state without terminating a
+    worker that was already running. That left the task durably parked while
+    the old process could keep changing files or external state. Snapshot the
+    process identity inside the winning transition and terminate it after the
+    transaction commits, mirroring the archive/reclaim safety boundary.
+    """
     with write_txn(conn):
+        row = conn.execute(
+            "SELECT status, claim_lock, worker_pid, worker_started_at "
+            "FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+        if row is None:
+            return False
+        was_running = row["status"] == "running"
+        prev_pid = row["worker_pid"]
+        prev_lock = row["claim_lock"]
+        prev_started = row["worker_started_at"]
         params: list[Any] = [task_id]
         sql = """
             UPDATE tasks
@@ -3747,7 +3764,15 @@ def schedule_task(
             conn, task_id, outcome="scheduled", status="scheduled", summary=reason, synthesize=bool(reason),
         )
         _append_event(conn, task_id, "scheduled", {"reason": reason}, run_id=run_id)
-        return True
+    if was_running:
+        termination = _terminate_reclaimed_worker(
+            prev_pid, prev_lock, signal_fn=signal_fn, started_at=prev_started,
+        )
+        with write_txn(conn):
+            _append_event(
+                conn, task_id, "schedule_worker_termination", termination, run_id=run_id,
+            )
+    return True
 
 
 # --- Worker context builder (what a spawned worker sees) ---
