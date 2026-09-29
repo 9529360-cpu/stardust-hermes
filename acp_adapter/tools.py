@@ -22,8 +22,9 @@ TOOL_KIND_MAP: Dict[str, ToolKind] = {
                  "browser_get_images", "vision_analyze"),
         "edit": ("write_file", "patch", "skill_manage"),
         "search": ("search_files",),
-        "execute": ("terminal", "process", "execute_code", "browser_click", "browser_type", "browser_scroll",
-                    "browser_press", "browser_back", "delegate_task", "image_generate", "text_to_speech"),
+        "execute": ("terminal", "process", "execute_code", "browser_click", "browser_type", "browser_interact",
+                    "browser_scroll", "browser_press", "browser_back", "delegate_task", "image_generate",
+                    "text_to_speech"),
         "fetch": ("web_search", "web_extract", "browser_navigate"),
         "other": ("todo",),
         "think": ("_thinking",),
@@ -40,7 +41,7 @@ _POLISHED_TOOLS = {
     "read_file", "write_file", "patch", "search_files", "terminal", "process", "execute_code",
     # Skills / web / browser / media
     "skill_view", "skills_list", "skill_manage", "web_search", "web_extract",
-    "browser_navigate", "browser_click", "browser_type", "browser_press", "browser_scroll",
+    "browser_navigate", "browser_click", "browser_type", "browser_interact", "browser_press", "browser_scroll",
     "browser_back", "browser_snapshot", "browser_console", "browser_get_images", "browser_vision",
     "vision_analyze", "image_generate", "text_to_speech",
     # Schedulers / platform integrations

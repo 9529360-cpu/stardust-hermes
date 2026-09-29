@@ -1951,6 +1951,7 @@ def test_voice_record_start_cuts_inflight_tts_before_arming_mic(monkeypatch):
         ),
     )
     monkeypatch.setattr(server, "_load_cfg", lambda: {"voice": {}})
+
     def fake_tts_stop(user_barge=True):
         tts_calls.append(user_barge)
         order.append("tts_stop")
@@ -1970,6 +1971,7 @@ def test_voice_record_start_cuts_inflight_tts_before_arming_mic(monkeypatch):
     assert resp["result"]["status"] == "recording"
     assert tts_calls == [True]
     assert order == ["tts_stop", "start_continuous"]
+
 
 def test_prompt_submit_typed_stop_phrase_ends_voice_chat(monkeypatch):
     """Typed bare stop phrase during an active voice chat is consumed at the
