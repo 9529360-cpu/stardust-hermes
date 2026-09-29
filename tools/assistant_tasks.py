@@ -25,7 +25,9 @@ MAX_RESUME_MESSAGE_CHARS = 16_000
 MAX_LIST_LIMIT = 50
 MAX_INSPECT_EVENTS = 60
 MAX_INSPECT_RUNS = 20
-_ATTENTION_STATUSES = {"blocked", "review", "triage"}
+# Human attention is semantic, not a raw Kanban status list. ``review`` is a
+# dispatcher-owned execution lane; ``triage`` is machine-owned when the
+# configured auto-decomposer is actually usable.
 _TERMINAL_STATUSES = {"done", "archived"}
 _NON_USER_TASK_SURFACES = frozenset({
     "api_server",
@@ -34,6 +36,39 @@ _NON_USER_TASK_SURFACES = frozenset({
     "tool",
     "webhook",
 })
+
+
+def _triage_is_machine_managed() -> bool:
+    """Whether triage can leave the queue without asking the user.
+
+    Reuse the Kanban diagnostics interpretation so this projection does not
+    invent a second definition of "usable decomposer". Fail closed: when
+    config cannot be read, surface triage for attention rather than claiming
+    automation that cannot be proven.
+    """
+    try:
+        from hermes_cli.config import load_config_readonly
+        from hermes_cli.kanban_diagnostics import triage_aux_status
+
+        status = triage_aux_status(load_config_readonly())
+    except Exception:
+        return False
+    if not isinstance(status, dict) or not status.get("auto_decompose"):
+        return False
+    return bool(status.get("decomposer_explicit") or status.get("main_model_visible"))
+
+
+def _task_needs_attention(task: Any, *, triage_machine_managed: bool) -> bool:
+    """Project only work that truly needs a person rather than a worker lane."""
+    status = str(getattr(task, "status", "") or "").strip()
+    if status == "blocked":
+        return True
+    if status == "triage":
+        return not triage_machine_managed
+    if status == "review":
+        # Review is a normal dispatcher lane when it still has an owner.
+        return not bool(str(getattr(task, "assignee", "") or "").strip())
+    return False
 
 
 def _idempotency_scope_token(owner_key: str, request_id: str) -> str:
@@ -331,6 +366,7 @@ def _list_tasks(
         if str(task_id).strip()
     }
     max_items = _safe_limit(limit)
+    triage_machine_managed = _triage_is_machine_managed()
     projected: list[dict[str, Any]] = []
     board_errors: list[dict[str, str]] = []
     # Creation remains board-scoped, but personal-assistant recall is user-scoped:
@@ -408,7 +444,9 @@ def _list_tasks(
                         "started_at": task.started_at,
                         "completed_at": task.completed_at,
                         "block_kind": task.block_kind,
-                        "needs_attention": task.status in _ATTENTION_STATUSES,
+                        "needs_attention": _task_needs_attention(
+                            task, triage_machine_managed=triage_machine_managed
+                        ),
                         "detail": detail,
                         "attachments": attachments,
                     })
