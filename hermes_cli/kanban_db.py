@@ -308,6 +308,7 @@ _CTX_MAX_COMMENTS       = 30      # most recent N comments shown in full
 _CTX_MAX_FIELD_BYTES    = 4 * 1024   # per summary/error/metadata/result
 _CTX_MAX_BODY_BYTES     = 8 * 1024   # per task.body (opening post)
 _CTX_MAX_COMMENT_BYTES  = 2 * 1024   # per comment
+_CTX_MAX_SHARED_WORKSPACE_PEERS = 5  # advisory rows for a shared dir: workspace
 
 
 def _relative_age(ts: Optional[int], now: Optional[int] = None) -> str:
@@ -3763,6 +3764,7 @@ def build_worker_context(conn: sqlite3.Connection, task_id: str) -> str:
     now = int(time.time())
     lines: list[str] = []
     _ctx_header(lines, task)
+    _ctx_shared_dir_workspace(lines, conn, task)
     _ctx_attachments(lines, list_attachments(conn, task_id))
     _ctx_prior_attempts(lines, conn, task_id, now)
     _ctx_parent_results(lines, conn, task_id, now)
@@ -3841,6 +3843,58 @@ def _ctx_header(lines: list[str], task: Task) -> None:
         lines.append("## Body")
         lines.append(_ctx_cap(task.body, _CTX_MAX_BODY_BYTES))
         lines.append("")
+
+
+def _ctx_shared_dir_workspace(
+    lines: list[str], conn: sqlite3.Connection, task: Task,
+) -> None:
+    """Warn when active tasks intentionally share the same persistent `dir` workspace.
+
+    Worktree and scratch tasks are isolated elsewhere and must stay quiet here. This is advisory,
+    not a lock: shared directories are a supported workflow, but two workers mutating the same
+    checkout/vault need to know that the filesystem is not task-private.
+    """
+    if task.workspace_kind != "dir" or not task.workspace_path:
+        return
+    raw_path = str(task.workspace_path)
+    expanded = Path(raw_path).expanduser()
+    path_aliases = {raw_path, str(expanded)}
+    try:
+        rel_home = expanded.relative_to(Path.home())
+        path_aliases.add("~/" + rel_home.as_posix())
+    except (ValueError, OSError):
+        pass
+    paths = tuple(sorted(path_aliases))
+    placeholders = ", ".join("?" for _ in paths)
+    rows = conn.execute(
+        "SELECT id, title, assignee, status FROM tasks "
+        "WHERE id != ? AND workspace_kind = 'dir' "
+        f"AND workspace_path IN ({placeholders}) "
+        "AND status IN ('ready', 'running', 'review') "
+        "ORDER BY CASE status WHEN 'running' THEN 0 WHEN 'review' THEN 1 ELSE 2 END, "
+        "priority DESC, created_at ASC, id ASC "
+        "LIMIT ?",
+        (task.id, *paths, _CTX_MAX_SHARED_WORKSPACE_PEERS + 1),
+    ).fetchall()
+    if not rows:
+        return
+
+    lines.append("## Shared workspace concurrency")
+    lines.append(
+        "This `dir:` workspace is shared with other active Kanban tasks; it is not an "
+        "isolated task checkout. This is an advisory warning, not a file lock. Re-read "
+        "files before writing and coordinate overlapping edits rather than assuming the "
+        "other task's changes are absent."
+    )
+    for row in rows[:_CTX_MAX_SHARED_WORKSPACE_PEERS]:
+        assignee = f" @{row['assignee']}" if row["assignee"] else ""
+        lines.append(
+            f"- {row['id']} [{row['status']}]{assignee} — {_ctx_cap(row['title'], 300)}"
+        )
+    omitted = len(rows) - _CTX_MAX_SHARED_WORKSPACE_PEERS
+    if omitted > 0:
+        lines.append(f"- … and at least {omitted} more active task(s) sharing this directory")
+    lines.append("")
 
 
 def _ctx_attachments(lines: list[str], attachments: list[Attachment]) -> None:
