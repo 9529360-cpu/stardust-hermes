@@ -150,12 +150,21 @@ def _record_model_calls_in_process(
     outbox_directory: str,
     count: int,
     start_barrier: Any | None = None,
+    busy_results: Any | None = None,
 ) -> None:
     if start_barrier is not None:
         start_barrier.wait()
     store = SharedMetricsStore(Path(database_path), Path(outbox_directory))
+    busy_calls = 0
     for _ in range(count):
-        store.record_model_call(_dimensions(), _resource())
+        try:
+            store.record_model_call(_dimensions(), _resource())
+        except sqlite3.OperationalError as exc:
+            if exc.sqlite_errorcode != sqlite3.SQLITE_BUSY:
+                raise
+            busy_calls += 1
+    if busy_results is not None:
+        busy_results.put(busy_calls)
 
 
 def _record_client_active_in_process(
@@ -1464,10 +1473,17 @@ def test_cross_process_model_call_updates_are_transactional(tmp_path):
     outbox_directory = tmp_path / "outbox"
     context = mp.get_context("spawn")
     start_barrier = context.Barrier(2)
+    busy_results = context.Queue()
     processes = [
         context.Process(
             target=_record_model_calls_in_process,
-            args=(str(database_path), str(outbox_directory), 10, start_barrier),
+            args=(
+                str(database_path),
+                str(outbox_directory),
+                10,
+                start_barrier,
+                busy_results,
+            ),
         )
         for _ in range(2)
     ]
@@ -1479,7 +1495,13 @@ def test_cross_process_model_call_updates_are_transactional(tmp_path):
         assert not process.is_alive()
         assert process.exitcode == 0
 
+    # record_model_call deliberately fails fast on SQLITE_BUSY. Mirror the
+    # in-process contention test: once the competing writers are gone, replay
+    # exactly the refused increments and verify the durable total is lossless.
+    busy_calls = sum(busy_results.get(timeout=5) for _ in processes)
     restarted = SharedMetricsStore(database_path, outbox_directory)
+    for _ in range(busy_calls):
+        restarted.record_model_call(_dimensions(), _resource())
     assert restarted.counter_snapshot()[0]["value"] == 20
 
 
