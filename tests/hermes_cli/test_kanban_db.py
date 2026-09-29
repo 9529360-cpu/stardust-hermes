@@ -254,6 +254,55 @@ def test_schedule_task_parks_time_delay_without_dispatching(kanban_home):
         events = kb.list_events(conn, t)
         assert any(e.kind == "scheduled" and e.payload == {"reason": "run next week"} for e in events)
 
+def test_schedule_running_task_terminates_worker_and_records_outcome(kanban_home, monkeypatch):
+    """Parking live work must stop the old worker, not only hide its claim."""
+    import json
+
+    with kbc.connect() as conn:
+        t = kb.create_task(conn, title="pause live worker", assignee="ops")
+        host = kb._claimer_id().split(":", 1)[0]
+        kb.claim_task(conn, t, claimer=f"{host}:worker")
+        kbd._set_worker_pid(conn, t, 45678)
+
+        monkeypatch.setattr(kb, "_pid_alive", lambda _pid: False)
+        signalled = []
+        assert kb.schedule_task(
+            conn, t, reason="wait until tomorrow",
+            signal_fn=lambda pid, sig: signalled.append((pid, sig)),
+        ) is True
+
+        task = kb.get_task(conn, t)
+        assert task.status == "scheduled"
+        assert task.worker_pid is None
+        assert signalled and signalled[0][0] == 45678
+
+        row = conn.execute(
+            "SELECT payload FROM task_events "
+            "WHERE task_id = ? AND kind = 'schedule_worker_termination'",
+            (t,),
+        ).fetchone()
+        payload = json.loads(row["payload"])
+        assert payload["prev_pid"] == 45678
+        assert payload["host_local"] is True
+        assert payload["termination_attempted"] is True
+        assert payload["terminated"] is True
+
+
+def test_schedule_non_running_task_does_not_signal_worker(kanban_home):
+    with kbc.connect() as conn:
+        t = kb.create_task(conn, title="future work", assignee="ops")
+        signalled = []
+        assert kb.schedule_task(
+            conn, t, reason="next week",
+            signal_fn=lambda pid, sig: signalled.append((pid, sig)),
+        ) is True
+        assert signalled == []
+        assert conn.execute(
+            "SELECT 1 FROM task_events "
+            "WHERE task_id = ? AND kind = 'schedule_worker_termination'",
+            (t,),
+        ).fetchone() is None
+
 
 
 
