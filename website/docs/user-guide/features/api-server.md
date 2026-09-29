@@ -574,7 +574,7 @@ External UIs can manage Hermes sessions over REST without standing up the dashbo
 | `GET` | `/api/sessions/{id}` | Read session metadata |
 | `PATCH` | `/api/sessions/{id}` | Update title or `end_reason` |
 | `DELETE` | `/api/sessions/{id}` | Delete a session |
-| `GET` | `/api/sessions/{id}/messages` | Message history for a session. Add `inline_images=false` when a lightweight client only needs text/placeholders; image data URIs are returned as `[image]` while the default keeps existing inline-image behavior |
+| `GET` | `/api/sessions/{id}/messages` | Message history for a session (`inline_images=false` replaces inline image data URIs with `[image]` placeholders for lightweight readers) |
 | `POST` | `/api/sessions/{id}/fork` | Branch the session via `SessionDB` lineage (matches CLI `/branch` semantics) |
 | `POST` | `/api/sessions/{id}/chat` | Run one synchronous agent turn |
 | `POST` | `/api/sessions/{id}/chat/stream` | SSE wrapper over a single turn — emits `assistant.delta`, `tool.started`, `tool.completed`, `run.completed` events |

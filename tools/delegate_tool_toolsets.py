@@ -10,14 +10,15 @@ from tools.delegate_tool_config import _get_inherit_mcp_toolsets
 
 logger = logging.getLogger("tools.delegate_tool")  # log-record parity with the origin module
 
-# Tools that children must never have access to
+# Tools that children must never have access to. Ordinary capabilities are inherited
+# from the parent; a child never gains a tool the parent lacks. Keep this list for
+# capabilities whose semantics inherently cross the delegated task boundary.
 DELEGATE_BLOCKED_TOOLS = frozenset(
     [
         "delegate_task",  # no recursive delegation
         "clarify",  # no user interaction
         "memory",  # no writes to shared MEMORY.md
         "send_message",  # no cross-platform side effects
-        "cronjob_manage",  # no scheduling more work in the parent's name
     ]
 )
 DEFAULT_TOOLSETS = ["terminal", "file", "web"]
@@ -73,7 +74,8 @@ def _resolve_child_toolsets(
     inherited. Blocked tools are stripped twice — whole blocked toolsets here, and exact one-tool deny toolsets via
     ``disabled_toolsets`` so blocked names inside mixed bundles (hermes-cli) are subtracted AFTER composite
     expansion and survive registry refreshes. Orchestrators get ``delegation`` re-added unconditionally
-    (role-granted, not inherited)."""
+    (role-granted, not inherited). ``cronjob`` follows ordinary parent capability inheritance; the cron tool\'s
+    own approval rules still govern any durable approval escalation."""
     # enabled_toolsets=None means "all tools", so derive from loaded tool names.
     parent_enabled = getattr(parent_agent, "enabled_toolsets", None)
     if parent_enabled is not None:

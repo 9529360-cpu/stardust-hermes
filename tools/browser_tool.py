@@ -589,6 +589,10 @@ BROWSER_TOOL_SCHEMAS = [
     },
 ]
 
+from tools import browser_tool_interactions as _interactions
+
+BROWSER_TOOL_SCHEMAS.append(_interactions.BROWSER_INTERACT_SCHEMA)
+
 from tools import browser_tool_snapshot as _snapshot
 
 # ----------------------------------------------------------------------------
@@ -886,6 +890,31 @@ def browser_type(ref: str, text: str, task_id: Optional[str] = None) -> str:
     else:
         response = _err(result.get("error", f"Failed to type into {ref}"))
     return _dumps(redact_browser_typed_text_for_display(_lp._copy_fallback_warning(response, result), text))
+
+
+def browser_interact(
+    action: str,
+    ref: Optional[str] = None,
+    target_ref: Optional[str] = None,
+    values: Optional[list[str]] = None,
+    text: Optional[str] = None,
+    url_contains: Optional[str] = None,
+    load_state: Optional[str] = None,
+    state: Optional[str] = "visible",
+    task_id: Optional[str] = None,
+) -> str:
+    """Advanced transaction interaction mapped onto the active browser session."""
+    return _interactions.browser_interact(
+        action=action,
+        ref=ref,
+        target_ref=target_ref,
+        values=values,
+        text=text,
+        url_contains=url_contains,
+        load_state=load_state,
+        state=state,
+        task_id=task_id,
+    )
 
 
 def browser_scroll(direction: str, task_id: Optional[str] = None) -> str:
@@ -1277,6 +1306,14 @@ def check_browser_routed_requirements(action: str = "browser_snapshot") -> bool:
     return _install.check_browser_requirements() or extension_controller_available(action)
 
 
+def check_browser_interact_requirements() -> bool:
+    """Advanced interactions require a state-preserving backend or matching controller."""
+    return (
+        _interactions.check_browser_interact_requirements()
+        or extension_controller_available("browser_interact")
+    )
+
+
 def _fallback_call(fn_name: str, arg_defaults: Dict[str, Any], extra_kw: tuple = ()):
     """Adapter from the registry's ``(args, kw)`` to ``<fn_name>(**schema_args, task_id=...)``;
     the function is looked up in module globals at call time so monkeypatching works."""
@@ -1297,6 +1334,10 @@ _BROWSER_TOOL_TABLE = (
     ("browser_snapshot", "📸", None, {"full": False}, ("user_task",)),
     ("browser_click", "👆", None, {"ref": ""}),
     ("browser_type", "⌨️", None, {"ref": "", "text": ""}),
+    ("browser_interact", "🖱️", check_browser_interact_requirements, {
+        "action": "", "ref": None, "target_ref": None, "values": None, "text": None,
+        "url_contains": None, "load_state": None, "state": "visible",
+    }),
     ("browser_scroll", "📜", None, {"direction": "down"}),
     ("browser_back", "◀️", None, {}),
     ("browser_press", "⌨️", None, {"key": ""}),

@@ -341,16 +341,20 @@ class CronPromptInjectionBlocked(Exception):
     """
 
 
-def _resolve_cron_disabled_toolsets(cfg: dict) -> list[str]:
+def _resolve_cron_disabled_toolsets(cfg: dict, job: Optional[dict] = None) -> list[str]:
     """Toolsets a cron-spawned agent must never receive: ``messaging``/``clarify`` always
-    (interactive); ``cronjob`` by default (loop prevention, not a security boundary —
-    ``cron.allow_agent_scheduling: true`` lifts only that); ``agent.disabled_toolsets`` layered on
-    top so per-job ``enabled_toolsets`` cannot widen past config.yaml's denylist.
+    (interactive); ``cronjob`` by default (loop prevention, not a security boundary).
+    Global ``cron.allow_agent_scheduling: true`` lifts that loop-prevention gate, and so does
+    a durable per-job ``approval_mode=approve`` grant: once the operator has explicitly
+    delegated autonomous authority to a task, it may schedule/update follow-up work without
+    a second unrelated config switch. ``agent.disabled_toolsets`` remains the user-owned hard
+    ceiling, so an explicit ``cronjob`` deny there still wins.
 
     See #25752.
     """
     cron_cfg = (cfg or {}).get("cron") or {}
-    if cron_cfg.get("allow_agent_scheduling"):
+    delegated_scheduling = (job or {}).get("approval_mode") == "approve"
+    if cron_cfg.get("allow_agent_scheduling") or delegated_scheduling:
         disabled = ["messaging", "clarify"]
     else:
         disabled = ["cronjob", "messaging", "clarify"]
@@ -363,7 +367,6 @@ def _resolve_cron_disabled_toolsets(cfg: dict) -> list[str]:
         if name and name not in disabled:
             disabled.append(name)
     return disabled
-
 
 def _merge_mcp_into_per_job_toolsets(per_job: list[str], cfg: dict) -> list[str]:
     """Layer enabled MCP servers onto a per-job ``enabled_toolsets`` allowlist (else a per-job list
@@ -442,6 +445,34 @@ from cron.executions import (
 
 # Response marker that suppresses delivery (output is still saved locally for audit).
 SILENT_MARKER = "[SILENT]"
+# Opt-in terminal marker for goal-oriented recurring jobs. Unlike SILENT, this is
+# only interpreted when the stored job explicitly has stop_when_done=true.
+DONE_MARKER = "[DONE]"
+
+
+def _extract_cron_done_response(text: str) -> tuple[str, bool]:
+    """Strip a standalone [DONE] first/last line and report terminal completion.
+
+    Mid-sentence mentions are ordinary content. A marker-only response becomes a
+    small user-facing completion notice so successful terminal jobs never fall
+    into the empty-response soft-failure path.
+    """
+    lines = str(text or "").splitlines()
+    nonempty = [i for i, line in enumerate(lines) if line.strip()]
+    if not nonempty:
+        return str(text or ""), False
+    marker_indexes = {
+        i for i in (nonempty[0], nonempty[-1])
+        if lines[i].strip().upper() == DONE_MARKER
+    }
+    if not marker_indexes:
+        return str(text or ""), False
+    cleaned = "\n".join(line for i, line in enumerate(lines) if i not in marker_indexes).strip()
+    # Completion must remain user-visible even if the model accidentally combines
+    # the terminal marker with the ordinary silence marker.
+    if cleaned and _is_cron_silence_response(cleaned):
+        cleaned = ""
+    return cleaned or "Task completed.", True
 
 
 def _is_cron_silence_response(text: str) -> bool:
@@ -2057,12 +2088,18 @@ class _CronRunScope:
             record_session_cwd(self.task_id, self.workdir)
         self._cron_session_var = _VAR_MAP["HERMES_CRON_SESSION"]
         self._cron_session_token = None
+        self._approval_mode = job.get("approval_mode")
+        self._approval_mode_token = None
         self._non_dispatcher_token = None
 
     def enter(self) -> None:
         # Scope cron approval policy; exit() RESETS via token (pinning "" would suppress the legacy
         # os.environ fallback used by standalone entrypoints/tests).
         self._cron_session_token = self._cron_session_var.set("1")
+        # A durable job grant applies only to this run context. copy_context() carries it
+        # into the agent worker and delegated children without touching process globals.
+        from tools.approval_context import set_cron_approval_mode_override
+        self._approval_mode_token = set_cron_approval_mode_override(self._approval_mode)
         # Mark NOT the kanban worker: a worker's cronjob(action="run") lands here with
         # HERMES_KANBAN_TASK in env, and an unrelated job could close the worker's task. Must be a
         # ContextVar, NOT an os.environ clear (env is shared with the worker heartbeat and
@@ -2077,6 +2114,9 @@ class _CronRunScope:
         clear_session_vars(self._ctx_tokens)  # also clears _SESSION_CWD
         if self._cron_session_token is not None:
             self._cron_session_var.reset(self._cron_session_token)
+        if self._approval_mode_token is not None:
+            from tools.approval_context import reset_cron_approval_mode_override
+            reset_cron_approval_mode_override(self._approval_mode_token)
         if self._non_dispatcher_token is not None:
             exit_non_dispatcher_owned_context(self._non_dispatcher_token)
         for name in _CRON_DELIVERY_VARS:
@@ -2178,7 +2218,7 @@ def _construct_cron_agent(AIAgent, job: dict, _cfg: dict, setup: _CronAgentSetup
         provider_sort=pr.get("sort"),
         openrouter_min_coding_score=(_cfg.get("openrouter") or {}).get("min_coding_score"),
         enabled_toolsets=_resolve_cron_enabled_toolsets(job, _cfg),
-        disabled_toolsets=_resolve_cron_disabled_toolsets(_cfg),
+        disabled_toolsets=_resolve_cron_disabled_toolsets(_cfg, job),
         quiet_mode=True,
         # Project context files only with a configured workdir; SOUL.md always.
         skip_context_files=not bool(workdir),
@@ -2636,6 +2676,7 @@ class _RunDelivery:
     side_effect_ownership_lost: bool = False
     delivery_content: str = ""
     local_session_delivered: bool = False
+    terminal_complete: bool = False
 
 
 def _save_compose_deliver(
@@ -2807,6 +2848,8 @@ def _finish_completed_run(d: _RunDelivery, fire_owner: Optional[str], execution_
         mark_kwargs["expected_fire_owner"] = fire_owner
     if d.blocked_config:
         mark_kwargs["status"] = "blocked_config"
+    if d.terminal_complete:
+        mark_kwargs["terminal_complete"] = True
     # A run that removed its own record has nothing left to mark; the delivery above is its result.
     marked = self_removal_delivery_allowed(job["id"]) or mark_job_run(
         job["id"], d.success, d.error, **mark_kwargs)
@@ -2976,9 +3019,14 @@ def _run_one_job_body(
             _record_fire_ownership_lost(job["id"], fire_owner, execution_id)
             return True
 
+        terminal_complete = False
+        if success and job.get("stop_when_done"):
+            final_response, terminal_complete = _extract_cron_done_response(final_response)
+
         # Agent is still live through delivery; wrap ALL of save/compose/deliver in try/finally so a
         # raise anywhere still tears the deferred agent down.
-        d = _RunDelivery(job=job, success=success, error=error)
+        d = _RunDelivery(
+            job=job, success=success, error=error, terminal_complete=terminal_complete)
         try:
             _save_compose_deliver(
                 d, fence, final_response, output, adapters=adapters, loop=loop, verbose=verbose,
