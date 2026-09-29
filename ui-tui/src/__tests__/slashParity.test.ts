@@ -122,6 +122,12 @@ describe('slash parity matrix', () => {
     expect(cmd, '/q must resolve to a command').toBeDefined()
     expect(cmd!.name).toBe('queue')
   })
+
+  it('/s alias resolves to steer, not sessions or a TUI-local command', () => {
+    const cmd = findSlashCommand('s')
+    expect(cmd, '/s must resolve to a command').toBeDefined()
+    expect(cmd!.name).toBe('steer')
+  })
 })
 
 describe('parseSlashCommand argument fidelity', () => {
