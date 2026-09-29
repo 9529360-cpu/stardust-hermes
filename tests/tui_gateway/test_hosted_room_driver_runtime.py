@@ -1224,6 +1224,14 @@ def test_deadline_releases_worker_capacity_for_later_room(tmp_path: Path):
     )
 
     runtime.start()
+    # The deadline is measured from the accepted submit, not from supervisor
+    # thread startup. Under a saturated full-suite runner, scheduling the room
+    # worker itself can consume most of the generic wait window and make this
+    # otherwise deterministic 50 ms deadline look flaky.
+    assert rpc.submitted.wait(timeout=10.0)
+    first_submit = next(params for method, params in rpc.calls if method == "submit")
+    assert first_submit["task"] == identities[0]
+
     _wait_for(lambda: state.get_task(db, identities[0])["status"] == "failed")
     _wait_for(lambda: state.get_task(db, identities[1])["status"] == "settled")
     assert runtime.stop(timeout=5.0)
