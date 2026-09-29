@@ -490,6 +490,11 @@ class ProcessSession:
     _completion_event: threading.Event = field(default_factory=threading.Event, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _reader_thread: Optional[threading.Thread] = field(default=None, repr=False)
+    # POSIX pipe reader/reconcile handoff. The reader holds this only across a
+    # ready, non-blocking read + buffer append; exit reconciliation holds it
+    # while draining the remaining bytes and publishing completion. This closes
+    # the race where the reader had consumed a chunk but had not appended it yet.
+    _pipe_read_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _pty: Any = field(default=None, repr=False)  # ptyprocess handle (use_pty=True)
 
     def append_output(self, text: str) -> None:
@@ -1172,11 +1177,21 @@ class ProcessRegistry(ProcessCheckpointMixin):
                         if idle_after_exit >= 3:
                             break
                         continue
-                chunk = _read_once()
+                if fd is not None:
+                    # A direct-child exit may be reconciled from list()/poll() while
+                    # this reader is active. Keep the actual pipe read and its buffer
+                    # append indivisible from reconciliation so completion notices
+                    # cannot snapshot between those two operations.
+                    with session._pipe_read_lock:
+                        chunk = _read_once()
+                        if chunk is not None and chunk:
+                            _append_chunk(chunk)
+                else:
+                    chunk = _read_once()
+                    if chunk is not None and chunk:
+                        _append_chunk(chunk)
                 if chunk is None:
                     break  # true EOF — all writers closed
-                if chunk:
-                    _append_chunk(chunk)
                 idle_after_exit = 0
         except Exception as e:
             logger.debug("Process stdout reader ended: %s", e)
@@ -1681,30 +1696,36 @@ class ProcessRegistry(ProcessCheckpointMixin):
         if rc is None:
             return  # Direct child still running — reader block is legitimate.
         # Best-effort non-blocking drain of whatever the reader hasn't consumed.
+        # Coordinate with the POSIX reader so it cannot have already removed bytes
+        # from the pipe while still waiting to append them to output_buffer.
         stdout = getattr(proc, "stdout", None)
-        if stdout is not None and not _IS_WINDOWS:
-            try:
-                import fcntl
-                fd = stdout.fileno()
-                flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-                fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        pipe_guard = session._pipe_read_lock if stdout is not None and not _IS_WINDOWS else suppress()
+        with pipe_guard:
+            if stdout is not None and not _IS_WINDOWS:
                 try:
-                    with suppress(BlockingIOError, OSError, ValueError):
-                        chunk = stdout.read()
-                        if chunk:
-                            session.append_output(chunk if isinstance(chunk, str) else chunk.decode("utf-8", errors="replace"))
-                finally:
-                    with suppress(Exception):
-                        fcntl.fcntl(fd, fcntl.F_SETFL, flags)
-            except Exception as e:
-                logger.debug("Non-blocking drain failed for %s: %s", session.id, e)
-        with session._lock:
-            session.mark_exited(rc)
-        logger.info(
-            "Reconciled session %s: direct child exited with code %s but reader "
-            "was still blocked (orphaned pipe). Flipped to exited.",
-            session.id, rc)
-        self._move_to_finished(session)
+                    import fcntl
+                    fd = stdout.fileno()
+                    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                    try:
+                        with suppress(BlockingIOError, OSError, ValueError):
+                            chunk = stdout.read()
+                            if chunk:
+                                session.append_output(
+                                    chunk if isinstance(chunk, str)
+                                    else chunk.decode("utf-8", errors="replace"))
+                    finally:
+                        with suppress(Exception):
+                            fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+                except Exception as e:
+                    logger.debug("Non-blocking drain failed for %s: %s", session.id, e)
+            with session._lock:
+                session.mark_exited(rc)
+            logger.info(
+                "Reconciled session %s: direct child exited with code %s but reader "
+                "was still blocked (orphaned pipe). Flipped to exited.",
+                session.id, rc)
+            self._move_to_finished(session)
 
     @staticmethod
     def _status_head(session: ProcessSession) -> dict:

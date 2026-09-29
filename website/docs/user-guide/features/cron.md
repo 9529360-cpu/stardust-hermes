@@ -14,6 +14,7 @@ Cron jobs can:
 
 - schedule one-shot or recurring tasks
 - pause, resume, edit, trigger, and remove jobs
+- run **goal-oriented recurring follow-ups** that automatically stop once the real-world goal is complete
 - attach zero, one, or multiple skills to a job
 - deliver results back to the origin chat, local files, or configured platform targets
 - run in fresh agent sessions with the normal static tool list
@@ -304,23 +305,37 @@ the job. It is not a security boundary against an operator who can run jobs.
 
 ## Agent-managed scheduling (cron jobs that manage cron jobs)
 
-By default, agents launched *by* the scheduler cannot use the `cronjob` tool —
-a scheduled job cannot create, edit, or remove other jobs. Opt in via
-`config.yaml`:
+Ordinary scheduled agents (`approval_mode: inherit` or `deny`) keep the old loop-prevention
+gate and do not receive the `cronjob` tool by default. There are now two ways to let a task
+manage follow-up scheduling:
+
+- grant that specific job `approval_mode: approve`; this is the preferred task-scoped path and
+  automatically gives that approved job the cron tool so it can schedule/update follow-up work;
+- or enable scheduling fleet-wide in `config.yaml`:
 
 ```yaml
 cron:
   allow_agent_scheduling: true   # default: false
 ```
 
-When enabled, a scheduled agent can manage the cron table like any chat
+With either path, a scheduled agent can manage the cron table like any chat
 session: schedule follow-up one-shots from within scheduled work, tune its own
 cadence, or run a "cron librarian" job that reconciles the whole table
-(list, then update/remove/create as needed). Two properties keep this sane:
+(list, then update/remove/create as needed). An explicit user-level
+`agent.disabled_toolsets: [cronjob]` still wins over both paths. The important
+properties are:
 
 - **One flat, user-owned table.** Jobs created from a cron run land in the
   same `jobs.json` as every other job with no special ownership — you can
   list, edit, or remove them exactly as if you had created them yourself.
+- **Approval authority can follow the task without becoming contagious.** `cronjob_manage` can set a job's
+  `approval_mode` to `approve`, `deny`, or `inherit`. Raising a job to `approve`
+  requires an explicit operator action or a live human approval for that durable
+  grant. A transient YOLO/off session and an already-approved parent cron cannot
+  silently mint a new approved child job. Future runs of the specifically approved
+  job keep that delegated authority across restarts. `inherit` follows the
+  profile-wide `approvals.cron_mode`; `deny` explicitly narrows the job. Hardline
+  command blocks and explicit user deny rules still apply.
 - **No dangling delivery.** A cron run is ephemeral, so `deliver: origin`
   from inside one is resolved **at create time** to the creating job's own
   concrete target (`platform:chat_id[:thread_id]`, or `local` if the creating
@@ -659,6 +674,16 @@ tool's `attach_to_session` (which overrides the global setting for that one job)
 cron:
   mirror_delivery: false   # set true to make cron deliveries continuable
 ```
+
+When an agent creates or updates a job with `attach_to_session: true`, Hermes also
+takes a **bounded creation-time handoff snapshot** from that session: recent user
+and assistant text only (no tool results or system messages). The future cron run
+still starts as a fresh session, but this snapshot is injected as background so a
+request such as "continue following up on this tomorrow" does not lose the task's
+immediate context. The snapshot is fixed at create/update time rather than being a
+live link to the conversation, so later unrelated chat does not silently change the
+scheduled task. Keep critical IDs, addresses, deadlines, and other must-not-guess
+details in the cron prompt itself.
 
 Behaviour is **thread-preferred**, scoped to the job's own conversation:
 
@@ -1047,6 +1072,41 @@ Times accept `9am`, `9:30pm`, `14:00`, bare 24-hour hours (`at 7`), `noon`, and 
 2026-03-15T09:00:00    → One-time at March 15, 2026 9:00 AM
 ```
 
+## Stop when the goal is done
+
+Some recurring tasks are not meant to run forever. A package tracker, refund follow-up,
+repair watch, or application-status check should keep running **until the requested outcome
+actually happens**, then stop.
+
+The agent-facing `cronjob` tool can create these with `stop_when_done=true`:
+
+```python
+cronjob(
+    action="create",
+    prompt="Check shipment 1Z... and tell me only when its status meaningfully changes. Stop once it is delivered.",
+    schedule="every 2h",
+    stop_when_done=True,
+    name="Track shipment",
+)
+```
+
+Goal mode reuses the normal Cron lifecycle. While the goal is still pending, the job keeps its
+schedule and can use `[SILENT]` on uneventful runs. Once the agent has evidence that the requested
+goal is truly satisfied, it emits an internal standalone `[DONE]` control line with its final
+user-facing summary. Hermes delivers that final summary and then retains the job record in
+`state=completed` with `next_run_at=null`; it does not delete the job or create a second task
+system.
+
+The marker is only interpreted for jobs that explicitly opted into `stop_when_done`, and only
+when it appears as its own first or last line. Merely mentioning `[DONE]` in ordinary text does
+not stop a job. A final delivery failure also does not re-run an already-completed real-world
+action: the job remains `completed` and records `last_status=delivery_failed` so the notification
+problem stays visible without repeating the task.
+
+Use goal mode for bounded follow-ups. Leave it off for perpetual briefings, monitoring, backups,
+or other routines that should continue indefinitely. It requires an agent and cannot be combined
+with `no_agent=true`.
+
 ## Repeat behavior
 
 | Schedule type | Default repeat | Behavior |
@@ -1261,7 +1321,10 @@ The storage uses atomic file writes so interrupted writes do not leave a partial
 ## Self-contained prompts still matter
 
 :::warning Important
-Cron jobs run in a completely fresh agent session. The prompt must contain everything the agent needs that is not already provided by attached skills.
+Cron jobs still run in a completely fresh agent session. A per-job
+`attach_to_session: true` handoff can provide a bounded creation-time conversation
+snapshot, but it is supplemental background rather than a live transcript. The prompt
+should still contain critical details the agent must not infer.
 :::
 
 **BAD:** `"Check on that server issue"`

@@ -213,6 +213,7 @@ def test_list_authenticated_providers_accepts_base_url_and_singular_model(monkey
     assert custom["total_models"] == 3
 
 
+
 def test_list_authenticated_providers_splits_comma_default_model_chain(monkeypatch):
     """A providers: default_model fallback chain is selectable one model at a time."""
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
@@ -244,7 +245,6 @@ def test_list_authenticated_providers_splits_comma_default_model_chain(monkeypat
         "glm-5.2",
     ]
     assert row["total_models"] == 4
-
 
 def test_list_authenticated_providers_dedupes_when_user_and_custom_overlap(monkeypatch):
     """When the same slug appears in both ``providers:`` dict and

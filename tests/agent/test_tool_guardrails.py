@@ -376,3 +376,43 @@ def test_supervised_task_platforms_keep_warning_only_default():
     for platform in ("telegram", "discord", "cron", "kanban"):
         cfg = ToolCallGuardrailConfig.from_mapping({}, platform=platform)
         assert cfg.hard_stop_enabled is True, platform
+
+
+
+def test_browser_interact_waits_are_observational_for_no_progress_guard():
+    controller = ToolCallGuardrailController(
+        ToolCallGuardrailConfig(
+            hard_stop_enabled=True,
+            no_progress_warn_after=2,
+            no_progress_block_after=2,
+        )
+    )
+    args = {"action": "wait_text", "text": "Confirmed"}
+    result = '{"success":true,"action":"wait_text","waited_for":"text","text":"Confirmed"}'
+
+    assert controller.before_call("browser_interact", args).action == "allow"
+    assert controller.after_call("browser_interact", args, result, failed=False).action == "allow"
+    assert controller.before_call("browser_interact", args).action == "allow"
+    warned = controller.after_call("browser_interact", args, result, failed=False)
+
+    assert warned.action == "warn"
+    assert warned.code == "idempotent_no_progress_warning"
+    blocked = controller.before_call("browser_interact", args)
+    assert blocked.action == "block"
+    assert blocked.code == "idempotent_no_progress_block"
+
+
+def test_browser_interact_page_actions_remain_mutations_for_no_progress_guard():
+    controller = ToolCallGuardrailController(
+        ToolCallGuardrailConfig(
+            hard_stop_enabled=True,
+            no_progress_warn_after=2,
+            no_progress_block_after=2,
+        )
+    )
+    args = {"action": "hover", "ref": "@e1"}
+    result = '{"success":true,"action":"hover","hovered":"@e1"}'
+
+    for _ in range(3):
+        assert controller.before_call("browser_interact", args).action == "allow"
+        assert controller.after_call("browser_interact", args, result, failed=False).action == "allow"
