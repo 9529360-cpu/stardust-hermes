@@ -216,6 +216,7 @@ _CATEGORY_MERGE: Dict[str, str] = {
     "session": "general",
     "nous": "agent",
     "connections": "agent",
+    "attachments": "agent",
 }
 
 
