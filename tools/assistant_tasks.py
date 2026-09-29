@@ -322,6 +322,7 @@ def _list_tasks(
     task_ids: Any,
     owner_key: str,
 ) -> str:
+    from hermes_cli.kanban_db import VALID_STATUSES
     from tools.kanban_tools import _board
 
     wanted = {
@@ -357,13 +358,24 @@ def _list_tasks(
                         if task is not None and task.assistant_owner_key == owner_key:
                             rows.append(task)
                 else:
-                    rows = kb.list_tasks(
-                        conn,
-                        assistant_owner_key=owner_key,
-                        include_archived=bool(include_completed),
-                        limit=max(200, max_items * 4),
-                        order_by="activity",
-                    )
+                    # Filter BEFORE each bounded read: newer completed work must
+                    # not crowd an old blocked/running task out of the candidates.
+                    # Top N+1 per status contains the global top N plus evidence
+                    # for has_more, without loading the entire task history.
+                    statuses = [None] if include_completed else sorted(VALID_STATUSES - _TERMINAL_STATUSES)
+                    candidates: dict[str, Any] = {}
+                    for status in statuses:
+                        for task in kb.list_tasks(
+                            conn,
+                            assistant_owner_key=owner_key,
+                            status=status,
+                            include_archived=bool(include_completed),
+                            limit=max_items + 1,
+                            order_by="activity",
+                        ):
+                            # A task may change status between reads; project it once.
+                            candidates[task.id] = task
+                    rows = list(candidates.values())
                 for task in rows:
                     if wanted and task.id not in wanted:
                         continue
@@ -410,11 +422,15 @@ def _list_tasks(
 
     projected.sort(
         key=lambda row: (
-            int(row.get("completed_at") or row.get("started_at") or row.get("created_at") or 0),
+            # Match Kanban's SQL COALESCE and tie-breakers (zero is not NULL).
+            int(next((row[key] for key in ("completed_at", "started_at", "created_at")
+                      if row.get(key) is not None), 0)),
+            int(row.get("created_at") or 0),
             str(row.get("task_id") or ""),
         ),
         reverse=True,
     )
+    has_more = len(projected) > max_items
     projected = projected[:max_items]
 
     return json.dumps(
@@ -422,6 +438,7 @@ def _list_tasks(
             "ok": True,
             "tasks": projected,
             "count": len(projected),
+            "has_more": has_more,
             "include_completed": bool(include_completed),
             "partial": bool(board_errors),
             "board_errors": board_errors,
