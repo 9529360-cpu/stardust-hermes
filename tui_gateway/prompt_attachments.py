@@ -80,12 +80,49 @@ def _allowed_image_extensions() -> frozenset[str]:
 
 
 def _session_home_dir(session: dict, name: str) -> Path:
-    """``<session home>/<name>``, anchored on the session's stored ``profile_home``: attach
-    RPCs run BEFORE ``prompt.submit`` installs the profile HERMES_HOME override, while
-    the sandbox mounts and the vision host-read allowlist resolve the *session profile's*
-    dirs at run time — writing anywhere else means the agent can never see the file."""
+    """Resolve one session-owned staging directory.
+
+    Most files stay under the owning profile home. Attachments may opt into the
+    session workspace so their @file refs remain inside the workspace boundary.
+    """
     profile_home = session.get("profile_home")
+    if name == "attachments" and _profile_attachments_storage(profile_home) == "workspace":
+        workspace = _session_attachments_workspace(session)
+        if workspace is not None:
+            return workspace / ".hermes" / "attachments"
     return (Path(profile_home) if profile_home else _hermes_home) / name
+
+
+def _profile_attachments_storage(profile_home) -> str:
+    """Read attachments.storage from the session owner's profile config.
+
+    file.attach can run before prompt.submit binds the profile runtime scope, so
+    process-global config is not authoritative for a multiplexed secondary profile.
+    Only the exact workspace value opts in; unreadable/unknown values fail safe to
+    the established profile-home staging behavior.
+    """
+    import contextlib as _contextlib
+    home = Path(profile_home) if profile_home else _hermes_home
+    with _contextlib.suppress(Exception):
+        from hermes_cli.config_effective import load_user_config_effective
+        cfg_path = home / "config.yaml"
+        if cfg_path.exists():
+            attachments_cfg = load_user_config_effective(cfg_path).get("attachments")
+            if isinstance(attachments_cfg, dict):
+                return str(attachments_cfg.get("storage") or "").strip().lower()
+    return ""
+
+
+def _session_attachments_workspace(session: dict) -> Path | None:
+    """Return a host-local existing workspace that can safely receive staging."""
+    import contextlib as _contextlib
+    if _cwd_is_remote(session.get("profile_home")):
+        return None
+    with _contextlib.suppress(Exception):
+        workspace = Path(_session_cwd(session)).resolve()
+        if workspace.is_dir():
+            return workspace
+    return None
 
 
 def _session_images_dir(session: dict) -> Path:

@@ -480,6 +480,18 @@ def _absorb_entry_models(grp: dict, entry: dict, active_model: Any) -> None:
     if _models_config_is_allowlist(models_field, _entry_models_discovered(entry)):
         grp["has_explicit_models"] = True
     _extend_unique(grp["models"], _declared_model_ids(models_field))
+    _split_chain_entries(grp["models"])
+
+
+def _split_chain_entries(models: list) -> None:
+    """Expand comma-separated fallback chains into individually selectable model ids.
+
+    Keep the raw chain first so selecting the provider's default still preserves
+    its server-side fallback semantics; append only non-empty, deduplicated parts.
+    """
+    for model in list(models):
+        if isinstance(model, str) and "," in model:
+            _extend_unique(models, [part.strip() for part in model.split(",")])
 
 
 def _extend_unique(target: list, items) -> None:
