@@ -40,7 +40,8 @@ def _signature_from_schema(schema: dict | None) -> tuple[inspect.Signature, dict
 # delegate_task/memory/session_search/todo (need the running AIAgent context).
 EXPOSED_TOOLS: tuple[str, ...] = (
     "web_search", "web_extract",
-    "browser_navigate", "browser_click", "browser_type", "browser_press", "browser_snapshot", "browser_scroll",
+    "browser_navigate", "browser_click", "browser_type", "browser_interact", "browser_press", "browser_snapshot",
+    "browser_scroll",
     "browser_back", "browser_get_images", "browser_console", "browser_vision",
     "vision_analyze", "image_generate", "skill_view", "skills_list", "text_to_speech",
     # Kanban handoff tools: stateless (read HERMES_KANBAN_TASK, write kanban.db).

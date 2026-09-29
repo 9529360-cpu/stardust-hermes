@@ -300,33 +300,17 @@ export interface OsDropStagingContext {
 function osDropNeedsStaging(candidate: DroppedFile, staging?: OsDropStagingContext): boolean {
   // Callers that do not know the backend context retain the historical safe
   // behavior: every native File goes through the staging pipeline.
-  if (!staging) {
-    return true
-  }
-
-  // A path-less native File cannot become an inline @file ref. Keep it on
-  // the attach path so the user sees a real attach failure rather than a drop
-  // that silently disappears.
-  if (!candidate.path) {
-    return true
-  }
+  if (!staging) return true
+  if (!candidate.path) return true
 
   // Vision needs image bytes gateway-side even when the path itself is
   // directly readable by a local backend.
   const file = candidate.file
+  if (file && (file.type.startsWith('image/') || isImagePath(file.name))) return true
+  if (isImagePath(candidate.path)) return true
 
-  if (file && (file.type.startsWith('image/') || isImagePath(file.name))) {
-    return true
-  }
-
-  if (isImagePath(candidate.path)) {
-    return true
-  }
-
-  return (
-    Boolean(staging.remote) ||
+  return Boolean(staging.remote) ||
     attachmentPathNeedsUpload(candidate.path, staging.backendCwd, staging.terminalBackend)
-  )
 }
 
 /**

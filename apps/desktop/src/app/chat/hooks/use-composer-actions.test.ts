@@ -98,21 +98,17 @@ describe('partitionDroppedFiles', () => {
   it('still stages an OS file for remote and container backends', () => {
     const finderPdf = osDrop('/Users/mahmoud/Downloads/DEVIS_signed.pdf')
 
-    expect(
-      partitionDroppedFiles([finderPdf], {
-        backendCwd: '/home/gateway/app',
-        remote: true,
-        terminalBackend: 'local'
-      })
-    ).toEqual({ inAppRefs: [], osDrops: [finderPdf] })
+    expect(partitionDroppedFiles([finderPdf], {
+      backendCwd: '/home/gateway/app',
+      remote: true,
+      terminalBackend: 'local'
+    })).toEqual({ inAppRefs: [], osDrops: [finderPdf] })
 
-    expect(
-      partitionDroppedFiles([finderPdf], {
-        backendCwd: '/workspace',
-        remote: false,
-        terminalBackend: 'docker'
-      })
-    ).toEqual({ inAppRefs: [], osDrops: [finderPdf] })
+    expect(partitionDroppedFiles([finderPdf], {
+      backendCwd: '/workspace',
+      remote: false,
+      terminalBackend: 'docker'
+    })).toEqual({ inAppRefs: [], osDrops: [finderPdf] })
   })
 
   it('stages a Windows host path when the local backend cwd is POSIX', () => {
@@ -132,7 +128,6 @@ describe('partitionDroppedFiles', () => {
 
   it('keeps legacy safe staging when no backend context is provided', () => {
     const report = osDrop('/abs/report.pdf')
-
     expect(partitionDroppedFiles([report])).toEqual({ inAppRefs: [], osDrops: [report] })
   })
 })

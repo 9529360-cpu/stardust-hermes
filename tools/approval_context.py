@@ -23,6 +23,11 @@ def _ctx(name: str, default: "str | None" = "") -> contextvars.ContextVar:
 _approval_session_key: contextvars.ContextVar[str] = _ctx("approval_session_key")
 _approval_turn_id: contextvars.ContextVar[str] = _ctx("approval_turn_id")
 _approval_tool_call_id: contextvars.ContextVar[str] = _ctx("approval_tool_call_id")
+# Per-run cron policy override. ``None`` means inherit ``approvals.cron_mode``.
+# The scheduler binds this from the durable job record; copy_context() carries it
+# into the agent worker without mutating process-global environment.
+_cron_approval_mode_override: contextvars.ContextVar[str | None] = _ctx(
+    "cron_approval_mode_override", None)
 # Hermes session id (observability identity, distinct from the gateway routing session_key), forwarded to approval
 # hooks so observer plugins attach marks to the REAL session scope — otherwise they fall back to a synthetic "default"
 # session whose scope never closes, so close-time exporters never ship them.
@@ -288,8 +293,34 @@ def _binary_approval_mode(key: str) -> str:
         return "deny"
 
 
+def set_cron_approval_mode_override(mode: str | None) -> contextvars.Token:
+    """Bind one cron run\'s dangerous-command policy.
+
+    ``None``/``inherit`` falls back to the profile-wide ``approvals.cron_mode``.
+    Invalid persisted values fail closed to ``deny`` so a hand-edited jobs.json
+    can never accidentally widen authority.
+    """
+    raw = str(mode or "").strip().lower()
+    if not raw or raw == "inherit":
+        resolved = None
+    elif raw in {"approve", "deny"}:
+        resolved = raw
+    else:
+        resolved = "deny"
+        logger.warning("Invalid cron job approval_mode %r; failing closed to deny", mode)
+    return _cron_approval_mode_override.set(resolved)
+
+
+def reset_cron_approval_mode_override(token: contextvars.Token) -> None:
+    """Restore the caller\'s prior cron approval policy."""
+    _cron_approval_mode_override.reset(token)
+
+
 def _get_cron_approval_mode() -> str:
-    """Read the cron approval mode from config. Returns 'deny' or 'approve'."""
+    """Return the effective cron approval mode for this run."""
+    override = _cron_approval_mode_override.get()
+    if override in {"approve", "deny"}:
+        return override
     return _binary_approval_mode("cron_mode")
 
 
