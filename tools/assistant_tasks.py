@@ -54,6 +54,24 @@ def _bounded_text(value: Any, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
+def _complete_task_text(value: Any, field: str, limit: int) -> str:
+    """Validate operative input; clipping is only safe for read-only previews.
+
+    A discarded suffix may contain the deliverable, a budget, or a prohibition.
+    Reject an unrepresentable handoff rather than enqueue a different task.
+    Errors name the field and limit, never echo potentially private input.
+    """
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    text = value.strip()
+    if len(text) > limit:
+        raise ValueError(
+            f"{field} exceeds {limit} characters; input was not truncated. "
+            "Use a complete concise instruction or reference supporting files."
+        )
+    return text
+
+
 def _inspect_text(redact, value: Any, limit: int = 1200) -> str:
     text = str(value or "").strip()
     if not text:
@@ -219,10 +237,11 @@ def _create_tasks(
         if not isinstance(raw, dict):
             failed.append({"index": index, "error": "task must be an object"})
             continue
-        title = _bounded_text(raw.get("title"), MAX_TITLE_CHARS)
-        instruction = _bounded_text(raw.get("instruction"), MAX_INSTRUCTION_CHARS)
-        if not title or not instruction:
-            failed.append({"index": index, "error": "title and instruction are required"})
+        try:
+            title = _complete_task_text(raw.get("title"), "title", MAX_TITLE_CHARS)
+            instruction = _complete_task_text(raw.get("instruction"), "instruction", MAX_INSTRUCTION_CHARS)
+        except ValueError as exc:
+            failed.append({"index": index, "error": str(exc)})
             continue
         try:
             unsafe_secret = _contains_durable_secret(f"{title}\n{instruction}")
@@ -666,12 +685,15 @@ def _resume_task(
     tid = str(task_id or "").strip()
     if not tid:
         return tool_error("assistant_tasks resume requires task_id")
-    message = _bounded_text(user_message, MAX_RESUME_MESSAGE_CHARS)
-    if not message:
+    if not isinstance(user_message, str) or not user_message.strip():
         return tool_error(
             "assistant_tasks resume requires the current user message; "
             "do not infer approval or input from memory, prior chats, or assistant text"
         )
+    try:
+        message = _complete_task_text(user_message, "current user message", MAX_RESUME_MESSAGE_CHARS)
+    except ValueError as exc:
+        return tool_error(str(exc), task_id=tid, input_recorded=False)
 
     # Do not create a second durable copy of a credential the user happened
     # to paste into chat. Existing Kanban handoff fields force-redact on disk;
@@ -883,8 +905,8 @@ ASSISTANT_TASKS_SCHEMA = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "title": {"type": "string"},
-                        "instruction": {"type": "string"},
+                        "title": {"type": "string", "maxLength": MAX_TITLE_CHARS},
+                        "instruction": {"type": "string", "maxLength": MAX_INSTRUCTION_CHARS},
                         "assignee": {"type": "string"},
                         "project": {"type": "string"},
                         "workspace_kind": {"type": "string", "enum": ["scratch", "dir", "worktree"]},
