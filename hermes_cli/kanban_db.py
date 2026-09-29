@@ -2639,6 +2639,31 @@ class ArtifactPreservationError(RuntimeError):
     """Raised when a declared scratch deliverable cannot be preserved."""
 
 
+def _terminate_displaced_transition_worker(
+    conn: sqlite3.Connection, task_id: str, run_id: Optional[int], *,
+    transition: str, worker_pid: Optional[int], claim_lock: Optional[str],
+    worker_started_at: Optional[int],
+) -> None:
+    """Stop a live worker displaced by an operator-owned state transition.
+
+    Worker-owned handoffs prove ownership with ``expected_run_id`` and must be
+    allowed to return normally. A mutation that clears somebody else's live
+    claim commits first, then terminates that host-local process and records
+    the outcome so a parked/terminal row can never silently mask continuing
+    side effects.
+    """
+    if not worker_pid or not claim_lock:
+        return
+    termination = _terminate_reclaimed_worker(
+        worker_pid, claim_lock, started_at=worker_started_at,
+    )
+    with write_txn(conn):
+        _append_event(
+            conn, task_id, "operator_worker_termination",
+            {"transition": transition, **termination},
+            run_id=run_id,
+        )
+
 def complete_task(
     conn: sqlite3.Connection, task_id: str, *, result: Optional[str] = None,
     summary: Optional[str] = None, metadata: Optional[dict] = None,
@@ -2675,7 +2700,23 @@ def complete_task(
             return False
         if acceptance is not None and not record_acceptance(conn, task_id, acceptance):
             return False
-        prior_status = _task_status(conn, task_id)
+        prior_row = conn.execute(
+            "SELECT status, worker_pid, claim_lock, worker_started_at "
+            "FROM tasks WHERE id = ?",
+            (task_id,),
+        ).fetchone()
+        prior_status = prior_row["status"] if prior_row is not None else None
+        displaced_worker = (
+            (
+                prior_row["worker_pid"],
+                prior_row["claim_lock"],
+                prior_row["worker_started_at"],
+            )
+            if prior_row is not None
+            and prior_row["status"] == "running"
+            and expected_run_id is None
+            else None
+        )
         sql = """
                 UPDATE tasks
                    SET status       = 'done',
@@ -2717,6 +2758,14 @@ def complete_task(
             conn, task_id, "completed",
             _completed_event_payload(result, event_summary, verified_cards, metadata),
             run_id=run_id,
+        )
+    if displaced_worker is not None:
+        _terminate_displaced_transition_worker(
+            conn, task_id, run_id,
+            transition="done",
+            worker_pid=displaced_worker[0],
+            claim_lock=displaced_worker[1],
+            worker_started_at=displaced_worker[2],
         )
     _flag_phantom_prose_refs(conn, task_id, run_id, summary, result, verified_cards)
     # Success wipes the breaker counter (history stays on the event log).
@@ -3047,11 +3096,18 @@ def block_task(
         raise ValueError(f"block kind must be one of {sorted(VALID_BLOCK_KINDS)} or None")
     with write_txn(conn):
         cur_row = conn.execute(
-            "SELECT status, block_kind, block_recurrences FROM tasks WHERE id = ?", (task_id,),
+            "SELECT status, block_kind, block_recurrences, worker_pid, claim_lock, worker_started_at "
+            "FROM tasks WHERE id = ?",
+            (task_id,),
         ).fetchone()
         if cur_row is None:
             return False
         source_status = _retry_status_for_run(conn, task_id) if cur_row["status"] == "running" else "ready"
+        displaced_worker = (
+            (cur_row["worker_pid"], cur_row["claim_lock"], cur_row["worker_started_at"])
+            if cur_row["status"] == "running" and expected_run_id is None
+            else None
+        )
         new_status, event_kind, set_sql, params, payload = _route_block(
             kind, reason, source_status, prev_kind=_row_get(cur_row, "block_kind"),
             prev_recurrences=int(_row_get(cur_row, "block_recurrences") or 0),
@@ -3080,8 +3136,16 @@ def block_task(
         if kind == "dependency":
             # Historical ordering: the dependency lane fires inside the txn.
             _fire_task_hook("kanban_task_blocked", blocked_task, task_id, run_id, reason=reason)
-            return True
-    _fire_task_hook("kanban_task_blocked", blocked_task, task_id, run_id, reason=reason)
+    if displaced_worker is not None:
+        _terminate_displaced_transition_worker(
+            conn, task_id, run_id,
+            transition=new_status,
+            worker_pid=displaced_worker[0],
+            claim_lock=displaced_worker[1],
+            worker_started_at=displaced_worker[2],
+        )
+    if kind != "dependency":
+        _fire_task_hook("kanban_task_blocked", blocked_task, task_id, run_id, reason=reason)
     return True
 
 
@@ -3163,13 +3227,15 @@ def request_review(
     # Staged copies live outside the txn: a rollback after staging must not
     # leave orphans that make the retry stage ``name_1.ext`` beside them.
     staged_copies: list[Path] = []
+    displaced_worker: Optional[tuple[Optional[int], Optional[str], Optional[int]]] = None
     try:
         with write_txn(conn):
             if not _parents_satisfied(conn, task_id):
                 return _ret(False, "parent dependencies are not satisfied")
             trow = conn.execute(
-                "SELECT assignee, status, claim_lock, current_run_id "
-                "FROM tasks WHERE id = ?", (task_id,),
+                "SELECT assignee, status, claim_lock, current_run_id, worker_pid, worker_started_at "
+                "FROM tasks WHERE id = ?",
+                (task_id,),
             ).fetchone()
             if trow is None:
                 return _ret(False, "task not found")
@@ -3186,6 +3252,13 @@ def request_review(
                     "(worker ownership) or force=True (explicit operator "
                     "override) instead of clearing the live run's claim",
                 )
+            displaced_worker = (
+                (trow["worker_pid"], trow["claim_lock"], trow["worker_started_at"])
+                if trow["status"] == "running"
+                and force
+                and expected_run_id is None
+                else None
+            )
             implementer = trow["assignee"]
             if reviewer is None:
                 reviewer = _prior_reviewer(conn, task_id)
@@ -3241,6 +3314,14 @@ def request_review(
         if staged_copies:
             _discard_staged_copies(staged_copies, staged_copies[0].parent)
         raise
+    if displaced_worker is not None:
+        _terminate_displaced_transition_worker(
+            conn, task_id, run_id,
+            transition="review",
+            worker_pid=displaced_worker[0],
+            claim_lock=displaced_worker[1],
+            worker_started_at=displaced_worker[2],
+        )
     return _ret(True)
 
 
@@ -3276,7 +3357,9 @@ def request_changes(
 
     with write_txn(conn):
         task_row = conn.execute(
-            "SELECT status, assignee, current_run_id FROM tasks WHERE id = ?", (task_id,),
+            "SELECT status, assignee, current_run_id, worker_pid, claim_lock, worker_started_at "
+            "FROM tasks WHERE id = ?",
+            (task_id,),
         ).fetchone()
         if task_row is None:
             return False, "task not found"
@@ -3298,6 +3381,15 @@ def request_changes(
         if implementer is None:
             return False, "review handoff has no valid implementer provenance"
         reviewer = _canonical_assignee(_nonblank_str(task_row["assignee"]))
+        displaced_worker = (
+            (
+                task_row["worker_pid"],
+                task_row["claim_lock"],
+                task_row["worker_started_at"],
+            )
+            if expected_run_id is None
+            else None
+        )
 
         new_status = _landing_status_after_parents(conn, task_id)
         # consecutive_failures deliberately PRESERVED: a review transition is
@@ -3330,6 +3422,14 @@ def request_changes(
                 "status": new_status,
             },
             run_id=run_id,
+        )
+    if displaced_worker is not None:
+        _terminate_displaced_transition_worker(
+            conn, task_id, run_id,
+            transition="changes_requested",
+            worker_pid=displaced_worker[0],
+            claim_lock=displaced_worker[1],
+            worker_started_at=displaced_worker[2],
         )
     return True, implementer
 
