@@ -1934,6 +1934,45 @@ def test_voice_record_start_handles_non_dict_voice_cfg(monkeypatch):
         assert captured["auto_restart"] is False
 
 
+def test_voice_record_start_cuts_inflight_tts_before_arming_mic(monkeypatch):
+    order: list[str] = []
+    tts_calls: list[bool] = []
+
+    def fake_start_continuous(**_kwargs):
+        order.append("start_continuous")
+        return True
+
+    monkeypatch.setitem(
+        sys.modules,
+        "hermes_cli.voice",
+        types.SimpleNamespace(
+            start_continuous=fake_start_continuous,
+            stop_continuous=lambda **_kwargs: None,
+        ),
+    )
+    monkeypatch.setattr(server, "_load_cfg", lambda: {"voice": {}})
+
+    def fake_tts_stop(user_barge=True):
+        tts_calls.append(user_barge)
+        order.append("tts_stop")
+
+    monkeypatch.setattr(server, "_tts_stream_stop", fake_tts_stop)
+    monkeypatch.setenv("HERMES_VOICE", "1")
+
+    resp = _dispatch_sync(
+        {
+            "id": "voice-record-tts-cut",
+            "method": "voice.record",
+            "params": {"action": "start"},
+        }
+    )
+
+    assert resp is not None and "result" in resp, resp
+    assert resp["result"]["status"] == "recording"
+    assert tts_calls == [True]
+    assert order == ["tts_stop", "start_continuous"]
+
+
 def test_prompt_submit_typed_stop_phrase_ends_voice_chat(monkeypatch):
     """Typed bare stop phrase during an active voice chat is consumed at the
     prompt.submit choke point: voice mode flips off, a distinct

@@ -723,6 +723,11 @@ def _(rid, params: dict) -> dict:
             stop_continuous(force_transcribe=True)
             _resume_voice_wake()
             return _ok(rid, {"status": "stopped"})
+        # Manual push-to-talk is an explicit user barge-in. Cut any in-flight
+        # speech before arming the microphone so the assistant cannot keep
+        # talking over the user's recording. This reuses the normal TTS stop
+        # path, including playback cleanup and the next-turn interruption note.
+        _tts_stream_stop(user_barge=True)
         from hermes_cli.voice import start_continuous
         # Busy probe holds the no-speech counter during long agent turns; safe to re-register every
         # start (older wrappers lack the setter).
