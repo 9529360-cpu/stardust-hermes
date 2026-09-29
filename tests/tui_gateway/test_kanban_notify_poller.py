@@ -279,6 +279,8 @@ class TestNotificationPollerLoopKanbanWiring:
 
         emits: list = []
         submits: list = []
+        submit_kwargs: list = []
+        session["_test_kanban_submit_kwargs"] = submit_kwargs
         monkeypatch.setattr(server, "_KANBAN_POLL_SECONDS", 0.01)
         monkeypatch.setattr(
             server, "_emit", lambda event, sid, payload=None: emits.append((event, payload))
@@ -286,7 +288,7 @@ class TestNotificationPollerLoopKanbanWiring:
         monkeypatch.setattr(
             server,
             "_run_prompt_submit",
-            lambda rid, sid, sess, text: submits.append(text),
+            lambda rid, sid, sess, text, **kwargs: (submits.append(text), submit_kwargs.append(kwargs)),
         )
         stop = threading.Event()
         thread = threading.Thread(
@@ -333,6 +335,7 @@ class TestNotificationPollerLoopKanbanWiring:
         assert any(tid in t for t in status_texts), status_texts
         assert any(e == "message.start" for e, _ in emits)
         assert any(tid in text for text in submits), submits
+        assert session["_test_kanban_submit_kwargs"][0]["display_kind"] == "internal_notification"
         assert session["running"] is True  # poller claimed the turn
         assert not session.get("_kanban_pending")
 
