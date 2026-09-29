@@ -414,8 +414,13 @@ def _dispatch_followup_turn(rid, sid: str, session: dict, prompt: Any, what: str
     """Chain one follow-up turn (caller set ``running``); on failure run ``on_error``, log,
     release ``running``."""
     try:
+        from gateway.response_filters import INTERNAL_NOTIFICATION_DISPLAY_KIND
+
         _emit("message.start", sid)
-        _run_prompt_submit(rid, sid, session, prompt)
+        _run_prompt_submit(
+            rid, sid, session, prompt,
+            display_kind=INTERNAL_NOTIFICATION_DISPLAY_KIND,
+        )
         if on_done is not None:
             on_done()
     except Exception as exc:
