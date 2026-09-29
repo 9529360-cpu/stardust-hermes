@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 # tool-using turns aren't killed mid-flight.
 WAKE_TURN_TIMEOUT_SECONDS = 600.0
 
+# Marks the API server authenticated loopback wake as machinery. The header
+# can only reduce user authority: even if an API client sets it manually, the
+# turn becomes non-human rather than gaining any permission.
+INTERNAL_WAKE_HEADER = "X-Hermes-Internal-Wake"
+
 # Backoff between retries on transient failures. The API server has no per-session lock (concurrent
 # turns are last-writer-wins) but DOES enforce a global max_concurrent_runs cap via HTTP 429, which
 # is worth waiting out.
@@ -150,7 +155,11 @@ async def _self_post_chat_completion(adapter: Any, *, text: str, session_id: str
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"  # bare IPv6 literal
     url = f"http://{host}:{port}/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "X-Hermes-Session-Id": session_id}
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "X-Hermes-Session-Id": session_id,
+        INTERNAL_WAKE_HEADER: "1",
+    }
     payload = {"model": str(getattr(adapter, "_model_name", "") or "hermes-agent"),
                "messages": [{"role": "user", "content": text}], "stream": False}
     last_err: Optional[BaseException] = None
