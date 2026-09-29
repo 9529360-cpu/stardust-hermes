@@ -406,7 +406,16 @@ def _notif_poll_kanban(sid: str, session: dict) -> None:
     with session["history_lock"]:
         batch, session["_kanban_pending"] = list(session.get("_kanban_pending") or []), []
     with contextlib.suppress(Exception):
-        _notif_submit(f"__notif__{int(time.time() * 1000)}", sid, session, "\n".join(batch), "kanban notification dispatch failed")
+        from gateway.response_filters import INTERNAL_NOTIFICATION_DISPLAY_KIND
+
+        _notif_submit(
+            f"__notif__{int(time.time() * 1000)}",
+            sid,
+            session,
+            "\n".join(batch),
+            "kanban notification dispatch failed",
+            display_kind=INTERNAL_NOTIFICATION_DISPLAY_KIND,
+        )
 
 
 def _notif_dispatch_event(sid: str, session: dict, evt: dict, text: str) -> bool:
