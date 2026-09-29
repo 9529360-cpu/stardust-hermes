@@ -511,6 +511,14 @@ class OpenAICompatRoutesMixin:
             # id from a header-less client is NOT: delegate_task keeps its forced-sync fallback
             # there — the wake would hard-fail or land in history that client never reloads.
             session_history_delivery=("1" if provided_session_id else ""))
+        if provided_session_id:
+            # Authenticated self-wakes still use role=user for provider alternation,
+            # but must never be mistaken for fresh human approval by inline tools.
+            from gateway.response_filters import INTERNAL_NOTIFICATION_DISPLAY_KIND
+            from gateway.wake import INTERNAL_WAKE_HEADER
+
+            if request.headers.get(INTERNAL_WAKE_HEADER, "").strip() == "1":
+                run_kwargs["persist_user_display_kind"] = INTERNAL_NOTIFICATION_DISPLAY_KIND
         if stream:
             _stream_q = ThreadSafeAsyncQueue()
             # tool_call_ids with an emitted "running": a "completed" without one (internal/

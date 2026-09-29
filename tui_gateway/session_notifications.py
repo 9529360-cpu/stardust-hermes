@@ -187,8 +187,13 @@ def _notif_slash_loop_tick(rid: str, sid: str, session: dict, mgr, wakeup: str) 
                 mgr.abandon_tick()
                 return
             try:
+                from gateway.response_filters import INTERNAL_NOTIFICATION_DISPLAY_KIND
+
                 _emit("message.start", sid)
-                started = bool(_run_prompt_submit(rid, sid, session, payload["message"]))
+                started = bool(_run_prompt_submit(
+                    rid, sid, session, payload["message"],
+                    display_kind=INTERNAL_NOTIFICATION_DISPLAY_KIND,
+                ))
             except Exception as exc:
                 _notif_log_failure("loop slash send dispatch failed", exc)
                 _notif_release_turn(session)
@@ -212,7 +217,8 @@ def _maybe_fire_tui_heartbeat_tick(sid: str, session: dict) -> None:
     ``_pending_input`` no turn loop ever drains — armed-but-dead. State is durable in SessionDB, so
     the session-owner process drives firing exactly like ``_maybe_fire_tui_loop_tick``: claim the
     idle session first (a racing user prompt wins), then re-enter through ``_run_prompt_submit`` as a
-    plain user turn. A dispatch that never starts a turn rewinds the persisted fire so the tick stays
+    typed internal turn. It still uses ``role=user`` for provider alternation but carries no human
+    authority. A dispatch that never starts a turn rewinds the persisted fire so the tick stays
     due instead of being silently consumed.
     """
     try:
@@ -229,8 +235,13 @@ def _maybe_fire_tui_heartbeat_tick(sid: str, session: dict) -> None:
         return
     started = False
     try:
+        from gateway.response_filters import INTERNAL_NOTIFICATION_DISPLAY_KIND
+
         _emit("status.update", sid, {"kind": "heartbeat", "text": f"♥ heartbeat #{mgr.state.fire_count} firing…"})
-        started = bool(_run_prompt_submit(f"__heartbeat__{int(time.time() * 1000)}", sid, session, prompt))
+        started = bool(_run_prompt_submit(
+            f"__heartbeat__{int(time.time() * 1000)}", sid, session, prompt,
+            display_kind=INTERNAL_NOTIFICATION_DISPLAY_KIND,
+        ))
     except Exception as exc:
         _notif_log_failure("heartbeat dispatch failed", exc)
     if not started:
@@ -261,8 +272,13 @@ def _maybe_fire_tui_loop_tick(sid: str, session: dict) -> None:
         if wakeup.lstrip().startswith("/"):
             _notif_slash_loop_tick(rid, sid, session, mgr, wakeup)
         else:
+            from gateway.response_filters import INTERNAL_NOTIFICATION_DISPLAY_KIND
+
             _emit("message.start", sid)
-            if not _run_prompt_submit(rid, sid, session, wakeup):
+            if not _run_prompt_submit(
+                rid, sid, session, wakeup,
+                display_kind=INTERNAL_NOTIFICATION_DISPLAY_KIND,
+            ):
                 _notif_release_turn(session)
                 mgr.abandon_tick()
     except Exception as exc:
@@ -406,7 +422,16 @@ def _notif_poll_kanban(sid: str, session: dict) -> None:
     with session["history_lock"]:
         batch, session["_kanban_pending"] = list(session.get("_kanban_pending") or []), []
     with contextlib.suppress(Exception):
-        _notif_submit(f"__notif__{int(time.time() * 1000)}", sid, session, "\n".join(batch), "kanban notification dispatch failed")
+        from gateway.response_filters import INTERNAL_NOTIFICATION_DISPLAY_KIND
+
+        _notif_submit(
+            f"__notif__{int(time.time() * 1000)}",
+            sid,
+            session,
+            "\n".join(batch),
+            "kanban notification dispatch failed",
+            display_kind=INTERNAL_NOTIFICATION_DISPLAY_KIND,
+        )
 
 
 def _notif_dispatch_event(sid: str, session: dict, evt: dict, text: str) -> bool:

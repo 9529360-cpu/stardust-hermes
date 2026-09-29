@@ -456,6 +456,29 @@ class TestAgentExecution:
         )
 
     @pytest.mark.asyncio
+    async def test_run_agent_passes_internal_turn_provenance_to_conversation(self, adapter):
+        mock_agent = MagicMock()
+        mock_agent.run_conversation.return_value = {"final_response": "ok"}
+        mock_agent.session_prompt_tokens = 0
+        mock_agent.session_completion_tokens = 0
+        mock_agent.session_total_tokens = 0
+
+        with patch.object(adapter, "_create_agent", return_value=mock_agent):
+            await adapter._run_agent(
+                user_message="[kanban] background task changed",
+                conversation_history=[],
+                session_id="session-internal",
+                persist_user_display_kind="internal_notification",
+            )
+
+        mock_agent.run_conversation.assert_called_once_with(
+            user_message="[kanban] background task changed",
+            conversation_history=[],
+            task_id="session-internal",
+            persist_user_display_kind="internal_notification",
+        )
+
+    @pytest.mark.asyncio
     async def test_run_agent_sets_and_clears_process_ownership_markers(self, adapter):
         """#76188 review: this surface runs its own agent lifecycle outside
         TurnRunner, so it needs its own baseline snapshot/clear — verify the
@@ -2443,6 +2466,36 @@ class TestSessionIdHeader:
                 assert mock_run.call_count == 0
 
     @pytest.mark.asyncio
+    async def test_internal_wake_header_marks_session_turn_as_machinery(self, auth_adapter):
+        mock_db = MagicMock()
+        mock_db.get_messages_as_conversation.return_value = []
+        mock_db.resolve_resume_session_id.side_effect = lambda sid: sid
+        auth_adapter._session_db = mock_db
+        app = _create_app(auth_adapter)
+
+        async with TestClient(TestServer(app)) as cli:
+            with patch.object(auth_adapter, "_run_agent", new_callable=AsyncMock) as mock_run:
+                mock_run.return_value = (
+                    {"final_response": "OK", "messages": [], "api_calls": 1},
+                    {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
+                )
+                resp = await cli.post(
+                    "/v1/chat/completions",
+                    headers={
+                        "X-Hermes-Session-Id": "existing-session",
+                        "X-Hermes-Internal-Wake": "1",
+                        "Authorization": "Bearer sk-secret",
+                    },
+                    json={
+                        "model": "hermes-agent",
+                        "messages": [{"role": "user", "content": "[kanban] task blocked"}],
+                    },
+                )
+
+        assert resp.status == 200
+        assert mock_run.call_args.kwargs["persist_user_display_kind"] == "internal_notification"
+
+    @pytest.mark.asyncio
     async def test_provided_session_id_loads_history_from_db(self, auth_adapter):
         """When X-Hermes-Session-Id is provided, history comes from SessionDB not request body."""
         mock_result = {"final_response": "OK", "messages": [], "api_calls": 1}
@@ -2478,6 +2531,7 @@ class TestSessionIdHeader:
             # History must come from DB, not from the request body
             assert call_kwargs["conversation_history"] == db_history
             assert call_kwargs["user_message"] == "new question"
+            assert "persist_user_display_kind" not in call_kwargs
 
 
 # ---------------------------------------------------------------------------
