@@ -3848,7 +3848,7 @@ def _ctx_header(lines: list[str], task: Task) -> None:
 def _ctx_shared_dir_workspace(
     lines: list[str], conn: sqlite3.Connection, task: Task,
 ) -> None:
-    """Warn when active tasks intentionally share the same persistent ``dir`` workspace.
+    """Warn when active tasks intentionally share the same persistent `dir` workspace.
 
     Worktree and scratch tasks are isolated elsewhere and must stay quiet here. This is advisory,
     not a lock: shared directories are a supported workflow, but two workers mutating the same
@@ -3859,9 +3859,6 @@ def _ctx_shared_dir_workspace(
     raw_path = str(task.workspace_path)
     expanded = Path(raw_path).expanduser()
     path_aliases = {raw_path, str(expanded)}
-    # A running task has already had ``~/...`` expanded by resolve_workspace/set_workspace_path,
-    # while a ready sibling may still carry the original tilde form. Add that lexical alias
-    # without resolving symlinks or touching the filesystem.
     try:
         rel_home = expanded.relative_to(Path.home())
         path_aliases.add("~/" + rel_home.as_posix())

@@ -1620,6 +1620,15 @@ def _normalize_base_url(value: Any) -> Optional[str]:
     return _normalize_job_optional_text(value, strip_trailing_slash=True)
 
 
+def _normalize_optional_bool(value: Any) -> Optional[bool]:
+    """Strict optional bool for durable opt-in job behavior."""
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise ValueError(f"Expected boolean value, got {value!r}.")
+    return value
+
+
 def _normalize_str_list(items: Any) -> Optional[List[str]]:
     """Non-blank stripped items of *items*, or None when nothing remains."""
     return [str(j).strip() for j in items if str(j).strip()] or None
@@ -1656,6 +1665,24 @@ def _normalize_local_session_origin(value: Any) -> Optional[Dict[str, str]]:
     return {"session_id": session_id, "source": source}
 
 
+def _normalize_job_approval_mode(value: Any) -> Optional[str]:
+    """Normalize a durable job-scoped approval posture.
+
+    None/blank/inherit keeps the historical profile-wide approvals.cron_mode
+    behavior. approve delegates approval authority to this job's future runs;
+    deny explicitly narrows it. The scheduler still applies hardline blocks and
+    explicit user deny rules before this recoverable approval layer.
+    """
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if not text or text == "inherit":
+        return None
+    if text not in {"approve", "deny"}:
+        raise ValueError(
+            f"Invalid approval_mode {value!r}. Valid values: inherit, approve, deny.")
+    return text
+
 def _normalize_reasoning_effort(value: Any) -> Optional[str]:
     """Spelling-only validation via the shared parser (cron knob never stricter/looser than
     config.yaml); model capability is deliberately NOT checked (model unknowable at create time,
@@ -1691,8 +1718,14 @@ _CREATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
     "no_agent": bool,
     "context_from": _normalize_context_from,
     "failure_deliver": _normalize_failure_deliver,
+    "handoff_context": _normalize_job_optional_text,
+    "approval_mode": _normalize_job_approval_mode,
+    "stop_when_done": _normalize_optional_bool,
 }
 _UPDATE_FIELD_NORMALIZERS: Dict[str, Callable[[Any], Any]] = {
+    "approval_mode": _normalize_job_approval_mode,
+    "stop_when_done": _normalize_optional_bool,
+    "handoff_context": _normalize_job_optional_text,
     "workdir": lambda v: None if v in {None, "", False} else _normalize_workdir(v),
     "monitor_script": _normalize_job_optional_text,
     "monitor_url": _normalize_job_optional_text,
@@ -1749,6 +1782,7 @@ def _validate_job_mode_invariants(
     monitor_url: Optional[str],
     no_agent: bool,
     script: Optional[str],
+    stop_when_done: bool = False,
 ) -> None:
     """Execution-mode invariants shared by create_job and update_job (no bypass via the update
     door)."""
@@ -1763,6 +1797,9 @@ def _validate_job_mode_invariants(
             "based on source changes. Use a plain no_agent script job instead.")
     if no_agent and not script:
         raise ValueError(NO_AGENT_WITHOUT_SCRIPT_ERROR)
+    if no_agent and stop_when_done:
+        raise ValueError(
+            "stop_when_done requires an agent run; it cannot be combined with no_agent=True.")
 
 
 def _oneshot_past_grace_error(run_at: Any) -> ValueError:
@@ -1806,12 +1843,15 @@ def create_job(
     workdir: Optional[str] = None,
     no_agent: bool = False,
     attach_to_session: Optional[bool] = None,
+    handoff_context: Optional[str] = None,
+    stop_when_done: Optional[bool] = None,
     monitor_script: Optional[str] = None,
     monitor_url: Optional[str] = None,
     reasoning_effort: Optional[str] = None,
     failure_deliver: Optional[str] = None,
     paused: bool = False,
     paused_reason: Optional[str] = None,
+    approval_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Create a new cron job and return the stored record.
 
@@ -1847,7 +1887,9 @@ def create_job(
     normalized_attach = attach_to_session if isinstance(attach_to_session, bool) else None
     normalized_reasoning_effort = _normalize_reasoning_effort(reasoning_effort)
 
-    _validate_job_mode_invariants(f["monitor_script"], f["monitor_url"], f["no_agent"], f["script"])
+    _validate_job_mode_invariants(
+        f["monitor_script"], f["monitor_url"], f["no_agent"], f["script"],
+        bool(f["stop_when_done"]))
     prompt_text = _coerce_job_text(prompt).strip()
     if not prompt_text and not f["script"] and not normalized_skills:
         raise ValueError(EMPTY_PAYLOAD_ERROR)
@@ -1910,7 +1952,9 @@ def create_job(
     for key, value in (
         ("attach_to_session", normalized_attach), ("reasoning_effort", normalized_reasoning_effort),
         ("failure_deliver", f["failure_deliver"]), ("local_session_origin", local_session_origin),
-        ("source_suggestion_id", source_suggestion_id),
+        ("source_suggestion_id", source_suggestion_id), ("approval_mode", f["approval_mode"]),
+        ("handoff_context", f["handoff_context"] if normalized_attach is True else None),
+        ("stop_when_done", True if f["stop_when_done"] else None),
     ):
         if value is not None:
             job[key] = value
@@ -2088,14 +2132,25 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         updated = _apply_skill_fields({**job, **updates})
         if updated.get("local_session_origin") is None:
             updated.pop("local_session_origin", None)
+        # inherit normalizes to None and is represented by absence so old
+        # jobs stay byte-compatible and continue following approvals.cron_mode.
+        if updated.get("approval_mode") is None:
+            updated.pop("approval_mode", None)
+        if not updated.get("stop_when_done"):
+            updated.pop("stop_when_done", None)
+        # Hidden session handoff belongs only to explicitly attached jobs. A failed
+        # explicit refresh stores no stale transcript snapshot.
+        if updated.get("attach_to_session") is not True or updated.get("handoff_context") is None:
+            updated.pop("handoff_context", None)
         _reject_terminal_activation(job, updated, job_id)
         # Re-check on the MERGED record; scoped to changed fields so legacy records keep loading.
-        if {"monitor_script", "monitor_url", "no_agent", "script"}.intersection(updates):
+        if {"monitor_script", "monitor_url", "no_agent", "script", "stop_when_done"}.intersection(updates):
             _validate_job_mode_invariants(
                 updated.get("monitor_script") or None,
                 updated.get("monitor_url") or None,
                 bool(updated.get("no_agent")),
-                _normalize_job_optional_text(updated.get("script")))
+                _normalize_job_optional_text(updated.get("script")),
+                bool(updated.get("stop_when_done")))
         if any(k in updates for k in _PAYLOAD_FIELDS) and job_payload_is_empty(updated):
             raise ValueError(EMPTY_PAYLOAD_ERROR)
         inference_fields_changed = bool(
@@ -2489,6 +2544,7 @@ def mark_job_run(
     *,
     expected_fire_owner: Optional[str] = None,
     model_unreachable: bool = False,
+    terminal_complete: bool = False,
 ) -> bool:
     """Mark a job as run: update last_run_at/last_status, bump completed, recompute next_run_at,
     and retire the record as a terminal completion when the repeat limit is reached.
@@ -2514,6 +2570,8 @@ def mark_job_run(
         now = _hermes_now().isoformat()
         _record_run_outcome(job, success, error, delivery_error, status, now)
         _advance_after_run(job, now)
+        if success and terminal_complete:
+            _complete_job_record(job)
         from cron.unreachable_retry import clear_state, plan_retry
 
         if not success and model_unreachable and not is_terminal_job(job):

@@ -176,9 +176,10 @@ def test_connect_migrates_legacy_db_before_optional_column_indexes(tmp_path):
 
 
 
-def test_worker_context_warns_about_active_tasks_sharing_dir_workspace(kanban_home, tmp_path):
+def test_worker_context_warns_about_active_tasks_sharing_dir_workspace(kanban_home, tmp_path, monkeypatch):
     shared = tmp_path / "shared-project"
     shared.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
     with kbc.connect() as conn:
         current = kb.create_task(
@@ -187,8 +188,6 @@ def test_worker_context_warns_about_active_tasks_sharing_dir_workspace(kanban_ho
         )
         peer = kb.create_task(
             conn, title="edit desktop", assignee="desktop",
-            # A ready sibling can still carry the user's tilde form while the
-            # running task has already persisted an expanded absolute path.
             workspace_kind="dir", workspace_path="~/shared-project",
         )
         done_peer = kb.create_task(

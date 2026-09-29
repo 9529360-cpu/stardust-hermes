@@ -9,6 +9,7 @@ Run with:  python -m pytest tests/test_delegate.py -v
    or:     python tests/test_delegate.py
 """
 
+import contextvars
 import json
 import os
 import threading
@@ -28,6 +29,7 @@ from tools.delegate_tool import (
     _build_child_progress_callback,
     _build_child_system_prompt,
     _strip_blocked_tools,
+    _resolve_child_toolsets,
     _resolve_child_credential_pool,
     _resolve_delegation_credentials,
 )
@@ -152,19 +154,72 @@ class TestStripBlockedTools(unittest.TestCase):
         result = _strip_blocked_tools(["terminal", "file", "delegation", "clarify", "memory", "code_execution"])
         self.assertEqual(sorted(result), ["code_execution", "file", "terminal"])
 
-    def test_strips_cronjob_toolset(self):
-        """Regression for issue #43466: child subagents must not inherit
-        the cronjob toolset from a parent running on a gateway platform.
-        Without this guard, a delegated child could schedule new cron jobs
-        under the parent's identity.
+    def test_preserves_parent_cronjob_toolset(self):
+        """Cron scheduling is an ordinary inherited capability: the child can
+        use it only when the parent already has it, and cron's own approval
+        gates still govern durable authority escalation.
         """
         result = _strip_blocked_tools(
             ["terminal", "file", "cronjob", "web"]
         )
-        self.assertNotIn("cronjob", result)
+        self.assertIn("cronjob", result)
         self.assertIn("terminal", result)
         self.assertIn("file", result)
         self.assertIn("web", result)
+        self.assertNotIn("cronjob_manage", DELEGATE_BLOCKED_TOOLS)
+
+    def test_cron_child_inherits_tool_but_cannot_mint_durable_approval(self):
+        """Delegation copies the parent ContextVars, so a cron child keeps the
+        cron approval boundary while inheriting the parent's scheduling tool.
+        """
+        from cron.scheduler import _CronRunScope
+        from tools.cronjob_tools import _approval_mode_change_error
+
+        parent = _make_mock_parent()
+        parent.enabled_toolsets = ["terminal", "cronjob"]
+        parent.disabled_toolsets = []
+        enabled, _disabled = _resolve_child_toolsets(parent, None, "leaf")
+        self.assertIn("cronjob", enabled)
+
+        scope = _CronRunScope({"approval_mode": "approve"}, "parent", None)
+        try:
+            scope.enter()
+            with (
+                patch("tools.approval._yolo_active", return_value=False),
+                patch("tools.approval_context._get_approval_mode", return_value="manual"),
+            ):
+                child_ctx = contextvars.copy_context()
+                error = child_ctx.run(
+                    _approval_mode_change_error,
+                    current_mode=None,
+                    requested_mode="approve",
+                    job_label="child-followup",
+                )
+        finally:
+            scope.exit()
+
+        self.assertIsNotNone(error)
+        self.assertIn("live human confirmation", error.lower())
+
+    def test_child_cannot_gain_cronjob_when_parent_lacks_it(self):
+        parent = _make_mock_parent()
+        parent.enabled_toolsets = ["terminal", "file", "web"]
+        parent.disabled_toolsets = []
+
+        enabled, disabled = _resolve_child_toolsets(
+            parent, ["cronjob"], "leaf"
+        )
+        self.assertNotIn("cronjob", enabled)
+        self.assertNotIn("cronjob", disabled)
+
+    def test_parent_explicit_cronjob_deny_still_wins(self):
+        parent = _make_mock_parent()
+        parent.enabled_toolsets = ["hermes-cli"]
+        parent.disabled_toolsets = ["cronjob"]
+
+        enabled, disabled = _resolve_child_toolsets(parent, None, "leaf")
+        self.assertEqual(enabled, ["hermes-cli"])
+        self.assertIn("cronjob", disabled)
 
     def test_mixed_composite_is_subtracted_at_child_assembly(self):
         """A mixed platform bundle must not re-expose blocked leaf tools.
@@ -199,11 +254,11 @@ class TestStripBlockedTools(unittest.TestCase):
         self.assertIn("browser", disabled)
         for toolset_name in (
             "clarify",
-            "cronjob",
             "delegation",
             "memory",
         ):
             self.assertIn(toolset_name, disabled)
+        self.assertNotIn("cronjob", disabled)
         # code_execution is deliberately NOT denied — children keep
         # execute_code for programmatic tool calling (Teknium, Jul 2026).
         self.assertNotIn("code_execution", disabled)
