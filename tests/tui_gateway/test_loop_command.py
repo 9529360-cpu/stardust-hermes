@@ -141,6 +141,7 @@ def test_tui_tick_fires_when_idle_and_due(server, session):
 
     def fake_submit(rid, sid_, session_, text, **kwargs):
         fired["text"] = text
+        fired["kwargs"] = kwargs
         return True
 
     with patch.object(server, "_run_prompt_submit", fake_submit), \
@@ -149,6 +150,7 @@ def test_tui_tick_fires_when_idle_and_due(server, session):
 
     assert "poll the build" in fired.get("text", "")
     assert "[/loop wakeup #1" in fired["text"]
+    assert fired["kwargs"] == {"display_kind": "internal_notification"}
     # Session claimed for the wakeup turn.
     assert s["running"] is True
 
@@ -171,6 +173,33 @@ def test_tui_tick_abandons_claim_when_prompt_turn_refuses_to_start(server, sessi
     assert state.ticks_fired == 0
     assert s["running"] is False
 
+
+def test_tui_slash_tick_send_turn_is_internal_machinery(server, session, monkeypatch):
+    sid, session_key, s = session
+    from hermes_cli.loops import LoopManager, save_loop
+
+    mgr = LoopManager(session_key)
+    mgr.set("/work check the build", interval_seconds=60)
+    mgr.state.next_due_at = time.time() - 1
+    save_loop(session_key, mgr.state)
+    monkeypatch.setitem(
+        server._methods,
+        "command.dispatch",
+        lambda rid, params: {"id": rid, "result": {"type": "send", "message": "expanded work"}},
+    )
+    captured = {}
+
+    def submit(_rid, _sid, _session, text, **kwargs):
+        captured["text"] = text
+        captured["kwargs"] = kwargs
+        return True
+
+    with patch.object(server, "_run_prompt_submit", submit), patch.object(server, "_emit"):
+        server._maybe_fire_tui_loop_tick(sid, s)
+
+    assert captured["text"] == "expanded work"
+    assert captured["kwargs"] == {"display_kind": "internal_notification"}
+    assert s["running"] is True
 
 def test_tui_slash_tick_abandons_claim_when_send_turn_refuses_to_start(
     server, session, monkeypatch

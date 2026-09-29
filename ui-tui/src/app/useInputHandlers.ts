@@ -81,6 +81,29 @@ export function resolveCtrlCComposerAction(opts: {
   return 'exit'
 }
 
+export type DoubleEscAction = 'clear' | 'interrupt' | 'none'
+
+/**
+ * Double-Esc is a fast stop gesture only when a turn is running and the
+ * composer is empty. Drafts keep the existing discard behavior, and a
+ * single Esc never interrupts anything.
+ */
+export function resolveDoubleEscAction(opts: {
+  busy: boolean
+  hasDraft: boolean
+  hasSession: boolean
+}): DoubleEscAction {
+  if (opts.hasDraft) {
+    return 'clear'
+  }
+
+  if (opts.busy && opts.hasSession) {
+    return 'interrupt'
+  }
+
+  return 'none'
+}
+
 /**
  * Approval / clarify / confirm overlays mount their own `useInput` handlers
  * for the in-prompt keys (arrows, numbers, Enter, sometimes Esc).  The global
@@ -371,29 +394,53 @@ export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
       })
   }
 
-  // Double-Esc discards the draft, matching Claude Code / Gemini CLI. It
-  // sits above the isBlocked early-return so a prompt overlay cannot swallow
-  // it. Ctrl+C now clears a non-empty composer even mid-stream; Esc Esc is
-  // still the dedicated discard (pushes the draft to history so Up recalls it).
+  // Double-Esc keeps the existing draft-discard gesture and adds an emergency
+  // stop when a turn is running with an empty composer. Draft discard stays
+  // above isBlocked so prompt overlays cannot swallow it; turn interruption
+  // remains below that boundary so approval/clarify overlays keep owning Esc.
   const lastEscRef = useRef(0)
 
   useInput((ch, key, event) => {
     const live = getUiState()
 
     if (key.escape) {
-      const now = Date.now()
-      const isDouble = now - lastEscRef.current <= DOUBLE_ESC_MS
+      // Escape-configured push-to-talk owns this chord. Two quick PTT presses
+      // are a stop/start pair, not a double-Esc interrupt.
+      if (isVoiceToggleKey(key, ch, voice.recordKey)) {
+        lastEscRef.current = 0
+      } else {
+        const now = Date.now()
+        const isDouble = now - lastEscRef.current <= DOUBLE_ESC_MS
 
-      lastEscRef.current = isDouble ? 0 : now
+        lastEscRef.current = isDouble ? 0 : now
 
-      if (isDouble && (cState.input || cState.inputBuf.length)) {
-        if (cState.input.trim()) {
-          cActions.pushHistory(cState.input)
+        if (isDouble) {
+          const escAction = resolveDoubleEscAction({
+            busy: live.busy,
+            hasDraft: Boolean(cState.input || cState.inputBuf.length),
+            hasSession: Boolean(live.sid)
+          })
+
+          // Draft discard intentionally remains above the prompt-overlay
+          // early-return. Interrupt does not: a blocking overlay owns Esc
+          // until the user answers or dismisses it.
+          if (escAction === 'interrupt' && live.sid && !isBlocked) {
+            return turnController.interruptTurn({
+              appendMessage: actions.appendMessage,
+              gw: gateway.gw,
+              sid: live.sid,
+              sys: actions.sys
+            })
+          }
+
+          if (escAction === 'clear') {
+            if (cState.input.trim()) {
+              cActions.pushHistory(cState.input)
+            }
+
+            return cActions.clearIn()
+          }
         }
-
-        cActions.clearIn()
-
-        return
       }
     }
 

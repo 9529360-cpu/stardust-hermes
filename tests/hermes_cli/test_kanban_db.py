@@ -176,6 +176,57 @@ def test_connect_migrates_legacy_db_before_optional_column_indexes(tmp_path):
 
 
 
+def test_worker_context_warns_about_active_tasks_sharing_dir_workspace(kanban_home, tmp_path, monkeypatch):
+    shared = tmp_path / "shared-project"
+    shared.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    with kbc.connect() as conn:
+        current = kb.create_task(
+            conn, title="edit backend", assignee="backend",
+            workspace_kind="dir", workspace_path=str(shared),
+        )
+        peer = kb.create_task(
+            conn, title="edit desktop", assignee="desktop",
+            workspace_kind="dir", workspace_path="~/shared-project",
+        )
+        done_peer = kb.create_task(
+            conn, title="finished cleanup", assignee="cleanup",
+            workspace_kind="dir", workspace_path=str(shared),
+        )
+        conn.execute("UPDATE tasks SET status = 'done' WHERE id = ?", (done_peer,))
+        conn.commit()
+
+        ctx = kb.build_worker_context(conn, current)
+
+    assert "## Shared workspace concurrency" in ctx
+    assert "advisory warning, not a file lock" in ctx
+    assert peer in ctx
+    assert "edit desktop" in ctx
+    assert "@desktop" in ctx
+    assert done_peer not in ctx
+    assert "finished cleanup" not in ctx
+
+
+def test_worker_context_does_not_warn_for_isolated_worktree_workspace(kanban_home, tmp_path):
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+
+    with kbc.connect() as conn:
+        current = kb.create_task(
+            conn, title="worktree A", assignee="a",
+            workspace_kind="worktree", workspace_path=str(repo),
+        )
+        kb.create_task(
+            conn, title="worktree B", assignee="b",
+            workspace_kind="worktree", workspace_path=str(repo),
+        )
+
+        ctx = kb.build_worker_context(conn, current)
+
+    assert "## Shared workspace concurrency" not in ctx
+
+
 # ---------------------------------------------------------------------------
 # Links + dependency resolution
 # ---------------------------------------------------------------------------
@@ -202,6 +253,55 @@ def test_schedule_task_parks_time_delay_without_dispatching(kanban_home):
 
         events = kb.list_events(conn, t)
         assert any(e.kind == "scheduled" and e.payload == {"reason": "run next week"} for e in events)
+
+def test_schedule_running_task_terminates_worker_and_records_outcome(kanban_home, monkeypatch):
+    """Parking live work must stop the old worker, not only hide its claim."""
+    import json
+
+    with kbc.connect() as conn:
+        t = kb.create_task(conn, title="pause live worker", assignee="ops")
+        host = kb._claimer_id().split(":", 1)[0]
+        kb.claim_task(conn, t, claimer=f"{host}:worker")
+        kbd._set_worker_pid(conn, t, 45678)
+
+        monkeypatch.setattr(kb, "_pid_alive", lambda _pid: False)
+        signalled = []
+        assert kb.schedule_task(
+            conn, t, reason="wait until tomorrow",
+            signal_fn=lambda pid, sig: signalled.append((pid, sig)),
+        ) is True
+
+        task = kb.get_task(conn, t)
+        assert task.status == "scheduled"
+        assert task.worker_pid is None
+        assert signalled and signalled[0][0] == 45678
+
+        row = conn.execute(
+            "SELECT payload FROM task_events "
+            "WHERE task_id = ? AND kind = 'schedule_worker_termination'",
+            (t,),
+        ).fetchone()
+        payload = json.loads(row["payload"])
+        assert payload["prev_pid"] == 45678
+        assert payload["host_local"] is True
+        assert payload["termination_attempted"] is True
+        assert payload["terminated"] is True
+
+
+def test_schedule_non_running_task_does_not_signal_worker(kanban_home):
+    with kbc.connect() as conn:
+        t = kb.create_task(conn, title="future work", assignee="ops")
+        signalled = []
+        assert kb.schedule_task(
+            conn, t, reason="next week",
+            signal_fn=lambda pid, sig: signalled.append((pid, sig)),
+        ) is True
+        assert signalled == []
+        assert conn.execute(
+            "SELECT 1 FROM task_events "
+            "WHERE task_id = ? AND kind = 'schedule_worker_termination'",
+            (t,),
+        ).fetchone() is None
 
 
 

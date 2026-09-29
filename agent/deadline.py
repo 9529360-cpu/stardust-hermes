@@ -430,6 +430,7 @@ def kill_process_tree(pid: int, *, sig: Optional[int] = None) -> bool:
 
     with _process_tree_snapshot(int(pid), hard_kill=sig == _signal.SIGKILL) as descendants:
         signalled = False
+        hard_killed = []
         # Signal descendants while their ownership ancestry is still observable.
         # Frozen hard-kill targets cannot fork during this bottom-up teardown.
         for child in reversed(descendants):
@@ -437,8 +438,27 @@ def kill_process_tree(pid: int, *, sig: Optional[int] = None) -> bool:
                 if child.is_running():
                     child.send_signal(sig)
                     signalled = True
+                    if sig == _signal.SIGKILL:
+                        hard_killed.append(child)
             except Exception:
                 continue
+
+        # SIGKILL delivery is asynchronous. Without a bounded wait a detached
+        # descendant can still be observably running after this function returns,
+        # even though it was signalled successfully. The cron timeout contract is
+        # stronger: once timeout cleanup returns, no owned descendant may keep
+        # executing. Wait only for descendants we actually hard-signalled; zombies
+        # are an acceptable terminal state and are reaped by their real owner.
+        if hard_killed:
+            try:
+                import psutil
+                psutil.wait_procs(hard_killed, timeout=1.0)
+            except Exception:
+                logger.debug(
+                    "kill_process_tree: hard-kill wait failed for pid %s",
+                    pid,
+                    exc_info=True,
+                )
         try:
             # getpgid→killpg has an inherent TOCTOU shared by every killpg site; the psutil
             # sweep below is identity-aware (PID + create time) and does not.

@@ -34,6 +34,9 @@ from tools.delegate_tool_config import (  # noqa: F401
     _resolve_child_runtime, _resolve_delegation_credentials,
     _subagent_auto_approve, _subagent_auto_deny,
 )
+from tools.delegate_tool_memory import (  # noqa: F401
+    _read_only_parent_memory_snapshot, _same_inference_privacy_boundary,
+)
 from tools.delegate_tool_dispatch import _Batch, _announce_batch, _capture_origin, _run_batch
 from tools.delegate_tool_progress import (  # noqa: F401
     DelegateEvent, SUBAGENT_FAILURE_STATUSES, _batch_prefix, _build_child_progress_callback,
@@ -114,105 +117,6 @@ def _apply_child_cache_ttl(child) -> None:
         child._cache_ttl = "5m"
 
 _CHILD_CAP_MIN = 16_000  # below this a child compresses on every call; treat as a config error
-_CHILD_MEMORY_SNAPSHOT_MAX_CHARS = 8_000
-
-
-def _same_inference_privacy_boundary(
-    parent_agent, child_runtime: Dict[str, Any], child_request_overrides: Optional[Dict[str, Any]] = None
-) -> bool:
-    """Whether parent and child send model context to the same inference boundary.
-
-    Read-only personal context may follow delegated work only when provider,
-    endpoint, model route, credential, fallback route, request-routing policy,
-    and ACP transport are unchanged. An operator-routed child outside that
-    boundary must not receive it implicitly.
-    """
-    parent_provider = str(getattr(parent_agent, "provider", "") or "").strip().lower()
-    child_provider = str(child_runtime.get("provider") or "").strip().lower()
-    if parent_provider != child_provider:
-        return False
-
-    def _endpoint(value: Any) -> str:
-        return str(value or "").strip().rstrip("/")
-
-    if _endpoint(getattr(parent_agent, "base_url", None)) != _endpoint(child_runtime.get("base_url")):
-        return False
-
-    # A different model may represent a different downstream inference vendor
-    # even behind the same gateway endpoint (for example OpenRouter). Treat it
-    # as a new privacy boundary rather than silently forwarding personal data.
-    parent_model = str(getattr(parent_agent, "model", "") or "").strip()
-    child_model = str(child_runtime.get("model") or "").strip()
-    if parent_model != child_model:
-        return False
-
-    parent_api_key = getattr(parent_agent, "api_key", None)
-    if not parent_api_key and hasattr(parent_agent, "_client_kwargs"):
-        parent_api_key = (getattr(parent_agent, "_client_kwargs", {}) or {}).get("api_key")
-    if parent_api_key != child_runtime.get("api_key"):
-        return False
-
-    # _fallback_chain is the parent's canonical resolved fallback owner; the
-    # child runtime's fallback_model carries that same normalized list forward.
-    parent_fallback = getattr(parent_agent, "_fallback_chain", None)
-    if not isinstance(parent_fallback, list):
-        parent_fallback = None
-    child_fallback = child_runtime.get("fallback_model")
-    if not isinstance(child_fallback, list):
-        child_fallback = None
-    if parent_fallback != child_fallback:
-        return False
-
-    parent_request_overrides = dict(getattr(parent_agent, "request_overrides", {}) or {})
-    if parent_request_overrides != dict(child_request_overrides or {}):
-        return False
-
-    parent_command = str(getattr(parent_agent, "acp_command", "") or "").strip()
-    child_command = str(child_runtime.get("acp_command") or "").strip()
-    if parent_command != child_command:
-        return False
-    if parent_command:
-        parent_args = list(getattr(parent_agent, "acp_args", []) or [])
-        child_args = list(child_runtime.get("acp_args") or [])
-        if parent_args != child_args:
-            return False
-    return True
-
-
-def _read_only_parent_memory_snapshot(
-    parent_agent, child_runtime: Dict[str, Any], child_request_overrides: Optional[Dict[str, Any]] = None
-) -> Optional[str]:
-    """Return the parent frozen builtin memory snapshot for a same-boundary child.
-
-    The child still runs with skip_memory=True and no memory tool, so this is
-    context inheritance only: it cannot initialize providers, sync child turns,
-    or write shared MEMORY.md/USER.md.
-    """
-    if not _same_inference_privacy_boundary(
-        parent_agent, child_runtime, child_request_overrides=child_request_overrides
-    ):
-        return None
-    store = getattr(parent_agent, "_memory_store", None)
-    formatter = getattr(store, "format_for_system_prompt", None)
-    if not callable(formatter):
-        return None
-
-    blocks: list[str] = []
-    for target in ("user", "memory"):
-        try:
-            block = formatter(target)
-        except Exception:
-            logger.debug("subagent: failed to read parent %s snapshot", target, exc_info=True)
-            continue
-        if isinstance(block, str) and block.strip():
-            blocks.append(block.strip())
-    if not blocks:
-        return None
-
-    snapshot = "\n\n".join(blocks)
-    if len(snapshot) > _CHILD_MEMORY_SNAPSHOT_MAX_CHARS:
-        snapshot = snapshot[:_CHILD_MEMORY_SNAPSHOT_MAX_CHARS].rstrip() + "\n[... parent memory snapshot truncated ...]"
-    return snapshot
 
 
 def _child_compression_cap_tokens(raw) -> "int | None":
@@ -324,11 +228,16 @@ def _build_child_agent(
         request_overrides = dict(override_request_overrides)
     else:
         request_overrides = {} if override_provider else dict(getattr(parent_agent, "request_overrides", {}) or {})
+
+    # Resolve the pool before prompt construction: a multi-account pool can
+    # rotate after spawn, so it is part of the personal-context privacy boundary.
+    child_pool = _resolve_child_credential_pool(rt["provider"], parent_agent, rt["base_url"])
     child_prompt = _build_child_system_prompt(
         goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
         max_spawn_depth=max_spawn, child_depth=child_depth,
         parent_memory_context=_read_only_parent_memory_snapshot(
-            parent_agent, rt, child_request_overrides=request_overrides
+            parent_agent, rt, child_request_overrides=request_overrides,
+            child_credential_pool=child_pool,
         ),
     )
     parent_sid = getattr(parent_agent, "session_id", None)
@@ -376,8 +285,7 @@ def _build_child_agent(
     # parent delete orphans them (mirrors /branch's ``_branched_from``).
     if parent_sid and getattr(child, "_session_init_model_config", None) is not None:
         child._session_init_model_config["_delegate_from"] = parent_sid
-    # Shared pool lets children rotate credentials on rate limits.
-    child_pool = _resolve_child_credential_pool(rt["provider"], parent_agent, rt["base_url"])
+    # Pool identity was already resolved for the privacy-boundary decision.
     if child_pool is not None:
         child._credential_pool = child_pool
 

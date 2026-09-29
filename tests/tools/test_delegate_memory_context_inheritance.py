@@ -29,6 +29,10 @@ def _parent():
         acp_command=None,
         acp_args=[],
         _memory_store=_SnapshotStore(),
+        _memory_persistence_enabled=True,
+        _memory_enabled=True,
+        _user_profile_enabled=True,
+        _credential_pool=None,
     )
 
 
@@ -167,9 +171,14 @@ def test_child_gets_snapshot_as_read_only_prompt_but_memory_runtime_stays_disabl
         memory="MEMORY: usually avoids late appointments",
     )
 
+    parent._credential_pool = None
+    parent._memory_persistence_enabled = True
+    parent._memory_enabled = True
+    parent._user_profile_enabled = True
+
     with patch("tools.delegate_tool._load_config", return_value={}), patch(
-        "run_agent.AIAgent"
-    ) as mock_agent:
+        "tools.delegate_tool._resolve_child_credential_pool", return_value=None
+    ), patch("run_agent.AIAgent") as mock_agent:
         mock_agent.return_value = MagicMock()
         _build_child_agent(
             task_index=0,
@@ -209,3 +218,55 @@ def test_missing_or_broken_parent_store_is_non_blocking():
     broken.format_for_system_prompt.side_effect = RuntimeError("broken snapshot")
     parent._memory_store = broken
     assert _read_only_parent_memory_snapshot(parent, runtime) is None
+
+def test_disabled_parent_memory_surfaces_are_not_forwarded():
+    parent = _parent()
+    parent._memory_enabled = False
+    runtime = {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
+        "acp_command": None,
+        "acp_args": [],
+    }
+    assert _read_only_parent_memory_snapshot(parent, runtime) == "USER SNAPSHOT"
+    parent._user_profile_enabled = False
+    assert _read_only_parent_memory_snapshot(parent, runtime) is None
+
+
+def test_multi_credential_pool_fails_closed():
+    class _Pool:
+        def entries(self):
+            return [object(), object()]
+
+    parent = _parent()
+    pool = _Pool()
+    parent._credential_pool = pool
+    runtime = {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
+        "acp_command": None,
+        "acp_args": [],
+    }
+    assert _read_only_parent_memory_snapshot(
+        parent, runtime, child_credential_pool=pool
+    ) is None
+
+
+def test_different_provider_routing_filter_fails_closed():
+    parent = _parent()
+    parent.providers_allowed = ["Anthropic"]
+    runtime = {
+        "provider": parent.provider,
+        "base_url": parent.base_url,
+        "model": parent.model,
+        "api_key": parent.api_key,
+        "acp_command": None,
+        "acp_args": [],
+        "providers_allowed": ["OpenAI"],
+    }
+    assert _read_only_parent_memory_snapshot(parent, runtime) is None
+

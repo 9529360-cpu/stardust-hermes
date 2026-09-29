@@ -500,27 +500,45 @@ async def get_session_latest_descendant(session_id: str, profile: Optional[str] 
         "changed": bool(path and latest != path[0])}
 
 
-def _project_for_display(messages: list) -> list:
-    """Replace compaction summaries with their display-only projection."""
+def _project_for_display(messages: list, *, inline_images: bool = True) -> list:
+    """Replace compaction summaries with their display-only projection.
+
+    ``inline_images=False`` is a transport projection only: stored rows remain untouched,
+    while image parts become ``[image]`` placeholders so remote/lightweight readers do not
+    re-download embedded data URIs they are not going to render.
+    """
     from agent.compaction_display import project_compaction_message_for_display
     from agent.context_compressor import is_compaction_summary_message
+
+    coerce = None
+    if not inline_images:
+        from tui_gateway.session_history import _coerce_message_text
+        coerce = _coerce_message_text
 
     projected_messages = []
     for message in messages:
         if not is_compaction_summary_message(message):
-            projected_messages.append(message)
-            continue
-        display_view = project_compaction_message_for_display(message)
-        projected = message.copy()
-        if display_view is None:
-            if not projected.get("display_kind"):
-                projected["display_kind"] = "hidden"
+            projected = message
         else:
-            # Keep the physical content for inspection/export compatibility;
-            # Desktop consumes this display-only projection. A legacy hidden
-            # wrapper must not hide a successfully recovered live ask.
-            projected["display_content"] = display_view.get("content")
-            projected.pop("display_kind", None)
+            display_view = project_compaction_message_for_display(message)
+            projected = message.copy()
+            if display_view is None:
+                if not projected.get("display_kind"):
+                    projected["display_kind"] = "hidden"
+            else:
+                # Keep physical content unchanged on the default path. The lightweight
+                # projection below strips inline image payloads from both physical and
+                # display content without mutating the stored/database row.
+                projected["display_content"] = display_view.get("content")
+                projected.pop("display_kind", None)
+
+        if coerce is not None:
+            projected = projected.copy()
+            if projected.get("content") is not None:
+                projected["content"] = coerce(projected["content"], image_urls=False)
+            if projected.get("display_content") is not None:
+                projected["display_content"] = coerce(projected["display_content"], image_urls=False)
+
         projected_messages.append(projected)
     return projected_messages
 
@@ -529,7 +547,7 @@ def _project_for_display(messages: list) -> list:
 async def get_session_messages(
     session_id: str, profile: Optional[str] = None, limit: Optional[int] = Query(None, ge=0),
     offset: int = Query(0, ge=0), order: Optional[str] = Query(None),
-    include_compacted: bool = Query(False)):
+    include_compacted: bool = Query(False), inline_images: bool = Query(True)):
     if order not in (None, "oldest", "latest"):
         raise HTTPException(status_code=400, detail="order must be one of: oldest, latest")
 
@@ -551,7 +569,7 @@ async def get_session_messages(
     if result is None:
         raise HTTPException(status_code=404, detail=_NOT_FOUND)
     sid, _limit, messages = result
-    projected_messages = _project_for_display(messages)
+    projected_messages = _project_for_display(messages, inline_images=inline_images)
     return {
         "session_id": sid,
         # The same stamp list rows carry, so the Desktop keys a page under the

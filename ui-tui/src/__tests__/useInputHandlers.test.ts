@@ -7,6 +7,7 @@ import {
   dismissSensitivePrompt,
   handleIdleHotkeyExit,
   resolveCtrlCComposerAction,
+  resolveDoubleEscAction,
   shouldAllowIdleHotkeyExit,
   shouldDetachEditedHistoryInput,
   shouldFallThroughForScroll
@@ -97,6 +98,28 @@ describe('resolveCtrlCComposerAction — draft wins over interrupt', () => {
 
   it('does not interrupt a busy session that has no sid yet', () => {
     expect(resolveCtrlCComposerAction({ busy: true, hasDraft: false, hasSession: false })).toBe('exit')
+  })
+})
+
+describe('resolveDoubleEscAction — draft wins and empty busy turns can stop', () => {
+  it('interrupts a running turn when the composer is empty', () => {
+    expect(resolveDoubleEscAction({ busy: true, hasDraft: false, hasSession: true })).toBe('interrupt')
+  })
+
+  it('clears a draft instead of interrupting, even while busy', () => {
+    expect(resolveDoubleEscAction({ busy: true, hasDraft: true, hasSession: true })).toBe('clear')
+  })
+
+  it('does nothing while idle with an empty composer', () => {
+    expect(resolveDoubleEscAction({ busy: false, hasDraft: false, hasSession: true })).toBe('none')
+  })
+
+  it('does not interrupt a busy turn before a session id exists', () => {
+    expect(resolveDoubleEscAction({ busy: true, hasDraft: false, hasSession: false })).toBe('none')
+  })
+
+  it('keeps the existing idle draft-discard behavior', () => {
+    expect(resolveDoubleEscAction({ busy: false, hasDraft: true, hasSession: true })).toBe('clear')
   })
 })
 
