@@ -1,7 +1,7 @@
 import { isMissingRestEndpoint } from '@/lib/gateway-rpc'
 import { maybeBackfillLegacySessionOwners } from '@/lib/legacy-session-owner-backfill'
 import { stampRowsWithOwningConnection } from '@/lib/session-owner-stamp'
-import { recordTranscriptTail } from '@/store/transcript-tail'
+import { pageHonorsLatestOrder, recordTranscriptTail } from '@/store/transcript-tail'
 import type {
   PaginatedSessions,
   SessionInfo,
@@ -476,7 +476,14 @@ export function getLatestSessionMessages(
       includeCompacted: true
     },
     options
-  ).then(page => {
+  ).then(async page => {
+    // A backend that predates the order query silently serves the OLDEST page
+    // while still returning pagination metadata. Only an explicit latest echo
+    // is safe to adopt as a tail; otherwise recover an authoritative complete
+    // transcript using the oldest-first contract both backend generations share.
+    const authoritativePage = pageHonorsLatestOrder(page)
+      ? page
+      : await completeTranscriptForOrderlessBackend(id, profile, page, options)
     // Record whether the tail was truncated (page came back full) and where
     // the next older page starts, so "Show earlier" can backfill over REST
     // (app/chat/transcript-backfill). Keyed under both the requested id and
@@ -489,14 +496,32 @@ export function getLatestSessionMessages(
       profile: route.profile || page.profile || ambientProfile
     }
 
-    recordTranscriptTail(id, page, route, owner)
+    recordTranscriptTail(id, authoritativePage, route, owner)
 
-    if (page.session_id && page.session_id !== id) {
-      recordTranscriptTail(page.session_id, page, route, owner)
+    if (authoritativePage.session_id && authoritativePage.session_id !== id) {
+      recordTranscriptTail(authoritativePage.session_id, authoritativePage, route, owner)
     }
 
-    return page
+    return authoritativePage
   })
+}
+
+/** Recover a complete transcript from a backend that did not honour order=latest. */
+async function completeTranscriptForOrderlessBackend(
+  id: string,
+  profile: ProfileScope | undefined,
+  page: SessionMessagesResponse,
+  options: { passive?: boolean }
+): Promise<SessionMessagesResponse> {
+  const { pagination, ...complete } = page
+
+  // No metadata means the pre-paging backend already returned everything.
+  // An orderless short first page also proves the whole transcript fit.
+  if (!pagination || page.messages.length < pagination.limit) {
+    return complete
+  }
+
+  return { ...complete, messages: (await getAllSessionMessages(id, profile, options)).messages }
 }
 
 /**
@@ -561,7 +586,7 @@ export function getOlderSessionMessages(
 export async function getAllSessionMessages(
   id: string,
   profile?: ProfileScope,
-  options: { maxJsonChars?: number } = {}
+  options: { maxJsonChars?: number; passive?: boolean } = {}
 ): Promise<SessionMessagesResponse> {
   const messages: SessionMessage[] = []
   const pageSize = 500
@@ -571,12 +596,17 @@ export async function getAllSessionMessages(
   let resolvedSessionId = id
 
   while (true) {
-    const page = await getSessionMessages(id, profile, {
-      limit: pageSize,
-      offset,
-      order: 'oldest',
-      includeCompacted: true
-    })
+    const page = await getSessionMessages(
+      id,
+      profile,
+      {
+        limit: pageSize,
+        offset,
+        order: 'oldest',
+        includeCompacted: true
+      },
+      { passive: options.passive }
+    )
 
     resolvedSessionId = page.session_id
     jsonChars += (JSON.stringify(page.messages) ?? '').length

@@ -1734,6 +1734,16 @@ def _fallback_chain_exhausted(agent, reason: "FailoverReason | None") -> bool:
     return False
 
 
+def _normalize_fallback_model(model: str, provider: str) -> str:
+    """Return the wire-side model id used for route identity checks."""
+    try:
+        from hermes_cli.model_normalize import normalize_model_for_provider
+        return normalize_model_for_provider(model, provider)
+    except Exception as exc:
+        logger.warning("Could not normalize fallback model %r for provider %r: %s", model, provider, exc)
+        return model
+
+
 def _should_skip_fallback_candidate(agent, fb: dict, fb_key: tuple, fb_provider: str, fb_model: str, unavailable: set) -> bool:
     """True when the entry is unavailable, persistently cooling down, malformed, locally
     unusable, or resolves to the backend that just failed (which would loop the failure)."""
@@ -1745,8 +1755,10 @@ def _should_skip_fallback_candidate(agent, fb: dict, fb_key: tuple, fb_provider:
     explicit_base_url = str(fb.get("base_url") or "")
     if explicit_base_url:
         from agent.route_health import allow_route
+        # Preflight only: do not claim a half-open lease until provider resolution
+        # yields the final wire-side (provider, model, base_url) identity.
         allowed, retry_after, health_state = allow_route(
-            fb_provider, fb_model, explicit_base_url, claim_probe=True,
+            fb_provider, fb_model, explicit_base_url, claim_probe=False,
         )
         agent._candidate_route_health_state = health_state
         if not allowed:
@@ -1879,7 +1891,7 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             agent._unavailable_fallback_keys = set()
         unavailable = agent._unavailable_fallback_keys
         fb_provider = (fb.get("provider") or "").strip().lower()
-        fb_model = (fb.get("model") or "").strip()
+        fb_model = _normalize_fallback_model((fb.get("model") or "").strip(), fb_provider)
         if _should_skip_fallback_candidate(agent, fb, fb_key, fb_provider, fb_model, unavailable):
             continue
 
@@ -1903,27 +1915,24 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
                 logger.warning("Fallback to %s failed: provider not configured", fb_provider)
                 unavailable.add(fb_key)
                 continue
-            try:
-                from hermes_cli.model_normalize import normalize_model_for_provider
-                fb_model = normalize_model_for_provider(fb_model, fb_provider)
-            except Exception as _norm_err:
-                logger.warning("Could not normalize fallback model %r for provider %r: %s", fb_model, fb_provider, _norm_err)
-
+            fb_model = _normalize_fallback_model(
+                str(_resolved_fb_model or fb_model).strip(), fb_provider,
+            )
             fb_base_url = str(fb_client.base_url)
-            # Entries commonly omit base_url. Re-check with the resolved endpoint so persistent
-            # health recorded from a real failed request cannot be bypassed by an empty hint.
-            if not fb_base_url_hint:
-                from agent.route_health import allow_route
-                allowed, retry_after, resolved_health_state = allow_route(
-                    fb_provider, fb_model, fb_base_url, claim_probe=True,
+            # Re-check the final resolved route for every entry. Explicit base URLs were
+            # preflighted without claiming a half-open lease, so this is the single claim
+            # point and cannot self-block on the lease it just created.
+            from agent.route_health import allow_route
+            allowed, retry_after, resolved_health_state = allow_route(
+                fb_provider, fb_model, fb_base_url, claim_probe=True,
+            )
+            if not allowed:
+                logger.info(
+                    "Fallback skip after resolution: %s/%s circuit is %s (retry in ~%ss)",
+                    fb_provider, fb_model, resolved_health_state, retry_after,
                 )
-                if not allowed:
-                    logger.info(
-                        "Fallback skip after resolution: %s/%s circuit is %s (retry in ~%ss)",
-                        fb_provider, fb_model, resolved_health_state, retry_after,
-                    )
-                    continue
-                agent._candidate_route_health_state = resolved_health_state
+                continue
+            agent._candidate_route_health_state = resolved_health_state
             from hermes_cli.providers import is_actual_route
             if is_actual_route(fb_provider, fb_base_url):
                 fb_api_mode = "chat_completions"

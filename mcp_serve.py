@@ -2,9 +2,11 @@
 Hermes MCP Server — expose messaging conversations as MCP tools (`hermes mcp serve`).
 
 A stdio MCP server letting any MCP client (Claude Code, Cursor, Codex, ...) list
-conversations, read history, send messages, poll live events, and manage approvals.
-Matches OpenClaw's 9-tool channel bridge surface plus the Hermes-specific
-channels_list. Client config: {"mcpServers": {"hermes": {"command": "hermes", "args": ["mcp", "serve"]}}}
+conversations, read history, send messages, and poll live message events. The
+approval tool names are retained for bridge compatibility, but standalone
+`hermes mcp serve` cannot observe or resolve the gateway process's in-memory
+approval queue and reports that limitation explicitly.
+Client config: {"mcpServers": {"hermes": {"command": "hermes", "args": ["mcp", "serve"]}}}
 """
 
 from __future__ import annotations
@@ -22,6 +24,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 logger = logging.getLogger("hermes.mcp_serve")
+
+_APPROVAL_BRIDGE_UNAVAILABLE = (
+    "Live gateway approvals are not available from standalone 'hermes mcp serve': "
+    "the authoritative approval queue lives in the gateway process and has no cross-process "
+    "broker on this surface. Resolve the approval in the owning Hermes UI/gateway."
+)
 
 # mcp 2.0 removed `mcp.server.fastmcp`; `mcp.server.MCPServer` keeps the same
 # `@server.tool()` / `run_stdio_async()` surface (docstring -> description,
@@ -49,11 +57,23 @@ def _get_sessions_dir() -> Path:
     return _hermes_home() / "sessions"
 
 
-def _read_state_db_mtime() -> float:
+def _stat_fingerprint(path: Path):
+    """Filesystem identity + mutation metadata without opening a live SQLite file."""
     try:
-        return (_hermes_home() / "state.db").stat().st_mtime
-    except OSError:  # missing file included
-        return 0.0
+        stat = path.stat()
+    except OSError:
+        return None
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
+
+
+def _read_state_db_fingerprint():
+    """Track state.db mutations through both the main database and its WAL sidecar.
+
+    Hermes uses SQLite WAL by default, so committed messages can live only in
+    state.db-wal for minutes while the main database mtime remains unchanged.
+    """
+    db_path = _hermes_home() / "state.db"
+    return (_stat_fingerprint(db_path), _stat_fingerprint(Path(f"{db_path}-wal")))
 
 
 def _read_json(path: Path):
@@ -233,7 +253,7 @@ POLL_INTERVAL = 0.2  # seconds between DB polls (200ms)
 class QueueEvent:
     """An event in the bridge's in-memory queue."""
     cursor: int
-    type: str  # "message", "approval_requested", "approval_resolved"
+    type: str  # currently "message"
     session_key: str = ""
     data: dict = field(default_factory=dict)
 
@@ -274,8 +294,7 @@ class EventBridge:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._last_poll_timestamps: Dict[str, float] = {}  # session_key -> unix timestamp
-        self._pending_approvals: Dict[str, dict] = {}  # populated from events
-        self._state_db_mtime: float = 0.0  # skip polling work when state.db is unchanged
+        self._state_db_fingerprint = (None, None)  # main DB + WAL change gate
         self._cached_sessions_index: dict = {}
 
     def start(self):
@@ -325,21 +344,6 @@ class EventBridge:
             self._new_event.wait(timeout=min(remaining, POLL_INTERVAL))
         return None
 
-    def list_pending_approvals(self) -> List[dict]:
-        """List approval requests observed during this bridge session."""
-        with self._lock:
-            return sorted(self._pending_approvals.values(), key=lambda a: a.get("created_at", ""))
-
-    def respond_to_approval(self, approval_id: str, decision: str) -> dict:
-        """Resolve a pending approval (best-effort without gateway IPC)."""
-        with self._lock:
-            approval = self._pending_approvals.pop(approval_id, None)
-        if not approval:
-            return {"error": f"Approval not found: {approval_id}"}
-        self._enqueue(QueueEvent(0, "approval_resolved", approval.get("session_key", ""),  # cursor set by _enqueue
-                                 {"approval_id": approval_id, "decision": decision}))
-        return {"resolved": True, "approval_id": approval_id, "decision": decision}
-
     def _enqueue(self, event: QueueEvent) -> None:
         """Add an event to the queue (trimmed to QUEUE_LIMIT) and wake any waiters."""
         with self._lock:
@@ -351,14 +355,14 @@ class EventBridge:
         self._new_event.set()
 
     def _establish_baseline(self) -> None:
-        """Record per-session latest timestamps and the state.db mtime WITHOUT
+        """Record per-session latest timestamps and the state.db/WAL fingerprint WITHOUT
         emitting events. Only sessions existing now are baselined; later ones
         default to last_seen=0.0 in _poll_once, so their first message is delivered."""
         db = _get_session_db()
         if not db:
             return
         try:
-            self._state_db_mtime = _read_state_db_mtime()
+            self._state_db_fingerprint = _read_state_db_fingerprint()
             try:
                 self._cached_sessions_index = _load_sessions_index()
             except Exception:
@@ -395,17 +399,18 @@ class EventBridge:
     def _poll_once(self, db):
         """Check for new messages across all sessions.
 
-        One state.db mtime check gates all work, making 200ms polling nearly free.
-        The routing index lives in the same file as the messages, so a new
+        One main-DB + WAL filesystem fingerprint check gates all work, making 200ms polling
+        nearly free while still seeing commits that have not checkpointed into state.db.
+        The routing index lives in the same database as the messages, so a new
         conversation and its first message land under a single mtime change (no
         dual-file race that could drop brand-new conversations).
 
         See #8925, #9006.
         """
-        db_mtime = _read_state_db_mtime()
-        if db_mtime == self._state_db_mtime:
+        db_fingerprint = _read_state_db_fingerprint()
+        if db_fingerprint == self._state_db_fingerprint:
             return
-        self._state_db_mtime = db_mtime
+        self._state_db_fingerprint = db_fingerprint
         # Refresh the index on every change tick: one indexed query, never lags messages.
         self._cached_sessions_index = _load_sessions_index()
 
@@ -569,7 +574,7 @@ class _ToolHandlers:
         Returns events that have occurred since the given cursor. Use the
         returned next_cursor value for subsequent polls.
 
-        Event types: message, approval_requested, approval_resolved
+        Event types: message
 
         Args:
             after_cursor: Return events after this cursor (0 for all)
@@ -660,14 +665,19 @@ class _ToolHandlers:
         return json.dumps({"count": len(channels), "channels": channels}, indent=2)
 
     def permissions_list_open(self) -> str:
-        """List pending approval requests observed during this bridge session.
+        """Report whether live gateway approvals are available on this MCP bridge.
 
-        Returns exec and plugin approval requests that the bridge has seen
-        since it started. Approvals are live-session only — older approvals
-        from before the bridge connected are not included.
+        The standalone MCP server is a separate process from the Hermes gateway, whose
+        approval queue is intentionally process-local. Until a cross-process approval
+        broker exists, returning an empty list would falsely claim there are no pending
+        approvals, so this compatibility tool reports the limitation explicitly.
         """
-        approvals = self.bridge.list_pending_approvals()
-        return json.dumps({"count": len(approvals), "approvals": approvals}, indent=2)
+        return json.dumps({
+            "supported": False,
+            "count": 0,
+            "approvals": [],
+            "error": _APPROVAL_BRIDGE_UNAVAILABLE,
+        }, indent=2)
 
     def permissions_respond(self, id: str, decision: str) -> str:
         """Respond to a pending approval request.
@@ -678,7 +688,13 @@ class _ToolHandlers:
         """
         if decision not in {"allow-once", "allow-always", "deny"}:
             return json.dumps({"error": f"Invalid decision: {decision}. Must be allow-once, allow-always, or deny"})
-        return json.dumps(self.bridge.respond_to_approval(id, decision), indent=2)
+        return json.dumps({
+            "supported": False,
+            "resolved": False,
+            "approval_id": id,
+            "decision": decision,
+            "error": _APPROVAL_BRIDGE_UNAVAILABLE,
+        }, indent=2)
 
 
 # Registration order == list_tools order (wire format).

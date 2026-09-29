@@ -80,6 +80,111 @@ def test_cancel_is_scoped_idempotent_and_releases_worker(
         finished.wait(5)
 
 
+def test_start_flow_reserves_server_slot_before_listener_setup(tmp_path, monkeypatch):
+    """Duplicate starts cannot both pass the per-server/profile gate while listener setup blocks."""
+    monkeypatch.setattr(sessions, "_sessions", {})
+    listener_entered = threading.Event()
+    release_listener = threading.Event()
+    second_done = threading.Event()
+    listener_calls = []
+    outcomes = {}
+
+    class _Listener:
+        server_address = ("127.0.0.1", 49152)
+
+        def shutdown(self):
+            return None
+
+        def server_close(self):
+            return None
+
+    def listener(flow):
+        listener_calls.append(flow.flow_id)
+        listener_entered.set()
+        assert release_listener.wait(5)
+        return _Listener()
+
+    def worker(session_id, *_args):
+        flow = sessions._sessions[session_id]["flow"]
+        asyncio.run(flow.publish_authorization_url("https://idp.example/authorize?state=test"))
+        flow.mark_worker_done()
+
+    monkeypatch.setattr(sessions, "_start_loopback_listener", listener)
+    monkeypatch.setattr(sessions, "_worker", worker)
+    home = str(tmp_path / "owner")
+
+    def run(label):
+        try:
+            outcomes[label] = sessions.start_flow(home, "reports", {"url": "https://mcp.example"})
+        except Exception as exc:  # captured for cross-thread assertion
+            outcomes[label] = exc
+        finally:
+            if label == "second":
+                second_done.set()
+
+    first = threading.Thread(target=run, args=("first",), daemon=True)
+    second = threading.Thread(target=run, args=("second",), daemon=True)
+    try:
+        first.start()
+        assert listener_entered.wait(2)
+        second.start()
+        assert second_done.wait(2), "duplicate start reached listener setup instead of being rejected"
+        assert len(listener_calls) == 1
+        assert isinstance(outcomes["second"], RuntimeError)
+        assert "already in progress" in str(outcomes["second"])
+    finally:
+        release_listener.set()
+        first.join(5)
+        second.join(5)
+
+    assert isinstance(outcomes.get("first"), dict)
+    assert outcomes["first"]["session_id"]
+
+
+def test_start_flow_setup_failure_releases_reserved_slot(tmp_path, monkeypatch):
+    monkeypatch.setattr(sessions, "_sessions", {})
+    monkeypatch.setattr(
+        sessions,
+        "_start_loopback_listener",
+        lambda _flow: (_ for _ in ()).throw(OSError("bind failed")),
+    )
+    home = str(tmp_path / "owner")
+
+    with pytest.raises(OSError, match="bind failed"):
+        sessions.start_flow(home, "reports", {"url": "https://mcp.example"})
+
+    assert sessions._sessions == {}
+
+
+def test_worker_redacts_oauth_failure_before_exposing_flow_error(tmp_path, monkeypatch):
+    secret = "sk-proj-abcdefghijklmnopqrstuvwxyz0123456789"
+    home = str(tmp_path)
+    flow = DashboardOAuthFlow(
+        "redact", "reports", None, home, "http://127.0.0.1:49152/callback"
+    )
+    rec = {
+        "flow": flow,
+        "server_name": "reports",
+        "hermes_home": home,
+        "httpd": None,
+    }
+    monkeypatch.setattr(sessions, "_sessions", {"redact": rec})
+
+    def fail_probe(*_args, **_kwargs):
+        raise RuntimeError(
+            f"token exchange failed with Authorization: Bearer {secret}"
+        )
+
+    monkeypatch.setattr(sessions, "_probe_with_rollback", fail_probe)
+
+    sessions._worker("redact", home, "reports", {"url": "https://mcp.example"}, False)
+
+    error = flow.snapshot()["error"] or ""
+    assert secret not in error
+    assert "Bearer ***" in error
+    assert flow.worker_done is True
+
+
 @pytest.mark.parametrize("operation", ["poll", "callback", "cancel"])
 def test_session_operations_require_resolved_owner(tmp_path, monkeypatch, operation):
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override

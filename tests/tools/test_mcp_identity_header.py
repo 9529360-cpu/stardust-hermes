@@ -250,6 +250,39 @@ class TestHTTPIdentityHeader:
         headers = captured.get("headers") or {}
         assert headers.get("X-Hermes-Profile") == "workbot"
 
+    def test_strict_redirect_strips_identity_header_cross_origin(self):
+        """identity_header is config-derived and must obey the same strict redirect boundary."""
+        from types import SimpleNamespace
+
+        from tools.mcp_tool import MCPServerTask, sdk_httpx
+
+        server = MCPServerTask("remote")
+        captured = _drive_http(server, {
+            "url": "https://example.com/mcp",
+            "strict_redirect_headers": True,
+            "identity_header": {
+                "name": "X-User-Id",
+                "value": "alice",
+            },
+        })
+        hook = captured["event_hooks"]["response"][0]
+        httpx = sdk_httpx()
+        next_request = httpx.Request(
+            "GET",
+            "https://other.example.test/mcp",
+            headers={
+                "X-User-Id": "alice",
+                "MCP-Protocol-Version": "2025-11-25",
+            },
+        )
+        response = SimpleNamespace(is_redirect=True, next_request=next_request)
+
+        asyncio.run(hook(response))
+
+        assert "x-user-id" not in next_request.headers
+        # Auto-generated protocol plumbing is not a configured secret/identity header.
+        assert next_request.headers["mcp-protocol-version"] == "2025-11-25"
+
 
 # ---------------------------------------------------------------------------
 # stdio transport — identity_header is warn-and-ignore

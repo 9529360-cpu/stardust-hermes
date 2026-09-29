@@ -14,6 +14,7 @@ _HERMES_FOUNDATION_TOOLS = [
     "skills_list", "skill_view", "skill_manage",
     "todo_list", "memory",
     "session_search",
+    "assistant_tasks",
     "clarify",
     "execute_code", "delegate_task",
 ]
@@ -25,7 +26,7 @@ _HERMES_FOUNDATION_TOOLS = [
 _HERMES_DEFAULT_EDGE_TOOLS = [
     "image_generate",
     "browser_navigate", "browser_snapshot", "browser_click",
-    "browser_type", "browser_scroll", "browser_back",
+    "browser_type", "browser_interact", "browser_scroll", "browser_back",
     "browser_press", "browser_get_images",
     "browser_vision", "browser_console", "browser_cdp", "browser_dialog",
     "browser_vault_list", "browser_vault_unlock", "browser_vault_fill", "browser_vault_save_login", "browser_vault_enter_code",
@@ -141,6 +142,10 @@ TOOLSETS = {
     ),
     "tts": _ts("Text-to-speech: convert text to audio with Edge TTS (free), ElevenLabs, OpenAI, or xAI", ["text_to_speech"]),
     "todo": _ts("Task planning and tracking for multi-step work", ["todo_list"]),
+    "assistant_tasks": _ts(
+        "Durable personal-assistant task intake and status over the existing Kanban execution authority",
+        ["assistant_tasks"],
+    ),
     "memory": _ts("Persistent memory across sessions (personal notes + user profile)", ["memory"]),
     "context_engine": _ts("Runtime tools exposed by the active context engine"),
     "session_search": _ts("Search and recall past conversations with summarization", ["session_search"]),

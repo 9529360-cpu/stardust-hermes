@@ -159,7 +159,7 @@ def _print_curator_first_run_notice() -> None:
     )
     print("  Preview now:  hermes curator run --dry-run")
     print("  Pause it:     hermes curator pause")
-    print("  Docs:         https://hermes-agent.nousresearch.com/docs/user-guide/features/curator")
+    print("  Docs:         https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/features/curator.md")
 
 
 def _print_fts_optimize_available_notice() -> None:

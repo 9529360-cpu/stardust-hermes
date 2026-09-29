@@ -179,8 +179,9 @@ _LEGACY_TOOLSET_MAP = {
     "vision_tools": ["vision_analyze"],
     "image_tools": ["image_generate"],
     "skills_tools": ["skills_list", "skill_view", "skill_manage"],
-    "browser_tools": ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_scroll",
-                      "browser_back", "browser_press", "browser_get_images", "browser_vision", "browser_console"],
+    "browser_tools": ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_interact",
+                      "browser_scroll", "browser_back", "browser_press", "browser_get_images", "browser_vision",
+                      "browser_console"],
     "cronjob_tools": ["cronjob_manage"],
     "file_tools": ["read_file", "write_file", "patch", "search_files"],
     "tts_tools": ["text_to_speech"],
@@ -393,14 +394,13 @@ def _rewrite_browser_exec(td: Dict[str, Any], available: set) -> Optional[Dict[s
 def _rewrite_delegate_task(td: Dict[str, Any], available: set) -> Optional[Dict[str, Any]]:
     """Trim the child-restrictions line to sibling tools actually present, or drop
     the line when none apply, so the model never learns ghost vocabulary. Two
-    source variants exist (depth-off also names delegate_task itself); test the
-    longer one first because the sibling list is a substring of it."""
-    blocked_present = [t for t in ("clarify", "memory", "cronjob_manage") if t in available]
-    if len(blocked_present) == 3:
+    source variants exist (depth-off also names delegate_task itself)."""
+    blocked_present = [t for t in ("clarify", "memory") if t in available]
+    if len(blocked_present) == 2:
         return td
     fn = td.get("function", {})
     desc = fn.get("description", "")
-    for full, self_named in (("delegate_task, clarify, memory, or cronjob", True), ("clarify, memory, or cronjob", False)):
+    for full, self_named in (("delegate_task, clarify, or memory", True), ("clarify or memory", False)):
         if full in desc:
             break
     else:
@@ -410,12 +410,10 @@ def _rewrite_delegate_task(td: Dict[str, Any], available: set) -> Optional[Dict[
         replacement = " or ".join(names) if len(names) <= 2 else ", ".join(names[:-1]) + ", or " + names[-1]
         desc = desc.replace(full, replacement)
     else:
-        # Both variants end at the following newline.
         start = desc.find("- Children cannot call " + full)
         if start != -1:
             desc = desc[:start] + desc[desc.index("\n", start) + 1:]
     return {**td, "function": {**fn, "description": desc}}
-
 
 _VAULT_INPUT_TOOL_HINT = "the browser's input tool"
 
@@ -434,13 +432,15 @@ def _rewrite_browser_vault(td: Dict[str, Any], available: set) -> Optional[Dict[
 
 
 _VAULT_NO_PASSWORD_NOTE = (
-    " Vault note: a user request to sign in, fill credentials, or enter a verification code is authorization "
-    "to continue through the secure vault flow; do not stop merely because the next field is sensitive. On a "
-    "login/checkout form call browser_vault_list first, then browser_vault_fill, or browser_vault_save_login "
-    "when nothing is saved for the site (it opens a masked UI prompt and fills immediately). For a one-time / "
-    "2FA code call browser_vault_enter_code. Do not put plaintext passwords, card numbers, CVCs, or verification "
-    "codes in this tool's arguments or repeat them in chat. If the user pasted a secret in chat, do not echo or "
-    "copy it into this tool; route through the secure vault prompt instead."
+    " Vault note: a user request to sign in, create/register an account, fill credentials, or enter a verification "
+    "code is authorization to continue through the matching secure vault flow; do not stop merely because the next "
+    "field is sensitive. On a login/checkout form call browser_vault_list first, then browser_vault_fill, or "
+    "browser_vault_save_login when nothing is saved for the site. For an explicitly requested sign-up, call "
+    "browser_vault_save_login with generate_password=true and the non-secret identifier; Stardust generates, saves, "
+    "and fills the new password without showing it to the model. For a one-time / 2FA code call "
+    "browser_vault_enter_code. Do not put plaintext passwords, card numbers, CVCs, or verification codes in this "
+    "tool's arguments or repeat them in chat. If the user pasted a secret in chat, do not echo or copy it into this "
+    "tool; route through the secure vault flow instead."
 )
 
 

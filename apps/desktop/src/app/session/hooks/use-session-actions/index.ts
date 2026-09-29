@@ -25,7 +25,7 @@ import {
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { recoverInFlightTurnJournal } from '@/lib/inflight-turn-journal'
 import { setSessionYolo } from '@/lib/yolo-session'
-import { $clarifyRequests } from '@/store/clarify'
+import { $clarifyRequests, clearClarifyRequest } from '@/store/clarify'
 import { migrateSessionDraft } from '@/store/composer'
 import { clearQueuedPrompts, migrateQueuedPrompts } from '@/store/composer-queue'
 import { $connectionRequests } from '@/store/connection-request'
@@ -51,7 +51,7 @@ import {
   resolveNewChatOwnerRoute
 } from '@/store/profile'
 import { $projectScope, resolveNewSessionCwd } from '@/store/projects'
-import { receiveApprovalRequest } from '@/store/prompts'
+import { clearAllPrompts, receiveApprovalRequest } from '@/store/prompts'
 import { clearStoredTranscriptReadOnly, markStoredTranscriptReadOnly } from '@/store/read-only-transcript'
 import {
   $activeSessionStoredIdRotation,
@@ -2512,7 +2512,12 @@ export function useSessionActions({
       // delete lands in the same tick, which used to leave the doomed route in
       // place and let the generic 4001 recovery rebind it.
       const wasSelected = selectedStoredSessionIdRef.current === storedSessionId
-      const closingRuntimeId = wasSelected ? activeSessionIdRef.current : null
+      // A sidebar/background session can still own a live runtime. Deleting the
+      // durable row must terminate that runtime too, not only the selected one.
+      const closingRuntimeId =
+        (wasSelected ? activeSessionIdRef.current : null) ??
+        runtimeIdByStoredSessionIdRef.current.get(storedSessionId) ??
+        null
       const previousMessages = $messages.get()
       const previousPinned = $pinnedSessionIds.get()
 
@@ -2547,6 +2552,36 @@ export function useSessionActions({
 
       try {
         if (closingRuntimeId) {
+          // Deletion is a lifecycle boundary: stop the turn first so approval /
+          // clarify / secret waits cannot outlive the row that owned them.
+          let previousInterruptState: Pick<ClientSessionState, 'interrupted' | 'needsInput'> | null = null
+
+          updateSessionState(closingRuntimeId, state => {
+            previousInterruptState = { interrupted: state.interrupted, needsInput: state.needsInput }
+
+            return { ...state, interrupted: true, needsInput: false }
+          })
+
+          try {
+            await requestForSessionProfile(removedOwner, requestGateway, 'session.interrupt', {
+              session_id: closingRuntimeId
+            })
+          } catch (error) {
+            // A runtime already gone has nothing left to interrupt. Any other
+            // failure means deletion cannot safely claim the work was stopped.
+            if (!isSessionGoneError(error)) {
+              updateSessionState(closingRuntimeId, state =>
+                previousInterruptState ? { ...state, ...previousInterruptState } : state
+              )
+              throw error
+            }
+          }
+
+          // Catch a request already queued on the transport before the local
+          // interrupted flag became visible.
+          clearAllPrompts(closingRuntimeId)
+          clearClarifyRequest(undefined, closingRuntimeId)
+
           await requestForSessionProfile(removedOwner, requestGateway, 'session.close', {
             session_id: closingRuntimeId
           }).catch(() => undefined)
@@ -2622,7 +2657,8 @@ export function useSessionActions({
       runtimeIdByStoredSessionIdRef,
       selectedStoredSessionIdRef,
       sessionStateByRuntimeIdRef,
-      startFreshSessionDraft
+      startFreshSessionDraft,
+      updateSessionState
     ]
   )
 

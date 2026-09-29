@@ -16,6 +16,7 @@ def summarize_server(name: str, cfg: dict) -> Dict[str, Any]:
     tell an OAuth server that still needs authentication from one already authenticated.
     """
     from hermes_cli.mcp_config import _oauth_tokens_present
+    from hermes_cli.mcp_security import redact_mcp_url_userinfo
 
     cfg = cfg if isinstance(cfg, dict) else {}
     transport = "http" if cfg.get("url") else ("stdio" if cfg.get("command") else "unknown")
@@ -26,7 +27,7 @@ def summarize_server(name: str, cfg: dict) -> Dict[str, Any]:
     return {
         "name": name,
         "transport": transport,
-        "url": cfg.get("url"),
+        "url": redact_mcp_url_userinfo(cfg.get("url")),
         "command": cfg.get("command"),
         "args": list(cfg.get("args") or []),
         "env": sorted(str(k) for k in (cfg.get("env") or {})),

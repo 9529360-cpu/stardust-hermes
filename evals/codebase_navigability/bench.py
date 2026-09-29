@@ -106,7 +106,7 @@ def test_imports(tree: Path, mods: dict[str, Path]) -> list[tuple[str, str, str]
 
 
 def resolve_definer(mods, name, start_mod, cache, depth=0):
-    """Follow re-exports (from X import name / lazy tables) to the module whose top level DEFINES name."""
+    """Follow top-level re-exports (from X import name) to the module whose top level DEFINES name."""
     if depth > 6 or start_mod not in mods:
         return None
     if start_mod not in cache:
@@ -125,7 +125,7 @@ def _is_alias(node) -> bool:
 
 
 def _reexports(src: str) -> dict[str, tuple[str, str]]:
-    """name -> (module, original) for top-level `from m import orig as name`, plus PLUGIN-COMPAT lazy tables."""
+    """name -> (module, original) for top-level `from m import orig as name`."""
     out = {}
     try:
         t = ast.parse(src)
@@ -135,12 +135,6 @@ def _reexports(src: str) -> dict[str, tuple[str, str]]:
         if isinstance(n, ast.ImportFrom) and n.module and n.level == 0:
             for a in n.names:
                 out[a.asname or a.name] = (n.module, a.name)
-        elif isinstance(n, ast.Assign) and any(isinstance(x, ast.Name) and x.id == "_PLUGIN_COMPAT_LAZY" for x in n.targets) and isinstance(n.value, ast.Dict):
-            for k, v in zip(n.value.keys, n.value.values):
-                try:
-                    out[ast.literal_eval(k)] = tuple(ast.literal_eval(v))
-                except Exception:
-                    pass
     return out
 
 

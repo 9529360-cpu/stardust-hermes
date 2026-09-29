@@ -105,6 +105,23 @@ class TestCacheMcpImageBlock:
         )
         assert _cache_mcp_image_block(block) == ""
 
+    def test_oversized_image_rejected_before_base64_decode(self, monkeypatch):
+        import tools.mcp_tool_content as content
+
+        class OversizedB64(str):
+            def __len__(self):
+                return content._MCP_RESOURCE_MAX_B64_CHARS + 1
+
+        def should_not_decode(_data):
+            raise AssertionError("oversized image reached base64 decode")
+
+        monkeypatch.setattr(content.base64, "b64decode", should_not_decode)
+        block = SimpleNamespace(data=OversizedB64("AAAA"), mimeType="image/png")
+
+        out = content._cache_mcp_image_block(block)
+
+        assert "image resource too large to cache" in out
+
     def test_handles_jpeg(self, tmp_path, monkeypatch):
         """JPEG signature should also be accepted."""
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))

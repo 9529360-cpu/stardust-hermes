@@ -708,7 +708,10 @@ class Task:
     # done / budget exhausted (-> kanban_block); ``goal_max_turns`` None -> goals default.
     goal_mode: bool = False
     goal_max_turns: Optional[int] = None
-    session_id: Optional[str] = None         # originating HERMES_SESSION_ID; NULL from CLI/dashboard
+    session_id: Optional[str] = None         # provenance only: originating HERMES_SESSION_ID
+    # Stable personal-assistant owner. Unlike session_id this survives chat deletion and
+    # lets a later conversation recover the user's durable task handles.
+    assistant_owner_key: Optional[str] = None
     # VALID_BLOCK_KINDS or None (legacy); kept across unblock so a same-kind re-block reads as a loop.
     block_kind: Optional[str] = None
     block_recurrences: int = 0               # unblock-loop counter, see BLOCK_RECURRENCE_LIMIT
@@ -742,7 +745,7 @@ _TASK_REQUIRED_COLUMNS = (
 _TASK_OPTIONAL_COLUMNS = (
     "branch_name", "project_id", "tenant", "result", "idempotency_key", "worker_pid",
     "max_runtime_seconds", "last_heartbeat_at", "current_run_id", "workflow_template_id",
-    "current_step_key", "max_retries", "session_id", "completion_contract",
+    "current_step_key", "max_retries", "session_id", "assistant_owner_key", "completion_contract",
 )
 # Text columns where "" is stored/read as "not set".
 _TASK_EMPTY_IS_NULL_COLUMNS = (
@@ -931,6 +934,10 @@ CREATE TABLE IF NOT EXISTS tasks (
     -- set the env var. Indexed so per-session list queries stay cheap on
     -- larger boards.
     session_id           TEXT,
+    -- Stable owner for personal-assistant task handles. This is deliberately
+    -- independent from session_id: deleting the originating chat must not orphan
+    -- durable work, while multi-user messaging installs still need isolation.
+    assistant_owner_key  TEXT,
     -- Typed block reason set by ``block_task`` (one of VALID_BLOCK_KINDS, or
     -- NULL for legacy/un-typed blocks). Drives routing: ``dependency`` never
     -- sits in ``blocked`` (goes to ``todo`` for parent-gating); the others go
@@ -1230,7 +1237,8 @@ def create_task(
     max_retries: Optional[int] = None, model_override: Optional[str] = None,
     provider_override: Optional[str] = None, reasoning_effort: Optional[str] = None,
     goal_mode: bool = False, goal_max_turns: Optional[int] = None, initial_status: str = "running",
-    session_id: Optional[str] = None, board: Optional[str] = None, project_id: Optional[str] = None,
+    session_id: Optional[str] = None, assistant_owner_key: Optional[str] = None,
+    board: Optional[str] = None, project_id: Optional[str] = None,
     project_source_task_id: Optional[str] = None,
     creator_task_id: Optional[str] = None,
     completion_contract: Optional[str] = None,
@@ -1243,8 +1251,9 @@ def create_task(
     instead of a duplicate. ``max_runtime_seconds``: cap before the dispatcher
     SIGTERMs and re-queues. ``model_override``/``provider_override`` pin the
     worker model (provider requires model); ``reasoning_effort`` is independent.
-    ``creator_task_id``: inherit durable session/subscriptions independently of
-    dependency edges; an explicit ``session_id`` still wins.
+    ``creator_task_id``: inherit durable session, assistant owner, and subscriptions
+    independently of dependency edges; explicit ``session_id`` / ``assistant_owner_key``
+    still win.
     ``project_source_task_id``: cross-profile fallback when ``project_id`` is not
     in the active profile's projects.db — see ``_resolve_project_link``.
     ``workspace_kind=None`` (omitted) inherits a project-scoped board's project;
@@ -1333,8 +1342,8 @@ def create_task(
                         max_runtime_seconds,
                         skills, max_retries, model_override, provider_override,
                         reasoning_effort,
-                        goal_mode, goal_max_turns, session_id, completion_contract
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        goal_mode, goal_max_turns, session_id, assistant_owner_key, completion_contract
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         task_id, title.strip(), body, assignee, task_status, priority,
@@ -1343,7 +1352,9 @@ def create_task(
                         _opt_int(max_runtime_seconds),
                         json.dumps(skills_list) if skills_list is not None else None,
                         _opt_int(max_retries), model_override, provider_override, reasoning_effort,
-                        1 if goal_mode else 0, _opt_int(goal_max_turns), session_id, completion_contract,
+                        1 if goal_mode else 0, _opt_int(goal_max_turns), session_id,
+                        (str(assistant_owner_key).strip() or None) if assistant_owner_key is not None else None,
+                        completion_contract,
                     ),
                 )
                 for pid in parents:
@@ -1481,12 +1492,14 @@ VALID_SORT_ORDERS: dict[str, str] = {
     "assignee": "assignee ASC, created_at ASC",
     "title": "title ASC, id ASC",
     "updated": "started_at DESC NULLS LAST, created_at DESC",
+    "activity": "COALESCE(completed_at, started_at, created_at) DESC, created_at DESC, id DESC",
 }
 
 
 def list_tasks(
     conn: sqlite3.Connection, *, assignee: Optional[str] = None, status: Optional[str] = None,
-    tenant: Optional[str] = None, session_id: Optional[str] = None, include_archived: bool = False,
+    tenant: Optional[str] = None, session_id: Optional[str] = None,
+    assistant_owner_key: Optional[str] = None, include_archived: bool = False,
     limit: Optional[int] = None, order_by: Optional[str] = None,
     workflow_template_id: Optional[str] = None, current_step_key: Optional[str] = None,
 ) -> list[Task]:
@@ -1496,7 +1509,8 @@ def list_tasks(
     params: list[Any] = []
     for col, val in (
         ("assignee", _canonical_assignee(assignee)), ("status", status), ("tenant", tenant),
-        ("session_id", session_id), ("workflow_template_id", workflow_template_id),
+        ("session_id", session_id), ("assistant_owner_key", assistant_owner_key),
+        ("workflow_template_id", workflow_template_id),
         ("current_step_key", current_step_key),
     ):
         if val is not None:
@@ -1725,6 +1739,31 @@ def add_comment(conn: sqlite3.Connection, task_id: str, author: str, body: str) 
         )
         _append_event(conn, task_id, "commented", {"author": author, "len": len(body)})
         return int(cur.lastrowid or 0)
+
+
+def add_assistant_user_input(
+    conn: sqlite3.Connection, task_id: str, body: str,
+) -> int:
+    """Persist one current-user response with verifiable Kanban provenance.
+
+    The text stays in the normal comment thread; a separate event stores only
+    its comment id. Worker-context rendering trusts the event marker, never an
+    author string that a worker/profile could forge.
+    """
+    with write_txn(conn):
+        comment_id = add_comment(
+            conn,
+            task_id,
+            "user-via-assistant",
+            body,
+        )
+        _append_event(
+            conn,
+            task_id,
+            "assistant_user_input",
+            {"comment_id": comment_id},
+        )
+        return comment_id
 
 
 def _require_task(conn: sqlite3.Connection, task_id: str) -> None:
@@ -3728,7 +3767,12 @@ def build_worker_context(conn: sqlite3.Connection, task_id: str) -> str:
     _ctx_prior_attempts(lines, conn, task_id, now)
     _ctx_parent_results(lines, conn, task_id, now)
     _ctx_role_history(lines, conn, task, now)
-    _ctx_comments(lines, list_comments(conn, task_id), now)
+    _ctx_comments(
+        lines,
+        list_comments(conn, task_id),
+        now,
+        verified_user_input_ids=_assistant_user_input_comment_ids(conn, task_id),
+    )
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -3774,6 +3818,11 @@ def _ctx_header(lines: list[str], task: Task) -> None:
     lines.append("")
     lines.append(f"Assignee: {task.assignee or '(unassigned)'}")
     lines.append(f"Status:   {task.status}")
+    if task.assistant_owner_key:
+        lines.append(
+            "Scope: personal-assistant durable work; the task body is the delegated scope, "
+            "not permission to expand beyond it."
+        )
     if task.tenant:
         lines.append(f"Tenant:   {task.tenant}")
     lines.append(f"Workspace: {task.workspace_kind} @ {task.workspace_path or '(unresolved)'}")
@@ -3902,24 +3951,59 @@ def _ctx_role_history(lines: list[str], conn: sqlite3.Connection, task: Task, no
     lines.append("")
 
 
-def _ctx_comments(lines: list[str], comments: list[Comment], now: int) -> None:
-    """Newest ``_CTX_MAX_COMMENTS`` comments. The explicit "comment from
-    worker" framing stops an operator-controlled HERMES_PROFILE like
-    "hermes-system" being read as a system directive above an
-    attacker-influenceable body (defense-in-depth)."""
+def _assistant_user_input_comment_ids(
+    conn: sqlite3.Connection, task_id: str,
+) -> set[int]:
+    """Comment ids proven to originate from assistant_tasks' current-user relay."""
+    ids: set[int] = set()
+    rows = conn.execute(
+        "SELECT payload FROM task_events "
+        "WHERE task_id = ? AND kind = 'assistant_user_input' ORDER BY id ASC",
+        (task_id,),
+    ).fetchall()
+    for row in rows:
+        payload = _json_dict(_row_get(row, "payload"))
+        try:
+            comment_id = int(payload.get("comment_id"))
+        except (TypeError, ValueError):
+            continue
+        if comment_id > 0:
+            ids.add(comment_id)
+    return ids
+
+
+def _ctx_comments(
+    lines: list[str],
+    comments: list[Comment],
+    now: int,
+    *,
+    verified_user_input_ids: Optional[set[int]] = None,
+) -> None:
+    """Render newest comments without trusting caller-controlled author names.
+
+    Ordinary comments retain the explicit "comment from worker" framing.
+    Only comment ids backed by an ``assistant_user_input`` event are rendered
+    as current-user input; the author string alone never grants that trust.
+    """
     shown, omitted_note = _ctx_tail(comments, _CTX_MAX_COMMENTS, "comment")
     if not shown:
         return
     lines.append("## Comment thread")
     if omitted_note:
         lines.append(omitted_note)
+    trusted = verified_user_input_ids or set()
     for c in shown:
-        # Render author with explicit "comment from worker" framing so operator-controlled HERMES_PROFILE
-        # values like "hermes-system" or "operator" can't be misread by the next worker as a system
-        # directive above the (attacker-influenceable) comment body. Defense-in-depth — the LLM-controlled
-        # author-forgery surface was already closed in #22435. See #22452.
-        safe_author = (c.author or "").replace("`", "")
-        lines.append(f"comment from worker `{safe_author}` at {_ctx_stamp(c.created_at, now)}:")
+        if c.id in trusted:
+            lines.append(
+                "verified current-user input relayed by Stardust "
+                f"at {_ctx_stamp(c.created_at, now)}:"
+            )
+        else:
+            # Render author with explicit "comment from worker" framing so
+            # operator-controlled HERMES_PROFILE values like "hermes-system"
+            # or "user-via-assistant" cannot manufacture trusted provenance.
+            safe_author = (c.author or "").replace("`", "")
+            lines.append(f"comment from worker `{safe_author}` at {_ctx_stamp(c.created_at, now)}:")
         lines.append(_ctx_cap(c.body, _CTX_MAX_COMMENT_BYTES))
         lines.append("")
 

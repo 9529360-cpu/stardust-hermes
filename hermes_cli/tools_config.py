@@ -65,6 +65,7 @@ CONFIGURABLE_TOOLSETS = [
     ("skills",          "📚 Skills",                    "list, view, manage"),
     ("todo",            "📋 Task Planning",             "todo_list"),
     ("kanban",          "📌 Kanban",                    "opt-in task board tools for this platform"),
+    ("assistant_tasks", "🧭 Durable Assistant Tasks",        "cross-conversation task intake, status, cancel, and resume"),
     ("memory",          "💾 Memory",                    "persistent memory across sessions"),
     ("context_engine",  "🧩 Context Engine",            "runtime tools from the active context engine"),
     ("session_search",  "🔎 Session Search",            "search past conversations"),
@@ -432,7 +433,7 @@ def enabled_mcp_server_names(config: dict) -> Set[str]:
 #: toolset on a checklist, an unchecking user's config is byte-identical to one saved before it existed and this
 #: rule would turn the opt-out back on (stuck checkbox). ``check_fn``-gated toolsets cost nothing here; never
 #: probe a remote service from this path — it runs on every CLI start, gateway session and cron tick.
-_RECENTLY_SHIPPED_TOOLSETS: frozenset = frozenset()
+_RECENTLY_SHIPPED_TOOLSETS: frozenset = frozenset({"assistant_tasks"})
 
 
 def _enable_recently_shipped_toolsets(enabled_toolsets: Set[str], config: dict, platform: str) -> None:
@@ -1029,7 +1030,7 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     print(color("☤ Hermes Tool Configuration", Colors.CYAN, Colors.BOLD))
     print(color("  Enable or disable tools per platform.", Colors.DIM))
     print(color("  Tools that need API keys will be configured when enabled.", Colors.DIM))
-    print(color("  Guide: https://hermes-agent.nousresearch.com/docs/user-guide/features/tools", Colors.DIM))
+    print(color("  Guide: https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/features/tools.md", Colors.DIM))
     print()
     if first_install:
         _first_install_flow(config, enabled_platforms)

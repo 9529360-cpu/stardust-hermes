@@ -24,16 +24,37 @@ def _cache_path() -> Path:
     return get_hermes_home() / "cache" / _CACHE_FILENAME
 
 
+def _filter_fingerprint(value: Any) -> dict:
+    """Canonicalize include/exclude with the same string-vs-list semantics as registration.
+
+    The mode is intentional: an absent include means "all tools", while an explicit
+    empty include list means "no tools". Flattening both to [] would let lazy startup
+    reuse a cache entry with a different tool exposure policy.
+    """
+    if isinstance(value, str):
+        return {"mode": "set", "patterns": [value]}
+    if isinstance(value, (list, tuple, set)):
+        return {"mode": "set", "patterns": sorted(str(item) for item in value)}
+    return {"mode": "unset", "patterns": []}
+
+
 def config_fingerprint(config: dict) -> str:
     """Stable hash of the connection-defining parts of an MCP server config."""
     tools_filter = config.get("tools") or {}
     payload = {
         "command": config.get("command"),
         "args": config.get("args") or [],
+        "cwd": config.get("cwd"),
         "url": config.get("url"),
         "transport": config.get("transport"),
-        "tools_include": sorted(tools_filter.get("include") or []),
-        "tools_exclude": sorted(tools_filter.get("exclude") or [])}
+        "tools_include": _filter_fingerprint(tools_filter.get("include")),
+        "tools_exclude": _filter_fingerprint(tools_filter.get("exclude")),
+        # Utility tools are materialized into the cache too. These flags must
+        # participate or a later lazy start can resurrect resources/prompts
+        # that the user disabled after the cache was written.
+        "tools_resources": tools_filter.get("resources"),
+        "tools_prompts": tools_filter.get("prompts"),
+    }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 

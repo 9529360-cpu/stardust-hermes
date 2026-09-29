@@ -1,7 +1,11 @@
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 
-import { readUseRealProfile } from '@/app/settings/browser-real-profile-panel'
+import {
+  readUseRealProfile,
+  rollbackUseRealProfileIfCurrent,
+  withUseRealProfile
+} from '@/app/settings/browser-real-profile-panel'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -67,15 +71,10 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
       return
     }
 
-    const browser =
-      config.browser && typeof config.browser === 'object' && !Array.isArray(config.browser)
-        ? (config.browser as Record<string, unknown>)
-        : {}
-
-    const next = { ...config, browser: { ...browser, use_real_profile: true } }
+    const previousEnabled = enabled
 
     setBusy(true)
-    setConfig(next)
+    setConfig(current => (current ? withUseRealProfile(current, true) : current))
 
     try {
       // Sparse patch: PUT /api/config deep-merges, and echoing the cached
@@ -83,12 +82,14 @@ export function RealProfileConsentDialog({ tabId }: RealProfileConsentDialogProp
       await saveHermesConfigRecord({ browser: { use_real_profile: true } })
       notify({ kind: 'info', title: copy.enabledTitle, message: copy.enabledMessage })
     } catch (err) {
-      setConfig(config)
+      setConfig(current =>
+        rollbackUseRealProfileIfCurrent(current, true, previousEnabled)
+      )
       notifyError(err, copy.failedSave)
     } finally {
       setBusy(false)
     }
-  }, [busy, config, copy, setConfig])
+  }, [busy, config, copy, enabled, setConfig])
 
   // Config not loaded yet, feature already on, opted out, or another pane
   // owns the prompt — render nothing. `enabled` flipping true after a

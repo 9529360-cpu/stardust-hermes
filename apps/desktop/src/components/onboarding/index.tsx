@@ -116,7 +116,7 @@ const API_KEY_OPTIONS: ApiKeyOption[] = [
     id: 'local',
     name: 'Local / custom endpoint',
     envKey: 'OPENAI_BASE_URL',
-    docsUrl: 'https://github.com/NousResearch/hermes-agent#bring-your-own-endpoint',
+    docsUrl: 'https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/guides/local-ollama-setup.md',
     placeholder: 'http://127.0.0.1:8000/v1'
   }
 ]

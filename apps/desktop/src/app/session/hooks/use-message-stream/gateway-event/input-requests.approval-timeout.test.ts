@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { $connectionRequests } from '@/store/connection-request'
 import { $notifications, clearNotifications } from '@/store/notifications'
 import { $approvalRequests, clearApprovalRequest, setApprovalRequest } from '@/store/prompts'
 import { $routeRequest } from '@/store/recovery-requests'
@@ -75,3 +76,41 @@ describe('approval request.cancel', () => {
     expect($notifications.get()).toHaveLength(0)
   })
 })
+
+describe('connection request after session interruption', () => {
+  afterEach(() => {
+    $connectionRequests.set({})
+  })
+
+  it('does not park a connection card for a stopped session', () => {
+    const payload = {
+      deadline_at: 1_800_000_000,
+      op_id: 'op-1',
+      targets: [{ action: 'install', kind: 'mcp', name: 'linear', state: 'pending' }],
+      tool_call_id: 'call-1'
+    }
+    const updateSessionState = vi.fn()
+    const upsertToolCall = vi.fn()
+    const ctx = {
+      deps: {
+        sessionInterrupted: () => true,
+        updateSessionState,
+        upsertToolCall
+      } as unknown as GatewayEventContext['deps'],
+      event: { payload, session_id: 's1', type: 'connection.request' },
+      explicitSid: 's1',
+      fromActiveSource: () => true,
+      isActiveEvent: true,
+      occurredAt: 1_700_000_000,
+      payload,
+      scheduleConfigRefresh: vi.fn(),
+      sessionId: 's1'
+    } as unknown as GatewayEventContext
+
+    expect(handleInputRequestEvent(ctx)).toBe(true)
+    expect($connectionRequests.get()['s1']).toBeUndefined()
+    expect(updateSessionState).not.toHaveBeenCalled()
+    expect(upsertToolCall).not.toHaveBeenCalled()
+  })
+})
+

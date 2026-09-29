@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
 import {
+  appliedPrimaryWindowRoute,
   normalizeWindowConnectionRoute,
   registrySshPoolScopeByConnectionId,
   registrySshScopeForWindowRoute,
@@ -138,3 +139,44 @@ test('does not match another connection, an unlabelled entry, or a torn-down tun
   assert.equal(registrySshPoolScopeByConnectionId(pool, 'source-b'), null)
   assert.equal(registrySshPoolScopeByConnectionId(pool, 'source-c'), null)
 })
+
+test('a local primary apply clears the stale registry route but preserves the viewed profile', () => {
+  const registry = {
+    primary: 'local',
+    connections: [
+      { id: 'local', kind: 'local' },
+      { id: 'macmini', kind: 'remote' }
+    ]
+  } as never
+
+  assert.deepEqual(appliedPrimaryWindowRoute(registry, 'work'), {
+    connectionId: null,
+    profile: 'work',
+    registryScoped: false
+  })
+})
+
+test('a remote primary apply pins the window to the new registry source', () => {
+  const registry = {
+    primary: 'macmini',
+    connections: [
+      { id: 'local', kind: 'local' },
+      { id: 'macmini', kind: 'remote' }
+    ]
+  } as never
+
+  assert.deepEqual(appliedPrimaryWindowRoute(registry, 'research'), {
+    connectionId: 'macmini',
+    profile: 'research',
+    registryScoped: true
+  })
+})
+
+test('an applied primary route uses the canonical profile when none is available', () => {
+  assert.deepEqual(appliedPrimaryWindowRoute({ primary: 'local', connections: [] } as never, undefined), {
+    connectionId: null,
+    profile: 'default',
+    registryScoped: false
+  })
+})
+

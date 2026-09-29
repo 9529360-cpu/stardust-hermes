@@ -17,9 +17,13 @@ _NEXT_DENY_PREFIXES = ("/login", "/auth/", "/api/auth/")
 
 
 def client_ip(request: Request) -> str:
-    """First ``X-Forwarded-For`` hop, else the peer address."""
-    fwd = request.headers.get("x-forwarded-for", "")
-    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "")
+    """Validated client address from the ASGI server.
+
+    Uvicorn rewrites ``request.client`` from forwarding headers only when the immediate peer is in
+    its bounded ``forwarded_allow_ips`` set. Reading ``X-Forwarded-For`` here would bypass that
+    trust boundary and let direct clients spoof rate-limit/audit identities.
+    """
+    return request.client.host if request.client else ""
 
 
 def extract_bearer(request: Request) -> str:

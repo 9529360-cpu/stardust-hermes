@@ -648,6 +648,34 @@ Type text into an input field. Clears the field first, then types the new text.
 Type "hermes agent" into the search field @e3
 ```
 
+### `browser_interact`
+
+Handle the form and dynamic-page operations that sit between simple click/type calls and raw CDP.
+It keeps these operations on the **same active browser session**:
+
+- `hover` — open hover menus or reveal hover-only controls
+- `select` — choose one or more dropdown values / visible labels
+- `check` / `uncheck` — set checkbox or radio-style controls
+- `drag` — drag one referenced element onto another
+- `scroll_into_view` — bring a referenced element into the viewport
+- `wait_element`, `wait_text`, `wait_url`, `wait_load` — wait for the condition that proves a page-changing action finished. `wait_url` uses a literal URL substring (for example `/dashboard`), not a glob.
+
+Use snapshot refs such as `@e5` for element actions. For a visible `wait_element`, either a
+snapshot ref or CSS selector works. Hidden-element waits require a CSS selector on the pinned browser
+driver; Stardust implements that state through an internally escaped condition because the current
+`^0.26.0` CLI does not support `wait <selector> --state hidden`. Prefer `wait_text`, `wait_url`,
+or a specific element over repeatedly taking snapshots.
+Use `networkidle` only for pages that are known to become quiet; long-lived WebSockets, SSE, or
+polling can keep it pending forever.
+
+`browser_interact` is intentionally unavailable when the active built-in backend cannot preserve
+these actions in the same session (currently Camofox REST and built-in Lightpanda). Browser Use mode
+already exposes the equivalent richer interaction primitives through `browser_exec`.
+
+File upload/download is **not** part of this tool. Browser file transfer crosses a separate
+artifact-security boundary so an agent cannot turn a generic interaction call into arbitrary host-file
+access.
+
 ### `browser_scroll`
 
 Scroll the page up or down to reveal more content.
