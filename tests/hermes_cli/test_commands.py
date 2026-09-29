@@ -86,6 +86,21 @@ class TestCommandRegistry:
 # resolve_command tests
 # ---------------------------------------------------------------------------
 
+class TestResolveCommandAliases:
+    def test_q_resolves_to_queue(self):
+        cmd = resolve_command("q")
+        assert cmd is not None and cmd.name == "queue"
+
+    def test_s_resolves_to_steer(self):
+        cmd = resolve_command("s")
+        assert cmd is not None and cmd.name == "steer"
+        assert "s" in GATEWAY_KNOWN_COMMANDS
+
+    def test_exact_names_still_win_over_one_letter_alias(self):
+        assert resolve_command("sessions").name == "sessions"
+        assert resolve_command("steer").name == "steer"
+
+
 class TestResolveCommand:
 
 
@@ -117,6 +132,7 @@ class TestDerivedDicts:
         assert "/bg" in COMMANDS
         assert "/reset" in COMMANDS
         assert "/q" in COMMANDS
+        assert "/s" in COMMANDS
         assert "/exit" in COMMANDS
         assert "/reload_mcp" in COMMANDS
         assert "/gateway" in COMMANDS
