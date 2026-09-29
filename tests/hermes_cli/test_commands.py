@@ -86,7 +86,6 @@ class TestCommandRegistry:
 # resolve_command tests
 # ---------------------------------------------------------------------------
 
-
 class TestResolveCommandAliases:
     def test_q_resolves_to_queue(self):
         cmd = resolve_command("q")

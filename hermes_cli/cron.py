@@ -575,7 +575,8 @@ _JOB_ARG_FIELDS = (("name", "name"), ("deliver", "deliver"), ("failure_deliver",
                    ("repeat", "repeat"), ("script", "script"), ("workdir", "workdir"),
                    ("model", "model"), ("provider", "model_provider"),
                    ("monitor_script", "monitor_script"), ("monitor_url", "monitor_url"),
-                   ("continuity", "continuity"), ("reasoning_effort", "reasoning_effort"))
+                   ("continuity", "continuity"), ("reasoning_effort", "reasoning_effort"),
+                   ("approval_mode", "approval_mode"))
 
 
 def _job_api_kwargs(args) -> Dict[str, Any]:
@@ -589,6 +590,7 @@ _JOB_DETAIL_LINES = (
     ("monitor_url", "  Monitor: {} (agent runs only on output change)"),
     ("no_agent", "  Mode: no-agent (script stdout delivered directly)"),
     ("continuity", "  Continuity: on (each run sees the previous run's output)"),
+    ("approval_mode", "  Approval: {}"),
     ("workdir", "  Workdir: {}"))
 
 
@@ -607,6 +609,7 @@ def cron_create(args):
         skill=getattr(args, "skill", None),
         skills=_normalize_skills(getattr(args, "skill", None), getattr(args, "skills", None)),
         no_agent=getattr(args, "no_agent", False) or None,
+        approval_mode_confirmed=getattr(args, "approval_mode", None) is not None,
         **({"paused": args.paused, "paused_reason": getattr(args, "paused_reason", None)}
            if getattr(args, "paused", False) or getattr(args, "paused_reason", None) is not None else {}),
         **_job_api_kwargs(args))
@@ -654,7 +657,9 @@ def cron_edit(args):
     result = _cron_api(action="update", job_id=args.job_id,
                        schedule=getattr(args, "schedule", None),
                        prompt=getattr(args, "prompt", None), skills=final_skills,
-                       no_agent=getattr(args, "no_agent", None), **_job_api_kwargs(args))
+                       no_agent=getattr(args, "no_agent", None),
+                       approval_mode_confirmed=getattr(args, "approval_mode", None) is not None,
+                       **_job_api_kwargs(args))
     if not result.get("success"):
         print(color(f"Failed to update job: {result.get('error', 'unknown error')}", Colors.RED))
         return 1
