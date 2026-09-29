@@ -87,6 +87,26 @@ sandboxes
 where the limit cannot be changed, startup continues without changing the
 limit.
 
+## Attachment Storage
+
+Desktop/TUI file uploads stage under the owning profile home by default:
+
+```yaml
+attachments:
+  storage: hermes-home
+```
+
+Set `attachments.storage: workspace` when a workspace-restricted agent should
+receive uploaded files inside `<workspace>/.hermes/attachments`. The resulting
+`@file:` reference stays workspace-relative instead of pointing outside the
+allowed root. The setting is resolved per profile, so profiles served by one
+multiplexed gateway can choose independently.
+
+SSH sessions always fall back to `hermes-home`: their working directory belongs
+to another host, so the gateway must not treat a same-looking local path as the
+remote workspace. The default also preserves existing container/remote staging
+and sync behavior.
+
 ## Database Settings
 
 The `database:` section controls how Hermes opens its SQLite state database
