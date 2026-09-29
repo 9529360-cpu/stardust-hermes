@@ -153,8 +153,10 @@ class TestSlashCommands:
         self, adapter, runner, platform
     ):
         """Alias targets with args must reach the built-in command handler."""
+        # Keep the fixture key outside the built-in registry: built-ins and
+        # their aliases intentionally take precedence over user quick commands.
         runner.config.quick_commands = {
-            "s": {"type": "alias", "target": "/status extra-arg"}
+            "x": {"type": "alias", "target": "/status extra-arg"}
         }
         async def _handle_status(event):
             assert event.get_command_args() == "extra-arg"
@@ -162,7 +164,7 @@ class TestSlashCommands:
 
         runner._handle_status_command = AsyncMock(side_effect=_handle_status)
 
-        send = await send_and_capture(adapter, "/s", platform)
+        send = await send_and_capture(adapter, "/x", platform)
 
         send.assert_called_once()
         response_text = send.call_args[1].get("content") or send.call_args[0][1]
