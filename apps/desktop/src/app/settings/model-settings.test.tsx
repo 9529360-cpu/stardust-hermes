@@ -285,6 +285,7 @@ describe('ModelSettings', () => {
 
     await renderModelSettings()
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Choose another service' }))
     fireEvent.click(await screen.findByRole('button', { name: /Ollama/ }))
     expect(await screen.findByText('qwen3:latest')).toBeTruthy()
 

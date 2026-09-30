@@ -1251,6 +1251,8 @@ export interface Translations {
       addCustomService: string
       advancedConnections: string
       advancedConnectionsHide: string
+      chooseOtherService: string
+      hideOtherServices: string
       noServices: string
       advancedModelSettings: string
       advancedModelSettingsHide: string

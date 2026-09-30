@@ -1409,6 +1409,8 @@ export const en: Translations = {
       addCustomService: 'Add custom service',
       advancedConnections: 'Advanced connection settings',
       advancedConnectionsHide: 'Hide advanced connection settings',
+      chooseOtherService: 'Choose another service',
+      hideOtherServices: 'Hide other services',
       noServices: 'No model services are configured yet.',
       advancedModelSettings: 'Advanced model settings',
       advancedModelSettingsHide: 'Hide advanced model settings',

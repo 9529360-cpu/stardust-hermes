@@ -1586,6 +1586,8 @@ export const zh = defineLocale({
       addCustomService: '添加自定义服务',
       advancedConnections: '高级连接设置',
       advancedConnectionsHide: '收起高级连接设置',
+      chooseOtherService: '选择其他服务',
+      hideOtherServices: '收起其他服务',
       noServices: '还没有配置模型服务。',
       advancedModelSettings: '高级模型设置',
       advancedModelSettingsHide: '收起高级模型设置',
