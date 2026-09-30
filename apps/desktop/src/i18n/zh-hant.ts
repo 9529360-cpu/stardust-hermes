@@ -1222,6 +1222,8 @@ export const zhHant = defineLocale({
       addCustomService: '新增自訂服務',
       advancedConnections: '進階連接設定',
       advancedConnectionsHide: '收起進階連接設定',
+      chooseOtherService: '選擇其他服務',
+      hideOtherServices: '收起其他服務',
       noServices: '尚未設定模型服務。',
       advancedModelSettings: '進階模型設定',
       advancedModelSettingsHide: '收起進階模型設定',
