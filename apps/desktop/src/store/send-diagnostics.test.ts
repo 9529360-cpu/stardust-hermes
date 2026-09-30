@@ -57,25 +57,21 @@ function localBundleRequest(overrides?: {
   prepare?: unknown
 }) {
   return vi.fn(
-    async (
-      method: string,
-      _params?: Record<string, unknown>,
-      _timeout?: number
-    ) => {
-    if (method === 'diagnostics.prepare_bundle') {
-      return (
-        overrides?.prepare ?? {
-          ok: true,
-          path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-x.zip',
-          filename: 'stardust-diagnostics-x.zip',
-          byte_size: 123
-        }
-      )
-    }
+    async (method: string, _params?: Record<string, unknown>, _timeout?: number) => {
+      if (method === 'diagnostics.prepare_bundle') {
+        return (
+          overrides?.prepare ?? {
+            ok: true,
+            path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-x.zip',
+            filename: 'stardust-diagnostics-x.zip',
+            byte_size: 123
+          }
+        )
+      }
 
-    if (method === 'diagnostics.discard_bundle') {
-      return overrides?.discard ?? { ok: true, removed: true }
-    }
+      if (method === 'diagnostics.discard_bundle') {
+        return overrides?.discard ?? { ok: true, removed: true }
+      }
 
       throw new Error(`unexpected diagnostics method: ${method}`)
     }
