@@ -8,9 +8,11 @@ legitimately have nothing to do for a PR that didn't touch their area.
 ``HARD_DISABLED_LANES`` is a different case: these jobs are unconditionally ``if: false`` in
 ci.yaml regardless of what changed, so every single run reports them ``skipped`` — treating
 that identically to a real pass would let the gate report green while an entire suite never
-once ran. Flag them distinctly in the printed summary instead. This does not change whether the
-gate blocks a merge (re-enabling a lane that's off because it's flaky is a separate, larger
-fix) — it only stops "skipped" from silently reading as "verified".
+once ran. Flag them distinctly in the printed summary instead. A hard-disabled lane is not
+itself blocking while it is quarantined. Instead, when the change classifier says
+desktop/runtime code is affected, the gate requires the stable Stardust Desktop
+smoke lane to finish successfully. That prevents "all required checks pass" from going green
+when every desktop runtime proof was skipped, without pretending the flaky full E2E is healthy.
 
 Usage (matches the ci.yaml step): pipe the ``toJSON(needs)`` object in on stdin.
     echo "$NEEDS" | python3 scripts/ci/evaluate_gate.py
@@ -29,16 +31,54 @@ HARD_DISABLED_LANES = {
     "e2e-desktop": "disabled since Sep 2026 — still flaky after the Sep 1 re-enable attempt",
 }
 
+# #11: Desktop E2E remains intentionally disabled, but desktop-affecting changes still need
+# one stable runtime proof. The visual smoke is that proof while full E2E is quarantined.
+DESKTOP_RUNTIME_PROOF_LANE = "stardust-visual-smoke"
+DESKTOP_RUNTIME_PROOF_OUTPUTS = ("python_prod", "frontend")
+
+
+def _desktop_runtime_proof_required(needs: dict) -> bool:
+    """Whether this run must contain a successful desktop runtime proof.
+
+    The classifier is authoritative when both relevant outputs are explicit booleans. If the
+    classifier result is successful but one of those outputs is missing/unknown, fail closed to
+    *more* validation whenever the proof lane is present in this workflow. That prevents a
+    classifier/output regression from silently turning a desktop change into an ordinary skip.
+    """
+    detect = needs.get("detect") or {}
+    outputs = detect.get("outputs") or {}
+    values = [
+        str(outputs.get(name, "")).strip().lower()
+        for name in DESKTOP_RUNTIME_PROOF_OUTPUTS
+    ]
+    if any(value == "true" for value in values):
+        return True
+    if all(value == "false" for value in values):
+        return False
+    return DESKTOP_RUNTIME_PROOF_LANE in needs
+
 
 def evaluate(needs: dict) -> tuple[dict[str, str], list[str], list[str]]:
     """Return ``(compact result-map, blocking job names, hard-disabled job names)``.
 
-    ``blocking`` = required jobs whose result is neither ``success`` nor ``skipped``.
+    ``blocking`` = failed/cancelled required jobs, plus conditionally required proof lanes
+    that were skipped or absent.
     ``disabled`` = jobs in ``HARD_DISABLED_LANES`` whose result is ``skipped`` this run —
     i.e. reported as passing but never actually executed, by design rather than by relevance.
     """
     compact = {name: info["result"] for name, info in needs.items()}
     blocking = [name for name, result in compact.items() if result not in ("success", "skipped")]
+
+    # Conditional lanes may legitimately skip, but a desktop-affecting change must have an actual
+    # runtime proof. A skipped/missing visual smoke is therefore blocking when detect says the
+    # runtime surface changed (or its outputs are malformed/unknown).
+    proof_missing = (
+        _desktop_runtime_proof_required(needs)
+        and compact.get(DESKTOP_RUNTIME_PROOF_LANE) != "success"
+    )
+    if proof_missing and DESKTOP_RUNTIME_PROOF_LANE not in blocking:
+        blocking.append(DESKTOP_RUNTIME_PROOF_LANE)
+
     disabled = [name for name in HARD_DISABLED_LANES if compact.get(name) == "skipped"]
     return compact, blocking, disabled
 
@@ -49,7 +89,7 @@ def render(compact: dict[str, str], blocking: list[str], disabled: list[str]) ->
         if name in disabled:
             lines.append(f"⚠️  {name}: skipped — HARD-DISABLED, not verified this run ({HARD_DISABLED_LANES[name]})")
         else:
-            icon = "✅" if result in ("success", "skipped") else "❌"
+            icon = "✅" if result in ("success", "skipped") and name not in blocking else "❌"
             lines.append(f"{icon} {name}: {result}")
     if blocking:
         lines.append(f"::error::{len(blocking)} required job(s) did not complete successfully: {', '.join(blocking)}")
