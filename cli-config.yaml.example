@@ -804,9 +804,8 @@ prompt_caching:
 #
 # WARNING: Not all models/providers support vision, summaries, or the same API
 # format. Keep auxiliary overrides explicit and test them with your backend.
-# Some combinations are EXPERIMENTAL and may not work. Not all providers
-# produce usable summaries, or accept the same API format.  Change at your own
-# risk — if things break, reset to "auto" / empty values.
+# Some combinations are EXPERIMENTAL; if one misbehaves, reset the provider/model
+# override to "auto" / empty values.
 #
 # Each task has its own provider + model pair so you can mix providers.
 # For example: OpenRouter for vision (needs multimodal), but your main
