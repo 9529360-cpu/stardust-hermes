@@ -590,7 +590,9 @@ def _inspect_task(*, task_id: Any, owner_key: str) -> str:
                 "started_at": task.started_at,
                 "completed_at": task.completed_at,
                 "block_kind": task.block_kind,
-                "needs_attention": task.status in _ATTENTION_STATUSES,
+                "needs_attention": _task_needs_attention(
+                    task, triage_machine_managed=_triage_is_machine_managed()
+                ),
                 "result": _inspect_text(redact_sensitive_text, task.result),
                 "last_failure_error": _inspect_text(redact_sensitive_text, task.last_failure_error),
             },
