@@ -26,6 +26,16 @@ def _call(method: str, params: dict | None = None) -> dict:
     return srv._methods[method](1, params or {})["result"]
 
 
+@pytest.fixture(autouse=True)
+def _enable_legacy_free_tier(monkeypatch):
+    """This file tests dormant Nous compatibility; Stardust itself ships the tier disabled."""
+    from hermes_cli.config import load_config, save_config
+
+    cfg = load_config()
+    cfg.setdefault("nous", {})["guest"] = True
+    save_config(cfg)
+
+
 @pytest.fixture
 def guest(tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))

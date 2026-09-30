@@ -639,29 +639,33 @@ class TestHasAnyProviderConfigured:
             f"provider registry sweep ran before config short-circuit: {sweep_calls}"
         )
 
-    def test_auth_json_skips_registry_sweep(self, monkeypatch, tmp_path):
-        """auth.json with a logged-in active provider must short-circuit before
-        the registry sweep. get_auth_status may be called ONLY for the active
-        provider from auth.json — any other provider id means the sweep ran.
-        """
+    def test_legacy_nous_auth_json_does_not_count_as_stardust_provider(self, monkeypatch, tmp_path):
+        """An inherited Nous Portal login must not bypass Stardust's explicit-provider setup guard."""
         import json
+
         hermes_home = self._setup_home(monkeypatch, tmp_path)
         (hermes_home / "auth.json").write_text(json.dumps({
             "active_provider": "nous",
+            "providers": {
+                "nous": {
+                    "access_token": "legacy-portal-token",
+                    "refresh_token": "legacy-refresh-token",
+                }
+            },
         }))
         calls = []
 
-        def _guarded_status(provider_id):
+        def _status(provider_id):
             calls.append(provider_id)
-            assert provider_id == "nous", "sweep must be skipped"
-            return {"logged_in": True}
+            return {}
 
-        monkeypatch.setattr("hermes_cli.auth.get_auth_status", _guarded_status)
+        monkeypatch.setattr("hermes_cli.auth.get_auth_status", _status)
         from hermes_cli.main import _has_any_provider_configured
-        assert _has_any_provider_configured() is True
-        assert calls == ["nous"], (
-            f"provider registry sweep ran before auth.json short-circuit: {calls}"
-        )
+
+        assert _has_any_provider_configured() is False
+        assert "nous" not in calls
+
+
 
 
 # =============================================================================

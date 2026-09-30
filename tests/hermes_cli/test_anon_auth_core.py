@@ -72,6 +72,11 @@ def portal(monkeypatch, tmp_path):
     monkeypatch.setenv("HERMES_ANON_API_SECRET", "test-secret")
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
     monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    # This file exercises the inherited compatibility layer intentionally. Stardust ships it off.
+    from hermes_cli.config import load_config, save_config
+    cfg = load_config()
+    cfg.setdefault("nous", {})["guest"] = True
+    save_config(cfg)
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     from hermes_cli import auth_nous
@@ -135,6 +140,7 @@ class TestIdentityLifecycle:
         other_home = tmp_path / "profiles" / "two"
         other_home.mkdir(parents=True)
         monkeypatch.setenv("HERMES_HOME", str(other_home))
+        _write_config(monkeypatch, guest=True)
         before = len(portal.calls)
         second = anon_auth.ensure_portal_identity(explicit=True)
         assert second["anon_token"] == first["anon_token"]
@@ -195,6 +201,7 @@ class TestExplicitProvision:
         sibling = tmp_path / "sibling-profile"
         sibling.mkdir()
         monkeypatch.setenv("HERMES_HOME", str(sibling))
+        _write_config(monkeypatch, guest=True)
         adopted = anon_auth.ensure_portal_identity(explicit=True)
         assert adopted and adopted["anon_token"] == token
         assert portal.minted == 1

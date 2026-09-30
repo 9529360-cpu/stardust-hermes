@@ -1897,7 +1897,9 @@ DEFAULT_CONFIG = {
         # Remote connector discovery/lifecycle through the Nous tool gateway.
         # The flag is the user's off switch; availability additionally requires
         # the portal sign-in every managed tool gates on.
-        "connectors": {"enabled": True},
+        # Stardust does not use the inherited Nous account/connector plane by default.
+        # Direct API/model configuration remains available independently.
+        "connectors": {"enabled": False},
     },
     "logging": {  # File logging to ~/.hermes/logs/: agent.log captures INFO+, errors.log WARNING+.
         "level": "INFO",       # minimum level for agent.log: DEBUG, INFO, WARNING
@@ -1920,6 +1922,9 @@ DEFAULT_CONFIG = {
         # Per-provider override URLs for self-hosted curation lists using the same schema, e.g.
         # providers: {openrouter: {url: https://example.com/my-curation.json}}.
         "providers": {},
+        # Nous Portal is an inherited account/subscription product, not a Stardust default.
+        # Users can still configure any direct API endpoint explicitly as a custom provider.
+        "excluded_providers": ["nous"],
     },
     # Per-model metadata overrides. Fields: context_window, supports_tools,
     # supports_vision, supports_reasoning, model_family. <provider>.<model_id> wins over
@@ -2443,11 +2448,9 @@ DEFAULT_CONFIG = {
         # 14-20% of consecutive calls in concurrent tool loops (measured 2026-09-06;
         # NousResearch/api#227), so chat is the default until that is fixed.
         "anthropic_wire": "chat",
-        # Nous free tier: with no other provider configured, Hermes sets up a free Nous identity on
-        # first use (inference on nous/welcome + connectors) and offers `/login` (terminal:
-        # `hermes auth upgrade`) to sign in. false turns the free tier off entirely: nothing is set
-        # up and nothing is used.
-        "guest": True,
+        # Inherited Nous anonymous/account onboarding is not a Stardust product path.
+        # Keep it off unless a downstream compatibility build explicitly opts back in.
+        "guest": False,
     },
     # Google Vertex AI (Gemini). Auth is OAuth2 from a service-account JSON or ADC, NOT an API key;
     # the credential path lives in .env (VERTEX_CREDENTIALS_PATH / GOOGLE_APPLICATION_CREDENTIALS).

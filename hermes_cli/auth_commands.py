@@ -24,7 +24,7 @@ from hermes_cli.secret_prompt import masked_secret_prompt
 
 
 # Providers that support OAuth login in addition to API keys.
-_OAUTH_CAPABLE_PROVIDERS = {"anthropic", "nous", "openai-codex", "xai-oauth", "qwen-oauth", "minimax-oauth", "openrouter"}
+_OAUTH_CAPABLE_PROVIDERS = {"anthropic", "openai-codex", "xai-oauth", "qwen-oauth", "minimax-oauth", "openrouter"}
 # ...and default to it when ``--type`` is omitted. OpenRouter stays API-key-first: the documented
 # ``hermes auth add openrouter --api-key sk-or-...`` must keep working with no ``--type``.
 _OAUTH_DEFAULT_PROVIDERS = _OAUTH_CAPABLE_PROVIDERS - {"openrouter"}
@@ -358,6 +358,12 @@ def _add_api_key_credential(args, provider: str, pool) -> PooledCredential:
 
 def auth_add_command(args) -> None:
     provider = _normalize_provider(getattr(args, "provider", ""))
+    if provider == "nous":
+        raise SystemExit(
+            "Stardust does not use Nous Portal account login or subscription credentials. "
+            "Configure the model API directly with `hermes model` -> Custom endpoint, or add a "
+            "provider under `providers:` with your own base URL and API key."
+        )
     configured_provider = _configured_provider_entry(provider)
     if not _is_known_provider(provider, configured_provider):
         raise _unknown_provider_exit(provider)
@@ -720,7 +726,7 @@ def _interactive_auth() -> None:
 
 def _pick_provider(prompt: str = "Provider") -> str:
     """Prompt for a provider name with auto-complete hints."""
-    known = sorted(set(list(PROVIDER_REGISTRY.keys()) + ["openrouter"]))
+    known = sorted((set(PROVIDER_REGISTRY) - {"nous"}) | {"openrouter"})
     custom_display = [entry["name"] for entry in _get_custom_provider_entries()]
     print(f"\nKnown providers: {', '.join(known)}")
     if custom_display:
@@ -819,7 +825,7 @@ def auth_upgrade_command(args) -> None:
 _AUTH_ACTIONS = {
     "add": auth_add_command, "list": auth_list_command, "remove": auth_remove_command,
     "reset": auth_reset_command, "priority": auth_priority_command, "refresh": auth_refresh_command, "status": auth_status_command,
-    "logout": auth_logout_command, "upgrade": auth_upgrade_command,
+    "logout": auth_logout_command,
     "spotify": auth_spotify_command}
 
 

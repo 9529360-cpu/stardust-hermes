@@ -217,6 +217,7 @@ def test_read_nous_provider_state_falls_back_to_global_root_for_share_auth_profi
     root = tmp_path / ".hermes"
     profile = root / "profiles" / "hermes-setup"
     profile.mkdir(parents=True)
+    (profile / "config.yaml").write_text("nous:\n  guest: true\n")
     (root / "auth.json").write_text(json.dumps({
         "version": 1,
         "providers": {"nous": {"auth_method": "anonymous", "access_token": "tok"}},
