@@ -9,7 +9,7 @@ sidebar_position: 0
 Hermes Agent connects to external systems for AI inference, tool servers, IDE workflows, programmatic access, and more. These integrations extend what Hermes can do and where it can run.
 
 :::tip Start here
-If you only have time to set up one integration, set up [Nous Portal](/integrations/nous-portal) — a single OAuth login covers 300+ models plus the four Tool Gateway tools (web search, image generation, TTS, and browser automation).
+Run `hermes model` and configure the provider, API endpoint, and model you actually intend to use. Stardust does not require a first-party account or subscription; direct API providers, OpenAI-compatible endpoints, and local models are all explicit choices.
 :::
 
 ## AI Providers & Routing
