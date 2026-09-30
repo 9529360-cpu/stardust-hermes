@@ -79,7 +79,7 @@ hermes gateway run|install|start|stop|restart|status|setup
 ```
 
 20+ platforms: Telegram, Discord, Slack, WhatsApp (Baileys + Business Cloud API), iMessage (Photon — `hermes photon setup`), Signal, Email, SMS, Matrix, Mattermost, Teams, LINE, SimpleX, ntfy, Google Chat, Home Assistant, DingTalk, Feishu, WeCom, Weixin, API Server, Webhooks. Open WebUI connects via the API Server adapter. Most adapters ship under `plugins/platforms/`.
-Docs: https://hermes-agent.nousresearch.com/docs/user-guide/messaging/
+Repository docs: `website/docs/user-guide/messaging/`
 
 ### Sessions
 
@@ -107,7 +107,7 @@ hermes profile rename A B | alias NAME | export NAME | import FILE
 
 ```
 hermes auth                 Interactive credential manager
-hermes auth add [PROVIDER]  Add OAuth or API-key credential (nous, openai-codex, qwen-oauth, …)
+hermes auth add [PROVIDER]  Add a supported OAuth/API credential (openai-codex, qwen-oauth, …)
 hermes auth list|remove P IDX|reset PROVIDER|status
 ```
 Multiple credentials per provider form a pool that rotates automatically and skips exhausted keys.
@@ -118,7 +118,6 @@ Multiple credentials per provider form a pool that rotates automatically and ski
 hermes desktop / gui        Native desktop app
 hermes dashboard            Web admin panel + embedded chat (--stop / --status)
 hermes proxy                OpenAI-compatible local proxy backed by an OAuth provider
-hermes portal               Quick setup / sign in via Nous Portal
 hermes kanban <verb>        Multi-agent work-queue board
 hermes project              Named multi-folder workspaces
 hermes skin list|use|set    Switch/tweak skins (see references/themes.md)
@@ -141,10 +140,10 @@ Plugin- and provider-supplied subcommands (e.g. `hermes photon setup`) only appe
 
 | Looking for... | Location |
 |---|---|
-| Config options | `hermes config edit` · [Configuration docs](https://hermes-agent.nousresearch.com/docs/user-guide/configuration) |
-| Tools / toolsets | `hermes tools list` · [Tools reference](https://hermes-agent.nousresearch.com/docs/reference/tools-reference) |
-| Skills catalog | `hermes skills browse` · [Skills catalog](https://hermes-agent.nousresearch.com/docs/reference/skills-catalog) |
-| Provider setup | `hermes model` · [Providers guide](https://hermes-agent.nousresearch.com/docs/integrations/providers) |
-| Env variables | `hermes config env-path` · [Env vars reference](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) |
+| Config options | `hermes config edit` · `website/docs/user-guide/configuration.md` |
+| Tools / toolsets | `hermes tools list` · `website/docs/reference/tools-reference.md` |
+| Skills catalog | `hermes skills browse` · `website/docs/reference/skills-catalog.md` |
+| Provider setup | `hermes model` · `website/docs/integrations/providers.md` |
+| Env variables | `hermes config env-path` · `website/docs/reference/environment-variables.md` |
 | Gateway logs | `~/.hermes/logs/gateway.log` (or `hermes logs`) |
 | Sessions | `hermes sessions browse` (reads state.db) |
