@@ -108,6 +108,11 @@ export async function confirmSendDiagnostics(): Promise<void> {
   const startedGeneration = generation
   const stillCurrent = () => generation === startedGeneration
   const gateway = $gateway.get()
+  // Freeze the gateway owner coordinate for the whole prepare -> download ->
+  // discard transaction. The user may switch active connection/profile while
+  // the backend is building the ZIP; downloading that old-backend path through
+  // the newly active connection would cross ownership boundaries.
+  const connection = $connection.get()
 
   if (!gateway) {
     $sendDiagnostics.set({ ...current, error: 'Hermes gateway unavailable', phase: 'error' })
@@ -153,7 +158,6 @@ export async function confirmSendDiagnostics(): Promise<void> {
       throw new Error('Desktop file save bridge is unavailable')
     }
 
-    const connection = $connection.get()
     const saved = await saveGatewayFile({
       connectionId: connection?.connectionId,
       path: preparedPath,
