@@ -1198,7 +1198,7 @@ agent:
   # Enable verbose logging
   verbose: false
   
-  # Reasoning effort level (OpenRouter and Nous Portal)
+  # Reasoning effort level (when supported by the selected provider)
   # Controls how much "thinking" the model does before responding.
   # Options: "xhigh" (max), "high", "medium", "low", "minimal", "none" (disable)
   reasoning_effort: "medium"
@@ -2016,59 +2016,31 @@ updates:
 # =============================================================================
 # Web Dashboard
 # =============================================================================
-# OAuth gate configuration for `hermes dashboard --host <non-loopback>`.
-# The bundled Nous Portal plugin reads these on startup; settings here are
-# the canonical surface. Each can be overridden by an environment variable:
+# Dashboard authentication for `hermes dashboard --host <non-loopback>`.
+# Stardust does not use a hosted first-party account for dashboard access.
+# Choose the bundled username/password provider, the self-hosted OIDC section
+# below, or an explicitly installed DashboardAuthProvider plugin.
 #
-#   dashboard.oauth.client_id   <-  HERMES_DASHBOARD_OAUTH_CLIENT_ID
-#   dashboard.oauth.portal_url  <-  HERMES_DASHBOARD_PORTAL_URL
-#   dashboard.public_url        <-  HERMES_DASHBOARD_PUBLIC_URL
+# `dashboard.public_url` declares the external base URL used for OAuth/OIDC
+# callbacks and other URLs handed to external systems:
 #
-# Env wins when set to a non-empty value. This is what Fly.io's platform-
-# secret injection uses to push per-deploy client_ids without needing to
-# bake a config.yaml into the image. Empty env values are treated as unset
-# so a provisioned-but-not-populated secret can't shadow a valid entry here.
-#
-# Local dev / on-prem deploys should typically set these via config.yaml
-# (the ~/.hermes/.env file is reserved for API keys and secrets).
+#   dashboard.public_url  <-  HERMES_DASHBOARD_PUBLIC_URL
 #
 # dashboard:
-#   oauth:
-#     client_id: ""    # agent:{instance_id}; Portal provisions this at deploy
-#     portal_url: ""   # blank → default https://portal.nousresearch.com
+#   # public_url: "https://example.com/stardust"
 #
-#   # Force the absolute base URL the OAuth callback (and any other public
-#   # URL the dashboard hands to external systems) is built from. Set this
-#   # for deploys behind reverse proxies that don't reliably forward
-#   # X-Forwarded-Host / X-Forwarded-Proto / X-Forwarded-Prefix (manual
-#   # nginx setups, on-prem ingresses, custom-domain Fly deploys without
-#   # full proxy header chains).
-#   #
-#   # When set, the value is the complete authority: scheme + host +
-#   # optional path prefix (e.g. "https://example.com/hermes"). The OAuth
-#   # callback URL becomes "<public_url>/auth/callback" — X-Forwarded-Prefix
-#   # is IGNORED on this code path because the operator has explicitly
-#   # declared the public URL and we no longer need to guess.
-#   #
-#   # Leave empty to use the existing proxy-header reconstruction (the
-#   # default — works on Fly.io out of the box).
-#   #
-#   #   public_url: "https://example.com/hermes"
-#   #
 #   # Reverse proxies connecting from another container or host are not
 #   # trusted by default. Add only the proxy's exact IP address, or a bounded
-#   # CIDR for a dedicated proxy network, so X-Forwarded-Proto and
-#   # X-Forwarded-For can be honored. Loopback is always trusted. Wildcards
-#   # and /0 networks are rejected.
+#   # CIDR for a dedicated proxy network. Loopback is always trusted.
 #   #
-#   #   trusted_proxies:
-#   #     - "172.20.0.5"
-#   #     # - "172.20.0.0/24"  # dedicated network, if the IP is dynamic
+#   # trusted_proxies:
+#   #   - "172.20.0.5"
+#   #   # - "172.20.0.0/24"  # dedicated network, if the IP is dynamic
 #
 # -----------------------------------------------------------------------------
 # Self-hosted OIDC dashboard auth (generic OpenID Connect — Authentik,
-# Keycloak, Zitadel, Authelia, Auth0, Okta, Google, …). Use this INSTEAD of the
-# nous block above when gating the dashboard with your own identity provider.
+# Keycloak, Zitadel, Authelia, Auth0, Okta, Google, …). This is Stardust's
+# generic OAuth/OIDC path when you want an external identity provider.
 # Each setting can be overridden by an environment variable:
 #
 #   dashboard.oauth.self_hosted.issuer         <-  HERMES_DASHBOARD_OIDC_ISSUER
@@ -2112,7 +2084,7 @@ updates:
 #     are skipped with a startup warning (never a silent clobber)
 #   - a source's override_existing lets it beat .env/shell values, but
 #     never another secret source's claim
-# Docs: https://hermes-agent.nousresearch.com/docs/user-guide/secrets/
+# Docs in this repository: website/docs/user-guide/secrets/
 #
 # secrets:
 #   # Optional explicit ordering of enabled sources.
