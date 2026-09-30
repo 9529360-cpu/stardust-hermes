@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { $gateway } from '@/store/gateway'
-import { $connection } from '@/store/session'
 import {
   $sendDiagnostics,
   confirmSendDiagnostics,
   dismissSendDiagnostics,
   requestSendDiagnostics
 } from '@/store/send-diagnostics'
+import { $connection } from '@/store/session'
 
 function stubGateway(
   request: (method: string, params?: Record<string, unknown>, timeout?: number) => Promise<unknown>
