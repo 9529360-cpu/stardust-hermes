@@ -64,6 +64,7 @@ export function ModelServicePicker({
   const { t } = useI18n()
   const m = t.settings.model
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [showAllProviders, setShowAllProviders] = useState(false)
 
   const orderedProviders = useMemo(() => {
     const rows = [...providers]
@@ -76,6 +77,10 @@ export function ModelServicePicker({
 
     return rows
   }, [currentModel?.provider, providers])
+
+  const visibleProviders = showAllProviders
+    ? orderedProviders
+    : orderedProviders.filter(provider => provider.slug === currentModel?.provider || provider.slug === selectedProvider)
 
   const ready = isModelServiceReady(selectedProviderRow)
   const apiKeyProvider = selectedProviderRow?.auth_type === 'api_key' && !!selectedProviderRow.key_env
@@ -90,9 +95,9 @@ export function ModelServicePicker({
       <SectionHeading icon={Cpu} title={m.primaryTitle} />
       <p className="mb-3 text-xs text-muted-foreground">{m.appliesDesc}</p>
 
-      {orderedProviders.length > 0 ? (
+      {visibleProviders.length > 0 ? (
         <div className="grid gap-1">
-          {orderedProviders.map(provider => {
+          {visibleProviders.map(provider => {
             const isCurrent = provider.slug === currentModel?.provider
             const isSelected = provider.slug === selectedProvider
             const providerReady = isModelServiceReady(provider)
@@ -237,6 +242,12 @@ export function ModelServicePicker({
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
+        {orderedProviders.length > visibleProviders.length && (
+          <Button onClick={() => setShowAllProviders(open => !open)} size="sm" variant="textStrong">
+            <ChevronRight className={cn('transition-transform', showAllProviders && 'rotate-90')} />
+            {showAllProviders ? m.hideOtherServices : m.chooseOtherService}
+          </Button>
+        )}
         <Button onClick={onAddService} size="sm" variant="textStrong">
           <Plus />
           {m.addService}
