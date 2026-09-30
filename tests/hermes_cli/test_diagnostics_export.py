@@ -93,6 +93,32 @@ def test_discard_refuses_paths_outside_diagnostics_cache(diagnostics_home, tmp_p
     assert outside.read_bytes() == b"do not delete"
 
 
+def test_prune_never_deletes_the_current_handoff_when_mtimes_tie(diagnostics_home, monkeypatch):
+    import hermes_cli.diagnostics_export as export
+
+    root = diagnostics_home / "cache" / "diagnostics"
+    root.mkdir(parents=True)
+    monkeypatch.setattr(export, "_MAX_EXPORTS", 2)
+
+    paths = [
+        root / f"stardust-diagnostics-tied-{index}.zip"
+        for index in range(3)
+    ]
+    for path in paths:
+        path.write_bytes(b"zip")
+        path.touch()
+
+    same_time = 1_700_000_000
+    for path in paths:
+        os.utime(path, (same_time, same_time))
+
+    export._prune_exports(root, keep=paths[-1])
+
+    remaining = set(root.glob("stardust-diagnostics-*.zip"))
+    assert paths[-1] in remaining
+    assert len(remaining) == 2
+
+
 def test_prepare_bounds_client_files_and_prunes_crash_leftovers(diagnostics_home, monkeypatch):
     import hermes_cli.diagnostics_export as export
 
