@@ -8,12 +8,15 @@ SHIPPED_GUIDANCE = (
     ROOT / "cli-config.yaml.example",
     ROOT / "hermes_cli" / "tips.py",
     ROOT / "skills" / "autonomous-ai-agents" / "hermes-agent" / "references" / "providers-and-models.md",
+    ROOT / "skills" / "autonomous-ai-agents" / "hermes-agent" / "references" / "cli-reference.md",
 )
 
 FORBIDDEN = (
     "hermes auth add nous",
     "Nous-approved",
     "Nous Portal OAuth",
+    "hermes portal",
+    "hermes-agent.nousresearch.com/docs",
 )
 
 
