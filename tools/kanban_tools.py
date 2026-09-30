@@ -615,9 +615,76 @@ def _handle_complete(args: dict, **kw) -> str:
         return _ok(task_id=tid, run_id=run.id if run else None)
 
 
+def _maybe_keep_transient_retry_in_run(kb, conn, tid: str, reason: str, run_id: Optional[int]) -> Optional[str]:
+    """Keep the first worker-owned transient failure inside the current run.
+
+    A dispatcher worker can usually retry a flaky network/tool failure itself.
+    Parking the card in ``blocked`` immediately turns a machine-recoverable
+    problem into human attention. Re-queueing immediately is unsafe too: the
+    old worker is still alive and a second worker could overlap it.
+
+    So the first trusted worker-owned ``kind=transient`` call is a durable
+    soft retry: the task stays ``running``, the existing block recurrence
+    counter is armed, and the model is told to retry with its available tools.
+    A second transient call falls through to ``block_task``; because the
+    recurrence counter is already 1, the existing loop breaker routes it to
+    ``triage`` instead of retrying forever. Orchestrator/manual calls keep the
+    historical hard-block semantics because they have no worker run id.
+    """
+    if run_id is None:
+        return None
+    with kb.write_txn(conn):
+        row = conn.execute(
+            "SELECT status, current_run_id, block_kind, block_recurrences "
+            "FROM tasks WHERE id = ?",
+            (tid,),
+        ).fetchone()
+        if (
+            row is None
+            or row["status"] != "running"
+            or row["current_run_id"] != int(run_id)
+        ):
+            return None
+        if row["block_kind"] == "transient" and int(row["block_recurrences"] or 0) >= 1:
+            return None
+        cur = conn.execute(
+            "UPDATE tasks SET block_kind = ?, block_recurrences = 1 "
+            "WHERE id = ? AND status = 'running' AND current_run_id = ? "
+            "AND (block_kind IS NULL OR block_kind != ? OR block_recurrences < 1)",
+            ("transient", tid, int(run_id), "transient"),
+        )
+        if cur.rowcount != 1:
+            return None
+        kb._append_event(
+            conn,
+            tid,
+            "transient_retry",
+            {
+                "reason": reason,
+                "kind": "transient",
+                "recurrences": 1,
+                "source_status": kb._retry_status_for_run(conn, tid, run_id),
+            },
+            run_id=run_id,
+        )
+    return _ok(
+        task_id=tid,
+        run_id=run_id,
+        status="running",
+        transient_retry=True,
+        retry_now=True,
+        message=(
+            "Transient failure recorded; this task is still running. Retry the operation now "
+            "with the available tools instead of asking a human. If the same transient "
+            "failure persists, call kanban_block(kind='transient') again and the circuit "
+            "breaker will surface it for triage."
+        ),
+    )
+
+
 @_kanban_handler("kanban_block")
 def _handle_block(args: dict, **kw) -> str:
-    """Transition the task to blocked with a reason a human will read."""
+    """Route a real blocker; keep one worker-owned transient failure self-retryable."""
     tid = _worker_guard("kanban_block", args)
     reason = _redact(
         _require_text(args, "reason", "reason is required — explain what input you need"))
@@ -641,7 +708,11 @@ def _handle_block(args: dict, **kw) -> str:
                f"{sorted(_GOAL_MODE_BLOCK_ALLOWED_KINDS)} (got {kind!r}). If the task is actually "
                f"finished or cannot proceed for another reason, call kanban_complete instead — "
                f"the completion judge will evaluate it.")
-        ok = kb.block_task(conn, tid, reason=reason, kind=kind, expected_run_id=_worker_run_id(tid))
+        run_id = _worker_run_id(tid)
+        if kind == "transient" and not (task and task.goal_mode):
+            if retry_result := _maybe_keep_transient_retry_in_run(kb, conn, tid, reason, run_id):
+                return retry_result
+        ok = kb.block_task(conn, tid, reason=reason, kind=kind, expected_run_id=run_id)
         _check(ok, f"could not block {tid} (unknown id or not in running/ready)")
         return _ok_landed(kb, conn, tid, "blocked", block_kind=kind)
 
