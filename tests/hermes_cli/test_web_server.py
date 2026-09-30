@@ -2798,35 +2798,21 @@ class TestNewEndpoints:
             config["platform_toolsets"]["discord"]
         )
 
-    def test_toolsets_resolve_subscription_features_once(self, monkeypatch):
+    def test_toolsets_do_not_resolve_nous_subscription_features(self, monkeypatch):
         import hermes_cli.tools_config as tools_config
-        from hermes_cli.nous_subscription import NousSubscriptionFeatures
-
-        calls = 0
-        features = NousSubscriptionFeatures(
-            subscribed=False,
-            nous_auth_present=False,
-            provider_is_nous=False,
-            features={},
-            account_info=None,
-        )
-
-        def resolve_features(config, *, force_fresh=False):
-            nonlocal calls
-            calls += 1
-            return features
 
         monkeypatch.setattr(
             tools_config,
             "get_nous_subscription_features",
-            resolve_features,
+            lambda *args, **kwargs: pytest.fail(
+                "Stardust toolset listing must not resolve Nous account/subscription state"
+            ),
         )
 
         resp = self.client.get("/api/tools/toolsets")
 
         assert resp.status_code == 200
         assert resp.json()
-        assert calls == 1
 
 
     def test_get_toolset_config_returns_provider_matrix(self):
@@ -2870,14 +2856,10 @@ class TestNewEndpoints:
         state so keyless ≠ ready.
         """
         import hermes_cli.tools_config as tools_config
-        from hermes_cli.nous_account import NousPortalAccountInfo
 
-        # Logged out of Nous Portal → managed subscription rows need sign-in.
         monkeypatch.setattr(
             "hermes_cli.nous_subscription.get_nous_portal_account_info",
-            lambda *a, **k: NousPortalAccountInfo(
-                logged_in=False, source="none", fresh=False, paid_service_access=None
-            ),
+            lambda *a, **k: pytest.fail("provider status must not query Nous Portal"),
         )
         # No xAI credentials → the Grok OAuth-backed row needs sign-in.
         import hermes_cli.tools_config_post_setup as tools_config_post_setup
@@ -2896,8 +2878,9 @@ class TestNewEndpoints:
         assert all(p["status"] in valid for p in data["providers"])
         # Genuinely-free keyless row stays Ready.
         assert by_name["Microsoft Edge TTS"]["status"] == "ready"
-        # Keyless ≠ ready for gated rows:
-        assert by_name["Nous Subscription"]["status"] == "needs_auth"
+        # Inherited Nous account/subscription rows are not part of Stardust's matrix.
+        assert "Nous Subscription" not in by_name
+        # Other third-party OAuth/setup rows retain their normal readiness semantics.
         assert by_name["xAI TTS"]["status"] == "needs_auth"
         assert by_name["KittenTTS"]["status"] == "needs_setup"
         assert by_name["Piper"]["status"] == "needs_setup"
@@ -2909,40 +2892,32 @@ class TestNewEndpoints:
 
 
 
-    def test_select_managed_nous_provider_reports_needs_nous_auth(self, monkeypatch):
-        """Selecting a managed Nous row while logged out flags needs_nous_auth.
-
-        Regression: the GUI PUT wrote browser.cloud_provider + use_gateway
-        but skipped the Portal entitlement handshake the CLI runs inline
-        (ensure_nous_portal_access) — so the row never activated and nothing
-        told the user to sign in. The endpoint now reports the entitlement
-        gap so the client can drive the existing Nous OAuth flow.
-        """
-        from hermes_cli.nous_account import NousPortalAccountInfo
-
+    def test_managed_nous_provider_is_not_exposed_or_selectable(self, monkeypatch):
+        """Capabilities API must not become a backdoor into the retired Nous account product."""
         monkeypatch.setattr(
             "hermes_cli.nous_subscription.get_nous_portal_account_info",
-            lambda *a, **k: NousPortalAccountInfo(
-                logged_in=False, source="none", fresh=False, paid_service_access=None
-            ),
+            lambda *a, **k: pytest.fail("tool provider surfaces must not query Nous Portal"),
         )
+
+        config_resp = self.client.get("/api/tools/toolsets/browser/config")
+        assert config_resp.status_code == 200
+        providers = config_resp.json()["providers"]
+        assert not any(row.get("requires_nous_auth") for row in providers)
+        assert all("Nous Subscription" not in row["name"] for row in providers)
 
         resp = self.client.put(
             "/api/tools/toolsets/browser/provider",
             json={"provider": "Nous Subscription (Browser Use cloud)"},
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["ok"] is True
-        assert data["needs_nous_auth"] is True
-        assert data["feature"] == "browser"
-        # The selection is still persisted — activation is what's gated.
-        # Managed rows store the single 'nous' provider string (the runtime
-        # maps it to the Browser Use cloud through the Nous Tool Gateway).
+        assert resp.status_code == 400
+        assert "Unknown provider" in resp.json()["detail"]
+
         from hermes_cli.config import load_config
         cfg = load_config()
-        assert cfg["browser"]["cloud_provider"] == "nous"
-        assert "use_gateway" not in cfg["browser"]
+        browser = cfg.get("browser")
+        if isinstance(browser, dict):
+            assert browser.get("cloud_provider") != "nous"
+
 
 
     # -- Web capability split (search vs extract backends) ------------------

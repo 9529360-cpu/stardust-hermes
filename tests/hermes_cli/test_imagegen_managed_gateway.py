@@ -96,12 +96,8 @@ def _quiet_reconfigure(monkeypatch):
     monkeypatch.setattr(ns, "ensure_nous_portal_access", lambda **k: True)
 
 
-def test_reconfigure_managed_fal_row_keeps_managed_selection(monkeypatch):
-    """The sibling bug of fe63353cb: the legacy-backend model-pick step in
-    _reconfigure_provider hardcoded the direct selection AFTER the managed
-    branch wrote the managed one — a Nous Subscription user re-entering the
-    picker to change models was silently flipped onto their personal
-    FAL_KEY."""
+def test_reconfigure_managed_fal_row_is_rejected_without_mutating_selection(monkeypatch):
+    """Dormant legacy rows cannot be used as a backdoor to persist provider=nous."""
     _quiet_reconfigure(monkeypatch)
     import hermes_cli.tools_config as tc
 
@@ -114,11 +110,12 @@ def test_reconfigure_managed_fal_row_keeps_managed_selection(monkeypatch):
         "imagegen_backend": "fal",
     }
     config = {"image_gen": {"model": "fal-ai/gpt-image-2", "use_gateway": True}}
+    before = {"image_gen": dict(config["image_gen"])}
 
     tc._reconfigure_provider(managed_row, config)
 
-    assert config["image_gen"]["provider"] == "nous"
-    assert "use_gateway" not in config["image_gen"]
+    assert config == before
+    assert config["image_gen"].get("provider") != "nous"
 
 
 def test_reconfigure_direct_fal_row_writes_vendor_selection(monkeypatch):

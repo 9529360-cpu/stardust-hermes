@@ -488,38 +488,9 @@ def _has_managed_default_direct(key: str) -> bool:
 
 
 def apply_nous_managed_defaults(config: Dict[str, object], *, enabled_toolsets: Optional[Iterable[str]] = None, force_fresh: bool = False) -> set[str]:
-    features = get_nous_subscription_features(config, force_fresh=force_fresh)
-    account_info = features.account_info
-    if not (account_info and account_info.logged_in and account_info.tool_gateway_entitled and features.provider_is_nous):
-        return set()
-
-    selected_toolsets = set(enabled_toolsets or ())
-    changed: set[str] = set()
-    for key in _DEFAULT_SECTIONS:
-        _ensure_section(config, key)
-    for key in _DEFAULT_SECTIONS:
-        if features.features[key].explicit_configured or _has_managed_default_direct(key):
-            continue
-        if key == "stt":
-            # STT is not toolset-gated. Skip when the user has a working local backend (strong signal
-            # "local" was a choice, not the DEFAULT_CONFIG seed) or isn't entitled to the managed
-            # "openai-audio" category (flipping would silently break transcription).
-            if _local_stt_backend_available() or not account_info.tool_gateway_entitled_for("openai-audio"):
-                continue
-        elif key not in selected_toolsets:
-            continue
-        _select_nous(config, key)
-        changed.add(key)
-    # Video gen is not funded by the free tool pool: only wire managed video for entitled (paid) users.
-    for key, category in (("image_gen", None), ("video_gen", "fal-video")):
-        if key in selected_toolsets and not fal_key_is_configured() and (category is None or account_info.tool_gateway_entitled_for(category)):
-            _select_nous(config, key)
-            changed.add(key)
-    return changed
-
-
-# Tool Gateway offer — per-tool checklist after model selection
-
+    """Legacy compatibility hook; Stardust never auto-selects Nous-managed tool backends."""
+    _ = (config, enabled_toolsets, force_fresh)
+    return set()
 
 def _get_gateway_direct_credentials() -> Dict[str, bool]:
     """tool_key -> has_direct_credentials. Env-configured keyless local backends (SearXNG, CAMOFOX_URL)
@@ -544,35 +515,9 @@ def _get_gateway_direct_credentials() -> Dict[str, bool]:
 
 
 def get_gateway_eligible_tools(config: Optional[Dict[str, object]] = None, *, force_fresh: bool = False) -> tuple[list[str], list[str], list[str], list[str]]:
-    """(unconfigured, has_direct, explicit_configured, already_managed) tool key lists: no credentials
-    and no explicit non-nous selection (safe to pre-check) / own API keys / explicit non-nous selection
-    stored (e.g. keyless SearXNG) even with nothing to detect / ``use_gateway`` explicitly set."""
-    # Entitlement gates the offer (paid OR live free pool) and says which categories are covered.
-    account_info = _account_info_or_none(force_fresh=force_fresh)
-    if not (account_info and account_info.logged_in and account_info.tool_gateway_entitled):
-        return [], [], [], []
-    if config is None:
-        config = load_config() or {}
-    if not _provider_is_nous(config):
-        return [], [], [], []
-    direct = _get_gateway_direct_credentials()
-    unconfigured, has_direct, explicit_configured, already_managed = [], [], [], []
-    for key in _ALL_GATEWAY_KEYS:
-        # Only offer tools the entitlement covers (free pool: image but not video).
-        if not account_info.tool_gateway_entitled_for(_FEATURES[key].coverage):
-            continue
-        section_key, field = _GATEWAY_SECTION_FIELDS[key]
-        selected = _selected_provider(config.get(section_key), field)
-        if _uses_gateway(config.get(key)):
-            already_managed.append(key)
-        elif selected is not None and selected != "nous":
-            explicit_configured.append(key)
-        elif direct.get(key):
-            has_direct.append(key)
-        else:
-            unconfigured.append(key)
-    return unconfigured, has_direct, explicit_configured, already_managed
-
+    """Legacy offer contract. Stardust does not offer a Nous Tool Gateway/account path."""
+    _ = (config, force_fresh)
+    return [], [], [], []
 
 def apply_gateway_defaults(config: Dict[str, object], tool_keys: list[str]) -> set[str]:
     """Store the managed selection for ``tool_keys``; returns the set of tools actually changed."""
@@ -585,61 +530,9 @@ def apply_gateway_defaults(config: Dict[str, object], tool_keys: list[str]) -> s
 
 
 def prompt_enable_tool_gateway(config: Dict[str, object], *, force_fresh: bool = True) -> set[str]:
-    """If eligible tools exist, show a per-tool checklist to route them through the Tool Gateway.
-    Triggered by a live free pool or paid access; explicit_configured tools (e.g. ``web.backend:
-    searxng``) are configured on purpose and never offered, like already_managed."""
-    unconfigured, has_direct, _explicit, _managed = get_gateway_eligible_tools(config, force_fresh=force_fresh)
-    if not unconfigured and not has_direct:
-        return set()
-    try:
-        from hermes_cli.setup import prompt_checklist
-    except Exception:
-        return set()
-    # Frame the offer by entitlement: a $0 free-tool-pool user is not on a paid plan.
-    account_info = _account_info_or_none(force_fresh=False)
-    pool_only = bool(
-        account_info and account_info.paid_service_access is not True and account_info.tool_access is not None and account_info.tool_access.enabled
-    )
-    source_label = "free tool pool" if pool_only else "Nous subscription"
-
-    # Unconfigured tools first (pre-checked for new users), then tools with the user's own key
-    # (unchecked). Tools previously offered and left unchecked are recorded in
-    # ``tool_gateway_declined_tools`` and never pre-checked again (no re-fire on every model swap).
-    # Acceptance used to be sticky while refusal was not, so the identical pre-checked checklist re-fired on
-    # every Nous model swap. See #92647.
-    declined_raw = config.get("tool_gateway_declined_tools")
-    declined: set[str] = {str(k) for k in declined_raw} if isinstance(declined_raw, list) else set()
-    offer_keys: list[str] = list(unconfigured) + list(has_direct)
-    labels = [_GATEWAY_TOOL_LABELS[k] for k in unconfigured] + [
-        f"{_GATEWAY_TOOL_LABELS[k]} — keep using your {_FEATURES[k].direct_label}" for k in has_direct
-    ]
-    pre_selected = [i for i, k in enumerate(unconfigured) if k not in declined]
-    title = (
-        "Your free Nous tool pool — pick the tools to enable:" if pool_only
-        else "Your Nous subscription includes the Tool Gateway — pick the tools to enable:"
-    )
-    try:
-        chosen_idx = prompt_checklist(title, labels, pre_selected)
-    except (KeyboardInterrupt, EOFError, OSError, SystemExit):
-        return set()
-    chosen_keys = [offer_keys[i] for i in chosen_idx if 0 <= i < len(offer_keys)]
-    # Every offered unconfigured tool NOT chosen is a decline; choosing a previously-declined tool
-    # clears it. Cancel paths above return before this and record nothing.
-    newly_declined = [k for k in unconfigured if k not in chosen_keys and k not in declined]
-    if newly_declined or (declined & set(chosen_keys)):
-        config["tool_gateway_declined_tools"] = sorted((declined | set(newly_declined)) - set(chosen_keys))
-    changed = apply_gateway_defaults(config, chosen_keys) if chosen_keys else set()
-    if changed or newly_declined:
-        from hermes_cli.config import save_config
-
-        save_config(config)
-        for key in sorted(changed):
-            print(f"  ✓ {_GATEWAY_TOOL_LABELS.get(key, key)}: enabled via {source_label}")
-    return changed
-
-
-# Inline Nous Portal login for the Tool Gateway picker (`hermes tools`)
-
+    """Legacy hook retained for callers; Stardust never prompts for a Nous subscription."""
+    _ = (config, force_fresh)
+    return set()
 
 def ensure_nous_portal_access(*, capability: str = "the Nous Tool Gateway", coverage_category: Optional[str] = None) -> bool:
     """Make sure the user is entitled to the Nous Tool Gateway, logging in if needed.
