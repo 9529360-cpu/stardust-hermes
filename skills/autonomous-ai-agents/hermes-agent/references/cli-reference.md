@@ -1,7 +1,7 @@
 # Hermes CLI Reference
 
 Live sources when anything looks stale: `hermes --help`, `hermes <command> --help`,
-https://hermes-agent.nousresearch.com/docs/reference/cli-commands
+and this checkout's `website/docs/reference/cli-commands.md`.
 
 ### Global Flags
 
