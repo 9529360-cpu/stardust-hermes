@@ -10,31 +10,49 @@ afterEach(() => {
   $sendDiagnostics.set(null)
 })
 
-// Stardust is independently maintained: the only default upload transport for
-// "Send diagnostics" is still the legacy, explicit-consent Nous bundle upload
-// (diagnostics.share_nous — see send-diagnostics.ts), but it must never be
-// presented as Stardust's own support channel. The dialog must (a) label the
-// upload honestly as going to Nous, so the user isn't misled about who can
-// see it, and (b) hand off support to Stardust's own issue tracker, never the
-// upstream Nous Portal/Discord links a first-party "Hermes Cloud" support
-// surface would have offered.
+// Stardust owns the support handoff: the default Desktop flow prepares a
+// force-redacted local ZIP and lets the user save it. It must neither present
+// Nous/Portal/Discord as the support authority nor claim that logs were
+// uploaded to a support service.
 describe('SendDiagnosticsHost', () => {
-  it('labels the upload as going to Nous, not implying it is a Stardust-run channel', () => {
+  it('describes a local redacted save with no support-service upload', () => {
     requestSendDiagnostics()
     render(<SendDiagnosticsHost />)
 
-    expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getAllByText(/nous/i).length).toBeGreaterThan(0)
+    const dialog = screen.getByRole('dialog')
+
+    expect(dialog).toBeTruthy()
+    expect(dialog.textContent).toMatch(/save diagnostics/i)
+    expect(dialog.textContent).toMatch(/nothing is uploaded/i)
+    expect(dialog.textContent).not.toMatch(/nous|portal|discord/i)
   })
 
-  it('only offers the Stardust issue tracker as support, never Nous Portal or Discord', () => {
+  it('shows the saved local path and only Stardust GitHub as the support handoff', () => {
     requestSendDiagnostics()
-    $sendDiagnostics.set({ phase: 'done', result: { viewUrl: 'https://example.com/view/x1' } })
+    $sendDiagnostics.set({
+      phase: 'done',
+      result: { savedPath: '/Users/me/Downloads/stardust-diagnostics.zip' }
+    })
     render(<SendDiagnosticsHost />)
 
-    const links = screen.getAllByRole('button').map(button => button.textContent ?? '')
+    expect(screen.getByText('/Users/me/Downloads/stardust-diagnostics.zip')).toBeTruthy()
 
-    expect(links.some(text => /github/i.test(text))).toBe(true)
-    expect(links.some(text => /nous portal|discord/i.test(text))).toBe(false)
+    const buttons = screen.getAllByRole('button').map(button => button.textContent ?? '')
+
+    expect(buttons.some(text => /github/i.test(text))).toBe(true)
+    expect(buttons.some(text => /nous portal|discord/i.test(text))).toBe(false)
+  })
+
+  it('surfaces backend cleanup uncertainty after a successful local save', () => {
+    $sendDiagnostics.set({
+      phase: 'done',
+      result: {
+        savedPath: '/tmp/stardust-diagnostics.zip',
+        cleanupWarning: 'backend cleanup unavailable'
+      }
+    })
+    render(<SendDiagnosticsHost />)
+
+    expect(screen.getByText(/backend cleanup unavailable/i)).toBeTruthy()
   })
 })

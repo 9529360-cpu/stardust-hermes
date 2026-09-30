@@ -668,6 +668,27 @@ export interface SetupRuntimeCheckResult {
   free_tier?: boolean | null
   profile?: string | null
 }
+export interface DiagnosticsDiscardBundleParams {
+  path: string
+}
+export interface DiagnosticsDiscardBundleResult {
+  ok: boolean
+  removed: boolean
+  error?: string | null
+}
+export interface DiagnosticsPrepareBundleParams {
+  error_context?: string | null
+  extra_files?: Record<string, string> | null
+  log_lines?: number | null
+}
+/** Backend-local short-lived file; Desktop downloads it, then calls discard. */
+export interface DiagnosticsPrepareBundleResult {
+  ok: boolean
+  path?: string | null
+  filename?: string | null
+  byte_size?: number | null
+  error?: string | null
+}
 export interface DiagnosticsShareNousParams {
   error_context?: string | null
   extra_files?: Record<string, string> | null
@@ -4247,6 +4268,10 @@ export interface RpcMethods {
   'delegation.pause': { params: DelegationPauseParams; result: DelegationPauseResult }
   /** Running subagent tree plus the spawn pause flag and limits. */
   'delegation.status': { params: ProfileParams; result: DelegationStatusResult }
+  /** Delete one temporary Stardust diagnostics archive from the current profile cache. */
+  'diagnostics.discard_bundle': { params: DiagnosticsDiscardBundleParams; result: DiagnosticsDiscardBundleResult }
+  /** Create a force-redacted temporary diagnostics ZIP without uploading it. */
+  'diagnostics.prepare_bundle': { params: DiagnosticsPrepareBundleParams; result: DiagnosticsPrepareBundleResult }
   /** Upload a force-redacted debug bundle to Nous-internal diagnostics storage. */
   'diagnostics.share_nous': { params: DiagnosticsShareNousParams; result: DiagnosticsShareNousResult }
   /** Stage a non-image file into the session workspace and hand back its @file: ref. */
@@ -4648,6 +4673,8 @@ export const RPC_METHODS = [
   'cron.manage',
   'delegation.pause',
   'delegation.status',
+  'diagnostics.discard_bundle',
+  'diagnostics.prepare_bundle',
   'diagnostics.share_nous',
   'file.attach',
   'free_tier.ack_notice',

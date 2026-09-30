@@ -251,26 +251,23 @@ export const ja = defineLocale({
   },
 
   sendDiagnostics: {
-    title: 'Nous に診断情報を送信',
+    title: '診断情報を保存',
     privacyNotice:
-      'デバッグバンドルを Nous 内部ストレージにアップロードします（公開ペーストではありません）。システム情報（OS、バージョン、プロバイダー、設定済み API キーの種類 — キー自体は含まれません）と、エージェント/ゲートウェイ/デスクトップの完全なログ（各最大 512 KB。会話内容、ツール出力、ファイルパスを含む可能性が高い）が含まれます。シークレットはアップロード前にマスクされます。閲覧できるのは Nous スタッフと許可された Discord モデレーターのみで、14 日後に自動削除されます。',
-    upload: 'アップロード',
-    uploading: 'アップロード中…',
+      'Stardust はバックエンド上で強制的に秘匿情報をマスクした診断 ZIP を作成します。OS、バージョン、プロバイダー、設定済み API キーの種類（キー本体は含みません）と、最近のエージェント／ゲートウェイ／デスクトップログが含まれ、会話内容、ツール出力、ファイルパスが含まれる場合があります。既定のフローではサポートサービスへアップロードしません。保存処理の後、Stardust はバックエンドの一時コピーを削除し、異常終了時の古い一時ファイルも自動的に整理します。',
+    save: '作成して保存',
+    preparing: '準備中…',
     cancel: 'キャンセル',
     close: '閉じる',
-    copyLink: 'リンクをコピー',
-    uploadIdFallback: id => `表示リンクが返されませんでした — サポートにアップロード ID ${id} をお伝えください`,
-    doneTitle: '診断情報を送信しました',
+    copyPath: 'パスをコピー',
+    doneTitle: '診断情報を保存しました',
     doneDescription:
-      'バンドルは非公開でアップロードされました。サポートスレッドで以下のリンクを共有すると、チームがログを確認できます。',
-    failedTitle: 'アップロードに失敗しました',
+      'マスク済みの診断バンドルをコンピューターに保存しました。サポートが必要な場合は Stardust の GitHub Issue に添付してください。',
+    failedTitle: '診断情報を保存できませんでした',
     failedHint:
-      'ターミナルから `hermes debug share --nous` を実行するか、`hermes debug share --local` でアップロードせずにレポートを表示することもできます。',
-    handoffLead: '続きは次の場所で:',
+      'Stardust とバックエンドを更新してから再試行してください。このフローがログをサポートサービスへアップロードする旧経路へフォールバックすることはありません。',
+    handoffLead: 'サポートが必要ですか？',
     links: {
-      github: 'GitHub Issues',
-      portal: 'Nous Portal サポート',
-      discord: 'Discord'
+      github: 'Stardust GitHub Issues'
     }
   },
 

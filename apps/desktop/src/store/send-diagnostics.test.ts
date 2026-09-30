@@ -18,15 +18,61 @@ function stubGateway(
   return () => $gateway.set(original)
 }
 
-function stubDesktopLogs(lines: null | string[]) {
+function stubDesktop(options?: {
+  lines?: string[]
+  save?: (payload: Record<string, unknown>) => Promise<{ canceled?: boolean; path?: string; saved: boolean }>
+}) {
   const original = window.hermesDesktop
+  const saveGatewayFile =
+    options?.save ??
+    vi.fn(async () => ({
+      path: '/Users/me/Downloads/stardust-diagnostics.zip',
+      saved: true
+    }))
 
   Object.defineProperty(window, 'hermesDesktop', {
     configurable: true,
-    value: lines ? { getRecentLogs: async () => ({ lines, path: '/tmp/desktop.log' }) } : undefined
+    value: {
+      getRecentLogs: async () => ({
+        lines: options?.lines ?? [],
+        path: '/tmp/desktop.log'
+      }),
+      saveGatewayFile
+    }
   })
 
-  return () => Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: original })
+  return {
+    saveGatewayFile,
+    restore: () =>
+      Object.defineProperty(window, 'hermesDesktop', {
+        configurable: true,
+        value: original
+      })
+  }
+}
+
+function localBundleRequest(overrides?: {
+  discard?: unknown
+  prepare?: unknown
+}) {
+  return vi.fn(async (method: string) => {
+    if (method === 'diagnostics.prepare_bundle') {
+      return (
+        overrides?.prepare ?? {
+          ok: true,
+          path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-x.zip',
+          filename: 'stardust-diagnostics-x.zip',
+          byte_size: 123
+        }
+      )
+    }
+
+    if (method === 'diagnostics.discard_bundle') {
+      return overrides?.discard ?? { ok: true, removed: true }
+    }
+
+    throw new Error(`unexpected diagnostics method: ${method}`)
+  })
 }
 
 describe('send-diagnostics store', () => {
@@ -35,7 +81,7 @@ describe('send-diagnostics store', () => {
     vi.restoreAllMocks()
   })
 
-  it('opens in consent phase without any network I/O', () => {
+  it('opens in consent phase without any backend or file I/O', () => {
     const request = vi.fn()
     const restore = stubGateway(request)
 
@@ -49,62 +95,141 @@ describe('send-diagnostics store', () => {
     }
   })
 
-  it('uploads on confirm, attaching error context and the local desktop log', async () => {
-    const request = vi.fn().mockResolvedValue({
-      ok: true,
-      view_url: 'https://nas.example/view/x1',
-      upload_id: 'x1',
-      expires_at: '2026-09-05T00:00:00Z'
-    })
-
+  it('prepares locally, saves through the desktop bridge, then discards the backend copy', async () => {
+    const request = localBundleRequest()
     const restoreGateway = stubGateway(request)
-    const restoreDesktop = stubDesktopLogs(['boot ok', 'ws connected'])
+    const desktop = stubDesktop({ lines: ['boot ok', 'ws connected'] })
 
     try {
       requestSendDiagnostics('layer: streaming\ncode: stream_drop')
       await confirmSendDiagnostics()
 
-      expect(request).toHaveBeenCalledTimes(1)
-      const [method, params] = request.mock.calls[0]
+      expect(request.mock.calls.map(call => call[0])).toEqual([
+        'diagnostics.prepare_bundle',
+        'diagnostics.discard_bundle'
+      ])
+      expect(request.mock.calls.some(call => call[0] === 'diagnostics.share_nous')).toBe(false)
 
-      expect(method).toBe('diagnostics.share_nous')
-      expect(params.error_context).toContain('stream_drop')
-      expect(params.extra_files['desktop.log']).toContain('ws connected')
+      const prepareParams = request.mock.calls[0][1] as Record<string, unknown>
+
+      expect(prepareParams.error_context).toContain('stream_drop')
+      expect((prepareParams.extra_files as Record<string, string>)['desktop.log']).toContain('ws connected')
+
+      expect(desktop.saveGatewayFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-x.zip',
+          suggestedName: 'stardust-diagnostics-x.zip'
+        })
+      )
 
       const state = $sendDiagnostics.get()
 
       expect(state?.phase).toBe('done')
-      expect(state?.result?.viewUrl).toBe('https://nas.example/view/x1')
+      expect(state?.result?.savedPath).toBe('/Users/me/Downloads/stardust-diagnostics.zip')
+      expect(state?.result?.byteSize).toBe(123)
     } finally {
-      restoreDesktop()
+      desktop.restore()
       restoreGateway()
     }
   })
 
-  it('omits extra_files when the desktop IPC is unavailable (browser dashboard)', async () => {
-    const request = vi.fn().mockResolvedValue({ ok: true, view_url: 'https://nas.example/view/x2' })
+  it('fails closed when the desktop save bridge is unavailable and still discards the temp bundle', async () => {
+    const request = localBundleRequest()
     const restoreGateway = stubGateway(request)
-    const restoreDesktop = stubDesktopLogs(null)
+    const originalDesktop = window.hermesDesktop
+
+    Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: undefined })
 
     try {
       requestSendDiagnostics()
       await confirmSendDiagnostics()
 
-      const [, params] = request.mock.calls[0]
-
-      expect(params.extra_files).toBeUndefined()
-      expect(params.error_context).toBeUndefined()
-      expect($sendDiagnostics.get()?.phase).toBe('done')
+      expect(request.mock.calls.map(call => call[0])).toEqual([
+        'diagnostics.prepare_bundle',
+        'diagnostics.discard_bundle'
+      ])
+      expect($sendDiagnostics.get()?.phase).toBe('error')
+      expect($sendDiagnostics.get()?.error).toContain('save bridge')
     } finally {
-      restoreDesktop()
+      Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: originalDesktop })
       restoreGateway()
     }
   })
 
-  it('surfaces upload failures inline and keeps the dialog open', async () => {
-    const request = vi.fn().mockResolvedValue({ ok: false, error: 'NAS unavailable' })
+  it('surfaces preparation failures without falling back to the legacy upload RPC', async () => {
+    const request = localBundleRequest({ prepare: { ok: false, error: 'bundle unavailable' } })
     const restoreGateway = stubGateway(request)
-    const restoreDesktop = stubDesktopLogs(null)
+    const desktop = stubDesktop()
+
+    try {
+      requestSendDiagnostics()
+      await confirmSendDiagnostics()
+
+      expect(request).toHaveBeenCalledTimes(1)
+      expect(request.mock.calls[0][0]).toBe('diagnostics.prepare_bundle')
+      expect(request.mock.calls.some(call => call[0] === 'diagnostics.share_nous')).toBe(false)
+      expect(desktop.saveGatewayFile).not.toHaveBeenCalled()
+      expect($sendDiagnostics.get()?.phase).toBe('error')
+      expect($sendDiagnostics.get()?.error).toContain('bundle unavailable')
+    } finally {
+      desktop.restore()
+      restoreGateway()
+    }
+  })
+
+  it('discards the backend copy when the local file save fails', async () => {
+    const request = localBundleRequest()
+    const restoreGateway = stubGateway(request)
+    const desktop = stubDesktop({
+      save: vi.fn(async () => {
+        throw new Error('disk full')
+      })
+    })
+
+    try {
+      requestSendDiagnostics()
+      await confirmSendDiagnostics()
+
+      expect(request.mock.calls.map(call => call[0])).toEqual([
+        'diagnostics.prepare_bundle',
+        'diagnostics.discard_bundle'
+      ])
+      expect($sendDiagnostics.get()?.phase).toBe('error')
+      expect($sendDiagnostics.get()?.error).toContain('disk full')
+    } finally {
+      desktop.restore()
+      restoreGateway()
+    }
+  })
+
+  it('treats native save cancellation as cancellation and cleans the backend copy', async () => {
+    const request = localBundleRequest()
+    const restoreGateway = stubGateway(request)
+    const desktop = stubDesktop({
+      save: vi.fn(async () => ({ canceled: true, saved: false }))
+    })
+
+    try {
+      requestSendDiagnostics()
+      await confirmSendDiagnostics()
+
+      expect(request.mock.calls.map(call => call[0])).toEqual([
+        'diagnostics.prepare_bundle',
+        'diagnostics.discard_bundle'
+      ])
+      expect($sendDiagnostics.get()).toBeNull()
+    } finally {
+      desktop.restore()
+      restoreGateway()
+    }
+  })
+
+  it('reports cleanup uncertainty without hiding a successful local save', async () => {
+    const request = localBundleRequest({
+      discard: { ok: false, removed: false, error: 'backend cleanup unavailable' }
+    })
+    const restoreGateway = stubGateway(request)
+    const desktop = stubDesktop()
 
     try {
       requestSendDiagnostics()
@@ -112,27 +237,29 @@ describe('send-diagnostics store', () => {
 
       const state = $sendDiagnostics.get()
 
-      expect(state?.phase).toBe('error')
-      expect(state?.error).toContain('NAS unavailable')
+      expect(state?.phase).toBe('done')
+      expect(state?.result?.cleanupWarning).toContain('backend cleanup unavailable')
+      expect(state?.result?.savedPath).toContain('stardust-diagnostics.zip')
     } finally {
-      restoreDesktop()
+      desktop.restore()
       restoreGateway()
     }
   })
 
-  it('confirm is a no-op outside the consent phase (no double upload)', async () => {
-    const request = vi.fn().mockResolvedValue({ ok: true })
+  it('confirm is a no-op outside the consent phase (no double prepare/save)', async () => {
+    const request = localBundleRequest()
     const restoreGateway = stubGateway(request)
-    const restoreDesktop = stubDesktopLogs(null)
+    const desktop = stubDesktop()
 
     try {
       requestSendDiagnostics()
       await confirmSendDiagnostics()
       await confirmSendDiagnostics()
 
-      expect(request).toHaveBeenCalledTimes(1)
+      expect(request.mock.calls.filter(call => call[0] === 'diagnostics.prepare_bundle')).toHaveLength(1)
+      expect(desktop.saveGatewayFile).toHaveBeenCalledTimes(1)
     } finally {
-      restoreDesktop()
+      desktop.restore()
       restoreGateway()
     }
   })
@@ -144,34 +271,48 @@ describe('send-diagnostics store', () => {
     expect($sendDiagnostics.get()).toBeNull()
   })
 
-  it('dismissal mid-upload is immediate and a stale completion cannot resurrect the dialog', async () => {
-    let resolveRequest: (value: unknown) => void = () => {}
+  it('dismissal mid-prepare cannot resurrect the dialog and the late temp bundle is discarded', async () => {
+    let resolvePrepare: (value: unknown) => void = () => {}
 
-    const request = vi.fn().mockImplementation(() => new Promise(resolve => (resolveRequest = resolve)))
+    const request = vi.fn((method: string) => {
+      if (method === 'diagnostics.prepare_bundle') {
+        return new Promise(resolve => (resolvePrepare = resolve))
+      }
+      if (method === 'diagnostics.discard_bundle') {
+        return Promise.resolve({ ok: true, removed: true })
+      }
+
+      throw new Error(`unexpected method ${method}`)
+    })
 
     const restoreGateway = stubGateway(request as never)
-    const restoreDesktop = stubDesktopLogs(null)
+    const desktop = stubDesktop()
 
     try {
       requestSendDiagnostics()
       const pending = confirmSendDiagnostics()
 
-      // Wait for the request to actually start, then dismiss mid-flight.
-      await vi.waitFor(() => expect(request).toHaveBeenCalled())
+      await vi.waitFor(() =>
+        expect(request.mock.calls.some(call => call[0] === 'diagnostics.prepare_bundle')).toBe(true)
+      )
       dismissSendDiagnostics()
       expect($sendDiagnostics.get()).toBeNull()
 
-      // The upload completes AFTER dismissal — it must not write back.
-      resolveRequest({ ok: true, view_url: 'https://nas.example/view/stale' })
+      resolvePrepare({
+        ok: true,
+        path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-stale.zip',
+        filename: 'stardust-diagnostics-stale.zip'
+      })
       await pending
 
       expect($sendDiagnostics.get()).toBeNull()
+      expect(desktop.saveGatewayFile).not.toHaveBeenCalled()
+      expect(request.mock.calls.some(call => call[0] === 'diagnostics.discard_bundle')).toBe(true)
 
-      // A NEW dialog opened after the stale completion is untouched by it.
       requestSendDiagnostics('fresh')
       expect($sendDiagnostics.get()?.phase).toBe('consent')
     } finally {
-      restoreDesktop()
+      desktop.restore()
       restoreGateway()
     }
   })

@@ -1,47 +1,44 @@
-// "Send Diagnostics" — the error card's consent-gated debug-bundle upload.
+// "Send Diagnostics" — Stardust-owned local diagnostics handoff.
 //
-// Flow: an error card (or any surface) calls requestSendDiagnostics() with
-// optional error context → the modal host renders the privacy notice → the
-// user explicitly clicks Upload → diagnostics.share_nous runs backend-side
-// (collect + force-redact + Nous-S3 upload) → the modal shows the private
-// view link plus the support handoff (GitHub Issues · Nous Portal Support ·
-// Discord).
+// Flow: an error card opens the consent modal -> the backend prepares a
+// force-redacted, short-lived ZIP in its own profile cache -> Electron downloads
+// that file through the existing authenticated gateway-file bridge -> the user
+// chooses the local save destination -> Desktop asks the backend to discard its
+// temporary copy. Nothing in this default flow is uploaded to a support service.
 //
-// Consent is per-upload and explicit — no "always allow", mirroring the CLI's
-// `hermes debug share --nous` confirmation contract. On a remote connection
-// the backend bundles ITS OWN logs (the runtime that owns the failure); the
-// local desktop.log is attached as a client-side extra so support sees both
-// halves in one bundle.
+// The legacy diagnostics.share_nous RPC remains backend-compatible for older
+// clients, but this Stardust Desktop surface never calls it.
 import { atom } from 'nanostores'
 
+import type { HermesGateway } from '@/hermes'
 import { $gateway } from '@/store/gateway'
+import { $connection } from '@/store/session'
 
 export interface SendDiagnosticsResult {
-  expiresAt?: string
-  uploadId?: string
-  viewUrl?: string
+  byteSize?: number
+  cleanupWarning?: string
+  filename?: string
+  savedPath?: string
 }
 
 export interface SendDiagnosticsState {
   /** Short text describing the failure that prompted the report (attached
-   *  to the bundle as error-context.txt, redacted server-side). */
+   *  to the bundle as error-context.txt, force-redacted server-side). */
   errorContext?: string
   error?: string
-  phase: 'consent' | 'done' | 'error' | 'uploading'
+  phase: 'consent' | 'done' | 'error' | 'preparing'
   result?: SendDiagnosticsResult
 }
 
 export const $sendDiagnostics = atom<SendDiagnosticsState | null>(null)
 
 // Generation token: bumped on every open AND every dismiss. An in-flight
-// upload captures the generation it started under and only writes its
-// completion back when the token still matches — so dismissing mid-upload is
-// immediate and a stale completion can't resurrect or overwrite the dialog.
-// Request cancellation stays best-effort (the WS call runs to completion
-// server-side; we just ignore the result).
+// prepare/save captures the generation it started under and only writes its
+// completion back when the token still matches, so dismissing mid-flight is
+// immediate and a stale completion cannot resurrect or overwrite the dialog.
 let generation = 0
 
-/** Open the consent modal. No network I/O happens until the user confirms. */
+/** Open the consent modal. No bundle collection or network I/O happens yet. */
 export function requestSendDiagnostics(errorContext?: string): void {
   generation += 1
   $sendDiagnostics.set({ errorContext, phase: 'consent' })
@@ -52,12 +49,18 @@ export function dismissSendDiagnostics(): void {
   $sendDiagnostics.set(null)
 }
 
-interface ShareNousResponse {
+interface PrepareBundleResponse {
+  byte_size?: number
   error?: string
-  expires_at?: string
+  filename?: string
   ok: boolean
-  upload_id?: string
-  view_url?: string
+  path?: string
+}
+
+interface DiscardBundleResponse {
+  error?: string
+  ok: boolean
+  removed: boolean
 }
 
 /** Read the LOCAL desktop log via Electron so a remote backend's bundle still
@@ -74,11 +77,27 @@ async function collectLocalExtras(): Promise<Record<string, string>> {
   }
 }
 
-// Bundle collection + upload legitimately takes a while (log reads + gzip +
-// S3 leg); the default WS timeout is too tight for slow disks/links.
-const SHARE_TIMEOUT_MS = 120_000
+const PREPARE_TIMEOUT_MS = 120_000
+const DISCARD_TIMEOUT_MS = 30_000
 
-/** User confirmed — run the upload. Transitions consent → uploading → done/error. */
+async function discardPreparedBundle(
+  gateway: HermesGateway,
+  path: string
+): Promise<string | undefined> {
+  try {
+    const response = await gateway.request<DiscardBundleResponse>(
+      'diagnostics.discard_bundle',
+      { path },
+      DISCARD_TIMEOUT_MS
+    )
+
+    return response.ok ? undefined : response.error || 'temporary diagnostics cleanup failed'
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error)
+  }
+}
+
+/** User confirmed — prepare locally, save through Electron, then delete backend temp copy. */
 export async function confirmSendDiagnostics(): Promise<void> {
   const current = $sendDiagnostics.get()
 
@@ -87,59 +106,112 @@ export async function confirmSendDiagnostics(): Promise<void> {
   }
 
   const startedGeneration = generation
-
-  // Only write back while the dialog the upload belongs to is still open.
   const stillCurrent = () => generation === startedGeneration
+  const gateway = $gateway.get()
 
-  $sendDiagnostics.set({ ...current, phase: 'uploading' })
+  if (!gateway) {
+    $sendDiagnostics.set({ ...current, error: 'Hermes gateway unavailable', phase: 'error' })
+
+    return
+  }
+
+  $sendDiagnostics.set({ ...current, phase: 'preparing' })
+
+  let preparedPath: string | undefined
 
   try {
-    const gateway = $gateway.get()
-
-    if (!gateway) {
-      throw new Error('Hermes gateway unavailable')
-    }
-
     const extraFiles = await collectLocalExtras()
 
     if (!stillCurrent()) {
       return
     }
 
-    const response = await gateway.request<ShareNousResponse>(
-      'diagnostics.share_nous',
+    const prepared = await gateway.request<PrepareBundleResponse>(
+      'diagnostics.prepare_bundle',
       {
         ...(current.errorContext ? { error_context: current.errorContext } : {}),
         ...(Object.keys(extraFiles).length ? { extra_files: extraFiles } : {})
       },
-      SHARE_TIMEOUT_MS
+      PREPARE_TIMEOUT_MS
     )
+
+    if (!prepared.ok || !prepared.path) {
+      throw new Error(prepared.error || 'diagnostics bundle preparation failed')
+    }
+
+    preparedPath = prepared.path
+
+    if (!stillCurrent()) {
+      await discardPreparedBundle(gateway, preparedPath)
+
+      return
+    }
+
+    const saveGatewayFile = window.hermesDesktop?.saveGatewayFile
+
+    if (!saveGatewayFile) {
+      throw new Error('Desktop file save bridge is unavailable')
+    }
+
+    const connection = $connection.get()
+    const saved = await saveGatewayFile({
+      connectionId: connection?.connectionId,
+      path: preparedPath,
+      profile: connection?.profile,
+      suggestedName: prepared.filename || 'stardust-diagnostics.zip'
+    })
+
+    const cleanupWarning = await discardPreparedBundle(gateway, preparedPath)
+
+    preparedPath = undefined
 
     if (!stillCurrent()) {
       return
     }
 
-    if (!response.ok) {
-      throw new Error(response.error || 'upload failed')
+    if (saved.canceled || !saved.saved) {
+      if (cleanupWarning) {
+        $sendDiagnostics.set({
+          ...current,
+          error: `Save canceled. Temporary backend cleanup could not be confirmed: ${cleanupWarning}`,
+          phase: 'error'
+        })
+      } else {
+        dismissSendDiagnostics()
+      }
+
+      return
     }
 
     $sendDiagnostics.set({
       ...current,
       phase: 'done',
       result: {
-        expiresAt: response.expires_at,
-        uploadId: response.upload_id,
-        viewUrl: response.view_url
+        byteSize: prepared.byte_size,
+        cleanupWarning,
+        filename: prepared.filename,
+        savedPath: saved.path
       }
     })
   } catch (error) {
+    let cleanupWarning: string | undefined
+
+    if (preparedPath) {
+      cleanupWarning = await discardPreparedBundle(gateway, preparedPath)
+    }
+
     if (!stillCurrent()) {
       return
     }
 
+    const detail = error instanceof Error ? error.message : String(error)
+    const cleanupSuffix = cleanupWarning
+      ? ` Temporary backend cleanup could not be confirmed: ${cleanupWarning}`
+      : ''
+
     $sendDiagnostics.set({
       ...current,
-      error: error instanceof Error ? error.message : String(error),
+      error: `${detail}${cleanupSuffix}`,
       phase: 'error'
     })
   }
