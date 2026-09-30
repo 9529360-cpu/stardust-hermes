@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import argparse
 
+import pytest
+
 from hermes_cli.subcommands.gateway import build_gateway_parser
 from hermes_cli.subcommands.profile import build_profile_parser
 
@@ -60,26 +62,20 @@ def test_gateway_and_proxy_dispatch():
     assert px.command == "proxy"
     assert px.func is _h_proxy
 
+    px_start = p.parse_args(["proxy", "start"])
+    assert px_start.provider == "xai"
 
 
 
-def test_gateway_enroll_dispatch():
-    p = _gateway_parser()
-    ns = p.parse_args(
-        [
+
+def test_gateway_enroll_is_not_a_stardust_command():
+    with pytest.raises(SystemExit):
+        _gateway_parser().parse_args([
             "gateway",
             "enroll",
             "--token",
             "tok",
             "--connector-url",
             "wss://connector.example.com/relay",
-            "--gateway-id",
-            "gw-1",
-        ]
-    )
-    assert ns.command == "gateway"
-    assert ns.gateway_command == "enroll"
-    assert ns.func is _h_gateway_enroll
-    assert ns.token == "tok"
-    assert ns.connector_url == "wss://connector.example.com/relay"
-    assert ns.gateway_id == "gw-1"
+        ])
+
