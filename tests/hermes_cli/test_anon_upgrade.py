@@ -100,6 +100,11 @@ def portal(monkeypatch, tmp_path):
     monkeypatch.setenv("HERMES_ANON_API_SECRET", "test-secret")
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
     monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    # Legacy-upgrade tests explicitly opt into the compatibility product that Stardust disables.
+    from hermes_cli.config import load_config, save_config
+    cfg = load_config()
+    cfg.setdefault("nous", {})["guest"] = True
+    save_config(cfg)
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     from hermes_cli import auth_nous
