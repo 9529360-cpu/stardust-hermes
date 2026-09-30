@@ -34,6 +34,9 @@ from tools.delegate_tool_config import (  # noqa: F401
     _resolve_child_runtime, _resolve_delegation_credentials,
     _subagent_auto_approve, _subagent_auto_deny,
 )
+from tools.delegate_tool_memory import (  # noqa: F401
+    _read_only_parent_memory_snapshot, _same_inference_privacy_boundary,
+)
 from tools.delegate_tool_dispatch import _Batch, _announce_batch, _capture_origin, _run_batch
 from tools.delegate_tool_progress import (  # noqa: F401
     DelegateEvent, SUBAGENT_FAILURE_STATUSES, _batch_prefix, _build_child_progress_callback,
@@ -200,10 +203,6 @@ def _build_child_agent(
     # as auxiliary.review.
     delegation_cfg = _load_config()
     child_toolsets, child_disabled_toolsets = _resolve_child_toolsets(parent_agent, toolsets, effective_role)
-    child_prompt = _build_child_system_prompt(
-        goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
-        max_spawn_depth=max_spawn, child_depth=child_depth,
-    )
     parent_api_key = getattr(parent_agent, "api_key", None)
     if (not parent_api_key) and hasattr(parent_agent, "_client_kwargs"):
         parent_api_key = parent_agent._client_kwargs.get("api_key")
@@ -229,6 +228,18 @@ def _build_child_agent(
         request_overrides = dict(override_request_overrides)
     else:
         request_overrides = {} if override_provider else dict(getattr(parent_agent, "request_overrides", {}) or {})
+
+    # Resolve the pool before prompt construction: a multi-account pool can
+    # rotate after spawn, so it is part of the personal-context privacy boundary.
+    child_pool = _resolve_child_credential_pool(rt["provider"], parent_agent, rt["base_url"])
+    child_prompt = _build_child_system_prompt(
+        goal, context, workspace_path=_resolve_workspace_hint(parent_agent), role=effective_role,
+        max_spawn_depth=max_spawn, child_depth=child_depth,
+        parent_memory_context=_read_only_parent_memory_snapshot(
+            parent_agent, rt, child_request_overrides=request_overrides,
+            child_credential_pool=child_pool,
+        ),
+    )
     parent_sid = getattr(parent_agent, "session_id", None)
     child_session_db = _open_child_session_db(parent_agent)
     with delegated_child_context():
@@ -274,8 +285,7 @@ def _build_child_agent(
     # parent delete orphans them (mirrors /branch's ``_branched_from``).
     if parent_sid and getattr(child, "_session_init_model_config", None) is not None:
         child._session_init_model_config["_delegate_from"] = parent_sid
-    # Shared pool lets children rotate credentials on rate limits.
-    child_pool = _resolve_child_credential_pool(rt["provider"], parent_agent, rt["base_url"])
+    # Pool identity was already resolved for the privacy-boundary decision.
     if child_pool is not None:
         child._credential_pool = child_pool
 
