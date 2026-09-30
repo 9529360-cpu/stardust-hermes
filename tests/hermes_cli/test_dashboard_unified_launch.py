@@ -110,5 +110,37 @@ class TestInteractiveDashboardAuthSetup:
         assert "configured external dashboard.public_url" in output
 
 
+    def test_public_dashboard_offers_self_hosted_oidc_not_nous(
+        self, main_mod, monkeypatch, capsys
+    ):
+        from hermes_cli.dashboard_auth import clear_providers
+
+        clear_providers()
+        monkeypatch.setattr(main_mod.sys.stdin, "isatty", lambda: True)
+        monkeypatch.setattr(main_mod.sys.stdout, "isatty", lambda: True)
+        monkeypatch.setattr("builtins.input", lambda _prompt: "2")
+
+        with pytest.raises(SystemExit) as exc:
+            main_mod._maybe_setup_dashboard_auth_interactively(_args(host="0.0.0.0"))
+
+        assert exc.value.code == 0
+        output = capsys.readouterr().out
+        assert "Self-hosted OIDC" in output
+        assert "HERMES_DASHBOARD_OIDC_ISSUER" in output
+        assert "HERMES_DASHBOARD_OIDC_CLIENT_ID" in output
+        assert "Nous Portal" not in output
+        assert "dashboard register" not in output
+
+    def test_fail_closed_auth_hint_is_provider_neutral(self):
+        from hermes_cli.web_server import _no_auth_provider_message
+
+        message = _no_auth_provider_message("0.0.0.0")
+
+        assert "HERMES_DASHBOARD_OIDC_ISSUER" in message
+        assert "HERMES_DASHBOARD_OIDC_CLIENT_ID" in message
+        assert "Nous Portal" not in message
+        assert "dashboard register" not in message
+
+
 
 
