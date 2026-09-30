@@ -140,6 +140,7 @@ class TestIdentityLifecycle:
         other_home = tmp_path / "profiles" / "two"
         other_home.mkdir(parents=True)
         monkeypatch.setenv("HERMES_HOME", str(other_home))
+        _write_config(monkeypatch, guest=True)
         before = len(portal.calls)
         second = anon_auth.ensure_portal_identity(explicit=True)
         assert second["anon_token"] == first["anon_token"]
@@ -200,6 +201,7 @@ class TestExplicitProvision:
         sibling = tmp_path / "sibling-profile"
         sibling.mkdir()
         monkeypatch.setenv("HERMES_HOME", str(sibling))
+        _write_config(monkeypatch, guest=True)
         adopted = anon_auth.ensure_portal_identity(explicit=True)
         assert adopted and adopted["anon_token"] == token
         assert portal.minted == 1
