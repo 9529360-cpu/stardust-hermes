@@ -61,8 +61,6 @@ model:
   # Inference provider selection:
   #   "auto"         - Auto-detect from credentials (default)
   #   "openrouter"   - OpenRouter (requires: OPENROUTER_API_KEY or OPENAI_API_KEY)
-  #   "nous"         - Nous Portal OAuth (requires: hermes auth add nous)
-  #   "nous-api"     - Nous Portal API key (requires: NOUS_API_KEY)
   #   "anthropic"    - Direct Anthropic API (requires: ANTHROPIC_API_KEY)
   #   "openai-codex" - OpenAI Codex (requires: hermes auth)
   #   "copilot"      - GitHub Copilot / GitHub Models (requires: GITHUB_TOKEN)
@@ -82,8 +80,11 @@ model:
   #   "azure-foundry" - Microsoft Foundry / Azure OpenAI (API key or Entra ID)
   #   "lmstudio"     - LM Studio local server (optional: LM_API_KEY, defaults to http://127.0.0.1:1234/v1)
   #
+  # Direct/self-hosted APIs:
+  #   "custom"       - Any OpenAI-compatible endpoint. Set base_url + api_key/key_env explicitly.
+  #                    This is the preferred path for services not listed above.
+  #
   # Local servers (LM Studio, Ollama, vLLM, llama.cpp):
-  #   "custom"       - Any other OpenAI-compatible endpoint. Set base_url below.
   #   Aliases: "ollama", "vllm", "llamacpp" all map to "custom".
   #   LM Studio is first-class and uses provider: "lmstudio".
   #   It works with both no-auth and auth-enabled server modes.
