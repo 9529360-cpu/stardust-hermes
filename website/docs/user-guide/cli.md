@@ -9,7 +9,7 @@ description: "Master the Hermes Agent terminal interface — commands, keybindin
 Hermes Agent's CLI is a full terminal user interface (TUI) — not a web UI. It features multiline editing, slash-command autocomplete, conversation history, interrupt-and-redirect, and streaming tool output. Built for people who live in the terminal.
 
 :::tip First-time setup
-One command — `hermes setup --portal` — and you're ready to `hermes chat`. See [Nous Portal](/integrations/nous-portal).
+Run `hermes model` to configure the API/provider and model you want, then start `hermes chat`. Custom OpenAI-compatible endpoints and local models are supported directly.
 :::
 
 :::tip
@@ -34,7 +34,7 @@ hermes chat --query-file - < prompt.txt
 hermes chat --model "anthropic/claude-sonnet-4"
 
 # With a specific provider
-hermes chat --provider nous        # Use Nous Portal
+hermes chat --provider anthropic   # Use your configured Anthropic API credentials
 hermes chat --provider openrouter  # Force OpenRouter
 
 # With specific toolsets

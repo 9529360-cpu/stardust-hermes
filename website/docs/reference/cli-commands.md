@@ -85,7 +85,6 @@ hermes [global-options] <command> [subcommand/options]
 | `hermes acp` | Run Hermes as an ACP server for editor integration. |
 | `hermes mcp` | Manage MCP server configurations and run Hermes as an MCP server. |
 | `hermes plugins` | Manage Hermes Agent plugins (install, enable, disable, remove). |
-| `hermes portal` | Nous Portal status, subscription link, and Tool Gateway routing. See [Tool Gateway](../user-guide/features/tool-gateway.md). |
 | `hermes tools` | Configure enabled tools per platform. |
 | `hermes computer-use` | Install or check the Computer Use (cua-driver) backend (macOS/Windows/Linux). |
 | `hermes pets` | Browse, install, and select [petdex](../user-guide/features/pets.md) animated pets shown across the CLI, TUI, and desktop app. Subcommands: `list`, `install`, `select`, `show`, `off`, `scale`, `remove`, `doctor`. |
@@ -242,7 +241,7 @@ hermes model
 
 Use this when you want to:
 - **add a new provider** (OpenRouter, Anthropic, Copilot, DeepSeek, custom, etc.)
-- log into OAuth-backed providers (Anthropic, Copilot, Codex, Nous Portal)
+- log into supported OAuth-backed providers (Anthropic, Copilot, Codex, xAI, MiniMax)
 - enter or update API keys
 - pick from provider-specific model lists
 - configure a custom/self-hosted endpoint
@@ -359,10 +358,9 @@ the full guide, supported languages, and configuration knobs.
 ## `hermes setup`
 
 ```bash
-hermes setup [model|tts|terminal|gateway|tools|agent] [--non-interactive] [--reset] [--quick] [--reconfigure] [--portal]
+hermes setup [model|tts|terminal|gateway|tools|telemetry|agent] [--non-interactive] [--reset] [--quick] [--reconfigure]
 ```
 
-**Easiest path:** `hermes setup --portal` — OAuth into Nous Portal and opt into the [Tool Gateway](../user-guide/features/tool-gateway.md) in one shot.
 
 **First run:** launches the first-time wizard.
 
@@ -386,23 +384,6 @@ Options:
 | `--non-interactive` | Use defaults / environment values without prompts. |
 | `--reset` | Reset configuration to defaults before setup. |
 | `--reconfigure` | Backwards-compat alias — bare `hermes setup` on an existing install now does this by default. |
-| `--portal` | One-shot Nous Portal setup: log in via OAuth, set Nous as the inference provider, and opt into the [Tool Gateway](../user-guide/features/tool-gateway.md). Skips the rest of the wizard. |
-
-## `hermes portal`
-
-```bash
-hermes portal [status|open|tools]
-```
-
-Inspect Nous Portal auth, Tool Gateway routing, and reach the subscription page. Subcommand-less invocation runs `status`.
-
-| Subcommand | Description |
-|------------|-------------|
-| `status` (default) | Portal auth state + per-tool Tool Gateway routing summary. Also shown when no subcommand is given. |
-| `open` | Open `portal.nousresearch.com/manage-subscription` in your default browser. |
-| `tools` | List every Tool Gateway partner (Firecrawl, FAL, OpenAI TTS, Browser Use, Modal) and which are routed via Nous. |
-
-For configuration of the gateway itself, see [Tool Gateway](../user-guide/features/tool-gateway.md). For the one-shot setup path, see `hermes setup --portal` above.
 
 ## `hermes whatsapp`
 
