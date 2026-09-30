@@ -28,6 +28,12 @@ from hermes_cli.proxy.adapters.xai import XAIGrokAdapter
 
 
 
+def test_public_proxy_registry_excludes_nous_account_adapter():
+    assert set(ADAPTERS) == {"xai"}
+    with pytest.raises(ValueError, match="Unknown proxy upstream provider"):
+        get_adapter("nous")
+
+
 # ---------------------------------------------------------------------------
 # NousPortalAdapter
 # ---------------------------------------------------------------------------

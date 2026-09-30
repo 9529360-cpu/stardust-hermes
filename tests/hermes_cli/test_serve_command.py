@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import argparse
 
+import pytest
+
 from hermes_cli.subcommands.dashboard import build_dashboard_parser
 
 
@@ -48,3 +50,8 @@ def test_serve_is_a_headless_backend_but_dashboard_is_not():
     # build; only `serve` carries it.
     assert getattr(_parser().parse_args(["serve"]), "headless_backend", False) is True
     assert getattr(_parser().parse_args(["dashboard"]), "headless_backend", False) is False
+
+def test_dashboard_register_is_not_a_stardust_command():
+    with pytest.raises(SystemExit):
+        _parser().parse_args(["dashboard", "register"])
+
