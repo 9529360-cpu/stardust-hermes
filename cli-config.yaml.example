@@ -802,8 +802,9 @@ prompt_caching:
 # auto-detected from your credentials.  You do NOT need to change anything
 # here for normal usage.
 #
-# WARNING: Overriding these with providers other than OpenRouter or Nous Portal
-# is EXPERIMENTAL and may not work.  Not all models/providers support vision,
+# WARNING: Not all models/providers support vision, summaries, or the same API
+# format. Keep auxiliary overrides explicit and test them with your backend.
+# Some combinations are EXPERIMENTAL and may not work. Not all providers
 # produce usable summaries, or accept the same API format.  Change at your own
 # risk — if things break, reset to "auto" / empty values.
 #
@@ -812,9 +813,8 @@ prompt_caching:
 # local endpoint for compression (just needs text).
 #
 # Provider options:
-#   "auto"       - Best available: OpenRouter → Nous Portal → main endpoint (default)
+#   "auto"       - Best explicitly configured route, then main endpoint (default)
 #   "openrouter" - Force OpenRouter (requires OPENROUTER_API_KEY)
-#   "nous"       - Force Nous Portal (requires: hermes auth add nous)
 #   "gemini"      - Force Google AI Studio direct (requires: GOOGLE_API_KEY or GEMINI_API_KEY)
 #   "ollama-cloud" - Ollama Cloud (requires: OLLAMA_API_KEY)
 #   "codex"       - Force Codex OAuth (requires: hermes model → Codex).
@@ -823,9 +823,8 @@ prompt_caching:
 #                  Works with OpenAI API, local models, or any OpenAI-compatible
 #                  endpoint.  Also falls back to Codex OAuth and API-key providers.
 #
-# Model: leave empty to use the provider's default.  When empty, OpenRouter
-# uses "google/gemini-3-flash-preview" and Nous uses "gemini-3-flash".
-# Other providers pick a sensible default automatically.
+# Model: leave empty to use the provider's default. OpenRouter commonly uses
+# "google/gemini-3-flash-preview"; other providers choose their own defaults.
 #
 # auxiliary:
 #   # Image analysis: vision_analyze tool + browser screenshots
