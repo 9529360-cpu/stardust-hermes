@@ -208,6 +208,8 @@ def test_failed_guest_mint_only_suppresses_that_profile(homes, monkeypatch, tmp_
     a, b = homes
     monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
     monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared"))
+    for home in (a, b):
+        (home / "config.yaml").write_text("nous:\n  guest: true\n", encoding="utf-8")
     import hermes_cli.anon_auth as anon
     import hermes_cli.auth_nous as auth_nous
 
