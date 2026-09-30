@@ -472,7 +472,9 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
             "    HERMES_DASHBOARD_OIDC_CLIENT_ID=stardust-dashboard\n"
             "  Or set dashboard.oauth.self_hosted.{issuer,client_id} in config.yaml.\n"
             "  An optional client secret can be supplied with "
-            "HERMES_DASHBOARD_OIDC_CLIENT_SECRET."
+            "HERMES_DASHBOARD_OIDC_CLIENT_SECRET.\n"
+            "  Docs: https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/"
+            "user-guide/features/web-dashboard.md#authentication-gated-mode"
         )
         sys.exit(0)
 
