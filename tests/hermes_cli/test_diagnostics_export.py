@@ -127,10 +127,11 @@ def test_prepare_bounds_client_files_and_prunes_crash_leftovers(diagnostics_home
     root.mkdir(parents=True)
     monkeypatch.setattr(export, "_MAX_EXPORTS", 2)
 
+    recent = time.time()
     first = Path(str(export.prepare_diagnostics_bundle()["path"]))
-    os.utime(first, (1, 1))
+    os.utime(first, (recent - 2, recent - 2))
     second = Path(str(export.prepare_diagnostics_bundle()["path"]))
-    os.utime(second, (2, 2))
+    os.utime(second, (recent - 1, recent - 1))
     third = Path(str(export.prepare_diagnostics_bundle()["path"]))
 
     existing = sorted(root.glob("stardust-diagnostics-*.zip"))
