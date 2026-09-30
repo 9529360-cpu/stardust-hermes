@@ -144,6 +144,52 @@ def test_create_retry_uses_same_idempotency_keys(monkeypatch):
     assert "local" not in calls[0]["idempotency_key"]
 
 
+def test_attention_semantics_keep_machine_owned_states_off_the_user_queue():
+    blocked = SimpleNamespace(status="blocked", assignee="default")
+    review = SimpleNamespace(status="review", assignee="reviewer")
+    ownerless_review = SimpleNamespace(status="review", assignee=None)
+    triage = SimpleNamespace(status="triage", assignee="default")
+    running = SimpleNamespace(status="running", assignee="default")
+
+    assert assistant_tasks._task_needs_attention(blocked, triage_machine_managed=True) is True
+    assert assistant_tasks._task_needs_attention(review, triage_machine_managed=False) is False
+    assert assistant_tasks._task_needs_attention(ownerless_review, triage_machine_managed=True) is True
+    assert assistant_tasks._task_needs_attention(triage, triage_machine_managed=True) is False
+    assert assistant_tasks._task_needs_attention(triage, triage_machine_managed=False) is True
+    assert assistant_tasks._task_needs_attention(running, triage_machine_managed=False) is False
+
+
+def test_triage_machine_management_requires_auto_decompose_and_usable_model(monkeypatch):
+    from hermes_cli import config as config_mod
+
+    monkeypatch.setattr(
+        config_mod,
+        "load_config_readonly",
+        lambda: {
+            "kanban": {"auto_decompose": True},
+            "model": {"provider": "openai", "default": "example/model"},
+        },
+    )
+    assert assistant_tasks._triage_is_machine_managed() is True
+
+    monkeypatch.setattr(
+        config_mod,
+        "load_config_readonly",
+        lambda: {
+            "kanban": {"auto_decompose": False},
+            "model": {"provider": "openai", "default": "example/model"},
+        },
+    )
+    assert assistant_tasks._triage_is_machine_managed() is False
+
+    monkeypatch.setattr(
+        config_mod,
+        "load_config_readonly",
+        lambda: {"kanban": {"auto_decompose": True}},
+    )
+    assert assistant_tasks._triage_is_machine_managed() is False
+
+
 def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
     rows = [
         SimpleNamespace(
@@ -156,6 +202,36 @@ def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
             workspace_path="/repo/.worktrees/t_active",
             created_at=100,
             started_at=110,
+            completed_at=None,
+            block_kind=None,
+            last_failure_error=None,
+            result=None,
+        ),
+        SimpleNamespace(
+            id="t_review",
+            title="Verify implementation",
+            status="review",
+            assignee="reviewer",
+            project_id="project-1",
+            workspace_kind="worktree",
+            workspace_path="/repo/.worktrees/t_review",
+            created_at=105,
+            started_at=107,
+            completed_at=None,
+            block_kind=None,
+            last_failure_error=None,
+            result=None,
+        ),
+        SimpleNamespace(
+            id="t_triage",
+            title="Break down research",
+            status="triage",
+            assignee="default",
+            project_id=None,
+            workspace_kind="scratch",
+            workspace_path=None,
+            created_at=98,
+            started_at=None,
             completed_at=None,
             block_kind=None,
             last_failure_error=None,
@@ -223,11 +299,18 @@ def test_list_is_read_only_projection_of_kanban_authority(monkeypatch):
     monkeypatch.setattr("tools.kanban_tools._board", fake_board)
 
     monkeypatch.setattr(assistant_tasks, "_assistant_board_slugs", lambda: ["default"])
+    monkeypatch.setattr(assistant_tasks, "_triage_is_machine_managed", lambda: True)
 
     active = json.loads(
         assistant_tasks.assistant_tasks_tool(action="list", include_completed=False)
     )
-    assert [row["task_id"] for row in active["tasks"]] == ["t_active", "t_wait"]
+    assert [row["task_id"] for row in active["tasks"]] == [
+        "t_active", "t_review", "t_triage", "t_wait"
+    ]
+    review = next(row for row in active["tasks"] if row["task_id"] == "t_review")
+    triage = next(row for row in active["tasks"] if row["task_id"] == "t_triage")
+    assert review["needs_attention"] is False
+    assert triage["needs_attention"] is False
     waiting = next(row for row in active["tasks"] if row["task_id"] == "t_wait")
     assert waiting["needs_attention"] is True
     assert waiting["block_kind"] == "needs_input"
