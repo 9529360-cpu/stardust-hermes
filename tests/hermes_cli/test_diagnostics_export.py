@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import time
 import zipfile
 from pathlib import Path
 
@@ -108,7 +109,7 @@ def test_prune_never_deletes_the_current_handoff_when_mtimes_tie(diagnostics_hom
         path.write_bytes(b"zip")
         path.touch()
 
-    same_time = 1_700_000_000
+    same_time = time.time()
     for path in paths:
         os.utime(path, (same_time, same_time))
 
@@ -126,11 +127,11 @@ def test_prepare_bounds_client_files_and_prunes_crash_leftovers(diagnostics_home
     root.mkdir(parents=True)
     monkeypatch.setattr(export, "_MAX_EXPORTS", 2)
 
-    first = Path(str(export.prepare_diagnostics_bundle()))
+    first = Path(str(export.prepare_diagnostics_bundle()["path"]))
     os.utime(first, (1, 1))
-    second = Path(str(export.prepare_diagnostics_bundle()))
+    second = Path(str(export.prepare_diagnostics_bundle()["path"]))
     os.utime(second, (2, 2))
-    third = Path(str(export.prepare_diagnostics_bundle()))
+    third = Path(str(export.prepare_diagnostics_bundle()["path"]))
 
     existing = sorted(root.glob("stardust-diagnostics-*.zip"))
     assert len(existing) == 2

@@ -154,6 +154,11 @@ def prepare_diagnostics_bundle(
             for label, body in bundle.items():
                 if label == "report":
                     name = "report.txt"
+                elif label.startswith("client/"):
+                    client_label = _safe_client_label(label.removeprefix("client/"))
+                    if not client_label:
+                        continue
+                    name = f"client/{client_label}"
                 else:
                     name = _safe_client_label(label)
                     if not name or name == "manifest.json":
