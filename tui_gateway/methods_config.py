@@ -339,9 +339,37 @@ def _safe_client_label(label: str) -> str:
     return safe.lstrip(".").strip()
 
 
+@method("diagnostics.discard_bundle")
+def _(rid, params: dict) -> dict:
+    """Remove a temporary local diagnostics ZIP created for the Desktop save flow."""
+    try:
+        from hermes_cli.diagnostics_export import discard_diagnostics_bundle
+
+        removed = discard_diagnostics_bundle(params.get("path") or "")
+        return _ok(rid, {"ok": True, "removed": bool(removed)})
+    except Exception as e:
+        return _ok(rid, {"ok": False, "removed": False, "error": str(e)})
+
+
+@method("diagnostics.prepare_bundle")
+def _(rid, params: dict) -> dict:
+    """Prepare a force-redacted diagnostics ZIP on the backend host without uploading it."""
+    try:
+        from hermes_cli.diagnostics_export import prepare_diagnostics_bundle
+
+        result = prepare_diagnostics_bundle(
+            error_context=params.get("error_context"),
+            extra_files=params.get("extra_files"),
+            log_lines=params.get("log_lines"),
+        )
+        return _ok(rid, {"ok": True, **result})
+    except Exception as e:
+        return _ok(rid, {"ok": False, "error": str(e)})
+
+
 @method("diagnostics.share_nous")
 def _(rid, params: dict) -> dict:
-    """Upload a redacted debug bundle to Nous-internal diagnostics storage — same collection +
+    """Legacy explicit upload to Nous-internal diagnostics storage — same collection +
     force-redaction pipeline as ``hermes debug share --nous``; redaction is NOT client-controllable
     and consent lives with the CALLER (privacy notice first). Structured ``ok``/``error`` envelope so
     upload failures render inline. Optional: ``error_context`` (-> ``error-context.txt``),

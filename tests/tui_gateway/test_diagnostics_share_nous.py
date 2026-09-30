@@ -1,4 +1,4 @@
-"""diagnostics.share_nous RPC — Desktop "Send Diagnostics" upload path.
+"""diagnostics.share_nous RPC — legacy explicit Nous upload compatibility path.
 
 Contract pinned:
 * Reuses the CLI ``--nous`` pipeline (collect_share_bundle → build_nous_bundle
@@ -6,7 +6,7 @@ Contract pinned:
 * ``error_context`` and ``extra_files`` are redacted server-side, labels
   sanitized, sizes capped.
 * Upload failures return a structured ``{ok: False, error}`` envelope, never a
-  JSON-RPC error (the desktop renders them inline in the modal).
+  JSON-RPC error. Current Stardust Desktop does not call this legacy method.
 """
 
 from __future__ import annotations

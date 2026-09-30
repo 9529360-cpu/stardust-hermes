@@ -1,7 +1,7 @@
 """Contracts: config, setup readiness, free tier, model inventory, connectors, diagnostics,
 image generation and structured session control.
 
-Handlers: ``tui_gateway/methods_config.py`` (``config.get``, ``setup.*``, ``diagnostics.share_nous``),
+Handlers: ``tui_gateway/methods_config.py`` (``config.get``, ``setup.*``, ``diagnostics.*``),
 ``methods_config_set.py`` (``config.set``), ``methods_free_tier.py``, ``methods_complete.py``
 (``model.options``), ``methods_connectors.py``, ``methods_images.py``, ``methods_session_control.py``
 and ``methods_session.py`` (``verification.status``).
@@ -149,6 +149,51 @@ class SetupRuntimeCheckResult(Result):
 
 method("setup.runtime_check", params=SetupRuntimeCheckParams, result=SetupRuntimeCheckResult,
        doc="Strict provider check through the same runtime resolution the agent uses on session creation.")
+
+
+# ── diagnostics bundles ────────────────────────────────────────────────────────────────────────
+
+
+class DiagnosticsDiscardBundleParams(Params):
+    path: str
+
+
+class DiagnosticsDiscardBundleResult(Result):
+    ok: bool
+    removed: bool
+    error: str | None = None
+
+
+method(
+    "diagnostics.discard_bundle",
+    params=DiagnosticsDiscardBundleParams,
+    result=DiagnosticsDiscardBundleResult,
+    doc="Delete one temporary Stardust diagnostics archive from the current profile cache.",
+)
+
+
+class DiagnosticsPrepareBundleParams(Params):
+    error_context: str | None = None
+    extra_files: dict[str, str] | None = None
+    log_lines: int | None = None
+
+
+class DiagnosticsPrepareBundleResult(Result):
+    """Backend-local short-lived file; Desktop downloads it, then calls discard."""
+
+    ok: bool
+    path: str | None = None
+    filename: str | None = None
+    byte_size: int | None = None
+    error: str | None = None
+
+
+method(
+    "diagnostics.prepare_bundle",
+    params=DiagnosticsPrepareBundleParams,
+    result=DiagnosticsPrepareBundleResult,
+    doc="Create a force-redacted temporary diagnostics ZIP without uploading it.",
+)
 
 
 # ── diagnostics.share_nous ────────────────────────────────────────────────────────────────────

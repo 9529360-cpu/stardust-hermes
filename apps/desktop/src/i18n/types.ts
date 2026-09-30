@@ -359,21 +359,18 @@ export interface Translations {
   sendDiagnostics: {
     title: string
     privacyNotice: string
-    upload: string
-    uploading: string
+    save: string
+    preparing: string
     cancel: string
     close: string
-    copyLink: string
-    uploadIdFallback: (id: string) => string
+    copyPath: string
     doneTitle: string
     doneDescription: string
     failedTitle: string
     failedHint: string
     handoffLead: string
     links: {
-      discord: string
       github: string
-      portal: string
     }
   }
 

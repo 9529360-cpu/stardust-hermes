@@ -243,25 +243,22 @@ export const zhHant = defineLocale({
   },
 
   sendDiagnostics: {
-    title: '向 Nous 傳送診斷資訊',
+    title: '儲存診斷資訊',
     privacyNotice:
-      '這會將偵錯套件上傳到 Nous 內部儲存空間（並非公開貼上板）。內容包括系統資訊（作業系統、版本、服務商、已設定的 API 金鑰種類 — 絕不包含金鑰本身）以及完整的 agent、gateway 與桌面端日誌（每個最多 512 KB，很可能包含對話內容、工具輸出與檔案路徑）。上傳前會先遮罩機密資訊。僅 Nous 員工與獲准的 Discord 版主可檢視，14 天後自動刪除。',
-    upload: '上傳',
-    uploading: '上傳中…',
+      '星塵會在後端建立一個強制遮罩機密資訊的本機診斷 ZIP。內容包括系統資訊（作業系統、版本、服務商、已設定的 API 金鑰種類——絕不包含金鑰本身）以及近期的 agent、gateway 與桌面端日誌，其中可能包含對話內容、工具輸出和檔案路徑。預設流程不會將這些內容上傳到任何支援服務。儲存嘗試結束後，星塵會要求後端刪除暫存副本；異常退出遺留的暫存檔也會自動清理。',
+    save: '建立並儲存',
+    preparing: '正在準備…',
     cancel: '取消',
     close: '關閉',
-    copyLink: '複製連結',
-    uploadIdFallback: id => `未回傳檢視連結 — 請向支援人員提供上傳 ID ${id}`,
-    doneTitle: '診斷資訊已傳送',
-    doneDescription: '偵錯套件已私密上傳。在您的支援討論串中分享以下連結，團隊即可檢視您的日誌。',
-    failedTitle: '上傳失敗',
+    copyPath: '複製路徑',
+    doneTitle: '診斷資訊已儲存',
+    doneDescription: '已將遮罩後的診斷套件儲存到您的電腦。如需支援，可將此檔案附加到星塵的 GitHub Issue。',
+    failedTitle: '無法儲存診斷資訊',
     failedHint:
-      '您也可以在終端機執行 `hermes debug share --nous`，或執行 `hermes debug share --local` 在不上傳的情況下檢視報告。',
-    handoffLead: '在以下位置繼續討論:',
+      '請更新星塵與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
+    handoffLead: '需要協助？',
     links: {
-      github: 'GitHub Issues',
-      portal: 'Nous Portal 支援',
-      discord: 'Discord'
+      github: '星塵 GitHub Issues'
     }
   },
 

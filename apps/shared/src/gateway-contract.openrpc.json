@@ -655,6 +655,42 @@
       }
     },
     {
+      "name": "diagnostics.discard_bundle",
+      "summary": "Delete one temporary Stardust diagnostics archive from the current profile cache.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/DiagnosticsDiscardBundleParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DiagnosticsDiscardBundleResult"
+        }
+      }
+    },
+    {
+      "name": "diagnostics.prepare_bundle",
+      "summary": "Create a force-redacted temporary diagnostics ZIP without uploading it.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/DiagnosticsPrepareBundleParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DiagnosticsPrepareBundleResult"
+        }
+      }
+    },
+    {
       "name": "diagnostics.share_nous",
       "summary": "Upload a force-redacted debug bundle to Nous-internal diagnostics storage.",
       "params": [
@@ -10109,6 +10145,160 @@
           "max_concurrent_children"
         ],
         "title": "DelegationStatusResult",
+        "type": "object"
+      },
+      "DiagnosticsDiscardBundleParams": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "DiagnosticsDiscardBundleParams",
+        "type": "object"
+      },
+      "DiagnosticsDiscardBundleResult": {
+        "additionalProperties": false,
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "required": [
+          "ok",
+          "removed"
+        ],
+        "title": "DiagnosticsDiscardBundleResult",
+        "type": "object"
+      },
+      "DiagnosticsPrepareBundleParams": {
+        "additionalProperties": false,
+        "properties": {
+          "error_context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Context"
+          },
+          "extra_files": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Extra Files"
+          },
+          "log_lines": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Log Lines"
+          }
+        },
+        "title": "DiagnosticsPrepareBundleParams",
+        "type": "object"
+      },
+      "DiagnosticsPrepareBundleResult": {
+        "additionalProperties": false,
+        "description": "Backend-local short-lived file; Desktop downloads it, then calls discard.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Path"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Filename"
+          },
+          "byte_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Byte Size"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "DiagnosticsPrepareBundleResult",
         "type": "object"
       },
       "DiagnosticsShareNousParams": {

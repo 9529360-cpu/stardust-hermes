@@ -312,26 +312,23 @@ export const en: Translations = {
   },
 
   sendDiagnostics: {
-    title: 'Send diagnostics to Nous',
+    title: 'Save diagnostics',
     privacyNotice:
-      'This uploads a debug bundle to Nous-internal storage (not a public paste). It includes system info (OS, versions, provider, which API keys are configured — never the keys themselves) and full agent, gateway, and desktop logs (up to 512 KB each), which likely contain conversation content, tool outputs, and file paths. Secrets are redacted before upload. The bundle is viewable only by Nous staff and allowlisted Discord moderators, and auto-deletes after 14 days.',
-    upload: 'Upload',
-    uploading: 'Uploading…',
+      'Stardust will prepare a local, force-redacted diagnostics ZIP. It includes system info (OS, versions, provider, and which API key types are configured — never the keys themselves) plus recent agent, gateway, and desktop logs, which may contain conversation content, tool outputs, and file paths. Nothing is uploaded to a support service. After the save attempt, Stardust asks the backend to delete its temporary copy; stale crash leftovers are pruned automatically.',
+    save: 'Prepare and save',
+    preparing: 'Preparing…',
     cancel: 'Cancel',
     close: 'Close',
-    copyLink: 'Copy link',
-    uploadIdFallback: id => `No view link returned — quote upload ID ${id} to support`,
-    doneTitle: 'Diagnostics sent',
+    copyPath: 'Copy path',
+    doneTitle: 'Diagnostics saved',
     doneDescription:
-      'Your bundle was uploaded privately. Share the link below in your support thread so the team can see your logs.',
-    failedTitle: 'Upload failed',
+      'The redacted bundle was saved to your computer. If you want support, attach it to a Stardust issue.',
+    failedTitle: 'Couldn’t save diagnostics',
     failedHint:
-      'You can also run `hermes debug share --nous` from a terminal, or `hermes debug share --local` to print the report without uploading.',
-    handoffLead: 'Pick up the discussion in:',
+      'Try again after updating Stardust and the backend. This flow does not fall back to uploading your logs to a support service.',
+    handoffLead: 'Need help?',
     links: {
-      github: 'GitHub Issues',
-      portal: 'Nous Portal Support',
-      discord: 'Discord'
+      github: 'Stardust GitHub Issues'
     }
   },
 
