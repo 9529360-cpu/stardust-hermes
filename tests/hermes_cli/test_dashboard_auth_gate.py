@@ -443,9 +443,12 @@ def test_loopback_public_url_fail_closed_message_is_actionable(monkeypatch):
     # Names the trigger and its value.
     assert "dashboard.public_url" in msg
     assert "https://dashboard.example.test:9443" in msg
-    # Exit 1: configure auth.
+    # Exit 1: configure a Stardust-owned auth path.
     assert "basic_auth" in msg
-    assert "hermes dashboard register" in msg
+    assert "HERMES_DASHBOARD_OIDC_ISSUER" in msg
+    assert "HERMES_DASHBOARD_OIDC_CLIENT_ID" in msg
+    assert "hermes dashboard register" not in msg
+    assert "Nous Portal" not in msg
     # Exit 2: remove public_url to restore local-only mode.
     assert "remove dashboard.public_url" in msg
     assert "LOCAL-ONLY" in msg
