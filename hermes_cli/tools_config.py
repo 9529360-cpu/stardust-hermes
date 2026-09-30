@@ -10,7 +10,7 @@ from hermes_cli.cli_output import print_info as _print_info
 from hermes_cli.colors import Colors, color
 from hermes_cli.config import cfg_get, load_config, save_config, get_env_value
 from hermes_cli.nous_subscription import (
-    NousSubscriptionFeatures, apply_nous_managed_defaults, get_nous_subscription_features)
+    NousSubscriptionFeatures, get_nous_subscription_features)
 from hermes_cli.platforms import PLATFORMS as _PLATFORMS_REGISTRY
 from hermes_cli.toolset_scope import (
     _TOOLSET_PLATFORM_RESTRICTIONS, toolset_allowed_for_platform as _toolset_allowed_for_platform)
@@ -725,7 +725,12 @@ def _provider_env_ready(provider: dict) -> bool:
 def _toolset_has_keys(
     ts_key: str, config: dict = None, *, force_fresh: bool = False, features: Optional[NousSubscriptionFeatures] = None,
 ) -> bool:
-    """Check if a toolset's required API keys are configured."""
+    """Check whether a toolset has a usable explicit/local backend.
+
+    ``features`` is retained for call-site compatibility but Nous account/subscription entitlement is
+    intentionally not a Stardust readiness signal and is never fetched here.
+    """
+    _ = features
     if config is None:
         config = load_config()
     if ts_key == "vision":
@@ -734,18 +739,16 @@ def _toolset_has_keys(
             return resolve_vision_provider_client()[1] is not None
         except Exception:
             return False
-    if ts_key in {"web", "image_gen", "video_gen", "tts", "stt", "browser"}:
-        if features is None:
-            features = get_nous_subscription_features(config, force_fresh=force_fresh)
-        feature = features.features.get(ts_key)
-        if feature and (feature.available or feature.managed_by_nous):
-            return True
-    # Provider-aware categories first: a no-key provider (Local Browser, Edge TTS) counts as configured.
+
+    # Provider-aware categories: visible rows already exclude inherited Nous account backends.
+    # A no-key local/provider row remains configured by construction.
     cat = TOOL_CATEGORIES.get(ts_key)
     if cat:
-        return any(_provider_env_ready(p) for p in _visible_providers(cat, config, force_fresh=force_fresh, features=features))
+        return any(
+            _provider_env_ready(provider)
+            for provider in _visible_providers(cat, config, force_fresh=force_fresh)
+        )
     return all(get_env_value(var) for var, _ in TOOLSET_ENV_REQUIREMENTS.get(ts_key, []))
-
 
 def _prompt_choice(question: str, choices: list, default: int = 0) -> int:
     """Single-select menu (arrow keys). Delegates to curses_radiolist."""
@@ -960,14 +963,10 @@ def _first_install_flow(config: dict, enabled_platforms: List[str]) -> None:
         current_enabled = _current_platform_tools(config, pkey)
         new_enabled = _prompt_toolset_checklist(pinfo["label"], current_enabled - _DEFAULT_OFF_TOOLSETS, pkey)
         _print_toolset_diff(*_checklist_diff(new_enabled, current_enabled, pkey))
-        auto_configured = apply_nous_managed_defaults(config, enabled_toolsets=new_enabled, force_fresh=True)
-        for ts_key in sorted(auto_configured):
-            label = next((l for k, l, _ in CONFIGURABLE_TOOLSETS if k == ts_key), ts_key)
-            print(color(f"  ✓ {label}: using your Nous subscription defaults", Colors.GREEN))
-        # Walk through ALL selected tools with provider options or key requirements, so browser (Local vs
-        # Browserbase), TTS (Edge vs OpenAI vs ElevenLabs), etc. are shown even when a free provider exists.
+        # Walk through ALL selected tools with provider options or key requirements. Stardust
+        # never auto-wires an inherited Nous subscription/free-tier backend during first install.
         _configure_list(
-            [ts for ts in sorted(new_enabled) if _is_configurable(ts) and ts not in auto_configured],
+            [ts for ts in sorted(new_enabled) if _is_configurable(ts)],
             config, selected=False)
         _save_platform_tools(config, pkey, new_enabled)
         save_config(config)
