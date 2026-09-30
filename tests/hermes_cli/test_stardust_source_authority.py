@@ -536,6 +536,7 @@ def test_openrouter_referer_headers_are_attribution_not_doc_links() -> None:
 
 def test_nous_account_product_is_not_a_stardust_default() -> None:
     defaults = _read("hermes_cli/config_defaults.py")
+    assert '"guest": False' in defaults
     assert '"connectors": {"enabled": False}' in defaults
     assert '"excluded_providers": ["nous"]' in defaults
 
@@ -548,6 +549,12 @@ def test_nous_account_product_is_not_a_stardust_default() -> None:
     assert 'help="Sign in with a Nous account' not in auth_parser
     assert '"--portal-url"' not in auth_parser
     assert '"--inference-url"' not in auth_parser
+
+    model_parser = _read("hermes_cli/subcommands/model.py")
+    login_parser = _read("hermes_cli/subcommands/login.py")
+    for source in (model_parser, login_parser):
+        assert '"--portal-url"' not in source
+        assert '"--inference-url"' not in source
 
     main = _read("hermes_cli/main.py")
     chat_block = main.split("def cmd_chat(args):", 1)[1].split("\ndef ", 1)[0]
