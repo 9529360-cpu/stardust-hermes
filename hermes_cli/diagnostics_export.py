@@ -51,8 +51,8 @@ def _is_export_name(name: str) -> bool:
     return name.startswith(_EXPORT_PREFIX) and name.endswith(_EXPORT_SUFFIX)
 
 
-def _prune_exports(root: Path) -> None:
-    """Best-effort bound for crash leftovers; active Desktop saves discard eagerly."""
+def _prune_exports(root: Path, *, keep: Path | None = None) -> None:
+    """Best-effort bound for crash leftovers; never prune the active handoff file."""
     if not root.is_dir():
         return
     now = time.time()
@@ -72,10 +72,16 @@ def _prune_exports(root: Path) -> None:
                     path.unlink()
 
     archives.sort(key=lambda item: item[0], reverse=True)
-    for index, (mtime, path) in enumerate(archives):
-        if index >= _MAX_EXPORTS or now - mtime > _EXPORT_RETENTION_SECONDS:
+    protected = keep if keep is not None and keep.parent == root else None
+    survivors = 1 if protected is not None and protected.exists() else 0
+    other_index = 0
+    for mtime, path in archives:
+        if protected is not None and path == protected:
+            continue
+        if other_index >= max(0, _MAX_EXPORTS - survivors) or now - mtime > _EXPORT_RETENTION_SECONDS:
             with suppress(OSError):
                 path.unlink()
+        other_index += 1
 
 
 def _zip_text(archive: zipfile.ZipFile, name: str, text: str) -> None:
@@ -165,7 +171,7 @@ def prepare_diagnostics_bundle(
             final_path.unlink()
         raise
 
-    _prune_exports(root)
+    _prune_exports(root, keep=final_path)
     return {
         "path": str(final_path),
         "filename": filename,
