@@ -2,15 +2,16 @@
 
 Set via `hermes model` (picker) or `hermes setup`. 35+ provider profiles ship as
 plugins under `plugins/model-providers/`; user plugins of the same name override.
-Full docs: https://hermes-agent.nousresearch.com/docs/integrations/providers
+Repository reference: `website/docs/integrations/providers.md`
 
 ### Providers
+
+Stardust does not use the inherited Nous Portal account/subscription path for new setups. For an unlisted service, configure its API directly as a custom endpoint.
 
 | Provider | Auth | Key env var(s) |
 |----------|------|----------------|
 | openrouter | API key | `OPENROUTER_API_KEY` |
 | anthropic | API key | `ANTHROPIC_API_KEY` (also `CLAUDE_CODE_OAUTH_TOKEN`) |
-| nous | OAuth device code | `hermes auth add nous` (or `NOUS_API_KEY`) |
 | openai-codex | OAuth | `hermes auth add openai-codex` |
 | qwen-oauth | OAuth | `hermes auth add qwen-oauth` |
 | minimax-oauth | OAuth | `hermes auth add minimax-oauth` |
