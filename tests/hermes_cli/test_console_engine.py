@@ -20,8 +20,6 @@ EXPECTED_CONSOLE_COMMANDS = {
     ("prompt-size",),
     ("insights",),
     ("security", "audit"),
-    ("portal", "info"),
-    ("portal", "tools"),
     ("backup",),
     ("import",),
     ("send",),
@@ -198,6 +196,16 @@ EXPECTED_CONSOLE_COMMANDS = {
     ("pets", "doctor"),
 }
 
+
+
+
+def test_retired_portal_surface_is_not_exposed() -> None:
+    engine = HermesConsoleEngine()
+
+    assert not any(path and path[0] == "portal" for path in engine.commands)
+    result = engine.execute("portal info")
+    assert result.status == "error"
+    assert "Unsupported Hermes Console command" in result.output
 
 MUTATING_CONFIRMATION_SMOKE_COMMANDS = [
     "config set console.test true",
