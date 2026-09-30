@@ -2,7 +2,7 @@
 
 Covers four shapes from Phase 4 of ``.hermes/plans/2026-05-21-dashboard-oauth-auth.md``:
 
-1. Plugin entry-point registration gating (env var checks).
+1. Plugin entry-point retirement (legacy provider class remains importable).
 2. ``start_login`` shape (PKCE/state, authorize URL parameters).
 3. ``complete_login`` httpx-mocked happy path + error mapping.
 4. ``verify_session`` JWT verification — RSA keypair, audience/issuer pinning,
@@ -165,136 +165,60 @@ class TestConstruction:
 
 
 # ---------------------------------------------------------------------------
-# Plugin entry point: env-gated registration
+# Plugin entry point: retired in Stardust; settings parser remains for migration
 # ---------------------------------------------------------------------------
 
 
 class TestPluginRegister:
-    def test_skips_when_client_id_missing(self, monkeypatch):
+    def test_never_registers_without_legacy_config(self, monkeypatch):
         monkeypatch.delenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", raising=False)
         monkeypatch.delenv("HERMES_DASHBOARD_PORTAL_URL", raising=False)
         ctx = MagicMock()
+
         nous_plugin.register(ctx)
+
         ctx.register_dashboard_auth_provider.assert_not_called()
-        # Skip reason is surfaced for the gate's fail-closed message.
-        assert "HERMES_DASHBOARD_OAUTH_CLIENT_ID" in nous_plugin.LAST_SKIP_REASON
+        assert "retired in Stardust" in nous_plugin.LAST_SKIP_REASON
 
-    def test_registers_with_default_portal_url_when_only_client_id_set(
-        self, monkeypatch
-    ):
-        """Phase 7 follow-up: HERMES_DASHBOARD_PORTAL_URL is optional —
-        defaults to the production Nous Portal. The user shouldn't have
-        to set it for the common production deployment path."""
+    def test_never_registers_even_with_legacy_client_id(self, monkeypatch):
         monkeypatch.setenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", "agent:inst1")
-        monkeypatch.delenv("HERMES_DASHBOARD_PORTAL_URL", raising=False)
+        monkeypatch.setenv("HERMES_DASHBOARD_PORTAL_URL", "https://portal.example.com")
         ctx = MagicMock()
+
         nous_plugin.register(ctx)
-        ctx.register_dashboard_auth_provider.assert_called_once()
-        registered = ctx.register_dashboard_auth_provider.call_args.args[0]
-        assert isinstance(registered, nous_plugin.NousDashboardAuthProvider)
-        assert registered._portal_url == "https://portal.nousresearch.com"
-        # Skip reason cleared on successful registration.
-        assert nous_plugin.LAST_SKIP_REASON == ""
+
+        ctx.register_dashboard_auth_provider.assert_not_called()
+        assert "retired in Stardust" in nous_plugin.LAST_SKIP_REASON
 
 
-    def test_empty_portal_url_env_uses_default(self, monkeypatch):
-        """Explicit empty string still falls back to the production
-        default — same handling as 'unset' so an empty Fly secret can't
-        accidentally point the dashboard at nowhere."""
-        monkeypatch.setenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", "agent:inst1")
-        monkeypatch.setenv("HERMES_DASHBOARD_PORTAL_URL", "")
-        ctx = MagicMock()
-        nous_plugin.register(ctx)
-        registered = ctx.register_dashboard_auth_provider.call_args.args[0]
-        assert registered._portal_url == "https://portal.nousresearch.com"
-
-
-# ---------------------------------------------------------------------------
-# Plugin entry point: config.yaml + env-override precedence
-# ---------------------------------------------------------------------------
-
-
-class TestConfigYamlSource:
-    """``dashboard.oauth.{client_id,portal_url}`` in ``config.yaml`` is the
-    canonical surface for these settings. ``HERMES_DASHBOARD_OAUTH_CLIENT_ID``
-    and ``HERMES_DASHBOARD_PORTAL_URL`` are operator overrides that win when
-    set — this is the contract Fly.io's platform-secret injection relies on,
-    and the contract that lets local devs experiment without setting env
-    vars.
-
-    Each test pins exactly one tier of the precedence chain so a regression
-    that flips the order is caught:
-
-        env (when truthy) > config.yaml (when truthy) > plugin default
-    """
-
+class TestLegacySettingsCompatibility:
     @pytest.fixture
     def patch_config(self, monkeypatch):
-        """Yield a callable that replaces ``hermes_cli.config.load_config``
-        with a stub returning the given dict. Tests pass the intended
-        ``dashboard.oauth`` block; the stub returns the wrapping structure."""
-
         def _set(oauth_block: Dict[str, Any] | None) -> None:
-            cfg = {}
-            if oauth_block is not None:
-                cfg = {"dashboard": {"oauth": oauth_block}}
-            monkeypatch.setattr(
-                "hermes_cli.config.load_config", lambda: cfg
-            )
+            cfg = {"dashboard": {"oauth": oauth_block}} if oauth_block is not None else {}
+            monkeypatch.setattr("hermes_cli.config.load_config", lambda: cfg)
 
         return _set
 
-    def test_config_yaml_only_client_id_registers(self, patch_config, monkeypatch):
-        """No env var, only config.yaml — plugin reads from config and
-        registers successfully. This is the path Teknium's review pushed
-        for (".env is for secrets only")."""
+    def test_config_yaml_settings_remain_parseable(self, patch_config, monkeypatch):
         monkeypatch.delenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", raising=False)
         monkeypatch.delenv("HERMES_DASHBOARD_PORTAL_URL", raising=False)
         patch_config({"client_id": "agent:from-config"})
-        ctx = MagicMock()
-        nous_plugin.register(ctx)
-        ctx.register_dashboard_auth_provider.assert_called_once()
-        registered = ctx.register_dashboard_auth_provider.call_args.args[0]
-        assert registered._client_id == "agent:from-config"
-        # Defaults to production portal URL when neither config nor env
-        # specifies one.
-        assert registered._portal_url == "https://portal.nousresearch.com"
 
+        settings = nous_plugin._settings()
 
-    def test_env_overrides_config_client_id(self, patch_config, monkeypatch):
-        """Env wins. Critical for Fly.io: the Portal injects
-        HERMES_DASHBOARD_OAUTH_CLIENT_ID at deploy time and we MUST
-        honour it even if a stale config.yaml ships in the image."""
+        assert settings["client_id"] == "agent:from-config"
+        assert settings["portal_url"] == "https://portal.nousresearch.com"
+
+    def test_env_override_remains_parseable_for_legacy_migration(self, patch_config, monkeypatch):
         monkeypatch.setenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", "agent:from-env")
-        patch_config({"client_id": "agent:from-config"})
-        ctx = MagicMock()
-        nous_plugin.register(ctx)
-        registered = ctx.register_dashboard_auth_provider.call_args.args[0]
-        assert registered._client_id == "agent:from-env", (
-            "env var must override config.yaml — Fly secret injection "
-            "depends on this precedence"
-        )
+        monkeypatch.setenv("HERMES_DASHBOARD_PORTAL_URL", "https://portal.example.com")
+        patch_config({"client_id": "agent:from-config", "portal_url": "https://stale.example.com"})
 
+        settings = nous_plugin._settings()
 
-    def test_neither_source_skips_with_helpful_reason(
-        self, patch_config, monkeypatch
-    ):
-        """Neither env nor config.yaml set — skip with a reason that
-        mentions BOTH surfaces so operators don't guess wrong about
-        which one to populate."""
-        monkeypatch.delenv("HERMES_DASHBOARD_OAUTH_CLIENT_ID", raising=False)
-        patch_config(None)
-        ctx = MagicMock()
-        nous_plugin.register(ctx)
-        ctx.register_dashboard_auth_provider.assert_not_called()
-        # Old behaviour: skip reason mentions the env var.
-        assert "HERMES_DASHBOARD_OAUTH_CLIENT_ID" in nous_plugin.LAST_SKIP_REASON
-        # New behaviour: skip reason ALSO mentions the config.yaml path
-        # so the user knows it's a valid alternative.
-        assert "dashboard.oauth.client_id" in nous_plugin.LAST_SKIP_REASON, (
-            f"skip reason omits the config.yaml surface — operators "
-            f"won't know it exists. got: {nous_plugin.LAST_SKIP_REASON!r}"
-        )
+        assert settings["client_id"] == "agent:from-env"
+        assert settings["portal_url"] == "https://portal.example.com"
 
 
 # ---------------------------------------------------------------------------
