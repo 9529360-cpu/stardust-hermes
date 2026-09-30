@@ -1343,13 +1343,15 @@ def _openrouter_auto_detected(scoped_key_env: Callable[[str], str]) -> bool:
 
 
 def _logged_in_oauth_active_provider(*, skip_free_tier: bool = False) -> Optional[str]:
-    """auth.json ``active_provider`` when it is a registry provider that reports logged in."""
+    """auth.json ``active_provider`` when it is a registry provider that may auto-route.
+
+    Stardust never auto-adopts inherited Nous Portal account state. Legacy Nous OAuth can remain
+    on disk for compatibility, but using it requires an explicit legacy provider configuration.
+    """
     try:
         _maybe = _load_auth_store().get("active_provider")
         if _maybe == "nous":
-            from hermes_cli.anon_auth import guest_enabled, has_guest
-            if has_guest() and (skip_free_tier or not guest_enabled()):
-                return None  # the free tier is off (or being discounted), so a guest is not a login
+            return None
         if _maybe and _maybe in PROVIDER_REGISTRY and get_auth_status(_maybe).get("logged_in"):
             return _maybe
     except Exception as e:
