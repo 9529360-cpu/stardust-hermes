@@ -56,7 +56,12 @@ function localBundleRequest(overrides?: {
   discard?: unknown
   prepare?: unknown
 }) {
-  return vi.fn(async (method: string) => {
+  return vi.fn(
+    async (
+      method: string,
+      _params?: Record<string, unknown>,
+      _timeout?: number
+    ) => {
     if (method === 'diagnostics.prepare_bundle') {
       return (
         overrides?.prepare ?? {
@@ -72,8 +77,9 @@ function localBundleRequest(overrides?: {
       return overrides?.discard ?? { ok: true, removed: true }
     }
 
-    throw new Error(`unexpected diagnostics method: ${method}`)
-  })
+      throw new Error(`unexpected diagnostics method: ${method}`)
+    }
+  )
 }
 
 describe('send-diagnostics store', () => {
