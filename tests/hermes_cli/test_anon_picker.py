@@ -33,6 +33,7 @@ def guest_home(monkeypatch, tmp_path):
     from hermes_cli.config import load_config, save_config
     cfg = load_config()
     cfg.setdefault("nous", {})["guest"] = True
+    cfg.setdefault("model_catalog", {})["excluded_providers"] = []
     save_config(cfg)
     for var in ("OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "NOUS_API_KEY", "LM_API_KEY", "LM_BASE_URL"):
         monkeypatch.delenv(var, raising=False)
