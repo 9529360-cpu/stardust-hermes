@@ -993,17 +993,7 @@ def _no_auth_provider_message(host: str) -> str:
 
     Names the exact trigger: on a loopback bind the ONLY trigger is
     dashboard.public_url, so print the offending URL and the remove-it exit.
-    Bundled providers expose ``LAST_SKIP_REASON`` so an installed-but-
-    unconfigured provider is not reported as merely "no providers".
     """
-    skip_reasons: list[str] = []
-    try:
-        from plugins.dashboard_auth import nous as _nous_plugin
-
-        if _nous_plugin.LAST_SKIP_REASON:
-            skip_reasons.append(f"  • nous: {_nous_plugin.LAST_SKIP_REASON}")
-    except Exception:
-        pass
 
     if host in _LOOPBACK_HOST_VALUES:
         public_url = ""
@@ -1036,8 +1026,9 @@ def _no_auth_provider_message(host: str) -> str:
         "    (hash with: python -c \"from "
         "plugins.dashboard_auth.basic import hash_password; "
         "print(hash_password('your-password'))\")\n"
-        "  • OAuth: run `hermes dashboard register` (Nous Portal) or "
-        "install a DashboardAuthProvider plugin.\n"
+        "  • OIDC: set HERMES_DASHBOARD_OIDC_ISSUER + "
+        "HERMES_DASHBOARD_OIDC_CLIENT_ID (or dashboard.oauth.self_hosted "
+        "in config.yaml), or install a DashboardAuthProvider plugin.\n"
         "There is no unauthenticated public-dashboard option. For "
         "local-only use, bind 127.0.0.1 and leave dashboard.public_url "
         "unset; a configured external public URL requires auth even "
@@ -1068,8 +1059,6 @@ def _no_auth_provider_message(host: str) -> str:
         f"Refusing to bind dashboard to {host} — {gate_reason}, "
         f"but no auth providers are registered.\n\n"
     )
-    if skip_reasons:
-        msg += "Bundled providers reported these issues:\n" + "\n".join(skip_reasons) + "\n\n"
     return msg + fix_hint
 
 
