@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { $gateway } from '@/store/gateway'
+import { $connection } from '@/store/session'
 import {
   $sendDiagnostics,
   confirmSendDiagnostics,
@@ -128,6 +129,63 @@ describe('send-diagnostics store', () => {
       expect(state?.result?.savedPath).toBe('/Users/me/Downloads/stardust-diagnostics.zip')
       expect(state?.result?.byteSize).toBe(123)
     } finally {
+      desktop.restore()
+      restoreGateway()
+    }
+  })
+
+  it('pins the download to the connection/profile that prepared the bundle', async () => {
+    let resolvePrepare: (value: unknown) => void = () => {}
+    const originalConnection = $connection.get()
+    const request = vi.fn((method: string) => {
+      if (method === 'diagnostics.prepare_bundle') {
+        return new Promise(resolve => (resolvePrepare = resolve))
+      }
+      if (method === 'diagnostics.discard_bundle') {
+        return Promise.resolve({ ok: true, removed: true })
+      }
+
+      throw new Error(`unexpected method ${method}`)
+    })
+    const restoreGateway = stubGateway(request as never)
+    const desktop = stubDesktop()
+
+    try {
+      $connection.set({
+        connectionId: 'old-connection',
+        mode: 'remote',
+        profile: 'old-profile'
+      } as never)
+
+      requestSendDiagnostics()
+      const pending = confirmSendDiagnostics()
+
+      await vi.waitFor(() =>
+        expect(request.mock.calls.some(call => call[0] === 'diagnostics.prepare_bundle')).toBe(true)
+      )
+
+      $connection.set({
+        connectionId: 'new-connection',
+        mode: 'remote',
+        profile: 'new-profile'
+      } as never)
+
+      resolvePrepare({
+        ok: true,
+        path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-pinned.zip',
+        filename: 'stardust-diagnostics-pinned.zip'
+      })
+      await pending
+
+      expect(desktop.saveGatewayFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          connectionId: 'old-connection',
+          profile: 'old-profile',
+          path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-pinned.zip'
+        })
+      )
+    } finally {
+      $connection.set(originalConnection)
       desktop.restore()
       restoreGateway()
     }
