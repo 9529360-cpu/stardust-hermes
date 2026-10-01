@@ -83,7 +83,7 @@ def _contains_any(query: str, needles: tuple[str, ...]) -> bool:
         if not needle:
             continue
         if needle.isascii() and needle == needle.strip():
-            if re.search(r"(?<!\\w)" + re.escape(needle) + r"(?!\\w)", text):
+            if re.search(r"(?<!\w)" + re.escape(needle) + r"(?!\w)", text):
                 return True
         elif needle in text:
             return True
