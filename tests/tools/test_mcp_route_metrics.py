@@ -52,7 +52,7 @@ def test_dispatch_records_one_final_logical_success(monkeypatch):
     )
 
     assert out == '{"result":"ok"}'
-    snap = metrics.snapshot("srv")
+    snap = metrics.snapshot("srv", route_token=id(server))
     assert snap.samples == 1
     assert snap.successes == 1
     assert snap.failures == 0
@@ -76,7 +76,7 @@ def test_dispatch_records_structured_error_as_failure(monkeypatch):
         lambda exc: None,
     )
 
-    snap = metrics.snapshot("srv")
+    snap = metrics.snapshot("srv", route_token=id(server))
     assert snap.samples == 1
     assert snap.failures == 1
 
@@ -100,4 +100,4 @@ def test_user_interrupt_does_not_penalize_route(monkeypatch):
     )
 
     assert "interrupted" in out.lower()
-    assert metrics.snapshot("srv") is None
+    assert metrics.snapshot("srv", route_token=id(server)) is None
