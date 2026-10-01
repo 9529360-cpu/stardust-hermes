@@ -132,7 +132,7 @@ def load_soul_md() -> Optional[str]:
     return content
 ```
 
-当 `load_soul_md()` 返回内容时，它会替换硬编码的 `DEFAULT_AGENT_IDENTITY`。随后调用 `build_context_files_prompt()` 时传入 `skip_soul=True`，以防止 SOUL.md 出现两次（一次作为身份，一次作为上下文文件）。
+当 `load_soul_md()` 返回内容时，它会替换硬编码的 `DEFAULT_AGENT_IDENTITY`。自定义文件只替换人设：除非文件里已逐字包含 `ASSISTANT_OPERATING_CONTRACT`（自动生成的默认文件就包含），否则其后会跟上 `SOUL_OPERATING_DEFAULTS`——即标题为 `# Operating defaults` 的这份做事约定，人设里明确写的要求优先。随后调用 `build_context_files_prompt()` 时传入 `skip_soul=True`，以防止 SOUL.md 出现两次（一次作为身份，一次作为上下文文件）。
 
 若 `SOUL.md` 不存在，系统将回退到：
 
@@ -239,7 +239,7 @@ def build_context_files_prompt(cwd=None, skip_soul=False):
 
 ### 优先使用这些入口
 
-- `~/.hermes/SOUL.md` — 用自定义 agent 角色和固定行为替换内置默认身份块。
+- `~/.hermes/SOUL.md` — 用自定义 agent 角色和固定行为替换内置默认人设（这里明确写的要求优先于其后的默认做事约定）。
 - `~/.hermes/MEMORY.md` 和 `~/.hermes/USER.md` — 提供应在新会话中快照的持久跨会话事实和用户配置文件数据。
 - 项目上下文文件，如 `.hermes.md`、`HERMES.md`、`AGENTS.md`、`CLAUDE.md` 或 `.cursorrules` — 注入仓库特定的工作规则。
 - Skills — 打包可复用的工作流和参考资料，无需编辑核心 prompt 代码。
