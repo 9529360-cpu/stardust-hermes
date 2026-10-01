@@ -106,27 +106,26 @@ def _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tas
         with _quiet("Spinner update_text failed: %s"):
             spinner_ref.update_text(f"🔀 {'[' + tag + '] ' if tag else ''}{remaining} task{'s' if remaining != 1 else ''} remaining")
 
-def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interrupt: bool) -> None:
-    """Run the batch's children in parallel, appending entries to ``results`` (sorted by task_index on return, one
-    completion line printed per child). Polls futures with a short ``wait()`` timeout instead of ``as_completed()``
-    so a wedged child cannot block the parent forever after an interrupt; on parent interrupt the still-pending
-    children are reported ``interrupted`` and abandoned (they already got the interrupt signal)."""
-    # Daemon workers (tools.daemon_pool): the `with` block still joins normally, but if the parent is interrupted
-    # while a child is wedged, the abandoned worker must not block interpreter exit.
+def _run_children_parallel(batch: _Batch, results: list, *, detached: bool) -> None:
+    """Run the batch's children in parallel, appending each child's OWN result entry to ``results`` as it finishes
+    (sorted by task_index on return, one completion line printed per child). ``detached``: an async unit's runner.
+
+    Every child is joined, parent stop or not: a child must not outlive the call that owns its resources (the pool's
+    ``with`` exit joins its workers regardless). A parent stop reaches the attached children, which unwind and return
+    their own ``interrupted`` entries, so the join never substitutes an outcome — a child that finished before the
+    stop but is still tearing down keeps its completed result; a stopped one keeps its partial summary and cost."""
+    # Daemon workers (tools.daemon_pool): after a stop the agent's tool executor may abandon this whole call once its
+    # short grace expires; children still unwinding then must not also block interpreter exit.
     from tools.daemon_pool import DaemonThreadPoolExecutor
     parent_agent, n_tasks = batch.parent_agent, len(batch.task_list)
     task_labels = [t["goal"][:40] for t in batch.task_list]
     spinner_ref = getattr(parent_agent, "_delegate_spinner", None)
     _tag = format_batch_tag(batch.live_deleg_id, parent_agent)
-    # Fabricated entries for still-pending / raised futures carry the correct _delegate_role.
+    # Fabricated entries for raised futures carry the correct _delegate_role.
     _child_by_index = {i: child for (i, _, child) in batch.children}
     n_here = len(batch.children)  # a per-group unit runs a subset; ``n_tasks`` keeps the call-wide ``i/N`` slot
 
     def _entry_of(future, idx):
-        if not future.done():
-            return _fabricated_entry(
-                idx, "interrupted", "Parent agent interrupted — child did not finish in time", _child_by_index.get(idx),
-            )
         try:
             return future.result()
         except Exception as exc:
@@ -136,18 +135,17 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
         futures = {executor.submit(contextvars.copy_context().run, batch.run_child, i, t, child): i for i, t, child in batch.children}
         pending = set(futures)
         while pending:
-            if honor_parent_interrupt and getattr(parent_agent, "_interrupt_requested", False) is True:
-                results.extend(_entry_of(f, futures[f]) for f in pending)
-                break
+            # Bounded waits, not as_completed(): a direct caller on the main thread stays Ctrl+C-interruptible (an
+            # untimed lock wait is not, on Windows).
             done, pending = _cf_wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
             for future in done:
                 entry = _entry_of(future, futures[future])
                 results.append(entry)
-                if not honor_parent_interrupt and batch.unit_id:
+                if detached and batch.unit_id:
                     # Detached unit: a crash before the join must not lose children that already finished.
                     record_unit_child(batch.unit_id, entry)
                 _report_child_done(parent_agent, spinner_ref, entry, _tag, task_labels, n_tasks, n_here - len(results))
-                if (not honor_parent_interrupt and batch.unit_id and entry.get("status") in SUBAGENT_FAILURE_STATUSES
+                if (detached and batch.unit_id and entry.get("status") in SUBAGENT_FAILURE_STATUSES
                         and len(results) < n_here):
                     # Detached unit, a sibling is still running: tell the parent NOW, not when the last one finishes.
                     # Non-durable and separate from the unit's final result (which is still delivered once).
@@ -159,7 +157,7 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
                             batch.unit_id, {**entry, **({"live_transcript": _live} if _live else {})}, n_tasks=n_tasks)
     results.sort(key=lambda r: r["task_index"])  # match input order
 
-def _execute_and_aggregate(batch: _Batch, *, honor_parent_interrupt: bool = True) -> dict:
+def _execute_and_aggregate(batch: _Batch, *, detached: bool = False) -> dict:
     """Run the batch's built children, join, finalize (hooks + cost rollup), return the combined dict. Shared by the
     sync path and the background runner; a background runner receives a per-group unit (a subset of the call's
     children) so each group JOINS only on itself. Live transcripts are finalized but retained as the full-fidelity
@@ -169,7 +167,7 @@ def _execute_and_aggregate(batch: _Batch, *, honor_parent_interrupt: bool = True
     if len(batch.children) == 1:
         results.append(batch.run_child(*batch.children[0]))
     else:
-        _run_children_parallel(batch, results, honor_parent_interrupt=honor_parent_interrupt)
+        _run_children_parallel(batch, results, detached=detached)
 
     _finalize_child_results(results, batch.task_list, batch.children, batch.parent_agent)
     total_duration = round(time.monotonic() - batch.overall_start, 2)
@@ -374,7 +372,7 @@ def _dispatch_unit(unit: _Batch, unit_id: Optional[str], slot_key: Optional[str]
         goals=[t["goal"] for t in unit.task_list], context=unit.context,
         toolsets=None,  # metadata for the completion block only; subagents inherit the parent's toolsets
         role=unit.top_role, model=unit.creds["model"],
-        runner=lambda: _execute_and_aggregate(unit, honor_parent_interrupt=False),
+        runner=lambda: _execute_and_aggregate(unit, detached=True),
         interrupt_fn=_interrupt, delegation_id=unit_id, slot_key=slot_key,
         task_indexes=[i for (i, _, _) in unit.children] if len(unit.children) < len(unit.task_list) else None,
         progress_fn=lambda: _batch_progress_token(child_agents), **routing,

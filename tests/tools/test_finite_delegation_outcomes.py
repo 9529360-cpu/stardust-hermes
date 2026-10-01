@@ -41,6 +41,7 @@ class _Child:
         self.allow_finish = threading.Event()
         self.finished = threading.Event()
         self.closed = threading.Event()
+        self.release_close = None  # an Event: close() blocks on it, like a slow sandbox/daemon teardown
         self.close_while_running = False
         self.worker = None
 
@@ -74,6 +75,21 @@ class _Child:
     def close(self):
         self.close_while_running |= not self.finished.is_set()
         self.closed.set()
+        if self.release_close is not None:
+            self.release_close.wait(30)
+
+
+class _Spinner:
+    """Parent delegation spinner; ``update_text`` runs once a finished sibling has been reported."""
+
+    def __init__(self):
+        self.sibling_reported = threading.Event()
+
+    def print_above(self, _line):
+        pass
+
+    def update_text(self, _text):
+        self.sibling_reported.set()
 
 
 @pytest.fixture
@@ -117,6 +133,8 @@ def harness(monkeypatch, tmp_path):
     for child in children:
         child.interrupted.set()
         child.allow_finish.set()
+        if child.release_close is not None:
+            child.release_close.set()
     async_delegation._reset_for_tests()
     for child in children:
         if child.started.is_set():
@@ -190,6 +208,48 @@ def test_finite_batch_returns_parent_interruption(harness):
         assert slow.interrupted.is_set()
     finally:
         slow.allow_finish.set()
+        stopper.join(5)
+        assert not stopper.is_alive()
+        assert not stop_errors
+
+
+def test_parent_stop_during_child_teardown_keeps_its_result(harness, monkeypatch):
+    """Child 0 finished, but its worker is still inside close() when the parent stop lands. The join reports
+    its completed result rather than a fabricated "interrupted" entry, and the stopped sibling keeps its own
+    partial result."""
+    parent, children, dispatch = harness
+    monkeypatch.setattr(dt, "_get_child_timeout", lambda: 30)  # this test is about stops, not timeouts
+    children.extend([_Child(), _Child("slow")])
+    finished, slow = children
+    finished.release_close = threading.Event()
+    parent._delegate_spinner = spinner = _Spinner()
+    stop_errors = []
+
+    def stop_parent():
+        try:
+            assert slow.started.wait(30)
+            assert finished.closed.wait(30), "finished child never began its teardown"
+            parent.hard_interrupt("test parent stop")
+            slow.allow_finish.set()
+            # Release child 0's teardown only after the join has collected the stopped sibling.
+            assert spinner.sibling_reported.wait(30), "stopped sibling was never reported"
+        except Exception as exc:
+            stop_errors.append(exc)
+        finally:
+            slow.allow_finish.set()
+            finished.release_close.set()
+
+    stopper = threading.Thread(target=stop_parent)
+    stopper.start()
+    try:
+        result = dispatch()
+        _joined(result, ["completed", "interrupted"])
+        assert result["results"][1]["summary"] == "partial"
+        assert slow.interrupted.is_set()
+    finally:
+        finished.release_close.set()
+        slow.allow_finish.set()
+        spinner.sibling_reported.set()  # unblock the stopper if dispatch() failed early
         stopper.join(5)
         assert not stopper.is_alive()
         assert not stop_errors

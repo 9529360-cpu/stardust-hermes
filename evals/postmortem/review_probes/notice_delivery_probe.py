@@ -45,8 +45,9 @@ def batch_run(did, gates):
         return {'task_index':i,'status':'error' if i<2 else 'completed','error':'offline failure' if i<2 else None,'summary':None if i<2 else 'FINISHED_SUCCESS','duration_seconds':0.1}
     b.run_child=child
     results=[]
-    kwargs={'honor_parent_interrupt':False}
-    if 'detached' in __import__('inspect').signature(dd._run_children_parallel).parameters: kwargs['detached']=True
+    # Detached-unit mode: honor_parent_interrupt=False on older heads, detached=True on newer ones.
+    params=__import__('inspect').signature(dd._run_children_parallel).parameters
+    kwargs={k:v for k,v in (('honor_parent_interrupt',False),('detached',True)) if k in params}
     dd._run_children_parallel(b,results,**kwargs)
     return {'results':results,'total_duration_seconds':1}
 
