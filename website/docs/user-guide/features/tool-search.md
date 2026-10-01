@@ -250,12 +250,13 @@ to any progressive-disclosure design, not specific to this implementation:
   stemming (English) applied to both the index and the query so
   morphological variants match ("issues" finds `create_issue`). Compact
   query-side Chinese capability aliases improve multilingual recall without
-  changing the byte-stable English-first catalog. A tool is admitted only if
-  it contains the query's rarest **answerable** token (present somewhere in
-  the catalog), so an unknown filler word cannot poison the gate. Unknown
-  terms are ignored for gate selection; if none of the query terms are
-  answerable, the group is empty and includes connected sources plus a retry
-  hint instead of returning `limit` tools that share one common word.
+  changing the byte-stable English-first catalog. A small query-side stopword
+  set removes conversational filler such as "please" and "help", but unknown
+  content/service tokens remain meaningful. A tool is admitted only if it
+  contains the query's rarest remaining token; an unknown service such as
+  "gmail" therefore gates to an empty result instead of letting a Slack tool
+  through just because it shares "post message". The empty group includes
+  connected sources plus a retry hint.
   After lexical admission, MCP results receive a runtime health multiplier;
   exact-name lookups remain first regardless of that multiplier.
 - **Relevance floor:** a tool must match at least half of a query's
