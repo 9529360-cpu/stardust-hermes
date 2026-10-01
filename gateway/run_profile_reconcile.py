@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from gateway.run_shutdown import _log_suppressed
-from utils import file_signature
+from utils import file_signature, path_signature
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +31,11 @@ _PROFILE_SIGNATURE_FILES = ("config.yaml", ".env")
 
 
 def profile_serve_signature(home: "Path") -> tuple:
-    """Cheap change detector for a served profile's credentials/config: file signature per file."""
+    """Change detector for served-profile credentials/config, including pinned timestamps."""
     sig = []
     for name in _PROFILE_SIGNATURE_FILES:
         try:
-            st = os.stat(Path(home) / name)
-            sig.append(file_signature(st))
+            sig.append(path_signature(Path(home) / name))
         except OSError:
             sig.append(None)
     return tuple(sig)
