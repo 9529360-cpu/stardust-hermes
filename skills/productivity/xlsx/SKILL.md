@@ -1,7 +1,7 @@
 ---
 name: xlsx
 description: Create, read, edit Excel .xlsx workbooks and CSVs.
-version: 1.2.0
+version: 1.3.0
 author: Nous Research
 license: MIT
 platforms: [linux, macos, windows]
@@ -58,6 +58,7 @@ python scripts/xlsx_restructure.py report.xlsx --sheet Data --insert-rows 3:2
 python scripts/xlsx_recalc.py report.xlsx
 python scripts/csv_to_xlsx.py data.csv out.xlsx --encoding utf-8
 python scripts/xlsx_to_csv.py report.xlsx out.csv --sheet Data
+python scripts/xlsx_verify.py report.xlsx --fix      # before delivering
 ```
 
 Author the JSON spec with `write_file`, inspect script JSON output with
@@ -68,6 +69,7 @@ Author the JSON spec with `write_file`, inspect script JSON output with
 | Task | Command |
 |---|---|
 | Create workbook from spec | `xlsx_create.py spec.json out.xlsx` |
+| Check before delivering (Excel will open it) | `xlsx_verify.py f.xlsx [--fix]` |
 | Sheet names + dimensions | `xlsx_read.py f.xlsx --sheets` |
 | Dump sheet as JSON | `xlsx_read.py f.xlsx --json --sheet S` |
 | Dump sheet as CSV | `xlsx_read.py f.xlsx --csv --out d.csv` |
@@ -198,10 +200,17 @@ took.
   in Excel.** A native table filters itself; also setting
   `ws.auto_filter.ref` over it makes Excel refuse the workbook, even in
   repair mode, while openpyxl reads it back fine. Use one or the other
-  (`xlsx_create.py` drops the sheet filter where a table overlaps it).
+  (`xlsx_create.py` drops the sheet filter where a table overlaps it;
+  `xlsx_verify.py --fix` repairs an existing file).
 
 ## Verification
 
+- **Before reporting any workbook done, run `xlsx_verify.py out.xlsx`**
+  (add `--fix` to repair what it reports). It names structure Excel
+  refuses, such as a sheet AutoFilter over a table, and on Windows with
+  Excel installed it opens the file in Excel. `"excel": "refused"` means
+  the file is broken, not the Excel installation: fix it and check
+  again. Never report a workbook Excel refuses as done.
 - After creating: `xlsx_read.py out.xlsx --sheets` and confirm sheet
   names, dimensions, merged ranges, and chart counts match intent.
 - Dump data with `--json` and compare against the source values.
@@ -212,7 +221,4 @@ took.
   where expected.
 - For a full visual check, open in LibreOffice:
   `soffice --headless --convert-to pdf out.xlsx` and inspect the PDF.
-- On Windows with Excel installed, open a workbook you produced in
-  Excel before calling it done. Reading it back with openpyxl does not
-  prove Excel accepts it; a file Excel rejects throws here:
-  `powershell.exe -NoProfile -NonInteractive -Command '$xl = New-Object -ComObject Excel.Application; $xl.DisplayAlerts = $false; $wb = $xl.Workbooks.Open("C:\work\out.xlsx", 0, $true); $wb.Close($false); $xl.Quit()'`
+  Reading a file back with openpyxl does not prove Excel accepts it.
