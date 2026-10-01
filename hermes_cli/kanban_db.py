@@ -1897,10 +1897,11 @@ def delete_attachment(conn: sqlite3.Connection, attachment_id: int) -> Optional[
             return None
         conn.execute("DELETE FROM task_attachments WHERE id = ?", (attachment_id,))
         _append_event(conn, att.task_id, "attachment_removed", {"filename": att.filename})
-    with contextlib.suppress(OSError):
-        p = Path(att.stored_path)
-        if p.is_file():
-            p.unlink()
+    managed = _managed_attachment_path(att.task_id, att.stored_path)
+    if managed is not None:
+        with contextlib.suppress(OSError):
+            if managed.is_file():
+                managed.unlink()
     return att
 
 
@@ -3781,7 +3782,13 @@ def archive_task(conn: sqlite3.Connection, task_id: str, *, signal_fn=None) -> b
             conn, task_id, outcome="reclaimed", status="reclaimed",
             summary="task archived with run still active",
         )
-        _append_event(conn, task_id, "archived", None, run_id=run_id)
+        _append_event(
+            conn,
+            task_id,
+            "archived",
+            {"was_running": was_running, "prev_pid": prev_pid if was_running else None},
+            run_id=run_id,
+        )
     if was_running:
         termination = _terminate_reclaimed_worker(prev_pid, prev_lock, signal_fn=signal_fn, started_at=prev_started)
         with write_txn(conn):
@@ -3793,34 +3800,224 @@ def archive_task(conn: sqlite3.Connection, task_id: str, *, signal_fn=None) -> b
     return True
 
 
-def _delete_task_relations(conn: sqlite3.Connection, task_id: str) -> None:
-    """Delete every row referencing ``task_id`` (schema has no ON DELETE CASCADE)."""
+def _delete_task_relations(conn: sqlite3.Connection, task_id: str) -> list[str]:
+    """Delete every row referencing ``task_id``; return attachment blobs to unlink.
+
+    The schema intentionally has no ON DELETE CASCADE. Keep this list complete so a
+    hard delete cannot leave durable rows (or attachment files) behind.
+    """
+    attachment_paths = [
+        str(row["stored_path"])
+        for row in conn.execute(
+            "SELECT stored_path FROM task_attachments WHERE task_id = ?",
+            (task_id,),
+        ).fetchall()
+        if row["stored_path"]
+    ]
     conn.execute("DELETE FROM task_links WHERE parent_id = ? OR child_id = ?", (task_id, task_id))
-    for table in ("task_comments", "task_events", "task_runs", "kanban_notify_subs"):
+    for table in (
+        "task_comments",
+        "task_events",
+        "task_runs",
+        "task_attachments",
+        "kanban_notify_subs",
+    ):
         conn.execute(f"DELETE FROM {table} WHERE task_id = ?", (task_id,))
+    return attachment_paths
 
 
-def delete_archived_task(conn: sqlite3.Connection, task_id: str) -> bool:
-    """Hard-delete an ARCHIVED task (+ related rows); anything else must be
-    archived first so data loss takes two deliberate actions."""
+def _managed_attachment_path(task_id: str, raw_path: str) -> Optional[Path]:
+    """Return a managed attachment blob path, else None.
+
+    stored_path is persisted data and may be stale/tampered or originate
+    from an old direct domain caller. Never unlink an arbitrary host path merely
+    because a DB row points at it. A managed blob must live under one of the
+    Kanban attachment roots and under that task's own directory.
+    """
+    try:
+        candidate = Path(raw_path).expanduser().resolve(strict=False)
+    except (OSError, RuntimeError):
+        return None
+
+    roots: list[Path] = []
+    override = os.environ.get("HERMES_KANBAN_ATTACHMENTS_ROOT", "").strip()
+    if override:
+        with contextlib.suppress(OSError, RuntimeError):
+            roots.append(Path(override).expanduser().resolve(strict=False))
+
+    try:
+        home = kanban_home().expanduser().resolve(strict=False)
+        roots.append((home / "kanban" / "attachments").resolve(strict=False))
+        named_root = home / "kanban" / "boards"
+        if named_root.is_dir():
+            for child in named_root.iterdir():
+                if child.is_dir():
+                    roots.append((child / "attachments").resolve(strict=False))
+    except (OSError, RuntimeError):
+        pass
+
+    for root in roots:
+        try:
+            rel = candidate.relative_to(root)
+        except ValueError:
+            continue
+        if len(rel.parts) >= 2 and rel.parts[0] == task_id:
+            return candidate
+    return None
+
+
+def _unlink_deleted_attachment_files(task_id: str, paths: Iterable[str]) -> None:
+    """Best-effort cleanup of blobs owned by this task's managed attachment dir."""
+    for raw_path in paths:
+        path = _managed_attachment_path(task_id, raw_path)
+        if path is None:
+            continue
+        with contextlib.suppress(OSError):
+            if path.is_file():
+                path.unlink()
+
+def _unlink_deleted_worker_logs(task_id: str, board: Optional[str]) -> None:
+    """Remove the task-owned log and rotated backups from the correct board."""
+    log_path = worker_log_path(task_id, board=board)
+    candidates = [log_path]
+    with contextlib.suppress(OSError):
+        candidates.extend(log_path.parent.glob(log_path.name + ".*"))
+    for path in candidates:
+        with contextlib.suppress(OSError):
+            if path.is_file():
+                path.unlink()
+
+def _hard_delete_workspace_blocker(conn: sqlite3.Connection, task_id: str) -> Optional[str]:
+    """Return a task-owned workspace path that still needs recovery/cleanup."""
+    row = conn.execute(
+        "SELECT workspace_kind, workspace_path FROM tasks WHERE id = ?",
+        (task_id,),
+    ).fetchone()
+    if row is None or not row["workspace_path"]:
+        return None
+
+    kind = str(row["workspace_kind"] or "")
+    path = Path(str(row["workspace_path"])).expanduser()
+    try:
+        exists = path.exists()
+    except OSError:
+        exists = True
+    if not exists:
+        return None
+
+    if kind == "worktree":
+        return str(path)
+    if kind == "scratch":
+        try:
+            from hermes_cli import kanban_db_workspace as kbw
+
+            if kbw._is_managed_scratch_path(path):
+                return str(path)
+        except Exception:
+            # Failure to prove ownership is a reason not to remove the user's
+            # task record while a supposedly managed scratch path still exists.
+            return str(path)
+    return None
+
+def delete_archived_task(
+    conn: sqlite3.Connection, task_id: str, *, board: Optional[str] = None,
+) -> bool:
+    """Hard-delete an ARCHIVED task only after any displaced worker stop settled."""
+    if _task_status(conn, task_id) != "archived":
+        return False
+    unsafe = _archive_worker_stop_unverified(conn, task_id)
+    if unsafe is not None:
+        raise RuntimeError(
+            "cannot permanently delete task because its worker stop was not confirmed; "
+            "the task remains archived"
+        )
+
+    workspace_blocker = _hard_delete_workspace_blocker(conn, task_id)
+    if workspace_blocker is not None:
+        raise RuntimeError(
+            "cannot permanently delete task because its task-owned workspace is still present; "
+            "the task remains archived for recovery"
+        )
+
+    attachment_paths: list[str] = []
     with write_txn(conn):
+        # Re-check under the write lock so a concurrent restore/reopen cannot
+        # cross the destructive boundary after the safety check above.
         if _task_status(conn, task_id) != "archived":
             return False
-        _delete_task_relations(conn, task_id)
+        attachment_paths = _delete_task_relations(conn, task_id)
         cur = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-        return cur.rowcount == 1
+        deleted = cur.rowcount == 1
+        if deleted:
+            # Hard delete removes the task's own append-only history. Leave one
+            # board-scoped mutation row so websocket cursors advance and other
+            # open clients refresh immediately without retaining task history.
+            _append_event(conn, "", "task_deleted", {"task_id": task_id})
+    if deleted:
+        _unlink_deleted_attachment_files(task_id, attachment_paths)
+        _unlink_deleted_worker_logs(task_id, board)
+        recompute_ready(conn)
+    return deleted
 
 
-def delete_task(conn: sqlite3.Connection, task_id: str) -> bool:
-    """Hard-delete a task and its related rows in one txn; False when not found."""
-    with write_txn(conn):
-        cur = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-        if cur.rowcount != 1:
+def _archive_worker_stop_unverified(conn: sqlite3.Connection, task_id: str) -> Optional[dict]:
+    """Return evidence that the latest archive still has an unsettled worker stop.
+
+    New archive events carry was_running so a concurrent purge cannot slip
+    between the durable archive transition and the post-commit process kill.
+    Legacy archive events lacked that marker; when they do have a subsequent
+    termination event, still honor an explicit terminated=false result.
+    """
+    archived = conn.execute(
+        "SELECT id, payload FROM task_events WHERE task_id = ? AND kind = 'archived' "
+        "ORDER BY id DESC LIMIT 1",
+        (task_id,),
+    ).fetchone()
+    if archived is None:
+        return None
+    archived_payload = _json_dict(archived["payload"])
+
+    row = conn.execute(
+        "SELECT payload FROM task_events "
+        "WHERE task_id = ? AND kind = 'archive_worker_termination' AND id > ? "
+        "ORDER BY id ASC LIMIT 1",
+        (task_id, int(archived["id"])),
+    ).fetchone()
+    if row is None:
+        if archived_payload.get("was_running"):
+            return {
+                "prev_pid": archived_payload.get("prev_pid"),
+                "termination_pending": True,
+                "terminated": False,
+            }
+        return None
+
+    payload = _json_dict(row["payload"])
+    if payload.get("prev_pid") and not payload.get("terminated"):
+        return payload
+    return None
+
+def delete_task(
+    conn: sqlite3.Connection, task_id: str, *, signal_fn=None, board: Optional[str] = None,
+) -> bool:
+    """Lifecycle-safe hard delete.
+
+    Active work is archived first so its worker is stopped through the normal
+    lifecycle. Hard deletion is refused when a known worker could not be
+    confirmed stopped; the archived record is deliberately retained for
+    recovery/diagnostics instead of creating an invisible orphan process.
+    """
+    task = get_task(conn, task_id)
+    if task is None:
+        return False
+    if task.status != "archived":
+        # Do not treat a concurrent archive as our successful stop boundary:
+        # another caller may still be between the durable status flip and the
+        # post-commit worker termination. Refuse and let the user retry.
+        if not archive_task(conn, task_id, signal_fn=signal_fn):
             return False
-        _delete_task_relations(conn, task_id)
-    recompute_ready(conn)
-    return True
 
+    return delete_archived_task(conn, task_id, board=board)
 
 def schedule_task(
     conn: sqlite3.Connection, task_id: str, *, reason: Optional[str] = None,
@@ -4268,15 +4465,22 @@ def task_age(task: Task) -> dict:
 # --- Retention + garbage collection ---
 
 def gc_events(conn: sqlite3.Connection, *, older_than_seconds: int = 30 * 24 * 3600) -> int:
-    """Prune old done/archived events, retaining decomposition identity until task deletion."""
+    """Prune old terminal events and expired board-mutation tombstones.
+
+    task_deleted rows use an empty task id so live board cursors advance
+    after the deleted task's own history is purged. They are synchronization
+    tombstones, not permanent audit history, and age out with normal events.
+    """
     cutoff = int(time.time()) - int(older_than_seconds)
     with write_txn(conn):
         cur = conn.execute(
-            "DELETE FROM task_events WHERE created_at < ? AND kind != 'decomposed' AND task_id IN "
-            "(SELECT id FROM tasks WHERE status IN ('done', 'archived'))", (cutoff,),
+            "DELETE FROM task_events WHERE created_at < ? AND kind != 'decomposed' AND ("
+            "(task_id = '' AND kind = 'task_deleted') OR task_id IN "
+            "(SELECT id FROM tasks WHERE status IN ('done', 'archived'))"
+            ")",
+            (cutoff,),
         )
     return int(cur.rowcount or 0)
-
 
 def gc_worker_logs(*, older_than_seconds: int = 30 * 24 * 3600, board: Optional[str] = None) -> int:
     """Delete worker log files older than the cutoff on one board; returns the count."""
