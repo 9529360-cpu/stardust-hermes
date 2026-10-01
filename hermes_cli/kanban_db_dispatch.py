@@ -200,14 +200,7 @@ def reap_worker_zombies() -> "list[int]":
     process spawned (``_spawned_worker_procs``).
     """
     reaped: "list[int]" = []
-    if os.name == "nt":
-        for pid, proc in list(_spawned_worker_procs.items()):
-            code = proc.poll()
-            if code is not None:
-                _spawned_worker_procs.pop(pid, None)  # drops the last reference: the handle closes
-                _record_worker_exit(pid, code << 8)
-                reaped.append(pid)
-    else:
+    if os.name != "nt":
         try:
             while True:
                 try:
@@ -220,6 +213,13 @@ def reap_worker_zombies() -> "list[int]":
                 reaped.append(pid)
         except Exception:
             pass
+    else:
+        for pid, proc in list(_spawned_worker_procs.items()):
+            code = proc.poll()
+            if code is not None:
+                _spawned_worker_procs.pop(pid, None)  # drops the last reference: the handle closes
+                _record_worker_exit(pid, code << 8)
+                reaped.append(pid)
     return reaped
 
 
