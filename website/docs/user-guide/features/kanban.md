@@ -899,6 +899,8 @@ All commands are also available as a slash command in the interactive CLI and in
 
 `--max-retries` is a per-task circuit-breaker override for the dispatcher. `--max-retries 1` blocks the task on the first non-successful attempt, while `--max-retries 3` allows two retries and blocks on the third failure. Omit it to use `kanban.failure_limit` from `config.yaml`, then the built-in default.
 
+A worker that failed only because its model provider was unavailable — rate limit, quota, timeout, overload or a 5xx after the agent's own retries — exits with code 75. The dispatcher requeues the task after a cooldown (`HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS`, default 300) without counting the attempt toward this limit, so a provider outage delays a task instead of blocking it.
+
 ### Concurrency, scheduling, and child promotion config
 
 | Config key | Default | What it does |

@@ -29,7 +29,7 @@ $HERMES_HOME/SOUL.md
 
 ### Important behavior
 
-- **SOUL.md is the agent's primary identity.** It occupies slot #1 in the system prompt, replacing the hardcoded default identity.
+- **SOUL.md is the agent's primary identity.** It occupies slot #1 in the system prompt, replacing the hardcoded default persona; the built-in operating defaults still follow it, and explicit SOUL.md instructions win over them.
 - Hermes creates a starter `SOUL.md` automatically if one does not exist yet
 - Existing user `SOUL.md` files are never overwritten
 - Hermes loads `SOUL.md` only from `HERMES_HOME`

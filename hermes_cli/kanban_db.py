@@ -287,8 +287,9 @@ def _resolve_claim_ttl_seconds(ttl_seconds: Optional[int] = None) -> int:
 # fork -> /proc window can report a fresh worker dead.
 DEFAULT_CRASH_GRACE_SECONDS = 30
 
-# Worker exit "provider rate-limited": released WITHOUT counting a failure (the
-# breaker must never trip on a throttle). 75 == BSD EX_TEMPFAIL.
+# Worker exit "provider rate-limited or unavailable" (quota, timeout, overload, 5xx —
+# cli._KANBAN_REQUEUE_FAILURE_REASONS): released WITHOUT counting a failure (the
+# breaker must never trip on a throttle or an outage). 75 == BSD EX_TEMPFAIL.
 KANBAN_RATE_LIMIT_EXIT_CODE = 75
 
 
