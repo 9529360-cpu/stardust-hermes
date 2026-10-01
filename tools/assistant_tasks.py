@@ -784,7 +784,7 @@ def _delete_task(
             # delete_task owns the destructive lifecycle: if this task is still
             # running it archives first, terminates the host-local worker, then
             # purges the durable record and attachments.
-            deleted = kb.delete_task(conn, tid)
+            deleted = kb.delete_task(conn, tid, board=board)
     except RuntimeError as exc:
         return tool_error(str(exc), task_id=tid, board=board)
     except Exception as exc:
