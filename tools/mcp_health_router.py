@@ -30,7 +30,7 @@ class MCPToolHealth:
         if self.failures:
             out["failures"] = int(self.failures)
         if self.retry_in is not None:
-            out["retry_in"] = int(self.retry_in)
+            out["retry_in_seconds"] = int(self.retry_in)
         return out
 
 
