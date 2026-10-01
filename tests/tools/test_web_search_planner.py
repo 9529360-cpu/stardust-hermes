@@ -66,6 +66,17 @@ def test_adaptive_current_queries_enable_freshness_signal():
     assert plan.freshness is True
 
 
+def test_deep_research_can_independently_request_freshness():
+    plan = plan_search(
+        "deep research on the latest MCP changes",
+        {"search_strategy": "adaptive"},
+        ensemble_available=True,
+    )
+    assert plan.intent == "deep_research"
+    assert plan.mode == "ensemble"
+    assert plan.freshness is True
+
+
 def test_adaptive_does_not_invent_ensemble_when_no_extra_provider_exists():
     plan = plan_search(
         "latest security news",
