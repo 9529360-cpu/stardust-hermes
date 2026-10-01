@@ -233,6 +233,12 @@ def _resolve_providers(primary_provider) -> tuple[list, dict[str, str]]:
     return providers, failures
 
 
+def ensemble_available(primary_provider) -> bool:
+    """True only when at least one configured additional provider is usable now."""
+    providers, _failures = _resolve_providers(primary_provider)
+    return len(providers) > 1
+
+
 def search_ensemble(
     primary_provider,
     query: str,
