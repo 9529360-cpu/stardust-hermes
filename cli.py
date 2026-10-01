@@ -4109,6 +4109,14 @@ def _sync_cli_session_id_from_agent(cli) -> None:
         cli.session_id = cli.agent.session_id
 
 
+# Provider-side failures a later attempt can get past unchanged (quota walls, outages,
+# overload, timeouts). 2026-09-30: two ~3-minute relay timeouts each exited 1, the
+# dispatcher's failure limit (2) gave the card up, and it sat blocked for an hour.
+_KANBAN_REQUEUE_FAILURE_REASONS = frozenset({
+    "rate_limit", "billing", "upstream_rate_limit", "overloaded", "server_error", "timeout",
+})
+
+
 def _run_quiet_single_query(cli, effective_query, emitter=None):
     """Quiet (-Q) one-shot turn: run, print the response (stderr for errors/session_id), then sys.exit with the automation exit code.
     With a ``StreamJsonEmitter`` the final answer and the exit line become the terminal ``result`` JSONL record instead.
@@ -4194,13 +4202,13 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
     if emitter is None:
         print(f"\nsession_id: {cli.session_id}", file=sys.stderr)
 
-    # Exit code 0/1 for automation wrappers. Kanban workers that failed purely on
-    # rate-limit/billing exit with the EX_TEMPFAIL sentinel so the dispatcher releases
-    # the task without counting a failure (a quota window must not trip the breaker).
+    # Exit code 0/1 for automation wrappers. Kanban workers that failed only because the
+    # provider was unavailable exit with the EX_TEMPFAIL sentinel so the dispatcher requeues
+    # the task without counting a failure (a quota window or outage must not trip the breaker).
     _exit_code = 0
     if isinstance(result, dict) and result.get("failed"):
         _exit_code = 1
-        if os.environ.get("HERMES_KANBAN_TASK") and result.get("failure_reason") in ("rate_limit", "billing"):
+        if os.environ.get("HERMES_KANBAN_TASK") and result.get("failure_reason") in _KANBAN_REQUEUE_FAILURE_REASONS:
             try:
                 from hermes_cli.kanban_db import KANBAN_RATE_LIMIT_EXIT_CODE as _RL_CODE
                 _exit_code = _RL_CODE
