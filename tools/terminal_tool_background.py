@@ -181,6 +181,10 @@ def spawn_background_process(
             if is_delegated_child_context():
                 result_data["notify_on_complete"] = False
                 result_data["subagent_note"] = _SUBAGENT_NOTIFY_NOTE
+        else:
+            from gateway.session_context import get_session_env
+            if get_session_env("HERMES_SINGLE_QUERY_SESSION") == "1":
+                result_data["finite_session_note"] = _FINITE_SESSION_PROCESS_NOTE
         if watch_patterns:
             proc_session.watch_patterns = list(watch_patterns)
             result_data["watch_patterns"] = proc_session.watch_patterns
@@ -197,6 +201,12 @@ _SUBAGENT_NOTIFY_NOTE = (
     "you finish. Before you finish, either wait for it (process_manage wait), kill it, or hand it to your parent with "
     "process_manage(action='handoff', session_id=..., data='<purpose>') so the parent receives its completion. For CI "
     "watchers prefer returning the fact (PR number, SHA) and letting the parent watch."
+)
+
+_FINITE_SESSION_PROCESS_NOTE = (
+    "This is a one-shot run (e.g. a Kanban worker): it ends after your final answer and stops the background "
+    "processes it started. Use this one for checks within the run; never tell the user a server or watcher was "
+    "left running — tell them how to start it themselves if they need it afterwards."
 )
 
 _YIELDED_NOTE = (

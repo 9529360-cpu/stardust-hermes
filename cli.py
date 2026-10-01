@@ -976,15 +976,28 @@ def _wait_for_oneshot_background_completions(cli) -> None:
         )
 
 
+def _stop_oneshot_owned_processes(cli) -> None:
+    """Stop the background processes a finished one-shot run still owns.
+
+    They would otherwise outlive it on a dead stdout pipe: 2026-09-30 a kanban worker's
+    ``python -m http.server`` stayed bound to its port for hours, failing every request. Same
+    ownership contract as ``hermes -z`` (``agent.close()``) and delegated children.
+    """
+    agent = getattr(cli, "agent", None)
+    if agent is not None:
+        agent.stop_owned_background_processes(source="oneshot_exit")
+
+
 def _finalize_single_query(cli) -> None:
     """Close one-shot CLI resources before releasing the active session lease."""
     try:
         # Order matters: linger for spawned background work BEFORE any teardown (the
-        # parent owns those children's stdout pipes); then the durable flush, since
-        # memory-provider shutdown inside _run_cleanup can issue aux-LLM calls and
-        # nothing after it may fail in a way that loses the turn.
+        # parent owns those children's stdout pipes), then stop what the run still owns;
+        # then the durable flush, since memory-provider shutdown inside _run_cleanup can
+        # issue aux-LLM calls and nothing after it may fail in a way that loses the turn.
         for step, what in (
             (_wait_for_oneshot_background_completions, "background completion wait"),
+            (_stop_oneshot_owned_processes, "owned background process stop"),
             (_flush_one_shot_session_store, "session store flush"),
         ):
             try:
@@ -4307,6 +4320,8 @@ def _install_single_query_signal_handlers(cli):
                 # store here or the worker's turn (and its usage deltas) never become durable (#88583 /
                 # #50881 class). Best-effort under the SIGALRM deadman above.
                 _flush_one_shot_session_store(cli)
+            with suppress(Exception):
+                _stop_oneshot_owned_processes(cli)  # still under the deadman: never orphan a worker's server
             _flush_logging_and_stdio()
             os._exit(0)
         raise KeyboardInterrupt()

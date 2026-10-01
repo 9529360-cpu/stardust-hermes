@@ -35,6 +35,10 @@ type KanbanMessages = {
   deselect: string
   moveTo: (label: string) => string
   delete: string
+  deleteTaskTitle: (name: string) => string
+  deleteTaskConfirm: string
+  deleteTasksTitle: (n: number) => string
+  deleteTasksConfirm: string
   reviewChecking: string
   attachedTip: (name: string) => string
   orchestratorTip: (name: string) => string
@@ -251,6 +255,12 @@ export const en: KanbanMessages = {
   deselect: 'Deselect',
   moveTo: label => `Move to ${label}`,
   delete: 'Delete',
+  deleteTaskTitle: name => `Delete "${name}"?`,
+  deleteTaskConfirm:
+    'This permanently deletes the task, its history, and its stored attachments. If it is running, Stardust stops its worker first. This cannot be undone.',
+  deleteTasksTitle: n => `Delete ${n} ${n === 1 ? 'task' : 'tasks'}?`,
+  deleteTasksConfirm:
+    'These tasks, their histories, and their stored attachments will be permanently deleted. Running workers are stopped first. This cannot be undone.',
   reviewChecking: 'A review agent is checking the completed work.',
   attachedTip: name => `${name} is attached — the dispatcher hands this over on its next tick (≤1m).`,
   orchestratorTip: name => `${name} (the orchestrator) picks this up on the next tick and writes the spec.`,
@@ -466,6 +476,12 @@ const ja: KanbanMessages = {
   deselect: '選択解除',
   moveTo: label => `${label} へ移動`,
   delete: '削除',
+  deleteTaskTitle: name => `「${name}」を完全に削除しますか？`,
+  deleteTaskConfirm:
+    'タスク、履歴、保存済み添付ファイルを完全に削除します。実行中の場合は先にワーカーを停止します。この操作は元に戻せません。',
+  deleteTasksTitle: n => `${n} 件のタスクを完全に削除しますか？`,
+  deleteTasksConfirm:
+    '選択したタスク、履歴、保存済み添付ファイルを完全に削除します。実行中のワーカーは先に停止します。この操作は元に戻せません。',
   reviewChecking: 'レビューエージェントが完了した作業を確認中です。',
   attachedTip: name => `${name} が担当 — ディスパッチャが次のティック（≤1分）で引き渡します。`,
   orchestratorTip: name => `${name}（オーケストレーター）が次のティックでこれを取得し、仕様を書きます。`,
@@ -680,6 +696,10 @@ const zh: KanbanMessages = {
   deselect: '取消选择',
   moveTo: label => `移动到 ${label}`,
   delete: '删除',
+  deleteTaskTitle: name => `永久删除“${name}”？`,
+  deleteTaskConfirm: '这会永久删除任务、任务历史和已保存的附件；如果任务正在运行，会先停止工作进程。此操作无法撤销。',
+  deleteTasksTitle: n => `永久删除 ${n} 个任务？`,
+  deleteTasksConfirm: '这会永久删除所选任务、任务历史和已保存的附件；正在运行的工作进程会先被停止。此操作无法撤销。',
   reviewChecking: '审查代理正在检查已完成的工作。',
   attachedTip: name => `${name} 已接手 — 调度器将在下一个周期（≤1 分钟）移交。`,
   orchestratorTip: name => `${name}（编排者）将在下一个周期领取并撰写规格。`,
@@ -891,6 +911,10 @@ const zhHant: KanbanMessages = {
   deselect: '取消選取',
   moveTo: label => `移至 ${label}`,
   delete: '刪除',
+  deleteTaskTitle: name => `永久刪除「${name}」？`,
+  deleteTaskConfirm: '這會永久刪除任務、任務歷史和已儲存的附件；若任務正在執行，會先停止工作單元。此操作無法復原。',
+  deleteTasksTitle: n => `永久刪除 ${n} 個任務？`,
+  deleteTasksConfirm: '這會永久刪除所選任務、任務歷史和已儲存的附件；正在執行的工作單元會先被停止。此操作無法復原。',
   reviewChecking: '審查代理正在檢查已完成的工作。',
   attachedTip: name => `${name} 已接手 — 排程器將在下一個週期（≤1 分鐘）移交。`,
   orchestratorTip: name => `${name}（編排者）將在下一個週期領取並撰寫規格。`,

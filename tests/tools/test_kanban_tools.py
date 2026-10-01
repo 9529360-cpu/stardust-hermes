@@ -557,6 +557,52 @@ def test_create_happy_path(worker_env):
         conn.close()
 
 
+@pytest.fixture
+def orchestrator_home(monkeypatch, tmp_path):
+    """A chat/orchestrator session (not a dispatcher-spawned worker) on an isolated board."""
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+    monkeypatch.delenv("HERMES_SESSION_ID", raising=False)
+    from hermes_cli import kanban_db as kb
+    kb._INITIALIZED_PATHS.clear()
+    kb.init_db()
+    return home
+
+
+def test_create_ready_task_with_no_dispatcher_says_it_is_only_queued(orchestrator_home):
+    """The model told a Desktop user a task had started in the background; nothing would run it.
+
+    No gateway exists for this isolated home, so the real presence probe reports the gap — the
+    same message ``hermes kanban create`` and the dashboard already show.
+    """
+    from tools import kanban_tools as kt
+    created = json.loads(kt._handle_create({"title": "research", "assignee": "default"}))
+    assert created["ok"] is True and created["status"] == "ready"
+    assert "No gateway is running" in created["dispatch_warning"]
+    assert "not started" in created["dispatch_warning"]
+
+
+def test_create_ready_task_with_a_running_dispatcher_has_no_warning(orchestrator_home, monkeypatch):
+    import hermes_cli.kanban as kanban_cli
+    from tools import kanban_tools as kt
+    monkeypatch.setattr(kanban_cli, "_check_dispatcher_presence",
+                        lambda hermes_home=None: (True, "gateway pid=4242, dispatch enabled"))
+    created = json.loads(kt._handle_create({"title": "research", "assignee": "default"}))
+    assert created["status"] == "ready" and "dispatch_warning" not in created
+
+
+def test_dispatcher_spawned_creator_skips_the_presence_probe(worker_env, monkeypatch):
+    """Its own dispatcher is running by definition; probing could only produce a false alarm."""
+    import hermes_cli.kanban as kanban_cli
+    from tools import kanban_tools as kt
+    monkeypatch.setattr(kanban_cli, "_check_dispatcher_presence",
+                        lambda hermes_home=None: pytest.fail("probed from a dispatcher-owned worker"))
+    created = json.loads(kt._handle_create({"title": "sibling", "assignee": "peer"}))
+    assert created["status"] == "ready" and "dispatch_warning" not in created
+
+
 @pytest.mark.parametrize("explicit", [{"workspace_kind": "scratch"}, {"project": ""}])
 @pytest.mark.parametrize("target_scoped", [False, True])
 def test_create_explicit_scratch_ignores_ambient_board_project(

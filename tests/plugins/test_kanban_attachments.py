@@ -111,6 +111,28 @@ def test_add_list_get_delete_attachment(kanban_home, tmp_path):
         conn.close()
 
 
+def test_delete_attachment_never_unlinks_external_path(kanban_home, tmp_path):
+    conn = kbc.connect()
+    try:
+        task_id = _make_task(conn, title="external-pointer")
+        external = tmp_path / "original.txt"
+        external.write_text("original", encoding="utf-8")
+        att_id = kb.add_attachment(
+            conn,
+            task_id,
+            filename="original.txt",
+            stored_path=str(external),
+            content_type="text/plain",
+            size=external.stat().st_size,
+            uploaded_by="legacy-direct-caller",
+        )
+        assert kb.delete_attachment(conn, att_id) is not None
+        assert kb.get_attachment(conn, att_id) is None
+        assert external.read_text(encoding="utf-8") == "original"
+    finally:
+        conn.close()
+
+
 def test_delete_attachment_missing_returns_none(kanban_home):
     conn = kbc.connect()
     try:

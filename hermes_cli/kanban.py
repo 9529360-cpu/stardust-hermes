@@ -1056,8 +1056,20 @@ def _cmd_archive(args: argparse.Namespace) -> int:
         return _err("at least one task_id is required")
     with kbc.connect_closing() as conn:
         if purge_ids:
-            return _bulk_apply(purge_ids, lambda tid: kb.delete_archived_task(conn, tid), lambda tid: f"Deleted {tid}",
-                               lambda tid: f"cannot delete {tid} (must already be archived)")
+            failed = False
+            for tid in purge_ids:
+                try:
+                    deleted = kb.delete_archived_task(conn, tid)
+                except RuntimeError as exc:
+                    failed = True
+                    print(f"cannot delete {tid}: {exc}", file=sys.stderr)
+                    continue
+                if deleted:
+                    print(f"Deleted {tid}")
+                else:
+                    failed = True
+                    print(f"cannot delete {tid} (must already be archived)", file=sys.stderr)
+            return 1 if failed else 0
         return _bulk_apply(ids, lambda tid: kb.archive_task(conn, tid),
                            lambda tid: f"Archived {tid}", lambda tid: f"cannot archive {tid}")
 

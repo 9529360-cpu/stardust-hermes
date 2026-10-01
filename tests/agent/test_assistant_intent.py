@@ -59,6 +59,9 @@ def test_prompt_guidance_names_durability_and_focus_boundaries():
     assert "secure local credential capture or Vault resolution" in ASSISTANT_EXECUTION_GUIDANCE
     assert "`assistant_tasks`" in DURABLE_TASK_GUIDANCE
     assert "originating session is provenance, not ownership" in DURABLE_TASK_GUIDANCE
+    assert "Permanently delete durable work only from the CURRENT user's explicit deletion request" in DURABLE_TASK_GUIDANCE
+    assert "deletion stops active work and removes its durable record" in DURABLE_TASK_GUIDANCE
+    assert "cancellation preserves history" in DURABLE_TASK_GUIDANCE
     assert "Existing user authorization continues only within its stated scope" in DURABLE_TASK_GUIDANCE
     assert "user decision, credential, authorization" not in ASSISTANT_EXECUTION_GUIDANCE
 

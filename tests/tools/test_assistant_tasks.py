@@ -11,6 +11,8 @@ def test_schema_stays_bounded_and_does_not_restore_stale_confirmation_policy():
 
     assert len(encoded) < 1600
     assert "assistant_tasks" in encoded
+    assert '"delete"' in encoded
+    assert "delete is irreversible and stops active work" in encoded
     assert "approval_required" not in encoded
 
 
@@ -648,6 +650,120 @@ def test_cancel_archives_owned_task_but_preserves_result_evidence(tmp_path, monk
         assert kb.get_task(conn, task_id).status == "archived"
         assert kb.list_comments(conn, task_id)[-1].body == "Partial result is preserved."
         assert kb.list_attachments(conn, task_id)[0].filename == "result.txt"
+
+
+def test_delete_active_owned_task_is_one_step_and_permanent(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Still active",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+
+    deleted = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="delete",
+            task_id=task_id,
+            owner_key="local",
+            user_message="Delete that task permanently.",
+        )
+    )
+    assert deleted == {
+        "ok": True,
+        "task_id": task_id,
+        "board": "default",
+        "deleted": True,
+    }
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id) is None
+
+
+def test_delete_archived_owned_task_removes_attachment_blob(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Delete archived evidence",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        attachment_dir = kb.task_attachments_dir(task_id)
+        attachment_dir.mkdir(parents=True, exist_ok=True)
+        attachment = attachment_dir / "durable-result.txt"
+        attachment.write_text("result", encoding="utf-8")
+        kb.add_attachment(
+            conn,
+            task_id,
+            filename=attachment.name,
+            stored_path=str(attachment),
+            content_type="text/plain",
+            size=attachment.stat().st_size,
+            uploaded_by="worker",
+        )
+        assert kb.archive_task(conn, task_id)
+
+    deleted = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="delete",
+            task_id=task_id,
+            owner_key="local",
+            user_message="Permanently delete this archived task.",
+        )
+    )
+    assert deleted["ok"] is True
+    assert deleted["deleted"] is True
+    assert not attachment.exists()
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id) is None
+        assert kb.list_attachments(conn, task_id) == []
+
+
+def test_delete_completed_owned_task_is_supported(tmp_path, monkeypatch):
+    from hermes_cli import kanban_db as kb
+    from hermes_cli import kanban_db_connect as kbc
+
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(home))
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="Completed history",
+            assignee="default",
+            assistant_owner_key="local",
+        )
+        assert kb.complete_task(conn, task_id, result="done")
+
+    deleted = json.loads(
+        assistant_tasks.assistant_tasks_tool(
+            action="delete",
+            task_id=task_id,
+            owner_key="local",
+            user_message="Permanently delete the completed task.",
+        )
+    )
+    assert deleted["ok"] is True
+    assert deleted["deleted"] is True
+    with kbc.connect() as conn:
+        assert kb.get_task(conn, task_id) is None
 
 
 def test_owner_identity_is_not_embedded_in_idempotency_key(monkeypatch):
@@ -1547,3 +1663,23 @@ def test_inspect_reads_real_kanban_events_without_comment_bodies(tmp_path, monke
     assert any(event["kind"] == "blocked" for event in result["events"])
     assert result["comments_omitted"] is True
     assert "private scratch note" not in json.dumps(result)
+
+
+def test_create_surfaces_a_queued_but_undispatched_warning_once(monkeypatch):
+    """Without a dispatcher the model must say "queued", not "started in the background"."""
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    warning = "No gateway is running — the task will sit in 'ready' until you start it."
+
+    def fake_create(args):
+        return json.dumps({"ok": True, "task_id": f"t_{args['title']}", "status": "ready",
+                           "subscribed": True, "dispatch_warning": warning})
+
+    monkeypatch.setattr("tools.kanban_tools._handle_create", fake_create)
+    result = json.loads(assistant_tasks.assistant_tasks_tool(
+        action="create", session_id="session-7", request_id="call-43",
+        tasks=[{"title": "a", "instruction": "Research library a."},
+               {"title": "b", "instruction": "Research library b."}],
+    ))
+    assert result["ok"] is True and len(result["created"]) == 2
+    assert result["dispatch_warning"] == warning
+    assert all("dispatch_warning" not in entry for entry in result["created"])
