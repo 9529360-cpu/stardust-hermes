@@ -57,17 +57,22 @@ def _server_key(server_name: str):
     return _resolve_server_key(server_name)
 
 
+def _metric_key(server_name: str, route_token: int | None):
+    return (_server_key(server_name), route_token)
+
+
 def record_call(
     server_name: str,
     *,
     elapsed_seconds: float,
     success: bool,
+    route_token: int | None = None,
     now: float | None = None,
 ) -> None:
     """Record one completed logical dispatch. User interrupts should not call this function."""
     timestamp = time.monotonic() if now is None else float(now)
     latency = max(0.0, float(elapsed_seconds))
-    key = _server_key(server_name)
+    key = _metric_key(server_name, route_token)
     with _lock:
         row = _metrics.setdefault(key, _MutableMetrics())
         row.samples += 1
@@ -91,9 +96,14 @@ def record_call(
             )
 
 
-def snapshot(server_name: str, *, now: float | None = None) -> MCPRouteSnapshot | None:
+def snapshot(
+    server_name: str,
+    *,
+    route_token: int | None = None,
+    now: float | None = None,
+) -> MCPRouteSnapshot | None:
     timestamp = time.monotonic() if now is None else float(now)
-    key = _server_key(server_name)
+    key = _metric_key(server_name, route_token)
     with _lock:
         row = _metrics.get(key)
         if row is None:
@@ -119,4 +129,6 @@ def clear(server_name: str | None = None) -> None:
         if server_name is None:
             _metrics.clear()
         else:
-            _metrics.pop(_server_key(server_name), None)
+            server_key = _server_key(server_name)
+            for key in [key for key in _metrics if key[0] == server_key]:
+                _metrics.pop(key, None)
