@@ -2,7 +2,23 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _forget_spawned_kanban_workers():
+    """Drop worker handles a test left in the dispatcher's module-level registry.
+
+    On Windows ``_default_spawn`` keeps each worker's Popen so ``reap_worker_zombies`` can read
+    its exit code; a test that swaps ``subprocess.Popen`` for a fake would otherwise leave that
+    fake there for every later reap in the same process.
+    """
+    yield
+    dispatch = sys.modules.get("hermes_cli.kanban_db_dispatch")
+    if dispatch is not None:
+        dispatch._spawned_worker_procs.clear()
 
 
 @pytest.fixture
