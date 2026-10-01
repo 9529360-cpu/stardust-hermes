@@ -304,28 +304,46 @@ def _handle_stdio_child_exited_and_retry(server_name: str, exc: Exception, retry
 
 def _dispatch(server_name: str, server: Any, op: str, call, tool_timeout: float, recoverers,
               on_final_failure: Callable[[BaseException], None], record_outcome: bool = False) -> str:
-    """Mark the call started on *server* (doubles may lack ``mark_tool_call``), run coroutine function *call*
-    on the MCP loop and, on failure, walk ``recoverers`` (``(server_name, exc, retry_call, op) -> Optional[str]``,
-    None = not its kind; order matters). Unrecovered exceptions go through ``on_final_failure`` and become the
-    generic call-failed error. ``record_outcome`` applies breaker bookkeeping to the FIRST attempt only."""
+    """Run one logical MCP dispatch and record aggregate route-quality telemetry.
+
+    Route metrics are process-local timing/outcome only. They deliberately record the final logical
+    result after recovery (not every transport attempt), and user interrupts are excluded so a human
+    steering the agent never makes an MCP backend look unhealthy.
+    """
     if callable(getattr(server, "mark_tool_call", None)):
         server.mark_tool_call()
+    started = time.monotonic()
 
     def call_once():
         return _loop._run_on_mcp_loop(call, timeout=tool_timeout)
 
+    def finish(result: str) -> str:
+        try:
+            from tools.mcp_route_metrics import record_call
+            record_call(
+                server_name,
+                elapsed_seconds=max(0.0, time.monotonic() - started),
+                success=not _result_is_error(result),
+            )
+        except Exception:
+            logger.debug("MCP route metric recording failed for %s/%s", server_name, op, exc_info=True)
+        return result
+
     try:
         result = call_once()
-        return _record_call_outcome(server_name, result) if record_outcome else result
+        result = _record_call_outcome(server_name, result) if record_outcome else result
+        return finish(result)
     except InterruptedError:
         return tool_error("MCP call interrupted: user sent a new message")
     except Exception as exc:
         for recover in recoverers:
             recovered = recover(server_name, exc, call_once, op)
             if recovered is not None:
-                return recovered
+                return finish(recovered)
         on_final_failure(exc)
-        return tool_error(_sanitize_error(f"MCP call failed: {type(exc).__name__}: {_exc_str(exc)}"))
+        return finish(tool_error(
+            _sanitize_error(f"MCP call failed: {type(exc).__name__}: {_exc_str(exc)}")
+        ))
 
 
 @asynccontextmanager
