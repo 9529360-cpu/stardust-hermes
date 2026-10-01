@@ -42,7 +42,7 @@ _thread_local = threading.local()
 # "post gmail message" must not silently route to Slack just because "post message" matches.
 _QUERY_STOPWORDS = frozenset({
     "a", "an", "the", "please", "pls", "help", "me", "my", "can", "could", "would",
-    "want", "wants", "need", "needs", "find", "use", "using", "with", "for", "to",
+    "want", "wants", "need", "needs", "with", "for", "to",
 })
 
 # Query-only multilingual aliases. The catalog itself stays byte-stable and English-first
