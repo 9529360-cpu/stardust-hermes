@@ -523,8 +523,6 @@ def test_windows_dispatcher_reads_a_real_worker_exit_code(kanban_home, monkeypat
     """Windows has no ``waitpid(-1)`` and no ``os.WIFEXITED``: every worker exit was booked as
     "pid N not alive", so a quota-wall/outage exit counted as a crash and two of them gave the card
     up (field incident 2026-09-30). The dispatcher must read the real exit code of its own worker."""
-    import psutil
-
     monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
     monkeypatch.setattr(kbd, "_worker_argv", lambda *_args: [sys.executable, "-c", f"import sys; sys.exit({exit_code})"])
     with kbc.connect() as conn:
@@ -534,7 +532,11 @@ def test_windows_dispatcher_reads_a_real_worker_exit_code(kanban_home, monkeypat
         pid = kbd._default_spawn(kb.get_task(conn, tid), str(tmp_path))
         conn.execute("UPDATE tasks SET worker_pid=? WHERE id=?", (pid, tid))
         conn.commit()
-        psutil.Process(pid).wait(timeout=60)
+        # The worker may already be gone here, and psutil reports an exited Windows process as
+        # missing even while a handle is open, so wait on the dispatcher's own liveness check.
+        deadline = time.monotonic() + 60
+        while kb._pid_alive(pid) and time.monotonic() < deadline:
+            time.sleep(0.1)
         assert not kb._pid_alive(pid), "the dispatcher's own handle must not keep an exited worker 'alive'"
 
         kbd.reap_worker_zombies()
