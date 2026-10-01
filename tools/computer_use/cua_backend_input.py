@@ -102,6 +102,9 @@ class _InputMixin:
         if button_norm not in {"left", "right", "middle"}:
             return _refuse("click", f"unknown button {button!r} — expected left, right, middle.")
         tool, args["button"] = ("double_click" if click_count == 2 else "click"), button_norm
+        if click_count == 2 and self._session.supports_input_property("click", "count"):
+            # cua-driver 0.31 double-clicks through click's `count`; its double_click takes no `button`.
+            tool, args["count"] = "click", 2
         refusal = self._pointer_args(tool, args, (
             ("element_index click", {"element_index": element} if element is not None else None),
             ("coordinate click", {"x": x, "y": y} if x is not None and y is not None else None),
@@ -115,6 +118,10 @@ class _InputMixin:
              button: str = "left", modifiers: Optional[List[str]] = None,
              delivery_mode: Optional[str] = None, bring_to_front: bool = False) -> ActionResult:
         refusal, args = self._target_args("drag")
+        if refusal is None and from_element is not None and self._session.supports_input_property("drag", "from_x") \
+                and not self._session.supports_input_property("drag", "from_element"):
+            refusal = _refuse("drag", "This cua-driver drags by coordinates only: pass from_coordinate/to_coordinate "
+                                      "(element bounds are in the latest capture).")
         if refusal is None:
             refusal = self._pointer_args("drag", args, (
                 ("element-based drag", {"from_element": from_element, "to_element": to_element}
@@ -137,7 +144,8 @@ class _InputMixin:
         # coordinates when the driver advertises support; otherwise it scrolls the targeted window
         # (window_id is still sent for routing).
         xy = lambda: ({"x": x, "y": y}  # noqa: E731
-                      if self._session.supports_capability("input.scroll.coordinates", tool="scroll") else {})
+                      if self._session.supports_capability("input.scroll.coordinates", tool="scroll")
+                      or self._session.supports_input_property("scroll", "x") else {})
         refusal = self._pointer_args("scroll", args, (
             ("element scroll", {"element_index": element}
              if element is not None and self._active_window_id is not None else None),

@@ -25,7 +25,7 @@ from tools.computer_use.cua_backend_daemon import _EmbeddedCuaDaemon
 from tools.computer_use.cua_backend_driver import (
     _CUA_DRIVER_CMD_ENV, cua_driver_binary_available, cua_driver_runtime_contract_status, cua_driver_update_nudge,
     resolve_cua_driver_cmd)
-from tools.computer_use.cua_backend_input import _InputMixin
+from tools.computer_use.cua_backend_input import _InputMixin, _refuse
 from tools.computer_use.cua_backend_parse import _action_result_from
 from tools.computer_use.cua_backend_session import _AsyncBridge, _CuaDriverSession
 
@@ -364,6 +364,14 @@ class CuaDriverBackend(_CaptureMixin, _InputMixin, ComputerUseBackend):
         if token and (self._session.supports_input_property(name, "element_token")
                       or self._session.supports_capability("accessibility.element_tokens", tool=name)):
             args["element_token"] = token
+        # cua-driver 0.31 schemas take element_token but no element_index (additionalProperties: false), so an
+        # index alone is refused as an unknown argument: address by the token, or refuse before the driver.
+        if isinstance(idx, int) and self._session.supports_input_property(name, "element_token") \
+                and not self._session.supports_input_property(name, "element_index"):
+            if "element_token" not in args:
+                return _refuse(name, f"Element {idx} is not in the latest capture: capture the window again and "
+                                     "use an element from it, or address the target by x/y.")
+            del args["element_index"]
         if inject_session:  # setdefault preserves any explicit session a caller already supplied
             args.setdefault("session", self._session_id)
         try:
