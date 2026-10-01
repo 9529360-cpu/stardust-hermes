@@ -227,51 +227,18 @@ def test_save_platform_tools_preserves_mcp_server_names():
 
 
 
-def test_first_install_nous_auto_configures_video_gen(monkeypatch):
-    """When a Nous subscriber checks video_gen in the toolset checklist,
-    apply_nous_managed_defaults must write video_gen.provider and
-    video_gen.use_gateway so the FAL plugin can route through the gateway
-    at runtime.  Regression test for the bug where video_gen was marked as
-    auto-configured but no config was actually written."""
-    monkeypatch.setattr("tools.tool_backend_helpers.managed_nous_tools_enabled", lambda: True)
+def test_first_install_never_auto_configures_nous_video_gen(monkeypatch):
+    """Even legacy Nous state cannot bypass explicit backend setup on a fresh Stardust install."""
     config = {
         "model": {"provider": "nous"},
         "platform_toolsets": {"cli": []},
     }
-    for env_var in (
-        "VOICE_TOOLS_OPENAI_KEY",
-        "OPENAI_API_KEY",
-        "ELEVENLABS_API_KEY",
-        "FIRECRAWL_API_KEY",
-        "FIRECRAWL_API_URL",
-        "KEENABLE_API_KEY",
-        "TAVILY_API_KEY",
-        "PARALLEL_API_KEY",
-        "BROWSERBASE_API_KEY",
-        "BROWSERBASE_PROJECT_ID",
-        "BROWSER_USE_API_KEY",
-        "FAL_KEY",
-    ):
-        monkeypatch.delenv(env_var, raising=False)
-
     monkeypatch.setattr(
         "hermes_cli.tools_config._prompt_toolset_checklist",
         lambda *args, **kwargs: {"video_gen"},
     )
     monkeypatch.setattr("hermes_cli.tools_config.save_config", lambda config: None)
-    monkeypatch.setattr(
-        "hermes_cli.tools_config._get_enabled_platforms",
-        lambda: ["cli"],
-    )
-    monkeypatch.setattr(
-        "hermes_cli.nous_subscription.get_nous_portal_account_info",
-        lambda *args, **kwargs: NousPortalAccountInfo(
-            logged_in=True,
-            source="jwt",
-            fresh=False,
-            paid_service_access=True,
-        ),
-    )
+    monkeypatch.setattr("hermes_cli.tools_config._get_enabled_platforms", lambda: ["cli"])
 
     configured = []
     monkeypatch.setattr(
@@ -281,10 +248,8 @@ def test_first_install_nous_auto_configures_video_gen(monkeypatch):
 
     tools_command(first_install=True, config=config)
 
-    assert config["video_gen"]["provider"] == "nous"
-    assert "use_gateway" not in config["video_gen"]
-    # video_gen should NOT appear in the manual configure list — it's auto-configured
-    assert "video_gen" not in configured
+    assert config.get("video_gen") in (None, {})
+    assert configured == ["video_gen"]
 
 # ── Platform / toolset consistency ────────────────────────────────────────────
 
@@ -907,72 +872,26 @@ def _fake_features(*, logged_in: bool, paid: bool = True):
     return SimpleNamespace(nous_auth_present=logged_in, account_info=account)
 
 
-def test_visible_providers_reuses_logged_out_feature_snapshot(monkeypatch):
+def test_visible_providers_hide_nous_account_rows_without_feature_reads(monkeypatch):
     import hermes_cli.tools_config as tools_config
 
-    account = NousPortalAccountInfo(
-        logged_in=False,
-        source="none",
-        fresh=False,
-        paid_service_access=None,
-    )
-    features = NousSubscriptionFeatures(
-        subscribed=False,
-        nous_auth_present=False,
-        provider_is_nous=False,
-        features={},
-        account_info=account,
-    )
     monkeypatch.setattr(
         tools_config,
         "get_nous_subscription_features",
-        lambda *args, **kwargs: pytest.fail("feature snapshot was resolved again"),
+        lambda *args, **kwargs: pytest.fail("provider rendering must not resolve Nous Portal features"),
     )
 
-    providers = _visible_providers(
-        TOOL_CATEGORIES["image_gen"], {}, features=features
-    )
+    providers = _visible_providers(TOOL_CATEGORIES["image_gen"], {})
 
-    assert any(
-        provider.get("managed_nous_feature") == "image_gen"
-        for provider in providers
-    )
+    assert providers
+    assert not any(provider.get("requires_nous_auth") for provider in providers)
+    assert not any(provider.get("managed_nous_feature") for provider in providers)
 
+def test_visible_video_providers_hide_all_nous_managed_rows():
+    providers = _visible_providers(TOOL_CATEGORIES["video_gen"], {})
+    assert not any(provider.get("requires_nous_auth") for provider in providers)
+    assert not any(provider.get("managed_nous_feature") for provider in providers)
 
-def test_visible_providers_reuses_pool_video_feature_snapshot(monkeypatch):
-    import hermes_cli.tools_config as tools_config
-
-    account = NousPortalAccountInfo(
-        logged_in=True,
-        source="jwt",
-        fresh=False,
-        paid_service_access=False,
-        tool_access=NousToolAccessInfo(
-            enabled=True,
-            coverage={"fal-video": False},
-        ),
-    )
-    features = NousSubscriptionFeatures(
-        subscribed=True,
-        nous_auth_present=True,
-        provider_is_nous=False,
-        features={},
-        account_info=account,
-    )
-    monkeypatch.setattr(
-        tools_config,
-        "get_nous_subscription_features",
-        lambda *args, **kwargs: pytest.fail("feature snapshot was resolved again"),
-    )
-
-    providers = _visible_providers(
-        TOOL_CATEGORIES["video_gen"], {}, features=features
-    )
-
-    assert not any(
-        provider.get("managed_nous_feature") == "video_gen"
-        for provider in providers
-    )
 
 
 

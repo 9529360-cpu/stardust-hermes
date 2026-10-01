@@ -131,34 +131,29 @@ _PLUGIN_ROW_BUILDERS = {
 def _visible_providers(
     cat: dict, config: dict, *, force_fresh: bool = False, features: Optional[NousSubscriptionFeatures] = None,
 ) -> list[dict]:
-    """Provider entries visible for the current auth/config state.
-    Nous-managed rows (``managed_nous_feature``) are always shown, even logged-out/unentitled, to
-    advertise the capability."""
-    from hermes_cli.tools_config import get_nous_subscription_features
+    """Provider rows exposed by Stardust's tool configuration surfaces.
 
-    if features is None:
-        features = get_nous_subscription_features(config, force_fresh=force_fresh)
-    acct = features.account_info
-    # Pool-only users (free tool pool, no paid access) get image gen but NOT video gen — the pool doesn't
-    # fund `fal-video`, so hide the managed video row rather than advertise a denial.
-    pool_only = bool(acct and acct.logged_in and acct.paid_service_access is not True and acct.tool_gateway_entitled)
-    visible = []
-    for provider in cat.get("providers", []):
-        managed = provider.get("managed_nous_feature")
-        # Managed rows stay visible regardless of auth (selecting one drives an inline Portal login); a
-        # `requires_nous_auth` row without a managed feature hides until logged in.
-        if provider.get("requires_nous_auth") and not managed and not features.nous_auth_present:
-            continue
-        if pool_only and managed == "video_gen" and not (acct and acct.tool_gateway_entitled_for("fal-video")):
-            continue
-        visible.append(provider)
+    Nous account/subscription rows are inherited compatibility data, not Stardust backends.
+    Keep them out of CLI/Web/Desktop provider matrices and, critically, do not resolve Portal
+    entitlement just to render a picker. Existing legacy config remains readable by runtimes.
+    """
+    _ = (config, force_fresh, features)
+    visible = [
+        provider
+        for provider in cat.get("providers", [])
+        if not provider.get("requires_nous_auth") and not provider.get("managed_nous_feature")
+    ]
 
-    # Plugin-registered rows render BELOW the hardcoded rows (for web/browser they are the only real provider rows).
+    # Plugin rows share the same product rule: a plugin can keep legacy Nous compatibility
+    # metadata without becoming an account-login entrypoint in Stardust.
     builder = _PLUGIN_ROW_BUILDERS.get(cat.get("name"))
     if builder is not None:
-        visible.extend(builder())
+        visible.extend(
+            provider
+            for provider in builder()
+            if not provider.get("requires_nous_auth") and not provider.get("managed_nous_feature")
+        )
     return visible
-
 
 def provider_readiness_status(provider: dict, config: dict, *, features=None, is_active: Optional[bool] = None) -> str:
     """Honest readiness state for a provider picker row.
@@ -252,7 +247,7 @@ def _configure_tool_category(ts_key: str, cat: dict, config: dict, *, force_fres
     """Provider selection for a tool category, then API-key setup for the chosen row.
     ``reconfigure`` ("Reconfigure an existing tool"): no setup note / skip row / Nous marker, and the
     chosen provider goes through the key-update prompts instead of the new-enable prompts."""
-    from hermes_cli.tools_config import _prompt_choice, _provider_env_ready, get_nous_subscription_features
+    from hermes_cli.tools_config import _prompt_choice, _provider_env_ready
 
     name = cat["name"]
     providers = _visible_providers(cat, config, force_fresh=force_fresh)
@@ -271,14 +266,6 @@ def _configure_tool_category(ts_key: str, cat: dict, config: dict, *, force_fres
         return
     print()
 
-    # Logged-in Nous users get a marker on rows included in their subscription (cost-extra vs. included).
-    _nous_logged_in = False
-    if not reconfigure:
-        try:
-            _nous_logged_in = bool(get_nous_subscription_features(config, force_fresh=force_fresh).nous_auth_present)
-        except Exception:
-            pass
-
     provider_choices = []  # plain text labels only (no ANSI codes in menu items)
     for p in providers:
         badge = f" [{p['badge']}]" if p.get("badge") else ""
@@ -289,11 +276,7 @@ def _configure_tool_category(ts_key: str, cat: dict, config: dict, *, force_fres
                 configured = " [active]"
             elif p.get("env_vars", []):
                 configured = " [configured]"
-        # Subscribers get the "included" star; everyone else a hint that selecting triggers a Portal login.
-        sub_marker = ""
-        if not reconfigure and p.get("managed_nous_feature"):
-            sub_marker = "  ★ Included with your Nous subscription" if _nous_logged_in else "  ★ via Nous Portal (login on select)"
-        provider_choices.append(f"{p['name']}{badge}{tag}{configured}{sub_marker}")
+        provider_choices.append(f"{p['name']}{badge}{tag}{configured}")
 
     if not reconfigure:
         provider_choices.append("Skip — keep defaults / configure later")
@@ -743,33 +726,19 @@ def apply_provider_selection(ts_key: str, provider_name: str, config: dict) -> N
 
 
 def _nous_provider_gate(provider: dict, config: dict, managed_feature, *, force_fresh: bool) -> bool:
-    """Return False (after printing why) when a Nous-gated row cannot be selected.
-    Managed Tool Gateway rows are always listed but only *activate* with paid Nous Portal access —
-    selecting one runs an inline Portal login (auth + entitlement only, no inference-provider switch).
-    Pure pre-auth UX rows (``requires_nous_auth`` without a managed feature) keep the older logged-in +
-    entitled gate."""
-    from hermes_cli.tools_config import get_nous_subscription_features
+    """Fail closed for inherited Nous account/subscription tool rows.
 
-    if managed_feature:
-        from hermes_cli.nous_subscription import ensure_nous_portal_access
-
-        if not ensure_nous_portal_access(
-            capability=f"{provider.get('name', 'the Nous Tool Gateway')}",
-            coverage_category=MANAGED_FEATURE_COVERAGE_CATEGORY.get(managed_feature)):
-            _print_warning("  Not enabled — Nous Portal access is required for this backend.")
-            return False
-        return True
-
-    if provider.get("requires_nous_auth"):
-        features = get_nous_subscription_features(config, force_fresh=force_fresh)
-        entitled = bool(features.account_info and features.account_info.paid_service_access is True)
-        if not features.nous_auth_present or not entitled:
-            message = format_nous_portal_entitlement_message(
-                features.account_info, capability=f"{provider.get('name', 'Nous Subscription')}")
-            _print_warning(f"  {message or 'Nous Subscription is only available after logging into Nous Portal.'}")
-            return False
+    The row definitions remain for legacy-config interpretation, but Stardust never starts Portal
+    OAuth from tool setup. Direct API/local backends remain selectable normally.
+    """
+    _ = (config, force_fresh)
+    if managed_feature or provider.get("requires_nous_auth"):
+        _print_warning(
+            "  This inherited Nous account/subscription backend is not available in Stardust. "
+            "Choose a direct API or local backend instead."
+        )
+        return False
     return True
-
 
 def _finish_provider_selection(provider: dict, config: dict, managed_feature) -> None:
     """Model pickers that follow a provider pick: plugin image/video gen, in-tree FAL, STT."""
@@ -815,21 +784,9 @@ def _print_provider_selection(provider: dict, managed_feature, *, reconfigure: b
 
 
 def _show_portal_hint(provider: dict, config: dict, managed_feature, force_fresh: bool) -> bool:
-    """True when a BYOK row shares its category with a Nous-managed sibling and the user is not authed to
-    Nous — a single dim hint tells them the key is avoidable via a Portal subscription."""
-    from hermes_cli.tools_config import TOOL_CATEGORIES, get_nous_subscription_features
-
-    if managed_feature or provider.get("requires_nous_auth"):
-        return False
-    try:
-        for _cat in TOOL_CATEGORIES.values():
-            _providers = _cat.get("providers", [])
-            if provider in _providers and any(sib.get("managed_nous_feature") for sib in _providers):
-                return not get_nous_subscription_features(config, force_fresh=force_fresh).nous_auth_present
-    except Exception:
-        pass
+    """Stardust does not advertise an upstream account/subscription while configuring direct APIs."""
+    _ = (provider, config, managed_feature, force_fresh)
     return False
-
 
 def _prompt_secret(
     key: str, label: str, url: str, default_val: str, *, reconfigure: bool, url_label: str, strip: bool = False,
