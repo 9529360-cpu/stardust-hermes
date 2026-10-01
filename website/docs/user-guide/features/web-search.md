@@ -33,6 +33,14 @@ Brave Search, DDGS, and xAI are **search-only** — pair any of them with Firecr
 
 **Per-capability split:** you can use different providers for search and extract independently — for example SearXNG (free) for search and Firecrawl for extract. See [Per-capability configuration](#per-capability-configuration) below.
 
+**Search fallback chain:** when you want deterministic failover instead of jumping straight to the anonymous free-tier ring, set `web.search_fallback_backends` to an ordered list of registered search providers. Stardust tries the configured primary first, then these fallbacks in order, and only then uses the keyless rescue ring when that tier is enabled. Fallback is one-shot per call: the next search retries the primary, and fallback-served results are not cached under the primary provider.
+
+```yaml
+web:
+  search_backend: "searxng"
+  search_fallback_backends: ["brave-free", "ddgs"]
+```
+
 :::info Works out of the box — keyless free-tier rotation
 A fresh install with **no web credentials at all** gets working `web_search` and `web_extract` out of the box: requests rotate round-robin across the ring vendors' public free tiers — **Exa, Parallel, Firecrawl, and Keenable** — spreading load evenly, and a rate-limited request automatically retries on the next vendor in the ring (multi-hop, until one serves or all are throttled). No signup, no key. This tier is strictly last-resort — any configured backend or present API key always wins — and requests carry no user identifiers (only a random per-process session id, rotated on restart). For guaranteed, unthrottled service, set up a keyed provider. Disable the keyless tier entirely with `web.keyless_fallback: false`.
 :::
