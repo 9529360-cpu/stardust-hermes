@@ -35,7 +35,9 @@ _VIRTUAL = {d.slug for d in provider_catalog() if d.auth_type == "virtual"}
 # exists, so there is nothing to configure on either Providers tab. Derived
 # from the catalog flag so any future keyless provider is covered.
 _KEYLESS = {d.slug for d in provider_catalog() if d.keyless}
-_EXEMPT = {"custom"} | _VIRTUAL | _KEYLESS
+# Nous remains in the inherited provider universe for compatibility/migration,
+# but Stardust intentionally does not expose the Nous Portal account product in Desktop.
+_EXEMPT = {"custom", "nous"} | _VIRTUAL | _KEYLESS
 
 # Providers that legitimately offer BOTH auth methods and so intentionally
 # appear on both desktop tabs (an API-key card AND an account sign-in card).

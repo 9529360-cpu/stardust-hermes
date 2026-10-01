@@ -583,6 +583,22 @@ def test_nous_dashboard_poller_preserves_effective_scope_when_token_omits_scope(
 
 
 
+def test_nous_account_oauth_is_not_exposed_or_startable():
+    resp = client.get("/api/providers/oauth", headers=HEADERS)
+    assert resp.status_code == 200, resp.text
+    assert "nous" not in {p["id"] for p in resp.json()["providers"]}
+
+    before_sessions = set(_web_server_oauth._oauth_sessions)
+    start = client.post("/api/providers/oauth/nous/start", headers=HEADERS)
+    assert start.status_code == 400, start.text
+    assert "Unknown provider nous" in start.text
+    assert set(_web_server_oauth._oauth_sessions) == before_sessions
+
+    disconnect = client.delete("/api/providers/oauth/nous", headers=HEADERS)
+    assert disconnect.status_code == 400, disconnect.text
+    assert "Unknown provider: nous" in disconnect.text
+
+
 def test_xai_oauth_listed_as_device_code_flow():
     """xAI Grok OAuth must surface in the catalog as a device-code flow."""
     resp = client.get("/api/providers/oauth", headers=HEADERS)
@@ -634,6 +650,8 @@ def test_accounts_offers_every_oauth_provider_from_catalog():
     assert resp.status_code == 200, resp.text
     offered = {p["id"] for p in resp.json()["providers"]}
     for d in provider_catalog():
+        if d.slug == "nous":
+            continue
         if d.tab == "accounts":
             assert d.slug in offered, (
                 f"{d.slug} is an accounts-tab provider in `hermes model` but is "
