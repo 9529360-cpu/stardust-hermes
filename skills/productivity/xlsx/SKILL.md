@@ -1,7 +1,7 @@
 ---
 name: xlsx
 description: Create, read, edit Excel .xlsx workbooks and CSVs.
-version: 1.1.0
+version: 1.2.0
 author: Nous Research
 license: MIT
 platforms: [linux, macos, windows]
@@ -149,8 +149,21 @@ soffice --headless --convert-to csv report.xlsx --outdir out/  # 1st sheet only
 ```
 
 Only the first sheet lands in a CSV; for other sheets use
-`xlsx_to_csv.py --sheet NAME`. If `soffice` is missing, install
-LibreOffice or hand the file to the user unconverted.
+`xlsx_to_csv.py --sheet NAME`.
+
+On Windows, Microsoft Excel is usually installed but not on PATH:
+check for it with `New-Object -ComObject Excel.Application` (or the
+`App Paths\excel.exe` registry key), not `Get-Command excel`. When it is
+there, Excel's own export matches what the user sees in Excel:
+
+```bash
+powershell.exe -NoProfile -NonInteractive -Command '$xl = New-Object -ComObject Excel.Application; $xl.DisplayAlerts = $false; $wb = $xl.Workbooks.Open("C:\work\report.xlsx", 0, $true); $wb.ExportAsFixedFormat(0, "C:\work\report.pdf"); $wb.Close($false); $xl.Quit()'
+```
+
+With neither Excel nor `soffice`, install LibreOffice yourself (e.g.
+`winget install --exact --id TheDocumentFoundation.LibreOffice`) or
+render the PDF from the data with a library, and say which route you
+took.
 
 ## Pitfalls
 
@@ -181,6 +194,11 @@ LibreOffice or hand the file to the user unconverted.
   openpyxl returns `datetime`/`date` objects. Dumps here emit ISO
   strings.
 - Sheet names are capped at 31 chars and reject `[ ] : * ? / \`.
+- **A table and a sheet AutoFilter on the same cells break the file
+  in Excel.** A native table filters itself; also setting
+  `ws.auto_filter.ref` over it makes Excel refuse the workbook, even in
+  repair mode, while openpyxl reads it back fine. Use one or the other
+  (`xlsx_create.py` drops the sheet filter where a table overlaps it).
 
 ## Verification
 
@@ -194,3 +212,7 @@ LibreOffice or hand the file to the user unconverted.
   where expected.
 - For a full visual check, open in LibreOffice:
   `soffice --headless --convert-to pdf out.xlsx` and inspect the PDF.
+- On Windows with Excel installed, open a workbook you produced in
+  Excel before calling it done. Reading it back with openpyxl does not
+  prove Excel accepts it; a file Excel rejects throws here:
+  `powershell.exe -NoProfile -NonInteractive -Command '$xl = New-Object -ComObject Excel.Application; $xl.DisplayAlerts = $false; $wb = $xl.Workbooks.Open("C:\work\out.xlsx", 0, $true); $wb.Close($false); $xl.Quit()'`
