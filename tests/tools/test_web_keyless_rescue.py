@@ -102,6 +102,22 @@ class TestEligibility:
         )
         assert web_tools_rescue._rescue_eligible(_KeyedBoomProvider()) is False
 
+    def test_search_fallback_does_not_enable_extract_rescue(self, monkeypatch):
+        monkeypatch.setattr(
+            web_tools, "_load_web_config",
+            lambda: {
+                "search_fallback_backends": ["searxng"],
+                "keyless_rescue": False,
+                "keyless_fallback": False,
+            },
+        )
+        monkeypatch.setattr(
+            "agent.web_search_registry._keyless_tier_enabled", lambda: False
+        )
+        provider = _KeyedBoomProvider()
+        assert web_tools_rescue._rescue_eligible(provider) is False
+        assert web_tools_rescue._search_rescue_eligible(provider) is True
+
 
 class TestSearchRescue:
     def _dispatch(self, monkeypatch, provider):
