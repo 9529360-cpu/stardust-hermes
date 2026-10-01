@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools import mcp_tool as core
 from tools import mcp_route_metrics as route_metrics
+from tools import mcp_tool as core
 from tools.mcp_health_router import tool_health
 
 
@@ -111,6 +111,7 @@ def test_half_open_server_can_recover_but_loses_to_healthy_peer():
 
 def test_non_mcp_tool_has_no_health_record():
     assert tool_health("read_file", now=100.0) is None
+
 
 def test_recent_failure_rate_deprioritizes_otherwise_healthy_server():
     tool = _map_tool()
