@@ -101,6 +101,39 @@ def test_one_failed_backend_does_not_discard_successful_results(monkeypatch):
     assert out["data"]["web"][0]["sources"] == ["primary"]
 
 
+def test_partial_failure_retries_only_failed_member_on_next_call(monkeypatch):
+    monkeypatch.setattr(
+        "tools.web_tools._load_web_config",
+        lambda: {"search_ensemble_backends": ["secondary"]},
+    )
+    primary = _Provider("primary", _ok([
+        {"title": "A", "url": "https://a.example", "description": "a", "position": 1},
+    ]))
+
+    class _Flaky(_Provider):
+        def search(self, query, limit=5):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary")
+            return _ok([
+                {"title": "B", "url": "https://b.example", "description": "b", "position": 1},
+            ])
+
+    secondary = _Flaky("secondary")
+    monkeypatch.setattr(
+        "agent.web_search_registry.get_provider",
+        lambda name: secondary if name == "secondary" else None,
+    )
+
+    first = search_ensemble(primary, "topic", 5)
+    second = search_ensemble(primary, "topic", 5)
+
+    assert "secondary" in first["data"]["failed_backends"]
+    assert "failed_backends" not in second["data"]
+    assert primary.calls == 1
+    assert secondary.calls == 2
+
+
 def test_unavailable_extra_provider_falls_back_to_normal_single_path(monkeypatch):
     monkeypatch.setattr(
         "tools.web_tools._load_web_config",
