@@ -2,6 +2,7 @@ import pytest
 
 from tools.web_result_cache import search_memo
 from tools.web_search_ensemble import configured_ensemble_backends, search_ensemble
+from tools.web_search_planner import SearchPlan
 
 
 class _Provider:
@@ -101,7 +102,19 @@ def test_duplicate_url_keeps_date_evidence_from_later_provider(monkeypatch):
         lambda name: secondary if name == "secondary" else None,
     )
 
-    out = search_ensemble(primary, "topic", 5)
+    out = search_ensemble(
+        primary,
+        "topic",
+        5,
+        plan=SearchPlan(
+            strategy="adaptive",
+            intent="current",
+            mode="ensemble",
+            freshness=True,
+            diversity=True,
+            near_duplicate_dedupe=True,
+        ),
+    )
 
     assert out["data"]["web"][0]["published_date"] == "2026-10-01"
 
