@@ -731,6 +731,10 @@ def test_projects_reads_are_scoped_to_the_requested_profile(monkeypatch, tmp_pat
     coder_repo = tmp_path / "repos" / "coder-repo"
     launch_repo.mkdir(parents=True)
     coder_repo.mkdir(parents=True)
+    # Keep the fake git probe inside these test repos. Windows pytest temp roots can live
+    # inside this checkout, whose parent .git would otherwise appear as a third project.
+    (launch_repo / ".git").mkdir()
+    (coder_repo / ".git").mkdir()
     _bind_profiles(monkeypatch, tmp_path, {"default": launch_home, "coder": coder_home})
 
     launch_project = _create_project(launch_home, "Launch", launch_repo, use=True)
@@ -780,6 +784,10 @@ def test_projects_tree_is_scoped_to_the_requested_profile(monkeypatch, tmp_path)
     coder_repo = tmp_path / "repos" / "tree-coder"
     launch_repo.mkdir(parents=True)
     coder_repo.mkdir(parents=True)
+    # Keep the fake git probe inside these test repos. Windows pytest temp roots can live
+    # inside this checkout, whose parent .git would otherwise appear as a third project.
+    (launch_repo / ".git").mkdir()
+    (coder_repo / ".git").mkdir()
     _bind_profiles(monkeypatch, tmp_path, {"default": launch_home, "coder": coder_home})
 
     _create_project(launch_home, "Launch", launch_repo, use=True)
