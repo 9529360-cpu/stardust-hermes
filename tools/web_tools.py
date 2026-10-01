@@ -300,13 +300,13 @@ def web_search_tool(query: str, limit: int = 5) -> str:
             response_data = {"success": False, "error": _no_provider_error("search", fallback)}
         else:
             logger.info("Web search via %s: '%s' (limit: %d)", provider.name, query, limit)
-            from tools.web_search_ensemble import configured_ensemble_backends, search_ensemble
+            from tools.web_search_ensemble import ensemble_available, search_ensemble
             from tools.web_search_planner import plan_search
 
             search_plan = plan_search(
                 query,
                 _load_web_config(),
-                ensemble_available=bool(configured_ensemble_backends(provider.name)),
+                ensemble_available=ensemble_available(provider),
             )
             ensemble = search_ensemble(provider, query, limit, plan=search_plan)
             if ensemble is None:
