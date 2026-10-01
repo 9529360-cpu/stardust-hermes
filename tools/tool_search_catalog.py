@@ -38,6 +38,74 @@ class CatalogEntry:
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 _thread_local = threading.local()
 
+# Query-only multilingual aliases. The catalog itself stays byte-stable and English-first
+# (tool names / vendor descriptions are overwhelmingly English), while user queries can be
+# Chinese-first. Keep this deliberately small and capability-oriented: these terms describe
+# actions/objects the tool catalog can actually answer, rather than attempting general
+# translation inside the runtime.
+_QUERY_ALIASES = (
+    ("搜索引擎", ("web", "search")),
+    ("拉取请求", ("pull", "request", "pr")),
+    ("合并请求", ("merge", "request", "pr")),
+    ("演示文稿", ("presentation", "slide")),
+    ("幻灯片", ("presentation", "slide")),
+    ("发邮件", ("send", "email")),
+    ("查邮件", ("search", "email")),
+    ("搜索", ("search",)),
+    ("查找", ("search", "find")),
+    ("查询", ("search", "find")),
+    ("邮件", ("email", "mail")),
+    ("邮箱", ("email", "mail")),
+    ("日历", ("calendar",)),
+    ("会议", ("meeting", "calendar")),
+    ("行程", ("calendar", "event")),
+    ("消息", ("message",)),
+    ("发送", ("send",)),
+    ("回复", ("reply",)),
+    ("创建", ("create",)),
+    ("新建", ("create",)),
+    ("更新", ("update",)),
+    ("修改", ("update", "edit")),
+    ("删除", ("delete", "remove")),
+    ("文件", ("file",)),
+    ("文档", ("document", "file")),
+    ("网盘", ("drive", "file")),
+    ("表格", ("spreadsheet", "sheet")),
+    ("任务", ("task",)),
+    ("项目", ("project",)),
+    ("代码", ("code",)),
+    ("仓库", ("repository", "repo")),
+    ("工单", ("issue", "ticket")),
+    ("浏览器", ("browser",)),
+    ("网页", ("web", "page")),
+    ("终端", ("terminal", "shell")),
+    ("命令", ("command",)),
+    ("运行", ("run", "execute")),
+    ("执行", ("execute", "run")),
+    ("图片", ("image",)),
+    ("视频", ("video",)),
+    ("语音", ("voice", "audio")),
+    ("翻译", ("translate",)),
+    ("飞书", ("feishu", "lark")),
+    ("知乎", ("zhihu",)),
+)
+
+
+def _query_tokenize(text: str) -> List[str]:
+    """Tokenize a user query and add compact Chinese capability aliases.
+
+    Raw CJK text is intentionally not emitted as an index token: a Chinese sentence would
+    otherwise contribute a never-answerable rare token and become the BM25 admission gate.
+    Alias terms are stemmed through the same path as catalog text and de-duplicated in order,
+    so natural-language phrasing does not overweight a capability simply by repeating aliases.
+    """
+    tokens = list(_tokenize(text))
+    raw = text or ""
+    for phrase, aliases in _QUERY_ALIASES:
+        if phrase in raw:
+            tokens.extend(_stem(alias.lower()) for alias in aliases)
+    return list(dict.fromkeys(tokens))
+
 
 @functools.lru_cache(maxsize=16384)
 def _stem(token: str) -> str:
@@ -144,14 +212,21 @@ def _corpus_stats(catalog: List[CatalogEntry]) -> _CorpusStats:
 
 
 def _gate_token(query_tokens: List[str], doc_freq: Dict[str, int], n_docs: int) -> str:
-    """The query token with the highest IDF: the word that names the intent. ``send``,
-    ``read``, ``create`` sit in dozens of tool documents and separate nothing; ``gmail``,
-    ``github``, ``incident`` sit in a few and separate everything. A document without this
-    token answered a different question, however many common tokens it shares."""
+    """Return the rarest answerable query token, or an empty string when none are answerable.
+
+    Unknown/filler terms must never become the mandatory gate. Previously a query such as
+    "github frobnicate issue" chose the absent word "frobnicate" (highest IDF because df=0)
+    and therefore returned no results even though two strong terms were present.
+    """
+    answerable = [token for token in query_tokens if doc_freq.get(token, 0) > 0]
+    if not answerable:
+        return ""
+
     def _idf(token: str) -> float:
-        df = doc_freq.get(token, 0)
+        df = doc_freq[token]
         return math.log(1 + (n_docs - df + 0.5) / (df + 0.5))
-    return max(query_tokens, key=_idf)
+
+    return max(answerable, key=_idf)
 
 
 # Relevance floor. The rarest-token gate stops queries whose intent word no tool carries; it
@@ -184,12 +259,14 @@ def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
     gmail email" returned 5 incident tools that only shared ``email``). A token no document
     carries admits nothing; the caller's empty-group hint tells the model to retry without it.
     Long queries additionally need :func:`_required_term_coverage` of their answerable terms."""
-    query_tokens = _tokenize(query) if catalog and limit > 0 else []
+    query_tokens = _query_tokenize(query) if catalog and limit > 0 else []
     if not query_tokens:
         return []
     corpus_stats = corpus_stats or _corpus_stats(catalog)
     doc_freq = corpus_stats[2]
     gate = _gate_token(query_tokens, doc_freq, corpus_stats[3])
+    if not gate:
+        return []
     answerable = {t for t in query_tokens if doc_freq.get(t, 0) > 0}
     required_terms = _required_term_coverage(len(answerable))
     exact_name = query.strip().lower()
