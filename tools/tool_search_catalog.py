@@ -250,7 +250,8 @@ def _required_term_coverage(answerable_term_count: int) -> int:
 
 
 def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
-                   corpus_stats: Optional[_CorpusStats] = None) -> List[CatalogEntry]:
+                   corpus_stats: Optional[_CorpusStats] = None,
+                   score_weights: Optional[Dict[str, float]] = None) -> List[CatalogEntry]:
     """Top-``limit`` catalog entries for ``query`` by BM25 (exact name match ranks first).
 
     Admission is by the query's rarest token (:func:`_gate_token`), not by ``score > 0``:
@@ -258,7 +259,8 @@ def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
     ``score > 0`` admits one-token matches and fills every slot with them (measured: "send
     gmail email" returned 5 incident tools that only shared ``email``). A token no document
     carries admits nothing; the caller's empty-group hint tells the model to retry without it.
-    Long queries additionally need :func:`_required_term_coverage` of their answerable terms."""
+    Long queries additionally need :func:`_required_term_coverage` of their answerable terms.
+    Optional score_weights multiply BM25 after admission; exact-name lookups stay authoritative."""
     query_tokens = _query_tokenize(query) if catalog and limit > 0 else []
     if not query_tokens:
         return []
@@ -278,10 +280,21 @@ def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
         tokens = set(entry._tokens)
         return gate in tokens and sum(1 for t in answerable if t in tokens) >= required_terms
 
-    scored = [
-        (float("inf") if entry.name.lower() == exact_name
-         else _bm25_score(query_tokens, entry._tokens, *corpus_stats), entry)
-        for entry in catalog if _admitted(entry)]
+    weights = score_weights or {}
+
+    def _weighted_score(entry: CatalogEntry) -> float:
+        if entry.name.lower() == exact_name:
+            return float("inf")
+        raw = _bm25_score(query_tokens, entry._tokens, *corpus_stats)
+        try:
+            weight = float(weights.get(entry.name, 1.0))
+        except (TypeError, ValueError):
+            weight = 1.0
+        # Routing hints may demote a degraded backend but must never negate lexical relevance.
+        weight = max(0.01, min(weight, 2.0))
+        return raw * weight
+
+    scored = [(_weighted_score(entry), entry) for entry in catalog if _admitted(entry)]
     scored.sort(key=lambda x: x[0], reverse=True)
     return [e for _, e in scored[:limit]]
 
