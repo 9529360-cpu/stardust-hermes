@@ -347,7 +347,11 @@ class TestBoundWindowsTempfileRetries:
 
     @pytest.mark.windows_only
     def test_stdlib_temp_creation_in_an_acl_denied_dir_gives_up(self, tmp_path):
-        """Real stdlib + real NTFS ACL: before the cap ``mkstemp``/``mkdtemp`` never returned."""
+        """Real stdlib + real NTFS ACL: before the cap ``mkstemp`` never returned.
+
+        ``mkdtemp`` shares the same ``TMP_MAX`` loop but is not probed: on the elevated GitHub
+        Windows runner it created the directory despite the deny ACE, so it cannot fail there.
+        """
         from tests.test_utils_mkstemp_fail_fast import deny_file_creation
 
         locked = tmp_path / "locked"
@@ -355,13 +359,12 @@ class TestBoundWindowsTempfileRetries:
         probe = textwrap.dedent('''
             import sys, tempfile
             import hermes_bootstrap
-            for create in (tempfile.mkstemp, tempfile.mkdtemp):
-                try:
-                    create(dir=sys.argv[1])
-                except OSError:
-                    continue
-                sys.exit(f"{create.__name__} succeeded in an ACL-denied directory")
-            print(tempfile.TMP_MAX)
+            try:
+                tempfile.mkstemp(dir=sys.argv[1])
+            except OSError:
+                print(tempfile.TMP_MAX)
+            else:
+                sys.exit("mkstemp succeeded in an ACL-denied directory")
         ''')
         repo_root = Path(__file__).resolve().parent.parent
         with deny_file_creation(locked):
