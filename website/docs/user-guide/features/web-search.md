@@ -41,6 +41,17 @@ web:
   search_fallback_backends: ["brave-free", "ddgs"]
 ```
 
+**Search ensemble mode:** for research queries where recall and cross-engine agreement matter more than minimizing API calls, set `web.search_ensemble_backends` to explicit additional providers. Stardust queries the primary and up to five additional available providers in parallel, canonicalizes URLs (including removal of common tracking parameters), de-duplicates overlaps, and reranks the merged set with Reciprocal Rank Fusion (RRF). Each result includes a `sources` list so the agent can see which engines surfaced it. One failed engine does not fail the ensemble.
+
+```yaml
+web:
+  search_backend: "searxng"
+  search_ensemble_backends: ["brave-free", "exa"]
+  search_fallback_backends: ["ddgs"]
+```
+
+With that configuration the normal path is **SearXNG + Brave + Exa in parallel → URL de-duplication → RRF ranking**. If every ensemble member fails, the normal fallback chain still applies afterward. Ensemble mode is deliberately opt-in because each uncached query may consume one request/credit on every configured provider.
+
 :::info Works out of the box — keyless free-tier rotation
 A fresh install with **no web credentials at all** gets working `web_search` and `web_extract` out of the box: requests rotate round-robin across the ring vendors' public free tiers — **Exa, Parallel, Firecrawl, and Keenable** — spreading load evenly, and a rate-limited request automatically retries on the next vendor in the ring (multi-hop, until one serves or all are throttled). No signup, no key. This tier is strictly last-resort — any configured backend or present API key always wins — and requests carry no user identifiers (only a random per-process session id, rotated on restart). For guaranteed, unthrottled service, set up a keyed provider. Disable the keyless tier entirely with `web.keyless_fallback: false`.
 :::
