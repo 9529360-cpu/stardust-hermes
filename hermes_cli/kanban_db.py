@@ -3876,6 +3876,17 @@ def _unlink_deleted_attachment_files(task_id: str, paths: Iterable[str]) -> None
             if path.is_file():
                 path.unlink()
 
+def _unlink_deleted_worker_logs(task_id: str, board: Optional[str]) -> None:
+    """Remove the task-owned log and rotated backups from the correct board."""
+    log_path = worker_log_path(task_id, board=board)
+    candidates = [log_path]
+    with contextlib.suppress(OSError):
+        candidates.extend(log_path.parent.glob(log_path.name + ".*"))
+    for path in candidates:
+        with contextlib.suppress(OSError):
+            if path.is_file():
+                path.unlink()
+
 def _hard_delete_workspace_blocker(conn: sqlite3.Connection, task_id: str) -> Optional[str]:
     """Return a task-owned workspace path that still needs recovery/cleanup."""
     row = conn.execute(
@@ -3908,7 +3919,9 @@ def _hard_delete_workspace_blocker(conn: sqlite3.Connection, task_id: str) -> Op
             return str(path)
     return None
 
-def delete_archived_task(conn: sqlite3.Connection, task_id: str) -> bool:
+def delete_archived_task(
+    conn: sqlite3.Connection, task_id: str, *, board: Optional[str] = None,
+) -> bool:
     """Hard-delete an ARCHIVED task only after any displaced worker stop settled."""
     if _task_status(conn, task_id) != "archived":
         return False
@@ -3927,7 +3940,6 @@ def delete_archived_task(conn: sqlite3.Connection, task_id: str) -> bool:
         )
 
     attachment_paths: list[str] = []
-    log_path = worker_log_path(task_id)
     with write_txn(conn):
         # Re-check under the write lock so a concurrent restore/reopen cannot
         # cross the destructive boundary after the safety check above.
@@ -3943,9 +3955,7 @@ def delete_archived_task(conn: sqlite3.Connection, task_id: str) -> bool:
             _append_event(conn, "", "task_deleted", {"task_id": task_id})
     if deleted:
         _unlink_deleted_attachment_files(task_id, attachment_paths)
-        with contextlib.suppress(OSError):
-            if log_path.is_file():
-                log_path.unlink()
+        _unlink_deleted_worker_logs(task_id, board)
         recompute_ready(conn)
     return deleted
 
@@ -3987,7 +3997,9 @@ def _archive_worker_stop_unverified(conn: sqlite3.Connection, task_id: str) -> O
         return payload
     return None
 
-def delete_task(conn: sqlite3.Connection, task_id: str, *, signal_fn=None) -> bool:
+def delete_task(
+    conn: sqlite3.Connection, task_id: str, *, signal_fn=None, board: Optional[str] = None,
+) -> bool:
     """Lifecycle-safe hard delete.
 
     Active work is archived first so its worker is stopped through the normal
@@ -4005,7 +4017,7 @@ def delete_task(conn: sqlite3.Connection, task_id: str, *, signal_fn=None) -> bo
         if not archive_task(conn, task_id, signal_fn=signal_fn):
             return False
 
-    return delete_archived_task(conn, task_id)
+    return delete_archived_task(conn, task_id, board=board)
 
 def schedule_task(
     conn: sqlite3.Connection, task_id: str, *, reason: Optional[str] = None,
@@ -4463,7 +4475,7 @@ def gc_events(conn: sqlite3.Connection, *, older_than_seconds: int = 30 * 24 * 3
     with write_txn(conn):
         cur = conn.execute(
             "DELETE FROM task_events WHERE created_at < ? AND kind != 'decomposed' AND ("
-            "task_id = '' OR task_id IN "
+            "(task_id = '' AND kind = 'task_deleted') OR task_id IN "
             "(SELECT id FROM tasks WHERE status IN ('done', 'archived'))"
             ")",
             (cutoff,),
