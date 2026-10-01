@@ -109,21 +109,16 @@ def _keyless_rescue_enabled() -> bool:
 
 
 def _rescue_eligible(provider) -> bool:
-    """True when a failed call has an explicit fallback or keyless rescue path.
+    """True when a failed call on provider should get keyless rescue.
 
-    Explicit search_fallback_backends are user-authorized and remain available even when the
-    anonymous keyless tier is disabled. Otherwise keep the historical rule: keyed/configured
-    paths may use keyless rescue, while a ring vendor already in keyless mode must not double-walk.
+    Eligible: a keyed/configured path — any non-ring backend, or a ring vendor in keyed mode. A ring
+    vendor already in keyless mode is NOT eligible: its failure means the ring was already walked.
     """
-    if provider is None:
-        return False
-    name = str(getattr(provider, "name", "") or "").strip().lower()
-    if any(candidate != name for candidate in _configured_search_fallbacks()):
-        return True
-    if not _keyless_rescue_enabled():
+    if not _keyless_rescue_enabled() or provider is None:
         return False
     try:
         from plugins.web.keyless_mcp import _KEYLESS_RING, use_keyless
+        name = getattr(provider, "name", "")
         if name not in _KEYLESS_RING:
             return True
         from agent.web_search_provider import get_provider_env
@@ -132,6 +127,16 @@ def _rescue_eligible(provider) -> bool:
     except Exception as exc:  # noqa: BLE001 — rescue is best-effort
         logger.debug("rescue eligibility check failed: %s", exc)
         return False
+
+
+def _search_rescue_eligible(provider) -> bool:
+    """Search may use an explicit fallback chain even when keyless rescue is disabled."""
+    if provider is None:
+        return False
+    name = str(getattr(provider, "name", "") or "").strip().lower()
+    if any(candidate != name for candidate in _configured_search_fallbacks()):
+        return True
+    return _rescue_eligible(provider)
 
 
 def _rescue_search(provider_name: str, original_error: str, query: str, limit: int) -> dict:
