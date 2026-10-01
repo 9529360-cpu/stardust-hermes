@@ -38,6 +38,13 @@ class CatalogEntry:
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 _thread_local = threading.local()
 
+# Query-side conversational filler only. Unknown content/service tokens remain meaningful:
+# "post gmail message" must not silently route to Slack just because "post message" matches.
+_QUERY_STOPWORDS = frozenset({
+    "a", "an", "the", "please", "pls", "help", "me", "my", "can", "could", "would",
+    "want", "wants", "need", "needs", "find", "use", "using", "with", "for", "to",
+})
+
 # Query-only multilingual aliases. The catalog itself stays byte-stable and English-first
 # (tool names / vendor descriptions are overwhelmingly English), while user queries can be
 # Chinese-first. Keep this deliberately small and capability-oriented: these terms describe
@@ -99,8 +106,12 @@ def _query_tokenize(text: str) -> List[str]:
     Alias terms are stemmed through the same path as catalog text and de-duplicated in order,
     so natural-language phrasing does not overweight a capability simply by repeating aliases.
     """
-    tokens = list(_tokenize(text))
     raw = text or ""
+    tokens = [
+        _stem(token.lower())
+        for token in _TOKEN_RE.findall(raw)
+        if token.lower() not in _QUERY_STOPWORDS
+    ]
     for phrase, aliases in _QUERY_ALIASES:
         if phrase in raw:
             tokens.extend(_stem(alias.lower()) for alias in aliases)
@@ -212,21 +223,17 @@ def _corpus_stats(catalog: List[CatalogEntry]) -> _CorpusStats:
 
 
 def _gate_token(query_tokens: List[str], doc_freq: Dict[str, int], n_docs: int) -> str:
-    """Return the rarest answerable query token, or an empty string when none are answerable.
+    """Return the rarest query token, including unknown content/service tokens.
 
-    Unknown/filler terms must never become the mandatory gate. Previously a query such as
-    "github frobnicate issue" chose the absent word "frobnicate" (highest IDF because df=0)
-    and therefore returned no results even though two strong terms were present.
+    Query-side conversational stopwords are removed before this point. Every remaining
+    token is meaningful evidence: an unknown service name such as "gmail" must gate to an
+    empty result rather than allowing a superficially similar Slack tool through.
     """
-    answerable = [token for token in query_tokens if doc_freq.get(token, 0) > 0]
-    if not answerable:
-        return ""
-
     def _idf(token: str) -> float:
-        df = doc_freq[token]
+        df = doc_freq.get(token, 0)
         return math.log(1 + (n_docs - df + 0.5) / (df + 0.5))
 
-    return max(answerable, key=_idf)
+    return max(query_tokens, key=_idf)
 
 
 # Relevance floor. The rarest-token gate stops queries whose intent word no tool carries; it
@@ -257,9 +264,9 @@ def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
     Admission is by the query's rarest token (:func:`_gate_token`), not by ``score > 0``:
     BM25 is additive over the tokens a document shares with the query, so on a large catalog
     ``score > 0`` admits one-token matches and fills every slot with them (measured: "send
-    gmail email" returned 5 incident tools that only shared ``email``). Gate selection ignores
-    unknown query tokens and chooses the rarest answerable token; if none are answerable, the
-    caller's empty-group hint tells the model to retry with a more concrete capability query.
+    gmail email" returned 5 incident tools that only shared ``email``). Conversational
+    stopwords are removed query-side, but any remaining unknown content/service token has the
+    highest IDF and gates the result to empty rather than permitting a wrong capability.
     Long queries additionally need :func:`_required_term_coverage` of their answerable terms.
     Optional score_weights multiply BM25 after admission; exact-name lookups stay authoritative."""
     query_tokens = _query_tokenize(query) if catalog and limit > 0 else []
