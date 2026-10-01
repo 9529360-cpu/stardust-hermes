@@ -1131,19 +1131,55 @@ def _record_task_failure(
         return True
 
 
-def _set_worker_pid(conn: sqlite3.Connection, task_id: str, pid: int) -> None:
-    """Record the spawned child's pid + its start-time fingerprint, and emit a ``spawned`` event
-    carrying them. The fingerprint is what lets every later liveness/kill decision tell OUR worker
-    from a process that recycled the PID after a reboot."""
+def _set_worker_pid(
+    conn: sqlite3.Connection,
+    task_id: str,
+    pid: int,
+    *,
+    expected_run_id: Optional[int] = None,
+    expected_claim_lock: Optional[str] = None,
+) -> tuple[bool, Optional[int]]:
+    """Persist a just-spawned worker only while its claim still owns the task.
+
+    Spawn necessarily happens outside the SQLite write transaction. An operator
+    can archive/delete/reschedule the task after claim but before the child PID
+    is known. In that race, never resurrect worker state or emit an orphan
+    ``spawned`` event; the caller must terminate the unadopted child instead.
+    Returns ``(persisted, started_at_fingerprint)``.
+    """
     from gateway.status import get_process_start_time
+
     started_at = get_process_start_time(int(pid))
     with _kb.write_txn(conn):
-        conn.execute("UPDATE tasks SET worker_pid = ?, worker_started_at = ? WHERE id = ?",
-                     (int(pid), started_at, task_id))
+        sql = (
+            "UPDATE tasks SET worker_pid = ?, worker_started_at = ? "
+            "WHERE id = ? AND status = 'running'"
+        )
+        params: list[Any] = [int(pid), started_at, task_id]
+        if expected_run_id is not None:
+            sql += " AND current_run_id = ?"
+            params.append(int(expected_run_id))
+        if expected_claim_lock is not None:
+            sql += " AND claim_lock = ?"
+            params.append(expected_claim_lock)
+        cur = conn.execute(sql, tuple(params))
+        if cur.rowcount != 1:
+            return False, started_at
+
         run_id = _kb._current_run_id(conn, task_id)
         if run_id is not None:
-            conn.execute("UPDATE task_runs SET worker_pid = ? WHERE id = ?", (int(pid), run_id))
-        _kb._append_event(conn, task_id, "spawned", {"pid": int(pid), "started_at": started_at}, run_id=run_id)
+            conn.execute(
+                "UPDATE task_runs SET worker_pid = ? WHERE id = ? AND ended_at IS NULL",
+                (int(pid), run_id),
+            )
+        _kb._append_event(
+            conn,
+            task_id,
+            "spawned",
+            {"pid": int(pid), "started_at": started_at},
+            run_id=run_id,
+        )
+    return True, started_at
 
 
 def _clear_failure_counter(conn: sqlite3.Connection, task_id: str) -> None:
@@ -1664,7 +1700,31 @@ def _dispatch_lane_task(
     try:
         pid = _call_spawn_fn(spawn_fn if spawn_fn is not None else _default_spawn, claimed, str(workspace), board)
         if pid:
-            _set_worker_pid(conn, claimed.id, int(pid))
+            persisted, started_at = _set_worker_pid(
+                conn,
+                claimed.id,
+                int(pid),
+                expected_run_id=claimed.current_run_id,
+                expected_claim_lock=claimed.claim_lock,
+            )
+            if not persisted:
+                # The task was displaced while spawn_fn ran. Kill the child we
+                # just created instead of leaving an untracked worker executing
+                # after archive/delete/reschedule.
+                termination = _terminate_reclaimed_worker(
+                    int(pid),
+                    claimed.claim_lock,
+                    started_at=started_at,
+                )
+                if not termination.get("terminated"):
+                    _kb._log.error(
+                        "kanban spawn race: task %s lost ownership before PID persistence "
+                        "and worker %s could not be confirmed stopped: %s",
+                        claimed.id,
+                        pid,
+                        termination,
+                    )
+                return False
         # Fires AFTER the PID (when reported) is durably persisted. Best-effort.
         _kb._fire_worker_spawned_hook(conn, claimed, str(workspace), pid, board=board)
         # consecutive_failures is deliberately NOT reset here: resetting on
