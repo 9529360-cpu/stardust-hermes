@@ -61,8 +61,6 @@ model:
   # Inference provider selection:
   #   "auto"         - Auto-detect from credentials (default)
   #   "openrouter"   - OpenRouter (requires: OPENROUTER_API_KEY or OPENAI_API_KEY)
-  #   "nous"         - Nous Portal OAuth (requires: hermes auth add nous)
-  #   "nous-api"     - Nous Portal API key (requires: NOUS_API_KEY)
   #   "anthropic"    - Direct Anthropic API (requires: ANTHROPIC_API_KEY)
   #   "openai-codex" - OpenAI Codex (requires: hermes auth)
   #   "copilot"      - GitHub Copilot / GitHub Models (requires: GITHUB_TOKEN)
@@ -82,8 +80,11 @@ model:
   #   "azure-foundry" - Microsoft Foundry / Azure OpenAI (API key or Entra ID)
   #   "lmstudio"     - LM Studio local server (optional: LM_API_KEY, defaults to http://127.0.0.1:1234/v1)
   #
+  # Direct/self-hosted APIs:
+  #   "custom"       - Any OpenAI-compatible endpoint. Set base_url + api_key/key_env explicitly.
+  #                    This is the preferred path for services not listed above.
+  #
   # Local servers (LM Studio, Ollama, vLLM, llama.cpp):
-  #   "custom"       - Any other OpenAI-compatible endpoint. Set base_url below.
   #   Aliases: "ollama", "vllm", "llamacpp" all map to "custom".
   #   LM Studio is first-class and uses provider: "lmstudio".
   #   It works with both no-auth and auth-enabled server modes.
@@ -801,19 +802,18 @@ prompt_caching:
 # auto-detected from your credentials.  You do NOT need to change anything
 # here for normal usage.
 #
-# WARNING: Overriding these with providers other than OpenRouter or Nous Portal
-# is EXPERIMENTAL and may not work.  Not all models/providers support vision,
-# produce usable summaries, or accept the same API format.  Change at your own
-# risk — if things break, reset to "auto" / empty values.
+# WARNING: Not all models/providers support vision, summaries, or the same API
+# format. Keep auxiliary overrides explicit and test them with your backend.
+# Some combinations are EXPERIMENTAL; if one misbehaves, reset the provider/model
+# override to "auto" / empty values.
 #
 # Each task has its own provider + model pair so you can mix providers.
 # For example: OpenRouter for vision (needs multimodal), but your main
 # local endpoint for compression (just needs text).
 #
 # Provider options:
-#   "auto"       - Best available: OpenRouter → Nous Portal → main endpoint (default)
+#   "auto"       - Best explicitly configured route, then main endpoint (default)
 #   "openrouter" - Force OpenRouter (requires OPENROUTER_API_KEY)
-#   "nous"       - Force Nous Portal (requires: hermes auth add nous)
 #   "gemini"      - Force Google AI Studio direct (requires: GOOGLE_API_KEY or GEMINI_API_KEY)
 #   "ollama-cloud" - Ollama Cloud (requires: OLLAMA_API_KEY)
 #   "codex"       - Force Codex OAuth (requires: hermes model → Codex).
@@ -822,9 +822,8 @@ prompt_caching:
 #                  Works with OpenAI API, local models, or any OpenAI-compatible
 #                  endpoint.  Also falls back to Codex OAuth and API-key providers.
 #
-# Model: leave empty to use the provider's default.  When empty, OpenRouter
-# uses "google/gemini-3-flash-preview" and Nous uses "gemini-3-flash".
-# Other providers pick a sensible default automatically.
+# Model: leave empty to use the provider's default. OpenRouter commonly uses
+# "google/gemini-3-flash-preview"; other providers choose their own defaults.
 #
 # auxiliary:
 #   # Image analysis: vision_analyze tool + browser screenshots
@@ -1197,7 +1196,7 @@ agent:
   # Enable verbose logging
   verbose: false
   
-  # Reasoning effort level (OpenRouter and Nous Portal)
+  # Reasoning effort level (when supported by the selected provider)
   # Controls how much "thinking" the model does before responding.
   # Options: "xhigh" (max), "high", "medium", "low", "minimal", "none" (disable)
   reasoning_effort: "medium"
@@ -2015,59 +2014,31 @@ updates:
 # =============================================================================
 # Web Dashboard
 # =============================================================================
-# OAuth gate configuration for `hermes dashboard --host <non-loopback>`.
-# The bundled Nous Portal plugin reads these on startup; settings here are
-# the canonical surface. Each can be overridden by an environment variable:
+# Dashboard authentication for `hermes dashboard --host <non-loopback>`.
+# Stardust does not use a hosted first-party account for dashboard access.
+# Choose the bundled username/password provider, the self-hosted OIDC section
+# below, or an explicitly installed DashboardAuthProvider plugin.
 #
-#   dashboard.oauth.client_id   <-  HERMES_DASHBOARD_OAUTH_CLIENT_ID
-#   dashboard.oauth.portal_url  <-  HERMES_DASHBOARD_PORTAL_URL
-#   dashboard.public_url        <-  HERMES_DASHBOARD_PUBLIC_URL
+# `dashboard.public_url` declares the external base URL used for OAuth/OIDC
+# callbacks and other URLs handed to external systems:
 #
-# Env wins when set to a non-empty value. This is what Fly.io's platform-
-# secret injection uses to push per-deploy client_ids without needing to
-# bake a config.yaml into the image. Empty env values are treated as unset
-# so a provisioned-but-not-populated secret can't shadow a valid entry here.
-#
-# Local dev / on-prem deploys should typically set these via config.yaml
-# (the ~/.hermes/.env file is reserved for API keys and secrets).
+#   dashboard.public_url  <-  HERMES_DASHBOARD_PUBLIC_URL
 #
 # dashboard:
-#   oauth:
-#     client_id: ""    # agent:{instance_id}; Portal provisions this at deploy
-#     portal_url: ""   # blank → default https://portal.nousresearch.com
+#   # public_url: "https://example.com/stardust"
 #
-#   # Force the absolute base URL the OAuth callback (and any other public
-#   # URL the dashboard hands to external systems) is built from. Set this
-#   # for deploys behind reverse proxies that don't reliably forward
-#   # X-Forwarded-Host / X-Forwarded-Proto / X-Forwarded-Prefix (manual
-#   # nginx setups, on-prem ingresses, custom-domain Fly deploys without
-#   # full proxy header chains).
-#   #
-#   # When set, the value is the complete authority: scheme + host +
-#   # optional path prefix (e.g. "https://example.com/hermes"). The OAuth
-#   # callback URL becomes "<public_url>/auth/callback" — X-Forwarded-Prefix
-#   # is IGNORED on this code path because the operator has explicitly
-#   # declared the public URL and we no longer need to guess.
-#   #
-#   # Leave empty to use the existing proxy-header reconstruction (the
-#   # default — works on Fly.io out of the box).
-#   #
-#   #   public_url: "https://example.com/hermes"
-#   #
 #   # Reverse proxies connecting from another container or host are not
 #   # trusted by default. Add only the proxy's exact IP address, or a bounded
-#   # CIDR for a dedicated proxy network, so X-Forwarded-Proto and
-#   # X-Forwarded-For can be honored. Loopback is always trusted. Wildcards
-#   # and /0 networks are rejected.
+#   # CIDR for a dedicated proxy network. Loopback is always trusted.
 #   #
-#   #   trusted_proxies:
-#   #     - "172.20.0.5"
-#   #     # - "172.20.0.0/24"  # dedicated network, if the IP is dynamic
+#   # trusted_proxies:
+#   #   - "172.20.0.5"
+#   #   # - "172.20.0.0/24"  # dedicated network, if the IP is dynamic
 #
 # -----------------------------------------------------------------------------
 # Self-hosted OIDC dashboard auth (generic OpenID Connect — Authentik,
-# Keycloak, Zitadel, Authelia, Auth0, Okta, Google, …). Use this INSTEAD of the
-# nous block above when gating the dashboard with your own identity provider.
+# Keycloak, Zitadel, Authelia, Auth0, Okta, Google, …). This is Stardust's
+# generic OAuth/OIDC path when you want an external identity provider.
 # Each setting can be overridden by an environment variable:
 #
 #   dashboard.oauth.self_hosted.issuer         <-  HERMES_DASHBOARD_OIDC_ISSUER
@@ -2111,7 +2082,7 @@ updates:
 #     are skipped with a startup warning (never a silent clobber)
 #   - a source's override_existing lets it beat .env/shell values, but
 #     never another secret source's claim
-# Docs: https://hermes-agent.nousresearch.com/docs/user-guide/secrets/
+# Docs in this repository: website/docs/user-guide/secrets/
 #
 # secrets:
 #   # Optional explicit ordering of enabled sources.
