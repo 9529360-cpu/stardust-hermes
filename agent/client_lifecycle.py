@@ -104,26 +104,32 @@ def _swap_fallback_clients(agent, fb_client, fb_provider: str, fb_model: str, fb
 
 
 class ClientLifecycleMixin:
+    def stop_owned_background_processes(self, *, source: str) -> int:
+        """Kill the running background processes this agent owns; returns how many were stopped."""
+        from tools.process_registry import process_registry
+
+        # A session can run several task IDs; delegated IDs also differ from session_id.
+        # Never match the environment key (e.g. "default"), shared by parent and siblings.
+        owners = getattr(self, "_process_owner_task_ids", ())
+        stopped = 0
+        for process in process_registry.list_sessions():
+            if process["owner_task_id"] in owners and process["status"] == "running":
+                result = process_registry.kill_process(process["session_id"], source=source, consume_output=True)
+                stopped += result.get("status") in {"killed", "already_exited"}
+        return stopped
+
     def _close_task_resources(self, task_id: str) -> None:
         """Release task resources without treating a shared environment as process ownership."""
         from run_agent import _quietly, cleanup_browser, cleanup_vm
-
-        def kill_processes() -> None:
-            from tools.process_registry import process_registry
-            # A session can run several task IDs; delegated IDs also differ from session_id.
-            # Never match the environment key (e.g. "default"), shared by parent and siblings.
-            owners = getattr(self, "_process_owner_task_ids", ())
-            for process in process_registry.list_sessions():
-                if process["owner_task_id"] in owners and process["status"] == "running":
-                    process_registry.kill_process(
-                        process["session_id"], source="agent_close", consume_output=True,
-                    )
 
         def release_computer_use() -> None:
             from tools.computer_use.tool import release_computer_use_session
             release_computer_use_session(task_id)
 
-        for step in (kill_processes, lambda: cleanup_vm(task_id), lambda: cleanup_browser(task_id), release_computer_use):
+        for step in (
+            lambda: self.stop_owned_background_processes(source="agent_close"),
+            lambda: cleanup_vm(task_id), lambda: cleanup_browser(task_id), release_computer_use,
+        ):
             _quietly(step)
 
     def _client_log_context(self) -> str:

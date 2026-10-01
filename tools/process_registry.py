@@ -1431,10 +1431,18 @@ class ProcessRegistry(ProcessCheckpointMixin):
         """
         proc = session.process
         if proc is not None:
+            # Windows has no select(): the reader blocks in read1(), holding the stream's buffer lock, so
+            # closing stdout from another thread waits for that read — forever when a descendant that
+            # escaped the kill still holds the pipe (a kill/reconcile caller then never returns). The
+            # reader closes it itself once the pipe reaches EOF.
+            reader = session._reader_thread
+            reader_busy = (_IS_WINDOWS and reader is not None and reader.is_alive()
+                           and reader is not threading.current_thread())
             for stream in (proc.stdout, proc.stderr, proc.stdin):
-                if stream is not None:
-                    with suppress(OSError, ValueError):  # a stdin flush can hit EPIPE
-                        stream.close()
+                if stream is None or (reader_busy and stream is proc.stdout):
+                    continue
+                with suppress(OSError, ValueError):  # a stdin flush can hit EPIPE
+                    stream.close()
         if session._pty is not None:
             # ptyprocess/pywinpty close() is idempotent (``closed`` flag) and
             # closes the master fd exactly once; it raises only if the child
