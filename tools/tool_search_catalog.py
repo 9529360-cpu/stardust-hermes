@@ -38,6 +38,91 @@ class CatalogEntry:
 _TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 _thread_local = threading.local()
 
+# Query-side conversational filler only. Unknown content/service tokens remain meaningful:
+# "post gmail message" must not silently route to Slack just because "post message" matches.
+_QUERY_STOPWORDS = frozenset({
+    "a", "an", "the", "please", "pls", "help", "me", "my", "can", "could", "would",
+    "want", "wants", "need", "needs", "with", "for", "to",
+})
+
+# Query-only multilingual aliases. The catalog itself stays byte-stable and English-first
+# (tool names / vendor descriptions are overwhelmingly English), while user queries can be
+# Chinese-first. Keep this deliberately small and capability-oriented: these terms describe
+# actions/objects the tool catalog can actually answer, rather than attempting general
+# translation inside the runtime.
+_QUERY_ALIASES = (
+    ("搜索引擎", ("web", "search")),
+    ("拉取请求", ("pull", "request", "pr")),
+    ("合并请求", ("merge", "request", "pr")),
+    ("演示文稿", ("presentation", "slide")),
+    ("幻灯片", ("presentation", "slide")),
+    ("发邮件", ("send", "email")),
+    ("查邮件", ("search", "email")),
+    ("搜索", ("search",)),
+    ("查找", ("search", "find")),
+    ("查询", ("search", "find")),
+    ("邮件", ("email", "mail")),
+    ("邮箱", ("email", "mail")),
+    ("日历", ("calendar",)),
+    ("会议", ("meeting", "calendar")),
+    ("行程", ("calendar", "event")),
+    ("消息", ("message",)),
+    ("发送", ("send",)),
+    ("回复", ("reply",)),
+    ("创建", ("create",)),
+    ("新建", ("create",)),
+    ("更新", ("update",)),
+    ("修改", ("update", "edit")),
+    ("删除", ("delete", "remove")),
+    ("文件", ("file",)),
+    ("文档", ("document", "file")),
+    ("网盘", ("drive", "file")),
+    ("表格", ("spreadsheet", "sheet")),
+    ("任务", ("task",)),
+    ("项目", ("project",)),
+    ("代码", ("code",)),
+    ("仓库", ("repository", "repo")),
+    ("工单", ("issue", "ticket")),
+    ("浏览器", ("browser",)),
+    ("网页", ("web", "page")),
+    ("终端", ("terminal", "shell")),
+    ("命令", ("command",)),
+    ("运行", ("run", "execute")),
+    ("执行", ("execute", "run")),
+    ("图片", ("image",)),
+    ("视频", ("video",)),
+    ("语音", ("voice", "audio")),
+    ("翻译", ("translate",)),
+    ("飞书", ("feishu", "lark")),
+    ("知乎", ("zhihu",)),
+)
+
+
+def _query_explicit_tokens(text: str) -> List[str]:
+    """Latin/alphanumeric tokens the user actually typed, minus conversational filler."""
+    raw = text or ""
+    return list(dict.fromkeys(
+        _stem(token.lower())
+        for token in _TOKEN_RE.findall(raw)
+        if token.lower() not in _QUERY_STOPWORDS
+    ))
+
+
+def _query_tokenize(text: str) -> List[str]:
+    """Tokenize a user query and add compact Chinese capability aliases.
+
+    Raw CJK text is intentionally not emitted as a literal index token. Chinese capability
+    phrases instead add synthetic English aliases. Those aliases improve recall, but unlike
+    user-typed service/content tokens they are not allowed to become a hard unknown-token gate:
+    e.g. "邮件" may expand to both "email" and "mail" even when a catalog only uses "email".
+    """
+    raw = text or ""
+    tokens = list(_query_explicit_tokens(raw))
+    for phrase, aliases in _QUERY_ALIASES:
+        if phrase in raw:
+            tokens.extend(_stem(alias.lower()) for alias in aliases)
+    return list(dict.fromkeys(tokens))
+
 
 @functools.lru_cache(maxsize=16384)
 def _stem(token: str) -> str:
@@ -143,15 +228,30 @@ def _corpus_stats(catalog: List[CatalogEntry]) -> _CorpusStats:
     return doc_lengths, avg_dl, dict(doc_freq), len(catalog)
 
 
-def _gate_token(query_tokens: List[str], doc_freq: Dict[str, int], n_docs: int) -> str:
-    """The query token with the highest IDF: the word that names the intent. ``send``,
-    ``read``, ``create`` sit in dozens of tool documents and separate nothing; ``gmail``,
-    ``github``, ``incident`` sit in a few and separate everything. A document without this
-    token answered a different question, however many common tokens it shares."""
+def _gate_token(
+    query_tokens: List[str],
+    doc_freq: Dict[str, int],
+    n_docs: int,
+    *,
+    hard_tokens: Optional[List[str]] = None,
+) -> str:
+    """Choose the mandatory relevance token without letting synthetic aliases poison recall.
+
+    Unknown tokens explicitly typed by the user remain hard gates ("post gmail message" must
+    not route to Slack). Synthetic Chinese aliases are softer: unknown synonym expansions are
+    ignored, while their answerable siblings can still retrieve the intended capability.
+    """
     def _idf(token: str) -> float:
         df = doc_freq.get(token, 0)
         return math.log(1 + (n_docs - df + 0.5) / (df + 0.5))
-    return max(query_tokens, key=_idf)
+
+    explicit = hard_tokens or []
+    unknown_explicit = [token for token in explicit if doc_freq.get(token, 0) == 0]
+    if unknown_explicit:
+        return max(unknown_explicit, key=_idf)
+
+    answerable = [token for token in query_tokens if doc_freq.get(token, 0) > 0]
+    return max(answerable, key=_idf) if answerable else ""
 
 
 # Relevance floor. The rarest-token gate stops queries whose intent word no tool carries; it
@@ -175,21 +275,29 @@ def _required_term_coverage(answerable_term_count: int) -> int:
 
 
 def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
-                   corpus_stats: Optional[_CorpusStats] = None) -> List[CatalogEntry]:
+                   corpus_stats: Optional[_CorpusStats] = None,
+                   score_weights: Optional[Dict[str, float]] = None) -> List[CatalogEntry]:
     """Top-``limit`` catalog entries for ``query`` by BM25 (exact name match ranks first).
 
     Admission is by the query's rarest token (:func:`_gate_token`), not by ``score > 0``:
     BM25 is additive over the tokens a document shares with the query, so on a large catalog
     ``score > 0`` admits one-token matches and fills every slot with them (measured: "send
-    gmail email" returned 5 incident tools that only shared ``email``). A token no document
-    carries admits nothing; the caller's empty-group hint tells the model to retry without it.
-    Long queries additionally need :func:`_required_term_coverage` of their answerable terms."""
-    query_tokens = _tokenize(query) if catalog and limit > 0 else []
+    gmail email" returned 5 incident tools that only shared ``email``). Conversational
+    stopwords are removed query-side, but any remaining unknown content/service token has the
+    highest IDF and gates the result to empty rather than permitting a wrong capability.
+    Long queries additionally need :func:`_required_term_coverage` of their answerable terms.
+    Optional score_weights multiply BM25 after admission; exact-name lookups stay authoritative."""
+    query_tokens = _query_tokenize(query) if catalog and limit > 0 else []
     if not query_tokens:
         return []
     corpus_stats = corpus_stats or _corpus_stats(catalog)
     doc_freq = corpus_stats[2]
-    gate = _gate_token(query_tokens, doc_freq, corpus_stats[3])
+    explicit_tokens = _query_explicit_tokens(query)
+    gate = _gate_token(
+        query_tokens, doc_freq, corpus_stats[3], hard_tokens=explicit_tokens
+    )
+    if not gate:
+        return []
     answerable = {t for t in query_tokens if doc_freq.get(t, 0) > 0}
     required_terms = _required_term_coverage(len(answerable))
     exact_name = query.strip().lower()
@@ -201,10 +309,21 @@ def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
         tokens = set(entry._tokens)
         return gate in tokens and sum(1 for t in answerable if t in tokens) >= required_terms
 
-    scored = [
-        (float("inf") if entry.name.lower() == exact_name
-         else _bm25_score(query_tokens, entry._tokens, *corpus_stats), entry)
-        for entry in catalog if _admitted(entry)]
+    weights = score_weights or {}
+
+    def _weighted_score(entry: CatalogEntry) -> float:
+        if entry.name.lower() == exact_name:
+            return float("inf")
+        raw = _bm25_score(query_tokens, entry._tokens, *corpus_stats)
+        try:
+            weight = float(weights.get(entry.name, 1.0))
+        except (TypeError, ValueError):
+            weight = 1.0
+        # Routing hints may demote a degraded backend but must never negate lexical relevance.
+        weight = max(0.01, min(weight, 2.0))
+        return raw * weight
+
+    scored = [(_weighted_score(entry), entry) for entry in catalog if _admitted(entry)]
     scored.sort(key=lambda x: x[0], reverse=True)
     return [e for _, e in scored[:limit]]
 

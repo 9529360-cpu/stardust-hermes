@@ -415,10 +415,11 @@ def _connection_identity(config: dict) -> tuple:
     """What makes one live connection reusable: the route fingerprint PLUS everything that
     authenticates the connection or changes its transport security/identity policy.
 
-    ``config_fingerprint`` deliberately excludes credentials so the schema cache survives token
-    rotation; live-connection reuse cannot. Headers/env, OAuth client options, mTLS material,
-    identity headers, TLS verification and strict redirect policy all affect who the connection
-    acts as or what security boundary it enforces, so any difference requires a fresh connection.
+    The schema-cache fingerprint now includes identity-bearing config too, because tool visibility
+    can be scope-dependent and a lazy manifest must never cross identities. Live-connection reuse
+    keeps the same strict rule: headers/env, OAuth client options, mTLS material, identity headers,
+    TLS verification and strict redirect policy all affect who the connection acts as or what
+    security boundary it enforces, so any difference requires a fresh connection.
     """
     from tools.mcp_schema_cache import config_fingerprint
 

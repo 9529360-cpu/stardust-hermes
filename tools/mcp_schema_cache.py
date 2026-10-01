@@ -47,6 +47,19 @@ def config_fingerprint(config: dict) -> str:
         "cwd": config.get("cwd"),
         "url": config.get("url"),
         "transport": config.get("transport"),
+        # Tool visibility can be identity/scope-dependent. The cache persists only this
+        # SHA-256 digest, never the payload, so including auth-bearing config prevents a
+        # lazy startup from advertising a previous identity's tool manifest without
+        # writing credentials to disk in cleartext.
+        "env": config.get("env") or {},
+        "headers": config.get("headers") or {},
+        "auth": config.get("auth"),
+        "oauth": config.get("oauth") or {},
+        "identity_header": config.get("identity_header"),
+        "client_cert": config.get("client_cert"),
+        "client_key": config.get("client_key"),
+        "ssl_verify": config.get("ssl_verify", True),
+        "strict_redirect_headers": bool(config.get("strict_redirect_headers")),
         "tools_include": _filter_fingerprint(tools_filter.get("include")),
         "tools_exclude": _filter_fingerprint(tools_filter.get("exclude")),
         # Utility tools are materialized into the cache too. These flags must

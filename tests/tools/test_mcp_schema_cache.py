@@ -52,6 +52,27 @@ class TestConfigFingerprint:
             {**base, "tools": {"resources": True, "prompts": False}}
         )
 
+
+    def test_changes_when_connection_identity_changes(self):
+        base = {"url": "https://mcp.example/mcp"}
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "headers": {"Authorization": "Bearer token-a"}}
+        )
+        assert msc.config_fingerprint(
+            {**base, "headers": {"Authorization": "Bearer token-a"}}
+        ) != msc.config_fingerprint(
+            {**base, "headers": {"Authorization": "Bearer token-b"}}
+        )
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "env": {"TENANT": "acme"}}
+        )
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "identity_header": {"name": "X-Profile", "value": "work"}}
+        )
+        assert msc.config_fingerprint(base) != msc.config_fingerprint(
+            {**base, "auth": "oauth", "oauth": {"scopes": ["repo"]}}
+        )
+
     def test_ignores_non_connection_keys(self):
         base = {"command": "npx", "args": []}
         assert msc.config_fingerprint(base) == msc.config_fingerprint(

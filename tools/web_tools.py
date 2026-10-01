@@ -20,7 +20,7 @@ from plugins.web.firecrawl.provider import _is_tool_gateway_ready, check_firecra
 from tools.debug_helpers import DebugSession
 from tools.tool_backend_helpers import NOUS_MANAGED_PROVIDER, selection_exists
 from tools.url_safety import async_is_safe_url
-from tools.web_tools_rescue import _rescue_eligible, _rescue_search
+from tools.web_tools_rescue import _rescue_search, _search_rescue_eligible
 from tools.web_tools_truncate import _effective_char_limit, _trim_results, _truncate_results, convert_base64_images_to_links
 from tools.web_tools_extract import (
     _extract_safe_urls, _merge_in_order, _no_provider_error, _resolve_extract_provider, _result_entry,
@@ -300,7 +300,19 @@ def web_search_tool(query: str, limit: int = 5) -> str:
             response_data = {"success": False, "error": _no_provider_error("search", fallback)}
         else:
             logger.info("Web search via %s: '%s' (limit: %d)", provider.name, query, limit)
-            response_data = _memoized_search(provider, query, limit)
+            from tools.web_search_ensemble import search_ensemble
+            ensemble = search_ensemble(provider, query, limit)
+            if ensemble is None:
+                response_data = _memoized_search(provider, query, limit)
+            elif ensemble.get("success"):
+                response_data = ensemble
+            elif _search_rescue_eligible(provider):
+                ensemble_error = str(ensemble.get("error") or "ensemble search failed")
+                response_data = _rescue_search(provider.name, ensemble_error, query, limit)
+                if response_data.get("success") and isinstance(response_data.get("data"), dict):
+                    response_data["data"]["ensemble_error"] = ensemble_error[:500]
+            else:
+                response_data = ensemble
 
         debug_call_data["results_count"] = len(response_data.get("data", {}).get("web", []))
         result_json = json.dumps(response_data, indent=2, ensure_ascii=False)
@@ -323,10 +335,10 @@ def _memoized_search(provider, query: str, limit: int) -> dict:
         try:
             resp = provider.search(query, fetch_limit)
         except Exception as exc:  # noqa: BLE001 — candidate for rescue
-            if not _rescue_eligible(provider):
+            if not _search_rescue_eligible(provider):
                 raise
             return _rescue_search(provider.name, str(exc), query, fetch_limit), True
-        if not resp.get("success") and _rescue_eligible(provider):
+        if not resp.get("success") and _search_rescue_eligible(provider):
             return _rescue_search(provider.name, str(resp.get("error", "")), query, fetch_limit), True
         return resp, False
 
