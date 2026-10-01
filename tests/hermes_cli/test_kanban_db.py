@@ -907,6 +907,10 @@ def test_dispatch_kills_spawned_worker_if_task_is_archived_before_pid_persistenc
             assert kb.archive_task(conn, task_id) is True
             return 65432
 
+        # The ownership-loss response is what this regression pins. Avoid
+        # coupling it to host PID inspection for a synthetic PID.
+        monkeypatch.setattr(kbd, "_set_worker_pid", lambda *_args, **_kwargs: (False, None))
+
         monkeypatch.setattr(
             kbd,
             "_terminate_reclaimed_worker",
