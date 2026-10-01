@@ -644,6 +644,14 @@ This is useful for MCP servers whose capabilities change dynamically (e.g. a ser
 
 The refresh is lock-protected so rapid-fire notifications from the same server don't cause overlapping refreshes. Prompt and resource change notifications (`prompts/list_changed`, `resources/list_changed`) are received but not yet acted on.
 
+### Route-quality ranking
+
+When multiple MCP tools are plausible matches, Tool Search combines lexical relevance with runtime route quality instead of treating every live server as equally reliable. Existing hard health signals remain primary: an open circuit breaker, reconnecting/suspect transport, connect cooldown, or disconnected session lowers the route immediately.
+
+For servers that are actually being used, Stardust also keeps a bounded **process-local** EWMA of completed logical RPC latency and success/failure outcomes. After at least three samples, consistently slow or recently unreliable routes receive a moderate additional ranking penalty. An `untrusted` write-capable tool receives a small approval-friction penalty because it will require a trust prompt; read-only tools do not. Exact-name Tool Search lookups remain authoritative, so route quality can demote a candidate but never make a named tool disappear.
+
+This telemetry is intentionally narrow: it stores no tool arguments, result content, URLs, credentials, OAuth tokens, or user text, and it is never written to disk. Samples are bound to the current live MCP server instance, so an ordinary reconnect keeps useful history while replacing/reconfiguring the server starts with fresh route metrics. Execution-time circuit breakers, OAuth recovery, profile scope, read-only annotations, and trust approval remain the actual security/availability authorities.
+
 ### Reloading
 
 If you change MCP config, use:
