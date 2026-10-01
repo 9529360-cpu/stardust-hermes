@@ -79,6 +79,40 @@ def test_rrf_merges_duplicate_urls_and_rewards_cross_engine_consensus(monkeypatc
     assert secondary.calls == 1
 
 
+def test_cached_keyless_reroute_is_retried_as_original_provider(monkeypatch):
+    monkeypatch.setattr(
+        "tools.web_tools._load_web_config",
+        lambda: {"search_ensemble_backends": ["secondary"]},
+    )
+    from tools.web_result_cache import search_memo
+
+    search_memo.store("primary", "topic", 5, {
+        "success": True,
+        "data": {
+            "served_by": "secondary",
+            "web": [
+                {"title": "stale", "url": "https://stale.example", "description": "", "position": 1},
+            ],
+        },
+    })
+    primary = _Provider("primary", _ok([
+        {"title": "fresh", "url": "https://fresh.example", "description": "", "position": 1},
+    ]))
+    secondary = _Provider("secondary", _ok([
+        {"title": "other", "url": "https://other.example", "description": "", "position": 1},
+    ]))
+    monkeypatch.setattr(
+        "agent.web_search_registry.get_provider",
+        lambda name: secondary if name == "secondary" else None,
+    )
+
+    out = search_ensemble(primary, "topic", 5)
+
+    assert primary.calls == 1
+    assert any(row["title"] == "fresh" for row in out["data"]["web"])
+    assert all(row["title"] != "stale" for row in out["data"]["web"])
+
+
 def test_keyless_reroute_is_not_counted_as_independent_consensus(monkeypatch):
     monkeypatch.setattr(
         "tools.web_tools._load_web_config",
