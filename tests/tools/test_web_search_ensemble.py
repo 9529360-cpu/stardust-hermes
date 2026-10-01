@@ -79,6 +79,33 @@ def test_rrf_merges_duplicate_urls_and_rewards_cross_engine_consensus(monkeypatc
     assert secondary.calls == 1
 
 
+def test_duplicate_url_keeps_date_evidence_from_later_provider(monkeypatch):
+    monkeypatch.setattr(
+        "tools.web_tools._load_web_config",
+        lambda: {"search_ensemble_backends": ["secondary"]},
+    )
+    primary = _Provider("primary", _ok([
+        {"title": "A", "url": "https://a.example/page", "description": "a", "position": 1},
+    ]))
+    secondary = _Provider("secondary", _ok([
+        {
+            "title": "A",
+            "url": "http://www.a.example/page",
+            "description": "a2",
+            "position": 1,
+            "published_date": "2026-10-01",
+        },
+    ]))
+    monkeypatch.setattr(
+        "agent.web_search_registry.get_provider",
+        lambda name: secondary if name == "secondary" else None,
+    )
+
+    out = search_ensemble(primary, "topic", 5)
+
+    assert out["data"]["web"][0]["published_date"] == "2026-10-01"
+
+
 def test_cached_keyless_reroute_is_retried_as_original_provider(monkeypatch):
     monkeypatch.setattr(
         "tools.web_tools._load_web_config",
