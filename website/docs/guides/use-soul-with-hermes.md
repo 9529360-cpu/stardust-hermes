@@ -65,7 +65,7 @@ Important:
 
 ## How Hermes uses it
 
-When Hermes starts a session, it reads `SOUL.md` from `HERMES_HOME`, scans it for prompt-injection patterns, truncates it if needed, and uses it as the **agent identity** — slot #1 in the system prompt. This means SOUL.md completely replaces the built-in default identity text.
+When Hermes starts a session, it reads `SOUL.md` from `HERMES_HOME`, scans it for prompt-injection patterns, truncates it if needed, and uses it as the **agent identity** — slot #1 in the system prompt. SOUL.md completely replaces the built-in persona text. The built-in operating defaults (how a request turns into action, and what counts as your permission) still follow it as a separate block, and anything your SOUL.md says explicitly wins over them.
 
 If SOUL.md is missing, empty, or cannot be loaded, Hermes falls back to a built-in default identity.
 

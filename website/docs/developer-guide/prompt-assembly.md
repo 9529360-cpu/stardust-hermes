@@ -185,7 +185,7 @@ def load_soul_md() -> Optional[str]:
     return content
 ```
 
-When `load_soul_md()` returns content, it replaces the hardcoded `DEFAULT_AGENT_IDENTITY`. The `build_context_files_prompt()` function is then called with `skip_soul=True` to prevent SOUL.md from appearing twice (once as identity, once as a context file).
+When `load_soul_md()` returns content, it replaces the hardcoded `DEFAULT_AGENT_IDENTITY`. A custom file replaces the persona only: unless it already contains `ASSISTANT_OPERATING_CONTRACT` verbatim (the seeded default does), `SOUL_OPERATING_DEFAULTS` follows it — that contract under an `# Operating defaults` heading, with explicit persona instructions taking precedence. The `build_context_files_prompt()` function is then called with `skip_soul=True` to prevent SOUL.md from appearing twice (once as identity, once as a context file).
 
 If `SOUL.md` doesn't exist, the system falls back to:
 
@@ -294,7 +294,7 @@ Most users should treat `agent/prompt_builder.py` as implementation code, not a 
 
 ### Use these surfaces first
 
-- `~/.hermes/SOUL.md` — replace the built-in default identity block with your own agent persona and standing behavior.
+- `~/.hermes/SOUL.md` — replace the built-in default persona with your own agent persona and standing behavior (explicit instructions there win over the operating defaults that follow it).
 - `~/.hermes/MEMORY.md` and `~/.hermes/USER.md` — provide durable cross-session facts and user profile data that should be snapshotted into new sessions.
 - Project context files such as `.hermes.md`, `HERMES.md`, `AGENTS.md`, `CLAUDE.md`, or `.cursorrules` — inject repo-specific working rules.
 - Skills — package reusable workflows and references without editing core prompt code.

@@ -4,10 +4,12 @@
 (no I/O).
 """
 
+import glob
 import os
 import posixpath
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -252,6 +254,34 @@ def _posix_roots(roots: List[str]) -> bool:
         not re.match(r"^[A-Za-z]:[\\/]", root) and "\\" not in root for root in roots)
 
 
+_RIPGREP_RELEASES_URL = "https://github.com/BurntSushi/ripgrep/releases"
+# The same winget command scripts/install.ps1 runs.
+_WINGET_RIPGREP_INSTALL_ARGS = ("install --exact --id BurntSushi.ripgrep.MSVC --source winget --silent "
+                                "--accept-package-agreements --accept-source-agreements")
+
+
+def _ripgrep_install_hint(*, windows_local: bool, winget: Optional[str]) -> str:
+    """The install step for the agent to run itself; a missing rg is re-probed on every search,
+    so the next search after the install succeeds without a restart."""
+    if windows_local and winget:
+        return (f"Install it yourself: run `{winget} {_WINGET_RIPGREP_INSTALL_ARGS}`, then retry the search "
+                "(no restart needed).")
+    if windows_local:
+        return (f"Install it yourself: download the x86_64-pc-windows-msvc zip from {_RIPGREP_RELEASES_URL}, "
+                "put rg.exe in a directory on PATH, then retry the search.")
+    return "Install ripgrep yourself with this host's package manager, then retry the search."
+
+
+def _winget_unpacked_rg(packages_dir: str) -> List[str]:
+    """rg.exe inside winget's unpacked ripgrep package, newest release first (numeric order)."""
+    pattern = os.path.join(glob.escape(packages_dir), "BurntSushi.ripgrep.MSVC_*", "*", "rg.exe")
+
+    def release(path: str) -> List[int]:
+        return [int(n) for n in re.findall(r"\d+", os.path.basename(os.path.dirname(path)))]
+
+    return sorted(glob.glob(pattern), key=release, reverse=True)
+
+
 class SearchMixin:
     """File-name and content search via rg with find/grep fallbacks. Requires
     ``_exec``, ``_has_command``, ``_expand_path``, ``_escape_shell_arg``,
@@ -282,13 +312,19 @@ class SearchMixin:
         if _IS_WINDOWS and isinstance(self.env, LocalEnvironment):
             user_profile = os.environ.get("USERPROFILE") or str(Path.home())
             local_app_data = os.environ.get("LOCALAPPDATA")
+            program_files = os.environ.get("ProgramFiles")
             scoop = os.environ.get("SCOOP") or os.path.join(user_profile, "scoop")
             candidates = [
                 os.path.join(user_profile, ".cargo", "bin", "rg.exe"),
                 os.path.join(scoop, "shims", "rg.exe"),
             ]
-            if local_app_data:
-                candidates.append(os.path.join(local_app_data, "Microsoft", "WinGet", "Links", "rg.exe"))
+            winget_roots = [os.path.join(local_app_data, "Microsoft", "WinGet")] if local_app_data else []
+            if program_files:
+                winget_roots.append(os.path.join(program_files, "WinGet"))
+            for winget_root in winget_roots:  # user scope, then machine scope
+                candidates.append(os.path.join(winget_root, "Links", "rg.exe"))
+                # A registered install can lack both its Links shim and a PATH entry.
+                candidates.extend(_winget_unpacked_rg(os.path.join(winget_root, "Packages")))
             for candidate in candidates:
                 if os.path.isfile(candidate):
                     resolved = candidate.replace("\\", "/")
@@ -405,6 +441,23 @@ class SearchMixin:
         if isinstance(self.env, LocalEnvironment):
             return self._escape_native_tool_arg(executable)
         return "'" + executable.replace("'", "'\"'\"'") + "'"
+
+    def _ripgrep_missing_hint(self) -> str:
+        """``_ripgrep_install_hint`` for this command host. On local Windows, winget may be absent
+        from PATH (a lost %LOCALAPPDATA%\\Microsoft\\WindowsApps entry) while its App Execution
+        Alias still runs by full path."""
+        from tools.environments.local import LocalEnvironment, _IS_WINDOWS
+
+        windows_local = _IS_WINDOWS and isinstance(self.env, LocalEnvironment)
+        winget = None
+        if windows_local:
+            local_app_data = os.environ.get("LOCALAPPDATA")
+            alias = os.path.join(local_app_data, "Microsoft", "WindowsApps", "winget.exe") if local_app_data else ""
+            if shutil.which("winget"):
+                winget = "winget"
+            elif alias and os.path.isfile(alias):
+                winget = self._quote_executable(alias)
+        return _ripgrep_install_hint(windows_local=windows_local, winget=winget)
 
     # --- macOS protected-folder exclusions --------------------------------------
 
@@ -672,13 +725,11 @@ class SearchMixin:
         if any(self._is_broad_local_search_root(root) for root in roots):
             return SearchResult(error=(
                 "Broad local file search without ripgrep is disabled because "
-                "find cannot keep this traversal safely bounded. Install "
-                "ripgrep or search a narrower directory."))
+                "find cannot keep this traversal safely bounded. "
+                f"{self._ripgrep_missing_hint()} Or search a narrower directory."))
         if not self._has_command("find"):
             return SearchResult(
-                error="File search requires 'rg' (ripgrep) or 'find'. "
-                      "Install ripgrep for best results: "
-                      "https://github.com/BurntSushi/ripgrep#installation")
+                error=f"File search requires 'rg' (ripgrep) or 'find'. {self._ripgrep_missing_hint()}")
 
         # Prune hidden descendant dirs (and hidden files, matching rg's default) while
         # still allowing an explicitly selected hidden root; dash-prefixed roots get
@@ -807,8 +858,7 @@ class SearchMixin:
             result = self._search_with_grep(pattern, path, file_glob, limit, offset, output_mode, context)
         else:
             return SearchResult(
-                error="Content search requires ripgrep (rg) or grep. "
-                      "Install ripgrep: https://github.com/BurntSushi/ripgrep#installation")
+                error=f"Content search requires ripgrep (rg) or grep. {self._ripgrep_missing_hint()}")
         if (not result.error and result.total_count == 0
                 and not result.matches and not result.files and not result.counts):
             try:

@@ -65,7 +65,7 @@ $HERMES_HOME/SOUL.md
 
 ## Hermes 如何使用它
 
-Hermes 启动会话时，会从 `HERMES_HOME` 读取 `SOUL.md`，扫描其中的提示词注入（prompt-injection）模式，必要时进行截断，并将其作为 **Agent 身份标识**——系统提示词中的第 1 个槽位。这意味着 `SOUL.md` 会完全替换内置的默认身份文本。
+Hermes 启动会话时，会从 `HERMES_HOME` 读取 `SOUL.md`，扫描其中的提示词注入（prompt-injection）模式，必要时进行截断，并将其作为 **Agent 身份标识**——系统提示词中的第 1 个槽位。`SOUL.md` 会完全替换内置的默认人设文本；内置的默认做事约定（请求如何变成行动、什么算你的许可）仍会作为单独一段跟在它后面，你在 `SOUL.md` 里明确写的要求优先。
 
 如果 `SOUL.md` 缺失、为空或无法加载，Hermes 将回退到内置的默认身份。
 

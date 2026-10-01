@@ -537,3 +537,82 @@ def test_order_is_ignored_for_content_search():
 
     assert result.error is None
     assert result.matches
+
+
+def _exec_without_rg(command, **kwargs):
+    from tools.file_operations import ExecuteResult
+
+    if command.startswith("test -e "):
+        return ExecuteResult(stdout="exists\n", exit_code=0)
+    return ExecuteResult(stdout="", exit_code=1)
+
+
+@pytest.mark.windows_only
+@pytest.mark.parametrize("scope_env, winget_root", [
+    ("LOCALAPPDATA", ("Microsoft", "WinGet")),
+    ("ProgramFiles", ("WinGet",)),
+])
+def test_unlinked_winget_rg_package_is_found_newest_release_first(
+    tmp_path, monkeypatch, scope_env, winget_root
+):
+    """Field case 2026-10-01: winget had ripgrep 15.2.0 registered and unpacked under WinGet\Packages,
+    but there was no Links shim and the package dir was not on PATH, so every broad search said
+    "install ripgrep" while rg.exe sat on disk."""
+    for name in ("LOCALAPPDATA", "ProgramFiles"):
+        monkeypatch.setenv(name, str(tmp_path / f"{name} root"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "User Profile"))
+    monkeypatch.delenv("SCOOP", raising=False)
+    package = (tmp_path / f"{scope_env} root").joinpath(*winget_root, "Packages",
+                                                        "BurntSushi.ripgrep.MSVC_Microsoft.Winget.Source_8wekyb3d8bbwe")
+    for release in ("9.1.0", "15.2.0"):  # numeric, not lexicographic, order picks the newest
+        exe = package / f"ripgrep-{release}-x86_64-pc-windows-msvc" / "rg.exe"
+        exe.parent.mkdir(parents=True)
+        exe.write_text("")
+    ops = ShellFileOperations(LocalEnvironment(str(tmp_path)))
+    monkeypatch.setattr(ops, "_exec", _exec_without_rg)
+
+    expected = package / "ripgrep-15.2.0-x86_64-pc-windows-msvc" / "rg.exe"
+    assert ops._resolve_command("rg") == str(expected).replace("\\", "/")
+
+
+@pytest.mark.windows_only
+def test_broad_search_without_rg_names_winget_by_full_path_when_path_lost_it(tmp_path, monkeypatch):
+    """Same machine: %LOCALAPPDATA%\Microsoft\WindowsApps was missing from PATH, so a bare `winget`
+    install hint would only have produced "command not found"."""
+    import tools.file_operations as file_operations
+
+    local_app_data = tmp_path / "Local Data"
+    alias = local_app_data / "Microsoft" / "WindowsApps" / "winget.exe"
+    alias.parent.mkdir(parents=True)
+    alias.write_text("")
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("LOCALAPPDATA", str(local_app_data))
+    monkeypatch.setenv("ProgramFiles", str(tmp_path / "Program Files"))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.delenv("SCOOP", raising=False)
+    monkeypatch.setenv("PATH", str(tmp_path / "empty-bin"))
+    monkeypatch.setattr(file_operations, "_HOME", str(home))
+    ops = ShellFileOperations(LocalEnvironment(str(tmp_path)))
+    monkeypatch.setattr(ops, "_exec", _exec_without_rg)
+
+    error = ops.search("*.pdf", path=str(home), target="files").error
+
+    assert "Microsoft/WindowsApps/winget.exe" in error
+    assert "install --exact --id BurntSushi.ripgrep.MSVC --source winget" in error
+    assert "retry" in error
+
+
+def test_rg_install_hint_is_a_step_the_agent_can_run_itself():
+    from tools.file_operations_search import _ripgrep_install_hint
+
+    winget = "'C:/Users/a/AppData/Local/Microsoft/WindowsApps/winget.exe'"
+    with_winget = _ripgrep_install_hint(windows_local=True, winget=winget)
+    assert f"{winget} install --exact --id BurntSushi.ripgrep.MSVC --source winget" in with_winget
+    assert "yourself" in with_winget and "retry" in with_winget
+
+    without_winget = _ripgrep_install_hint(windows_local=True, winget=None)
+    assert "https://github.com/BurntSushi/ripgrep/releases" in without_winget
+
+    other_host = _ripgrep_install_hint(windows_local=False, winget=None)
+    assert "package manager" in other_host and "retry" in other_host

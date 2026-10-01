@@ -1719,7 +1719,7 @@ Hermes 使用两种不同的上下文范围：
 | `.cursorrules` | Cursor IDE 规则（也会检测） | 仅工作目录 |
 | `.cursor/rules/*.mdc` | Cursor 规则文件（也会检测） | 仅工作目录 |
 
-- **SOUL.md** 是 agent 的主要身份。它占据系统提示词的第 #1 槽位，完全替换内置的默认身份。编辑它以完全自定义 agent 是谁。
+- **SOUL.md** 是 agent 的主要身份。它占据系统提示词的第 #1 槽位，完全替换内置的默认人设；内置的默认做事约定（请求如何变成行动、什么算许可）仍跟在其后，`SOUL.md` 中明确写的要求优先。编辑它以完全自定义 agent 是谁。
 - 如果 SOUL.md 缺失、为空或无法加载，Hermes 回退到内置默认身份。
 - **项目上下文文件使用优先级系统** —— 仅加载一种类型（第一个匹配优先）：`.hermes.md` → `AGENTS.md` → `CLAUDE.md` → `.cursorrules`。SOUL.md 始终独立加载。
 - **AGENTS.md** 是分层的：如果子目录也有 AGENTS.md，所有都会合并。
