@@ -31,11 +31,13 @@ class _SlowUnwindingChild:
 
     def run_conversation(self, **_kwargs):
         self.started.set()
-        assert self.interrupted.wait(timeout=1)
+        assert self.interrupted.wait(timeout=30)
         # Model the real child turn's finally path: it still performs session
-        # activity/SQLite cleanup after the parent requests interruption.
+        # activity/SQLite cleanup after the parent requests interruption. Only
+        # the test ends that window: a short guard here would let a slow parent
+        # teardown (cold imports under load) see this child "finish" by itself.
         self.unwinding.set()
-        assert self.allow_finish.wait(timeout=2)
+        assert self.allow_finish.wait(timeout=30)
         self.finished.set()
         return {
             "final_response": "",
