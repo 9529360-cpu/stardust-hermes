@@ -82,6 +82,7 @@ import { BoardSwitcher } from './board-switcher'
 import { TaskDrawer } from './drawer'
 import { EMPTY_OVERRIDE, ModelOverrideField, overrideCreateFields, type TaskModelOverride } from './model-override'
 import { OrchestrationPanel } from './orchestration'
+import { TaskDeleteConfirm } from './task-delete-confirm'
 import { columnMeta, type KanbanBoard, type KanbanTask, type TaskEstimate } from './types'
 import {
   $newTaskLane,
@@ -248,7 +249,7 @@ function Card({
   task
 }: {
   columns: string[]
-  onDelete: (id: string) => void
+  onDelete: (task: KanbanTask) => void
   onMove: (id: string, status: string) => void
   onOpen: (id: string) => void
   onToggleSelect: (id: string) => void
@@ -323,7 +324,7 @@ function Card({
             </ContextMenuItem>
           ))}
         <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => onDelete(task.id)} variant="destructive">
+        <ContextMenuItem onSelect={() => onDelete(task)} variant="destructive">
           <Codicon name="trash" size="0.85rem" />
           {k.delete}
         </ContextMenuItem>
@@ -351,7 +352,7 @@ function Column({
   column: { name: string; tasks: KanbanTask[] }
   columns: string[]
   onAdd: (status: string) => void
-  onDelete: (id: string) => void
+  onDelete: (task: KanbanTask) => void
   onDropTask: (id: string, status: string) => void
   onMove: (id: string, status: string) => void
   onOpen: (id: string) => void
@@ -986,22 +987,26 @@ function SelectionBar({
     onSuccess: data => finish(data.results.filter(r => !r.ok))
   })
 
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+
   // No bulk-delete on the backend — fan out per id, same partial-failure story.
-  const bulkDelete = useMutation({
-    mutationFn: async () => {
-      const ids = [...selected]
-      const settled = await Promise.allSettled(ids.map(id => deleteTask(id)))
+  const deleteSelectedConfirmed = async () => {
+    const ids = [...selected]
+    const settled = await Promise.allSettled(ids.map(id => deleteTask(id)))
+    const failed = ids.flatMap((id, i) => {
+      const result = settled[i]
 
-      return ids.flatMap((id, i) => {
-        const result = settled[i]
+      return result.status === 'rejected' ? [{ error: errText(result.reason), id }] : []
+    })
 
-        return result.status === 'rejected' ? [{ error: errText(result.reason), id }] : []
-      })
-    },
-    onSuccess: finish
-  })
+    finish(failed)
 
-  const busy = bulk.isPending || bulkDelete.isPending
+    if (failed.length > 0) {
+      throw new Error(k.bulkFailed(failed.length, ids.length, failed[0].error ?? k.refused))
+    }
+  }
+
+  const busy = bulk.isPending
   // One menu at a time — controlled, so a click on the second trigger can
   // never race Radix's dismiss layer into two open menus.
   const [menu, setMenu] = useState<'assign' | 'move' | null>(null)
@@ -1061,7 +1066,7 @@ function SelectionBar({
         <Button
           className="text-destructive"
           disabled={busy}
-          onClick={() => bulkDelete.mutate()}
+          onClick={() => setDeleteConfirmOpen(true)}
           size="xs"
           variant="ghost"
         >
@@ -1074,6 +1079,12 @@ function SelectionBar({
           </Button>
         </Tip>
       </div>
+      <TaskDeleteConfirm
+        count={selected.size}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={deleteSelectedConfirmed}
+        open={deleteConfirmOpen}
+      />
     </div>
   )
 }
@@ -1101,6 +1112,7 @@ export function KanbanBoardPage() {
   const [tenant, setTenant] = useState('')
   const [assignee, setAssignee] = useState('')
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const [deleteTarget, setDeleteTarget] = useState<null | { id: string; title: string }>(null)
 
   // A new-task request raised from outside the page (⌘⌥N, the palette row).
   // The command navigates here and parks the lane; the page picks it up on
@@ -1211,28 +1223,6 @@ export function KanbanBoardPage() {
     }
   })
 
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => deleteTask(id),
-    onMutate: async id => {
-      await qc.cancelQueries({ queryKey: boardKey(slug, archived) })
-      const previous = qc.getQueryData<KanbanBoard>(boardKey(slug, archived))
-
-      if (previous) {
-        qc.setQueryData(boardKey(slug, archived), removeCard(previous, id))
-      }
-
-      return { previous }
-    },
-    onError: (err, _id, context) => {
-      if (context?.previous) {
-        qc.setQueryData(boardKey(slug, archived), context.previous)
-      }
-
-      host.notify({ kind: 'error', message: errText(err) })
-    },
-    onSettled: () => void qc.invalidateQueries({ queryKey: ['kanban', 'board'] })
-  })
-
   const onMove = (id: string, status: string) => {
     const task = board?.columns.flatMap(col => col.tasks).find(candidate => candidate.id === id)
 
@@ -1247,6 +1237,20 @@ export function KanbanBoardPage() {
     }
 
     moveMut.mutate({ id, status })
+  }
+
+  const deleteOneConfirmed = async () => {
+    if (!deleteTarget) {
+      return
+    }
+
+    await deleteTask(deleteTarget.id)
+
+    if (openId === deleteTarget.id) {
+      setOpenId(null)
+    }
+
+    void qc.invalidateQueries({ queryKey: ['kanban', 'board'] })
   }
 
   const errorMessage = error ? errText(error) : null
@@ -1403,7 +1407,7 @@ export function KanbanBoardPage() {
                 columns={columnNames}
                 key={col.name}
                 onAdd={setAddStatus}
-                onDelete={id => deleteMut.mutate(id)}
+                onDelete={task => setDeleteTarget({ id: task.id, title: task.title || task.id })}
                 onDropTask={onMove}
                 onMove={onMove}
                 onOpen={setOpenId}
@@ -1426,7 +1430,20 @@ export function KanbanBoardPage() {
       )}
 
       <NewTaskDialog onClose={() => setAddStatus(null)} parents={parentOptions} target={addStatus} />
-      <TaskDrawer columns={columnNames} id={openId} onClose={() => setOpenId(null)} onOpen={setOpenId} />
+      <TaskDrawer
+        columns={columnNames}
+        id={openId}
+        onClose={() => setOpenId(null)}
+        onDelete={task => setDeleteTarget({ id: task.id, title: task.title || task.id })}
+        onOpen={setOpenId}
+      />
+      <TaskDeleteConfirm
+        count={1}
+        name={deleteTarget?.title}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={deleteOneConfirmed}
+        open={deleteTarget !== null}
+      />
     </div>
   )
 }
