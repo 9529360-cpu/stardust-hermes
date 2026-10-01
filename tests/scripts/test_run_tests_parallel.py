@@ -101,6 +101,33 @@ def test_progress_output_tolerates_legacy_stdout_encoding(tmp_path: Path) -> Non
     assert "1 tests passed" in proc.stdout
 
 
+def test_runner_keeps_volatile_temp_roots_out_of_checkout_listing(tmp_path: Path) -> None:
+    """Per-file pytest and child tempfile paths share a stable ignored parent."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    probe = tmp_path / "test_runner_temp_root.py"
+    probe.write_text(
+        "import os, tempfile\n"
+        "from pathlib import Path\n"
+        "def test_temp_root():\n"
+        "    root = Path(os.environ['PYTEST_DEBUG_TEMPROOT']).resolve()\n"
+        "    assert root.parent == Path.cwd() / '.pytest-runner-tmp'\n"
+        "    assert Path(tempfile.gettempdir()).resolve() == root\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    # Simulate a machine whose OS temp location is unusable. The runner must
+    # still give the child a usable per-file root outside the checkout listing.
+    for key in ("TMPDIR", "TEMP", "TMP"):
+        env[key] = str(tmp_path / "missing-temp")
+    proc = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "run_tests_parallel.py"),
+         "--paths", str(probe), "-j", "1", "--file-timeout", "30"],
+        cwd=repo_root, env=env, capture_output=True, text=True, timeout=60,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "1 tests passed" in proc.stdout
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only probe")
 @pytest.mark.live_system_guard_bypass
 def test_grandchild_leak_is_killed_by_runner(tmp_path: Path) -> None:

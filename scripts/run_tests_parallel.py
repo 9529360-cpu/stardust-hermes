@@ -492,8 +492,14 @@ def _run_one_file_once(
     env = os.environ.copy()
     # Keep the prefix short: pytest appends the username and test name, while
     # Linux AF_UNIX socket paths are capped at 108 bytes.
-    temproot = tempfile.mkdtemp(prefix="hpt-")
+    # On Windows tempfile may fall back to the checkout itself (even with
+    # TEMP/TMP set). Put all volatile directories behind a stable, ignored
+    # parent so parallel pytest collection cannot stat a just-deleted root.
+    temp_parent = repo_root / ".pytest-runner-tmp"
+    temp_parent.mkdir(exist_ok=True)
+    temproot = tempfile.mkdtemp(prefix="hpt-", dir=temp_parent)
     env["PYTEST_DEBUG_TEMPROOT"] = temproot
+    env.update({"TMPDIR": temproot, "TEMP": temproot, "TMP": temproot})
 
     subproc_start = time.monotonic()
     # Spawn + registration are one cancellation-critical section. The signal
