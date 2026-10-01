@@ -689,19 +689,6 @@ export interface DiagnosticsPrepareBundleResult {
   byte_size?: number | null
   error?: string | null
 }
-export interface DiagnosticsShareNousParams {
-  error_context?: string | null
-  extra_files?: Record<string, string> | null
-  log_lines?: number | null
-}
-/** Structured envelope: ``ok=False`` + ``error`` renders inline instead of failing the RPC. */
-export interface DiagnosticsShareNousResult {
-  ok: boolean
-  view_url?: string | null
-  upload_id?: string | null
-  expires_at?: string | null
-  error?: string | null
-}
 /** ``available`` = an identity exists AND the tier is on; whether inference runs on it is ``setup.runtime_check.free_tier``'s question. */
 export interface FreeTierStatusResult {
   has_guest: boolean
@@ -4272,8 +4259,6 @@ export interface RpcMethods {
   'diagnostics.discard_bundle': { params: DiagnosticsDiscardBundleParams; result: DiagnosticsDiscardBundleResult }
   /** Create a force-redacted temporary diagnostics ZIP without uploading it. */
   'diagnostics.prepare_bundle': { params: DiagnosticsPrepareBundleParams; result: DiagnosticsPrepareBundleResult }
-  /** Upload a force-redacted debug bundle to Nous-internal diagnostics storage. */
-  'diagnostics.share_nous': { params: DiagnosticsShareNousParams; result: DiagnosticsShareNousResult }
   /** Stage a non-image file into the session workspace and hand back its @file: ref. */
   'file.attach': { params: FileAttachParams; result: FileAttachResult }
   /** Mark the one-time availability notice as shown on the free-tier identity. */
@@ -4675,7 +4660,6 @@ export const RPC_METHODS = [
   'delegation.status',
   'diagnostics.discard_bundle',
   'diagnostics.prepare_bundle',
-  'diagnostics.share_nous',
   'file.attach',
   'free_tier.ack_notice',
   'free_tier.provision',
