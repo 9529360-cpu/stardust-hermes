@@ -9,14 +9,23 @@ import subprocess
 import sys
 import textwrap
 import threading
+from types import SimpleNamespace
+
+import pytest
+
+from tests.test_utils_mkstemp_fail_fast import deny_file_creation
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_headless_terminal_result_survives_cli_exit(tmp_path):
-    """Real CLI, tool dispatch, shell child and fresh reader; only the LLM is local."""
+def _run_background_review(tmp_path):
+    """One quiet one-shot CLI turn that starts a ``notify`` background child; only the LLM is local.
+
+    This is the kanban worker shape (``hermes chat -q ... -Q``): the turn ends, the CLI lingers for
+    the child's completion, injects it as a follow-up turn, then exits.
+    """
     home = tmp_path / "profile"
-    home.mkdir()
+    home.mkdir(exist_ok=True)
     (home / "config.yaml").write_text(
         "model:\n  provider: custom\n  api_mode: chat_completions\n"
         "terminal:\n  env: local\n  oneshot_completion_wait_seconds: 10\n"
@@ -121,6 +130,12 @@ def test_headless_terminal_result_survives_cli_exit(tmp_path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+    return SimpleNamespace(home=home, env=env, producer=producer, observed=observed, follow_ups=follow_ups)
+
+
+def _assert_completion_delivered(run) -> str:
+    """The CLI exited cleanly and the child's real result reached the model; returns the process id."""
+    producer, observed, follow_ups = run.producer, run.observed, run.follow_ups
     assert producer.returncode == 0, producer.stdout + producer.stderr
     assert "Coordinator finished." in producer.stdout
     assert len(observed) == 1, (observed, producer.stdout, producer.stderr)
@@ -132,6 +147,14 @@ def test_headless_terminal_result_survives_cli_exit(tmp_path):
     assert process_id in follow_ups[0]
     assert "SYNTHETIC_REVIEW_COMPLETE" in follow_ups[0]
     assert "exit code 7" in follow_ups[0]
+    return process_id
+
+
+def test_headless_terminal_result_survives_cli_exit(tmp_path):
+    """Real CLI, tool dispatch, shell child and fresh reader; only the LLM is local."""
+    run = _run_background_review(tmp_path)
+    process_id = _assert_completion_delivered(run)
+    home, env = run.home, run.env
 
     consumer = textwrap.dedent('''
         import json, sys
@@ -161,6 +184,26 @@ def test_headless_terminal_result_survives_cli_exit(tmp_path):
     assert "review stderr" in recovered["result"]["output"]
     assert recovered["replayed"] is False
     assert read_result(tmp_path / "other-profile")["result"]["status"] == "not_found"
+
+
+@pytest.mark.windows_only
+def test_unwritable_results_dir_cannot_wedge_the_one_shot_exit(tmp_path):
+    """A results dir the user may not write into costs the durable receipt, never the process.
+
+    Field failure (2026-10-01): ``logs/process-results`` carried an owner-only DACL from an elevated
+    run. Every finished background child sent its reader thread into CPython's Windows ``mkstemp``
+    retry loop while it held the registry lock, so ``wait_for_pending_completions`` never even took
+    the lock: kanban workers whose tasks were already done ran (and spun) for hours. Before the fix
+    the producer below hangs until ``subprocess.run`` times it out.
+    """
+    locked = tmp_path / "profile" / "logs" / "process-results"
+    locked.mkdir(parents=True)
+    with deny_file_creation(locked):
+        run = _run_background_review(tmp_path)
+    _assert_completion_delivered(run)  # live delivery survives the disk failure
+    assert list(locked.iterdir()) == []
+    errors = (run.home / "logs" / "errors.log").read_text(encoding="utf-8")
+    assert "Could not retain completed process result" in errors  # the loss is reported, not silent
 
 
 def test_receipts_are_bounded_redacted_and_session_scoped(tmp_path, monkeypatch):

@@ -859,8 +859,10 @@ def test_successful_spawn_transfers_cleanup_to_runner(tmp_path, monkeypatch):
 
 
 def test_write_dm_file_unlinks_partial_file_on_write_exception(tmp_path, monkeypatch):
+    import utils
+
     tmp_path / "partial.txt"
-    real_mkstemp = bot_mode_dm.tempfile.mkstemp
+    real_mkstemp = utils.mkstemp_fail_fast
 
     def fixed_mkstemp(**kwargs):
         kwargs["dir"] = tmp_path
@@ -876,7 +878,7 @@ def test_write_dm_file_unlinks_partial_file_on_write_exception(tmp_path, monkeyp
         def write(self, content):
             raise OSError("disk full")
 
-    monkeypatch.setattr(bot_mode_dm.tempfile, "mkstemp", fixed_mkstemp)
+    monkeypatch.setattr(utils, "mkstemp_fail_fast", fixed_mkstemp)
     monkeypatch.setattr(bot_mode_dm.os, "fdopen", lambda *args, **kwargs: BrokenWriter())
 
     with pytest.raises(OSError, match="disk full"):

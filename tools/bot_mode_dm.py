@@ -338,8 +338,10 @@ def _unlink_dm_file(path: str) -> None:
 
 def _write_dm_file(content: str) -> str:
     """The message rides a temp file — never inline shell text."""
+    from utils import mkstemp_fail_fast
+
     cleanup_bot_dm_cache()
-    fd, path = tempfile.mkstemp(prefix="dm-", suffix=".txt", dir=_dm_dir(), text=True)
+    fd, path = mkstemp_fail_fast(prefix="dm-", suffix=".txt", dir=_dm_dir(), text=True)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(content)

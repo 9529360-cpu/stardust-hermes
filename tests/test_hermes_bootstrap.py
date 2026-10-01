@@ -334,6 +334,46 @@ class TestHardenImportPath:
 
 
 
+class TestBoundWindowsTempfileRetries:
+    """Windows' 2**31 - 1 ``TMP_MAX`` turned one temp file in an ACL-denied directory into a
+    loop that never returned (2026-10-01: finished kanban workers spun for hours)."""
+
+    @pytest.mark.linux_only
+    def test_noop_on_posix(self):
+        import tempfile
+        before = tempfile.TMP_MAX
+        _fresh_import().bound_windows_tempfile_retries()
+        assert tempfile.TMP_MAX == before
+
+    @pytest.mark.windows_only
+    def test_stdlib_temp_creation_in_an_acl_denied_dir_gives_up(self, tmp_path):
+        """Real stdlib + real NTFS ACL: before the cap ``mkstemp``/``mkdtemp`` never returned."""
+        from tests.test_utils_mkstemp_fail_fast import deny_file_creation
+
+        locked = tmp_path / "locked"
+        locked.mkdir()
+        probe = textwrap.dedent('''
+            import sys, tempfile
+            import hermes_bootstrap
+            for create in (tempfile.mkstemp, tempfile.mkdtemp):
+                try:
+                    create(dir=sys.argv[1])
+                except OSError:
+                    continue
+                sys.exit(f"{create.__name__} succeeded in an ACL-denied directory")
+            print(tempfile.TMP_MAX)
+        ''')
+        repo_root = Path(__file__).resolve().parent.parent
+        with deny_file_creation(locked):
+            result = subprocess.run(
+                [sys.executable, "-c", probe, str(locked)], cwd=repo_root,
+                env={**os.environ, "PYTHONPATH": str(repo_root)},
+                capture_output=True, text=True, timeout=120,
+            )
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert result.stdout.strip() == "10000"
+
+
 class TestSuppressPlatformVerConsole:
     """suppress_platform_ver_console: stub applied on Windows, no-op on POSIX."""
 

@@ -4,6 +4,7 @@ import errno
 import json
 import logging
 import os
+import secrets
 import shutil
 import stat
 import tempfile
@@ -298,12 +299,48 @@ def fsync_directory(path: Union[str, Path]) -> None:
         os.close(fd)
 
 
+# CPython's mkstemp treats EVERY PermissionError on Windows as "a directory with this name exists"
+# whenever os.access(dir, W_OK) is true, and os.access there checks only the read-only attribute,
+# never the ACL. In a directory whose ACL denies file creation it retries TMP_MAX (2**31 - 1) names:
+# a CPU-bound loop that never returns (2026-10-01: finished kanban workers spun for hours inside
+# save_completed_result while holding the process-registry lock). A real collision is retried here,
+# boundedly; an access denial is raised. hermes_bootstrap caps TMP_MAX for every other caller.
+_TEMP_NAME_ATTEMPTS = 100
+
+
+def mkstemp_fail_fast(suffix: "str | None" = None, prefix: "str | None" = None,
+                      dir: "str | os.PathLike[str] | None" = None, text: bool = False) -> "tuple[int, str]":
+    """:func:`tempfile.mkstemp` that raises ``PermissionError`` instead of spinning on Windows.
+
+    Same contract: created ``O_CREAT | O_EXCL`` at 0600, not inherited by child processes, absolute
+    path returned. The shared atomic writers use it, so state written under a lock fails at once
+    instead of after the bootstrap's bounded stdlib loop.
+    """
+    directory = os.path.abspath(tempfile.gettempdir() if dir is None else os.fspath(dir))
+    prefix = tempfile.gettempprefix() if prefix is None else prefix
+    suffix = "" if suffix is None else suffix
+    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NOINHERIT", 0)
+    if not text:
+        flags |= getattr(os, "O_BINARY", 0)
+    for _ in range(_TEMP_NAME_ATTEMPTS):
+        candidate = os.path.join(directory, f"{prefix}{secrets.token_hex(4)}{suffix}")
+        try:
+            return os.open(candidate, flags, 0o600), candidate
+        except FileExistsError:
+            continue
+        except PermissionError:
+            if os.path.isdir(candidate):  # Windows reports a same-named directory as access-denied
+                continue
+            raise
+    raise FileExistsError(errno.EEXIST, "No usable temporary file name found", directory)
+
+
 def _atomic_write(path: Path, write, *, prefix: str, encoding: str = "utf-8", mode: "int | None" = None,
                   preserve_owner: bool = True, binary: bool = False, fsync_dir: bool = False) -> None:
     """Temp file + fsync + :func:`atomic_replace`, then re-apply owner/mode.
 
     *write(f)* emits the payload into the open handle (text, or bytes when *binary*). The temp file
-    is created by ``mkstemp`` — ``O_CREAT|O_EXCL`` at 0600 regardless of umask — so a secret is
+    is created by :func:`mkstemp_fail_fast` — ``O_CREAT|O_EXCL`` at 0600 regardless of umask — so a secret is
     never readable at process umask, not even between create and chmod. *mode* is fchmod'd onto
     the temp fd BEFORE the replace so the target never transits through mkstemp's 0600 (fchmod is
     Unix-only; the post-replace chmod is the sole path on Windows). With no *mode* a NEW target
@@ -317,7 +354,7 @@ def _atomic_write(path: Path, write, *, prefix: str, encoding: str = "utf-8", mo
     if mode is None and not path.exists():
         mode = default_new_file_mode()
     original_owner = _preserve_file_owner(path) if preserve_owner else None
-    fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), prefix=prefix, suffix=".tmp")
+    fd, tmp_path = mkstemp_fail_fast(dir=path.parent, prefix=prefix, suffix=".tmp")
     try:
         with os.fdopen(fd, "wb" if binary else "w", encoding=None if binary else encoding) as f:
             if mode is not None and hasattr(os, "fchmod"):

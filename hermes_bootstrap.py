@@ -74,6 +74,27 @@ def suppress_platform_ver_console() -> None:
         pass  # hardening only — never break an entry point
 
 
+# CPython's mkstemp/mkdtemp retry every Windows PermissionError as a name collision while
+# os.access() (read-only bit only, never the ACL) calls the directory writable: TMP_MAX times,
+# and the Windows CRT's TMP_MAX is 2**31 - 1. A temp file in a directory whose ACL denies
+# creation is then a CPU-bound loop that never returns. 10000 is the POSIX value: a genuine name
+# collision never gets near it, and it caps the access-denied loop at ~2s (then FileExistsError).
+_WINDOWS_TEMPFILE_TMP_MAX = 10_000
+
+
+def bound_windows_tempfile_retries() -> None:
+    """Cap ``tempfile.TMP_MAX`` on Windows so no temp file/dir creation can spin forever.
+
+    Process-wide backstop for every tempfile caller, third-party code included; Hermes' own
+    atomic writes go through ``utils.mkstemp_fail_fast``, which raises ``PermissionError`` at once.
+    """
+    if not _IS_WINDOWS:
+        return
+    import tempfile
+
+    tempfile.TMP_MAX = min(tempfile.TMP_MAX, _WINDOWS_TEMPFILE_TMP_MAX)
+
+
 def harden_import_path(src_root: str | None = None) -> None:
     """Stop a package in the current directory from shadowing Hermes modules.
 
@@ -116,4 +137,5 @@ def activate_durable_lazy_target() -> None:
 # Apply on import — entry points only need ``import hermes_bootstrap`` first.
 apply_windows_utf8_bootstrap()
 suppress_platform_ver_console()
+bound_windows_tempfile_retries()
 activate_durable_lazy_target()

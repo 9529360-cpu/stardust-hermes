@@ -36,8 +36,8 @@ def opens_spy(monkeypatch):
             observed.append((os.fspath(path), flags, mode))
         return real_open(path, flags, mode, *args, **kwargs)
 
-    # mkstemp resolves ``os.open`` at call time from the ``tempfile`` module namespace.
-    monkeypatch.setattr(utils.tempfile._os, "open", spying)
+    # utils.mkstemp_fail_fast (like tempfile.mkstemp) resolves ``os.open`` at call time.
+    monkeypatch.setattr(utils.os, "open", spying)
     return observed
 
 
