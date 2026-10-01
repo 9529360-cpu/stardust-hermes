@@ -993,3 +993,48 @@ class TestDeferredCallSchemaProbe:
         }, calls)
 
         assert validate_deferred_call_args(name, {"payload": {"anything": True}}) is None
+
+# ---------------------------------------------------------------------------
+# Multilingual / natural-language catalog retrieval
+# ---------------------------------------------------------------------------
+
+
+class TestMultilingualCatalogRetrieval:
+    def test_chinese_capability_query_finds_english_tool(self):
+        from tools.tool_search_catalog import build_catalog, search_catalog
+
+        catalog = build_catalog([
+            _td("mcp__mailbox__send_email", "Send an email message"),
+            _td("mcp__calendar__list_events", "List calendar events"),
+        ])
+        hits = search_catalog(catalog, "帮我发送邮件", limit=5)
+        assert [hit.name for hit in hits] == ["mcp__mailbox__send_email"]
+
+    def test_chinese_issue_query_maps_actions_and_objects(self):
+        from tools.tool_search_catalog import build_catalog, search_catalog
+
+        catalog = build_catalog([
+            _td("mcp__github__create_issue", "Create a repository issue"),
+            _td("mcp__github__list_commits", "List repository commits"),
+        ])
+        hits = search_catalog(catalog, "在 GitHub 创建工单", limit=5)
+        assert hits
+        assert hits[0].name == "mcp__github__create_issue"
+
+    def test_unknown_filler_term_does_not_poison_gate(self):
+        from tools.tool_search_catalog import build_catalog, search_catalog
+
+        catalog = build_catalog([
+            _td("mcp__github__create_issue", "Create a GitHub issue"),
+            _td("mcp__github__list_commits", "List GitHub commits"),
+        ])
+        hits = search_catalog(catalog, "github frobnicate issue", limit=5)
+        assert hits
+        assert hits[0].name == "mcp__github__create_issue"
+
+    def test_no_answerable_terms_still_returns_empty(self):
+        from tools.tool_search_catalog import build_catalog, search_catalog
+
+        catalog = build_catalog([_td("mcp__github__create_issue", "Create a GitHub issue")])
+        assert search_catalog(catalog, "完全不相关的天气预报", limit=5) == []
+
