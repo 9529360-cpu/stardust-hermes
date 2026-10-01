@@ -137,12 +137,18 @@ class DispatchResult:
 
 # Bounded registry of recently-reaped worker exits, filled by the reap loop in
 # ``dispatch_once`` and read by ``detect_crashed_workers`` to classify a dead-pid
-# task. Entry: ``pid -> (raw_wait_status, reaped_at_epoch)``; raw status kept so
-# both WIFEXITED/WEXITSTATUS and WIFSIGNALED can be consulted. Trimmed by age
-# plus a total size cap.
+# task. Entry: ``pid -> (raw_wait_status, reaped_at_epoch)``; a raw wait status on
+# every platform (Windows records ``returncode << 8``, as ``os.waitpid`` does there),
+# decoded by ``os.waitstatus_to_exitcode``. Trimmed by age plus a total size cap.
 _RECENT_WORKER_EXIT_TTL_SECONDS = 600
 _RECENT_WORKER_EXITS_MAX = 4096
 _recent_worker_exits: "dict[int, tuple[int, float]]" = {}
+
+# Windows has no ``waitpid(-1)``: the only way to learn a worker's exit code is the
+# Popen handle that spawned it, so this process keeps its own workers' handles until
+# the reap loop reads them. Without it every exit was booked "pid N not alive" — a
+# rate-limit/outage requeue (exit 75) counted as a crash (field incident 2026-09-30).
+_spawned_worker_procs: "dict[int, subprocess.Popen]" = {}
 
 
 def _record_worker_exit(pid: int, raw_status: int) -> None:
@@ -173,24 +179,35 @@ def _classify_worker_exit(pid: int) -> "tuple[str, Optional[int]]":
         return ("unknown", None)
     raw, _ = entry
     try:
-        if os.WIFEXITED(raw):
-            code = os.WEXITSTATUS(raw)
-            if code == 0:
-                return ("clean_exit", 0)
-            if code == _kb.KANBAN_RATE_LIMIT_EXIT_CODE:
-                return ("rate_limited", code)
-            return ("nonzero_exit", code)
-        if os.WIFSIGNALED(raw):
-            return ("signaled", os.WTERMSIG(raw))
-    except Exception:
-        pass
-    return ("unknown", None)
+        # Portable decode (os.WIFEXITED & co. do not exist on Windows): an exit code,
+        # or minus the signal number; stopped/continued statuses raise ValueError.
+        code = os.waitstatus_to_exitcode(raw)
+    except (ValueError, OverflowError):
+        return ("unknown", None)
+    if code < 0:
+        return ("signaled", -code)
+    if code == 0:
+        return ("clean_exit", 0)
+    if code == _kb.KANBAN_RATE_LIMIT_EXIT_CODE:
+        return ("rate_limited", code)
+    return ("nonzero_exit", code)
 
 
 def reap_worker_zombies() -> "list[int]":
-    """Reap all zombie children without blocking; returns reaped PIDs. No-op on Windows."""
+    """Reap exited workers without blocking and record their exit statuses; returns reaped PIDs.
+
+    POSIX reaps every zombie child; Windows reads the Popen handles of the workers this
+    process spawned (``_spawned_worker_procs``).
+    """
     reaped: "list[int]" = []
-    if os.name != "nt":
+    if os.name == "nt":
+        for pid, proc in list(_spawned_worker_procs.items()):
+            code = proc.poll()
+            if code is not None:
+                _spawned_worker_procs.pop(pid, None)  # drops the last reference: the handle closes
+                _record_worker_exit(pid, code << 8)
+                reaped.append(pid)
+    else:
         try:
             while True:
                 try:
@@ -800,11 +817,11 @@ def _classify_dead_worker(pid: int, claimer: Optional[str]) -> _DeadWorker:
             protocol_violation=True,
         )
     if kind == "rate_limited":
-        # Quota wall — NOT a task failure. Release to the source phase and do
-        # NOT count a failure so a long quota window can't trip the breaker.
+        # Quota wall or provider outage — NOT a task failure. Release to the source phase
+        # and do NOT count a failure so a long quota window or outage can't trip the breaker.
         return _DeadWorker(
             kind, code,
-            f"pid {pid} exited rate-limited (quota wall) — requeued without counting a failure",
+            f"pid {pid} exited rate-limited / provider unavailable — requeued without counting a failure",
             "rate_limited",
             {"pid": pid, "claimer": claimer, "exit_code": code},
             rate_limited=True,
@@ -2465,6 +2482,8 @@ def _default_spawn(task: Task, workspace: str, *, board: Optional[str] = None) -
         )
     # Intentionally NOT closing log_f: the child keeps writing after return;
     # the OS-level FD stays open in the child until it exits.
+    if _kb._IS_WINDOWS:
+        _spawned_worker_procs[proc.pid] = proc  # reap_worker_zombies reads its exit code
     return proc.pid
 
 

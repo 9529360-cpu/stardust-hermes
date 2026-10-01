@@ -517,6 +517,37 @@ def test_rate_limit_exit_requeues_without_counting_failure(
 
 
 
+@pytest.mark.windows_only
+@pytest.mark.parametrize("exit_code, requeued", [(75, True), (1, False)])
+def test_windows_dispatcher_reads_a_real_worker_exit_code(kanban_home, monkeypatch, tmp_path, exit_code, requeued):
+    """Windows has no ``waitpid(-1)`` and no ``os.WIFEXITED``: every worker exit was booked as
+    "pid N not alive", so a quota-wall/outage exit counted as a crash and two of them gave the card
+    up (field incident 2026-09-30). The dispatcher must read the real exit code of its own worker."""
+    import psutil
+
+    monkeypatch.setenv("HERMES_KANBAN_CRASH_GRACE_SECONDS", "0")
+    monkeypatch.setattr(kbd, "_worker_argv", lambda *_args: [sys.executable, "-c", f"import sys; sys.exit({exit_code})"])
+    with kbc.connect() as conn:
+        host = kb._claimer_id().split(":", 1)[0]
+        tid = kb.create_task(conn, title="exit code", assignee="a")
+        kb.claim_task(conn, tid, claimer=f"{host}:w")
+        pid = kbd._default_spawn(kb.get_task(conn, tid), str(tmp_path))
+        conn.execute("UPDATE tasks SET worker_pid=? WHERE id=?", (pid, tid))
+        conn.commit()
+        psutil.Process(pid).wait(timeout=60)
+        assert not kb._pid_alive(pid), "the dispatcher's own handle must not keep an exited worker 'alive'"
+
+        kbd.reap_worker_zombies()
+        crashed = kbd.detect_crashed_workers(conn)
+        task = kb.get_task(conn, tid)
+    if requeued:
+        assert tid not in crashed
+        assert task.status == "ready" and task.consecutive_failures == 0
+    else:
+        assert tid in crashed and task.consecutive_failures == 1
+        assert f"exited with code {exit_code}" in (task.last_failure_error or "")
+
+
 def test_respawn_guard_defers_rate_limited_within_cooldown(
     kanban_home, monkeypatch,
 ):
