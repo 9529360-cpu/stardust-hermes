@@ -324,6 +324,7 @@ def _dispatch(server_name: str, server: Any, op: str, call, tool_timeout: float,
                 server_name,
                 elapsed_seconds=max(0.0, time.monotonic() - started),
                 success=not _result_is_error(result),
+                route_token=id(server),
             )
         except Exception:
             logger.debug("MCP route metric recording failed for %s/%s", server_name, op, exc_info=True)
