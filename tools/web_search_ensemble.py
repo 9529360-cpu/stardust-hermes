@@ -72,6 +72,13 @@ def _provider_error(response) -> str:
     return "" if isinstance(web, list) else "success response missing data.web list"
 
 
+def _actual_backend(requested_name: str, response: dict) -> str:
+    """Actual serving vendor when a keyless provider walked the free-tier ring."""
+    data = response.get("data") if isinstance(response, dict) else None
+    served_by = data.get("served_by") if isinstance(data, dict) else None
+    return str(served_by or requested_name).strip().lower() or requested_name
+
+
 def _direct_cached_search(provider, query: str, limit: int) -> dict:
     """Direct provider call with normal memoization but no rescue/fallback recursion."""
     from tools.web_result_cache import bucket_limit, search_memo, slice_search_response
@@ -86,7 +93,11 @@ def _direct_cached_search(provider, query: str, limit: int) -> dict:
             return slice_search_response(cached, limit)
         response = provider.search(query, bucket_limit(limit))
         if isinstance(response, dict) and response.get("success"):
-            search_memo.store(provider.name, query, limit, response)
+            # A keyless ring hop is transient failover, not a stable answer from this
+            # configured provider. Do not pin the rerouted result under the requested
+            # provider's cache key; the next ensemble call should retry that provider.
+            if _actual_backend(str(provider.name), response) == str(provider.name).strip().lower():
+                search_memo.store(provider.name, query, limit, response)
         return slice_search_response(response, limit) if isinstance(response, dict) else {
             "success": False, "error": "malformed response"
         }
@@ -236,20 +247,39 @@ def search_ensemble(primary_provider, query: str, limit: int) -> Optional[dict]:
                 + (f" ({detail})" if detail else ""),
             }
 
-        ordered_successes = [(name, successes[name]) for name in names if name in successes]
+        # Keyless providers can transparently walk the free-tier ring. Collapse two
+        # requested providers that were actually served by the same vendor so RRF never
+        # mistakes a failover alias for independent cross-engine agreement.
+        ordered_successes = []
+        actual_seen = set()
+        rerouted: dict[str, str] = {}
+        for requested_name in names:
+            if requested_name not in successes:
+                continue
+            response_for_name = successes[requested_name]
+            actual_name = _actual_backend(requested_name, response_for_name)
+            if actual_name != requested_name:
+                rerouted[requested_name] = actual_name
+            if actual_name in actual_seen:
+                continue
+            actual_seen.add(actual_name)
+            ordered_successes.append((actual_name, response_for_name))
+
         response = {
             "success": True,
             "data": {
                 "web": _merge_rrf(ordered_successes, limit),
                 "search_mode": "ensemble",
                 "backends": [name for name, _ in ordered_successes],
+                "requested_backends": names,
             },
         }
+        if rerouted:
+            response["data"]["rerouted_backends"] = rerouted
         if failures:
             response["data"]["failed_backends"] = failures
-        else:
-            # Do not make partial degradation sticky for a whole TTL. Successful provider
-            # responses are already cached individually, so the next ensemble call cheaply
-            # reuses them while retrying only the failed member(s).
+        elif not rerouted:
+            # Do not make partial degradation or a keyless ring reroute sticky for a
+            # whole TTL. Stable all-direct success is the only fused result we cache.
             search_memo.store(cache_key, query, limit, response)
         return response
