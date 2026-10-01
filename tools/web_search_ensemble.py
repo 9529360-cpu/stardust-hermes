@@ -247,5 +247,9 @@ def search_ensemble(primary_provider, query: str, limit: int) -> Optional[dict]:
         }
         if failures:
             response["data"]["failed_backends"] = failures
-        search_memo.store(cache_key, query, limit, response)
+        else:
+            # Do not make partial degradation sticky for a whole TTL. Successful provider
+            # responses are already cached individually, so the next ensemble call cheaply
+            # reuses them while retrying only the failed member(s).
+            search_memo.store(cache_key, query, limit, response)
         return response
