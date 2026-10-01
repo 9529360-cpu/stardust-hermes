@@ -1021,16 +1021,24 @@ class TestMultilingualCatalogRetrieval:
         assert hits
         assert hits[0].name == "mcp__github__create_issue"
 
-    def test_unknown_filler_term_does_not_poison_gate(self):
+    def test_conversational_stopword_does_not_poison_gate(self):
         from tools.tool_search_catalog import build_catalog, search_catalog
 
         catalog = build_catalog([
             _td("mcp__github__create_issue", "Create a GitHub issue"),
             _td("mcp__github__list_commits", "List GitHub commits"),
         ])
-        hits = search_catalog(catalog, "github frobnicate issue", limit=5)
+        hits = search_catalog(catalog, "please github issue", limit=5)
         assert hits
         assert hits[0].name == "mcp__github__create_issue"
+
+    def test_unknown_content_token_remains_a_hard_gate(self):
+        from tools.tool_search_catalog import build_catalog, search_catalog
+
+        catalog = build_catalog([
+            _td("mcp__slack__post_message", "Post a message to Slack"),
+        ])
+        assert search_catalog(catalog, "post gmail message", limit=5) == []
 
     def test_no_answerable_terms_still_returns_empty(self):
         from tools.tool_search_catalog import build_catalog, search_catalog
