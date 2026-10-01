@@ -17,6 +17,84 @@ _RING_KEY_VARS = {
 }
 
 
+def _configured_search_fallbacks() -> list[str]:
+    """Explicit one-shot search fallback chain from web.search_fallback_backends.
+
+    A string is accepted as a one-item list for hand-edited configs. Names are normalized,
+    blanks/duplicates are removed, and no provider is contacted here.
+    """
+    try:
+        from tools.web_tools import _load_web_config
+        raw = _load_web_config().get("search_fallback_backends")
+    except Exception as exc:  # noqa: BLE001 — config is best-effort on rescue path
+        logger.debug("search fallback config read failed: %s", exc)
+        return []
+    raw = [raw] if isinstance(raw, str) else raw
+    if not isinstance(raw, (list, tuple)):
+        return []
+    out: list[str] = []
+    for item in raw:
+        name = str(item or "").strip().lower()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def _configured_fallback_search(provider_name: str, original_error: str, query: str, limit: int):
+    """Try explicitly configured fallback providers in order.
+
+    Returns (result_or_none, failures). A fallback call never recursively triggers rescue:
+    the chain is bounded by the configured list, and keyless-ring rescue remains the final step.
+    """
+    fallbacks = [name for name in _configured_search_fallbacks() if name != provider_name]
+    if not fallbacks:
+        return None, []
+    try:
+        from agent.web_search_registry import get_provider
+    except Exception as exc:  # noqa: BLE001
+        return None, [f"registry unavailable: {exc}"]
+
+    failures = []
+    for name in fallbacks:
+        provider = get_provider(name)
+        if provider is None:
+            failures.append(f"{name}: not registered")
+            continue
+        try:
+            if not provider.supports_search():
+                failures.append(f"{name}: search unsupported")
+                continue
+            keyed = bool(provider.is_available())
+            keyless = False if keyed else bool(provider.is_keyless_available())
+            if not keyed and not keyless:
+                failures.append(f"{name}: unavailable")
+                continue
+            logger.warning(
+                "web_search backend '%s' failed (%s); trying configured fallback '%s'",
+                provider_name, (original_error or "")[:200], name,
+            )
+            result = provider.search(query, limit)
+        except Exception as exc:  # noqa: BLE001 — continue down the explicit chain
+            failures.append(f"{name}: {type(exc).__name__}: {str(exc)[:160]}")
+            continue
+        if not isinstance(result, dict) or not result.get("success"):
+            failures.append(f"{name}: {str((result or {}).get('error', 'search failed'))[:180]}")
+            continue
+        data = result.setdefault("data", {})
+        if isinstance(data, dict):
+            data.update(
+                fallback_from=provider_name,
+                fallback_backend=name,
+                backend_error=(
+                    f"Configured backend '{provider_name}' failed this call "
+                    f"({(original_error or 'unknown error')[:300]}); result served by "
+                    f"configured fallback '{name}'. The next call will retry '{provider_name}'."
+                ),
+            )
+        return result, failures
+    return None, failures
+
+
 def _keyless_rescue_enabled() -> bool:
     """``web.keyless_rescue`` (default on), implicitly off when the keyless tier is disabled."""
     from tools.web_tools import _load_web_config
@@ -31,16 +109,21 @@ def _keyless_rescue_enabled() -> bool:
 
 
 def _rescue_eligible(provider) -> bool:
-    """True when a failed call on *provider* should get a one-shot rescue.
+    """True when a failed call has an explicit fallback or keyless rescue path.
 
-    Eligible: a keyed/configured path — any non-ring backend, or a ring vendor in keyed mode. A ring
-    vendor already in keyless mode is NOT eligible: its failure means the ring was already walked.
+    Explicit search_fallback_backends are user-authorized and remain available even when the
+    anonymous keyless tier is disabled. Otherwise keep the historical rule: keyed/configured
+    paths may use keyless rescue, while a ring vendor already in keyless mode must not double-walk.
     """
-    if not _keyless_rescue_enabled() or provider is None:
+    if provider is None:
+        return False
+    name = str(getattr(provider, "name", "") or "").strip().lower()
+    if any(candidate != name for candidate in _configured_search_fallbacks()):
+        return True
+    if not _keyless_rescue_enabled():
         return False
     try:
         from plugins.web.keyless_mcp import _KEYLESS_RING, use_keyless
-        name = getattr(provider, "name", "")
         if name not in _KEYLESS_RING:
             return True
         from agent.web_search_provider import get_provider_env
@@ -52,7 +135,20 @@ def _rescue_eligible(provider) -> bool:
 
 
 def _rescue_search(provider_name: str, original_error: str, query: str, limit: int) -> dict:
-    """Rescue a failed search via the ring; annotate the result with the original failure."""
+    """Rescue a failed search through explicit fallbacks, then the anonymous keyless ring."""
+    explicit, fallback_failures = _configured_fallback_search(
+        provider_name, original_error, query, limit
+    )
+    if explicit is not None:
+        return explicit
+
+    if not _keyless_rescue_enabled():
+        suffix = (
+            f" (configured fallbacks also failed: {'; '.join(fallback_failures)})"
+            if fallback_failures else ""
+        )
+        return {"success": False, "error": f"{original_error or 'search failed'}{suffix}"}
+
     from plugins.web.keyless_mcp import search_with_failover
     logger.warning(
         "web_search backend '%s' failed (%s); one-shot keyless rescue",
@@ -68,13 +164,16 @@ def _rescue_search(provider_name: str, original_error: str, query: str, limit: i
                 f"The next call will use '{provider_name}' again."
             ),
         )
+        if fallback_failures:
+            rescued["data"]["fallback_errors"] = fallback_failures[:8]
         return rescued
     # Ring also failed: the ORIGINAL error names the user's setup, so lead with it.
+    detail = f"; configured fallbacks: {'; '.join(fallback_failures)}" if fallback_failures else ""
     return {
         "success": False,
         "error": (
             f"{original_error or 'search failed'} "
-            f"(keyless rescue also failed: {rescued.get('error', 'unknown')})"
+            f"(keyless rescue also failed: {rescued.get('error', 'unknown')}{detail})"
         ),
     }
 
