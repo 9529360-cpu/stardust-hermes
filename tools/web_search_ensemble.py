@@ -11,11 +11,11 @@ from __future__ import annotations
 import contextvars
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 if TYPE_CHECKING:
     from tools.web_search_planner import SearchPlan
-from urllib.parse import parse_qsl, urlencode, urlsplit
 
 logger = logging.getLogger("tools.web_tools")
 
