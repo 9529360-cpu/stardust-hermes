@@ -66,11 +66,22 @@ Each query in a `tool_search` call is searched independently against the
 same catalog (`limit` applies per query); the per-query groups carry tool
 names only, while the shared `tools` map holds each matched tool's
 description and required parameter names once. Queries are stemmed, so
-"issues" finds `create_issue`. Each query group that returns no matches
-includes an `available_sources` summary of the connected servers so a lexical
-miss is not mistaken for a missing capability.
+"issues" finds `create_issue`; common Chinese capability phrases such as
+"创建工单", "发送邮件", "日历", "浏览器", and "文件" are mapped to the compact
+English capability vocabulary used by most tool schemas. Each query group
+that returns no matches includes an `available_sources` summary of the
+connected servers so a lexical miss is not mistaken for a missing capability.
 `tool_describe` resolves every requested name in one call; unknown names
 are reported in `not_found` without failing the rest of the batch.
+
+For MCP tools, Tool Search also applies a **read-only health routing weight**
+from the existing MCP runtime state. A server whose circuit breaker is open,
+whose transport is reconnecting/suspect, or whose initial connect is in
+cooldown is ranked below a healthy alternative. The tool is not hidden:
+an exact-name search remains authoritative, and degraded matches include a
+small `health` object describing the current state and retry window when
+known. This ranking never probes or reconnects a server and does not replace
+the call-time MCP circuit breaker.
 
 When the model invokes `tool_call`, Hermes **unwraps the bridge** and
 dispatches the underlying tool exactly as if the model had called it
@@ -237,13 +248,17 @@ to any progressive-disclosure design, not specific to this implementation:
   finds that server's tools even when a tool's own name doesn't carry
   the service), description, and parameter names, with Snowball
   stemming (English) applied to both the index and the query so
-  morphological variants match ("issues" finds `create_issue`). A tool is
-  a result only if it contains the query's rarest token (the one in the
-  fewest tool documents, so the word that names the intent: `gmail`,
-  `github`, `incident`, not `send` or `create`). A query whose rarest
-  token appears in no tool returns an empty group with the connected
-  sources and a retry hint, instead of `limit` tools that share one
-  common word.
+  morphological variants match ("issues" finds `create_issue`). Compact
+  query-side Chinese capability aliases improve multilingual recall without
+  changing the byte-stable English-first catalog. A small query-side stopword
+  set removes conversational filler such as "please" and "help", but unknown
+  content/service tokens remain meaningful. A tool is admitted only if it
+  contains the query's rarest remaining token; an unknown service such as
+  "gmail" therefore gates to an empty result instead of letting a Slack tool
+  through just because it shares "post message". The empty group includes
+  connected sources plus a retry hint.
+  After lexical admission, MCP results receive a runtime health multiplier;
+  exact-name lookups remain first regardless of that multiplier.
 - **Relevance floor:** a tool must match at least half of a query's
   *answerable* terms (terms present anywhere in the catalog) before it
   is offered — sharing one incidental word with a long query is not a
