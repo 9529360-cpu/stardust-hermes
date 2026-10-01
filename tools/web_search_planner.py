@@ -124,13 +124,14 @@ def plan_search(query: str, config: dict[str, Any] | None, *, ensemble_available
     """Return one bounded execution plan without performing network work."""
     strategy = configured_search_strategy(config)
     intent = classify_search_intent(query)
+    freshness = _contains_any(query, _CURRENT) or _contains_any(query, _NEWS)
 
     if strategy == "single" or not ensemble_available:
         return SearchPlan(
             strategy=strategy,
             intent=intent,
             mode="single",
-            freshness=intent in {"current", "news"},
+            freshness=freshness,
             reason="ensemble disabled or unavailable",
         )
 
@@ -139,7 +140,7 @@ def plan_search(query: str, config: dict[str, Any] | None, *, ensemble_available
             strategy=strategy,
             intent=intent,
             mode="ensemble",
-            freshness=intent in {"current", "news"},
+            freshness=freshness,
             diversity=False,
             near_duplicate_dedupe=False,
             reason="configured ensemble behavior preserved",
@@ -151,7 +152,7 @@ def plan_search(query: str, config: dict[str, Any] | None, *, ensemble_available
         strategy="adaptive",
         intent=intent,
         mode="ensemble" if use_ensemble else "single",
-        freshness=intent in {"current", "news"},
+        freshness=freshness,
         diversity=use_ensemble,
         near_duplicate_dedupe=use_ensemble,
         reason=(
