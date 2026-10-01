@@ -457,7 +457,7 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
     print()
     print("  How do you want to authenticate the dashboard?")
     print("    [1] Username & password (quickest; for a trusted LAN / VPN)")
-    print("    [2] OAuth via Nous Portal (run `hermes dashboard register`)\n    [3] Cancel\n")
+    print("    [2] Self-hosted OIDC (use your own identity provider)\n    [3] Cancel\n")
 
     try:
         choice = input("  Choice [1]: ").strip() or "1"
@@ -467,11 +467,12 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
     if choice == "2":
         print()
         print(
-            "  Run this on the host where the dashboard lives, then start "
-            "the dashboard again:\n"
-            "    hermes dashboard register\n"
-            "  It provisions a Nous Portal OAuth client and writes "
-            "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env for you.\n"
+            "  Configure your OIDC issuer + client id, then restart the dashboard:\n"
+            "    HERMES_DASHBOARD_OIDC_ISSUER=https://id.example.com\n"
+            "    HERMES_DASHBOARD_OIDC_CLIENT_ID=stardust-dashboard\n"
+            "  Or set dashboard.oauth.self_hosted.{issuer,client_id} in config.yaml.\n"
+            "  An optional client secret can be supplied with "
+            "HERMES_DASHBOARD_OIDC_CLIENT_SECRET.\n"
             "  Docs: https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/"
             "user-guide/features/web-dashboard.md#authentication-gated-mode"
         )

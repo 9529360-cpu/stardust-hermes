@@ -146,10 +146,12 @@ def _settings() -> dict:
 
 
 def register(ctx) -> None:
-    """Register ``NousDashboardAuthProvider`` when a client_id is configured."""
+    """Keep the inherited provider implementation importable, but never register it in Stardust."""
     global LAST_SKIP_REASON
-    LAST_SKIP_REASON = ""
-    kwargs, LAST_SKIP_REASON = register_provider(ctx, logger, _TAG, NousDashboardAuthProvider, _settings)
-    if kwargs is not None:
-        logger.info(
-            "dashboard-auth-nous: registered provider (client_id=%s, portal=%s)", kwargs["client_id"], kwargs["portal_url"])
+    _ = ctx
+    LAST_SKIP_REASON = (
+        "Nous Portal dashboard authentication is retired in Stardust. "
+        "Use the bundled username/password provider, self-hosted OIDC, "
+        "or an explicitly installed DashboardAuthProvider plugin."
+    )
+    logger.info("dashboard-auth-nous: compatibility provider not registered in Stardust")
