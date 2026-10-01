@@ -212,6 +212,25 @@ def test_deliver_write_failure_still_removes_tempfile(home, monkeypatch, tmp_pat
     assert not glob.glob(str(tmp_path / "hermes-relay-dm-*")), "tempfile leaked"
 
 
+def test_deliver_fdopen_failure_still_removes_tempfile(home, monkeypatch, tmp_path):
+    """A failed descriptor handoff must close the handle before unlinking on Windows."""
+    import glob
+    import os
+    import tempfile
+
+    real_mkstemp = tempfile.mkstemp
+
+    def _tracking_mkstemp(*args, **kwargs):
+        kwargs["dir"] = str(tmp_path)
+        return real_mkstemp(*args, **kwargs)
+
+    monkeypatch.setattr("tempfile.mkstemp", _tracking_mkstemp)
+    monkeypatch.setattr(os, "fdopen", lambda *a, **k: (_ for _ in ()).throw(OSError("fdopen failed")))
+    err = srv._methods["bot_relay.deliver"](1, {"profile": "ops", "message": "private text"})
+    assert "error" in err
+    assert not glob.glob(str(tmp_path / "hermes-relay-dm-*")), "tempfile leaked"
+
+
 @pytest.fixture
 def fake_runs(monkeypatch):
     """Fake ``subprocess.run`` that records each call's kwargs; ``outcomes`` holds (returncode, stderr) per call."""
