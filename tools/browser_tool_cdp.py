@@ -6,7 +6,7 @@ import contextlib
 import os
 from typing import Tuple
 
-from agent.proxy_bypass import loopback_request_kwargs
+from agent.proxy_bypass import is_loopback_host, loopback_request_kwargs
 from tools.browser_tool_origin import origin_module as _origin
 
 
@@ -63,11 +63,33 @@ def _get_cdp_override_raw() -> str:
 def _get_cdp_override() -> str:
     """Resolved CDP URL override, or "" (skips cloud AND local launch).
 
-    May perform HTTP ``/json/version`` discovery — only call on paths about to *connect*; pure gates must use
-    :func:`_get_cdp_override_raw`.
+    May perform HTTP ``/json/version`` discovery and start the local debug browser for a closed loopback endpoint
+    — only call on paths about to *connect*; pure gates must use :func:`_get_cdp_override_raw`.
     """
-    _bt = _origin()
-    return _resolve_cdp_override(raw) if (raw := _get_cdp_override_raw()) else ""
+    raw = _get_cdp_override_raw()
+    if not raw:
+        return ""
+    _start_closed_loopback_browser(raw)
+    return _resolve_cdp_override(raw)
+
+
+def _start_closed_loopback_browser(cdp_url: str) -> None:
+    """Start the ``/browser connect`` debug browser (its own profile under HERMES_HOME) when *cdp_url* is a
+    loopback port nothing answers on: a closed browser otherwise turned every browser task into a 30s failure."""
+    from urllib.parse import urlparse
+
+    from hermes_cli.browser_connect import is_browser_debug_ready, launch_chrome_debug
+
+    parsed = urlparse(cdp_url if "://" in cdp_url else f"http://{cdp_url}")
+    try:
+        port = parsed.port
+    except ValueError:
+        return
+    if not port or not is_loopback_host(parsed.hostname) or is_browser_debug_ready(cdp_url):
+        return
+    launch = launch_chrome_debug(port)
+    _origin().logger.info("CDP endpoint %s was not answering; started the local debug browser: %s",
+                          _origin()._sanitize_url_for_logs(cdp_url), "ready" if launch.launched else launch.hint)
 
 
 def _get_dialog_policy_config() -> Tuple[str, float]:

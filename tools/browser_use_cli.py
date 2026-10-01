@@ -719,11 +719,15 @@ _HELPERS_DIGEST = (
     "navigates the current tab, wait_for_load() after navigation, page_info() summarizes the current page "
     "state, js(expr) evaluates a JS expression and returns its value (js('document.title'); wrap function "
     "bodies as js('(() => {...})()') — a bare '() => {...}' returns the function itself, uncalled), "
-    "fill_input(selector, text) types into inputs, click_at_xy(x, y) clicks viewport coordinates, "
+    "fill_input(selector, text) types into inputs as keystrokes, so for <input type=date|time|datetime-local|month> "
+    "and other masked fields set the value instead: js(\"(() => { const e = document.querySelector('#d'); "
+    "e.value = '2026-09-28'; e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new "
+    "Event('change', {bubbles: true})); return e.value })()\"), click_at_xy(x, y) clicks viewport coordinates, "
     "capture_screenshot() saves and prints a screenshot path, cdp('Domain.method', **kwargs) is raw CDP — "
     "cdp('Accessibility.getFullAXTree')['nodes'] lists every element's role/name/backendDOMNodeId (filter "
     "in Python before printing; it is thousands of nodes), then cdp('DOM.getBoxModel', backendNodeId=n) "
-    "gives click coordinates. ensure_real_tab() recovers from a stale/internal tab. Login walls: never guess "
+    "gives click coordinates. ensure_real_tab() recovers from a stale/internal tab. Read every field's value "
+    "back with js() before submitting a form and fix any mismatch: a submit cannot be undone. Login walls: never guess "
     "credentials; see the vault note below if present, otherwise stop and ask the user."
 )
 
