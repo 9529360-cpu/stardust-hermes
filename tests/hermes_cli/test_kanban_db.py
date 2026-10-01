@@ -289,6 +289,34 @@ def test_schedule_running_task_terminates_worker_and_records_outcome(kanban_home
         assert payload["terminated"] is True
 
 
+def test_schedule_running_task_parks_when_worker_stop_is_unconfirmed(kanban_home, monkeypatch):
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="stubborn scheduled worker", assignee="ops")
+        host = kb._claimer_id().split(":", 1)[0]
+        assert kb.claim_task(conn, task_id, claimer=f"{host}:worker") is not None
+        kbd._set_worker_pid(conn, task_id, 45679)
+        monkeypatch.setattr(
+            kb,
+            "_terminate_reclaimed_worker",
+            lambda pid, claim_lock, **_kwargs: {
+                "prev_pid": pid,
+                "host_local": True,
+                "termination_attempted": True,
+                "terminated": False,
+                "sigkill": True,
+            },
+        )
+
+        with pytest.raises(kb.WorkerTerminationError, match="parked blocked"):
+            kb.schedule_task(conn, task_id, reason="later")
+
+        task = kb.get_task(conn, task_id)
+        assert task is not None
+        assert task.status == "blocked"
+        assert task.block_kind == "transient"
+        assert kb.claim_task(conn, task_id) is None
+
+
 def test_schedule_non_running_task_does_not_signal_worker(kanban_home):
     with kbc.connect() as conn:
         t = kb.create_task(conn, title="future work", assignee="ops")
@@ -902,9 +930,14 @@ def test_dispatch_kills_spawned_worker_if_task_is_archived_before_pid_persistenc
 
         def spawn(task, _workspace):
             assert task.id == task_id
-            # Simulate an operator archive landing after process spawn but
-            # before dispatch persists the returned PID.
-            assert kb.archive_task(conn, task_id) is True
+            # Simulate a concurrent operator archive landing after the child
+            # exists but before dispatch persists its returned PID. #210 makes
+            # that operator call fail closed because the worker PID is not yet
+            # known; the durable task still lands archived. The independent
+            # spawn path then returns its PID and must reap the displaced child.
+            with pytest.raises(kb.WorkerTerminationError, match="worker stop was not confirmed after archive"):
+                kb.archive_task(conn, task_id)
+            assert kb.get_task(conn, task_id).status == "archived"
             return 65432
 
         # The ownership-loss response is what this regression pins. Avoid

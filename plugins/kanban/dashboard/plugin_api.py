@@ -602,10 +602,12 @@ def _patch_status(conn, task_id: str, payload: UpdateTaskBody, review_assignee_d
     (naming the blocking parent(s) for ``ready`` so the UI renders an actionable toast)."""
     s = payload.status
     if s == "archived":
-        ok = kanban_db.archive_task(conn, task_id)
+        with _map_errors(409, RuntimeError):
+            ok = kanban_db.archive_task(conn, task_id)
     else:
-        with _map_errors(400, _StatusRejected):
-            ok = _apply_status(conn, task_id, s, payload, f"unknown status: {s}")
+        with _map_errors(409, RuntimeError):
+            with _map_errors(400, _StatusRejected):
+                ok = _apply_status(conn, task_id, s, payload, f"unknown status: {s}")
         if s == "review" and ok and review_assignee_deferred and not payload.assignee:
             ok = kanban_db.assign_task(conn, task_id, None)
     if ok:
@@ -692,23 +694,20 @@ def _parents_blocking_ready(conn: sqlite3.Connection, task_id: str) -> list:
 
 
 def _set_status_direct(conn: sqlite3.Connection, task_id: str, new_status: str) -> bool:
-    """Direct status write for drag-drop moves without a structured verb (todo<->ready,
-    running<->ready) + a ``status`` event. Leaving ``running`` closes the run as 'reclaimed'
-    so attempt history isn't orphaned; the worker is killed only AFTER the txn commits."""
-    terminations: list[tuple[Optional[int], Optional[str], Optional[int]]] = []
+    """Direct dashboard move; displaced workers must be stopped before work is dispatchable again."""
+    termination_records: list[dict[str, Any]] = []
     effective_status = new_status
     with kanban_db.write_txn(conn):
         prev = conn.execute(
             "SELECT status, current_run_id, worker_pid, claim_lock, worker_started_at FROM tasks WHERE id = ?",
-            (task_id,)).fetchone()
+            (task_id,),
+        ).fetchone()
         if prev is None:
             return False
         if prev["status"] == "running" and new_status == "ready":
             resume_status = kanban_db._retry_status_for_run(conn, task_id, prev["current_run_id"])
             if resume_status == "review":
                 effective_status = "review" if kanban_db._parents_satisfied(conn, task_id) else "todo"
-        # Never promote to 'ready' unless all parents are done/archived — otherwise the
-        # dispatcher spawns a child whose upstream work hasn't completed.
         if effective_status == "ready" and not kanban_db._parents_satisfied(conn, task_id):
             return False
         was_running = prev["status"] == "running"
@@ -719,26 +718,55 @@ def _set_status_direct(conn: sqlite3.Connection, task_id: str, new_status: str) 
             "  claim_expires = CASE WHEN ? = 'running' THEN claim_expires ELSE NULL END, "
             "  worker_pid = CASE WHEN ? = 'running' THEN worker_pid ELSE NULL END "
             "WHERE id = ?",
-            (effective_status,) * 4 + (task_id,))
+            (effective_status,) * 4 + (task_id,),
+        )
         if cur.rowcount != 1:
             return False
         run_id = None
         if was_running and effective_status != "running" and prev["current_run_id"]:
             run_id = kanban_db._end_run(
                 conn, task_id, outcome="reclaimed", status="reclaimed",
-                summary=f"status changed to {effective_status} (dashboard/direct)")
-            terminations.append((prev["worker_pid"], prev["claim_lock"], prev["worker_started_at"]))
+                summary=f"status changed to {effective_status} (dashboard/direct)",
+            )
+            termination_records.append(
+                {
+                    "task_id": task_id,
+                    "run_id": run_id,
+                    "worker_pid": prev["worker_pid"],
+                    "claim_lock": prev["claim_lock"],
+                    "worker_started_at": prev["worker_started_at"],
+                    "transition": f"dashboard:{effective_status}",
+                }
+            )
         conn.execute(
             "INSERT INTO task_events (task_id, run_id, kind, payload, created_at) VALUES (?, ?, 'status', ?, ?)",
-            (task_id, run_id, json.dumps({"status": effective_status, "requested_status": new_status}), int(time.time())))
+            (task_id, run_id, json.dumps({"status": effective_status, "requested_status": new_status}), int(time.time())),
+        )
         if reopening_satisfied_parent:
-            # Domain-layer invalidation composes via a savepoint inside our txn and hands
-            # back worker terminations to perform post-commit.
             result = kanban_db.invalidate_descendants_for_parent_reopen(conn, task_id, author="dashboard")
-            terminations.extend(result["terminations"])
-    for pid, claim_lock, started_at in terminations:
-        kanban_db._terminate_reclaimed_worker(pid, claim_lock, started_at=started_at)
-    # Re-opening something may have made children stale.
+            for record in result.get("termination_records", []):
+                termination_records.append({**record, "transition": "ancestor_reopened"})
+
+    failed: list[str] = []
+    for record in termination_records:
+        termination = kanban_db._terminate_displaced_transition_worker(
+            conn,
+            record["task_id"],
+            record["run_id"],
+            transition=record["transition"],
+            worker_pid=record["worker_pid"],
+            claim_lock=record["claim_lock"],
+            worker_started_at=record["worker_started_at"],
+            raise_on_failure=False,
+        )
+        if not termination.get("terminated"):
+            failed.append(record["task_id"])
+    if failed:
+        raise kanban_db.WorkerTerminationError(
+            "worker stop was not confirmed for task(s) " + ", ".join(failed) +
+            "; affected tasks were parked blocked to prevent duplicate execution"
+        )
+
     if effective_status in {"done", "ready", "review"}:
         kanban_db.recompute_ready(conn)
     return True

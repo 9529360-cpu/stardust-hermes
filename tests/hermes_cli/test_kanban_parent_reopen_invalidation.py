@@ -134,6 +134,41 @@ def test_running_descendant_event_precedes_termination_via_reclaim_helper(
     assert run is not None and run.outcome == "reclaimed"
 
 
+def test_running_descendant_parks_when_worker_stop_is_unconfirmed(conn, monkeypatch):
+    parent_id = kb.create_task(conn, title="ancestor", assignee="planner")
+    assert kb.complete_task(conn, parent_id)
+    child_id = kb.create_task(
+        conn, title="running child", assignee="builder", parents=[parent_id],
+    )
+    claimed = kb.claim_task(conn, child_id)
+    assert claimed is not None
+    kbd._set_worker_pid(conn, child_id, 424243)
+
+    monkeypatch.setattr(
+        kb,
+        "_terminate_reclaimed_worker",
+        lambda pid, claim_lock, **_kwargs: {
+            "prev_pid": pid,
+            "host_local": True,
+            "termination_attempted": True,
+            "terminated": False,
+            "sigkill": True,
+        },
+    )
+
+    _reopen_parent_directly(conn, parent_id)
+    with pytest.raises(kb.WorkerTerminationError, match="parked blocked"):
+        kb.invalidate_descendants_for_parent_reopen(
+            conn, parent_id, author="operator",
+        )
+
+    child = kb.get_task(conn, child_id)
+    assert child is not None
+    assert child.status == "blocked"
+    assert child.block_kind == "transient"
+    assert kb.claim_task(conn, child_id) is None
+
+
 def test_counter_reset_on_invalidated_descendants(conn):
     parent_id, child_id = _done_parent_with_done_child(conn)
     with kb.write_txn(conn):

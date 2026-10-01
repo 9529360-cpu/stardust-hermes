@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 
 from hermes_cli import kanban_db as kb
 from hermes_cli import kanban_db_connect as kbc
+from hermes_cli import kanban_db_dispatch as kbd
 
 
 # ---------------------------------------------------------------------------
@@ -456,6 +457,40 @@ def test_dashboard_reclaim_of_active_review_preserves_review_phase(client):
         assert run.outcome == "reclaimed"
         next_review = kb.claim_review_task(conn, task_id)
         assert next_review is not None
+
+
+def test_dashboard_running_to_ready_returns_conflict_when_old_worker_survives(client, monkeypatch):
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="stubborn dashboard worker", assignee="builder")
+        host = kb._claimer_id().split(":", 1)[0]
+        assert kb.claim_task(conn, task_id, claimer=f"{host}:worker") is not None
+        kbd._set_worker_pid(conn, task_id, 51515)
+
+    monkeypatch.setattr(
+        kb,
+        "_terminate_reclaimed_worker",
+        lambda pid, claim_lock, **_kwargs: {
+            "prev_pid": pid,
+            "host_local": True,
+            "termination_attempted": True,
+            "terminated": False,
+            "sigkill": True,
+        },
+    )
+
+    response = client.patch(
+        f"/api/plugins/kanban/tasks/{task_id}",
+        json={"status": "ready"},
+    )
+    assert response.status_code == 409, response.text
+    assert "parked blocked" in response.json()["detail"]
+
+    with kbc.connect() as conn:
+        task = kb.get_task(conn, task_id)
+        assert task is not None
+        assert task.status == "blocked"
+        assert task.block_kind == "transient"
+        assert kb.claim_task(conn, task_id) is None
 
 
 # ---------------------------------------------------------------------------

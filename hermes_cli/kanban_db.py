@@ -2640,23 +2640,60 @@ class ArtifactPreservationError(RuntimeError):
     """Raised when a declared scratch deliverable cannot be preserved."""
 
 
+class WorkerTerminationError(RuntimeError):
+    """An operator transition landed, but its displaced worker did not stop."""
+
+
+def _park_after_worker_stop_failure(
+    conn: sqlite3.Connection, task_id: str, run_id: Optional[int], *,
+    transition: str, termination: dict,
+) -> None:
+    """Fail closed in a sticky blocked state so no replacement worker can spawn."""
+    task = get_task(conn, task_id)
+    if task is None:
+        return
+    source_status = task.status
+    resume_status = "review" if source_status == "review" else "ready"
+    reason = (
+        f"worker stop was not confirmed after operator transition {transition!r}; "
+        "task parked to prevent duplicate execution"
+    )
+    with write_txn(conn):
+        current = get_task(conn, task_id)
+        if current is None:
+            return
+        conn.execute(
+            "UPDATE tasks SET status = 'blocked', completed_at = NULL, "
+            "claim_lock = NULL, claim_expires = NULL, worker_pid = NULL, "
+            "current_run_id = NULL, block_kind = 'transient', block_recurrences = 0, "
+            "last_failure_error = ? WHERE id = ?",
+            (reason, task_id),
+        )
+        _append_event(
+            conn, task_id, "blocked",
+            {
+                "reason": reason,
+                "kind": "transient",
+                "source_status": source_status,
+                "resume_status": resume_status,
+                "worker_stop_failed": True,
+                "transition": transition,
+                "termination": termination,
+            },
+            run_id=run_id,
+        )
+
+
 def _terminate_displaced_transition_worker(
     conn: sqlite3.Connection, task_id: str, run_id: Optional[int], *,
     transition: str, worker_pid: Optional[int], claim_lock: Optional[str],
-    worker_started_at: Optional[int],
-) -> None:
-    """Stop a live worker displaced by an operator-owned state transition.
-
-    Worker-owned handoffs prove ownership with ``expected_run_id`` and must be
-    allowed to return normally. A mutation that clears somebody else's live
-    claim commits first, then terminates that host-local process and records
-    the outcome so a parked/terminal row can never silently mask continuing
-    side effects.
-    """
+    worker_started_at: Optional[int], signal_fn=None, raise_on_failure: bool = True,
+) -> dict:
+    """Stop a worker displaced by an operator transition and fail closed if it survives."""
     if not worker_pid or not claim_lock:
-        return
+        return {"terminated": True, "termination_attempted": False, "prev_pid": worker_pid}
     termination = _terminate_reclaimed_worker(
-        worker_pid, claim_lock, started_at=worker_started_at,
+        worker_pid, claim_lock, signal_fn=signal_fn, started_at=worker_started_at,
     )
     with write_txn(conn):
         _append_event(
@@ -2664,7 +2701,16 @@ def _terminate_displaced_transition_worker(
             {"transition": transition, **termination},
             run_id=run_id,
         )
-
+    if not termination.get("terminated"):
+        _park_after_worker_stop_failure(
+            conn, task_id, run_id, transition=transition, termination=termination,
+        )
+        if raise_on_failure:
+            raise WorkerTerminationError(
+                f"worker stop was not confirmed after {transition}; task was parked blocked "
+                "to prevent duplicate execution"
+            )
+    return termination
 
 def complete_task(
     conn: sqlite3.Connection, task_id: str, *, result: Optional[str] = None,
@@ -3618,6 +3664,7 @@ def invalidate_descendants_for_parent_reopen(
     now = int(time.time())
     invalidated: list[dict[str, Any]] = []
     terminations: list[tuple[Optional[int], Optional[str], Optional[int]]] = []
+    termination_records: list[dict[str, Any]] = []
     with write_txn(conn, allow_nested=True):
         rows = conn.execute(
             """
@@ -3649,6 +3696,15 @@ def invalidate_descendants_for_parent_reopen(
                 run_id = _end_run(
                     conn, row["id"], outcome="reclaimed", status="todo",
                     summary=f"ancestor {task_id} reopened",
+                )
+                termination_records.append(
+                    {
+                        "task_id": row["id"],
+                        "run_id": run_id,
+                        "worker_pid": row["worker_pid"],
+                        "claim_lock": row["claim_lock"],
+                        "worker_started_at": row["worker_started_at"],
+                    }
                 )
             # consecutive_failures = 0: deliberate operator reset — see
             # docstring for why this diverges from reopen_review_task.
@@ -3685,9 +3741,31 @@ def invalidate_descendants_for_parent_reopen(
     if not caller_owns_txn:
         # Standalone: committed above, audit trail durable, safe to kill now.
         # Composed calls leave this to the caller post-commit.
-        for pid, claim_lock, started_at in terminations:
-            _terminate_reclaimed_worker(pid, claim_lock, started_at=started_at)
-    return {"invalidated": invalidated, "terminations": terminations}
+        failed: list[str] = []
+        for record in termination_records:
+            termination = _terminate_displaced_transition_worker(
+                conn,
+                record["task_id"],
+                record["run_id"],
+                transition="ancestor_reopened",
+                worker_pid=record["worker_pid"],
+                claim_lock=record["claim_lock"],
+                worker_started_at=record["worker_started_at"],
+                raise_on_failure=False,
+            )
+            if not termination.get("terminated"):
+                failed.append(record["task_id"])
+        if failed:
+            raise WorkerTerminationError(
+                "worker stop was not confirmed for invalidated descendant(s) "
+                + ", ".join(failed)
+                + "; affected tasks were parked blocked to prevent duplicate execution"
+            )
+    return {
+        "invalidated": invalidated,
+        "terminations": terminations,
+        "termination_records": termination_records,
+    }
 
 
 def specify_triage_task(
@@ -3793,6 +3871,11 @@ def archive_task(conn: sqlite3.Connection, task_id: str, *, signal_fn=None) -> b
         termination = _terminate_reclaimed_worker(prev_pid, prev_lock, signal_fn=signal_fn, started_at=prev_started)
         with write_txn(conn):
             _append_event(conn, task_id, "archive_worker_termination", termination, run_id=run_id)
+        if not termination.get("terminated"):
+            raise WorkerTerminationError(
+                "worker stop was not confirmed after archive; task remains archived "
+                "and will not be dispatched"
+            )
     # ``archived`` parents no longer block children; promote them now.
     recompute_ready(conn)
     # Reap the workspace on archive too (never-completed tasks kept it forever).
@@ -4063,12 +4146,25 @@ def schedule_task(
         )
         _append_event(conn, task_id, "scheduled", {"reason": reason}, run_id=run_id)
     if was_running:
-        termination = _terminate_reclaimed_worker(
-            prev_pid, prev_lock, signal_fn=signal_fn, started_at=prev_started,
+        termination = _terminate_displaced_transition_worker(
+            conn,
+            task_id,
+            run_id,
+            transition="scheduled",
+            worker_pid=prev_pid,
+            claim_lock=prev_lock,
+            worker_started_at=prev_started,
+            signal_fn=signal_fn,
+            raise_on_failure=False,
         )
         with write_txn(conn):
             _append_event(
                 conn, task_id, "schedule_worker_termination", termination, run_id=run_id,
+            )
+        if not termination.get("terminated"):
+            raise WorkerTerminationError(
+                "worker stop was not confirmed after scheduling; task was parked blocked "
+                "to prevent duplicate execution"
             )
     return True
 

@@ -64,6 +64,52 @@ def _apply_transition(conn, transition: str, task_id: str, run_id: int, *, opera
 
 
 @pytest.mark.parametrize(
+    ("transition", "review_run"),
+    [
+        ("done", False),
+        ("blocked", False),
+        ("review", False),
+        ("changes_requested", True),
+    ],
+)
+def test_operator_transition_parks_task_when_displaced_worker_will_not_stop(
+    kanban_home, monkeypatch, transition, review_run,
+):
+    conn = kbc.connect()
+    try:
+        task_id, run_id = _claimed_task(
+            conn, review_run=review_run, pid=43000 + run_id_seed(transition),
+        )
+
+        monkeypatch.setattr(
+            kb,
+            "_terminate_reclaimed_worker",
+            lambda pid, claim_lock, **_kwargs: {
+                "prev_pid": pid,
+                "host_local": True,
+                "termination_attempted": True,
+                "terminated": False,
+                "sigkill": True,
+            },
+        )
+
+        with pytest.raises(kb.WorkerTerminationError, match="parked blocked"):
+            _apply_transition(conn, transition, task_id, run_id, operator=True)
+
+        task = kb.get_task(conn, task_id)
+        assert task is not None
+        assert task.status == "blocked"
+        assert task.block_kind == "transient"
+        assert task.current_run_id is None
+        assert task.worker_pid is None
+        latest_block = [e for e in kb.list_events(conn, task_id) if e.kind == "blocked"][-1]
+        assert latest_block.payload["worker_stop_failed"] is True
+        assert latest_block.payload["transition"] == transition
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize(
     ("transition", "review_run", "final_status"),
     [
         ("done", False, "done"),
