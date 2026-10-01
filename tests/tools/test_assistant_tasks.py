@@ -1663,3 +1663,23 @@ def test_inspect_reads_real_kanban_events_without_comment_bodies(tmp_path, monke
     assert any(event["kind"] == "blocked" for event in result["events"])
     assert result["comments_omitted"] is True
     assert "private scratch note" not in json.dumps(result)
+
+
+def test_create_surfaces_a_queued_but_undispatched_warning_once(monkeypatch):
+    """Without a dispatcher the model must say "queued", not "started in the background"."""
+    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
+    warning = "No gateway is running — the task will sit in 'ready' until you start it."
+
+    def fake_create(args):
+        return json.dumps({"ok": True, "task_id": f"t_{args['title']}", "status": "ready",
+                           "subscribed": True, "dispatch_warning": warning})
+
+    monkeypatch.setattr("tools.kanban_tools._handle_create", fake_create)
+    result = json.loads(assistant_tasks.assistant_tasks_tool(
+        action="create", session_id="session-7", request_id="call-43",
+        tasks=[{"title": "a", "instruction": "Research library a."},
+               {"title": "b", "instruction": "Research library b."}],
+    ))
+    assert result["ok"] is True and len(result["created"]) == 2
+    assert result["dispatch_warning"] == warning
+    assert all("dispatch_warning" not in entry for entry in result["created"])

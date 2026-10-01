@@ -969,8 +969,29 @@ def _handle_create(args: dict, **kw) -> str:
         landed = _fields(kb.get_task(conn, new_tid), _CREATED_FIELDS)
         wait = [e for e in kb.list_events(conn, new_tid) if e.kind == "dependency_wait"]
         gate = {"gated": True, "gated_by": wait[-1].payload["parent"]} if wait else {"gated": False}
-        return _ok(task_id=new_tid, **landed, **gate,
-                   subscribed=_maybe_auto_subscribe(conn, new_tid))
+        created = dict(task_id=new_tid, **landed, **gate, subscribed=_maybe_auto_subscribe(conn, new_tid))
+    # Probe outside the board connection. A dispatcher-spawned creator proves a dispatcher is running.
+    if landed.get("status") == "ready" and self_tid is None:
+        warning = _dispatch_gap_warning()
+        if warning:
+            created["dispatch_warning"] = warning
+    return _ok(**created)
+
+
+def _dispatch_gap_warning() -> Optional[str]:
+    """Why a ready task will not start yet, or None when a dispatcher will pick it up.
+
+    ``hermes kanban create`` and the dashboard already warn. The model-facing create did not, so on a
+    Desktop with no gateway the model told the user a task had "started in the background" that
+    nothing would ever run (assistant exam 2026-09-29, background research).
+    """
+    from hermes_cli.kanban import _check_dispatcher_presence
+    from hermes_constants import get_hermes_home
+
+    running, message = _check_dispatcher_presence(hermes_home=get_hermes_home())
+    if running or not message:
+        return None
+    return f"{message} Until then the task is only queued: tell the user it has not started."
 
 
 def _resolve_notify_target() -> Optional[dict[str, Any]]:

@@ -267,6 +267,7 @@ def _create_tasks(
     replay_token = _idempotency_scope_token(owner, scope)
     created: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
+    dispatch_warning: Optional[str] = None
 
     for index, raw in enumerate(tasks):
         if not isinstance(raw, dict):
@@ -323,6 +324,7 @@ def _create_tasks(
                 "error": result.get("error") or "task creation failed",
             })
             continue
+        dispatch_warning = dispatch_warning or result.get("dispatch_warning")
         created.append({
             "index": index,
             "task_id": result.get("task_id"),
@@ -335,19 +337,19 @@ def _create_tasks(
             "continuous": bool(raw.get("continuous")),
         })
 
-    return json.dumps(
-        {
-            "ok": bool(created) and not failed,
-            "created": created,
-            "failed": failed,
-            "summary": {
-                "requested": len(tasks),
-                "created": len(created),
-                "failed": len(failed),
-            },
+    response: dict[str, Any] = {
+        "ok": bool(created) and not failed,
+        "created": created,
+        "failed": failed,
+        "summary": {
+            "requested": len(tasks),
+            "created": len(created),
+            "failed": len(failed),
         },
-        ensure_ascii=False,
-    )
+    }
+    if dispatch_warning:
+        response["dispatch_warning"] = dispatch_warning
+    return json.dumps(response, ensure_ascii=False)
 
 
 def _list_tasks(
