@@ -99,3 +99,8 @@ def test_navigational_url_query_stays_single_in_adaptive_mode():
         ensemble_available=True,
     )
     assert plan.mode == "single"
+
+
+def test_english_keywords_do_not_match_inside_larger_words():
+    assert classify_search_intent("currently implementing a parser") == "simple"
+    assert classify_search_intent("newspaper parser library") == "simple"
