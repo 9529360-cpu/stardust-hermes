@@ -255,20 +255,29 @@ def search_ensemble(primary_provider, query: str, limit: int) -> Optional[dict]:
         # Keyless providers can transparently walk the free-tier ring. Collapse two
         # requested providers that were actually served by the same vendor so RRF never
         # mistakes a failover alias for independent cross-engine agreement.
-        ordered_successes = []
-        actual_seen = set()
+        chosen_by_actual: dict[str, tuple[dict, bool]] = {}
+        actual_order: list[str] = []
         rerouted: dict[str, str] = {}
         for requested_name in names:
             if requested_name not in successes:
                 continue
             response_for_name = successes[requested_name]
             actual_name = _actual_backend(requested_name, response_for_name)
-            if actual_name != requested_name:
+            direct = actual_name == requested_name
+            if not direct:
                 rerouted[requested_name] = actual_name
-            if actual_name in actual_seen:
-                continue
-            actual_seen.add(actual_name)
-            ordered_successes.append((actual_name, response_for_name))
+            if actual_name not in chosen_by_actual:
+                chosen_by_actual[actual_name] = (response_for_name, direct)
+                actual_order.append(actual_name)
+            elif direct and not chosen_by_actual[actual_name][1]:
+                # Prefer evidence from a request addressed directly to the actual vendor
+                # over an alias that only reached it through keyless failover.
+                chosen_by_actual[actual_name] = (response_for_name, True)
+
+        ordered_successes = [
+            (actual_name, chosen_by_actual[actual_name][0])
+            for actual_name in actual_order
+        ]
 
         response = {
             "success": True,
