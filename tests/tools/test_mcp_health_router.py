@@ -116,10 +116,10 @@ def test_recent_failure_rate_deprioritizes_otherwise_healthy_server():
     tool = _map_tool()
     core._servers["github"] = _server()
 
-    route_metrics.record_call("github", elapsed_seconds=0.2, success=False)
-    route_metrics.record_call("github", elapsed_seconds=0.2, success=False)
-    route_metrics.record_call("github", elapsed_seconds=0.2, success=False)
-    route_metrics.record_call("github", elapsed_seconds=0.2, success=True)
+    route_metrics.record_call("github", elapsed_seconds=0.2, success=False, route_token=id(core._servers["github"]))
+    route_metrics.record_call("github", elapsed_seconds=0.2, success=False, route_token=id(core._servers["github"]))
+    route_metrics.record_call("github", elapsed_seconds=0.2, success=False, route_token=id(core._servers["github"]))
+    route_metrics.record_call("github", elapsed_seconds=0.2, success=True, route_token=id(core._servers["github"]))
 
     health = tool_health(tool)
     assert health.status == "route_degraded"
@@ -133,7 +133,7 @@ def test_slow_recent_route_is_deprioritized_after_enough_samples():
     core._servers["github"] = _server()
 
     for _ in range(4):
-        route_metrics.record_call("github", elapsed_seconds=8.0, success=True)
+        route_metrics.record_call("github", elapsed_seconds=8.0, success=True, route_token=id(core._servers["github"]))
 
     health = tool_health(tool)
     assert health.status == "slow"
@@ -144,7 +144,7 @@ def test_slow_recent_route_is_deprioritized_after_enough_samples():
 def test_one_slow_sample_does_not_change_routing_weight():
     tool = _map_tool()
     core._servers["github"] = _server()
-    route_metrics.record_call("github", elapsed_seconds=20.0, success=True)
+    route_metrics.record_call("github", elapsed_seconds=20.0, success=True, route_token=id(core._servers["github"]))
 
     health = tool_health(tool)
     assert health.status == "healthy"
