@@ -409,17 +409,52 @@ def _clip_description(text: str, cap: int = 500) -> str:
     return text if len(text) <= cap else text[:cap] + "…"
 
 
-def _shared_tool_record(entry: CatalogEntry) -> Dict[str, Any]:
-    """One record for the shared ``tools`` map (per-query groups carry names only);
-    ``required`` lets the model attempt a trivial call without a ``tool_describe`` round-trip."""
+def _mcp_health_snapshot(catalog: List[CatalogEntry]) -> Tuple[Dict[str, float], Dict[str, Dict[str, Any]]]:
+    """Routing weights + sparse model-visible health metadata for MCP catalog entries.
+
+    This is deliberately read-only: it never probes, reconnects, or mutates MCP state. Healthy,
+    lazy, recycled and warming entries stay quiet in the tool-search response; degraded states
+    are surfaced only when a matching tool is actually returned.
+    """
+    weights: Dict[str, float] = {}
+    details: Dict[str, Dict[str, Any]] = {}
+    try:
+        from tools.mcp_health_router import tool_health
+    except Exception:
+        return weights, details
+    quiet_statuses = {"healthy", "lazy", "recycled", "warming"}
+    for entry in catalog:
+        if entry.source != "mcp":
+            continue
+        try:
+            health = tool_health(entry.name)
+        except Exception:
+            health = None
+        if health is None:
+            continue
+        weights[entry.name] = health.score
+        if health.status not in quiet_statuses:
+            details[entry.name] = health.as_dict()
+    return weights, details
+
+
+def _shared_tool_record(entry: CatalogEntry, health: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """One record for the shared tools map (per-query groups carry names only).
+
+    required lets the model attempt a trivial call without a tool_describe round-trip.
+    Degraded MCP health is attached only when relevant so healthy catalogs stay compact.
+    """
     try:
         required = entry.schema["function"]["parameters"]["required"]
     except (TypeError, KeyError, AttributeError):
         required = []
-    return {"source": entry.source, "source_name": entry.source_name,
-            "description": _clip_description(entry.description or ""),
-            "required": [r[:64] for r in (required if isinstance(required, list) else [])
-                         if isinstance(r, str)][:32]}
+    record = {"source": entry.source, "source_name": entry.source_name,
+              "description": _clip_description(entry.description or ""),
+              "required": [r[:64] for r in (required if isinstance(required, list) else [])
+                           if isinstance(r, str)][:32]}
+    if health:
+        record["health"] = health
+    return record
 
 
 def _available_source_summary(catalog: List[CatalogEntry]) -> List[Dict[str, Any]]:
@@ -474,11 +509,12 @@ def dispatch_tool_search(args: Dict[str, Any], *, current_tool_defs: List[Dict[s
     results: List[Dict[str, Any]] = []
     tools_map: Dict[str, Dict[str, Any]] = {}
     available_sources = _available_source_summary(catalog) if catalog else []
+    health_weights, health_details = _mcp_health_snapshot(catalog)
     for position, query in enumerate(queries):
         corpus = catalog + remote_entries[position]
-        hits = search_catalog(corpus, query, limit=limit)
+        hits = search_catalog(corpus, query, limit=limit, score_weights=health_weights)
         for h in hits:
-            tools_map.setdefault(h.name, _shared_tool_record(h))
+            tools_map.setdefault(h.name, _shared_tool_record(h, health_details.get(h.name)))
         matches = [h.name for h in hits]
         group: Dict[str, Any] = {"query": query, "matches": matches}
         if not matches and catalog:
