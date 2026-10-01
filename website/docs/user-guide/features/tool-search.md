@@ -74,14 +74,24 @@ connected servers so a lexical miss is not mistaken for a missing capability.
 `tool_describe` resolves every requested name in one call; unknown names
 are reported in `not_found` without failing the rest of the batch.
 
-For MCP tools, Tool Search also applies a **read-only health routing weight**
+For MCP tools, Tool Search also applies a **read-only route-quality weight**
 from the existing MCP runtime state. A server whose circuit breaker is open,
 whose transport is reconnecting/suspect, or whose initial connect is in
-cooldown is ranked below a healthy alternative. The tool is not hidden:
-an exact-name search remains authoritative, and degraded matches include a
-small `health` object describing the current state and retry window when
-known. This ranking never probes or reconnects a server and does not replace
-the call-time MCP circuit breaker.
+cooldown is ranked below a healthy alternative. Stardust also keeps a bounded,
+process-local EWMA of completed MCP RPC latency and success/failure outcomes.
+After at least three samples, a consistently slow or recently unreliable
+server receives a moderate additional demotion; an `untrusted` write-capable
+tool receives a small approval-friction penalty. Exact-name search remains
+authoritative, so a degraded tool is never hidden.
+
+Degraded matches include a compact `health` object with the relevant state,
+retry window, recent success rate, EWMA latency, auth type, or
+`approval_required` marker when applicable. The telemetry contains no tool
+arguments, result content, URLs, credentials, or user data and is never
+persisted. It is bound to the live MCP server instance, so reconnects preserve
+useful history while replacing/reconfiguring the server starts fresh. Routing
+never probes or reconnects a server and does not replace the call-time MCP
+circuit breaker or trust gate.
 
 When the model invokes `tool_call`, Hermes **unwraps the bridge** and
 dispatches the underlying tool exactly as if the model had called it
