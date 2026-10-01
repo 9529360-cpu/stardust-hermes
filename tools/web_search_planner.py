@@ -33,7 +33,7 @@ _CURRENT = (
     "latest", "current", "today", "recent", "newest", "this week", "this month",
     "最新", "现在", "当前", "今天", "近期", "最近", "本周", "本月",
 )
-_NEWS = ("news", "breaking", "announcement", "announced", "新闻", "突发", "宣布", "消息")
+_NEWS = ("news", "breaking", "announcement", "announced", "新闻", "突发", "宣布", "最新消息")
 _COMPARE = (
     " vs ", " versus ", " compare", " comparison", " difference", " differences",
     "对比", "比较", "区别", "差别", "相比", "哪个好", "哪一个好",
@@ -79,7 +79,15 @@ class SearchPlan:
 
 def _contains_any(query: str, needles: tuple[str, ...]) -> bool:
     text = query.lower()
-    return any(needle in text for needle in needles)
+    for needle in needles:
+        if not needle:
+            continue
+        if needle.isascii() and needle == needle.strip():
+            if re.search(r"(?<!\\w)" + re.escape(needle) + r"(?!\\w)", text):
+                return True
+        elif needle in text:
+            return True
+    return False
 
 
 def classify_search_intent(query: str) -> SearchIntent:
