@@ -33,7 +33,6 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import {
   $boardSlug,
   addComment,
-  deleteTask,
   estimateTask,
   fetchLog,
   fetchProfiles,
@@ -542,11 +541,13 @@ export function TaskDrawer({
   columns,
   id,
   onClose,
+  onDelete,
   onOpen
 }: {
   columns: string[]
   id: null | string
   onClose: () => void
+  onDelete: (task: KanbanTaskDetail['task']) => void
   onOpen: (id: string) => void
 }) {
   const k = useKanban()
@@ -724,7 +725,7 @@ export function TaskDrawer({
                     <Codicon name="archive" size="0.85rem" />
                     {k.archive}
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" onSelect={mutate(() => deleteTask(task.id), onClose)}>
+                  <DropdownMenuItem className="text-destructive" onSelect={() => onDelete(task)}>
                     <Codicon name="trash" size="0.85rem" />
                     {k.delete}
                   </DropdownMenuItem>
