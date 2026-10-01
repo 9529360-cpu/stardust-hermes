@@ -848,6 +848,33 @@ class TestEnvironmentHints:
         assert "Terminal backend: docker" in result
         assert "inside" in result.lower()
 
+    @pytest.mark.windows_only
+    def test_windows_powershell_example_survives_the_git_bash_terminal(self, monkeypatch, tmp_path):
+        """The PowerShell invocation the hint teaches must work verbatim through the bash terminal.
+
+        Field failure (2026-09-24/30): for registry / uninstall / process queries the model wrapped
+        PowerShell in bash DOUBLE quotes; bash expanded ``$_``/``$x`` first and every attempt died
+        with a PowerShell parse error (``Round(/c/Users ...`` — ``$_`` had become bash's last arg).
+        """
+        import re
+
+        import agent.prompt_builder as _pb
+        from tools.environments.local import LocalEnvironment
+
+        monkeypatch.setattr(_pb, "is_wsl", lambda: False)
+        monkeypatch.delenv("TERMINAL_ENV", raising=False)
+        _pb._BACKEND_PROBE_CACHE.clear()
+        example = re.search(r"`(powershell\.exe [^`]+)`", _pb.build_environment_hints())
+        assert example, "the Windows shell hint must show how to call PowerShell from bash"
+
+        env = LocalEnvironment(cwd=str(tmp_path), timeout=60)
+        try:
+            result = env.execute(example.group(1))
+        finally:
+            env.cleanup()
+        assert result["returncode"] == 0, result
+        assert "powershell is running" in result["output"].lower(), result
+
     def test_build_environment_hints_uses_terminal_cwd_over_launch_dir(self, monkeypatch, tmp_path):
         """THE BUG: gateway/cron set TERMINAL_CWD but the prompt emitted os.getcwd()
         (the daemon launch dir). Regression for #24882/#24969/#27383/#29265."""
