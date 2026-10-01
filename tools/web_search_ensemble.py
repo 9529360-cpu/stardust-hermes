@@ -187,6 +187,17 @@ def _merge_rrf(
                 item["description"] = desc
             if not item["url"] and raw_url:
                 item["url"] = raw_url
+            if not any(item.get(date_key) is not None for date_key in (
+                "published_date", "published_at", "publishedAt",
+                "date", "updated_at", "updatedAt",
+            )):
+                for date_key in (
+                    "published_date", "published_at", "publishedAt",
+                    "date", "updated_at", "updatedAt",
+                ):
+                    if row.get(date_key) is not None:
+                        item[date_key] = row[date_key]
+                        break
 
     ranked = sorted(merged.values(), key=lambda item: (-item["score"], item["first_seen"]))
     if plan is not None and plan.strategy == "adaptive":
