@@ -196,29 +196,6 @@ method(
 )
 
 
-# ── diagnostics.share_nous ────────────────────────────────────────────────────────────────────
-
-
-class DiagnosticsShareNousParams(Params):
-    error_context: str | None = None
-    extra_files: dict[str, str] | None = None
-    log_lines: int | None = None
-
-
-class DiagnosticsShareNousResult(Result):
-    """Structured envelope: ``ok=False`` + ``error`` renders inline instead of failing the RPC."""
-
-    ok: bool
-    view_url: str | None = None
-    upload_id: str | None = None
-    expires_at: str | None = None
-    error: str | None = None
-
-
-method("diagnostics.share_nous", params=DiagnosticsShareNousParams, result=DiagnosticsShareNousResult,
-       doc="Upload a force-redacted debug bundle to Nous-internal diagnostics storage.")
-
-
 # ── free tier ─────────────────────────────────────────────────────────────────────────────────
 
 
