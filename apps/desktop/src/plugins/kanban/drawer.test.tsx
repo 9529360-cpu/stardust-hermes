@@ -71,10 +71,16 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-function openDrawer() {
+function openDrawer(onDelete = vi.fn()) {
   return render(
     <QueryClientProvider client={client}>
-      <TaskDrawer columns={['todo', 'ready', 'done']} id="t_example" onClose={vi.fn()} onOpen={vi.fn()} />
+      <TaskDrawer
+        columns={['todo', 'ready', 'done']}
+        id="t_example"
+        onClose={vi.fn()}
+        onDelete={onDelete}
+        onOpen={vi.fn()}
+      />
     </QueryClientProvider>
   )
 }
@@ -125,5 +131,24 @@ describe('task attachment compatibility', () => {
     )
     expect(await screen.findByText(file.name)).toBeTruthy()
     expect(screen.queryByText(en.noAttachments)).toBeNull()
+  })
+})
+
+
+describe('task deletion', () => {
+  it('routes the destructive menu action to the board confirmation owner', async () => {
+    detail = { ...legacyDetail, attachments: [] }
+    const onDelete = vi.fn()
+    openDrawer(onDelete)
+
+    await screen.findByRole('heading', { name: legacyDetail.task.title })
+    const actions = screen.getByRole('button', { name: en.taskActions })
+    // Radix DropdownMenu opens on the pointer sequence a real mouse click emits.
+    fireEvent.pointerDown(actions, { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(actions, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(await screen.findByText(en.delete))
+
+    expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: legacyDetail.task.id }))
+    expect(rest).not.toHaveBeenCalledWith('/tasks/t_example', expect.objectContaining({ method: 'DELETE' }))
   })
 })
