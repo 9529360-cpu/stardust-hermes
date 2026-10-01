@@ -18,6 +18,7 @@ time is positive proof the turn never finished. Contract pinned here:
 
 from __future__ import annotations
 
+import multiprocessing
 import threading
 import time
 import types
@@ -115,6 +116,55 @@ def test_marker_roundtrip(tmp_path):
 
     clear_turn_marker(tmp_path, "abc")
     assert read_turn_marker(tmp_path, "abc") is None
+
+
+def _paused_marker_writer(home, loaded, release):
+    from tui_gateway import turn_marker
+
+    original_load = turn_marker._load
+
+    def paused_load(path):
+        entries = original_load(path)
+        loaded.set()
+        if not release.wait(10):
+            raise TimeoutError("marker writer was not released")
+        return entries
+
+    turn_marker._load = paused_load
+    turn_marker.record_turn_start(home, "first", "resume first")
+
+
+def _second_marker_writer(home, started):
+    started.set()
+    record_turn_start(home, "second", "resume second")
+
+
+def test_marker_writers_in_separate_processes_preserve_both_sessions(tmp_path):
+    """A read-modify-write must hold a shared OS lock, not only a per-process mutex."""
+    ctx = multiprocessing.get_context("spawn")
+    loaded, release, started = (ctx.Event() for _ in range(3))
+    first = ctx.Process(target=_paused_marker_writer, args=(tmp_path, loaded, release))
+    second = ctx.Process(target=_second_marker_writer, args=(tmp_path, started))
+    try:
+        first.start()
+        assert loaded.wait(15), "first writer never loaded the sidecar"
+        second.start()
+        assert started.wait(15), "second writer never started"
+        # In the broken implementation the second writer commits while the first
+        # still holds its stale snapshot. With an OS lock it waits for release.
+        second.join(1)
+        assert second.is_alive(), "second writer did not wait for the first writer's lock"
+    finally:
+        release.set()
+        for process in (first, second):
+            if process.pid is not None:
+                process.join(15)
+                if process.is_alive():
+                    process.terminate()
+                    process.join(5)
+    assert first.exitcode == second.exitcode == 0
+    assert read_turn_marker(tmp_path, "first")["prompt"] == "resume first"
+    assert read_turn_marker(tmp_path, "second")["prompt"] == "resume second"
 
 
 def test_marker_survives_corrupt_sidecar(tmp_path):
