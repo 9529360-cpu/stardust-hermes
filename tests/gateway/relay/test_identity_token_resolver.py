@@ -1,4 +1,4 @@
-"""Unit tests for the generic-OIDC / Nous-Portal caller-identity token resolver.
+"""Unit tests for the explicit relay caller-identity token resolver.
 
 Covers gateway.relay._resolve_relay_identity_token() — the canonical resolver
 shared by the runtime self-provision path and the `hermes gateway enroll` CLI.
@@ -10,10 +10,11 @@ Three modes:
   1b. Ambient token endpoint when token_url is configured WITHOUT client
      credentials: plain GET, body is the token (raw JWT or JSON envelope).
      The metadata-server pattern (e.g. Domino's $DOMINO_API_PROXY/access-token).
-  2. Nous Portal (resolve_nous_access_token) otherwise — the default.
+  2. No token_url: fail closed. Stardust never borrows a model/account provider
+     credential for relay provisioning.
 
-The HTTP calls and the Nous resolver are monkeypatched; these prove the mode
-SELECTION, the request shapes, and the fail-closed paths.
+The HTTP calls are monkeypatched; these prove selection, request shapes, and
+fail-closed behavior.
 """
 
 from __future__ import annotations
@@ -37,6 +38,20 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     # Never read config.yaml off disk by default.
     monkeypatch.setattr("gateway.run._load_gateway_config", lambda: {}, raising=False)
+
+
+def test_no_explicit_identity_configuration_fails_closed(monkeypatch):
+    """A relay URL alone must never cause a Nous/account credential lookup."""
+    import hermes_cli.auth as auth
+
+    monkeypatch.setattr(
+        auth,
+        "resolve_nous_access_token",
+        lambda *args, **kwargs: pytest.fail("relay resolver must not borrow Nous credentials"),
+    )
+
+    with pytest.raises(RuntimeError, match="relay identity is not configured"):
+        relay._resolve_relay_identity_token()
 
 
 def test_client_credentials_via_env(monkeypatch):

@@ -409,7 +409,8 @@ def _resolve_relay_identity_token() -> str:
           ``$DOMINO_API_PROXY/access-token``): a plain GET whose body IS the token,
           raw JWT or a JSON envelope with ``access_token``. Possession of the
           (typically loopback) endpoint is the credential.
-      2.  Nous Portal (default): ``resolve_nous_access_token()``.
+    There is deliberately no account-provider fallback. If no token endpoint is
+    configured, the relay identity is unresolved and callers fail closed / skip.
 
     Raises on failure; callers decide whether that's fatal (enroll CLI) or a graceful
     boot no-op (self-provision).
@@ -425,9 +426,11 @@ def _resolve_relay_identity_token() -> str:
     token_url, client_id, client_secret, scope = (env[k] for k in _IDP_KEYS)
 
     if not token_url:
-        from hermes_cli.auth import resolve_nous_access_token
-
-        return resolve_nous_access_token()
+        raise RuntimeError(
+            "relay identity is not configured: set gateway.idp.token_url "
+            "(or GATEWAY_RELAY_IDP_TOKEN_URL) to an explicit token endpoint, "
+            "or pin GATEWAY_RELAY_ID + GATEWAY_RELAY_SECRET from a prior enrollment"
+        )
 
     if not client_id and not client_secret:
         # Mode 1b — plain GET; the body is the token, raw or JSON-enveloped.
@@ -495,7 +498,7 @@ def self_provision_relay() -> bool:
     connector's rotation window covers a still-connected prior instance. The trigger
     is deliberately NOT ``is_managed()`` (False on a NAS-hosted Fly agent): "pointed
     at a connector without a pinned secret" is the real signal and self-guards (an
-    enrolled gateway has a PINNED secret -> skipped; no resolvable identity -> no-op).
+    enrolled gateway has a PINNED secret -> skipped; no explicitly configured identity -> no-op).
     Returns True iff it provisioned. NEVER raises: a failure logs and returns False so
     the gateway still boots (the adapter then dials unauthenticated / is rejected).
     """
