@@ -246,3 +246,98 @@ class TestExtractRescue:
                 monkeypatch, _KeyedBoomProvider(), ["https://a", "https://b"]
             )
         assert all("HTTP 500" in r.get("error", "") for r in results)
+
+class TestConfiguredSearchFallbacks:
+    class _FallbackProvider:
+        name = "searxng"
+
+        def supports_search(self):
+            return True
+
+        def is_available(self):
+            return True
+
+        def is_keyless_available(self):
+            return False
+
+        def search(self, query, limit=5):
+            return {"success": True, "data": {"web": [{"url": "https://fallback.example"}]}}
+
+    def _dispatch(self, monkeypatch, primary):
+        monkeypatch.setattr(web_tools, "_ensure_web_plugins_loaded", lambda: None)
+        fallback = self._FallbackProvider()
+
+        def _get(name):
+            return primary if name == "keenable" else fallback if name == "searxng" else None
+
+        monkeypatch.setattr("agent.web_search_registry.get_provider", _get)
+        return json.loads(web_tools.web_search_tool("q", limit=2))
+
+    def test_explicit_fallback_precedes_keyless_ring(self, monkeypatch):
+        monkeypatch.setattr(
+            web_tools, "_load_web_config",
+            lambda: {"backend": "keenable", "search_fallback_backends": ["searxng"]},
+        )
+        with patch.object(keyless_mcp, "search_with_failover") as ring:
+            out = self._dispatch(monkeypatch, _KeyedBoomProvider())
+        assert out["success"] is True
+        assert out["data"]["fallback_from"] == "keenable"
+        assert out["data"]["fallback_backend"] == "searxng"
+        ring.assert_not_called()
+
+    def test_explicit_fallback_works_with_keyless_rescue_disabled(self, monkeypatch):
+        monkeypatch.setattr(
+            web_tools, "_load_web_config",
+            lambda: {
+                "backend": "keenable",
+                "search_fallback_backends": "searxng",
+                "keyless_rescue": False,
+                "keyless_fallback": False,
+            },
+        )
+        out = self._dispatch(monkeypatch, _KeyedBoomProvider())
+        assert out["success"] is True
+        assert out["data"]["fallback_backend"] == "searxng"
+
+    def test_failed_explicit_fallback_continues_to_keyless_ring(self, monkeypatch):
+        class _BadFallback(self._FallbackProvider):
+            def search(self, query, limit=5):
+                return {"success": False, "error": "fallback down"}
+
+        primary = _KeyedBoomProvider()
+        fallback = _BadFallback()
+        monkeypatch.setattr(
+            web_tools, "_load_web_config",
+            lambda: {"backend": "keenable", "search_fallback_backends": ["searxng"]},
+        )
+        monkeypatch.setattr(web_tools, "_ensure_web_plugins_loaded", lambda: None)
+        monkeypatch.setattr(
+            "agent.web_search_registry.get_provider",
+            lambda name: primary if name == "keenable" else fallback if name == "searxng" else None,
+        )
+        with patch.object(
+            keyless_mcp, "search_with_failover", return_value=_ring_ok("exa")
+        ) as ring:
+            out = json.loads(web_tools.web_search_tool("q", limit=2))
+        assert out["success"] is True
+        assert out["data"]["rescued_from"] == "keenable"
+        assert any("searxng" in item for item in out["data"]["fallback_errors"])
+        ring.assert_called_once()
+
+    def test_next_call_retries_primary_after_fallback_success(self, monkeypatch):
+        calls = {"primary": 0}
+
+        class _Counting(_KeyedBoomProvider):
+            def search(self, query, limit=5):
+                calls["primary"] += 1
+                return super().search(query, limit)
+
+        monkeypatch.setattr(
+            web_tools, "_load_web_config",
+            lambda: {"backend": "keenable", "search_fallback_backends": ["searxng"]},
+        )
+        primary = _Counting()
+        self._dispatch(monkeypatch, primary)
+        self._dispatch(monkeypatch, primary)
+        assert calls["primary"] == 2
+
