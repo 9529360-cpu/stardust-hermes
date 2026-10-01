@@ -98,20 +98,26 @@ _QUERY_ALIASES = (
 )
 
 
-def _query_tokenize(text: str) -> List[str]:
-    """Tokenize a user query and add compact Chinese capability aliases.
-
-    Raw CJK text is intentionally not emitted as an index token: a Chinese sentence would
-    otherwise contribute a never-answerable rare token and become the BM25 admission gate.
-    Alias terms are stemmed through the same path as catalog text and de-duplicated in order,
-    so natural-language phrasing does not overweight a capability simply by repeating aliases.
-    """
+def _query_explicit_tokens(text: str) -> List[str]:
+    """Latin/alphanumeric tokens the user actually typed, minus conversational filler."""
     raw = text or ""
-    tokens = [
+    return list(dict.fromkeys(
         _stem(token.lower())
         for token in _TOKEN_RE.findall(raw)
         if token.lower() not in _QUERY_STOPWORDS
-    ]
+    ))
+
+
+def _query_tokenize(text: str) -> List[str]:
+    """Tokenize a user query and add compact Chinese capability aliases.
+
+    Raw CJK text is intentionally not emitted as a literal index token. Chinese capability
+    phrases instead add synthetic English aliases. Those aliases improve recall, but unlike
+    user-typed service/content tokens they are not allowed to become a hard unknown-token gate:
+    e.g. "邮件" may expand to both "email" and "mail" even when a catalog only uses "email".
+    """
+    raw = text or ""
+    tokens = list(_query_explicit_tokens(raw))
     for phrase, aliases in _QUERY_ALIASES:
         if phrase in raw:
             tokens.extend(_stem(alias.lower()) for alias in aliases)
@@ -222,18 +228,30 @@ def _corpus_stats(catalog: List[CatalogEntry]) -> _CorpusStats:
     return doc_lengths, avg_dl, dict(doc_freq), len(catalog)
 
 
-def _gate_token(query_tokens: List[str], doc_freq: Dict[str, int], n_docs: int) -> str:
-    """Return the rarest query token, including unknown content/service tokens.
+def _gate_token(
+    query_tokens: List[str],
+    doc_freq: Dict[str, int],
+    n_docs: int,
+    *,
+    hard_tokens: Optional[List[str]] = None,
+) -> str:
+    """Choose the mandatory relevance token without letting synthetic aliases poison recall.
 
-    Query-side conversational stopwords are removed before this point. Every remaining
-    token is meaningful evidence: an unknown service name such as "gmail" must gate to an
-    empty result rather than allowing a superficially similar Slack tool through.
+    Unknown tokens explicitly typed by the user remain hard gates ("post gmail message" must
+    not route to Slack). Synthetic Chinese aliases are softer: unknown synonym expansions are
+    ignored, while their answerable siblings can still retrieve the intended capability.
     """
     def _idf(token: str) -> float:
         df = doc_freq.get(token, 0)
         return math.log(1 + (n_docs - df + 0.5) / (df + 0.5))
 
-    return max(query_tokens, key=_idf)
+    explicit = hard_tokens or []
+    unknown_explicit = [token for token in explicit if doc_freq.get(token, 0) == 0]
+    if unknown_explicit:
+        return max(unknown_explicit, key=_idf)
+
+    answerable = [token for token in query_tokens if doc_freq.get(token, 0) > 0]
+    return max(answerable, key=_idf) if answerable else ""
 
 
 # Relevance floor. The rarest-token gate stops queries whose intent word no tool carries; it
@@ -272,7 +290,10 @@ def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
         return []
     corpus_stats = corpus_stats or _corpus_stats(catalog)
     doc_freq = corpus_stats[2]
-    gate = _gate_token(query_tokens, doc_freq, corpus_stats[3])
+    explicit_tokens = _query_explicit_tokens(query)
+    gate = _gate_token(
+        query_tokens, doc_freq, corpus_stats[3], hard_tokens=explicit_tokens
+    )
     if not gate:
         return []
     answerable = {t for t in query_tokens if doc_freq.get(t, 0) > 0}
