@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+pytest.importorskip("aiohttp", reason="two-gateway HTTP contract requires the optional aiohttp extra")
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
