@@ -142,7 +142,9 @@ def test_keyless_reroute_is_not_counted_as_independent_consensus(monkeypatch):
     assert out["data"]["requested_backends"] == ["exa", "parallel"]
     assert out["data"]["rerouted_backends"] == {"exa": "parallel"}
     assert out["data"]["web"][0]["sources"] == ["parallel"]
-    # The second configured alias must not add a second RRF vote for the same real engine.
+    assert out["data"]["web"][0]["title"] == "B"
+    # The rerouted Exa alias must not add a second RRF vote or replace the
+    # direct Parallel request's evidence.
     assert len(out["data"]["web"]) == 1
 
 
