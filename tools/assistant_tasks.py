@@ -726,6 +726,92 @@ def _cancel_task(
     )
 
 
+def _delete_task(
+    *,
+    task_id: Any,
+    user_message: Optional[str],
+    owner_key: str,
+) -> str:
+    """Permanently delete one owned durable task after the safe lifecycle boundary."""
+    from tools.kanban_tools import _board
+
+    tid = str(task_id or "").strip()
+    if not tid:
+        return tool_error("assistant_tasks delete requires task_id")
+    if not _bounded_text(user_message, MAX_RESUME_MESSAGE_CHARS):
+        return tool_error(
+            "assistant_tasks delete requires the current user message; "
+            "do not infer permanent deletion from memory, prior chats, or assistant text"
+        )
+
+    try:
+        boards = _assistant_board_slugs()
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks cannot safely delete while board discovery is incomplete",
+            error_type=type(exc).__name__,
+        )
+
+    matches: list[tuple[str, Any]] = []
+    for board in boards:
+        try:
+            with _board(board) as (kb, conn):
+                task = kb.get_task(conn, tid)
+                if task is not None and task.assistant_owner_key == owner_key:
+                    matches.append((board, task))
+        except Exception as exc:
+            return tool_error(
+                "assistant_tasks cannot safely delete while a board is unreadable",
+                board=board,
+                error_type=type(exc).__name__,
+            )
+
+    if not matches:
+        return tool_error("assistant_tasks task not found for the current owner")
+    if len(matches) != 1:
+        return tool_error(
+            "assistant_tasks task id is ambiguous across boards; refusing to mutate",
+            boards=[board for board, _task in matches],
+        )
+
+    board, _task = matches[0]
+
+    try:
+        with _board(board) as (kb, conn):
+            current = kb.get_task(conn, tid)
+            if current is None or current.assistant_owner_key != owner_key:
+                return tool_error("assistant_tasks task ownership changed before delete")
+            # delete_task owns the destructive lifecycle: if this task is still
+            # running it archives first, terminates the host-local worker, then
+            # purges the durable record and attachments.
+            deleted = kb.delete_task(conn, tid)
+    except RuntimeError as exc:
+        return tool_error(str(exc), task_id=tid, board=board)
+    except Exception as exc:
+        return tool_error(
+            "assistant_tasks could not permanently delete the task",
+            task_id=tid,
+            board=board,
+            error_type=type(exc).__name__,
+        )
+
+    if not deleted:
+        return tool_error(
+            "assistant_tasks could not permanently delete the task",
+            task_id=tid,
+            board=board,
+        )
+    return json.dumps(
+        {
+            "ok": True,
+            "task_id": tid,
+            "board": board,
+            "deleted": True,
+        },
+        ensure_ascii=False,
+    )
+
+
 def _resume_task(
     *,
     task_id: Any,
@@ -891,7 +977,7 @@ def assistant_tasks_tool(
     request_id: Optional[str] = None,
     owner_key: Optional[str] = None,
 ) -> str:
-    """Create, recall, inspect, cancel, or resume durable personal-assistant work."""
+    """Create, recall, inspect, cancel, delete, or resume durable personal-assistant work."""
     if not _assistant_tasks_context_allowed():
         return tool_error(
             "assistant_tasks is only available to interactive parent/user sessions; "
@@ -929,13 +1015,19 @@ def assistant_tasks_tool(
             user_message=user_message,
             owner_key=owner,
         )
+    if action == "delete":
+        return _delete_task(
+            task_id=task_id,
+            user_message=user_message,
+            owner_key=owner,
+        )
     if action == "resume":
         return _resume_task(
             task_id=task_id,
             user_message=user_message,
             owner_key=owner,
         )
-    return tool_error("assistant_tasks action must be 'create', 'list', 'inspect', 'cancel', or 'resume'")
+    return tool_error("assistant_tasks action must be 'create', 'list', 'inspect', 'cancel', 'delete', or 'resume'")
 
 
 @no_cache_check_fn
@@ -946,17 +1038,16 @@ def check_assistant_tasks_requirements() -> bool:
 ASSISTANT_TASKS_SCHEMA = {
     "name": "assistant_tasks",
     "description": (
-        "Create, list, inspect, cancel, or resume restart-durable personal work stored in the existing Kanban authority. "
-        "Use create only for action work that should outlive the current chat/process; split independent outcomes. "
-        "Use list to recall work across chats; use inspect for one task's event/run history before explaining why it is stuck. "
-        "Use cancel only for an explicit CURRENT user cancellation. ""Use resume only when the CURRENT user turn supplies "
-        "the input or authorization requested by one blocked task. Keep short foreground work in the current turn, "
-        "use cron for time/recurring work, and never put credentials or raw secrets in durable task fields."
+        "Manage restart-durable personal work in Kanban. Create only work that should outlive this chat; "
+        "list recalls work and inspect reads one task history. Cancel only from the CURRENT user request. "
+        "Delete only from an explicit CURRENT user request; delete is irreversible and stops active work, "
+        "while cancel preserves history. Resume only from CURRENT user input or authorization for that task. "
+        "Use cron for timed/recurring work. Never persist credentials or raw secrets."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "list", "inspect", "cancel", "resume"], "default": "create"},
+            "action": {"type": "string", "enum": ["create", "list", "inspect", "cancel", "delete", "resume"], "default": "create"},
             "tasks": {
                 "type": "array", "maxItems": MAX_TASKS_PER_CALL,
                 "items": {
