@@ -14,6 +14,7 @@ from typing import Any
 
 
 _EWMA_ALPHA = 0.25
+_MAX_ROUTE_KEYS = 256
 _lock = threading.Lock()
 
 
@@ -47,6 +48,7 @@ class _MutableMetrics:
     ewma_latency_s: float = 0.0
     last_success_at: float | None = None
     last_failure_at: float | None = None
+    last_updated_at: float = 0.0
 
 
 _metrics: dict[Any, _MutableMetrics] = {}
@@ -74,8 +76,14 @@ def record_call(
     latency = max(0.0, float(elapsed_seconds))
     key = _metric_key(server_name, route_token)
     with _lock:
-        row = _metrics.setdefault(key, _MutableMetrics())
+        row = _metrics.get(key)
+        if row is None:
+            if len(_metrics) >= _MAX_ROUTE_KEYS:
+                oldest = min(_metrics, key=lambda candidate: _metrics[candidate].last_updated_at)
+                _metrics.pop(oldest, None)
+            row = _metrics[key] = _MutableMetrics()
         row.samples += 1
+        row.last_updated_at = timestamp
         if success:
             row.successes += 1
             row.last_success_at = timestamp
