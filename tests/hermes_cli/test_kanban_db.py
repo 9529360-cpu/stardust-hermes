@@ -822,6 +822,28 @@ def test_delete_task_removes_task_relations_and_attachment_blob(kanban_home):
     assert not log_path.exists()
 
 
+def test_hard_delete_removes_logs_only_from_owning_board(kanban_home):
+    kb.create_board("other")
+    with kbc.connect(board="other") as conn:
+        task_id = kb.create_task(conn, title="named board delete")
+        own_log = kb.worker_log_path(task_id, board="other")
+        own_log.parent.mkdir(parents=True, exist_ok=True)
+        own_log.write_text("private\n", encoding="utf-8")
+        rotated = own_log.with_suffix(own_log.suffix + ".1")
+        rotated.write_text("older\n", encoding="utf-8")
+
+        # Same task-id-shaped filename on another board must never be touched.
+        default_log = kb.worker_log_path(task_id, board="default")
+        default_log.parent.mkdir(parents=True, exist_ok=True)
+        default_log.write_text("unrelated\n", encoding="utf-8")
+
+        assert kb.delete_task(conn, task_id, board="other") is True
+
+    assert not own_log.exists()
+    assert not rotated.exists()
+    assert default_log.read_text(encoding="utf-8") == "unrelated\n"
+
+
 def test_delete_task_drops_external_attachment_metadata_without_unlinking_file(kanban_home, tmp_path):
     external = tmp_path / "user-source.txt"
     external.write_text("keep me", encoding="utf-8")
