@@ -658,6 +658,25 @@ def test_intermediate_tool_call_does_not_suppress_crash_recovery(schedule_env, m
     assert len(schedule_env) == 1
 
 
+@pytest.mark.parametrize("assistant", [
+    {"content": ""},
+    {"content": "", "reasoning": "private intermediate reasoning"},
+])
+def test_empty_assistant_does_not_suppress_crash_recovery(schedule_env, marker_home, assistant):
+    """A blank or reasoning-only assistant row is not a terminal answer to the user."""
+    record_turn_start(marker_home, "session-key", "finish the migration")
+    marker = read_turn_marker(marker_home, "session-key")
+    session = _session(history=[
+        {"role": "user", "content": "finish the migration", "timestamp": marker["started_at"] + 0.5},
+        {"role": "assistant", "timestamp": marker["started_at"] + 1, **assistant},
+    ])
+
+    result = server._maybe_schedule_auto_continue("sid", session, "session-key")
+
+    assert result is not None
+    assert len(schedule_env) == 1
+
+
 def test_compaction_summary_does_not_suppress_crash_recovery(schedule_env, marker_home):
     record_turn_start(marker_home, "session-key", "finish the migration")
     marker = read_turn_marker(marker_home, "session-key")
