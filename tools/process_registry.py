@@ -1123,8 +1123,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
         """
         first_chunk = True
         # A split multibyte UTF-8 char would become U+FFFD with stateless decoding; the
-        # incremental decoder holds the partial sequence until the rest arrives.
-        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        # incremental decoder holds the partial sequence until the rest arrives (and on
+        # Windows decodes console-code-page lines, e.g. PowerShell's GBK, as such).
+        from tools.environments.base_output import console_output_decoder
+
+        decoder = console_output_decoder()
 
         # Incremental decoder: raw pipe reads can split a multibyte UTF-8 character across two read1()
         # chunks. A stateless per-chunk ``bytes.decode(errors="replace")`` turns both halves into U+FFFD

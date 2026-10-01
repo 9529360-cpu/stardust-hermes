@@ -339,6 +339,56 @@ class _ThreadedProcessHandle:
 
 
 # --- Stdout drain thread ---
+class _ConsoleCodePageFallbackDecoder:
+    """Incremental decoder that decodes each complete line as UTF-8, or with *code_page* when the line is not
+    valid UTF-8. One pipe interleaves UTF-8 writers (Python, Git, Node) with Windows tools that write the
+    console code page (PowerShell 5.1 and cmd write GBK on Chinese Windows), so the line is the unit. Neither
+    encoding uses ``\\n``/``\\r`` inside a multibyte character, so line splits never cut one."""
+
+    _MAX_PENDING = 64 * 1024  # a newline-free run streams out instead of waiting for EOF
+
+    def __init__(self, code_page: str) -> None:
+        self._code_page = code_page
+        self._pending = b""
+
+    def decode(self, data: bytes, final: bool = False) -> str:
+        self._pending += data
+        cut = len(self._pending) if final else self._pending.rfind(b"\n") + 1
+        rest = self._pending[cut:]
+        if rest.isascii() or len(rest) >= self._MAX_PENDING:
+            # An unterminated ASCII tail (a prompt, a progress line) reads the same in both encodings: stream it.
+            cut = len(self._pending)
+        lines, self._pending = self._pending[:cut], self._pending[cut:]
+        return "".join(self._decode_line(line) for line in lines.splitlines(keepends=True))
+
+    def _decode_line(self, line: bytes) -> str:
+        try:
+            return line.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            # Only a line the console code page decodes cleanly switches; a UTF-8 line cut mid-character
+            # (process exit, a byte clamp) or binary noise keeps the U+FFFD substitution.
+            if exc.reason != "unexpected end of data":
+                try:
+                    return line.decode(self._code_page)
+                except UnicodeDecodeError:
+                    pass
+            return line.decode("utf-8", errors="replace")
+
+
+def console_output_decoder():
+    """Incremental decoder for command output captured on this host (UTF-8 off Windows)."""
+    if os.name != "nt":
+        return codecs.getincrementaldecoder("utf-8")(errors="replace")
+    import ctypes
+
+    code_page = f"cp{ctypes.windll.kernel32.GetOEMCP()}"
+    try:
+        codecs.lookup(code_page)
+    except LookupError:
+        code_page = "mbcs"
+    return _ConsoleCodePageFallbackDecoder(code_page)
+
+
 def _drain_stdout(proc: ProcessHandle, output: _BoundedOutputCollector, stop: "threading.Event | None" = None) -> None:
     """Drain ``proc.stdout`` into *output* until EOF or shortly after exit.
     ``for line in proc.stdout`` would block on ``readline()`` until EOF, and a backgrounded
@@ -367,8 +417,9 @@ def _drain_stdout(proc: ProcessHandle, output: _BoundedOutputCollector, stop: "t
     # incremental decoder buffers partial sequences across chunks, and ``errors="replace"`` mirrors the
     # baseline ``TextIOWrapper`` (which was constructed with ``encoding="utf-8", errors="replace"`` on
     # ``Popen``) so binary or mis-encoded output is preserved with U+FFFD substitution rather than
-    # clobbering the whole buffer.
-    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    # clobbering the whole buffer. On Windows, console-code-page lines are decoded as such (see
+    # ``console_output_decoder``).
+    decoder = console_output_decoder()
     try:
         fd = stream.fileno()
     except Exception:  # mocks / in-memory adapters without a real descriptor
