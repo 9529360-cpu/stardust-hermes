@@ -70,7 +70,7 @@ def _apply_route_quality(base: MCPToolHealth, tool_name: str, key, server, core)
     from tools.mcp_tool_scope import _server_key
     from tools.mcp_route_metrics import snapshot
 
-    metrics = snapshot(base.server)
+    metrics = snapshot(base.server, route_token=id(server) if server is not None else None)
     auth_type = str(
         getattr(server, "_auth_type", "")
         or (getattr(server, "_config", {}) or {}).get("auth")
