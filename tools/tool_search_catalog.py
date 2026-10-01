@@ -257,8 +257,9 @@ def search_catalog(catalog: List[CatalogEntry], query: str, limit: int = 5, *,
     Admission is by the query's rarest token (:func:`_gate_token`), not by ``score > 0``:
     BM25 is additive over the tokens a document shares with the query, so on a large catalog
     ``score > 0`` admits one-token matches and fills every slot with them (measured: "send
-    gmail email" returned 5 incident tools that only shared ``email``). A token no document
-    carries admits nothing; the caller's empty-group hint tells the model to retry without it.
+    gmail email" returned 5 incident tools that only shared ``email``). Gate selection ignores
+    unknown query tokens and chooses the rarest answerable token; if none are answerable, the
+    caller's empty-group hint tells the model to retry with a more concrete capability query.
     Long queries additionally need :func:`_required_term_coverage` of their answerable terms.
     Optional score_weights multiply BM25 after admission; exact-name lookups stay authoritative."""
     query_tokens = _query_tokenize(query) if catalog and limit > 0 else []
