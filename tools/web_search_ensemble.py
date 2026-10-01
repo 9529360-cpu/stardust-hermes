@@ -83,13 +83,18 @@ def _direct_cached_search(provider, query: str, limit: int) -> dict:
     """Direct provider call with normal memoization but no rescue/fallback recursion."""
     from tools.web_result_cache import bucket_limit, search_memo, slice_search_response
 
+    requested_name = str(provider.name).strip().lower()
+
+    def _direct_hit(cached_response: dict) -> bool:
+        return _actual_backend(requested_name, cached_response) == requested_name
+
     cached = search_memo.lookup(provider.name, query, limit)
-    if cached is not None:
+    if cached is not None and _direct_hit(cached):
         return slice_search_response(cached, limit)
 
     with search_memo.flight_lock(provider.name, query, limit):
         cached = search_memo.lookup(provider.name, query, limit)
-        if cached is not None:
+        if cached is not None and _direct_hit(cached):
             return slice_search_response(cached, limit)
         response = provider.search(query, bucket_limit(limit))
         if isinstance(response, dict) and response.get("success"):
