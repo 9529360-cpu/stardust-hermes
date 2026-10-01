@@ -557,6 +557,8 @@ def _build_oauth_catalog() -> list[Dict[str, Any]]:
     try:
         from hermes_cli.provider_catalog import provider_catalog
         for d in provider_catalog():
+            if d.slug == "nous":
+                continue
             if d.tab != "accounts" or d.slug in seen:
                 continue
             seen.add(d.slug)
