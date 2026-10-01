@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import os
 import sqlite3
 import subprocess
@@ -631,18 +632,294 @@ def test_delete_archived_task_removes_related_rows(kanban_home):
         assert conn.execute("SELECT COUNT(*) FROM task_events WHERE task_id = ?", (tid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM task_runs WHERE task_id = ?", (tid,)).fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM kanban_notify_subs WHERE task_id = ?", (tid,)).fetchone()[0] == 0
+        board_event = conn.execute(
+            "SELECT task_id, kind, payload FROM task_events ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        assert board_event["task_id"] == ""
+        assert board_event["kind"] == "task_deleted"
+        assert json.loads(board_event["payload"]) == {"task_id": tid}
 
 
-def test_delete_task_removes_task_and_cascades(kanban_home):
+def test_delete_archived_task_refuses_running_archive_before_termination_settles(kanban_home):
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="archive-purge-race", assignee="worker")
+        claimed = kb.claim_task(conn, task_id)
+        assert claimed is not None
+        run_id = claimed.current_run_id
+        assert run_id is not None
+        with kb.write_txn(conn):
+            conn.execute(
+                "UPDATE tasks SET status = 'archived', claim_lock = NULL, "
+                "claim_expires = NULL, worker_pid = NULL WHERE id = ?",
+                (task_id,),
+            )
+            kb._end_run(
+                conn, task_id, outcome="reclaimed", status="reclaimed",
+                summary="archive purge race",
+            )
+            kb._append_event(
+                conn, task_id, "archived",
+                {"was_running": True, "prev_pid": 77881},
+                run_id=run_id,
+            )
+
+        with pytest.raises(RuntimeError, match="worker stop was not confirmed"):
+            kb.delete_archived_task(conn, task_id)
+        assert kb.get_task(conn, task_id) is not None
+
+        with kb.write_txn(conn):
+            kb._append_event(
+                conn, task_id, "archive_worker_termination",
+                {
+                    "prev_pid": 77881,
+                    "host_local": True,
+                    "termination_attempted": True,
+                    "terminated": True,
+                    "sigkill": False,
+                },
+                run_id=run_id,
+            )
+        assert kb.delete_archived_task(conn, task_id) is True
+        assert kb.get_task(conn, task_id) is None
+
+
+def test_delete_archived_task_honors_legacy_unconfirmed_termination_event(kanban_home):
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="legacy unsafe archive")
+        with kb.write_txn(conn):
+            conn.execute("UPDATE tasks SET status = 'archived' WHERE id = ?", (task_id,))
+            kb._append_event(conn, task_id, "archived", None)
+            kb._append_event(
+                conn, task_id, "archive_worker_termination",
+                {
+                    "prev_pid": 88991,
+                    "host_local": True,
+                    "termination_attempted": True,
+                    "terminated": False,
+                    "sigkill": True,
+                },
+            )
+
+        with pytest.raises(RuntimeError, match="worker stop was not confirmed"):
+            kb.delete_archived_task(conn, task_id)
+        assert kb.get_task(conn, task_id) is not None
+
+
+def test_delete_archived_parent_recomputes_children_after_link_removal(kanban_home):
+    with kbc.connect() as conn:
+        parent = kb.create_task(conn, title="legacy archived parent")
+        child = kb.create_task(conn, title="dependent child", assignee="worker", parents=[parent])
+        assert kb.get_task(conn, child).status == "todo"
+        # Simulate an old/direct archive row where the normal archive hook did
+        # not get a chance to recompute dependencies.
+        with kb.write_txn(conn):
+            conn.execute("UPDATE tasks SET status = 'archived' WHERE id = ?", (parent,))
+            kb._append_event(conn, parent, "archived", None)
+
+        assert kb.delete_archived_task(conn, parent) is True
+        assert kb.get_task(conn, child).status == "ready"
+
+
+def test_gc_events_expires_board_delete_tombstones(kanban_home):
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="delete tombstone gc")
+        assert kb.delete_task(conn, task_id) is True
+        row = conn.execute(
+            "SELECT id FROM task_events WHERE task_id = '' AND kind = 'task_deleted' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        assert row is not None
+        with kb.write_txn(conn):
+            conn.execute("UPDATE task_events SET created_at = 0 WHERE id = ?", (row["id"],))
+
+        assert kb.gc_events(conn, older_than_seconds=1) >= 1
+        assert conn.execute(
+            "SELECT 1 FROM task_events WHERE id = ?", (row["id"],)
+        ).fetchone() is None
+
+
+def test_hard_delete_refuses_preserved_worktree(kanban_home, tmp_path):
+    preserved = tmp_path / "preserved-worktree"
+    preserved.mkdir()
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="preserve worktree",
+            workspace_kind="worktree",
+            workspace_path=str(preserved),
+        )
+        assert kb.archive_task(conn, task_id) is True
+        with pytest.raises(RuntimeError, match="task-owned workspace is still present"):
+            kb.delete_archived_task(conn, task_id)
+        task = kb.get_task(conn, task_id)
+        assert task is not None
+        assert task.status == "archived"
+        assert preserved.is_dir()
+
+
+def test_hard_delete_refuses_managed_scratch_still_needed_by_child(kanban_home):
+    with kbc.connect() as conn:
+        parent = kb.create_task(conn, title="parent scratch")
+        parent_task = kb.get_task(conn, parent)
+        assert parent_task is not None
+        workspace = kbw.resolve_workspace(parent_task)
+        kbw.set_workspace_path(conn, parent, workspace)
+        workspace.mkdir(parents=True, exist_ok=True)
+        child = kb.create_task(conn, title="child", assignee="worker", parents=[parent])
+        assert kb.archive_task(conn, parent) is True
+        assert workspace.is_dir()
+        with pytest.raises(RuntimeError, match="task-owned workspace is still present"):
+            kb.delete_archived_task(conn, parent)
+        assert kb.get_task(conn, parent) is not None
+        assert kb.get_task(conn, child) is not None
+
+
+def test_hard_delete_allows_external_dir_workspace_to_survive(kanban_home, tmp_path):
+    external = tmp_path / "external-project"
+    external.mkdir()
+    with kbc.connect() as conn:
+        task_id = kb.create_task(
+            conn,
+            title="external dir task",
+            workspace_kind="dir",
+            workspace_path=str(external),
+        )
+        assert kb.archive_task(conn, task_id) is True
+        assert kb.delete_archived_task(conn, task_id) is True
+        assert kb.get_task(conn, task_id) is None
+    assert external.is_dir()
+
+
+def test_delete_task_removes_task_relations_and_attachment_blob(kanban_home):
     with kbc.connect() as conn:
         t = kb.create_task(conn, title="to-delete", assignee="alice")
+        log_path = kb.worker_log_path(t)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("private worker output\n", encoding="utf-8")
+        attachment_dir = kb.task_attachments_dir(t)
+        attachment_dir.mkdir(parents=True, exist_ok=True)
+        attachment = attachment_dir / "delete-me.txt"
+        attachment.write_text("evidence", encoding="utf-8")
         kb.add_comment(conn, t, "user", "comment")
         kb.add_comment(conn, t, "user", "another")
+        kb.add_attachment(
+            conn,
+            t,
+            filename=attachment.name,
+            stored_path=str(attachment),
+            content_type="text/plain",
+            size=attachment.stat().st_size,
+            uploaded_by="user",
+        )
         assert kb.delete_task(conn, t)
         assert kb.get_task(conn, t) is None
         assert len(kb.list_comments(conn, t)) == 0
         assert len(kb.list_events(conn, t)) == 0
         assert len(kb.list_runs(conn, t)) == 0
+        assert len(kb.list_attachments(conn, t)) == 0
+
+    assert not attachment.exists()
+    assert not log_path.exists()
+
+
+def test_delete_task_drops_external_attachment_metadata_without_unlinking_file(kanban_home, tmp_path):
+    external = tmp_path / "user-source.txt"
+    external.write_text("keep me", encoding="utf-8")
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="external attachment pointer")
+        kb.add_attachment(
+            conn,
+            task_id,
+            filename="user-source.txt",
+            stored_path=str(external),
+            content_type="text/plain",
+            size=external.stat().st_size,
+            uploaded_by="legacy-direct-caller",
+        )
+        assert kb.delete_task(conn, task_id) is True
+        assert kb.get_task(conn, task_id) is None
+        assert kb.list_attachments(conn, task_id) == []
+
+    assert external.read_text(encoding="utf-8") == "keep me"
+
+
+def test_delete_running_task_refuses_purge_when_worker_stop_is_unconfirmed(kanban_home, monkeypatch):
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="stubborn worker", assignee="alice")
+        host = kb._claimer_id().split(":", 1)[0]
+        kb.claim_task(conn, task_id, claimer=f"{host}:worker")
+        kbd._set_worker_pid(conn, task_id, 54322)
+
+        monkeypatch.setattr(
+            kb,
+            "_terminate_reclaimed_worker",
+            lambda pid, claim_lock, **_kw: {
+                "prev_pid": int(pid),
+                "host_local": True,
+                "termination_attempted": True,
+                "terminated": False,
+                "sigkill": True,
+            },
+        )
+
+        with pytest.raises(RuntimeError, match="worker stop was not confirmed"):
+            kb.delete_task(conn, task_id)
+
+        task = kb.get_task(conn, task_id)
+        assert task is not None
+        assert task.status == "archived"
+
+
+def test_dispatch_kills_spawned_worker_if_task_is_archived_before_pid_persistence(kanban_home, monkeypatch):
+    terminations = []
+    monkeypatch.setattr(kbd, "_profile_exists_fn", lambda: None)
+
+    with kbc.connect() as conn:
+        task_id = kb.create_task(conn, title="spawn race", assignee="alice")
+
+        def spawn(task, _workspace):
+            assert task.id == task_id
+            # Simulate an operator archive landing after process spawn but
+            # before dispatch persists the returned PID.
+            assert kb.archive_task(conn, task_id) is True
+            return 65432
+
+        monkeypatch.setattr(
+            kbd,
+            "_terminate_reclaimed_worker",
+            lambda pid, claim_lock, **kw: terminations.append((pid, claim_lock, kw.get("started_at"))) or {
+                "prev_pid": int(pid),
+                "host_local": True,
+                "termination_attempted": True,
+                "terminated": True,
+                "sigkill": False,
+            },
+        )
+
+        result = kbd.dispatch_once(conn, spawn_fn=spawn)
+
+        assert result.spawned == []
+        assert terminations and terminations[0][0] == 65432
+        assert kb.get_task(conn, task_id).status == "archived"
+        assert not [event for event in kb.list_events(conn, task_id) if event.kind == "spawned"]
+
+
+def test_delete_running_task_terminates_worker_before_purge(kanban_home, monkeypatch):
+    with kbc.connect() as conn:
+        t = kb.create_task(conn, title="running-delete", assignee="alice")
+        host = kb._claimer_id().split(":", 1)[0]
+        kb.claim_task(conn, t, claimer=f"{host}:worker")
+        kbd._set_worker_pid(conn, t, 54321)
+
+        monkeypatch.setattr(kb, "_pid_alive", lambda _pid: False)
+        signalled = []
+        assert kb.delete_task(
+            conn, t, signal_fn=lambda pid, sig: signalled.append((pid, sig)),
+        ) is True
+
+        assert signalled and signalled[0][0] == 54321
+        assert kb.get_task(conn, t) is None
 
 
 
