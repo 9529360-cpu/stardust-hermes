@@ -26,9 +26,9 @@ SearchIntent = Literal[
 SearchMode = Literal["single", "ensemble"]
 
 _URLISH_RE = re.compile(
-    r"(?i)(?:https?://|\\b[a-z0-9-]+(?:\\.[a-z0-9-]+)+(?:/\\S*)?\\b)"
+    r"(?i)(?:https?://|\b[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:/\S*)?\b)"
 )
-_TOKEN_RE = re.compile(r"[A-Za-z0-9_+#.-]+|[\\u3400-\\u9fff]+")
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_+#.-]+|[\u3400-\u9fff]+")
 _CURRENT = (
     "latest", "current", "today", "recent", "newest", "this week", "this month",
     "最新", "现在", "当前", "今天", "近期", "最近", "本周", "本月",
