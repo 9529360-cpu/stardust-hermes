@@ -79,6 +79,39 @@ def test_rrf_merges_duplicate_urls_and_rewards_cross_engine_consensus(monkeypatc
     assert secondary.calls == 1
 
 
+def test_keyless_reroute_is_not_counted_as_independent_consensus(monkeypatch):
+    monkeypatch.setattr(
+        "tools.web_tools._load_web_config",
+        lambda: {"search_ensemble_backends": ["parallel"]},
+    )
+    exa = _Provider("exa", {
+        "success": True,
+        "data": {
+            "served_by": "parallel",
+            "web": [
+                {"title": "A", "url": "https://a.example", "description": "a", "position": 1},
+            ],
+        },
+    })
+    parallel = _Provider("parallel", _ok([
+        {"title": "B", "url": "https://b.example", "description": "b", "position": 1},
+    ]))
+    monkeypatch.setattr(
+        "agent.web_search_registry.get_provider",
+        lambda name: parallel if name == "parallel" else None,
+    )
+
+    out = search_ensemble(exa, "topic", 5)
+
+    assert out["success"] is True
+    assert out["data"]["backends"] == ["parallel"]
+    assert out["data"]["requested_backends"] == ["exa", "parallel"]
+    assert out["data"]["rerouted_backends"] == {"exa": "parallel"}
+    assert out["data"]["web"][0]["sources"] == ["parallel"]
+    # The second configured alias must not add a second RRF vote for the same real engine.
+    assert len(out["data"]["web"]) == 1
+
+
 def test_one_failed_backend_does_not_discard_successful_results(monkeypatch):
     monkeypatch.setattr(
         "tools.web_tools._load_web_config",
