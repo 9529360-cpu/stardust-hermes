@@ -120,8 +120,15 @@ def _(rid, params: dict, _root=_relay_root, _run=_run_delivery) -> dict:
 
         fd, tmp = tempfile.mkstemp(prefix="hermes-relay-dm-", suffix=".txt", text=True)
         try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(message)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(message)
+            except BaseException:
+                # fdopen can fail before taking ownership; a failed writer can also leave the
+                # descriptor open. Windows refuses to unlink a still-open message tempfile.
+                with contextlib.suppress(OSError):
+                    os.close(fd)
+                raise
             # Per-profile turn lock serializes with any other delivery turn into this profile and
             # covers only the turn window. Worst-case hold is lock wait (bot_mode.turn_wait_seconds,
             # default 120s) + the 600s turn timeout, doubled on one retry — callers tolerate ~1320s.

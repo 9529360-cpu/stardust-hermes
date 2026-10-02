@@ -594,7 +594,11 @@ test('darwin staging ships the Swift helper executable and the rewritten windows
 
     stageGetWindowsInto(srcRoot, destRoot, { platform: 'darwin' })
 
-    assert.equal(fs.statSync(join(destRoot, 'main')).mode & 0o777, 0o755)
+    // Windows stat.mode reflects read-only state, not the executable bits
+    // installed for the requested Darwin target.
+    if (process.platform !== 'win32') {
+      assert.equal(fs.statSync(join(destRoot, 'main')).mode & 0o777, 0o755)
+    }
     const staged = fs.readFileSync(join(destRoot, 'lib', 'windows.js'), 'utf8')
     assert.match(staged, /Rewritten by stage-native-deps\.mjs/)
     assert.ok(!staged.includes('node-pre-gyp'), 'pre-gyp loader must not survive staging')

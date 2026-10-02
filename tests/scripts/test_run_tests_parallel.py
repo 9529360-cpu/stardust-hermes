@@ -20,6 +20,7 @@ POSIX-only: Windows has its own grandchild lifecycle (no shared session,
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -40,6 +41,14 @@ _HANDOFF_DIR.mkdir(exist_ok=True)
 
 def _handoff_path_for(nonce: str) -> Path:
     return _HANDOFF_DIR / f"grandchild-{nonce}.json"
+
+
+def _load_runner():
+    spec = importlib.util.spec_from_file_location(
+        "run_tests_parallel", Path(__file__).resolve().parents[2] / "scripts" / "run_tests_parallel.py")
+    runner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runner)
+    return runner
 
 
 def _pid_alive(pid: int) -> bool:
@@ -99,6 +108,73 @@ def test_progress_output_tolerates_legacy_stdout_encoding(tmp_path: Path) -> Non
     assert proc.returncode == 0, proc.stdout
     assert "UnicodeEncodeError" not in proc.stdout
     assert "1 tests passed" in proc.stdout
+
+
+def test_runner_puts_per_file_temp_roots_in_the_os_temp_dir(tmp_path: Path) -> None:
+    """With a usable OS temp dir, each file's temp root lives there, not in the checkout.
+
+    Roots inside the checkout put every test's tmp_path inside a git repo and under a hidden
+    directory, and pushed AF_UNIX socket paths past Linux's 108-byte cap: 144 tests failed
+    across all four CI slices on main after #225.
+    """
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    os_temp = tmp_path / "os-temp"
+    os_temp.mkdir()
+    if os_temp.resolve().is_relative_to(repo_root.resolve()):
+        pytest.skip("this host has no usable temp location outside the checkout")
+    probe = tmp_path / "test_runner_temp_root.py"
+    probe.write_text(
+        "import os, tempfile\n"
+        "from pathlib import Path\n"
+        "def test_temp_root():\n"
+        f"    os_temp = Path({str(os_temp.resolve())!r})\n"
+        "    root = Path(os.environ['PYTEST_DEBUG_TEMPROOT']).resolve()\n"
+        "    assert root.parent == os_temp and root.name.startswith('hpt-')\n"
+        "    assert Path(tempfile.gettempdir()).resolve() == os_temp\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.update({key: str(os_temp) for key in ("TMPDIR", "TEMP", "TMP")})
+    proc = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "run_tests_parallel.py"),
+         "--paths", str(probe), "-j", "1", "--file-timeout", "30"],
+        cwd=repo_root, env=env, capture_output=True, text=True, timeout=60,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "1 tests passed" in proc.stdout
+
+
+def test_temp_root_stays_in_a_usable_os_temp_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A usable OS temp dir holds the root; nothing lands in the checkout and the child's
+    TMPDIR is left alone. Runs on every host, unlike the runner probe above, which skips
+    where no temp location exists outside the checkout."""
+    runner = _load_runner()
+    checkout = tmp_path / "checkout"
+    os_temp = tmp_path / "os-temp"
+    checkout.mkdir()
+    os_temp.mkdir()
+    monkeypatch.setattr(runner.tempfile, "gettempdir", lambda: str(os_temp))
+
+    root, env = runner._make_file_temproot(checkout)
+
+    assert Path(root).parent == os_temp
+    assert env == {"PYTEST_DEBUG_TEMPROOT": root}
+    assert not (checkout / ".pytest-runner-tmp").exists()
+
+
+def test_temp_root_moves_under_the_ignored_parent_when_tempfile_falls_back_to_the_checkout(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No usable OS temp location: tempfile falls back to the cwd, the checkout itself. The
+    root then goes under the ignored parent, and the child's own temp files follow it."""
+    runner = _load_runner()
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    monkeypatch.setattr(runner.tempfile, "gettempdir", lambda: str(checkout))
+
+    root, env = runner._make_file_temproot(checkout)
+
+    assert Path(root).parent == checkout / ".pytest-runner-tmp"
+    assert env == {key: root for key in ("PYTEST_DEBUG_TEMPROOT", "TMPDIR", "TEMP", "TMP")}
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="POSIX-only probe")

@@ -14,7 +14,8 @@ Spec (JSON object):
         "row_heights": {"1": 24},
         "merges": ["A1:C1"],
         "freeze_panes": "A2",
-        "autofilter": "A1:C10",
+        "autofilter": "A1:C10",             # dropped where a table overlaps it
+                                            # (a table filters itself)
         "conditional_formats": [
           {"range": "B2:B9", "type": "cell_is", "operator": "greaterThan",
            "formula": ["100"], "fill": "FFC7CE"},
@@ -28,7 +29,7 @@ Spec (JSON object):
           {"range": "D2:D9", "type": "list", "formula1": "\"Yes,No,Maybe\""}
         ],
         "tables": [
-          {"name": "Sales", "range": "A1:C4",
+          {"name": "Sales", "range": "E1:G4",
            "style": "TableStyleMedium9"}        # native Excel table
         ],
         "protection": {"password": "your-password",   # NOT security --
@@ -169,6 +170,12 @@ def add_conditional(ws, spec):
     ws.conditional_formatting.add(rng, rule)
 
 
+def ranges_overlap(a, b):
+    a_min_col, a_min_row, a_max_col, a_max_row = range_boundaries(a)
+    b_min_col, b_min_row, b_max_col, b_max_row = range_boundaries(b)
+    return a_min_col <= b_max_col and b_min_col <= a_max_col and a_min_row <= b_max_row and b_min_row <= a_max_row
+
+
 def build_sheet(ws, spec):
     for row in spec.get("rows", []):
         values, styled = [], []
@@ -194,8 +201,14 @@ def build_sheet(ws, spec):
         ws.merge_cells(rng)
     if spec.get("freeze_panes"):
         ws.freeze_panes = spec["freeze_panes"]
-    if spec.get("autofilter"):
-        ws.auto_filter.ref = spec["autofilter"]
+    autofilter = spec.get("autofilter")
+    covering = [t["name"] for t in spec.get("tables", []) if autofilter and ranges_overlap(autofilter, t["range"])]
+    if covering:
+        # A table filters itself, and Excel refuses a workbook whose sheet AutoFilter overlaps a table.
+        print(f"note: sheet autofilter {autofilter} dropped: table {covering[0]} already filters it "
+              "(Excel will not open a workbook with both)", file=sys.stderr)
+    elif autofilter:
+        ws.auto_filter.ref = autofilter
     for cf in spec.get("conditional_formats", []):
         add_conditional(ws, cf)
     for ch in spec.get("charts", []):

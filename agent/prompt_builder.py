@@ -407,7 +407,9 @@ TASK_COMPLETION_GUIDANCE = (
     "the deliverable only when that is what they asked for. When the user asks you to build, run, or verify "
     "something, the deliverable is a working artifact backed by real tool output — not a description of one. Do not "
     "stop after writing a stub, a plan, or a single command. Keep working until you have actually exercised the code "
-    "or produced the requested result, then report what real execution returned.\n"
+    "or produced the requested result, then report what real execution returned. If you reached the result by a "
+    "different route than the one asked for (wrote the file directly instead of typing it in the app), say so in one "
+    "line.\n"
     "Treat \"I can't\" as a problem to solve. When a program, package, or driver you need is missing, install or "
     "enable it yourself from its official source and carry on; a newly installed tool family may only appear as tools "
     "in your next session, so keep going with what you have now. When one path fails, try another: a different tool, "
@@ -922,6 +924,16 @@ _WINDOWS_BASH_SHELL_HINT = (
     "driving prompts."
 )
 
+_WINDOWS_DESKTOP_APPS_HINT = (
+    "Desktop apps: Office and most GUI apps are not on PATH, so `Get-Command excel` says nothing about whether Excel "
+    "is installed; check with `New-Object -ComObject Excel.Application` (Word.Application, ...) or the `App Paths` "
+    "registry key. When Excel or Word is installed, use it for faithful conversions (`ExportAsFixedFormat`) and open "
+    "a document you produced in it before calling the work done. Close only what you opened (the workbook or window "
+    "you opened, e.g. `$wb.Close($false)`); never force-kill a GUI app (`taskkill /F`, `Stop-Process -Force`): one "
+    "Excel, Word or browser process holds every window the user has open in it. If it will not close, leave it open "
+    "and say so."
+)
+
 
 def _tenv_read(name: str, default: str = "") -> str:
     """Scope-aware TERMINAL_* read: the multiplexing gateway's per-turn scope carries
@@ -1037,7 +1049,7 @@ def _local_host_hints() -> list[str]:
         "Use the 'User home directory' above to construct paths under C:\\Users\\<user>\\, never the hostname."
     )
     # Windows-local terminal runs bash, not PowerShell — without this the model issues PowerShell syntax.
-    return ["\n".join(host_lines), _WINDOWS_BASH_SHELL_HINT]
+    return ["\n".join(host_lines), _WINDOWS_BASH_SHELL_HINT, _WINDOWS_DESKTOP_APPS_HINT]
 
 
 def _remote_backend_hint(backend: str) -> str:

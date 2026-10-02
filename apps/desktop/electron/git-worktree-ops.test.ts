@@ -164,7 +164,9 @@ test('listBranches: empty on a non-repo path', async () => {
   try {
     assert.deepEqual(await listBranches(dir, 'git'), [])
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    // Windows keeps the dir busy briefly after the git probe exits. The async rm retries
+    // that; rmSync's maxRetries does not (Node 24 fails a busy dir with EPERM at once).
+    await fs.promises.rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 })
 

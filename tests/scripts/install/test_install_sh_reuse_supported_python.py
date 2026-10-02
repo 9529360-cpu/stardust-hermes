@@ -31,14 +31,22 @@ def _run_prerequisites(tmp_path: Path, *, uv_find_script: str) -> subprocess.Com
     _exe(hermes_home / "bin" / "uv", "#!/bin/sh\n[ \"$1\" = --version ] && { echo 'uv 0.9.0'; exit 0; }\n"
          "if [ \"$1\" = python ] && [ \"$2\" = find ]; then\n" + uv_find_script + "fi\n"
          "if [ \"$1\" = python ] && [ \"$2\" = install ]; then echo 'DOWNLOAD ATTEMPTED' >&2; exit 1; fi\nexit 0\n")
-    for tool in ("git", "node", "npm", "curl", "rg", "g++", "c++"):
+    for tool in ("git", "node", "npm", "curl", "rg", "ffmpeg", "g++", "c++"):
         _exe(bin_dir / tool, "#!/bin/sh\ncase \"$1\" in --version|-v) echo 'v22.12.0 2.50.0';; esac\nexit 0\n")
+    # The stage installs whatever it finds missing, and the host PATH sits behind these stubs:
+    # with ffmpeg unstubbed, every CI run did a real `sudo apt install ffmpeg` (20 s to past the
+    # 300 s file timeout). Package managers are recorded and refused here, never reached.
+    attempts = tmp_path / "host-package-manager-calls.log"
+    for manager in ("sudo", "apt", "apt-get", "dnf", "pacman", "brew", "pkg"):
+        _exe(bin_dir / manager, f"#!/bin/sh\necho \"{manager} $*\" >> '{attempts}'\nexit 1\n")
     env = os.environ.copy()
     env.update({"HOME": str(home), "HERMES_HOME": str(hermes_home),
                 "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', os.defpath)}"})
     bash = shutil.which("bash") or "/bin/bash"
-    return subprocess.run([bash, str(INSTALL_SH), "--stage", "prerequisites", "--non-interactive"],
-                          env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+    result = subprocess.run([bash, str(INSTALL_SH), "--stage", "prerequisites", "--non-interactive"],
+                            env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+    assert not attempts.exists(), attempts.read_text(encoding="utf-8") + result.stdout
+    return result
 
 
 @pytest.mark.linux_only

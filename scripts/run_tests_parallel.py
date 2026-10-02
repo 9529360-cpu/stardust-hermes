@@ -463,6 +463,30 @@ def _run_one_file(
 _FLAKY_RESULTS: List[Tuple[Path, str]] = []
 _flaky_lock = threading.Lock()
 
+# Parent for per-file temp roots when there is no usable OS temp location and tempfile has
+# fallen back into the checkout itself (seen on Windows with TEMP/TMP set but unwritable).
+# Ignored by git (.gitignore) and by pytest collection (the default ".*" norecursedirs).
+_CHECKOUT_TEMP_PARENT = ".pytest-runner-tmp"
+
+
+def _make_file_temproot(repo_root: Path) -> Tuple[str, Dict[str, str]]:
+    """Create one attempt's temp root; return it with the env vars the child needs.
+
+    The root normally lives in the OS temp dir, outside the checkout: tests rely on a temp
+    path sitting in no git repo and under no hidden directory, and Linux caps AF_UNIX socket
+    paths at 108 bytes, so the prefix stays short. Only when tempfile has fallen back into
+    the checkout does the root go under the ignored ``_CHECKOUT_TEMP_PARENT``, with the
+    child's TMPDIR/TEMP/TMP pointed at it so its own temp files stay contained too.
+    """
+    os_temp = Path(tempfile.gettempdir())
+    if not os_temp.resolve().is_relative_to(repo_root.resolve()):
+        temproot = tempfile.mkdtemp(prefix="hpt-", dir=os_temp)
+        return temproot, {"PYTEST_DEBUG_TEMPROOT": temproot}
+    parent = repo_root / _CHECKOUT_TEMP_PARENT
+    parent.mkdir(exist_ok=True)
+    temproot = tempfile.mkdtemp(prefix="hpt-", dir=parent)
+    return temproot, {"PYTEST_DEBUG_TEMPROOT": temproot, "TMPDIR": temproot, "TEMP": temproot, "TMP": temproot}
+
 
 def _run_one_file_once(
     file: Path,
@@ -490,10 +514,8 @@ def _run_one_file_once(
     # One root for each subprocess removes the shared directory that the race
     # needs. The parent deletes the root after the attempt.
     env = os.environ.copy()
-    # Keep the prefix short: pytest appends the username and test name, while
-    # Linux AF_UNIX socket paths are capped at 108 bytes.
-    temproot = tempfile.mkdtemp(prefix="hpt-")
-    env["PYTEST_DEBUG_TEMPROOT"] = temproot
+    temproot, temp_env = _make_file_temproot(repo_root)
+    env.update(temp_env)
 
     subproc_start = time.monotonic()
     # Spawn + registration are one cancellation-critical section. The signal
