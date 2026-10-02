@@ -103,5 +103,7 @@ test.skipIf(process.platform === 'win32')('POSIX hand-off preserves the Desktop 
 })
 
 test.skipIf(process.platform !== 'win32')('PowerShell hand-off preserves the Desktop marker acquisition time', () => {
+  // Three cold PowerShell processes run in sequence; concurrent desktop tests can
+  // push their startup beyond Vitest's default five-second test budget.
   assertScriptHandoff(runWindows)
-})
+}, 20_000)
