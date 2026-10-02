@@ -312,6 +312,12 @@ function CronJobSidebarRow({
     }
 
     const confirmationOwner = captureCronJobsScope(jobsScope)
+    const confirmationRequest = captureCronJobsRequest(jobsScope)
+    const confirmationSnapshot = $cronJobs.get()
+
+    if (!confirmationSnapshot.some(row => row === job)) {
+      return
+    }
 
     const ok = await confirm({
       confirmLabel: t.common.delete,
@@ -320,12 +326,14 @@ function CronJobSidebarRow({
       title: c.deleteTitle
     })
 
-    if (!ok || !routeIsCurrent() || !isCronJobsScopeCurrent(confirmationOwner) || $cronJobsScope.get() !== jobsScope) {
+    if (!ok || !routeIsCurrent() || !isCronJobsScopeCurrent(confirmationOwner) ||
+      !isCronJobsRequestCurrent(confirmationRequest) || $cronJobsScope.get() !== jobsScope ||
+      $cronJobs.get() !== confirmationSnapshot || !confirmationSnapshot.some(row => row === job)) {
       return
     }
 
-    const owner = captureCronJobsRequest(jobsScope)
-    const snapshot = $cronJobs.get()
+    const owner = confirmationRequest
+    const snapshot = confirmationSnapshot
 
     try {
       await deleteCronJob(job.id)

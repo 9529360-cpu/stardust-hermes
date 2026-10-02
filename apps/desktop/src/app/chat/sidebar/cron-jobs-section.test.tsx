@@ -162,6 +162,35 @@ describe('SidebarCronJobsSection action ownership', () => {
     expect($cronJobs.get()[0]?.name).toBe('personal job')
   })
 
+  it('rejects confirmation after a same-profile read replaces the row', async () => {
+    const scope = '\u0000work'
+    commitCronJobsRequest(beginCronJobsRequest(scope), [JOB])
+    renderSection(vi.fn(), scope)
+    fireEvent.contextMenu(screen.getByText('nightly'))
+    fireEvent.click(await screen.findByRole('menuitem', { name: TRANSLATIONS.en.common.delete }))
+
+    const replacement = { ...JOB, name: 'new owner of reused id' }
+    act(() => { commitCronJobsRequest(beginCronJobsRequest(scope), [replacement]) })
+    await act(async () => { settleConfirm(true) })
+
+    expect(deleteCronJob).not.toHaveBeenCalled()
+    expect($cronJobs.get()).toEqual([replacement])
+  })
+
+  it('rejects confirmation while a newer same-profile read is pending', async () => {
+    const scope = '\u0000work'
+    commitCronJobsRequest(beginCronJobsRequest(scope), [JOB])
+    renderSection(vi.fn(), scope)
+    fireEvent.contextMenu(screen.getByText('nightly'))
+    fireEvent.click(await screen.findByRole('menuitem', { name: TRANSLATIONS.en.common.delete }))
+
+    const pending = beginCronJobsRequest(scope)
+    await act(async () => { settleConfirm(true) })
+
+    expect(deleteCronJob).not.toHaveBeenCalled()
+    expect(commitCronJobsRequest(pending, [{ ...JOB, name: 'newer read' }])).toBe(true)
+  })
+
   it('refuses to pause an outgoing row while the new connection read is pending', async () => {
     const scope = '\u0000work'
     commitCronJobsRequest(beginCronJobsRequest(scope), [JOB])
