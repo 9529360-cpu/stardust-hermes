@@ -153,7 +153,11 @@ class TestVaultStore:
         assert listed["allow_any_origin"] is True
         dumped = json.dumps(listed)
         assert _CARD["card_number"] not in dumped
-        assert _CARD["cvc"] not in dumped
+        # Not a substring test for the 3-digit CVC: the random hex id and the microsecond
+        # timestamp contain "123" by chance in roughly one run of 150. No secret field name or
+        # value may be metadata; a leaked secret blob would carry the card number checked above.
+        assert not set(_CARD) & set(listed)
+        assert not set(_CARD.values()) & {value for value in listed.values() if isinstance(value, str)}
 
     def test_any_origin_requires_delegated_payment(self, store):
         with pytest.raises(VaultError, match="requires a delegated payment card"):
