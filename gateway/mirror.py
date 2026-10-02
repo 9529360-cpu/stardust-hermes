@@ -14,10 +14,6 @@ from hermes_cli.config import get_hermes_home
 
 logger = logging.getLogger(__name__)
 
-_SESSIONS_DIR = get_hermes_home() / "sessions"
-_SESSIONS_INDEX = _SESSIONS_DIR / "sessions.json"
-
-
 def _origin_user_id(entry: dict) -> str:
     return str((entry.get("origin") or {}).get("user_id") or "")
 
@@ -86,10 +82,13 @@ def _find_session_id(platform: str, chat_id: str, thread_id: Optional[str] = Non
     except Exception as e:
         logger.debug("Mirror state.db session lookup failed: %s", e)
 
-    if not _SESSIONS_INDEX.exists():
+    # Resolve the legacy index inside the same profile scope as the SQLite lookup
+    # and write; an import-time path would borrow the launch profile's sessions.
+    sessions_index = get_hermes_home() / "sessions" / "sessions.json"
+    if not sessions_index.exists():
         return None
     try:
-        data = json.loads(_SESSIONS_INDEX.read_text(encoding="utf-8"))
+        data = json.loads(sessions_index.read_text(encoding="utf-8"))
     except Exception:
         return None
 
