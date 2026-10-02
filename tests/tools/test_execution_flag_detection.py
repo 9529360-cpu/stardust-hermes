@@ -283,6 +283,26 @@ def test_benign_segment_scaling_benchmark():
     print(f"benign segment benchmark: 2k={small:.3f}s, 4k={large:.3f}s")
 
 
+def test_no_detection_pattern_backtracks_quadratically_on_many_segments():
+    """Each pattern alone stays linear on a long benign command.
+
+    An unanchored pair of ``(?=[\\s\\S]*...)`` lookaheads made ``re.search`` rescan the rest of
+    the command from every start position: vetting 4,000 benign segments took ~157 s, nearly all
+    of it in that one pattern. A linear pattern needs about a millisecond here; the bound sits two
+    orders of magnitude above that and far below the quadratic cost (~10 s).
+    """
+    from tools.approval_detection import DANGEROUS_PATTERNS_COMPILED, HARDLINE_PATTERNS_COMPILED
+
+    command = ";".join(f"printf segment-{index}" for index in range(2_000)).lower()
+    timings = []
+    for pattern_re, description, *_ in [*DANGEROUS_PATTERNS_COMPILED, *HARDLINE_PATTERNS_COMPILED]:
+        started = time.perf_counter()
+        pattern_re.search(command)
+        timings.append((time.perf_counter() - started, description))
+    slowest, description = max(timings)
+    assert slowest < 0.5, f"{description!r} took {slowest:.2f}s on 2,000 benign segments"
+
+
 def test_max_accepted_separator_free_input_is_fast():
     from tools.approval_detection import _MAX_SEPARATOR_FREE_COMMAND_CHARS
 
