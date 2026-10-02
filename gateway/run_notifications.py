@@ -1018,6 +1018,27 @@ class GatewayNotificationsMixin:
                 return a
         return None
 
+    def _api_process_event_profile(self, evt: dict) -> Optional[str]:
+        """Resolve a raw API event's immutable owner to a served ingress route.
+
+        An owned secondary event must never use the default listener's unprefixed route,
+        even if the raw session id happens to exist in both profiles.
+        """
+        from gateway.run import _multiplex_profile_homes
+        from hermes_constants import hermes_home_key
+        from hermes_cli.profiles import get_profile_dir
+        owner_home = evt.get("owner_home")
+        if not owner_home:
+            # Legacy events have no durable owner. A secondary ambient scope is not
+            # authority to target the default listener's raw-id namespace.
+            return "default" if hermes_home_key() == hermes_home_key(get_profile_dir("default")) else None
+        for name, home in _multiplex_profile_homes(self.config):
+            if hermes_home_key(home) == owner_home:
+                return name
+        if hermes_home_key(get_profile_dir("default")) == owner_home:
+            return "default"  # Default-only gateways do not enumerate the multiplex served set.
+        return None
+
     async def _self_post_api_server(self, adapter, synth_text: str, raw_sid: str, evt: dict) -> bool:
         """Deliver to a non-push (api_server) session by raw session id.
 
@@ -1026,6 +1047,10 @@ class GatewayNotificationsMixin:
         self-post them as a new role=user prompt. Other watch events wake the session via self-post.
         """
         from gateway.wake import deliver_wake, persist_delegation_delivery
+        profile = self._api_process_event_profile(evt)
+        if profile is None:
+            logger.warning("Deferring raw API notification for session %s: owner profile is not served", raw_sid)
+            return False
         if evt.get("type") == "async_delegation":
             info = "Async delegation completion — persisting delivery row for api_server session %s (no wake turn)"
             fail = "Async delegation delivery persist failed for session %s: %s"
@@ -1033,7 +1058,7 @@ class GatewayNotificationsMixin:
         else:
             info = "Watch pattern notification — waking api_server session %s via self-post"
             fail = "Watch notification self-post wake failed for session %s: %s"
-            deliver = lambda: deliver_wake(adapter, text=synth_text, session_id=raw_sid)  # noqa: E731
+            deliver = lambda: deliver_wake(adapter, text=synth_text, session_id=raw_sid, profile=profile)  # noqa: E731
         try:
             logger.info(info, raw_sid)
             await deliver()
