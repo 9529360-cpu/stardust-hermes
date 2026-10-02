@@ -45,10 +45,23 @@ export function beginCronJobsRequest(scope: string): CronJobsRequest {
   return { generation: cronJobsRequestGeneration, scope }
 }
 
+// Capture ownership without changing the current request scope. In particular,
+// opening a confirmation must not cancel a newer connection's pending list read.
+export function captureCronJobsScope(scope: string): CronJobsScopeToken {
+  return { generation: cronJobsScopeGeneration, scope }
+}
+
+// Sidebar row actions must not activate their cached scope: a newer gateway's
+// list request may already be pending. Preserve the request generation so a
+// later same-scope read also wins over the row's in-flight mutation.
+export function captureCronJobsRequest(scope: string): CronJobsRequest {
+  return { generation: cronJobsRequestGeneration, scope }
+}
+
 export function beginCronJobsAction(scope: string): CronJobsScopeToken {
   activateCronJobsScope(scope)
 
-  return { generation: cronJobsScopeGeneration, scope }
+  return captureCronJobsScope(scope)
 }
 
 export function isCronJobsScopeCurrent(token: CronJobsScopeToken): boolean {

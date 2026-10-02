@@ -9,14 +9,31 @@ import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { SidebarGroup, SidebarGroupContent } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
-import { deleteCronJob, getCronJobRuns, pauseCronJob, resumeCronJob, type SessionInfo } from '@/hermes'
+import {
+  deleteCronJob,
+  getApiRequestConnection,
+  getApiRequestProfile,
+  getCronJobRuns,
+  pauseCronJob,
+  resumeCronJob,
+  type SessionInfo
+} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { fmtDayTime, relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { confirm } from '@/store/confirm'
-import { updateCronJobs } from '@/store/cron'
+import {
+  $cronJobs,
+  $cronJobsScope,
+  captureCronJobsRequest,
+  captureCronJobsScope,
+  isCronJobsRequestCurrent,
+  isCronJobsScopeCurrent,
+  updateCronJobs
+} from '@/store/cron'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
 import { notify, notifyError } from '@/store/notifications'
+import { $profileScope, sidebarProfileForScope } from '@/store/profile'
 import { $selectedStoredSessionId } from '@/store/session'
 import type { CronJob } from '@/types/hermes'
 
@@ -69,6 +86,8 @@ function formatRunTime(seconds?: null | number): string {
 interface SidebarCronJobsSectionProps {
   jobs: CronJob[]
   label: string
+  // Scope of the rows that supplied these actions; never mutate a later view.
+  jobsScope: string
   max?: number
   // Open a run session's chat (1 click to output). Keep the row so the
   // owner-aware resume path can route to the backend that produced it.
@@ -83,6 +102,7 @@ interface SidebarCronJobsSectionProps {
 
 export function SidebarCronJobsSection({
   jobs,
+  jobsScope,
   label,
   max = 50,
   onManageJob,
@@ -199,6 +219,7 @@ export function SidebarCronJobsSection({
               busy={triggeringJobIds.has(job.id)}
               expanded={peekJobId === job.id}
               job={job}
+              jobsScope={jobsScope}
               key={job.id}
               nowMs={nowMs}
               onManage={() => onManageJob(job.id)}
@@ -223,6 +244,7 @@ function CronJobSidebarRow({
   busy,
   expanded,
   job,
+  jobsScope,
   nowMs,
   onManage,
   onOpenRun,
@@ -232,6 +254,7 @@ function CronJobSidebarRow({
   busy: boolean
   expanded: boolean
   job: CronJob
+  jobsScope: string
   nowMs: number
   onManage: () => void
   onOpenRun: (sessionId: string, session?: SessionInfo) => void
@@ -247,14 +270,36 @@ function CronJobSidebarRow({
 
   const meta = INACTIVE_STATES.has(state) ? (c.states[state] ?? state) : next !== null ? relativeTime(next, nowMs) : '—'
 
+  // The REST mutation helpers route through the current ambient gateway/profile.
+  // A cached list may still belong to A while B's refresh is pending or failed.
+  const routeIsCurrent = () => {
+    const profile = sidebarProfileForScope($profileScope.get())
+
+    // An all-profiles list has no per-row owner. The API pins mutations to the
+    // ambient concrete profile, which may own a different job with this ID.
+    return profile !== 'all' && profile === getApiRequestProfile() &&
+      jobsScope === `${getApiRequestConnection() ?? ''}\u0000${profile}`
+  }
+
   // Pause/resume and delete aren't threaded through the sidebar's prop chain, so
   // drive them against the shared $cronJobs atom directly (same path the cron
   // overlay uses) — the sidebar and overlay render from that one atom, so the
   // row updates in place.
   const togglePause = async () => {
+    if (!routeIsCurrent() || $cronJobsScope.get() !== jobsScope) {
+      return
+    }
+
+    const owner = captureCronJobsRequest(jobsScope)
+    const snapshot = $cronJobs.get()
+
     try {
       const updated = isPaused ? await resumeCronJob(job.id) : await pauseCronJob(job.id)
-      updateCronJobs(rows => rows.map(row => (row.id === job.id ? updated : row)))
+
+      if (isCronJobsRequestCurrent(owner) && $cronJobsScope.get() === jobsScope && $cronJobs.get() === snapshot) {
+        updateCronJobs(rows => rows.map(row => (row.id === job.id ? updated : row)))
+      }
+
       notify({ kind: 'success', title: isPaused ? c.resumed : c.paused, message: label })
     } catch (err) {
       notifyError(err, c.failedUpdate)
@@ -262,6 +307,12 @@ function CronJobSidebarRow({
   }
 
   const remove = async () => {
+    if (!routeIsCurrent() || $cronJobsScope.get() !== jobsScope) {
+      return
+    }
+
+    const confirmationOwner = captureCronJobsScope(jobsScope)
+
     const ok = await confirm({
       confirmLabel: t.common.delete,
       description: `${c.deleteDescPrefix}${label}${c.deleteDescSuffix}`,
@@ -269,13 +320,20 @@ function CronJobSidebarRow({
       title: c.deleteTitle
     })
 
-    if (!ok) {
+    if (!ok || !routeIsCurrent() || !isCronJobsScopeCurrent(confirmationOwner) || $cronJobsScope.get() !== jobsScope) {
       return
     }
 
+    const owner = captureCronJobsRequest(jobsScope)
+    const snapshot = $cronJobs.get()
+
     try {
       await deleteCronJob(job.id)
-      updateCronJobs(rows => rows.filter(row => row.id !== job.id))
+
+      if (isCronJobsRequestCurrent(owner) && $cronJobsScope.get() === jobsScope && $cronJobs.get() === snapshot) {
+        updateCronJobs(rows => rows.filter(row => row.id !== job.id))
+      }
+
       notify({ kind: 'success', title: c.deleted, message: label })
     } catch (err) {
       notifyError(err, c.failedDelete)
@@ -285,22 +343,32 @@ function CronJobSidebarRow({
   // One action set for both the hover buttons and the right-click menu.
   const items = (kit: MenuKit) => (
     <>
-      {renderActionItem(kit, { icon: 'zap', key: 'trigger', label: c.triggerNow, onSelect: onTrigger })}
-      {renderActionItem(kit, {
+      {jobsScope.endsWith('\u0000all') ? null : renderActionItem(kit, {
+        icon: 'zap', key: 'trigger', label: c.triggerNow, onSelect: () => {
+          if (routeIsCurrent()) {
+            onTrigger()
+          }
+        }
+      })}
+      {jobsScope.endsWith('\u0000all') ? null : renderActionItem(kit, {
         icon: isPaused ? 'play' : 'debug-pause',
         key: 'pause',
         label: isPaused ? c.resume : c.pause,
         onSelect: () => void togglePause()
       })}
       {renderActionItem(kit, { icon: 'watch', key: 'manage', label: c.manage, onSelect: onManage })}
-      <kit.Separator />
-      {renderActionItem(kit, {
-        icon: 'trash',
-        key: 'delete',
-        label: t.common.delete,
-        onSelect: () => void remove(),
-        variant: 'destructive'
-      })}
+      {jobsScope.endsWith('\u0000all') ? null : (
+        <>
+          <kit.Separator />
+          {renderActionItem(kit, {
+            icon: 'trash',
+            key: 'delete',
+            label: t.common.delete,
+            onSelect: () => void remove(),
+            variant: 'destructive'
+          })}
+        </>
+      )}
     </>
   )
 
@@ -321,8 +389,12 @@ function CronJobSidebarRow({
                   <button
                     aria-label={c.triggerNow}
                     className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground disabled:cursor-wait disabled:opacity-60"
-                    disabled={busy}
-                    onClick={onTrigger}
+                    disabled={busy || jobsScope.endsWith('\u0000all')}
+                    onClick={() => {
+                      if (routeIsCurrent()) {
+                        onTrigger()
+                      }
+                    }}
                     type="button"
                   >
                     {busy ? (
