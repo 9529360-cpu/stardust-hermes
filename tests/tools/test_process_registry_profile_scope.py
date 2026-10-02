@@ -66,6 +66,46 @@ def test_checkpoint_and_receipt_stay_with_owner_when_other_profile_finishes(tmp_
     assert foreign.id not in (a / "processes.json").read_text(encoding="utf-8")
 
 
+def test_legacy_mixed_profile_checkpoints_recover_only_named_namespace(tmp_path, monkeypatch):
+    """Pre-upgrade gateways copied both owners into both checkpoint files."""
+    registry = ProcessRegistry()
+    root = tmp_path / "root"
+    default, other = root, root / "profiles" / "other"
+    monkeypatch.setattr("hermes_constants.get_default_hermes_root", lambda: root)
+    other.mkdir(parents=True)
+    entries = [
+        {"session_id": "proc_default", "pid": 111, "command": "default-secret",
+         "session_key": "agent:main:telegram:dm:123", "watcher_interval": 5},
+        {"session_id": "proc_other", "pid": 222, "command": "other-secret",
+         "session_key": "agent:other:telegram:dm:123", "watcher_interval": 5},
+        {"session_id": "proc_ambiguous", "pid": 333, "command": "api-secret",
+         "session_key": "api-session"},
+    ]
+    for home in (default, other):
+        (home / "processes.json").write_text(json.dumps(entries), encoding="utf-8")
+    monkeypatch.setattr(registry, "_host_pid_is_ours", lambda *_: True)
+    token = _scope(default)
+    try:
+        assert registry.recover_from_checkpoint() == 1
+        assert registry.get("proc_default") is not None
+        assert registry.get("proc_other") is None
+        assert registry.get("proc_ambiguous") is None
+        assert [e["session_id"] for e in json.loads((default / "processes.json").read_text())] == ["proc_default"]
+    finally:
+        reset_hermes_home_override(token)
+    token = _scope(other)
+    try:
+        assert registry.recover_from_checkpoint() == 1
+        assert registry.get("proc_other") is not None
+        assert registry.get("proc_default") is None
+        assert [e["session_id"] for e in json.loads((other / "processes.json").read_text())] == ["proc_other"]
+    finally:
+        reset_hermes_home_override(token)
+    assert {watcher["owner_home"] for watcher in registry.pending_watchers} == {
+        hermes_home_key(default), hermes_home_key(other),
+    }
+
+
 def test_unresolved_checkpoint_entry_cannot_migrate_from_foreign_owner(tmp_path):
     registry = ProcessRegistry()
     owner, foreign = tmp_path / "owner", tmp_path / "foreign"

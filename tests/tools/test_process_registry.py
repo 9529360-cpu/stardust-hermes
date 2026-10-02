@@ -1337,6 +1337,7 @@ class TestCheckpoint:
         checkpoint = tmp_path / "procs.json"
         entry = {
             "session_id": "proc_dead_scope",
+            "session_key": "agent:main:telegram:dm:123",
             "command": "daemonize",
             "pid": 999999999,
             "pid_scope": "host",
@@ -1361,6 +1362,7 @@ class TestCheckpoint:
         checkpoint = tmp_path / "procs.json"
         entry = {
             "session_id": "proc_dead_scope",
+            "session_key": "agent:main:telegram:dm:123",
             "command": "daemonize",
             "pid": 999999999,
             "pid_scope": "host",
@@ -1384,6 +1386,7 @@ class TestCheckpoint:
         checkpoint = tmp_path / "procs.json"
         original = [{
             "session_id": "proc_remote",
+            "session_key": "agent:main:telegram:dm:123",
             "command": "sleep 999",
             "pid": os.getpid(),
             "task_id": "t1",

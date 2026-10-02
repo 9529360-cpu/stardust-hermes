@@ -67,8 +67,10 @@ class GatewayNotificationsMixin:
     """Process/completion/update notifications, media delivery and async-delegation delivery for GatewayRunner."""
 
     # Coalescing keys: process completions (short-window fan-in) and async delegations (+ parent session).
-    _COMPLETION_BATCH_KEY_FIELDS = ("owner_home", "session_key", "platform", "chat_type", "chat_id", "thread_id", "user_id")
-    _ASYNC_GROUP_KEY_FIELDS = ("session_key", "parent_session_id", *_COMPLETION_BATCH_KEY_FIELDS[2:])
+    _COMPLETION_BATCH_KEY_FIELDS = (
+        "owner_home", "session_key", "parent_session_id", "platform", "chat_type", "chat_id", "thread_id", "user_id",
+    )
+    _ASYNC_GROUP_KEY_FIELDS = ("session_key", "parent_session_id", *_COMPLETION_BATCH_KEY_FIELDS[3:])
 
     @dataclasses.dataclass
     class _UpdatePaths:

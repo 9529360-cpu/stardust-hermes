@@ -482,6 +482,34 @@ def test_completion_batches_do_not_cross_profiles_with_identical_routes():
     assert set(deliveries) == {("private-a", "/profiles/a"), ("private-b", "/profiles/b")}
 
 
+def test_completion_batches_do_not_cross_parent_sessions_with_identical_routes():
+    runner = _runner(SimpleNamespace(handle_message=AdmittingHandler()))
+    deliveries = []
+
+    async def _deliver(text, event):
+        # A closed parent cannot accept a completion, but must never have its
+        # output included when the live sibling is delivered.
+        if event["parent_session_id"] == "closed-parent":
+            return None
+        deliveries.append((text, event["parent_session_id"]))
+        return True
+
+    runner._deliver_completion_notification = _deliver
+    first = _completion_event(started_at=1.0, session_id="proc_closed")
+    second = _completion_event(started_at=2.0, session_id="proc_live")
+    first.update(owner_home="/profiles/a", parent_session_id="closed-parent", output="private-old")
+    second.update(owner_home="/profiles/a", parent_session_id="live-parent", output="private-new")
+
+    async def _exercise():
+        return await asyncio.gather(
+            runner._enqueue_process_completion_notification("private-old", first),
+            runner._enqueue_process_completion_notification("private-new", second),
+        )
+
+    assert asyncio.run(_exercise()) == [None, True]
+    assert deliveries == [("private-new", "live-parent")]
+
+
 def test_failed_coalesced_delivery_retries_all_entries():
     attempts = 0
 

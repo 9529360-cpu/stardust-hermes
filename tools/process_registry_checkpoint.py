@@ -58,10 +58,16 @@ class ProcessCheckpointMixin:
             _CHECKPOINT_DEFAULTS, _WATCHER_ROUTE_KEYS, _stop_systemd_unit,
         )
 
-        from hermes_constants import hermes_home_key
+        from hermes_constants import get_hermes_home, hermes_home_key, profile_name_for_home
+        from gateway.session import profile_from_session_key_namespace
 
         checkpoint_path = _checkpoint_path()
         owner_home = hermes_home_key()
+        current_profile = profile_name_for_home(get_hermes_home())
+        if current_profile is None:
+            # Custom single-profile HERMES_HOME roots do not follow the standard
+            # profiles/<name> layout; their legacy namespace is still agent:main.
+            current_profile = "default"
         if not checkpoint_path.exists():
             return 0
         try:
@@ -71,10 +77,21 @@ class ProcessCheckpointMixin:
         recovered = 0
         unresolved_scope_entries: List[Dict[str, Any]] = []
         for entry in entries:
-            # The containing file is authoritative for legacy entries. Do not adopt a
-            # foreign entry from an old mixed-profile checkpoint under this profile.
-            if entry.get("owner_home") and entry["owner_home"] != owner_home:
-                continue
+            # Old multiplexed gateways copied the global registry into EVERY
+            # profile checkpoint. File location therefore cannot establish owner.
+            # Only a stamped owner or the unambiguous agent:<profile>: namespace
+            # may authorize adoption; API/raw and missing keys have no safe owner.
+            stamped_home = entry.get("owner_home")
+            if stamped_home:
+                if stamped_home != owner_home:
+                    continue
+            else:
+                parts = str(entry.get("session_key") or "").split(":")
+                if len(parts) < 3 or parts[0] != "agent" or not parts[1]:
+                    logger.warning("Skipping legacy process %s with ambiguous profile ownership", entry.get("session_id"))
+                    continue
+                if profile_from_session_key_namespace(parts[1]) != current_profile:
+                    continue
             pid, pid_scope = entry.get("pid"), entry.get("pid_scope", "host")
             if not pid:
                 continue
