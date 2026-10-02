@@ -306,6 +306,12 @@ def _dispatch(server_name: str, server: Any, op: str, call, tool_timeout: float,
               on_final_failure: Callable[[BaseException], None], record_outcome: bool = False) -> str:
     """Run one logical MCP dispatch and record aggregate route-quality telemetry.
 
+    Mark the call started on *server* (doubles may lack ``mark_tool_call``), run coroutine function
+    *call* on the MCP loop and, on failure, walk ``recoverers`` (``(server_name, exc, retry_call, op)
+    -> Optional[str]``, None = not its kind; order matters). Unrecovered exceptions go through
+    ``on_final_failure`` and become the generic call-failed error. ``record_outcome`` applies breaker
+    bookkeeping to the FIRST attempt only.
+
     Route metrics are process-local timing/outcome only. They deliberately record the final logical
     result after recovery (not every transport attempt), and user interrupts are excluded so a human
     steering the agent never makes an MCP backend look unhealthy.
