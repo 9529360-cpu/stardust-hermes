@@ -17,7 +17,8 @@ from tools import async_delegation as delegation
 
 def pending(key, name):
     evt = {"type": "async_delegation", "session_key": key, "delegation_id": name,
-           "summary": name, "status": "completed", "dispatched_at": time.time()}
+           "summary": name, "status": "completed", "dispatched_at": time.time(),
+           "owner_home": hermes_home_key()}
     delegation._persist_dispatch(evt)
     delegation._persist_completion(evt, {"status": "completed", "summary": name})
     return evt
@@ -97,9 +98,9 @@ async def test_unavailable_raw_route_is_quiet_without_hiding_invalid_routes(tmp_
     runner = GatewayRunner(GatewayConfig())
     runner.adapters = {}
     evt = pending("opaque-client-session", "raw-admission")
-    # Raw API IDs have no profile namespace; a durable owner stamp is required
-    # even when the adapter is initially unavailable.
-    evt["owner_home"] = hermes_home_key()
+    # Raw API IDs have no profile namespace; the durable row (not just the
+    # in-memory event) needs its owner for replay after adapter recovery.
+    assert delegation.get_durable_delegation(evt["delegation_id"])["event"]["owner_home"] == evt["owner_home"]
     caplog.set_level(logging.WARNING, logger="gateway.run")
     caplog.clear()
     for _ in range(3):
