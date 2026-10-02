@@ -45,6 +45,8 @@ def isolated_registry(tmp_path, monkeypatch):
 def _runner(adapter, *, origins=None):
     runner = object.__new__(GatewayRunner)
     runner._running = True
+    from gateway.config import GatewayConfig
+    runner.config = GatewayConfig()
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner.session_store = SimpleNamespace(
         _ensure_loaded=lambda: None,
@@ -988,6 +990,8 @@ def test_unavailable_delivery_preserves_budget_across_restarts(tmp_path, unavail
     for event in events:
         if raw:
             event["session_key"] = "opaque-client-session"
+            from hermes_constants import hermes_home_key
+            event["owner_home"] = hermes_home_key()
         if unavailable == "owner_db":
             event["parent_session_id"] = "parent-session"
         _persist_pending_completion(event)

@@ -29,6 +29,11 @@ def test_live_lookup_list_and_task_queries_do_not_cross_profiles(tmp_path):
         registry._running[foreign.id] = foreign
         assert registry.get(own.id) is None
         assert registry.get(own.id[5:9]) is None
+        assert registry.is_session_waiting(own.id) is False
+        assert registry.is_completion_consumed(own.id) is False
+        own.notify_on_complete = True
+        assert registry.wait_for_pending_completions(timeout=0.01) == {
+            "waited": [], "completed": [], "timed_out": []}
         assert {p["session_id"] for p in registry.list_sessions()} == {foreign.id}
         assert {p["session_id"] for p in registry.list_sessions("same-task", "same-key")} == {foreign.id}
         assert {s.id for s in registry.running_owned_by("same-task")} == {foreign.id}

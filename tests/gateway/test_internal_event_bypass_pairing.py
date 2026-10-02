@@ -153,7 +153,10 @@ async def test_notify_on_complete_uses_session_store_origin_for_group_topic(monk
         )
     )
 
+    from hermes_constants import hermes_home_key
+
     watcher = {
+        "owner_home": hermes_home_key(),
         "session_id": "proc_test_internal",
         "check_interval": 0,
         "session_key": "agent:main:telegram:group:-100:42",

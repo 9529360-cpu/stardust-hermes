@@ -1481,8 +1481,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
     # ----- Query Methods -----
 
     def is_completion_consumed(self, session_id: str) -> bool:
-        """Check if a completion notification was already consumed via wait/log."""
-        return session_id in self._completion_consumed
+        """Check if an owned completion notification was already consumed via wait/log."""
+        return self.get(session_id) is not None and session_id in self._completion_consumed
 
     def is_session_waiting(self, session_id: str) -> bool:
         """Whether a goal loop (``hermes_cli.goals`` wait barrier) should stay parked on
@@ -1491,7 +1491,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         already-fired sessions return False so a stale barrier can never wedge the loop."""
         with self._lock:
             session = (self._running.get(session_id) or self._finished.get(session_id)) if session_id else None
-        if session is None:
+        if session is None or not self._in_current_home(session):
             return False
         with suppress(Exception):
             self._refresh_detached_session(session)
@@ -1526,7 +1526,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
             # window would otherwise see nothing pending, drain nothing and exit without the follow-up turn.
             pending = [
                 s for store in (self._running, self._finished) for s in store.values()
-                if s.notify_on_complete and not s._completion_event.is_set() and (task_id is None or s.task_id == task_id)
+                if self._in_current_home(s) and s.notify_on_complete and not s._completion_event.is_set()
+                and (task_id is None or s.task_id == task_id)
             ]
         if not pending or timeout <= 0:
             return result

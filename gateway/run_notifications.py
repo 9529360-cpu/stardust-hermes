@@ -70,7 +70,7 @@ class GatewayNotificationsMixin:
     _COMPLETION_BATCH_KEY_FIELDS = (
         "owner_home", "session_key", "parent_session_id", "platform", "chat_type", "chat_id", "thread_id", "user_id",
     )
-    _ASYNC_GROUP_KEY_FIELDS = ("session_key", "parent_session_id", *_COMPLETION_BATCH_KEY_FIELDS[3:])
+    _ASYNC_GROUP_KEY_FIELDS = ("owner_home", "session_key", "parent_session_id", *_COMPLETION_BATCH_KEY_FIELDS[3:])
 
     @dataclasses.dataclass
     class _UpdatePaths:
@@ -1256,6 +1256,10 @@ class GatewayNotificationsMixin:
         """Unavailable owners/transports must not spend a durable delivery attempt."""
         from gateway.wake import adapter_supports_push
 
+        # An unstamped raw API ID cannot authorize even a terminal disposition:
+        # classifying it against the default DB could discard a secondary's receipt.
+        if _raw_process_event_session_id(evt) and not evt.get("owner_home"):
+            return False
         parent_session_id = str(evt.get("parent_session_id") or "").strip()
         if parent_session_id:
             verdict = await self._classify_completion_target(parent_session_id)
@@ -1268,6 +1272,10 @@ class GatewayNotificationsMixin:
             adapter = self._resolve_injection_adapter(platform, source)
         else:
             raw_sid = _raw_process_event_session_id(evt)
+            # A legacy raw API ID has no profile authority. Never inspect or write the
+            # default DB on its behalf; leave the durable row pending for manual recovery.
+            if raw_sid and not evt.get("owner_home"):
+                return False
             adapter = self.adapters.get(Platform.API_SERVER) if raw_sid else None
             if adapter is not None and adapter_supports_push(adapter):
                 return False

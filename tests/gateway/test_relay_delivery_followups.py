@@ -387,6 +387,7 @@ def test_durable_dispatch_persists_and_recovers_scope_id(tmp_path, monkeypatch):
 
     ad._reset_for_tests()
     monkeypatch.setattr(ad, "_db_path", lambda: tmp_path / "state.db")
+    from hermes_constants import hermes_home_key
 
     tokens = set_session_vars(
         platform="discord",
@@ -405,6 +406,7 @@ def test_durable_dispatch_persists_and_recovers_scope_id(tmp_path, monkeypatch):
             "parent_session_id": "sess-p",
             "goal": "scoped goal",
             "dispatched_at": 100.0,
+            "owner_home": hermes_home_key(),
             **ad._capture_routing_origin(),
         }
         assert record.get("scope_id") == "G777", (
@@ -427,6 +429,7 @@ def test_durable_dispatch_persists_and_recovers_scope_id(tmp_path, monkeypatch):
     import json as _json
 
     evt = _json.loads(row[0])
+    assert evt["owner_home"] == hermes_home_key()
     assert evt.get("scope_id") == "G777", (
         "recovered completion event lost scope_id — post-restart scoped "
         "relay egress would be declined by the connector's tenant guard"

@@ -96,7 +96,7 @@ class TestKillToolSubprocessesMarksCronInterrupted:
             object(): ("owner-1", sched._get_hermes_home().resolve())
         }
 
-        monkeypatch.setattr(_pr.process_registry, "kill_all", lambda task_id=None: 1)
+        monkeypatch.setattr(_pr.process_registry, "kill_all", lambda task_id=None, *, all_profiles=False: 1)
         monkeypatch.setattr(_tt, "cleanup_all_environments", lambda: None)
         monkeypatch.setattr(terminal_tool_lifecycle, "cleanup_all_environments", lambda: None)
         monkeypatch.setattr(bt_lifecycle, "cleanup_all_browsers", lambda: None)
