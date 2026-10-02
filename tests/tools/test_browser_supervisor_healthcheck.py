@@ -114,6 +114,21 @@ def test_cache_hit_returns_same_instance_when_healthy(
     first.stop()
 
 
+def test_scoped_keys_do_not_reuse_or_stop_peer_supervisor(
+    isolated_registry, stub_cdp_supervisor
+):
+    first_key = ("home-a", "shared")
+    second_key = ("home-b", "shared")
+    first = isolated_registry.get_or_start(task_id=first_key, cdp_url="http://h/1")
+    second = isolated_registry.get_or_start(task_id=second_key, cdp_url="http://h/2")
+    assert first is not second
+    assert isolated_registry.get(first_key) is first
+    isolated_registry.stop(second_key)
+    assert isolated_registry.get(first_key) is first
+    assert isolated_registry.get(second_key) is None
+    first.stop()
+
+
 def test_missing_thread_and_loop_attrs_trigger_recreate(
     isolated_registry, stub_cdp_supervisor
 ):

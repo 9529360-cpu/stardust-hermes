@@ -215,7 +215,8 @@ def _browser_cdp_via_supervisor(task_id: str, frame_id: str, method: str, params
         return tool_error(f"CDP supervisor is not available: {exc}. frame_id routing requires a running "
                           "supervisor attached via /browser connect or an active Browserbase session.")
 
-    supervisor = SUPERVISOR_REGISTRY.get(task_id)
+    from tools.browser_tool import _registry_session_key
+    supervisor = SUPERVISOR_REGISTRY.get(_registry_session_key(task_id))
     if supervisor is None:
         return tool_error(f"No CDP supervisor is attached for task={task_id!r}. Call browser_navigate or "
                           "/browser connect first so the supervisor can attach. Once attached, browser_snapshot "

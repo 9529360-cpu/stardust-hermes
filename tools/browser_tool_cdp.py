@@ -133,7 +133,7 @@ def _ensure_cdp_supervisor(task_id: str) -> None:
     cdp_url = _get_cdp_override()
     if not cdp_url:
         with _bt._cleanup_lock:
-            session_info = _bt._active_sessions.get(task_id, {})
+            session_info = _bt._active_sessions.get(_bt._registry_session_key(task_id), {})
         maybe = str(session_info.get("cdp_url") or "")
         if maybe:
             cdp_url = _resolve_cdp_override(maybe)
@@ -142,7 +142,7 @@ def _ensure_cdp_supervisor(task_id: str) -> None:
     try:
         from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
         policy, timeout_s = _get_dialog_policy_config()
-        SUPERVISOR_REGISTRY.get_or_start(task_id=task_id, cdp_url=cdp_url, dialog_policy=policy, dialog_timeout_s=timeout_s)
+        SUPERVISOR_REGISTRY.get_or_start(task_id=_bt._registry_session_key(task_id), cdp_url=cdp_url, dialog_policy=policy, dialog_timeout_s=timeout_s)
     except Exception as exc:
         _bt.logger.debug("CDP supervisor attach for task=%s failed (non-fatal): %s", task_id, exc)
 
@@ -151,6 +151,6 @@ def _stop_cdp_supervisor(task_id: str) -> None:
     """Stop the CDP supervisor for ``task_id`` if one exists. No-op otherwise."""
     try:
         from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
-        SUPERVISOR_REGISTRY.stop(task_id)
+        SUPERVISOR_REGISTRY.stop(_origin()._registry_session_key(task_id))
     except Exception as exc:
         _origin().logger.debug("CDP supervisor stop for task=%s failed (non-fatal): %s", task_id, exc)

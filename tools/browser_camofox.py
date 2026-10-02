@@ -235,7 +235,7 @@ def _rewrite_loopback_url_for_camofox(url: str) -> tuple[str, Optional[Dict[str,
 
 
 # ---- Session management ----
-_sessions: Dict[str, Dict[str, Any]] = {}  # task_id -> {"user_id": str, "tab_id": str|None, ...}
+_sessions: Dict[str | tuple[str, str], Dict[str, Any]] = {}  # scoped task -> user_id, tab_id, ...
 _sessions_lock = threading.Lock()
 
 
@@ -263,9 +263,11 @@ def _get_session(task_id: Optional[str]) -> Dict[str, Any]:
     (CAMOFOX_USER_ID / config) → profile-scoped identity when managed persistence
     is on → random ephemeral userId."""
     task_id = task_id or "default"
+    from hermes_constants import get_hermes_home_override, hermes_home_key
+    cache_key = (hermes_home_key(), task_id) if get_hermes_home_override() else task_id
     with _sessions_lock:
-        if task_id in _sessions:
-            return _adopt_existing_tab(_sessions[task_id])
+        if cache_key in _sessions:
+            return _adopt_existing_tab(_sessions[cache_key])
         camofox_cfg = _get_camofox_config()
         identity = _camofox_identity_override(task_id, camofox_cfg)
         if identity is None and _managed_persistence_enabled(camofox_cfg):
@@ -277,7 +279,7 @@ def _get_session(task_id: Optional[str]) -> Dict[str, Any]:
             managed, adopt = True, _flag("CAMOFOX_ADOPT_EXISTING_TAB", camofox_cfg, "adopt_existing_tab")
         session = {"user_id": identity["user_id"], "tab_id": None, "session_key": identity["session_key"],
                    "managed": managed, "adopt_existing_tab": adopt}
-        _sessions[task_id] = session
+        _sessions[cache_key] = session
         return _adopt_existing_tab(session)
 
 
@@ -292,8 +294,11 @@ def _ensure_tab(task_id: Optional[str], url: str = "about:blank") -> Dict[str, A
 
 def _drop_session(task_id: Optional[str]) -> Optional[Dict[str, Any]]:
     """Remove and return session info."""
+    from hermes_constants import get_hermes_home_override, hermes_home_key
+    task_id = task_id or "default"
+    cache_key = (hermes_home_key(), task_id) if get_hermes_home_override() else task_id
     with _sessions_lock:
-        return _sessions.pop(task_id or "default", None)
+        return _sessions.pop(cache_key, None)
 
 
 def camofox_soft_cleanup(task_id: Optional[str] = None) -> bool:

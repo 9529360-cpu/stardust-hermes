@@ -93,11 +93,13 @@ class CDPSupervisor(DialogSupervisionMixin, FrameTrackingMixin):
     domains and auto-attach. ``snapshot()`` / ``respond_to_dialog()`` / ``evaluate_runtime()``
     are sync, thread-safe bridges onto that loop; all CDP I/O lives on the loop."""
 
-    def __init__(self, task_id: str, cdp_url: str, *, dialog_policy: str = DEFAULT_DIALOG_POLICY,
+    def __init__(self, task_id: str | tuple[str, str], cdp_url: str, *, dialog_policy: str = DEFAULT_DIALOG_POLICY,
                  dialog_timeout_s: float = DEFAULT_DIALOG_TIMEOUT_S) -> None:
         if dialog_policy not in _VALID_POLICIES:
             raise ValueError(f"Invalid dialog_policy {dialog_policy!r}; must be one of {sorted(_VALID_POLICIES)}")
-        self.task_id = task_id
+        # Registry ownership is scoped, but snapshots and diagnostics keep the
+        # external task ID unchanged.
+        self.task_id = task_id[1] if isinstance(task_id, tuple) else task_id
         self.cdp_url = cdp_url
         self.dialog_policy = dialog_policy
         self.dialog_timeout_s = float(dialog_timeout_s)
@@ -463,22 +465,25 @@ class CDPSupervisor(DialogSupervisionMixin, FrameTrackingMixin):
     }
 
 
+_SupervisorKey = str | tuple[str, str]
+
+
 class _SupervisorRegistry:
-    """Process-global (task_id → supervisor) map with idempotent start/stop (``SUPERVISOR_REGISTRY``)."""
+    """Process-global scoped-key → supervisor map (``SUPERVISOR_REGISTRY``)."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._by_task: Dict[str, CDPSupervisor] = {}
+        self._by_task: Dict[_SupervisorKey, CDPSupervisor] = {}
 
-    def get(self, task_id: str) -> Optional[CDPSupervisor]:
+    def get(self, task_id: _SupervisorKey) -> Optional[CDPSupervisor]:
         with self._lock:
             return self._by_task.get(task_id)
 
-    def _pop(self, task_id: str) -> Optional[CDPSupervisor]:
+    def _pop(self, task_id: _SupervisorKey) -> Optional[CDPSupervisor]:
         with self._lock:
             return self._by_task.pop(task_id, None)
 
-    def get_or_start(self, task_id: str, cdp_url: str, *, dialog_policy: str = DEFAULT_DIALOG_POLICY,
+    def get_or_start(self, task_id: _SupervisorKey, cdp_url: str, *, dialog_policy: str = DEFAULT_DIALOG_POLICY,
                      dialog_timeout_s: float = DEFAULT_DIALOG_TIMEOUT_S, start_timeout: float = 15.0) -> CDPSupervisor:
         """Idempotently ensure a supervisor runs for ``(task_id, cdp_url)``; one bound to a
         different ``cdp_url`` or unhealthy (dead thread / stopped loop) is stopped and replaced."""
@@ -505,7 +510,7 @@ class _SupervisorRegistry:
             self._by_task[task_id] = supervisor
         return supervisor
 
-    def stop(self, task_id: str) -> None:
+    def stop(self, task_id: _SupervisorKey) -> None:
         supervisor = self._pop(task_id)
         if supervisor is not None:
             supervisor.stop()
