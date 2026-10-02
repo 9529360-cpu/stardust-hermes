@@ -110,7 +110,7 @@ class RemoteKernel:
     kernel_dir: str
     pid: str
     rpc_token: str
-    owner: str
+    owner: str | tuple[str, str]
     last_used: float = field(default_factory=time.monotonic)
     execution_count: int = 0
     cell_seq: int = 0
@@ -148,7 +148,7 @@ class RemoteKernel:
                 logger.debug(failure, exc_info=True)
 
 
-def _kernel_key(owner: str, env_type: str, task_env_id: str, sandbox_tools: frozenset) -> Tuple:
+def _kernel_key(owner: str | tuple[str, str], env_type: str, task_env_id: str, sandbox_tools: frozenset) -> Tuple:
     """The hermes_tools stub module is generated from ``sandbox_tools`` once, at spawn, so a kernel
     is only reusable by calls with the SAME tool set; a different set gets its own kernel."""
     return (owner, "remote", env_type, task_env_id, tuple(sorted(sandbox_tools)))
@@ -167,10 +167,11 @@ def shutdown_remote_kernels_for_owner(owner: str) -> None:
     """Session-boundary disposal — wired to the same clear_session hook as
     local kernels, so /new and session close reap both kinds."""
     if owner:
-        _REGISTRY.shutdown(owner)
+        from tools.code_kernel import _session_owner
+        _REGISTRY.shutdown(_session_owner(owner))
 
 
-def shutdown_remote_kernels_where(owner_matches: Callable[[str], bool]) -> None:
+def shutdown_remote_kernels_where(owner_matches: Callable[[str | tuple[str, str]], bool]) -> None:
     """Dispose every remote kernel whose owner satisfies the predicate (a finished child's kernels)."""
     _REGISTRY.shutdown(owner_matches=owner_matches)
 
@@ -201,7 +202,7 @@ def _evict_over_cap_unlocked(keep: Tuple) -> List["RemoteKernel"]:
 atexit.register(shutdown_all_remote_kernels)
 
 
-def _spawn_remote_kernel(env, env_type: str, owner: str, task_env_id: str,
+def _spawn_remote_kernel(env, env_type: str, owner: str | tuple[str, str], task_env_id: str,
                          sandbox_tools: frozenset, *, idle_exit: int) -> Optional[RemoteKernel]:
     """Start a detached kernel runner on the remote. None on failure (dir removed)."""
     from tools.code_execution_tool import (
@@ -248,7 +249,7 @@ def _spawn_remote_kernel(env, env_type: str, owner: str, task_env_id: str,
     return kernel
 
 
-def _acquire_remote_kernel(env, env_type: str, owner: str, task_env_id: str,
+def _acquire_remote_kernel(env, env_type: str, owner: str | tuple[str, str], task_env_id: str,
                            sandbox_tools: frozenset, *, reset: bool,
                            idle_exit: int) -> Tuple[Optional[RemoteKernel], bool, bool, bool]:
     """Find/respawn the owner's kernel: (kernel|None, reused, state_reset, state_lost); reaps

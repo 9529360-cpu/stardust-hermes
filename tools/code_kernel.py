@@ -365,7 +365,8 @@ class KernelRegistry:
         self.kernels: Dict[Tuple, Any] = {}
         self.lock, self._teardown = threading.Lock(), teardown
 
-    def shutdown(self, owner: Optional[str] = None, *, owner_matches: Optional[Callable[[str], bool]] = None) -> None:
+    def shutdown(self, owner: Optional[str | tuple[str, str]] = None,
+                 *, owner_matches: Optional[Callable[[str | tuple[str, str]], bool]] = None) -> None:
         """Tear down every kernel, every kernel one owner (key[0]) holds, or every kernel whose owner
         satisfies ``owner_matches``."""
         with self.lock:
@@ -409,7 +410,15 @@ def _lifecycle_limits() -> Tuple[int, int]:
 _CHILD_OWNER_QUALIFIER = "::child::"
 
 
-def _resolve_owner(task_id: str) -> str:
+def _session_owner(session_key: str) -> str | tuple[str, str]:
+    """Distinguish identical session ids in different in-process profile scopes."""
+    from hermes_constants import get_hermes_home_override, hermes_home_key
+
+    home = get_hermes_home_override()
+    return (hermes_home_key(home), session_key) if home else session_key
+
+
+def _resolve_owner(task_id: str) -> str | tuple[str, str]:
     """The stable identity a session kernel belongs to: the conversation's approval session key
     (context-propagated, stable across turns, distinct per session). ``run_agent`` mints a fresh
     task id per turn, so a task-keyed kernel would neither survive the next turn nor be torn down
@@ -433,7 +442,7 @@ def _resolve_owner(task_id: str) -> str:
             owner = f"{owner}{_CHILD_OWNER_QUALIFIER}{child_id}"
     except Exception:
         pass
-    return owner
+    return _session_owner(owner)
 
 
 def shutdown_all_kernels() -> None:
@@ -448,14 +457,18 @@ def shutdown_kernels_for_owner(owner: str) -> None:
     See #88637.
     """
     if owner:
-        _REGISTRY.shutdown(owner)
+        _REGISTRY.shutdown(_session_owner(owner))
 
 
-def delegated_child_owner_matcher(child_session_id: str) -> Callable[[str], bool]:
+def delegated_child_owner_matcher(child_session_id: str) -> Callable[[str | tuple[str, str]], bool]:
     """Predicate for the kernels a delegate_task child owns (``_resolve_owner`` qualifies a child's
     owner with its delegation session id). Shared with the remote registry."""
     suffix = f"{_CHILD_OWNER_QUALIFIER}{child_session_id}"
-    return lambda owner: owner.endswith(suffix)
+    scoped = _session_owner("")
+    if isinstance(scoped, tuple):
+        return lambda owner: (isinstance(owner, tuple) and owner[0] == scoped[0]
+                              and owner[1].endswith(suffix))
+    return lambda owner: isinstance(owner, str) and owner.endswith(suffix)
 
 
 def shutdown_kernels_for_delegated_child(child_session_id: str) -> None:
