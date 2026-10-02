@@ -408,9 +408,9 @@ export function ChatSidebar({
   const profiles = useStore($profiles)
   const profileScope = useStore($profileScope)
   const activeConnectionId = useStore($activeConnectionId)
-  const cronJobs = cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}`
-    ? cachedCronJobs
-    : []
+  const currentCronJobsScope = `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}`
+
+  const cronJobs = cronJobsScope === currentCronJobsScope ? cachedCronJobs : []
 
   // Toggle the persisted read-state watermark from a row menu. The row's own
   // `unread` prop mirrors what the dot paints; flip it and let the backend
@@ -1930,6 +1930,7 @@ export function ChatSidebar({
             {!trimmedQuery && !worktreeGroupingActive && cronJobs.length > 0 && (
               <SidebarCronJobsSection
                 jobs={cronJobs}
+                jobsScope={currentCronJobsScope}
                 label={s.cronJobs}
                 onManageJob={onManageCronJob}
                 onOpenRun={onResumeSession}
