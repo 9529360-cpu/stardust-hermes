@@ -881,6 +881,7 @@ export interface AnalyticsTotals {
 }
 
 export interface CronJob {
+  profile?: string
   deliver?: null | string
   enabled: boolean
   id: string
