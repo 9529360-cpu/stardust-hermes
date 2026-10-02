@@ -64,8 +64,9 @@ def _eval_js(task_id: str, expression: str) -> Dict[str, Any]:
     """
     try:
         from tools.browser_supervisor import SUPERVISOR_REGISTRY
+        from tools.browser_tool import _registry_session_key
 
-        supervisor = SUPERVISOR_REGISTRY.get(task_id)
+        supervisor = SUPERVISOR_REGISTRY.get(_registry_session_key(task_id))
         if supervisor is not None:
             sup = supervisor.evaluate_runtime(expression)
             if sup.get("ok"):
@@ -96,8 +97,9 @@ def _ensure_supervisor(task_id: str):
     for the packaged Chromium's endpoint (``get cdp-url``: same daemon, same reaper) and attach.
     Returns None when no endpoint is reachable; the fill then refuses rather than touching argv."""
     from tools.browser_supervisor import SUPERVISOR_REGISTRY
+    from tools.browser_tool import _registry_session_key
 
-    supervisor = SUPERVISOR_REGISTRY.get(task_id)
+    supervisor = SUPERVISOR_REGISTRY.get(_registry_session_key(task_id))
     if supervisor is not None:
         return supervisor
     from tools.browser_tool import _last_session_key
@@ -110,7 +112,7 @@ def _ensure_supervisor(task_id: str):
         return None
     policy, timeout_s = _get_dialog_policy_config()
     try:
-        return SUPERVISOR_REGISTRY.get_or_start(task_id=task_id, cdp_url=_resolve_cdp_override(cdp_url),
+        return SUPERVISOR_REGISTRY.get_or_start(task_id=_registry_session_key(task_id), cdp_url=_resolve_cdp_override(cdp_url),
                                                 dialog_policy=policy, dialog_timeout_s=timeout_s)
     except Exception as exc:
         logger.debug("vault fill: supervisor attach to local session failed (%s)", exc)

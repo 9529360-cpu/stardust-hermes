@@ -47,6 +47,33 @@ def _clear_session_state():
     mod._vnc_url_checked = False
 
 
+def test_ephemeral_camofox_sessions_do_not_cross_served_profiles(tmp_path):
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    first_home = tmp_path / "first"
+    second_home = tmp_path / "second"
+    first_home.mkdir()
+    second_home.mkdir()
+    first_token = set_hermes_home_override(str(first_home))
+    try:
+        first = _get_session("shared")
+    finally:
+        reset_hermes_home_override(first_token)
+    second_token = set_hermes_home_override(str(second_home))
+    try:
+        second = _get_session("shared")
+        assert second is not first
+        assert second["user_id"] != first["user_id"]
+        assert _drop_session("shared") is second
+    finally:
+        reset_hermes_home_override(second_token)
+    first_token = set_hermes_home_override(str(first_home))
+    try:
+        assert _get_session("shared") is first
+    finally:
+        reset_hermes_home_override(first_token)
+
+
 class TestManagedPersistenceToggle:
     def test_disabled_by_default(self):
         config = {"browser": {"camofox": {"managed_persistence": False}}}

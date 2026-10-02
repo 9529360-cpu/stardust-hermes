@@ -518,8 +518,9 @@ def _attach_vault_supervisor(env: dict, task_id: Optional[str]) -> None:
     try:
         from tools.browser_supervisor import SUPERVISOR_REGISTRY
         from tools.browser_tool_cdp import _get_dialog_policy_config, _resolve_cdp_override
+        from tools.browser_tool import _registry_session_key
         policy, timeout_s = _get_dialog_policy_config()
-        SUPERVISOR_REGISTRY.get_or_start(task_id=task_id or "default", cdp_url=_resolve_cdp_override(cdp),
+        SUPERVISOR_REGISTRY.get_or_start(task_id=_registry_session_key(task_id or "default"), cdp_url=_resolve_cdp_override(cdp),
                                          dialog_policy=policy, dialog_timeout_s=timeout_s)
     except Exception as exc:
         logger.debug("browser_exec: CDP supervisor attach failed (non-fatal): %s", exc)

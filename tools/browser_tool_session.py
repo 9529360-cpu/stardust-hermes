@@ -272,25 +272,26 @@ def _get_session_info(task_id: Optional[str] = None) -> Dict[str, Any]:
     even with a cloud provider configured."""
     if task_id is None:
         task_id = "default"
+    registry_key = _bt._registry_session_key(task_id)
 
     _lifecycle._start_browser_cleanup_thread()
-    _lifecycle._update_session_activity(task_id)
+    _lifecycle._update_session_activity(registry_key)
 
     with _bt._cleanup_lock:
-        existing_session = _bt._active_sessions.get(task_id)
+        existing_session = _bt._active_sessions.get(registry_key)
 
     def _replacement_after_teardown() -> Optional[Dict[str, Any]]:
         # Teardown removes the activity entry; re-touch so the reaper tracks the
         # replacement. Another thread may already have re-created it — reuse that.
-        _lifecycle._update_session_activity(task_id)
+        _lifecycle._update_session_activity(registry_key)
         with _bt._cleanup_lock:
-            replacement = _bt._active_sessions.get(task_id)
+            replacement = _bt._active_sessions.get(registry_key)
         return replacement if replacement is not None and replacement is not existing_session else None
 
     if existing_session is not None:
         # Suspect recycle: a command timeout marked this session; the expensive recycle
         # lives here at next use, not on the timeout path (mark must stay cheap).
-        if not _bt._browser_session_backend(task_id).ensure_healthy():
+        if not _bt._browser_session_backend(registry_key).ensure_healthy():
             replacement = _replacement_after_teardown()
             if replacement is not None:
                 return replacement
@@ -299,7 +300,7 @@ def _get_session_info(task_id: Optional[str] = None) -> Dict[str, Any]:
             return existing_session
         else:
             _bt.logger.info("Replacing expired or dead browser session for task %s", task_id)
-            _lifecycle._cleanup_single_browser_session(task_id)
+            _lifecycle._cleanup_single_browser_session(registry_key)
             replacement = _replacement_after_teardown()
             if replacement is not None:
                 return replacement
@@ -308,13 +309,13 @@ def _get_session_info(task_id: Optional[str] = None) -> Dict[str, Any]:
     session_info = _create_session_for_key(task_id, force_local)
 
     with _bt._cleanup_lock:
-        if task_id in _bt._active_sessions:  # created concurrently during the network call — don't leak ours
-            return _bt._active_sessions[task_id]
+        if registry_key in _bt._active_sessions:  # created concurrently during the network call — don't leak ours
+            return _bt._active_sessions[registry_key]
         session_info = dict(session_info)
         session_info.setdefault("session_key", task_id)
         session_info.setdefault("owner_task_id", _bt._bare_task_id_for_session_key(task_id))
-        _bt._active_sessions[task_id] = session_info
-        _bt._suspect_browser_sessions.pop(task_id, None)  # brand-new session is healthy by definition
+        _bt._active_sessions[registry_key] = session_info
+        _bt._suspect_browser_sessions.pop(registry_key, None)  # brand-new session is healthy by definition
 
     # Lazy-start the CDP supervisor (idempotent). Skip local sidecars (no CDP URL) and
     # Lightpanda sessions (Browser Use mode hides the tools that consume supervisor state).
@@ -326,10 +327,11 @@ def _get_session_info(task_id: Optional[str] = None) -> Dict[str, Any]:
 
 def _discard_timed_out_browser_session(task_id: str, session_info: Dict[str, Any], task_socket_dir: str) -> None:
     """Drop a stuck client generation without losing cloud cleanup state."""
+    task_id = _bt._registry_session_key(task_id)
     with _bt._cleanup_lock:
         if _bt._active_sessions.get(task_id) is not session_info:
             return
-        _cdp._stop_cdp_supervisor(task_id)
+        _cdp._stop_cdp_supervisor(_bt._raw_session_key(task_id))
         if session_info.get("bb_session_id") or session_info.get("cdp_url"):
             replacement = dict(session_info)
             replacement["session_name"] = f"h_{uuid.uuid4().hex[:10]}"
@@ -339,7 +341,10 @@ def _discard_timed_out_browser_session(task_id: str, session_info: Dict[str, Any
             _bt._active_sessions.pop(task_id, None)
             _bt._session_last_activity.pop(task_id, None)
 
-        bare_task_id = _bt._bare_task_id_for_session_key(task_id)
+        bare_task_id = _bt._raw_session_key(task_id)
+        bare_task_id = _bt._bare_task_id_for_session_key(bare_task_id)
+        if isinstance(task_id, tuple):
+            bare_task_id = (task_id[0], bare_task_id)
         if _bt._last_active_session_key.get(bare_task_id) == task_id:
             _bt._last_active_session_key.pop(bare_task_id, None)
 
@@ -421,7 +426,7 @@ def _handle_browser_command_timeout(task_id: str, session_info: Dict[str, Any], 
         _discard_timed_out_browser_session(task_id, session_info, task_socket_dir)
         return
 
-    _bt._browser_session_backend(task_id).mark_suspect("browser command timed out; session may be poisoned")
+    _bt._browser_session_backend(_bt._registry_session_key(task_id)).mark_suspect("browser command timed out; session may be poisoned")
 
     session_name = str(session_info.get("session_name") or "")
     daemon_pid = _read_browser_daemon_pid(task_socket_dir, session_name) if session_name else None
@@ -441,7 +446,7 @@ def _handle_browser_command_timeout(task_id: str, session_info: Dict[str, Any], 
     _discard_timed_out_browser_session(task_id, session_info, task_socket_dir)
     # The poisoned entry is gone either way; the flag must not poison a session
     # created later under the same key.
-    _bt._suspect_browser_sessions.pop(task_id, None)
+    _bt._suspect_browser_sessions.pop(_bt._registry_session_key(task_id), None)
 
 
 def _interpret_browser_command_output(command: str, stdout: str, stderr: str, returncode: int) -> Dict[str, Any]:
