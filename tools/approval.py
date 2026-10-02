@@ -164,8 +164,15 @@ def resolve_gateway_approval(session_key: str, choice: str,
             _gateway_queues.pop(session_key, None)
 
     for entry in targets:
-        entry.result = choice
-        if reason:
+        # Every response surface (RPC, server request, chat adapter) converges here.
+        # A malformed or unoffered answer is never consent, even for /approve all.
+        allowed = {"once", "deny"}
+        if entry.data.get("allow_session", True) and not entry.data.get("smart_denied"):
+            allowed.add("session")
+        if entry.data.get("allow_permanent", True) and not entry.data.get("smart_denied"):
+            allowed.add("always")
+        entry.result = choice if isinstance(choice, str) and choice in allowed else "deny"
+        if reason and entry.result == "deny":
             entry.reason = reason
         entry.event.set()
     return len(targets)
