@@ -319,6 +319,119 @@ def test_codex_dashboard_start_rewords_device_authorization_error(monkeypatch):
             _web_server_oauth._oauth_sessions.pop(sid, None)
 
 
+@pytest.mark.parametrize("provider", ["minimax-oauth", "xai-oauth"])
+def test_device_poller_cancel_during_token_poll_never_saves_in_any_profile(tmp_path, monkeypatch, provider):
+    """A real DELETE after polling starts must not persist the granted token anywhere."""
+    from hermes_cli import auth as auth_mod
+
+    _make_profile_home(tmp_path, monkeypatch, profile="coder")
+    sid, sess = _rt_oauth._new_oauth_session(provider, "device_code", profile="coder")
+    sess.update({
+        "portal_base_url": "https://example.invalid", "client_id": "test-client",
+        "user_code": "TEST", "code_verifier": "verifier", "expired_in_raw": 600,
+        "device_code": "device", "interval": 5, "expires_at": time.time() + 600,
+    })
+    saved = []
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def poll_and_cancel(*args, **kwargs):
+        response = client.delete(f"/api/providers/oauth/sessions/{sid}?profile=coder", headers=HEADERS)
+        assert response.status_code == 200, response.text
+        return {"access_token": "test-access", "refresh_token": "test-refresh",
+                "expired_in": 3600, "expires_in": 3600}
+
+    monkeypatch.setattr(httpx, "Client", _Client)
+    monkeypatch.setattr(auth_mod, "_minimax_poll_token", poll_and_cancel)
+    monkeypatch.setattr(auth_mod, "_xai_oauth_discovery", lambda *_a: {"token_endpoint": "https://example.invalid"})
+    monkeypatch.setattr(auth_mod, "_xai_oauth_poll_device_token", poll_and_cancel)
+    monkeypatch.setattr(auth_mod, "_minimax_save_auth_state", lambda state: saved.append(("minimax", state)))
+    monkeypatch.setattr(auth_mod, "_save_xai_oauth_tokens", lambda *a, **k: saved.append(("xai", a)))
+    monkeypatch.setattr(auth_mod, "mark_provider_active_if_unset", lambda *a: saved.append(("active", a)))
+    monkeypatch.setattr(auth_mod, "unsuppress_credential_source", lambda *a: saved.append(("unsuppress", a)))
+    try:
+        (_web_server_oauth._minimax_poller if provider == "minimax-oauth" else
+         _web_server_oauth._xai_device_poller)(sid)
+        assert saved == []
+        assert sess["status"] == "cancelled"
+        assert sid not in _web_server_oauth._oauth_sessions
+    finally:
+        _web_server_oauth._oauth_sessions.pop(sid, None)
+
+
+@pytest.mark.parametrize("provider", ["minimax-oauth", "xai-oauth"])
+def test_device_poller_save_keeps_cancel_outside_critical_section(tmp_path, monkeypatch, provider):
+    """DELETE cannot succeed between the final cancellation check and credential writes."""
+    import threading
+    from hermes_cli import auth as auth_mod
+    from hermes_constants import get_hermes_home
+
+    home = _make_profile_home(tmp_path, monkeypatch, profile="coder")
+    sid, sess = _rt_oauth._new_oauth_session(provider, "device_code", profile="coder")
+    sess.update({
+        "portal_base_url": "https://example.invalid", "client_id": "test-client",
+        "user_code": "TEST", "code_verifier": "verifier", "expired_in_raw": 600,
+        "device_code": "device", "interval": 5, "expires_at": time.time() + 600,
+    })
+    delete_started = threading.Event()
+    delete_finished = threading.Event()
+    threads = []
+    saved = []
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def delete_on_other_thread():
+        delete_started.set()
+        response = client.delete(f"/api/providers/oauth/sessions/{sid}?profile=coder", headers=HEADERS)
+        assert response.status_code == 200, response.text
+        delete_finished.set()
+
+    def save(*args, **kwargs):
+        assert get_hermes_home() == home
+        thread = threading.Thread(target=delete_on_other_thread, daemon=True)
+        threads.append(thread)
+        thread.start()
+        assert delete_started.wait(timeout=2)
+        saved.append(not delete_finished.wait(timeout=0.2))
+
+    monkeypatch.setattr(httpx, "Client", _Client)
+    monkeypatch.setattr(auth_mod, "_minimax_poll_token", lambda *a, **k: {
+        "access_token": "test", "refresh_token": "test", "expired_in": 3600})
+    monkeypatch.setattr(auth_mod, "_xai_oauth_discovery", lambda *_a: {"token_endpoint": "https://example.invalid"})
+    monkeypatch.setattr(auth_mod, "_xai_oauth_poll_device_token", lambda *a, **k: {
+        "access_token": "test", "refresh_token": "test", "expires_in": 3600})
+    monkeypatch.setattr(auth_mod, "_minimax_save_auth_state", save)
+    monkeypatch.setattr(auth_mod, "_save_xai_oauth_tokens", save)
+    monkeypatch.setattr(auth_mod, "mark_provider_active_if_unset", lambda *_a: None)
+    monkeypatch.setattr(auth_mod, "unsuppress_credential_source", lambda *_a: None)
+    try:
+        (_web_server_oauth._minimax_poller if provider == "minimax-oauth" else
+         _web_server_oauth._xai_device_poller)(sid)
+        for thread in threads:
+            thread.join(timeout=2)
+        assert saved == [True]
+        assert delete_finished.is_set()
+        assert sess["cancelled"] is True
+    finally:
+        _web_server_oauth._oauth_sessions.pop(sid, None)
+
+
 def test_codex_dashboard_worker_stops_polling_after_cancel(tmp_path, monkeypatch):
     """A real DELETE mid-poll must stop the worker before it exchanges/saves tokens.
 
