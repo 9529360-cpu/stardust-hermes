@@ -315,7 +315,8 @@ def _teardown_session(session: dict | None, *, end_reason: str = "tui_close") ->
     with contextlib.suppress(Exception):
         from tools.approval import unregister_gateway_notify
         if key := session.get("session_key"):
-            unregister_gateway_notify(key)
+            with _session_profile_runtime_scope(session):
+                unregister_gateway_notify(key)
     # agent.close() → shutdown_memory_provider reads the provider's config/credentials at call time; same
     # scope rule as _finalize_session (every caller here is an unscoped reaper/atexit/pool thread).
     with contextlib.suppress(Exception), _session_profile_runtime_scope(session):
@@ -477,7 +478,8 @@ def _interrupt_session_turn(
     _clear_pending(sid)
     with contextlib.suppress(Exception):
         from tools.approval import resolve_gateway_approval
-        resolve_gateway_approval(session["session_key"], "deny", resolve_all=True)
+        with _session_profile_runtime_scope(session):
+            resolve_gateway_approval(session["session_key"], "deny", resolve_all=True)
     return use_compute_host
 
 

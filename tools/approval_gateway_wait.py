@@ -129,8 +129,9 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict, *,
         "session_key": session_key, "surface": surface,
     }
     keys = list(approval_data.get("pattern_keys") or [])
+    state_key = _approval._state_key(session_key)
     with _approval._lock:
-        leader = next((e for e in _approval._gateway_queues.get(session_key, [])
+        leader = next((e for e in _approval._gateway_queues.get(state_key, [])
                        if e.data.get("command") == approval_data.get("command")
                        and list(e.data.get("pattern_keys") or []) == keys), None)
     if leader is not None:
@@ -140,15 +141,15 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict, *,
 
     entry = _ApprovalEntry(approval_data)
     with _approval._lock:
-        _approval._gateway_queues.setdefault(session_key, []).append(entry)
+        _approval._gateway_queues.setdefault(state_key, []).append(entry)
 
     def _drop_entry(reason: str) -> None:
         with _approval._lock:
-            queue = _approval._gateway_queues.get(session_key, [])
+            queue = _approval._gateway_queues.get(state_key, [])
             if entry in queue:
                 queue.remove(entry)
             if not queue:
-                _approval._gateway_queues.pop(session_key, None)
+                _approval._gateway_queues.pop(state_key, None)
             settle, entry.settle = entry.settle, None
         if settle is not None:
             try:

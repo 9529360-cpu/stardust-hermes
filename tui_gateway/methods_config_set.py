@@ -272,8 +272,9 @@ def _set_yolo(rid, params, key, value, session):
         _emit_all_session_info()  # reflect the flip in every live indicator
     elif session:
         skey = session["session_key"]
-        enable = _BOOL_WORDS.get(raw, not is_session_yolo_enabled(skey))
-        (enable_session_yolo if enable else disable_session_yolo)(skey)
+        with _session_profile_runtime_scope(session):
+            enable = _BOOL_WORDS.get(raw, not is_session_yolo_enabled(skey))
+            (enable_session_yolo if enable else disable_session_yolo)(skey)
         _emit_session_info(params.get("session_id", ""), session)
     else:
         enable = _BOOL_WORDS.get(raw, not is_truthy_value(os.environ.get("HERMES_YOLO_MODE")))

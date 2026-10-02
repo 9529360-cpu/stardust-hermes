@@ -709,18 +709,19 @@ def _pending_connection_request_payload(sid: str) -> dict | None:
     return operation.request_payload() if operation is not None else None
 
 
-def _pending_approval_request_payload(session_key: str) -> dict | None:
-    """Read the oldest unresolved approval in a session, if there is one."""
+def _pending_approval_request_payload(session: dict) -> dict | None:
+    """Read the oldest unresolved approval belonging to this profile and session."""
     try:
         from tools.approval import get_pending_gateway_approval
-        approval = get_pending_gateway_approval(session_key)
+        with _session_profile_runtime_scope(session):
+            approval = get_pending_gateway_approval(str(session.get("session_key") or ""))
     except Exception:
-        logger.debug("failed to read pending approval for %s", session_key, exc_info=True)
+        logger.debug("failed to read pending approval for %s", session.get("session_key"), exc_info=True)
         return None
     return _approval_request_payload(approval) if approval else None
 
 
-def _emit_approval_request(sid: str, data: dict | None) -> None:
+def _emit_approval_request(sid: str, data: dict | None, *, owner: dict | None = None) -> None:
     """Send an ``approval`` server request with the command redacted: a credential-shaped value Tirith flagged
     would otherwise echo verbatim to the TUI (third egress alongside chat platforms and the SSE/API stream).
     See #48456, #50767.
@@ -732,18 +733,24 @@ def _emit_approval_request(sid: str, data: dict | None) -> None:
     from tools import approval as _approval
     payload = _approval_request_payload(data)
     request_id = str(payload.get("request_id") or "")
-    session_key = str((_sessions.get(sid) or {}).get("session_key") or "")
+    # The notifier captures its session object when wired; don't look up a reused
+    # live SID when an old approval is emitted or answered later.
+    session = owner if owner is not None else (_sessions.get(sid) or {})
+    session_key = str(session.get("session_key") or "")
+    profile_home = session.get("profile_home")
 
     def on_result(result: dict | None) -> None:
         if result is None:  # withdrawn: the queue entry resolves on its own path
             return
         choice = str(result.get("choice") or "deny")
-        _approval.resolve_gateway_approval(session_key, choice, resolve_all=bool(result.get("all")),
-                                           request_id=request_id or None)
+        with _session_profile_runtime_scope({"profile_home": profile_home}):
+            _approval.resolve_gateway_approval(session_key, choice, resolve_all=bool(result.get("all")),
+                                               request_id=request_id or None)
 
     settle = server_requests.send_async("approval", sid, payload, on_result)
     if request_id:
-        _approval.register_gateway_settle(session_key, request_id, settle)
+        with _session_profile_runtime_scope({"profile_home": profile_home}):
+            _approval.register_gateway_settle(session_key, request_id, settle)
 
 
 def _status_update(sid: str, kind: str, text: str | None = None):
@@ -1011,7 +1018,9 @@ def _wire_session_agent(sid: str, key: str, agent) -> bool:
     notify_registered = False
     with contextlib.suppress(Exception):
         from tools.approval import load_permanent_allowlist, register_gateway_notify
-        register_gateway_notify(key, lambda data: _emit_approval_request(sid, data))
+        owner = _sessions.get(sid) or {}
+        with _session_profile_runtime_scope(owner):
+            register_gateway_notify(key, lambda data: _emit_approval_request(sid, data, owner=owner))
         notify_registered = True
         load_permanent_allowlist()
     _wire_callbacks(sid)
@@ -1079,7 +1088,8 @@ def _finish_agent_build(sid: str, key: str, current: dict, *, notify_registered:
     if replaced and notify_registered:
         with contextlib.suppress(Exception):
             from tools.approval import unregister_gateway_notify
-            unregister_gateway_notify(key)
+            with _session_profile_runtime_scope(current):
+                unregister_gateway_notify(key)
     # Dedicated profile handle: hand it to the agent that will be torn down, else close it (build
     # failed, or `replaced`: this agent is discarded and _teardown_session never reaches it).
     if session_db is not None and not _transfer_db_to_agent(None if replaced else current.get("agent"), session_db):
@@ -2091,7 +2101,8 @@ def _session_info(agent, session: dict | None = None) -> dict:
     # --yolo env, the per-session flag): the session flag alone would show "off" while config auto-approves.
     try:
         from tools.approval import _YOLO_MODE_FROZEN, is_session_yolo_enabled
-        session_yolo = bool(is_session_yolo_enabled(session_key)) if session_key else False
+        with _session_profile_runtime_scope(sess):
+            session_yolo = bool(is_session_yolo_enabled(session_key)) if session_key else False
         approval_mode = _load_approval_mode()
         yolo = bool(_YOLO_MODE_FROZEN) or session_yolo or approval_mode == "off"
     except Exception:
@@ -2812,7 +2823,7 @@ def _live_session_payload(
         "status": _session_live_status(sid, session),
     }
     for key, value in (("inflight", inflight), ("queued", queued),
-                       ("pending_approval", _pending_approval_request_payload(str(session.get("session_key") or ""))),
+                       ("pending_approval", _pending_approval_request_payload(session)),
                        ("open_requests", _open_requests(sid)),
                        ("pending_connection", _pending_connection_request_payload(sid))):
         if value:

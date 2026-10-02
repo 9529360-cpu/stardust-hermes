@@ -19,6 +19,59 @@ from tools.approval_context import _normalize_approval_mode
 from tools.approval_smart import _smart_approve
 
 
+def test_same_stored_session_id_has_independent_profile_approvals(tmp_path):
+    """Two imported profiles may share a stored id, but never consent or YOLO state."""
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from tools.approval_gateway_wait import _ApprovalEntry
+
+    homes = [tmp_path / "profile-a", tmp_path / "profile-b"]
+    for home in homes:
+        home.mkdir()
+    key = "imported-stored-session"
+    entries = []
+    try:
+        for home, label in zip(homes, ("a", "b")):
+            token = set_hermes_home_override(home)
+            try:
+                entry = _ApprovalEntry({"request_id": f"req-{label}", "command": label})
+                approval_module._gateway_queues[approval_module._state_key(key)] = [entry]
+                entries.append(entry)
+                if label == "a":
+                    approval_module.approve_session(key, "dangerous")
+                    approval_module.enable_session_yolo(key)
+                    approval_module._record_denial(key)
+            finally:
+                reset_hermes_home_override(token)
+        token = set_hermes_home_override(homes[1])
+        try:
+            assert not approval_module.is_approved(key, "dangerous")
+            assert not approval_module.is_session_yolo_enabled(key)
+            assert approval_module._denial_breaker_addendum(key) == ""
+            assert [item["request_id"] for item in approval_module.list_gateway_approvals(key)] == ["req-b"]
+            assert approval_module.resolve_gateway_approval(key, "once", request_id="req-a") == 0
+            assert approval_module.resolve_gateway_approval(key, "deny", request_id="req-b") == 1
+        finally:
+            reset_hermes_home_override(token)
+        assert entries[1].result == "deny" and not entries[0].event.is_set()
+        token = set_hermes_home_override(homes[0])
+        try:
+            assert approval_module.is_approved(key, "dangerous")
+            assert approval_module.is_session_yolo_enabled(key)
+            assert approval_module.resolve_gateway_approval(key, "once", request_id="req-a") == 1
+        finally:
+            reset_hermes_home_override(token)
+    finally:
+        for home in homes:
+            token = set_hermes_home_override(home)
+            try:
+                approval_module.disable_session_yolo(key)
+                approval_module.clear_session(key)
+                approval_module.unregister_gateway_notify(key)
+                approval_module._reset_denials(key)
+            finally:
+                reset_hermes_home_override(token)
+
+
 class TestPackageManagerUninstallApproval:
     """Package-manager removal verbs remove software outside the project (#10199)."""
 
