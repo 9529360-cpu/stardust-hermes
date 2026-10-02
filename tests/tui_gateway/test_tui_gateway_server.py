@@ -18827,7 +18827,10 @@ def test_notification_poller_skips_consumed(monkeypatch):
     isolated_queue: _queue_mod.Queue = _queue_mod.Queue()
     monkeypatch.setattr(process_registry, "completion_queue", isolated_queue)
 
-    process_registry._completion_consumed.add("proc_already_done")
+    # The registry now requires an owned session for consumed checks. This
+    # poller test isolates that query rather than fabricating a global process.
+    monkeypatch.setattr(process_registry, "is_completion_consumed",
+                        lambda session_id: session_id == "proc_already_done")
     isolated_queue.put({
         "type": "completion",
         "session_id": "proc_already_done",
@@ -18844,7 +18847,6 @@ def test_notification_poller_skips_consumed(monkeypatch):
         assert len(turns) == 0
     finally:
         server._sessions.pop("sid_skip", None)
-        process_registry._completion_consumed.discard("proc_already_done")
         while not process_registry.completion_queue.empty():
             process_registry.completion_queue.get_nowait()
 
