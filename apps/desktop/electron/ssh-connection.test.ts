@@ -93,7 +93,7 @@ test('controlSocketPath is stable, short, and host-distinct', () => {
   assert.equal(a, a2, 'same triple → same socket (ControlMaster reuse)')
   assert.notEqual(a, b, 'different host → different socket')
   // 16 hex chars + .sock keeps the basename short for sun_path 104-byte limit
-  assert.match(a, /\/[0-9a-f]{16}\.sock$/)
+  assert.match(path.basename(a), /^[0-9a-f]{16}\.sock$/)
 })
 
 test('controlSocketPath default base stays under sun_path even with the temp-listener suffix', () => {
@@ -285,7 +285,7 @@ test('open() establishes the master when not already alive', async () => {
     return { code: 0 }
   })
 
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d' })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', mux: true })
   await conn.open()
   assert.deepEqual(ops, ['check', 'master'], 'probes liveness first, then opens the master')
 })
@@ -317,7 +317,7 @@ test('open() is a no-op when the master is already alive and execs verify', asyn
     return { code: 0 } // check succeeds → alive; verify exec succeeds → trusted
   })
 
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d' })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', mux: true })
   await conn.open()
   assert.deepEqual(ops, ['check', 'verify'], 'alive master is exec-verified, then trusted without reopening')
 })
@@ -352,7 +352,7 @@ test('open() evicts a wedged master (check passes, exec hangs) and dials fresh',
     return { code: 0 }
   })
 
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', connectTimeoutMs: 50 })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', connectTimeoutMs: 50, mux: true })
 
   await conn.open()
   assert.deepEqual(
@@ -378,7 +378,7 @@ test('close() removes the control socket when -O exit fails', async () => {
     return { code: 255, stderr: 'mux: master gone' } // -O exit fails
   })
 
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: dir })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: dir, mux: true })
   await conn.open()
   fs.writeFileSync(conn.controlPath, '') // simulate the lingering socket file
   await conn.close()
@@ -390,7 +390,7 @@ test('open() creates the control-socket directory if it does not exist', async (
   const dir = path.join(os.tmpdir(), `hermes-ssh-test-${process.pid}-${Date.now()}`)
   assert.ok(!fs.existsSync(dir), 'precondition: control dir absent')
   const spawnFn = scriptedSpawn(args => (args.includes('check') ? { code: 255 } : { code: 0 }))
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: dir })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: dir, mux: true })
 
   try {
     await conn.open()
@@ -413,7 +413,7 @@ test('open() surfaces a classified auth error', async () => {
     return { code: 255, stderr: 'Permission denied (publickey).' }
   })
 
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d' })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', mux: true })
   await assert.rejects(
     () => conn.open(),
     (err: any) => {
@@ -444,7 +444,7 @@ test('exec() returns stdout on success and rejects (classified) on failure', asy
 
 test('exec() treats a hung ssh as a timeout (half-open connection)', async () => {
   const spawnFn = scriptedSpawn([{ hang: true }])
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d' })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', mux: true })
   await assert.rejects(
     () => conn.exec('uname -s', { timeoutMs: 30 }),
     (err: any) => {
@@ -457,7 +457,7 @@ test('exec() treats a hung ssh as a timeout (half-open connection)', async () =>
 
 test('forward() issues -O forward with a loopback-bound -L spec', async () => {
   const spawnFn = scriptedSpawn([{ code: 0 }])
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d' })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', mux: true })
   await conn.forward(5000, 6000)
   const args = spawnFn.calls[0]
   assert.equal(args[0], '-O')
@@ -471,7 +471,7 @@ test('lifecycle logging passes through redaction', async () => {
 
   const conn = new SshConnection(
     { host: 'box', user: 'me' },
-    { spawnFn, controlDir: '/tmp/d', rememberLog: l => logs.push(l) }
+    { spawnFn, controlDir: '/tmp/d', rememberLog: l => logs.push(l), mux: true }
   )
 
   await conn.open()
@@ -926,7 +926,7 @@ test('runSsh delivers stdinData to the child and does not log it', async () => {
   assert.equal(stdinWritten, 'secret-token-value', 'stdinData must be written to child.stdin')
 })
 
-test('open() rejects a control-dir that is a symlink', async () => {
+test.skipIf(process.platform === 'win32')('open() rejects a control-dir that is a symlink', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ssh-test-'))
   const real = path.join(tmp, 'real')
   const link = path.join(tmp, 'link')
@@ -947,7 +947,7 @@ test('open() enforces 0700 on an existing control dir with lax permissions', asy
   const dir = path.join(tmp, 'ctrl')
   fs.mkdirSync(dir, { mode: 0o755 })
   const spawnFn = scriptedSpawn(args => (args.includes('check') ? { code: 255 } : { code: 0 }))
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: dir })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: dir, mux: true })
   await conn.open()
   const stat = fs.statSync(dir)
   assert.equal(stat.mode & 0o777, 0o700, 'control dir must be tightened to 0700')
@@ -1014,7 +1014,8 @@ test('closing one scope addresses only that scope control master', async () => {
       spawnFn: firstSpawn,
       controlDir: '/tmp/d',
       ownershipId: 'installation',
-      scope: 'first'
+      scope: 'first',
+      mux: true
     }
   )
 
@@ -1024,7 +1025,8 @@ test('closing one scope addresses only that scope control master', async () => {
       spawnFn: secondSpawn,
       controlDir: '/tmp/d',
       ownershipId: 'installation',
-      scope: 'second'
+      scope: 'second',
+      mux: true
     }
   )
 
@@ -1043,7 +1045,7 @@ test('failed ControlMaster close disowns the master instead of retrying it', asy
   // contract: a master that refuses -O exit is disowned — socket dropped,
   // connection marked closed — so the next open dials fresh.
   const spawnFn = scriptedSpawn([{ code: 255, stderr: 'master refused exit' }])
-  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d' })
+  const conn = new SshConnection({ host: 'box', user: 'me' }, { spawnFn, controlDir: '/tmp/d', mux: true })
   conn._opened = true
   await conn.close()
   assert.equal(conn._opened, false)
