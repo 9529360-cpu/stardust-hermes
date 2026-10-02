@@ -1795,6 +1795,8 @@ export const ar = defineLocale({
     created: 'تم الإنشاء',
     updated: 'تم التحديث',
     failedLoad: 'فشل تحميل المهام',
+    loadFailedHelp: 'تعذر التحقق من المهام المجدولة المحفوظة. حاول مرة أخرى.',
+    loadFailedStale: 'تعذر تحديث المهام المجدولة. تُعرض القائمة المحمّلة سابقًا.',
     failedUpdate: 'فشل التحديث',
     failedTrigger: 'فشل التشغيل',
     failedDelete: 'فشل الحذف',

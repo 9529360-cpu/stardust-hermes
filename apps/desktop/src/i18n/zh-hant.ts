@@ -2297,6 +2297,8 @@ export const zhHant = defineLocale({
     created: '排程工作已建立',
     updated: '排程工作已更新',
     failedLoad: '載入排程工作失敗',
+    loadFailedHelp: '目前無法確認是否有已儲存的排程工作，請重試。',
+    loadFailedStale: '無法重新整理排程工作，目前顯示上次載入的清單。',
     failedUpdate: '更新排程工作失敗',
     failedTrigger: '觸發排程工作失敗',
     failedDelete: '刪除排程工作失敗',

@@ -2310,6 +2310,8 @@ export interface Translations {
     created: string
     updated: string
     failedLoad: string
+    loadFailedHelp: string
+    loadFailedStale: string
     failedUpdate: string
     failedTrigger: string
     failedDelete: string

@@ -2898,6 +2898,8 @@ export const zh = defineLocale({
     created: '定时任务已创建',
     updated: '定时任务已更新',
     failedLoad: '加载定时任务失败',
+    loadFailedHelp: '暂时无法确认是否有已保存的定时任务，请重试。',
+    loadFailedStale: '未能刷新定时任务，当前显示上次加载的列表。',
     failedUpdate: '更新定时任务失败',
     failedTrigger: '触发定时任务失败',
     failedDelete: '删除定时任务失败',

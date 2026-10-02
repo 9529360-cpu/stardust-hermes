@@ -2696,6 +2696,8 @@ export const en: Translations = {
     created: 'Cron created',
     updated: 'Cron updated',
     failedLoad: 'Failed to load cron jobs',
+    loadFailedHelp: 'Could not check your scheduled jobs. Try again to see whether any are saved.',
+    loadFailedStale: 'Could not refresh scheduled jobs. Showing the last loaded list.',
     failedUpdate: 'Failed to update cron job',
     failedTrigger: 'Failed to trigger cron job',
     failedDelete: 'Failed to delete cron job',
