@@ -15,9 +15,11 @@ import { useSessionSlice } from '@/lib/use-session-slice'
 import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus } from '@/store/activity'
 import { registerRepoStatusCwd, repoStatusForCwd } from '@/store/coding-status'
 import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProcess } from '@/store/composer-status'
-import { $cronJobs, setCronFocusJobId } from '@/store/cron'
+import { $activeConnectionId } from '@/store/connections'
+import { $cronJobs, $cronJobsScope, setCronFocusJobId } from '@/store/cron'
 import { applyDesktopLayoutPreset } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
+import { $profileScope, sidebarProfileForScope } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
 import { $approvalRequests } from '@/store/prompts'
 import { setRightContextOpen } from '@/store/right-context'
@@ -179,7 +181,13 @@ export function WorkspaceOverview() {
   const attentionSessionIds = useStore($attentionSessionIds)
   const approvalRequests = useStore($approvalRequests)
   const backgroundStatusBySession = useStore($backgroundStatusBySession)
-  const cronJobs = useStore($cronJobs)
+  const cachedCronJobs = useStore($cronJobs)
+  const cronJobsScope = useStore($cronJobsScope)
+  const activeConnectionId = useStore($activeConnectionId)
+  const profileScope = useStore($profileScope)
+  const cronJobs = useMemo(() => (
+    cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}` ? cachedCronJobs : []
+  ), [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope])
   const desktopActionTasks = useStore($desktopActionTasks)
   const previewServerRestart = useStore($previewServerRestart)
   const sessionStates = useStore($sessionStates)

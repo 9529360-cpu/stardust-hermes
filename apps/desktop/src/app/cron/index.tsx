@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import { ErrorBanner, ErrorState } from '@/components/ui/error-state'
 import { Field, FieldHint } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import {
@@ -53,7 +54,15 @@ import { AlertTriangle } from '@/lib/icons'
 import { requestModelOptions } from '@/lib/model-options'
 import { asText } from '@/lib/text'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronFocusJobId, $cronJobs, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
+import {
+  $cronFocusJobId,
+  $cronJobs,
+  $cronJobsLoad,
+  $cronJobsScope,
+  type CronJobsRequest,
+  invalidateCronJobsRequestIfCurrent,
+  setCronFocusJobId
+} from '@/store/cron'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
@@ -343,9 +352,10 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const c = t.cron
   // Source of truth is the shared atom (also fed by the controller poll), so the
   // sidebar and this overlay never drift — a delete here clears the sidebar row
-  // immediately. `loading` only gates the first paint before the atom is filled.
-  const jobs = useStore($cronJobs)
-  const [loading, setLoading] = useState(jobs.length === 0)
+  // immediately. Read status is shared too: background reads can supersede us.
+  const cachedJobs = useStore($cronJobs)
+  const jobsScope = useStore($cronJobsScope)
+  const jobsLoad = useStore($cronJobsLoad)
   const [query, setQuery] = useState('')
   const [busyJobTokens, setBusyJobTokens] = useState<ReadonlyMap<string, symbol>>(() => new Map())
   const [triggeringJobKeys, setTriggeringJobKeys] = useState<ReadonlySet<string>>(() => new Set())
@@ -398,34 +408,34 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const activeConnectionId = useStore($activeConnectionId)
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
   const profile = cronProfileForScope(profileScope)
+  const loadScope = `${activeConnectionId ?? ''}\u0000${profile}`
+  const jobs = useMemo(() => jobsScope === loadScope ? cachedJobs : [], [cachedJobs, jobsScope, loadScope])
+  const loadFailed = jobsLoad?.scope === loadScope && jobsLoad.status === 'error'
+  const loading = jobsLoad?.scope === loadScope && jobsLoad.status === 'loading'
+
   // Consent decisions are profile-local. Even while the jobs view is aggregated,
   // suggestions belong to the active profile on the active connection.
   const suggestionProfile =
     profileScope === ALL_PROFILES ? normalizeProfileKey(activeGatewayProfile) : normalizeProfileKey(profileScope)
 
   const refresh = useCallback(async () => {
-    const { refreshError, stale } = await refreshCronJobs(profile)
-
-    if (stale) {
-      return
-    }
-
-    if (refreshError) {
-      notifyError(refreshError, c.failedLoad)
-    }
-
-    setLoading(false)
-  }, [c, profile])
+    await refreshCronJobs(profile)
+  }, [profile])
 
   useRefreshHotkey(refresh)
 
   useEffect(() => {
-    void refresh()
-    // Fence the previous profile's request before the next profile effect, and
-    // fence every pending completion when the overlay unmounts.
+    let request: CronJobsRequest | null = null
 
-    return () => invalidateCronJobsRequests()
-  }, [refresh])
+    void refreshCronJobs(profile, started => { request = started })
+
+    // Only revoke our own in-flight read; a newer sidebar refresh owns its token.
+    return () => {
+      if (request) {
+        invalidateCronJobsRequestIfCurrent(request)
+      }
+    }
+  }, [activeConnectionId, profile])
 
   // Sidebar → "open this job": resolve the focus id (or name) to a job, select
   // it, queue a scroll, then clear the one-shot focus so re-opening cron
@@ -693,7 +703,11 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
 
     setBusySuggestionId(suggestion.id)
     try {
-      const { value: job, refreshError, stale } = await mutateAndRefreshCronJobs(profile, () =>
+      const {
+        value: job,
+        refreshError,
+        stale
+      } = await mutateAndRefreshCronJobs(profile, () =>
         acceptCronSuggestion(suggestion.id, suggestionProfile, selectedStoredSessionId)
       )
       await suggestionsQuery.refetch()
@@ -785,6 +799,12 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
       visibleSuggestions.length === 0 &&
       visibleBlueprints.length === 0 ? (
         <PageLoader label={c.loading} />
+      ) : loadFailed && totalCount === 0 && visibleSuggestions.length === 0 && visibleBlueprints.length === 0 ? (
+        <ErrorState className="m-auto" description={c.loadFailedHelp} title={c.failedLoad}>
+          <Button onClick={() => void refresh()} size="sm" variant="outline">
+            {t.common.retry}
+          </Button>
+        </ErrorState>
       ) : totalCount === 0 && visibleSuggestions.length === 0 && visibleBlueprints.length === 0 ? (
         <PanelEmpty
           action={
@@ -797,107 +817,117 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
           title={c.emptyTitleNew}
         />
       ) : (
-        <PanelBody>
-          <PanelList
-            onSearchChange={setQuery}
-            searchHints={jobs
-              .map(jobTitle)
-              .filter(Boolean)
-              .slice(0, 5)
-              .map(title => t.common.tryHint(title))}
-            searchLabel={c.search}
-            searchPlaceholder={c.search}
-            searchValue={query}
-          >
-            {visibleJobs.map(job => (
-              <CronJobListRow
-                active={selectedJob?.id === job.id}
-                job={job}
-                key={job.id}
-                menuItems={[
-                  { icon: 'edit', label: c.edit, onSelect: () => setEditor({ mode: 'edit', job }) },
-                  { icon: 'trash', label: t.common.delete, onSelect: () => setPendingDelete(job), tone: 'danger' }
-                ]}
-                menuLabel={c.manage}
-                onSelect={() => {
-                  setSelectedSuggestionId(null)
-                  setSelectedJobId(job.id)
-                }}
-              />
-            ))}
-            {visibleJobs.length === 0 && visibleSuggestions.length === 0 && visibleBlueprints.length === 0 && (
-              <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-                {query.trim() ? c.emptyTitleSearch : c.emptyTitleNew}
-              </p>
-            )}
-            <PanelAddButton label={c.newCron} onClick={() => setEditor({ mode: 'create' })} />
-            {visibleSuggestions.length > 0 && (
-              <>
-                <PanelSectionLabel className="mt-3 px-2">{c.suggestions.tab}</PanelSectionLabel>
-                {visibleSuggestions.map(item => (
-                  <PanelListRow
-                    active={selectedSuggestion?.id === item.id}
-                    icon="lightbulb"
-                    key={item.id}
-                    onSelect={() => {
-                      setSelectedJobId(null)
-                      setSelectedSuggestionId(item.id)
-                    }}
-                    rowKey={`suggestion-${item.id}`}
-                    title={suggestionDisplayTitle(item, c)}
-                  />
-                ))}
-              </>
-            )}
-            {visibleBlueprints.length > 0 && (
-              <>
-                <PanelSectionLabel className="mt-3 px-2">{c.blueprints.tab}</PanelSectionLabel>
-                {visibleBlueprints.map(item => (
-                  <PanelListRow
-                    active={false}
-                    icon="rocket"
-                    key={item.key}
-                    onSelect={() => setEditor({ blueprintKey: item.key, mode: 'create' })}
-                    rowKey={`blueprint-${item.key}`}
-                    title={blueprintDisplayTitle(item, c)}
-                  />
-                ))}
-              </>
-            )}
-          </PanelList>
-
-          {selectedSuggestion ? (
-            <CronSuggestionDetail
-              busy={busySuggestionId === selectedSuggestion.id}
-              c={c}
-              canAccept={Boolean(selectedStoredSessionId)}
-              onAccept={() => void handleSuggestionAccept(selectedSuggestion)}
-              onDismiss={() => void handleSuggestionDismiss(selectedSuggestion)}
-              suggestion={selectedSuggestion}
-            />
-          ) : selectedJob ? (
-            <CronJobDetail
-              busy={busyJobTokens.has(selectedJob.id) || triggeringJobKeys.has(`${profile}:${selectedJob.id}`)}
-              c={c}
-              job={selectedJob}
-              onEdit={() => setEditor({ mode: 'edit', job: selectedJob })}
-              onOpenSession={onOpenSession}
-              onPauseResume={() => void handlePauseResume(selectedJob)}
-              onTrigger={() => void handleTrigger(selectedJob)}
-            />
-          ) : query.trim() ? (
-            // A search with no selected job: search-flavored copy is right.
-            <PanelEmpty description={c.emptyDescSearch} icon="search" />
-          ) : (
-            // No selection and no search — "Try a broader search query" here
-            // just confused people staring at an empty panel with zero jobs.
-            <PanelEmpty
-              description={c.emptyDescNew}
-              icon="watch"
-              title={jobs.length === 0 ? c.emptyTitleNew : undefined}
-            />
+        <>
+          {loadFailed && (
+            <ErrorBanner className="mb-3 shrink-0">
+              {totalCount > 0 ? c.loadFailedStale : c.loadFailedHelp}{' '}
+              <Button onClick={() => void refresh()} size="xs" variant="ghost">
+                {t.common.retry}
+              </Button>
+            </ErrorBanner>
           )}
-        </PanelBody>
+          <PanelBody>
+            <PanelList
+              onSearchChange={setQuery}
+              searchHints={jobs
+                .map(jobTitle)
+                .filter(Boolean)
+                .slice(0, 5)
+                .map(title => t.common.tryHint(title))}
+              searchLabel={c.search}
+              searchPlaceholder={c.search}
+              searchValue={query}
+            >
+              {visibleJobs.map(job => (
+                <CronJobListRow
+                  active={selectedJob?.id === job.id}
+                  job={job}
+                  key={job.id}
+                  menuItems={[
+                    { icon: 'edit', label: c.edit, onSelect: () => setEditor({ mode: 'edit', job }) },
+                    { icon: 'trash', label: t.common.delete, onSelect: () => setPendingDelete(job), tone: 'danger' }
+                  ]}
+                  menuLabel={c.manage}
+                  onSelect={() => {
+                    setSelectedSuggestionId(null)
+                    setSelectedJobId(job.id)
+                  }}
+                />
+              ))}
+              {visibleJobs.length === 0 && visibleSuggestions.length === 0 && visibleBlueprints.length === 0 && (
+                <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                  {query.trim() ? c.emptyTitleSearch : c.emptyTitleNew}
+                </p>
+              )}
+              <PanelAddButton label={c.newCron} onClick={() => setEditor({ mode: 'create' })} />
+              {visibleSuggestions.length > 0 && (
+                <>
+                  <PanelSectionLabel className="mt-3 px-2">{c.suggestions.tab}</PanelSectionLabel>
+                  {visibleSuggestions.map(item => (
+                    <PanelListRow
+                      active={selectedSuggestion?.id === item.id}
+                      icon="lightbulb"
+                      key={item.id}
+                      onSelect={() => {
+                        setSelectedJobId(null)
+                        setSelectedSuggestionId(item.id)
+                      }}
+                      rowKey={`suggestion-${item.id}`}
+                      title={suggestionDisplayTitle(item, c)}
+                    />
+                  ))}
+                </>
+              )}
+              {visibleBlueprints.length > 0 && (
+                <>
+                  <PanelSectionLabel className="mt-3 px-2">{c.blueprints.tab}</PanelSectionLabel>
+                  {visibleBlueprints.map(item => (
+                    <PanelListRow
+                      active={false}
+                      icon="rocket"
+                      key={item.key}
+                      onSelect={() => setEditor({ blueprintKey: item.key, mode: 'create' })}
+                      rowKey={`blueprint-${item.key}`}
+                      title={blueprintDisplayTitle(item, c)}
+                    />
+                  ))}
+                </>
+              )}
+            </PanelList>
+
+            {selectedSuggestion ? (
+              <CronSuggestionDetail
+                busy={busySuggestionId === selectedSuggestion.id}
+                c={c}
+                canAccept={Boolean(selectedStoredSessionId)}
+                onAccept={() => void handleSuggestionAccept(selectedSuggestion)}
+                onDismiss={() => void handleSuggestionDismiss(selectedSuggestion)}
+                suggestion={selectedSuggestion}
+              />
+            ) : selectedJob ? (
+              <CronJobDetail
+                busy={busyJobTokens.has(selectedJob.id) || triggeringJobKeys.has(`${profile}:${selectedJob.id}`)}
+                c={c}
+                job={selectedJob}
+                onEdit={() => setEditor({ mode: 'edit', job: selectedJob })}
+                onOpenSession={onOpenSession}
+                onPauseResume={() => void handlePauseResume(selectedJob)}
+                onTrigger={() => void handleTrigger(selectedJob)}
+              />
+            ) : query.trim() ? (
+              // A search with no selected job: search-flavored copy is right.
+              <PanelEmpty description={c.emptyDescSearch} icon="search" />
+            ) : (
+              // No selection and no search — "Try a broader search query" here
+              // just confused people staring at an empty panel with zero jobs.
+              <PanelEmpty
+                description={c.emptyDescNew}
+                icon="watch"
+                title={jobs.length === 0 ? c.emptyTitleNew : undefined}
+              />
+            )}
+          </PanelBody>
+        </>
       )}
 
       <CronEditorDialog
@@ -1483,11 +1513,7 @@ function CronEditorDialog({
               const help = blueprintDisplayFieldHelp(blueprint.key, field, c)
 
               return (
-                <Field
-                  htmlFor={fieldId}
-                  key={field.name}
-                  label={blueprintDisplayFieldLabel(blueprint.key, field, c)}
-                >
+                <Field htmlFor={fieldId} key={field.name} label={blueprintDisplayFieldLabel(blueprint.key, field, c)}>
                   {field.name === 'deliver' ? (
                     // Use the shared, backend-sourced delivery targets (same as the
                     // manual editor) rather than the blueprint's static field.options,

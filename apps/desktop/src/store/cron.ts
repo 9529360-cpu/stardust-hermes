@@ -6,6 +6,12 @@ import type { CronJob } from '@/types/hermes'
 // the job — schedule, state, live next-run countdown — makes the job the
 // first-class entity; its runs (sessions) resolve under it in the cron detail.
 export const $cronJobs = atom<CronJob[]>([])
+// Jobs are usable only by the connection/profile whose read supplied them.
+export const $cronJobsScope = atom<string | null>(null)
+
+// Latest authoritative list read, including reads initiated by the sidebar.
+// A failed read must not make an empty cache look like an empty backend list.
+export const $cronJobsLoad = atom<{ scope: string; status: 'loading' | 'ready' | 'error' } | null>(null)
 
 export interface CronJobsRequest {
   generation: number
@@ -34,6 +40,7 @@ function activateCronJobsScope(scope: string): void {
 export function beginCronJobsRequest(scope: string): CronJobsRequest {
   activateCronJobsScope(scope)
   cronJobsRequestGeneration += 1
+  $cronJobsLoad.set({ scope, status: 'loading' })
 
   return { generation: cronJobsRequestGeneration, scope }
 }
@@ -55,6 +62,30 @@ export function isCronJobsRequestCurrent(request: CronJobsRequest): boolean {
 export function invalidateCronJobsRequests(): void {
   cronJobsRequestGeneration += 1
   cronJobsScopeGeneration += 1
+  $cronJobsLoad.set(null)
+}
+
+// Closing an overlay must not cancel a newer sidebar/background owner.
+export function invalidateCronJobsRequestIfCurrent(request: CronJobsRequest): boolean {
+  if (!isCronJobsRequestCurrent(request)) {
+    return false
+  }
+
+  cronJobsRequestGeneration += 1
+  $cronJobsLoad.set(null)
+
+  return true
+}
+
+export function failCronJobsRequest(request: CronJobsRequest): boolean {
+  if (!isCronJobsRequestCurrent(request)) {
+    return false
+  }
+
+  cronJobsRequestGeneration += 1
+  $cronJobsLoad.set({ scope: request.scope, status: 'error' })
+
+  return true
 }
 
 export function commitCronJobsRequest(request: CronJobsRequest, jobs: CronJob[]): boolean {
@@ -66,6 +97,8 @@ export function commitCronJobsRequest(request: CronJobsRequest, jobs: CronJob[])
   // can publish after this authoritative snapshot.
   cronJobsRequestGeneration += 1
   $cronJobs.set(jobs)
+  $cronJobsScope.set(request.scope)
+  $cronJobsLoad.set({ scope: request.scope, status: 'ready' })
 
   return true
 }
@@ -73,6 +106,8 @@ export function commitCronJobsRequest(request: CronJobsRequest, jobs: CronJob[])
 export const setCronJobs = (jobs: CronJob[]) => {
   cronJobsRequestGeneration += 1
   $cronJobs.set(jobs)
+  $cronJobsScope.set(null)
+  $cronJobsLoad.set(null)
 }
 
 // In-place edit so the cron overlay's mutations (create/edit/delete/pause/…)
@@ -80,6 +115,7 @@ export const setCronJobs = (jobs: CronJob[]) => {
 export const updateCronJobs = (fn: (jobs: CronJob[]) => CronJob[]) => {
   cronJobsRequestGeneration += 1
   $cronJobs.set(fn($cronJobs.get()))
+  $cronJobsLoad.set(null)
 }
 
 // One-shot focus target: clicking "Manage" on a job sets this, then opens the
