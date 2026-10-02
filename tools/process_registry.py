@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, NamedTuple, Optional
 
 from hermes_cli.config import get_hermes_home
+from hermes_constants import hermes_home_key
 
 from tools.process_registry_notifications import format_process_notification
 from tools.process_registry_checkpoint import ProcessCheckpointMixin
@@ -449,6 +450,7 @@ class ProcessSession:
     owner_task_id: str = ""                     # RAW spawning task id ("sa-..."); ownership
                                                 # checks must use this, not task_id
     session_key: str = ""                       # Gateway session key (reset protection)
+    owner_home: str = ""                        # Immutable canonical profile home; stamped on spawn/recovery
     pid: Optional[int] = None
     process: Optional[subprocess.Popen] = None  # Popen handle (local only)
     env_ref: Any = None                         # Environment object (sandbox spawns)
@@ -497,6 +499,12 @@ class ProcessSession:
     _pipe_read_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _pty: Any = field(default=None, repr=False)  # ptyprocess handle (use_pty=True)
 
+    def __post_init__(self) -> None:
+        # Directly constructed sessions (including tests and retained receipts) also
+        # acquire an owner; an unstamped entry must never bypass profile checks.
+        if not self.owner_home:
+            self.owner_home = hermes_home_key()
+
     def append_output(self, text: str) -> None:
         """Append to the rolling output buffer under the session lock, keeping the tail."""
         with self._lock:
@@ -521,7 +529,7 @@ _WATCHER_ROUTE_KEYS = ("platform", "chat_id", "user_id", "user_name", "thread_id
 # ``session_id``; ``command`` is redacted and ``owner_task_id`` defaulted on write).
 _CHECKPOINT_FIELDS = (
     "command", "pid", "pid_scope", "host_start_time", "systemd_unit", "cwd",
-    "started_at", "task_id", "owner_task_id", "session_key", "handoff_note",
+    "started_at", "task_id", "owner_task_id", "session_key", "owner_home", "handoff_note",
     *(f"watcher_{k}" for k in _WATCHER_ROUTE_KEYS), "watcher_interval",
     "parent_session_id", "notify_on_complete", "watch_patterns")
 _CHECKPOINT_DEFAULTS = {
@@ -575,6 +583,12 @@ class ProcessRegistry(ProcessCheckpointMixin):
         # a read-only terminal tab without killing the process.
         self.on_output = None
         self.on_close = None
+
+    def take_pending_watchers(self) -> List[Dict[str, Any]]:
+        """Atomically detach the gateway watcher batch across spawn/recovery threads."""
+        with self._lock:
+            watchers, self.pending_watchers = self.pending_watchers, []
+        return watchers
 
     @staticmethod
     def _clean_shell_noise(text: str) -> str:
@@ -683,6 +697,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         """Session identity + watcher routing fields shared by every watch event."""
         return {
             "session_id": session.id,
+            "owner_home": session.owner_home,
             "session_key": session.session_key,
             "task_id": session.task_id,
             "owner_task_id": session.owner_task_id or session.task_id,
@@ -890,6 +905,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         return ProcessSession(
             id=f"proc_{uuid.uuid4().hex[:12]}", command=command, task_id=task_id,
             owner_task_id=owner_task_id or task_id, session_key=session_key, cwd=cwd,
+            owner_home=hermes_home_key(),
             parent_session_id=get_session_env("HERMES_SESSION_ID", ""),
             started_at=time.time(), **extra)
 
@@ -1395,11 +1411,20 @@ class ProcessRegistry(ProcessCheckpointMixin):
         # that was just killed. poll()/wait()/read_log() serve from the
         # buffered ``output_buffer``, never from the pipe.
         self._release_finished_handles(session)
-        self._write_checkpoint()
+        if session.owner_home and session.owner_home != hermes_home_key():
+            from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+            token = set_hermes_home_override(session.owner_home)
+            try:
+                self._write_checkpoint()
+            finally:
+                reset_hermes_home_override(token)
+        else:
+            self._write_checkpoint()
         if was_running and session.notify_on_complete:
             notification = {
                 "type": "completion",
                 "session_id": session.id,
+                "owner_home": session.owner_home,
                 "session_key": session.session_key,
                 "task_id": session.task_id,
                 "owner_task_id": session.owner_task_id or session.task_id,
@@ -1582,6 +1607,8 @@ class ProcessRegistry(ProcessCheckpointMixin):
     @staticmethod
     def _owns_event(evt: dict, session_key: str, owns_event, is_async_delegation: bool) -> bool:
         """Routing verdict for one drained event (see drain_notifications); False = requeue."""
+        if evt.get("owner_home") and evt["owner_home"] != hermes_home_key():
+            return False
         evt_session_key = str(evt.get("session_key") or "")
         requires_positive_proof = is_async_delegation or bool(evt_session_key or evt.get("origin_ui_session_id"))
         if owns_event is not None and requires_positive_proof:
@@ -1652,6 +1679,10 @@ class ProcessRegistry(ProcessCheckpointMixin):
     # Minimum suffix chars for prefix resolution; "p"/"proc_1" are too collision-prone.
     _MIN_PREFIX_CHARS = 4
 
+    @staticmethod
+    def _in_current_home(session: ProcessSession) -> bool:
+        return session.owner_home == hermes_home_key()
+
     def get(self, session_id: str) -> Optional[ProcessSession]:
         """Session by full ID or unique prefix (``proc_4dae`` / bare ``4dae``, like git
         short hashes); ambiguous or too-short prefixes resolve to None, never a guess."""
@@ -1659,8 +1690,11 @@ class ProcessRegistry(ProcessCheckpointMixin):
             return None
         with self._lock:
             session = self._running.get(session_id) or self._finished.get(session_id)
-        if session is None:
-            session = load_completed_results(session_id).get(session_id)
+        if session is not None and not self._in_current_home(session):
+            session = None
+        else:
+            if session is None:
+                session = load_completed_results(session_id).get(session_id)
         return self._refresh_detached_session(session if session is not None else self._resolve_prefix(session_id))
 
     def _resolve_prefix(self, session_id: str) -> Optional[ProcessSession]:
@@ -1677,7 +1711,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         with self._lock:
             matches.update({
                 sid: s for store in (self._running, self._finished)
-                for sid, s in store.items() if sid.startswith(query)
+                for sid, s in store.items() if sid.startswith(query) and self._in_current_home(s)
             })
         return next(iter(matches.values())) if len(matches) == 1 else None
 
@@ -2064,7 +2098,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         with self._lock:
             sessions.update(self._finished)
             sessions.update(self._running)
-        all_sessions = [self._refresh_detached_session(s) for s in sessions.values()]
+        all_sessions = [self._refresh_detached_session(s) for s in sessions.values() if self._in_current_home(s)]
         if task_id or session_key:
             all_sessions = [
                 s for s in all_sessions
@@ -2111,15 +2145,16 @@ class ProcessRegistry(ProcessCheckpointMixin):
 
     # ----- Session/Task Queries (for gateway integration) -----
 
-    def _any_running(self, predicate) -> bool:
+    def _any_running(self, predicate, *, all_profiles: bool = False) -> bool:
         """True if any still-running session satisfies *predicate*, after refreshing
         detached sessions so a finished-but-unreaped process reads as inactive."""
         with self._lock:
-            sessions = list(self._running.values())
+            sessions = [s for s in self._running.values() if all_profiles or self._in_current_home(s)]
         for session in sessions:
             self._refresh_detached_session(session)
         with self._lock:
-            return any(not s.exited and predicate(s) for s in self._running.values())
+            return any(not s.exited and (all_profiles or self._in_current_home(s)) and predicate(s)
+                       for s in self._running.values())
 
     def has_active_processes(self, task_id: str) -> bool:
         """Whether any process for ``task_id`` is still running."""
@@ -2128,14 +2163,14 @@ class ProcessRegistry(ProcessCheckpointMixin):
     def running_owned_by(self, owner_task_id: str) -> List[ProcessSession]:
         """Running processes whose RAW spawning owner is ``owner_task_id``."""
         with self._lock:
-            return [s for s in self._running.values() if s.owner_task_id == owner_task_id and not s.exited]
+            return [s for s in self._running.values() if self._in_current_home(s) and s.owner_task_id == owner_task_id and not s.exited]
 
     def unread_completions_owned_by(self, owner_task_id: str) -> List[ProcessSession]:
         """Exited ``notify_on_complete`` processes of ``owner_task_id`` whose result nobody read (no wait/log/poll).
         A child's completion notice is suppressed in the parent, so an unread exit is otherwise lost silently."""
         with self._lock:
             return [s for s in self._finished.values()
-                    if s.owner_task_id == owner_task_id and s.notify_on_complete
+                    if self._in_current_home(s) and s.owner_task_id == owner_task_id and s.notify_on_complete
                     and s.id not in self._completion_consumed and s.id not in self._poll_observed]
 
     def transfer_ownership(self, session_id: str, *, from_owner: str, to_owner: str, to_task_id: str,
@@ -2167,14 +2202,14 @@ class ProcessRegistry(ProcessCheckpointMixin):
     def has_any_active(self) -> bool:
         """Whether ANY background process is running — scale-to-zero must not
         suspend a gateway with live background work or the process is lost."""
-        return self._any_running(lambda s: True)
+        return self._any_running(lambda s: True, all_profiles=True)
 
     def snapshot_running_ids(self, task_id: str) -> frozenset[str]:
         """Running IDs owned by ``task_id`` — a turn-boundary marker: on timeout
         only processes absent from the starting snapshot belong to the abandoned
         turn; older ones intentionally span turns and must survive."""
         with self._lock:
-            return frozenset(s.id for s in self._running.values() if s.task_id == task_id and not s.exited)
+            return frozenset(s.id for s in self._running.values() if self._in_current_home(s) and s.task_id == task_id and not s.exited)
 
     def kill_started_since(self, task_id: str, baseline_ids, *, source: str) -> int:
         """Kill ``task_id`` processes created after ``baseline_ids``. Output is
@@ -2184,17 +2219,27 @@ class ProcessRegistry(ProcessCheckpointMixin):
 
     def kill_all(
         self, task_id: Optional[str] = None, *, exclude_ids: frozenset = frozenset(),
-        source: str = "kill_all", consume_output: bool = False) -> int:
+        source: str = "kill_all", consume_output: bool = False, all_profiles: bool = False) -> int:
         """Kill all running processes, optionally filtered by task_id. Returns count killed."""
         with self._lock:
             targets = [
                 s for s in self._running.values()
-                if (task_id is None or s.task_id == task_id) and s.id not in exclude_ids and not s.exited
+                if (all_profiles or self._in_current_home(s)) and (task_id is None or s.task_id == task_id)
+                and s.id not in exclude_ids and not s.exited
             ]
-        return sum(
-            self.kill_process(s.id, source=source, consume_output=consume_output).get("status")
-            in {"killed", "already_exited"}
-            for s in targets)
+        if not all_profiles:
+            return sum(self.kill_process(s.id, source=source, consume_output=consume_output).get("status")
+                       in {"killed", "already_exited"} for s in targets)
+        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        killed = 0
+        for session in targets:
+            token = set_hermes_home_override(session.owner_home)
+            try:
+                killed += self.kill_process(session.id, source=source, consume_output=consume_output).get("status") in {
+                    "killed", "already_exited"}
+            finally:
+                reset_hermes_home_override(token)
+        return killed
 
     # ----- Cleanup / Pruning -----
 

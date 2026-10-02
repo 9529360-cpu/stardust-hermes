@@ -16,12 +16,15 @@ class ProcessCheckpointMixin:
     def _write_checkpoint(self, extra_entries: Optional[List[Dict[str, Any]]] = None):
         """Write running process metadata to the checkpoint file atomically."""
         from tools.process_registry import _checkpoint_path, _CHECKPOINT_FIELDS
+        from hermes_constants import hermes_home_key
+
+        owner_home = hermes_home_key()
 
         try:
             with self._lock:
                 entries = []
                 for s in self._running.values():
-                    if s.exited:
+                    if s.exited or s.owner_home != owner_home:
                         continue
                     # Backfill the start time so recovery can detect PID recycling
                     # even for sessions spawned before this field existed.
@@ -37,7 +40,11 @@ class ProcessCheckpointMixin:
                     entries.append(entry)
                 if extra_entries:
                     tracked_ids = {item.get("session_id") for item in entries}
-                    entries.extend(item for item in extra_entries if item.get("session_id") not in tracked_ids)
+                    entries.extend(
+                        item for item in extra_entries
+                        if item.get("session_id") not in tracked_ids
+                        and (not item.get("owner_home") or item["owner_home"] == owner_home)
+                    )
             from utils import atomic_json_write
             atomic_json_write(_checkpoint_path(), entries)
         except Exception as e:
@@ -51,7 +58,10 @@ class ProcessCheckpointMixin:
             _CHECKPOINT_DEFAULTS, _WATCHER_ROUTE_KEYS, _stop_systemd_unit,
         )
 
+        from hermes_constants import hermes_home_key
+
         checkpoint_path = _checkpoint_path()
+        owner_home = hermes_home_key()
         if not checkpoint_path.exists():
             return 0
         try:
@@ -61,11 +71,15 @@ class ProcessCheckpointMixin:
         recovered = 0
         unresolved_scope_entries: List[Dict[str, Any]] = []
         for entry in entries:
+            # The containing file is authoritative for legacy entries. Do not adopt a
+            # foreign entry from an old mixed-profile checkpoint under this profile.
+            if entry.get("owner_home") and entry["owner_home"] != owner_home:
+                continue
             pid, pid_scope = entry.get("pid"), entry.get("pid_scope", "host")
             if not pid:
                 continue
-            # The registry is process-global, so every profile's checkpoint carries every live
-            # process; a multiplexer recovering several homes must adopt each session once.
+            # The registry is process-global; a multiplexer recovers each profile's
+            # checkpoint into the shared registry without re-adopting the same ID.
             with self._lock:
                 already_tracked = entry.get("session_id") in self._running
             if already_tracked:
@@ -95,6 +109,7 @@ class ProcessCheckpointMixin:
                 continue
             fields = {f: entry.get(f, _CHECKPOINT_DEFAULTS[f]) for f in _CHECKPOINT_FIELDS}
             fields.update(
+                owner_home=owner_home,
                 command=entry.get("command", "unknown"),
                 owner_task_id=entry.get("owner_task_id", "") or entry.get("task_id", ""),
                 started_at=entry.get("started_at", time.time()))
@@ -106,13 +121,15 @@ class ProcessCheckpointMixin:
             logger.info("Recovered detached process: %s (pid=%d)", session.command[:60], pid)
             # Re-enqueue watcher so gateway can resume notifications
             if session.watcher_interval > 0:
-                self.pending_watchers.append({
-                    "session_id": session.id,
-                    "check_interval": session.watcher_interval,
-                    "session_key": session.session_key,
-                    **{key: getattr(session, f"watcher_{key}") for key in _WATCHER_ROUTE_KEYS},
-                    "notify_on_complete": session.notify_on_complete,
-                    "parent_session_id": session.parent_session_id,
-                })
+                with self._lock:
+                    self.pending_watchers.append({
+                        "session_id": session.id,
+                        "owner_home": session.owner_home,
+                        "check_interval": session.watcher_interval,
+                        "session_key": session.session_key,
+                        **{key: getattr(session, f"watcher_{key}") for key in _WATCHER_ROUTE_KEYS},
+                        "notify_on_complete": session.notify_on_complete,
+                        "parent_session_id": session.parent_session_id,
+                    })
         self._write_checkpoint(extra_entries=unresolved_scope_entries)
         return recovered

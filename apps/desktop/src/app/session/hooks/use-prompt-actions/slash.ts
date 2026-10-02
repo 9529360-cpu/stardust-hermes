@@ -41,7 +41,7 @@ import {
   setSessions,
   setYoloActive
 } from '@/store/session'
-import { $sessionStates } from '@/store/session-states'
+import { $sessionStates, requestForOwnedSession } from '@/store/session-states'
 import {
   applyWakeStartResult,
   applyWakeStatus,
@@ -535,7 +535,9 @@ export function useSlashCommand(deps: SlashCommandDeps) {
           }
 
           try {
-            const result = await requestGateway<unknown>('process.stop', {})
+            const result = await requestForOwnedSession<unknown>(
+              initialSessionId, requestGateway, 'process.stop', { session_id: initialSessionId }
+            )
             const processMessage = renderRpcResult(result, ctx.name)
 
             if (processMessage) {

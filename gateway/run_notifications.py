@@ -67,8 +67,8 @@ class GatewayNotificationsMixin:
     """Process/completion/update notifications, media delivery and async-delegation delivery for GatewayRunner."""
 
     # Coalescing keys: process completions (short-window fan-in) and async delegations (+ parent session).
-    _COMPLETION_BATCH_KEY_FIELDS = ("session_key", "platform", "chat_type", "chat_id", "thread_id", "user_id")
-    _ASYNC_GROUP_KEY_FIELDS = ("session_key", "parent_session_id", *_COMPLETION_BATCH_KEY_FIELDS[1:])
+    _COMPLETION_BATCH_KEY_FIELDS = ("owner_home", "session_key", "platform", "chat_type", "chat_id", "thread_id", "user_id")
+    _ASYNC_GROUP_KEY_FIELDS = ("session_key", "parent_session_id", *_COMPLETION_BATCH_KEY_FIELDS[2:])
 
     @dataclasses.dataclass
     class _UpdatePaths:
@@ -899,6 +899,17 @@ class GatewayNotificationsMixin:
                 platform, home, transport, message, "state.db warning notification failed for %s:%s: %s",
             )
 
+    def _process_event_source_matches_owner(self, evt: dict, source: SessionSource) -> bool:
+        """Never let a shared session-key cache retarget an owned process event."""
+        owner_home = evt.get("owner_home")
+        if not owner_home:
+            return True  # Legacy non-process events retain their existing routing behavior.
+        from hermes_constants import hermes_home_key
+        try:
+            return hermes_home_key(self._resolve_profile_home_for_source(source)) == owner_home
+        except Exception:
+            return False
+
     def _build_process_event_source(self, evt: dict):
         """Resolve the canonical source for a synthetic background-process event.
 
@@ -912,11 +923,13 @@ class GatewayNotificationsMixin:
                 self.session_store._ensure_loaded()
                 entry = self.session_store._entries.get(session_key)
                 if entry and getattr(entry, "origin", None):
-                    return entry.origin
+                    source = entry.origin
+                    if self._process_event_source_matches_owner(evt, source):
+                        return source
             except Exception as exc:
                 logger.debug("Synthetic process-event session-store lookup failed for %s: %s", session_key, exc)
             cached_source = self._get_cached_session_source(session_key)
-            if cached_source is not None:
+            if cached_source is not None and self._process_event_source_matches_owner(evt, cached_source):
                 return cached_source
             derived = _parse_session_key(session_key) or {}
         profile = derived.get("profile")
@@ -960,10 +973,14 @@ class GatewayNotificationsMixin:
                 "without scope_id; scoped relay egress may be declined by "
                 "the connector's tenant guard (user_id fallback only).", platform_name, chat_id, chat_type,
             )
-        return SessionSource(
+        source = SessionSource(
             platform=platform, chat_id=chat_id, chat_type=chat_type, thread_id=_opt("thread_id"),
             user_id=_opt("user_id"), user_name=_opt("user_name"), scope_id=scope_id, profile=profile,
         )
+        if not self._process_event_source_matches_owner(evt, source):
+            logger.warning("Refusing process event source outside its owner profile: %s", session_key)
+            return None
+        return source
 
     async def _drain_watch_notifications(self, completion_queue) -> None:
         """Consume queued watch events and inject them when notifications are enabled.
@@ -1312,7 +1329,12 @@ class GatewayNotificationsMixin:
         the ROOT scope, so a secondary profile's completion was looked up in the DEFAULT profile's
         state.db — classified ``terminal`` and dropped, its ledger row stranded ``pending`` forever."""
         from gateway.run import _async_profile_runtime_scope
-        from hermes_constants import get_hermes_home_override
+        from hermes_constants import get_hermes_home_override, hermes_home_key
+        owner_home = evt.get("owner_home")
+        if owner_home:
+            if hermes_home_key() == owner_home:
+                return contextlib.nullcontext()
+            return _async_profile_runtime_scope(owner_home)
         source = self._build_process_event_source(evt)
         if source is None or not getattr(source, "profile", None):
             return contextlib.nullcontext()
@@ -1670,6 +1692,8 @@ class GatewayNotificationsMixin:
     async def _send_watcher_message(self, platform_name: str, chat_id, thread_id, message_text: str, watcher: dict) -> None:
         from gateway.run import _non_conversational_metadata
         source = await asyncio.to_thread(self._build_process_event_source, watcher)
+        if watcher.get("owner_home") and source is None:
+            return  # A mismatched cache/source must not fall back to an ambient adapter.
         adapter = self._resolve_injection_adapter(platform_name, source)
         if adapter and chat_id:
             with _log_suppressed(logging.ERROR, "Watcher delivery error: %s"):
@@ -1702,6 +1726,7 @@ class GatewayNotificationsMixin:
         return {
             "type": "completion",
             "session_id": session_id,
+            "owner_home": watcher["owner_home"],
             **{k: watcher.get(k, "") for k in _WATCHER_ROUTE_FIELDS},
             "message_id": str(watcher.get("message_id") or "").strip() or None,
             "started_at": getattr(session, "started_at", None),
@@ -1739,6 +1764,19 @@ class GatewayNotificationsMixin:
         return f"{header}\n\nRecent output:\n```\n{new_output.strip()}\n```" if new_output.strip() else header
 
     async def _run_process_watcher(self, watcher: dict) -> None:
+        """Keep the immutable process owner active across polling and delivery."""
+        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        owner_home = watcher.get("owner_home")
+        if not owner_home:
+            logger.warning("Skipping process watcher without owner home: %s", watcher.get("session_id"))
+            return
+        token = set_hermes_home_override(owner_home)
+        try:
+            await self._run_process_watcher_owned(watcher)
+        finally:
+            reset_hermes_home_override(token)
+
+    async def _run_process_watcher_owned(self, watcher: dict) -> None:
         """Poll a background process and push updates until it exits. Mode
         (``display.background_process_notifications``): concise (default one-liner; failures append
         the output tail) / all (running updates + final raw) / result (final raw) / error (final raw

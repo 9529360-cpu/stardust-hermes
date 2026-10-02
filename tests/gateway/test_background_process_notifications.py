@@ -57,6 +57,7 @@ def _build_runner(monkeypatch, tmp_path, mode: str) -> GatewayRunner:
 
     import gateway.run as gateway_run
 
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
 
     runner = GatewayRunner(GatewayConfig())
@@ -66,8 +67,12 @@ def _build_runner(monkeypatch, tmp_path, mode: str) -> GatewayRunner:
 
 
 def _watcher_dict(session_id="proc_test", thread_id=""):
+    from hermes_constants import hermes_home_key
     d = {
         "session_id": session_id,
+        "owner_home": hermes_home_key(),
+        "session_key": "agent:main:telegram:dm:123",
+        "chat_type": "dm",
         "check_interval": 0,
         "platform": "telegram",
         "chat_id": "123",
