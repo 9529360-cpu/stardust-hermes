@@ -31,6 +31,11 @@ def repo(tmp_path):
     _git(root, "init", "-q", "-b", "main")
     _git(root, "config", "user.email", "t@t")
     _git(root, "config", "user.name", "t")
+    # git >= 2.5x runs `maintenance run --auto` after every commit, which repacks in the
+    # background: it consolidated the packs these tests build (6 became 3-4) and raced the
+    # next commit (`git commit` exit 128 on CI). Only the code under test may repack here.
+    _git(root, "config", "maintenance.auto", "false")
+    _git(root, "config", "gc.auto", "0")
     (root / "f.txt").write_text("x\n")
     _git(root, "add", "-A")
     _git(root, "commit", "-qm", "init")
@@ -114,11 +119,10 @@ class TestMaintainPackHealth:
         from hermes_cli import worktree_ops
 
         made = self._make_packs(repo, 6)
-        # Behavior contract, not a snapshot: different git builds consolidate
-        # differently while packs accumulate (CI produced 3-4 from 6 attempts;
-        # local git produces 6). All the fixture must guarantee is SPRAWL —
-        # strictly more packs than the threshold we set — so the maintenance
-        # pass has something real to consolidate.
+        # Behavior contract, not a snapshot: all the fixture must guarantee is
+        # SPRAWL — strictly more packs than the threshold we set — so the
+        # maintenance pass has something real to consolidate. (With git's
+        # auto-maintenance off in the fixture, every git build makes 6.)
         threshold = 2
         monkeypatch.setattr(worktree_ops, "_PACK_SPRAWL_THRESHOLD", threshold)
         assert made > threshold, f"fixture failed to produce sprawl (made={made})"
