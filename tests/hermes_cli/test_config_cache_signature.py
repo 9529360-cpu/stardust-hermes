@@ -5,7 +5,10 @@ import os
 import shutil
 from unittest.mock import patch
 
+import pytest
+
 from hermes_cli import config as config_mod
+import utils
 
 
 def _replace_pinning_mtime(path, content: str) -> None:
@@ -14,6 +17,17 @@ def _replace_pinning_mtime(path, content: str) -> None:
     other.write_text(content, encoding="utf-8")
     shutil.copy2(other, path)
     os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows ChangeTime collision")
+def test_path_signature_detects_rewrite_even_when_windows_change_time_is_unchanged(tmp_path, monkeypatch):
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text("model: aaaa-route\n", encoding="utf-8")
+    monkeypatch.setattr(utils, "_windows_change_time", lambda path: 12345)
+    before = utils.path_signature(cfg)
+    _replace_pinning_mtime(cfg, "model: bbbb-route\n")
+    after = utils.path_signature(cfg)
+    assert before != after
 
 
 def test_load_config_sees_replacement_with_pinned_mtime_and_size(tmp_path):

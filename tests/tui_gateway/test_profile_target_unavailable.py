@@ -35,7 +35,12 @@ def test_explicit_profile_target_never_falls_back(tmp_path, monkeypatch):
     # A real resolution I/O failure must propagate, too (no predicate patch).
     profiles = home / "profiles"
     profiles.rename(home / "saved-profiles")
-    profiles.symlink_to("profiles")
+    try:
+        profiles.symlink_to("profiles")
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows symlinks require developer mode or privilege")
+        raise
     with pytest.raises((OSError, RuntimeError)):
         server._profile_home("worker")
 

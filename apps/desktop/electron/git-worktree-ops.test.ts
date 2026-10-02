@@ -164,7 +164,17 @@ test('listBranches: empty on a non-repo path', async () => {
   try {
     assert.deepEqual(await listBranches(dir, 'git'), [])
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true })
+        break
+      } catch (error) {
+        if (process.platform !== 'win32' || (error as NodeJS.ErrnoException).code !== 'EPERM' || attempt === 9) {
+          throw error
+        }
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
   }
 })
 

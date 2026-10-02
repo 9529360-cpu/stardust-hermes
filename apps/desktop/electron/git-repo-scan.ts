@@ -116,7 +116,10 @@ export async function scanGitRepos(roots: string[], options: RepoScanOptions = {
 
   const maxDepthValue = Number(options.maxDepth)
   const maxDepth = Number.isFinite(maxDepthValue) && maxDepthValue >= 0 ? maxDepthValue : DEFAULT_MAX_DEPTH
-  const pathOptions: RepoScanPathOptions = options.platform ? { platform: options.platform } : {}
+  // The platform override controls discovery policy (e.g. macOS media exclusions),
+  // not the syntax of paths on the machine actually being scanned. Test fixtures
+  // and callers still supply native filesystem paths when exercising that policy.
+  const pathOptions: RepoScanPathOptions = {}
   const requestedRoots = Array.isArray(roots) && roots.length > 0 ? roots : [os.homedir()]
 
   const searchRoots = [
@@ -172,7 +175,7 @@ export async function scanGitRepos(roots: string[], options: RepoScanOptions = {
       return
     }
 
-    const skipTccProtectedPaths = (pathOptions.platform ?? process.platform) === 'darwin'
+    const skipTccProtectedPaths = (options.platform ?? process.platform) === 'darwin'
 
     const subdirs = entries
       .filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !JUNK_DIRS.has(entry.name))

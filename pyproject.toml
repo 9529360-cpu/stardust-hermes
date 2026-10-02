@@ -603,6 +603,9 @@ plugins = ["**/plugin.yaml", "**/plugin.yml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A stable parent for per-file runner temp roots: never recurse into volatile
+# directories while another worker is deleting them (notably on Windows).
+norecursedirs = [".*", "build", "dist", "CVS", "_darcs", "{arch}", "*.egg", "venv", ".pytest-runner-tmp"]
 markers = [
     "integration: marks tests requiring external services (API keys, Modal, etc.)",
     "real_concurrent_gate: opt out of the autouse stub that disables _detect_concurrent_hermes_instances",

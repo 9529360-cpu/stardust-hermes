@@ -2,16 +2,20 @@
 lives only in process memory (the agent flushes to SQLite at turn end), so a marker is written at turn
 start and cleared on any conclusion — only a process death leaves one behind, and ``session.resume``
 reads it (``_maybe_schedule_auto_continue``). Stored per ``HERMES_HOME`` (profile-aware); writes prune
-entries older than ``_MAX_AGE_SECS`` and cap the count so a crash streak can't grow the file. Every
-function is best-effort — marker bookkeeping must never break a turn — so I/O errors degrade to "no
-marker" instead of raising."""
+entries older than ``_MAX_AGE_SECS`` and cap the count so a crash streak can't grow the file. Writers
+hold a persistent sibling lockfile across load/mutate/atomic replace: a second backend process must not
+overwrite the first process's newly recorded session with a stale snapshot. Every function is
+best-effort — marker bookkeeping must never break a turn — so I/O errors degrade to "no marker"
+instead of raising."""
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from utils import atomic_json_write
@@ -24,6 +28,32 @@ _MAX_ENTRIES = 32
 _MAX_PROMPT_CHARS = 64_000
 
 _lock = threading.Lock()
+
+
+@contextmanager
+def _write_lock(path: Path):
+    """Lock a stable sibling file: the JSON file itself is atomically replaced or unlinked."""
+    lock_path = path.with_name(f".{path.name}.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a+b") as handle:
+        if os.name == "nt":  # pragma: no cover - exercised on Windows CI
+            import msvcrt
+            if handle.seek(0, os.SEEK_END) == 0:
+                handle.write(b"\0")
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if os.name == "nt":  # pragma: no cover - exercised on Windows CI
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _marker_path(home: Path | str) -> Path:
@@ -65,9 +95,10 @@ def _update(home: Path | str, session_key: str, mutate, what: str) -> None:
     try:
         with _lock:
             path = _marker_path(home)
-            entries = mutate(_load(path))
-            if entries is not None:
-                _store(path, entries)
+            with _write_lock(path):
+                entries = mutate(_load(path))
+                if entries is not None:
+                    _store(path, entries)
     except Exception:
         logger.debug("failed to %s turn marker for %s", what, session_key, exc_info=True)
 

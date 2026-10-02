@@ -298,6 +298,12 @@ class PeerRunsHTTPClient:
         except urllib.error.HTTPError as exc:
             self._raise_http_error(exc, method=method, path=path, deadline=deadline)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            reason = exc.reason if isinstance(exc, urllib.error.URLError) else exc
+            if isinstance(reason, TimeoutError) and time.monotonic() >= deadline:
+                raise PeerRunsHTTPError(
+                    _BUDGET_MESSAGES["time"].format(kind=""), retryable=True,
+                    ambiguous=ambiguous,
+                ) from exc
             not_admitted = ambiguous and _is_proven_pre_admission_failure(exc)
             raise PeerRunsHTTPError(
                 "peer RoomLink endpoint is unreachable", retryable=True,

@@ -59,8 +59,8 @@ def _history_proves_marker_settled(session: dict, marker: dict) -> bool:
 
     Turn-marker deletion is deliberately best-effort, so a stale sidecar must not by itself replay a turn that
     actually committed. Resume histories are loaded from SessionDB before auto-continue runs. A real terminal
-    assistant row after the marker is therefore stronger evidence than the stale sidecar. Tool-call assistants are
-    intermediate, and compaction summaries are synthetic, so neither closes the turn.
+    assistant reply after the marker is therefore stronger evidence than the stale sidecar. Tool-call and
+    blank/reasoning-only assistants are intermediate, and compaction summaries are synthetic, so none closes the turn.
     """
     try:
         started_at = float(marker.get("started_at") or 0.0)
@@ -91,6 +91,8 @@ def _history_proves_marker_settled(session: dict, marker: dict) -> bool:
             saw_post_marker_user = True
             continue
         if role != "assistant" or not saw_post_marker_user or message.get("tool_calls"):
+            continue
+        if not _coerce_message_text(content).strip():
             continue
         return True
     return False
