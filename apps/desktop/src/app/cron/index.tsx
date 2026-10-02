@@ -54,7 +54,7 @@ import { AlertTriangle } from '@/lib/icons'
 import { requestModelOptions } from '@/lib/model-options'
 import { asText } from '@/lib/text'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronFocusJobId, $cronJobs, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
+import { $cronFocusJobId, $cronJobs, $cronJobsLoad, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
@@ -344,10 +344,9 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const c = t.cron
   // Source of truth is the shared atom (also fed by the controller poll), so the
   // sidebar and this overlay never drift — a delete here clears the sidebar row
-  // immediately. `loading` only gates the first paint before the atom is filled.
+  // immediately. Read status is shared too: background reads can supersede us.
   const jobs = useStore($cronJobs)
-  const [loading, setLoading] = useState(jobs.length === 0)
-  const [loadErrorScope, setLoadErrorScope] = useState<null | string>(null)
+  const jobsLoad = useStore($cronJobsLoad)
   const [query, setQuery] = useState('')
   const [busyJobTokens, setBusyJobTokens] = useState<ReadonlyMap<string, symbol>>(() => new Map())
   const [triggeringJobKeys, setTriggeringJobKeys] = useState<ReadonlySet<string>>(() => new Set())
@@ -400,8 +399,9 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const activeConnectionId = useStore($activeConnectionId)
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
   const profile = cronProfileForScope(profileScope)
-  const loadScope = `${activeConnectionId ?? 'local'}\u0000${profile}`
-  const loadFailed = loadErrorScope === loadScope
+  const loadScope = `${activeConnectionId ?? ''}\u0000${profile}`
+  const loadFailed = jobsLoad?.scope === loadScope && jobsLoad.status === 'error'
+  const loading = jobsLoad?.scope === loadScope && jobsLoad.status === 'loading'
 
   // Consent decisions are profile-local. Even while the jobs view is aggregated,
   // suggestions belong to the active profile on the active connection.
@@ -409,15 +409,8 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
     profileScope === ALL_PROFILES ? normalizeProfileKey(activeGatewayProfile) : normalizeProfileKey(profileScope)
 
   const refresh = useCallback(async () => {
-    const { refreshError, stale } = await refreshCronJobs(profile)
-
-    if (stale) {
-      return
-    }
-
-    setLoadErrorScope(refreshError ? loadScope : null)
-    setLoading(false)
-  }, [loadScope, profile])
+    await refreshCronJobs(profile)
+  }, [profile])
 
   useRefreshHotkey(refresh)
 
@@ -791,7 +784,7 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
       visibleSuggestions.length === 0 &&
       visibleBlueprints.length === 0 ? (
         <PageLoader label={c.loading} />
-      ) : loadFailed && totalCount === 0 ? (
+      ) : loadFailed && totalCount === 0 && visibleSuggestions.length === 0 && visibleBlueprints.length === 0 ? (
         <ErrorState className="m-auto" description={c.loadFailedHelp} title={c.failedLoad}>
           <Button onClick={() => void refresh()} size="sm" variant="outline">
             {t.common.retry}
@@ -812,7 +805,7 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
         <>
           {loadFailed && (
             <ErrorBanner className="mb-3 shrink-0">
-              {c.loadFailedStale}{' '}
+              {totalCount > 0 ? c.loadFailedStale : c.loadFailedHelp}{' '}
               <Button onClick={() => void refresh()} size="xs" variant="ghost">
                 {t.common.retry}
               </Button>
