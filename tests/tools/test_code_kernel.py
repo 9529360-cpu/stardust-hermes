@@ -242,6 +242,41 @@ class TestKernelOwnershipAndLifecycle(unittest.TestCase):
         self.assertEqual(other["status"], "error", other)
         self.assertIn("NameError", other.get("error", ""))
 
+    def test_identical_stored_id_in_two_profiles_never_reuses_or_tears_down_other_kernel(self):
+        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from tools.code_kernel import shutdown_kernels_for_owner
+
+        profiles = tempfile.TemporaryDirectory()
+        self.addCleanup(profiles.cleanup)
+        home_a, home_b = Path(profiles.name) / "profile-a", Path(profiles.name) / "profile-b"
+
+        def in_profile(home, code):
+            token = set_hermes_home_override(home)
+            try:
+                return self._run_as("shared-session", code, task_id="turn")
+            finally:
+                reset_hermes_home_override(token)
+
+        with _kernel_config(max_session_kernels=4):
+            first = in_profile(home_a, "secret = 'private-a'")
+            other = in_profile(home_b, "print(globals().get('secret', 'ISOLATED'))")
+            assert first["status"] == other["status"] == "success"
+            assert "ISOLATED" in other["output"]
+            assert other["kernel"]["reused"] is False
+            token = set_hermes_home_override(home_a)
+            try:
+                shutdown_kernels_for_owner("shared-session")
+            finally:
+                reset_hermes_home_override(token)
+            remaining = in_profile(home_b, "print('still-alive')")
+            assert remaining["status"] == "success"
+            assert remaining["kernel"]["reused"] is True
+            assert "still-alive" in remaining["output"]
+            launch = self._run_as("shared-session", "print(globals().get('secret', 'ISOLATED'))", task_id="turn")
+            assert launch["status"] == "success"
+            assert launch["kernel"]["reused"] is False
+            assert "ISOLATED" in launch["output"]
+
     def test_delegated_children_get_their_own_kernels(self):
         """A delegated child runs in a COPY of the parent's context and
         inherits the parent's approval session key — the naive owner

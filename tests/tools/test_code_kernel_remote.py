@@ -203,6 +203,59 @@ class TestOwnershipIsolation(RemoteKernelBase):
         self.assertEqual(len(_REMOTE_KERNELS), 2)
         self.assertEqual(sum(1 for c in env.commands if "nohup" in c), 2)
 
+    def test_identical_owner_in_different_profiles_has_distinct_remote_kernels(self):
+        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from pathlib import Path
+        import tempfile
+
+        env = ScriptedEnv(_spawn_ok_handlers([_cell(), _cell(), _cell()]))
+        with tempfile.TemporaryDirectory() as root:
+            homes = [Path(root) / "a", Path(root) / "b"]
+
+            def scoped(home, operation):
+                token = set_hermes_home_override(home)
+                try:
+                    return operation()
+                finally:
+                    reset_hermes_home_override(token)
+
+            first = scoped(homes[0], lambda: _run(env, task="same"))
+            other = scoped(homes[1], lambda: _run(env, task="same"))
+            self.assertFalse(first["kernel"]["reused"])
+            self.assertFalse(other["kernel"]["reused"])
+            self.assertEqual(len(_REMOTE_KERNELS), 2)
+            scoped(homes[0], lambda: shutdown_remote_kernels_for_owner("same"))
+            remaining = scoped(homes[1], lambda: _run(env, task="same"))
+            self.assertTrue(remaining["kernel"]["reused"])
+            self.assertEqual(len(_REMOTE_KERNELS), 1)
+
+    def test_delegated_child_disposal_does_not_reap_other_profiles_child(self):
+        from agent.delegation_context import delegated_child_context
+        from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+        from pathlib import Path
+        from tools.code_kernel import shutdown_kernels_for_delegated_child
+        import tempfile
+
+        env = ScriptedEnv(_spawn_ok_handlers([_cell(), _cell()]))
+        with tempfile.TemporaryDirectory() as root:
+            homes = [Path(root) / "a", Path(root) / "b"]
+
+            def scoped(home, operation):
+                token = set_hermes_home_override(home)
+                try:
+                    with delegated_child_context("same-child"):
+                        return operation()
+                finally:
+                    reset_hermes_home_override(token)
+
+            for home in homes:
+                scoped(home, lambda: _run(env, task="same-parent"))
+            self.assertEqual(len(_REMOTE_KERNELS), 2)
+            scoped(homes[0], lambda: shutdown_kernels_for_delegated_child("same-child"))
+            self.assertEqual(len(_REMOTE_KERNELS), 1)
+            remaining = scoped(homes[1], lambda: _run(env, task="same-parent"))
+            self.assertTrue(remaining["kernel"]["reused"])
+
     def test_owner_disposal_reaps_only_that_owner(self):
         env = ScriptedEnv(_spawn_ok_handlers([_cell(), _cell()]))
         _run(env, task="owner-a")
