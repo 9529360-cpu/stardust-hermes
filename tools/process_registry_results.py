@@ -10,6 +10,7 @@ import logging
 import re
 import sqlite3
 import time
+from pathlib import Path
 
 from hermes_constants import get_hermes_home
 from utils import atomic_json_write
@@ -25,9 +26,9 @@ _RESULT_FIELDS = (
 )
 
 
-def _result_paths():
+def _result_paths(home: Path | None = None):
     """Prune by completion time, not start time (jobs can take days)."""
-    directory = get_hermes_home() / "logs" / "process-results"
+    directory = (home if home is not None else get_hermes_home()) / "logs" / "process-results"
     cutoff = time.time() - RESULT_RETENTION_SECONDS
     retained = []
     for path in directory.glob("proc_*.json"):
@@ -55,11 +56,11 @@ def save_completed_result(session) -> None:
     # Live-output opt-out must not persist raw credentials in durable receipts.
     record["output"] = redact_terminal_output(record["output"], record["command"], force=True)
     record["command"] = redact_sensitive_text(record["command"], code_file=True, force=True)
-    directory = get_hermes_home() / "logs" / "process-results"
+    directory = (Path(session.owner_home) if session.owner_home else get_hermes_home()) / "logs" / "process-results"
     try:
         directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         atomic_json_write(directory / f"{session.id}.json", record, mode=0o600)
-        _result_paths()
+        _result_paths(directory.parent.parent)
     except OSError:
         # Preserve live delivery on disk failure, but never silently claim durability.
         logger.warning("Could not retain completed process result %s", session.id, exc_info=True)

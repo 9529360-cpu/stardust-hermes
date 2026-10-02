@@ -9,6 +9,7 @@ from gateway.config import GatewayConfig, Platform, PlatformConfig
 from gateway.platforms.event import MessageEvent
 from gateway.run import GatewayRunner
 from gateway.session import SessionSource, build_session_key
+from hermes_constants import hermes_home_key
 from hermes_state import SessionDB
 from plugins.platforms.discord.adapter import DiscordAdapter
 from tools import async_delegation as delegation
@@ -16,7 +17,8 @@ from tools import async_delegation as delegation
 
 def pending(key, name):
     evt = {"type": "async_delegation", "session_key": key, "delegation_id": name,
-           "summary": name, "status": "completed", "dispatched_at": time.time()}
+           "summary": name, "status": "completed", "dispatched_at": time.time(),
+           "owner_home": hermes_home_key()}
     delegation._persist_dispatch(evt)
     delegation._persist_completion(evt, {"status": "completed", "summary": name})
     return evt
@@ -96,7 +98,11 @@ async def test_unavailable_raw_route_is_quiet_without_hiding_invalid_routes(tmp_
     runner = GatewayRunner(GatewayConfig())
     runner.adapters = {}
     evt = pending("opaque-client-session", "raw-admission")
+    # Raw API IDs have no profile namespace; the durable row (not just the
+    # in-memory event) needs its owner for replay after adapter recovery.
+    assert delegation.get_durable_delegation(evt["delegation_id"])["event"]["owner_home"] == evt["owner_home"]
     caplog.set_level(logging.WARNING, logger="gateway.run")
+    caplog.clear()
     for _ in range(3):
         assert await runner._deliver_async_delegation_group([evt]) is False
     assert not caplog.records

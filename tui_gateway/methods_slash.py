@@ -334,7 +334,8 @@ def _mirror_reload_mcp(sid, session, agent, arg) -> None:
 
 def _mirror_stop(sid, session, agent, arg) -> None:
     from tools.process_registry import process_registry
-    process_registry.kill_all()
+    with _session_profile_runtime_scope(session):
+        process_registry.kill_all()
 
 
 # name → mirror(sid, session, agent, arg); a falsy return means "no warning".

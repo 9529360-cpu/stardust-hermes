@@ -133,6 +133,9 @@ def test_publish_durable_completion_is_idempotent_and_enqueued(tmp_path, monkeyp
     event = _drain_for("cron_exec_1")
     assert event is not None
     assert event["session_key"] == "desktop-session"
+    from hermes_constants import hermes_home_key
+    assert event["owner_home"] == hermes_home_key()
+    assert ad.get_durable_delegation("cron_exec_1")["event"]["owner_home"] == hermes_home_key()
     assert event["role"] == "cron_run"
     durable = ad.get_durable_delegation("cron_exec_1")
     assert durable is not None
@@ -288,6 +291,8 @@ def test_durable_receipt_exposes_parent_task_and_terminal_event_for_recovery(tmp
     receipt = ad.get_durable_delegation(res["delegation_id"])
     assert receipt is not None
     assert receipt["parent_session_id"] == "parent-session"
+    from hermes_constants import hermes_home_key
+    assert evt["owner_home"] == receipt["task"]["owner_home"] == receipt["event"]["owner_home"] == hermes_home_key()
     assert receipt["task"]["goal"] == "research task"
     assert receipt["task"]["context"] == "project context"
     assert receipt["task"]["toolsets"] == ["web"]

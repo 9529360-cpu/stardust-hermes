@@ -931,6 +931,7 @@ class TestSpawnEnvSanitization:
             patch("tools.process_registry._find_shell", return_value="/bin/bash"), \
             patch("subprocess.Popen", side_effect=fake_popen), \
             patch("threading.Thread", return_value=fake_thread), \
+            patch("tools.process_registry.hermes_home_key", return_value="/test/owner"), \
             patch.object(registry, "_write_checkpoint"):
             registry.spawn_local(
                 "echo hello",
@@ -1336,6 +1337,7 @@ class TestCheckpoint:
         checkpoint = tmp_path / "procs.json"
         entry = {
             "session_id": "proc_dead_scope",
+            "session_key": "agent:main:telegram:dm:123",
             "command": "daemonize",
             "pid": 999999999,
             "pid_scope": "host",
@@ -1360,6 +1362,7 @@ class TestCheckpoint:
         checkpoint = tmp_path / "procs.json"
         entry = {
             "session_id": "proc_dead_scope",
+            "session_key": "agent:main:telegram:dm:123",
             "command": "daemonize",
             "pid": 999999999,
             "pid_scope": "host",
@@ -1383,6 +1386,7 @@ class TestCheckpoint:
         checkpoint = tmp_path / "procs.json"
         original = [{
             "session_id": "proc_remote",
+            "session_key": "agent:main:telegram:dm:123",
             "command": "sleep 999",
             "pid": os.getpid(),
             "task_id": "t1",

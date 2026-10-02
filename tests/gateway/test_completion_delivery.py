@@ -45,6 +45,8 @@ def isolated_registry(tmp_path, monkeypatch):
 def _runner(adapter, *, origins=None):
     runner = object.__new__(GatewayRunner)
     runner._running = True
+    from gateway.config import GatewayConfig
+    runner.config = GatewayConfig()
     runner.adapters = {Platform.TELEGRAM: adapter}
     runner.session_store = SimpleNamespace(
         _ensure_loaded=lambda: None,
@@ -245,6 +247,7 @@ def test_explicit_kill_returns_output_before_consuming_notification(monkeypatch)
     monkeypatch.setattr(asyncio, "sleep", _instant_sleep)
     asyncio.run(runner._run_process_watcher({
         "session_id": session.id,
+        "owner_home": session.owner_home,
         "check_interval": 0,
         "session_key": "agent:main:telegram:dm:123",
         "platform": "telegram",
@@ -315,6 +318,7 @@ def test_autonomous_completion_redacts_real_command_and_output_secrets(monkeypat
     monkeypatch.setattr(asyncio, "sleep", _instant_sleep)
     asyncio.run(runner._run_process_watcher({
         "session_id": session.id,
+        "owner_home": session.owner_home,
         "check_interval": 0,
         "session_key": "agent:main:telegram:dm:123",
         "platform": "telegram",
@@ -348,6 +352,7 @@ def test_concurrent_process_watchers_coalesce_one_session_completion_turn(monkey
         registry._finished[session.id] = session
         watchers.append({
             "session_id": session.id,
+            "owner_home": session.owner_home,
             "check_interval": 0,
             "session_key": "agent:main:telegram:dm:123",
             "platform": "telegram",
@@ -427,6 +432,84 @@ def test_completion_batches_do_not_cross_conversation_routes():
 
     assert asyncio.run(_exercise()) == [True, True]
     assert adapter.handle_message.await_count == 2
+
+
+def test_owned_completion_ignores_foreign_source_with_same_session_key(tmp_path):
+    from hermes_constants import hermes_home_key, reset_hermes_home_override, set_hermes_home_override
+
+    runner = _runner(SimpleNamespace(handle_message=AdmittingHandler()))
+    owner, foreign = tmp_path / "owner", tmp_path / "foreign"
+    owner.mkdir()
+    foreign.mkdir()
+    event = _completion_event(started_at=1.0)
+    event["owner_home"] = hermes_home_key(owner)
+    source = SessionSource(platform=Platform.TELEGRAM, chat_id="123", profile="foreign")
+    runner.session_store._entries[event["session_key"]] = SimpleNamespace(origin=source)
+    runner._get_cached_session_source = lambda _key: source
+    runner._resolve_profile_home_for_source = lambda candidate: foreign if candidate.profile == "foreign" else owner
+    token = set_hermes_home_override(owner)
+    try:
+        resolved = runner._build_process_event_source(event)
+        assert resolved is not source
+        assert resolved is not None and resolved.chat_id == "123"
+        async def _scope():
+            async with runner._completion_event_scope(event):
+                assert hermes_home_key() == event["owner_home"]
+        asyncio.run(_scope())
+    finally:
+        reset_hermes_home_override(token)
+
+
+def test_completion_batches_do_not_cross_profiles_with_identical_routes():
+    runner = _runner(SimpleNamespace(handle_message=AdmittingHandler()))
+    deliveries = []
+
+    async def _deliver(text, event):
+        deliveries.append((text, event["owner_home"]))
+        return True
+
+    runner._deliver_completion_notification = _deliver
+    first = _completion_event(started_at=1.0, session_id="proc_owner_a")
+    second = _completion_event(started_at=2.0, session_id="proc_owner_b")
+    first.update(owner_home="/profiles/a", output="private-a")
+    second.update(owner_home="/profiles/b", output="private-b")
+
+    async def _exercise():
+        return await asyncio.gather(
+            runner._enqueue_process_completion_notification("private-a", first),
+            runner._enqueue_process_completion_notification("private-b", second),
+        )
+
+    assert asyncio.run(_exercise()) == [True, True]
+    assert set(deliveries) == {("private-a", "/profiles/a"), ("private-b", "/profiles/b")}
+
+
+def test_completion_batches_do_not_cross_parent_sessions_with_identical_routes():
+    runner = _runner(SimpleNamespace(handle_message=AdmittingHandler()))
+    deliveries = []
+
+    async def _deliver(text, event):
+        # A closed parent cannot accept a completion, but must never have its
+        # output included when the live sibling is delivered.
+        if event["parent_session_id"] == "closed-parent":
+            return None
+        deliveries.append((text, event["parent_session_id"]))
+        return True
+
+    runner._deliver_completion_notification = _deliver
+    first = _completion_event(started_at=1.0, session_id="proc_closed")
+    second = _completion_event(started_at=2.0, session_id="proc_live")
+    first.update(owner_home="/profiles/a", parent_session_id="closed-parent", output="private-old")
+    second.update(owner_home="/profiles/a", parent_session_id="live-parent", output="private-new")
+
+    async def _exercise():
+        return await asyncio.gather(
+            runner._enqueue_process_completion_notification("private-old", first),
+            runner._enqueue_process_completion_notification("private-new", second),
+        )
+
+    assert asyncio.run(_exercise()) == [None, True]
+    assert deliveries == [("private-new", "live-parent")]
 
 
 def test_failed_coalesced_delivery_retries_all_entries():
@@ -907,6 +990,8 @@ def test_unavailable_delivery_preserves_budget_across_restarts(tmp_path, unavail
     for event in events:
         if raw:
             event["session_key"] = "opaque-client-session"
+            from hermes_constants import hermes_home_key
+            event["owner_home"] = hermes_home_key()
         if unavailable == "owner_db":
             event["parent_session_id"] = "parent-session"
         _persist_pending_completion(event)

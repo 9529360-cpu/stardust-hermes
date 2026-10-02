@@ -38,7 +38,11 @@ def mux(tmp_path, monkeypatch):
     """Default home allows user 777; profile ``ops`` is a shared-bot satellite; ``team_b`` owns a bot."""
     from agent import secret_scope
     from gateway.run import GatewayRunner
+    import hermes_state
 
+    # The suite redirects DEFAULT_DB_PATH to a fixed sandbox path; restore the
+    # dynamic production path resolver for assertions about profile scopes.
+    monkeypatch.setattr(hermes_state, "_IMPORT_DEFAULT_DB_PATH", hermes_state.DEFAULT_DB_PATH)
     home = tmp_path / "hh"
     for name in ("ops", "team_b"):
         (home / "profiles" / name).mkdir(parents=True)
@@ -151,3 +155,50 @@ def test_completion_preflight_runs_in_target_profile_scope(mux):
         return unscoped, scoped
 
     assert asyncio.run(_run()) == ("terminal", "deliver")
+
+
+def test_raw_async_completion_with_colliding_parent_uses_immutable_owner(mux):
+    """A secondary's raw API SID must never resolve against the default profile's same SID."""
+    from gateway import run as run_module
+    from hermes_constants import hermes_home_key
+    from hermes_state import SessionDB
+
+    sid = "same-raw-api-session"
+    secondary = mux.home / "profiles" / "team_b"
+    SessionDB(db_path=mux.home / "state.db").create_session(sid, source="api_server")
+    SessionDB(db_path=secondary / "state.db").create_session(sid, source="api_server")
+    runner = mux.runner
+    runner._session_db_pinned = run_module._SESSION_DB_UNPINNED
+    runner._session_db_handles, runner._session_db_handles_lock = {}, threading.Lock()
+    runner.session_store, runner._session_sources = None, {}
+    event = {"type": "async_delegation", "delegation_id": "secondary-delegation",
+             "session_key": sid, "parent_session_id": sid, "owner_home": hermes_home_key(secondary)}
+
+    async def _run():
+        async with runner._completion_event_scope(event):
+            return hermes_home_key(), await runner._classify_completion_target(sid)
+
+    assert asyncio.run(_run()) == (hermes_home_key(secondary), "deliver")
+    default_db = SessionDB(db_path=mux.home / "state.db")
+    secondary_db = SessionDB(db_path=secondary / "state.db")
+    try:
+        from hermes_constants import get_hermes_home
+        api = SimpleNamespace(_ensure_session_db=lambda: SessionDB(db_path=get_hermes_home() / "state.db"))
+
+        async def _persist():
+            async with runner._completion_event_scope(event):
+                assert await runner._self_post_api_server(api, "secondary secret", sid, event)
+
+        asyncio.run(_persist())
+        assert not default_db.get_messages(sid)
+        rows = secondary_db.get_messages(sid)
+        assert len(rows) == 1 and rows[0]["display_kind"] == "async_delegation_complete"
+        assert "secondary secret" in str(rows[0])
+    finally:
+        default_db.close()
+        secondary_db.close()
+    assert runner._event_route_key(event, runner._ASYNC_GROUP_KEY_FIELDS) != runner._event_route_key(
+        {**event, "owner_home": hermes_home_key(mux.home)}, runner._ASYNC_GROUP_KEY_FIELDS)
+    legacy = {key: value for key, value in event.items() if key != "owner_home"}
+    with patch.object(runner, "_classify_completion_target", side_effect=AssertionError("foreign DB lookup")):
+        assert asyncio.run(runner._completion_delivery_ready(legacy)) is False
