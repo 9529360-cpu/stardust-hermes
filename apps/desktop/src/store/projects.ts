@@ -7,7 +7,13 @@ import {
   type SidebarProjectTree
 } from '@/app/chat/sidebar/projects/workspace-groups'
 import type { HermesGitBaseBranch, HermesGitBranch } from '@/global'
-import { getHermesConfig, hermesApi, type HermesGateway } from '@/hermes'
+import {
+  ambientOwnerConnectionId,
+  getApiRequestConnection,
+  getHermesConfig,
+  hermesApi,
+  type HermesGateway
+} from '@/hermes'
 import { translateNow } from '@/i18n'
 import { desktopDefaultCwd, isDesktopFsRemoteMode, selectDesktopPaths, writeDesktopFileText } from '@/lib/desktop-fs'
 import { desktopGit } from '@/lib/desktop-git'
@@ -377,6 +383,7 @@ interface ProjectTreePayload {
   projects: SidebarProjectTree[]
   active_id: null | string
   scoped_session_ids: string[]
+  errors?: Array<{ profile: string; error: string }>
 }
 
 // Expanded previews need the complete existing tree window before the renderer
@@ -388,14 +395,25 @@ const projectTreePreviewLimit = () => ($sidebarShowAllSessions.get() ? 2000 : 3)
 const PROJECT_TREE_REQUEST_TIMEOUT_MS = 60_000
 
 let projectTreeRefreshGeneration = 0
+let completeProjectTreeContext: null | string = null
+let projectTreeRecoveryTimer: ReturnType<typeof setTimeout> | null = null
+const PROJECT_TREE_ERROR_RETRY_MS = 2_200 // after the server's 2s error-cache TTL
 
-function applyProjectTreePayload(res: ProjectTreePayload): void {
+function cancelProjectTreeRecovery(): void {
+  if (projectTreeRecoveryTimer !== null) {
+    clearTimeout(projectTreeRecoveryTimer)
+  }
+
+  projectTreeRecoveryTimer = null
+}
+
+function applyProjectTreePayload(res: ProjectTreePayload, complete = true): void {
   const scoped = new Set(res.scoped_session_ids ?? [])
   $projectTree.set(res.projects ?? [])
   $activeProjectId.set(res.active_id ?? null)
   const tombstones = $removedSessionIds.get()
 
-  if (tombstones.size) {
+  if (complete && tombstones.size) {
     // Keep a tombstone while the backend still lists the id (delete pending on
     // its side) OR while its mutation is still in flight locally — dropping it
     // early flashes the row back until the RPC lands.
@@ -462,11 +480,15 @@ async function refreshProjectTreeOn(context: ActiveProjectsContext): Promise<voi
 // sessions + the scoped-session-id set). Best-effort: a failure leaves the
 // cached tree intact so the sidebar doesn't flicker.
 export async function refreshProjectTree(): Promise<void> {
+  cancelProjectTreeRecovery()
+
   if ($profileScope.get() === ALL_PROFILES) {
     await refreshProjectTreeAcrossProfiles()
 
     return
   }
+
+  completeProjectTreeContext = null
 
   try {
     await refreshProjectTreeOn(await activeProjectsContext())
@@ -479,8 +501,20 @@ export async function refreshProjectTree(): Promise<void> {
 // backend's own profile, so it can only ever describe a slice of this view;
 // the REST fan-out reads every profile's databases directly instead of asking
 // us to hold a backend open per profile just to draw lanes.
-async function refreshProjectTreeAcrossProfiles(): Promise<void> {
+async function refreshProjectTreeAcrossProfiles(recoveryRetries = 1): Promise<void> {
   const generation = ++projectTreeRefreshGeneration
+  const connection = getApiRequestConnection()
+  const context = `${connection ?? `ambient:${ambientOwnerConnectionId() ?? 'unknown'}`}::${ALL_PROFILES}`
+
+  const stillOnContext = () =>
+    $profileScope.get() === ALL_PROFILES &&
+    getApiRequestConnection() === connection &&
+    `${getApiRequestConnection() ?? `ambient:${ambientOwnerConnectionId() ?? 'unknown'}`}::${ALL_PROFILES}` === context
+
+  if (completeProjectTreeContext !== context) {
+    completeProjectTreeContext = null
+  }
+
   $projectTreeLoading.set(true)
 
   try {
@@ -491,14 +525,40 @@ async function refreshProjectTreeAcrossProfiles(): Promise<void> {
 
     // A profile switch mid-flight leaves this payload describing the wrong
     // scope; the newer refresh owns the tree.
-    if (generation !== projectTreeRefreshGeneration || $profileScope.get() !== ALL_PROFILES) {
+    if (generation !== projectTreeRefreshGeneration || !stillOnContext()) {
+      return
+    }
+
+    if (res.errors?.length) {
+      // Fan-out merges lanes/counts across profiles; a partial result cannot be
+      // merged with old nodes without double counting. Retain only a complete
+      // snapshot from this very connection, otherwise show the available slice.
+      if (completeProjectTreeContext !== context) {
+        // A partial scoped-session-id set cannot prove deletion. Preserve
+        // optimistic tombstones until an authoritative full tree arrives.
+        applyProjectTreePayload(res, false)
+      }
+
+      if (recoveryRetries > 0) {
+        projectTreeRecoveryTimer = setTimeout(() => {
+          projectTreeRecoveryTimer = null
+
+          if (generation === projectTreeRefreshGeneration && stillOnContext()) {
+            void refreshProjectTreeAcrossProfiles(recoveryRetries - 1)
+          }
+        }, PROJECT_TREE_ERROR_RETRY_MS)
+      }
+
       return
     }
 
     applyProjectTreePayload(res)
+    completeProjectTreeContext = context
     markProjectsRpcSuccess()
   } catch (err) {
-    markProjectsRpcFailure(err)
+    if (generation === projectTreeRefreshGeneration && stillOnContext()) {
+      markProjectsRpcFailure(err)
+    }
   } finally {
     if (generation === projectTreeRefreshGeneration) {
       $projectTreeLoading.set(false)

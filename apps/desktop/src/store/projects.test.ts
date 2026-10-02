@@ -64,6 +64,8 @@ vi.mock('@/lib/desktop-git', async importOriginal => ({
 }))
 
 vi.mock('@/hermes', () => ({
+  ambientOwnerConnectionId: vi.fn(() => 'local'),
+  getApiRequestConnection: vi.fn(() => null),
   getHermesConfig: vi.fn(),
   getProfiles: vi.fn(),
   hermesApi: vi.fn(),
@@ -926,6 +928,90 @@ describe('project tree profile isolation', () => {
 
     expect(profileB?.id).toBe('profile-b')
     await expect(pendingDefault).resolves.toBeNull()
+  })
+})
+
+describe('all-profile project tree error recovery', () => {
+  const response = (id: string, errors = false) => ({
+    active_id: null,
+    projects: [{ id, label: id, path: null, repos: [], sessionCount: 1 }],
+    scoped_session_ids: [id],
+    ...(errors ? { errors: [{ profile: 'broken', error: 'database unavailable' }] } : {})
+  })
+
+  afterEach(async () => {
+    setShowAllProfiles(false)
+    await vi.advanceTimersByTimeAsync(2_200)
+    vi.useRealTimers()
+    $removedSessionIds.set(new Set())
+  })
+
+  it('retries once after the cached partial response expires, without erasing a complete tree', async () => {
+    vi.useFakeTimers()
+    setShowAllProfiles(true)
+    $projectTree.set([])
+    const api = vi.mocked(hermes.hermesApi)
+    api.mockReset()
+    api.mockResolvedValueOnce(response('complete'))
+    await refreshProjectTree()
+    api
+      .mockResolvedValueOnce(response('partial', true))
+      .mockResolvedValueOnce(response('partial', true))
+      .mockResolvedValueOnce(response('recovered'))
+
+    await refreshProjectTree()
+    expect($projectTree.get().map(project => project.id)).toEqual(['complete'])
+    // The sole recovery signal arrives inside the server's error TTL.
+    await refreshProjectTree()
+    expect($projectTree.get().map(project => project.id)).toEqual(['complete'])
+    await vi.advanceTimersByTimeAsync(2_200)
+    expect($projectTree.get().map(project => project.id)).toEqual(['recovered'])
+    expect(api).toHaveBeenCalledTimes(4)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(api).toHaveBeenCalledTimes(4)
+  })
+
+  it('keeps tombstones while a partial tree cannot confirm deletion', async () => {
+    vi.useFakeTimers()
+    setShowAllProfiles(true)
+    tombstoneSessions(['pending-delete'])
+    const api = vi.mocked(hermes.hermesApi)
+    api.mockReset().mockResolvedValue(response('partial', true))
+    await refreshProjectTree()
+    expect($removedSessionIds.get().has('pending-delete')).toBe(true)
+    $removedSessionIds.set(new Set())
+    setShowAllProfiles(false)
+  })
+
+  it('never retains another connection tree after switching back to a previous connection', async () => {
+    vi.useFakeTimers()
+    setShowAllProfiles(true)
+    const connection = vi.mocked(hermes.getApiRequestConnection)
+    const api = vi.mocked(hermes.hermesApi)
+    api
+      .mockReset()
+      .mockResolvedValueOnce(response('connection-a'))
+      .mockResolvedValueOnce(response('partial-b', true))
+      .mockResolvedValueOnce(response('partial-a', true))
+    connection.mockReturnValue('a')
+    await refreshProjectTree()
+    connection.mockReturnValue('b')
+    await refreshProjectTree()
+    connection.mockReturnValue('a')
+    await refreshProjectTree()
+    expect($projectTree.get().map(project => project.id)).toEqual(['partial-a'])
+    connection.mockReturnValue(null)
+  })
+
+  it('cancels a pending partial retry when the profile scope changes', async () => {
+    vi.useFakeTimers()
+    setShowAllProfiles(true)
+    const api = vi.mocked(hermes.hermesApi)
+    api.mockReset().mockResolvedValue(response('partial', true))
+    await refreshProjectTree()
+    setShowAllProfiles(false)
+    await vi.advanceTimersByTimeAsync(2_200)
+    expect(api).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -162,10 +162,7 @@ class SidebarCacheTests(unittest.TestCase):
         self.assertEqual(scan(), {"ok": True})
         self.assertEqual(calls, 2)
 
-    def test_does_not_cache_payloads_that_carry_profile_errors(self):
-        # A 200 with a non-empty errors[] is how a failed profile scan is
-        # reported. Caching it for the TTL keeps the empty recents page in
-        # front of a store that has already recovered.
+    def test_profile_errors_have_shorter_ttl_and_recover_without_fleet_rescan(self):
         calls = 0
 
         @profiles._sidebar_singleflight_cache
@@ -173,18 +170,47 @@ class SidebarCacheTests(unittest.TestCase):
             nonlocal calls
             calls += 1
             if calls == 1:
-                return {
-                    "errors": [{"profile": "default", "error": "disk I/O error"}],
-                    "recents": {"sessions": []},
-                }
-            return {"errors": [], "recents": {"sessions": [{"id": "yesterday"}]}}
+                return {"errors": [{"profile": "default", "error": "disk I/O error"}],
+                        "recents": {"sessions": []}}
+            return {"errors": [], "recents": {"sessions": [{"id": "recovered"}]}}
 
-        first = scan()
-        second = scan()
+        clock = [100.0]
+        with mock.patch.object(profiles.time, "monotonic", side_effect=lambda: clock[0]):
+            first = scan()
+            first["recents"]["sessions"].append({"id": "mutated"})
+            for _ in range(8):
+                self.assertEqual(scan()["recents"]["sessions"], [])
+            self.assertEqual(calls, 1)
+            clock[0] = 101.99
+            self.assertEqual(scan()["errors"][0]["error"], "disk I/O error")
+            clock[0] = 102.0
+            self.assertEqual(scan()["recents"]["sessions"], [{"id": "recovered"}])
+            self.assertEqual(calls, 2)
+            clock[0] = 106.0
+            self.assertEqual(scan()["recents"]["sessions"], [{"id": "recovered"}])
+            self.assertEqual(calls, 2)
 
-        self.assertEqual(first["errors"][0]["error"], "disk I/O error")
-        self.assertEqual(second["recents"]["sessions"], [{"id": "yesterday"}])
-        self.assertEqual(calls, 2)
+    def test_concurrent_profile_errors_share_one_scan(self):
+        workers = 8
+        entered = threading.Event()
+        release = threading.Event()
+        calls = 0
+
+        @profiles._sidebar_singleflight_cache
+        def scan():
+            nonlocal calls
+            calls += 1
+            entered.set()
+            self.assertTrue(release.wait(timeout=_HANG_GUARD_SECONDS))
+            return {"errors": [{"profile": "default", "error": "locked"}], "rows": []}
+
+        # Keep error TTL long enough that scheduling delays cannot turn a late
+        # worker into a second scan; the TTL itself is tested with a fake clock above.
+        with mock.patch.object(profiles, "_SIDEBAR_ERROR_CACHE_TTL_SECONDS", 3600.0):
+            results = self._run_burst(scan, workers, entered, release)
+        self.assertEqual(calls, 1)
+        self.assertEqual(results, [results[0]] * workers)
+        self.assertEqual(len({id(result) for result in results}), workers)
 
     def test_can_be_disabled(self):
         calls = 0

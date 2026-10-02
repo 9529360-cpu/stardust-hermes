@@ -254,6 +254,9 @@ def _read_profile_db(name: str, home, errors: Optional[List[Dict[str, str]]],
 # Sidebar scan cache TTL: short enough that the UI never shows meaningfully stale data, long
 # enough to coalesce the desktop's reconnect/focus/change poll bursts into one scan.
 _SIDEBAR_CACHE_TTL_SECONDS = 5.0
+# A persistently unreadable profile must not make every sidebar poll rescan the fleet.
+# Keep failed responses shorter-lived than successful ones so recovery is prompt.
+_SIDEBAR_ERROR_CACHE_TTL_SECONDS = 2.0
 _SIDEBAR_CACHE_MAX_ENTRIES = 32
 _SIDEBAR_PROFILE_CACHE_MAX_ENTRIES = 256
 _SIDEBAR_PROFILE_CACHE = OrderedDict()
@@ -347,10 +350,12 @@ def _sidebar_singleflight_cache(func):
             if cached is not miss:
                 return cached
             result = func(*args, **kwargs)
-            # A 200 carrying errors[] is a FAILED profile scan, not a successful empty page.
-            # Caching it would hold the empty recents in front of a store that has already
-            # recovered, for the whole TTL.
-            if isinstance(result, dict) and result.get("errors"):
+            # Even a 200 carrying errors[] needs a short negative TTL: otherwise every
+            # poll reopens a persistently broken store and rescans the healthy profiles.
+            # Ordinary successful scans retain the longer freshness window.
+            response_ttl = (_SIDEBAR_ERROR_CACHE_TTL_SECONDS
+                            if isinstance(result, dict) and result.get("errors") else ttl)
+            if response_ttl <= 0:
                 return result
             try:
                 snapshot = copy.deepcopy(result)
@@ -358,7 +363,7 @@ def _sidebar_singleflight_cache(func):
                 _log.exception("sidebar response could not be cached")
                 return result
             with cache_lock:
-                cache[key] = (time.monotonic() + ttl, snapshot)
+                cache[key] = (time.monotonic() + response_ttl, snapshot)
                 cache.move_to_end(key)
                 while len(cache) > _SIDEBAR_CACHE_MAX_ENTRIES:
                     cache.popitem(last=False)
