@@ -6,6 +6,8 @@ import type { CronJob } from '@/types/hermes'
 // the job — schedule, state, live next-run countdown — makes the job the
 // first-class entity; its runs (sessions) resolve under it in the cron detail.
 export const $cronJobs = atom<CronJob[]>([])
+// Jobs are usable only by the connection/profile whose read supplied them.
+export const $cronJobsScope = atom<string | null>(null)
 
 // Latest authoritative list read, including reads initiated by the sidebar.
 // A failed read must not make an empty cache look like an empty backend list.
@@ -63,6 +65,18 @@ export function invalidateCronJobsRequests(): void {
   $cronJobsLoad.set(null)
 }
 
+// Closing an overlay must not cancel a newer sidebar/background owner.
+export function invalidateCronJobsRequestIfCurrent(request: CronJobsRequest): boolean {
+  if (!isCronJobsRequestCurrent(request)) {
+    return false
+  }
+
+  cronJobsRequestGeneration += 1
+  $cronJobsLoad.set(null)
+
+  return true
+}
+
 export function failCronJobsRequest(request: CronJobsRequest): boolean {
   if (!isCronJobsRequestCurrent(request)) {
     return false
@@ -83,6 +97,7 @@ export function commitCronJobsRequest(request: CronJobsRequest, jobs: CronJob[])
   // can publish after this authoritative snapshot.
   cronJobsRequestGeneration += 1
   $cronJobs.set(jobs)
+  $cronJobsScope.set(request.scope)
   $cronJobsLoad.set({ scope: request.scope, status: 'ready' })
 
   return true
@@ -91,6 +106,7 @@ export function commitCronJobsRequest(request: CronJobsRequest, jobs: CronJob[])
 export const setCronJobs = (jobs: CronJob[]) => {
   cronJobsRequestGeneration += 1
   $cronJobs.set(jobs)
+  $cronJobsScope.set(null)
   $cronJobsLoad.set(null)
 }
 

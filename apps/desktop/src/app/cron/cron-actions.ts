@@ -40,8 +40,14 @@ async function refreshForGeneration(profile: string, request: CronJobsRequest): 
   }
 }
 
-export function refreshCronJobs(profile: string): Promise<CronTriggerRefreshResult> {
-  return refreshForGeneration(profile, beginCronJobsRequest(cronRequestScope(profile)))
+export function refreshCronJobs(
+  profile: string,
+  onRequest?: (request: CronJobsRequest) => void
+): Promise<CronTriggerRefreshResult> {
+  const request = beginCronJobsRequest(cronRequestScope(profile))
+  onRequest?.(request)
+
+  return refreshForGeneration(profile, request)
 }
 
 export async function mutateAndRefreshCronJobs<T>(

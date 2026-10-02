@@ -54,7 +54,15 @@ import { AlertTriangle } from '@/lib/icons'
 import { requestModelOptions } from '@/lib/model-options'
 import { asText } from '@/lib/text'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronFocusJobId, $cronJobs, $cronJobsLoad, invalidateCronJobsRequests, setCronFocusJobId } from '@/store/cron'
+import {
+  $cronFocusJobId,
+  $cronJobs,
+  $cronJobsLoad,
+  $cronJobsScope,
+  type CronJobsRequest,
+  invalidateCronJobsRequestIfCurrent,
+  setCronFocusJobId
+} from '@/store/cron'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
 import { notify, notifyError } from '@/store/notifications'
 import { $activeGatewayProfile, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
@@ -345,7 +353,8 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   // Source of truth is the shared atom (also fed by the controller poll), so the
   // sidebar and this overlay never drift — a delete here clears the sidebar row
   // immediately. Read status is shared too: background reads can supersede us.
-  const jobs = useStore($cronJobs)
+  const cachedJobs = useStore($cronJobs)
+  const jobsScope = useStore($cronJobsScope)
   const jobsLoad = useStore($cronJobsLoad)
   const [query, setQuery] = useState('')
   const [busyJobTokens, setBusyJobTokens] = useState<ReadonlyMap<string, symbol>>(() => new Map())
@@ -400,6 +409,7 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
   const profile = cronProfileForScope(profileScope)
   const loadScope = `${activeConnectionId ?? ''}\u0000${profile}`
+  const jobs = useMemo(() => jobsScope === loadScope ? cachedJobs : [], [cachedJobs, jobsScope, loadScope])
   const loadFailed = jobsLoad?.scope === loadScope && jobsLoad.status === 'error'
   const loading = jobsLoad?.scope === loadScope && jobsLoad.status === 'loading'
 
@@ -415,12 +425,17 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   useRefreshHotkey(refresh)
 
   useEffect(() => {
-    void refresh()
-    // Fence the previous profile's request before the next profile effect, and
-    // fence every pending completion when the overlay unmounts.
+    let request: CronJobsRequest | null = null
 
-    return () => invalidateCronJobsRequests()
-  }, [refresh])
+    void refreshCronJobs(profile, started => { request = started })
+
+    // Only revoke our own in-flight read; a newer sidebar refresh owns its token.
+    return () => {
+      if (request) {
+        invalidateCronJobsRequestIfCurrent(request)
+      }
+    }
+  }, [activeConnectionId, profile])
 
   // Sidebar → "open this job": resolve the focus id (or name) to a job, select
   // it, queue a scroll, then clear the one-shot focus so re-opening cron
