@@ -1741,6 +1741,48 @@ class TestConcurrentApprovalCoalescing:
                 time.sleep(0.05)
         return results, threads
 
+    def test_unoffered_and_malformed_answers_fail_closed(self, monkeypatch):
+        from tools import approval as mod
+        monkeypatch.setattr(approval_context, "_get_approval_timeout", lambda: 30)
+
+        for data, choice in [
+            (self._data(), "garbage"),
+            (self._data(), "deny "),
+            (self._data(), None),
+            (self._data(), 1),
+            ({**self._data(), "allow_session": False, "allow_permanent": False}, "session"),
+            ({**self._data(), "allow_session": False, "allow_permanent": False}, "always"),
+            ({**self._data(), "smart_denied": True}, "session"),
+            ({**self._data(), "smart_denied": True}, "always"),
+        ]:
+            import threading
+            notified = []
+            result = []
+            thread = threading.Thread(target=lambda: result.append(
+                mod._await_gateway_decision(self.SESSION_KEY, notified.append, data)))
+            thread.start()
+            for _ in range(400):
+                if notified:
+                    break
+                time.sleep(0.005)
+            assert notified, "approval did not reach the response surface"
+            assert mod.resolve_gateway_approval(self.SESSION_KEY, choice,
+                                                request_id=notified[0]["request_id"]) == 1
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+            assert result[0]["choice"] == "deny"
+
+    def test_malformed_approve_all_cannot_authorize_any_entry(self, monkeypatch):
+        from tools import approval as mod
+        monkeypatch.setattr(approval_context, "_get_approval_timeout", lambda: 30)
+        notified = []
+        results, threads = self._spawn_waits(mod, notified, n=2, command="rm -rf .git")
+        assert mod.resolve_gateway_approval(self.SESSION_KEY, "garbage", resolve_all=True) == 1
+        for thread in threads:
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+        assert all(result["choice"] == "deny" for result in results)
+
     def test_identical_concurrent_approvals_send_one_prompt(self, monkeypatch):
         from tools import approval as mod
         monkeypatch.setattr(approval_context, "_get_approval_timeout", lambda: 30)
