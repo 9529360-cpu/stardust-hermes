@@ -133,6 +133,94 @@ afterEach(() => {
   setSessionsLoading(false)
 })
 
+describe('sidebar error-cache recovery', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('recovers after the sole in-TTL refresh, without polling a persistently broken profile', async () => {
+    vi.useFakeTimers()
+    const failed = { ...sidebar({ sessions: [] }), errors: [{ profile: 'broken', error: 'database unavailable' }] }
+    listSidebarSessions
+      .mockResolvedValueOnce(failed)
+      .mockResolvedValueOnce(failed)
+      .mockResolvedValueOnce(sidebar({ sessions: [row('recovered', { profile: 'broken' })] }))
+    const { result, unmount } = renderHook(() => useSessionListActions({ profileScope: 'all' }))
+
+    await act(async () => {
+      await result.current.refreshSessions()
+    })
+    // This is the only recovery signal and still sees the cached error response.
+    await act(async () => {
+      await result.current.refreshSessions()
+    })
+    expect($sessions.get()).toEqual([])
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_200)
+    })
+    expect($sessions.get().map(s => s.id)).toEqual(['recovered'])
+    expect(listSidebarSessions).toHaveBeenCalledTimes(3)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000)
+    })
+    expect(listSidebarSessions).toHaveBeenCalledTimes(3)
+    unmount()
+  })
+
+  it('a stale profile callback cannot cancel the current scope recovery', async () => {
+    vi.useFakeTimers()
+    listSidebarSessions
+      .mockResolvedValueOnce({ ...sidebar({ sessions: [] }), errors: [{ profile: 'broken', error: 'offline' }] })
+      .mockResolvedValueOnce(sidebar({ sessions: [row('healthy')] }))
+
+    const { result, rerender, unmount } = renderHook(({ scope }) => useSessionListActions({ profileScope: scope }), {
+      initialProps: { scope: 'all' }
+    })
+
+    const staleRefresh = result.current.refreshSessions
+    rerender({ scope: 'default' })
+    await act(async () => {
+      await result.current.refreshSessions()
+    })
+    await act(async () => {
+      await staleRefresh()
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_200)
+    })
+    expect(listSidebarSessions).toHaveBeenCalledTimes(2)
+    expect($sessions.get().map(s => s.id)).toEqual(['healthy'])
+    unmount()
+  })
+
+  it('does not run an error retry after unmount or profile switch', async () => {
+    vi.useFakeTimers()
+    listSidebarSessions.mockResolvedValue({
+      ...sidebar({ sessions: [] }),
+      errors: [{ profile: 'broken', error: 'offline' }]
+    })
+
+    const { result, rerender, unmount } = renderHook(({ scope }) => useSessionListActions({ profileScope: scope }), {
+      initialProps: { scope: 'all' }
+    })
+
+    await act(async () => {
+      await result.current.refreshSessions()
+    })
+    rerender({ scope: 'default' })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_200)
+    })
+    expect(listSidebarSessions).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await result.current.refreshSessions()
+    })
+    unmount()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_200)
+    })
+    expect(listSidebarSessions).toHaveBeenCalledTimes(2)
+  })
+})
+
 describe('refreshSessions identity + loading hygiene', () => {
   it('keeps the previous $sessions array when the refresh is content-identical', async () => {
     const rows = [row('a'), row('b')]
