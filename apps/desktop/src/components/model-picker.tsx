@@ -207,7 +207,7 @@ export function ModelPickerDialog({
 
         <DialogFooter className="flex-row items-center justify-end gap-2 bg-card p-3">
           <Button onClick={addProvider} variant="ghost">
-            {copy.addProvider}
+            {t.onboarding.setupRelay}
           </Button>
           <Button onClick={() => onOpenChange(false)} variant="outline">
             {t.common.cancel}
@@ -274,8 +274,7 @@ function ModelResults({
   }
 
   // Only configured providers (those with curated models) are selectable
-  // here. Switching to a NOT-yet-configured provider goes through the
-  // "Add provider" footer button, which opens the full onboarding selector.
+  // here. New services are added through the direct model API editor.
   // The local provider sits behind the --local launch flag (strict: staged
   // models on disk don't show without it). Module-level read — a launch flag
   // can't change mid-session.
