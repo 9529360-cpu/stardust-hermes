@@ -109,7 +109,7 @@ describe('ChatSidebar compact conversation surface', () => {
     renderSidebar('/', 'chat')
 
     expect(screen.getByText('Pinned chats')).toBeTruthy()
-    expect(screen.getByText('Conversations')).toBeTruthy()
+    expect(screen.getByText('Chats')).toBeTruthy()
     expect(screen.getByText('No sessions yet')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'New project' })).toBeNull()
   })
