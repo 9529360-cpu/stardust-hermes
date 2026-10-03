@@ -43,6 +43,7 @@ import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord 
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
 import { CONTROL_TEXT } from './constants'
+import { CustomEndpointsSettings } from './custom-endpoints-settings'
 import { getNested, setNested } from './helpers'
 import { isModelServiceReady, type ModelConnectionView, ModelServicePicker } from './model-service-picker'
 import { ListRow, Pill, SectionHeading } from './primitives'
@@ -244,6 +245,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const [applying, setApplying] = useState(false)
   const [editingAuxTask, setEditingAuxTask] = useState<null | string>(null)
   const [advancedModelSettingsOpen, setAdvancedModelSettingsOpen] = useState(false)
+  const [otherServicesOpen, setOtherServicesOpen] = useState(false)
 
   const [auxDraft, setAuxDraft] = useState<{ model: string; provider: string; reasoningEffort: string }>({
     model: '',
@@ -939,27 +941,33 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
   return (
     <div className="grid gap-6">
-      <ModelServicePicker
-        activating={activating}
-        apiKeyDraft={apiKeyDraft}
-        applying={applying}
-        currentModel={mainModel}
-        onActivateApiKey={() => void activateApiKeyProvider()}
-        onAddCustomService={() => openConnectionView('custom-endpoints')}
-        onAddService={() => startManualOnboarding(null, scopeProfile)}
-        onApiKeyChange={setApiKeyDraft}
-        onApply={() => void applyMainModel()}
-        onOpenConnectionView={openConnectionView}
-        onSelectModel={setSelectedModel}
-        onSelectProvider={selectMainProvider}
-        onSetupProvider={startProviderSetup}
-        providers={serviceProviders}
-        selectedModel={selectedModel}
-        selectedProvider={selectedProvider}
-        selectedProviderModels={selectedProviderModels}
-        selectedProviderRow={selectedProviderRow}
-        setupIsApiKey={setupIsApiKey}
-      />
+      <CustomEndpointsSettings onMainModelChanged={onMainModelChanged} scopeProfile={scopeProfile} />
+      <Button onClick={() => setOtherServicesOpen(open => !open)} size="sm" variant="textStrong">
+        {otherServicesOpen ? m.advancedConnectionsHide : m.chooseOtherService}
+      </Button>
+      {otherServicesOpen && (
+        <ModelServicePicker
+          activating={activating}
+          apiKeyDraft={apiKeyDraft}
+          applying={applying}
+          currentModel={mainModel}
+          onActivateApiKey={() => void activateApiKeyProvider()}
+          onAddCustomService={() => openConnectionView('custom-endpoints')}
+          onAddService={() => startManualOnboarding(null, scopeProfile)}
+          onApiKeyChange={setApiKeyDraft}
+          onApply={() => void applyMainModel()}
+          onOpenConnectionView={openConnectionView}
+          onSelectModel={setSelectedModel}
+          onSelectProvider={selectMainProvider}
+          onSetupProvider={startProviderSetup}
+          providers={serviceProviders}
+          selectedModel={selectedModel}
+          selectedProvider={selectedProvider}
+          selectedProviderModels={selectedProviderModels}
+          selectedProviderRow={selectedProviderRow}
+          setupIsApiKey={setupIsApiKey}
+        />
+      )}
 
       {config && mainModel && (reasoningSupported || fastSupported) && (
         <section>
@@ -1047,19 +1055,19 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       </div>
 
       <section data-slot="advanced-model-settings" hidden={!advancedModelSettingsOpen}>
-          <div className="mb-2.5 flex items-center justify-between">
-            <SectionHeading icon={Cpu} title={m.auxiliaryTitle} />
-            <Button
-              disabled={!mainModel || applying}
-              onClick={() => void resetAuxiliaryModels()}
-              size="sm"
-              variant="textStrong"
-            >
-              {m.resetAllToMain}
-            </Button>
-          </div>
-          <p className="mb-2 text-xs text-muted-foreground">{m.auxiliaryDesc}</p>
-          <div className="grid gap-1">
+        <div className="mb-2.5 flex items-center justify-between">
+          <SectionHeading icon={Cpu} title={m.auxiliaryTitle} />
+          <Button
+            disabled={!mainModel || applying}
+            onClick={() => void resetAuxiliaryModels()}
+            size="sm"
+            variant="textStrong"
+          >
+            {m.resetAllToMain}
+          </Button>
+        </div>
+        <p className="mb-2 text-xs text-muted-foreground">{m.auxiliaryDesc}</p>
+        <div className="grid gap-1">
           {AUX_TASKS.map(meta => {
             const copy = m.tasks[meta.key] ?? { label: meta.key, hint: meta.key }
             const current = auxiliary?.tasks.find(entry => entry.task === meta.key)
