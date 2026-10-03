@@ -1,8 +1,10 @@
 import { reportFirstBuildToolComplete } from '@/components/onboarding-chat/first-build'
+import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
 import { refreshBackgroundProcesses } from '@/store/composer-status'
 import { flashPetActivity, setPetActivity } from '@/store/pet'
-import { pruneDelegateFallbackSubagents, upsertSubagent } from '@/store/subagents'
+import { setRightContextOpen } from '@/store/right-context'
+import { $subagentsBySession, pruneDelegateFallbackSubagents, upsertSubagent } from '@/store/subagents'
 import { reportMcpToolResult } from '@/store/suggestion-providers/repair'
 import { invalidateSkillSuggestionIndex } from '@/store/suggestion-providers/skill'
 import { restoreSessionTodosFromSnapshot } from '@/store/todos'
@@ -138,6 +140,14 @@ export function handleToolEvent(ctx: GatewayEventContext): boolean {
         pruneDelegateFallbackSubagents(sessionId)
       }
 
+      const revealTeam =
+        isActiveEvent &&
+        ctx.fromActiveSource() &&
+        (event.type === 'subagent.spawn_requested' || event.type === 'subagent.start') &&
+        !($subagentsBySession.get()[sessionId] ?? []).some(
+          item => item.status === 'running' || item.status === 'queued'
+        )
+
       nativeSubagentSessionsRef.current.add(sessionId)
       upsertSubagent(
         sessionId,
@@ -145,6 +155,11 @@ export function handleToolEvent(ctx: GatewayEventContext): boolean {
         event.type === 'subagent.spawn_requested' || event.type === 'subagent.start',
         event.type
       )
+
+      if (revealTeam) {
+        setRightContextOpen(true)
+        revealTreePane('workspace-overview')
+      }
     }
 
     return true
