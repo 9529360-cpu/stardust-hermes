@@ -159,9 +159,6 @@ const SCROLL_Y = 'overflow-y-auto overflow-x-hidden overscroll-contain scrollbar
 // outer one: nested scrollers would each reserve their own and stack the inset.
 const SCROLL_GUTTER = '[scrollbar-gutter:stable]'
 
-// A non-session group's scroll body: own scroller when tall, flattened when compact.
-const GROUP_BODY = cn(SCROLL_Y, COMPACT_FLAT)
-
 // Section-header action icons stay hidden until the whole header row is hovered
 // (group/section lives on SidebarSectionHeader), mirroring the artifacts/file
 // browser header affordances. focus-visible keeps them keyboard-reachable.
@@ -936,7 +933,7 @@ export function ChatSidebar({
   // "Sessions" when flat, "Projects" at the overview, and the project's name
   // once you've entered one.
   const sessionsLabel =
-    inProject && enteredProject ? enteredProject.label : worktreeGroupingActive ? s.projects.sectionLabel : s.recent
+    inProject && enteredProject ? enteredProject.label : worktreeGroupingActive ? s.projects.sectionLabel : s.sessions
 
   // Mirror the section's skeleton gate (projectsLoading + nothing to show yet):
   // while the skeleton is up there's no point also spinning the header count.
