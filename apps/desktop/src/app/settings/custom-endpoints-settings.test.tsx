@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
+import { validateCustomEndpoint } from '@/hermes'
 
 const getCustomEndpoints = vi.fn()
 
@@ -23,6 +24,28 @@ afterEach(() => {
 })
 
 describe('CustomEndpointsSettings', () => {
+  it('validates HTTP URLs without accepting arbitrary schemes', async () => {
+    const { isEndpointUrl } = await import('./custom-endpoints-settings')
+    expect(isEndpointUrl('https://relay.example/v1')).toBe(true)
+    expect(isEndpointUrl('http://127.0.0.1:8000/v1')).toBe(true)
+    expect(isEndpointUrl('file:///etc/passwd')).toBe(false)
+    expect(isEndpointUrl('relay.example/v1')).toBe(false)
+  })
+
+  it('discovers candidates from the unsaved form without silently choosing a default', async () => {
+    vi.mocked(validateCustomEndpoint).mockResolvedValue({ ok: true, reachable: true, message: '', models: ['relay-model'] })
+    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    render(<I18nProvider configClient={null} initialLocale="zh"><CustomEndpointsSettings /></I18nProvider>)
+    await screen.findByText('添加模型服务')
+    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), { target: { value: 'https://relay.example/v1' } })
+    fireEvent.click(screen.getByRole('button', { name: '测试连接' }))
+    await waitFor(() => expect(validateCustomEndpoint).toHaveBeenCalled())
+    await waitFor(() => expect(document.querySelector('datalist option[value="relay-model"]')).toBeTruthy())
+    expect(screen.getByPlaceholderText('gpt-5.4')).toHaveProperty('value', '')
+    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), { target: { value: 'https://other.example/v1' } })
+    expect(document.querySelector('datalist option[value="relay-model"]')).toBeNull()
+  })
+
   it('shows a plain-language Chinese setup first and keeps technical fields behind advanced options', async () => {
     const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
 

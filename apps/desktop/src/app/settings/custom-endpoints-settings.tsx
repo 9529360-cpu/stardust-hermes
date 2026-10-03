@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -34,6 +34,15 @@ interface EndpointForm {
   makeDefault: boolean
   model: string
   name: string
+}
+
+export function isEndpointUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim())
+    return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname)
+  } catch {
+    return false
+  }
 }
 
 const EMPTY_FORM: EndpointForm = {
@@ -88,6 +97,14 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
   const [form, setForm] = useState<EndpointForm>(EMPTY_FORM)
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const probeRevision = useRef(0)
+  const [probeMessage, setProbeMessage] = useState<string | null>(null)
+  function updateForm(update: (current: EndpointForm) => EndpointForm) {
+    probeRevision.current++
+    setDiscoveredModels([])
+    setProbeMessage(null)
+    setForm(update)
+  }
 
   async function refresh() {
     const data = await getCustomEndpoints()
@@ -129,6 +146,10 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
   }, [c.loadFailed])
 
   async function handleSave() {
+    if (!isEndpointUrl(form.baseUrl)) {
+      setProbeMessage(c.validationFailed)
+      return
+    }
     try {
       setSaving(true)
       const response = await saveCustomEndpoint(toPayload(form, discoveredModels))
@@ -155,28 +176,32 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
   }
 
   async function handleValidate() {
+    if (!isEndpointUrl(form.baseUrl)) {
+      setProbeMessage(c.validationFailed)
+      return
+    }
+    const revision = ++probeRevision.current
     try {
       setTesting(true)
+      setProbeMessage(null)
       const response = await validateCustomEndpoint(toPayload(form))
-      setDiscoveredModels(response.models)
+      if (revision !== probeRevision.current) return
+      setDiscoveredModels(response.ok ? response.models : [])
 
       if (response.ok) {
-        if (!form.model && response.models[0]) {
-          setForm(current => ({ ...current, model: response.models[0] }))
-        }
-
         notify({
           kind: 'success',
           message: response.models.length ? c.validationReachableModels(response.models.length) : c.validationReachable
         })
       } else {
+        setProbeMessage(response.message || c.validationFailed)
         notify({
           kind: response.reachable ? 'warning' : 'error',
           message: response.message ? `${c.validationFailed}: ${response.message}` : c.validationFailed
         })
       }
     } catch (err) {
-      notifyError(err, c.validationFailed)
+      if (revision === probeRevision.current) notifyError(err, c.validationFailed)
     } finally {
       setTesting(false)
     }
@@ -226,7 +251,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
   }
 
   const allModelOptions = Array.from(new Set([...discoveredModels, form.model].filter(Boolean)))
-  const canSave = form.name.trim() && form.baseUrl.trim() && form.model.trim()
+  const canSave = form.name.trim() && isEndpointUrl(form.baseUrl) && form.model.trim()
 
   return (
     <SettingsContent>
@@ -240,6 +265,8 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
                   <button
                     className="min-w-0 text-left"
                     onClick={() => {
+                      probeRevision.current++
+                      setProbeMessage(null)
                       setForm(formFromEndpoint(endpoint))
                       setDiscoveredModels(endpoint.models)
                       setAdvancedOpen(false)
@@ -301,7 +328,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
             <label className="grid gap-1.5 text-xs text-muted-foreground">
               {c.nameLabel}
               <Input
-                onChange={event => setForm(current => ({ ...current, name: event.target.value }))}
+                onChange={event => updateForm(current => ({ ...current, name: event.target.value }))}
                 placeholder={c.namePlaceholder}
                 value={form.name}
               />
@@ -309,7 +336,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
             <label className="grid gap-1.5 text-xs text-muted-foreground">
               {c.endpointUrlLabel}
               <Input
-                onChange={event => setForm(current => ({ ...current, baseUrl: event.target.value }))}
+                onChange={event => updateForm(current => ({ ...current, baseUrl: event.target.value }))}
                 placeholder="http://127.0.0.1:8081/v1"
                 value={form.baseUrl}
               />
@@ -318,7 +345,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
               {c.modelLabel}
               <Input
                 list="custom-endpoint-models"
-                onChange={event => setForm(current => ({ ...current, model: event.target.value }))}
+                onChange={event => updateForm(current => ({ ...current, model: event.target.value }))}
                 placeholder="gpt-5.4"
                 value={form.model}
               />
@@ -328,10 +355,13 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
                 ))}
               </datalist>
             </label>
+            {discoveredModels.length > 0 && (
+              <p className="text-xs text-muted-foreground">{c.validationReachableModels(discoveredModels.length)}</p>
+            )}
             <label className="grid gap-1.5 text-xs text-muted-foreground">
               {c.apiKeyLabel}
               <Input
-                onChange={event => setForm(current => ({ ...current, apiKey: event.target.value }))}
+                onChange={event => updateForm(current => ({ ...current, apiKey: event.target.value }))}
                 placeholder={form.id ? c.apiKeyKeepExisting : c.apiKeyOptional}
                 type="password"
                 value={form.apiKey}
@@ -356,7 +386,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
                 <label className="grid gap-1.5 text-xs text-muted-foreground">
                   {c.providerIdLabel}
                   <Input
-                    onChange={event => setForm(current => ({ ...current, id: event.target.value }))}
+                    onChange={event => updateForm(current => ({ ...current, id: event.target.value }))}
                     placeholder={c.providerIdPlaceholder}
                     value={form.id}
                   />
@@ -366,7 +396,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
                   {c.contextLabel}
                   <Input
                     inputMode="numeric"
-                    onChange={event => setForm(current => ({ ...current, contextLength: event.target.value }))}
+                    onChange={event => updateForm(current => ({ ...current, contextLength: event.target.value }))}
                     placeholder={c.contextPlaceholder}
                     value={form.contextLength}
                   />
@@ -381,9 +411,10 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
               </div>
             )}
 
+            {probeMessage && <p role="alert" className="text-xs text-destructive">{probeMessage}</p>}
             <div className="flex flex-wrap gap-2">
               <Button
-                disabled={testing || !form.baseUrl.trim()}
+                disabled={testing || !isEndpointUrl(form.baseUrl)}
                 onClick={() => void handleValidate()}
                 variant="outline"
               >
