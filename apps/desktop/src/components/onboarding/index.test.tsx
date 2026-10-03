@@ -57,7 +57,7 @@ describe('onboarding Picker', () => {
     setState()
     render(<Picker ctx={ctx} />)
 
-    expect(screen.getByRole('button', { name: 'Set up model API' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add model API' })).toBeTruthy()
     expect(screen.queryByText('Anthropic Claude')).toBeNull()
     expect(screen.queryByText('OpenAI Codex / ChatGPT')).toBeNull()
     expect(screen.queryByText('Nous Portal')).toBeNull()
@@ -68,7 +68,7 @@ describe('onboarding Picker', () => {
     setState()
     render(<Picker ctx={ctx} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set up model API' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add model API' }))
 
     expect($desktopOnboarding.get().firstRunSkipped).toBe(true)
     expect(window.location.hash).toBe('#/settings?tab=config%3Amodel')
