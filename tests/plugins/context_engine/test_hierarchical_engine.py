@@ -34,6 +34,8 @@ def _plain_messages():
         {"role": "assistant", "content": "recent answer"},
         {"role": "user", "content": "recent question"},
         {"role": "assistant", "content": "recent final"},
+        {"role": "user", "content": "protected newest question"},
+        {"role": "assistant", "content": "protected newest answer"},
     ]
 
 
