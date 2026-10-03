@@ -436,6 +436,25 @@ def test_invalid_custom_endpoint_fails_before_approval(monkeypatch):
     assert "http:// or https://" in result["error"]
 
 
+def test_custom_endpoint_rejects_embedded_url_credentials_before_approval(monkeypatch):
+    monkeypatch.setattr(
+        mod,
+        "_confirm_configuration",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("credential-bearing URL must fail before approval")),
+    )
+
+    result = _payload(
+        mod._configure_custom_endpoint(
+            base_url="https://user:pass@relay.example/v1",
+            model="model",
+            api_key="",
+            keyless=True,
+        )
+    )
+
+    assert "http:// or https://" in result["error"]
+
+
 def test_oauth_provider_rejects_pasted_api_key_before_any_write(monkeypatch):
     descriptor = _descriptor(
         slug="openai-codex",
