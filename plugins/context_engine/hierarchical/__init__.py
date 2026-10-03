@@ -388,6 +388,11 @@ class HierarchicalContextEngine(ContextCompressor):
     ) -> List[Dict[str, Any]]:
         """Compact only the newly-consumed region, then carry immutable blocks forward."""
         telemetry = self._begin_compress_attempt(current_tokens, force)
+        # Keep the exact input projection so a terminal summary failure is a true
+        # no-op. The built-in compressor intentionally lets its cheap pre-prune
+        # survive an abort; this engine's stronger contract is different because
+        # immutable block creation must be all-or-nothing.
+        original_messages = messages
         n_messages = len(messages)
         minimum = self._protect_head_size(messages) + 4
         if n_messages <= minimum:
@@ -502,7 +507,7 @@ class HierarchicalContextEngine(ContextCompressor):
                 compress_end - compress_start,
                 scan.previous_summary_before,
             ):
-                return messages
+                return original_messages
 
         if not summary:
             summary = self._fallback_increment(
