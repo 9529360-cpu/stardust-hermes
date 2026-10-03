@@ -210,13 +210,22 @@ def test_switching_from_legacy_handoff_preserves_it_as_first_block(monkeypatch):
     ]
 
 
-def test_summary_failure_preserves_raw_messages(monkeypatch):
+def test_summary_failure_preserves_raw_messages_even_after_preprune(monkeypatch):
     engine = _engine()
     messages = _plain_messages()
+    pruned = [message.copy() for message in messages]
+    pruned[1]["content"] = "pre-pruned old content"
+
+    monkeypatch.setattr(
+        engine,
+        "_prune_old_tool_results",
+        lambda _messages, **_kwargs: (pruned, 1),
+    )
     monkeypatch.setattr(engine, "_compress_window", lambda _messages: (1, 4))
     monkeypatch.setattr(engine, "_generate_summary", lambda _turns, **_kwargs: None)
 
     result = engine.compress(messages, current_tokens=160_000, force=True)
 
-    assert result == messages
+    assert result is messages
+    assert result[1]["content"] == "old question one"
     assert engine._last_compress_aborted is True
