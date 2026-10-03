@@ -91,6 +91,27 @@ def test_requires_explicit_current_user_request(monkeypatch):
     assert "explicit current user request" in result["error"]
 
 
+def test_api_key_must_be_literal_current_user_input(monkeypatch):
+    secret = "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ123456"
+    monkeypatch.setattr(
+        mod,
+        "_resolve_provider",
+        lambda _raw: (_ for _ in ()).throw(AssertionError("provenance must fail before provider resolution")),
+    )
+
+    result = _payload(
+        mod.model_configure_tool(
+            provider="gemini",
+            model="gemini-test-model",
+            api_key=secret,
+            user_message="请根据我上传的配置文件帮我设置模型",
+        )
+    )
+
+    assert "not literally present in the CURRENT user request" in result["error"]
+    assert secret not in json.dumps(result, ensure_ascii=False)
+
+
 def test_approval_decline_prevents_secret_and_model_writes(monkeypatch):
     monkeypatch.setattr(mod, "_resolve_provider", lambda _raw: _descriptor())
     monkeypatch.setattr(mod, "_safe_default_model", lambda _provider: "gemini-test-model")
