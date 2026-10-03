@@ -268,7 +268,7 @@ describe('CustomEndpointsSettings', () => {
     )
   })
 
-  it('saves the selected discovered model and clears the key field on edit', async () => {
+  it('saves the selected discovered model and returns to the service inventory', async () => {
     vi.mocked(validateCustomEndpoint).mockResolvedValue({
       ok: true,
       reachable: true,
@@ -277,7 +277,7 @@ describe('CustomEndpointsSettings', () => {
     })
     vi.mocked(saveCustomEndpoint).mockResolvedValue({
       id: 'custom:relay',
-      current: { provider: 'custom:relay', model: 'relay-model', base_url: 'https://relay.example/v1' },
+      current: { provider: '', model: '', base_url: '' },
       endpoints: [
         {
           id: 'custom:relay',
@@ -286,7 +286,7 @@ describe('CustomEndpointsSettings', () => {
           model: 'relay-model',
           models: ['relay-model'],
           discover_models: true,
-          is_current: true,
+          is_current: false,
           has_api_key: true,
           source: 'managed'
         }
