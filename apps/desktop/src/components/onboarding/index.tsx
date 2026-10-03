@@ -15,6 +15,7 @@ import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { cn } from '@/lib/utils'
 import { $desktopBoot, type DesktopBootState } from '@/store/boot'
 import { FREE_TIER_MODEL } from '@/store/free-tier'
+import { requestGatewayForProfile } from '@/store/gateway'
 import { $introReveal, shouldPlayFirstRunIntro } from '@/store/intro-reveal'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import {
@@ -35,8 +36,6 @@ import { $onboardingSurfaces, onboardingSurfaceActive } from '@/store/onboarding
 import { DocsLink, FlowPanel } from './flow'
 import { DecodedLabel } from './glyph'
 import { LocalModelsProviderRow } from './providers'
-
-import { requestGatewayForProfile } from '@/store/gateway'
 
 interface DesktopOnboardingOverlayProps {
   enabled: boolean
