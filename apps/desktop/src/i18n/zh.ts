@@ -3781,7 +3781,7 @@ export const zh = defineLocale({
     collapse: '收起',
     otherProviders: '其他提供方',
     haveApiKey: '我有 API 密钥',
-    chooseLater: '稍后再选择提供方',
+    chooseLater: '稍后再设置',
     recommended: '推荐',
     connected: '已连接',
     featuredPitch: '一个订阅，300+ 前沿模型 — 运行 Stardust 的推荐方式',

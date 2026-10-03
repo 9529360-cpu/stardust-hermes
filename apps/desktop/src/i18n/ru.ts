@@ -3145,7 +3145,7 @@ export const ru = defineLocale({
     collapse: 'Свернуть',
     otherProviders: 'Другие провайдеры',
     haveApiKey: 'У меня есть API-ключ',
-    chooseLater: 'Выберу провайдера позже',
+    chooseLater: 'Настрою позже',
     recommended: 'Рекомендуется',
     connected: 'Подключено',
     featuredPitch: 'Одна подписка, 300+ передовых моделей — рекомендуемый способ запускать Stardust',

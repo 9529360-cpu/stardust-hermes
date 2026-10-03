@@ -21,7 +21,7 @@ test('input setup survives a fresh-install zoom restore before onboarding', asyn
     const page = launched.page
     await page.waitForSelector('button', { state: 'attached' })
     await prepareWindowForInput(app, page)
-    const later = page.getByRole('button', { name: /choose a provider later/i })
+    const later = page.getByRole('button', { name: /set this up later|choose a provider later|稍后再设置/i })
     await expect(later).toBeVisible({ timeout: 60_000 })
     const appWindow = await app.browserWindow(page)
     await appWindow.evaluate(win => win.emit('focus'))
@@ -43,7 +43,7 @@ for (const lifecycleEvent of ['focus', 'navigation'] as const) {
 
     try {
       await prepareWindowForInput(app, page)
-      const later = page.getByRole('button', { name: /choose a provider later/i })
+      const later = page.getByRole('button', { name: /set this up later|choose a provider later|稍后再设置/i })
       await expect(later).toBeVisible({ timeout: 60_000 })
       const zoomFile = path.join(sandbox.userDataDir, 'zoom-state.json')
       const savedLevel = () => JSON.parse(readFileSync(zoomFile, 'utf8')).zoomLevel as number
@@ -73,7 +73,7 @@ for (const lifecycleEvent of ['focus', 'navigation'] as const) {
         await page.evaluate(() => { window.location.hash = '#/' })
       }
 
-      await page.getByRole('button', { name: 'Open settings', exact: true }).click({ timeout: 5_000 })
+      await page.getByRole('button', { name: /^(Open settings|打开设置)$/ }).click({ timeout: 5_000 })
       await expect(page).toHaveURL(/settings/)
     } finally {
       await fixture.cleanup()

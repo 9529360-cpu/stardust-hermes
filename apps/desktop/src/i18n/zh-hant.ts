@@ -3030,7 +3030,7 @@ export const zhHant = defineLocale({
     collapse: '收合',
     otherProviders: '其他提供方',
     haveApiKey: '我有 API 金鑰',
-    chooseLater: '稍後再選擇提供方',
+    chooseLater: '稍後再設定',
     recommended: '建議',
     connected: '已連線',
     featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Stardust 的建議方式',
