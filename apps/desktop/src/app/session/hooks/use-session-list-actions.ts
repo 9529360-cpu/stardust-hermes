@@ -42,15 +42,14 @@ import { $sessionTiles, $workingSessionIds, getRecentlySettledSessionIds } from 
 
 import { refreshCronJobs as refreshCronJobsStore } from '../../cron/cron-actions'
 
-// The recents list is local-only: cron rows have their own section, kanban
-// dispatcher workers are read on the board, and each messaging platform
-// (telegram, discord, …) is fetched separately into its own self-managed
-// sidebar section (refreshMessagingSessions). Excluding them here keeps
-// "Load more" paging through interactive local chats instead of
-// interleaving gateway threads that bury them.
+// The backend keeps local recents and messaging conversations in separate
+// source-scoped slices so each can be refreshed without reopening unrelated
+// history. The compact Desktop sidebar projects both slices into one visible
+// conversation list; cron/kanban/subagent/tool sessions remain excluded.
 const SIDEBAR_EXCLUDED_SOURCES = ['cron', 'kanban', 'subagent', 'tool', ...MESSAGING_SESSION_SOURCE_IDS]
 // The messaging slice is the inverse: drop cron + every local source so only
-// external-platform conversations remain, then split per platform in the UI.
+// external-platform conversations remain before the sidebar merges the slice
+// into its unified conversation projection.
 const MESSAGING_EXCLUDED_SOURCES = ['cron', ...LOCAL_SESSION_SOURCE_IDS]
 
 // Drop rows the user just deleted/archived: ANY list fetch (full refresh,
@@ -108,9 +107,9 @@ interface UseSessionListActionsArgs {
   profileScope: string
 }
 
-/** Owns the sidebar's session-list fetching + paging: recents, cron runs/jobs,
- *  and the per-platform messaging slices. Returns the callbacks the controller
- *  wires into the sidebar and refresh effects. */
+/** Owns the sidebar's session-list fetching + paging: local recents, cron
+ *  state, and messaging conversations. The UI decides how those authoritative
+ *  slices are projected; the compact personal sidebar merges chat slices. */
 export function useSessionListActions({ profileScope }: UseSessionListActionsArgs) {
   const profileScopeRef = useRef(profileScope)
   const loadMoreMessagingRequestRef = useRef<Record<string, number>>({})
@@ -166,8 +165,8 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
       const rows = dropTombstoned(result.sessions.filter(s => isMessagingSource(s.source)))
 
       setMessagingSessions(prev => (sameCronSignature(prev, rows) ? prev : rows))
-      // Hit the cap → at least one platform may have more on disk than loaded,
-      // so platform sections offer their own per-platform "load more".
+      // Hit the cap → at least one platform may have more on disk than loaded.
+      // Keep the truncation signal authoritative for any paging surface.
       setMessagingTruncated(result.sessions.length >= MESSAGING_SECTION_LIMIT)
     } catch {
       // Non-fatal: the messaging sections just stay empty/stale.
@@ -391,9 +390,9 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
             return sameCronSignature(prev, incoming) ? prev : incoming
           })
 
-          // Messaging sections: drop any non-messaging source the broad exclude
-          // didn't catch (custom sources stay in local recents), then split per
-          // platform in the UI.
+          // Messaging slice: drop any non-messaging source the broad exclude
+          // didn't catch (custom sources stay in local recents). The sidebar
+          // later merges these rows into the unified conversation list.
           const messagingErrors = result.messaging.errors ?? result.errors
           setMessagingSessions(prev => {
             const messagingRows = dropTombstoned(
