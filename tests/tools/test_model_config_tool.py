@@ -1,11 +1,9 @@
+import json
 from types import SimpleNamespace
 
-import json
+import pytest
 
 import tools.model_config_tool as mod
-
-
-import pytest
 
 
 @pytest.fixture(autouse=True)
