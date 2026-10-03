@@ -35,7 +35,7 @@ test.describe('onboarding with no provider configured', () => {
     await waitForOnboarding(fixture.page, 90_000)
   })
 
-  test('onboarding shows provider options or API key form', async () => {
+  test('onboarding shows the model setup picker', async () => {
     if (!fixture) {
       test.skip(true, 'Previous test failed — no app running')
 
@@ -44,24 +44,14 @@ test.describe('onboarding with no provider configured', () => {
 
     const page = fixture.page
 
-    // The onboarding overlay should contain provider-related text.
-    // It might show OAuth providers, an API key form, or a "choose later"
-    // link. Verify at least one of these is visible.
+    await expect(page.locator('[data-onboarding-state="picker"]')).toBeVisible()
+
     const rootText = await page.evaluate(() => {
       const root = document.getElementById('root')
 
       return root?.textContent ?? ''
     })
 
-    const hasProviderText =
-      rootText.includes('provider') ||
-      rootText.includes('Provider') ||
-      rootText.includes('API key') ||
-      rootText.includes('Sign in') ||
-      rootText.includes('OpenRouter') ||
-      rootText.includes('OpenAI')
-
-    expect(hasProviderText).toBe(true)
     expect(rootText).not.toMatch(/Nous Portal|Nous account|Nous · free tier|Nous · 免费层|登录 Nous 账户/i)
   })
 
