@@ -2437,7 +2437,7 @@ export const zhHant = defineLocale({
     clearSearch: '清除搜尋',
     noMatch: query => `沒有工作階段符合「${query}」。`,
     results: '結果',
-    pinned: '已釘選',
+    pinned: '置頂會話',
     sessions: '對話',
     cronJobs: '排程任務',
     groupAriaGrouped: '以單一清單顯示工作階段',
