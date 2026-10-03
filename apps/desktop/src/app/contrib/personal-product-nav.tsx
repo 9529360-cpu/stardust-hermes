@@ -66,13 +66,17 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
   const sidebarGrouping = useStore($sidebarGrouping)
   const skillsTab = new URLSearchParams(search).get('tab')
 
-  const newChat = () =>
+  const newChat = () => {
+    setSidebarAgentsGrouped(false)
+    setSidebarOpen(true)
+    revealTreePane('sessions')
     onNavigate({
       action: 'new-session',
       id: 'new-session',
       icon: NULL_ICON,
       label: copy.newChat
     })
+  }
 
   const openTasks = () =>
     onNavigate({
