@@ -3129,7 +3129,7 @@ export const zh = defineLocale({
     clearSearch: '清除搜索',
     noMatch: query => `没有会话匹配"${query}"。`,
     results: '结果',
-    pinned: '已置顶',
+    pinned: '置顶会话',
     sessions: '对话',
     cronJobs: '定时任务',
     groupAriaGrouped: '以单一列表显示会话',
