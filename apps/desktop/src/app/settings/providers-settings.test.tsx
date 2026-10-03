@@ -8,7 +8,8 @@ import type { EnvVarInfo, OAuthProvider } from '@/types/hermes'
 
 const listOAuthProviders = vi.fn()
 const disconnectOAuthProvider = vi.fn()
-const getEnvVars = vi.fn()\nconst getCustomEndpoints = vi.fn()
+const getEnvVars = vi.fn()
+const getCustomEndpoints = vi.fn()
 const setEnvVar = vi.fn()
 const startManualProviderOAuth = vi.fn()
 const startManualLocalEndpoint = vi.fn()
@@ -156,7 +157,20 @@ describe('ProvidersSettings', () => {
     }
   })
 
-  it('passes the shared Settings target into the custom-endpoint editor', async () => {\n    const { $settingsScopeOverride } = await import('@/store/settings-scope')\n    $settingsScopeOverride.set('profile-b')\n    const { ProvidersSettings } = await import('./providers-settings')\n\n    try {\n      render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="custom-endpoints" />)\n      await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalledWith('profile-b'))\n    } finally {\n      cleanup()\n      $settingsScopeOverride.set(null)\n    }\n  })\n  it('uses the settings target for account reads, removal and sign-in', async () => {
+  it('passes the shared Settings target into the custom-endpoint editor', async () => {
+    const { $settingsScopeOverride } = await import('@/store/settings-scope')
+    $settingsScopeOverride.set('profile-b')
+    const { ProvidersSettings } = await import('./providers-settings')
+
+    try {
+      render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="custom-endpoints" />)
+      await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalledWith('profile-b'))
+    } finally {
+      cleanup()
+      $settingsScopeOverride.set(null)
+    }
+  })
+  it('uses the settings target for account reads, removal and sign-in', async () => {
     const { $settingsScopeOverride } = await import('@/store/settings-scope')
     $settingsScopeOverride.set('beta')
 
