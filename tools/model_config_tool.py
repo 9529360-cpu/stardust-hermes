@@ -355,7 +355,7 @@ def model_configure_tool(
     keyless: Any = False,
     user_message: Any = "",
 ) -> str:
-    """Configure one built-in provider as the current profile default."""
+    """Configure one built-in provider or direct custom endpoint as the current profile default."""
 
     # This is a mutation capability, not a general autonomous optimization knob.
     # Require a real current user turn in addition to the human confirmation below.
@@ -379,8 +379,8 @@ def model_configure_tool(
     descriptor = _resolve_provider(_clean(provider))
     if descriptor is None:
         return tool_error(
-            "Unknown built-in model provider. For a custom OpenAI-compatible relay/base URL, "
-            "use the Desktop custom-endpoint setup; this tool intentionally does not invent endpoint configuration."
+            "Unknown built-in model provider. For a custom OpenAI-compatible relay, "
+            "call model_configure with provider='custom', base_url, and an explicit model id."
         )
 
     if requested_key and descriptor.auth_type != "api_key":
