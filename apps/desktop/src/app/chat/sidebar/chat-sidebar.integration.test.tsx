@@ -16,8 +16,6 @@ import { type AppView, ROUTES_AREA, SIDEBAR_NAV_AREA } from '../../routes'
 import { ChatSidebar } from './index'
 
 const noop = () => {}
-const noopAsync = async () => {}
-
 const sessionRows = [
   makeSessionInfo({ id: 'tile-one', last_active: 2, profile: 'default', started_at: 1, title: 'Tile one' }),
   makeSessionInfo({ id: 'tile-two', last_active: 2, profile: 'default', started_at: 1, title: 'Tile two' })
