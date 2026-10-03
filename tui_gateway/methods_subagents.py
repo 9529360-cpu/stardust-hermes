@@ -13,7 +13,6 @@ _SUBAGENT_SNAPSHOT_FIELDS = (
     "subagent_id", "parent_id", "depth", "goal", "delegation_id", "model",
     "started_at", "status", "tool_count", "last_tool", "accepting_steer",
 )
-_SUBAGENT_TAIL_BYTES = 16384
 
 
 def _owned_subagent_records(session_id, transport, owner):
@@ -72,21 +71,10 @@ def _(rid, params):
     transport, owner = _current_session_steer_authority(session_id)
     if transport is None or owner is None:
         return _err(rid, 4001, "session not found or not owned by this transport")
-    result = {"subagent_id": subagent_id, "available": False, "text": "", "truncated": False}
     record = next((r for r in _owned_subagent_records(session_id, transport, owner)
                    if r.get("subagent_id") == subagent_id), None)
-    path = getattr(record.get("agent"), "_live_transcript_path", None) if record else None
-    if not path:
-        return _ok(rid, result)
-    try:
-        with open(path, "rb") as stream:
-            size = stream.seek(0, 2)
-            stream.seek(max(0, size - _SUBAGENT_TAIL_BYTES))
-            text = stream.read(_SUBAGENT_TAIL_BYTES).decode("utf-8", errors="ignore")
-    except OSError:
-        # Creation/cleanup races are normal while a child starts or ends.
-        return _ok(rid, result)
-    return _ok(rid, {**result, "available": True, "text": text, "truncated": size > _SUBAGENT_TAIL_BYTES})
+    from tools.delegate_tool_observation import read_child_activity
+    return _ok(rid, {"subagent_id": subagent_id, **read_child_activity(record)})
 
 
 def register(server):
