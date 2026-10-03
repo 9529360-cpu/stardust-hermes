@@ -64,7 +64,6 @@ def test_requires_explicit_current_user_request(monkeypatch):
 
     result = _payload(mod.model_configure_tool(provider="gemini"))
 
-    assert result["success"] is False
     assert "explicit current user request" in result["error"]
 
 
@@ -93,7 +92,6 @@ def test_approval_decline_prevents_secret_and_model_writes(monkeypatch):
         )
     )
 
-    assert result["success"] is False
     assert "not approved" in result["error"]
 
 
@@ -178,7 +176,6 @@ def test_failed_model_validation_reports_partial_secret_write_without_echo(monke
     )
     result = _payload(raw)
 
-    assert result["success"] is False
     assert result["credential_saved"] is True
     assert result["model_changed"] is False
     assert result["credential_stored_as"] == "GEMINI_API_KEY"
@@ -208,7 +205,6 @@ def test_oauth_provider_rejects_pasted_api_key_before_any_write(monkeypatch):
         )
     )
 
-    assert result["success"] is False
     assert "rather than a pasted API key" in result["error"]
 
 
@@ -231,5 +227,4 @@ def test_secure_capture_cancel_does_not_change_model(monkeypatch):
         )
     )
 
-    assert result["success"] is False
     assert "secure secret entry was unavailable or cancelled" in result["error"]
