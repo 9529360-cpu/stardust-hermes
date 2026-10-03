@@ -65,6 +65,7 @@ import { ComputerUsePanel } from '../settings/computer-use-panel'
 import { asText, includesQuery, prettyName, toolNames, toolsetDisplayLabel } from '../settings/helpers'
 import { TerminalBackendPanel } from '../settings/terminal-backend-panel'
 import { ToolsetConfigPanel } from '../settings/toolset-config-panel'
+import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 import { EmbeddedHubPicker } from './embedded-hub-picker'
@@ -76,6 +77,8 @@ import { $skillsSortDesc, $toolsetsSortDesc } from './store'
 // Skills tab now (EmbeddedHubPicker below the installed list). Legacy
 // `?tab=hub` links fall back to 'skills' via useRouteEnumParam.
 const SKILLS_MODES = ['skills', 'toolsets', 'mcp', 'plugins'] as const
+
+const toolsetRowId = (name: string) => `toolset-row-${name}`
 
 // Skills + toolsets live in the RQ cache so switching tabs/pages paints the
 // cached lists instantly (no reload flash) and mount only fires a deduped
@@ -557,6 +560,16 @@ export function SkillsView({
     () => visibleToolsets.find(ts => ts.name === selectedToolset) ?? visibleToolsets[0] ?? null,
     [selectedToolset, visibleToolsets]
   )
+
+  // `?tab=toolsets&toolset=<name>` selects that toolset so its configuration
+  // panel is open on arrival (e.g. the pet generator's image-backend setup).
+  useDeepLinkHighlight({
+    block: 'nearest',
+    elementId: toolsetRowId,
+    onResolve: setSelectedToolset,
+    param: 'toolset',
+    ready: name => visibleToolsets.some(toolset => toolset.name === name)
+  })
 
   // Single toggles are optimistic and silent on success (the row repaints
   // immediately — a toast per flip would spam rapid customization). Errors
@@ -1089,6 +1102,7 @@ export function SkillsView({
                         }
                         onSelect={() => setSelectedToolset(toolset.name)}
                         onToggle={checked => void handleToggleToolset(toolset, checked)}
+                        rowId={toolsetRowId(toolset.name)}
                         subtitle={presentedToolsetDescription(toolset, t.skills.toolsetDescriptions)}
                         title={label}
                         toggleLabel={t.skills.toggleToolset(label, !toolset.enabled)}

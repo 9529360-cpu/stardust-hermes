@@ -262,7 +262,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     billingSettingsSeenRef.current = billingSettingsRequest
 
     if (billingSettingsRequest > 0) {
-      navigate(`${SETTINGS_ROUTE}?tab=providers&pview=keys`)
+      navigate(`${SETTINGS_ROUTE}?tab=config:model`)
     }
   }, [billingSettingsRequest, navigate])
 
@@ -442,7 +442,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     requestGateway
   })
 
-  const openProviderSettings = useCallback(() => navigate(`${SETTINGS_ROUTE}?tab=providers`), [navigate])
+  const openModelServices = useCallback(() => navigate(`${SETTINGS_ROUTE}?tab=config:model`), [navigate])
 
   // Palette "Keyboard shortcuts" entry dispatches a custom event (contributions
   // don't have router access); listen and navigate to the settings keybinds tab.
@@ -1347,7 +1347,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       <SessionPickerOverlay onResume={sessionId => openSession(sessionId, navigate)} />
       <ModelVisibilityOverlay
         gateway={gateway || undefined}
-        onOpenProviders={openProviderSettings}
+        onAddModelApi={openModelServices}
         ownerConnectionId={activeConnectionId || undefined}
         profile={activeGatewayProfile}
       />
