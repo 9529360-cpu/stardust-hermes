@@ -3047,6 +3047,9 @@ export interface Translations {
 
   onboarding: {
     headerTitle: string
+    setupRelay: string
+    setupRelayHint: string
+    advancedProviders: string
     headerDesc: string
     preparingInstall: string
     starting: string

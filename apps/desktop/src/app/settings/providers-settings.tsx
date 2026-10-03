@@ -458,6 +458,10 @@ export function ProvidersSettings({
     }
   }
 
+  if (view === 'custom-endpoints') {
+    return <CustomEndpointsSettings onConfigSaved={onConfigSaved} onMainModelChanged={onMainModelChanged} />
+  }
+
   if (!vars) {
     return <SettingsSkeleton search sections={[{ rows: 6 }]} />
   }
@@ -467,7 +471,7 @@ export function ProvidersSettings({
   // First-party Nous account sign-in is intentionally not a Stardust surface.
   // Keep generic third-party OAuth/CLI providers available, but when none exist
   // the provider page falls through to user-owned API keys instead.
-  const showApiKeys = view === 'keys' || (!hasOauth && view !== 'custom-endpoints')
+  const showApiKeys = view === 'keys' || !hasOauth
 
   const keyGroups = buildProviderKeyGroups(vars)
 
@@ -519,10 +523,6 @@ export function ProvidersSettings({
         )}
       </SettingsContent>
     )
-  }
-
-  if (view === 'custom-endpoints') {
-    return <CustomEndpointsSettings onConfigSaved={onConfigSaved} onMainModelChanged={onMainModelChanged} />
   }
 
   if (view === 'local') {

@@ -3508,7 +3508,10 @@ export const en: Translations = {
 
   onboarding: {
     headerTitle: "Let's get you setup with Stardust Agent",
-    headerDesc: 'Connect a model provider to start chatting. Most options take one click.',
+    setupRelay: 'Set up a custom model endpoint',
+    setupRelayHint: 'Open model settings to enter your endpoint URL, key, and model.',
+    advancedProviders: 'Advanced: provider accounts and other services',
+    headerDesc: 'Connect your own model endpoint first, or finish setup later in Settings.',
     preparingInstall: 'Stardust is finishing install. This usually takes under a minute on first run.',
     starting: 'Starting Stardust…',
     lookingUpProviders: 'Looking up providers...',
