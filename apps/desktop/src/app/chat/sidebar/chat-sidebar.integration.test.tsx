@@ -7,7 +7,7 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { registry } from '@/contrib/registry'
-import { $selectedStoredSessionId, $sessions } from '@/store/session'
+import { $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
 import { makeSessionInfo } from '@/test/session-info'
 
@@ -16,6 +16,7 @@ import { type AppView, ROUTES_AREA, SIDEBAR_NAV_AREA } from '../../routes'
 import { ChatSidebar } from './index'
 
 const noop = () => {}
+
 const sessionRows = [
   makeSessionInfo({ id: 'tile-one', last_active: 2, profile: 'default', started_at: 1, title: 'Tile one' }),
   makeSessionInfo({ id: 'tile-two', last_active: 2, profile: 'default', started_at: 1, title: 'Tile two' })
@@ -39,10 +40,13 @@ const renderSidebar = (pathname: string, currentView: AppView) =>
     </MemoryRouter>
   )
 
-const selectedRows = () =>
-  ['Tile one', 'Tile two']
+const expectOnlySelectedSession = (title: null | string) => {
+  const selectedRows = ['Tile one', 'Tile two']
     .map(label => screen.queryByText(label)?.closest('.group.row-hover'))
     .filter(row => row?.className.includes('bg-(--ui-row-active-background)'))
+
+  expect(selectedRows).toEqual(title ? [screen.getByText(title).closest('.group.row-hover')] : [])
+}
 
 const focus = (groupId: null | string) => act(() => noteActiveTreeGroup(groupId))
 
@@ -72,6 +76,7 @@ describe('ChatSidebar compact conversation surface', () => {
     disposeContributions()
     $selectedStoredSessionId.set(null)
     $sessions.set([])
+    $sessionsLoading.set(true)
     $removedSessionIds.set(new Set())
     $layoutTree.set(null)
     noteActiveTreeGroup(null)
@@ -88,22 +93,59 @@ describe('ChatSidebar compact conversation surface', () => {
     expect(screen.queryByRole('button', { name: 'Artifacts' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Scheduled jobs' })).toBeNull()
     expect(screen.queryByRole('textbox', { name: 'Search sessions' })).toBeNull()
+  })
+
+  it('keeps session selection coherent with the focused pane', () => {
+    renderSidebar('/kanban', 'extension')
+    expectOnlySelectedSession(null)
 
     focus('tile-one-group')
-    expect(selectedRows()).toEqual([screen.getByText('Tile one').closest('.group.row-hover')])
+    expectOnlySelectedSession('Tile one')
+
+    focus('tile-two-group')
+    expectOnlySelectedSession('Tile two')
+
+    focus(null)
+    expectOnlySelectedSession(null)
+
+    // Removing the focused tile's session leaves nothing selected rather than
+    // jumping the highlight to a row the user never focused.
+    focus('tile-two-group')
+    act(() => {
+      $removedSessionIds.set(new Set(['tile-two']))
+      $sessions.set([sessionRows[0]])
+    })
+    expectOnlySelectedSession(null)
   })
 
   it('keeps the conversation list visible while a product page owns the workspace', () => {
-    renderSidebar('/skills?tab=plugins', 'skills')
+    for (const [pathname, currentView] of [
+      ['/skills?tab=toolsets', 'skills'],
+      ['/skills?tab=plugins', 'skills'],
+      ['/messaging', 'messaging'],
+      ['/artifacts', 'artifacts'],
+      ['/cron', 'cron']
+    ] as const) {
+      cleanup()
+      focus('workspace-group')
+      renderSidebar(pathname, currentView)
 
-    expect(screen.getByText('Tile one')).toBeTruthy()
-    expect(screen.getByText('Tile two')).toBeTruthy()
-    expect(screen.queryByRole('textbox', { name: 'Search sessions' })).toBeNull()
+      expect(screen.getByText('Tile one')).toBeTruthy()
+      expect(screen.getByText('Tile two')).toBeTruthy()
+      expect(screen.queryByRole('textbox', { name: 'Search sessions' })).toBeNull()
+      expectOnlySelectedSession(null)
+
+      focus('tile-one-group')
+      expectOnlySelectedSession('Tile one')
+    }
   })
 
   it('keeps the pinned and conversation sections when history is empty', () => {
+    // A loaded-but-empty history. `$sessionsLoading` starts true (before the
+    // first list fetch), which correctly paints skeletons instead of the copy.
     act(() => {
       $sessions.set([])
+      $sessionsLoading.set(false)
     })
 
     renderSidebar('/', 'chat')
