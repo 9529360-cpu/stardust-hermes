@@ -2696,6 +2696,8 @@ export const en: Translations = {
     created: 'Cron created',
     updated: 'Cron updated',
     failedLoad: 'Failed to load cron jobs',
+    loadFailedHelp: 'Could not check your scheduled jobs. Try again to see whether any are saved.',
+    loadFailedStale: 'Could not refresh scheduled jobs. Showing the last loaded list.',
     failedUpdate: 'Failed to update cron job',
     failedTrigger: 'Failed to trigger cron job',
     failedDelete: 'Failed to delete cron job',
@@ -3506,7 +3508,10 @@ export const en: Translations = {
 
   onboarding: {
     headerTitle: "Let's get you setup with Stardust Agent",
-    headerDesc: 'Connect a model provider to start chatting. Most options take one click.',
+    setupRelay: 'Set up a custom model endpoint',
+    setupRelayHint: 'Open model settings to enter your endpoint URL, key, and model.',
+    advancedProviders: 'Advanced: provider accounts and other services',
+    headerDesc: 'Connect your own model endpoint first, or finish setup later in Settings.',
     preparingInstall: 'Stardust is finishing install. This usually takes under a minute on first run.',
     starting: 'Starting Stardust…',
     lookingUpProviders: 'Looking up providers...',

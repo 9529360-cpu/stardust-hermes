@@ -56,7 +56,8 @@ async def admit_internal_event(adapter: Any, event: Any) -> None:
         raise WakeNotAccepted("internal wake not accepted by adapter")
 
 
-async def deliver_wake(adapter: Any, *, text: str, session_id: str = "", source: Any = None) -> None:
+async def deliver_wake(adapter: Any, *, text: str, session_id: str = "", source: Any = None,
+                       profile: str = "default") -> None:
     """Deliver a wake turn to the session behind ``adapter``. ``session_id`` is the RAW session id
     (``X-Hermes-Session-Id`` / state.db key) — required for non-push adapters. ``source`` is the
     ``SessionSource`` for the synthetic event — required for push-capable adapters. Raises on
@@ -71,7 +72,14 @@ async def deliver_wake(adapter: Any, *, text: str, session_id: str = "", source:
     if not session_id:
         raise ValueError("deliver_wake: non-push adapter (supports_async_delivery=False) "
                          "requires the raw session id to self-post the wake turn")
-    await _self_post_chat_completion(adapter, text=text, session_id=session_id)
+    if profile == "default":
+        from hermes_cli.profiles import get_profile_dir
+        from hermes_constants import hermes_home_key
+        if hermes_home_key() != hermes_home_key(get_profile_dir("default")):
+            raise ValueError("wake self-post default route does not match the current owner scope")
+        await _self_post_chat_completion(adapter, text=text, session_id=session_id)
+    else:
+        await _self_post_chat_completion(adapter, text=text, session_id=session_id, profile=profile)
 
 
 def _delegation_display_metadata(evt: dict) -> dict:
@@ -137,7 +145,8 @@ async def persist_delegation_delivery(adapter: Any, *, text: str, session_id: st
     )
 
 
-async def _self_post_chat_completion(adapter: Any, *, text: str, session_id: str) -> None:
+async def _self_post_chat_completion(adapter: Any, *, text: str, session_id: str,
+                                     profile: str = "default") -> None:
     """POST the wake text to the in-pod API server as a normal session turn, using the adapter's
     own bind host/port/key. Session continuation via ``X-Hermes-Session-Id`` is 403-gated on
     ``API_SERVER_KEY``, so a missing key is a hard error rather than a wake in a fresh session
@@ -154,7 +163,16 @@ async def _self_post_chat_completion(adapter: Any, *, text: str, session_id: str
                            "server, so the wake cannot reach the target session")
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"  # bare IPv6 literal
-    url = f"http://{host}:{port}/v1/chat/completions"
+    if profile != "default":
+        from hermes_cli.profiles import get_profile_dir, normalize_profile_name
+        from hermes_constants import hermes_home_key
+        name = normalize_profile_name(profile)
+        if name == "default" or hermes_home_key(get_profile_dir(name)) != hermes_home_key():
+            raise ValueError("wake self-post profile does not match the current owner scope")
+        route = f"/p/{name}"
+    else:
+        route = ""
+    url = f"http://{host}:{port}{route}/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "X-Hermes-Session-Id": session_id,

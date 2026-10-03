@@ -19,6 +19,59 @@ from tools.approval_context import _normalize_approval_mode
 from tools.approval_smart import _smart_approve
 
 
+def test_same_stored_session_id_has_independent_profile_approvals(tmp_path):
+    """Two imported profiles may share a stored id, but never consent or YOLO state."""
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from tools.approval_gateway_wait import _ApprovalEntry
+
+    homes = [tmp_path / "profile-a", tmp_path / "profile-b"]
+    for home in homes:
+        home.mkdir()
+    key = "imported-stored-session"
+    entries = []
+    try:
+        for home, label in zip(homes, ("a", "b")):
+            token = set_hermes_home_override(home)
+            try:
+                entry = _ApprovalEntry({"request_id": f"req-{label}", "command": label})
+                approval_module._gateway_queues[approval_module._state_key(key)] = [entry]
+                entries.append(entry)
+                if label == "a":
+                    approval_module.approve_session(key, "dangerous")
+                    approval_module.enable_session_yolo(key)
+                    approval_module._record_denial(key)
+            finally:
+                reset_hermes_home_override(token)
+        token = set_hermes_home_override(homes[1])
+        try:
+            assert not approval_module.is_approved(key, "dangerous")
+            assert not approval_module.is_session_yolo_enabled(key)
+            assert approval_module._denial_breaker_addendum(key) == ""
+            assert [item["request_id"] for item in approval_module.list_gateway_approvals(key)] == ["req-b"]
+            assert approval_module.resolve_gateway_approval(key, "once", request_id="req-a") == 0
+            assert approval_module.resolve_gateway_approval(key, "deny", request_id="req-b") == 1
+        finally:
+            reset_hermes_home_override(token)
+        assert entries[1].result == "deny" and not entries[0].event.is_set()
+        token = set_hermes_home_override(homes[0])
+        try:
+            assert approval_module.is_approved(key, "dangerous")
+            assert approval_module.is_session_yolo_enabled(key)
+            assert approval_module.resolve_gateway_approval(key, "once", request_id="req-a") == 1
+        finally:
+            reset_hermes_home_override(token)
+    finally:
+        for home in homes:
+            token = set_hermes_home_override(home)
+            try:
+                approval_module.disable_session_yolo(key)
+                approval_module.clear_session(key)
+                approval_module.unregister_gateway_notify(key)
+                approval_module._reset_denials(key)
+            finally:
+                reset_hermes_home_override(token)
+
+
 class TestPackageManagerUninstallApproval:
     """Package-manager removal verbs remove software outside the project (#10199)."""
 
@@ -1740,6 +1793,48 @@ class TestConcurrentApprovalCoalescing:
                 # the leader wait.
                 time.sleep(0.05)
         return results, threads
+
+    def test_unoffered_and_malformed_answers_fail_closed(self, monkeypatch):
+        from tools import approval as mod
+        monkeypatch.setattr(approval_context, "_get_approval_timeout", lambda: 30)
+
+        for data, choice in [
+            (self._data(), "garbage"),
+            (self._data(), "deny "),
+            (self._data(), None),
+            (self._data(), 1),
+            ({**self._data(), "allow_session": False, "allow_permanent": False}, "session"),
+            ({**self._data(), "allow_session": False, "allow_permanent": False}, "always"),
+            ({**self._data(), "smart_denied": True}, "session"),
+            ({**self._data(), "smart_denied": True}, "always"),
+        ]:
+            import threading
+            notified = []
+            result = []
+            thread = threading.Thread(target=lambda: result.append(
+                mod._await_gateway_decision(self.SESSION_KEY, notified.append, data)))
+            thread.start()
+            for _ in range(400):
+                if notified:
+                    break
+                time.sleep(0.005)
+            assert notified, "approval did not reach the response surface"
+            assert mod.resolve_gateway_approval(self.SESSION_KEY, choice,
+                                                request_id=notified[0]["request_id"]) == 1
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+            assert result[0]["choice"] == "deny"
+
+    def test_malformed_approve_all_cannot_authorize_any_entry(self, monkeypatch):
+        from tools import approval as mod
+        monkeypatch.setattr(approval_context, "_get_approval_timeout", lambda: 30)
+        notified = []
+        results, threads = self._spawn_waits(mod, notified, n=2, command="rm -rf .git")
+        assert mod.resolve_gateway_approval(self.SESSION_KEY, "garbage", resolve_all=True) == 1
+        for thread in threads:
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+        assert all(result["choice"] == "deny" for result in results)
 
     def test_identical_concurrent_approvals_send_one_prompt(self, monkeypatch):
         from tools import approval as mod

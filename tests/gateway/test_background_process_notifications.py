@@ -57,6 +57,7 @@ def _build_runner(monkeypatch, tmp_path, mode: str) -> GatewayRunner:
 
     import gateway.run as gateway_run
 
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
 
     runner = GatewayRunner(GatewayConfig())
@@ -66,8 +67,12 @@ def _build_runner(monkeypatch, tmp_path, mode: str) -> GatewayRunner:
 
 
 def _watcher_dict(session_id="proc_test", thread_id=""):
+    from hermes_constants import hermes_home_key
     d = {
         "session_id": session_id,
+        "owner_home": hermes_home_key(),
+        "session_key": "agent:main:telegram:dm:123",
+        "chat_type": "dm",
         "check_interval": 0,
         "platform": "telegram",
         "chat_id": "123",
@@ -625,6 +630,39 @@ async def test_inject_watch_notification_raw_session_key_self_posts(monkeypatch,
     assert posts == [
         {"text": "[SYSTEM: subagent finished]", "session_id": "raw-hq-session-id"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_raw_api_event_uses_owning_profile_route(monkeypatch, tmp_path):
+    """A secondary raw SID collision must not self-post through the default API route."""
+    from hermes_constants import hermes_home_key, set_hermes_home_override, reset_hermes_home_override
+    import gateway.run as gateway_run
+    import gateway.wake as wake_mod
+
+    runner = _build_runner(monkeypatch, tmp_path, "all")
+    secondary = tmp_path / "profiles" / "other"
+    secondary.mkdir(parents=True)
+    monkeypatch.setattr(gateway_run, "_multiplex_profile_homes",
+                        lambda config: [("default", tmp_path), ("other", secondary)])
+    runner.adapters[Platform.API_SERVER] = SimpleNamespace(supports_async_delivery=False)
+    posts = []
+
+    async def fake_self_post(adapter, *, text, session_id, profile="default"):
+        posts.append((session_id, profile))
+
+    monkeypatch.setattr(wake_mod, "_self_post_chat_completion", fake_self_post)
+    evt = {"type": "watch_match", "session_id": "proc-other", "session_key": "same-raw-id",
+           "owner_home": hermes_home_key(secondary)}
+    token = set_hermes_home_override(str(secondary))
+    try:
+        assert await runner._inject_watch_notification("other output", evt) is True
+    finally:
+        reset_hermes_home_override(token)
+    assert posts == [("same-raw-id", "other")]
+
+    evt["owner_home"] = hermes_home_key(tmp_path / "unserved")
+    assert await runner._inject_watch_notification("other output", evt) is False
+    assert posts == [("same-raw-id", "other")]
 
 
 @pytest.mark.asyncio

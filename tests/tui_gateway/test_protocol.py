@@ -555,6 +555,109 @@ def test_approval_respond_4001_when_nothing_resolves(server, monkeypatch):
     assert response["error"]["code"] == 4001
 
 
+def test_approval_rpc_isolates_duplicate_stored_ids_across_profiles(server, tmp_path, monkeypatch):
+    """Pending, acknowledgment and consent belong to the live profile, not its stored id."""
+    from tools import approval
+    from tools.approval_gateway_wait import _ApprovalEntry
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    monkeypatch.setattr(server, "set_hermes_home_override", set_hermes_home_override)
+    monkeypatch.setattr(server, "reset_hermes_home_override", reset_hermes_home_override)
+
+    homes = [tmp_path / "profile-a", tmp_path / "profile-b"]
+    for home in homes:
+        home.mkdir()
+    sessions = [{"session_key": "same-stored-id", "profile_home": str(home), "history": []}
+                for home in homes]
+    server._sessions.update({"sid-a": sessions[0], "sid-b": sessions[1]})
+    entries = []
+    state_keys = []
+    for session, label in zip(sessions, ("a", "b")):
+        with server._session_profile_runtime_scope(session):
+            entry = _ApprovalEntry({"request_id": f"req-{label}", "command": label})
+            state_key = approval._state_key("same-stored-id")
+            assert state_key not in state_keys, "profiles must have distinct approval state keys"
+            state_keys.append(state_key)
+            approval._gateway_queues[state_key] = [entry]
+            entries.append(entry)
+
+    def rpc(method, sid, **other):
+        return server.handle_request({"id": "approval-test", "method": method,
+                                      "params": {"session_id": sid, **other}})
+
+    assert [item["request_id"] for item in rpc("approval.pending", "sid-a")["result"]["approvals"]] == ["req-a"]
+    assert [item["request_id"] for item in rpc("approval.pending", "sid-b")["result"]["approvals"]] == ["req-b"]
+    assert rpc("approval.received", "sid-a", request_id="req-b")["result"] == {"acknowledged": False}
+    assert rpc("approval.respond", "sid-a", choice="once", request_id="req-b")["result"] == {"resolved": 0}
+    assert not entries[0].event.is_set() and not entries[1].event.is_set()
+    assert rpc("approval.respond", "sid-a", choice="once", request_id="req-a")["result"] == {"resolved": 1}
+    assert entries[0].result == "once" and not entries[1].event.is_set()
+    assert rpc("approval.respond", "sid-b", choice="deny", request_id="req-b")["result"] == {"resolved": 1}
+    assert entries[1].result == "deny"
+
+
+def test_approval_stale_sid_is_ambiguous_and_does_not_fall_through(server, tmp_path, monkeypatch):
+    from tools import approval
+    from tools.approval_gateway_wait import _ApprovalEntry
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    monkeypatch.setattr(server, "set_hermes_home_override", set_hermes_home_override)
+    monkeypatch.setattr(server, "reset_hermes_home_override", reset_hermes_home_override)
+
+    homes = [tmp_path / "profile-a", tmp_path / "profile-b"]
+    for home in homes:
+        home.mkdir()
+    sessions = [{"session_key": "shared", "profile_home": str(home), "history": []} for home in homes]
+    server._sessions.update({"sid-a": sessions[0], "sid-b": sessions[1]})
+    for session, label in zip(sessions, ("a", "b")):
+        with server._session_profile_runtime_scope(session):
+            approval._gateway_queues[approval._state_key("shared")] = [
+                _ApprovalEntry({"request_id": f"req-{label}", "command": label})]
+
+    def respond(sid, **other):
+        return server.handle_request({"id": "stale", "method": "approval.respond",
+                                      "params": {"session_id": sid, "choice": "once", **other}})
+
+    assert respond("shared")["error"]["code"] == 4001
+    assert respond("shared", request_id="missing")["error"]["code"] == 4001
+    assert respond("sid-a", profile="nonexistent", request_id="req-a")["error"]["code"] == 4064
+    assert respond("gone", request_id="req-b")["result"] == {"resolved": 1}
+    assert respond("gone", request_id="req-a")["result"] == {"resolved": 1}
+
+
+def test_late_approval_response_keeps_original_profile_after_sid_reuse(server, tmp_path, monkeypatch):
+    """A notifier and callback must not use a recycled live SID as authority."""
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from tools import approval
+    from tools.approval_gateway_wait import _ApprovalEntry
+    from tui_gateway import server_requests
+
+    monkeypatch.setattr(server, "set_hermes_home_override", set_hermes_home_override)
+    monkeypatch.setattr(server, "reset_hermes_home_override", reset_hermes_home_override)
+    homes = [tmp_path / "profile-a", tmp_path / "profile-b"]
+    for home in homes:
+        home.mkdir()
+    owners = [{"session_key": "shared", "profile_home": str(home)} for home in homes]
+    server._sessions["reused-sid"] = owners[0]
+    callbacks = []
+    monkeypatch.setattr(server_requests, "send_async", lambda method, sid, payload, cb:
+                        callbacks.append(cb) or (lambda reason: None))
+    for owner, label in zip(owners, ("a", "b")):
+        with server._session_profile_runtime_scope(owner):
+            approval._gateway_queues[approval._state_key("shared")] = [
+                _ApprovalEntry({"request_id": f"req-{label}", "command": label})]
+    with server._session_profile_runtime_scope(owners[0]):
+        approval.register_gateway_notify("shared", lambda data:
+            server._emit_approval_request("reused-sid", data, owner=owners[0]))
+    server._sessions["reused-sid"] = owners[1]
+    with server._session_profile_runtime_scope(owners[0]):
+        notify = approval._gateway_notify_cb("shared")
+    notify({"request_id": "req-a", "command": "a"})
+    callbacks[0]({"choice": "once"})
+    with server._session_profile_runtime_scope(owners[0]):
+        assert approval.list_gateway_approvals("shared") == []
+    with server._session_profile_runtime_scope(owners[1]):
+        assert [item["request_id"] for item in approval.list_gateway_approvals("shared")] == ["req-b"]
+
+
 # ── Session lookup ───────────────────────────────────────────────────
 
 

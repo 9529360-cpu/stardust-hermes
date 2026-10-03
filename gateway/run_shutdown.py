@@ -1565,7 +1565,8 @@ class GatewayShutdownMixin:
 
         def _kill_processes() -> None:
             from tools.process_registry import process_registry
-            _count_step("Shutdown (%s): killed %d tool subprocess(es)", process_registry.kill_all)
+            _count_step("Shutdown (%s): killed %d tool subprocess(es)",
+                        lambda: process_registry.kill_all(all_profiles=True))
 
         def _mark_cron_interrupted() -> list:
             # kill_all() is global: a cron job mid-dispatch lost its tool subprocess and its agent thread may

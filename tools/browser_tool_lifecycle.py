@@ -116,7 +116,9 @@ def _session_owner_scope(task_id: str):
     from agent.secret_scope import build_profile_secret_scope, reset_secret_scope, set_secret_scope
     from hermes_cli.env_loader import hydrate_profile_secret_sources
 
-    home_token = set_hermes_home_override(owner_home)
+    # A launch-context session retains its raw registry key even when the janitor
+    # happens to run inside a served profile's context.
+    home_token = set_hermes_home_override(owner_home if isinstance(task_id, tuple) else None)
     try:
         hydrate_profile_secret_sources(Path(owner_home))
         secret_token = set_secret_scope(build_profile_secret_scope(Path(owner_home)))
@@ -159,7 +161,8 @@ def _cleanup_inactive_browser_sessions():
         _bt.logger.info("Cleaning up inactive session for task: %s (inactive for %ss)", task_id, elapsed)
         try:
             with _session_owner_scope(task_id):
-                cleanup_browser(task_id)
+                _cleanup_single_browser_session(task_id)
+                _drop_last_active_binding(task_id)
             _forget_session_tracking(task_id)
         except Exception as e:
             with _bt._cleanup_lock:
@@ -636,7 +639,9 @@ def _drop_last_active_binding(task_id: str) -> None:
     """Drop stale last-active ownership after cleaning ``task_id``: a bare task always, a
     sidecar only if it was still the recorded owner (a later click must not resurrect a
     cleaned sidecar while a primary-session binding is preserved)."""
-    bare_task_id = _bt._bare_task_id_for_session_key(task_id)
+    bare_task_id = _bt._bare_task_id_for_session_key(_bt._raw_session_key(task_id))
+    if isinstance(task_id, tuple):
+        bare_task_id = (task_id[0], bare_task_id)
     if bare_task_id == task_id or _bt._last_active_session_key.get(bare_task_id) == task_id:
         _bt._last_active_session_key.pop(bare_task_id, None)
 
@@ -647,14 +652,15 @@ def cleanup_browser(task_id: Optional[str] = None) -> None:
     if task_id is None:
         task_id = "default"
 
-    session_keys = [task_id]
-    sidecar_key = f"{task_id}{_bt._LOCAL_SUFFIX}"
+    registry_key = _bt._registry_session_key(task_id)
+    session_keys = [registry_key]
+    sidecar_key = _bt._sidecar_registry_key(registry_key)
     with _bt._cleanup_lock:
         if not _bt._is_local_sidecar_key(task_id) and sidecar_key in _bt._active_sessions:
             session_keys.append(sidecar_key)
     for session_key in session_keys:
         _cleanup_single_browser_session(session_key)
-    _drop_last_active_binding(task_id)
+    _drop_last_active_binding(registry_key)
 
 
 def _kill_verified_daemon(socket_dir: str, session_name: str) -> bool:
@@ -709,7 +715,7 @@ def _force_reap_browser_session(task_id: str) -> None:
 
     Janitor last resort after repeated cleanup failures (#100738).
     """
-    _cdp._stop_cdp_supervisor(task_id)
+    _cdp._stop_cdp_supervisor(_bt._raw_session_key(task_id))
     with _bt._cleanup_lock:
         session_info = _bt._active_sessions.get(task_id)
         _bt._session_last_activity.pop(task_id, None)
@@ -721,15 +727,16 @@ def _force_reap_browser_session(task_id: str) -> None:
 
 def _cleanup_single_browser_session(task_id: str) -> None:
     """Reap a single browser session by its exact session key."""
-    _cdp._stop_cdp_supervisor(task_id)  # close our WebSocket BEFORE the backend tears down the endpoint
+    raw_task_id = _bt._raw_session_key(task_id)
+    _cdp._stop_cdp_supervisor(raw_task_id)  # close our WebSocket BEFORE the backend tears down the endpoint
 
     # Camofox: managed persistence keeps the profile (cookies) across tasks; skip the full
     # close then — the inactivity reaper still frees idle resources.
     if _bt._is_camofox_mode():
         def _camofox_cleanup():
             from tools.browser_camofox import camofox_close, camofox_soft_cleanup
-            if not camofox_soft_cleanup(task_id):
-                camofox_close(task_id)
+            if not camofox_soft_cleanup(raw_task_id):
+                camofox_close(raw_task_id)
         _best_effort(f"Camofox cleanup for task {task_id}", _camofox_cleanup)
 
     _bt.logger.debug("cleanup_browser called for task_id: %s", task_id)
@@ -744,7 +751,7 @@ def _cleanup_single_browser_session(task_id: str) -> None:
         return
 
     _bt.logger.debug("Found session for task %s: bb_session_id=%s", task_id, session_info.get("bb_session_id", "unknown"))
-    _bt._maybe_stop_recording(task_id)  # saves the file before close
+    _bt._maybe_stop_recording(raw_task_id)  # saves the file before close
 
     # Lightpanda sessions have no daemon to ``close``; an expired cloud CDP URL cannot
     # accept one and would make _get_session_info() renew the session mid-cleanup.
@@ -760,7 +767,7 @@ def _cleanup_single_browser_session(task_id: str) -> None:
         _bt.logger.debug("Skipping agent-browser close for dead local daemon %s", task_id)
     else:
         try:
-            _session._run_browser_command(task_id, "close", [], timeout=10)
+            _session._run_browser_command(raw_task_id, "close", [], timeout=10)
             _bt.logger.debug("agent-browser close command completed for task %s", task_id)
         except Exception as e:
             _bt.logger.warning("agent-browser close failed for task %s: %s", task_id, e)
@@ -774,7 +781,9 @@ def cleanup_all_browsers() -> None:
     with _bt._cleanup_lock:
         task_ids = list(_bt._active_sessions.keys())
     for task_id in task_ids:
-        cleanup_browser(task_id)
+        with _session_owner_scope(task_id):
+            _cleanup_single_browser_session(task_id)
+            _drop_last_active_binding(task_id)
 
     try:  # tear down CDP supervisors so background threads exit
         from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]

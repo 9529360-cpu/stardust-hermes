@@ -125,6 +125,7 @@ function ConfigSettingsInner({
   // Seed the local draft once, the first time the shared record lands.
   // Background refetches thereafter must not clobber in-progress edits.
   const configSeeded = useRef(false)
+  const profileRefreshGeneration = useRef(0)
   // Snapshot of the record as it was when the draft was seeded. Autosave
   // diffs the draft against this (not against disk) so a field the user
   // never touched — possibly changed out-of-band by `hermes config set`
@@ -150,6 +151,7 @@ function ConfigSettingsInner({
   // B. Drop the seed + draft (re-seeds from B's refetch) and zero saveVersion so
   // the pending debounced autosave is cancelled by its effect cleanup.
   useOnProfileSwitch(() => {
+    const generation = ++profileRefreshGeneration.current
     configSeeded.current = false
     configBaselineRef.current = null
     savedDiscoverySignatureRef.current = undefined
@@ -157,6 +159,19 @@ function ConfigSettingsInner({
     saveVersionRef.current = 0
     setSaveVersion(0)
     saveQueueRef.current = Promise.resolve()
+    // The shared active-profile cache key can retain the same object reference
+    // across a switch. Explicitly re-seed from the authoritative refetch rather
+    // than waiting for the loadedConfig effect to see a changed reference.
+    void refetchConfig().then(result => {
+      if (generation !== profileRefreshGeneration.current || !result.data || configSeeded.current) {
+        return
+      }
+
+      configSeeded.current = true
+      configBaselineRef.current = result.data
+      savedDiscoverySignatureRef.current = repoDiscoveryPolicySignature(repoDiscoveryPolicyFromConfig(result.data))
+      setConfig(result.data)
+    })
   })
 
   useEffect(() => {

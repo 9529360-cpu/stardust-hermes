@@ -2310,6 +2310,8 @@ export interface Translations {
     created: string
     updated: string
     failedLoad: string
+    loadFailedHelp: string
+    loadFailedStale: string
     failedUpdate: string
     failedTrigger: string
     failedDelete: string
@@ -3045,6 +3047,9 @@ export interface Translations {
 
   onboarding: {
     headerTitle: string
+    setupRelay: string
+    setupRelayHint: string
+    advancedProviders: string
     headerDesc: string
     preparingInstall: string
     starting: string

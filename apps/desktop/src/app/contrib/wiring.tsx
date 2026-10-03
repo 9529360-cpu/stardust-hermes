@@ -1134,8 +1134,8 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onEdit: editMessage,
     onLoadMoreMessaging: loadMoreMessagingForPlatform,
     onLoadMoreSessions: loadMoreSessions,
-    onManageCronJob: jobId => {
-      setCronFocusJobId(jobId)
+    onManageCronJob: (jobId, owner?: string) => {
+      setCronFocusJobId(owner ? { id: jobId, profile: owner } : jobId)
       navigate(CRON_ROUTE)
     },
     onNavigate: selectSidebarItem,
@@ -1186,10 +1186,17 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onThreadMessagesChange: handleThreadMessagesChange,
     onToggleSelectedPin: toggleSelectedPin,
     onTranscribeAudio: transcribeVoiceAudio,
-    onTriggerCronJob: jobId =>
-      triggerAndRefreshCronJobs(jobId, profileScope === ALL_PROFILES ? 'all' : profileScope)
+    onTriggerCronJob: (jobId, owner?: string) => {
+      const viewProfile = profileScope === ALL_PROFILES ? 'all' : profileScope
+
+      if (!owner && viewProfile === 'all') {
+        return Promise.resolve()
+      }
+
+      return triggerAndRefreshCronJobs(jobId, viewProfile, owner || viewProfile)
         .then(() => undefined)
-        .catch(() => undefined),
+        .catch(() => undefined)
+    },
     getGateway: () => gatewayRef.current,
     openAgents,
     openCommandCenterSection,

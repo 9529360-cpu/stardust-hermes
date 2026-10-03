@@ -1201,8 +1201,11 @@ def _(rid, params: dict) -> dict:
     session, err = _sess(params, rid)
     if err:
         return err
-    return _approval_reply(
-        rid, "approvals", lambda a: a.list_gateway_approvals(session["session_key"]))
+    if params.get("profile") is not None and not _live_profile_matches(session, _profile_home(params["profile"])):
+        return _err(rid, 4001, "session not found")
+    with _session_profile_runtime_scope(session):
+        return _approval_reply(
+            rid, "approvals", lambda a: a.list_gateway_approvals(session["session_key"]))
 
 
 @method("approval.received")
@@ -1212,8 +1215,11 @@ def _(rid, params: dict) -> dict:
         return err
     if not isinstance(request_id := params.get("request_id"), str) or not request_id:
         return _err(rid, 4006, "request_id required")
-    return _approval_reply(
-        rid, "acknowledged", lambda a: a.ack_gateway_approval(session["session_key"], request_id))
+    if params.get("profile") is not None and not _live_profile_matches(session, _profile_home(params["profile"])):
+        return _err(rid, 4001, "session not found")
+    with _session_profile_runtime_scope(session):
+        return _approval_reply(
+            rid, "acknowledged", lambda a: a.ack_gateway_approval(session["session_key"], request_id))
 
 
 def _approval_respond_session_fallback(params: dict):
@@ -1223,27 +1229,31 @@ def _approval_respond_session_fallback(params: dict):
 
     See #91684.
     """
+    requested_home = _ANY_PROFILE
+    if params.get("profile") is not None:
+        requested_home = _profile_home(params["profile"])
+    with _sessions_lock:
+        live = [session for session in _sessions.values()
+                if not session.get("_finalized") and _live_profile_matches(session, requested_home)]
     request_id = str(params.get("request_id") or "")
     if request_id:
         try:
             from tools.approval import list_gateway_approvals
-            with _sessions_lock:
-                live = list(_sessions.items())
-            for sid, session in live:
+            matches = []
+            for session in live:
                 key = str(session.get("session_key") or "")
-                if key and any(
-                    str(pending.get("request_id") or "") == request_id
-                    for pending in list_gateway_approvals(key)):
-                    return session
+                if key:
+                    with _session_profile_runtime_scope(session):
+                        if any(str(pending.get("request_id") or "") == request_id
+                               for pending in list_gateway_approvals(key)):
+                            matches.append(session)
+            return matches[0] if len(matches) == 1 else None
         except Exception:
             logger.debug("approval.respond request_id fallback failed", exc_info=True)
-    if target := str(params.get("session_id") or ""):
-        try:
-            if (live := _find_live_session_by_key(target)) is not None:
-                return live[1]
-        except Exception:
-            logger.debug("approval.respond stored-id fallback failed", exc_info=True)
-    return None
+        return None  # A stale request id must never fall through to FIFO or 'all'.
+    target = str(params.get("session_id") or "")
+    matches = [session for session in live if _session_lookup_key(session) == target]
+    return matches[0] if len(matches) == 1 else None
 
 
 @method("approval.respond")
@@ -1256,11 +1266,14 @@ def _(rid, params: dict) -> dict:
         session = _approval_respond_session_fallback(params)
         if session is None:
             return err
-    return _approval_reply(
-        rid, "resolved",
-        lambda a: a.resolve_gateway_approval(
-            session["session_key"], params.get("choice", "deny"),
-            resolve_all=params.get("all", False), request_id=params.get("request_id")))
+    elif params.get("profile") is not None and not _live_profile_matches(session, _profile_home(params["profile"])):
+        return _err(rid, 4001, "session not found")
+    with _session_profile_runtime_scope(session):
+        return _approval_reply(
+            rid, "resolved",
+            lambda a: a.resolve_gateway_approval(
+                session["session_key"], params.get("choice", "deny"),
+                resolve_all=params.get("all", False), request_id=params.get("request_id")))
 
 
 def register(server) -> None:

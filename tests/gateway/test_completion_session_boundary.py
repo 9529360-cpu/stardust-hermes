@@ -88,8 +88,10 @@ def _finished_session(registry, session_id="proc_boundary", **kwargs):
 
 
 def _watcher(session_id, parent_session_id=None):
+    from hermes_constants import hermes_home_key
     watcher = {
         "session_id": session_id,
+        "owner_home": hermes_home_key(),
         "check_interval": 0,
         "session_key": "agent:main:telegram:dm:123",
         "platform": "telegram",

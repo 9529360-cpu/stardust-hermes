@@ -47,10 +47,22 @@ _YOLO_MODE_FROZEN: bool = is_truthy_value(os.getenv("HERMES_YOLO_MODE", ""))
 
 # --- Per-session approval state (thread-safe) -----------------------------------------------------------------------
 
+
+def _state_key(session_key: str) -> str | tuple[str, str]:
+    """Keep a stored session id distinct in every routed profile without changing its
+    public identity (tool/process owners and chat-adapter keys remain the raw id).
+    The launch profile retains the legacy key for single-profile callers.
+    """
+    from hermes_constants import get_hermes_home_override, hermes_home_key
+
+    home = get_hermes_home_override()
+    return (hermes_home_key(home), session_key) if home else session_key
+
+
 _lock = threading.Lock()
-_pending: dict[str, dict] = {}
-_session_approved: dict[str, set] = {}
-_session_yolo: set[str] = set()
+_pending: dict[str | tuple[str, str], dict] = {}
+_session_approved: dict[str | tuple[str, str], set] = {}
+_session_yolo: set[str | tuple[str, str]] = set()
 _permanent_approved: set = set()
 # Routed multiplex profiles: one permanent allowlist per profile home (see ``_permanent_set``).
 _permanent_approved_by_home: dict[str, set] = {}
@@ -61,7 +73,7 @@ _permanent_approved_by_home: dict[str, set] = {}
 # instruction; any approval resets the tally. Only TOOL RESULT text changes — no history surgery, no interrupts — so
 # it is prompt-cache-invariant. Capped so short-lived session keys cannot grow it without bound; oldest (least
 # recently denied) entries are evicted.
-_denial_tally: dict[str, int] = {}
+_denial_tally: dict[str | tuple[str, str], int] = {}
 _DENIAL_TALLY_MAX_SESSIONS = 256
 
 
@@ -77,8 +89,8 @@ def _record_denial(session_key: str) -> int:
     """Increment and return the session's consecutive guardian-denial count. Pop-and-reinsert
     keeps actively-denying sessions at the most-recent end so eviction drops idle keys."""
     with _lock:
-        count = _denial_tally.pop(session_key, 0) + 1
-        _denial_tally[session_key] = count
+        count = _denial_tally.pop(_state_key(session_key), 0) + 1
+        _denial_tally[_state_key(session_key)] = count
         while len(_denial_tally) > _DENIAL_TALLY_MAX_SESSIONS:
             _denial_tally.pop(next(iter(_denial_tally)))
         return count
@@ -87,14 +99,14 @@ def _record_denial(session_key: str) -> int:
 def _reset_denials(session_key: str) -> None:
     """Clear the session's consecutive-denial tally (an approval happened)."""
     with _lock:
-        _denial_tally.pop(session_key, None)
+        _denial_tally.pop(_state_key(session_key), None)
 
 
 def _denial_breaker_addendum(session_key: str) -> str:
     """Escalated hard-stop text once the breaker has tripped, else ''. Read-only: callers
     increment via :func:`_record_denial`; the text is appended verbatim to the deny message."""
     with _lock:
-        count = _denial_tally.get(session_key, 0)
+        count = _denial_tally.get(_state_key(session_key), 0)
     threshold = _get_denial_breaker_threshold()
     if threshold <= 0 or count < threshold:
         return ""
@@ -115,23 +127,23 @@ def _denial_breaker_addendum(session_key: str) -> str:
 
 # Optional free-text reason supplied with an explicit deny (``/deny <reason>``) so the agent can adapt
 # instead of only hearing "denied". Ported from qwibitai/nanoclaw#2832.
-_gateway_queues: dict[str, list] = {}        # session_key → [_ApprovalEntry, …]
-_gateway_notify_cbs: dict[str, object] = {}  # session_key → callable(approval_data)
+_gateway_queues: dict[str | tuple[str, str], list] = {}        # profile-scoped key → [_ApprovalEntry, …]
+_gateway_notify_cbs: dict[str | tuple[str, str], object] = {}  # profile-scoped key → callable(approval_data)
 
 
 def register_gateway_notify(session_key: str, cb) -> None:
     """Register ``cb(approval_data: dict) -> None`` for sending approval requests. The callback
     bridges sync→async: it runs in the agent thread and must schedule the send on the loop."""
     with _lock:
-        _gateway_notify_cbs[session_key] = cb
+        _gateway_notify_cbs[_state_key(session_key)] = cb
 
 
 def unregister_gateway_notify(session_key: str) -> None:
     """Unregister the callback and wake ALL blocked threads for this session so
     they don't hang forever (agent run finished or interrupted)."""
     with _lock:
-        _gateway_notify_cbs.pop(session_key, None)
-        entries = _gateway_queues.pop(session_key, [])
+        _gateway_notify_cbs.pop(_state_key(session_key), None)
+        entries = _gateway_queues.pop(_state_key(session_key), [])
     for entry in entries:
         entry.event.set()
 
@@ -147,7 +159,7 @@ def resolve_gateway_approval(session_key: str, choice: str,
     relayed to the agent in the BLOCKED message. Returns the number resolved.
     """
     with _lock:
-        queue = _gateway_queues.get(session_key)
+        queue = _gateway_queues.get(_state_key(session_key))
         if not queue:
             return 0
         if request_id:
@@ -161,11 +173,18 @@ def resolve_gateway_approval(session_key: str, choice: str,
         else:
             targets = [queue.pop(0)]
         if not queue:
-            _gateway_queues.pop(session_key, None)
+            _gateway_queues.pop(_state_key(session_key), None)
 
     for entry in targets:
-        entry.result = choice
-        if reason:
+        # Every response surface (RPC, server request, chat adapter) converges here.
+        # A malformed or unoffered answer is never consent, even for /approve all.
+        allowed = {"once", "deny"}
+        if entry.data.get("allow_session", True) and not entry.data.get("smart_denied"):
+            allowed.add("session")
+        if entry.data.get("allow_permanent", True) and not entry.data.get("smart_denied"):
+            allowed.add("always")
+        entry.result = choice if isinstance(choice, str) and choice in allowed else "deny"
+        if reason and entry.result == "deny":
             entry.reason = reason
         entry.event.set()
     return len(targets)
@@ -174,14 +193,14 @@ def resolve_gateway_approval(session_key: str, choice: str,
 def list_gateway_approvals(session_key: str) -> list[dict]:
     """Return replay-safe snapshots of unresolved approvals for one session."""
     with _lock:
-        return [dict(entry.data) for entry in _gateway_queues.get(session_key, [])]
+        return [dict(entry.data) for entry in _gateway_queues.get(_state_key(session_key), [])]
 
 
 def register_gateway_settle(session_key: str, request_id: str, settle) -> bool:
     """Attach ``settle(reason)`` to one pending approval; it runs once when that wait ends by any path.
     False when the request is no longer pending (the surface should withdraw its prompt itself)."""
     with _lock:
-        for entry in _gateway_queues.get(session_key, []):
+        for entry in _gateway_queues.get(_state_key(session_key), []):
             if entry.data.get("request_id") == request_id:
                 entry.settle = settle
                 return True
@@ -191,7 +210,7 @@ def register_gateway_settle(session_key: str, request_id: str, settle) -> bool:
 def ack_gateway_approval(session_key: str, request_id: str) -> bool:
     """Record that a client received a particular pending approval request."""
     with _lock:
-        for entry in _gateway_queues.get(session_key, []):
+        for entry in _gateway_queues.get(_state_key(session_key), []):
             if entry.data.get("request_id") == request_id:
                 entry.acknowledged = True
                 return True
@@ -201,7 +220,7 @@ def ack_gateway_approval(session_key: str, request_id: str) -> bool:
 def has_blocking_approval(session_key: str) -> bool:
     """Check if a session has one or more blocking gateway approvals waiting."""
     with _lock:
-        return bool(_gateway_queues.get(session_key))
+        return bool(_gateway_queues.get(_state_key(session_key)))
 
 
 def get_pending_gateway_approval(session_key: str) -> dict | None:
@@ -210,7 +229,7 @@ def get_pending_gateway_approval(session_key: str) -> dict | None:
     if not session_key:
         return None
     with _lock:
-        queue = _gateway_queues.get(session_key)
+        queue = _gateway_queues.get(_state_key(session_key))
         if not queue:
             return None
         return dict(queue[0].data)
@@ -219,13 +238,13 @@ def get_pending_gateway_approval(session_key: str) -> dict | None:
 def submit_pending(session_key: str, approval: dict):
     """Store a pending approval request for a session."""
     with _lock:
-        _pending[session_key] = approval
+        _pending[_state_key(session_key)] = approval
 
 
 def approve_session(session_key: str, pattern_key: str):
     """Approve a pattern for this session only."""
     with _lock:
-        _session_approved.setdefault(session_key, set()).add(pattern_key)
+        _session_approved.setdefault(_state_key(session_key), set()).add(pattern_key)
 
 
 def _release_permission_mode_dependents(session_key: str) -> None:
@@ -244,7 +263,7 @@ def _set_session_yolo(session_key: str, enabled: bool) -> None:
     if not session_key:
         return
     with _lock:
-        (_session_yolo.add if enabled else _session_yolo.discard)(session_key)
+        (_session_yolo.add if enabled else _session_yolo.discard)(_state_key(session_key))
     _release_permission_mode_dependents(session_key)
 
 
@@ -263,10 +282,10 @@ def clear_session(session_key: str) -> None:
     if not session_key:
         return
     with _lock:
-        _session_approved.pop(session_key, None)
-        _session_yolo.discard(session_key)
-        _pending.pop(session_key, None)
-        entries = _gateway_queues.pop(session_key, [])
+        _session_approved.pop(_state_key(session_key), None)
+        _session_yolo.discard(_state_key(session_key))
+        _pending.pop(_state_key(session_key), None)
+        entries = _gateway_queues.pop(_state_key(session_key), [])
     for entry in entries:
         # Cancel blocked waits now so the old run unwinds instead of idling until timeout.
         entry.result = "deny"
@@ -287,7 +306,7 @@ def is_session_yolo_enabled(session_key: str) -> bool:
     if not session_key:
         return False
     with _lock:
-        return session_key in _session_yolo
+        return _state_key(session_key) in _session_yolo
 
 
 def is_current_session_yolo_enabled() -> bool:
@@ -328,7 +347,7 @@ def is_approved(session_key: str, pattern_key: str) -> bool:
     regex-derived key so existing command_allowlist entries survive key migrations."""
     aliases = _approval_key_aliases(pattern_key)
     with _lock:
-        approved = _permanent_set() | _session_approved.get(session_key, set())
+        approved = _permanent_set() | _session_approved.get(_state_key(session_key), set())
     return any(alias in approved for alias in aliases)
 
 
@@ -515,7 +534,7 @@ def _user_approved(session_key: str, description: str) -> dict:
 
 def _gateway_notify_cb(session_key: str):
     with _lock:
-        return _gateway_notify_cbs.get(session_key)
+        return _gateway_notify_cbs.get(_state_key(session_key))
 
 
 def _pending_result(spec, session_key: str, *, command: str, description: str,

@@ -134,12 +134,13 @@ class TestInactivityJanitorMultiplex:
         home_tok = set_hermes_home_override(str(p1))
         scope_tok = secret_scope.set_secret_scope(secret_scope.build_profile_secret_scope(p1))
         try:
-            bt_lifecycle._update_session_activity("t1")
-            self.bt._active_sessions["t1"] = {"session_name": "s1", "bb_session_id": None}
+            scoped_key = self.bt._registry_session_key("t1")
+            bt_lifecycle._update_session_activity(scoped_key)
+            self.bt._active_sessions[scoped_key] = {"session_name": "s1", "bb_session_id": None}
         finally:
             secret_scope.reset_secret_scope(scope_tok)
             reset_hermes_home_override(home_tok)
-        self.bt._session_last_activity["t1"] -= 10
+        self.bt._session_last_activity[scoped_key] -= 10
 
         seen = {}
 
@@ -156,9 +157,9 @@ class TestInactivityJanitorMultiplex:
             bt_lifecycle._cleanup_inactive_browser_sessions()
 
         assert seen == {"home": str(p1), "url": "http://127.0.0.1:1"}
-        assert "t1" not in self.bt._session_last_activity
-        assert "t1" not in self.bt._active_sessions
-        assert "t1" not in self.bt._session_owner_homes
+        assert scoped_key not in self.bt._session_last_activity
+        assert scoped_key not in self.bt._active_sessions
+        assert scoped_key not in self.bt._session_owner_homes
 
     def test_repeated_failures_force_reap_and_close_cloud_session(self):
         from unittest.mock import MagicMock
@@ -168,7 +169,7 @@ class TestInactivityJanitorMultiplex:
         provider = MagicMock()
 
         with (
-            patch("tools.browser_tool_lifecycle.cleanup_browser", side_effect=RuntimeError("boom")),
+            patch("tools.browser_tool_lifecycle._cleanup_single_browser_session", side_effect=RuntimeError("boom")),
             patch("tools.browser_tool_cloud._get_cloud_provider", return_value=provider),
             patch("tools.browser_tool.os.path.exists", return_value=False),
         ):
@@ -187,6 +188,137 @@ class TestInactivityJanitorMultiplex:
         assert "t1" not in self.bt._active_sessions
         assert "t1" not in self.bt._session_last_activity
         assert "t1" not in self.bt._cleanup_failures
+
+
+def test_same_task_id_in_two_profiles_cannot_reuse_or_close_peer_browser(tmp_path, monkeypatch):
+    """The process-global browser registry must respect served-profile ownership."""
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from tools import browser_tool as bt
+    from tools import browser_tool_session as bs
+
+    first_home = tmp_path / "first"
+    second_home = tmp_path / "second"
+    first_home.mkdir()
+    second_home.mkdir()
+    created = []
+    closed = []
+    saved = {name: getattr(bt, name).copy() for name in (
+        "_active_sessions", "_session_last_activity", "_session_owner_homes",
+        "_last_active_session_key", "_cleanup_failures", "_suspect_browser_sessions",
+    )}
+    for name in saved:
+        getattr(bt, name).clear()
+    monkeypatch.setattr(bt_lifecycle, "_start_browser_cleanup_thread", lambda: None)
+    monkeypatch.setattr(bs, "_create_session_for_key", lambda key, local: (
+        created.append({"session_name": f"fake-{len(created)}", "bb_session_id": None}) or created[-1]
+    ))
+    monkeypatch.setattr(bt_lifecycle, "_session_has_expired", lambda info: False)
+    monkeypatch.setattr(bs, "_local_backend_process_dead", lambda info: False)
+    monkeypatch.setattr(bt_lifecycle, "_cleanup_single_browser_session", lambda key: closed.append(key))
+
+    try:
+        first_token = set_hermes_home_override(str(first_home))
+        try:
+            first = bs._get_session_info("shared")
+        finally:
+            reset_hermes_home_override(first_token)
+        second_token = set_hermes_home_override(str(second_home))
+        try:
+            second = bs._get_session_info("shared")
+            bt_lifecycle.cleanup_browser("shared")
+        finally:
+            reset_hermes_home_override(second_token)
+        assert second is not first
+        first_token = set_hermes_home_override(str(first_home))
+        try:
+            assert bs._get_session_info("shared") is first
+        finally:
+            reset_hermes_home_override(first_token)
+        assert len(created) == 2
+        assert closed and all(key != "shared" for key in closed)
+    finally:
+        for name, original in saved.items():
+            live = getattr(bt, name)
+            live.clear()
+            live.update(original)
+
+
+def test_followup_binding_ignores_same_task_in_other_profile(tmp_path):
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+    from tools import browser_tool as bt
+
+    saved_sessions = bt._active_sessions.copy()
+    saved_bindings = bt._last_active_session_key.copy()
+    bt._active_sessions.clear()
+    bt._last_active_session_key.clear()
+    try:
+        first_home = tmp_path / "first"
+        second_home = tmp_path / "second"
+        first_home.mkdir()
+        second_home.mkdir()
+        first_token = set_hermes_home_override(str(first_home))
+        try:
+            primary_key = bt._registry_session_key("shared")
+            sidecar_key = bt._registry_session_key("shared::local")
+            bt._active_sessions[sidecar_key] = {
+                "session_key": "shared::local", "owner_task_id": "shared",
+            }
+            bt._last_active_session_key[primary_key] = sidecar_key
+            assert bt._last_session_key("shared") == "shared::local"
+        finally:
+            reset_hermes_home_override(first_token)
+        second_token = set_hermes_home_override(str(second_home))
+        try:
+            assert bt._last_session_key("shared") == "shared"
+            assert bt._registry_session_key("shared") != primary_key
+        finally:
+            reset_hermes_home_override(second_token)
+    finally:
+        bt._active_sessions.clear()
+        bt._active_sessions.update(saved_sessions)
+        bt._last_active_session_key.clear()
+        bt._last_active_session_key.update(saved_bindings)
+
+
+def test_shutdown_closes_each_profile_under_its_owner_scope(tmp_path, monkeypatch):
+    from hermes_constants import get_hermes_home, reset_hermes_home_override, set_hermes_home_override
+    from tools import browser_tool as bt
+
+    saved = {name: getattr(bt, name).copy() for name in (
+        "_active_sessions", "_session_last_activity", "_session_owner_homes",
+        "_last_active_session_key", "_cleanup_failures", "_recording_sessions",
+    )}
+    for name in saved:
+        getattr(bt, name).clear()
+    seen = []
+    monkeypatch.setattr(bt_lifecycle, "_session_has_expired", lambda info: True)
+    monkeypatch.setattr(bt_lifecycle, "_is_camofox_mode", lambda: False, raising=False)
+    monkeypatch.setattr(bt, "_is_camofox_mode", lambda: False)
+    monkeypatch.setattr(bt_lifecycle._cloud, "_get_cloud_provider", lambda: None)
+    monkeypatch.setattr(bt_lifecycle, "_release_local_session_artifacts", lambda *args: None)
+    monkeypatch.setattr(bt_lifecycle, "_release_session_resources", lambda key, info: (
+        seen.append((key, str(get_hermes_home()))), bt_lifecycle._forget_session_tracking(key, session=True)
+    ))
+    try:
+        for name in ("first", "second"):
+            home = tmp_path / name
+            home.mkdir()
+            token = set_hermes_home_override(str(home))
+            try:
+                key = bt._registry_session_key("shared")
+                bt_lifecycle._update_session_activity(key)
+                bt._active_sessions[key] = {"session_name": f"{name}-browser", "bb_session_id": None}
+            finally:
+                reset_hermes_home_override(token)
+        bt_lifecycle.cleanup_all_browsers()
+        assert len(seen) == 2
+        assert {home for _, home in seen} == {str(tmp_path / "first"), str(tmp_path / "second")}
+        assert not bt._active_sessions
+    finally:
+        for name, original in saved.items():
+            live = getattr(bt, name)
+            live.clear()
+            live.update(original)
 
 
 class TestAtexitStopSwallowsInterrupt:

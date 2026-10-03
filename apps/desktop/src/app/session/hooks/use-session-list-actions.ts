@@ -116,6 +116,19 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
   const loadMoreMessagingRequestRef = useRef<Record<string, number>>({})
   const refreshMessagingSessionsRequestRef = useRef(0)
   const refreshSessionsRequestRef = useRef(0)
+  const sidebarRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sidebarMountedRef = useRef(true)
+
+  useEffect(
+    () => () => {
+      sidebarMountedRef.current = false
+
+      if (sidebarRecoveryTimerRef.current !== null) {
+        clearTimeout(sidebarRecoveryTimerRef.current)
+      }
+    },
+    []
+  )
 
   useLayoutEffect(() => {
     profileScopeRef.current = profileScope
@@ -240,12 +253,17 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
 
   /** Refresh every sidebar session slice without committing an obsolete profile response. */
   const refreshSessions = useCallback(
-    async (shouldPublish: () => boolean = () => true) => {
+    async function refreshSessions(shouldPublish: () => boolean = () => true, recoveryRetries = 1) {
       const sessionProfile = sidebarProfileForScope(profileScope)
       const activationEpoch = gatewayActivationEpoch()
 
       if (!shouldPublish() || sidebarProfileForScope(profileScopeRef.current) !== sessionProfile) {
         return
+      }
+
+      if (sidebarRecoveryTimerRef.current !== null) {
+        clearTimeout(sidebarRecoveryTimerRef.current)
+        sidebarRecoveryTimerRef.current = null
       }
 
       const requestId = refreshSessionsRequestRef.current + 1
@@ -291,6 +309,29 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
           sidebarProfileForScope(profileScopeRef.current) === sessionProfile &&
           gatewayActivationEpoch() === activationEpoch
         ) {
+          // An error-bearing 200 may be the server's short negative-cache hit.
+          // A single reconnect/focus event inside its 2s TTL must still recover
+          // without waiting for another event. One delayed attempt only: a
+          // persistently broken profile must not create background polling.
+          const hasErrors = [result.errors, result.recents.errors, result.cron.errors, result.messaging.errors].some(
+            errors => Boolean(errors?.length)
+          )
+
+          if (hasErrors && recoveryRetries > 0) {
+            sidebarRecoveryTimerRef.current = setTimeout(() => {
+              sidebarRecoveryTimerRef.current = null
+
+              if (
+                sidebarMountedRef.current &&
+                shouldPublish() &&
+                sidebarProfileForScope(profileScopeRef.current) === sessionProfile &&
+                gatewayActivationEpoch() === activationEpoch
+              ) {
+                void refreshSessions(shouldPublish, recoveryRetries - 1).catch(() => undefined)
+              }
+            }, 2_200)
+          }
+
           const recents = result.recents
 
           // Drop rows the user just deleted/archived: a refresh can race an

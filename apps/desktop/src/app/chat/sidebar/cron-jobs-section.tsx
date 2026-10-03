@@ -9,14 +9,32 @@ import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { SidebarGroup, SidebarGroupContent } from '@/components/ui/sidebar'
 import { Tip } from '@/components/ui/tooltip'
-import { deleteCronJob, getCronJobRuns, pauseCronJob, resumeCronJob, type SessionInfo } from '@/hermes'
+import {
+  deleteCronJob,
+  getApiRequestConnection,
+  getApiRequestProfile,
+  getCronJobRuns,
+  pauseCronJob,
+  resumeCronJob,
+  type SessionInfo
+} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { fmtDayTime, relativeTime } from '@/lib/time'
 import { cn } from '@/lib/utils'
 import { confirm } from '@/store/confirm'
-import { updateCronJobs } from '@/store/cron'
+import {
+  $cronJobs,
+  $cronJobsLoad,
+  $cronJobsScope,
+  captureCronJobsRequest,
+  captureCronJobsScope,
+  isCronJobsRequestCurrent,
+  isCronJobsScopeCurrent,
+  updateCronJobs
+} from '@/store/cron'
 import { $changeEventsAvailable, $cronChangeTick } from '@/store/live-sync'
 import { notify, notifyError } from '@/store/notifications'
+import { $activeGatewayProfile, $profileScope, normalizeProfileKey, sidebarProfileForScope } from '@/store/profile'
 import { $selectedStoredSessionId } from '@/store/session'
 import type { CronJob } from '@/types/hermes'
 
@@ -42,6 +60,8 @@ const PEEK_BACKSTOP_INTERVAL_MS = 60_000
 // steps on demand (mirrors the messaging sections in the sidebar).
 const INITIAL_VISIBLE_JOBS = 3
 const LOAD_MORE_STEP = 10
+
+const jobRowKey = (job: CronJob): string => JSON.stringify([job.profile ?? null, job.id])
 
 function nextRunMs(job: CronJob): null | number {
   if (!job.next_run_at) {
@@ -69,20 +89,23 @@ function formatRunTime(seconds?: null | number): string {
 interface SidebarCronJobsSectionProps {
   jobs: CronJob[]
   label: string
+  // Scope of the rows that supplied these actions; never mutate a later view.
+  jobsScope: string
   max?: number
   // Open a run session's chat (1 click to output). Keep the row so the
   // owner-aware resume path can route to the backend that produced it.
   onOpenRun: (sessionId: string, session?: SessionInfo) => void
   // Open the full Cron page focused on this job (manage / full history).
-  onManageJob: (jobId: string) => void
+  onManageJob: (jobId: string, owner?: string) => void
   // Fire the job now.
-  onTriggerJob: (jobId: string) => Promise<void>
+  onTriggerJob: (jobId: string, owner?: string) => Promise<void>
   onToggle: () => void
   open: boolean
 }
 
 export function SidebarCronJobsSection({
   jobs,
+  jobsScope,
   label,
   max = 50,
   onManageJob,
@@ -126,14 +149,15 @@ export function SidebarCronJobsSection({
     }
   }, [])
 
-  const triggerJob = (jobId: string) => {
+  const triggerJob = (job: CronJob, owner: string) => {
+    const key = jobRowKey(job)
     const controller = triggerControllerRef.current
 
     if (!controller) {
       return
     }
 
-    void controller.run(jobId, () => onTriggerJob(jobId)).catch(() => undefined)
+    void controller.run(key, () => onTriggerJob(job.id, owner)).catch(() => undefined)
   }
 
   const visible = usePaneVisible()
@@ -196,15 +220,16 @@ export function SidebarCronJobsSection({
         <SidebarGroupContent className="scrollbar-fade flex max-h-72 flex-col gap-px overflow-x-hidden overflow-y-auto overscroll-contain pb-1.75 compact:max-h-none compact:overflow-visible">
           {shown.map(job => (
             <CronJobSidebarRow
-              busy={triggeringJobIds.has(job.id)}
-              expanded={peekJobId === job.id}
+              busy={triggeringJobIds.has(jobRowKey(job))}
+              expanded={peekJobId === jobRowKey(job)}
               job={job}
-              key={job.id}
+              jobsScope={jobsScope}
+              key={jobRowKey(job)}
               nowMs={nowMs}
-              onManage={() => onManageJob(job.id)}
+              onManage={owner => onManageJob(job.id, owner)}
               onOpenRun={onOpenRun}
-              onTogglePeek={() => setPeekJobId(prev => (prev === job.id ? null : job.id))}
-              onTrigger={() => triggerJob(job.id)}
+              onTogglePeek={() => setPeekJobId(prev => (prev === jobRowKey(job) ? null : jobRowKey(job)))}
+              onTrigger={owner => triggerJob(job, owner)}
             />
           ))}
           {hiddenCount > 0 && (
@@ -223,6 +248,7 @@ function CronJobSidebarRow({
   busy,
   expanded,
   job,
+  jobsScope,
   nowMs,
   onManage,
   onOpenRun,
@@ -232,11 +258,12 @@ function CronJobSidebarRow({
   busy: boolean
   expanded: boolean
   job: CronJob
+  jobsScope: string
   nowMs: number
-  onManage: () => void
+  onManage: (owner: string) => void
   onOpenRun: (sessionId: string, session?: SessionInfo) => void
   onTogglePeek: () => void
-  onTrigger: () => void
+  onTrigger: (owner: string) => void
 }) {
   const { t } = useI18n()
   const c = t.cron
@@ -244,17 +271,65 @@ function CronJobSidebarRow({
   const next = nextRunMs(job)
   const label = jobTitle(job)
   const isPaused = state === 'paused'
+  // Re-evaluate the owner when a pending list read settles for an open peek.
+  const jobsLoad = useStore($cronJobsLoad)
 
   const meta = INACTIVE_STATES.has(state) ? (c.states[state] ?? state) : next !== null ? relativeTime(next, nowMs) : '—'
+
+  // The list's scope must still match the live route. A concrete list owns
+  // its jobs; an aggregate row is actionable only with an explicit owner.
+  const rowOwner = () => {
+    const profile = sidebarProfileForScope($profileScope.get())
+
+    const load = $cronJobsLoad.get()
+
+    if ((load?.scope === jobsScope && load.status === 'loading') ||
+      jobsScope !== `${getApiRequestConnection() ?? ''}\u0000${profile}` ||
+      (profile === 'all' && getApiRequestProfile() !== normalizeProfileKey($activeGatewayProfile.get())) ||
+      (profile !== 'all' && profile !== getApiRequestProfile())) {
+      return null
+    }
+
+    // The UI route may be a local alias for the backend's actual profile.
+    // Prefer the row's backend owner; legacy concrete rows use the route key.
+    return job.profile?.trim() || (profile === 'all' ? null : profile)
+  }
+
+  const rowIsActionable = !jobsScope.endsWith('\u0000all') || Boolean(job.profile?.trim())
+
+  const manage = () => {
+    const owner = rowOwner()
+
+    if (owner && $cronJobsScope.get() === jobsScope && $cronJobs.get().includes(job)) {
+      onManage(owner)
+    }
+  }
 
   // Pause/resume and delete aren't threaded through the sidebar's prop chain, so
   // drive them against the shared $cronJobs atom directly (same path the cron
   // overlay uses) — the sidebar and overlay render from that one atom, so the
   // row updates in place.
   const togglePause = async () => {
+    const profile = rowOwner()
+
+    if (!profile || $cronJobsScope.get() !== jobsScope) {
+      return
+    }
+
+    const owner = captureCronJobsRequest(jobsScope)
+    const snapshot = $cronJobs.get()
+
+    if (!snapshot.includes(job) || !isCronJobsRequestCurrent(owner)) {
+      return
+    }
+
     try {
-      const updated = isPaused ? await resumeCronJob(job.id) : await pauseCronJob(job.id)
-      updateCronJobs(rows => rows.map(row => (row.id === job.id ? updated : row)))
+      const updated = isPaused ? await resumeCronJob(job.id, profile) : await pauseCronJob(job.id, profile)
+
+      if (isCronJobsRequestCurrent(owner) && $cronJobsScope.get() === jobsScope && $cronJobs.get() === snapshot) {
+        updateCronJobs(rows => rows.map(row => (row === job ? { ...updated, profile: job.profile ?? updated.profile } : row)))
+      }
+
       notify({ kind: 'success', title: isPaused ? c.resumed : c.paused, message: label })
     } catch (err) {
       notifyError(err, c.failedUpdate)
@@ -262,6 +337,20 @@ function CronJobSidebarRow({
   }
 
   const remove = async () => {
+    const profile = rowOwner()
+
+    if (!profile || $cronJobsScope.get() !== jobsScope) {
+      return
+    }
+
+    const confirmationOwner = captureCronJobsScope(jobsScope)
+    const confirmationRequest = captureCronJobsRequest(jobsScope)
+    const confirmationSnapshot = $cronJobs.get()
+
+    if (!confirmationSnapshot.some(row => row === job)) {
+      return
+    }
+
     const ok = await confirm({
       confirmLabel: t.common.delete,
       description: `${c.deleteDescPrefix}${label}${c.deleteDescSuffix}`,
@@ -269,13 +358,22 @@ function CronJobSidebarRow({
       title: c.deleteTitle
     })
 
-    if (!ok) {
+    if (!ok || rowOwner() !== profile || !isCronJobsScopeCurrent(confirmationOwner) ||
+      !isCronJobsRequestCurrent(confirmationRequest) || $cronJobsScope.get() !== jobsScope ||
+      $cronJobs.get() !== confirmationSnapshot || !confirmationSnapshot.some(row => row === job)) {
       return
     }
 
+    const owner = confirmationRequest
+    const snapshot = confirmationSnapshot
+
     try {
-      await deleteCronJob(job.id)
-      updateCronJobs(rows => rows.filter(row => row.id !== job.id))
+      await deleteCronJob(job.id, profile)
+
+      if (isCronJobsRequestCurrent(owner) && $cronJobsScope.get() === jobsScope && $cronJobs.get() === snapshot) {
+        updateCronJobs(rows => rows.filter(row => row !== job))
+      }
+
       notify({ kind: 'success', title: c.deleted, message: label })
     } catch (err) {
       notifyError(err, c.failedDelete)
@@ -285,22 +383,34 @@ function CronJobSidebarRow({
   // One action set for both the hover buttons and the right-click menu.
   const items = (kit: MenuKit) => (
     <>
-      {renderActionItem(kit, { icon: 'zap', key: 'trigger', label: c.triggerNow, onSelect: onTrigger })}
-      {renderActionItem(kit, {
+      {!rowIsActionable ? null : renderActionItem(kit, {
+        icon: 'zap', key: 'trigger', label: c.triggerNow, onSelect: () => {
+          const owner = rowOwner()
+
+          if (owner && $cronJobsScope.get() === jobsScope && $cronJobs.get().includes(job)) {
+            onTrigger(owner)
+          }
+        }
+      })}
+      {!rowIsActionable ? null : renderActionItem(kit, {
         icon: isPaused ? 'play' : 'debug-pause',
         key: 'pause',
         label: isPaused ? c.resume : c.pause,
         onSelect: () => void togglePause()
       })}
-      {renderActionItem(kit, { icon: 'watch', key: 'manage', label: c.manage, onSelect: onManage })}
-      <kit.Separator />
-      {renderActionItem(kit, {
-        icon: 'trash',
-        key: 'delete',
-        label: t.common.delete,
-        onSelect: () => void remove(),
-        variant: 'destructive'
-      })}
+      {rowIsActionable ? renderActionItem(kit, { icon: 'watch', key: 'manage', label: c.manage, onSelect: manage }) : null}
+      {!rowIsActionable ? null : (
+        <>
+          <kit.Separator />
+          {renderActionItem(kit, {
+            icon: 'trash',
+            key: 'delete',
+            label: t.common.delete,
+            onSelect: () => void remove(),
+            variant: 'destructive'
+          })}
+        </>
+      )}
     </>
   )
 
@@ -321,8 +431,14 @@ function CronJobSidebarRow({
                   <button
                     aria-label={c.triggerNow}
                     className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground disabled:cursor-wait disabled:opacity-60"
-                    disabled={busy}
-                    onClick={onTrigger}
+                    disabled={busy || !rowIsActionable}
+                    onClick={() => {
+                      const owner = rowOwner()
+
+                      if (owner && $cronJobsScope.get() === jobsScope && $cronJobs.get().includes(job)) {
+                        onTrigger(owner)
+                      }
+                    }}
                     type="button"
                   >
                     {busy ? (
@@ -336,7 +452,8 @@ function CronJobSidebarRow({
                   <button
                     aria-label={c.manage}
                     className="grid size-5 place-items-center rounded-sm text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground"
-                    onClick={onManage}
+                    disabled={!rowIsActionable}
+                    onClick={manage}
                     type="button"
                   >
                     <Codicon name="watch" size="0.75rem" />
@@ -378,17 +495,31 @@ function CronJobSidebarRow({
           </Tip>
         </SidebarRowShell>
       </ActionsContextMenu>
-      {expanded && <CronJobSidebarRuns jobId={job.id} onOpenRun={onOpenRun} />}
+      {expanded && (
+        <CronJobSidebarRuns
+          jobId={job.id}
+          jobsLoadStatus={jobsLoad?.scope === jobsScope ? jobsLoad.status : null}
+          jobsScope={jobsScope}
+          onOpenRun={onOpenRun}
+          profile={rowOwner()}
+        />
+      )}
     </div>
   )
 }
 
 function CronJobSidebarRuns({
   jobId,
-  onOpenRun
+  jobsLoadStatus,
+  jobsScope,
+  onOpenRun,
+  profile
 }: {
   jobId: string
+  jobsLoadStatus: 'error' | 'loading' | 'ready' | null
+  jobsScope: string
   onOpenRun: (sessionId: string, session?: SessionInfo) => void
+  profile: null | string
 }) {
   const { t } = useI18n()
   const c = t.cron
@@ -401,18 +532,35 @@ function CronJobSidebarRuns({
   useEffect(() => {
     let cancelled = false
 
-    const load = () =>
-      getCronJobRuns(jobId, PEEK_RUN_LIMIT)
+    const routeIsCurrent = () => {
+      const scopeProfile = sidebarProfileForScope($profileScope.get())
+
+      const load = $cronJobsLoad.get()
+
+      return profile && !(load?.scope === jobsScope && load.status === 'loading') &&
+        jobsScope === `${getApiRequestConnection() ?? ''}\u0000${scopeProfile}` &&
+        (scopeProfile === 'all'
+          ? getApiRequestProfile() === normalizeProfileKey($activeGatewayProfile.get())
+          : scopeProfile === getApiRequestProfile())
+    }
+
+    const load = () => {
+      if (!profile || !routeIsCurrent()) {
+        return
+      }
+
+      void getCronJobRuns(jobId, PEEK_RUN_LIMIT, profile)
         .then(result => {
-          if (!cancelled) {
+          if (!cancelled && routeIsCurrent()) {
             setRuns(result)
           }
         })
         .catch(() => {
-          if (!cancelled) {
+          if (!cancelled && routeIsCurrent()) {
             setRuns(prev => prev ?? [])
           }
         })
+    }
 
     // Hidden pane: skip the peek entirely — no initial load, no interval.
     // `visible` is in the dep array, so becoming visible re-runs this effect
@@ -439,7 +587,7 @@ function CronJobSidebarRuns({
       window.clearInterval(intervalId)
     }
     // cronChangeTick: a fired run reloads the peek immediately.
-  }, [changeEventsAvailable, cronChangeTick, jobId, visible])
+  }, [changeEventsAvailable, cronChangeTick, jobId, jobsLoadStatus, jobsScope, profile, visible])
 
   return (
     <div className="mb-1 ml-[1.375rem] flex flex-col gap-px">

@@ -100,6 +100,55 @@ def test_deliver_wake_non_push_self_posts_raw_session_id(monkeypatch):
     ]
 
 
+def test_secondary_wake_posts_only_to_owned_profile_session(tmp_path, monkeypatch):
+    """Colliding raw session ids in two profile DBs must not wake the default transcript."""
+    from aiohttp import web
+    from hermes_constants import set_hermes_home_override, reset_hermes_home_override
+    from hermes_state import SessionDB
+
+    root = tmp_path / "root"
+    secondary = root / "profiles" / "other"
+    secondary.mkdir(parents=True)
+    monkeypatch.setenv("HERMES_HOME", str(root))
+    default_db = SessionDB(db_path=root / "state.db")
+    other_db = SessionDB(db_path=secondary / "state.db")
+    for db in (default_db, other_db):
+        db.create_session("same-raw-id", source="api_server")
+
+    async def handler(request):
+        assert request.headers["X-Hermes-Session-Id"] == "same-raw-id"
+        db = other_db if request.path.startswith("/p/other/") else default_db
+        db.append_message("same-raw-id", "user", content=(await request.json())["messages"][0]["content"])
+        return web.json_response({"choices": []})
+
+    async def run():
+        app = web.Application()
+        app.router.add_post("/v1/chat/completions", handler)
+        app.router.add_post("/p/other/v1/chat/completions", handler)
+        server = web.AppRunner(app)
+        await server.setup()
+        site = web.TCPSite(server, "127.0.0.1", 0)
+        await site.start()
+        try:
+            port = site._server.sockets[0].getsockname()[1]
+            token = set_hermes_home_override(str(secondary))
+            try:
+                await deliver_wake(ApiServerLikeAdapter(port=port), text="other secret",
+                                   session_id="same-raw-id", profile="other")
+            finally:
+                reset_hermes_home_override(token)
+        finally:
+            await server.cleanup()
+
+    try:
+        asyncio.run(run())
+        assert default_db.get_messages("same-raw-id") == []
+        assert other_db.get_messages("same-raw-id")[0]["content"] == "other secret"
+    finally:
+        default_db.close()
+        other_db.close()
+
+
 def test_deliver_wake_retries_429_then_succeeds(monkeypatch):
     """HTTP 429 (max_concurrent_runs cap) is transient — retried with backoff."""
     from aiohttp import web

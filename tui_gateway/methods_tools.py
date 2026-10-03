@@ -227,7 +227,6 @@ def _(rid, params: dict) -> dict:
 # One-expression handlers: name → (fail_code, payload builder(params)).
 _SIMPLE_RPCS = {
     # Session-scoped view of the background process registry (desktop status stack).
-    "process.stop": (5010, lambda params: {"killed": _tools_mod("tools.process_registry").process_registry.kill_all()}),
     # Re-read ``~/.hermes/.env`` (CLI ``/reload`` parity); built agents keep their pool, ``/new`` resolves fresh.
     "reload.env": (5015, lambda params: {"updated": int(_tools_mod("hermes_cli.config").reload_env())}),
     "plugins.list": (5032, lambda params: {"plugins": [
@@ -241,10 +240,30 @@ _SIMPLE_RPCS = {
 }
 for _name, (_code, _build) in _SIMPLE_RPCS.items():
     # Look the builder up at call time: bind_module rebinds the table's lambdas onto server globals.
-    _rpc(_name, _code)(lambda rid, params, _n=_name: _ok(rid, _SIMPLE_RPCS[_n][1](params)))
+    (_scoped_rpc if _name == "agents.list" else _rpc)(_name, _code)(
+        lambda rid, params, _n=_name: _ok(rid, _SIMPLE_RPCS[_n][1](params)))
 del _name, _code, _build
+
+
+@_scoped_rpc("process.stop", 5010)
+def _(rid, params: dict) -> dict:
+    """Stop processes belonging to the explicit profile or the resolved session owner."""
+    if params.get("session_id"):
+        session, err = _sess(params, rid)
+        if err:
+            return err
+        with _session_profile_runtime_scope(session):
+            return _ok(rid, {"killed": _tools_mod("tools.process_registry").process_registry.kill_all()})
+    return _ok(rid, {"killed": _tools_mod("tools.process_registry").process_registry.kill_all()})
+
+
 _rpc("process.list", 5010, live_session=True)(
-    lambda rid, params, session: _ok(rid, {"processes": _session_processes(session)}))
+    lambda rid, params, session: _ok(rid, {"processes": _processes_for_session(session)}))
+
+
+def _processes_for_session(session: dict) -> list:
+    with _session_profile_runtime_scope(session):
+        return _session_processes(session)
 
 
 @_rpc("process.kill", live_session=True, fail_code=5010)
@@ -254,10 +273,11 @@ def _(rid, params: dict, session) -> dict:
     if not proc_id:
         return _err(rid, 4012, "process_id required")
     registry = _tools_mod("tools.process_registry").process_registry
-    proc = registry.get(proc_id)
-    if proc is None or str(getattr(proc, "session_key", "") or "") != str(session.get("session_key") or ""):
-        return _err(rid, 4044, f"no such process: {proc_id}")
-    return _ok(rid, registry.kill_process(proc_id))
+    with _session_profile_runtime_scope(session):
+        proc = registry.get(proc_id)
+        if proc is None or str(getattr(proc, "session_key", "") or "") != str(session.get("session_key") or ""):
+            return _err(rid, 4044, f"no such process: {proc_id}")
+        return _ok(rid, registry.kill_process(proc.id))
 
 
 def _mcp_reload_confirm_required() -> bool:

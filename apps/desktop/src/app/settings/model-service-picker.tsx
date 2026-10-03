@@ -78,9 +78,15 @@ export function ModelServicePicker({
     return rows
   }, [currentModel?.provider, providers])
 
+  // Keep configured/current services visible; the backend catalog is still available
+  // behind Advanced, but should not dominate the default relay setup experience.
   const visibleProviders = showAllProviders
     ? orderedProviders
-    : orderedProviders.filter(provider => provider.slug === currentModel?.provider || provider.slug === selectedProvider)
+    : orderedProviders.filter(
+        provider =>
+          provider.slug === currentModel?.provider ||
+          (provider.is_user_defined && isModelServiceReady(provider))
+      )
 
   const ready = isModelServiceReady(selectedProviderRow)
   const apiKeyProvider = selectedProviderRow?.auth_type === 'api_key' && !!selectedProviderRow.key_env
@@ -242,17 +248,8 @@ export function ModelServicePicker({
       )}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {orderedProviders.length > visibleProviders.length && (
-          <Button onClick={() => setShowAllProviders(open => !open)} size="sm" variant="textStrong">
-            <ChevronRight className={cn('transition-transform', showAllProviders && 'rotate-90')} />
-            {showAllProviders ? m.hideOtherServices : m.chooseOtherService}
-          </Button>
-        )}
-        <Button onClick={onAddService} size="sm" variant="textStrong">
+        <Button onClick={onAddCustomService} size="sm" variant="textStrong">
           <Plus />
-          {m.addService}
-        </Button>
-        <Button onClick={onAddCustomService} size="sm" variant="text">
           {m.addCustomService}
         </Button>
       </div>
@@ -264,6 +261,15 @@ export function ModelServicePicker({
         </Button>
         {advancedOpen && (
           <div className="mt-1 flex flex-wrap gap-1">
+            {orderedProviders.length > visibleProviders.length && (
+              <Button onClick={() => setShowAllProviders(open => !open)} size="sm" variant="text">
+                <ChevronRight className={cn('transition-transform', showAllProviders && 'rotate-90')} />
+                {showAllProviders ? m.hideOtherServices : m.chooseOtherService}
+              </Button>
+            )}
+            <Button onClick={onAddService} size="sm" variant="text">
+              {m.addService}
+            </Button>
             <Button onClick={() => onOpenConnectionView('accounts')} size="sm" variant="text">
               {t.settings.nav.providerAccounts}
             </Button>

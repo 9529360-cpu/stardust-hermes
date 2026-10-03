@@ -61,7 +61,7 @@ class ProcessStopResult(Result):
 
 
 method("process.stop", params=ProcessStopParams, result=ProcessStopResult,
-       doc="Kill every background process in the registry (``/stop``), answering the count killed.")
+       doc="Kill processes in the session owner's profile, or the explicitly selected profile when no session is supplied (``/stop``).")
 
 
 class AgentsListParams(Params):
@@ -80,7 +80,7 @@ class AgentsListResult(Result):
 
 
 method("agents.list", params=AgentsListParams, result=AgentsListResult,
-       doc="Registry-wide background process summary for ``/agents``.")
+       doc="Selected profile's background process summary for ``/agents``.")
 
 
 class ProcessListParams(Params):

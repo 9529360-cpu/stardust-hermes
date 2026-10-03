@@ -5,6 +5,7 @@
 // capabilityScoped are shared across api/ but must not reach call sites, or
 // request scoping stops having a single owner.
 export {
+  ambientOwnerConnectionId,
   getApiRequestConnection,
   getApiRequestProfile,
   hermesApi,

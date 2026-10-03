@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { atom } from 'nanostores'
 import { createRef } from 'react'
 import { MemoryRouter } from 'react-router'
@@ -20,8 +20,9 @@ vi.mock('@/hermes', () => ({
   setApiRequestProfile: () => {}
 }))
 
+let triggerProfileSwitch: (() => void) | undefined
 vi.mock('../hooks/use-on-profile-switch', () => ({
-  useOnProfileSwitch: () => {}
+  useOnProfileSwitch: (callback: () => void) => { triggerProfileSwitch = callback }
 }))
 
 // The real stores pull in the gateway/profile stack, which needs a live
@@ -60,6 +61,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  triggerProfileSwitch = undefined
 })
 
 function renderConfigSettings(activeSectionId = 'safety') {
@@ -78,6 +80,18 @@ function renderConfigSettings(activeSectionId = 'safety') {
 }
 
 describe('ConfigSettings autosave', () => {
+  it('recovers its draft after a profile switch when the shared config cache retains the same object', async () => {
+    const record = { checkpoints: { enabled: false } }
+    getHermesConfigRecord.mockResolvedValue(record)
+    renderConfigSettings()
+    expect(await screen.findByRole('switch')).toBeTruthy()
+
+    act(() => triggerProfileSwitch?.())
+    await waitFor(() => expect(getHermesConfigRecord).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('switch')).toBeTruthy()
+    expect(screen.queryByText('Failed to load settings')).toBeNull()
+  })
+
   it('renders and saves the Codex compression auto-raise setting', async () => {
     getHermesConfigRecord.mockResolvedValue({
       compression: { codex_gpt55_autoraise: true }

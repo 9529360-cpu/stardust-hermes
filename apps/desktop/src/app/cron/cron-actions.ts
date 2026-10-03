@@ -4,7 +4,7 @@ import {
   beginCronJobsRequest,
   commitCronJobsRequest,
   type CronJobsRequest,
-  isCronJobsRequestCurrent,
+  failCronJobsRequest,
   isCronJobsScopeCurrent
 } from '@/store/cron'
 
@@ -32,7 +32,7 @@ async function refreshForGeneration(profile: string, request: CronJobsRequest): 
 
     return { jobs, refreshError: null, stale: false }
   } catch (refreshError) {
-    if (!isCronJobsRequestCurrent(request)) {
+    if (!failCronJobsRequest(request)) {
       return { jobs: null, refreshError: null, stale: true }
     }
 
@@ -40,8 +40,14 @@ async function refreshForGeneration(profile: string, request: CronJobsRequest): 
   }
 }
 
-export function refreshCronJobs(profile: string): Promise<CronTriggerRefreshResult> {
-  return refreshForGeneration(profile, beginCronJobsRequest(cronRequestScope(profile)))
+export function refreshCronJobs(
+  profile: string,
+  onRequest?: (request: CronJobsRequest) => void
+): Promise<CronTriggerRefreshResult> {
+  const request = beginCronJobsRequest(cronRequestScope(profile))
+  onRequest?.(request)
+
+  return refreshForGeneration(profile, request)
 }
 
 export async function mutateAndRefreshCronJobs<T>(
@@ -89,9 +95,10 @@ export async function mutateAndRefreshCronJobs<T>(
  */
 export async function triggerAndRefreshCronJobs(
   jobId: string,
-  profile: 'all' | string
+  profile: 'all' | string,
+  ownerProfile = profile
 ): Promise<CronTriggerRefreshResult> {
-  const { value: _value, ...result } = await mutateAndRefreshCronJobs(profile, () => triggerCronJob(jobId))
+  const { value: _value, ...result } = await mutateAndRefreshCronJobs(profile, () => triggerCronJob(jobId, ownerProfile))
 
   return result
 }

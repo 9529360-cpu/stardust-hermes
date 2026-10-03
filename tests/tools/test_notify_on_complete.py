@@ -152,6 +152,7 @@ class TestCheckpointNotify:
         checkpoint = tmp_path / "procs.json"
         checkpoint.write_text(json.dumps([{
             "session_id": "proc_live",
+            "session_key": "agent:main:telegram:dm:123",
             "command": "sleep 999",
             "pid": os.getpid(),
             "task_id": "t1",

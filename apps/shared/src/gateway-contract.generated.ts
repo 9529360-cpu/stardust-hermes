@@ -4183,7 +4183,7 @@ export interface RequestCancelPayload {
 
 // ── Client→server methods ──
 export interface RpcMethods {
-  /** Registry-wide background process summary for ``/agents``. */
+  /** Selected profile's background process summary for ``/agents``. */
   'agents.list': { params: AgentsListParams; result: AgentsListResult }
   /** Replay the approvals still waiting on this session (reconnect / polling). */
   'approval.pending': { params: ApprovalPendingParams; result: ApprovalPendingResult }
@@ -4409,7 +4409,7 @@ export interface RpcMethods {
   'process.kill': { params: ProcessKillParams; result: ProcessKillResult }
   /** Background processes owned by the caller's session (desktop status stack poll). */
   'process.list': { params: ProcessListParams; result: ProcessListResult }
-  /** Kill every background process in the registry (``/stop``), answering the count killed. */
+  /** Kill processes in the session owner's profile, or the explicitly selected profile when no session is supplied (``/stop``). */
   'process.stop': { params: ProcessStopParams; result: ProcessStopResult }
   /** Editor Save: apply any subset of a profile's sections and report each one. */
   'profiles.configure': { params: ProfilesConfigureParams; result: ProfilesConfigureResult }

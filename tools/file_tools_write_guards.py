@@ -281,7 +281,7 @@ def _request_protected_instruction_approval(reasons: list[str], task_id: str = "
     session_key = get_current_session_key()
     try:
         with _approval._lock:
-            notify_cb = _approval._gateway_notify_cbs.get(session_key)
+            notify_cb = _approval._gateway_notify_cbs.get(_approval._state_key(session_key))
     except Exception:
         notify_cb = None
 

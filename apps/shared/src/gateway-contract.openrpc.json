@@ -8,7 +8,7 @@
   "methods": [
     {
       "name": "agents.list",
-      "summary": "Registry-wide background process summary for ``/agents``.",
+      "summary": "Selected profile's background process summary for ``/agents``.",
       "params": [
         {
           "name": "params",
@@ -2042,7 +2042,7 @@
     },
     {
       "name": "process.stop",
-      "summary": "Kill every background process in the registry (``/stop``), answering the count killed.",
+      "summary": "Kill processes in the session owner's profile, or the explicitly selected profile when no session is supplied (``/stop``).",
       "params": [
         {
           "name": "params",

@@ -74,7 +74,8 @@ def browser_dialog(
     task_id: Optional[str] = None,
 ) -> str:
     """Respond to a pending dialog on the active task's CDP supervisor."""
-    supervisor = SUPERVISOR_REGISTRY.get(task_id or "default")
+    from tools.browser_tool import _registry_session_key
+    supervisor = SUPERVISOR_REGISTRY.get(_registry_session_key(task_id or "default"))
     if supervisor is None:
         return json.dumps({
             "success": False,
