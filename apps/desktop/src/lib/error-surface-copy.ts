@@ -31,7 +31,7 @@ export function errorCardText(
   // A credential rejection is worded by HOW the provider is credentialed
   // (key vs sign-in), which the code alone (`auth`) cannot tell.
   if (surface?.layer === 'auth' && surface.authKind === 'oauth') {
-    return { body: thread.errorOauthExpired(provider), title: render(thread.errorAuthKinds.oauth.title, provider) }
+    return { body: thread.errorLayerBodies.auth, title: render(thread.errorAuthKinds.oauth.title, provider) }
   }
 
   if (surface?.layer === 'auth' && surface.authKind === 'api_key') {
