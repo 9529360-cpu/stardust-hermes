@@ -2840,7 +2840,7 @@ export const en: Translations = {
     clearSearch: 'Clear search',
     noMatch: query => `No sessions match “${query}”.`,
     results: 'Results',
-    pinned: 'Pinned',
+    pinned: 'Pinned chats',
     sessions: 'Chats',
     cronJobs: 'Cron jobs',
     groupAriaGrouped: 'Show sessions as a single list',
