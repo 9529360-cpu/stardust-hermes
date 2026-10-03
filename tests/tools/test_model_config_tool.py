@@ -5,6 +5,14 @@ import json
 import tools.model_config_tool as mod
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _desktop_surface(monkeypatch):
+    monkeypatch.setattr(mod, "_is_desktop_session", lambda: True)
+
+
 def _descriptor(
     *,
     slug="gemini",
@@ -53,6 +61,25 @@ def test_provider_alias_google_targets_gemini(monkeypatch):
 
     assert mod._resolve_provider("Google").slug == "gemini"
     assert mod._resolve_provider("google ai studio").slug == "gemini"
+
+
+def test_non_desktop_surface_fails_before_any_provider_work(monkeypatch):
+    monkeypatch.setattr(mod, "_is_desktop_session", lambda: False)
+    monkeypatch.setattr(
+        mod,
+        "_resolve_provider",
+        lambda _raw: (_ for _ in ()).throw(AssertionError("non-Desktop surface must fail before provider resolution")),
+    )
+
+    result = _payload(
+        mod.model_configure_tool(
+            provider="gemini",
+            model="gemini-test-model",
+            user_message="帮我切换模型",
+        )
+    )
+
+    assert "only in an active Stardust Desktop session" in result["error"]
 
 
 def test_registry_dispatch_forwards_current_user_task(monkeypatch):
