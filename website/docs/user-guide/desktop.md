@@ -34,7 +34,9 @@ That uses your current config, keys, sessions, and skills.
 
 ## What's in the app
 
-The desktop app is organized as a chat-first window with a compact left sidebar. Its permanent product navigation is **New chat**, **Tasks**, **Tools**, **Plugins**, and **Project**, followed by pinned conversations and the unified conversation list. Secondary destinations stay available through their owning views, the command palette, and keybinds instead of accumulating permanent sidebar rows.
+The desktop app is organized as a chat-first window with a compact left sidebar. Its permanent product navigation is **New chat**, **Tasks**, **Tools**, **Plugins**, and **Project**, followed by pinned conversations and the unified conversation list (local chats and messaging-platform threads together). Secondary destinations stay available through their owning views, the command palette, and keybinds instead of accumulating permanent sidebar rows.
+
+Sidebar selection follows the focused chat pane. Focusing a session tab clears the navigation highlight of the page the workspace is showing, even while the workspace keeps that page’s route.
 
 ### Chat
 
@@ -283,7 +285,7 @@ chats decide who replies: [Bot Mode: A Roster of Agents](./bot-mode.md).
 ### Sessions & profiles
 
 - **Session-list overhaul** — a reworked session list with archiving and general session hygiene to keep the list manageable as it grows.
-- **Search sessions by id** — find a specific session directly by its id.
+- **Search sessions** — **Cmd/Ctrl+Shift+F** opens **Command Center → Sessions**. Typing matches loaded sessions instantly (title, preview, id, workspace, branch, platform) and also searches the full message history, so older conversations and messaging threads outside the loaded list are found too.
 - **Concurrent multi-profile sessions** — run sessions across multiple [profiles](./profiles.md) at the same time, and reference a session in another profile with cross-profile `@session` links.
 - **Export / import a profile** — share a whole setup as a single file. **⌘K → Export profile…** (or right-click a profile square in the rail) writes a `.tar.gz` with skills, memory, persona, crons, plugins, and settings; API keys are stripped. Exporting from the desktop also bundles your appearance and interface — skin, light/dark mode, custom themes, the profile's rail color, and your window layout — so an imported profile arrives looking the way the sender had it. Import via **⌘K → Import profile…** or the button beside the rail's **+**; it applies the overlay and drops you into the new profile. The same archive works with `/export` / `/import` in chat and `hermes profile export` / `import` from a shell. See [Export and import a profile file](./profile-distributions.md#export-and-import-a-profile-file).
 
