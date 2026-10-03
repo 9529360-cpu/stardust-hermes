@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { atom } from 'nanostores'
+import { useEffect } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -29,7 +30,7 @@ const startManualLocalEndpoint = vi.fn()
 const startManualOnboarding = vi.fn()
 const startManualProviderOAuth = vi.fn()
 const desktopOnboarding = atom({ manual: false })
-let profileSwitchHandler: (() => void) | null = null
+const profileSwitchHandlers = new Set<() => void>()
 
 vi.mock('@/hermes', () => ({
   getGlobalModelInfo: (profile?: null | string) => getGlobalModelInfo(profile),
@@ -57,7 +58,13 @@ vi.mock('@/store/onboarding', () => ({
 
 vi.mock('../hooks/use-on-profile-switch', () => ({
   useOnProfileSwitch: (handler: () => void) => {
-    profileSwitchHandler = handler
+    useEffect(() => {
+      profileSwitchHandlers.add(handler)
+
+      return () => {
+        profileSwitchHandlers.delete(handler)
+      }
+    }, [handler])
   }
 }))
 
@@ -90,7 +97,7 @@ afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   desktopOnboarding.set({ manual: false })
-  profileSwitchHandler = null
+  profileSwitchHandlers.clear()
 })
 
 async function renderModelSettings(
@@ -264,7 +271,9 @@ describe('ModelSettings', () => {
     expect(await screen.findByRole('button', { name: /Custom A/ })).toBeTruthy()
 
     await act(async () => {
-      profileSwitchHandler?.()
+      for (const handler of [...profileSwitchHandlers]) {
+        handler()
+      }
     })
 
     await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(2))
