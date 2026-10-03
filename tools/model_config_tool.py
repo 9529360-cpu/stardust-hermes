@@ -173,6 +173,8 @@ def _custom_endpoint_parts(base_url: str) -> tuple[str, str] | tuple[None, None]
     parsed = urllib.parse.urlparse(cleaned)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         return None, None
+    if parsed.username is not None or parsed.password is not None:
+        return None, None
     identity = parsed.hostname
     if parsed.port:
         identity = f"{identity}_{parsed.port}"
