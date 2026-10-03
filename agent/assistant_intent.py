@@ -554,6 +554,15 @@ def project_kanban_task(
     final_report = (
         _first_text((run_record, task), "final_report", "summary", "result") or None
     )
+    requires_approval = bool(
+        task.get("requires_approval")
+        or run_record.get("requires_approval")
+        or metadata.get("requires_approval")
+    )
+    if state is AssistantTaskState.BLOCKED and (
+        _text(task.get("block_kind")).lower() == "needs_input" or requires_approval
+    ):
+        state = AssistantTaskState.WAITING_FOR_USER
 
     return AssistantTaskProjection(
         task_id=assistant_task_id(AssistantExecutionRail.KANBAN, owner_id),
@@ -567,11 +576,7 @@ def project_kanban_task(
         child_ids=_refs_from(records, "child_ids", "children", "created_cards"),
         project_ref=_text(task.get("project_id") or task.get("project_ref")) or None,
         workspace=_text(task.get("workspace_path") or task.get("workdir")) or None,
-        requires_approval=bool(
-            task.get("requires_approval")
-            or run_record.get("requires_approval")
-            or metadata.get("requires_approval")
-        ),
+        requires_approval=requires_approval,
         approval_refs=_refs_from(records, "approval_id", "approval_ids", "approval_refs"),
         artifact_refs=_refs_from(records, "artifacts", "artifact_refs"),
         final_report=final_report,
@@ -582,7 +587,11 @@ def project_kanban_task(
             "last_failure_error",
         ),
         recoverable=False,
-        recovery_action="unblock" if state is AssistantTaskState.BLOCKED else None,
+        recovery_action=(
+            "unblock"
+            if state in {AssistantTaskState.BLOCKED, AssistantTaskState.WAITING_FOR_USER}
+            else None
+        ),
     )
 
 

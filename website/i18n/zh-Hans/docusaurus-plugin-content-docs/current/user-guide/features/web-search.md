@@ -31,6 +31,46 @@ Brave Search、DDGS 和 xAI 均为**仅搜索**——如果同时需要 `web_ext
 
 **按能力拆分：** 搜索和提取可分别使用不同的提供商——例如搜索使用 SearXNG（免费），提取使用 Firecrawl。详见下方[按能力配置](#per-capability-configuration)。
 
+### 搜索故障切换、并行融合与自适应策略
+
+如果希望主搜索引擎失败时按固定顺序切换，可配置：
+
+```yaml
+web:
+  search_backend: "searxng"
+  search_fallback_backends: ["brave-free", "ddgs"]
+```
+
+如果希望多个搜索引擎并行检索，可配置 `search_ensemble_backends`。星尘会并行查询主引擎和最多 5 个额外引擎，对 URL 做规范化和去重，再使用 RRF（Reciprocal Rank Fusion）融合排序。Keyless ring 发生内部切换时，会按实际 `served_by` 厂商计票，避免同一个真实引擎被误算成多份“交叉验证”。
+
+```yaml
+web:
+  search_backend: "searxng"
+  search_ensemble_backends: ["brave-free", "exa"]
+  search_fallback_backends: ["ddgs"]
+```
+
+如果已经配置了多个搜索引擎，但不希望每次普通查询都同时消耗多家额度，可启用自适应搜索：
+
+```yaml
+web:
+  search_backend: "searxng"
+  search_ensemble_backends: ["brave-free", "exa"]
+  search_fallback_backends: ["ddgs"]
+  search_strategy: "adaptive"
+```
+
+`search_strategy` 支持：
+
+| 策略 | 行为 |
+| --- | --- |
+| `legacy` | **默认。** 保持旧行为：只要存在可用的 ensemble 后端，就每次都使用并行融合。 |
+| `adaptive` | 普通、导航、技术查询优先单引擎；最新资讯、新闻、对比、核实、深度研究才启用多引擎。 |
+| `single` | 不使用 ensemble；主引擎失败时仍可走正常 fallback/rescue。 |
+| `ensemble` | 只要存在可用的 ensemble 后端，就始终并行检索。 |
+
+自适应模式不使用 LLM 进行分类，也不会修改会话系统提示词。多引擎结果会额外应用有边界的质量信号：只有搜索结果本身提供可解析发布日期/更新时间时才给予新鲜度加权，未提供日期的结果不会被惩罚；同时限制单一域名挤占结果，并只对高置信度的同标题重复内容做折叠。返回结果中的 `search_plan` 会说明本次判定的查询类型和执行模式。
+
 :::tip Nous 订阅用户
 如果您拥有付费 [Nous Portal](https://portal.nousresearch.com) 订阅，网页搜索和提取可通过 **[Tool Gateway](tool-gateway.md)** 使用托管的 Firecrawl——无需 API 密钥。新安装可运行 `hermes setup --portal` 登录并一次性开启所有 gateway 工具；现有安装可通过 `hermes tools` 单独开启网页功能。
 :::

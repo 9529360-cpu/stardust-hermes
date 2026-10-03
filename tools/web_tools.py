@@ -300,10 +300,24 @@ def web_search_tool(query: str, limit: int = 5) -> str:
             response_data = {"success": False, "error": _no_provider_error("search", fallback)}
         else:
             logger.info("Web search via %s: '%s' (limit: %d)", provider.name, query, limit)
-            from tools.web_search_ensemble import search_ensemble
-            ensemble = search_ensemble(provider, query, limit)
+            from tools.web_search_ensemble import ensemble_available, search_ensemble
+            from tools.web_search_planner import plan_search
+
+            search_plan = plan_search(
+                query,
+                _load_web_config(),
+                ensemble_available=ensemble_available(provider),
+            )
+            ensemble = search_ensemble(provider, query, limit, plan=search_plan)
             if ensemble is None:
                 response_data = _memoized_search(provider, query, limit)
+                if (
+                    search_plan.strategy == "adaptive"
+                    and response_data.get("success")
+                    and isinstance(response_data.get("data"), dict)
+                ):
+                    response_data["data"]["search_mode"] = "single"
+                    response_data["data"]["search_plan"] = search_plan.as_dict()
             elif ensemble.get("success"):
                 response_data = ensemble
             elif _search_rescue_eligible(provider):
@@ -311,6 +325,8 @@ def web_search_tool(query: str, limit: int = 5) -> str:
                 response_data = _rescue_search(provider.name, ensemble_error, query, limit)
                 if response_data.get("success") and isinstance(response_data.get("data"), dict):
                     response_data["data"]["ensemble_error"] = ensemble_error[:500]
+                    if search_plan.strategy == "adaptive":
+                        response_data["data"]["search_plan"] = search_plan.as_dict()
             else:
                 response_data = ensemble
 

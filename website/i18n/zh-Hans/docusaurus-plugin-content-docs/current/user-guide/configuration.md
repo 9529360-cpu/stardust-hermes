@@ -1508,6 +1508,12 @@ web:
   # 或使用每功能键混合 provider（例如免费搜索 + 付费提取）：
   search_backend: "searxng"
   extract_backend: "firecrawl"
+
+  # 搜索调度。legacy 为兼容旧行为的默认值。
+  # adaptive：普通/导航/技术查询走单引擎，需要时效、交叉验证或覆盖度时才并行。
+  search_strategy: "adaptive"   # legacy | adaptive | single | ensemble
+  search_ensemble_backends: ["brave-free", "exa"]
+  search_fallback_backends: ["ddgs"]
 ```
 
 | 后端 | 环境变量 | 搜索 | 提取 |
