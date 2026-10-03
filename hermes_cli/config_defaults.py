@@ -377,6 +377,12 @@ DEFAULT_CONFIG = {
         "backend": "",           # shared fallback — applies to both search and extract
         "search_backend": "",    # per-capability override for web_search (e.g. "searxng")
         "extract_backend": "",   # per-capability override for web_extract (e.g. "native")
+        # Search orchestration. "legacy" preserves existing behavior: when explicit ensemble
+        # backends are configured, every query fans out. "adaptive" reserves ensemble spend for
+        # current/news/comparison/verification/deep-research queries. "single" / "ensemble" pin it.
+        "search_strategy": "legacy",
+        "search_ensemble_backends": [],
+        "search_fallback_backends": [],
         # per-page char budget for web_extract; larger pages truncate, full text kept in cache/web
         "extract_char_limit": 15000,
         # Keyless free-tier ring: with NO web backend configured or keyed, web_search/web_extract

@@ -2539,6 +2539,13 @@ web:
   search_backend: "searxng"
   extract_backend: "firecrawl"
 
+  # Search orchestration. legacy is the backward-compatible default.
+  # adaptive uses one provider for simple/navigation/technical lookups and
+  # fans out only for current/news/comparison/verification/deep research.
+  search_strategy: "adaptive"   # legacy | adaptive | single | ensemble
+  search_ensemble_backends: ["brave-free", "exa"]
+  search_fallback_backends: ["ddgs"]
+
   # Keyless free-tier fallback (default: true). With no backend configured
   # and no API keys present, web tools rotate across the Exa/Parallel/
   # Firecrawl/Keenable free tiers. Set false to disable.

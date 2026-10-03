@@ -11,8 +11,11 @@ from __future__ import annotations
 import contextvars
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit
+
+if TYPE_CHECKING:
+    from tools.web_search_planner import SearchPlan
 
 logger = logging.getLogger("tools.web_tools")
 
@@ -136,8 +139,17 @@ def _rows(response: dict) -> list[dict]:
     return [row for row in web if isinstance(row, dict)] if isinstance(web, list) else []
 
 
-def _merge_rrf(provider_results: list[tuple[str, dict]], limit: int) -> list[dict]:
-    """Merge provider rankings with RRF and canonical-URL dedupe."""
+def _merge_rrf(
+    provider_results: list[tuple[str, dict]],
+    limit: int,
+    *,
+    plan: Optional["SearchPlan"] = None,
+) -> list[dict]:
+    """Merge provider rankings with RRF and canonical-URL dedupe.
+
+    Legacy calls keep the original pure-RRF ordering. Adaptive plans may apply the separate
+    evidence-based freshness/diversity/near-duplicate pass after fusion.
+    """
     merged: dict[str, dict] = {}
     order = 0
     for provider_name, response in provider_results:
@@ -156,6 +168,13 @@ def _merge_rrf(provider_results: list[tuple[str, dict]], limit: int) -> list[dic
                     "description": str(row.get("description") or ""),
                     "sources": [],
                 }
+                for date_key in (
+                    "published_date", "published_at", "publishedAt",
+                    "date", "updated_at", "updatedAt",
+                ):
+                    if row.get(date_key) is not None:
+                        item[date_key] = row[date_key]
+                        break
                 order += 1
             item["score"] += 1.0 / (_RRF_K + rank)
             if provider_name not in item["sources"]:
@@ -168,8 +187,29 @@ def _merge_rrf(provider_results: list[tuple[str, dict]], limit: int) -> list[dic
                 item["description"] = desc
             if not item["url"] and raw_url:
                 item["url"] = raw_url
+            if not any(item.get(date_key) is not None for date_key in (
+                "published_date", "published_at", "publishedAt",
+                "date", "updated_at", "updatedAt",
+            )):
+                for date_key in (
+                    "published_date", "published_at", "publishedAt",
+                    "date", "updated_at", "updatedAt",
+                ):
+                    if row.get(date_key) is not None:
+                        item[date_key] = row[date_key]
+                        break
 
     ranked = sorted(merged.values(), key=lambda item: (-item["score"], item["first_seen"]))
+    if plan is not None and plan.strategy == "adaptive":
+        from tools.web_search_quality import rerank_fused_results
+        return rerank_fused_results(
+            ranked,
+            limit,
+            freshness=plan.freshness,
+            diversity=plan.diversity,
+            near_duplicate_dedupe=plan.near_duplicate_dedupe,
+        )
+
     out = []
     for position, item in enumerate(ranked[:limit], start=1):
         out.append({
@@ -204,8 +244,22 @@ def _resolve_providers(primary_provider) -> tuple[list, dict[str, str]]:
     return providers, failures
 
 
-def search_ensemble(primary_provider, query: str, limit: int) -> Optional[dict]:
-    """Run the opt-in ensemble; None means no usable additional provider was configured."""
+def ensemble_available(primary_provider) -> bool:
+    """True only when at least one configured additional provider is usable now."""
+    providers, _failures = _resolve_providers(primary_provider)
+    return len(providers) > 1
+
+
+def search_ensemble(
+    primary_provider,
+    query: str,
+    limit: int,
+    *,
+    plan: Optional["SearchPlan"] = None,
+) -> Optional[dict]:
+    """Run the configured ensemble; None means the plan/config chose the single-provider path."""
+    if plan is not None and plan.mode != "ensemble":
+        return None
     providers, resolution_failures = _resolve_providers(primary_provider)
     if len(providers) < 2:
         return None
@@ -214,6 +268,11 @@ def search_ensemble(primary_provider, query: str, limit: int) -> Optional[dict]:
 
     names = [str(provider.name) for provider in providers]
     cache_key = "ensemble:" + ",".join(names)
+    if plan is not None and plan.strategy == "adaptive":
+        cache_key += (
+            f":adaptive:{plan.intent}:f{int(plan.freshness)}"
+            f"d{int(plan.diversity)}n{int(plan.near_duplicate_dedupe)}"
+        )
     cached = search_memo.lookup(cache_key, query, limit)
     if cached is not None:
         return slice_search_response(cached, limit)
@@ -282,12 +341,14 @@ def search_ensemble(primary_provider, query: str, limit: int) -> Optional[dict]:
         response = {
             "success": True,
             "data": {
-                "web": _merge_rrf(ordered_successes, limit),
+                "web": _merge_rrf(ordered_successes, limit, plan=plan),
                 "search_mode": "ensemble",
                 "backends": [name for name, _ in ordered_successes],
                 "requested_backends": names,
             },
         }
+        if plan is not None and plan.strategy == "adaptive":
+            response["data"]["search_plan"] = plan.as_dict()
         if rerouted:
             response["data"]["rerouted_backends"] = rerouted
         if failures:

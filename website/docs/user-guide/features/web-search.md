@@ -52,6 +52,29 @@ web:
 
 With that configuration the normal path is **SearXNG + Brave + Exa in parallel → URL de-duplication → RRF ranking**. If every ensemble member fails, the configured fallback/keyless rescue chain still applies afterward. Ensemble mode is deliberately opt-in because each uncached query may consume one request/credit on every configured provider. For keyless ring members, `sources` reports the actual `served_by` vendor; aliases that resolve to the same real vendor are collapsed before RRF so a ring failover cannot create false cross-engine consensus.
 
+### Adaptive search strategy
+
+If you have configured ensemble backends but do not want to pay the multi-provider cost for every lookup, set `web.search_strategy: adaptive`. The planner is deterministic and model-free: it classifies only the search need, does not alter the conversation prompt, and uses one provider for simple/navigational/technical lookups while reserving the configured ensemble for current/news, comparison, verification, and deep-research queries.
+
+```yaml
+web:
+  search_backend: "searxng"
+  search_ensemble_backends: ["brave-free", "exa"]
+  search_fallback_backends: ["ddgs"]
+  search_strategy: "adaptive"
+```
+
+Strategies are:
+
+| Strategy | Behavior |
+| --- | --- |
+| `legacy` | **Default.** Preserves existing behavior: if usable ensemble backends are configured, every search uses the ensemble. |
+| `adaptive` | Single provider for low-coverage queries; ensemble only when independent coverage/corroboration is useful. Adaptive ensemble results also apply bounded freshness, host-diversity, and conservative duplicate-title quality signals. |
+| `single` | Never fan out to ensemble backends. Normal failure fallback/rescue still applies. |
+| `ensemble` | Always use the configured usable ensemble when one is available. |
+
+Adaptive quality ranking never invents a domain-authority score. Freshness is only a bounded bonus when a provider actually supplied a parseable publication/update date; undated results are not penalized. Host diversity prevents one domain from crowding out the result set, and near-duplicate collapse only merges strong exact normalized-title matches. The returned `search_plan` metadata explains the selected intent/mode for adaptive calls.
+
 :::info Works out of the box — keyless free-tier rotation
 A fresh install with **no web credentials at all** gets working `web_search` and `web_extract` out of the box: requests rotate round-robin across the ring vendors' public free tiers — **Exa, Parallel, Firecrawl, and Keenable** — spreading load evenly, and a rate-limited request automatically retries on the next vendor in the ring (multi-hop, until one serves or all are throttled). No signup, no key. This tier is strictly last-resort — any configured backend or present API key always wins — and requests carry no user identifiers (only a random per-process session id, rotated on restart). For guaranteed, unthrottled service, set up a keyed provider. Disable the keyless tier entirely with `web.keyless_fallback: false`.
 :::

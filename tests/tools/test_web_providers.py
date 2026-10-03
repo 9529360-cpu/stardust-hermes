@@ -116,6 +116,9 @@ class TestDefaultConfig:
         assert "backend" in web
         assert "search_backend" in web
         assert "extract_backend" in web
+        assert web["search_strategy"] == "legacy"
+        assert web["search_ensemble_backends"] == []
+        assert web["search_fallback_backends"] == []
         # All empty string by default (no override)
         assert web["backend"] == ""
         assert web["search_backend"] == ""
