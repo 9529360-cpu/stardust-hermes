@@ -945,7 +945,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         applying={applying}
         currentModel={mainModel}
         onActivateApiKey={() => void activateApiKeyProvider()}
-        onAddCustomService={() => startManualLocalEndpoint(null, scopeProfile)}
+        onAddCustomService={() => openConnectionView('custom-endpoints')}
         onAddService={() => startManualOnboarding(null, scopeProfile)}
         onApiKeyChange={setApiKeyDraft}
         onApply={() => void applyMainModel()}
