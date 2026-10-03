@@ -126,6 +126,73 @@ def test_registry_dispatch_forwards_current_user_task(monkeypatch):
     assert result["model"] == "gemini-test-model"
 
 
+def test_real_inline_executor_forwards_current_human_turn(monkeypatch):
+    """Production execution derives authority from the exact current human row."""
+    from agent.inline_tool_executors import INLINE_TOOL_EXECUTORS, InlineToolContext
+
+    captured = {}
+
+    def fake_model_configure_tool(**kwargs):
+        captured.update(kwargs)
+        return json.dumps({"success": True})
+
+    monkeypatch.setattr(mod, "model_configure_tool", fake_model_configure_tool)
+    ctx = InlineToolContext(
+        effective_task_id="turn-1",
+        tool_call_id="call-1",
+        messages=[
+            {"role": "user", "content": "这是我的 Gemini API，请帮我配置并执行"},
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "call-1"}]},
+        ],
+    )
+
+    raw = INLINE_TOOL_EXECUTORS["model_configure"](
+        SimpleNamespace(session_id="session-1"),
+        {"provider": "gemini", "model": "gemini-test-model"},
+        ctx,
+    )
+
+    assert json.loads(raw)["success"] is True
+    assert captured["user_message"] == "这是我的 Gemini API，请帮我配置并执行"
+    assert captured["provider"] == "gemini"
+    assert captured["model"] == "gemini-test-model"
+
+
+def test_real_inline_executor_never_reuses_old_human_authority(monkeypatch):
+    """Synthetic current-user rows must not fall back to an older human request."""
+    from agent.inline_tool_executors import INLINE_TOOL_EXECUTORS, InlineToolContext
+
+    captured = {}
+
+    def fake_model_configure_tool(**kwargs):
+        captured.update(kwargs)
+        return json.dumps({"success": False})
+
+    monkeypatch.setattr(mod, "model_configure_tool", fake_model_configure_tool)
+    ctx = InlineToolContext(
+        effective_task_id="turn-2",
+        tool_call_id="call-2",
+        messages=[
+            {"role": "user", "content": "我之前同意配置 Gemini"},
+            {"role": "assistant", "content": "收到"},
+            {
+                "role": "user",
+                "content": "[background] retry provider setup",
+                "display_kind": "internal_notification",
+            },
+            {"role": "assistant", "content": "", "tool_calls": [{"id": "call-2"}]},
+        ],
+    )
+
+    INLINE_TOOL_EXECUTORS["model_configure"](
+        SimpleNamespace(session_id="session-1"),
+        {"provider": "gemini", "model": "gemini-test-model"},
+        ctx,
+    )
+
+    assert captured["user_message"] == ""
+
+
 def test_requires_explicit_current_user_request(monkeypatch):
     monkeypatch.setattr(
         mod,
