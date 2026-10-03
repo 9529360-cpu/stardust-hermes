@@ -2620,12 +2620,14 @@ def save_env_value(key: str, value: str):
 
 
 def custom_endpoint_key_env(identity: str) -> str:
-    """Env var name holding a custom endpoint's API key.
-    ``identity`` is the endpoint's own id (Desktop endpoint id, or ``host:port`` for CLI setup),
-    so two endpoints on one host get separate slots. The fixed ``HERMES_CUSTOM_`` prefix keeps the
-    name POSIX-valid when the slug starts with a digit (``save_env_value`` rejects those)."""
+    """Legacy env slot used by CLI setup and preexisting Desktop endpoints."""
     slug = re.sub(r"[^A-Z0-9]+", "_", str(identity or "").upper()).strip("_")
     return f"HERMES_CUSTOM_{slug}_API_KEY" if slug else "HERMES_CUSTOM_API_KEY"
+
+
+def custom_endpoint_key_env_v2(identity: str) -> str:
+    """Byte-preserving Desktop endpoint slot; callers still check persisted key_env collisions."""
+    return f"HERMES_CUSTOM_V2_{str(identity or '').encode('utf-8').hex().upper()}_API_KEY"
 
 
 def remove_env_value(key: str) -> bool:

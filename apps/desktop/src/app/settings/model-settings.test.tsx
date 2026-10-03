@@ -563,6 +563,43 @@ describe('ModelSettings MoA preset editor', () => {
     }
   })
 
+  it('does not send the previous profile’s debounced MoA edit after a live switch', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    try {
+      await openReferenceEditor()
+      fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
+      await act(async () => {
+        for (const handler of [...profileSwitchHandlers]) { handler() }
+      })
+      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      expect(saveMoaModels).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not repaint a previous profile’s in-flight MoA save after a live switch', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    try {
+      let resolveSave!: (value: ReturnType<typeof moaConfig>) => void
+      saveMoaModels.mockImplementationOnce(() => new Promise(resolve => {resolveSave = resolve}))
+      await openReferenceEditor()
+      fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
+      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      expect(saveMoaModels).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        for (const handler of [...profileSwitchHandlers]) { handler() }
+      })
+      await waitFor(() => expect(getMoaModels).toHaveBeenCalledTimes(2))
+      await act(async () => { resolveSave({ ...moaConfig(), presets: { default: { ...moaConfig().presets.default, enabled: false } } }) })
+      expect(screen.getByRole('switch', { name: 'Enabled' }).getAttribute('aria-checked')).toBe('true')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('saves a disabled reference model without removing it (per-slot enabled toggle)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
 
