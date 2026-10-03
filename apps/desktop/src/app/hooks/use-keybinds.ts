@@ -68,6 +68,7 @@ import {
   $workspaceIsPage,
   AGENTS_ROUTE,
   ARTIFACTS_ROUTE,
+  COMMAND_CENTER_ROUTE,
   CRON_ROUTE,
   MESSAGING_ROUTE,
   navigateToWorkspacePage,
@@ -224,7 +225,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'session.next': () => cycleTab(1),
     'session.prev': () => cycleTab(-1),
     ...sessionSlotHandlers,
-    'session.focusSearch': deps.toggleCommandCenter,
+    'session.focusSearch': () => navigate(`${COMMAND_CENTER_ROUTE}?section=sessions`),
     'session.togglePin': deps.toggleSelectedPin,
     'session.archive': deps.archiveSelectedSession,
     // openWorktreeDialog resolves the target. There is no test for a repo
