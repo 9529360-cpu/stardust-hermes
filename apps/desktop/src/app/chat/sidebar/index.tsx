@@ -946,96 +946,6 @@ export function ChatSidebar({
     !projectOverview?.length &&
     !(inProject && (enteredProject?.sessionCount ?? 0) > 0)
 
-  const runKeyedLoad = useCallback(
-    (
-      key: string,
-      load: ((key: string) => Promise<void> | void) | undefined,
-      setPending: React.Dispatch<React.SetStateAction<Record<string, boolean>>>
-    ) => {
-      if (!load) {
-        return
-      }
-
-      setPending(prev => ({ ...prev, [key]: true }))
-
-      void Promise.resolve(load(key))
-        .catch(() => undefined)
-        .finally(() => setPending(({ [key]: _done, ...rest }) => rest))
-    },
-    []
-  )
-
-  const loadMoreForMessaging = useCallback(
-    (platform: string) => runKeyedLoad(platform, onLoadMoreMessaging, setMessagingLoadMorePending),
-    [onLoadMoreMessaging, runKeyedLoad]
-  )
-
-  // Reveal another batch of a platform's rows; fetch from the backend too if we
-  // run past what's loaded and more remain on disk.
-  const revealMoreMessaging = (platform: string, loaded: number, hasMore: boolean) => {
-    const next = (messagingVisible[platform] ?? NON_SESSION_INITIAL_ROWS) + NON_SESSION_LOAD_STEP
-
-    setMessagingVisible(prev => ({ ...prev, [platform]: next }))
-
-    if (next > loaded && hasMore) {
-      loadMoreForMessaging(platform)
-    }
-  }
-
-  // Each messaging platform is its own self-managed section: split the
-  // separately-fetched messaging slice by source, newest platform first, rows
-  // within a platform by recency. Per-platform totals (when a "load more" has
-  // resolved them) drive the count + whether more remain on disk.
-  const messagingGroups = useMemo<MessagingSection[]>(() => {
-    if (!visibleMessagingSessions.length) {
-      return []
-    }
-
-    const bySource = new Map<string, SessionInfo[]>()
-    // Rows this platform owns that the Pinned section is showing instead. The
-    // backend's per-platform total counts them, so discount it or "load more"
-    // promises rows that will never appear.
-    const pinnedBySource = new Map<string, number>()
-
-    for (const session of visibleMessagingSessions) {
-      const sourceId = normalizeSessionSource(session.source)
-
-      if (!sourceId) {
-        continue
-      }
-
-      if (isPinnedSession(session)) {
-        pinnedBySource.set(sourceId, (pinnedBySource.get(sourceId) ?? 0) + 1)
-
-        continue
-      }
-
-      const list = bySource.get(sourceId) ?? []
-      list.push(session)
-      bySource.set(sourceId, list)
-    }
-
-    return [...bySource.entries()]
-      .map(([sourceId, list]) => {
-        const ordered = [...list].sort((a, b) => sessionTime(b) - sessionTime(a))
-        const known = messagingPlatformTotals[messagingTotalsKey(messagingProfile, sourceId)]
-        const unpinnedKnown = known == null ? null : Math.max(0, known - (pinnedBySource.get(sourceId) ?? 0))
-        const total = Math.max(ordered.length, unpinnedKnown ?? 0)
-
-        return {
-          // Known exact total → more exist iff total exceeds loaded; otherwise
-          // the seed fetch was capped, so assume more until a per-platform load
-          // resolves the count.
-          hasMore: unpinnedKnown != null ? unpinnedKnown > ordered.length : messagingTruncated,
-          label: sessionSourceLabel(sourceId) ?? sourceId,
-          sessions: ordered,
-          sourceId,
-          total
-        }
-      })
-      .sort((a, b) => sessionTime(b.sessions[0]) - sessionTime(a.sessions[0]))
-  }, [visibleMessagingSessions, messagingPlatformTotals, messagingTruncated, isPinnedSession, messagingProfile])
-
   const profileGroups = useGatewaySessionGroups(agentSessions, profileScope === ALL_PROFILES && grouping === 'profile')
 
   // The flat Sessions list always shows ALL recent sessions; Projects is a
@@ -1176,21 +1086,21 @@ export function ChatSidebar({
   // Filtered down to nothing still renders the section: the empty state is what
   // tells you the filter — not an empty account — is why the list is bare.
   const showSessionSections =
-    showSessionSkeletons || filtersActive || sortedSessions.length > 0 || projectModel.length > 0
+    showSessionSkeletons ||
+    filtersActive ||
+    pinnedSessions.length > 0 ||
+    displayAgentSessions.length > 0 ||
+    projectModel.length > 0
 
-  // The sidebar's session-area mode — exposed as data-attributes so custom
-  // skins can target project mode (overview vs. entered), archived, or search
-  // without relying on internal class names. `data-sessions-project` carries
-  // the entered project's id for per-project targeting.
-  const sessionsMode: 'archived' | 'flat' | 'project' | 'projects' | 'search' = trimmedQuery
-    ? 'search'
-    : showArchived
-      ? 'archived'
-      : inProject
-        ? 'project'
-        : worktreeGroupingActive
-          ? 'projects'
-          : 'flat'
+  // Expose the structural conversation-list mode for skins without making
+  // search or secondary feature groups part of the sidebar contract.
+  const sessionsMode: 'archived' | 'flat' | 'project' | 'projects' = showArchived
+    ? 'archived'
+    : inProject
+      ? 'project'
+      : worktreeGroupingActive
+        ? 'projects'
+        : 'flat'
 
   // Each reorderable list reports its OWN new id order; persisting is a direct,
   // typed write — no id-prefix sniffing to figure out which level moved.
