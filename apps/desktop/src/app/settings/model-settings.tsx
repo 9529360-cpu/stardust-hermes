@@ -1,7 +1,6 @@
 import type { ModelOptionProvider } from '@hermes/shared'
 import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@hermes/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,10 +12,8 @@ import {
   getGlobalModelInfo,
   getGlobalModelOptions,
   getMoaModels,
-  getRecommendedDefaultModel,
   saveHermesConfig,
   saveMoaModels,
-  setEnvVar,
   setModelAssignment
 } from '@/hermes'
 import type {
@@ -30,14 +27,8 @@ import { useI18n } from '@/i18n'
 import { isCodeSkewRestartRequired } from '@/lib/code-skew-error'
 import { AlertTriangle, Cpu, Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
-import { setMainModelAssignment } from '@/store/cron-model-impact'
+import { $localModelsEnabled } from '@/store/local-models-flag'
 import { notifyError, readableError } from '@/store/notifications'
-import {
-  $desktopOnboarding,
-  startManualLocalEndpoint,
-  startManualOnboarding,
-  startManualProviderOAuth
-} from '@/store/onboarding'
 
 import { hermesConfigCacheWriter, invalidateHermesConfig, useHermesConfigRecord } from '../hooks/use-config-record'
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
@@ -45,7 +36,7 @@ import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 import { CONTROL_TEXT } from './constants'
 import { CustomEndpointsSettings } from './custom-endpoints-settings'
 import { getNested, setNested } from './helpers'
-import { isModelServiceReady, type ModelConnectionView, ModelServicePicker } from './model-service-picker'
+import { LocalModelsSettings } from './local-models-settings'
 import { ListRow, Pill, SectionHeading } from './primitives'
 import { useDeepLinkHighlight } from './use-deep-link-highlight'
 
@@ -126,6 +117,9 @@ const AUX_TASKS: readonly AuxTaskMeta[] = [
 ]
 
 const NO_PROVIDERS: readonly ModelOptionProvider[] = [{ name: '—', slug: '', models: [] }]
+
+const isModelServiceReady = (provider?: ModelOptionProvider) =>
+  !!provider && (provider.authenticated !== false || (provider.models?.length ?? 0) > 0)
 
 // Radix <Select> renders a blank trigger when `value` matches no <SelectItem>.
 // A custom model (e.g. one added via config that isn't in the provider's
@@ -224,16 +218,12 @@ interface ModelSettingsProps {
 export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.model
-  const navigate = useNavigate()
-  const location = useLocation()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [skewRestart, setSkewRestart] = useState(false)
   const [restartingBackend, setRestartingBackend] = useState(false)
   const [mainModel, setMainModel] = useState<{ model: string; provider: string } | null>(null)
   const [providers, setProviders] = useState<ModelOptionProvider[]>([])
-  const [selectedProvider, setSelectedProvider] = useState('')
-  const [selectedModel, setSelectedModel] = useState('')
   const [auxiliary, setAuxiliary] = useState<AuxiliaryModelsResponse | null>(null)
   const [moa, setMoa] = useState<MoaConfigResponse | null>(null)
   const [selectedMoaPreset, setSelectedMoaPreset] = useState('')
@@ -245,21 +235,12 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   const [applying, setApplying] = useState(false)
   const [editingAuxTask, setEditingAuxTask] = useState<null | string>(null)
   const [advancedModelSettingsOpen, setAdvancedModelSettingsOpen] = useState(false)
-  const [otherServicesOpen, setOtherServicesOpen] = useState(false)
 
   const [auxDraft, setAuxDraft] = useState<{ model: string; provider: string; reasoningEffort: string }>({
     model: '',
     provider: '',
     reasoningEffort: '__inherit__'
   })
-
-  // Aux slots reported stale by the backend immediately after a main-model
-  // switch (provider differs from the new main). Cleared on next switch/reset.
-  const [switchStaleAux, setSwitchStaleAux] = useState<StaleAuxAssignment[]>([])
-  // Inline API-key entry for picking an unconfigured `api_key` provider in
-  // place — mirrors the onboarding ApiKeyForm but scoped to the model picker.
-  const [apiKeyDraft, setApiKeyDraft] = useState('')
-  const [activating, setActivating] = useState(false)
 
   const revealAdvancedModelSettings = useCallback(() => setAdvancedModelSettingsOpen(true), [])
 
@@ -286,112 +267,57 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     [m.restartRequired]
   )
 
-  const refresh = useCallback(
-    async ({ replaceSelection = false }: { replaceSelection?: boolean } = {}) => {
-      const epoch = profileEpoch.current
-      setLoading(true)
-      setError('')
-      setSkewRestart(false)
+  const refresh = useCallback(async () => {
+    const epoch = profileEpoch.current
+    setLoading(true)
+    setError('')
+    setSkewRestart(false)
 
-      try {
-        const [modelInfo, modelOptions, auxiliaryModels, moaModels] = await Promise.all([
-          getGlobalModelInfo(scopeProfile),
-          getGlobalModelOptions(undefined, scopeProfile),
-          getAuxiliaryModels(scopeProfile),
-          getMoaModels(scopeProfile).catch(() => null)
-        ])
+    try {
+      const [modelInfo, modelOptions, auxiliaryModels, moaModels] = await Promise.all([
+        getGlobalModelInfo(scopeProfile),
+        getGlobalModelOptions(undefined, scopeProfile),
+        getAuxiliaryModels(scopeProfile),
+        getMoaModels(scopeProfile).catch(() => null)
+      ])
 
-        if (profileEpoch.current !== epoch) {
-          return
-        }
-
-        setMainModel({ model: modelInfo.model, provider: modelInfo.provider })
-        setProviders(modelOptions.providers || [])
-
-        if (replaceSelection) {
-          setSelectedProvider(modelInfo.provider)
-          setSelectedModel(modelInfo.model)
-        } else {
-          setSelectedProvider(prev => prev || modelInfo.provider)
-          setSelectedModel(prev => prev || modelInfo.model)
-        }
-
-        setAuxiliary(auxiliaryModels)
-        setMoa(moaModels)
-
-        if (moaModels) {
-          setSelectedMoaPreset(prev => (prev && moaModels.presets[prev] ? prev : moaModels.default_preset))
-        }
-
-        // The config record loads via its own shared query; a model switch can
-        // change it server-side (aux slots), so nudge that cache to refetch.
-        void invalidateHermesConfig(scopeProfile)
-      } catch (err) {
-        if (profileEpoch.current === epoch) {
-          setCaughtError(err, m.loadFailed)
-        }
-      } finally {
-        if (profileEpoch.current === epoch) {
-          setLoading(false)
-        }
+      if (profileEpoch.current !== epoch) {
+        return
       }
-    },
-    [m.loadFailed, scopeProfile, setCaughtError]
-  )
+
+      setMainModel({ model: modelInfo.model, provider: modelInfo.provider })
+      setProviders(modelOptions.providers || [])
+      setAuxiliary(auxiliaryModels)
+      setMoa(moaModels)
+
+      if (moaModels) {
+        setSelectedMoaPreset(prev => (prev && moaModels.presets[prev] ? prev : moaModels.default_preset))
+      }
+
+      // The config record loads via its own shared query; a model switch can
+      // change it server-side (aux slots), so nudge that cache to refetch.
+      void invalidateHermesConfig(scopeProfile)
+    } catch (err) {
+      if (profileEpoch.current === epoch) {
+        setCaughtError(err, m.loadFailed)
+      }
+    } finally {
+      if (profileEpoch.current === epoch) {
+        setLoading(false)
+      }
+    }
+  }, [m.loadFailed, scopeProfile, setCaughtError])
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
-
-  // Provider setup runs in the shared onboarding overlay. Subscribe to the
-  // owner directly so closing that flow refreshes the service list without
-  // mirroring atom state through a render-lagging ref.
-  useEffect(() => {
-    let wasActive = $desktopOnboarding.get().manual
-
-    return $desktopOnboarding.subscribe(state => {
-      const active = state.manual
-
-      if (wasActive && !active) {
-        void refresh()
-      }
-
-      wasActive = active
-    })
   }, [refresh])
 
   // A profile switch swaps the backend under the mounted panel — reload for the
   // new profile (bumping the epoch first so any in-flight A request is discarded).
   useOnProfileSwitch(() => {
     profileEpoch.current += 1
-    // The panel stays mounted across profile switches, so clear the previous
-    // profile's draft selection before loading the new profile's source of
-    // truth. Ordinary same-profile refreshes still preserve in-progress edits.
-    setSelectedProvider('')
-    setSelectedModel('')
-    setApiKeyDraft('')
-    void refresh({ replaceSelection: true })
+    void refresh()
   })
-
-  // The main model can point at a user-defined/stale provider that the catalog
-  // no longer returns. Keep that active choice visible as a synthetic service
-  // row so the user can still see and replace it instead of falling into an
-  // empty selector.
-  const serviceProviders = useMemo<ModelOptionProvider[]>(() => {
-    if (!mainModel?.provider || providers.some(provider => provider.slug === mainModel.provider)) {
-      return providers
-    }
-
-    return [
-      {
-        authenticated: Boolean(mainModel.model),
-        models: mainModel.model ? [mainModel.model] : [],
-        name: mainModel.provider,
-        slug: mainModel.provider
-      },
-      ...providers
-    ]
-  }, [mainModel, providers])
 
   // Auxiliary/MoA selectors should offer only services that can actually
   // produce models. The primary service page may still show an unavailable
@@ -403,32 +329,6 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   // that would create a recursive MoA tree (the backend rejects it on save).
   // Hide it from the slot selectors so it isn't offered as a dead choice.
   const moaSlotProviderOptions = providerOptions.filter(provider => (provider.slug || '').toLowerCase() !== 'moa')
-
-  const selectedProviderRow = useMemo(
-    () => serviceProviders.find(provider => provider.slug === selectedProvider),
-    [selectedProvider, serviceProviders]
-  )
-
-  const selectedProviderModels = selectedProviderRow?.models ?? []
-
-  // An unconfigured provider was picked: no credentials yet, so there are no
-  // models to choose. `api_key` providers can be activated inline (paste key);
-  // OAuth / external flows hand off to the onboarding sign-in.
-  const needsSetup = !!selectedProvider && !isModelServiceReady(selectedProviderRow)
-  const setupIsApiKey = needsSetup && selectedProviderRow?.auth_type === 'api_key' && !!selectedProviderRow?.key_env
-
-  // Clear any half-typed key when switching provider so it can't leak across.
-  useEffect(() => {
-    setApiKeyDraft('')
-  }, [selectedProvider])
-
-  const selectMainProvider = useCallback(
-    (provider: ModelOptionProvider) => {
-      setSelectedProvider(provider.slug)
-      setSelectedModel(provider.slug === mainModel?.provider ? mainModel.model : (provider.models?.[0] ?? ''))
-    },
-    [mainModel]
-  )
 
   const auxDraftProviderModels = useMemo(
     () => providers.find(provider => provider.slug === auxDraft.provider)?.models ?? [],
@@ -635,173 +535,6 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     [config, m.defaultsFailed, scopeProfile, setConfig]
   )
 
-  // Paste or replace the API key for the selected provider. A first-time
-  // connection gets the provider's recommended model; replacing an existing
-  // key keeps the user's current model selection intact.
-  const activateApiKeyProvider = useCallback(async () => {
-    const keyEnv = selectedProviderRow?.key_env
-    const slug = selectedProviderRow?.slug
-
-    if (!keyEnv || !slug || !apiKeyDraft.trim()) {
-      return
-    }
-
-    const epoch = profileEpoch.current
-    const wasReady = isModelServiceReady(selectedProviderRow)
-    const previousModel = selectedModel
-    setActivating(true)
-    setError('')
-
-    try {
-      await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile)
-      setApiKeyDraft('')
-
-      let nextModel = previousModel
-
-      if (!wasReady) {
-        // Pick a sensible default for a freshly-connected provider (mirrors
-        // `hermes model` curation). Best-effort — fall through to the refreshed
-        // model list if it fails.
-        nextModel = ''
-
-        try {
-          const rec = await getRecommendedDefaultModel(slug, scopeProfile)
-          nextModel = rec.model || ''
-        } catch {
-          nextModel = ''
-        }
-      }
-
-      const options = await getGlobalModelOptions(undefined, scopeProfile)
-
-      if (profileEpoch.current !== epoch) {
-        return
-      }
-
-      setProviders(options.providers || [])
-      const refreshedRow = options.providers?.find(p => p.slug === slug)
-      const fallbackModel = refreshedRow?.models?.[0] ?? ''
-      setSelectedModel(wasReady ? previousModel : nextModel || fallbackModel)
-    } catch (err) {
-      setCaughtError(err, m.loadFailed)
-    } finally {
-      setActivating(false)
-    }
-  }, [apiKeyDraft, m.loadFailed, scopeProfile, selectedModel, selectedProviderRow, setCaughtError])
-
-  // OAuth / external providers can't be activated with a pasted key — hand off
-  // to the shared onboarding flow scoped to this provider's real sign-in. The
-  // custom / local endpoint is NOT an OAuth provider, so it gets the dedicated
-  // local-endpoint form (URL + optional API key) instead of being dead-ended
-  // on the OAuth picker (the original "booted back to the first screen" loop).
-  const openConnectionView = useCallback(
-    (view: ModelConnectionView) => {
-      const params = new URLSearchParams(location.search)
-      params.set('tab', 'providers')
-      params.set('pview', view)
-      const query = params.toString()
-
-      navigate(
-        {
-          hash: location.hash,
-          pathname: location.pathname,
-          search: query ? `?${query}` : ''
-        },
-        { replace: true }
-      )
-    },
-    [location.hash, location.pathname, location.search, navigate]
-  )
-
-  const startProviderSetup = useCallback(() => {
-    const catalogRow = providers.find(provider => provider.slug === selectedProvider)
-    const slug = selectedProvider.trim()
-
-    if (!slug) {
-      return
-    }
-
-    const lower = slug.toLowerCase()
-
-    if (lower === 'custom' || lower === 'local' || lower.startsWith('custom:')) {
-      startManualLocalEndpoint(null, scopeProfile)
-    } else if (catalogRow) {
-      startManualProviderOAuth(catalogRow.slug, scopeProfile)
-    } else {
-      // A provider missing from the live catalog has no trustworthy auth
-      // metadata. Open the generic provider picker instead of pretending an
-      // OAuth flow exists for a stale or retired id.
-      startManualOnboarding(null, scopeProfile)
-    }
-  }, [providers, scopeProfile, selectedProvider])
-
-  const applyMainModel = useCallback(async () => {
-    if (!selectedProvider || !selectedModel) {
-      return
-    }
-
-    const epoch = profileEpoch.current
-    setApplying(true)
-    setError('')
-
-    try {
-      const keyEnv =
-        selectedProviderRow?.auth_type === 'api_key' && selectedProviderRow.key_env ? selectedProviderRow.key_env : null
-
-      // DSH-style editor semantics: a blank key means "keep the saved key";
-      // entering a new one rotates it before the model choice is applied.
-      if (keyEnv && apiKeyDraft.trim()) {
-        await setEnvVar(keyEnv, apiKeyDraft.trim(), scopeProfile)
-
-        if (profileEpoch.current !== epoch) {
-          return
-        }
-
-        setApiKeyDraft('')
-      }
-
-      const result = await setMainModelAssignment(
-        {
-          model: selectedModel,
-          provider: selectedProvider,
-          ...(selectedProviderRow?.api_url ? { base_url: selectedProviderRow.api_url } : {})
-        },
-        scopeProfile
-      )
-
-      if (profileEpoch.current !== epoch) {
-        return
-      }
-
-      const provider = result.provider || selectedProvider
-      const model = result.model || selectedModel
-      setMainModel({ provider, model })
-      setSwitchStaleAux(result.stale_aux ?? [])
-
-      // Live UI stores mirror the ACTIVE profile's model; a scoped apply
-      // changed a different profile and must not repaint them.
-      if (scopeProfile == null) {
-        onMainModelChanged?.(provider, model)
-      }
-
-      await refresh()
-    } catch (err) {
-      setCaughtError(err, m.loadFailed)
-    } finally {
-      setApplying(false)
-    }
-  }, [
-    apiKeyDraft,
-    m.loadFailed,
-    onMainModelChanged,
-    refresh,
-    scopeProfile,
-    selectedModel,
-    selectedProvider,
-    selectedProviderRow,
-    setCaughtError
-  ])
-
   // Sibling of the applyMainModel endpoint passthrough (#65254): auxiliary
   // assignments targeting a user-defined provider must carry that provider's
   // endpoint too, or the backend pins the slot without a base_url and the
@@ -911,7 +644,6 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         },
         scopeProfile
       )
-      setSwitchStaleAux([])
       await refresh()
     } catch (err) {
       setCaughtError(err, m.loadFailed)
@@ -927,7 +659,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
     try {
       await window.hermesDesktop?.recycleBackend?.(scopeProfile)
-      await refresh({ replaceSelection: true })
+      await refresh()
     } catch (err) {
       setCaughtError(err, m.restartFailed)
     } finally {
@@ -941,33 +673,12 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
   return (
     <div className="grid gap-6">
-      <CustomEndpointsSettings onMainModelChanged={onMainModelChanged} scopeProfile={scopeProfile} />
-      <Button onClick={() => setOtherServicesOpen(open => !open)} size="sm" variant="textStrong">
-        {otherServicesOpen ? m.advancedConnectionsHide : m.chooseOtherService}
-      </Button>
-      {otherServicesOpen && (
-        <ModelServicePicker
-          activating={activating}
-          apiKeyDraft={apiKeyDraft}
-          applying={applying}
-          currentModel={mainModel}
-          onActivateApiKey={() => void activateApiKeyProvider()}
-          onAddCustomService={() => openConnectionView('custom-endpoints')}
-          onAddService={() => startManualOnboarding(null, scopeProfile)}
-          onApiKeyChange={setApiKeyDraft}
-          onApply={() => void applyMainModel()}
-          onOpenConnectionView={openConnectionView}
-          onSelectModel={setSelectedModel}
-          onSelectProvider={selectMainProvider}
-          onSetupProvider={startProviderSetup}
-          providers={serviceProviders}
-          selectedModel={selectedModel}
-          selectedProvider={selectedProvider}
-          selectedProviderModels={selectedProviderModels}
-          selectedProviderRow={selectedProviderRow}
-          setupIsApiKey={setupIsApiKey}
-        />
-      )}
+      <CustomEndpointsSettings
+        onConfigSaved={() => void refresh()}
+        onMainModelChanged={onMainModelChanged}
+        scopeProfile={scopeProfile}
+      />
+      {$localModelsEnabled.get() ? <LocalModelsSettings /> : null}
 
       {config && mainModel && (reasoningSupported || fastSupported) && (
         <section>
@@ -1024,16 +735,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         </div>
       )}
 
-      {switchStaleAux.length > 0 && (
-        <StaleAuxWarning
-          applying={applying}
-          onReset={() => void resetAuxiliaryModels()}
-          slots={switchStaleAux}
-          taskLabel={auxiliaryTaskLabel}
-        />
-      )}
-
-      {switchStaleAux.length === 0 && persistentStaleAux.length > 0 && (
+      {persistentStaleAux.length > 0 && (
         <StaleAuxWarning
           applying={applying}
           onReset={() => void resetAuxiliaryModels()}

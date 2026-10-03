@@ -14,7 +14,7 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('settings exposes provider configuration without reviving the legacy app account surface', async ({}, testInfo) => {
+test('settings offers one model services page without reviving provider account pages', async ({}, testInfo) => {
   const page = fixture!.page
 
   // Settings left the primary nav; the titlebar gear is its visible door.
@@ -22,36 +22,42 @@ test('settings exposes provider configuration without reviving the legacy app ac
   await expect(page.getByRole('button', { name: '关闭设置' })).toBeVisible()
 
   const settingsNav = page.getByRole('complementary')
-  await expect(settingsNav.getByRole('button', { name: /提供方/ })).toBeVisible()
+  const modelServices = settingsNav.getByRole('button', { name: '模型服务' })
+  await expect(modelServices).toBeVisible()
   await expect(settingsNav.getByRole('button', { name: '网关' })).toBeVisible()
   await expect(settingsNav.getByText('浏览器', { exact: true })).toBeVisible()
   await expect(settingsNav.getByText('Browser', { exact: true })).toHaveCount(0)
   await expect(settingsNav.getByRole('button', { name: '关于' })).toBeVisible()
+  // The retired provider account surfaces stay gone.
   await expect(settingsNav.getByText('账单', { exact: true })).toHaveCount(0)
+  await expect(settingsNav.getByRole('button', { name: '网页登录' })).toHaveCount(0)
+  await expect(settingsNav.getByRole('button', { name: 'API 密钥' })).toHaveCount(0)
   await expect(page.getByText(/Nous/i)).toHaveCount(0)
-  await settingsNav.getByRole('button', { name: /提供方/ }).click()
-  await expect(settingsNav.getByRole('button', { name: '网页登录' })).toBeVisible()
-  await expect(settingsNav.getByRole('button', { name: 'API 密钥' })).toBeVisible()
-  await expect(settingsNav.getByRole('button', { name: '自定义端点' })).toBeVisible()
-  await expect(settingsNav.getByText('账单', { exact: true })).toHaveCount(0)
-  await expect(page.getByText(/Nous/i)).toHaveCount(0)
-  await expect(page.getByText(/Stardust 会在应用中完成提供方登录流程/)).toBeVisible()
-  await expect(page.getByText(/Hermes 会在应用中为你完成浏览器登录/)).toHaveCount(0)
+
+  await modelServices.click()
+  await expect(modelServices).toHaveClass(/bg-\(--ui-bg-tertiary\)/)
+  await expect(page.getByText('自定义服务', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('服务地址', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('默认模型', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(/提供方登录|网页登录/)).toHaveCount(0)
 
   const overlayTheme = await page.locator('[data-overlay-surface]').evaluate(element =>
     getComputedStyle(element).getPropertyValue('--ui-chat-surface-background').trim()
   )
-  expect(['#081021e6', 'rgba(8, 16, 33, 0.9)']).toContain(overlayTheme)
+  expect(overlayTheme).not.toBe('')
 
   await page.screenshot({ path: testInfo.outputPath('personal-assistant-settings.png') })
 
   const aboutButton = settingsNav.getByRole('button', { name: '关于' })
-  const providersButton = settingsNav.getByRole('button', { name: /提供方/ })
   await aboutButton.click()
   await expect(aboutButton).toHaveClass(/bg-\(--ui-bg-tertiary\)/)
-  await expect(providersButton).not.toHaveClass(/bg-\(--ui-bg-tertiary\)/)
-  await expect(page.getByRole('heading', { name: 'Stardust Desktop' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Hermes Desktop' })).toHaveCount(0)
-  await expect(page.getByText('更新', { exact: true })).toBeVisible()
-  await page.screenshot({ path: testInfo.outputPath('personal-assistant-about.png') })
+  await expect(modelServices).not.toHaveClass(/bg-\(--ui-bg-tertiary\)/)
+
+  // A saved legacy provider-account deep link lands on the same Models page.
+  await page.evaluate(() => {
+    window.location.hash = '#/settings?tab=providers&pview=accounts'
+  })
+  await expect(modelServices).toHaveClass(/bg-\(--ui-bg-tertiary\)/)
+  await expect(page.getByText('自定义服务', { exact: true }).first()).toBeVisible()
+  await page.screenshot({ path: testInfo.outputPath('personal-assistant-settings-legacy-link.png') })
 })

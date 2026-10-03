@@ -371,7 +371,7 @@ export const ar = defineLocale({
     exportFailed: 'فشل التصدير',
     resetFailed: 'فشلت إعادة الضبط',
     nav: {
-      providers: 'المزودون',
+      providers: 'خدمات النماذج',
       providerAccounts: 'الحسابات',
       providerApiKeys: 'مفاتيح API',
       gateway: 'البوابة',
@@ -2429,7 +2429,9 @@ export const ar = defineLocale({
   },
   onboarding: {
     headerTitle: 'لنُعِدّ لك Stardust Agent',
-    headerDesc: 'اربط مزوّد نماذج لبدء المحادثة. معظم الخيارات تتطلب نقرة واحدة.',
+    headerDesc: 'اربط واجهة API لنموذجك مباشرةً، أو أضفها لاحقًا من الإعدادات.',
+    setupRelay: 'إضافة واجهة API للنموذج',
+    setupRelayHint: 'أدخل عنوان URL الأساسي لواجهة API ومفتاح API والنموذج.',
     preparingInstall: 'يُكمل Stardust التثبيت. عادة ما يستغرق ذلك أقل من دقيقة في أول تشغيل.',
     starting: 'جار بدء Stardust...',
     lookingUpProviders: 'جار البحث عن المزوّدين...',
@@ -2858,7 +2860,7 @@ export const ar = defineLocale({
       errorSwitchProvider: 'تبديل المزوّد',
       errorSignInAgain: provider => `تسجيل الدخول إلى ${provider} مجدداً`,
       errorOauthExpired: provider =>
-        `انتهت صلاحية تسجيل دخولك إلى ${provider} أو تم إلغاؤه. سجّل الدخول مجدداً لمتابعة المحادثة.`,
+        `انتهت صلاحية تسجيل دخولك إلى ${provider} أو تم إلغاؤه. شغّل hermes model في الطرفية واختر ${provider} لتسجيل الدخول مجددًا، أو انتقل إلى واجهة API لنموذج من «الإعدادات ← خدمات النماذج».`,
       errorOpenLogs: 'فتح السجلات',
       errorOpenLogsFailed: 'تعذّر فتح مجلد السجلات',
       errorOpenDesktopLogs: 'فتح سجلات سطح المكتب',

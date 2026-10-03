@@ -9,58 +9,33 @@ import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { getGlobalModelOptions } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { Check, ChevronDown, ChevronLeft, KeyRound, Loader2 } from '@/lib/icons'
+import { Check, ChevronLeft, KeyRound, Loader2 } from '@/lib/icons'
 import { isSubmitEnter } from '@/lib/ime'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { cn } from '@/lib/utils'
 import { $desktopBoot, type DesktopBootState } from '@/store/boot'
 import { FREE_TIER_MODEL } from '@/store/free-tier'
+import { requestGatewayForProfile } from '@/store/gateway'
 import { $introReveal, shouldPlayFirstRunIntro } from '@/store/intro-reveal'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import {
   $desktopOnboarding,
   ackFreeTierIntro,
   clearFreeTierIntro,
-  clearPendingProviderOAuth,
   closeManualOnboarding,
   confirmOnboardingModel,
   DEFAULT_MANUAL_ONBOARDING_REASON,
   DEFAULT_ONBOARDING_REASON,
   dismissFirstRunOnboarding,
   type OnboardingContext,
-  peekPendingProviderOAuth,
   refreshOnboarding,
   saveOnboardingApiKey,
-  setOnboardingMode,
-  startManualOnboarding,
-  startProviderOAuth
 } from '@/store/onboarding'
 import { $onboardingSurfaces, onboardingSurfaceActive } from '@/store/onboarding-presence'
-import type { OAuthProvider } from '@/types/hermes'
 
-import { DocsLink, FlowPanel, Status } from './flow'
+import { DocsLink, FlowPanel } from './flow'
 import { DecodedLabel } from './glyph'
-import {
-  FeaturedProviderRow,
-  FireworksProviderRow,
-  LocalModelsProviderRow,
-  OpenRouterProviderRow,
-  ProviderRow,
-  sortProviders
-} from './providers'
-
-export {
-  FeaturedProviderRow,
-  FireworksProviderRow,
-  KeyProviderRow,
-  LocalModelsProviderRow,
-  OpenRouterProviderRow,
-  ProviderRow,
-  providerTitle,
-  sortProviders
-} from './providers'
-
-import { requestGatewayForProfile } from '@/store/gateway'
+import { LocalModelsProviderRow } from './providers'
 
 interface DesktopOnboardingOverlayProps {
   enabled: boolean
@@ -281,36 +256,6 @@ export function DesktopOnboardingOverlay({
     }
   }, [ctx, enabled, onboarding.requested])
 
-  // When the Providers settings page asked to connect a specific provider, the
-  // store stashed its id. Once the provider list has loaded and we're back at
-  // an idle picker, launch that exact OAuth flow so the user lands directly in
-  // sign-in instead of the picker they just came from.
-  useEffect(() => {
-    if (!onboarding.manual || onboarding.providers === null || onboarding.flow.status !== 'idle') {
-      return
-    }
-
-    const pendingId = peekPendingProviderOAuth()
-
-    if (!pendingId) {
-      return
-    }
-
-    const provider = onboarding.providers.find(p => p.id === pendingId)
-
-    if (provider) {
-      // Only clear once we've committed to launching it, so a failed/empty
-      // provider fetch doesn't silently drop the hand-off.
-      clearPendingProviderOAuth()
-      void startProviderOAuth(provider, ctx)
-    } else if (onboarding.providers.length > 0) {
-      // The list loaded but the id isn't a real provider — drop the stale
-      // hand-off. An empty list means the fetch isn't ready yet, so keep it
-      // and let a later refresh retry.
-      clearPendingProviderOAuth()
-    }
-  }, [ctx, onboarding.flow.status, onboarding.manual, onboarding.providers])
-
   if (
     !onboarding.manual &&
     (introReveal.phase !== 'hidden' || onboardingSurfaceActive() || shouldPlayFirstRunIntro(onboarding.firstRunSkipped))
@@ -328,8 +273,7 @@ export function DesktopOnboardingOverlay({
   }
 
   // The user chose "I'll choose a provider later" on first run. Stay out of the
-  // way on every subsequent launch — they re-enter via Settings → Providers
-  // (manual mode), which sets manual=true and bypasses this gate.
+  // way on every subsequent launch; model APIs are added later from Settings → Models.
   if (onboarding.firstRunSkipped && !onboarding.manual && !onboarding.freeTierReady) {
     return null
   }
@@ -424,8 +368,8 @@ export function DesktopOnboardingOverlay({
  * The one-time free-tier welcome, shown when the free tier is what serves this
  * user. Bare and centered like the model-confirm screen it stands in for: this
  * IS their "you're in" moment, so it names the route, its model and its price,
- * and offers the two ways out of it (a real account, or a provider of their
- * own) without making either the default.
+ * and lets the user continue with the free tier or jump to their own model API
+ * without reviving the retired provider-account picker.
  */
 function FreeTierReadyPanel({
   leaving,
@@ -469,12 +413,16 @@ function FreeTierReadyPanel({
           {copy.begin}
         </Button>
         <Button
-          onClick={() => void onDismiss(() => startManualOnboarding(null))}
+          onClick={() =>
+            void onDismiss(() => {
+              window.location.hash = '#/settings?tab=config%3Amodel'
+            })
+          }
           size="xs"
           type="button"
           variant="text"
         >
-          {copy.otherProviders}
+          {t.onboarding.setupRelay}
         </Button>
       </div>
     </div>
@@ -529,40 +477,20 @@ function Header() {
   )
 }
 
-export const FEATURED_ID = 'nous'
-
 export function Picker({ ctx }: { ctx: OnboardingContext }) {
   const { t } = useI18n()
-  const { localEndpoint, manual, mode, providers } = useStore($desktopOnboarding)
-  const [showAll, setShowAll] = useState(false)
-  // Which key-form option to preselect when we flip to 'apikey' mode. The
-  // OpenRouter row selects its key; the generic link lands on the first option.
-  const [apiKeyInitialEnv, setApiKeyInitialEnv] = useState<string | undefined>(undefined)
-
-  const openKeyForm = (envKey?: string) => {
-    setApiKeyInitialEnv(envKey)
-    setOnboardingMode('apikey')
-  }
-
-  const ordered = useMemo(
-    () => (providers ? sortProviders(providers).filter(provider => provider.id !== FEATURED_ID) : []),
-    [providers]
-  )
-
-  const hasOauth = ordered.length > 0
+  const { localEndpoint, manual, mode } = useStore($desktopOnboarding)
   const apiKeyOptions = useApiKeyCatalog()
 
-  // localEndpoint forces the key form regardless of `mode` (which a manual
-  // provider refresh may flip back to 'oauth'); it preselects the local option
-  // and hides the "back to sign in" link since the user came specifically to
-  // configure a custom endpoint.
+  // Compatibility only: old flows can still land on the direct-key form, but
+  // the normal Desktop setup path no longer exposes provider/account catalogs.
   if (localEndpoint || mode === 'apikey') {
     return (
       <div className="grid gap-3">
         <ApiKeyForm
-          canGoBack={hasOauth && !localEndpoint}
-          initialEnvKey={localEndpoint ? 'OPENAI_BASE_URL' : apiKeyInitialEnv}
-          onBack={() => setOnboardingMode('oauth')}
+          canGoBack={false}
+          initialEnvKey={localEndpoint ? 'OPENAI_BASE_URL' : undefined}
+          onBack={() => undefined}
           onSave={(envKey, value, name, apiKey) => saveOnboardingApiKey(envKey, value, name, ctx, apiKey)}
           options={apiKeyOptions}
         />
@@ -575,15 +503,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
     )
   }
 
-  const select = (p: OAuthProvider) => void startProviderOAuth(p, ctx)
-
-  const featured = ordered.find(p => p.id === FEATURED_ID) ?? null
-  const rest = featured ? ordered.filter(p => p.id !== FEATURED_ID) : ordered
-
-  // The model settings page owns custom endpoint validation, model discovery,
-  // activation and persistence. Leave onboarding before navigating so the
-  // first-run overlay cannot cover that page or reappear on the next launch.
-  const openRelaySetup = () => {
+  const openModelServices = () => {
     if (manual) {
       closeManualOnboarding()
     } else {
@@ -593,74 +513,22 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
     window.location.hash = '#/settings?tab=config%3Amodel'
   }
 
-  // "Run models locally" leaves the picker for Settings -> Providers ->
-  // Local Models, where install/download live. First-run: persist the skip
-  // (same contract as ChooseLaterLink) so the blocking overlay never
-  // re-nags; manual mode just closes. window.location keeps this picker
-  // router-independent (it renders outside the route tree on first run).
-  const openLocalModels = () => {
-    if (manual) {
-      closeManualOnboarding()
-    } else {
-      dismissFirstRunOnboarding()
-    }
-
-    window.location.hash = '#/settings?tab=providers&pview=local'
-  }
-
   return (
     <div className="grid gap-2">
-      <Button onClick={openRelaySetup} type="button">
+      <Button onClick={openModelServices} type="button">
         {t.onboarding.setupRelay}
       </Button>
       <p className="text-xs text-muted-foreground">{t.onboarding.setupRelayHint}</p>
-      <Button
-        aria-expanded={showAll}
-        className="self-start font-medium"
-        onClick={() => setShowAll(value => !value)}
-        size="xs"
-        type="button"
-        variant="text"
-      >
-        {showAll ? t.onboarding.collapse : t.onboarding.advancedProviders}
-        <ChevronDown className={cn('size-3.5 transition', showAll && 'rotate-180')} />
-      </Button>
-      {showAll ? (
-        <div className="grid max-h-[60dvh] gap-2 overflow-y-auto p-1">
-          {providers === null ? <Status>{t.onboarding.lookingUpProviders}</Status> : null}
-          {featured ? <FeaturedProviderRow onSelect={select} provider={featured} /> : null}
-          {/* The no-account path: everything runs on this machine. Shipped
-            behind the --local launch flag. (Fireworks moved into the
-            expanded list on main.) */}
-          {$localModelsEnabled.get() ? <LocalModelsProviderRow onClick={openLocalModels} /> : null}
-
-          {/* Fireworks leads the expanded list, matching CANONICAL_PROVIDERS
-                (Nous → Fireworks), but stays hidden until the user opens it. */}
-          <FireworksProviderRow onClick={() => openKeyForm('FIREWORKS_API_KEY')} />
-          {rest.map(p => (
-            <ProviderRow key={p.id} onSelect={select} provider={p} />
-          ))}
-          <OpenRouterProviderRow onClick={() => openKeyForm('OPENROUTER_API_KEY')} />
-        </div>
-      ) : null}
+      {$localModelsEnabled.get() ? <LocalModelsProviderRow onClick={openModelServices} /> : null}
       <div className="flex items-center justify-between gap-3 pt-1">
-        {/* First run only: let the user defer the choice and land in the app.
-            In manual mode the overlay already has a close affordance, so the
-            "choose later" escape would be redundant — hide it. */}
         {manual ? <span /> : <ChooseLaterLink />}
-        {showAll ? (
-          <Button className="-mr-2 font-medium" onClick={() => openKeyForm()} size="xs" type="button" variant="text">
-            {t.onboarding.haveApiKey}
-          </Button>
-        ) : null}
       </div>
     </div>
   )
 }
 
 // "I'll choose a provider later" — dismisses the first-run picker and persists
-// the skip so it never re-nags. The user connects a provider any time from
-// Settings → Providers. Rendered only on the unconfigured first-run flow.
+// the skip so it never re-nags. Model APIs can be added later from Settings → Models.
 function ChooseLaterLink() {
   const { t } = useI18n()
 
@@ -671,11 +539,8 @@ function ChooseLaterLink() {
   )
 }
 
-// Presentational two-column key picker. Onboarding feeds it its curated
-// options + a ctx-bound save; the Providers settings page feeds it the full
-// provider catalog + a setEnvVar-backed save (plus `isSet`/`onClear` so it can
-// double as a manage surface). Keep it free of store/ctx coupling so both
-// surfaces render the identical form.
+// Legacy compatibility key picker. New Desktop setup uses CustomEndpointsSettings;
+// this remains only for old onboarding states that still enter api-key/local-endpoint mode.
 export function ApiKeyForm({
   canGoBack,
   initialEnvKey,

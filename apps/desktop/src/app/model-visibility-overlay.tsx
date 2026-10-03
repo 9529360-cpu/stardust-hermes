@@ -7,14 +7,14 @@ import { $activeSessionId, $gatewayState } from '@/store/session'
 
 interface ModelVisibilityOverlayProps {
   gateway?: HermesGateway
-  onOpenProviders: () => void
+  onAddModelApi: () => void
   ownerConnectionId?: string
   profile: string
 }
 
 export function ModelVisibilityOverlay({
   gateway,
-  onOpenProviders,
+  onAddModelApi,
   ownerConnectionId,
   profile
 }: ModelVisibilityOverlayProps) {
@@ -29,8 +29,8 @@ export function ModelVisibilityOverlay({
   return (
     <ModelVisibilityDialog
       gw={gateway}
+      onAddModelApi={onAddModelApi}
       onOpenChange={setModelVisibilityOpen}
-      onOpenProviders={onOpenProviders}
       open={open}
       ownerConnectionId={ownerConnectionId}
       profile={profile}

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
-import { SETTINGS_ROUTE } from '@/app/routes'
+import { SKILLS_ROUTE } from '@/app/routes'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -195,9 +195,14 @@ export function PetGenerateContent() {
   const headerTitle =
     status === 'hatching' ? copy.spawning : status === 'preview' || status === 'adopting' ? copy.hatched : copy.title
 
-  // Send the user to set up a key without closing — the overlay yields to the
-  // settings route (useRouteOverlayActive) and reappears + re-checks on return.
-  const setupImageGen = () => navigate(`${SETTINGS_ROUTE}?tab=providers`)
+  // Image backends are configured on the Image generation toolset — the same
+  // panel as `hermes tools` → Image Generation. That page is a workspace view,
+  // not a route overlay this dialog yields to, so close first; nothing is lost
+  // while no backend is available.
+  const setupImageGen = () => {
+    closePetGenerate()
+    navigate(`${SKILLS_ROUTE}?tab=toolsets&toolset=image_gen`)
+  }
 
   // Prompt input only belongs on the describe/draft screens (and never when
   // there's no backend to generate with).

@@ -29,8 +29,8 @@ import { $collapsedProviders, toggleCollapsedProvider } from '@/store/provider-c
 
 interface ModelVisibilityDialogProps {
   gw?: HermesGateway
+  onAddModelApi: () => void
   onOpenChange: (open: boolean) => void
-  onOpenProviders: () => void
   open: boolean
   ownerConnectionId?: string
   profile?: string
@@ -39,8 +39,8 @@ interface ModelVisibilityDialogProps {
 
 export function ModelVisibilityDialog({
   gw,
+  onAddModelApi,
   onOpenChange,
-  onOpenProviders,
   open,
   ownerConnectionId,
   profile = 'default',
@@ -175,13 +175,13 @@ export function ModelVisibilityDialog({
             className="-ml-2 text-(--ui-text-tertiary)"
             onClick={() => {
               onOpenChange(false)
-              onOpenProviders()
+              onAddModelApi()
             }}
             size="xs"
             type="button"
             variant="text"
           >
-            {copy.addProvider}
+            {t.onboarding.setupRelay}
           </Button>
         </div>
       </DialogContent>

@@ -1,8 +1,9 @@
-"""Unified provider catalog — one source of truth for the provider universe.
+"""Unified runtime/CLI provider catalog.
 
-The provider list shown by ``hermes model`` (CLI/TUI) and the desktop Settings → Providers tabs
-(Accounts + API keys) **must be the same set**; providers added after those lists were written
-silently went missing from the GUI. ``auth_type`` / ``api_key_env_vars`` / ``base_url_env_var``
+The catalog remains the compatibility source for CLI/TUI model setup, existing profiles, and
+runtime credential resolution. Stardust Desktop no longer mirrors this provider universe as an
+account picker; its setup surface is the direct model API editor (base URL + key + model).
+``auth_type`` / ``api_key_env_vars`` / ``base_url_env_var``
 come from :data:`hermes_cli.auth.PROVIDER_REGISTRY` (credential truth); ``display_name`` /
 ``description`` / ``signup_url`` from the provider's :class:`providers.base.ProviderProfile`, falling
 back to the ``CANONICAL_PROVIDERS`` entry's ``label`` / ``tui_desc`` and the ``OPTIONAL_ENV_VARS``

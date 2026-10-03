@@ -3771,9 +3771,9 @@ export const zh = defineLocale({
 
   onboarding: {
     headerTitle: '开始设置 Stardust',
-    headerDesc: '先连接你自己的模型中转服务；也可以稍后在设置中完成。',
-    setupRelay: '配置模型中转接口',
-    setupRelayHint: '前往模型设置，填写接口地址、密钥并选择模型。',
+    headerDesc: '直接连接你自己的模型 API；也可以稍后在设置中添加。',
+    setupRelay: '添加模型 API',
+    setupRelayHint: '填写 API 地址、API Key 和模型即可。',
     advancedProviders: '高级选项：官方账号和其他提供方',
     preparingInstall: 'Stardust 正在完成安装。首次运行通常不到一分钟。',
     starting: '正在启动 Stardust…',
@@ -4327,7 +4327,8 @@ export const zh = defineLocale({
       errorStartNewSession: '开始新会话',
       errorSwitchProvider: '切换服务商',
       errorSignInAgain: provider => `重新登录 ${provider}`,
-      errorOauthExpired: provider => `您的 ${provider} 登录已过期或被撤销。请重新登录以继续对话。`,
+      errorOauthExpired: provider =>
+        `您的 ${provider} 登录已过期或被撤销。请在终端运行 hermes model，选择 ${provider} 重新登录；或在“设置 → 模型服务”中改用模型 API。`,
       errorOpenLogs: '打开日志',
       errorOpenLogsFailed: '无法打开日志文件夹',
       errorOpenDesktopLogs: '打开桌面端日志',

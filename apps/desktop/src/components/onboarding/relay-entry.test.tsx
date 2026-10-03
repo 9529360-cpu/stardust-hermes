@@ -6,7 +6,7 @@ import { I18nProvider } from '@/i18n'
 
 const dismiss = vi.fn()
 const closeManual = vi.fn()
-const onboarding = atom({ localEndpoint: false, manual: false, mode: 'oauth', providers: null })
+const onboarding = atom({ localEndpoint: false, manual: false, mode: 'oauth', providers: null as unknown })
 
 vi.mock('@/store/onboarding', () => ({
   $desktopOnboarding: onboarding,
@@ -22,8 +22,8 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('first-run relay entry', () => {
-  it('offers relay setup before providers load and navigates to the existing model settings', async () => {
+describe('first-run model API entry', () => {
+  it('offers direct model API setup before provider inventory loads', async () => {
     const { Picker } = await import('./index')
 
     render(
@@ -32,16 +32,23 @@ describe('first-run relay entry', () => {
       </I18nProvider>
     )
 
-    expect(screen.getByRole('button', { name: '配置模型中转接口' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '添加模型 API' })).toBeTruthy()
     expect(screen.queryByText('Fireworks AI')).toBeNull()
-    expect(screen.getByRole('button', { name: /高级选项/ }).getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: /高级选项/ })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: '配置模型中转接口' }))
+    fireEvent.click(screen.getByRole('button', { name: '添加模型 API' }))
     expect(dismiss).toHaveBeenCalledOnce()
     expect(window.location.hash).toBe('#/settings?tab=config%3Amodel')
   })
 
-  it('keeps legacy provider choices available only on explicit expansion', async () => {
+  it('does not expose legacy provider choices even when provider inventory already exists', async () => {
+    onboarding.set({
+      localEndpoint: false,
+      manual: false,
+      mode: 'oauth',
+      providers: [{ id: 'anthropic', name: 'Anthropic Claude' }]
+    })
+
     const { Picker } = await import('./index')
 
     render(
@@ -50,8 +57,9 @@ describe('first-run relay entry', () => {
       </I18nProvider>
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /高级选项/ }))
-    expect(screen.getByText('Fireworks AI')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '收起' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: '添加模型 API' })).toBeTruthy()
+    expect(screen.queryByText('Anthropic Claude')).toBeNull()
+    expect(screen.queryByText('Fireworks AI')).toBeNull()
+    expect(screen.queryByRole('button', { name: /高级选项/ })).toBeNull()
   })
 })

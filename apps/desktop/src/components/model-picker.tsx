@@ -15,7 +15,6 @@ import type { LocalModelLoadProgress } from '@/types/hermes'
 
 import type { HermesGateway } from '../hermes'
 import { cn } from '../lib/utils'
-import { startManualOnboarding } from '../store/onboarding'
 
 import { InlineNotice } from './notifications'
 import { Button } from './ui/button'
@@ -167,13 +166,11 @@ export function ModelPickerDialog({
     onOpenChange(false)
   }
 
-  // Open the full onboarding provider selector to add/switch a provider.
-  // Reuses the entire onboarding flow (OAuth rows, API-key form, device-code,
-  // model-confirm) instead of duplicating provider UI here. Closes the picker
-  // so the onboarding overlay isn't rendered underneath it.
+  // Provider account catalogs are no longer a Desktop setup surface. Adding a
+  // service always lands on the direct endpoint editor (URL + key + model).
   const addProvider = () => {
-    startManualOnboarding()
     onOpenChange(false)
+    window.location.hash = '#/settings?tab=config%3Amodel'
   }
 
   return (
@@ -210,7 +207,7 @@ export function ModelPickerDialog({
 
         <DialogFooter className="flex-row items-center justify-end gap-2 bg-card p-3">
           <Button onClick={addProvider} variant="ghost">
-            {copy.addProvider}
+            {t.onboarding.setupRelay}
           </Button>
           <Button onClick={() => onOpenChange(false)} variant="outline">
             {t.common.cancel}
@@ -277,8 +274,7 @@ function ModelResults({
   }
 
   // Only configured providers (those with curated models) are selectable
-  // here. Switching to a NOT-yet-configured provider goes through the
-  // "Add provider" footer button, which opens the full onboarding selector.
+  // here. New services are added through the direct model API editor.
   // The local provider sits behind the --local launch flag (strict: staged
   // models on disk don't show without it). Module-level read — a launch flag
   // can't change mid-session.

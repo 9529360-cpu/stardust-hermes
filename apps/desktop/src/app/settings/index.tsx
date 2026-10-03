@@ -47,14 +47,12 @@ import { KeybindSettings } from './keybind-settings'
 import { KEYS_VIEWS, KeysSettings, type KeysView } from './keys-settings'
 import { movedSettingsTabRedirect } from './moved-tabs'
 import { NotificationsSettings } from './notifications-settings'
-import { PROVIDER_VIEWS, ProvidersSettings, type ProviderView } from './providers-settings'
 import { SessionsSettings } from './sessions-settings'
 import type { SettingsPageProps, SettingsView as SettingsViewId } from './types'
 import { vaultOwnerKey, VaultSettings } from './vault-settings'
 
 const SETTINGS_VIEWS: readonly SettingsViewId[] = [
   ...SECTIONS.map(s => `config:${s.id}` as SettingsViewId),
-  'providers',
   'gateway',
   // Legacy alias: the Connections page merged into Gateways. Kept in the enum
   // so saved `?tab=connections` deep links still resolve (redirected below).
@@ -63,7 +61,6 @@ const SETTINGS_VIEWS: readonly SettingsViewId[] = [
   'keys',
   'vault',
   'notifications',
-  'billing',
   'sessions',
   'about'
 ]
@@ -95,9 +92,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       setActiveView('gateway')
     }
   }, [activeView, setActiveView])
-  // Providers subnav (Accounts vs API keys) lives in its own param so each
-  // sub-view is deep-linkable and survives a refresh.
-  const [providerView, setProviderView] = useRouteEnumParam<ProviderView>('pview', PROVIDER_VIEWS, 'accounts')
   const [keysView] = useRouteEnumParam<KeysView>('kview', KEYS_VIEWS, 'tools')
 
   // Jump to a section + its sub-view in one navigate. Two sequential setters
@@ -163,9 +157,8 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   const navGroups: OverlayNavGroup[] = useMemo(
     () => [
       ...SECTIONS.flatMap(s => {
-        // Model connection surfaces are grouped below as one user-facing
-        // "Model services" area instead of exposing the backend split between
-        // model selection, provider sign-in, API keys, and custom endpoints.
+        // Model setup is one user-facing "Model services" area. Legacy provider
+        // account/key routes redirect here instead of remaining separate settings.
         if (s.id === 'model') {
           return []
         }
@@ -205,11 +198,9 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onSelect: () => setActiveView('notifications')
       },
       {
-        // DSH-style information architecture: users get one Models entry.
-        // Account/API-key/custom endpoint pages stay reachable from the model
-        // page as advanced/detail flows and legacy deep links, but they no
-        // longer compete as top-level choices.
-        active: activeView === 'config:model' || activeView === 'providers',
+        // Users get one Models entry. Direct API services are the setup surface;
+        // retired account/key deep links are normalized here by moved-tabs.
+        active: activeView === 'config:model',
         gapBefore: true,
         icon: Zap,
         id: 'model-services',
@@ -372,15 +363,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         importInputRef={importInputRef}
         onConfigSaved={onConfigSaved}
         onMainModelChanged={onMainModelChanged}
-      />
-    ) : activeView === 'providers' || activeView === 'billing' ? (
-      <ProvidersSettings
-        key={scopeProfile}
-        onClose={onClose}
-        onConfigSaved={onConfigSaved}
-        onMainModelChanged={onMainModelChanged}
-        onViewChange={setProviderView}
-        view={providerView}
       />
     ) : activeView === 'keys' ? (
       <KeysSettings view={keysView} />

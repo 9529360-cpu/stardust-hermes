@@ -3508,10 +3508,10 @@ export const en: Translations = {
 
   onboarding: {
     headerTitle: "Let's get you setup with Stardust Agent",
-    setupRelay: 'Set up a custom model endpoint',
-    setupRelayHint: 'Open model settings to enter your endpoint URL, key, and model.',
+    setupRelay: 'Add model API',
+    setupRelayHint: 'Enter the API base URL, API key, and model.',
     advancedProviders: 'Advanced: provider accounts and other services',
-    headerDesc: 'Connect your own model endpoint first, or finish setup later in Settings.',
+    headerDesc: 'Connect your own model API directly, or add one later in Settings.',
     preparingInstall: 'Stardust is finishing install. This usually takes under a minute on first run.',
     starting: 'Starting Stardust…',
     lookingUpProviders: 'Looking up providers...',
@@ -4210,7 +4210,7 @@ export const en: Translations = {
       errorUpdateApiKey: 'Update API key',
       errorSignInAgain: provider => `Sign in to ${provider} again`,
       errorOauthExpired: provider =>
-        `Your ${provider} sign-in has expired or was revoked. Sign in again to keep chatting.`,
+        `Your ${provider} sign-in has expired or was revoked. Run hermes model in a terminal and choose ${provider} to sign in again, or switch to a model API in Settings → Model services.`,
       errorOpenLogs: 'Open logs',
       errorOpenLogsFailed: 'Could not open the logs folder',
       errorOpenDesktopLogs: 'Open Desktop logs',

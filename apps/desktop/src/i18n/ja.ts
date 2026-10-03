@@ -313,7 +313,7 @@ export const ja = defineLocale({
     exportFailed: '書き出しに失敗しました',
     resetFailed: 'リセットに失敗しました',
     nav: {
-      providers: 'プロバイダー',
+      providers: 'モデルサービス',
       providerAccounts: 'アカウント',
       providerApiKeys: 'API キー',
       providerCustomEndpoints: 'カスタムエンドポイント',
@@ -2825,7 +2825,9 @@ export const ja = defineLocale({
 
   onboarding: {
     headerTitle: 'Stardust Agent のセットアップをしましょう',
-    headerDesc: 'チャットを始めるにはモデルプロバイダーを接続してください。ほとんどのオプションはワンクリックです。',
+    headerDesc: 'モデル API を直接接続するか、あとで設定から追加できます。',
+    setupRelay: 'モデル API を追加',
+    setupRelayHint: 'API のベース URL、API キー、モデルを入力します。',
     preparingInstall: 'Stardust はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
     starting: 'Stardust を起動中…',
     lookingUpProviders: 'プロバイダーを検索中...',
@@ -3313,7 +3315,7 @@ export const ja = defineLocale({
       errorSwitchProvider: 'プロバイダーを切り替え',
       errorSignInAgain: provider => `${provider} に再度サインイン`,
       errorOauthExpired: provider =>
-        `${provider} のサインインが期限切れか取り消されました。続けるには再度サインインしてください。`,
+        `${provider} のサインインが期限切れか取り消されました。ターミナルで hermes model を実行して ${provider} を選び、再度サインインするか、「設定 → モデルサービス」でモデル API に切り替えてください。`,
       errorOpenLogs: 'ログを開く',
       errorOpenLogsFailed: 'ログフォルダを開けませんでした',
       errorOpenDesktopLogs: 'デスクトップのログを開く',

@@ -10,8 +10,8 @@ const MOVED_TO_CAPABILITIES: Record<string, string> = { mcp: 'server', plugins: 
 export function movedSettingsTabRedirect(search: string): null | string {
   const params = new URLSearchParams(search)
   const tab = params.get('tab')
-  if (tab === 'billing') {
-    return `${SETTINGS_ROUTE}?tab=providers&pview=keys`
+  if (tab === 'billing' || tab === 'providers') {
+    return `${SETTINGS_ROUTE}?tab=config%3Amodel`
   }
 
   const rowParam = tab ? MOVED_TO_CAPABILITIES[tab] : undefined
