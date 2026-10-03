@@ -133,7 +133,7 @@ def test_approval_decline_prevents_secret_and_model_writes(monkeypatch):
             provider="gemini",
             model="gemini-test-model",
             api_key="AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ123456",
-            user_message="帮我配置 Gemini API 并启用这个模型",
+            user_message="API key 是 AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ123456，帮我配置 Gemini API 并启用这个模型",
         )
     )
 
@@ -157,7 +157,7 @@ def test_current_message_api_key_uses_credential_lifecycle_then_canonical_switch
         provider="google",
         model="gemini-test-model",
         api_key=secret,
-        user_message="这是我的 Gemini API key，请帮我配置并执行",
+        user_message=f"这是我的 Gemini API key：{secret}，请帮我配置并执行",
     )
     result = _payload(raw)
 
@@ -209,7 +209,7 @@ def test_failed_model_validation_reports_partial_secret_write_without_echo(monke
         provider="gemini",
         model="mistyped-model",
         api_key=secret,
-        user_message="帮我配置这个 Gemini API",
+        user_message=f"帮我配置这个 Gemini API，key 是 {secret}",
     )
     result = _payload(raw)
 
@@ -238,7 +238,7 @@ def test_custom_endpoint_routes_through_direct_endpoint_path(monkeypatch):
             base_url="https://relay.example/v1",
             model="relay-model",
             api_key="sk-relay-ABCDEFGHIJKLMN123456",
-            user_message="把这个模型 API 配好并启用",
+            user_message="把这个模型 API 配好并启用，key 是 sk-relay-ABCDEFGHIJKLMN123456",
         )
     )
 
@@ -341,7 +341,7 @@ def test_oauth_provider_rejects_pasted_api_key_before_any_write(monkeypatch):
             provider="openai-codex",
             model="gpt-test",
             api_key="sk-proj-ABCDEFGHIJKLMN123456",
-            user_message="把这个 key 配到 Codex",
+            user_message="把这个 key sk-proj-ABCDEFGHIJKLMN123456 配到 Codex",
         )
     )
 
