@@ -157,9 +157,8 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   const navGroups: OverlayNavGroup[] = useMemo(
     () => [
       ...SECTIONS.flatMap(s => {
-        // Model connection surfaces are grouped below as one user-facing
-        // "Model services" area instead of exposing the backend split between
-        // model selection, provider sign-in, API keys, and custom endpoints.
+        // Model setup is one user-facing "Model services" area. Legacy provider
+        // account/key routes redirect here instead of remaining separate settings.
         if (s.id === 'model') {
           return []
         }
@@ -199,10 +198,8 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onSelect: () => setActiveView('notifications')
       },
       {
-        // DSH-style information architecture: users get one Models entry.
-        // Account/API-key/custom endpoint pages stay reachable from the model
-        // page as advanced/detail flows and legacy deep links, but they no
-        // longer compete as top-level choices.
+        // Users get one Models entry. Direct API services are the setup surface;
+        // retired account/key deep links are normalized here by moved-tabs.
         active: activeView === 'config:model',
         gapBefore: true,
         icon: Zap,
