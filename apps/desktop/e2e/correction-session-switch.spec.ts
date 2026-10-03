@@ -117,7 +117,7 @@ async function transcriptMessageOrder(page: Page): Promise<string[]> {
  * for the old text to disappear from the page (it never will).
  */
 async function openFreshDraft(page: Page, priorSessionText: string): Promise<void> {
-  await page.locator('[data-slot="sidebar"] button').filter({ hasText: /New session|新建会话/ }).first().click()
+  await page.locator('[data-tour="sidebar-nav-new-session"]').click()
   await page.waitForFunction(
     ([priorText, surfaceSelector]: [string, string]) => {
       const surfaces = document.querySelectorAll(surfaceSelector)
