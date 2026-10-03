@@ -1928,6 +1928,61 @@ class TestWebServerEndpoints:
         assert not any(e["id"] == "worker-proxy" for e in default_list["endpoints"])
 
 
+    def test_custom_endpoint_backend_rejects_non_http_and_embedded_credentials(self):
+        """Renderer validation is not the security boundary; direct REST writes must match it."""
+        for base_url in ("file://host/etc/passwd", "ftp://relay.example/v1", "https://user:pass@relay.example/v1"):
+            resp = self.client.post(
+                "/api/providers/custom-endpoints",
+                json={"id": "bad", "name": "Bad", "base_url": base_url, "model": "m"},
+            )
+            assert resp.status_code == 400, (base_url, resp.text)
+
+    def test_custom_endpoint_validate_reuses_saved_key_when_edit_keeps_it_blank(self, monkeypatch):
+        """Editing an existing relay with a blank key must test with that profile's saved key."""
+        import hermes_cli.web_routers.config_env as mod
+
+        saved = self.client.post(
+            "/api/providers/custom-endpoints",
+            json={
+                "id": "proxy", "name": "Proxy", "base_url": "https://llm.example.com/v1",
+                "model": "m", "api_key": "sk-existing-secret",
+            },
+        )
+        assert saved.status_code == 200
+        seen = {}
+
+        class _Resp:
+            status_code = 200
+            is_success = True
+
+            def json(self):
+                return {"data": [{"id": "m"}]}
+
+        class _Client:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+            async def get(self, url, headers=None, **_kwargs):
+                seen["url"] = url
+                seen["headers"] = dict(headers or {})
+                return _Resp()
+
+        monkeypatch.setattr(mod, "_endpoint_probe_client", lambda _url, _timeout: _Client())
+        response = self.client.post(
+            "/api/providers/custom-endpoints/validate",
+            json={
+                "id": "proxy", "name": "Proxy", "base_url": "https://llm.example.com/v1",
+                "model": "m"
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        assert response.json()["ok"] is True
+        assert seen["url"] == "https://llm.example.com/v1/models"
+        assert seen["headers"]["Authorization"] == "Bearer sk-existing-secret"
     def test_custom_endpoint_save_keeps_the_api_key_out_of_config(self):
         """The key belongs in .env behind key_env, never in config.yaml (#69449)."""
         from hermes_cli.config import custom_endpoint_key_env, get_env_value, load_config

@@ -435,19 +435,35 @@ def _detach_main_model_from_provider(cfg: Dict[str, Any], provider_key: str) -> 
     cfg["model"] = model_cfg
 
 
+def _validated_custom_endpoint_base_url(raw: str) -> str:
+    """Canonical backend boundary for user-entered model-service URLs.
+
+    The renderer validates too, but REST is authoritative.  Only HTTP(S) model
+    endpoints are meaningful here; URL userinfo is rejected so credentials
+    cannot be smuggled into config.yaml, logs, or error text via base_url.
+    """
+    base_url = (raw or "").strip().rstrip("/")
+    if not base_url:
+        raise HTTPException(status_code=400, detail="base_url required")
+    try:
+        parsed = urllib.parse.urlparse(base_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="base_url must be a valid http:// or https:// URL") from exc
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.hostname:
+        raise HTTPException(status_code=400, detail="base_url must be an http:// or https:// URL with a host")
+    if parsed.username is not None or parsed.password is not None:
+        raise HTTPException(status_code=400, detail="base_url must not contain embedded credentials")
+    return base_url
+
+
 def _write_custom_endpoint(cfg: Dict[str, Any], body: CustomEndpointUpdate) -> Tuple[str, Dict[str, Any]]:
     endpoint_id = _custom_endpoint_id(body.id or body.name)
     name = (body.name or "").strip()
-    base_url = (body.base_url or "").strip().rstrip("/")
+    base_url = _validated_custom_endpoint_base_url(body.base_url)
     model = (body.model or "").strip()
 
     if not name:
         raise HTTPException(status_code=400, detail="name required")
-    if not base_url:
-        raise HTTPException(status_code=400, detail="base_url required")
-    parsed = urllib.parse.urlparse(base_url)
-    if not parsed.scheme or not parsed.netloc:
-        raise HTTPException(status_code=400, detail="base_url must include scheme and host")
     if not model:
         raise HTTPException(status_code=400, detail="model required")
 
@@ -621,17 +637,45 @@ def delete_custom_endpoint(endpoint_id: str, profile: Optional[str] = None):
         return response
 
 
+def _custom_endpoint_probe_inputs(body: CustomEndpointUpdate, profile: Optional[str]) -> tuple[str, str]:
+    """Resolve a probe URL/key inside the requested profile without exposing the saved secret.
+
+    In the editor, omitted api_key means "keep the current key".  Reuse that
+    profile's stored credential for the read-only /models probe; an explicitly
+    submitted empty string remains keyless and never falls back to disk.
+    """
+    with _config_profile_scope(profile):
+        base_url = _validated_custom_endpoint_base_url(body.base_url)
+        submitted_key = body.api_key.strip() if body.api_key is not None else None
+        if submitted_key is not None:
+            return base_url, submitted_key
+        if not body.id:
+            return base_url, ""
+
+        provider_key = _custom_endpoint_id(body.id)
+        _stored, entry = find_provider_entry(load_config().get("providers"), provider_key)
+        if not isinstance(entry, dict):
+            return base_url, ""
+
+        key_env = str(entry.get("key_env") or entry.get("api_key_env") or "").strip()
+        if key_env:
+            saved = str(load_env().get(key_env) or "").strip()
+            if saved:
+                return base_url, saved
+        return base_url, str(entry.get("api_key") or "").strip()
+
+
 @router.post("/api/providers/custom-endpoints/validate")
-async def validate_custom_endpoint(body: CustomEndpointUpdate):
+async def validate_custom_endpoint(body: CustomEndpointUpdate, profile: Optional[str] = None):
     """Probe a custom endpoint by calling its OpenAI-compatible /models URL."""
-    base_url = (body.base_url or "").strip().rstrip("/")
-    if not base_url:
+    if not (body.base_url or "").strip():
         return {"ok": False, "reachable": True, "message": "Enter an endpoint URL first.", "models": []}
 
+    base_url, api_key = await asyncio.to_thread(_custom_endpoint_probe_inputs, body, profile)
     url = base_url + "/models"
     headers = {"Accept": "application/json"}
-    if body.api_key and body.api_key.strip():
-        headers["Authorization"] = f"Bearer {body.api_key.strip()}"
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     try:
         async with _endpoint_probe_client(url, 8.0) as client:

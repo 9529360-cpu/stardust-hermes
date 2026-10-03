@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
 import type { CustomEndpoint, CustomEndpointUpdate } from '@/types/hermes'
+
+import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
 import { EmptyState, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from './primitives'
 
@@ -41,7 +43,12 @@ export function isEndpointUrl(value: string): boolean {
   try {
     const url = new URL(value.trim())
 
-    return (url.protocol === 'http:' || url.protocol === 'https:') && Boolean(url.hostname)
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      Boolean(url.hostname) &&
+      !url.username &&
+      !url.password
+    )
   } catch {
     return false
   }
@@ -104,6 +111,7 @@ export function CustomEndpointsSettings({
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const probeRevision = useRef(0)
+  const profileEpoch = useRef(0)
   const [probeMessage, setProbeMessage] = useState<string | null>(null)
 
   function updateForm(update: (current: EndpointForm) => EndpointForm) {
@@ -120,19 +128,12 @@ export function CustomEndpointsSettings({
     })
   }
 
-  async function refresh() {
-    const data = await getCustomEndpoints(scopeProfile)
-    setEndpoints(data.endpoints)
-  }
-
-  useEffect(() => {
-    let cancelled = false
-
-    async function load() {
+  const loadProfile = useCallback(
+    async (epoch: number) => {
       try {
         const data = await getCustomEndpoints(scopeProfile)
 
-        if (cancelled) {
+        if (profileEpoch.current !== epoch) {
           return
         }
 
@@ -142,22 +143,65 @@ export function CustomEndpointsSettings({
         if (current) {
           setForm(formFromEndpoint(current))
           setDiscoveredModels(current.models)
+        } else {
+          setForm(EMPTY_FORM)
+          setDiscoveredModels([])
         }
       } catch (err) {
-        notifyError(err, c.loadFailed)
+        if (profileEpoch.current === epoch) {
+          notifyError(err, c.loadFailed)
+        }
       } finally {
-        if (!cancelled) {
+        if (profileEpoch.current === epoch) {
           setLoading(false)
         }
       }
-    }
+    },
+    [c.loadFailed, scopeProfile]
+  )
 
-    void load()
+  const beginProfileReload = useCallback(() => {
+    const epoch = ++profileEpoch.current
+    probeRevision.current++
+    setLoading(true)
+    setSaving(false)
+    setTesting(false)
+    setActivating(null)
+    setDeleting(null)
+    setEndpoints([])
+    setForm(EMPTY_FORM)
+    setDiscoveredModels([])
+    setAdvancedOpen(false)
+    setProbeMessage(null)
+    void loadProfile(epoch)
+  }, [loadProfile])
+
+  async function refresh() {
+    const epoch = profileEpoch.current
+    const data = await getCustomEndpoints(scopeProfile)
+
+    if (profileEpoch.current === epoch) {
+      setEndpoints(data.endpoints)
+    }
+  }
+
+  useEffect(() => {
+    beginProfileReload()
 
     return () => {
-      cancelled = true
+      profileEpoch.current++
+      probeRevision.current++
     }
-  }, [c.loadFailed, scopeProfile])
+  }, [beginProfileReload])
+
+  // A live active-profile swap does not change scopeProfile when this panel is
+  // following the foreground profile (undefined). Explicit Applies-to targets
+  // stay pinned and are reloaded by the scopeProfile effect when that target changes.
+  useOnProfileSwitch(() => {
+    if (scopeProfile === undefined) {
+      beginProfileReload()
+    }
+  })
 
   async function handleSave() {
     if (!isEndpointUrl(form.baseUrl)) {
@@ -166,9 +210,16 @@ export function CustomEndpointsSettings({
       return
     }
 
+    const epoch = profileEpoch.current
+
     try {
       setSaving(true)
       const response = await saveCustomEndpoint(toPayload(form, discoveredModels), scopeProfile)
+
+      if (profileEpoch.current !== epoch) {
+        return
+      }
+
       setEndpoints(response.endpoints)
       const saved = response.endpoints.find(endpoint => endpoint.id === response.id)
 
@@ -177,17 +228,21 @@ export function CustomEndpointsSettings({
         setDiscoveredModels(saved.models)
       }
 
-      if (saved && saved.is_current) {
-        if (!scopeProfile) {onMainModelChanged?.(saved.id, saved.model)}
+      if (saved && saved.is_current && scopeProfile === undefined) {
+        onMainModelChanged?.(saved.id, saved.model)
       }
 
       triggerHaptic('success')
       onConfigSaved?.()
       notify({ kind: 'success', message: c.saved })
     } catch (err) {
-      notifyError(err, c.saveFailed)
+      if (profileEpoch.current === epoch) {
+        notifyError(err, c.saveFailed)
+      }
     } finally {
-      setSaving(false)
+      if (profileEpoch.current === epoch) {
+        setSaving(false)
+      }
     }
   }
 
@@ -199,13 +254,14 @@ export function CustomEndpointsSettings({
     }
 
     const revision = ++probeRevision.current
+    const epoch = profileEpoch.current
 
     try {
       setTesting(true)
       setProbeMessage(null)
       const response = await validateCustomEndpoint(toPayload(form), scopeProfile)
 
-      if (revision !== probeRevision.current) {return}
+      if (revision !== probeRevision.current || profileEpoch.current !== epoch) {return}
       setDiscoveredModels(response.ok ? response.models : [])
 
       if (response.ok) {
@@ -221,25 +277,41 @@ export function CustomEndpointsSettings({
         })
       }
     } catch (err) {
-      if (revision === probeRevision.current) {notifyError(err, c.validationFailed)}
+      if (revision === probeRevision.current && profileEpoch.current === epoch) {notifyError(err, c.validationFailed)}
     } finally {
-      setTesting(false)
+      if (revision === probeRevision.current && profileEpoch.current === epoch) {setTesting(false)}
     }
   }
 
   async function handleActivate(endpoint: CustomEndpoint) {
+    const epoch = profileEpoch.current
+
     try {
       setActivating(endpoint.id)
       const response = await activateCustomEndpoint(endpoint.id, scopeProfile)
+
+      if (profileEpoch.current !== epoch) {
+        return
+      }
+
       await refresh()
+
+      if (profileEpoch.current !== epoch) {
+        return
+      }
+
       onConfigSaved?.()
 
-      if (!scopeProfile) {onMainModelChanged?.(response.provider, response.model)}
+      if (scopeProfile === undefined) {onMainModelChanged?.(response.provider, response.model)}
       triggerHaptic('success')
     } catch (err) {
-      notifyError(err, c.activationFailed)
+      if (profileEpoch.current === epoch) {
+        notifyError(err, c.activationFailed)
+      }
     } finally {
-      setActivating(null)
+      if (profileEpoch.current === epoch) {
+        setActivating(null)
+      }
     }
   }
 
@@ -248,9 +320,16 @@ export function CustomEndpointsSettings({
       return
     }
 
+    const epoch = profileEpoch.current
+
     try {
       setDeleting(endpoint.id)
       const response = await deleteCustomEndpoint(endpoint.id, scopeProfile)
+
+      if (profileEpoch.current !== epoch) {
+        return
+      }
+
       setEndpoints(response.endpoints)
 
       if (form.id === endpoint.id) {
@@ -261,9 +340,13 @@ export function CustomEndpointsSettings({
       onConfigSaved?.()
       triggerHaptic('success')
     } catch (err) {
-      notifyError(err, c.deleteFailed)
+      if (profileEpoch.current === epoch) {
+        notifyError(err, c.deleteFailed)
+      }
     } finally {
-      setDeleting(null)
+      if (profileEpoch.current === epoch) {
+        setDeleting(null)
+      }
     }
   }
 

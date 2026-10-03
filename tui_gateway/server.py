@@ -1823,10 +1823,14 @@ def _load_tool_progress_mode() -> str:
 
 
 def _gui_surface_toolsets(platform: str) -> set[str]:
-    """Toolsets that exist because of the CLIENT (both off ``_HERMES_CORE_TOOLS``; this is the one gate).
+    """Toolsets that exist because of the CLIENT (all off ``_HERMES_CORE_TOOLS``; this is the one gate).
     ``platform`` is the SESSION's source, never a process env var: the desktop may drive a URL/cloud
-    backend where ``HERMES_DESKTOP`` is unset (AGENTS.md surface rule)."""
-    return {"project", "desktop_ui"} if platform == "desktop" else {"project"}
+    backend where ``HERMES_DESKTOP`` is unset (AGENTS.md surface rule).
+
+    Model/provider mutation is deliberately desktop-only: messaging, webhook and generic API sessions
+    must never gain profile credential/config authority merely because they share this backend.
+    """
+    return {"project", "desktop_ui", "model_config"} if platform == "desktop" else {"project"}
 
 
 def _tui_notice(text: str) -> None:

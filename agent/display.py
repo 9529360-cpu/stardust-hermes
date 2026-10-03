@@ -325,11 +325,17 @@ def redact_browser_typed_text_for_display(value: Any, typed_text: Any) -> Any:
 
 
 def redact_tool_args_for_display(tool_name: str, args: dict | None) -> dict | None:
-    """Return a copy of tool args safe for logs/progress UI (masks ``browser_type`` secrets)."""
+    """Return a copy of tool args safe for logs/progress UI.
+
+    Credential-bearing calls are always force-redacted even when the operator disabled
+    generic result redaction: tool progress is presentation, never a secret transport.
+    """
     if not isinstance(args, dict):
         return args
     if tool_name == "browser_type" and isinstance(args.get("text"), str):
         return {**args, "text": redact_sensitive_text(args["text"], force=True)}
+    if tool_name == "model_configure" and isinstance(args.get("api_key"), str):
+        return {**args, "api_key": redact_sensitive_text(args["api_key"], force=True)}
     return args
 
 
@@ -357,7 +363,7 @@ _PRIMARY_ARGS = {
     "image_generate": "prompt", "text_to_speech": "text",
     "vision_analyze": "question", "skill_view": "name", "skills_list": "category", "cronjob_manage": "action",
     "execute_code": "code", "browser_exec": "code", "delegate_task": "goal", "clarify": "question",
-    "skill_manage": "name",
+    "skill_manage": "name", "model_configure": "model",
 }
 _FALLBACK_PREVIEW_KEYS = ("query", "text", "command", "path", "name", "prompt", "code", "goal")
 
@@ -416,6 +422,13 @@ def _preview_read_file(args: dict, max_len: int) -> str | None:
     return None if label is None else _tail_trunc(f"{label} {_read_file_line_label(args)}".strip(), max_len) or None
 
 
+def _preview_model_configure(args: dict, max_len: int) -> str | None:
+    provider = _oneline(str(args.get("provider") or ""))
+    model = _oneline(str(args.get("model") or ""))
+    preview = f"{provider} / {model}" if provider and model else provider or model
+    return _tail_trunc(preview, max_len) or None
+
+
 def _preview_memory(args: dict, _max_len: int) -> str:
     action, target = args.get("action", ""), args.get("target", "")
     if action == "add":
@@ -444,7 +457,7 @@ _PREVIEW_BUILDERS = {
     "process_manage": _preview_process_manage, "todo_list": _preview_todo_list,
     "terminal": _preview_shell("command"), "execute_code": _preview_shell("code"),
     "read_file": _preview_read_file, "memory": _preview_memory, "send_message": _preview_send_message,
-    "skill_view": _preview_skill_view,
+    "skill_view": _preview_skill_view, "model_configure": _preview_model_configure,
     "session_search": lambda args, _m: f"recall: \"{_clip(_oneline(args.get('query', '')), 25)}\"",
 }
 
@@ -495,6 +508,7 @@ _TOOL_VERBS: dict[str, str] = {
     "skill_view": "Reading skill", "skills_list": "Listing skills", "skill_manage": "Updating skill",
     "delegate_task": "Delegating", "cronjob_manage": "Scheduling", "clarify": "Asking",
     "memory": "Updating memory", "todo_list": "Updating tasks",
+    "model_configure": "Configuring model",
 }
 # Verbs that read better without the argument preview appended.
 _TOOL_VERBS_NO_PREVIEW: frozenset[str] = frozenset({"skills_list", "session_search"})
