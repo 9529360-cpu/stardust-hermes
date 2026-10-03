@@ -37,8 +37,18 @@ test('settings offers one model services page without reviving provider account 
   await modelServices.click()
   await expect(modelServices).toHaveClass(/bg-\(--ui-bg-tertiary\)/)
   await expect(page.getByText('自定义服务', { exact: true }).first()).toBeVisible()
-  await expect(page.getByText('服务地址', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: '添加模型服务' })).toBeVisible()
+  await expect(page.getByText('服务地址', { exact: true })).toHaveCount(0)
+
+  // Inventory is the default state. Add explicitly enters a create-only editor,
+  // and cancelling returns to the inventory instead of leaving an existing
+  // service loaded into a reusable form.
+  await page.getByRole('button', { name: '添加模型服务' }).click()
+  await expect(page.getByText('服务地址', { exact: true })).toBeVisible()
   await expect(page.getByText('默认模型', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: '设为新对话默认服务' })).not.toBeChecked()
+  await page.getByRole('button', { name: '取消' }).click()
+  await expect(page.getByText('服务地址', { exact: true })).toHaveCount(0)
   await expect(page.getByText(/提供方登录|网页登录/)).toHaveCount(0)
 
   const overlayTheme = await page.locator('[data-overlay-surface]').evaluate(element =>
