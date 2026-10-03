@@ -152,7 +152,7 @@ TOOLSETS = {
     "connections": _ts("Remote connector discovery, execution, and account authorization", ["manage_connections"]),
     "project": _ts("Desktop Projects — create/switch workspaces and manage session-scoped Project facts (GUI only)", ["desktop_project"]),
     "model_config": _ts(
-        "Desktop-only model/provider configuration with explicit user approval and secure credential capture",
+        "Desktop-only model/provider configuration with explicit user approval and profile-safe credential storage",
         ["model_configure"],
     ),
     "bot_room": _ts("Verified text-only Group Chat turn capabilities"),
