@@ -128,12 +128,7 @@ import {
   useRepoWorktreeMap
 } from './projects'
 import { WorktreeDialog } from './projects/worktree-dialog'
-import {
-  SidebarBlankState,
-  SidebarLoadErrorState,
-  SidebarPinnedEmptyState,
-  SidebarSessionSkeletons
-} from './section-states'
+import { SidebarLoadErrorState, SidebarPinnedEmptyState, SidebarSessionSkeletons } from './section-states'
 import { buildSessionByAnyId, resolvePinnedSessions } from './session-index'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
 import { useEnteredProjectSessions } from './use-entered-project-sessions'
@@ -1067,15 +1062,6 @@ export function ChatSidebar({
   // every background refresh instead of the empty state.
   const showSessionSkeletons = sessionsLoading && scopedSessions.length === 0
 
-  // Filtered down to nothing still renders the section: the empty state is what
-  // tells you the filter — not an empty account — is why the list is bare.
-  const showSessionSections =
-    showSessionSkeletons ||
-    filtersActive ||
-    pinnedSessions.length > 0 ||
-    displayAgentSessions.length > 0 ||
-    projectModel.length > 0
-
   // Expose the structural conversation-list mode for skins without making
   // search or secondary feature groups part of the sidebar contract.
   const sessionsMode: 'archived' | 'flat' | 'project' | 'projects' = showArchived
@@ -1123,8 +1109,7 @@ export function ChatSidebar({
       data-tour="sessions-sidebar"
     >
       <SidebarContent className="gap-0 overflow-hidden bg-transparent px-2.5">
-        {showSessionSections && (
-          <div
+        <div
             className={cn('flex min-h-0 flex-1 flex-col pb-1.75', SCROLL_Y, SCROLL_GUTTER)}
             data-sessions-mode={sessionsMode}
             data-sessions-project={inProject ? (enteredProjectId ?? undefined) : undefined}
@@ -1345,9 +1330,6 @@ export function ChatSidebar({
               />
 
           </div>
-        )}
-
-        {!showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} />}
 
         <div className="shrink-0 px-0.5 pb-1 pt-0.5">
           <ProfileRail />
