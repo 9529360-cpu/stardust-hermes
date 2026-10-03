@@ -34,8 +34,6 @@ export const SIDEBAR_FILTERED_PAGE_SIZE = 300
 
 const SIDEBAR_PINNED_STORAGE_KEY = 'hermes.desktop.pinnedSessions'
 const SIDEBAR_AGENTS_GROUPED_STORAGE_KEY = 'hermes.desktop.agentsGroupedByWorkspace'
-const SIDEBAR_CRON_OPEN_STORAGE_KEY = 'hermes.desktop.sidebarCronOpen'
-const SIDEBAR_MESSAGING_OPEN_STORAGE_KEY = 'hermes.desktop.sidebarMessagingOpen'
 const SIDEBAR_SESSION_ORDER_STORAGE_KEY = 'hermes.desktop.sessionOrder'
 const SIDEBAR_SESSION_ORDER_MANUAL_STORAGE_KEY = 'hermes.desktop.sessionOrder.manual'
 const SIDEBAR_GROUPING_STORAGE_KEY = 'hermes.desktop.sidebarGrouping'
@@ -216,18 +214,6 @@ export const $dismissedWorktreeIds = persistentAtom(
 export const $removedWorktreeIds = persistentAtom('hermes.desktop.removedWorktrees', [] as string[], Codecs.stringArray)
 export const $sidebarPinsOpen = atom(true)
 export const $sidebarRecentsOpen = atom(true)
-// Cron-job sessions live in their own section below recents, collapsed by
-// default (it only renders at all when cron sessions exist) so the
-// scheduler's `[IMPORTANT: …]` first-message previews don't spam recents.
-export const $sidebarCronOpen = persistentAtom(SIDEBAR_CRON_OPEN_STORAGE_KEY, false, Codecs.bool)
-// Messaging platform sections collapse by default (they can be numerous and
-// tall). We persist the ids the user has *explicitly expanded*, so the default
-// stays collapsed unless they've opened a platform before.
-export const $sidebarMessagingOpenIds = persistentAtom(
-  SIDEBAR_MESSAGING_OPEN_STORAGE_KEY,
-  [] as string[],
-  Codecs.stringArray
-)
 // The Project-grouping flag, per scope like the grouping atoms below it: one
 // global bool here meant picking Project inside a workspace also flipped the
 // all-profiles view into the project tree (and leaving it there wiped the
@@ -597,18 +583,6 @@ export function setSidebarPinsOpen(open: boolean) {
 
 export function setSidebarRecentsOpen(open: boolean) {
   $sidebarRecentsOpen.set(open)
-}
-
-export function setSidebarCronOpen(open: boolean) {
-  $sidebarCronOpen.set(open)
-}
-
-export function toggleSidebarMessagingOpen(sourceId: string) {
-  const current = $sidebarMessagingOpenIds.get()
-
-  $sidebarMessagingOpenIds.set(
-    current.includes(sourceId) ? current.filter(id => id !== sourceId) : [...current, sourceId]
-  )
 }
 
 export function setSidebarAgentsGrouped(grouped: boolean) {

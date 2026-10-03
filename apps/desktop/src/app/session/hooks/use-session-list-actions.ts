@@ -2,12 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
 import { listAllProfileSessions, listSidebarSessions, type SessionInfo } from '@/hermes'
 import { sameCronSignature } from '@/lib/session-signatures'
-import {
-  isMessagingSource,
-  LOCAL_SESSION_SOURCE_IDS,
-  MESSAGING_SESSION_SOURCE_IDS,
-  normalizeSessionSource
-} from '@/lib/session-source'
+import { isMessagingSource, LOCAL_SESSION_SOURCE_IDS, MESSAGING_SESSION_SOURCE_IDS } from '@/lib/session-source'
 import { gatewayActivationEpoch } from '@/store/gateway'
 import {
   $pinnedSessionIds,
@@ -15,12 +10,10 @@ import {
   $sidebarFiltersActive,
   bumpSessionsLimit,
   raiseSessionsLimit,
-  SIDEBAR_FILTERED_PAGE_SIZE,
-  SIDEBAR_SESSIONS_PAGE_SIZE
+  SIDEBAR_FILTERED_PAGE_SIZE
 } from '@/store/layout'
-import { messagingTotalsKey, normalizeProfileKey, sidebarProfileForScope } from '@/store/profile'
+import { normalizeProfileKey, sidebarProfileForScope } from '@/store/profile'
 import {
-  $messagingSessions,
   $selectedStoredSessionId,
   $sessions,
   carryForwardFailedProfileSessions,
@@ -29,9 +22,7 @@ import {
   mergeSessionPage,
   MESSAGING_SECTION_LIMIT,
   setCronSessions,
-  setMessagingPlatformTotals,
   setMessagingSessions,
-  setMessagingTruncated,
   setSessionProfilesTruncated,
   setSessionProfilesUsage,
   setSessions,
@@ -53,7 +44,7 @@ const SIDEBAR_EXCLUDED_SOURCES = ['cron', 'kanban', 'subagent', 'tool', ...MESSA
 const MESSAGING_EXCLUDED_SOURCES = ['cron', ...LOCAL_SESSION_SOURCE_IDS]
 
 // Drop rows the user just deleted/archived: ANY list fetch (full refresh,
-// "Load more" paging, a per-platform messaging page, the cron slice) can race
+// "Load more" paging, the messaging slice, the cron slice) can race
 // an in-flight delete RPC, and the backend page still carries the doomed row
 // until the DELETE commits — so it flashed back into the sidebar (#50928).
 // Honoring the optimistic tombstone at every ingestion point keeps the removal
@@ -112,7 +103,6 @@ interface UseSessionListActionsArgs {
  *  slices are projected; the compact personal sidebar merges chat slices. */
 export function useSessionListActions({ profileScope }: UseSessionListActionsArgs) {
   const profileScopeRef = useRef(profileScope)
-  const loadMoreMessagingRequestRef = useRef<Record<string, number>>({})
   const refreshMessagingSessionsRequestRef = useRef(0)
   const refreshSessionsRequestRef = useRef(0)
   const sidebarRecoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -165,75 +155,10 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
       const rows = dropTombstoned(result.sessions.filter(s => isMessagingSource(s.source)))
 
       setMessagingSessions(prev => (sameCronSignature(prev, rows) ? prev : rows))
-      // Hit the cap → at least one platform may have more on disk than loaded.
-      // Keep the truncation signal authoritative for any paging surface.
-      setMessagingTruncated(result.sessions.length >= MESSAGING_SECTION_LIMIT)
     } catch {
       // Non-fatal: the messaging sections just stay empty/stale.
     }
   }, [profileScope])
-
-  /** Page one messaging platform without replacing another platform's rows. */
-  const loadMoreMessagingForPlatform = useCallback(
-    async (platform: string) => {
-      const sessionProfile = sidebarProfileForScope(profileScope)
-      const activationEpoch = gatewayActivationEpoch()
-
-      if (sidebarProfileForScope(profileScopeRef.current) !== sessionProfile) {
-        return
-      }
-
-      const requestKey = messagingTotalsKey(sessionProfile, platform)
-      const requestId = (loadMoreMessagingRequestRef.current[requestKey] ?? 0) + 1
-      loadMoreMessagingRequestRef.current[requestKey] = requestId
-
-      const inProfile = (s: SessionInfo) =>
-        sessionProfile === 'all' || normalizeProfileKey(s.profile) === sessionProfile
-
-      const inPlatform = (s: SessionInfo) => normalizeSessionSource(s.source) === platform && inProfile(s)
-      const loaded = $messagingSessions.get().filter(inPlatform).length
-
-      let result
-
-      try {
-        result = await listAllProfileSessions(
-          loaded + SIDEBAR_SESSIONS_PAGE_SIZE,
-          1,
-          'exclude',
-          'recent',
-          sessionProfile,
-          { source: platform }
-        )
-      } catch {
-        // Non-fatal: leave the platform's loaded rows and total unchanged.
-        return
-      }
-
-      if (
-        loadMoreMessagingRequestRef.current[requestKey] !== requestId ||
-        sidebarProfileForScope(profileScopeRef.current) !== sessionProfile ||
-        gatewayActivationEpoch() !== activationEpoch
-      ) {
-        return
-      }
-
-      const incoming = dropTombstoned(result.sessions.filter(inPlatform))
-
-      setMessagingSessions(prev => [
-        ...prev.filter(s => !inPlatform(s)),
-        ...mergeSessionPage(
-          prev.filter(inPlatform),
-          carryForwardFailedProfileSessions(prev.filter(inPlatform), incoming, result.errors),
-          sessionsToKeep()
-        )
-      ])
-
-      const total = result.total ?? incoming.length
-
-      setMessagingPlatformTotals(prev => ({ ...prev, [requestKey]: Math.max(total, incoming.length) }))
-    },
-    [profileScope]
-  )
 
   /** Refresh cron jobs only while the profile that requested them remains active. */
   const refreshCronJobs = useCallback(async () => {
@@ -405,10 +330,6 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
 
             return sameCronSignature(prev, messagingRows) ? prev : messagingRows
           })
-          // Hit the cap → at least one platform may have more on disk than loaded.
-          setMessagingTruncated(prev =>
-            messagingErrors?.length ? prev : result.messaging.sessions.length >= MESSAGING_SECTION_LIMIT
-          )
         }
       } finally {
         // Request identity preserves the zero-argument refresh contract across a
@@ -463,7 +384,6 @@ export function useSessionListActions({ profileScope }: UseSessionListActionsArg
   )
 
   return {
-    loadMoreMessagingForPlatform,
     loadMoreSessions,
     refreshCronJobs,
     refreshMessagingSessions,
