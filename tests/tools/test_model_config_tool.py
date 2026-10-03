@@ -61,6 +61,28 @@ def test_provider_alias_google_targets_gemini(monkeypatch):
     assert mod._resolve_provider("google ai studio").slug == "gemini"
 
 
+def test_desktop_surface_guard_reads_session_source_context(monkeypatch):
+    from gateway.session_context import clear_session_vars, set_session_vars
+
+    monkeypatch.undo()
+    tokens = set_session_vars(platform="", source="desktop", session_key="desktop-test")
+    try:
+        assert mod._is_desktop_session() is True
+    finally:
+        clear_session_vars(tokens)
+
+
+def test_api_server_surface_guard_fails_closed(monkeypatch):
+    from gateway.session_context import clear_session_vars, set_session_vars
+
+    monkeypatch.undo()
+    tokens = set_session_vars(platform="api_server", source="api_server", session_key="api-test")
+    try:
+        assert mod._is_desktop_session() is False
+    finally:
+        clear_session_vars(tokens)
+
+
 def test_non_desktop_surface_fails_before_any_provider_work(monkeypatch):
     monkeypatch.setattr(mod, "_is_desktop_session", lambda: False)
     monkeypatch.setattr(
