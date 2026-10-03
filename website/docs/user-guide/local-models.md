@@ -16,7 +16,7 @@ after a model is downloaded.
 
 ## Getting started
 
-1. Open **Settings → Providers → Local Models** (or choose **Run models
+1. Open **Settings → Models** (or choose **Run models
    locally** during onboarding).
 2. Click **Install runtime**. Hermes downloads the official llama.cpp
    build for your hardware (a few hundred MB), verifies it, and keeps it
