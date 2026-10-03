@@ -253,6 +253,7 @@ export function ChatSidebar({
   const unreadCount = useStore($unreadFinishedSessionIds).length
   const profiles = useStore($profiles)
   const profileScope = useStore($profileScope)
+  const activeConnectionId = useStore($activeConnectionId)
   // Toggle the persisted read-state watermark from a row menu. The row's own
   // `unread` prop mirrors what the dot paints; flip it and let the backend
   // become the truth (optimistic update + rollback in markSessionUnread).
@@ -365,24 +366,42 @@ export function ChatSidebar({
     [scopedSessions, filtersNarrow, sessionMatchesFilters]
   )
 
-  // Recents by activity (last_active || started_at). User send stamps
-  // last_active immediately. Ordering by status doesn't sort here — it re-slots
-  // rows *inside* whatever dividers are on, via sortOrderIds below — so the
-  // date buckets stay chronological either way.
-  const sortedSessions = useMemo(
-    () => [...visibleSessions].sort((a, b) => sessionTime(b) - sessionTime(a)),
-    [visibleSessions]
-  )
-
   const visibleCronSessions = useMemo(
     () => filterSessionsByProfileScope(cronSessions, profileScope),
     [cronSessions, profileScope]
   )
 
-  const visibleMessagingSessions = useMemo(
-    () => filterSessionsByProfileScope(messagingSessions, profileScope),
-    [messagingSessions, profileScope]
-  )
+  const visibleMessagingSessions = useMemo(() => {
+    if (showArchived) {
+      return []
+    }
+
+    const scoped = filterSessionsByProfileScope(messagingSessions, profileScope)
+
+    return filtersNarrow ? scoped.filter(sessionMatchesFilters) : scoped
+  }, [filtersNarrow, messagingSessions, profileScope, sessionMatchesFilters, showArchived])
+
+  // The sidebar has one conversation list. Gateway/messaging conversations used
+  // to render in separate platform sections; fold them into the same recency
+  // stream instead. Deduplicate both live ids and lineage roots so a conversation
+  // present in both backend slices still paints exactly once.
+  const sortedConversationSessions = useMemo(() => {
+    const seen = new Set<string>()
+    const rows: SessionInfo[] = []
+
+    for (const session of [...visibleSessions, ...visibleMessagingSessions]) {
+      const identities = [session.id, session._lineage_root_id].filter((id): id is string => Boolean(id))
+
+      if (identities.some(id => seen.has(id))) {
+        continue
+      }
+
+      identities.forEach(id => seen.add(id))
+      rows.push(session)
+    }
+
+    return rows.sort((a, b) => sessionTime(b) - sessionTime(a))
+  }, [visibleMessagingSessions, visibleSessions])
 
   // Index sessions by every id a pin might be stored under — recents, cron,
   // AND messaging, since all three can be pinned (see session-index.ts).
@@ -445,70 +464,9 @@ export function ChatSidebar({
     [isPinnedSession, filtersNarrow, sessionMatchesFilters]
   )
 
-  // Full-text search across *all* sessions (not just the loaded page) so 699
-  // sessions stay findable. Debounced; loaded sessions are matched instantly
-  // client-side and merged ahead of the server hits.
-  useEffect(() => {
-    if (!trimmedQuery) {
-      setServerMatches([])
-      setSearchPending(false)
-
-      return
-    }
-
-    let cancelled = false
-
-    setSearchPending(true)
-
-    const id = window.setTimeout(() => {
-      void searchSessions(trimmedQuery)
-        .then(res => {
-          if (!cancelled) {
-            setServerMatches(res.results)
-          }
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          if (!cancelled) {
-            setSearchPending(false)
-          }
-        })
-    }, 200)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(id)
-    }
-  }, [trimmedQuery])
-
-  const searchResults = useMemo(() => {
-    if (!trimmedQuery) {
-      return []
-    }
-
-    const out = new Map<string, SessionInfo>()
-
-    for (const s of sortedSessions) {
-      if (sessionMatchesSearch(s, trimmedQuery)) {
-        out.set(s.id, s)
-      }
-    }
-
-    for (const match of serverMatches) {
-      if (out.has(match.session_id)) {
-        continue
-      }
-
-      const loaded = sessionByAnyId.get(match.session_id)
-      out.set(match.session_id, loaded ?? searchResultToSession(match))
-    }
-
-    return [...out.values()]
-  }, [trimmedQuery, sortedSessions, serverMatches, sessionByAnyId])
-
   const unpinnedAgentSessions = useMemo(
-    () => sortedSessions.filter(s => !isPinnedSession(s)),
-    [sortedSessions, isPinnedSession]
+    () => sortedConversationSessions.filter(session => !isPinnedSession(session)),
+    [isPinnedSession, sortedConversationSessions]
   )
 
   useEffect(() => {
@@ -539,10 +497,7 @@ export function ChatSidebar({
   // instead of flattening the whole sidebar into an undated manual mode.
   const agentSessions = unpinnedAgentSessions
 
-  // Recents are local-only: messaging-platform sessions are fetched as their
-  // own slice ($messagingSessions) and rendered in self-managed per-platform
-  // sections below, so there is no source-grouping magic to untangle here.
-  //
+  // Messaging and local conversations now share this one recents stream.
   // Workspace grouping is a `project -> repo -> lane -> sessions` tree computed
   // authoritatively on the backend (projects.tree). Parents reorder via
   // workspaceParentOrderIds; worktrees within a parent via workspaceOrderIds.
