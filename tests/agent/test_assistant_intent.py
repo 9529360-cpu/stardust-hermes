@@ -356,3 +356,37 @@ def test_projection_wire_shape_keeps_provenance_and_attention_machine_readable()
     assert wire["artifact_refs"] == ["diff://42"]
     assert wire["terminal"] is False
     assert wire["needs_attention"] is True
+
+
+
+def test_kanban_projection_maps_needs_input_block_to_waiting_for_user():
+    projection = project_kanban_task(
+        {
+            "id": "k-waiting",
+            "title": "Need a decision",
+            "status": "blocked",
+            "block_kind": "needs_input",
+        }
+    )
+
+    assert projection.state is AssistantTaskState.WAITING_FOR_USER
+    assert projection.requires_approval is False
+    assert projection.needs_attention is True
+    assert projection.terminal is False
+    assert projection.recovery_action == "unblock"
+
+
+def test_kanban_projection_maps_approval_block_to_waiting_for_user():
+    projection = project_kanban_task(
+        {
+            "id": "k-approval",
+            "title": "Approve the change",
+            "status": "blocked",
+        },
+        run={"metadata": {"requires_approval": True}},
+    )
+
+    assert projection.state is AssistantTaskState.WAITING_FOR_USER
+    assert projection.requires_approval is True
+    assert projection.needs_attention is True
+    assert projection.recovery_action == "unblock"
