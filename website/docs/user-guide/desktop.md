@@ -34,9 +34,7 @@ That uses your current config, keys, sessions, and skills.
 
 ## What's in the app
 
-The desktop app is organized as a chat-first window with a left sidebar for navigation. It's built to allow managing multiple simultaneous agent conversations, configuring messaging providers, creating artifacts, browsing projects' folder structures, and working on multiple projects at once.
-
-Sidebar selection follows the focused chat pane. Opening or focusing a session tab clears a page's highlight, including contributed pages such as Kanban, even when the workspace retains that page's route.
+The desktop app is organized as a chat-first window with a compact left sidebar. Its permanent product navigation is **New chat**, **Tasks**, **Tools**, **Plugins**, and **Project**, followed by pinned conversations and the unified conversation list. Secondary destinations stay available through their owning views, the command palette, and keybinds instead of accumulating permanent sidebar rows.
 
 ### Chat
 
@@ -110,7 +108,7 @@ Explore and preview the working directory without leaving the app — useful for
 
 When connected to a remote gateway, opening a file artifact downloads it through that gateway, using the artifact’s originating profile and session. Relative paths resolve against the session’s saved working directory; home-relative paths use the gateway’s home, never the Desktop machine’s home. Windows-style relative paths are recognized alongside forward-slash paths, and file URIs retain drive and network-share information for the gateway to interpret. Missing sessions or working directories produce an error rather than selecting a different local file.
 
-The **Artifacts** view collects what your sessions generate — **images, files, and links** — into one searchable, browsable gallery. Open it from the sidebar, the command palette (**Artifacts — Browse generated outputs**), or a `nav.artifacts` shortcut you bind yourself. It indexes recent session outputs automatically; every artifact shows which session produced it with a jump back to that chat, and images and files open in a preview with download / open-in-browser / copy actions.
+The **Artifacts** view collects what your sessions generate — **images, files, and links** — into one searchable, browsable gallery. Open it from the command palette (**Artifacts — Browse generated outputs**) or a `nav.artifacts` shortcut you bind yourself. It indexes recent session outputs automatically; every artifact shows which session produced it with a jump back to that chat, and images and files open in a preview with download / open-in-browser / copy actions.
 
 ### Windows, tabs & panes
 
