@@ -63,7 +63,7 @@ export interface DesktopOnboardingState {
   /** True when the user explicitly chose "I'll choose a provider later" on the
    *  first-run picker. Persisted to localStorage so the blocking overlay never
    *  re-nags on subsequent launches — the user can connect a provider any time
-   *  from Settings → Providers (or the model picker's "Add provider"). Distinct
+   *  from Settings → Models (or the model picker's "Add model API"). Distinct
    *  from `configured`: the app still has no usable provider, so chat won't work
    *  until one is connected; we just stop forcing the choice up front. */
   firstRunSkipped: boolean
