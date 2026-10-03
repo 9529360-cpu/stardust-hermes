@@ -71,6 +71,12 @@ class TestSurfaceResolution:
 
     def test_tui_session_does_not(self, no_desktop_env):
         assert "desktop_ui" not in server._gui_surface_toolsets("tui")
+        assert "model_config" not in server._gui_surface_toolsets("tui")
+
+    def test_model_config_is_desktop_session_only(self, no_desktop_env):
+        assert "model_config" in server._gui_surface_toolsets("desktop")
+        from toolsets import _HERMES_CORE_TOOLS
+        assert "model_configure" not in _HERMES_CORE_TOOLS
 
     def test_desktop_env_alone_does_not_grant_them(self, no_desktop_env):
         """A desktop-spawned backend serving a TUI session stays clean.
@@ -96,6 +102,7 @@ class TestResolverPlumbing:
         assert server._load_enabled_toolsets("desktop") == [
             "coding",
             "desktop_ui",
+            "model_config",
             "project",
         ]
         assert server._load_enabled_toolsets("tui") == ["coding", "project"]
@@ -133,7 +140,9 @@ class TestResolverPlumbing:
 
         assert desktop is not None and tui is not None
         assert "desktop_ui" in desktop
+        assert "model_config" in desktop
         assert "desktop_ui" not in tui
+        assert "model_config" not in tui
 
     def test_explicit_env_pin_still_wins(self, no_desktop_env):
         """HERMES_TUI_TOOLSETS is an operator override; surface can't re-add."""
