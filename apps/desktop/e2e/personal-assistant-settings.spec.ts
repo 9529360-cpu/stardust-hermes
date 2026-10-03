@@ -17,6 +17,7 @@ test.afterAll(async () => {
 test('settings offers one model services page without reviving provider account pages', async ({}, testInfo) => {
   const page = fixture!.page
 
+  // Settings left the primary nav; the titlebar gear is its visible door.
   await page.getByRole('button', { name: '打开设置' }).click()
   await expect(page.getByRole('button', { name: '关闭设置' })).toBeVisible()
 

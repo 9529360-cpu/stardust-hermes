@@ -2224,7 +2224,7 @@ export const ja = defineLocale({
     clearSearch: '検索をクリア',
     noMatch: query => `"${query}" に一致するセッションがありません。`,
     results: '結果',
-    pinned: 'ピン留め',
+    pinned: 'ピン留めした会話',
     sessions: 'チャット',
     cronJobs: 'Cronジョブ',
     groupAriaGrouped: 'セッションを単一リストとして表示',

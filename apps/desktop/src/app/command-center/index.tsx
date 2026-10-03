@@ -5,12 +5,27 @@ import { LogTail } from '@/components/chat/log-tail'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { SearchField } from '@/components/ui/search-field'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { ResponsiveTabs } from '@/components/ui/tab-dropdown'
 import { Tip } from '@/components/ui/tooltip'
-import { getActionStatus, getLogs, getStatus, getUsageAnalytics, restartGateway, updateHermes } from '@/hermes'
-import type { ActionStatusResponse, AnalyticsResponse, SessionInfo, StatusResponse } from '@/hermes'
+import {
+  getActionStatus,
+  getLogs,
+  getStatus,
+  getUsageAnalytics,
+  restartGateway,
+  searchSessions,
+  updateHermes
+} from '@/hermes'
+import type {
+  ActionStatusResponse,
+  AnalyticsResponse,
+  SessionInfo,
+  SessionSearchResult,
+  StatusResponse
+} from '@/hermes'
 import { useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import {
@@ -25,6 +40,7 @@ import {
   Wrench
 } from '@/lib/icons'
 import { exportSession } from '@/lib/session-export'
+import { mergeSessionSearchResults } from '@/lib/session-search'
 import { fmtDateTime } from '@/lib/time'
 import { useStoreSelector } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
@@ -56,6 +72,7 @@ type UsagePeriod = (typeof USAGE_PERIODS)[number]
 // component never re-renders from $sessions ticks while on System/Usage/etc.
 const EMPTY_SESSIONS: readonly never[] = []
 const EMPTY_PINNED: readonly string[] = []
+const NO_SERVER_MATCHES: { query: string; results: SessionSearchResult[] } = { query: '', results: [] }
 
 interface CommandCenterViewProps {
   initialSection?: CommandCenterSection
@@ -163,6 +180,39 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
 
   const debouncedQuery = useDebouncedValue(query.trim(), 180)
 
+  // Full-text hits for exactly one query. Keyed by the query that produced
+  // them, so a slow response for an older query can never repaint the list.
+  const [serverMatches, setServerMatches] = useState<{ query: string; results: SessionSearchResult[] }>(
+    NO_SERVER_MATCHES
+  )
+
+  // The message index reaches every stored conversation — older pages and
+  // messaging threads the loaded list does not hold — so searching never stops
+  // at whatever happens to be loaded. A failed lookup keeps the instant
+  // client-side matches.
+  useEffect(() => {
+    if (section !== 'sessions' || !debouncedQuery) {
+      return
+    }
+
+    let cancelled = false
+
+    void searchSessions(debouncedQuery)
+      .then(response => response.results)
+      .catch(() => [])
+      .then(results => {
+        if (!cancelled) {
+          setServerMatches({ query: debouncedQuery, results })
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedQuery, section])
+
+  const serverSearchPending = Boolean(debouncedQuery) && serverMatches.query !== debouncedQuery
+
   const filteredSessions = useMemo(() => {
     const sorted = [...sessions].sort((a, b) => {
       const left = a.last_active || a.started_at || 0
@@ -171,18 +221,16 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
       return right - left
     })
 
-    const needle = debouncedQuery.toLowerCase()
-
-    if (!needle) {
+    if (!debouncedQuery) {
       return sorted
     }
 
-    return sorted.filter(session => {
-      const haystack = `${sessionTitle(session)} ${session.id}`.toLowerCase()
-
-      return haystack.includes(needle)
-    })
-  }, [debouncedQuery, sessions])
+    return mergeSessionSearchResults(
+      sorted,
+      debouncedQuery,
+      serverMatches.query === debouncedQuery ? serverMatches.results : []
+    )
+  }, [debouncedQuery, serverMatches, sessions])
 
   const refreshSystem = useCallback(async () => {
     setSystemLoading(true)
@@ -374,7 +422,13 @@ export function CommandCenterView({ initialSection, onClose, onDeleteSession, on
           {section === 'sessions' ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
               {!sessionListHasResults ? (
-                <EmptyPanel description={debouncedQuery ? cc.noResults : cc.noSessions} />
+                serverSearchPending ? (
+                  <div className="grid min-h-48 place-items-center">
+                    <GlyphSpinner ariaLabel={t.common.loading} className="text-(--ui-text-tertiary)" />
+                  </div>
+                ) : (
+                  <EmptyPanel description={debouncedQuery ? cc.noResults : cc.noSessions} />
+                )
               ) : (
                 <ul>
                   {filteredSessions.map(session => {

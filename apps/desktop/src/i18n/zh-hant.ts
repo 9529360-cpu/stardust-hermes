@@ -1636,7 +1636,7 @@ export const zhHant = defineLocale({
       },
       bundledDescriptions: {
         'hermes-bots': '智能體名冊，為每個智能體提供獨立對話、定時任務、群聊與智能體間訊息。',
-        kanban: '多智能體任務看板，包含看板頁面、側欄入口與狀態列中的即時任務動態。',
+        kanban: '多智能體任務看板，包含看板頁面、命令面板入口與狀態列中的即時任務動態。',
         radio: '線上電台，支援固定常用電台、搜尋與隨音訊變化的波形顯示。'
       },
       halfDesktop: '桌面',
@@ -2437,7 +2437,7 @@ export const zhHant = defineLocale({
     clearSearch: '清除搜尋',
     noMatch: query => `沒有工作階段符合「${query}」。`,
     results: '結果',
-    pinned: '已釘選',
+    pinned: '置頂會話',
     sessions: '對話',
     cronJobs: '排程任務',
     groupAriaGrouped: '以單一清單顯示工作階段',

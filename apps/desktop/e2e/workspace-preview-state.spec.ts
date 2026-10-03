@@ -48,7 +48,7 @@ test('context rail preview keeps the conversation mounted and uses the real prev
   const productNav = page.locator('[data-personal-product-nav]')
   const composer = page.getByRole('textbox', { name: '消息' })
 
-  await expect(productNav.getByRole('button', { name: '对话', exact: true })).toBeVisible()
+  await expect(productNav.getByRole('button', { name: '新建对话', exact: true })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '工作空间' })).toHaveCount(0)
   await expect(composer).toBeVisible()
   await expect(page.locator('[data-jarvis-workspace]')).toHaveCount(0)

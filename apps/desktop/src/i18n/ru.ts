@@ -2492,7 +2492,7 @@ export const ru = defineLocale({
     clearSearch: 'Очистить поиск',
     noMatch: query => `Нет сеансов по запросу «${query}».`,
     results: 'Результаты',
-    pinned: 'Закреплённые',
+    pinned: 'Закреплённые чаты',
     sessions: 'Чаты',
     cronJobs: 'Cron-задачи',
     groupAriaGrouped: 'Показать сеансы одним списком',

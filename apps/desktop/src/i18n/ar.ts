@@ -1912,7 +1912,7 @@ export const ar = defineLocale({
     clearSearch: 'مسح البحث',
     noMatch: query => `لا توجد جلسات تطابق "${query}"`,
     results: 'النتائج',
-    pinned: 'المثبتة',
+    pinned: 'المحادثات المثبتة',
     sessions: 'المحادثات',
     cronJobs: 'المهام المجدولة',
     groupAriaGrouped: 'الجلسات مجمعة حسب مساحة العمل',

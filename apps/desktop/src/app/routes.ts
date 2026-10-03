@@ -111,10 +111,10 @@ function isContributedPath(pathname: string): boolean {
   return contributedRoutes().some(route => route.path === pathname)
 }
 
-// ── Contributed sidebar nav — the `sidebar.nav` registry area ────────────────
-// A DATA contribution adds a row to the sidebar's top nav (below Artifacts).
-// Pair with a ROUTES_AREA page: the row navigates to `path` and lights up
-// while the app is there.
+// ── Contributed sidebar nav compatibility area ─────────────────────────────
+// Retained so existing plugins and SDK consumers keep a stable contract. The
+// compact personal sidebar intentionally does not render arbitrary contributed
+// rows; new plugin pages should expose palette/keybind navigation instead.
 
 export const SIDEBAR_NAV_AREA = 'sidebar.nav'
 
