@@ -189,9 +189,7 @@ export function stripFtsMarkers(snippet: string): string {
 
 interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   currentView: AppView
-  onNavigate: (item: SidebarNavItem) => void
   onLoadMoreSessions: () => Promise<void> | void
-  onLoadMoreMessaging?: (platform: string) => Promise<void> | void
   onResumeSession: (sessionId: string, session?: SessionInfo) => void
   onDeleteSession: (sessionId: string) => void
   onArchiveSession: (sessionId: string) => void
@@ -204,54 +202,20 @@ interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
    *  buttons), which land a fresh session exactly where it's dropped. The
    *  context-menu "Open in split" path passes just a `dir`. */
   onNewSessionSplit: NewSessionSplitHandler
-  onManageCronJob: (jobId: string, owner?: string) => void
-  onTriggerCronJob: (jobId: string, owner?: string) => Promise<void>
 }
 
 export function ChatSidebar({
   currentView: routeView,
-  onNavigate,
   onLoadMoreSessions,
-  onLoadMoreMessaging,
   onResumeSession,
   onDeleteSession,
   onArchiveSession,
   onBranchSession,
   onNewSessionInWorkspace,
-  onNewSessionSplit,
-  onManageCronJob,
-  onTriggerCronJob
+  onNewSessionSplit
 }: ChatSidebarProps) {
   const { t } = useI18n()
   const s = t.sidebar
-  const { pathname } = useLocation()
-  // Contributed nav rows (plugins pairing a page with a sidebar entry) render
-  // below the built-ins with the same chrome; active = at their route.
-  const navContributions = useContributions(SIDEBAR_NAV_AREA)
-
-  const contributedNav = useMemo<SidebarNavItem[]>(
-    () =>
-      navContributions.flatMap(c => {
-        const data = c.data as Partial<SidebarNavContribution> | undefined
-
-        if (!data?.path?.startsWith('/') || !data.label) {
-          return []
-        }
-
-        const codicon = data.codicon || 'plug'
-
-        return [
-          {
-            id: c.id,
-            label: data.label,
-            icon: (props: { className?: string }) => <Codicon name={codicon} {...props} />,
-            route: data.path
-          }
-        ]
-      }),
-    [navContributions]
-  )
-
   const panesFlipped = useStore($panesFlipped)
   const grouping = useStore($sidebarGrouping)
   const ordering = useStore($sidebarOrdering)
@@ -276,7 +240,6 @@ export function ChatSidebar({
   const unconfirmedPinWrites = useStore($unconfirmedPinWrites)
   const pinsOpen = useStore($sidebarPinsOpen)
   const agentsOpen = useStore($sidebarRecentsOpen)
-  const cronOpen = useStore($sidebarCronOpen)
   // The sidebar highlight tracks the FOCUSED session — the interacted tile's
   // tab, else the main selection — so it stays 1:1 with whatever tab is active.
   const selectedSessionId = useStore($focusedStoredSessionId)
@@ -284,21 +247,12 @@ export function ChatSidebar({
   const currentView = focusedSessionIsTile ? 'chat' : routeView
   const sessions = useStore($sessions)
   const cronSessions = useStore($cronSessions)
-  const cachedCronJobs = useStore($cronJobs)
-  const cronJobsScope = useStore($cronJobsScope)
   const messagingSessions = useStore($messagingSessions)
-  const messagingPlatformTotals = useStore($messagingPlatformTotals)
-  const messagingTruncated = useStore($messagingTruncated)
   const sessionsLoading = useStore($sessionsLoading)
   const sessionProfilesTruncated = useStore($sessionProfilesTruncated)
   const unreadCount = useStore($unreadFinishedSessionIds).length
   const profiles = useStore($profiles)
   const profileScope = useStore($profileScope)
-  const activeConnectionId = useStore($activeConnectionId)
-  const currentCronJobsScope = `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}`
-
-  const cronJobs = cronJobsScope === currentCronJobsScope ? cachedCronJobs : []
-
   // Toggle the persisted read-state watermark from a row menu. The row's own
   // `unread` prop mirrors what the dot paints; flip it and let the backend
   // become the truth (optimistic update + rollback in markSessionUnread).
@@ -319,7 +273,6 @@ export function ChatSidebar({
   // profile while scope is still ALL (persisted), the rail is hidden and they'd
   // otherwise be stuck in the grouped view with no way out.
   const showAllProfiles = multiProfile && profileScope === ALL_PROFILES
-  const messagingProfile = sidebarProfileForScope(profileScope)
   const agentOrderIds = useStore($sidebarSessionOrderIds)
   const agentOrderManual = useStore($sidebarSessionOrderManual)
   const workspaceOrderIds = useStore($sidebarWorkspaceOrderIds)
@@ -345,48 +298,7 @@ export function ChatSidebar({
   const currentCwd = useStore($currentCwd)
   const gatewayState = useStore($gatewayState)
   const dismissedAutoProjects = useStore($dismissedAutoProjectIds)
-  const newSessionCombo = useStore($bindings)['session.new']?.[0]
-  const newSessionKbd = newSessionCombo ? comboTokens(newSessionCombo) : []
-  const [searchQuery, setSearchQuery] = useState('')
-  const [serverMatches, setServerMatches] = useState<SessionSearchResult[]>([])
-  const [searchPending, setSearchPending] = useState(false)
-  const [newSessionKbdFlash, setNewSessionKbdFlash] = useState(false)
-  const [messagingLoadMorePending, setMessagingLoadMorePending] = useState<Record<string, boolean>>({})
   const [recentsLoadMorePending, setRecentsLoadMorePending] = useState(false)
-  const messagingOpenIds = useStore($sidebarMessagingOpenIds)
-  // Per-platform count of rows currently revealed (starts at NON_SESSION_INITIAL_ROWS).
-  const [messagingVisible, setMessagingVisible] = useState<Record<string, number>>({})
-  const searchInputRef = useRef<HTMLInputElement>(null)
-  const trimmedQuery = searchQuery.trim()
-
-  // Hotkey (session.focusSearch) → focus the field once it's mounted.
-  useEffect(() => {
-    const onFocus = () => searchInputRef.current?.focus({ preventScroll: true })
-
-    window.addEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
-
-    return () => window.removeEventListener(SESSION_SEARCH_FOCUS_EVENT, onFocus)
-  }, [])
-
-  // Flash the ⌘N hint full-opacity (no transition) for the press, so hitting
-  // the shortcut visibly pings its affordance in the sidebar.
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout> | undefined
-
-    const onShortcut = () => {
-      setNewSessionKbdFlash(true)
-      clearTimeout(timeout)
-      timeout = setTimeout(() => setNewSessionKbdFlash(false), 140)
-    }
-
-    window.addEventListener('hermes:new-session-shortcut', onShortcut)
-
-    return () => {
-      window.removeEventListener('hermes:new-session-shortcut', onShortcut)
-      clearTimeout(timeout)
-    }
-  }, [])
-
   const activeSidebarSessionId = currentView === 'chat' ? selectedSessionId : null
 
   const dndSensors = useSensors(
