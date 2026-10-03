@@ -3021,7 +3021,9 @@ export const zhHant = defineLocale({
 
   onboarding: {
     headerTitle: '開始設定 Stardust Agent',
-    headerDesc: '連線模型提供方即可開始聊天。大多數選項只需一次點擊。',
+    headerDesc: '直接連線你自己的模型 API；也可以稍後在設定中新增。',
+    setupRelay: '新增模型 API',
+    setupRelayHint: '填寫 API 位址、API Key 與模型即可。',
     preparingInstall: 'Stardust 正在完成安裝。首次執行通常不到一分鐘。',
     starting: '正在啟動 Stardust…',
     lookingUpProviders: '正在查詢提供方...',
@@ -3493,7 +3495,8 @@ export const zhHant = defineLocale({
       errorStartNewSession: '開始新工作階段',
       errorSwitchProvider: '切換服務商',
       errorSignInAgain: provider => `重新登入 ${provider}`,
-      errorOauthExpired: provider => `您的 ${provider} 登入已過期或被撤銷。請重新登入以繼續對話。`,
+      errorOauthExpired: provider =>
+        `您的 ${provider} 登入已過期或被撤銷。請在終端機執行 hermes model，選擇 ${provider} 重新登入；或在「設定 → 模型服務」中改用模型 API。`,
       errorOpenLogs: '開啟日誌',
       errorOpenLogsFailed: '無法開啟日誌資料夾',
       errorOpenDesktopLogs: '開啟桌面端日誌',

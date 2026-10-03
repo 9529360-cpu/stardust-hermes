@@ -332,9 +332,11 @@ describe('expired OAuth grant recovery', () => {
     )
 
     expect(await screen.findByText('Your Nous Portal sign-in expired')).toBeTruthy()
+    // Desktop has no in-app provider sign-in any more: the copy must name the
+    // real way back instead of promising a sign-in the card cannot start.
     expect(
       screen.getByText(
-        'The AI service rejected your sign-in. Check the credentials for this provider, then send your message again.'
+        'Your Nous Portal sign-in has expired or was revoked. Run hermes model in a terminal and choose Nous Portal to sign in again, or switch to a model API in Settings → Model services.'
       )
     ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()

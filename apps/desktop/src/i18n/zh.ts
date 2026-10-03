@@ -4327,7 +4327,8 @@ export const zh = defineLocale({
       errorStartNewSession: '开始新会话',
       errorSwitchProvider: '切换服务商',
       errorSignInAgain: provider => `重新登录 ${provider}`,
-      errorOauthExpired: provider => `您的 ${provider} 登录已过期或被撤销。请重新登录以继续对话。`,
+      errorOauthExpired: provider =>
+        `您的 ${provider} 登录已过期或被撤销。请在终端运行 hermes model，选择 ${provider} 重新登录；或在“设置 → 模型服务”中改用模型 API。`,
       errorOpenLogs: '打开日志',
       errorOpenLogsFailed: '无法打开日志文件夹',
       errorOpenDesktopLogs: '打开桌面端日志',
