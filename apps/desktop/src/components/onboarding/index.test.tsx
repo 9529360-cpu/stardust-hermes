@@ -3,29 +3,34 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { $desktopOnboarding, type DesktopOnboardingState, type OnboardingContext } from '@/store/onboarding'
 import { makeOAuthProvider } from '@/test/oauth-provider'
-import type { OAuthProvider } from '@/types/hermes'
 
 import { Picker } from '.'
 
-function setProviders(providers: OAuthProvider[]) {
+function setState(overrides: Partial<DesktopOnboardingState> = {}) {
   $desktopOnboarding.set({
     configured: false,
     flow: { status: 'idle' },
     mode: 'oauth',
-    providers,
+    providers: [
+      makeOAuthProvider('anthropic', 'Anthropic Claude'),
+      makeOAuthProvider('openai-codex', 'OpenAI Codex / ChatGPT'),
+      makeOAuthProvider('nous', 'Nous Portal')
+    ],
     reason: null,
     requested: false,
     firstRunSkipped: false,
     manual: false,
     localEndpoint: false,
-    freeTierReady: false
-  } satisfies DesktopOnboardingState)
+    freeTierReady: false,
+    ...overrides
+  })
 }
 
 const ctx: OnboardingContext = { requestGateway: async () => undefined as never }
 
 afterEach(() => {
   cleanup()
+  window.location.hash = ''
 
   try {
     window.localStorage.clear()
@@ -48,68 +53,39 @@ afterEach(() => {
 })
 
 describe('onboarding Picker', () => {
-  it('filters the first-party Nous account while preserving user-owned provider choices', () => {
-    setProviders([makeOAuthProvider('anthropic', 'Anthropic Claude'), makeOAuthProvider('nous', 'Nous Portal')])
+  it('offers direct model services without exposing the legacy account catalog', () => {
+    setState()
     render(<Picker ctx={ctx} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced: provider accounts and other services' }))
 
+    expect(screen.getByRole('button', { name: 'Set up model API' })).toBeTruthy()
+    expect(screen.queryByText('Anthropic Claude')).toBeNull()
+    expect(screen.queryByText('OpenAI Codex / ChatGPT')).toBeNull()
     expect(screen.queryByText('Nous Portal')).toBeNull()
-    expect(screen.queryByText('Recommended')).toBeNull()
-    expect(screen.getByText('Fireworks AI')).toBeTruthy()
-    expect(screen.getByText('Anthropic API Key')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /provider accounts/i })).toBeNull()
   })
 
-  it('keeps third-party providers in their normal order after removing Nous', () => {
-    setProviders([
-      makeOAuthProvider('openai-codex', 'OpenAI Codex / ChatGPT'),
-      makeOAuthProvider('minimax-oauth', 'MiniMax'),
-      makeOAuthProvider('nous', 'Nous Portal')
-    ])
+  it('routes setup to the model API service page and dismisses first-run blocking', () => {
+    setState()
     render(<Picker ctx={ctx} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced: provider accounts and other services' }))
 
-    const labels = screen
-      .getAllByRole('button')
-      .map(el => el.textContent ?? '')
-      .filter(text => /Fireworks AI|ChatGPT or Codex|MiniMax|OpenRouter/.test(text))
+    fireEvent.click(screen.getByRole('button', { name: 'Set up model API' }))
 
-    const indexOf = (needle: string) => labels.findIndex(text => text.includes(needle))
-    expect(screen.queryByText('Nous Portal')).toBeNull()
-    expect(indexOf('Fireworks AI')).toBeGreaterThanOrEqual(0)
-    expect(indexOf('ChatGPT or Codex')).toBeGreaterThan(indexOf('Fireworks AI'))
-    expect(indexOf('MiniMax')).toBeGreaterThan(indexOf('ChatGPT or Codex'))
-  })
-
-  it('shows every provider under advanced choices when Nous Portal is absent', () => {
-    setProviders([
-      makeOAuthProvider('anthropic', 'Anthropic Claude'),
-      makeOAuthProvider('openai-codex', 'OpenAI Codex / ChatGPT')
-    ])
-    render(<Picker ctx={ctx} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced: provider accounts and other services' }))
-
-    expect(screen.getByText('Fireworks AI')).toBeTruthy()
-    expect(screen.getByText('Anthropic API Key')).toBeTruthy()
-    expect(screen.getByText('ChatGPT or Codex Subscription')).toBeTruthy()
-    expect(screen.queryByText('Other sign-in options')).toBeNull()
-    expect(screen.queryByText('Recommended')).toBeNull()
+    expect($desktopOnboarding.get().firstRunSkipped).toBe(true)
+    expect(window.location.hash).toBe('#/settings?tab=config%3Amodel')
   })
 
   it('offers "choose later" on first run and persists the skip', () => {
-    setProviders([makeOAuthProvider('nous', 'Nous Portal')])
+    setState()
     render(<Picker ctx={ctx} />)
 
-    const skip = screen.getByRole('button', { name: "I'll choose a provider later" })
-
-    fireEvent.click(skip)
+    fireEvent.click(screen.getByRole('button', { name: "I'll choose a provider later" }))
 
     expect($desktopOnboarding.get().firstRunSkipped).toBe(true)
     expect(window.localStorage.getItem('hermes-onboarding-skipped-v1')).toBe('1')
   })
 
-  it('hides "choose later" in manual (add-provider) mode', () => {
-    setProviders([makeOAuthProvider('nous', 'Nous Portal')])
-    $desktopOnboarding.set({ ...$desktopOnboarding.get(), manual: true })
+  it('hides "choose later" in manual compatibility mode', () => {
+    setState({ manual: true })
     render(<Picker ctx={ctx} />)
 
     expect(screen.queryByRole('button', { name: "I'll choose a provider later" })).toBeNull()
