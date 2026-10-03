@@ -241,9 +241,6 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     reasoningEffort: '__inherit__'
   })
 
-  // Aux slots reported stale by the backend immediately after a main-model
-  // switch (provider differs from the new main). Cleared on next switch/reset.
-  const [switchStaleAux, setSwitchStaleAux] = useState<StaleAuxAssignment[]>([])
   const revealAdvancedModelSettings = useCallback(() => setAdvancedModelSettingsOpen(true), [])
 
   // Deep link from the vision Capabilities detail (?tab=config:model&aux=vision):
@@ -270,46 +267,45 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   )
 
   const refresh = useCallback(async () => {
-      const epoch = profileEpoch.current
-      setLoading(true)
-      setError('')
-      setSkewRestart(false)
+    const epoch = profileEpoch.current
+    setLoading(true)
+    setError('')
+    setSkewRestart(false)
 
-      try {
-        const [modelInfo, modelOptions, auxiliaryModels, moaModels] = await Promise.all([
-          getGlobalModelInfo(scopeProfile),
-          getGlobalModelOptions(undefined, scopeProfile),
-          getAuxiliaryModels(scopeProfile),
-          getMoaModels(scopeProfile).catch(() => null)
-        ])
+    try {
+      const [modelInfo, modelOptions, auxiliaryModels, moaModels] = await Promise.all([
+        getGlobalModelInfo(scopeProfile),
+        getGlobalModelOptions(undefined, scopeProfile),
+        getAuxiliaryModels(scopeProfile),
+        getMoaModels(scopeProfile).catch(() => null)
+      ])
 
-        if (profileEpoch.current !== epoch) {
-          return
-        }
-
-        setMainModel({ model: modelInfo.model, provider: modelInfo.provider })
-        setProviders(modelOptions.providers || [])
-
-        setAuxiliary(auxiliaryModels)
-        setMoa(moaModels)
-
-        if (moaModels) {
-          setSelectedMoaPreset(prev => (prev && moaModels.presets[prev] ? prev : moaModels.default_preset))
-        }
-
-        // The config record loads via its own shared query; a model switch can
-        // change it server-side (aux slots), so nudge that cache to refetch.
-        void invalidateHermesConfig(scopeProfile)
-      } catch (err) {
-        if (profileEpoch.current === epoch) {
-          setCaughtError(err, m.loadFailed)
-        }
-      } finally {
-        if (profileEpoch.current === epoch) {
-          setLoading(false)
-        }
+      if (profileEpoch.current !== epoch) {
+        return
       }
-    }, [m.loadFailed, scopeProfile, setCaughtError])
+
+      setMainModel({ model: modelInfo.model, provider: modelInfo.provider })
+      setProviders(modelOptions.providers || [])
+      setAuxiliary(auxiliaryModels)
+      setMoa(moaModels)
+
+      if (moaModels) {
+        setSelectedMoaPreset(prev => (prev && moaModels.presets[prev] ? prev : moaModels.default_preset))
+      }
+
+      // The config record loads via its own shared query; a model switch can
+      // change it server-side (aux slots), so nudge that cache to refetch.
+      void invalidateHermesConfig(scopeProfile)
+    } catch (err) {
+      if (profileEpoch.current === epoch) {
+        setCaughtError(err, m.loadFailed)
+      }
+    } finally {
+      if (profileEpoch.current === epoch) {
+        setLoading(false)
+      }
+    }
+  }, [m.loadFailed, scopeProfile, setCaughtError])
 
   useEffect(() => {
     void refresh()
@@ -647,7 +643,6 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         },
         scopeProfile
       )
-      setSwitchStaleAux([])
       await refresh()
     } catch (err) {
       setCaughtError(err, m.loadFailed)
@@ -677,7 +672,11 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
 
   return (
     <div className="grid gap-6">
-      <CustomEndpointsSettings onMainModelChanged={onMainModelChanged} scopeProfile={scopeProfile} />
+      <CustomEndpointsSettings
+        onConfigSaved={() => void refresh()}
+        onMainModelChanged={onMainModelChanged}
+        scopeProfile={scopeProfile}
+      />
       {$localModelsEnabled.get() ? <LocalModelsSettings /> : null}
 
       {config && mainModel && (reasoningSupported || fastSupported) && (
@@ -735,16 +734,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         </div>
       )}
 
-      {switchStaleAux.length > 0 && (
-        <StaleAuxWarning
-          applying={applying}
-          onReset={() => void resetAuxiliaryModels()}
-          slots={switchStaleAux}
-          taskLabel={auxiliaryTaskLabel}
-        />
-      )}
-
-      {switchStaleAux.length === 0 && persistentStaleAux.length > 0 && (
+      {persistentStaleAux.length > 0 && (
         <StaleAuxWarning
           applying={applying}
           onReset={() => void resetAuxiliaryModels()}
