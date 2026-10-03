@@ -40,6 +40,16 @@ def _clean(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
+def _is_desktop_session() -> bool:
+    """Execution-time surface authority; toolset selection alone is not a security boundary."""
+    try:
+        from tools.approval_context import _get_session_platform
+
+        return _get_session_platform().strip().lower() == "desktop"
+    except Exception:
+        return False
+
+
 def _resolve_provider(raw: str):
     """Resolve a human provider name without the legacy openai->openrouter alias trap."""
     from hermes_cli.provider_catalog import provider_catalog
@@ -301,6 +311,10 @@ def model_configure_tool(
     """Configure one built-in provider or direct custom endpoint as the current profile default."""
 
     # This is a mutation capability, not a general autonomous optimization knob.
+    # Fail closed outside the Desktop turn context even if an operator accidentally
+    # exposes the toolset on another surface.
+    if not _is_desktop_session():
+        return tool_error("model_configure is available only in an active Stardust Desktop session")
     # Require a real current user turn in addition to the human confirmation below.
     if not _clean(user_message):
         return tool_error(
