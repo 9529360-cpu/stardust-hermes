@@ -583,18 +583,6 @@ export function revealFileInTree(path: string): void {
   $revealInTreeRequest.set(path)
 }
 
-// Hotkey → focus the sessions search field. Opens the sidebar first, then lets
-// the field (which only mounts when the sidebar is open) subscribe + focus.
-export const SESSION_SEARCH_FOCUS_EVENT = 'hermes:focus-session-search'
-
-export function requestSessionSearchFocus() {
-  setSidebarOpen(true)
-
-  if (typeof window !== 'undefined') {
-    window.setTimeout(() => window.dispatchEvent(new CustomEvent(SESSION_SEARCH_FOCUS_EVENT)), 0)
-  }
-}
-
 export function togglePanesFlipped() {
   $panesFlipped.set(!$panesFlipped.get())
 }
