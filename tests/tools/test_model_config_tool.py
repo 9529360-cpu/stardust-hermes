@@ -55,6 +55,30 @@ def test_provider_alias_google_targets_gemini(monkeypatch):
     assert mod._resolve_provider("google ai studio").slug == "gemini"
 
 
+def test_registry_dispatch_forwards_current_user_task(monkeypatch):
+    from tools.registry import registry
+
+    monkeypatch.setattr(mod, "_resolve_provider", lambda _raw: _descriptor())
+    monkeypatch.setattr(mod, "_provider_has_credentials", lambda _provider: True)
+    monkeypatch.setattr(mod, "_confirm_configuration", lambda *a, **k: True)
+    monkeypatch.setattr(
+        mod,
+        "_switch_and_persist",
+        lambda provider, model: _switch_result(provider=provider, model=model),
+    )
+
+    raw = registry.dispatch(
+        "model_configure",
+        {"provider": "gemini", "model": "gemini-test-model"},
+        user_task="请把 Gemini 配成默认模型并执行",
+    )
+    result = _payload(raw)
+
+    assert result["success"] is True
+    assert result["provider"] == "gemini"
+    assert result["model"] == "gemini-test-model"
+
+
 def test_requires_explicit_current_user_request(monkeypatch):
     monkeypatch.setattr(
         mod,
