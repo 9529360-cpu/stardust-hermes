@@ -14,7 +14,8 @@ import { isSubmitEnter } from '@/lib/ime'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { cn } from '@/lib/utils'
 import { $desktopBoot, type DesktopBootState } from '@/store/boot'
-import { FREE_TIER_MODEL } from '@/store/free-tier'import { $introReveal, shouldPlayFirstRunIntro } from '@/store/intro-reveal'
+import { FREE_TIER_MODEL } from '@/store/free-tier'
+import { $introReveal, shouldPlayFirstRunIntro } from '@/store/intro-reveal'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import {
   $desktopOnboarding,
