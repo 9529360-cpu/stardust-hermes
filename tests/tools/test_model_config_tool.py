@@ -151,33 +151,25 @@ def test_current_message_api_key_uses_credential_lifecycle_then_canonical_switch
     assert secret not in raw
 
 
-def test_missing_key_uses_masked_secret_capture(monkeypatch):
-    calls = []
+def test_missing_key_fails_closed_without_changing_model(monkeypatch):
     monkeypatch.setattr(mod, "_resolve_provider", lambda _raw: _descriptor())
     monkeypatch.setattr(mod, "_provider_has_credentials", lambda _provider: False)
     monkeypatch.setattr(mod, "_confirm_configuration", lambda *a, **k: True)
     monkeypatch.setattr(
         mod,
-        "_capture_provider_key",
-        lambda env, label, provider: calls.append(("capture", env, label, provider)) or True,
-    )
-    monkeypatch.setattr(
-        mod,
         "_switch_and_persist",
-        lambda provider, model: calls.append(("model", provider, model)) or _switch_result(model=model),
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("missing key must block model write")),
     )
 
     result = _payload(
         mod.model_configure_tool(
             provider="gemini",
             model="gemini-test-model",
-            user_message="帮我配置 Gemini，我来输入 API key",
+            user_message="帮我配置 Gemini",
         )
     )
 
-    assert calls[0] == ("capture", "GEMINI_API_KEY", "Google Gemini", "gemini")
-    assert calls[1] == ("model", "gemini", "gemini-test-model")
-    assert result["credential_saved"] is True
+    assert "requires an API key in the CURRENT user request" in result["error"]
 
 
 def test_failed_model_validation_reports_partial_secret_write_without_echo(monkeypatch):
@@ -238,51 +230,29 @@ def test_custom_endpoint_routes_through_direct_endpoint_path(monkeypatch):
     }]
 
 
-def test_remote_custom_endpoint_uses_masked_capture_and_never_echoes_key(monkeypatch):
-    calls = []
-    secret = "sk-relay-ABCDEFGHIJKLMN123456"
+def test_remote_custom_endpoint_without_current_key_fails_closed(monkeypatch):
     monkeypatch.setattr(mod, "_confirm_configuration", lambda *a, **k: True)
-    monkeypatch.setattr(mod, "_capture_provider_key", lambda *a: calls.append(("capture", *a)) or True)
-    monkeypatch.setattr(mod, "_read_scoped_secret", lambda env: secret)
     monkeypatch.setattr(
         mod,
         "_switch_custom_and_persist",
-        lambda base_url, model, api_key, key_env: (
-            calls.append(("switch", base_url, model, api_key, key_env))
-            or SimpleNamespace(
-                success=True,
-                new_model=model,
-                base_url=base_url,
-                warning_message="",
-                error_message="",
-            )
-        ),
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("missing key must block custom model write")),
     )
 
-    raw = mod._configure_custom_endpoint(
-        base_url="https://relay.example/v1",
-        model="relay-model",
-        api_key="",
-        keyless=False,
+    result = _payload(
+        mod._configure_custom_endpoint(
+            base_url="https://relay.example/v1",
+            model="relay-model",
+            api_key="",
+            keyless=False,
+        )
     )
-    result = _payload(raw)
 
-    assert result["success"] is True
-    assert calls[0][0] == "capture"
-    assert calls[1][0] == "switch"
-    assert calls[1][3] == secret
-    assert result["credential_saved"] is True
-    assert secret not in raw
+    assert "requires an API key in the CURRENT user request" in result["error"]
 
 
 def test_loopback_custom_endpoint_defaults_to_keyless(monkeypatch):
     calls = []
     monkeypatch.setattr(mod, "_confirm_configuration", lambda *a, **k: True)
-    monkeypatch.setattr(
-        mod,
-        "_capture_provider_key",
-        lambda *_a: (_ for _ in ()).throw(AssertionError("loopback endpoint must not force secret capture")),
-    )
     monkeypatch.setattr(
         mod,
         "_switch_custom_and_persist",
@@ -357,23 +327,24 @@ def test_oauth_provider_rejects_pasted_api_key_before_any_write(monkeypatch):
     assert "rather than a pasted API key" in result["error"]
 
 
-def test_secure_capture_cancel_does_not_change_model(monkeypatch):
+def test_existing_provider_credentials_allow_model_change_without_new_key(monkeypatch):
     monkeypatch.setattr(mod, "_resolve_provider", lambda _raw: _descriptor())
-    monkeypatch.setattr(mod, "_provider_has_credentials", lambda _provider: False)
+    monkeypatch.setattr(mod, "_provider_has_credentials", lambda _provider: True)
     monkeypatch.setattr(mod, "_confirm_configuration", lambda *a, **k: True)
-    monkeypatch.setattr(mod, "_capture_provider_key", lambda *_a: False)
     monkeypatch.setattr(
         mod,
         "_switch_and_persist",
-        lambda *_a: (_ for _ in ()).throw(AssertionError("cancelled secret capture must block model write")),
+        lambda provider, model: _switch_result(provider=provider, model=model),
     )
 
     result = _payload(
         mod.model_configure_tool(
             provider="gemini",
             model="gemini-test-model",
-            user_message="帮我配置 Gemini",
+            user_message="把已经配置好的 Gemini 切到这个模型",
         )
     )
 
-    assert "secure secret entry was unavailable or cancelled" in result["error"]
+    assert result["success"] is True
+    assert result["credential_saved"] is False
+    assert result["model_changed"] is True
