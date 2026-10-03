@@ -109,8 +109,8 @@ export function parseErrorSurface(value: unknown): ErrorSurface | null {
   }
 }
 
-/** True when the failed turn's provider rejected an OAuth grant — the
- *  one-click recovery is re-running that provider's sign-in, not editing keys. */
+/** True when the failed turn's provider rejected an OAuth grant. Signing in
+ *  again (from a terminal) changes the outcome, so Retry stays offered. */
 export function isOAuthReauthSurface(surface: ErrorSurface | null | undefined): surface is ErrorSurface & {
   authKind: 'oauth'
   provider: string
@@ -119,7 +119,7 @@ export function isOAuthReauthSurface(surface: ErrorSurface | null | undefined): 
 }
 
 /** True when the failed turn's provider rejected a saved API key — the fix is
- *  replacing the key in Settings → Keys, then retrying. */
+ *  replacing the key in Settings → Models, then retrying. */
 export function isApiKeyRejectedSurface(surface: ErrorSurface | null | undefined): surface is ErrorSurface & {
   authKind: 'api_key'
 } {
@@ -157,10 +157,8 @@ export interface ErrorRecoveryPlan {
   editMessage: boolean
   /** Reveal the Hermes data folder so the user can free space (disk_full). */
   openHermesFolder: boolean
-  /** Settings → Keys deep link (auth, api_key). */
+  /** Settings → Models deep link to replace a rejected key (auth, api_key). */
   updateApiKey: boolean
-  /** Re-run the provider's OAuth sign-in (auth, oauth). */
-  signInAgain: boolean
   /** Settings → Models deep link. */
   switchProvider: boolean
 }
@@ -196,7 +194,6 @@ export function errorRecoveryPlan(surface: ErrorSurface | null | undefined): Err
     // where fixing the credential changes the outcome and Retry is the
     // natural second click.
     retry: !surface || surface.retryable || oauthReauth || apiKeyRejected,
-    signInAgain: oauthReauth,
     startNewSession: false,
     switchProvider: surface != null && SWITCH_PROVIDER_LAYERS.includes(surface.layer),
     updateApiKey: apiKeyRejected
