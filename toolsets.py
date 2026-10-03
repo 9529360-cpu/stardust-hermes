@@ -151,6 +151,10 @@ TOOLSETS = {
     "session_search": _ts("Search and recall past conversations with summarization", ["session_search"]),
     "connections": _ts("Remote connector discovery, execution, and account authorization", ["manage_connections"]),
     "project": _ts("Desktop Projects — create/switch workspaces and manage session-scoped Project facts (GUI only)", ["desktop_project"]),
+    "model_config": _ts(
+        "Desktop-only model/provider configuration with explicit user approval and secure credential capture",
+        ["model_configure"],
+    ),
     "bot_room": _ts("Verified text-only Group Chat turn capabilities"),
 
     # GUI-renderer affordances, enabled per desktop-sourced SESSION by the GUI
