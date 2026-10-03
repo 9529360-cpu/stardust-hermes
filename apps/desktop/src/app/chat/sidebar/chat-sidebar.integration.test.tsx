@@ -100,4 +100,17 @@ describe('ChatSidebar compact conversation surface', () => {
     expect(screen.getByText('Tile two')).toBeTruthy()
     expect(screen.queryByRole('textbox', { name: 'Search sessions' })).toBeNull()
   })
+
+  it('keeps the pinned and conversation sections when history is empty', () => {
+    act(() => {
+      $sessions.set([])
+    })
+
+    renderSidebar('/', 'chat')
+
+    expect(screen.getByText('Pinned chats')).toBeTruthy()
+    expect(screen.getByText('Conversations')).toBeTruthy()
+    expect(screen.getByText('No sessions yet')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'New project' })).toBeNull()
+  })
 })
