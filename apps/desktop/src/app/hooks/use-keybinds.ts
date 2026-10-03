@@ -30,7 +30,7 @@ import {
 } from '@/store/find-in-page'
 import { toggleHud } from '@/store/hud'
 import { $capture, $comboIndex, endCapture, setBinding } from '@/store/keybinds'
-import { requestSessionSearchFocus, setFileBrowserOpen, togglePanesFlipped, toggleSidebarOpen } from '@/store/layout'
+import { setFileBrowserOpen, togglePanesFlipped, toggleSidebarOpen } from '@/store/layout'
 import { openBrowserTab } from '@/store/preview'
 import {
   $newChatProfile,
@@ -68,6 +68,7 @@ import {
   $workspaceIsPage,
   AGENTS_ROUTE,
   ARTIFACTS_ROUTE,
+  COMMAND_CENTER_ROUTE,
   CRON_ROUTE,
   MESSAGING_ROUTE,
   navigateToWorkspacePage,
@@ -211,20 +212,19 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'nav.agents': () => navigate(AGENTS_ROUTE),
 
     'session.new': () => {
-      // Match the sidebar New Session button. A plain keyboard new chat should
+      // Match the product nav New chat button. A plain keyboard new chat should
       // target the current live profile, not a stale per-profile quick-create
       // selection from a prior action.
       setWorkspaceScope('sessions')
       $newChatProfile.set(null)
       deps.startFreshSession()
-      window.dispatchEvent(new CustomEvent('hermes:new-session-shortcut'))
     },
     'session.newTab': () => deps.openNewSessionTab(),
     'session.newWindow': () => void openNewWindow(),
     'session.next': () => cycleTab(1),
     'session.prev': () => cycleTab(-1),
     ...sessionSlotHandlers,
-    'session.focusSearch': requestSessionSearchFocus,
+    'session.focusSearch': () => navigate(`${COMMAND_CENTER_ROUTE}?section=sessions`),
     'session.togglePin': deps.toggleSelectedPin,
     'session.archive': deps.archiveSelectedSession,
     // openWorktreeDialog resolves the target. There is no test for a repo

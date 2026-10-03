@@ -101,10 +101,10 @@ The ONLY import surface is `@hermes/plugin-sdk` (plus `react` /
   — declare a `height` (e.g. `'200px'`) so it doesn't take half the zone.
 - Full PAGES: register `area: ROUTES_AREA` with `data: { path: '/my-page' }`
   and a `render` — the page mounts in the workspace (main) pane like any
-  built-in view. Make it reachable with a sidebar nav row:
-  `ctx.register({ id: 'nav', area: SIDEBAR_NAV_AREA, data: { path: '/my-page', label: 'My Page', codicon: 'project' } })`
-  (renders below Artifacts, lights up at the route) — and/or a
-  `PALETTE_AREA` command calling `host.navigate('/my-page')`.
+  built-in view. Make it reachable with a `PALETTE_AREA` command and/or a
+  keybind calling `host.navigate('/my-page')`. `SIDEBAR_NAV_AREA` remains
+  accepted for compatibility with older Desktop/plugin contracts, but the
+  compact personal sidebar does not render arbitrary contributed rows.
 - TRANSCRIPT directives: register `area: TRANSCRIPT_DIRECTIVE_AREA` with
   `data: { name: 'task', render: ({ attrs, streaming }) => jsx(...) }` and
   the assistant can render your component inline in a chat message by

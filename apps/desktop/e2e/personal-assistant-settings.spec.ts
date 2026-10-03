@@ -16,9 +16,9 @@ test.afterAll(async () => {
 
 test('settings exposes provider configuration without reviving the legacy app account surface', async ({}, testInfo) => {
   const page = fixture!.page
-  const productNav = page.locator('[data-personal-product-nav]')
 
-  await productNav.getByRole('button', { name: '设置' }).click()
+  // Settings left the primary nav; the titlebar gear is its visible door.
+  await page.getByRole('button', { name: '打开设置' }).click()
   await expect(page.getByRole('button', { name: '关闭设置' })).toBeVisible()
 
   const settingsNav = page.getByRole('complementary')
