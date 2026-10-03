@@ -36,6 +36,18 @@ it('keeps each worker draft while inspecting siblings and removes settled select
   expect(screen.queryByRole('textbox')).toBeNull()
 })
 
+it('expands sidebar members initially and respects a manual collapse during progress', () => {
+  upsertSubagent('parent', { subagent_id: 'worker', goal: 'Project development' })
+  upsertSubagent('foreign', { subagent_id: 'foreign', goal: 'Foreign private work' })
+  render(<SubagentSection defaultCollapsed={false} sessionId="parent" />)
+  expect(screen.getByText('Project development')).toBeTruthy()
+  expect(screen.queryByText('Foreign private work')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: /1 Subagent/ }))
+  act(() => upsertSubagent('parent', { subagent_id: 'worker', text: 'Checking source' }, false, 'subagent.progress'))
+  expect(screen.queryByText('Project development')).toBeNull()
+  expect(screen.getByRole('button', { name: /1 Subagent/ }).getAttribute('aria-expanded')).toBe('false')
+})
+
 it('measures detail elapsed from worker start rather than first inspection', () => {
   const now = vi.spyOn(Date, 'now').mockReturnValue(100000)
   upsertSubagent('parent', { subagent_id: 'timed', goal: 'Timed worker' })
