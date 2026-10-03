@@ -2,19 +2,6 @@
   padding-bottom: 0;
 }
 
-/* Keep the conversation sidebar's real session entry points. The product
-   navigation already owns Tasks and Tools, so only those duplicated legacy
-   rows are suppressed; New conversation, Messaging, Artifacts and contributed
-   entries remain reachable. */
-[data-personal-conversations]
-  [data-slot='sidebar-group']:has([data-tour='sidebar-nav-new-session'])
-  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-skills']),
-[data-personal-conversations]
-  [data-slot='sidebar-group']:has([data-tour='sidebar-nav-new-session'])
-  [data-slot='sidebar-menu-item']:has([data-tour='sidebar-nav-cron']) {
-  display: none;
-}
-
 [data-personal-conversations]
   [data-tour='sessions-sidebar']
   [data-slot='sidebar-content']::before {
