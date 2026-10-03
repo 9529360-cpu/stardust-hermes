@@ -18,7 +18,9 @@ import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
 import type { CustomEndpoint, CustomEndpointUpdate } from '@/types/hermes'
 
-import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'\n\nimport { EmptyState, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from './primitives'
+import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
+
+import { EmptyState, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from './primitives'
 
 interface CustomEndpointsSettingsProps {
   onConfigSaved?: () => void
@@ -104,6 +106,7 @@ export function CustomEndpointsSettings({
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const probeRevision = useRef(0)
+  const profileEpoch = useRef(0)
   const [probeMessage, setProbeMessage] = useState<string | null>(null)
 
   function updateForm(update: (current: EndpointForm) => EndpointForm) {
@@ -120,7 +123,81 @@ export function CustomEndpointsSettings({
     })
   }
 
-  const loadProfile = useCallback(\n    async (epoch: number) => {\n      try {\n        const data = await getCustomEndpoints(scopeProfile)\n\n        if (profileEpoch.current !== epoch) {\n          return\n        }\n\n        setEndpoints(data.endpoints)\n        const current = data.endpoints.find(endpoint => endpoint.is_current) ?? data.endpoints[0]\n\n        if (current) {\n          setForm(formFromEndpoint(current))\n          setDiscoveredModels(current.models)\n        } else {\n          setForm(EMPTY_FORM)\n          setDiscoveredModels([])\n        }\n      } catch (err) {\n        if (profileEpoch.current === epoch) {\n          notifyError(err, c.loadFailed)\n        }\n      } finally {\n        if (profileEpoch.current === epoch) {\n          setLoading(false)\n        }\n      }\n    },\n    [c.loadFailed, scopeProfile]\n  )\n\n  const beginProfileReload = useCallback(() => {\n    const epoch = ++profileEpoch.current\n    probeRevision.current++\n    setLoading(true)\n    setSaving(false)\n    setTesting(false)\n    setActivating(null)\n    setDeleting(null)\n    setEndpoints([])\n    setForm(EMPTY_FORM)\n    setDiscoveredModels([])\n    setAdvancedOpen(false)\n    setProbeMessage(null)\n    void loadProfile(epoch)\n  }, [loadProfile])\n\n  async function refresh() {\n    const epoch = profileEpoch.current\n    const data = await getCustomEndpoints(scopeProfile)\n\n    if (profileEpoch.current === epoch) {\n      setEndpoints(data.endpoints)\n    }\n  }\n\n  useEffect(() => {\n    beginProfileReload()\n\n    return () => {\n      profileEpoch.current++\n      probeRevision.current++\n    }\n  }, [beginProfileReload])\n\n  // A live active-profile swap does not change scopeProfile when this panel is\n  // following the foreground profile (undefined). Explicit Applies-to targets\n  // stay pinned and are reloaded by the scopeProfile effect when that target changes.\n  useOnProfileSwitch(() => {\n    if (scopeProfile === undefined) {\n      beginProfileReload()\n    }\n  })\n
+  const loadProfile = useCallback(
+    async (epoch: number) => {
+      try {
+        const data = await getCustomEndpoints(scopeProfile)
+
+        if (profileEpoch.current !== epoch) {
+          return
+        }
+
+        setEndpoints(data.endpoints)
+        const current = data.endpoints.find(endpoint => endpoint.is_current) ?? data.endpoints[0]
+
+        if (current) {
+          setForm(formFromEndpoint(current))
+          setDiscoveredModels(current.models)
+        } else {
+          setForm(EMPTY_FORM)
+          setDiscoveredModels([])
+        }
+      } catch (err) {
+        if (profileEpoch.current === epoch) {
+          notifyError(err, c.loadFailed)
+        }
+      } finally {
+        if (profileEpoch.current === epoch) {
+          setLoading(false)
+        }
+      }
+    },
+    [c.loadFailed, scopeProfile]
+  )
+
+  const beginProfileReload = useCallback(() => {
+    const epoch = ++profileEpoch.current
+    probeRevision.current++
+    setLoading(true)
+    setSaving(false)
+    setTesting(false)
+    setActivating(null)
+    setDeleting(null)
+    setEndpoints([])
+    setForm(EMPTY_FORM)
+    setDiscoveredModels([])
+    setAdvancedOpen(false)
+    setProbeMessage(null)
+    void loadProfile(epoch)
+  }, [loadProfile])
+
+  async function refresh() {
+    const epoch = profileEpoch.current
+    const data = await getCustomEndpoints(scopeProfile)
+
+    if (profileEpoch.current === epoch) {
+      setEndpoints(data.endpoints)
+    }
+  }
+
+  useEffect(() => {
+    beginProfileReload()
+
+    return () => {
+      profileEpoch.current++
+      probeRevision.current++
+    }
+  }, [beginProfileReload])
+
+  // A live active-profile swap does not change scopeProfile when this panel is
+  // following the foreground profile (undefined). Explicit Applies-to targets
+  // stay pinned and are reloaded by the scopeProfile effect when that target changes.
+  useOnProfileSwitch(() => {
+    if (scopeProfile === undefined) {
+      beginProfileReload()
+    }
+  })
+
   async function handleSave() {
     if (!isEndpointUrl(form.baseUrl)) {
       setProbeMessage(c.validationFailed)
