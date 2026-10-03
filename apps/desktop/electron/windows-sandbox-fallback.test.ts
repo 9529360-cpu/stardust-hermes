@@ -186,6 +186,34 @@ test('shouldAttemptAclRepair only fires on evidence of trouble', () => {
   assert.equal(shouldAttemptAclRepair({ state: 'fallback' }), true)
 })
 
+test('an unwritable userData never stops the launch that persists the marker', () => {
+  // The marker only carries the crash-recovery decision to the NEXT launch. A
+  // userData folder this process may not write (policy, permissions, a full
+  // disk) used to throw from module top-level and kill startup with Electron's
+  // "JavaScript error in the main process" dialog.
+  const warnings: string[] = []
+
+  const denied = () => {
+    throw Object.assign(new Error("EPERM: operation not permitted, open 'windows-sandbox-fallback.json'"), {
+      code: 'EPERM'
+    })
+  }
+
+  const written = writeSandboxMarker(
+    'C:\\locked\\userData',
+    { state: 'booting', bootAborts: 1 },
+    { mkdirSync: (() => undefined) as unknown as typeof fs.mkdirSync, warn: message => warnings.push(message), writeFileSync: denied }
+  )
+
+  assert.equal(written, false)
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0], /EPERM/)
+  assert.equal(
+    writeSandboxMarker('C:\\locked\\userData', { state: 'booting' }, { mkdirSync: denied, warn: () => undefined }),
+    false
+  )
+})
+
 test('sandbox marker round-trips through the userData file', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-sandbox-marker-'))
 
