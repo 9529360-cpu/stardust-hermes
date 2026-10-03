@@ -2032,7 +2032,7 @@ export const zh = defineLocale({
       },
       bundledDescriptions: {
         'hermes-bots': '智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。',
-        kanban: '多智能体任务看板，包含看板页面、侧栏入口和状态栏中的实时任务动态。',
+        kanban: '多智能体任务看板，包含看板页面、命令面板入口和状态栏中的实时任务动态。',
         radio: '在线电台，支持固定常用电台、搜索和随音频变化的波形显示。'
       },
       halfDesktop: '桌面',
