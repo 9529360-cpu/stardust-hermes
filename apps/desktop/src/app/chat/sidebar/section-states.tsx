@@ -23,26 +23,6 @@ export function SidebarSessionSkeletons() {
   )
 }
 
-export function SidebarBlankState({ onNewProject }: { onNewProject: () => void }) {
-  const { t } = useI18n()
-  const s = t.sidebar
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col px-2 pt-2">
-      <p className="px-2 py-1 text-[0.7rem] text-(--ui-text-quaternary)">{s.noSessions}</p>
-      <Button
-        className="h-7 justify-start px-2 text-[0.72rem] font-normal text-(--ui-text-tertiary)"
-        onClick={onNewProject}
-        size="sm"
-        variant="ghost"
-      >
-        <Codicon name="add" size="0.7rem" />
-        {s.projects.newButton}
-      </Button>
-    </div>
-  )
-}
-
 export function SidebarPinnedEmptyState() {
   const { t } = useI18n()
 
