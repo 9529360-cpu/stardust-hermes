@@ -77,6 +77,19 @@ class TestBuildToolPreview:
         assert safe_args["ref"] == "@e3"
         assert safe_args["text"].startswith("ghp_AB")
 
+    def test_model_configure_display_never_echoes_api_key(self):
+        secret = "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ123456"
+        args = {"provider": "gemini", "model": "gemini-test-model", "api_key": secret}
+
+        safe_args = redact_tool_args_for_display("model_configure", args)
+        preview = build_tool_preview("model_configure", args)
+
+        assert secret not in str(safe_args)
+        assert safe_args["provider"] == "gemini"
+        assert safe_args["model"] == "gemini-test-model"
+        assert preview == "gemini / gemini-test-model"
+        assert secret not in preview
+
 
 
 

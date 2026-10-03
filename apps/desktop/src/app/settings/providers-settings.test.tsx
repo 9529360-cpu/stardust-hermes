@@ -9,6 +9,7 @@ import type { EnvVarInfo, OAuthProvider } from '@/types/hermes'
 const listOAuthProviders = vi.fn()
 const disconnectOAuthProvider = vi.fn()
 const getEnvVars = vi.fn()
+const getCustomEndpoints = vi.fn()
 const setEnvVar = vi.fn()
 const startManualProviderOAuth = vi.fn()
 const startManualLocalEndpoint = vi.fn()
@@ -27,6 +28,11 @@ vi.mock('@/hermes', () => ({
   setEnvVar: (key: string, value: string, profile?: string) => setEnvVar(key, value, profile),
   disconnectOAuthProvider: (...args: unknown[]) => disconnectOAuthProvider(...args),
   getEnvVars: (...args: unknown[]) => getEnvVars(...args),
+  getCustomEndpoints: (...args: unknown[]) => getCustomEndpoints(...args),
+  activateCustomEndpoint: vi.fn(),
+  deleteCustomEndpoint: vi.fn(),
+  saveCustomEndpoint: vi.fn(),
+  validateCustomEndpoint: vi.fn(),
   listOAuthProviders: (...args: unknown[]) => listOAuthProviders(...args)
 }))
 
@@ -73,6 +79,7 @@ function keyVar(patch: Partial<EnvVarInfo> = {}): EnvVarInfo {
 beforeEach(() => {
   onboarding.set({ manual: false })
   getEnvVars.mockResolvedValue({})
+  getCustomEndpoints.mockResolvedValue({ endpoints: [] })
   disconnectOAuthProvider.mockResolvedValue({ ok: true, provider: 'minimax-oauth' })
   listOAuthProviders.mockResolvedValue({
     providers: [provider('nous', true), provider('minimax-oauth', true)]
@@ -150,6 +157,19 @@ describe('ProvidersSettings', () => {
     }
   })
 
+  it('passes the shared Settings target into the custom-endpoint editor', async () => {
+    const { $settingsScopeOverride } = await import('@/store/settings-scope')
+    $settingsScopeOverride.set('profile-b')
+    const { ProvidersSettings } = await import('./providers-settings')
+
+    try {
+      render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="custom-endpoints" />)
+      await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalledWith('profile-b'))
+    } finally {
+      cleanup()
+      $settingsScopeOverride.set(null)
+    }
+  })
   it('uses the settings target for account reads, removal and sign-in', async () => {
     const { $settingsScopeOverride } = await import('@/store/settings-scope')
     $settingsScopeOverride.set('beta')

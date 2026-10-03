@@ -229,6 +229,27 @@ def _assistant_tasks(agent, args: dict, ctx: InlineToolContext) -> Any:
     )
 
 
+def _model_configure(agent, args: dict, ctx: InlineToolContext) -> Any:
+    """Configure the current profile from the exact current human-authored turn.
+
+    Model/provider configuration is a security-sensitive mutation. Do not rely on
+    model_tools user_task here: the real agent executor does not pass that field
+    for ordinary registry tools. Reuse the same provenance boundary as durable
+    assistant-task mutations so synthetic wakes/tool output can never inherit an
+    older human authorization.
+    """
+    from tools.model_config_tool import model_configure_tool
+
+    return model_configure_tool(
+        provider=args.get("provider"),
+        model=args.get("model", ""),
+        api_key=args.get("api_key", ""),
+        base_url=args.get("base_url", ""),
+        keyless=args.get("keyless", False),
+        user_message=_latest_user_message(ctx.messages),
+    )
+
+
 # Order is the historical if/elif order of ``execute_tool_calls_sequential``.
 INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
     "todo_list": _tool(
@@ -236,6 +257,7 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
         store=lambda agent, ctx: agent._todo_store,
     ),
     "assistant_tasks": _assistant_tasks,
+    "model_configure": _model_configure,
     # Bot Mode teammate DM is injected, not registered: only a canonical Bot
     # Chat session carries the schema, and the tool re-gates on the title.
     "message_agent": _tool(
