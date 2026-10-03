@@ -369,8 +369,8 @@ export function DesktopOnboardingOverlay({
  * The one-time free-tier welcome, shown when the free tier is what serves this
  * user. Bare and centered like the model-confirm screen it stands in for: this
  * IS their "you're in" moment, so it names the route, its model and its price,
- * and offers the two ways out of it (a real account, or a provider of their
- * own) without making either the default.
+ * and lets the user continue with the free tier or jump to their own model API
+ * without reviving the retired provider-account picker.
  */
 function FreeTierReadyPanel({
   leaving,
@@ -541,7 +541,7 @@ function ChooseLaterLink() {
 }
 
 // Legacy compatibility key picker. New Desktop setup uses CustomEndpointsSettings;
- // this remains only for old onboarding states that still enter api-key/local-endpoint mode.
+// this remains only for old onboarding states that still enter api-key/local-endpoint mode.
 export function ApiKeyForm({
   canGoBack,
   initialEnvKey,
