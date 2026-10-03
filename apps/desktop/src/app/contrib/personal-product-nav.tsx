@@ -8,8 +8,10 @@ import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $sidebarGrouping, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
+import { $newChatProfile } from '@/store/profile'
 import { exitProjectScope } from '@/store/projects'
 import { $selectedStoredSessionId } from '@/store/session'
+import { $focusedSessionIsTile } from '@/store/session-states'
 
 import { type AppView, CRON_ROUTE, NEW_CHAT_ROUTE, sessionRoute, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
@@ -58,18 +60,26 @@ function ProductNavButton({ active = false, icon, label, onClick, tour }: Produc
   )
 }
 
-export function PersonalProductNav({ currentView, onNavigate }: PersonalProductNavProps) {
+export function PersonalProductNav({ currentView: routeView, onNavigate }: PersonalProductNavProps) {
   const { locale } = useI18n()
   const { search } = useLocation()
   const copy = PRODUCT_NAV_COPY[locale]
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
   const sidebarGrouping = useStore($sidebarGrouping)
+  // Selection follows the focused pane, exactly as the conversation list below
+  // does: while a session tile owns focus, no page is current even if the
+  // workspace keeps that page's route.
+  const focusedSessionIsTile = useStore($focusedSessionIsTile)
+  const currentView = focusedSessionIsTile ? 'chat' : routeView
   const skillsTab = new URLSearchParams(search).get('tab')
 
   const newChat = () => {
     setSidebarAgentsGrouped(false)
     setSidebarOpen(true)
     revealTreePane('sessions')
+    // A plain new chat lands in the live profile, matching the `session.new`
+    // keybind; a prior per-profile quick-create must not leak into it.
+    $newChatProfile.set(null)
     onNavigate({
       action: 'new-session',
       id: 'new-session',
@@ -108,7 +118,7 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
     setSidebarOpen(true)
     revealTreePane('sessions')
 
-    if (currentView !== 'chat') {
+    if (routeView !== 'chat') {
       onNavigate({
         id: 'project',
         label: copy.project,
@@ -124,16 +134,9 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
       className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-[calc(var(--titlebar-height)+0.45rem)]"
       data-personal-product-nav=""
     >
-      <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">
-        Stardust
-      </div>
+      <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">Stardust</div>
       <div className="flex flex-col gap-0.5">
-        <ProductNavButton
-          icon="add"
-          label={copy.newChat}
-          onClick={newChat}
-          tour="sidebar-nav-new-session"
-        />
+        <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
         <ProductNavButton
           active={currentView === 'cron'}
           icon="checklist"
