@@ -331,7 +331,12 @@ describe('expired OAuth grant recovery', () => {
       </MemoryRouter>
     )
 
-    expect(await screen.findByText(/Nous Portal sign-in has expired/)).toBeTruthy()
+    expect(await screen.findByText('Your Nous Portal sign-in expired')).toBeTruthy()
+    expect(
+      screen.getByText(
+        'The AI service rejected your sign-in. Check the credentials for this provider, then send your message again.'
+      )
+    ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Sign in to Nous Portal again' })).toBeNull()
 
