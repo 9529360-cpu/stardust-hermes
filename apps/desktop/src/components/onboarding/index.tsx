@@ -344,7 +344,8 @@ export function DesktopOnboardingOverlay({
     rawReason &&
     !isProviderSetupErrorMessage(rawReason) &&
     rawReason !== DEFAULT_ONBOARDING_REASON &&
-    rawReason !== DEFAULT_MANUAL_ONBOARDING_REASON
+    rawReason !== DEFAULT_MANUAL_ONBOARDING_REASON &&
+    !rawReason.startsWith('Stardust is not connected to any AI provider yet.')
       ? rawReason
       : null
 
