@@ -1,20 +1,27 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { saveCustomEndpoint, validateCustomEndpoint } from '@/hermes'
 import { I18nProvider } from '@/i18n'
 
-const getCustomEndpoints = vi.fn()
+const getCustomEndpoints = vi.fn()\nlet profileSwitchHandler: (() => void) | null = null
 
 vi.mock('@/hermes', () => ({
   activateCustomEndpoint: vi.fn(),
   deleteCustomEndpoint: vi.fn(),
-  getCustomEndpoints: () => getCustomEndpoints(),
+  getCustomEndpoints: (...args: unknown[]) => getCustomEndpoints(...args),
   saveCustomEndpoint: vi.fn(),
   validateCustomEndpoint: vi.fn()
 }))
 
+vi.mock('../hooks/use-on-profile-switch', () => ({
+  useOnProfileSwitch: (handler: () => void) => {
+    profileSwitchHandler = handler
+  }
+}))
+
 beforeEach(() => {
+  profileSwitchHandler = null
   getCustomEndpoints.mockResolvedValue({ endpoints: [] })
 })
 
@@ -32,7 +39,7 @@ describe('CustomEndpointsSettings', () => {
     expect(isEndpointUrl('relay.example/v1')).toBe(false)
   })
 
-  it('discovers candidates from the unsaved form without silently choosing a default', async () => {
+  it('drops stale responses when the requested profile changes', async () => {\n    let resolveA!: (value: unknown) => void\n    let resolveB!: (value: unknown) => void\n    const requestA = new Promise(resolve => {resolveA = resolve})\n    const requestB = new Promise(resolve => {resolveB = resolve})\n    getCustomEndpoints.mockImplementation((profile?: string) => (profile === 'profile-a' ? requestA : requestB))\n    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')\n    const view = render(<CustomEndpointsSettings scopeProfile="profile-a" />)\n\n    await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalledWith('profile-a'))\n    view.rerender(<CustomEndpointsSettings scopeProfile="profile-b" />)\n    await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalledWith('profile-b'))\n\n    await act(async () => {\n      resolveB({\n        endpoints: [{\n          id: 'b', name: 'Profile B Relay', base_url: 'https://b.example/v1', model: 'b-model',\n          models: ['b-model'], discover_models: true, is_current: true, has_api_key: false, source: 'providers'\n        }]\n      })\n      await requestB\n    })\n    expect(await screen.findByText('Profile B Relay')).toBeTruthy()\n\n    await act(async () => {\n      resolveA({\n        endpoints: [{\n          id: 'a', name: 'Profile A Relay', base_url: 'https://a.example/v1', model: 'a-model',\n          models: ['a-model'], discover_models: true, is_current: true, has_api_key: false, source: 'providers'\n        }]\n      })\n      await requestA\n    })\n\n    expect(screen.queryByText('Profile A Relay')).toBeNull()\n    expect(screen.getByText('Profile B Relay')).toBeTruthy()\n  })\n\n  it('reloads and clears old relay state on a live active-profile switch', async () => {\n    getCustomEndpoints\n      .mockResolvedValueOnce({\n        endpoints: [{\n          id: 'a', name: 'Active A Relay', base_url: 'https://a.example/v1', model: 'a-model',\n          models: ['a-model'], discover_models: true, is_current: true, has_api_key: false, source: 'providers'\n        }]\n      })\n      .mockResolvedValueOnce({ endpoints: [] })\n    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')\n    render(<CustomEndpointsSettings />)\n\n    expect(await screen.findByText('Active A Relay')).toBeTruthy()\n    expect(profileSwitchHandler).toBeTypeOf('function')\n    act(() => profileSwitchHandler?.())\n\n    await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalledTimes(2))\n    await waitFor(() => expect(screen.queryByText('Active A Relay')).toBeNull())\n    expect(await screen.findByText('Add model service')).toBeTruthy()\n    expect(screen.getByPlaceholderText('My model service')).toHaveProperty('value', '')\n  })\n  it('discovers candidates from the unsaved form without silently choosing a default', async () => {
     vi.mocked(validateCustomEndpoint).mockResolvedValue({
       ok: true,
       reachable: true,
