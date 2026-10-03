@@ -46,9 +46,9 @@ const SOURCE_ALIASES: Record<string, string[]> = {
 export const LOCAL_SESSION_SOURCE_IDS = ['cli', 'codex', 'desktop', 'gateway', 'kanban', 'local', 'tui']
 const LOCAL_SOURCE_IDS = new Set(LOCAL_SESSION_SOURCE_IDS)
 
-// External messaging platforms that each get their own self-managed sidebar
-// section (fetched separately from local recents). Mirrors the gateway platform
-// adapters; keep in sync with PLATFORM_ICONS in app/messaging/platform-icon.tsx.
+// External messaging platforms are fetched as their own backend slice, then
+// folded into the Desktop's unified conversation list. Keep this source set in
+// sync with the gateway adapters and PLATFORM_ICONS in app/messaging/platform-icon.tsx.
 export const MESSAGING_SESSION_SOURCE_IDS = [
   'telegram',
   'discord',
@@ -73,8 +73,8 @@ export const MESSAGING_SESSION_SOURCE_IDS = [
 ]
 const MESSAGING_SOURCE_IDS = new Set(MESSAGING_SESSION_SOURCE_IDS)
 
-/** True when a source id is an external messaging platform (gets its own
- *  sidebar section) rather than a local/CLI/desktop session. */
+/** True when a source id belongs to an external messaging platform rather
+ *  than a local/CLI/desktop session. */
 export function isMessagingSource(source: null | string | undefined): boolean {
   const id = normalizeSessionSource(source)
 

@@ -39,7 +39,7 @@ describe('desktop i18n runtime translator', () => {
   it('translates settings copy for newly supported locales', () => {
     setRuntimeI18nLocale('ja')
     expect(translateNow('settings.appearance.title')).toBe('外観')
-    expect(translateNow('settings.nav.providers')).toBe('プロバイダー')
+    expect(translateNow('settings.nav.providers')).toBe('モデルサービス')
 
     setRuntimeI18nLocale('zh-hant')
     expect(translateNow('settings.appearance.title')).toBe('外觀')

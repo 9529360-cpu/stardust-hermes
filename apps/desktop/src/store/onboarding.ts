@@ -63,7 +63,7 @@ export interface DesktopOnboardingState {
   /** True when the user explicitly chose "I'll choose a provider later" on the
    *  first-run picker. Persisted to localStorage so the blocking overlay never
    *  re-nags on subsequent launches — the user can connect a provider any time
-   *  from Settings → Providers (or the model picker's "Add provider"). Distinct
+   *  from Settings → Models (or the model picker's "Add model API"). Distinct
    *  from `configured`: the app still has no usable provider, so chat won't work
    *  until one is connected; we just stop forcing the choice up front. */
   firstRunSkipped: boolean
@@ -540,11 +540,9 @@ export function consumePendingCredentialWarning(): null | string {
   return warning
 }
 
-// Open the onboarding provider selector on demand from an already-configured
-// app — e.g. the model picker's "Add provider" button. Reuses the entire
-// onboarding flow (OAuth rows, API-key form, model-confirm) instead of
-// duplicating provider UI. Sets manual=true so the overlay shows the picker
-// even though configured===true, and refreshes the provider list.
+// Reopen the onboarding picker from an already-configured app (the onboarding
+// flow's own "choose again" paths). Sets manual=true so the overlay shows the
+// picker even though configured===true, and refreshes the provider list.
 export function startManualOnboarding(reason: null | string = DEFAULT_MANUAL_ONBOARDING_REASON, profile?: string) {
   cancelOnboardingFlow()
   providersRefreshPromise = null
@@ -564,59 +562,12 @@ export function startManualOnboarding(reason: null | string = DEFAULT_MANUAL_ONB
   void refreshProviders()
 }
 
-// Open the onboarding overlay directly on the local / custom endpoint form
-// (URL + optional API key), bypassing the OAuth picker. Used by Settings →
-// Model's "Set up custom endpoint" so it lands on a form that can actually
-// configure the endpoint instead of dead-ending on the OAuth provider list
-// (`custom` is not an OAuth provider, so the generic manual flow would just
-// re-show the picker — the original "booted back to the first screen" loop).
-export function startManualLocalEndpoint(reason: null | string = null, profile?: string) {
-  cancelOnboardingFlow()
-  pendingProviderOAuthId = null
-  patch({
-    manual: true,
-    targetProfile: profile,
-    providers: null,
-    requested: true,
-    localEndpoint: true,
-    mode: 'apikey',
-    reason: reason ? reason.trim() || DEFAULT_ONBOARDING_REASON : null,
-    flow: { status: 'idle' }
-  })
-}
-
-// One-shot hand-off used when the dedicated Providers settings page launches a
-// specific provider's sign-in: we open the manual onboarding overlay AND
-// remember which provider to start, so the overlay drives that exact OAuth
-// flow instead of re-showing the picker the user just clicked through.
-// Module-level (not store state) because it's consumed immediately on the next
-// overlay render and never needs to persist or re-render anything itself.
-let pendingProviderOAuthId: null | string = null
-
-export function startManualProviderOAuth(providerId: string, profile?: string) {
-  pendingProviderOAuthId = providerId
-  startManualOnboarding(null, profile)
-}
-
-// Read the pending provider id without clearing it. The overlay only clears it
-// (via clearPendingProviderOAuth) once it has actually launched that provider,
-// so a transient empty/failed provider fetch doesn't drop the hand-off and the
-// deep-link can still auto-start after the list loads.
-export function peekPendingProviderOAuth(): null | string {
-  return pendingProviderOAuthId
-}
-
-export function clearPendingProviderOAuth() {
-  pendingProviderOAuthId = null
-}
-
 // Dismiss a manually-opened provider selector without touching the existing
 // (working) configuration. Only valid in the manual path — the unconfigured
 // first-run flow has no close affordance because the app can't run yet.
 export function closeManualOnboarding() {
   cancelOnboardingFlow()
   providersRefreshPromise = null
-  pendingProviderOAuthId = null
 
   patch({
     targetProfile: undefined,
@@ -651,7 +602,7 @@ export function completeDesktopOnboarding() {
 // "I'll choose a provider later" on the first-run picker. Persists the skip so
 // the blocking overlay never re-nags on future launches, and dismisses it now
 // so the user lands in the app. Chat won't work until a provider is connected
-// (from Settings → Providers or the model picker's "Add provider") — this only
+// (from Settings → Models or the model picker's "Add model API") — this only
 // stops forcing the choice up front. Distinct from completeDesktopOnboarding,
 // which marks the app actually configured.
 export function dismissFirstRunOnboarding() {
@@ -665,10 +616,6 @@ export function dismissFirstRunOnboarding() {
     freeTierReady: false,
     flow: { status: 'idle' }
   })
-}
-
-export function setOnboardingMode(mode: OnboardingMode) {
-  patch({ mode })
 }
 
 export async function refreshOnboarding(ctx: OnboardingContext) {

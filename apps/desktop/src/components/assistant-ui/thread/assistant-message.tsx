@@ -31,7 +31,7 @@ import { PreviewAttachment } from '@/components/chat/preview-attachment'
 import { Codicon } from '@/components/ui/codicon'
 import { CopyButton } from '@/components/ui/copy-button'
 import { useI18n } from '@/i18n'
-import { errorRecoveryPlan, type ErrorSurface, formatErrorDiagnostics, isOAuthReauthSurface } from '@/lib/error-surface'
+import { errorRecoveryPlan, type ErrorSurface, formatErrorDiagnostics } from '@/lib/error-surface'
 import { errorCardText } from '@/lib/error-surface-copy'
 import { triggerHaptic } from '@/lib/haptics'
 import {
@@ -51,8 +51,7 @@ import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
 import { playSpeechText, stopVoicePlayback } from '@/lib/voice-playback'
 import { notifyError } from '@/store/notifications'
-import { startManualProviderOAuth } from '@/store/onboarding'
-import { $activeGatewayProfile, normalizeProfileKey, requestFreshSession } from '@/store/profile'
+import { requestFreshSession } from '@/store/profile'
 import { requestSendDiagnostics } from '@/store/send-diagnostics'
 import { $connection, $currentModel, setModelPickerOpen } from '@/store/session'
 import { sessionTileDelegate } from '@/store/session-states'
@@ -513,20 +512,6 @@ const SettingsLinkAction: FC<{ icon?: ReactNode; label: string; to: string }> = 
   )
 }
 
-// Settings → Keys deep link for a rejected API key: `?tab=keys` plus
-// `&key=<ENV>` when the descriptor names the env var (keys-settings.tsx
-// scrolls to and expands that row). Older backends omit `api_key_env`; the
-// tab alone is still the right place.
-const updateApiKeyRoute = (surface: ErrorSurface | undefined) => {
-  const params = new URLSearchParams({ tab: 'keys' })
-
-  if (surface?.apiKeyEnv) {
-    params.set('key', surface.apiKeyEnv)
-  }
-
-  return `${SETTINGS_ROUTE}?${params.toString()}`
-}
-
 // "Edit message" for a safety refusal: opens the preceding user message in
 // the edit composer, the same runtime call the bubble's own click performs
 // (user-message.tsx ActionBarPrimitive.Edit). Retry would reproduce the
@@ -622,23 +607,6 @@ const ErrorRecoveryActions: FC = () => {
   // One table decides which buttons this failure gets (lib/error-surface.ts).
   const plan = errorRecoveryPlan(surface)
 
-  // An expired/revoked OAuth grant (HTTP 401 on nous / openai-codex / ...):
-  // the one-click fix is re-running that provider's sign-in, which the
-  // onboarding overlay already owns end to end (device code → poll →
-  // reload.env → model confirm). Scoped to the gateway profile the failed
-  // session runs on, so a Bot profile's grant is renewed, not the primary's.
-  const gatewayProfile = useStore($activeGatewayProfile)
-
-  const signInAgain = useCallback(() => {
-    if (!isOAuthReauthSurface(surface)) {
-      return
-    }
-
-    triggerHaptic('submit')
-    const key = normalizeProfileKey(gatewayProfile)
-    startManualProviderOAuth(surface.provider, key === 'default' ? undefined : key)
-  }, [gatewayProfile, surface])
-
   // Reveal a local folder through Electron; `logsRoot` is the profile's
   // HERMES_HOME/logs, and its parent is the Hermes data folder itself (what
   // the user needs to see to free space after a disk-full failure).
@@ -708,17 +676,11 @@ const ErrorRecoveryActions: FC = () => {
           {copy.errorStartNewSession}
         </button>
       )}
-      {plan.signInAgain && isOAuthReauthSurface(surface) && (
-        <button className="aui-error-action" onClick={signInAgain} type="button">
-          <KeyRound className="size-3" />
-          {copy.errorSignInAgain(surface.providerLabel || surface.provider)}
-        </button>
-      )}
       {plan.updateApiKey && inRouter && (
         <SettingsLinkAction
           icon={<KeyRound className="size-3" />}
           label={copy.errorUpdateApiKey}
-          to={updateApiKeyRoute(surface)}
+          to={`${SETTINGS_ROUTE}?tab=config:model`}
         />
       )}
       {plan.openHermesFolder && localFolders && (
@@ -734,7 +696,7 @@ const ErrorRecoveryActions: FC = () => {
           </button>
         </ActionBarPrimitive.Reload>
       )}
-      {plan.switchProvider && inRouter && (
+      {plan.switchProvider && !plan.updateApiKey && inRouter && (
         <SettingsLinkAction label={copy.errorSwitchProvider} to={`${SETTINGS_ROUTE}?tab=config:model`} />
       )}
       {localFolders && (

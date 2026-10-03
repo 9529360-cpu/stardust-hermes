@@ -158,6 +158,7 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
   it('keeps long toolset protocol documentation behind a secondary details disclosure', async () => {
     const longDescription =
       'A2A protocol support with inbound and outbound transport, discovery, authentication, routing, compatibility adapters, implementation notes, security defaults, wire-format details, troubleshooting guidance, and platform-specific transport behavior that are useful for debugging but too detailed for the primary capability summary.'
+
     getToolsets.mockResolvedValue([toolset({ description: longDescription })])
 
     await renderSkills()
@@ -176,6 +177,39 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
     await screen.findByRole('switch', { name: 'Turn Web Search toolset off' })
     await waitFor(() => expect(getToolsetConfig).toHaveBeenCalled())
     expect(getToolsetConfig.mock.calls[0][0]).toBe('web')
+  })
+
+  it('opens the toolset named by a ?toolset= deep link instead of the first row', async () => {
+    // The pet generator's "Set up image generation" lands here: the image
+    // backend panel must be the one open on arrival, not whichever row sorts first.
+    getToolsets.mockResolvedValue([
+      toolset({
+        name: 'browser',
+        label: 'Browser Automation',
+        description: 'browser tools',
+        tools: ['browser_navigate']
+      }),
+      toolset({
+        name: 'image_gen',
+        label: 'Image Generation',
+        description: 'image_generate',
+        tools: ['image_generate']
+      })
+    ])
+    Element.prototype.scrollIntoView = vi.fn()
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/skills?tab=toolsets&toolset=image_gen']}>
+            <SkillsView />
+          </MemoryRouter>
+        </QueryClientProvider>
+      )
+    })
+
+    await waitFor(() => expect(getToolsetConfig.mock.calls.some(call => call[0] === 'image_gen')).toBe(true))
+    expect(document.getElementById('toolset-row-image_gen')?.className).toContain('bg-(--ui-row-active-background)')
   })
 
   it('scopes Tools config to the profile chosen in the selector', async () => {

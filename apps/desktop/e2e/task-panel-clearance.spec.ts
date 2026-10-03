@@ -26,7 +26,7 @@ async function send(page: Page, text: string): Promise<void> {
 }
 
 async function openFreshDraft(page: Page): Promise<void> {
-  await page.locator('[data-slot="sidebar"] button').filter({ hasText: /New session|新建会话/ }).first().click()
+  await page.locator('[data-tour="sidebar-nav-new-session"]').click()
   await expect(activeSurface(page).locator('[data-slot="aui_thread-viewport"]')).not.toContainText(PROMPT)
   await page.waitForTimeout(1_000)
 }

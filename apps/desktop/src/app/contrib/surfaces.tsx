@@ -62,11 +62,9 @@ export const SidebarSurface = memo(function SidebarSurface({
       data-personal-sidebar-view={currentView}
     >
       <PersonalProductNav currentView={currentView} onNavigate={latestActions.onNavigate} />
-      {currentView === 'chat' && (
-        <div className="min-h-0 flex-1 overflow-hidden" data-personal-conversations="">
-          <ChatSidebar currentView={currentView} {...latestActions} />
-        </div>
-      )}
+      <div className="min-h-0 flex-1 overflow-hidden" data-personal-conversations="">
+        <ChatSidebar currentView={currentView} {...latestActions} />
+      </div>
     </div>
   )
 })

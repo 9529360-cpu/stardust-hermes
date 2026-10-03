@@ -40,7 +40,7 @@ _IMAGE_ERROR_HINTS: tuple[tuple[tuple[str, ...], str], ...] = (
      "The image provider blocked this prompt — its safety filter rejects "
      "trademarked characters and real people. Try an original description."),
     (("api key", "unauthorized", "401", "auth"),
-     "The image provider rejected the request — check your API key in Settings → Providers."),
+     "The image provider rejected the request — check your model API in Settings → Models."),
     (("rate limit", "429"), "The image provider is rate-limiting — wait a moment and try again."),
 )
 

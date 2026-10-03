@@ -88,7 +88,7 @@ export function useTipRotation(copy: Translations['tips']) {
     }
 
     const openLocalModels = () => {
-      navigate(`${SETTINGS_ROUTE}?tab=providers&pview=local`)
+      navigate(`${SETTINGS_ROUTE}?tab=config:model`)
     }
 
     // Engine updates use the first quiet chat moment, independently of the tutorial clock.

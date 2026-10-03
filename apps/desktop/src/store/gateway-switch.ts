@@ -14,9 +14,7 @@ import {
   setCronSessions,
   setFreshDraftReady,
   setMessages,
-  setMessagingPlatformTotals,
   setMessagingSessions,
-  setMessagingTruncated,
   setSelectedStoredSessionId,
   setSessionProfilesTruncated,
   setSessionProfilesUsage,
@@ -198,8 +196,6 @@ export function wipeSessionListsForGatewaySwitch(): void {
   invalidateCronJobsRequests()
   setCronJobs([])
   setMessagingSessions([])
-  setMessagingPlatformTotals({})
-  setMessagingTruncated(false)
   // Clearing $sessionStates automatically clears $workingSessionIds and
   // $attentionSessionIds (computed) and $stalledSessionIds (owned beside it).
   // $unreadFinishedSessionIds is separate, so wipe it explicitly. Only the

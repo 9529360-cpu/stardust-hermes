@@ -2032,7 +2032,7 @@ export const zh = defineLocale({
       },
       bundledDescriptions: {
         'hermes-bots': '智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。',
-        kanban: '多智能体任务看板，包含看板页面、侧栏入口和状态栏中的实时任务动态。',
+        kanban: '多智能体任务看板，包含看板页面、命令面板入口和状态栏中的实时任务动态。',
         radio: '在线电台，支持固定常用电台、搜索和随音频变化的波形显示。'
       },
       halfDesktop: '桌面',
@@ -3129,7 +3129,7 @@ export const zh = defineLocale({
     clearSearch: '清除搜索',
     noMatch: query => `没有会话匹配"${query}"。`,
     results: '结果',
-    pinned: '已置顶',
+    pinned: '置顶会话',
     sessions: '对话',
     cronJobs: '定时任务',
     groupAriaGrouped: '以单一列表显示会话',
@@ -3771,9 +3771,9 @@ export const zh = defineLocale({
 
   onboarding: {
     headerTitle: '开始设置 Stardust',
-    headerDesc: '先连接你自己的模型中转服务；也可以稍后在设置中完成。',
-    setupRelay: '配置模型中转接口',
-    setupRelayHint: '前往模型设置，填写接口地址、密钥并选择模型。',
+    headerDesc: '直接连接你自己的模型 API；也可以稍后在设置中添加。',
+    setupRelay: '添加模型 API',
+    setupRelayHint: '填写 API 地址、API Key 和模型即可。',
     advancedProviders: '高级选项：官方账号和其他提供方',
     preparingInstall: 'Stardust 正在完成安装。首次运行通常不到一分钟。',
     starting: '正在启动 Stardust…',
@@ -4327,7 +4327,8 @@ export const zh = defineLocale({
       errorStartNewSession: '开始新会话',
       errorSwitchProvider: '切换服务商',
       errorSignInAgain: provider => `重新登录 ${provider}`,
-      errorOauthExpired: provider => `您的 ${provider} 登录已过期或被撤销。请重新登录以继续对话。`,
+      errorOauthExpired: provider =>
+        `您的 ${provider} 登录已过期或被撤销。请在终端运行 hermes model，选择 ${provider} 重新登录；或在“设置 → 模型服务”中改用模型 API。`,
       errorOpenLogs: '打开日志',
       errorOpenLogsFailed: '无法打开日志文件夹',
       errorOpenDesktopLogs: '打开桌面端日志',

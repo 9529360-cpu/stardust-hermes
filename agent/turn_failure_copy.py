@@ -150,7 +150,7 @@ _AUTH_COPY: Dict[str, str] = {
     ),
     "api_key": (
         "{label} rejected your API key, so the model can't be reached. Update it in "
-        "Settings → Providers, or run `hermes setup` in a terminal."
+        "Settings → Models, or run `hermes setup` in a terminal."
     ),
 }
 

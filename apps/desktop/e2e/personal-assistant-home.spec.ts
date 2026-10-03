@@ -27,7 +27,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
 
   const intro = page.locator('[data-slot="aui_intro"]')
   const productNav = page.locator('[data-personal-product-nav]')
-  const conversationButton = productNav.getByRole('button', { name: '对话', exact: true })
+  const newChatButton = productNav.getByRole('button', { name: '新建对话', exact: true })
   const projectButton = productNav.getByRole('button', { name: '项目', exact: true })
   const overview = page.locator('[data-personal-overview]')
   const composer = page.getByRole('textbox', { name: '消息' })
@@ -41,27 +41,24 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   await expect(page.getByRole('tab', { name: 'SESSIONS' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: 'BOTS' })).toHaveCount(0)
   await expect(page.getByText('今天想做什么？', { exact: true })).toBeVisible()
-  await expect(conversationButton).toBeVisible()
-  await expect(conversationButton).toHaveAttribute('aria-current', 'page')
-  await expect(productNav.getByRole('button', { name: '工作空间' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /新建会话/ })).toBeVisible()
+  await expect(newChatButton).toBeVisible()
   await expect(productNav.getByRole('button', { name: '任务' })).toBeVisible()
-  await expect(productNav.getByRole('button', { name: '项目' })).toBeVisible()
-  await expect(productNav.getByRole('button', { name: '知识库' })).toBeVisible()
   await expect(productNav.getByRole('button', { name: '工具' })).toBeVisible()
-  await expect(productNav.getByRole('button', { name: '设置' })).toBeVisible()
+  await expect(productNav.getByRole('button', { name: '插件' })).toBeVisible()
+  await expect(productNav.getByRole('button', { name: '项目' })).toBeVisible()
+  await expect(productNav.getByRole('button', { name: '对话' })).toHaveCount(0)
+  await expect(productNav.getByRole('button', { name: '知识库' })).toHaveCount(0)
+  await expect(productNav.getByRole('button', { name: '设置' })).toHaveCount(0)
   await expect(overview).not.toBeVisible()
 
   // Projects are a sidebar/context mode around the same conversation, not a
   // competing center page or an immediate native folder-picker action.
   await projectButton.click()
   await expect(projectButton).toHaveAttribute('aria-current', 'page')
-  await expect(conversationButton).not.toHaveAttribute('aria-current', 'page')
   await expect(composer).toBeVisible()
   await expect(overview).not.toBeVisible()
 
-  await conversationButton.click()
-  await expect(conversationButton).toHaveAttribute('aria-current', 'page')
+  await newChatButton.click()
   await expect(projectButton).not.toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('tab', { name: /terminal/i })).toHaveCount(0)
 
@@ -100,7 +97,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   await expect(composer).toBeVisible()
   await expect(page.locator('[data-jarvis-workspace]')).toHaveCount(0)
   await expect(overview).not.toBeVisible()
-  await expect(conversationButton).toHaveAttribute('aria-current', 'page')
+  await expect(newChatButton).toBeVisible()
   await expect(productNav.getByRole('button', { name: '工作空间' })).toHaveCount(0)
 
   const navBox = await productNav.boundingBox()

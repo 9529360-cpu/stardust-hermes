@@ -25,7 +25,7 @@ function Harness() {
   const tip = useStore($activeTip)
   const navigate = useNavigate()
   const location = useLocation()
-  offer = () => offerLocalRuntimeUpdateTip(en.tips, () => navigate(`${SETTINGS_ROUTE}?tab=providers&pview=local`))
+  offer = () => offerLocalRuntimeUpdateTip(en.tips, () => navigate(`${SETTINGS_ROUTE}?tab=config:model`))
 
   return (
     <>
@@ -276,7 +276,7 @@ it('the real Update now button navigates and sends exactly one install POST, nev
     fireEvent.click(button)
     fireEvent.click(button)
   })
-  expect(screen.getByRole('status').textContent).toBe(`${SETTINGS_ROUTE}?tab=providers&pview=local`)
+  expect(screen.getByRole('status').textContent).toBe(`${SETTINGS_ROUTE}?tab=config:model`)
   expect(api.mock.calls.filter(([request]) => request.method === 'POST').map(([request]) => request)).toEqual([
     { body: { backend: null }, method: 'POST', path: '/api/local-models/runtime/install' }
   ])

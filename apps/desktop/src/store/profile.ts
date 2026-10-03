@@ -873,10 +873,6 @@ export const ALL_PROFILES = '__all__'
 export const sidebarProfileForScope = (profileScope: string): string =>
   profileScope === ALL_PROFILES ? 'all' : normalizeProfileKey(profileScope)
 
-/** Key a platform total by its Desktop profile route so counts cannot leak across profiles. */
-export const messagingTotalsKey = (messagingProfile: string, sourceId: string): string =>
-  `${messagingProfile}:${sourceId}`
-
 const SHOW_ALL_PROFILES_STORAGE_KEY = 'hermes.desktop.showAllProfiles'
 
 // Opt-in unified view. When false, scope follows the live gateway profile, so

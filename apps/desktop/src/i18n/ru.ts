@@ -411,7 +411,7 @@ export const ru = defineLocale({
     exportFailed: 'Не удалось экспортировать',
     resetFailed: 'Не удалось сбросить',
     nav: {
-      providers: 'Провайдеры',
+      providers: 'Сервисы моделей',
       providerAccounts: 'Аккаунты',
       providerApiKeys: 'API-ключи',
       providerCustomEndpoints: 'Свои эндпоинты',
@@ -2492,7 +2492,7 @@ export const ru = defineLocale({
     clearSearch: 'Очистить поиск',
     noMatch: query => `Нет сеансов по запросу «${query}».`,
     results: 'Результаты',
-    pinned: 'Закреплённые',
+    pinned: 'Закреплённые чаты',
     sessions: 'Чаты',
     cronJobs: 'Cron-задачи',
     groupAriaGrouped: 'Показать сеансы одним списком',
@@ -3136,7 +3136,9 @@ export const ru = defineLocale({
   },
   onboarding: {
     headerTitle: 'Настроим для вас Stardust Agent',
-    headerDesc: 'Подключите провайдера модели, чтобы начать общение. Большинство вариантов — в один клик.',
+    headerDesc: 'Подключите API модели напрямую или добавьте его позже в настройках.',
+    setupRelay: 'Добавить API модели',
+    setupRelayHint: 'Укажите базовый URL API, ключ API и модель.',
     preparingInstall: 'Stardust завершает установку. Обычно это занимает меньше минуты при первом запуске.',
     starting: 'Запускаем Stardust…',
     lookingUpProviders: 'Ищем провайдеров...',

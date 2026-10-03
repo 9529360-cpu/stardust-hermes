@@ -393,8 +393,7 @@ const toSessionEntry = (session: SessionRow): SessionEntry => ({
   title: sessionTitle(session)
 })
 
-type NonConfigSettingsLabel =
-  'about' | 'archivedChats' | 'gateway' | 'keysSettings' | 'keysTools' | 'mcp' | 'providerAccounts' | 'providerApiKeys'
+type NonConfigSettingsLabel = 'about' | 'archivedChats' | 'gateway' | 'keysSettings' | 'keysTools' | 'mcp'
 
 const NON_CONFIG_SETTINGS: ReadonlyArray<{
   icon: IconComponent
@@ -402,18 +401,6 @@ const NON_CONFIG_SETTINGS: ReadonlyArray<{
   labelKey: NonConfigSettingsLabel
   tab: string
 }> = [
-  {
-    icon: Zap,
-    keywords: ['accounts', 'sign in', 'oauth', 'login', 'subscription', 'models', 'anthropic', 'openai'],
-    labelKey: 'providerAccounts',
-    tab: 'providers&pview=accounts'
-  },
-  {
-    icon: KeyRound,
-    keywords: ['providers', 'api key', 'keys', 'secrets', 'tokens', 'egress', 'iron proxy', 'sandbox proxy'],
-    labelKey: 'providerApiKeys',
-    tab: 'providers&pview=keys'
-  },
   {
     icon: Globe,
     // The Connections registry merged into the unified Gateways page.
@@ -447,6 +434,12 @@ const NON_CONFIG_SETTINGS: ReadonlyArray<{
   { icon: Archive, keywords: ['history', 'archived'], labelKey: 'archivedChats', tab: 'sessions' },
   { icon: Info, keywords: ['version', 'about'], labelKey: 'about', tab: 'about' }
 ]
+
+// Extra palette keywords per config section. Model API setup (base URL + key +
+// model) lives on the Models section since the provider account pages retired.
+const SECTION_KEYWORDS: Readonly<Record<string, readonly string[]>> = {
+  model: ['models', 'model api', 'api key', 'base url', 'endpoint', 'provider', 'openai', 'anthropic']
+}
 
 const THEME_MODES: ReadonlyArray<{ icon: IconComponent; mode: ThemeMode }> = [
   { icon: Sun, mode: 'light' },
@@ -980,7 +973,12 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           ...SECTIONS.map(section => ({
             icon: section.icon,
             id: `set-config-${section.id}`,
-            keywords: ['settings', section.label, settingsSectionLabel(section)],
+            keywords: [
+              'settings',
+              section.label,
+              settingsSectionLabel(section),
+              ...(SECTION_KEYWORDS[section.id] ?? [])
+            ],
             label: settingsSectionLabel(section),
             run: go(settingsTab(`config:${section.id}`))
           })),
@@ -1284,7 +1282,12 @@ function CommandPaletteBody({ onExited }: { onExited: () => void }) {
           ...SECTIONS.map(section => ({
             icon: section.icon,
             id: `sp-config-${section.id}`,
-            keywords: ['settings', section.label, settingsSectionLabel(section)],
+            keywords: [
+              'settings',
+              section.label,
+              settingsSectionLabel(section),
+              ...(SECTION_KEYWORDS[section.id] ?? [])
+            ],
             label: settingsSectionLabel(section),
             run: go(settingsTab(`config:${section.id}`))
           })),
