@@ -3518,7 +3518,7 @@ export const en: Translations = {
     collapse: 'Collapse',
     otherProviders: 'Other providers',
     haveApiKey: 'I have an API key',
-    chooseLater: "I'll choose a provider later",
+    chooseLater: "I'll set this up later",
     recommended: 'Recommended',
     connected: 'Connected',
     featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Stardust',

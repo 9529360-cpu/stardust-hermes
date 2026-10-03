@@ -140,7 +140,8 @@ async function main() {
   // A fresh install with no configured provider shows the onboarding card
   // ("Let's get you setup..."). It mounts LATE and in phases: first a
   // buttonless boot-progress card ("Starting Hermes... 86%"), then the
-  // provider picker with "I'll choose a provider later".
+  // provider picker with "I'll set this up later" (older builds: "I'll choose
+  // a provider later").
   // Two traps: a one-shot dismiss probe fires before the picker's button
   // exists, and isVisible() on the settings gear reports true while the
   // gear sits UNDER the fullscreen overlay that intercepts every click.
@@ -149,8 +150,8 @@ async function main() {
   // checks the hit target, so a landed click is proof the overlay is gone.
   // Harmless when onboarding never shows: the first settings click lands.
   const laterLocators = [
-    p => p.getByRole('button', { name: /choose a provider later/i }),
-    p => p.getByText(/choose a provider later/i),
+    p => p.getByRole('button', { name: /set this up later|choose a provider later/i }),
+    p => p.getByText(/set this up later|choose a provider later/i),
     p => p.getByRole('button', { name: /skip/i })
   ]
   const settingsLocators = [
