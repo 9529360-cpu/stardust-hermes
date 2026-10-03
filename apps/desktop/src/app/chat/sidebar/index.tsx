@@ -233,6 +233,7 @@ export function ChatSidebar({
   const profiles = useStore($profiles)
   const profileScope = useStore($profileScope)
   const activeConnectionId = useStore($activeConnectionId)
+
   // Toggle the persisted read-state watermark from a row menu. The row's own
   // `unread` prop mirrors what the dot paints; flip it and let the backend
   // become the truth (optimistic update + rollback in markSessionUnread).
@@ -1110,149 +1111,149 @@ export function ChatSidebar({
     >
       <SidebarContent className="gap-0 overflow-hidden bg-transparent px-2.5">
         <div
-            className={cn('flex min-h-0 flex-1 flex-col pb-1.75', SCROLL_Y, SCROLL_GUTTER)}
-            data-sessions-mode={sessionsMode}
-            data-sessions-project={inProject ? (enteredProjectId ?? undefined) : undefined}
-          >
-            <SidebarSessionsSection
-                activeSessionId={activeSidebarSessionId}
-                contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
-                dndSensors={dndSensors}
-                emptyState={<SidebarPinnedEmptyState />}
-                label={s.pinned}
-                onArchiveSession={onArchiveSession}
-                onBranchSession={onBranchSession}
-                onDeleteSession={onDeleteSession}
-                onReorderSessions={reorderPinned}
-                onResumeSession={onResumeSession}
-                onToggle={() => setSidebarPinsOpen(!pinsOpen)}
-                onTogglePin={unpinSession}
-                onToggleUnread={toggleUnread}
-                open={pinsOpen}
-                pinned
-                rootClassName="shrink-0 p-0 pb-1"
-                sessions={pinnedSessions}
-                showProfileTags={showAllProfiles}
-                sortable={pinnedSessions.length > 1}
-              />
+          className={cn('flex min-h-0 flex-1 flex-col pb-1.75', SCROLL_Y, SCROLL_GUTTER)}
+          data-sessions-mode={sessionsMode}
+          data-sessions-project={inProject ? (enteredProjectId ?? undefined) : undefined}
+        >
+          <SidebarSessionsSection
+            activeSessionId={activeSidebarSessionId}
+            contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
+            dndSensors={dndSensors}
+            emptyState={<SidebarPinnedEmptyState />}
+            label={s.pinned}
+            onArchiveSession={onArchiveSession}
+            onBranchSession={onBranchSession}
+            onDeleteSession={onDeleteSession}
+            onReorderSessions={reorderPinned}
+            onResumeSession={onResumeSession}
+            onToggle={() => setSidebarPinsOpen(!pinsOpen)}
+            onTogglePin={unpinSession}
+            onToggleUnread={toggleUnread}
+            open={pinsOpen}
+            pinned
+            rootClassName="shrink-0 p-0 pb-1"
+            sessions={pinnedSessions}
+            showProfileTags={showAllProfiles}
+            sortable={pinnedSessions.length > 1}
+          />
 
-            {inProject && projectLoadFailed && <SidebarLoadErrorState onRetry={retryProject} />}
-            <SidebarSessionsSection
-                activeProjectId={activeProjectId}
-                activeSessionId={activeSidebarSessionId}
-                // Inbox style is a render variant, not a grouping — it rides
-                // whichever view is active: flat recents, project lanes, and
-                // the overview previews all render the same card.
-                card={cardRows}
-                collapsible={!inProject}
-                contentClassName={cn(
-                  'flex min-h-0 flex-1 flex-col gap-px pb-1.75',
-                  // The section is the ONE authority on whether the virtual
-                  // list owns scrolling: it neutralizes this wrapper scroller
-                  // itself (overflow-visible) when it virtualizes. Gating
-                  // SCROLL_Y here on index's own parallel guess desynced the
-                  // two — a cached project tree flipped this side but not the
-                  // section's, leaving the list with no scroller at all and
-                  // the recents pane rendering blank under Updated grouping.
-                  SCROLL_Y,
-                  // Flatten into the single scroll when compact — unless this is the
-                  // virtualized long list, which must keep its own scroller.
-                  !recentsVirtualizes && COMPACT_FLAT
+          {inProject && projectLoadFailed && <SidebarLoadErrorState onRetry={retryProject} />}
+          <SidebarSessionsSection
+            activeProjectId={activeProjectId}
+            activeSessionId={activeSidebarSessionId}
+            // Inbox style is a render variant, not a grouping — it rides
+            // whichever view is active: flat recents, project lanes, and
+            // the overview previews all render the same card.
+            card={cardRows}
+            collapsible={!inProject}
+            contentClassName={cn(
+              'flex min-h-0 flex-1 flex-col gap-px pb-1.75',
+              // The section is the ONE authority on whether the virtual
+              // list owns scrolling: it neutralizes this wrapper scroller
+              // itself (overflow-visible) when it virtualizes. Gating
+              // SCROLL_Y here on index's own parallel guess desynced the
+              // two — a cached project tree flipped this side but not the
+              // section's, leaving the list with no scroller at all and
+              // the recents pane rendering blank under Updated grouping.
+              SCROLL_Y,
+              // Flatten into the single scroll when compact — unless this is the
+              // virtualized long list, which must keep its own scroller.
+              !recentsVirtualizes && COMPACT_FLAT
+            )}
+            dndSensors={dndSensors}
+            emptyState={
+              inProject && projectLoadFailed ? null : showSessionSkeletons || (inProject && projectLoading) ? (
+                <SidebarSessionSkeletons />
+              ) : (
+                <div className="grid min-h-16 place-items-center rounded-lg px-2 text-center text-xs text-(--ui-text-tertiary)">
+                  {inProject
+                    ? s.projectEmpty
+                    : filtersActive
+                      ? s.noFilterMatches
+                      : pinnedSessions.length > 0
+                        ? s.allPinned
+                        : s.noSessions}
+                </div>
+              )
+            }
+            footer={
+              // Hidden only when workspace-grouped — those groups page
+              // themselves. Profile groups don't: this one footer fetches the
+              // next page, which grows every profile at once.
+              !agentsGrouped && !showSessionSkeletons && hasMoreSessions ? (
+                <SidebarLoadMoreRow
+                  loading={sessionsLoading || recentsLoadMorePending}
+                  onClick={() => void onLoadMoreRecents()}
+                  // Recents are post-filtered to non-project sessions, so a
+                  // backend page size (50) is not a truthful "rows you'll
+                  // see" count. Use the generic label instead of a fake N.
+                  step={0}
+                />
+              ) : null
+            }
+            forceEmptyState={showSessionSkeletons}
+            // Archived is a plain list, and so is a magnitude-ranked one.
+            // Otherwise project lanes stay chronological whatever the flat
+            // list does — only the flat list can swap its dividers for
+            // WORKING / DONE.
+            grouping={showArchived || rankedGlobally ? 'none' : grouping === 'status' ? 'status' : 'date'}
+            groups={displayAgentGroups}
+            headerAction={
+              // One cluster, not a fragment: the header is justify-between,
+              // so two children (mark-all + the rest) park the check-all in
+              // the middle as a blank 24px hole until hover.
+              <div className="flex shrink-0 items-center gap-0.5">
+                {unreadCount > 0 && (
+                  <Tip label={s.markAllRead}>
+                    <Button
+                      aria-label={s.markAllRead}
+                      className={HEADER_ACTION_BTN}
+                      onClick={event => {
+                        event.stopPropagation()
+                        markAllSessionsRead()
+                        // Ack the persisted layer too, or the next list
+                        // refresh repaints every dot just dismissed.
+                        ackAllSessionsRead()
+                      }}
+                      size="icon-xs"
+                      variant="ghost"
+                    >
+                      <Codicon name="check-all" size="0.75rem" />
+                    </Button>
+                  </Tip>
                 )}
-                dndSensors={dndSensors}
-                emptyState={
-                  inProject && projectLoadFailed ? null : showSessionSkeletons || (inProject && projectLoading) ? (
-                    <SidebarSessionSkeletons />
-                  ) : (
-                    <div className="grid min-h-16 place-items-center rounded-lg px-2 text-center text-xs text-(--ui-text-tertiary)">
-                      {inProject
-                        ? s.projectEmpty
-                        : filtersActive
-                          ? s.noFilterMatches
-                          : pinnedSessions.length > 0
-                            ? s.allPinned
-                            : s.noSessions}
-                    </div>
-                  )
-                }
-                footer={
-                  // Hidden only when workspace-grouped — those groups page
-                  // themselves. Profile groups don't: this one footer fetches the
-                  // next page, which grows every profile at once.
-                  !agentsGrouped && !showSessionSkeletons && hasMoreSessions ? (
-                    <SidebarLoadMoreRow
-                      loading={sessionsLoading || recentsLoadMorePending}
-                      onClick={() => void onLoadMoreRecents()}
-                      // Recents are post-filtered to non-project sessions, so a
-                      // backend page size (50) is not a truthful "rows you'll
-                      // see" count. Use the generic label instead of a fake N.
-                      step={0}
-                    />
-                  ) : null
-                }
-                forceEmptyState={showSessionSkeletons}
-                // Archived is a plain list, and so is a magnitude-ranked one.
-                // Otherwise project lanes stay chronological whatever the flat
-                // list does — only the flat list can swap its dividers for
-                // WORKING / DONE.
-                grouping={showArchived || rankedGlobally ? 'none' : grouping === 'status' ? 'status' : 'date'}
-                groups={displayAgentGroups}
-                headerAction={
-                  // One cluster, not a fragment: the header is justify-between,
-                  // so two children (mark-all + the rest) park the check-all in
-                  // the middle as a blank 24px hole until hover.
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    {unreadCount > 0 && (
-                      <Tip label={s.markAllRead}>
+                {inProject && enteredProject ? (
+                  <div className="group/workspace flex shrink-0 items-center gap-0.5">
+                    {enteredProject.path && <StartWorkButton repoPath={enteredProject.path} />}
+                    {/* Home has no folder and no record to rename, theme, or delete. */}
+                    {!enteredProject.isNoProject && (
+                      <ProjectMenu
+                        isActive={enteredProject.id === activeProjectId}
+                        onExitScope={exitProjectScope}
+                        project={enteredProject}
+                        scoped
+                      />
+                    )}
+                    <div className="grid size-6 place-items-center">
+                      <Tip label={s.showProjects}>
                         <Button
-                          aria-label={s.markAllRead}
-                          className={HEADER_ACTION_BTN}
+                          aria-label={s.showProjects}
+                          className={HEADER_NAV_BTN}
                           onClick={event => {
                             event.stopPropagation()
-                            markAllSessionsRead()
-                            // Ack the persisted layer too, or the next list
-                            // refresh repaints every dot just dismissed.
-                            ackAllSessionsRead()
+                            exitProjectScope()
                           }}
                           size="icon-xs"
                           variant="ghost"
                         >
-                          <Codicon name="check-all" size="0.75rem" />
+                          <Codicon name="list-unordered" size="0.75rem" />
                         </Button>
                       </Tip>
-                    )}
-                    {inProject && enteredProject ? (
-                      <div className="group/workspace flex shrink-0 items-center gap-0.5">
-                        {enteredProject.path && <StartWorkButton repoPath={enteredProject.path} />}
-                        {/* Home has no folder and no record to rename, theme, or delete. */}
-                        {!enteredProject.isNoProject && (
-                          <ProjectMenu
-                            isActive={enteredProject.id === activeProjectId}
-                            onExitScope={exitProjectScope}
-                            project={enteredProject}
-                            scoped
-                          />
-                        )}
-                        <div className="grid size-6 place-items-center">
-                          <Tip label={s.showProjects}>
-                            <Button
-                              aria-label={s.showProjects}
-                              className={HEADER_NAV_BTN}
-                              onClick={event => {
-                                event.stopPropagation()
-                                exitProjectScope()
-                              }}
-                              size="icon-xs"
-                              variant="ghost"
-                            >
-                              <Codicon name="list-unordered" size="0.75rem" />
-                            </Button>
-                          </Tip>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {/* The flat-list header "+" is a drag source too — the
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* The flat-list header "+" is a drag source too — the
                             same gesture as the nav's "New session" row: drag
                             it onto a chat zone's tab strip / edge / center to
                             create the session exactly there. Project-overview
@@ -1260,76 +1261,75 @@ export function ChatSidebar({
                             the project-drag variant: a drop opens the SAME
                             project dialog, and the created project starts at
                             the dropped spot. */}
-                        <SidebarSectionAddButton
-                          ariaLabel={agentsGrouped ? s.projects.newButton : s.nav['new-session']}
-                          onNewProjectDrag={
-                            agentsGrouped
-                              ? {
-                                  // Dragging the "New project" + arms WHERE the
-                                  // project should start; the dialog flow consumes
-                                  // it on create (see $newProjectDropPlacement).
-                                  onArm: placement => $newProjectDropPlacement.set(placement)
-                                }
-                              : undefined
-                          }
-                          onNewSessionSplit={agentsGrouped ? undefined : onNewSessionSplit}
-                          onPlainClick={() => {
-                            if (agentsGrouped) {
-                              openProjectCreate()
-                            } else {
-                              onNewSessionInWorkspace(null)
+                    <SidebarSectionAddButton
+                      ariaLabel={agentsGrouped ? s.projects.newButton : s.nav['new-session']}
+                      onNewProjectDrag={
+                        agentsGrouped
+                          ? {
+                              // Dragging the "New project" + arms WHERE the
+                              // project should start; the dialog flow consumes
+                              // it on create (see $newProjectDropPlacement).
+                              onArm: placement => $newProjectDropPlacement.set(placement)
                             }
-                          }}
-                        />
-                        <div className="grid size-6 place-items-center">
-                          <SidebarFilterMenu className={HEADER_NAV_BTN} />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                }
-                label={sessionsLabel}
-                labelMeta={
-                  worktreeGroupingActive ? (
-                    reposScanning && !projectsSkeletonVisible ? (
-                      <GlyphSpinner ariaLabel={s.loading} className="text-[0.6875rem] text-(--ui-text-quaternary)" />
-                    ) : undefined
-                  ) : undefined
-                }
-                liveSessions={inProject ? enteredProjectOverlaySessions : undefined}
-                manualOrderIds={agentOrderManual ? agentOrderIds : sortOrderIds}
-                onArchiveSession={onArchiveSession}
-                onBranchSession={onBranchSession}
-                onDeleteSession={onDeleteSession}
-                onEnterProject={onEnterProject}
-                onNewSessionInWorkspace={onNewSessionInWorkspace}
-                onNewSessionSplit={onNewSessionSplit}
-                onReorderProjects={showAllProfiles ? undefined : reorderProjects}
-                onReorderSessions={showAllProfiles ? undefined : reorderSessions}
-                onResumeSession={onResumeSession}
-                onToggle={() => setSidebarRecentsOpen(!agentsOpen)}
-                onTogglePin={pinSession}
-                onToggleUnread={toggleUnread}
-                open={agentsOpen}
-                pinned={false}
-                projectBackRow={
-                  inProject ? <ProjectBackRow label={s.projects.back} onClick={exitProjectScope} /> : undefined
-                }
-                projectContent={inProject ? enteredProjectContent : undefined}
-                projectOverview={projectOverview}
-                projectOverviewPreviews={overviewPreviews}
-                projectRepoWorktrees={inProject ? scopedRepoWorktrees : undefined}
-                projectsLoading={worktreeGroupingActive ? projectTreeLoading : false}
-                removedSessionIds={inProject ? removedSessionIds : undefined}
-                rootClassName={cn(
-                  'min-h-32 flex-1 overflow-hidden p-0',
-                  !recentsVirtualizes && 'compact:min-h-0 compact:flex-none compact:overflow-visible'
+                          : undefined
+                      }
+                      onNewSessionSplit={agentsGrouped ? undefined : onNewSessionSplit}
+                      onPlainClick={() => {
+                        if (agentsGrouped) {
+                          openProjectCreate()
+                        } else {
+                          onNewSessionInWorkspace(null)
+                        }
+                      }}
+                    />
+                    <div className="grid size-6 place-items-center">
+                      <SidebarFilterMenu className={HEADER_NAV_BTN} />
+                    </div>
+                  </>
                 )}
-                sessions={displayAgentSessions}
-                sortable={!showAllProfiles && agentSessions.length > 1}
-              />
-
-          </div>
+              </div>
+            }
+            label={sessionsLabel}
+            labelMeta={
+              worktreeGroupingActive ? (
+                reposScanning && !projectsSkeletonVisible ? (
+                  <GlyphSpinner ariaLabel={s.loading} className="text-[0.6875rem] text-(--ui-text-quaternary)" />
+                ) : undefined
+              ) : undefined
+            }
+            liveSessions={inProject ? enteredProjectOverlaySessions : undefined}
+            manualOrderIds={agentOrderManual ? agentOrderIds : sortOrderIds}
+            onArchiveSession={onArchiveSession}
+            onBranchSession={onBranchSession}
+            onDeleteSession={onDeleteSession}
+            onEnterProject={onEnterProject}
+            onNewSessionInWorkspace={onNewSessionInWorkspace}
+            onNewSessionSplit={onNewSessionSplit}
+            onReorderProjects={showAllProfiles ? undefined : reorderProjects}
+            onReorderSessions={showAllProfiles ? undefined : reorderSessions}
+            onResumeSession={onResumeSession}
+            onToggle={() => setSidebarRecentsOpen(!agentsOpen)}
+            onTogglePin={pinSession}
+            onToggleUnread={toggleUnread}
+            open={agentsOpen}
+            pinned={false}
+            projectBackRow={
+              inProject ? <ProjectBackRow label={s.projects.back} onClick={exitProjectScope} /> : undefined
+            }
+            projectContent={inProject ? enteredProjectContent : undefined}
+            projectOverview={projectOverview}
+            projectOverviewPreviews={overviewPreviews}
+            projectRepoWorktrees={inProject ? scopedRepoWorktrees : undefined}
+            projectsLoading={worktreeGroupingActive ? projectTreeLoading : false}
+            removedSessionIds={inProject ? removedSessionIds : undefined}
+            rootClassName={cn(
+              'min-h-32 flex-1 overflow-hidden p-0',
+              !recentsVirtualizes && 'compact:min-h-0 compact:flex-none compact:overflow-visible'
+            )}
+            sessions={displayAgentSessions}
+            sortable={!showAllProfiles && agentSessions.length > 1}
+          />
+        </div>
 
         <div className="shrink-0 px-0.5 pb-1 pt-0.5">
           <ProfileRail />
