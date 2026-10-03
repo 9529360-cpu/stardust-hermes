@@ -558,7 +558,7 @@ registry.register(
         api_key=args.get("api_key", ""),
         base_url=args.get("base_url", ""),
         keyless=args.get("keyless", False),
-        user_message=kw.get("user_message"),
+        user_message=kw.get("user_task"),
     ),
     emoji="🔐",
 )
