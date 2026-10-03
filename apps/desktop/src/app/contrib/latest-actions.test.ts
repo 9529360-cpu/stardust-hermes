@@ -40,14 +40,11 @@ function makeSidebarActions(): SidebarActions {
     onArchiveSession: vi.fn(),
     onBranchSession: vi.fn(),
     onDeleteSession: vi.fn(),
-    onLoadMoreMessaging: vi.fn(),
     onLoadMoreSessions: vi.fn(),
-    onManageCronJob: vi.fn(),
     onNavigate: vi.fn(),
     onNewSessionInWorkspace: vi.fn(),
     onNewSessionSplit: vi.fn(),
-    onResumeSession: vi.fn(),
-    onTriggerCronJob: vi.fn()
+    onResumeSession: vi.fn()
   }
 }
 
@@ -109,12 +106,6 @@ describe('latestActions adapters', () => {
     expect(adaptedChat.onRestoreToMessage).toBeUndefined()
     expect(adaptedChat.onTranscribeAudio).toBeUndefined()
 
-    const sidebar = makeSidebarActions()
-    sidebar.onLoadMoreMessaging = undefined
-
-    const adaptedSidebar = latestSidebarActions(sidebar)
-
-    expect(adaptedSidebar.onLoadMoreMessaging).toBeUndefined()
   })
 
   it('still late-binds a PRESENT optional handler to the latest closure', async () => {
