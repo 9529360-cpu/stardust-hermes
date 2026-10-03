@@ -142,7 +142,7 @@ export function PersonalProductNav({ currentView, onNavigate }: PersonalProductN
           tour="sidebar-nav-cron"
         />
         <ProductNavButton
-          active={currentView === 'skills' && skillsTab === 'toolsets'}
+          active={currentView === 'skills' && skillsTab !== 'plugins'}
           icon="tools"
           label={copy.tools}
           onClick={openTools}
