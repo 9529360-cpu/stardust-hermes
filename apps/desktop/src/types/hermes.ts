@@ -237,6 +237,7 @@ export interface CustomEndpointUpdate {
   api_key?: string
   base_url: string
   context_length?: number
+  create_only?: boolean
   discover_models?: boolean
   id?: string
   make_default?: boolean

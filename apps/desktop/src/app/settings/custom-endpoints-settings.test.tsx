@@ -97,8 +97,8 @@ describe('CustomEndpointsSettings', () => {
 
     await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.queryByText('Active A Relay')).toBeNull())
-    expect(await screen.findByText('Add model service')).toBeTruthy()
-    expect(screen.getByPlaceholderText('My model service')).toHaveProperty('value', '')
+    expect(await screen.findByRole('button', { name: 'Add model service' })).toBeTruthy()
+    expect(screen.queryByPlaceholderText('My model service')).toBeNull()
   })
   it('discovers candidates from the unsaved form without silently choosing a default', async () => {
     vi.mocked(validateCustomEndpoint).mockResolvedValue({
@@ -113,7 +113,7 @@ describe('CustomEndpointsSettings', () => {
         <CustomEndpointsSettings />
       </I18nProvider>
     )
-    await screen.findByText('添加模型服务')
+    fireEvent.click(await screen.findByRole('button', { name: '添加模型服务' }))
     fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), {
       target: { value: 'https://relay.example/v1' }
     })
@@ -139,8 +139,8 @@ describe('CustomEndpointsSettings', () => {
     )
     await waitFor(() => expect(getCustomEndpoints).toHaveBeenCalled())
 
-    expect(await screen.findByText('添加模型服务')).toBeTruthy()
-    expect(screen.getByText('服务名称')).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: '添加模型服务' }))
+    expect(await screen.findByText('服务名称')).toBeTruthy()
     expect(screen.getByText('服务地址')).toBeTruthy()
     expect(screen.getByText('默认模型')).toBeTruthy()
     expect(screen.getByText('API 密钥')).toBeTruthy()
@@ -162,7 +162,113 @@ describe('CustomEndpointsSettings', () => {
     expect(screen.getByRole('button', { name: '收起高级选项' })).toBeTruthy()
   })
 
-  it('saves the selected discovered model and clears the key field on edit', async () => {
+  it('adds a second service without turning the existing service into an edit target', async () => {
+    const existing = {
+      id: 'alpha',
+      name: 'Alpha',
+      base_url: 'https://alpha.example/v1',
+      model: 'alpha-model',
+      models: ['alpha-model'],
+      discover_models: true,
+      is_current: true,
+      has_api_key: false,
+      source: 'providers'
+    }
+    const added = {
+      id: 'beta',
+      name: 'Beta',
+      base_url: 'https://beta.example/v1',
+      model: 'beta-model',
+      models: ['beta-model'],
+      discover_models: true,
+      is_current: false,
+      has_api_key: false,
+      source: 'providers'
+    }
+    getCustomEndpoints.mockResolvedValueOnce({ endpoints: [existing] })
+    vi.mocked(saveCustomEndpoint).mockResolvedValue({
+      id: 'beta',
+      current: { provider: 'alpha', model: 'alpha-model', base_url: 'https://alpha.example/v1' },
+      endpoints: [existing, added]
+    })
+
+    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    render(<CustomEndpointsSettings />)
+
+    expect(await screen.findByText('Alpha')).toBeTruthy()
+    expect(screen.queryByPlaceholderText('My model service')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add model service' }))
+    fireEvent.change(screen.getByPlaceholderText('My model service'), { target: { value: 'Beta' } })
+    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), {
+      target: { value: 'https://beta.example/v1' }
+    })
+    fireEvent.change(screen.getByPlaceholderText('gpt-5.4'), { target: { value: 'beta-model' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save service' }))
+
+    await waitFor(() =>
+      expect(saveCustomEndpoint).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: undefined,
+          name: 'Beta',
+          base_url: 'https://beta.example/v1',
+          model: 'beta-model',
+          create_only: true,
+          make_default: false
+        }),
+        undefined
+      )
+    )
+    await waitFor(() => expect(screen.queryByPlaceholderText('My model service')).toBeNull())
+    expect(screen.getByText('Alpha')).toBeTruthy()
+    expect(screen.getByText('Beta')).toBeTruthy()
+  })
+
+  it('edits only the service explicitly opened for editing', async () => {
+    const existing = {
+      id: 'alpha',
+      name: 'Alpha',
+      base_url: 'https://alpha.example/v1',
+      model: 'alpha-model',
+      models: ['alpha-model'],
+      discover_models: true,
+      is_current: false,
+      has_api_key: false,
+      source: 'providers'
+    }
+    const updated = { ...existing, model: 'alpha-model-2', models: ['alpha-model', 'alpha-model-2'] }
+    getCustomEndpoints.mockResolvedValueOnce({ endpoints: [existing] })
+    vi.mocked(saveCustomEndpoint).mockResolvedValue({
+      id: 'alpha',
+      current: { provider: '', model: '', base_url: '' },
+      endpoints: [updated]
+    })
+
+    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    render(<CustomEndpointsSettings />)
+
+    expect(await screen.findByText('Alpha')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit model service' }))
+    fireEvent.change(screen.getByPlaceholderText('gpt-5.4'), { target: { value: 'alpha-model-2' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced options' }))
+    expect(screen.getByDisplayValue('alpha')).toHaveProperty('disabled', true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save service' }))
+
+    await waitFor(() =>
+      expect(saveCustomEndpoint).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'alpha',
+          model: 'alpha-model-2',
+          create_only: false
+        }),
+        undefined
+      )
+    )
+  })
+
+  it('saves the selected discovered model and returns to the service inventory', async () => {
     vi.mocked(validateCustomEndpoint).mockResolvedValue({
       ok: true,
       reachable: true,
@@ -171,7 +277,7 @@ describe('CustomEndpointsSettings', () => {
     })
     vi.mocked(saveCustomEndpoint).mockResolvedValue({
       id: 'custom:relay',
-      current: { provider: 'custom:relay', model: 'relay-model', base_url: 'https://relay.example/v1' },
+      current: { provider: '', model: '', base_url: '' },
       endpoints: [
         {
           id: 'custom:relay',
@@ -180,7 +286,7 @@ describe('CustomEndpointsSettings', () => {
           model: 'relay-model',
           models: ['relay-model'],
           discover_models: true,
-          is_current: true,
+          is_current: false,
           has_api_key: true,
           source: 'managed'
         }
@@ -188,7 +294,7 @@ describe('CustomEndpointsSettings', () => {
     })
     const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
     render(<CustomEndpointsSettings />)
-    await screen.findByText('Add model service')
+    fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
     fireEvent.change(screen.getByPlaceholderText('My model service'), { target: { value: 'Relay' } })
     fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), {
       target: { value: 'https://relay.example/v1' }
@@ -202,13 +308,13 @@ describe('CustomEndpointsSettings', () => {
           name: 'Relay',
           base_url: 'https://relay.example/v1',
           model: 'relay-model',
-          models: ['relay-model']
+          models: ['relay-model'],
+          create_only: true
         }),
         undefined
       )
     )
-    await waitFor(() =>
-      expect(screen.getByPlaceholderText('Leave blank to keep the current key')).toHaveProperty('value', '')
-    )
+    await waitFor(() => expect(screen.queryByPlaceholderText('Leave blank to keep the current key')).toBeNull())
+    expect(screen.getByText('Relay')).toBeTruthy()
   })
 })
