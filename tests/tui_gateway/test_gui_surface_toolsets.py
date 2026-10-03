@@ -41,6 +41,11 @@ def no_desktop_env(monkeypatch):
 
 
 class TestDesktopUiToolset:
+    def test_model_config_toolset_resolves_only_its_mutation_tool(self):
+        from tools.registry import discover_builtin_tools
+        discover_builtin_tools()
+        assert set(resolve_toolset("model_config")) == {"model_configure"}
+
     def test_holds_exactly_the_gui_affordances(self):
         # apply_layout registers into desktop_ui via the registry (not the
         # static toolsets.py list), so force discovery first — otherwise the
