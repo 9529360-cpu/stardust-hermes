@@ -182,6 +182,131 @@ def test_failed_model_validation_reports_partial_secret_write_without_echo(monke
     assert secret not in raw
 
 
+def test_custom_endpoint_routes_through_direct_endpoint_path(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        mod,
+        "_configure_custom_endpoint",
+        lambda **kwargs: calls.append(kwargs) or json.dumps({"success": True, "provider": "custom"}),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_resolve_provider",
+        lambda _raw: (_ for _ in ()).throw(AssertionError("custom base_url must bypass built-in provider resolution")),
+    )
+
+    result = _payload(
+        mod.model_configure_tool(
+            provider="custom",
+            base_url="https://relay.example/v1",
+            model="relay-model",
+            api_key="sk-relay-ABCDEFGHIJKLMN123456",
+            user_message="把这个模型 API 配好并启用",
+        )
+    )
+
+    assert result["success"] is True
+    assert calls == [{
+        "base_url": "https://relay.example/v1",
+        "model": "relay-model",
+        "api_key": "sk-relay-ABCDEFGHIJKLMN123456",
+        "keyless": False,
+    }]
+
+
+def test_remote_custom_endpoint_uses_masked_capture_and_never_echoes_key(monkeypatch):
+    calls = []
+    secret = "sk-relay-ABCDEFGHIJKLMN123456"
+    monkeypatch.setattr(mod, "_confirm_configuration", lambda *a, **k: True)
+    monkeypatch.setattr(mod, "_capture_provider_key", lambda *a: calls.append(("capture", *a)) or True)
+    monkeypatch.setattr(mod, "_read_scoped_secret", lambda env: secret)
+    monkeypatch.setattr(
+        mod,
+        "_switch_custom_and_persist",
+        lambda base_url, model, api_key, key_env: (
+            calls.append(("switch", base_url, model, api_key, key_env))
+            or SimpleNamespace(
+                success=True,
+                new_model=model,
+                base_url=base_url,
+                warning_message="",
+                error_message="",
+            )
+        ),
+    )
+
+    raw = mod._configure_custom_endpoint(
+        base_url="https://relay.example/v1",
+        model="relay-model",
+        api_key="",
+        keyless=False,
+    )
+    result = _payload(raw)
+
+    assert result["success"] is True
+    assert calls[0][0] == "capture"
+    assert calls[1][0] == "switch"
+    assert calls[1][3] == secret
+    assert result["credential_saved"] is True
+    assert secret not in raw
+
+
+def test_loopback_custom_endpoint_defaults_to_keyless(monkeypatch):
+    calls = []
+    monkeypatch.setattr(mod, "_confirm_configuration", lambda *a, **k: True)
+    monkeypatch.setattr(
+        mod,
+        "_capture_provider_key",
+        lambda *_a: (_ for _ in ()).throw(AssertionError("loopback endpoint must not force secret capture")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_switch_custom_and_persist",
+        lambda base_url, model, api_key, key_env: (
+            calls.append((base_url, model, api_key, key_env))
+            or SimpleNamespace(
+                success=True,
+                new_model=model,
+                base_url=base_url,
+                warning_message="",
+                error_message="",
+            )
+        ),
+    )
+
+    result = _payload(
+        mod._configure_custom_endpoint(
+            base_url="http://127.0.0.1:8080/v1/",
+            model="local-model",
+            api_key="",
+            keyless=False,
+        )
+    )
+
+    assert result["success"] is True
+    assert calls == [("http://127.0.0.1:8080/v1", "local-model", "", "")]
+    assert result["credential_saved"] is False
+
+
+def test_invalid_custom_endpoint_fails_before_approval(monkeypatch):
+    monkeypatch.setattr(
+        mod,
+        "_confirm_configuration",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("invalid URL must fail before approval")),
+    )
+
+    result = _payload(
+        mod._configure_custom_endpoint(
+            base_url="file:///tmp/model",
+            model="model",
+            api_key="",
+            keyless=True,
+        )
+    )
+
+    assert "http:// or https://" in result["error"]
+
+
 def test_oauth_provider_rejects_pasted_api_key_before_any_write(monkeypatch):
     descriptor = _descriptor(
         slug="openai-codex",
