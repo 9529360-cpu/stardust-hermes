@@ -37,6 +37,7 @@ describe('CustomEndpointsSettings', () => {
     expect(isEndpointUrl('https://relay.example/v1')).toBe(true)
     expect(isEndpointUrl('http://127.0.0.1:8000/v1')).toBe(true)
     expect(isEndpointUrl('file:///etc/passwd')).toBe(false)
+    expect(isEndpointUrl('https://user:pass@relay.example/v1')).toBe(false)
     expect(isEndpointUrl('relay.example/v1')).toBe(false)
   })
 
