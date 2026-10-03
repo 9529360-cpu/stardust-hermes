@@ -14,8 +14,7 @@ import { isSubmitEnter } from '@/lib/ime'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import { cn } from '@/lib/utils'
 import { $desktopBoot, type DesktopBootState } from '@/store/boot'
-import { FREE_TIER_MODEL } from '@/store/free-tier'
-import { $introReveal, shouldPlayFirstRunIntro } from '@/store/intro-reveal'
+import { FREE_TIER_MODEL } from '@/store/free-tier'import { $introReveal, shouldPlayFirstRunIntro } from '@/store/intro-reveal'
 import { $localModelsEnabled } from '@/store/local-models-flag'
 import {
   $desktopOnboarding,
@@ -32,7 +31,7 @@ import {
 } from '@/store/onboarding'
 import { $onboardingSurfaces, onboardingSurfaceActive } from '@/store/onboarding-presence'
 
-import { DocsLink, FlowPanel, Status } from './flow'
+import { DocsLink, FlowPanel } from './flow'
 import { DecodedLabel } from './glyph'
 import { LocalModelsProviderRow } from './providers'
 
