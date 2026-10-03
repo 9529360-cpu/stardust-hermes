@@ -274,8 +274,7 @@ export function DesktopOnboardingOverlay({
   }
 
   // The user chose "I'll choose a provider later" on first run. Stay out of the
-  // way on every subsequent launch — they re-enter via Settings → Providers
-  // (manual mode), which sets manual=true and bypasses this gate.
+  // way on every subsequent launch; model APIs are added later from Settings → Models.
   if (onboarding.firstRunSkipped && !onboarding.manual && !onboarding.freeTierReady) {
     return null
   }
@@ -424,7 +423,7 @@ function FreeTierReadyPanel({
           type="button"
           variant="text"
         >
-          {copy.otherProviders}
+          {t.onboarding.setupRelay}
         </Button>
       </div>
     </div>
@@ -530,8 +529,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
 }
 
 // "I'll choose a provider later" — dismisses the first-run picker and persists
-// the skip so it never re-nags. The user connects a provider any time from
-// Settings → Providers. Rendered only on the unconfigured first-run flow.
+// the skip so it never re-nags. Model APIs can be added later from Settings → Models.
 function ChooseLaterLink() {
   const { t } = useI18n()
 
@@ -542,11 +540,8 @@ function ChooseLaterLink() {
   )
 }
 
-// Presentational two-column key picker. Onboarding feeds it its curated
-// options + a ctx-bound save; the Providers settings page feeds it the full
-// provider catalog + a setEnvVar-backed save (plus `isSet`/`onClear` so it can
-// double as a manage surface). Keep it free of store/ctx coupling so both
-// surfaces render the identical form.
+// Legacy compatibility key picker. New Desktop setup uses CustomEndpointsSettings;
+ // this remains only for old onboarding states that still enter api-key/local-endpoint mode.
 export function ApiKeyForm({
   canGoBack,
   initialEnvKey,
