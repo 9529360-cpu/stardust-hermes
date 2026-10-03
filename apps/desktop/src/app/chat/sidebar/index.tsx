@@ -3,44 +3,23 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router'
 
-import { PlatformAvatar } from '@/app/messaging/platform-icon'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
-import { KbdGroup } from '@/components/ui/kbd'
-import { SearchField } from '@/components/ui/search-field'
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem
-} from '@/components/ui/sidebar'
-import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
-import { useContributions } from '@/contrib/react/use-contributions'
-import { searchSessions, type SessionInfo, type SessionSearchResult } from '@/hermes'
+import { Sidebar, SidebarContent } from '@/components/ui/sidebar'
+import { Tip } from '@/components/ui/tooltip'
+import type { SessionInfo } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { comboTokens } from '@/lib/keybinds/combo'
-import { sessionMatchesSearch } from '@/lib/session-search'
-import { normalizeSessionSource, sessionSourceLabel } from '@/lib/session-source'
 import { cn } from '@/lib/utils'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronJobs, $cronJobsScope } from '@/store/cron'
-import { $bindings } from '@/store/keybinds'
 import {
   $dismissedAutoProjectIds,
   $panesFlipped,
   $pinnedSessionIds,
   $sidebarCardRows,
-  $sidebarCronOpen,
   $sidebarFiltersActive,
   $sidebarGrouping,
-  $sidebarMessagingOpenIds,
   $sidebarOrdering,
   $sidebarPinsOpen,
   $sidebarPrDataWanted,
@@ -58,9 +37,7 @@ import {
   $sidebarWorkspaceParentOrderIds,
   filterVisibleProjects,
   pinSession,
-  SESSION_SEARCH_FOCUS_EVENT,
   setPinnedSessionOrder,
-  setSidebarCronOpen,
   setSidebarPinsOpen,
   setSidebarProjectOrderIds,
   setSidebarRecentsOpen,
@@ -69,19 +46,10 @@ import {
   setSidebarWorkspaceOrderIds,
   setSidebarWorkspaceParentOrderIds,
   SIDEBAR_SESSIONS_PAGE_SIZE,
-  toggleSidebarMessagingOpen,
   unpinSession
 } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
-import {
-  $newChatProfile,
-  $profiles,
-  $profileScope,
-  ALL_PROFILES,
-  messagingTotalsKey,
-  normalizeProfileKey,
-  sidebarProfileForScope
-} from '@/store/profile'
+import { $profiles, $profileScope, ALL_PROFILES, normalizeProfileKey } from '@/store/profile'
 import {
   $activeProjectId,
   $newProjectDropPlacement,
@@ -107,14 +75,11 @@ import {
   refreshPullRequests,
   sessionPrKey
 } from '@/store/pull-requests'
-import { openRouteTile } from '@/store/route-tiles'
 import {
   $cronSessions,
   $currentCwd,
   $gatewayState,
-  $messagingPlatformTotals,
   $messagingSessions,
-  $messagingTruncated,
   $sessionProfilesTruncated,
   $sessions,
   $sessionsLoading,
@@ -132,20 +97,10 @@ import { markSessionUnread } from '@/store/session-unread-remote'
 import { $archivedSessions, loadArchivedSessions } from '@/store/sidebar-archive'
 import { $sidebarSessionRankIds } from '@/store/sidebar-sort'
 
-import {
-  type AppView,
-  ARTIFACTS_ROUTE,
-  CRON_ROUTE,
-  MESSAGING_ROUTE,
-  SIDEBAR_NAV_AREA,
-  type SidebarNavContribution,
-  SKILLS_ROUTE
-} from '../../routes'
-import type { SidebarNavItem } from '../../types'
-import { type NewSessionSplitHandler, startNewSessionDrag } from '../new-session-drag'
+import type { AppView } from '../../routes'
+import type { NewSessionSplitHandler } from '../new-session-drag'
 
 import { SidebarSectionAddButton } from './chrome'
-import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarFilterMenu } from './filter-menu'
 import { useGatewaySessionGroups } from './gateway-group-model'
 import { SidebarLoadMoreRow } from './load-more-row'
@@ -181,57 +136,12 @@ import {
 } from './section-states'
 import { buildSessionByAnyId, resolvePinnedSessions } from './session-index'
 import { SidebarSessionsSection, VIRTUALIZE_THRESHOLD } from './sessions-section'
-import { CONTEXT_SPLIT_KIT, SplitSubmenu } from './split-submenu'
 import { useEnteredProjectSessions } from './use-entered-project-sessions'
-
-// Non-session groups (messaging platforms) stay compact: show a few rows up
-// front, reveal more in larger steps on demand. Keeps a busy platform from
-// dominating the sidebar before the user asks to see it.
-const NON_SESSION_INITIAL_ROWS = 3
-const NON_SESSION_LOAD_STEP = 10
 
 // How long after connecting to warm the project tree for someone who isn't in
 // the grouped view. Long enough that the flat list — the thing actually on
 // screen — has the connection to itself first.
 const PROJECT_TREE_WARM_MS = 2_000
-
-const SIDEBAR_NAV: SidebarNavItem[] = [
-  {
-    id: 'new-session',
-    label: '',
-    icon: props => <Codicon name="robot" {...props} />,
-    action: 'new-session',
-    keybindActionId: 'session.new'
-  },
-  {
-    id: 'skills',
-    label: '',
-    icon: props => <Codicon name="symbol-misc" {...props} />,
-    route: SKILLS_ROUTE,
-    keybindActionId: 'nav.skills'
-  },
-  {
-    id: 'messaging',
-    label: '',
-    icon: props => <Codicon name="comment" {...props} />,
-    route: MESSAGING_ROUTE,
-    keybindActionId: 'nav.messaging'
-  },
-  {
-    id: 'artifacts',
-    label: '',
-    icon: props => <Codicon name="files" {...props} />,
-    route: ARTIFACTS_ROUTE,
-    keybindActionId: 'nav.artifacts'
-  },
-  {
-    id: 'cron',
-    label: '',
-    icon: props => <Codicon name="watch" {...props} />,
-    route: CRON_ROUTE,
-    keybindActionId: 'nav.cron'
-  }
-]
 
 // Two modes via the `compact` height variant (styles.css):
 //   tall    → each section is shrink-0, capped, its own scroller; Sessions is flex-1.
@@ -275,29 +185,6 @@ const HEADER_NAV_BTN =
 // Exported for tests.
 export function stripFtsMarkers(snippet: string): string {
   return snippet.replaceAll('>>>', '').replaceAll('<<<', '')
-}
-
-function searchResultToSession(result: SessionSearchResult): SessionInfo {
-  const ts = result.session_started ?? Date.now() / 1000
-
-  return {
-    archived: false,
-    cwd: null,
-    ended_at: null,
-    id: result.session_id,
-    _lineage_root_id: result.lineage_root ?? null,
-    input_tokens: 0,
-    is_active: false,
-    last_active: ts,
-    message_count: 0,
-    model: result.model ?? null,
-    output_tokens: 0,
-    preview: stripFtsMarkers(result.snippet ?? '').trim() || null,
-    source: result.source ?? null,
-    started_at: ts,
-    title: null,
-    tool_call_count: 0
-  }
 }
 
 interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
