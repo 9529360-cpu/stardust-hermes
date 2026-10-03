@@ -3771,7 +3771,10 @@ export const zh = defineLocale({
 
   onboarding: {
     headerTitle: '开始设置 Stardust',
-    headerDesc: '连接模型提供方即可开始对话。大多数选项只需一次点击。',
+    headerDesc: '先连接你自己的模型中转服务；也可以稍后在设置中完成。',
+    setupRelay: '配置模型中转接口',
+    setupRelayHint: '前往模型设置，填写接口地址、密钥并选择模型。',
+    advancedProviders: '高级选项：官方账号和其他提供方',
     preparingInstall: 'Stardust 正在完成安装。首次运行通常不到一分钟。',
     starting: '正在启动 Stardust…',
     lookingUpProviders: '正在查找提供方...',

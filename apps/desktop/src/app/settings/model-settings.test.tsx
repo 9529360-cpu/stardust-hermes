@@ -33,6 +33,7 @@ let profileSwitchHandler: (() => void) | null = null
 
 vi.mock('@/hermes', () => ({
   getGlobalModelInfo: (profile?: null | string) => getGlobalModelInfo(profile),
+  getCustomEndpoints: () => Promise.resolve({ endpoints: [] }),
   getGlobalModelOptions: (opts?: unknown, profile?: null | string) => getGlobalModelOptions(opts, profile),
   getAuxiliaryModels: (profile?: null | string) => getAuxiliaryModels(profile),
   getApiRequestProfile: () => 'default',
@@ -92,11 +93,15 @@ afterEach(() => {
   profileSwitchHandler = null
 })
 
-async function renderModelSettings(scopeProfile?: string, initialEntries: string[] = ['/']) {
+async function renderModelSettings(
+  scopeProfile?: string,
+  initialEntries: string[] = ['/'],
+  expandOtherServices = true
+) {
   const { ModelSettings } = await import('./model-settings')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-  return render(
+  const result = render(
     // The aux-task deep-link highlight reads useSearchParams, so the page
     // needs a router context in tests (the app provides HashRouter at root).
     <MemoryRouter initialEntries={initialEntries}>
@@ -105,6 +110,12 @@ async function renderModelSettings(scopeProfile?: string, initialEntries: string
       </QueryClientProvider>
     </MemoryRouter>
   )
+
+  if (expandOtherServices) {
+    fireEvent.click(await screen.findByRole('button', { name: 'Choose another service' }))
+  }
+
+  return result
 }
 
 async function openAdvancedModelSettings(label = 'Advanced model settings') {
@@ -115,7 +126,7 @@ async function renderChineseModelSettings() {
   const { ModelSettings } = await import('./model-settings')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
-  return render(
+  const result = render(
     <I18nProvider configClient={null} initialLocale="zh">
       <MemoryRouter>
         <QueryClientProvider client={client}>
@@ -124,6 +135,10 @@ async function renderChineseModelSettings() {
       </MemoryRouter>
     </I18nProvider>
   )
+
+  fireEvent.click(await screen.findByRole('button', { name: '选择其他服务' }))
+
+  return result
 }
 
 describe('ModelSettings profile scope', () => {
@@ -152,13 +167,13 @@ describe('ModelSettings profile scope', () => {
 
 describe('ModelSettings', () => {
   it('shows configured model services as rows instead of a provider dropdown', async () => {
-    await renderModelSettings()
+    await renderModelSettings(undefined, ['/'], false)
 
-    await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalled())
     await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalled())
-
+    expect(await screen.findByText('Add model service')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Nous/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another service' }))
     expect(await screen.findByRole('button', { name: /Nous/ })).toBeTruthy()
-    expect(screen.getByText('Default')).toBeTruthy()
     expect(screen.queryByText(/DeepSeek/)).toBeNull()
   })
 
@@ -285,7 +300,6 @@ describe('ModelSettings', () => {
 
     await renderModelSettings()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Choose another service' }))
     fireEvent.click(await screen.findByRole('button', { name: /Ollama/ }))
     expect(await screen.findByText('qwen3:latest')).toBeTruthy()
 
@@ -370,11 +384,12 @@ describe('ModelSettings', () => {
   it('opens the shared provider and custom-service flows from the model page', async () => {
     await renderModelSettings('research')
 
+    fireEvent.click(await screen.findByRole('button', { name: 'Advanced connection settings' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
     expect(startManualOnboarding).toHaveBeenCalledWith(null, 'research')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add custom service' }))
-    expect(startManualLocalEndpoint).toHaveBeenCalledWith(null, 'research')
+    expect(startManualLocalEndpoint).not.toHaveBeenCalled()
   })
 
   it('refreshes the model-service list after the shared setup flow closes', async () => {

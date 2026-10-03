@@ -51,6 +51,7 @@ describe('onboarding Picker', () => {
   it('filters the first-party Nous account while preserving user-owned provider choices', () => {
     setProviders([makeOAuthProvider('anthropic', 'Anthropic Claude'), makeOAuthProvider('nous', 'Nous Portal')])
     render(<Picker ctx={ctx} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced: provider accounts and other services' }))
 
     expect(screen.queryByText('Nous Portal')).toBeNull()
     expect(screen.queryByText('Recommended')).toBeNull()
@@ -65,6 +66,7 @@ describe('onboarding Picker', () => {
       makeOAuthProvider('nous', 'Nous Portal')
     ])
     render(<Picker ctx={ctx} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced: provider accounts and other services' }))
 
     const labels = screen
       .getAllByRole('button')
@@ -78,12 +80,13 @@ describe('onboarding Picker', () => {
     expect(indexOf('MiniMax')).toBeGreaterThan(indexOf('ChatGPT or Codex'))
   })
 
-  it('shows every provider directly when Nous Portal is absent', () => {
+  it('shows every provider under advanced choices when Nous Portal is absent', () => {
     setProviders([
       makeOAuthProvider('anthropic', 'Anthropic Claude'),
       makeOAuthProvider('openai-codex', 'OpenAI Codex / ChatGPT')
     ])
     render(<Picker ctx={ctx} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced: provider accounts and other services' }))
 
     expect(screen.getByText('Fireworks AI')).toBeTruthy()
     expect(screen.getByText('Anthropic API Key')).toBeTruthy()
