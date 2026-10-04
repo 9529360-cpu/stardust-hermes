@@ -50,7 +50,8 @@ def test_utf16_file_reads_as_lines(ops, tmp_path):
 
     result = ops.read_file(str(target))
 
-    assert result.error is None, result.error
+    probe = ops._exec("python3 -c 'pass'; echo python3-rc=$?; python -c 'pass'; echo python-rc=$?")
+    assert result.error is None, f"{result.error} | interpreter={ops._python_cmd} | {probe.stdout!r}"
     assert result.total_lines == 3
     assert [line.split("|", 1)[-1] for line in result.content.splitlines()] == ["one", "two", "three"]
     assert "﻿" not in result.content and "\r" not in result.content

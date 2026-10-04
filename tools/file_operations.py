@@ -186,6 +186,7 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         # an off-PATH resolver and may be installed mid-session — so only successful
         # rg resolutions are cached (see SearchMixin._resolve_command).
         self._command_cache: Dict[str, bool] = {}
+        self._python_cmd: Optional[str] = None
         self._rg_resolution_cache: Dict[str, str] = {}
         self._rg_modified_capability: Dict[str, Optional[str]] = {}
 
@@ -225,12 +226,19 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         return self._exec(f"head -c {nbytes} {self._escape_shell_arg(path)} 2>/dev/null")
 
     def _run_python_snippet(self, snippet: str) -> ExecuteResult:
-        """Run ``snippet`` via the backend's ``python3``, retrying with ``python``
-        when only that name exists (Windows / older systems)."""
-        result = self._exec(f"python3 -c {self._escape_shell_literal(snippet)}")
-        if result.exit_code != 0 and "python3" in (result.stdout or ""):
-            result = self._exec(f"python -c {self._escape_shell_literal(snippet)}")
-        return result
+        """Run ``snippet`` via the backend's Python (see ``_python_command``)."""
+        return self._exec(f"{self._python_command()} -c {self._escape_shell_literal(snippet)}")
+
+    def _python_command(self) -> str:
+        """``python3`` when it actually runs on the backend, else ``python`` (Windows /
+        older systems). Probed once per instance. On Windows ``python3`` is often only
+        the Microsoft Store alias stub: it is on PATH, exits non-zero and prints a
+        localized "Python was not found", so keying a retry off "python3" in the
+        output never fell back and the UTF-16 rescue read never ran."""
+        if self._python_cmd is None:
+            probe = self._exec("python3 -c 'pass' >/dev/null 2>&1 && echo yes")
+            self._python_cmd = "python3" if (probe.stdout or "").strip() == "yes" else "python"
+        return self._python_cmd
 
     def _sample_file_bytes(self, path: str, length: int = 1000):
         """First ``length`` raw bytes, base64-wrapped so they survive the terminal

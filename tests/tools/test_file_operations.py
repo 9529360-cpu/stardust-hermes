@@ -308,6 +308,30 @@ class TestShellFileOpsHelpers:
         assert file_ops._escape_shell_literal(r"call\(x\)|C:\Users") == r"'call\(x\)|C:\Users'"
         assert file_ops._escape_shell_literal("it's") == "'it'\"'\"'s'"
 
+    @staticmethod
+    def _interpreters(mock_env, python3_runs):
+        commands = []
+
+        def side_effect(command, **kwargs):
+            commands.append(command)
+            if command.startswith("python3 ") and not python3_runs:
+                # Windows' Microsoft Store alias: on PATH, exits non-zero, and its
+                # (localized) message never says "python3".
+                return {"output": "找不到 Python；请从 Microsoft Store 安装", "returncode": 9009}
+            return {"output": "yes\n" if "echo yes" in command else "ok", "returncode": 0}
+
+        mock_env.execute.side_effect = side_effect
+        ops = ShellFileOperations(mock_env)
+        assert ops._run_python_snippet("print(1)").exit_code == 0
+        assert ops._run_python_snippet("print(2)").exit_code == 0
+        return [command.split(" ", 1)[0] for command in commands]
+
+    def test_python_snippets_fall_back_when_python3_is_only_a_store_stub(self, mock_env):
+        assert self._interpreters(mock_env, python3_runs=False) == ["python3", "python", "python"]
+
+    def test_python_snippets_keep_python3_when_it_runs(self, mock_env):
+        assert self._interpreters(mock_env, python3_runs=True) == ["python3", "python3", "python3"]
+
 
     @pytest.mark.windows_only
     def test_escape_shell_arg_rewrites_forward_slash_native_paths(self, file_ops):
