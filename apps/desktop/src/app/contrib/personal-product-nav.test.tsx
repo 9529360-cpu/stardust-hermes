@@ -41,6 +41,10 @@ describe('PersonalProductNav', () => {
   it('renders only the compact Stardust primary navigation in product order', () => {
     renderNav('chat')
 
+    const nav = screen.getByRole('navigation', { name: 'Product navigation' })
+    expect(nav.className).toContain('pt-0')
+    expect(nav.className).not.toContain('titlebar-height')
+
     expect(screen.getAllByRole('button').map(button => button.textContent?.trim())).toEqual([
       '新建对话',
       '任务',
