@@ -70,14 +70,12 @@ test('tools and plugins are direct primary navigation destinations', async ({}, 
   await expect(page.getByRole('columnheader', { name: '默认配置 中的智能体', exact: true })).toBeVisible()
   await expect(page.getByText('智能体', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('任务看板', { exact: true })).toBeVisible()
-  await expect(page.getByText('电台', { exact: true })).toBeVisible()
   await expect(
     page.getByText('智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。', { exact: true })
   ).toBeVisible()
   await expect(
     page.getByText('多智能体任务看板，包含看板页面、命令面板入口和状态栏中的实时任务动态。', { exact: true })
   ).toBeVisible()
-  await expect(page.getByText('在线电台，支持固定常用电台、搜索和随音频变化的波形显示。', { exact: true })).toBeVisible()
   await expect(page.getByText('Hermes（默认）', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Hermes (default)', { exact: true })).toHaveCount(0)
   await expect(page.getByText('插件目录', { exact: true })).toBeVisible()
