@@ -146,8 +146,10 @@ class ErrorSurface(Payload):
     retryable: bool
     provider: str | None = None
     model: str | None = None
-    # ``stamp_fallback_route``: the failing agent had a fallback route to switch to.
+    # ``stamp_agent_context``: the failing agent had a fallback route to switch to.
     fallback_configured: bool | None = None
+    # The provider's display name (a custom service's configured name, not ``custom``).
+    provider_label: str | None = None
     model_config = Payload.model_config | {"extra": "allow"}
 
 

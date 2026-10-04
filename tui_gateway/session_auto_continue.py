@@ -423,8 +423,8 @@ def _emit_terminal_turn_error(
     agent = session.get("agent")
     if error_surface is None and isinstance(error, BaseException):
         with contextlib.suppress(Exception):
-            from agent.error_surface import build_error_surface_from_exception, stamp_fallback_route
-            error_surface = stamp_fallback_route(build_error_surface_from_exception(
+            from agent.error_surface import build_error_surface_from_exception, stamp_agent_context
+            error_surface = stamp_agent_context(build_error_surface_from_exception(
                 error, provider=str(getattr(agent, "provider", "") or ""), model=str(getattr(agent, "model", "") or "")),
                 agent)
     with session["history_lock"]:
