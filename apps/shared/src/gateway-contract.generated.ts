@@ -3909,6 +3909,7 @@ export interface ErrorSurface {
   provider?: string | null
   model?: string | null
   fallback_configured?: boolean | null
+  provider_label?: string | null
   [key: string]: unknown
 }
 /** ``server._status_update`` and the direct emitters (goal / loop / heartbeat / process). */
