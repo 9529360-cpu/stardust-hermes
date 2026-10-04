@@ -212,6 +212,20 @@ def upsert_topic_summary(
     }
 
 
+def reset_topic_summaries() -> bool:
+    """Delete the local topic-summary store. Returns whether the file existed."""
+    path = topic_memory_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with MemoryStore._file_lock(path):
+        existed = path.exists()
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            # Atomic empty replacement is safer than leaving stale recallable data behind.
+            atomic_write_text(path, '{"version": 1, "topics": []}\n', create_mode=0o600, fsync_dir=True)
+        return existed
+
+
 def remove_topic_summary(topic: str) -> dict[str, Any]:
     key = _topic_key(topic)
     if not key:
