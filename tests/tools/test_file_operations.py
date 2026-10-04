@@ -303,6 +303,11 @@ class TestShellFileOpsHelpers:
     def test_escape_shell_arg_simple(self, file_ops):
         assert file_ops._escape_shell_arg("hello") == "'hello'"
 
+    def test_escape_shell_literal_keeps_backslashes_and_drive_paths(self, file_ops):
+        """Regex patterns and ``python -c`` source are not paths: no rewrite on any OS."""
+        assert file_ops._escape_shell_literal(r"call\(x\)|C:\Users") == r"'call\(x\)|C:\Users'"
+        assert file_ops._escape_shell_literal("it's") == "'it'\"'\"'s'"
+
 
     @pytest.mark.windows_only
     def test_escape_shell_arg_rewrites_forward_slash_native_paths(self, file_ops):

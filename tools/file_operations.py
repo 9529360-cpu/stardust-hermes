@@ -227,9 +227,9 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
     def _run_python_snippet(self, snippet: str) -> ExecuteResult:
         """Run ``snippet`` via the backend's ``python3``, retrying with ``python``
         when only that name exists (Windows / older systems)."""
-        result = self._exec(f"python3 -c {self._escape_shell_arg(snippet)}")
+        result = self._exec(f"python3 -c {self._escape_shell_literal(snippet)}")
         if result.exit_code != 0 and "python3" in (result.stdout or ""):
-            result = self._exec(f"python -c {self._escape_shell_arg(snippet)}")
+            result = self._exec(f"python -c {self._escape_shell_literal(snippet)}")
         return result
 
     def _sample_file_bytes(self, path: str, length: int = 1000):
@@ -347,12 +347,21 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         return path
 
     def _escape_shell_arg(self, arg: str) -> str:
-        """Single-quote ``arg`` for the shell. On Windows, native drive paths and
+        """Single-quote a PATH for the shell. On Windows, native drive paths and
         mixed MSYS leftovers are first rewritten to the Git Bash ``/c/Users/x``
         form via the env-layer ``_bash_safe_path`` (bash eats backslashes; MSYS
-        mangles drive paths), so shell file ops and the terminal ``cd`` agree."""
+        mangles drive paths), so shell file ops and the terminal ``cd`` agree.
+        Anything that is not a path goes through ``_escape_shell_literal``."""
         from tools.environments.local import _bash_safe_path
-        return "'" + _bash_safe_path(arg).replace("'", "'\"'\"'") + "'"
+        return self._escape_shell_literal(_bash_safe_path(arg))
+
+    @staticmethod
+    def _escape_shell_literal(arg: str) -> str:
+        """Single-quote ``arg`` for the shell exactly as given — for values that are
+        not paths (regex patterns, ``python -c`` source). Single quotes keep every
+        backslash; the Windows path rewrite in ``_escape_shell_arg`` turned them into
+        ``/``, so a pattern like ``foo\\(`` reached rg as ``foo/(`` (unclosed group)."""
+        return "'" + arg.replace("'", "'\"'\"'") + "'"
 
     def _escape_native_tool_arg(self, arg: str) -> str:
         """Quote a path for a NATIVE Windows binary (rg, node, git ...): those don't
@@ -362,7 +371,7 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         from tools.environments.local import _IS_WINDOWS, _msys_to_windows_path
         if _IS_WINDOWS and arg:
             arg = _msys_to_windows_path(arg).replace("\\", "/")
-        return "'" + arg.replace("'", "'\"'\"'") + "'"
+        return self._escape_shell_literal(arg)
 
     def _atomic_write(self, path: str, content: str) -> "ExecuteResult":
         """Write ``content`` atomically: stdin → temp file in the SAME directory →
