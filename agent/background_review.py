@@ -456,8 +456,8 @@ _SKILL_REVIEW_PROMPT = (
 
 _COMBINED_REVIEW_PROMPT = (
     "Review the conversation above and update two things:\n\n"
-    "**Memory**: keep always-loaded memory tiny. Put stable identity/preferences in target='user', "
-    "only truly cross-topic standing facts in target='memory', and durable CURRENT project/domain/workstream "
+    "**Memory**: use the memory tool, but keep always-loaded memory tiny. Put stable identity/preferences "
+    "in target='user', only truly cross-topic standing facts in target='memory', and durable CURRENT project/domain/workstream "
     "state in target='topic'. For a topic use one stable key, compact summary, and useful keywords; update "
     "the same topic when state changes and remove superseded facts instead of appending history. Raw details "
     "remain searchable in session history.\n\n"
