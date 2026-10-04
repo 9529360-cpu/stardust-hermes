@@ -298,14 +298,16 @@ def _digest_history(messages_snapshot: List[Dict], tail: int = 24) -> List[Dict]
 # Review prompts. AIAgent exposes them as class attributes (``_MEMORY_REVIEW_PROMPT`` etc.) so
 # per-agent overrides work; the text lives here.
 _MEMORY_REVIEW_PROMPT = (
-    "Review the conversation above and consider saving to memory if appropriate.\n\n"
-    "Focus on:\n"
-    "1. Has the user revealed things about themselves — their persona, desires, preferences, or "
-    "personal details worth remembering?\n"
-    "2. Has the user expressed expectations about how you should behave, their work style, or ways "
-    "they want you to operate?\n\n"
-    "If something stands out, save it using the memory tool. If nothing is worth saving, just say "
-    "'Nothing to save.' and stop."
+    "Review the conversation above and update durable memory only when it will help future work.\n\n"
+    "Use three layers deliberately:\n"
+    "1. target='user': stable identity, preferences, communication style, and expectations that apply broadly.\n"
+    "2. target='memory': only tiny cross-topic facts or standing rules that truly belong in every session.\n"
+    "3. target='topic': the CURRENT state of a project, recurring domain, relationship, or workstream. "
+    "Use one stable topic key plus a compact summary and useful keywords. If that topic already exists, "
+    "replace/update the same topic: preserve still-current facts and remove superseded facts. Do not append "
+    "chronological incident logs.\n\n"
+    "Raw conversation detail stays in session history and can be recovered with session_search; do not copy "
+    "it into durable memory. Procedures belong in skills. If nothing durable changed, say 'Nothing to save.' and stop."
 )
 
 # Shared shape contract for anything written into a skill. The failure mode this prevents is the
@@ -454,9 +456,11 @@ _SKILL_REVIEW_PROMPT = (
 
 _COMBINED_REVIEW_PROMPT = (
     "Review the conversation above and update two things:\n\n"
-    "**Memory**: who the user is. Did the user reveal persona, desires, preferences, personal "
-    "details, or expectations about how you should behave? Save facts about the user and durable "
-    "preferences with the memory tool.\n\n"
+    "**Memory**: keep always-loaded memory tiny. Put stable identity/preferences in target='user', "
+    "only truly cross-topic standing facts in target='memory', and durable CURRENT project/domain/workstream "
+    "state in target='topic'. For a topic use one stable key, compact summary, and useful keywords; update "
+    "the same topic when state changes and remove superseded facts instead of appending history. Raw details "
+    "remain searchable in session history.\n\n"
     "**Skills**: how to do this class of task. Be ACTIVE — most sessions produce at least one "
     "skill update. A pass that does nothing is a missed learning opportunity, not a neutral "
     "outcome.\n\n"
@@ -564,7 +568,7 @@ def _verbose_memory_lines(label: str, detail: Dict) -> List[str]:
 # Tool-call argument fields surfaced in action summaries, with their defaults.
 _CALL_DETAIL_DEFAULTS = (
     ("action", "?"), ("target", "memory"), ("content", ""), ("old_text", ""), ("name", ""),
-    ("old_string", ""), ("new_string", ""),
+    ("old_string", ""), ("new_string", ""), ("topic", ""), ("title", ""),
 )
 
 
@@ -643,7 +647,9 @@ def _action_lines(data: Dict, detail: Dict, verbose: bool) -> List[str]:
         return [message]
     if not is_skill and not target:
         return []
-    label = "Skill" if is_skill else {"memory": "Memory", "user": "User profile"}.get(target, target)
+    label = "Skill" if is_skill else {
+        "memory": "Memory", "user": "User profile", "topic": "Topic summary"
+    }.get(target, target)
     if verbose:
         return [_verbose_skill_line(data, detail, message)] if is_skill else _verbose_memory_lines(label, detail)
     hit = any(k in lower for k in ("added", "replaced", "removed", "applied")) or (target and "add" in lower)
@@ -1122,6 +1128,12 @@ def _run_review_fork(
     st.review_agent, _rt, _routed = build_cache_parity_fork(
         agent, task_cfg, max_iterations=_REVIEW_MAX_ITERATIONS)
     st.review_agent._review_attended = explicit
+    if review_memory and getattr(agent, "_topic_summaries_enabled", False):
+        with suppress(Exception):
+            from tools.topic_memory_store import review_topic_context
+            existing_topics = review_topic_context(messages_snapshot)
+            if existing_topics:
+                prompt = prompt + "\n\n" + existing_topics
     _track_review_fork(agent, st.review_agent, register=True)
     from hermes_cli.plugins import set_thread_tool_whitelist, clear_thread_tool_whitelist
     review_whitelist, configured_extra_tools = _review_tool_whitelist(st.review_agent, task_cfg, review_memory)
