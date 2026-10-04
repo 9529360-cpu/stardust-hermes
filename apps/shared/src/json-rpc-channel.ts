@@ -134,6 +134,12 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 120_000
 // so the client hangs forever (issue #32997). Browser/undici WebSocket does
 // not expose an acknowledged ping/pong API, so this uses a small JSON-RPC
 // heartbeat that the TUI gateway explicitly answers.
+//
+// The deadline runs from the oldest ping still waiting for an answer, never
+// from the last inbound frame. A hidden Chromium window throttles this
+// interval to one wake-up per minute; measured from the last frame, every
+// idle hidden desktop window declared its healthy socket dead after three
+// minutes and redialed it around the clock.
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000
 export const DEFAULT_HEARTBEAT_DEADLINE_MS = 45_000
 const MAX_OUTSTANDING_PINGS = 8
@@ -175,7 +181,8 @@ export class JsonRpcRequestChannel {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private heartbeatSequence = 0
   private readonly outstandingPings = new Set<string>()
-  private lastLivenessAt = 0
+  // When the oldest ping still waiting for liveness was sent; null while none is.
+  private unansweredPingSince: number | null = null
   private readonly requestHandlers: ServerRequestHandler[] = []
   private readonly options: Required<
     Omit<JsonRpcRequestChannelOptions, 'onEvent' | 'onHeartbeatFailure' | 'onUnhandledRequest'>
@@ -209,7 +216,6 @@ export class JsonRpcRequestChannel {
   attach(transport: JsonRpcTransport): void {
     this.stopHeartbeat()
     this.transport = transport
-    this.lastLivenessAt = Date.now()
   }
 
   /** Drop the transport and fail every in-flight call with `error`. */
@@ -402,7 +408,7 @@ export class JsonRpcRequestChannel {
     }
 
     if (this.options.heartbeatLiveness === 'any-inbound') {
-      this.lastLivenessAt = Date.now()
+      this.unansweredPingSince = null
     }
 
     if (isServerRequestFrame(frame)) {
@@ -414,7 +420,7 @@ export class JsonRpcRequestChannel {
 
     if (frame.id !== undefined && frame.id !== null) {
       if (typeof frame.id === 'string' && this.outstandingPings.delete(frame.id)) {
-        this.lastLivenessAt = Date.now()
+        this.unansweredPingSince = null
 
         return frame
       }
@@ -422,7 +428,7 @@ export class JsonRpcRequestChannel {
       const call = this.pending.get(frame.id)
 
       if (call) {
-        this.lastLivenessAt = Date.now()
+        this.unansweredPingSince = null
         this.clearPending(frame.id)
 
         if (frame.error) {
@@ -453,11 +459,11 @@ export class JsonRpcRequestChannel {
    * Begin the `gateway.ping` keepalive on the bound transport. Only call when
    * `gateway.ready.heartbeat` advertised support — an older backend would
    * answer with -32601 and never count as alive. What counts as liveness is
-   * `heartbeatLiveness`; a full deadline without it drops the transport.
+   * `heartbeatLiveness`; a ping left without it for a full deadline drops
+   * the transport.
    */
   startHeartbeat(): void {
     this.stopHeartbeat()
-    this.lastLivenessAt = Date.now()
 
     const transport = this.transport
 
@@ -470,7 +476,9 @@ export class JsonRpcRequestChannel {
         return
       }
 
-      if (Date.now() - this.lastLivenessAt >= this.options.heartbeatDeadlineMs) {
+      const now = Date.now()
+
+      if (this.unansweredPingSince !== null && now - this.unansweredPingSince >= this.options.heartbeatDeadlineMs) {
         this.failHeartbeat(new Error('WebSocket heartbeat acknowledgement timed out'))
 
         return
@@ -484,6 +492,11 @@ export class JsonRpcRequestChannel {
       // cannot grow with it.
       if (this.outstandingPings.size > MAX_OUTSTANDING_PINGS) {
         this.outstandingPings.delete(this.outstandingPings.values().next().value as string)
+      }
+
+      // Before the send, so a transport that answers synchronously clears it.
+      if (this.unansweredPingSince === null) {
+        this.unansweredPingSince = now
       }
 
       try {
@@ -500,6 +513,7 @@ export class JsonRpcRequestChannel {
 
   stopHeartbeat(): void {
     this.outstandingPings.clear()
+    this.unansweredPingSince = null
 
     if (this.heartbeatTimer !== null) {
       clearInterval(this.heartbeatTimer)
