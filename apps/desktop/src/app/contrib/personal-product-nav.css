@@ -18,6 +18,13 @@
   background: var(--ui-control-active-background);
   box-shadow: inset 2px 0 0 var(--theme-primary);
 }
+/* The sessions strip is replaced by the product navigation below. On Windows
+   the native controls can force tabs onto a second row; hiding only the strip
+   leaves that extra 28px as an empty titlebar band. */
+:root:has([data-personal-sidebar-shell])
+  [data-tree-group='grp-sessions'] > [data-panel-header] {
+  height: 34px !important;
+}
 :root:has([data-personal-sidebar-shell])
   [data-zone-tabstrip]:has([data-tree-tab='sessions']) {
   display: none !important;
