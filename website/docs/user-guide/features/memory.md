@@ -249,8 +249,6 @@ See [Session Search Tool](/user-guide/sessions#session-search-tool) for the thre
 
 ### session_search vs memory
 
-| Feature | Persistent Memory | Session Search |
-|---------|------------------|----------------|
 | Feature | Core memory (USER/MEMORY) | Topic summaries | Session Search |
 |---------|---------------------------|-----------------|----------------|
 | **Capacity** | Intentionally tiny | Up to bounded summaries on disk | Unlimited session history |
