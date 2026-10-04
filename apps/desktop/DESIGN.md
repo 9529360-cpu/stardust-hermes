@@ -57,10 +57,10 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
-- **Pages are secondary destinations.** Tasks, projects, knowledge, tools, and
-  settings may be reached from the left navigation or overlays. Returning to
-  Conversation restores the assistant transcript, never a separate Workspace
-  landing page.
+- **Pages are secondary destinations.** Tasks, projects, knowledge, and tools
+  render in the workspace when opened from the left navigation; settings and
+  focused utilities may still use overlays. Returning to Conversation restores
+  the assistant transcript, never a separate Workspace landing page.
 - **Panes are working context.** Browser/preview, agent activity, files, review,
   terminal, tests, and diff belong to the right stage and remain attached to
   the current task. Their state survives temporary hiding where the underlying
@@ -212,8 +212,9 @@ blurred backdrop.
   padding; `PAGE_INSET_NEG_X` to bleed a child to the edge. Don't hardcode
   `px-6`/`px-8` on pages.
 - **Master/detail overlays:** `OverlaySplitLayout` + `OverlaySidebar` /
-  `OverlayMain`. Cron, profiles, etc. ride this — don't rebuild a titlebar
-  shell.
+  `OverlayMain`. Profiles and other true overlays ride this — don't rebuild a
+  titlebar shell. Tasks/Cron is a workspace page and reuses the shared
+  list/detail primitives without the `OverlayView` wrapper.
 - **Rows:** `ListRow` (settings `primitives.tsx`) for label/description/action
   rows. Flat, flush-left; no per-row indentation that fights flush headers.
 - **No dividers between rows** unless the list genuinely needs them; prefer

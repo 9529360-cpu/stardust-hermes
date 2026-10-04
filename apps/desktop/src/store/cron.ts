@@ -139,6 +139,6 @@ export const $cronFocusJobId = atom<CronFocusJob | null>(null)
 export const setCronFocusJobId = (job: CronFocusJob | null) => $cronFocusJobId.set(job)
 
 // Shell-owned one-shot intent for stores without router context. Do not set a
-// focus id here: the cron overlay's first fetch may not have loaded that row.
+// focus id here: the scheduled-tasks page's first fetch may not have loaded that row.
 export const $cronReviewRequest = atom(0)
 export const requestCronReview = () => $cronReviewRequest.set($cronReviewRequest.get() + 1)

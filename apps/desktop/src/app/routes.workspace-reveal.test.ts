@@ -1,5 +1,5 @@
 /**
- * A full page (Capabilities/Messaging/Artifacts/a contributed route) renders
+ * A full page (Capabilities/Messaging/Artifacts/Tasks/a contributed route) renders
  * INSIDE the `workspace` pane, so navigating to one has to front that pane —
  * otherwise a main zone parked on a session tile keeps the tile on screen and
  * the click looks dead until the app restarts (#72602).
@@ -97,8 +97,8 @@ describe('classification of targets carrying a query', () => {
 })
 
 describe('syncWorkspaceRoute', () => {
-  it('publishes and fronts on a page route', () => {
-    syncWorkspaceRoute(SKILLS_ROUTE)
+  it.each([SKILLS_ROUTE, CRON_ROUTE])('publishes and fronts on page route %s', to => {
+    syncWorkspaceRoute(to)
 
     expect($workspaceIsPage.get()).toBe(true)
     expect(fronted()).toBe(true)
@@ -140,7 +140,6 @@ describe('syncWorkspaceRoute', () => {
     ['the new-chat route', NEW_CHAT_ROUTE],
     ['an overlay', SETTINGS_ROUTE],
     ['an overlay with a query', `${SETTINGS_ROUTE}?tab=keys`],
-    ['another overlay', CRON_ROUTE],
     ['yet another overlay', AGENTS_ROUTE]
   ])('leaves the tab alone on %s', (_label, to) => {
     syncWorkspaceRoute(to)

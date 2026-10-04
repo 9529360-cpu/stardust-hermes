@@ -46,7 +46,7 @@ function mount() {
 
   return render(
     <QueryClientProvider client={client}>
-      <CronView onClose={() => {}} />
+      <CronView />
     </QueryClientProvider>
   )
 }

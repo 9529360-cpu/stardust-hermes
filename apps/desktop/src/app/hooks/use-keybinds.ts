@@ -208,7 +208,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     'nav.skills': () => navigateToWorkspacePage(navigate, SKILLS_ROUTE),
     'nav.messaging': () => navigateToWorkspacePage(navigate, MESSAGING_ROUTE),
     'nav.artifacts': () => navigateToWorkspacePage(navigate, ARTIFACTS_ROUTE),
-    'nav.cron': () => navigate(CRON_ROUTE),
+    'nav.cron': () => navigateToWorkspacePage(navigate, CRON_ROUTE),
     'nav.agents': () => navigate(AGENTS_ROUTE),
 
     'session.new': () => {
