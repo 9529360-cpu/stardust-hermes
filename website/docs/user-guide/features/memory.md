@@ -62,9 +62,9 @@ The format includes:
 
 ## Resetting Built-in Memory Is a Durable Forget Boundary
 
-`hermes memory reset` and the Desktop/Web reset controls only reset the built-in
-`MEMORY.md` / `USER.md` targets; they do not erase external-provider data or
-ordinary chat/session history.
+`hermes memory reset` and the Desktop/Web full reset controls erase the built-in
+`MEMORY.md`, `USER.md`, and local `TOPICS.json` topic summaries; they do not erase
+external-provider data or ordinary chat/session history.
 
 Each built-in target has a profile-scoped reset generation stored beside the file.
 A running session captures that generation with its memory snapshot. When reset
