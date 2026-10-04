@@ -106,12 +106,7 @@ describe('cron list load failure', () => {
   it('settles an overlay request superseded by a failing sidebar refresh', async () => {
     let rejectOverlay: (error: Error) => void = () => {}
     getCronJobs
-      .mockImplementationOnce(
-        () =>
-          new Promise((_, reject) => {
-            rejectOverlay = reject
-          })
-      )
+      .mockImplementationOnce(() => new Promise((_, reject) => { rejectOverlay = reject }))
       .mockRejectedValueOnce(new Error('sidebar offline'))
     mount()
     await waitFor(() => expect(getCronJobs).toHaveBeenCalledTimes(1))
@@ -129,22 +124,13 @@ describe('cron list load failure', () => {
     mount()
     await screen.findByText(en.cron.failedLoad)
 
-    await act(async () => {
-      await refreshCronJobs('all')
-    })
+    await act(async () => { await refreshCronJobs('all') })
     expect(await screen.findByText(en.cron.emptyTitleNew)).toBeTruthy()
     expect(screen.queryByText(en.cron.failedLoad)).toBeNull()
   })
 
   it('keeps independently loaded suggestions available when the jobs list fails', async () => {
-    getCronSuggestions.mockResolvedValueOnce([
-      {
-        id: 'suggestion-1',
-        title: 'Review weekly notes',
-        description: 'Weekly review',
-        job_spec: { schedule: '0 9 * * 1' }
-      }
-    ])
+    getCronSuggestions.mockResolvedValueOnce([{ id: 'suggestion-1', title: 'Review weekly notes', description: 'Weekly review', job_spec: { schedule: '0 9 * * 1' } }])
     getCronJobs.mockRejectedValue(new Error('offline'))
     mount()
 
@@ -176,12 +162,7 @@ describe('cron list load failure', () => {
     let finishSidebar: (jobs: unknown[]) => void = () => {}
     getCronJobs
       .mockImplementationOnce(() => new Promise(() => {}))
-      .mockImplementationOnce(
-        () =>
-          new Promise(resolve => {
-            finishSidebar = resolve
-          })
-      )
+      .mockImplementationOnce(() => new Promise(resolve => { finishSidebar = resolve }))
     const view = mount()
     await waitFor(() => expect(getCronJobs).toHaveBeenCalledTimes(1))
     let sidebarRefresh: ReturnType<typeof refreshCronJobs>

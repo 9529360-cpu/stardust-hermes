@@ -23,13 +23,7 @@ import { $profileScope, sidebarProfileForScope } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
 import { $approvalRequests } from '@/store/prompts'
 import { setRightContextOpen } from '@/store/right-context'
-import {
-  $activeSessionId,
-  $currentCwd,
-  $selectedStoredSessionId,
-  $sessions,
-  sessionMatchesStoredId
-} from '@/store/session'
+import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
 import { $subagentsBySession } from '@/store/subagents'
 import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
@@ -156,10 +150,8 @@ export function WorkspaceOverview() {
             assistantTitle: 'Stardust assistant',
             activeTaskTitle: 'Active task',
             currentConversationTitle: 'Current conversation',
-            assistantSummary:
-              'Project, file, preview, and tool context appears here when the current conversation needs it; ordinary chat needs no project.',
-            assistantSession:
-              'The current conversation is ready. Expand project, file, or preview context only when it is useful.',
+            assistantSummary: 'Project, file, preview, and tool context appears here when the current conversation needs it; ordinary chat needs no project.',
+            assistantSession: 'The current conversation is ready. Expand project, file, or preview context only when it is useful.',
             taskProgress: 'Task progress',
             activity: 'Task center',
             activityRunning: 'Running',
@@ -178,10 +170,8 @@ export function WorkspaceOverview() {
             activityFiles: (count: number) => `${count} files`,
             currentStep: 'Current step',
             needsInput: 'Waiting for your input',
-            attentionSummary:
-              'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
-            workingSummary:
-              'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
+            attentionSummary: 'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
+            workingSummary: 'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
             hidePreview: 'Hide context'
           }
 
@@ -199,13 +189,9 @@ export function WorkspaceOverview() {
   const activeConnectionId = useStore($activeConnectionId)
   const profileScope = useStore($profileScope)
 
-  const cronJobs = useMemo(
-    () =>
-      cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}`
-        ? cachedCronJobs
-        : [],
-    [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope]
-  )
+  const cronJobs = useMemo(() => (
+    cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}` ? cachedCronJobs : []
+  ), [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope])
 
   const desktopActionTasks = useStore($desktopActionTasks)
   const previewServerRestart = useStore($previewServerRestart)
@@ -326,8 +312,7 @@ export function WorkspaceOverview() {
   const branch = effectiveRepoStatus?.branch || copy.noRepository
   const todoItems = statusItems.filter(item => item.type === 'todo')
   const completedTodoCount = todoItems.filter(item => item.todoStatus === 'completed').length
-  const activeTodo =
-    todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
+  const activeTodo = todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
   const todoPercent = todoItems.length > 0 ? Math.round((completedTodoCount / todoItems.length) * 100) : 0
   const showTaskCard = primaryAttention || primaryWorking
 
@@ -394,12 +379,7 @@ export function WorkspaceOverview() {
     >
       <div className="mb-2 flex items-center justify-between px-1">
         <div className="text-[0.68rem] font-semibold text-(--ui-text-primary)">{copy.workspace}</div>
-        <Button
-          aria-label={systemLabels.hidePreview}
-          onClick={() => setRightContextOpen(false)}
-          size="icon-xs"
-          variant="ghost"
-        >
+        <Button aria-label={systemLabels.hidePreview} onClick={() => setRightContextOpen(false)} size="icon-xs" variant="ghost">
           <Codicon name="close" />
         </Button>
       </div>
@@ -423,10 +403,7 @@ export function WorkspaceOverview() {
               <div className="mt-3 border-t border-(--ui-stroke-quaternary) pt-2">
                 <Metric label={copy.branch} value={<span className="font-mono">{branch}</span>} />
                 {effectiveRepoStatus && (
-                  <Metric
-                    label={copy.sync}
-                    value={copy.syncValue(effectiveRepoStatus.ahead, effectiveRepoStatus.behind)}
-                  />
+                  <Metric label={copy.sync} value={copy.syncValue(effectiveRepoStatus.ahead, effectiveRepoStatus.behind)} />
                 )}
               </div>
             </>
@@ -435,9 +412,7 @@ export function WorkspaceOverview() {
               <Codicon className="mt-0.5 shrink-0 text-(--ui-text-tertiary)" name="comment" size="0.8rem" />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[0.76rem] font-semibold text-(--ui-text-primary)">{sessionLabel}</div>
-                <div className="mt-1 text-[0.6rem] leading-4 text-(--ui-text-quaternary)">
-                  {assistantContextSummary}
-                </div>
+                <div className="mt-1 text-[0.6rem] leading-4 text-(--ui-text-quaternary)">{assistantContextSummary}</div>
               </div>
             </div>
           )}
@@ -445,7 +420,7 @@ export function WorkspaceOverview() {
 
         {showTaskCard && (
           <Card title={copy.currentResult}>
-            <>
+          <>
               <div className="flex items-start gap-2.5">
                 <Codicon
                   className={
@@ -460,9 +435,7 @@ export function WorkspaceOverview() {
                   <div className="truncate text-[0.76rem] font-semibold text-(--ui-text-primary)">{sessionLabel}</div>
                   <div className="mt-1 text-[0.64rem] leading-5 text-(--ui-text-tertiary)">{summary}</div>
                   {displaySession?.model && (
-                    <div className="mt-1 truncate font-mono text-[0.56rem] text-(--ui-text-quaternary)">
-                      {displaySession.model}
-                    </div>
+                    <div className="mt-1 truncate font-mono text-[0.56rem] text-(--ui-text-quaternary)">{displaySession.model}</div>
                   )}
                   {displayTaskStoredId && (primaryAttention || primaryWorking) && (
                     <Button
@@ -481,9 +454,7 @@ export function WorkspaceOverview() {
                 <div className="mt-3 border-t border-(--ui-stroke-quaternary) pt-2.5">
                   <div className="flex items-center justify-between gap-2 text-[0.6rem] text-(--ui-text-tertiary)">
                     <span>{systemLabels.taskProgress}</span>
-                    <span className="font-mono text-(--ui-text-secondary)">
-                      {completedTodoCount}/{todoItems.length}
-                    </span>
+                    <span className="font-mono text-(--ui-text-secondary)">{completedTodoCount}/{todoItems.length}</span>
                   </div>
                   <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-(--ui-bg-quaternary)">
                     <div
@@ -504,8 +475,8 @@ export function WorkspaceOverview() {
                   )}
                 </div>
               )}
-            </>
-          </Card>
+          </>
+        </Card>
         )}
 
         {secondaryActivityTasks.length > 0 && (
@@ -522,7 +493,9 @@ export function WorkspaceOverview() {
                     className={
                       task.status === 'running'
                         ? 'mt-0.5 shrink-0 text-(--theme-primary)'
-                        : task.status === 'waiting' || task.status === 'error' || task.status === 'interrupted'
+                        : task.status === 'waiting' ||
+                            task.status === 'error' ||
+                            task.status === 'interrupted'
                           ? 'mt-0.5 shrink-0 text-(--ui-text-secondary)'
                           : 'mt-0.5 shrink-0 text-(--ui-text-tertiary)'
                     }
