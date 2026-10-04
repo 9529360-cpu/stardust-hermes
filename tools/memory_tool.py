@@ -527,8 +527,9 @@ def _build_memory_schema_overrides() -> Dict[str, Any]:
     if narrowed := _SINGLE_TARGET_TEXT.get(tuple(t for t in targets if t != "topic")):
         target_schema["description"], replacement = narrowed
         description = description.replace(
-            "TARGETS: 'user' = who the user is (name, role, preferences, style). 'memory' = your "
-            "notes (environment, conventions, tool quirks, lessons).", replacement)
+            "TARGETS: 'user' = who the user is; 'memory' = tiny always-relevant notes; 'topic' = "
+            "a compact current-state summary recalled only for relevant turns. For target='topic', set "
+            "topic (stable key), content (summary), optional title and keywords.", replacement)
     return {"description": description, "parameters": parameters}
 
 
