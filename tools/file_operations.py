@@ -226,8 +226,12 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
         return self._exec(f"head -c {nbytes} {self._escape_shell_arg(path)} 2>/dev/null")
 
     def _run_python_snippet(self, snippet: str) -> ExecuteResult:
-        """Run ``snippet`` via the backend's Python (see ``_python_command``)."""
-        return self._exec(f"{self._python_command()} -c {self._escape_shell_literal(snippet)}")
+        r"""Run ``snippet`` via the backend's Python (see ``_python_command``), reading
+        the source from stdin rather than the command line: on Windows the Git Bash
+        runtime re-parses the command line a native process starts it with and halves
+        ``\\`` inside quotes, so the ``repr()`` of a ``C:\\Users`` path baked into the
+        source became a ``\U`` escape and the snippet died with a SyntaxError."""
+        return self._exec(f"{self._python_command()} -", stdin_data=snippet)
 
     def _python_command(self) -> str:
         """``python3`` when it actually runs on the backend, else ``python`` (Windows /
@@ -366,9 +370,12 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
     @staticmethod
     def _escape_shell_literal(arg: str) -> str:
         """Single-quote ``arg`` for the shell exactly as given — for values that are
-        not paths (regex patterns, ``python -c`` source). Single quotes keep every
-        backslash; the Windows path rewrite in ``_escape_shell_arg`` turned them into
-        ``/``, so a pattern like ``foo\\(`` reached rg as ``foo/(`` (unclosed group)."""
+        not paths (regex patterns). Single quotes keep every backslash; the Windows
+        path rewrite in ``_escape_shell_arg`` turned them into ``/``, so a pattern
+        like ``foo\\(`` reached rg as ``foo/(`` (unclosed group). On Windows the
+        Git Bash runtime still halves a doubled backslash inside the command line
+        it is started with; payloads that must stay byte-exact go through stdin
+        (see ``_run_python_snippet``)."""
         return "'" + arg.replace("'", "'\"'\"'") + "'"
 
     def _escape_native_tool_arg(self, arg: str) -> str:

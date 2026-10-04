@@ -310,10 +310,11 @@ class TestShellFileOpsHelpers:
 
     @staticmethod
     def _interpreters(mock_env, python3_runs):
-        commands = []
+        commands, stdins = [], []
 
         def side_effect(command, **kwargs):
             commands.append(command)
+            stdins.append(kwargs.get("stdin_data"))
             if command.startswith("python3 ") and not python3_runs:
                 # Windows' Microsoft Store alias: on PATH, exits non-zero, and its
                 # (localized) message never says "python3".
@@ -322,8 +323,13 @@ class TestShellFileOpsHelpers:
 
         mock_env.execute.side_effect = side_effect
         ops = ShellFileOperations(mock_env)
-        assert ops._run_python_snippet("print(1)").exit_code == 0
-        assert ops._run_python_snippet("print(2)").exit_code == 0
+        snippet = "p = 'C:\\\\Users\\\\x'\nprint(p)"
+        assert ops._run_python_snippet(snippet).exit_code == 0
+        assert ops._run_python_snippet(snippet).exit_code == 0
+        # The source rides stdin, never the command line (Git Bash halves a doubled
+        # backslash in the command line a native process starts it with).
+        assert stdins[-2:] == [snippet, snippet]
+        assert all("Users" not in command for command in commands)
         return [command.split(" ", 1)[0] for command in commands]
 
     def test_python_snippets_fall_back_when_python3_is_only_a_store_stub(self, mock_env):
