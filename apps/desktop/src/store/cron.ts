@@ -134,7 +134,7 @@ export const updateCronJobs = (fn: (jobs: CronJob[]) => CronJob[]) => {
 // One-shot focus target: clicking "Manage" on a job sets this, then opens the
 // cron overlay, which reads it once to select + scroll to that job. Cleared
 // after consumption so re-opening cron normally doesn't re-focus a stale job.
-export type CronFocusJob = { id: string, profile: string } | string
+export type CronFocusJob = { id: string; profile: string } | string
 export const $cronFocusJobId = atom<CronFocusJob | null>(null)
 export const setCronFocusJobId = (job: CronFocusJob | null) => $cronFocusJobId.set(job)
 
