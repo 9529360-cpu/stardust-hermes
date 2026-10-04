@@ -1823,12 +1823,10 @@ export const en: Translations = {
       bundledNames: {
         'hermes-bots': 'Agents',
         kanban: 'Task Board',
-        radio: 'Radio'
       },
       bundledDescriptions: {
         'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.',
         kanban: 'Multi-agent task board with a board view, a command palette entry, and live task activity in the status bar.',
-        radio: 'Live radio with pinned stations, search, and an audio-reactive waveform.'
       },
       halfDesktop: 'Desktop',
       halfDesktopHint: 'this app, same for every profile',
