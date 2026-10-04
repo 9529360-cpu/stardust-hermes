@@ -227,8 +227,8 @@ export class GatewayClient extends EventEmitter {
     }
   }
 
-  // The shared heartbeat found no inbound frame for a full deadline: force the
-  // socket closed so the ordinary close path reconnects (issue #32997).
+  // The shared heartbeat saw a ping go unanswered for a full deadline: force
+  // the socket closed so the ordinary close path reconnects (issue #32997).
   private onHeartbeatFailure() {
     const ws = this.ws
 
