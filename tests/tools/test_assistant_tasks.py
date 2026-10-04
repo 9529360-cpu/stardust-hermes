@@ -423,6 +423,24 @@ def test_messaging_owner_key_is_stable_route_not_raw_identity(monkeypatch):
     assert assistant_tasks._resolve_owner_key() is None
 
 
+def test_background_model_route_is_explicit_and_provider_requires_model(monkeypatch):
+    seen = []
+    monkeypatch.setattr("tools.kanban_tools._handle_create", lambda args: (
+        seen.append(args) or json.dumps({"ok": True, "task_id": "t_one", "status": "ready"})
+    ))
+    task = {"title": "Work", "instruction": "Do the work"}
+    result = json.loads(assistant_tasks._create_tasks(
+        [dict(task), dict(task, model="gpt-6-sol", provider="openai-api"),
+         dict(task, provider="openai-api")],
+        session_id="s", request_id="route-test", owner_key="local",
+    ))
+    assert result["summary"] == {"requested": 3, "created": 2, "failed": 1}
+    assert "model" not in seen[0] and "provider" not in seen[0]
+    assert seen[1]["model"] == "gpt-6-sol"
+    assert seen[1]["provider"] == "openai-api"
+    assert result["failed"][0]["error"] == "provider requires model"
+
+
 def test_local_owner_survives_origin_session_deletion(tmp_path, monkeypatch):
     from hermes_state import SessionDB
     from hermes_cli import kanban_db as kb

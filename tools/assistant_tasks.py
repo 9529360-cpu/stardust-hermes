@@ -305,6 +305,16 @@ def _create_tasks(
             args["session_id"] = sid
         if raw.get("goal_max_turns") is not None:
             args["goal_max_turns"] = raw.get("goal_max_turns")
+        # Pin both values only when the caller explicitly selected a route.
+        # Otherwise the assigned profile owns its model; never infer a live
+        # conversation's model from process-global configuration.
+        if raw.get("provider") and not raw.get("model"):
+            failed.append({"index": index, "title": title, "error": "provider requires model"})
+            continue
+        if raw.get("model"):
+            args["model"] = raw["model"]
+        if raw.get("provider"):
+            args["provider"] = raw["provider"]
         if "project" in raw:
             args["project"] = raw.get("project")
         if raw.get("workspace_kind"):
@@ -1040,11 +1050,10 @@ def check_assistant_tasks_requirements() -> bool:
 ASSISTANT_TASKS_SCHEMA = {
     "name": "assistant_tasks",
     "description": (
-        "Manage restart-durable personal work in Kanban. Create only work that should outlive this chat; "
-        "list recalls work and inspect reads one task history. Cancel only from the CURRENT user request. "
-        "Delete only from an explicit CURRENT user request; delete is irreversible and stops active work, "
-        "while cancel preserves history. Resume only from CURRENT user input or authorization for that task. "
-        "Use cron for timed/recurring work. Never persist credentials or raw secrets."
+        "Manage restart-durable personal Kanban work. Cancel/delete/resume only from the CURRENT user request; "
+        "delete is irreversible and stops active work. Use cron for timed work. Never persist secrets. "
+        "Set model and provider to pin a background task to this conversation's route; "
+        "otherwise it uses the assignee profile. User-requested API/model takes precedence."
     ),
     "parameters": {
         "type": "object",
@@ -1058,6 +1067,8 @@ ASSISTANT_TASKS_SCHEMA = {
                         "title": {"type": "string", "maxLength": MAX_TITLE_CHARS},
                         "instruction": {"type": "string", "maxLength": MAX_INSTRUCTION_CHARS},
                         "assignee": {"type": "string"},
+                        "model": {"type": "string", "description": "Explicit worker model; omit to use the assignee profile's model."},
+                        "provider": {"type": "string", "description": "Provider for the explicit model; requires model."},
                         "project": {"type": "string"},
                         "workspace_kind": {"type": "string", "enum": ["scratch", "dir", "worktree"]},
                         "workspace_path": {"type": "string"},

@@ -4193,7 +4193,9 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
 
     # Kanban goal_mode: keep working in THIS session until a judge agrees the card is
     # done, the worker terminates it, or the turn budget runs out (sticky block).
-    if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1":
+    if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1" and not (
+        isinstance(result, dict) and (result.get("failed") or result.get("partial"))
+    ):
         try:
             _run_kanban_goal_loop_q(cli, response)
         except Exception as _goal_exc:
@@ -4206,7 +4208,9 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
     # provider was unavailable exit with the EX_TEMPFAIL sentinel so the dispatcher requeues
     # the task without counting a failure (a quota window or outage must not trip the breaker).
     _exit_code = 0
-    if isinstance(result, dict) and result.get("failed"):
+    if isinstance(result, dict) and (result.get("failed") or (
+        os.environ.get("HERMES_KANBAN_TASK") and result.get("partial")
+    )):
         _exit_code = 1
         if os.environ.get("HERMES_KANBAN_TASK") and result.get("failure_reason") in _KANBAN_REQUEUE_FAILURE_REASONS:
             try:
