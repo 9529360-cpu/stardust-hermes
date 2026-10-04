@@ -9,7 +9,7 @@ import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $sidebarGrouping, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
-import { $newChatProfile } from '@/store/profile'
+import { $newChatProfile, $profileScope, ALL_PROFILES } from '@/store/profile'
 import {
   $projectScope,
   $projectTree,
@@ -83,30 +83,51 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
   const { search } = useLocation()
   const copy = PRODUCT_NAV_COPY[locale]
   const [projectsOpen, setProjectsOpen] = useState(false)
+  const [expandedProjectId, setExpandedProjectId] = useState<null | string>(null)
   const [enteredProject, setEnteredProject] = useState<null | SidebarProjectTree>(null)
   const [projectLoadFailed, setProjectLoadFailed] = useState(false)
   const projects = useStore($projectTree)
+  const profileScope = useStore($profileScope)
   const projectScope = useStore($projectScope)
   useEffect(() => {
-    if (!projectsOpen || !projects.some(project => project.id === projectScope)) {
+    if (!projectsOpen || !expandedProjectId) {
+      return
+    }
+
+    const projectNode = projects.find(project => project.id === expandedProjectId)
+
+    if (!projectNode) {
+      return
+    }
+
+    // The all-profile tree already carries cross-profile previews; the scoped
+    // RPC cannot fetch project sessions without a concrete profile.
+    if (profileScope === ALL_PROFILES) {
+      setEnteredProject(projectNode)
+      setProjectLoadFailed(false)
+
       return
     }
 
     let cancelled = false
     setEnteredProject(null)
     setProjectLoadFailed(false)
-    void fetchProjectSessions(projectScope)
+    void fetchProjectSessions(expandedProjectId)
       .then(project => {
-        if (!cancelled) {setEnteredProject(project)}
+        if (!cancelled) {
+          setEnteredProject(project)
+        }
       })
       .catch(() => {
-        if (!cancelled) {setProjectLoadFailed(true)}
+        if (!cancelled) {
+          setProjectLoadFailed(true)
+        }
       })
 
     return () => {
       cancelled = true
     }
-  }, [projectsOpen, projectScope, projects])
+  }, [projectsOpen, expandedProjectId, projects, profileScope])
   const currentCwd = useStore($currentCwd)
   const sidebarGrouping = useStore($sidebarGrouping)
   // Selection follows the focused pane, exactly as the conversation list below
@@ -174,14 +195,27 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
   }
 
   const selectProject = (id: string) => {
+    if (expandedProjectId === id) {
+      setExpandedProjectId(null)
+
+      return
+    }
+
     setSidebarAgentsGrouped(false)
     enterProject(id)
+    setExpandedProjectId(id)
     const cwd = projectRootCwd(projects.find(project => project.id === id))
 
     if (cwd && cwd !== currentCwd) {
       setCurrentCwd(cwd)
     }
   }
+
+  const projectLaneSessions = enteredProject?.repos.flatMap(repo => repo.groups.flatMap(group => group.sessions)) ?? []
+
+  const shownProjectSessions = projectLaneSessions.length
+    ? projectLaneSessions
+    : (enteredProject?.previewSessions ?? [])
 
   return (
     <nav
@@ -221,7 +255,7 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
             {projects.map(project => (
               <div key={project.id}>
                 <button
-                  aria-expanded={projectScope === project.id}
+                  aria-expanded={expandedProjectId === project.id}
                   aria-pressed={projectScope === project.id}
                   className="flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[0.72rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
                   onClick={() => selectProject(project.id)}
@@ -232,30 +266,28 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
                   <span className="min-w-0 flex-1 truncate">{project.label}</span>
                   <Codicon
                     className="shrink-0 opacity-60"
-                    name={projectScope === project.id ? 'chevron-down' : 'chevron-right'}
+                    name={expandedProjectId === project.id ? 'chevron-down' : 'chevron-right'}
                     size="0.7rem"
                   />
                 </button>
-                {projectScope === project.id && (
+                {expandedProjectId === project.id && (
                   <div className="ml-3 border-l border-(--ui-stroke-tertiary) pl-1.5">
                     {projectLoadFailed && (
                       <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projectLoadFailed}</div>
                     )}
                     {enteredProject?.id === project.id &&
-                      (enteredProject.repos.flatMap(repo => repo.groups.flatMap(group => group.sessions)).length ? (
-                        enteredProject.repos
-                          .flatMap(repo => repo.groups.flatMap(group => group.sessions))
-                          .map(session => (
-                            <button
-                              className="block min-h-8 w-full truncate rounded-md px-2 text-left text-[0.7rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
-                              key={session.id}
-                              onClick={() => onResumeSession?.(session.id, session)}
-                              title={session.title ?? session.preview ?? session.id}
-                              type="button"
-                            >
-                              {session.title ?? session.preview ?? session.id}
-                            </button>
-                          ))
+                      (shownProjectSessions.length ? (
+                        shownProjectSessions.map(session => (
+                          <button
+                            className="block min-h-8 w-full truncate rounded-md px-2 text-left text-[0.7rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
+                            key={session.id}
+                            onClick={() => onResumeSession?.(session.id, session)}
+                            title={session.title ?? session.preview ?? session.id}
+                            type="button"
+                          >
+                            {session.title ?? session.preview ?? session.id}
+                          </button>
+                        ))
                       ) : (
                         <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projectEmpty}</div>
                       ))}

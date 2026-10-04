@@ -123,6 +123,9 @@ describe('PersonalProductNav', () => {
     expect($sidebarGrouping.get()).not.toBe('project')
     expect(onNavigate).not.toHaveBeenCalled()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Example' }))
+    expect(screen.getByRole('button', { name: 'Example' }).getAttribute('aria-expanded')).toBe('false')
+
     fireEvent.click(projectButton)
     expect(projectButton.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('button', { name: 'Example' })).toBeNull()
