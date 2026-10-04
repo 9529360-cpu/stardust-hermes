@@ -392,7 +392,8 @@ def _fmt_gave_up(ev, n) -> tuple:
     # (spawn failure, crash, or timeout alike): it is now Blocked and waiting for a human.
     failures = _payload(ev, "failures")
     count = f"it failed {int(failures)} times in a row" if failures else "it kept failing"
-    last = _clip(ev, "error", " (last: {})", 160)
+    # ``worker_error``: the worker's own reason (model not served, quota, ...) over its exit status.
+    last = _clip(ev, "worker_error", " (last: {})", 160) or _clip(ev, "error", " (last: {})", 160)
     return (
         f"⛔ {n.head} is now blocked: {count}{last}. Fix the cause, then `hermes kanban unblock "
         f"{n.task_id}` (or `hermes kanban reassign {n.task_id}`). Logs: `hermes kanban log {n.task_id}`.",
@@ -415,7 +416,9 @@ _EVENT_FORMATTERS: dict[str, Callable[[Any, "_KanbanNotification"], tuple]] = {
     "blocked": lambda ev, n: (f"⏸ {n.head} blocked{_clip(ev, 'reason', ': {}', 160)}", None, None),
     "gave_up": _fmt_gave_up,
     "crashed": lambda ev, n: (
-        f"✖ {n.head} — its worker stopped unexpectedly; it will be retried automatically.", None, None,
+        f"✖ {n.head} — its worker "
+        + (_clip(ev, "worker_error", "failed: {}", 160) or "stopped unexpectedly")
+        + "; it will be retried automatically.", None, None,
     ),
     "timed_out": _fmt_timed_out,
     "status": lambda ev, n: (f"🔄 {n.head} → {_payload(ev, 'status') or ''}", None, None),
