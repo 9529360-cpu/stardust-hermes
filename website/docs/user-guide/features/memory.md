@@ -10,14 +10,18 @@ Stardust has bounded, curated memory that persists across sessions. It is the au
 
 ## How It Works
 
-Two files make up the agent's memory:
+Stardust uses three built-in memory layers plus session history:
 
-| File | Purpose | Char Limit |
-|------|---------|------------|
-| **MEMORY.md** | Cross-project assistant knowledge — global environment facts, standing conventions, reusable tool quirks and lessons | 2,200 chars (~800 tokens) |
-| **USER.md** | User profile — your preferences, communication style, expectations | 1,375 chars (~500 tokens) |
+| Store | Purpose | Prompt behavior |
+|------|---------|-----------------|
+| **USER.md** | Stable user profile — preferences, communication style, expectations | Always loaded; keep tiny |
+| **MEMORY.md** | Cross-topic facts and standing rules that truly apply everywhere | Always loaded; keep tiny |
+| **TOPICS.json** | Current-state summaries for projects, domains, relationships, and recurring workstreams | Recalled locally only when relevant |
+| **state.db** | Complete session history | Never bulk-loaded; searched on demand |
 
-Both are stored in `~/.hermes/memories/` and are injected into the system prompt as a turn-stable snapshot. The snapshot stays byte-stable during a turn, then refreshes at the next turn boundary if the built-in files or their reset generation changed. The agent manages its own memory via the `memory` tool — it can add, replace, or remove entries.
+The files live under `~/.hermes/memories/`. USER.md and MEMORY.md remain a turn-stable system-prompt snapshot. Topic summaries do **not** enter the system prompt: the current user turn is matched locally against topic titles/keywords, then at most a small configured subset is injected through the per-turn memory-context sidecar. This routing does not call an LLM or a network service.
+
+A topic summary is an upsert, not an event log. When a decision changes, Stardust updates the same topic to describe the current truth and removes superseded statements; exact historical detail remains in `state.db`.
 
 :::caution One agent per Hermes home
 Don't point two agent processes at the same Hermes home directory. Memory writes are automatic and load back into the system prompt at session start, so two writers sharing one home will compound each other's entries into state neither of them (nor you) authored. Memory is scoped per [profile](/user-guide/profiles) by design — give a second agent its own profile, and if they need shared memory, use an [external memory provider](/user-guide/features/memory-providers) instead.
@@ -58,9 +62,9 @@ The format includes:
 
 ## Resetting Built-in Memory Is a Durable Forget Boundary
 
-`hermes memory reset` and the Desktop/Web reset controls only reset the built-in
-`MEMORY.md` / `USER.md` targets; they do not erase external-provider data or
-ordinary chat/session history.
+`hermes memory reset` and the Desktop/Web full reset controls erase the built-in
+`MEMORY.md`, `USER.md`, and local `TOPICS.json` topic summaries; they do not erase
+external-provider data or ordinary chat/session history.
 
 Each built-in target has a profile-scoped reset generation stored beside the file.
 A running session captures that generation with its memory snapshot. When reset
@@ -245,16 +249,15 @@ See [Session Search Tool](/user-guide/sessions#session-search-tool) for the thre
 
 ### session_search vs memory
 
-| Feature | Persistent Memory | Session Search |
-|---------|------------------|----------------|
-| **Capacity** | ~1,300 tokens total | Unlimited (all sessions) |
-| **Speed** | Instant (in system prompt) | ~20ms FTS5 query, ~1ms scroll |
-| **Cost** | Token cost in every prompt | Free — no LLM calls |
-| **Use case** | Key facts always available | Finding specific past conversations |
-| **Management** | Manually curated by agent | Automatic — all sessions stored |
-| **Token cost** | Fixed per session (~1,300 tokens) | On-demand (searched when needed) |
+| Feature | Core memory (USER/MEMORY) | Topic summaries | Session Search |
+|---------|---------------------------|-----------------|----------------|
+| **Capacity** | Intentionally tiny | Up to bounded summaries on disk | Unlimited session history |
+| **When loaded** | Every session | Only when the current turn matches | Only when explicitly searched |
+| **Routing cost** | None | Local lexical matching; no LLM/network call | Local FTS5 search |
+| **Use case** | Identity + universal rules | Current project/domain state | Exact historical detail |
+| **Token cost** | Small fixed prompt cost | Only selected summaries, once per unchanged version/session | Only returned search snippets |
 
-**Memory** is for critical cross-project facts that should always be in context. Project facts belong to `projects.db`. **Session search** is for "did we discuss X last week?" queries where the agent needs to recall specifics from past conversations.
+This is the default hierarchy: answer from the live conversation first, then core memory, then relevant topic summaries; use `session_search` when exact history is actually needed. The Learning Journey / memory graph remains a visualization and management surface, not the primary retrieval engine.
 
 ## Learning Journey (`/journey`)
 
@@ -284,8 +287,11 @@ memory:
   enabled: true           # master durable-memory privacy switch
   memory_enabled: true    # built-in MEMORY.md
   user_profile_enabled: true
-  memory_char_limit: 2200   # ~800 tokens
-  user_char_limit: 1375     # ~500 tokens
+  memory_char_limit: 2200   # always-loaded core memory
+  user_char_limit: 1375     # always-loaded user profile
+  topic_summaries_enabled: true
+  topic_recall_limit: 2
+  topic_recall_char_budget: 1800
   write_approval: false     # false = write freely (default) | true = require approval
 ```
 

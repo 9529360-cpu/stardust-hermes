@@ -454,6 +454,8 @@ async def get_memory_status():
         for fname, key in _MEMORY_FILES:
             path = mem_dir / fname
             files[key] = path.stat().st_size if path.exists() else 0
+        topic_path = mem_dir / "TOPICS.json"
+        files["topic"] = topic_path.stat().st_size if topic_path.exists() else 0
         return {"active": active, "providers": _discover_memory_provider_statuses(), "builtin_files": files}
 
     return await asyncio.to_thread(_run)
@@ -483,6 +485,7 @@ async def reset_memory(body: MemoryReset):
         raise HTTPException(status_code=400, detail="target must be all, memory, or user")
 
     from tools.memory_tool import MemoryStore
+    from tools.topic_memory_store import reset_topic_summaries
 
     deleted = []
     reset_targets = []
@@ -500,6 +503,15 @@ async def reset_memory(body: MemoryReset):
         reset_targets.append(fname)
         if existed:
             deleted.append(fname)
+    if target == "all":
+        try:
+            existed = reset_topic_summaries()
+        except (OSError, RuntimeError) as exc:
+            completed = f" Earlier targets already reset: {', '.join(reset_targets)}." if reset_targets else ""
+            raise HTTPException(status_code=500, detail=f"Could not reset TOPICS.json: {exc}.{completed}") from exc
+        reset_targets.append("TOPICS.json")
+        if existed:
+            deleted.append("TOPICS.json")
     return {
         "ok": True,
         "deleted": deleted,
