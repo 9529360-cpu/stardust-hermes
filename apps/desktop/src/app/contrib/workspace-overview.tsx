@@ -28,6 +28,7 @@ import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/stor
 import { $subagentsBySession } from '@/store/subagents'
 import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
 
+import { SubagentSection } from '../chat/composer/status-stack/subagent-section'
 import { CRON_ROUTE, sessionRoute } from '../routes'
 import {
   findLiveTaskRuntimeId,
@@ -82,6 +83,7 @@ export function WorkspaceOverview() {
   const { locale } = useI18n()
   const navigate = useNavigate()
   const copy = WORKSPACE_OVERVIEW_COPY[locale]
+
   const systemLabels =
     locale === 'zh'
       ? {
@@ -172,6 +174,7 @@ export function WorkspaceOverview() {
             workingSummary: 'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
             hidePreview: 'Hide context'
           }
+
   const cwd = useStore($currentCwd)
   const projectScope = useStore($projectScope)
   const projectTree = useStore($projectTree)
@@ -185,9 +188,11 @@ export function WorkspaceOverview() {
   const cronJobsScope = useStore($cronJobsScope)
   const activeConnectionId = useStore($activeConnectionId)
   const profileScope = useStore($profileScope)
+
   const cronJobs = useMemo(() => (
     cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}` ? cachedCronJobs : []
   ), [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope])
+
   const desktopActionTasks = useStore($desktopActionTasks)
   const previewServerRestart = useStore($previewServerRestart)
   const sessionStates = useStore($sessionStates)
@@ -197,23 +202,30 @@ export function WorkspaceOverview() {
   const session = selectedStoredSessionId
     ? sessions.find(candidate => sessionMatchesStoredId(candidate, selectedStoredSessionId))
     : undefined
+
   const anyAttention = attentionSessionIds.length > 0
   const anyWorking = workingSessionIds.length > 0
+
   const fallbackTaskSession = selectedStoredSessionId
     ? undefined
     : findLiveTaskSession(sessions, attentionSessionIds, workingSessionIds)
+
   const fallbackTaskStoredId = selectedStoredSessionId
     ? null
     : findLiveTaskStoredId(sessions, attentionSessionIds, workingSessionIds)
+
   const scopedProjectCwd =
     projectScope === ALL_PROJECTS ? '' : projectRootCwd(projectTree.find(project => project.id === projectScope))
+
   const effectiveCwd = resolveTaskWorkspaceCwd(cwd, session, fallbackTaskSession, scopedProjectCwd)
   const repoStatus = useStore(repoStatusForCwd(effectiveCwd))
+
   const fallbackTaskRuntimeId = fallbackTaskSession
     ? findLiveTaskRuntimeId(sessionStates, fallbackTaskSession)
     : fallbackTaskStoredId
       ? findLiveTaskRuntimeIdByStoredId(sessionStates, fallbackTaskStoredId)
       : null
+
   const runtimeStoredSessionIds = useMemo(
     () =>
       Object.fromEntries(
@@ -221,8 +233,10 @@ export function WorkspaceOverview() {
       ),
     [sessionStates]
   )
+
   const statusSessionId = selectedStoredSessionId ? activeSessionId : (fallbackTaskRuntimeId ?? activeSessionId)
   const statusItems = useSessionSlice($statusItemsBySession, statusSessionId)
+
   const activityTasks = useMemo(
     () =>
       buildTaskCenterTasks({
@@ -254,22 +268,27 @@ export function WorkspaceOverview() {
   useEffect(() => registerRepoStatusCwd(effectiveCwd), [effectiveCwd])
 
   const effectiveRepoStatus = repoStatus
+
   const selectedAttention = selectedStoredSessionId
     ? session
       ? attentionSessionIds.some(storedId => sessionMatchesStoredId(session, storedId))
       : attentionSessionIds.includes(selectedStoredSessionId)
     : false
+
   const selectedWorking = selectedStoredSessionId
     ? session
       ? workingSessionIds.some(storedId => sessionMatchesStoredId(session, storedId))
       : workingSessionIds.includes(selectedStoredSessionId)
     : false
+
   const primaryAttention = selectedStoredSessionId ? selectedAttention : anyAttention
   const primaryWorking = selectedStoredSessionId ? selectedWorking : anyWorking
   const displaySession = session ?? fallbackTaskSession
+
   const displayTaskStoredId =
     displaySession?.id ??
     (primaryAttention || primaryWorking ? (selectedStoredSessionId ?? fallbackTaskStoredId) : fallbackTaskStoredId)
+
   const sessionLabel = displaySession
     ? storedSessionTitle(displaySession)
     : selectedStoredSessionId
@@ -279,6 +298,7 @@ export function WorkspaceOverview() {
       : displayTaskStoredId
         ? systemLabels.activeTaskTitle
         : systemLabels.assistantTitle
+
   const assistantContextSummary = primaryAttention
     ? systemLabels.attentionSummary
     : primaryWorking
@@ -286,6 +306,7 @@ export function WorkspaceOverview() {
       : selectedStoredSessionId
         ? systemLabels.assistantSession
         : systemLabels.assistantSummary
+
   const normalizedCwd = effectiveCwd.replace(/[/\\]+$/, '')
   const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? copy.noProject
   const branch = effectiveRepoStatus?.branch || copy.noRepository
@@ -294,19 +315,23 @@ export function WorkspaceOverview() {
   const activeTodo = todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
   const todoPercent = todoItems.length > 0 ? Math.round((completedTodoCount / todoItems.length) * 100) : 0
   const showTaskCard = primaryAttention || primaryWorking
+
   const summary = primaryAttention
     ? systemLabels.attentionSummary
     : primaryWorking
       ? systemLabels.workingSummary
       : assistantContextSummary
+
   const currentActivityTaskId = displaySession?.id
     ? `session:${displaySession.id}`
     : displayTaskStoredId
       ? `session:${displayTaskStoredId}`
       : null
+
   const secondaryActivityTasks = currentActivityTaskId
     ? activityTasks.filter(task => task.id !== currentActivityTaskId)
     : activityTasks
+
   const activityStatusLabels: Record<TaskCenterStatus, string> = {
     error: systemLabels.activityFailed,
     interrupted: systemLabels.activityInterrupted,
@@ -316,11 +341,13 @@ export function WorkspaceOverview() {
     success: systemLabels.activityCompleted,
     waiting: systemLabels.activityWaiting
   }
+
   const durabilityLabels = {
     'process-local': systemLabels.durabilityProcess,
     'restart-durable': systemLabels.durabilityRestart,
     turn: systemLabels.durabilityTurn
   } as const
+
   const handleTaskAction = (task: (typeof secondaryActivityTasks)[number]) => {
     if (task.action === 'open-session' && task.sessionId) {
       if (task.rail === 'subagent') {
@@ -358,6 +385,9 @@ export function WorkspaceOverview() {
       </div>
 
       <div className="flex flex-col gap-2.5">
+        {activeSessionId && (
+          <SubagentSection defaultCollapsed={false} key={activeSessionId} sessionId={activeSessionId} />
+        )}
         <Card title={effectiveCwd ? copy.projectContext : systemLabels.assistantContext}>
           {effectiveCwd ? (
             <>

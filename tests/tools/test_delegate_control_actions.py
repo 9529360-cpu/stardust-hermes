@@ -797,6 +797,7 @@ def test_spawn_count_zero_for_control_actions():
     from agent.tool_guardrails import _subagent_spawn_count
 
     assert _subagent_spawn_count({"action": "list"}) == 0
+    assert _subagent_spawn_count({"action": "inspect", "subagent_id": "x"}) == 0
     assert _subagent_spawn_count({"action": "steer", "subagent_id": "x"}) == 0
     assert _subagent_spawn_count({"action": "stop", "subagent_id": "x"}) == 0
     # Spawn shapes unchanged
@@ -820,6 +821,7 @@ def test_control_action_not_blocked_at_spawn_cap():
     assert ctl.before_call("delegate_task", {"goal": "a"}).action == "allow"
     # A second spawn is blocked
     assert ctl.before_call("delegate_task", {"goal": "b"}).action == "block"
+    assert ctl.before_call("delegate_task", {"action": "inspect", "subagent_id": "x"}).action == "allow"
     # Control actions still pass on a fresh controller after cap exhaustion
     ctl2 = ToolCallGuardrailController(cfg)
     assert ctl2.before_call("delegate_task", {"goal": "a"}).action == "allow"

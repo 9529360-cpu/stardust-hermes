@@ -36,7 +36,8 @@ test('settings offers one model services page without reviving provider account 
 
   await modelServices.click()
   await expect(modelServices).toHaveClass(/bg-\(--ui-bg-tertiary\)/)
-  await expect(page.getByText('自定义服务', { exact: true }).first()).toBeVisible()
+  // The service list loads from the backend on first open.
+  await expect(page.getByText('自定义服务', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
   await expect(page.getByRole('button', { name: '添加模型服务' })).toBeVisible()
   await expect(page.getByText('服务地址', { exact: true })).toHaveCount(0)
 

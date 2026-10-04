@@ -78,7 +78,7 @@ describe('onboarding Picker', () => {
     setState()
     render(<Picker ctx={ctx} />)
 
-    fireEvent.click(screen.getByRole('button', { name: "I'll choose a provider later" }))
+    fireEvent.click(screen.getByRole('button', { name: "I'll set this up later" }))
 
     expect($desktopOnboarding.get().firstRunSkipped).toBe(true)
     expect(window.localStorage.getItem('hermes-onboarding-skipped-v1')).toBe('1')
@@ -88,6 +88,6 @@ describe('onboarding Picker', () => {
     setState({ manual: true })
     render(<Picker ctx={ctx} />)
 
-    expect(screen.queryByRole('button', { name: "I'll choose a provider later" })).toBeNull()
+    expect(screen.queryByRole('button', { name: "I'll set this up later" })).toBeNull()
   })
 })

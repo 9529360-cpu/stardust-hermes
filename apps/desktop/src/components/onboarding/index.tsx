@@ -272,7 +272,7 @@ export function DesktopOnboardingOverlay({
     return null
   }
 
-  // The user chose "I'll choose a provider later" on first run. Stay out of the
+  // The user chose "I'll set this up later" on first run. Stay out of the
   // way on every subsequent launch; model APIs are added later from Settings → Models.
   if (onboarding.firstRunSkipped && !onboarding.manual && !onboarding.freeTierReady) {
     return null
@@ -319,6 +319,11 @@ export function DesktopOnboardingOverlay({
       // window glass or the shell shows through. Contract:
       // `[data-glass-opaque]` in styles.css.
       data-glass-opaque=""
+      // Which onboarding screen is up, independent of the UI language: E2E
+      // specs wait on it instead of matching translated copy.
+      data-onboarding-state={
+        !ready ? 'preparing' : freeTierIntro ? 'free-tier' : showPicker ? 'picker' : 'flow'
+      }
     >
       <div
         className={cn(
@@ -527,7 +532,7 @@ export function Picker({ ctx }: { ctx: OnboardingContext }) {
   )
 }
 
-// "I'll choose a provider later" — dismisses the first-run picker and persists
+// "I'll set this up later" — dismisses the first-run picker and persists
 // the skip so it never re-nags. Model APIs can be added later from Settings → Models.
 function ChooseLaterLink() {
   const { t } = useI18n()

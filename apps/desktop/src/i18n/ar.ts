@@ -2438,7 +2438,7 @@ export const ar = defineLocale({
     collapse: 'طي',
     otherProviders: 'مزودون آخرون',
     haveApiKey: 'لديك مفتاح API',
-    chooseLater: 'سأختار مزوّدا لاحقا',
+    chooseLater: 'سأقوم بالإعداد لاحقًا',
     recommended: 'موصى به',
     connected: 'متصل',
     featuredPitch: 'اشتراك واحد، أكثر من 300 نموذج متقدم — الطريقة الموصى بها لتشغيل Stardust',

@@ -129,25 +129,43 @@ export function readSandboxMarker(userDataDir: string, { readFileSync = fs.readF
   }
 }
 
+/**
+ * Persist the marker for the NEXT launch. Best-effort by contract, like
+ * readSandboxMarker: an unwritable userData (policy, permissions, a full disk)
+ * must never stop THIS launch — callers run it from module top-level and from
+ * crash handlers. Returns whether the marker was written; a failure is logged.
+ */
 export function writeSandboxMarker(
   userDataDir: string,
   marker: SandboxMarker,
   {
     mkdirSync = fs.mkdirSync,
+    warn = console.warn,
     writeFileSync = fs.writeFileSync
   }: {
     mkdirSync?: typeof fs.mkdirSync
+    warn?: (message: string) => void
     writeFileSync?: typeof fs.writeFileSync
   } = {}
-): void {
+): boolean {
   const dir = String(userDataDir || '')
 
   if (!dir) {
-    return
+    return false
   }
 
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(sandboxMarkerPath(dir), `${JSON.stringify(marker)}\n`, 'utf8')
+  try {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(sandboxMarkerPath(dir), `${JSON.stringify(marker)}\n`, 'utf8')
+
+    return true
+  } catch (error) {
+    warn(
+      `[hermes] could not save the Windows sandbox marker in ${dir}: ${error instanceof Error ? error.message : String(error)} (#38216)`
+    )
+
+    return false
+  }
 }
 
 export interface SandboxLaunchDecision {

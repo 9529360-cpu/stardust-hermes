@@ -2834,7 +2834,7 @@ export const ja = defineLocale({
     collapse: '折りたたむ',
     otherProviders: 'その他のプロバイダー',
     haveApiKey: 'API キーをお持ちです',
-    chooseLater: '後でプロバイダーを選択します',
+    chooseLater: 'あとで設定します',
     recommended: '推奨',
     connected: '接続済み',
     featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Stardust を実行するための推奨方法',
