@@ -3606,6 +3606,7 @@ export const zhHant = defineLocale({
       errorRetry: '重試',
       errorStartNewSession: '開始新工作階段',
       errorSwitchProvider: '切換服務商',
+      errorSetUpFallback: '設定備用模型',
       errorSignInAgain: provider => `重新登入 ${provider}`,
       errorOauthExpired: provider =>
         `您的 ${provider} 登入已過期或被撤銷。請在終端機執行 hermes model，選擇 ${provider} 重新登入；或在「設定 → 模型服務」中改用模型 API。`,

@@ -192,3 +192,14 @@ def build_error_surface_from_exception(exc: BaseException, provider: str = "", m
     except Exception:  # pragma: no cover — never break the error path
         logger.debug("error_surface: exception classification failed", exc_info=True)
         return None
+
+
+def stamp_fallback_route(surface: Optional[dict], agent: Any) -> Optional[dict]:
+    """Add ``fallback_configured`` — whether the failing agent had a fallback route to
+    switch to — so a client can offer setting one up when a provider-side failure (busy,
+    rate-limited, timed out, model unavailable) ended the turn with nowhere to go.
+    Left out when the agent's chain is unknown."""
+    chain = getattr(agent, "_fallback_chain", None)
+    if surface is not None and isinstance(chain, list):
+        surface["fallback_configured"] = bool(chain)
+    return surface

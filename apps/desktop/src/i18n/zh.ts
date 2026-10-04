@@ -4438,6 +4438,7 @@ export const zh = defineLocale({
       errorRetry: '重试',
       errorStartNewSession: '开始新会话',
       errorSwitchProvider: '切换服务商',
+      errorSetUpFallback: '设置备用模型',
       errorSignInAgain: provider => `重新登录 ${provider}`,
       errorOauthExpired: provider =>
         `您的 ${provider} 登录已过期或被撤销。请在终端运行 hermes model，选择 ${provider} 重新登录；或在“设置 → 模型服务”中改用模型 API。`,

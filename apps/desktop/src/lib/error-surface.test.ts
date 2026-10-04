@@ -60,6 +60,46 @@ describe('parseErrorSurface', () => {
     // Absent identity yields no keys, not empty strings.
     expect(parseErrorSurface({ layer: 'provider', code: 'x', retryable: true })?.provider).toBeUndefined()
   })
+
+  it('carries whether the failing session had a fallback model', () => {
+    const busy = { layer: 'provider', code: 'overloaded', retryable: true }
+
+    expect(parseErrorSurface({ ...busy, fallback_configured: false })?.fallbackConfigured).toBe(false)
+    expect(parseErrorSurface({ ...busy, fallback_configured: true })?.fallbackConfigured).toBe(true)
+    // Older backends do not say: no key, so the card never guesses.
+    expect(parseErrorSurface(busy)?.fallbackConfigured).toBeUndefined()
+  })
+})
+
+describe('errorRecoveryPlan fallback offer', () => {
+  const failure = (code: string, fallbackConfigured?: boolean): ErrorSurface => ({
+    code,
+    layer: 'provider',
+    retryable: true,
+    ...(fallbackConfigured === undefined ? {} : { fallbackConfigured })
+  })
+
+  it('offers setting up a fallback when another model would have got past the failure', () => {
+    for (const code of [
+      'overloaded',
+      'server_error',
+      'rate_limit',
+      'upstream_rate_limit',
+      'timeout',
+      'model_not_found'
+    ]) {
+      expect(errorRecoveryPlan(failure(code, false)).setUpFallback, code).toBe(true)
+    }
+  })
+
+  it('does not offer it when a fallback exists, the backend did not say, or another model would not help', () => {
+    expect(errorRecoveryPlan(failure('overloaded', true)).setUpFallback).toBe(false)
+    expect(errorRecoveryPlan(failure('overloaded')).setUpFallback).toBe(false)
+
+    for (const code of ['content_policy_blocked', 'context_overflow', 'format_error', 'loop_error', 'auth']) {
+      expect(errorRecoveryPlan(failure(code, false)).setUpFallback, code).toBe(false)
+    }
+  })
 })
 
 describe('formatErrorDiagnostics', () => {

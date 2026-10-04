@@ -10394,6 +10394,18 @@
             ],
             "default": null,
             "title": "Model"
+          },
+          "fallback_configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fallback Configured"
           }
         },
         "required": [
