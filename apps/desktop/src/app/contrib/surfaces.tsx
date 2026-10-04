@@ -62,7 +62,11 @@ export const SidebarSurface = memo(function SidebarSurface({
       data-personal-sidebar-shell=""
       data-personal-sidebar-view={currentView}
     >
-      <PersonalProductNav currentView={currentView} onNavigate={latestActions.onNavigate} />
+      <PersonalProductNav
+        currentView={currentView}
+        onNavigate={latestActions.onNavigate}
+        onResumeSession={latestActions.onResumeSession}
+      />
       <div className="min-h-0 flex-1 overflow-hidden" data-personal-conversations="">
         <ChatSidebar currentView={currentView} {...latestActions} />
       </div>

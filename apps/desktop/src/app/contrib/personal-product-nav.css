@@ -13,7 +13,8 @@
   -webkit-app-region: no-drag;
 }
 
-[data-personal-product-nav] button[aria-current='page'] {
+[data-personal-product-nav] button[aria-current='page'],
+[data-personal-product-nav] button[aria-pressed='true'] {
   border: 1px solid transparent;
   background: var(--ui-control-active-background);
   box-shadow: inset 2px 0 0 var(--theme-primary);
