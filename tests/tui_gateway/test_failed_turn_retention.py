@@ -284,6 +284,8 @@ def test_returned_error_result_carries_error_surface(emits, turn_env):
         # report the model that actually failed, not the composer's current.
         "provider": "openrouter",
         "model": "test/model",
+        # ...under the name the user knows it by.
+        "provider_label": "OpenRouter",
     }
 
     snapshot = server._inflight_snapshot(session)
@@ -317,6 +319,36 @@ def test_returned_error_surface_says_whether_a_fallback_was_configured(emits, tu
     assert payload["error_surface"]["fallback_configured"] is expected
     # Resume replay carries the same descriptor.
     assert server._inflight_snapshot(session)["error_surface"]["fallback_configured"] is expected
+
+
+def test_returned_error_surface_names_a_custom_service_by_its_configured_name(emits, turn_env):
+    """A relay configured as a custom service fails with provider id ``custom``; the card
+    must say "zdzui is limiting requests", not "custom is limiting requests"."""
+    agent = types.SimpleNamespace(
+        session_id="session-key",
+        provider="custom",
+        model="gemini-3.8-flash",
+        base_url="https://zdzui.example/v1",
+        _custom_providers=[
+            {"name": "other", "base_url": "https://other.example/v1"},
+            {"name": "zdzui", "base_url": "https://ZDZUI.example/v1/"},
+        ],
+        run_conversation=lambda *a, **k: {
+            "final_response": "",
+            "error": "HTTP 429: Rate limit exceeded",
+            "failed": True,
+            "failure_reason": "rate_limit",
+        },
+        clear_interrupt=lambda: None,
+    )
+    session = _session(agent=agent, running=True)
+    server._start_inflight_turn(session, "do the thing")
+
+    server._run_prompt_submit("rid", "sid", session, "do the thing")
+
+    surface = _events(emits, "message.complete")[0]["error_surface"]
+    assert surface["provider"] == "custom"
+    assert surface["provider_label"] == "zdzui"
 
 
 def test_returned_error_without_reason_omits_no_frame(emits, turn_env):
