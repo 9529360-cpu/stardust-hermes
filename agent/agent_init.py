@@ -1278,7 +1278,10 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
             agent._topic_summaries_enabled = (
                 not skip_memory
                 and agent._memory_persistence_enabled
-                and topic_summaries_enabled(_agent_cfg)
+                and topic_summaries_enabled(
+                    _agent_cfg,
+                    store_flags=(agent._memory_enabled, agent._user_profile_enabled),
+                )
             )
             agent._topic_recall_limit = max(0, min(5, _parse_config_int(mem_config.get("topic_recall_limit"), 2)))
             agent._topic_recall_char_budget = max(
