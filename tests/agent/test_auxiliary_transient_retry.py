@@ -36,6 +36,29 @@ def test_transient_retry_count_default(monkeypatch):
 
 
 
+class _StatusError(Exception):
+    def __init__(self, message, status_code, body):
+        super().__init__(message)
+        self.status_code = status_code
+        self.body = body
+
+
+def test_relay_model_unavailable_503_skips_same_provider_retry():
+    """A relay's 503 "no channel serves this model" is deterministic for the route: the
+    auxiliary call goes straight to fallback instead of spending its same-provider retries,
+    while an ordinary 503 blip keeps them."""
+    from agent import auxiliary_client as ac
+
+    unservable = _StatusError(
+        "Error code: 503", 503,
+        {"code": "model_not_found", "message": "No available channel for model m under group g (distributor)"},
+    )
+    assert ac._is_transient_transport_error(unservable) is True
+    assert ac._should_retry_same_provider("title_generation", unservable, "") is False
+    blip = _StatusError("Service Unavailable", 503, {})
+    assert ac._should_retry_same_provider("title_generation", blip, "") is True
+
+
 def test_model_participates_in_client_cache_key():
     """Same provider/base_url/key, different model -> different cache key.
 

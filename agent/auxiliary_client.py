@@ -7384,6 +7384,13 @@ def _should_retry_same_provider(task: Optional[str], exc: Exception, tag: str) -
     to fallback."""
     if not _is_transient_transport_error(exc):
         return False
+    # A relay's 503 "no channel serves this model" looks like a 5xx blip but is deterministic for
+    # the route: retrying it only delays the fallback.
+    from agent.error_classifier import is_unservable_model_error
+    if is_unservable_model_error(exc):
+        logger.info("Auxiliary %s%s: route cannot serve the model; falling back without "
+                    "same-provider retry: %s", task, tag, exc)
+        return False
     if _should_skip_same_provider_retry(task, exc):
         logger.info("Auxiliary %s%s: timeout on the critical path; "
                     "skipping same-provider retry and falling back: %s", task, tag, exc)
