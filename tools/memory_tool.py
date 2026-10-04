@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # One tool-definition pass must use ONE config decision for availability and the
 # dynamic target schema: the check_fn result flows to the immediately following
 # dynamic_schema_overrides call; ContextVar isolates concurrent profile builds.
-_memory_surface_flags: ContextVar[Optional[Tuple[bool, bool]]] = ContextVar("memory_surface_flags", default=None)
+_memory_surface_flags: ContextVar[Optional[Tuple[bool, bool, bool]]] = ContextVar("memory_surface_flags", default=None)
 
 
 def get_memory_dir() -> Path:
@@ -322,20 +322,34 @@ def get_builtin_memory_store_flags(config: Optional[Dict[str, Any]] = None) -> T
     return tuple(is_truthy_value(section.get(k), default=True) for k in ("memory_enabled", "user_profile_enabled"))
 
 
-def topic_summaries_enabled(config: Optional[Dict[str, Any]] = None) -> bool:
+def topic_summaries_enabled(
+    config: Optional[Dict[str, Any]] = None,
+    *,
+    store_flags: Optional[Tuple[bool, bool]] = None,
+) -> bool:
+    """Return the local topic-summary state without changing legacy opt-out semantics.
+
+    When the new key is absent, topics default on only for the normal configuration
+    where both legacy stores are enabled. A profile that deliberately disabled one
+    or both legacy stores keeps the old tool surface unless it explicitly opts in.
+    """
     section = get_builtin_memory_config(config)
     if not is_truthy_value(section.get("enabled"), default=True):
         return False
-    return is_truthy_value(section.get("topic_summaries_enabled"), default=True)
+    if "topic_summaries_enabled" in section:
+        return is_truthy_value(section.get("topic_summaries_enabled"), default=False)
+    flags = store_flags if store_flags is not None else get_builtin_memory_store_flags(config)
+    return bool(flags[0] and flags[1])
 
 
 @no_cache_check_fn
 def check_memory_requirements() -> bool:
-    """Snapshot store flags and report whether any built-in memory surface is available."""
+    """Snapshot every built-in memory surface from one availability pass."""
     _memory_surface_flags.set(None)
-    flags = get_builtin_memory_store_flags()
-    _memory_surface_flags.set(flags)
-    return flags[0] or flags[1] or topic_summaries_enabled()
+    store_flags = get_builtin_memory_store_flags()
+    topic_enabled = topic_summaries_enabled(store_flags=store_flags)
+    _memory_surface_flags.set((store_flags[0], store_flags[1], topic_enabled))
+    return store_flags[0] or store_flags[1] or topic_enabled
 
 
 def _memory_target_error(store: "MemoryStore", target: str) -> Optional[Dict[str, Any]]:
@@ -349,8 +363,13 @@ def _memory_target_error(store: "MemoryStore", target: str) -> Optional[Dict[str
         }
     if target not in {"memory", "user"}:
         from tools.registry import _bound_error_text
-        return {"success": False,
-                "error": _bound_error_text(f"Invalid memory target '{target}'. Use 'memory', 'user', or 'topic'.")}
+        return {
+            "success": False,
+            "error": _bound_error_text(
+                f"Invalid memory target '{target}'. Use 'memory' or 'user' "
+                "(or 'topic' when topic summaries are enabled)."
+            ),
+        }
     if store.target_enabled(target):
         return None
     label = "USER.md" if target == "user" else "MEMORY.md"
@@ -494,12 +513,15 @@ _SINGLE_TARGET_TEXT = {
 
 def _build_memory_schema_overrides() -> Dict[str, Any]:
     """Narrow the advertised target surface using the availability snapshot."""
-    flags = _memory_surface_flags.get() or get_builtin_memory_store_flags()
+    flags = _memory_surface_flags.get()
     _memory_surface_flags.set(None)
-    targets = [t for t, on in zip(("memory", "user"), flags) if on]
+    if flags is None:
+        store_flags = get_builtin_memory_store_flags()
+        flags = (*store_flags, topic_summaries_enabled(store_flags=store_flags))
+    targets = [t for t, on in zip(("memory", "user"), flags[:2]) if on]
     parameters = copy.deepcopy(MEMORY_SCHEMA["parameters"])
     target_schema, description = parameters["properties"]["target"], MEMORY_SCHEMA["description"]
-    if topic_summaries_enabled():
+    if flags[2]:
         targets.append("topic")
     target_schema["enum"] = targets
     if narrowed := _SINGLE_TARGET_TEXT.get(tuple(t for t in targets if t != "topic")):
