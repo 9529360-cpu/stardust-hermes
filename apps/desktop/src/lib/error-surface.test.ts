@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
 import { en } from '@/i18n/en'
+import { ja } from '@/i18n/ja'
+import { zh } from '@/i18n/zh'
+import { zhHant } from '@/i18n/zh-hant'
 
-import { ERROR_CODE_KEYS, errorRecoveryPlan, type ErrorSurface, formatErrorDiagnostics, parseErrorSurface } from './error-surface'
+import {
+  ERROR_CODE_KEYS,
+  ERROR_SURFACE_LAYERS,
+  errorRecoveryPlan,
+  type ErrorSurface,
+  formatErrorDiagnostics,
+  parseErrorSurface
+} from './error-surface'
 import { errorCardText } from './error-surface-copy'
 
 describe('parseErrorSurface', () => {
@@ -91,11 +101,14 @@ describe('formatErrorDiagnostics', () => {
 // The card body and the buttons under it must agree: a body that says "retry"
 // while the plan hides the Retry button leaves the user with an instruction
 // they cannot follow. Walks every code the backend can send (plus the layer
-// fallbacks) with the non-retryable verdict the classifier stamps for it.
-describe('error copy never names a hidden Retry', () => {
-  const thread = en.assistant.thread
-  const RETRY_WORDS = /\bretry\b|\btry again\b/i
-
+// fallbacks) with the non-retryable verdict the classifier stamps for it, in
+// every locale that words the card itself.
+describe.each([
+  ['en', en.assistant.thread, /\bretry\b|\btry again\b/i],
+  ['zh', zh.assistant.thread, /重试/],
+  ['zh-hant', zhHant.assistant.thread, /重試/],
+  ['ja', ja.assistant.thread, /再試行/]
+] as const)('error copy never names a hidden Retry (%s)', (_locale, thread, RETRY_WORDS) => {
   // Verdicts the classifier stamps as deterministic (agent/error_surface.py
   // `_NON_RETRYABLE_REASONS`); everything else arrives retryable.
   const NON_RETRYABLE = new Set([
@@ -136,5 +149,45 @@ describe('error copy never names a hidden Retry', () => {
   it('a credential rejection keeps Retry, so its body may still say retry', () => {
     const surface: ErrorSurface = { authKind: 'api_key', code: 'auth', layer: 'auth', provider: 'openai', retryable: false }
     expect(errorRecoveryPlan(surface).retry).toBe(true)
+  })
+})
+
+// zh / zh-hant / ja used to fall back to English for every per-code title and
+// body, the layer bodies and the card's buttons — half-English cards at the
+// moment the user has to decide what to do.
+describe.each([
+  ['zh', zh.assistant.thread],
+  ['zh-hant', zhHant.assistant.thread],
+  ['ja', ja.assistant.thread]
+] as const)('the %s error card is worded in its own language', (_locale, thread) => {
+  const english = en.assistant.thread
+
+  const surfaces: ErrorSurface[] = [
+    ...ERROR_CODE_KEYS.map(code => ({ code, layer: 'provider' as const, provider: 'Acme', retryable: true })),
+    ...ERROR_SURFACE_LAYERS.map(layer => ({ code: 'unknown', layer, provider: 'Acme', retryable: true }))
+  ]
+
+  it.each(surfaces.map(surface => [surface.code, surface.layer, surface] as const))(
+    '%s on %s',
+    (_code, _layer, surface) => {
+      const ours = errorCardText(thread, surface)
+      const base = errorCardText(english, surface)
+
+      expect(ours.title).not.toBe(base.title)
+      expect(ours.body).not.toBe(base.body)
+    }
+  )
+
+  it('names its buttons', () => {
+    for (const key of [
+      'errorChooseModel',
+      'errorCompressConversation',
+      'errorUpdateApiKey',
+      'errorOpenHermesFolder',
+      'errorDetails',
+      'errorToastTitle'
+    ] as const) {
+      expect(thread[key], key).not.toBe(english[key])
+    }
   })
 })
