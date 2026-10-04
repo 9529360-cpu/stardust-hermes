@@ -1,0 +1,71 @@
+// Presentation-only copy for bundled skills. The backend ID, source description,
+// and SKILL.md remain authoritative for loading, editing, and invocation.
+// Unknown, user-authored, and third-party skills retain their original metadata.
+const ZH_BUNDLED_SKILLS: Record<string, { name: string; description: string }> = {
+  'apple-notes': { name: 'Apple 备忘录', description: '通过 memo CLI 创建、搜索和编辑 Apple 备忘录。' },
+  'apple-reminders': { name: 'Apple 提醒事项', description: '通过 remindctl 添加、列出和完成提醒事项。' },
+  findmy: { name: '查找 Apple 设备', description: '在 macOS 上通过 FindMy.app 定位 Apple 设备和 AirTag。' },
+  imessage: { name: 'iMessage 短信', description: '在 macOS 上通过 imsg CLI 收发 iMessage 和短信。' },
+  'claude-code': { name: 'Claude Code 编程委派', description: '将功能开发和 PR 工作委派给 Claude Code CLI。' },
+  codex: { name: 'Codex 编程委派', description: '将功能开发和 PR 工作委派给 OpenAI Codex CLI。' },
+  'computer-use': { name: '桌面操作', description: '优先在后台操作桌面，并在需要时升级处理。' },
+  'hermes-agent': { name: 'Hermes Agent 管理', description: '使用、配置、定制和编排 Hermes Agent。' },
+  opencode: { name: 'OpenCode 编程委派', description: '将功能开发和 PR 审查委派给 OpenCode CLI。' },
+  'architecture-diagram': { name: '架构图', description: '以 HTML 呈现深色主题的 SVG 架构、云服务和基础设施图。' },
+  'ascii-video': { name: 'ASCII 视频', description: '将视频或音频转换为彩色 ASCII MP4 或 GIF。' },
+  'baoyu-infographic': { name: '信息图', description: '使用多种布局和风格制作信息图。' },
+  'claude-design': { name: 'HTML 设计稿', description: '设计落地页、演示文稿或原型等一次性 HTML 作品。' },
+  'design-md': { name: 'DESIGN.md 规范', description: '编写、验证和导出 Google 的 DESIGN.md 设计令牌规范文件。' },
+  humanizer: { name: '文字自然化', description: '去除文字中的 AI 腔，赋予更自然的表达。' },
+  'manim-video': { name: 'Manim 动画', description: '用 Manim CE 制作数学和算法动画。' },
+  p5js: { name: 'p5.js 创意编程', description: '用 p5.js 创作生成艺术、着色器、交互作品和 3D 草图。' },
+  'popular-web-designs': { name: '网页设计参考', description: '参考 Stripe、Linear、Vercel 等真实设计系统编写 HTML/CSS。' },
+  'songwriting-and-ai-music': { name: '歌曲创作与 AI 音乐', description: '辅助歌曲创作并编写 Suno AI 音乐提示词。' },
+  'sdlc-review': { name: '开发流程审查', description: '审查看板交接，并为已验证的成果安排后续流转。' },
+  'email-inbox-triage': { name: '收件箱整理', description: '按优先级整理邮件会话，并安全地起草回复。' },
+  himalaya: { name: 'Himalaya 邮件', description: '通过 Himalaya CLI 在终端使用 IMAP/SMTP 邮件。' },
+  'gif-search': { name: 'GIF 搜索', description: '通过 curl 和 jq 从 Tenor 搜索、下载 GIF。' },
+  songsee: { name: '音频特征分析', description: '通过命令行生成音频频谱及 mel、chroma、MFCC 等特征。' },
+  'youtube-content': { name: 'YouTube 内容整理', description: '将 YouTube 字幕整理为摘要、帖子或博客文章。' },
+  obsidian: { name: 'Obsidian 笔记', description: '读取、搜索、创建和编辑 Obsidian 库中的笔记。' },
+  airtable: { name: 'Airtable 数据管理', description: '通过 Airtable REST API 创建、读取、更新、删除、筛选及更新或插入记录。' },
+  box: { name: 'Box 云文件', description: '管理 Box 云文件、共享、搜索和元数据。' },
+  'document-to-action-items': { name: '文档待办提取', description: '从文档中提取有出处的义务、截止日期和任务。' },
+  docx: { name: 'Word 文档', description: '创建、读取、编辑和审阅 Word .docx 文件及模板。' },
+  'google-workspace': { name: 'Google Workspace', description: '通过 gws CLI 或 Python 使用 Gmail、日历、云端硬盘、文档和表格。' },
+  maps: { name: '地图与路线', description: '通过 OpenStreetMap 和 OSRM 查询地点、路线、地理编码和时区。' },
+  'meeting-action-items': { name: '会议行动项', description: '从会议记录中整理有出处的决策、负责人和工单。' },
+  notion: { name: 'Notion 管理', description: '通过 Notion API 和 ntn CLI 操作页面、数据库、Markdown 和 Workers。' },
+  pdf: { name: 'PDF 处理', description: '创建、读取、合并、填写 PDF，并进行 OCR 和文本编辑。' },
+  powerpoint: { name: 'PowerPoint 演示文稿', description: '使用 python-pptx 创建、读取和编辑 .pptx 演示文稿。' },
+  'product-price-monitor': { name: '价格监控', description: '监控商品、航班或列表价格，并在达到目标价时提醒。' },
+  'teams-meeting-pipeline': { name: 'Teams 会议处理', description: '处理 Teams 会议摘要、任务重放和 Graph 订阅。' },
+  'weekly-review-planning': { name: '每周回顾与规划', description: '梳理承诺和停滞工作，并制定下周计划。' },
+  xlsx: { name: 'Excel 表格', description: '创建、读取和编辑 Excel .xlsx 工作簿及 CSV 文件。' },
+  arxiv: { name: 'arXiv 论文搜索', description: '按关键词、作者、分类或 ID 搜索 arXiv 论文。' },
+  'competitor-news-monitor': { name: '竞品新闻监控', description: '跟踪指定公司的重要新闻，生成附来源的摘要。' },
+  'grounded-citations': { name: '可核查引文', description: '用有出处、可核查的来源支撑回答和文档。' },
+  'llm-wiki': { name: 'LLM Wiki 知识库', description: '使用 Karpathy 的 LLM Wiki 构建和查询互相关联的 Markdown 知识库。' },
+  xurl: { name: 'X/Twitter 操作', description: '通过 xurl CLI 搜索帖子、发帖、收发私信和处理媒体。' },
+  'codebase-inspection': { name: '代码库概览', description: '使用 pygount 统计代码行数、语言和占比。' },
+  dogfood: { name: '网页应用探索测试', description: '对网页应用进行探索式测试，记录缺陷、证据和报告。' },
+  github: { name: 'GitHub 操作', description: '通过 gh CLI 管理 PR、议题、审查、仓库和身份验证。' },
+  'hermes-agent-skill-authoring': { name: 'Hermes 技能编写', description: '编写仓库内的 SKILL.md 文件及其元数据和结构。' },
+  'inspecting-hermes-desktop-dom': { name: 'Hermes 桌面界面检查', description: '通过 CDP 读取 Hermes 桌面的实时 DOM 和 CSS。' },
+  'node-inspect-debugger': { name: 'Node.js 调试', description: '通过 --inspect 和 Chrome DevTools Protocol CLI 调试 Node.js。' },
+  'python-debugpy': { name: 'Python 调试', description: '使用 pdb 交互调试和 debugpy 远程 DAP 调试 Python。' },
+  'requesting-code-review': { name: '提交前代码审查', description: '在提交前执行安全扫描、质量检查和自动修复。' },
+  'simplify-code': { name: '代码精简', description: '通过四个并行代理清理近期代码改动。' },
+  spike: { name: '技术可行性试验', description: '通过一次性实验验证构想，再决定是否正式构建。' },
+  'systematic-debugging': { name: '系统化调试', description: '按四阶段方法定位根因，先理解缺陷再修复。' },
+  'test-driven-development': { name: '测试驱动开发', description: '遵循先写测试的红、绿、重构循环。' },
+  'blocked-page-recovery': { name: '受阻网页访问恢复', description: '在抓取遇到 403、429、付费墙、WAF 或机器人拦截时尝试恢复访问。' }
+}
+
+export function skillDisplayName(name: string, locale: string, bundled = true): string {
+  return bundled && locale === 'zh' ? ZH_BUNDLED_SKILLS[name]?.name ?? name : name
+}
+
+export function skillDisplayDescription(name: string, description: string, locale: string, bundled = true): string {
+  return bundled && locale === 'zh' ? ZH_BUNDLED_SKILLS[name]?.description ?? description : description
+}

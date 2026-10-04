@@ -71,6 +71,7 @@ import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 import { EmbeddedHubPicker } from './embedded-hub-picker'
 import { McpTab } from './mcp-tab'
 import { PluginsTab } from './plugins-tab'
+import { skillDisplayDescription, skillDisplayName } from './skill-display'
 import { $skillsSortDesc, $toolsetsSortDesc } from './store'
 
 // 'hub' is gone as a top-level tab — the Skills Hub browser lives inside the
@@ -151,21 +152,23 @@ function skillSubtitle(skill: SkillInfo, labels: Record<string, string>): React.
   )
 }
 
-function filteredSkills(skills: SkillInfo[], query: string, desc: boolean): SkillInfo[] {
+function filteredSkills(skills: SkillInfo[], query: string, desc: boolean, locale: string): SkillInfo[] {
   const q = normalize(query)
   const sign = desc ? 1 : -1
 
   return skills
     .filter(
       skill =>
-        !q || includesQuery(skill.name, q) || includesQuery(skill.description, q) || includesQuery(skill.category, q)
+        !q || includesQuery(skill.name, q) || includesQuery(skill.description, q) || includesQuery(skill.category, q) ||
+        includesQuery(skillDisplayName(skill.name, locale, skill.provenance === 'bundled'), q) ||
+        includesQuery(skillDisplayDescription(skill.name, skill.description, locale, skill.provenance === 'bundled'), q)
     )
     .sort((a, b) => sign * (usageOf(b) - usageOf(a)) || asText(a.name).localeCompare(asText(b.name)))
 }
 
 // Catalog rows have no usage yet — plain A–Z, same query fields as installed
 // rows plus tags (the catalog's frontmatter tags are its richest search text).
-function filteredOfficial(skills: OfficialSkillInfo[], query: string): OfficialSkillInfo[] {
+function filteredOfficial(skills: OfficialSkillInfo[], query: string, locale: string): OfficialSkillInfo[] {
   const q = normalize(query)
 
   return skills
@@ -175,7 +178,9 @@ function filteredOfficial(skills: OfficialSkillInfo[], query: string): OfficialS
         includesQuery(skill.name, q) ||
         includesQuery(skill.description, q) ||
         includesQuery(skill.category, q) ||
-        skill.tags.some(tag => includesQuery(tag, q))
+        skill.tags.some(tag => includesQuery(tag, q)) ||
+        includesQuery(skillDisplayName(skill.name, locale), q) ||
+        includesQuery(skillDisplayDescription(skill.name, skill.description, locale), q)
     )
     .sort((a, b) => asText(a.name).localeCompare(asText(b.name)))
 }
@@ -262,7 +267,7 @@ export function SkillsView({
   setStatusbarItemGroup: _setStatusbarItemGroup,
   ...props
 }: SkillsViewProps) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   // Both hooks run unconditionally (rules of hooks); embedded picks the local
   // one so tab clicks inside a dialog don't rewrite the page URL.
   const routeTab = useRouteEnumParam('tab', SKILLS_MODES, 'skills')
@@ -466,8 +471,8 @@ export function SkillsView({
   })
 
   const visibleSkills = useMemo(
-    () => (skills ? filteredSkills(skills, query, skillsSortDesc) : []),
-    [query, skills, skillsSortDesc]
+    () => (skills ? filteredSkills(skills, query, skillsSortDesc, locale) : []),
+    [locale, query, skills, skillsSortDesc]
   )
 
   // Installed-name set for the hub picker's already-installed guard — the
@@ -480,8 +485,8 @@ export function SkillsView({
   const visibleOfficial = useMemo(() => {
     const catalog = (officialData?.skills ?? []).filter(s => !s.installed && !installedSkillNames.has(s.name))
 
-    return filteredOfficial(catalog, query)
-  }, [installedSkillNames, officialData, query])
+    return filteredOfficial(catalog, query, locale)
+  }, [installedSkillNames, locale, officialData, query])
 
   // Identifiers with a hub install currently running — selected as a joined
   // string so $hubActions' per-log-line churn doesn't re-render the list.
@@ -1009,7 +1014,7 @@ export function SkillsView({
                         }}
                         onToggle={enabled => void handleToggleSkill(skill, enabled)}
                         subtitle={skillSubtitle(skill, t.skills.skillCategoryLabels)}
-                        title={skill.name}
+                        title={skillDisplayName(skill.name, locale, skill.provenance === 'bundled')}
                         toggleLabel={skill.name}
                       />
                     ))}
@@ -1043,7 +1048,7 @@ export function SkillsView({
                           key={skill.identifier}
                           onSelect={() => setSelectedOfficial(skill.identifier)}
                           subtitle={presentedSkillCategory(skill.category, t.skills.skillCategoryLabels)}
-                          title={skill.name}
+                          title={skillDisplayName(skill.name, locale)}
                         />
                       )
                     })}
@@ -1305,15 +1310,18 @@ function skillBodyOverview(body: string): string {
 function SkillContentSummary({
   body,
   description,
-  meta
+  meta,
+  translated = false
 }: {
   body: string
   description: string
   meta: [string, string][]
+  translated?: boolean
 }) {
   const { t } = useI18n()
   const overview = skillBodyOverview(body)
-  const showOverview = overview && normalize(overview) !== normalize(description)
+  const showOverview = !translated && overview && normalize(overview) !== normalize(description)
+
   const platforms = frontmatterTokens(frontmatterValue(meta, ['platforms', 'platform']))
   const requirements = frontmatterTokens(
     frontmatterValue(meta, ['prerequisites', 'requirements', 'requires', 'dependencies'])
@@ -1417,10 +1425,14 @@ function SkillDetail({
   profile?: ProfileScope
   skill: SkillInfo
 }) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   // Only learned/local skills are the user's to rewrite or archive — bundled
   // and hub skills are managed by their sources.
   const editable = skill.provenance === 'agent'
+
+  const displayDescription = skillDisplayDescription(
+    skill.name, asText(skill.description) || t.skills.noDescription, locale, skill.provenance === 'bundled'
+  )
 
   // Fetch the complete SKILL.md for any provenance, scoped to the Capabilities
   // profile selector. The default pane distills it into product-level context;
@@ -1439,10 +1451,13 @@ function SkillDetail({
   return (
     <>
       <DetailHeader
-        description={asText(skill.description) || t.skills.noDescription}
+        description={displayDescription}
         pills={
           <>
             <PanelPill>{presentedSkillCategory(categoryFor(skill), t.skills.skillCategoryLabels)}</PanelPill>
+            {skillDisplayName(skill.name, locale, skill.provenance === 'bundled') !== skill.name && (
+              <PanelPill tone="muted">{skill.name}</PanelPill>
+            )}
             {skill.provenance && skill.provenance !== 'bundled' && (
               <PanelPill tone={skill.provenance === 'agent' ? 'good' : 'muted'}>
                 {t.skills.provenance[skill.provenance]}
@@ -1450,7 +1465,7 @@ function SkillDetail({
             )}
           </>
         }
-        title={skill.name}
+        title={skillDisplayName(skill.name, locale, skill.provenance === 'bundled')}
       />
       {editable && (
         <div className="flex items-center gap-2">
@@ -1468,8 +1483,9 @@ function SkillDetail({
         <>
           <SkillContentSummary
             body={parsed.body}
-            description={asText(skill.description) || t.skills.noDescription}
+            description={displayDescription}
             meta={parsed.meta}
+            translated={displayDescription !== (asText(skill.description) || t.skills.noDescription)}
           />
           <SkillSourceDetails body={parsed.body} meta={parsed.meta} />
         </>
@@ -1492,7 +1508,7 @@ function OfficialSkillDetail({
   profile?: ProfileScope
   skill: OfficialSkillInfo
 }) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
 
   const previewQuery = useQuery({
     queryKey: ['official-skill-preview', skill.identifier, profileScopeKey(profile)],
@@ -1509,14 +1525,14 @@ function OfficialSkillDetail({
   return (
     <>
       <DetailHeader
-        description={asText(skill.description) || t.skills.noDescription}
+        description={skillDisplayDescription(skill.name, asText(skill.description) || t.skills.noDescription, locale)}
         pills={
           <>
             <PanelPill>{presentedSkillCategory(skill.category, t.skills.skillCategoryLabels)}</PanelPill>
             <PanelPill tone="muted">{t.skills.officialPill}</PanelPill>
           </>
         }
-        title={skill.name}
+        title={skillDisplayName(skill.name, locale)}
       />
       <div className="flex items-center gap-2">
         <Button disabled={installing} onClick={onInstall} size="xs" variant="textStrong">
@@ -1530,8 +1546,9 @@ function OfficialSkillDetail({
         <>
           <SkillContentSummary
             body={parsed.body}
-            description={asText(skill.description) || t.skills.noDescription}
+            description={skillDisplayDescription(skill.name, asText(skill.description) || t.skills.noDescription, locale)}
             meta={parsed.meta}
+            translated={skillDisplayDescription(skill.name, skill.description, locale) !== skill.description}
           />
           <SkillSourceDetails body={parsed.body} meta={parsed.meta} />
         </>
