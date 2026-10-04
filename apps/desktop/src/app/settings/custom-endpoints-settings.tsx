@@ -15,7 +15,7 @@ import { triggerHaptic } from '@/lib/haptics'
 import { Check, Globe, Loader2, Plus, Save, Trash2, Zap } from '@/lib/icons'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
-import type { CustomEndpoint, CustomEndpointUpdate } from '@/types/hermes'
+import type { CustomEndpoint, CustomEndpointsResponse, CustomEndpointUpdate } from '@/types/hermes'
 
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
@@ -64,6 +64,11 @@ const EMPTY_FORM: EndpointForm = {
   name: ''
 }
 
+// The Electron REST bridge reports HTTP failures as `Error("<status>: <body>")`.
+function isConflictError(error: unknown): boolean {
+  return /(^|\s)409:/.test(error instanceof Error ? error.message : String(error))
+}
+
 function formFromEndpoint(endpoint: CustomEndpoint): EndpointForm {
   return {
     apiKey: '',
@@ -106,6 +111,10 @@ export function CustomEndpointsSettings({
   const [activating, setActivating] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [endpoints, setEndpoints] = useState<CustomEndpoint[]>([])
+  // Whether this profile already has a main model. Adding a service never
+  // replaces a working default implicitly, but on a profile with none (first
+  // run) the first service must become the default or chat still has no model.
+  const [hasMainModel, setHasMainModel] = useState(true)
   const [editorMode, setEditorMode] = useState<'add' | 'edit' | null>(null)
   const [form, setForm] = useState<EndpointForm>(EMPTY_FORM)
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
@@ -128,6 +137,11 @@ export function CustomEndpointsSettings({
     })
   }
 
+  const applyEndpoints = useCallback((data: CustomEndpointsResponse) => {
+    setEndpoints(data.endpoints)
+    setHasMainModel(Boolean(data.current?.model?.trim()) || data.endpoints.some(endpoint => endpoint.is_current))
+  }, [])
+
   const loadProfile = useCallback(
     async (epoch: number) => {
       try {
@@ -137,7 +151,7 @@ export function CustomEndpointsSettings({
           return
         }
 
-        setEndpoints(data.endpoints)
+        applyEndpoints(data)
       } catch (err) {
         if (profileEpoch.current === epoch) {
           notifyError(err, c.loadFailed)
@@ -148,7 +162,7 @@ export function CustomEndpointsSettings({
         }
       }
     },
-    [c.loadFailed, scopeProfile]
+    [applyEndpoints, c.loadFailed, scopeProfile]
   )
 
   const beginProfileReload = useCallback(() => {
@@ -173,7 +187,7 @@ export function CustomEndpointsSettings({
     const data = await getCustomEndpoints(scopeProfile)
 
     if (profileEpoch.current === epoch) {
-      setEndpoints(data.endpoints)
+      applyEndpoints(data)
     }
   }
 
@@ -189,7 +203,7 @@ export function CustomEndpointsSettings({
   function beginAdd() {
     probeRevision.current++
     setEditorMode('add')
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, makeDefault: !hasMainModel })
     setDiscoveredModels([])
     setAdvancedOpen(false)
     setProbeMessage(null)
@@ -237,6 +251,7 @@ export function CustomEndpointsSettings({
 
     try {
       setSaving(true)
+
       const response = await saveCustomEndpoint(
         { ...toPayload(form, discoveredModels), create_only: editorMode === 'add' },
         scopeProfile
@@ -246,7 +261,7 @@ export function CustomEndpointsSettings({
         return
       }
 
-      setEndpoints(response.endpoints)
+      applyEndpoints(response)
       const saved = response.endpoints.find(endpoint => endpoint.id === response.id)
 
       if (saved && saved.is_current && scopeProfile === undefined) {
@@ -259,7 +274,13 @@ export function CustomEndpointsSettings({
       notify({ kind: 'success', message: c.saved })
     } catch (err) {
       if (profileEpoch.current === epoch) {
-        notifyError(err, c.saveFailed)
+        if (editorMode === 'add' && isConflictError(err)) {
+          // Add is create-only: the backend refused to overwrite a saved
+          // service with the same name. Say so where the user is typing.
+          setProbeMessage(c.duplicateService)
+        } else {
+          notifyError(err, c.saveFailed)
+        }
       }
     } finally {
       if (profileEpoch.current === epoch) {
@@ -352,7 +373,7 @@ export function CustomEndpointsSettings({
         return
       }
 
-      setEndpoints(response.endpoints)
+      applyEndpoints(response)
 
       onConfigSaved?.()
       triggerHaptic('success')

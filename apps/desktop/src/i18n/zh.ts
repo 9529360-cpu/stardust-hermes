@@ -1143,7 +1143,8 @@ export const zh = defineLocale({
       validationReachable: '连接正常。',
       validationReachableModels: count => `连接正常，找到 ${count} 个模型。`,
       validationFailed: '连接测试失败',
-      activationFailed: '切换默认服务失败'
+      activationFailed: '切换默认服务失败',
+      duplicateService: '已经有同名的模型服务。请在列表里编辑它，或换一个名称。'
     },
     computerUse: {
       accessibility: '辅助功能',

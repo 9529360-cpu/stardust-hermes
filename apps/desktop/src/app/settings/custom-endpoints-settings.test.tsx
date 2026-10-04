@@ -174,6 +174,7 @@ describe('CustomEndpointsSettings', () => {
       has_api_key: false,
       source: 'providers'
     }
+
     const added = {
       id: 'beta',
       name: 'Beta',
@@ -185,6 +186,7 @@ describe('CustomEndpointsSettings', () => {
       has_api_key: false,
       source: 'providers'
     }
+
     getCustomEndpoints.mockResolvedValueOnce({ endpoints: [existing] })
     vi.mocked(saveCustomEndpoint).mockResolvedValue({
       id: 'beta',
@@ -224,6 +226,95 @@ describe('CustomEndpointsSettings', () => {
     expect(screen.getByText('Beta')).toBeTruthy()
   })
 
+  it('makes the first service the default when the profile has no main model yet', async () => {
+    // First run: onboarding sends the user here to "add a model API". If that
+    // first service did not become the default, chat would still have no model.
+    getCustomEndpoints.mockResolvedValueOnce({ current: { provider: '', model: '', base_url: '' }, endpoints: [] })
+    vi.mocked(saveCustomEndpoint).mockResolvedValue({
+      id: 'relay',
+      current: { provider: 'relay', model: 'relay-model', base_url: 'https://relay.example/v1' },
+      endpoints: [
+        {
+          id: 'relay',
+          name: 'Relay',
+          base_url: 'https://relay.example/v1',
+          model: 'relay-model',
+          models: ['relay-model'],
+          discover_models: true,
+          is_current: true,
+          has_api_key: false,
+          source: 'providers'
+        }
+      ]
+    })
+
+    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    render(
+      <I18nProvider configClient={null} initialLocale="zh">
+        <CustomEndpointsSettings />
+      </I18nProvider>
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加模型服务' }))
+    expect(screen.getByRole('checkbox', { name: '设为新对话默认服务' }).getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.change(screen.getByPlaceholderText('我的模型服务'), { target: { value: 'Relay' } })
+    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), {
+      target: { value: 'https://relay.example/v1' }
+    })
+    fireEvent.change(screen.getByPlaceholderText('gpt-5.4'), { target: { value: 'relay-model' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存服务' }))
+
+    await waitFor(() =>
+      expect(saveCustomEndpoint).toHaveBeenCalledWith(
+        expect.objectContaining({ create_only: true, make_default: true, name: 'Relay' }),
+        undefined
+      )
+    )
+  })
+
+  it('explains a name collision on Add in place, without a raw server error', async () => {
+    const existing = {
+      id: 'relay',
+      name: 'Relay',
+      base_url: 'https://a.example/v1',
+      model: 'model-a',
+      models: ['model-a'],
+      discover_models: true,
+      is_current: true,
+      has_api_key: false,
+      source: 'providers'
+    }
+
+    getCustomEndpoints.mockResolvedValueOnce({
+      current: { provider: 'relay', model: 'model-a', base_url: 'https://a.example/v1' },
+      endpoints: [existing]
+    })
+    vi.mocked(saveCustomEndpoint).mockRejectedValue(
+      new Error('409: {"detail":"model service already exists; edit the existing service instead"}')
+    )
+
+    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    render(
+      <I18nProvider configClient={null} initialLocale="zh">
+        <CustomEndpointsSettings />
+      </I18nProvider>
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: '添加模型服务' }))
+    fireEvent.change(screen.getByPlaceholderText('我的模型服务'), { target: { value: 'Relay' } })
+    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), {
+      target: { value: 'https://b.example/v1' }
+    })
+    fireEvent.change(screen.getByPlaceholderText('gpt-5.4'), { target: { value: 'model-b' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存服务' }))
+
+    expect(await screen.findByText('已经有同名的模型服务。请在列表里编辑它，或换一个名称。')).toBeTruthy()
+    // The editor stays open with the user's input so they can rename.
+    expect(screen.getByPlaceholderText('我的模型服务')).toHaveProperty('value', 'Relay')
+    expect(screen.queryByText(/model service already exists/)).toBeNull()
+  })
+
   it('edits only the service explicitly opened for editing', async () => {
     const existing = {
       id: 'alpha',
@@ -236,6 +327,7 @@ describe('CustomEndpointsSettings', () => {
       has_api_key: false,
       source: 'providers'
     }
+
     const updated = { ...existing, model: 'alpha-model-2', models: ['alpha-model', 'alpha-model-2'] }
     getCustomEndpoints.mockResolvedValueOnce({ endpoints: [existing] })
     vi.mocked(saveCustomEndpoint).mockResolvedValue({
