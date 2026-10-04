@@ -1618,8 +1618,8 @@ export interface Translations {
       agentTitle: string
       agentBlurb: string
       pageBlurb: string
-      bundledNames: Record<'hermes-bots' | 'kanban' | 'radio', string>
-      bundledDescriptions: Record<'hermes-bots' | 'kanban' | 'radio', string>
+      bundledNames: Record<'hermes-bots' | 'kanban', string>
+      bundledDescriptions: Record<'hermes-bots' | 'kanban', string>
       halfDesktop: string
       halfDesktopHint: string
       halfAgent: string
