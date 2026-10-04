@@ -131,7 +131,7 @@ export function PersonalProductNav({ currentView: routeView, onNavigate }: Perso
   return (
     <nav
       aria-label="Product navigation"
-      className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-[calc(var(--titlebar-height)+0.45rem)]"
+      className="jarvis-product-nav relative isolate shrink-0 overflow-hidden border-b border-(--ui-stroke-tertiary) bg-(--ui-sidebar-surface-background) px-2.5 pb-2 pt-2.5"
       data-personal-product-nav=""
     >
       <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">Stardust</div>
