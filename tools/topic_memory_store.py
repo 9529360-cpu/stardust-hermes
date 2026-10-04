@@ -328,6 +328,9 @@ def format_topic_recall(topics: Iterable[dict[str, Any]]) -> str:
 
 
 def review_topic_context(messages: Iterable[dict[str, Any]], *, limit: int = 3, char_budget: int = 2400) -> str:
+    inventory = list_topic_summaries()
+    if not inventory:
+        return ""
     text_parts: list[str] = []
     for message in list(messages)[-18:]:
         if not isinstance(message, dict) or message.get("role") not in {"user", "assistant"}:
@@ -336,12 +339,17 @@ def review_topic_context(messages: Iterable[dict[str, Any]], *, limit: int = 3, 
         if isinstance(content, str) and content.strip():
             text_parts.append(content[-1200:])
     selected = recall_topic_summaries("\n".join(text_parts), limit=limit, char_budget=char_budget)
-    if not selected:
-        return ""
+    keys = ", ".join(
+        f"{row.get('key')} ({row.get('title')})" if row.get("title") else str(row.get("key"))
+        for row in inventory[:24]
+    )
     lines = [
-        "Existing relevant topic summaries. If the conversation changes one, UPDATE the same topic key; "
-        "preserve still-current facts and remove superseded ones instead of appending a second topic."
+        "Existing topic keys (reuse these instead of creating near-duplicates): " + keys + ".",
+        "If the conversation changes an existing topic, UPDATE the same topic key; preserve still-current "
+        "facts and remove superseded ones instead of appending chronology.",
     ]
+    if selected:
+        lines.append("Relevant current summaries:")
     for topic in selected:
         keywords = ", ".join(str(x) for x in topic.get("keywords") or [])
         lines.append(
