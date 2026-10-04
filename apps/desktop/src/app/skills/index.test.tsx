@@ -6,6 +6,7 @@ import type * as ReactRouterDom from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type * as HermesApi from '@/hermes'
+import { I18nProvider } from '@/i18n/context'
 import { queryClient } from '@/lib/query-client'
 import type * as HubActions from '@/store/hub-actions'
 import { setPaneHeightOverride } from '@/store/panes'
@@ -20,6 +21,7 @@ const getUsageAnalytics = vi.fn()
 const getProfiles = vi.fn()
 const getSkillContent = vi.fn()
 const getOfficialSkills = vi.fn()
+const previewSkillHub = vi.fn()
 
 // Partial mock: keep the real module (SkillsView pulls in @/store/profile,
 // whose import-time subscription calls setApiRequestProfile) and stub only the
@@ -37,7 +39,8 @@ vi.mock('@/hermes', async importOriginal => ({
   getUsageAnalytics: (days: number, profile?: null | string) => getUsageAnalytics(days, profile),
   getProfiles: () => getProfiles(),
   getSkillContent: (name: string, profile?: null | string) => getSkillContent(name, profile),
-  getOfficialSkills: (profile?: null | string) => getOfficialSkills(profile)
+  getOfficialSkills: (profile?: null | string) => getOfficialSkills(profile),
+  previewSkillHub: (identifier: string, profile?: null | string) => previewSkillHub(identifier, profile)
 }))
 
 // Notifications hit nanostores/timers we don't care about here.
@@ -105,6 +108,7 @@ beforeEach(() => {
   getToolsetConfig.mockResolvedValue({ has_category: true, active_provider: null, providers: [] })
   getUsageAnalytics.mockResolvedValue({ tools: [] })
   getOfficialSkills.mockResolvedValue({ skills: [] })
+  previewSkillHub.mockResolvedValue({ skill_md: '' })
   getSkillContent.mockResolvedValue({
     name: 'web-research',
     path: '/skills/web-research/SKILL.md',
@@ -590,5 +594,36 @@ describe('SkillsView toolset management', { timeout: 60_000 }, () => {
     await waitFor(() =>
       expect(vi.mocked(installHubSkill)).toHaveBeenCalledWith('official/gifs/gif-search', expect.anything())
     )
+  })
+
+  it('shows Chinese catalog copy and retains the capability overview for an optional skill', async () => {
+    getSkills.mockResolvedValue([])
+    getOfficialSkills.mockResolvedValue({ skills: [{
+      name: 'baoyu-article-illustrator',
+      description: 'Article illustrations: type × style × palette consistency.',
+      identifier: 'official/creative/baoyu-article-illustrator',
+      category: 'creative',
+      installed: false,
+      tags: []
+    }] })
+    previewSkillHub.mockResolvedValue({ skill_md: '---\nname: baoyu-article-illustrator\ndescription: Article illustrations\n---\n# Article illustrator\n\nAdapted for an English tool ecosystem.' })
+
+    await act(async () => {
+      render(
+        <I18nProvider configClient={null} initialLocale="zh">
+          <QueryClientProvider client={queryClient}>
+            <MemoryRouter initialEntries={['/skills?tab=skills']}><SkillsView /></MemoryRouter>
+          </QueryClientProvider>
+        </I18nProvider>
+      )
+    })
+
+    const row = await screen.findByText('宝玉文章配图')
+    fireEvent.click(row)
+    expect(await screen.findAllByText('宝玉文章配图')).toHaveLength(2)
+    expect(screen.getAllByText('按类型、风格与配色一致性制作文章插图').length).toBeGreaterThan(0)
+    expect(await screen.findByText('它能做什么')).toBeTruthy()
+    expect(screen.getAllByText('baoyu-article-illustrator').length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: '安装' }).length).toBeGreaterThan(0)
   })
 })
