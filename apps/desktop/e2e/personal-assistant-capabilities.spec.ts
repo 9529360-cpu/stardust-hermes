@@ -70,6 +70,7 @@ test('tools and plugins are direct primary navigation destinations', async ({}, 
   await expect(page.getByRole('columnheader', { name: '默认配置 中的智能体', exact: true })).toBeVisible()
   await expect(page.getByText('智能体', { exact: true }).first()).toBeVisible()
   await expect(page.getByText('任务看板', { exact: true })).toBeVisible()
+  await expect(page.getByText('电台', { exact: true })).toHaveCount(0)
   await expect(
     page.getByText('智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。', { exact: true })
   ).toBeVisible()
