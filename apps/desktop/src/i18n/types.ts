@@ -828,6 +828,7 @@ export interface Translations {
       validationReachableModels: (count: number) => string
       validationFailed: string
       activationFailed: string
+      duplicateService: string
     }
     computerUse: {
       accessibility: string

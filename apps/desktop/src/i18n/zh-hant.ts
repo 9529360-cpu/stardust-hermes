@@ -923,7 +923,8 @@ export const zhHant = defineLocale({
       validationReachable: '連線正常。',
       validationReachableModels: count => `連線正常，找到 ${count} 個模型。`,
       validationFailed: '連線測試失敗',
-      activationFailed: '切換預設服務失敗'
+      activationFailed: '切換預設服務失敗',
+      duplicateService: '已經有同名的模型服務。請在列表中編輯它，或換一個名稱。'
     },
     computerUse: {
       accessibility: '輔助使用',
