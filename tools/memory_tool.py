@@ -64,7 +64,7 @@ def load_on_disk_store() -> "MemoryStore":
 
 
 def _gate_or_stage(
-    summary: str, detail: str, payload: Dict[str, Any], store: "MemoryStore"
+    summary: str, detail: str, payload: Dict[str, Any], store: Optional["MemoryStore"]
 ) -> Optional[str]:
     """JSON tool-result string when the write must NOT proceed (blocked or staged
     for approval), None to proceed. Fails open if the gate module can't load."""
@@ -73,7 +73,8 @@ def _gate_or_stage(
     except Exception:
         return None
     payload = dict(payload)
-    payload["_reset_generation"] = store.reset_generation(payload.get("target", "memory"))
+    if store is not None and payload.get("target") in {"memory", "user"}:
+        payload["_reset_generation"] = store.reset_generation(payload.get("target", "memory"))
     decision = wa.evaluate_gate(wa.MEMORY, inline_summary=summary, inline_detail=detail)
     if decision.allow:
         return None
@@ -107,11 +108,26 @@ def _apply_write_gate(
     target: str,
     content: Optional[str],
     old_text: Optional[str],
-    store: "MemoryStore",
+    store: Optional["MemoryStore"],
     operations: Optional[List[Dict[str, Any]]] = None,
+    *,
+    topic: Optional[str] = None,
+    title: Optional[str] = None,
+    keywords: Any = None,
 ) -> Optional[str]:
     """Gate one mutating op, or (``operations`` set) a whole batch as a single unit."""
-    label = "user profile" if target == "user" else "memory"
+    label = "user profile" if target == "user" else ("topic summary" if target == "topic" else "memory")
+    if target == "topic":
+        detail = f"{topic or title or 'topic'}: {content or old_text or ''}"
+        return _gate_or_stage(
+            f"{action} {label}",
+            detail,
+            {
+                "action": action, "target": target, "content": content, "old_text": old_text,
+                "topic": topic, "title": title, "keywords": keywords,
+            },
+            store,
+        )
     if operations is not None:
         return _gate_or_stage(
             f"apply {len(operations)} op(s) to {label}",
@@ -193,16 +209,46 @@ def _background_delete_gate(
 
 def memory_tool(action: str = None, target: str = "memory", content: str = None, old_text: str = None,
                 new_text: str = None, operations: Optional[List[Dict[str, Any]]] = None,
+                topic: str = None, title: str = None, keywords: Any = None,
                 store: Optional[MemoryStore] = None) -> str:
-    """Tool entry point; returns a JSON string. Single op (action + content/old_text)
-    or batch (``operations``, atomic against the final budget). ``new_text``
-    aliases ``content`` — callers mirror ``old_text`` with it (patch-tool shape)."""
-    if store is None:
-        return tool_error("Memory is not available. It may be disabled in config or this environment.", success=False)
+    """Tool entry point for core/user memory and topic summaries."""
     if content is None and new_text is not None:
         content = new_text
     # Strict providers send JSON null for optional fields; treat as omitted.
     target = "memory" if target is None else target
+    if target == "topic":
+        if not memory_persistence_enabled(fail_closed=True):
+            return tool_error("Memory persistence is disabled by memory.enabled. Nothing was saved.", success=False)
+        if operations:
+            return tool_error("Topic summaries use one upsert/remove per call; batch operations are not supported.", success=False)
+        from tools.topic_memory_store import remove_topic_summary, upsert_topic_summary
+        topic_key = (topic or title or "").strip()
+        if action in {"add", "replace"}:
+            if not topic_key:
+                return tool_error("topic is required when target='topic'.", success=False)
+            if not content:
+                return tool_error("content is required when target='topic'.", success=False)
+            gate_result = _apply_write_gate(
+                "upsert", target, content, old_text, store, topic=topic, title=title, keywords=keywords
+            )
+            if gate_result is not None:
+                return gate_result
+            return json.dumps(
+                upsert_topic_summary(topic_key, content, title=title, keywords=keywords),
+                ensure_ascii=False,
+            )
+        if action == "remove":
+            if not topic_key:
+                return tool_error("topic is required when removing a topic summary.", success=False)
+            gate_result = _apply_write_gate(
+                "remove", target, None, old_text, store, topic=topic, title=title, keywords=keywords
+            )
+            if gate_result is not None:
+                return gate_result
+            return json.dumps(remove_topic_summary(topic_key), ensure_ascii=False)
+        return tool_error("Unknown topic action. Use add/replace to upsert or remove to delete.", success=False)
+    if store is None:
+        return tool_error("Built-in MEMORY.md / USER.md is not available in this environment.", success=False)
     target_error = _memory_target_error(store, target)
     if target_error is not None:
         return json.dumps(target_error)
@@ -276,13 +322,20 @@ def get_builtin_memory_store_flags(config: Optional[Dict[str, Any]] = None) -> T
     return tuple(is_truthy_value(section.get(k), default=True) for k in ("memory_enabled", "user_profile_enabled"))
 
 
+def topic_summaries_enabled(config: Optional[Dict[str, Any]] = None) -> bool:
+    section = get_builtin_memory_config(config)
+    if not is_truthy_value(section.get("enabled"), default=True):
+        return False
+    return is_truthy_value(section.get("topic_summaries_enabled"), default=True)
+
+
 @no_cache_check_fn
 def check_memory_requirements() -> bool:
-    """Snapshot store flags and report whether the built-in tool is available."""
+    """Snapshot store flags and report whether any built-in memory surface is available."""
     _memory_surface_flags.set(None)
     flags = get_builtin_memory_store_flags()
     _memory_surface_flags.set(flags)
-    return flags[0] or flags[1]
+    return flags[0] or flags[1] or topic_summaries_enabled()
 
 
 def _memory_target_error(store: "MemoryStore", target: str) -> Optional[Dict[str, Any]]:
@@ -297,7 +350,7 @@ def _memory_target_error(store: "MemoryStore", target: str) -> Optional[Dict[str
     if target not in {"memory", "user"}:
         from tools.registry import _bound_error_text
         return {"success": False,
-                "error": _bound_error_text(f"Invalid memory target '{target}'. Use 'memory' or 'user'.")}
+                "error": _bound_error_text(f"Invalid memory target '{target}'. Use 'memory', 'user', or 'topic'.")}
     if store.target_enabled(target):
         return None
     label = "USER.md" if target == "user" else "MEMORY.md"
@@ -312,6 +365,18 @@ def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[
     of re-populating facts the user explicitly forgot.
     """
     action, target = payload.get("action"), payload.get("target", "memory")
+    if target == "topic":
+        if not memory_persistence_enabled(fail_closed=True):
+            return {"success": False, "error": "Memory persistence is disabled by memory.enabled."}
+        from tools.topic_memory_store import remove_topic_summary, upsert_topic_summary
+        topic = payload.get("topic") or payload.get("title") or ""
+        if action in {"add", "replace", "upsert"}:
+            return upsert_topic_summary(
+                topic, payload.get("content") or "", title=payload.get("title"), keywords=payload.get("keywords")
+            )
+        if action == "remove":
+            return remove_topic_summary(topic)
+        return {"success": False, "error": f"Unknown staged topic action '{action}'."}
     target_error = _memory_target_error(store, target)
     if target_error is not None:
         return target_error
@@ -333,8 +398,8 @@ def apply_memory_pending(payload: Dict[str, Any], store: "MemoryStore") -> Dict[
 MEMORY_SCHEMA = {
     "name": "memory",
     "description": (
-        "Save durable facts to persistent memory that survive across sessions. Memory is "
-        "injected into every future turn, so keep entries compact and high-signal.\n\n"
+        "Save durable facts to persistent memory that survive across sessions. Core/user memory is "
+        "injected into every future turn; topic summaries are recalled only when relevant.\n\n"
         "HOW: make ALL your changes in ONE call via an 'operations' array (each item: "
         "{action, content?, old_text?}). The batch applies atomically and the char limit is "
         "checked only on the FINAL result — so a single call can remove/replace stale entries "
@@ -342,16 +407,16 @@ MEMORY_SCHEMA = {
         "reports current/limit chars and confirms completion; one batch call finishes the "
         "update, so don't repeat it. Use the bare action/content/old_text fields only for a "
         "single lone change.\n\n"
-        "WHEN: only for facts that apply to EVERY session regardless of task: who the user "
-        "is, stable environment facts, standing conventions with no task home. Anything "
-        "learned while doing a task (procedures, pitfalls, and the user's preferences and "
-        "corrections for that kind of work) belongs in the task's skill via skill_manage, "
-        "where it loads only when relevant; memory is injected into every turn and must "
-        "stay small.\n\n"
+        "WHEN: use 'user'/'memory' only for facts that apply to EVERY session regardless of task. "
+        "Use target='topic' for the current durable state of a project, domain, relationship, or "
+        "recurring area that should load only when relevant. Topic summaries are UPSERTS: update the "
+        "same topic key when facts change; remove superseded facts instead of appending chronology. "
+        "Procedures and task-specific how-to lessons belong in a skill.\n\n"
         "IF FULL: an add is rejected with the current entries shown. Reissue as ONE batch that "
         "removes or shortens enough stale entries and adds the new one together.\n\n"
-        "TARGETS: 'user' = who the user is (name, role, preferences, style). 'memory' = your "
-        "notes (environment, conventions, tool quirks, lessons).\n\n"
+        "TARGETS: 'user' = who the user is; 'memory' = tiny always-relevant notes; 'topic' = "
+        "a compact current-state summary recalled only for relevant turns. For target='topic', set "
+        "topic (stable key), content (summary), optional title and keywords.\n\n"
         "SKIP: trivial/obvious info, easily re-discovered facts, raw data dumps, task progress, "
         "completed-work logs, temporary TODO state (use session_search for those). Reusable "
         "procedures belong in a skill, not memory."
@@ -366,8 +431,21 @@ MEMORY_SCHEMA = {
             },
             "target": {
                 "type": "string",
-                "enum": ["memory", "user"],
-                "description": "Which memory store: 'memory' for personal notes, 'user' for user profile."
+                "enum": ["memory", "user", "topic"],
+                "description": "Store: 'memory'/'user' are always-loaded; 'topic' is recalled only when relevant."
+            },
+            "topic": {
+                "type": "string",
+                "description": "Stable topic key for target='topic', e.g. 'stardust' or 'markus-classroom'."
+            },
+            "title": {
+                "type": "string",
+                "description": "Optional human-readable topic title."
+            },
+            "keywords": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional recall aliases/keywords for target='topic'."
             },
             "content": {
                 "type": "string",
@@ -421,8 +499,10 @@ def _build_memory_schema_overrides() -> Dict[str, Any]:
     targets = [t for t, on in zip(("memory", "user"), flags) if on]
     parameters = copy.deepcopy(MEMORY_SCHEMA["parameters"])
     target_schema, description = parameters["properties"]["target"], MEMORY_SCHEMA["description"]
+    if topic_summaries_enabled():
+        targets.append("topic")
     target_schema["enum"] = targets
-    if narrowed := _SINGLE_TARGET_TEXT.get(tuple(targets)):
+    if narrowed := _SINGLE_TARGET_TEXT.get(tuple(t for t in targets if t != "topic")):
         target_schema["description"], replacement = narrowed
         description = description.replace(
             "TARGETS: 'user' = who the user is (name, role, preferences, style). 'memory' = your "
@@ -438,7 +518,7 @@ registry.register(
     schema=MEMORY_SCHEMA,
     handler=lambda args, **kw: memory_tool(
         action=args.get("action", ""), target=args.get("target", "memory"), store=kw.get("store"),
-        **{k: args.get(k) for k in ("content", "old_text", "new_text", "operations")}),
+        **{k: args.get(k) for k in ("content", "old_text", "new_text", "operations", "topic", "title", "keywords")}),
     check_fn=check_memory_requirements,
     emoji="🧠",
     dynamic_schema_overrides=_build_memory_schema_overrides)
