@@ -3908,6 +3908,7 @@ export interface ErrorSurface {
   retryable: boolean
   provider?: string | null
   model?: string | null
+  fallback_configured?: boolean | null
   [key: string]: unknown
 }
 /** ``server._status_update`` and the direct emitters (goal / loop / heartbeat / process). */

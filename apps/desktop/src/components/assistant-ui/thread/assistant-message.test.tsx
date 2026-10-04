@@ -322,6 +322,55 @@ describe('rejected API key recovery', () => {
   })
 })
 
+describe('fallback model offer', () => {
+  it('routes a busy provider with no fallback straight to the fallback field', async () => {
+    render(
+      <MemoryRouter>
+        <LocationProbe />
+        <Harness
+          assistant={failedMessage(
+            {
+              code: 'overloaded',
+              fallbackConfigured: false,
+              layer: 'provider',
+              provider: 'custom:relay',
+              retryable: true
+            },
+            'HTTP 503: No available channel for model gemini-3.8-flash'
+          )}
+        />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeTruthy()
+    // One way to the same settings page, and it lands on the field that fixes this.
+    expect(screen.queryByRole('button', { name: 'Switch provider' })).toBeNull()
+
+    screen.getByRole('button', { name: 'Set up a fallback model' }).click()
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toMatch(/\?tab=config:model&field=fallback_providers$/)
+    )
+  })
+
+  it('keeps Switch provider and no fallback offer when one was configured', async () => {
+    render(
+      <MemoryRouter>
+        <Harness
+          assistant={failedMessage({
+            code: 'overloaded',
+            fallbackConfigured: true,
+            layer: 'provider',
+            retryable: true
+          })}
+        />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Switch provider' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Set up a fallback model' })).toBeNull()
+  })
+})
+
 describe('expired OAuth grant recovery', () => {
   it('keeps the legacy credential readable but routes recovery to model API services', async () => {
     render(

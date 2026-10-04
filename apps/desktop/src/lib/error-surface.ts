@@ -72,6 +72,9 @@ export interface ErrorSurface {
    *  (OPENAI_API_KEY). Deep-links Settings → Keys to that row. Absent from
    *  older backends. */
   apiKeyEnv?: string
+  /** Whether the failing session had a fallback model to switch to. Absent
+   *  when the backend did not say (older backends). */
+  fallbackConfigured?: boolean
 }
 
 /** Validate a wire payload into an ErrorSurface, or null when absent/garbled. */
@@ -84,6 +87,7 @@ export function parseErrorSurface(value: unknown): ErrorSurface | null {
     api_key_env?: unknown
     auth_kind?: unknown
     code?: unknown
+    fallback_configured?: unknown
     layer?: unknown
     model?: unknown
     provider?: unknown
@@ -105,7 +109,8 @@ export function parseErrorSurface(value: unknown): ErrorSurface | null {
     ...(typeof raw.model === 'string' && raw.model ? { model: raw.model } : {}),
     ...(raw.auth_kind === 'oauth' || raw.auth_kind === 'api_key' ? { authKind: raw.auth_kind } : {}),
     ...(typeof raw.provider_label === 'string' && raw.provider_label ? { providerLabel: raw.provider_label } : {}),
-    ...(typeof raw.api_key_env === 'string' && raw.api_key_env ? { apiKeyEnv: raw.api_key_env } : {})
+    ...(typeof raw.api_key_env === 'string' && raw.api_key_env ? { apiKeyEnv: raw.api_key_env } : {}),
+    ...(typeof raw.fallback_configured === 'boolean' ? { fallbackConfigured: raw.fallback_configured } : {})
   }
 }
 
@@ -161,7 +166,22 @@ export interface ErrorRecoveryPlan {
   updateApiKey: boolean
   /** Settings → Models deep link. */
   switchProvider: boolean
+  /** Settings → Models → fallback models deep link: a failure another model
+   *  would get past ended the turn because none was configured. */
+  setUpFallback: boolean
 }
+
+// Failures about the CURRENT model/provider that a fallback model gets past
+// automatically — the agent switches only when one is configured.
+const FALLBACK_RESCUES: ReadonlySet<string> = new Set([
+  'overloaded',
+  'server_error',
+  'rate_limit',
+  'upstream_rate_limit',
+  'timeout',
+  'model_not_found',
+  'provider_policy_blocked'
+])
 
 // Layers where the fix is provider/endpoint/auth config, not a retry.
 const SWITCH_PROVIDER_LAYERS: readonly ErrorSurfaceLayer[] = ['auth', 'billing', 'endpoint', 'provider']
@@ -194,6 +214,7 @@ export function errorRecoveryPlan(surface: ErrorSurface | null | undefined): Err
     // where fixing the credential changes the outcome and Retry is the
     // natural second click.
     retry: !surface || surface.retryable || oauthReauth || apiKeyRejected,
+    setUpFallback: surface?.fallbackConfigured === false && FALLBACK_RESCUES.has(surface.code),
     startNewSession: false,
     switchProvider: surface != null && SWITCH_PROVIDER_LAYERS.includes(surface.layer),
     updateApiKey: apiKeyRejected

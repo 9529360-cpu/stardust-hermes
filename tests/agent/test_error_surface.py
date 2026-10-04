@@ -14,6 +14,7 @@ from agent.error_surface import (
     LAYER_STREAMING,
     build_error_surface_from_exception,
     build_error_surface_from_result,
+    stamp_fallback_route,
 )
 
 
@@ -229,3 +230,21 @@ def test_exception_never_raises_on_weird_input():
 
     # Must not raise, whatever it returns.
     build_error_surface_from_exception(Hostile("x"))
+
+
+# ── stamp_fallback_route ─────────────────────────────────────────────────
+
+
+def test_stamp_fallback_route_reports_the_agents_chain():
+    no_chain = type("Agent", (), {"_fallback_chain": []})()
+    with_chain = type("Agent", (), {"_fallback_chain": [{"provider": "openrouter", "model": "x"}]})()
+
+    assert stamp_fallback_route({"layer": LAYER_PROVIDER}, no_chain)["fallback_configured"] is False
+    assert stamp_fallback_route({"layer": LAYER_PROVIDER}, with_chain)["fallback_configured"] is True
+
+
+def test_stamp_fallback_route_leaves_unknown_chains_and_missing_surfaces_alone():
+    # No agent, or one whose chain is not a list (stand-ins, older agents): no guess.
+    assert "fallback_configured" not in stamp_fallback_route({"layer": LAYER_PROVIDER}, None)
+    assert "fallback_configured" not in stamp_fallback_route({"layer": LAYER_PROVIDER}, object())
+    assert stamp_fallback_route(None, type("Agent", (), {"_fallback_chain": []})()) is None

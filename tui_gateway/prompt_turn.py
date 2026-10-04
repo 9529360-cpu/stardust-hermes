@@ -703,10 +703,10 @@ def _complete_turn_payload(session: dict, st: _TurnRun, status_note: str | None,
     _error_surface = None
     if _result_status(result) == "error":
         try:
-            from agent.error_surface import build_error_surface_from_result
-            _error_surface = build_error_surface_from_result(
+            from agent.error_surface import build_error_surface_from_result, stamp_fallback_route
+            _error_surface = stamp_fallback_route(build_error_surface_from_result(
                 result, provider=str(getattr(agent, "provider", "") or ""),
-                model=str(getattr(agent, "model", "") or ""))
+                model=str(getattr(agent, "model", "") or "")), agent)
         except Exception:
             _error_surface = None
     raw, status, last_reasoning = _turn_outcome(result, _error_surface)
