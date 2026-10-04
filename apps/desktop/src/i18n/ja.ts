@@ -3300,16 +3300,143 @@ export const ja = defineLocale({
       react: 'リアクション',
       dismissError: 'エラーを閉じる',
       errorLayers: {
-        auth: '認証エラー',
-        billing: 'クレジット不足',
-        disk: 'ディスク容量不足',
-        endpoint: 'カスタムエンドポイントのエラー',
-        gateway: 'ゲートウェイのエラー',
-        generic: 'ターンが失敗しました',
-        provider: 'プロバイダーのエラー',
-        runtime: 'ローカルランタイムのエラー',
-        streaming: 'ストリーミング接続のエラー'
+        auth: 'サインインまたはキーの問題',
+        billing: 'クレジットが残っていません',
+        disk: 'ディスクがいっぱいです',
+        endpoint: 'モデルサーバーに接続できません',
+        gateway: 'Stardust で問題が起きました',
+        generic: 'Stardust はこの返信を完了できませんでした',
+        provider: 'AI サービスがエラーを返しました',
+        runtime: 'Stardust で問題が起きました',
+        streaming: '返信が途中で切れました'
       },
+      errorLayerBodies: {
+        auth: 'AI サービスがサインイン情報を受け付けませんでした。このサービスのキーやサインインを確認してから、もう一度送信してください。',
+        billing:
+          'このサービスのアカウントにクレジットが残っていません。チャージするかプロバイダーを切り替えてから、もう一度送信してください。',
+        disk: 'ディスクがいっぱいのため、Stardust はこの会話を保存できませんでした。空き容量を作ってから再試行してください。',
+        endpoint:
+          'Stardust はカスタムモデルサーバーに接続できません。起動していることを確認してから、もう一度送信してください。',
+        gateway:
+          'Stardust が返信を始める際に内部で問題が起きました。もう一度送信してください。繰り返す場合は診断情報を送信してください。',
+        generic: 'Stardust の返信中に問題が起きました。再試行するか、繰り返す場合は詳細をコピーしてください。',
+        provider:
+          'AI サービスがこのリクエストを完了できませんでした。少し待って再試行するか、プロバイダーを切り替えてください。',
+        runtime:
+          'Stardust が返信を始める際に内部で問題が起きました。もう一度送信してください。繰り返す場合は診断情報を送信してください。',
+        streaming: '返信が終わる前に接続が切れました。再試行するともう一度送信します。'
+      },
+      errorCodes: {
+        auth: {
+          title: provider => `${provider} がサインインを受け付けませんでした`,
+          body: provider =>
+            `${provider} 用に保存された認証情報が受け付けられませんでした。設定で修正するかプロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        auth_permanent: {
+          title: provider => `${provider} がサインインを受け付けませんでした`,
+          body: provider =>
+            `${provider} の認証情報が無効か取り消されています。更新するかプロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        billing: {
+          title: 'クレジットが残っていません',
+          body: provider =>
+            `${provider} のアカウントにクレジットが残っていません。チャージするかプロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        rate_limit: {
+          title: 'AI サービスが混み合っています',
+          body: provider => `${provider} がリクエストを制限しています。1 分ほど待ってから再試行してください。`
+        },
+        upstream_rate_limit: {
+          title: 'AI サービスが混み合っています',
+          body: provider => `${provider} がリクエストを制限しています。1 分ほど待ってから再試行してください。`
+        },
+        overloaded: {
+          title: 'AI サービスが過負荷です',
+          body: provider =>
+            `${provider} で問題が起きています。少し待って再試行するか、プロバイダーを切り替えてください。`
+        },
+        server_error: {
+          title: 'AI サービスで問題が起きました',
+          body: provider =>
+            `${provider} がサーバーエラーを返しました。少し待って再試行するか、プロバイダーを切り替えてください。`
+        },
+        timeout: {
+          title: '返信がタイムアウトしました',
+          body: provider => `${provider} が時間内に応答しませんでした。再試行するともう一度送信します。`
+        },
+        stream_drop: {
+          title: '返信が途中で切れました',
+          body: '返信が終わる前に接続が切れました。再試行するともう一度送信します。'
+        },
+        ssl_cert_verification: {
+          title: '安全な接続に失敗しました',
+          body: provider =>
+            `Stardust は ${provider} との安全な接続を確認できませんでした。ネットワークやプロキシの設定を確認するか、プロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        context_overflow: {
+          title: 'この会話が長すぎます',
+          body: '会話がモデルで扱える長さを超えました。会話を圧縮するか新しいチャットを始めてから、もう一度送信してください。'
+        },
+        payload_too_large: {
+          title: 'このメッセージが大きすぎます',
+          body: 'リクエストがモデルには大きすぎました。会話を圧縮するか新しいチャットを始めてから、もう一度送信してください。'
+        },
+        model_not_found: {
+          title: 'このモデルは利用できません',
+          body: provider =>
+            `${provider} はあなたのアカウントでこのモデルを提供していません。別のモデルを選んでから、もう一度送信してください。`
+        },
+        provider_policy_blocked: {
+          title: 'アカウント設定でこのモデルがブロックされています',
+          body: provider =>
+            `アカウントのデータやプライバシーの設定により、${provider} はこのリクエストを転送しません。別のモデルを選ぶか、プロバイダーを切り替えてください。`
+        },
+        content_policy_blocked: {
+          title: 'AI サービスがこのリクエストを断りました',
+          body: provider => `${provider} はこのメッセージに回答しませんでした。内容を編集してから送り直してください。`
+        },
+        format_error: {
+          title: 'AI サービスがリクエストを受け付けませんでした',
+          body: provider =>
+            `${provider} はこのリクエストの形式を受け付けませんでした。プロバイダーを切り替えるか、調査のために診断情報を送信してください。`
+        },
+        truncated: {
+          title: '返信が途中で止まりました',
+          body: 'モデルが最後まで書き終える前に止まりました。再試行すると完全な返信を取得します。'
+        },
+        invalid_response: {
+          title: 'AI サービスが読み取れない返信を返しました',
+          body: provider => `${provider} が Stardust の読み取れない内容を返しました。少し待って再試行してください。`
+        },
+        empty_response: {
+          title: 'AI サービスが空の返信を返しました',
+          body: provider => `${provider} はこのメッセージに何も返しませんでした。少し待って再試行してください。`
+        },
+        loop_error: {
+          title: 'Stardust がループに入りました',
+          body: '返信が同じ手順を繰り返したため、Stardust が停止しました。再試行するか、再発する場合は新しいチャットを始めてください。'
+        },
+        SESSION_NOT_OWNED: {
+          title: 'このチャットは別の場所で開かれています',
+          body: 'このチャットは別の Stardust ウィンドウかターミナルで開かれています。そちらで閉じてからもう一度送信するか、ここで新しいチャットを始めてください。'
+        },
+        disk_full: {
+          title: 'ディスクがいっぱいです',
+          body: 'ディスクがいっぱいのため、Stardust はこの会話を保存できませんでした。空き容量を作ってから再試行してください。'
+        }
+      },
+      errorAuthKinds: {
+        api_key: {
+          title: provider => `${provider} が API キーを受け付けませんでした`,
+          body: provider => `${provider} 用に保存されたキーが無効か取り消されています。更新してから再試行してください。`
+        },
+        oauth: {
+          title: provider => `${provider} のサインインが期限切れです`
+        }
+      },
+      errorDetails: '詳細',
+      errorGenericProvider: 'AI サービス',
+      errorToastTitle: 'Stardust は返信を完了できませんでした',
       errorRetry: '再試行',
       errorStartNewSession: '新しいセッションを開始',
       errorSwitchProvider: 'プロバイダーを切り替え',
@@ -3317,6 +3444,12 @@ export const ja = defineLocale({
       errorSignInAgain: provider => `${provider} に再度サインイン`,
       errorOauthExpired: provider =>
         `${provider} のサインインが期限切れか取り消されました。ターミナルで hermes model を実行して ${provider} を選び、再度サインインするか、「設定 → モデルサービス」でモデル API に切り替えてください。`,
+      errorChooseModel: 'モデルを選ぶ',
+      errorCompressConversation: '会話を圧縮',
+      errorCompressFailed: '会話を圧縮できませんでした',
+      errorOpenHermesFolder: 'Stardust のデータフォルダを開く',
+      errorOpenHermesFolderFailed: 'Stardust のデータフォルダを開けませんでした',
+      errorUpdateApiKey: 'API キーを更新',
       errorOpenLogs: 'ログを開く',
       errorOpenLogsFailed: 'ログフォルダを開けませんでした',
       errorOpenDesktopLogs: 'デスクトップのログを開く',
