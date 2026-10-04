@@ -955,7 +955,8 @@ export const en: Translations = {
       validationReachable: 'Connection works.',
       validationReachableModels: count => `Connection works. Found ${count} model${count === 1 ? '' : 's'}.`,
       validationFailed: 'Connection test failed',
-      activationFailed: 'Could not switch the default service'
+      activationFailed: 'Could not switch the default service',
+      duplicateService: 'A model service with this name already exists. Edit it from the list, or use a different name.'
     },
     computerUse: {
       accessibility: 'Accessibility',
