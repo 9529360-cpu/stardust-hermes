@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { PAGE_INSET_X } from '@/app/layout-constants'
 import { PageLoader } from '@/components/page-loader'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -55,6 +56,7 @@ import { type Translations, useI18n } from '@/i18n'
 import { AlertTriangle } from '@/lib/icons'
 import { requestModelOptions } from '@/lib/model-options'
 import { asText } from '@/lib/text'
+import { cn } from '@/lib/utils'
 import { $activeConnectionId } from '@/store/connections'
 import {
   $cronFocusJobId,
@@ -72,7 +74,6 @@ import { $selectedStoredSessionId } from '@/store/session'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import {
-  Panel,
   PanelAction,
   PanelAddButton,
   PanelBlock,
@@ -344,12 +345,16 @@ function matchesSuggestion(suggestion: CronSuggestion, q: string, c: Translation
 }
 
 interface CronViewProps extends React.ComponentProps<'section'> {
-  onClose: () => void
   onOpenSession?: (sessionId: string, session?: SessionInfo) => void
   setStatusbarItemGroup?: SetStatusbarItemGroup
 }
 
-export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setStatusbarItemGroup }: CronViewProps) {
+export function CronView({
+  className,
+  onOpenSession,
+  setStatusbarItemGroup: _setStatusbarItemGroup,
+  ...props
+}: CronViewProps) {
   const { t } = useI18n()
   const c = t.cron
   // Source of truth is the shared atom (also fed by the controller poll), so the
@@ -825,8 +830,18 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
   }
 
   return (
-    <Panel closeLabel={c.close} onClose={onClose}>
-      <PanelHeader subtitle={c.count(totalCount)} title={c.title} />
+    <section
+      {...props}
+      className={cn('flex h-full min-w-0 flex-col overflow-hidden bg-(--ui-chat-surface-background)', className)}
+      data-cron-page=""
+    >
+      <div
+        className={cn(
+          'flex h-full min-h-0 flex-col pb-4 pt-[calc(var(--titlebar-height)+0.5rem)]',
+          PAGE_INSET_X
+        )}
+      >
+        <PanelHeader subtitle={c.count(totalCount)} title={c.title} />
 
       {(loading || suggestionsQuery.isLoading || blueprintsQuery.isLoading) &&
       jobs.length === 0 &&
@@ -993,7 +1008,8 @@ export function CronView({ onClose, onOpenSession, setStatusbarItemGroup: _setSt
         open={pendingDelete !== null}
         title={c.deleteTitle}
       />
-    </Panel>
+      </div>
+    </section>
   )
 }
 
