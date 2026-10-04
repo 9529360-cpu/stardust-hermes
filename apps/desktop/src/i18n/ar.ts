@@ -2858,6 +2858,7 @@ export const ar = defineLocale({
       errorRetry: 'إعادة المحاولة',
       errorStartNewSession: 'بدء جلسة جديدة',
       errorSwitchProvider: 'تبديل المزوّد',
+      errorSetUpFallback: 'إعداد نموذج احتياطي',
       errorSignInAgain: provider => `تسجيل الدخول إلى ${provider} مجدداً`,
       errorOauthExpired: provider =>
         `انتهت صلاحية تسجيل دخولك إلى ${provider} أو تم إلغاؤه. شغّل hermes model في الطرفية واختر ${provider} لتسجيل الدخول مجددًا، أو انتقل إلى واجهة API لنموذج من «الإعدادات ← خدمات النماذج».`,

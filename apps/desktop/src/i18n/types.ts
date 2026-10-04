@@ -3628,6 +3628,7 @@ export interface Translations {
       /** Escape hatch when Retry would only reproduce SESSION_NOT_OWNED (#106217). */
       errorStartNewSession: string
       errorSwitchProvider: string
+      errorSetUpFallback: string
       errorChooseModel: string
       errorCompressConversation: string
       errorCompressFailed: string

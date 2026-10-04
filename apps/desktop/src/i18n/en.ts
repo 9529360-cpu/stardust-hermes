@@ -4201,6 +4201,7 @@ export const en: Translations = {
       errorRetry: 'Retry',
       errorStartNewSession: 'Start new session',
       errorSwitchProvider: 'Switch provider',
+      errorSetUpFallback: 'Set up a fallback model',
       errorChooseModel: 'Choose a model',
       errorCompressConversation: 'Compress conversation',
       errorCompressFailed: 'Could not compress the conversation',

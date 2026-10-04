@@ -291,6 +291,34 @@ def test_returned_error_result_carries_error_surface(emits, turn_env):
     assert snapshot["error_surface"]["layer"] == "provider"
 
 
+@pytest.mark.parametrize("chain, expected", [([], False), ([{"provider": "openrouter", "model": "x"}], True)])
+def test_returned_error_surface_says_whether_a_fallback_was_configured(emits, turn_env, chain, expected):
+    """A busy relay with no fallback simply ends the turn; the descriptor tells the
+    client so it can offer setting one up (and not when the fallback also failed)."""
+    agent = types.SimpleNamespace(
+        session_id="session-key",
+        provider="custom:relay",
+        model="gemini-3.8-flash",
+        _fallback_chain=chain,
+        run_conversation=lambda *a, **k: {
+            "final_response": "",
+            "error": "HTTP 503: No available channel for model gemini-3.8-flash",
+            "failed": True,
+            "failure_reason": "overloaded",
+        },
+        clear_interrupt=lambda: None,
+    )
+    session = _session(agent=agent, running=True)
+    server._start_inflight_turn(session, "do the thing")
+
+    server._run_prompt_submit("rid", "sid", session, "do the thing")
+
+    payload = _events(emits, "message.complete")[0]
+    assert payload["error_surface"]["fallback_configured"] is expected
+    # Resume replay carries the same descriptor.
+    assert server._inflight_snapshot(session)["error_surface"]["fallback_configured"] is expected
+
+
 def test_returned_error_without_reason_omits_no_frame(emits, turn_env):
     """Legacy result dicts (no failure_reason) still get a best-effort
     descriptor — never a crash, never a missing terminal frame."""
