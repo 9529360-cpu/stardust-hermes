@@ -1,6 +1,8 @@
-// Presentation-only copy for bundled skills. The backend ID, source description,
-// and SKILL.md remain authoritative for loading, editing, and invocation.
-// Unknown, user-authored, and third-party skills retain their original metadata.
+import optionalSkills from './skill-optional-display.json'
+
+// Presentation-only copy for bundled and official optional skills. The backend
+// ID, source description and SKILL.md remain authoritative for invocation.
+// Unknown, user-authored and third-party skills retain their original metadata.
 const ZH_BUNDLED_SKILLS: Record<string, { name: string; description: string }> = {
   'apple-notes': { name: 'Apple 备忘录', description: '通过 memo CLI 创建、搜索和编辑 Apple 备忘录。' },
   'apple-reminders': { name: 'Apple 提醒事项', description: '通过 remindctl 添加、列出和完成提醒事项。' },
@@ -62,10 +64,20 @@ const ZH_BUNDLED_SKILLS: Record<string, { name: string; description: string }> =
   'blocked-page-recovery': { name: '受阻网页访问恢复', description: '在抓取遇到 403、429、付费墙、WAF 或机器人拦截时尝试恢复访问。' }
 }
 
-export function skillDisplayName(name: string, locale: string, bundled = true): string {
-  return bundled && locale === 'zh' ? ZH_BUNDLED_SKILLS[name]?.name ?? name : name
+export type SkillDisplaySource = 'bundled' | 'official' | 'other'
+
+function skillCopy(name: string, source: SkillDisplaySource) {
+  if (source === 'bundled') {return ZH_BUNDLED_SKILLS[name]}
+
+  if (source === 'official') {return (optionalSkills as Record<string, { name: string; description: string }>)[name]}
+
+  return undefined
 }
 
-export function skillDisplayDescription(name: string, description: string, locale: string, bundled = true): string {
-  return bundled && locale === 'zh' ? ZH_BUNDLED_SKILLS[name]?.description ?? description : description
+export function skillDisplayName(name: string, locale: string, source: SkillDisplaySource = 'bundled'): string {
+  return locale === 'zh' ? skillCopy(name, source)?.name ?? name : name
+}
+
+export function skillDisplayDescription(name: string, description: string, locale: string, source: SkillDisplaySource = 'bundled'): string {
+  return locale === 'zh' ? skillCopy(name, source)?.description ?? description : description
 }
