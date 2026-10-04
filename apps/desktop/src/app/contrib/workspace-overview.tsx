@@ -29,7 +29,7 @@ import { $subagentsBySession } from '@/store/subagents'
 import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
 
 import { SubagentSection } from '../chat/composer/status-stack/subagent-section'
-import { CRON_ROUTE, sessionRoute } from '../routes'
+import { CRON_ROUTE, navigateToWorkspacePage, sessionRoute } from '../routes'
 import {
   findLiveTaskRuntimeId,
   findLiveTaskRuntimeIdByStoredId,
@@ -367,7 +367,7 @@ export function WorkspaceOverview() {
 
     if (task.action === 'manage-cron') {
       setCronFocusJobId(task.id.slice('cron:'.length))
-      navigate(CRON_ROUTE)
+      navigateToWorkspacePage(navigate, CRON_ROUTE)
     }
   }
 
