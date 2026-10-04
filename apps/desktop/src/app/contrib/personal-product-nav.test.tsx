@@ -6,24 +6,38 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
 import { I18nProvider } from '@/i18n'
+import { $sidebarGrouping, setSidebarAgentsGrouped } from '@/store/layout'
 import { $newChatProfile } from '@/store/profile'
+import { $projectScope, $projectTree, ALL_PROJECTS, fetchProjectSessions } from '@/store/projects'
+import { $currentCwd } from '@/store/session'
+import type { SessionInfo } from '@/types/hermes'
 
 import type { AppView } from '../routes'
 
 import { PersonalProductNav } from './personal-product-nav'
 
+vi.mock('@/store/projects', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchProjectSessions: vi.fn().mockResolvedValue(null)
+}))
+
 afterEach(() => {
   cleanup()
+  vi.mocked(fetchProjectSessions).mockResolvedValue(null)
   $newChatProfile.set(null)
+  $projectTree.set([])
+  $projectScope.set(ALL_PROJECTS)
+  $currentCwd.set('')
+  setSidebarAgentsGrouped(false)
   $layoutTree.set(null)
   noteActiveTreeGroup(null)
 })
 
-function renderNav(currentView: AppView, path = '/', onNavigate = vi.fn()) {
+function renderNav(currentView: AppView, path = '/', onNavigate = vi.fn(), onResumeSession = vi.fn()) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <I18nProvider configClient={null} initialLocale="zh">
-        <PersonalProductNav currentView={currentView} onNavigate={onNavigate} />
+        <PersonalProductNav currentView={currentView} onNavigate={onNavigate} onResumeSession={onResumeSession} />
       </I18nProvider>
     </MemoryRouter>
   )
@@ -88,6 +102,65 @@ describe('PersonalProductNav', () => {
 
     expect($newChatProfile.get()).toBeNull()
     expect(onNavigate).toHaveBeenCalledTimes(1)
+  })
+
+  it('expands projects beneath the nav without replacing recent conversations', () => {
+    $projectTree.set([{ id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 2 }])
+    setSidebarAgentsGrouped(true) // persisted legacy view must return to recents
+    const onNavigate = renderNav('chat')
+    const projectButton = screen.getByRole('button', { name: '项目' })
+
+    fireEvent.click(projectButton)
+    expect(projectButton.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Example' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '新建项目' })).toBeTruthy()
+    expect($sidebarGrouping.get()).not.toBe('project')
+    expect(onNavigate).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Example' }))
+    expect($projectScope.get()).toBe('p_example')
+    expect($currentCwd.get()).toBe('D:/Example')
+    expect($sidebarGrouping.get()).not.toBe('project')
+    expect(onNavigate).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Example' }))
+    expect(screen.getByRole('button', { name: 'Example' }).getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(projectButton)
+    expect(projectButton.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: 'Example' })).toBeNull()
+  })
+
+  it('opens a project conversation from its nested list without removing recents', async () => {
+    const session = { id: 'chat-1', title: '项目讨论', preview: null } as SessionInfo
+
+    const project = {
+      id: 'p_example',
+      label: 'Example',
+      path: 'D:/Example',
+      sessionCount: 1,
+      repos: [
+        {
+          id: 'repo',
+          label: 'Repo',
+          path: 'D:/Example',
+          sessionCount: 1,
+          groups: [{ id: 'lane', label: 'main', path: 'D:/Example', sessions: [session] }]
+        }
+      ]
+    }
+
+    $projectTree.set([project])
+    vi.mocked(fetchProjectSessions).mockResolvedValue(project)
+    const onResumeSession = vi.fn()
+    renderNav('chat', '/', vi.fn(), onResumeSession)
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Example' }))
+    const conversation = await screen.findByRole('button', { name: '项目讨论' })
+    fireEvent.click(conversation)
+    expect(onResumeSession).toHaveBeenCalledWith('chat-1', session)
+    expect($sidebarGrouping.get()).not.toBe('project')
   })
 
   it('marks exactly the page that owns the current route', () => {
