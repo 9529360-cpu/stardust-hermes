@@ -8,6 +8,7 @@ import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/s
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { registry } from '@/contrib/registry'
 import { $pinnedSessionIds } from '@/store/layout'
+import { $projects } from '@/store/projects'
 import { $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
 import { makeSessionInfo } from '@/test/session-info'
@@ -23,7 +24,7 @@ const sessionRows = [
   makeSessionInfo({ id: 'tile-two', last_active: 2, profile: 'default', started_at: 1, title: 'Tile two' })
 ]
 
-const renderSidebar = (pathname: string, currentView: AppView) =>
+const renderSidebar = (pathname: string, currentView: AppView, projectChatsInNav = false) =>
   render(
     <MemoryRouter initialEntries={[pathname]}>
       <SidebarProvider>
@@ -36,6 +37,7 @@ const renderSidebar = (pathname: string, currentView: AppView) =>
           onNewSessionInWorkspace={noop}
           onNewSessionSplit={noop}
           onResumeSession={noop}
+          projectChatsInNav={projectChatsInNav}
         />
       </SidebarProvider>
     </MemoryRouter>
@@ -61,6 +63,7 @@ describe('ChatSidebar compact conversation surface', () => {
     ])
     $selectedStoredSessionId.set('tile-one')
     $sessions.set(sessionRows)
+    $projects.set([])
     $removedSessionIds.set(new Set())
     $layoutTree.set(
       split('row', [
@@ -77,6 +80,7 @@ describe('ChatSidebar compact conversation surface', () => {
     disposeContributions()
     $selectedStoredSessionId.set(null)
     $sessions.set([])
+    $projects.set([])
     $sessionsLoading.set(true)
     $removedSessionIds.set(new Set())
     $pinnedSessionIds.set([])
@@ -173,5 +177,34 @@ describe('ChatSidebar compact conversation surface', () => {
 
     expect(screen.queryByText('Pinned chats')).toBeNull()
     expect(screen.getByText('Tile two')).toBeTruthy()
+  })
+
+  it('files manually created project chats under Projects while keeping repo and pinned chats visible', () => {
+    act(() => {
+      $sessionsLoading.set(false)
+      $projects.set([{
+        archived: false, board_slug: null, color: null, created_at: 0, description: null,
+        folders: [{ added_at: 0, is_primary: true, label: null, path: '/work/project' }],
+        icon: null, id: 'p_project', name: 'Project', primary_path: '/work/project', slug: 'project'
+      }])
+      $sessions.set([
+        makeSessionInfo({ id: 'manual', cwd: '/work/project', title: 'Manual chat' }),
+        makeSessionInfo({ id: 'repo', cwd: '/work/repo', git_repo_root: '/work/repo', title: 'Repo chat' })
+      ])
+    })
+
+    renderSidebar('/', 'chat', true)
+    expect(screen.queryByText('Manual chat')).toBeNull()
+    expect(screen.getByText('Repo chat')).toBeTruthy()
+
+    act(() => $pinnedSessionIds.set(['manual']))
+    expect(screen.getByText('Pinned chats')).toBeTruthy()
+    expect(screen.getByText('Manual chat')).toBeTruthy()
+
+    cleanup()
+    act(() => $pinnedSessionIds.set([]))
+    renderSidebar('/', 'chat')
+    expect(screen.getByText('Manual chat')).toBeTruthy()
+    expect(screen.getByText('Repo chat')).toBeTruthy()
   })
 })

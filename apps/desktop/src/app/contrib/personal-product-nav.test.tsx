@@ -34,11 +34,22 @@ afterEach(() => {
   noteActiveTreeGroup(null)
 })
 
-function renderNav(currentView: AppView, path = '/', onNavigate = vi.fn(), onResumeSession = vi.fn()) {
+function renderNav(
+  currentView: AppView,
+  path = '/',
+  onNavigate = vi.fn(),
+  onResumeSession = vi.fn(),
+  onNewSessionInWorkspace?: (path: null | string) => void
+) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <I18nProvider configClient={null} initialLocale="zh">
-        <PersonalProductNav currentView={currentView} onNavigate={onNavigate} onResumeSession={onResumeSession} />
+        <PersonalProductNav
+          currentView={currentView}
+          onNavigate={onNavigate}
+          onNewSessionInWorkspace={onNewSessionInWorkspace}
+          onResumeSession={onResumeSession}
+        />
       </I18nProvider>
     </MemoryRouter>
   )
@@ -53,6 +64,24 @@ const currentButtons = () =>
     .map(button => button.textContent?.trim())
 
 describe('PersonalProductNav', () => {
+  it('starts project chats in their folder and leaves project scope for a plain new chat', () => {
+    $projectTree.set([
+      { id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 1 },
+      { id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 1 }
+    ])
+    const startInWorkspace = vi.fn()
+    renderNav('chat', '/', vi.fn(), vi.fn(), startInWorkspace)
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+    expect(screen.queryByRole('button', { name: /Home.*新建|新建.*Home/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Example.*新建|新建.*Example/ }))
+    expect(startInWorkspace).toHaveBeenCalledWith('D:/Example')
+    expect($projectScope.get()).toBe('p_example')
+
+    fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
+    expect($projectScope.get()).toBe(ALL_PROJECTS)
+  })
+
   it('renders only the compact Stardust primary navigation in product order', () => {
     renderNav('chat')
 
