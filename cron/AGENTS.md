@@ -57,8 +57,16 @@ Durable SQLite-backed board letting multiple profiles/workers collaborate. Users
 <verb>`; dispatcher-spawned workers use a dedicated `kanban_*` toolset so their schema footprint is
 zero outside a kanban task (footprint ladder rung 3).
 
-- **CLI:** `hermes_cli/kanban.py` facade + 14 `kanban_*.py` siblings (`boards`, `db`, `db_connect`,
-  `db_dispatch`, `db_notify`, `db_graph` (task initialization and decomposition), `workspace`, ...). Verbs: `init, create, list (ls), show, assign, link,
+- **Storage:** `hermes_cli/kanban_db.py` is the facade (data classes, schema SQL, task creation,
+  links, comments/events, runs, ready recompute) and re-exports its `kanban_db_*` siblings:
+  `boards` (slugs, paths, board.json), `connect` (connections, schema init/migrations), `claims`,
+  `completion`, `transitions` (block/review/unblock/reopen/schedule), `retirement`
+  (archive/delete), `worker_context`, `maintenance` (stats, GC, logs, assignees), `dispatch`,
+  `workspace`, `notify`, `graph`. Siblings reach the facade late-bound (`_kb.<name>`) so
+  `monkeypatch.setattr(kanban_db, ...)` keeps reaching every caller; new code follows that
+  convention.
+- **CLI:** `hermes_cli/kanban.py` facade + `kanban_*.py` siblings (`boards`, `ops`, `parser`,
+  `output`, `transfer`, `decompose`, `swarm`, ...). Verbs: `init, create, list (ls), show, assign, link,
   unlink, comment, attach, attachments, attach-rm, complete, request-review, request-changes,
   reopen-review, block, unblock, archive, tail`, plus `watch, stats, runs, log, assignees, heartbeat,
   notify-*, dispatch, daemon, gc`. Argparse alias dispatch must accept both `list` and `ls` (root).
