@@ -134,7 +134,6 @@ export const OVERLAY_VIEWS: ReadonlySet<AppView> = new Set([
   'session-import',
   'agents',
   'command-center',
-  'cron',
   'profiles',
   'settings',
   'starmap',
@@ -219,7 +218,7 @@ export function appViewForPath(pathname: string): AppView {
 }
 
 /** Does `to` land on a full page rendered INSIDE the workspace pane
- *  (skills/messaging/artifacts/contributed routes)? Overlays don't count —
+ *  (skills/messaging/artifacts/cron/contributed routes)? Overlays don't count —
  *  they float over whatever the workspace is already showing. */
 function isWorkspacePageRoute(to: string): boolean {
   const view = appViewForPath(to)
@@ -228,7 +227,7 @@ function isWorkspacePageRoute(to: string): boolean {
 }
 
 /** True while the workspace pane shows a FULL PAGE (skills/messaging/
- *  artifacts/plugin routes) instead of the chat. Published by the wiring
+ *  artifacts/cron/plugin routes) instead of the chat. Published by the wiring
  *  (which owns the router location); the workspace pane contribution mirrors
  *  it as `headerVeto` so the zone tab bar stands down on pages. Overlays
  *  (settings/…) don't count — the chat stays beneath them. */

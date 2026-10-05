@@ -309,9 +309,13 @@ def _kb_timed_out(task, payload: dict, title: str) -> str:
 _KANBAN_EVENT_FORMATTERS = {
     "completed": ("✔", _kb_completed),
     "blocked": ("⏸", lambda t, p, title: " blocked" + (f": {str(p.get('reason'))[:160]}" if p.get("reason") else "")),
-    "gave_up": ("✖", lambda t, p, title: " gave up after repeated spawn failures"
-                + (f"\n{str(p.get('error'))[:200]}" if p.get("error") else "")),
-    "crashed": ("✖", lambda t, p, title: " worker crashed (pid gone); dispatcher will retry"),
+    # ``worker_error``: the worker's own failure reason (model not served, quota, ...), over its exit status.
+    "gave_up": ("✖", lambda t, p, title: " gave up after repeated failures"
+                + (f"\n{str(p.get('worker_error') or p.get('error'))[:200]}"
+                   if p.get("worker_error") or p.get("error") else "")),
+    "crashed": ("✖", lambda t, p, title: (
+        f" worker failed: {str(p['worker_error'])[:200]}; dispatcher will retry" if p.get("worker_error")
+        else " worker crashed (pid gone); dispatcher will retry")),
     "timed_out": ("⏱", _kb_timed_out),
     "status": ("🔄", lambda t, p, title: f" → {p.get('status') or ''}"),
 }

@@ -650,11 +650,7 @@ if (IS_WINDOWS) {
     windowsSandboxFallbackSticky = true
     windowsSandboxFallbackReason = 'gpu-breakpoint'
 
-    try {
-      writeSandboxMarker(app.getPath('userData'), fallbackMarker('gpu-breakpoint', app.getVersion()))
-    } catch {
-      void 0
-    }
+    writeSandboxMarker(app.getPath('userData'), fallbackMarker('gpu-breakpoint', app.getVersion()))
 
     console.warn(
       `[hermes] Windows GPU sandbox crashed (exit=${details?.exitCode}); relaunching once with --no-sandbox (#38216)`
@@ -14036,18 +14032,15 @@ function createWindow() {
       // Start Menu click does not re-enter the GPU FATAL crash loop. The marker
       // records the app version so the next update re-probes the sandbox.
       if (IS_WINDOWS) {
-        try {
-          writeSandboxMarker(
-            app.getPath('userData'),
-            markerAfterSuccessfulBoot({
-              fallbackActive: windowsSandboxFallbackSticky,
-              reason: windowsSandboxFallbackReason,
-              appVersion: app.getVersion()
-            })
-          )
-        } catch (error) {
-          rememberLog(`[sandbox] marker update after main-window reveal failed: ${error?.message || error}`)
-        }
+        writeSandboxMarker(
+          app.getPath('userData'),
+          markerAfterSuccessfulBoot({
+            fallbackActive: windowsSandboxFallbackSticky,
+            reason: windowsSandboxFallbackReason,
+            appVersion: app.getVersion()
+          }),
+          { warn: rememberLog }
+        )
       }
     }
   })
@@ -14125,11 +14118,7 @@ function createWindow() {
         windowsSandboxFallbackSticky = true
         windowsSandboxFallbackReason = 'renderer-crash-loop'
 
-        try {
-          writeSandboxMarker(app.getPath('userData'), fallbackMarker('renderer-crash-loop', app.getVersion()))
-        } catch {
-          void 0
-        }
+        writeSandboxMarker(app.getPath('userData'), fallbackMarker('renderer-crash-loop', app.getVersion()))
 
         rememberLog('[renderer] Windows sandbox crash loop detected; relaunching once with --no-sandbox (#38216)')
 
@@ -17681,11 +17670,7 @@ app.on('before-quit', event => {
   // Keyed on sticky (not active): a manual --no-sandbox run still records a
   // clean quit, while an engaged fallback keeps its sticky marker.
   if (IS_WINDOWS && !windowsSandboxFallbackSticky) {
-    try {
-      writeSandboxMarker(app.getPath('userData'), markerAfterSuccessfulBoot({ fallbackActive: false }))
-    } catch {
-      void 0
-    }
+    writeSandboxMarker(app.getPath('userData'), markerAfterSuccessfulBoot({ fallbackActive: false }))
   }
 
   // The always-on-top overlay isn't a "real" app window; close it so a stray

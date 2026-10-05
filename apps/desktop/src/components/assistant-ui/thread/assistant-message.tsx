@@ -696,7 +696,13 @@ const ErrorRecoveryActions: FC = () => {
           </button>
         </ActionBarPrimitive.Reload>
       )}
-      {plan.switchProvider && !plan.updateApiKey && inRouter && (
+      {plan.setUpFallback && inRouter && (
+        <SettingsLinkAction
+          label={copy.errorSetUpFallback}
+          to={`${SETTINGS_ROUTE}?tab=config:model&field=fallback_providers`}
+        />
+      )}
+      {plan.switchProvider && !plan.updateApiKey && !plan.setUpFallback && inRouter && (
         <SettingsLinkAction label={copy.errorSwitchProvider} to={`${SETTINGS_ROUTE}?tab=config:model`} />
       )}
       {localFolders && (

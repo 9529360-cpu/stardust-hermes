@@ -299,6 +299,7 @@ def _endpoint_disk_cache_put(normalized: str, cache: Dict[str, Dict[str, Any]]) 
 CONTEXT_PROBE_TIERS = [256_000, 128_000, 64_000, 32_000, 16_000, 8_000]
 DEFAULT_FALLBACK_CONTEXT = CONTEXT_PROBE_TIERS[0]
 _FALLBACK_WARNED: set = set()  # the fallback is never cached, so dedupe its warning per (model, base_url)
+_CATALOG_HIT_NOTED: set = set()  # nor is a custom endpoint's catalog hit: note it once per (model, base_url)
 
 
 def _warn_context_length_fallback(model: str, base_url: str) -> None:
@@ -1810,19 +1811,17 @@ def _resolve_custom_endpoint_context_length(model: str, base_url: str, api_key: 
     if ctx is not None:
         _save_unless_skipped(model, base_url, ctx, provider)
         return ctx
-    # 3. Probe-down fallback after endpoint-specific detection failed
-    logger.info(
-        "Could not detect context length for model %r at %s — defaulting to %s tokens (probe-down). "
-        "Set model.context_length in config.yaml to override.",
-        model, base_url, f"{DEFAULT_FALLBACK_CONTEXT:,}",
-    )
-    # 3b. Hardcoded catalog as a last resort: a proxied Anthropic gateway fails the probes above
-    # but its model name still matches DEFAULT_CONTEXT_LENGTHS.
+    # 3. Endpoint-specific detection failed. Hardcoded catalog first: a proxied Anthropic gateway
+    # fails the probes above but its model name still matches DEFAULT_CONTEXT_LENGTHS.
     hit = _longest_key_match(DEFAULT_CONTEXT_LENGTHS, model.lower())
     if hit:
-        logger.info("Using hardcoded context length %s for model %r (custom endpoint, catalog match on %r)", f"{hit[1]:,}", model, hit[0])
+        # Every agent build resolves the same model several times (agent, compressor, aux);
+        # say it once per model+endpoint.
+        if (model, base_url or "") not in _CATALOG_HIT_NOTED:
+            _CATALOG_HIT_NOTED.add((model, base_url or ""))
+            logger.info("Using hardcoded context length %s for model %r (custom endpoint, catalog match on %r)", f"{hit[1]:,}", model, hit[0])
         return hit[1]
-    # Same silent-256K bug class as the step-9 fallback — warn here too.
+    # 3b. Probe-down default. Same silent-256K bug class as the step-9 fallback — warn here too.
     _warn_context_length_fallback(model, base_url)
     return DEFAULT_FALLBACK_CONTEXT
 

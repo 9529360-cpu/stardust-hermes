@@ -195,7 +195,7 @@ Manage providers, models, tools, and credentials from a real UI instead of editi
 - **VS Code Marketplace themes** — beyond the built-in theme presets, the appearance settings include a live VS Code Marketplace search: pick any color theme and the app downloads, converts, and installs it as a desktop theme. The same importer is available from the command palette (*Install theme*), and imported themes can be removed again from the appearance settings.
 - **Keep computer awake** — **Settings → Advanced → Keep computer awake** stops the machine from sleeping so long or overnight agent runs keep going (the display can still dim). This is a per-computer setting.
 
-First-run onboarding has been redesigned on a unified overlay design system, and you can pick **Choose provider later** to skip provider setup and get into the app first.
+First-run onboarding has been redesigned on a unified overlay design system, and you can pick **I'll set this up later** to skip model setup and get into the app first.
 
 #### Per-profile settings: the "Applies to" scope
 

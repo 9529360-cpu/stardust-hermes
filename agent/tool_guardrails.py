@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field, fields
 from typing import Any, Mapping
 
 from utils import safe_json_loads
-from agent.tool_result_classification import file_mutation_result_landed
+from agent.tool_result_classification import declared_tool_verdict, file_mutation_result_landed
 
 
 IDEMPOTENT_TOOL_NAMES = frozenset({
@@ -233,10 +233,13 @@ def classify_tool_failure(tool_name: str, result: str | None) -> tuple[bool, str
         exit_code = data.get("exit_code") if isinstance(data, dict) else None
         return (True, f" [exit {exit_code}]") if exit_code is not None and exit_code != 0 else (False, "")
 
+    data = safe_json_loads(result)
     if tool_name == "memory":
-        data = safe_json_loads(result)
         if isinstance(data, dict) and data.get("success") is False and "exceed the limit" in data.get("error", ""):
             return True, " [full]"
+    verdict = declared_tool_verdict(data)
+    if verdict is not None:
+        return (False, "") if verdict else (True, " [error]")
     lower = result[:500].lower()
     return (True, " [error]") if '"error"' in lower or '"failed"' in lower or result.startswith("Error") else (False, "")
 
@@ -635,7 +638,7 @@ def _int_at_least(value: Any, default: int, minimum: int) -> int:
 
 def _subagent_spawn_count(args: Mapping[str, Any]) -> int:
     """Subagents one delegate_task call spawns: ``len(tasks)`` for a non-empty batch, else 1; control actions 0."""
-    if str(args.get("action") or "").strip().lower() in ("list", "steer", "stop"):
+    if str(args.get("action") or "").strip().lower() in ("list", "inspect", "steer", "stop"):
         return 0
     tasks = args.get("tasks")
     return len(tasks) if isinstance(tasks, list) and tasks else 1

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
+from urllib.parse import urlsplit
 
 logger = logging.getLogger(__name__)
 
@@ -192,3 +193,52 @@ def build_error_surface_from_exception(exc: BaseException, provider: str = "", m
     except Exception:  # pragma: no cover — never break the error path
         logger.debug("error_surface: exception classification failed", exc_info=True)
         return None
+
+
+def stamp_agent_context(surface: Optional[dict], agent: Any) -> Optional[dict]:
+    """Add what only the failing agent knows to its error descriptor:
+
+    - ``fallback_configured``: whether it had a fallback route to switch to, so a client
+      can offer setting one up when a provider-side failure (busy, rate-limited, timed
+      out, model unavailable) ended the turn with nowhere to go. Left out when the chain
+      is unknown.
+    - ``provider_label``: the name the user knows the provider by. A custom endpoint's
+      provider id is just ``custom`` — the cards read "custom is limiting requests" — so
+      it is named after the service the user configured for that base URL (Settings →
+      Model services), else its ``custom:<name>``, else its host.
+    """
+    if surface is None:
+        return None
+    chain = getattr(agent, "_fallback_chain", None)
+    if isinstance(chain, list):
+        surface["fallback_configured"] = bool(chain)
+    provider = str(surface.get("provider") or "")
+    label = _custom_endpoint_label(agent, provider) if _names_custom_service(provider) else ""
+    label = label or (_provider_label(provider) if provider else "")
+    if label:
+        surface["provider_label"] = label
+    return surface
+
+
+def _names_custom_service(provider: str) -> bool:
+    p = provider.strip().lower()
+    return p == "custom" or p.startswith("custom:")
+
+
+def _custom_endpoint_label(agent: Any, provider: str) -> str:
+    """The configured name of the custom service at the agent's base URL, else the
+    ``custom:<name>`` suffix, else the base URL's host; "" when none is known."""
+    def norm(url: Any) -> str:
+        return str(url or "").strip().rstrip("/").lower()
+
+    base_url = norm(getattr(agent, "base_url", ""))
+    entries = getattr(agent, "_custom_providers", None)
+    for entry in entries if isinstance(entries, list) else []:
+        if isinstance(entry, dict) and base_url and norm(entry.get("base_url")) == base_url:
+            name = str(entry.get("name") or "").strip()
+            if name:
+                return name
+    _, _, suffix = provider.partition(":")
+    if suffix.strip():
+        return suffix.strip()
+    return (urlsplit(base_url).hostname or "") if base_url else ""

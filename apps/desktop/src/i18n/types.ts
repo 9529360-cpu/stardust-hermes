@@ -828,6 +828,7 @@ export interface Translations {
       validationReachableModels: (count: number) => string
       validationFailed: string
       activationFailed: string
+      duplicateService: string
     }
     computerUse: {
       accessibility: string
@@ -1617,8 +1618,8 @@ export interface Translations {
       agentTitle: string
       agentBlurb: string
       pageBlurb: string
-      bundledNames: Record<'hermes-bots' | 'kanban' | 'radio', string>
-      bundledDescriptions: Record<'hermes-bots' | 'kanban' | 'radio', string>
+      bundledNames: Record<'hermes-bots' | 'kanban', string>
+      bundledDescriptions: Record<'hermes-bots' | 'kanban', string>
       halfDesktop: string
       halfDesktopHint: string
       halfAgent: string
@@ -2439,6 +2440,7 @@ export interface Translations {
 
   sidebar: {
     recent: string
+    filters: string
     gatewayGroups: {
       grouping: string
       rename: string
@@ -2611,6 +2613,7 @@ export interface Translations {
 
   composer: {
     message: string
+    addContext: string
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string
@@ -3485,6 +3488,7 @@ export interface Translations {
   }
 
   zones: {
+    paneTitles: { overview: string; files: string; review: string; terminal: string }
     showTabStrip: string
     hideTabStrip: string
     showStripTab: (title: string) => string
@@ -3627,6 +3631,7 @@ export interface Translations {
       /** Escape hatch when Retry would only reproduce SESSION_NOT_OWNED (#106217). */
       errorStartNewSession: string
       errorSwitchProvider: string
+      errorSetUpFallback: string
       errorChooseModel: string
       errorCompressConversation: string
       errorCompressFailed: string

@@ -4,13 +4,16 @@ Inspired by Claude Cowork (desktop changelog v1.46388.1, 2026-09-04): "automatic
 (after 5, 15, and 30 minutes) for a scheduled task that could not reach the model at all,
 for example right after the computer wakes behind a VPN."
 
-The class is deliberately narrow: the run must have FAILED with a transient network /
-DNS error (``cron.scheduler_preflight._is_transient_provider_resolve_error``) AND the
-agent must have completed zero API calls. Nothing was executed and nothing was spent, so
-re-running cannot double a side effect — unlike a generic failure retry (see PR #16512),
-which has to answer for one-shot dispatch accounting and mid-run side effects. Recurring
-jobs only: finite one-shots are pre-claimed by ``claim_dispatch`` (at-most-times, #38758)
-and must not regain a consumed dispatch here.
+The class is deliberately narrow: the agent must have completed zero API calls AND the run
+must have FAILED either with a transient network / DNS error
+(``cron.scheduler_preflight._is_transient_provider_resolve_error``) or because the provider
+did not answer — busy, rate-limited, erroring or timing out (``PROVIDER_UNAVAILABLE_REASONS``,
+the agent's own classifier verdict). No model reply means no tool ran, so re-running cannot
+double a side effect — unlike a generic failure retry (see PR #16512), which has to answer
+for one-shot dispatch accounting and mid-run side effects. (A provider may still bill a
+request it timed out on; the ladder bounds that to three.) Recurring jobs only: finite
+one-shots are pre-claimed by ``claim_dispatch`` (at-most-times, #38758) and must not regain a
+consumed dispatch here.
 
 While a retry is pending the failure notice is suppressed (Cowork re-runs silently); a
 run that reaches the model — success or not — resets the ladder. Disable with
@@ -23,6 +26,7 @@ import logging
 from datetime import timedelta
 from typing import Any, Dict, Optional
 
+from agent.error_classifier import PROVIDER_UNAVAILABLE_REASONS  # shared with kanban's requeue rule
 from hermes_time import now as _hermes_now
 
 logger = logging.getLogger("cron.scheduler")
@@ -53,10 +57,13 @@ def retry_enabled(cfg: Optional[dict] = None) -> bool:
 
 
 def is_model_unreachable_failure(exc: BaseException, agent: Any = None) -> bool:
-    """True when *exc* is a transient network/DNS failure and *agent* (may be ``None``)
-    never completed a model call — the run consumed nothing and executed nothing."""
+    """True when *agent* (may be ``None``) never completed a model call and *exc* is a
+    transient network/DNS failure or a provider that did not answer (``failure_reason``
+    stamped by the scheduler from the agent's result) — the run executed nothing."""
     if int(getattr(agent, "session_api_calls", 0) or 0) > 0:
         return False
+    if getattr(exc, "failure_reason", "") in PROVIDER_UNAVAILABLE_REASONS:
+        return True
     from cron.scheduler_preflight import _is_transient_provider_resolve_error
 
     return _is_transient_provider_resolve_error(exc)

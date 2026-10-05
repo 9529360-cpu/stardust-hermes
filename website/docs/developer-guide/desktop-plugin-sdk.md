@@ -63,11 +63,7 @@ and enable/disable live. A unified package is just the disk door scanning inside
 your agent plugin's folder — see
 [One package, both SDKs](#one-package-both-sdks). Everything on this page is
 written against the disk door (what you and the agent write);
-[Bundled plugins](#bundled-plugins) notes the two
-differences. Radio ships as a bundled SDK-only plugin, off by default. Enable it
-in **Capabilities → Plugins** for free live streams, station search, and status-bar
-playback controls with an audio-reactive waveform. It uses the existing plugin
-toggle and contributes nothing while disabled. Reference demos live in the companion
+[Bundled plugins](#bundled-plugins) notes the two differences. Reference demos live in the companion
 [`hermes-example-plugins`](https://github.com/NousResearch/hermes-example-plugins)
 repo.
 

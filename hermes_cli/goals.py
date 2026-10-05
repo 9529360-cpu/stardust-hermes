@@ -44,6 +44,21 @@ DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES = 3
 # 401 every call and must not spend every turn on an unreachable judge.
 DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES = 5
 
+
+def judge_outage(transport_failures: int, parse_failures: int) -> str:
+    """Why a judged loop must stop consulting its judge, or "" while the judge still works.
+
+    A broken judge fails open to "continue", so without a stop a bad key or a model that cannot emit
+    the JSON verdict spends the whole turn / tick budget. Kanban goal mode and ``/loop --until`` use
+    this; ``GoalManager`` applies the same thresholds with its own config-specific pause messages.
+    """
+    if transport_failures >= DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES:
+        return f"its judge API returned errors {transport_failures} times in a row"
+    if parse_failures >= DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES:
+        return f"its judge model returned unparseable verdicts {parse_failures} times in a row"
+    return ""
+
+
 # Quality gates: deterministic shell commands that must pass before the judge may declare DONE. A
 # failed gate short-circuits the judge — its output IS the continuation prompt, so the agent works
 # on concrete evidence instead of a vibe check.
@@ -1621,6 +1636,9 @@ def run_kanban_goal_loop(
     last_response = first_response or ""
     turns_used = 1   # the first turn already consumed one unit of budget
     nudged_to_finalize = False
+    # A broken judge (bad key, unparseable model) must not spend the worker's whole turn budget
+    # on "continue" verdicts nobody actually reached (judge_outage, shared with /loop --until).
+    judge_transport_failures = judge_parse_failures = 0
 
     while True:
         try:
@@ -1639,7 +1657,9 @@ def run_kanban_goal_loop(
             _log(f"kanban goal loop: task {task_id} status={status!r}; stopping")
             return _result("stopped", f"status={status}")
 
-        verdict, reason, _parse_failed, _wait, _transport_failed = judge_goal(goal_text, last_response)
+        verdict, reason, parse_failed, _wait, transport_failed = judge_goal(goal_text, last_response)
+        judge_transport_failures = judge_transport_failures + 1 if transport_failed else 0
+        judge_parse_failures = judge_parse_failures + 1 if parse_failed else 0
         if verdict == "wait":
             verdict = "continue"
         _log(f"kanban goal loop: turn {turns_used}/{max_turns} verdict={verdict} reason={_truncate(reason, 120)}")
@@ -1665,6 +1685,16 @@ def run_kanban_goal_loop(
             nudged_to_finalize = True
         else:
             prompt = KANBAN_GOAL_CONTINUATION_TEMPLATE.format(reason=_truncate(reason, 400))
+
+        judge_problem = judge_outage(judge_transport_failures, judge_parse_failures)
+        if judge_problem:
+            _log(f"kanban goal loop: task {task_id} stopped — {judge_problem}; blocking")
+            _block(
+                f"Goal-mode worker stopped: {judge_problem}, so progress could not be judged. "
+                f"Check auxiliary.goal_judge (provider/key/model) in config.yaml, then unblock. "
+                f"Last judge note: {_truncate(reason, 200)}"
+            )
+            return _result("blocked_judge_unavailable", judge_problem)
 
         # Budget check BEFORE spending another turn.
         if turns_used >= max_turns:

@@ -5406,6 +5406,41 @@ class TestRetryExhaustion:
         # exactly one API call, no empty-response retry loop.
         assert agent.client.chat.completions.create.call_count == 1
 
+    def test_relay_503_no_channel_for_model_is_not_retried(self, agent):
+        """A new-api relay answers "no channel in your key's group serves this model" with HTTP
+        503 + ``model_not_found``. Read as overload, every backoff retry was spent and the user
+        was told the service was busy; the route cannot serve the model, so the first answer is
+        terminal and the copy says to pick another model."""
+        import httpx
+        from openai import InternalServerError
+
+        self._setup_agent(agent)
+        payload = {"error": {
+            "code": "model_not_found",
+            "message": "No available channel for model test/model under group pro (distributor)",
+            "type": "new_api_error",
+        }}
+        response = httpx.Response(
+            503, json=payload, request=httpx.Request("POST", "https://relay.example/v1/chat/completions"))
+        agent.client.chat.completions.create.side_effect = InternalServerError(
+            f"Error code: 503 - {payload}", response=response, body=payload["error"])
+        from agent import conversation_loop as _conv_loop
+        from agent import retry_utils as _retry_utils
+        with (
+            patch.object(agent, "_persist_session"),
+            patch.object(agent, "_save_trajectory"),
+            patch.object(agent, "_cleanup_task_resources"),
+            patch("run_agent.time", self._make_fast_time_mock()),
+            patch.object(_conv_loop, "time", self._make_fast_time_mock()),
+            patch.object(_retry_utils, "jittered_backoff", lambda *a, **k: 0.0),
+        ):
+            result = agent.run_conversation("hello")
+        assert result.get("failed") is True
+        assert result["failure_reason"] == FailoverReason.model_not_found.value
+        assert result["failure_retryable"] is False
+        assert agent.client.chat.completions.create.call_count == 1
+        assert "isn't available" in result["final_response"]
+
 
     def test_build_api_kwargs_error_no_unbound_local(self, agent):
         """When _build_api_kwargs raises, except handler must not crash with UnboundLocalError.

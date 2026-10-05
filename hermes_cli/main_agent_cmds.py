@@ -34,6 +34,7 @@ def _cmd_memory_on():
 def _cmd_memory_reset(args):
     from hermes_constants import display_hermes_home
     from tools.memory_tool import MemoryStore
+    from tools.topic_memory_store import reset_topic_summaries, topic_memory_path
 
     target = getattr(args, "target", "all")
     targets = []
@@ -47,6 +48,10 @@ def _cmd_memory_reset(args):
         path = MemoryStore._path_for(key)
         if path.exists() or path.is_symlink():
             existing.append((key, fname, desc, path))
+    if target == "all":
+        topic_path = topic_memory_path()
+        if topic_path.exists() or topic_path.is_symlink():
+            existing.append(("topic", "TOPICS.json", "topic summaries", topic_path))
 
     if existing:
         print("\n  This will permanently erase the following built-in memory files:")
@@ -87,6 +92,17 @@ def _cmd_memory_reset(args):
             print(f"  ✓ Deleted {fname} ({desc})")
         else:
             print(f"  ✓ Advanced forget boundary for {fname} ({desc}); no file bytes were present")
+
+    if target == "all":
+        try:
+            existed = reset_topic_summaries()
+        except (OSError, RuntimeError) as exc:
+            suffix = f" Already reset: {', '.join(completed)}." if completed else ""
+            print(f"\n  ✗ Could not reset TOPICS.json: {exc}.{suffix}\n", file=sys.stderr)
+            raise SystemExit(1) from exc
+        completed.append("TOPICS.json")
+        if existed:
+            print("  ✓ Deleted TOPICS.json (topic summaries)")
 
     print(
         "\n  Memory reset complete. Existing sessions refresh built-in memory on their "

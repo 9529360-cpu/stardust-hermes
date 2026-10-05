@@ -6,9 +6,9 @@ Spawns child AIAgent instances with a fresh conversation, their own task_id
 (terminal session, file-ops cache), the parent's toolsets minus child-blocked
 tools, and a focused system prompt built from goal + context. Single-task and
 batch (parallel) modes; top-level model calls run in the background while
-orchestrator children wait for their own workers. The parent only ever sees
-the delegation call and the summary result, never the child's intermediate
-tool calls or reasoning.
+orchestrator children wait for their own workers. Final summaries return to
+the parent automatically; explicit inspection reads bounded recent operational
+activity without copying the child's entire conversation into the parent.
 """
 
 import logging
@@ -275,7 +275,7 @@ def _build_child_agent(
     child._delegate_depth, child._delegate_role = child_depth, effective_role  # post-degrade role
     child._subagent_id, child._parent_subagent_id = subagent_id, parent_subagent_id
     _apply_child_compression_cap(child, delegation_cfg)
-    # Ownership chain for action=list/steer/stop; weakref so a finished parent
+    # Ownership chain for observation/control; weakref so a finished parent
     # can be collected while a detached child record lingers in the registry.
     try:
         child._delegate_parent_ref = weakref.ref(parent_agent)
@@ -378,16 +378,36 @@ def _build_children(
     ``(children, None)`` or ``([], error)`` on an explicit-pin preflight failure."""
     from tools.delegation_live_log import wrap_progress_callback
     from tools.delegation_output_schema import append_output_contract
-    overrides = {
-        "override_provider": creds["provider"], "override_base_url": creds["base_url"],
-        "override_api_key": creds["api_key"], "override_api_mode": creds["api_mode"],
-        "override_request_overrides": creds.get("request_overrides"),
-        "override_acp_command": creds.get("command"),
-        "override_acp_args": creds.get("args"),
-        "routing_cfg": routing_cfg,
-    }
+    # Resolve every member before constructing any child: an invalid explicit
+    # route must not leave a partially created team. Provider changes must never
+    # reuse another provider's endpoint, key, request headers, or SDK command.
+    routes = []
+    for task in task_list:
+        member_cfg = routing_cfg
+        member_creds = creds
+        if task.get("model") or task.get("provider"):
+            member_cfg = dict(routing_cfg)
+            if task.get("provider"):
+                for key in ("base_url", "api_key", "api_mode", "request_overrides", "command", "args", "model"):
+                    member_cfg.pop(key, None)
+                member_cfg["provider"] = task["provider"]
+            if task.get("model"):
+                member_cfg["model"] = task["model"]
+            try:
+                member_creds = _resolve_delegation_credentials(member_cfg, parent_agent)
+            except ValueError as exc:
+                return [], f"Member model configuration: {exc}"
+        routes.append((member_cfg, member_creds))
     children = []
     for i, t in enumerate(task_list):
+        member_cfg, member_creds = routes[i]
+        overrides = {
+            "override_provider": member_creds["provider"], "override_base_url": member_creds["base_url"],
+            "override_api_key": member_creds["api_key"], "override_api_mode": member_creds["api_mode"],
+            "override_request_overrides": member_creds.get("request_overrides"),
+            "override_acp_command": member_creds.get("command"), "override_acp_args": member_creds.get("args"),
+            "routing_cfg": member_cfg,
+        }
         _task_schema = task_schemas[i] if i < len(task_schemas) else None
         _child_context = t.get("context")
         if _task_schema is not None:
@@ -396,7 +416,7 @@ def _build_children(
             child = _build_child_preserving_parent_tools(
                 task_index=i, goal=t["goal"], context=_child_context,
                 toolsets=None,  # always inherit the parent's toolsets
-                model=creds["model"], max_iterations=max_iterations, task_count=len(task_list),
+                model=member_creds["model"], max_iterations=max_iterations, task_count=len(task_list),
                 parent_agent=parent_agent, role=_normalize_role(t.get("role") or top_role), **overrides,
             )
         except ValueError as exc:
@@ -432,7 +452,7 @@ def delegate_task(
     credentials_cfg: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Spawn child agents (single ``goal`` or ``tasks=[...]`` batch) or control running ones. ``action``
-    list/steer/stop run synchronously and bypass the pause gate, depth limit and async dispatch. ``role`` is legacy
+    list/inspect/steer/stop run synchronously and bypass the pause gate, depth limit and async dispatch. ``role`` is legacy
     (per-task beats top-level; capability is depth-derived). Returns JSON with one results entry per task, or a
     dispatch handle when running in the background."""
     if parent_agent is None:
@@ -442,7 +462,7 @@ def delegate_task(
     if normalized_action in _CONTROL_ACTIONS:
         return _handle_control_action(normalized_action, subagent_id, message, parent_agent)
     if normalized_action and normalized_action != "spawn":
-        return tool_error(f"Unknown action '{action}'. Use spawn (default), list, steer, or stop.")
+        return tool_error(f"Unknown action '{action}'. Use spawn (default), list, inspect, steer, or stop.")
 
     # Operator kill switch (TUI / delegation.pause RPC): blocks NEW spawns only.
     if is_spawn_paused():
@@ -555,7 +575,7 @@ _DESCRIPTION_HEAD = (
     "as a new message when subagents finish ({delivery}). Background results are delivered only "
     "BETWEEN your turns: finish whatever does not depend on them, then give a one-line status and END YOUR TURN. Never "
     "wait or poll on transcripts, artifact files, or CI for a child. "
-    "While children run, `action` (list/steer/stop) controls them live — steer when a transcript shows a "
+    "While children run, `action` (list/inspect/steer/stop) observes and controls them live — steer when activity shows a "
     "child drifting.\n\n"
     "USE FOR: reasoning-heavy subtasks, work that would flood your context with intermediate data, or independent "
     "parallel workstreams.\n"
@@ -574,7 +594,8 @@ _DESCRIPTION_HEAD = (
     "succeeded.\n"
 )
 _DESCRIPTION_TAIL = (
-    "- Children inherit the parent model unless pinned via delegation.provider / delegation.model in config.yaml."
+    "- Children inherit the parent model unless pinned via delegation.provider / delegation.model in config.yaml "
+    "or per-task model/provider."
 )
 
 def _build_tasks_param_description() -> str:
@@ -647,6 +668,11 @@ DELEGATE_TASK_SCHEMA = {
                             "Background THIS child needs: file paths, error messages, constraints. Each child "
                             "sees only its own context — repeat shared background in every task that needs it.",
                         ),
+                        "model": _p("string", "Optional model for this member; overrides the delegation default."),
+                        "provider": _p(
+                            "string", "Optional configured provider/service for this member, including a named custom "
+                            "provider. Credentials resolve from existing secure configuration; do not supply an API key.",
+                        ),
                         "output_schema": _p(
                             "object",
                             "Optional JSON Schema this child's final answer must validate against (told to the "
@@ -679,14 +705,15 @@ DELEGATE_TASK_SCHEMA = {
             "action": _p(
                 "string",
                 "Default 'spawn'. Live control of running children: "
-                "'list' = ids/goals/status/transcripts; 'steer' = queue "
+                "'list' = ids/goals/status/tool counts; 'inspect' = read a child's bounded recent activity "
+                "(subagent_id), without requiring filesystem access; 'steer' = queue "
                 "course-correction text into one child (subagent_id + "
                 "message) without stopping it; 'stop' = end one child "
                 "early (subagent_id; partial result still returns). "
                 "Control actions return immediately; goal/tasks are ignored unless spawning.",
-                enum=["spawn", "list", "steer", "stop"],
+                enum=["spawn", "list", "inspect", "steer", "stop"],
             ),
-            "subagent_id": _p("string", "Target for action='steer'/'stop' (ids from the spawn response or action='list')."),
+            "subagent_id": _p("string", "Target for action='inspect'/'steer'/'stop' (ids from the spawn response or action='list')."),
             "message": _p(
                 "string",
                 "For action='steer': the course correction, appended to "

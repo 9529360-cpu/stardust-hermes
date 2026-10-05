@@ -166,7 +166,7 @@ function FloatingPane({ pane }: { pane: Contribution }) {
         onPointerUp={onPointerUp}
         style={{ touchAction: 'none' }}
       >
-        <span className="truncate font-medium">{pane.title ?? pane.id}</span>
+        <span className="truncate font-medium">{paneChrome(pane).tabTitle?.() ?? pane.title ?? pane.id}</span>
         <button
           className="rounded p-0.5 text-(--ui-text-quaternary) transition-colors hover:text-(--ui-text-primary)"
           data-floating-no-drag=""
