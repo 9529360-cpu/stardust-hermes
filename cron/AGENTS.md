@@ -5,7 +5,13 @@ user docs `website/docs/user-guide/features/cron.md`, `kanban.md`.
 
 ## Cron
 
-`cron/jobs.py` (job store) + `cron/scheduler.py` (tick loop; `scheduler_*.py` siblings). Agents
+`cron/jobs.py` (job store) + `cron/scheduler.py` (tick loop, in-flight registry, `run_one_job`,
+`python -m cron.scheduler` entry). `scheduler.py` keeps the stateful parts and re-exports its
+`scheduler_*` siblings: `job_runtime` (toolsets, model/runtime, pool, agent construction),
+`agent_run` (prompt, watchdog, final response, `run_job`), `run_outcome` (compose/deliver/mark),
+`external_worker`, `failures` (notices, incidents), `delivery`, `prompt`, `preflight`, `script`,
+`provider`. Siblings reach it late-bound (`_sched.<name>`) so `monkeypatch.setattr(cron.scheduler,
+...)` keeps reaching every caller; the `__main__` entry stays below every split-module import. Agents
 schedule via the `cronjob` tool; users via `hermes cron list|add|edit|pause|resume|run|remove` or
 `/cron`. Schedules: duration (`"30m"`, `"2h"`, `"1d"`), "every" phrase (`"every 2h"`, `"every monday
 9am"`), 5-field cron (`"0 9 * * *"`), ISO one-shot (`"2026-06-01T09:00:00Z"`). Per-job fields:
