@@ -55,10 +55,12 @@ zero outside a kanban task (footprint ladder rung 3).
   links, comments/events, runs, ready recompute) and re-exports its `kanban_db_*` siblings:
   `boards` (slugs, paths, board.json), `connect` (connections, schema init/migrations), `claims`,
   `completion`, `transitions` (block/review/unblock/reopen/schedule), `retirement`
-  (archive/delete), `worker_context`, `maintenance` (stats, GC, logs, assignees), `dispatch`,
-  `workspace`, `notify`, `graph`. Siblings reach the facade late-bound (`_kb.<name>`) so
-  `monkeypatch.setattr(kanban_db, ...)` keeps reaching every caller; new code follows that
-  convention.
+  (archive/delete), `worker_context`, `maintenance` (stats, GC, logs, assignees), `dispatch`
+  (liveness, respawn guard, caps, `dispatch_once`, daemon; re-exports `reclaim` — runtime/stale/
+  orphan/crash reclaim and failure accounting — and `worker_spawn`), `workspace`, `notify`,
+  `graph`. Siblings reach the facade late-bound (`_kb.<name>`; the dispatcher's own siblings reach
+  it as `_kbd.<name>`) so `monkeypatch.setattr(kanban_db, ...)` keeps reaching every caller; new
+  code follows that convention.
 - **CLI:** `hermes_cli/kanban.py` facade + `kanban_*.py` siblings (`boards`, `ops`, `parser`,
   `output`, `transfer`, `decompose`, `swarm`, ...). Verbs: `init, create, list (ls), show, assign, link,
   unlink, comment, attach, attachments, attach-rm, complete, request-review, request-changes,

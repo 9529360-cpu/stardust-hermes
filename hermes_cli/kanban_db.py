@@ -2040,12 +2040,16 @@ from hermes_cli.kanban_db_dispatch import (  # noqa: E402
     DEFAULT_FAILURE_LIMIT,
     DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS,
     DispatchResult,
-    _clear_failure_counter,
     _defer_reclaim_for_live_worker,
     _pid_alive,
-    _record_task_failure,
     _terminate_reclaimed_worker,
     _worker_alive,
     _worker_survived_termination,
+)
+from hermes_cli.kanban_db_reclaim import (  # noqa: E402
+    _clear_failure_counter,
+    _record_task_failure,
+)
+from hermes_cli.kanban_db_worker_spawn import (  # noqa: E402
     _worker_terminal_timeout_env,
 )
