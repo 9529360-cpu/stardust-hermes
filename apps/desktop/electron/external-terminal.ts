@@ -22,8 +22,11 @@
 //         choice — before falling back to the common concrete emulators.
 //       - Windows: Windows Terminal when installed, else a `cmd.exe` console.
 //
-// Everything here is pure so it can be unit-tested without Electron; the side
-// effects (writing the script, spawning) live in main.ts.
+// Resolution and script generation are pure so they can be tested without
+// Electron. Launching is kept here as a narrow injectable process boundary;
+// writing the script remains in main.ts.
+
+import { spawn } from 'node:child_process'
 
 /** Argv for resuming a session in the TUI, profile-pinned when we know it. */
 export function tuiResumeArgs(sessionId: string, profile?: string): string[] {
@@ -130,6 +133,45 @@ const LINUX_TERMINALS: Array<{ command: string; flag: string }> = [
   { command: 'foot', flag: '' },
   { command: 'xterm', flag: '-e' }
 ]
+
+export interface TerminalLaunch {
+  command: string
+  args: string[]
+}
+
+/** Resolve only after the terminal process actually starts, not when spawn returns. */
+export function launchExternalTerminal(
+  launch: TerminalLaunch,
+  spawnProcess: typeof spawn = spawn,
+  onLateError: (error: Error) => void = error => console.error('[terminal] external terminal failed after launch:', error)
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawnProcess(launch.command, launch.args, { detached: true, stdio: 'ignore' })
+    let settled = false
+    let started = false
+
+    // Node reports spawn failures asynchronously. Keep this listener after
+    // launch as well: an error from a detached child must not crash Electron.
+    child.on('error', error => {
+      if (started) {
+        onLateError(error)
+      } else if (!settled) {
+        settled = true
+        reject(error)
+      }
+    })
+    child.once('spawn', () => {
+      if (settled) {
+        return
+      }
+
+      started = true
+      settled = true
+      child.unref()
+      resolve()
+    })
+  })
+}
 
 export interface TerminalLaunchOptions {
   scriptPath: string

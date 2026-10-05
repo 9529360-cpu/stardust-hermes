@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
+import type { ChildProcess, spawn } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 
-import { test } from 'vitest'
+import { test, vi } from 'vitest'
 
 import {
   buildTerminalScript,
+  launchExternalTerminal,
   posixQuote,
   resolveTerminalLaunch,
   terminalScriptEnv,
@@ -14,6 +17,69 @@ import {
 
 const never = () => null
 const always = (command: string) => `/usr/bin/${command}`
+
+test('launchExternalTerminal waits for spawn before reporting success and detaches the child', async () => {
+  const child = new EventEmitter() as ChildProcess
+  child.unref = vi.fn()
+  const spawnProcess = vi.fn(() => child) as unknown as typeof spawn
+  const pending = launchExternalTerminal({ command: 'terminal', args: ['script'] }, spawnProcess)
+  let completed = false
+  void pending.then(() => { completed = true })
+
+  await Promise.resolve()
+  assert.equal(completed, false)
+  assert.deepEqual(vi.mocked(spawnProcess).mock.calls[0], [
+    'terminal', ['script'], { detached: true, stdio: 'ignore' }
+  ])
+  child.emit('spawn')
+  await pending
+  assert.equal(completed, true)
+  assert.equal(vi.mocked(child.unref).mock.calls.length, 1)
+})
+
+test('launchExternalTerminal rejects asynchronous spawn errors without unhandled child errors', async () => {
+  const child = new EventEmitter() as ChildProcess
+  child.unref = vi.fn()
+  const spawnProcess = (() => child) as typeof spawn
+  const pending = launchExternalTerminal({ command: 'missing-terminal', args: [] }, spawnProcess)
+  const error = Object.assign(new Error('spawn missing-terminal ENOENT'), { code: 'ENOENT' })
+
+  child.emit('error', error)
+  await assert.rejects(pending, { code: 'ENOENT' })
+  assert.equal(vi.mocked(child.unref).mock.calls.length, 0)
+  assert.equal(child.listenerCount('error'), 1)
+  assert.doesNotThrow(() => child.emit('error', error))
+})
+
+test('launchExternalTerminal reports permission errors as launch failures', async () => {
+  const child = new EventEmitter() as ChildProcess
+  child.unref = vi.fn()
+  const pending = launchExternalTerminal({ command: 'blocked-terminal', args: [] }, (() => child) as typeof spawn)
+
+  child.emit('error', Object.assign(new Error('spawn blocked-terminal EACCES'), { code: 'EACCES' }))
+  await assert.rejects(pending, { code: 'EACCES' })
+  assert.equal(vi.mocked(child.unref).mock.calls.length, 0)
+})
+
+test('launchExternalTerminal rejects a genuinely missing executable without crashing the host', async () => {
+  await assert.rejects(
+    launchExternalTerminal({ command: '__stardust_missing_terminal_executable__', args: [] }),
+    { code: 'ENOENT' }
+  )
+})
+
+test('launchExternalTerminal retains the error listener after success and reports late failures', async () => {
+  const child = new EventEmitter() as ChildProcess
+  child.unref = vi.fn()
+  const onLateError = vi.fn()
+  const pending = launchExternalTerminal({ command: 'terminal', args: [] }, (() => child) as typeof spawn, onLateError)
+
+  child.emit('spawn')
+  await pending
+  const error = new Error('terminal failed after launch')
+  assert.doesNotThrow(() => child.emit('error', error))
+  assert.deepEqual(onLateError.mock.calls, [[error]])
+})
 
 test('tuiResumeArgs resumes the session in the TUI', () => {
   assert.deepEqual(tuiResumeArgs('20260814_101010_abc123'), ['--tui', '--resume', '20260814_101010_abc123'])
