@@ -6,7 +6,12 @@ user docs `website/docs/user-guide/features/cron.md`, `kanban.md`.
 ## Cron
 
 `cron/jobs.py` (job store) + `cron/scheduler.py` (tick loop, in-flight registry, `run_one_job`,
-`python -m cron.scheduler` entry). `scheduler.py` keeps the stateful parts and re-exports its
+`python -m cron.scheduler` entry). `jobs.py` keeps the store itself (paths, locks, load/save,
+record normalization, state predicates, run output, telemetry counters) and re-exports its
+`jobs_*` siblings: `schedule` (schedule grammar, next run), `records` (create/edit/pause/resume/
+remove), `runs` (run outcomes, dispatch/heartbeat/fire claims), `due` (repairs, catch-up,
+`get_due_jobs`), `ticker` (liveness markers); they reach it late-bound (`_jobs.<name>`).
+`scheduler.py` keeps the stateful parts and re-exports its
 `scheduler_*` siblings: `job_runtime` (toolsets, model/runtime, pool, agent construction),
 `agent_run` (prompt, watchdog, final response, `run_job`), `run_outcome` (compose/deliver/mark),
 `external_worker`, `failures` (notices, incidents), `delivery`, `prompt`, `preflight`, `script`,
