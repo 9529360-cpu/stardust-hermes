@@ -4053,10 +4053,17 @@ def _interrupt_agent_for_signal(agent, signum) -> None:
         pass  # never block signal handling
 
 
-def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str) -> None:
+def _kanban_turn_failed(result) -> bool:
+    """A kanban worker turn the agent's own retries and fallbacks gave up on (or cut short)."""
+    return isinstance(result, dict) and bool(result.get("failed") or result.get("partial"))
+
+
+def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str) -> "dict | None":
     """Drive a kanban goal_mode worker through ``goals.run_kanban_goal_loop`` after its first turn.
 
-    The caller swallows all errors: a broken loop must never wedge a worker.
+    Returns the result of a continuation turn that failed — it ends the run, and the worker
+    exits on it like a failed first turn — else None. The caller swallows all errors: a broken
+    loop must never wedge a worker.
     """
     task_id = (os.environ.get("HERMES_KANBAN_TASK") or "").strip()
     if not task_id:
@@ -4080,12 +4087,20 @@ def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str) -> None:
     if not goal_text:
         return
 
+    failed_turns: list = []
+
     def _run_turn(prompt: str) -> str:
         result = cli.agent.run_conversation(user_message=prompt, conversation_history=cli.conversation_history)
         _sync_cli_session_id_from_agent(cli)
         resp = result.get("final_response", "") if isinstance(result, dict) else str(result)
         if resp:
             print(resp)
+        if _kanban_turn_failed(result):
+            # Stop here (the loop treats a raising turn as the end): judging the failure text and
+            # continuing re-ran the same failing call for the rest of the budget — 20 turns in 13 s
+            # against an unserved model (2026-10-04) — then blocked the card as "not completed".
+            failed_turns.append(result)
+            raise RuntimeError(f"turn failed: {result.get('failure_reason') or result.get('error') or 'partial'}")
         return resp or ""
 
     def _task_status() -> "str | None":
@@ -4101,6 +4116,7 @@ def _run_kanban_goal_loop_q(cli: "HermesCLI", first_response: str) -> None:
         max_turns=task.goal_max_turns or _DEF_TURNS, first_response=first_response or "",
         log=lambda m: logger.info("%s", m),
     )
+    return failed_turns[-1] if failed_turns else None
 
 
 def _sync_cli_session_id_from_agent(cli) -> None:
@@ -4193,11 +4209,10 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
 
     # Kanban goal_mode: keep working in THIS session until a judge agrees the card is
     # done, the worker terminates it, or the turn budget runs out (sticky block).
-    if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1" and not (
-        isinstance(result, dict) and (result.get("failed") or result.get("partial"))
-    ):
+    if os.environ.get("HERMES_KANBAN_GOAL_MODE") == "1" and not _kanban_turn_failed(result):
         try:
-            _run_kanban_goal_loop_q(cli, response)
+            # The exit status (and the reason recorded for the board) follow the turn that failed.
+            result = _run_kanban_goal_loop_q(cli, response) or result
         except Exception as _goal_exc:
             logger.debug("kanban goal loop failed: %s", _goal_exc)
 
@@ -4218,6 +4233,10 @@ def _run_quiet_single_query(cli, effective_query, emitter=None):
                 _exit_code = _RL_CODE
             except Exception:
                 _exit_code = 1
+        if os.environ.get("HERMES_KANBAN_TASK"):
+            # The dispatcher sees only this exit status; leave it the reason.
+            from hermes_cli.kanban_worker_failure import record_worker_failure
+            record_worker_failure(result)
     if emitter is not None:
         _exit_code = emitter.emit_result(result, session_id=cli.session_id or "", exit_code=_exit_code)
     sys.exit(_exit_code)

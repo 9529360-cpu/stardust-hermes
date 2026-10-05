@@ -24,6 +24,8 @@ from typing import Mapping
 from typing import Optional
 from typing import TYPE_CHECKING
 
+from hermes_cli.kanban_worker_failure import describe_worker_failure, worker_failure_note
+
 if TYPE_CHECKING:
     from hermes_cli.kanban_db import Task
 
@@ -845,9 +847,9 @@ class _CrashSweep:
 
     crashed: list[str] = field(default_factory=list)
     rate_limited: list[str] = field(default_factory=list)
-    # ``(task_id, pid, claimer, protocol_violation, error_text)``: accounted
-    # after the txn via ``_record_task_failure`` (needs its own write_txn).
-    crash_details: list[tuple[str, int, str, bool, str]] = field(default_factory=list)
+    # ``(task_id, pid, claimer, protocol_violation, error_text, worker_fields)``:
+    # accounted after the txn via ``_record_task_failure`` (needs its own write_txn).
+    crash_details: list[tuple[str, int, str, bool, str, dict]] = field(default_factory=list)
     # Worker-exit observer payloads, fired only after every reclaim/accounting
     # txn has committed.
     exited_hook_payloads: list[dict] = field(default_factory=list)
@@ -877,6 +879,15 @@ def _reclaim_dead_workers(conn: sqlite3.Connection) -> _CrashSweep:
 
             pid = int(row["worker_pid"])
             dead = _classify_dead_worker(pid, row["claim_lock"])
+            # The worker's own account of the failure (model not served, quota wall, ...) for the
+            # run record, the events and their notifications. The breaker and respawn guard keep
+            # the dispatcher's exit-status text, so their decisions do not change.
+            note = worker_failure_note(conn, row["id"], _kb._current_run_id(conn, row["id"]))
+            worker_fields = (
+                {"worker_error": describe_worker_failure(note), "failure_reason": note.get("failure_reason")}
+                if note else {}
+            )
+            dead.event_payload.update(worker_fields)
             retry_status = _kb._retry_status_for_run(conn, row["id"])
             dead.event_payload["retry_status"] = retry_status
             cur = conn.execute(
@@ -891,7 +902,9 @@ def _reclaim_dead_workers(conn: sqlite3.Connection) -> _CrashSweep:
             run_id = _kb._end_run(
                 conn, row["id"],
                 outcome=dead.run_outcome, status=dead.run_outcome,
-                error=dead.error_text,
+                error=(
+                    f"{worker_fields['worker_error']} ({dead.error_text})" if worker_fields else dead.error_text
+                ),
                 metadata=dict(dead.event_payload),
             )
             _kb._append_event(conn, row["id"], dead.event_kind, dead.event_payload, run_id=run_id)
@@ -920,7 +933,7 @@ def _reclaim_dead_workers(conn: sqlite3.Connection) -> _CrashSweep:
             else:
                 sweep.crashed.append(row["id"])
                 sweep.crash_details.append(
-                    (row["id"], pid, row["claim_lock"], dead.protocol_violation, dead.error_text)
+                    (row["id"], pid, row["claim_lock"], dead.protocol_violation, dead.error_text, worker_fields)
                 )
     return sweep
 
@@ -935,10 +948,10 @@ def _account_crashes(conn: sqlite3.Connection, crash_details: list) -> list[str]
     """
     auto_blocked: list[str] = []
     fp_counts: dict[str, int] = {}
-    for _, _, _, _, err_text in crash_details:
+    for _, _, _, _, err_text, _ in crash_details:
         fp = _error_fingerprint(err_text)
         fp_counts[fp] = fp_counts.get(fp, 0) + 1
-    for tid, pid, claimer, protocol_violation, error_text in crash_details:
+    for tid, pid, claimer, protocol_violation, error_text, worker_fields in crash_details:
         if protocol_violation:
             streak = _protocol_violation_streak(conn, tid)
             trow = conn.execute("SELECT max_retries FROM tasks WHERE id = ?", (tid,)).fetchone()
@@ -967,6 +980,7 @@ def _account_crashes(conn: sqlite3.Connection, crash_details: list) -> list[str]
                     "claimer": claimer,
                     "protocol_violations": streak,
                     "protocol_violation_limit": violation_limit,
+                    **worker_fields,
                 },
             )
         else:
@@ -978,7 +992,7 @@ def _account_crashes(conn: sqlite3.Connection, crash_details: list) -> list[str]
                 failure_limit=1 if is_systemic else None,
                 release_claim=False,
                 end_run=False,
-                event_payload_extra={"pid": pid, "claimer": claimer},
+                event_payload_extra={"pid": pid, "claimer": claimer, **worker_fields},
             )
         if tripped:
             auto_blocked.append(tid)
