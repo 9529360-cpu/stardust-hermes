@@ -108,9 +108,10 @@ def _report_child_done(parent_agent, spinner_ref, entry, tag, task_labels, n_tas
 
 def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interrupt: bool) -> None:
     """Run the batch's children in parallel, appending entries to ``results`` (sorted by task_index on return, one
-    completion line printed per child). Polls futures with a short ``wait()`` timeout instead of ``as_completed()``
-    so a wedged child cannot block the parent forever after an interrupt; on parent interrupt the still-pending
-    children are reported ``interrupted`` and abandoned (they already got the interrupt signal)."""
+    completion line printed per child). Polls futures with a short ``wait()`` timeout so a parent interrupt is
+    noticed promptly. The still-pending children already got the interrupt signal, and leaving the executor joins
+    them regardless, so their entries are what they actually returned: a child that finished its work while the
+    parent was stopping keeps its result instead of being reported ``interrupted``."""
     # Daemon workers (tools.daemon_pool): the `with` block still joins normally, but if the parent is interrupted
     # while a child is wedged, the abandoned worker must not block interpreter exit.
     from tools.daemon_pool import DaemonThreadPoolExecutor
@@ -118,15 +119,11 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
     task_labels = [t["goal"][:40] for t in batch.task_list]
     spinner_ref = getattr(parent_agent, "_delegate_spinner", None)
     _tag = format_batch_tag(batch.live_deleg_id, parent_agent)
-    # Fabricated entries for still-pending / raised futures carry the correct _delegate_role.
+    # Fabricated entries for raised futures carry the correct _delegate_role.
     _child_by_index = {i: child for (i, _, child) in batch.children}
     n_here = len(batch.children)  # a per-group unit runs a subset; ``n_tasks`` keeps the call-wide ``i/N`` slot
 
     def _entry_of(future, idx):
-        if not future.done():
-            return _fabricated_entry(
-                idx, "interrupted", "Parent agent interrupted — child did not finish in time", _child_by_index.get(idx),
-            )
         try:
             return future.result()
         except Exception as exc:
@@ -137,6 +134,7 @@ def _run_children_parallel(batch: _Batch, results: list, *, honor_parent_interru
         pending = set(futures)
         while pending:
             if honor_parent_interrupt and getattr(parent_agent, "_interrupt_requested", False) is True:
+                _cf_wait(pending)
                 results.extend(_entry_of(f, futures[f]) for f in pending)
                 break
             done, pending = _cf_wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
