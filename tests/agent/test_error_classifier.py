@@ -8,6 +8,7 @@ from agent.error_classifier import (
     FailoverReason,
     PROVIDER_STREAM_NON_JSON_ERROR_CODE,
     classify_api_error,
+    is_unservable_model_error,
     _extract_status_code,
     _extract_error_body,
     _extract_error_code,
@@ -491,6 +492,45 @@ class TestClassifyApiError:
         e = MockAPIError("Service Unavailable", status_code=503)
         result = classify_api_error(e)
         assert result.reason == FailoverReason.overloaded
+
+    def test_503_relay_no_channel_for_model_is_model_not_found(self):
+        """new-api relays answer "no channel in your key's group serves this model" with 503 +
+        ``model_not_found``. Retrying the route cannot help; read as overload it spent every
+        backoff retry and then told the user the service was busy."""
+        error = {
+            "code": "model_not_found",
+            "message": "No available channel for model gemini-3.8-flash under group pro (distributor)",
+            "type": "new_api_error",
+        }
+        # The OpenAI SDK keeps the inner ``error`` object as ``body``.
+        e = MockAPIError(f"Error code: 503 - {{'error': {error}}}", status_code=503, body=error)
+        result = classify_api_error(e, provider="custom", model="gemini-3.8-flash")
+        assert result.reason == FailoverReason.model_not_found
+        assert result.retryable is False
+        assert result.should_fallback is True
+
+    def test_503_one_api_no_channel_wording_is_model_not_found(self):
+        """One API sends the same refusal in Chinese and without a code."""
+        error = {"message": "当前分组 default 下对于模型 gpt-x 无可用渠道", "type": "one_api_error"}
+        e = MockAPIError("Error code: 503", status_code=503, body=error)
+        result = classify_api_error(e, provider="custom", model="gpt-x")
+        assert result.reason == FailoverReason.model_not_found
+        assert result.retryable is False
+
+    def test_5xx_with_model_unavailable_code_is_model_not_found(self):
+        for status in (500, 502):
+            e = MockAPIError("Server Error", status_code=status, body={"code": "model_not_available"})
+            result = classify_api_error(e)
+            assert result.reason == FailoverReason.model_not_found, status
+            assert result.retryable is False, status
+
+    def test_is_unservable_model_error(self):
+        unservable = MockAPIError(
+            "Error code: 503", status_code=503,
+            body={"code": "model_not_found", "message": "No available channel for model m under group g"},
+        )
+        assert is_unservable_model_error(unservable) is True
+        assert is_unservable_model_error(MockAPIError("Service Unavailable", status_code=503)) is False
 
 
     def test_408_request_timeout_is_retryable_timeout(self):

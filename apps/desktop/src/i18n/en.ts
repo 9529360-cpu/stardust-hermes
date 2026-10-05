@@ -955,7 +955,8 @@ export const en: Translations = {
       validationReachable: 'Connection works.',
       validationReachableModels: count => `Connection works. Found ${count} model${count === 1 ? '' : 's'}.`,
       validationFailed: 'Connection test failed',
-      activationFailed: 'Could not switch the default service'
+      activationFailed: 'Could not switch the default service',
+      duplicateService: 'A model service with this name already exists. Edit it from the list, or use a different name.'
     },
     computerUse: {
       accessibility: 'Accessibility',
@@ -1822,12 +1823,10 @@ export const en: Translations = {
       bundledNames: {
         'hermes-bots': 'Agents',
         kanban: 'Task Board',
-        radio: 'Radio'
       },
       bundledDescriptions: {
         'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.',
         kanban: 'Multi-agent task board with a board view, a command palette entry, and live task activity in the status bar.',
-        radio: 'Live radio with pinned stations, search, and an audio-reactive waveform.'
       },
       halfDesktop: 'Desktop',
       halfDesktopHint: 'this app, same for every profile',
@@ -2816,6 +2815,7 @@ export const en: Translations = {
 
   sidebar: {
     recent: 'Recent',
+    filters: 'Filters',
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',
@@ -2999,6 +2999,7 @@ export const en: Translations = {
 
   composer: {
     message: 'Message',
+    addContext: 'Add context',
     wakingProfile: profile => `Waking up ${profile}…`,
     placeholderStarting: 'Starting your assistant...',
     placeholderReconnecting: 'Reconnecting…',
@@ -3518,7 +3519,7 @@ export const en: Translations = {
     collapse: 'Collapse',
     otherProviders: 'Other providers',
     haveApiKey: 'I have an API key',
-    chooseLater: "I'll choose a provider later",
+    chooseLater: "I'll set this up later",
     recommended: 'Recommended',
     connected: 'Connected',
     featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Stardust',
@@ -3968,6 +3969,7 @@ export const en: Translations = {
   },
 
   zones: {
+    paneTitles: { overview: 'Context', files: 'Files', review: 'Review', terminal: 'Terminal' },
     showTabStrip: 'Show tabs',
     hideTabStrip: 'Hide tabs',
     showStripTab: title => `Show ${title}`,
@@ -4202,6 +4204,7 @@ export const en: Translations = {
       errorRetry: 'Retry',
       errorStartNewSession: 'Start new session',
       errorSwitchProvider: 'Switch provider',
+      errorSetUpFallback: 'Set up a fallback model',
       errorChooseModel: 'Choose a model',
       errorCompressConversation: 'Compress conversation',
       errorCompressFailed: 'Could not compress the conversation',

@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useEffect, useMemo } from 'react'
+import { type ReactNode, useMemo } from 'react'
 import { useNavigate } from 'react-router'
 
 import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Slot } from '@/contrib/react/slot'
 import { registry } from '@/contrib/registry'
 import { TASK_CENTER_AREAS } from '@/contrib/task-center'
@@ -12,12 +13,12 @@ import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { readKey, writeKey } from '@/lib/storage'
 import { useSessionSlice } from '@/lib/use-session-slice'
+import { cn } from '@/lib/utils'
 import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus } from '@/store/activity'
-import { registerRepoStatusCwd, repoStatusForCwd } from '@/store/coding-status'
 import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProcess } from '@/store/composer-status'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronJobs, $cronJobsScope, setCronFocusJobId } from '@/store/cron'
-import { applyDesktopLayoutPreset } from '@/store/pane-focus'
+import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
 import { $profileScope, sidebarProfileForScope } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
@@ -28,7 +29,8 @@ import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/stor
 import { $subagentsBySession } from '@/store/subagents'
 import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
 
-import { CRON_ROUTE, sessionRoute } from '../routes'
+import { SubagentSection } from '../chat/composer/status-stack/subagent-section'
+import { CRON_ROUTE, navigateToWorkspacePage, sessionRoute } from '../routes'
 import {
   findLiveTaskRuntimeId,
   findLiveTaskRuntimeIdByStoredId,
@@ -37,6 +39,7 @@ import {
   resolveTaskWorkspaceCwd
 } from '../workspace/task-session'
 
+import { CorePaneTitle } from './core-pane-title'
 import { WORKSPACE_OVERVIEW_COPY } from './workspace-overview-copy'
 
 export const WORKSPACE_OVERVIEW_PANE_ID = 'workspace-overview'
@@ -44,23 +47,38 @@ export const WORKSPACE_OVERVIEW_PANE_ID = 'workspace-overview'
 const PERSONAL_LAYOUT_VERSION = 3
 const PERSONAL_LAYOUT_VERSION_KEY = 'hermes.desktop.personalLayoutVersion'
 
-function Card({ children, title }: { children: ReactNode; title: string }) {
+// One type scale for the whole rail: 13px titles, 12px body, 11px labels and meta.
+const TITLE_CLASS = 'truncate text-[0.8125rem] font-medium leading-5 text-(--ui-text-primary)'
+const BODY_CLASS = 'text-[0.75rem] leading-[1.125rem] text-(--ui-text-tertiary)'
+const META_CLASS = 'text-[0.6875rem] leading-4 text-(--ui-text-quaternary)'
+
+function Section({ children, title }: { children: ReactNode; title: string }) {
   return (
-    <section className="border-t border-(--ui-stroke-quaternary) py-3 first:border-t-0 first:pt-0">
-      <div className="mb-2 text-[0.62rem] font-medium text-(--ui-text-tertiary)">{title}</div>
+    <section className="flex flex-col gap-2">
+      <h3 className="text-[0.6875rem] font-medium leading-4 text-(--ui-text-tertiary)">{title}</h3>
       {children}
     </section>
   )
 }
 
-function Metric({ label, value }: { label: string; value: ReactNode }) {
+function IconTile({ className, name, spinning }: { className?: string; name: string; spinning?: boolean }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-3 py-0.5 text-[0.68rem]">
-      <span className="text-(--ui-text-tertiary)">{label}</span>
-      <span className="min-w-0 truncate text-right font-medium text-(--ui-text-secondary)">{value}</span>
-    </div>
+    <span
+      className={cn(
+        'flex size-8 shrink-0 items-center justify-center rounded-lg bg-(--ui-bg-quaternary) text-(--ui-text-secondary)',
+        className
+      )}
+    >
+      <Codicon name={name} size="0.875rem" spinning={spinning} />
+    </span>
   )
 }
+
+const WORKSPACE_TOOLS = [
+  { icon: 'files', id: 'files' },
+  { icon: 'git-compare', id: 'review' },
+  { icon: 'terminal', id: 'terminal' }
+] as const
 
 function activityIcon(status: TaskCenterStatus): string {
   if (status === 'queued') {
@@ -82,6 +100,7 @@ export function WorkspaceOverview() {
   const { locale } = useI18n()
   const navigate = useNavigate()
   const copy = WORKSPACE_OVERVIEW_COPY[locale]
+
   const systemLabels =
     locale === 'zh'
       ? {
@@ -111,7 +130,8 @@ export function WorkspaceOverview() {
           needsInput: '等待你的输入',
           attentionSummary: '当前任务正在等待你的确认或补充信息；工作上下文会保留，回复后可以继续。',
           workingSummary: '有任务仍在执行；可以回到对应会话查看进度，也可以继续处理其他事情。',
-          hidePreview: '收起上下文'
+          hidePreview: '收起上下文',
+          emptyRail: '后台任务、子代理和进度会显示在这里。'
         }
       : locale === 'zh-hant'
         ? {
@@ -141,7 +161,8 @@ export function WorkspaceOverview() {
             needsInput: '等待你的輸入',
             attentionSummary: '目前任務正在等待你的確認或補充資訊；工作上下文會保留，回覆後可以繼續。',
             workingSummary: '有任務仍在執行；可以回到對應對話查看進度，也可以繼續處理其他事情。',
-            hidePreview: '收起上下文'
+            hidePreview: '收起上下文',
+            emptyRail: '背景任務、子代理與進度會顯示在這裡。'
           }
         : {
             assistantContext: 'Current context',
@@ -170,8 +191,10 @@ export function WorkspaceOverview() {
             needsInput: 'Waiting for your input',
             attentionSummary: 'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
             workingSummary: 'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
-            hidePreview: 'Hide context'
+            hidePreview: 'Hide context',
+            emptyRail: 'Background tasks, subagents and progress show up here.'
           }
+
   const cwd = useStore($currentCwd)
   const projectScope = useStore($projectScope)
   const projectTree = useStore($projectTree)
@@ -185,9 +208,11 @@ export function WorkspaceOverview() {
   const cronJobsScope = useStore($cronJobsScope)
   const activeConnectionId = useStore($activeConnectionId)
   const profileScope = useStore($profileScope)
+
   const cronJobs = useMemo(() => (
     cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}` ? cachedCronJobs : []
   ), [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope])
+
   const desktopActionTasks = useStore($desktopActionTasks)
   const previewServerRestart = useStore($previewServerRestart)
   const sessionStates = useStore($sessionStates)
@@ -197,23 +222,29 @@ export function WorkspaceOverview() {
   const session = selectedStoredSessionId
     ? sessions.find(candidate => sessionMatchesStoredId(candidate, selectedStoredSessionId))
     : undefined
+
   const anyAttention = attentionSessionIds.length > 0
   const anyWorking = workingSessionIds.length > 0
+
   const fallbackTaskSession = selectedStoredSessionId
     ? undefined
     : findLiveTaskSession(sessions, attentionSessionIds, workingSessionIds)
+
   const fallbackTaskStoredId = selectedStoredSessionId
     ? null
     : findLiveTaskStoredId(sessions, attentionSessionIds, workingSessionIds)
+
   const scopedProjectCwd =
     projectScope === ALL_PROJECTS ? '' : projectRootCwd(projectTree.find(project => project.id === projectScope))
+
   const effectiveCwd = resolveTaskWorkspaceCwd(cwd, session, fallbackTaskSession, scopedProjectCwd)
-  const repoStatus = useStore(repoStatusForCwd(effectiveCwd))
+
   const fallbackTaskRuntimeId = fallbackTaskSession
     ? findLiveTaskRuntimeId(sessionStates, fallbackTaskSession)
     : fallbackTaskStoredId
       ? findLiveTaskRuntimeIdByStoredId(sessionStates, fallbackTaskStoredId)
       : null
+
   const runtimeStoredSessionIds = useMemo(
     () =>
       Object.fromEntries(
@@ -221,8 +252,10 @@ export function WorkspaceOverview() {
       ),
     [sessionStates]
   )
+
   const statusSessionId = selectedStoredSessionId ? activeSessionId : (fallbackTaskRuntimeId ?? activeSessionId)
   const statusItems = useSessionSlice($statusItemsBySession, statusSessionId)
+
   const activityTasks = useMemo(
     () =>
       buildTaskCenterTasks({
@@ -251,25 +284,26 @@ export function WorkspaceOverview() {
     ]
   )
 
-  useEffect(() => registerRepoStatusCwd(effectiveCwd), [effectiveCwd])
-
-  const effectiveRepoStatus = repoStatus
   const selectedAttention = selectedStoredSessionId
     ? session
       ? attentionSessionIds.some(storedId => sessionMatchesStoredId(session, storedId))
       : attentionSessionIds.includes(selectedStoredSessionId)
     : false
+
   const selectedWorking = selectedStoredSessionId
     ? session
       ? workingSessionIds.some(storedId => sessionMatchesStoredId(session, storedId))
       : workingSessionIds.includes(selectedStoredSessionId)
     : false
+
   const primaryAttention = selectedStoredSessionId ? selectedAttention : anyAttention
   const primaryWorking = selectedStoredSessionId ? selectedWorking : anyWorking
   const displaySession = session ?? fallbackTaskSession
+
   const displayTaskStoredId =
     displaySession?.id ??
     (primaryAttention || primaryWorking ? (selectedStoredSessionId ?? fallbackTaskStoredId) : fallbackTaskStoredId)
+
   const sessionLabel = displaySession
     ? storedSessionTitle(displaySession)
     : selectedStoredSessionId
@@ -279,6 +313,7 @@ export function WorkspaceOverview() {
       : displayTaskStoredId
         ? systemLabels.activeTaskTitle
         : systemLabels.assistantTitle
+
   const assistantContextSummary = primaryAttention
     ? systemLabels.attentionSummary
     : primaryWorking
@@ -286,27 +321,29 @@ export function WorkspaceOverview() {
       : selectedStoredSessionId
         ? systemLabels.assistantSession
         : systemLabels.assistantSummary
-  const normalizedCwd = effectiveCwd.replace(/[/\\]+$/, '')
-  const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? copy.noProject
-  const branch = effectiveRepoStatus?.branch || copy.noRepository
+
   const todoItems = statusItems.filter(item => item.type === 'todo')
   const completedTodoCount = todoItems.filter(item => item.todoStatus === 'completed').length
   const activeTodo = todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
   const todoPercent = todoItems.length > 0 ? Math.round((completedTodoCount / todoItems.length) * 100) : 0
   const showTaskCard = primaryAttention || primaryWorking
+
   const summary = primaryAttention
     ? systemLabels.attentionSummary
     : primaryWorking
       ? systemLabels.workingSummary
       : assistantContextSummary
+
   const currentActivityTaskId = displaySession?.id
     ? `session:${displaySession.id}`
     : displayTaskStoredId
       ? `session:${displayTaskStoredId}`
       : null
+
   const secondaryActivityTasks = currentActivityTaskId
     ? activityTasks.filter(task => task.id !== currentActivityTaskId)
     : activityTasks
+
   const activityStatusLabels: Record<TaskCenterStatus, string> = {
     error: systemLabels.activityFailed,
     interrupted: systemLabels.activityInterrupted,
@@ -316,11 +353,13 @@ export function WorkspaceOverview() {
     success: systemLabels.activityCompleted,
     waiting: systemLabels.activityWaiting
   }
+
   const durabilityLabels = {
     'process-local': systemLabels.durabilityProcess,
     'restart-durable': systemLabels.durabilityRestart,
     turn: systemLabels.durabilityTurn
   } as const
+
   const handleTaskAction = (task: (typeof secondaryActivityTasks)[number]) => {
     if (task.action === 'open-session' && task.sessionId) {
       if (task.rail === 'subagent') {
@@ -340,179 +379,152 @@ export function WorkspaceOverview() {
 
     if (task.action === 'manage-cron') {
       setCronFocusJobId(task.id.slice('cron:'.length))
-      navigate(CRON_ROUTE)
+      navigateToWorkspacePage(navigate, CRON_ROUTE)
     }
   }
 
   return (
     <aside
       aria-label={copy.workspace}
-      className="jarvis-context-rail flex h-full min-h-0 flex-col overflow-y-auto bg-(--ui-sidebar-surface-background) px-3 pb-3 pt-[calc(var(--titlebar-height)+0.75rem)] text-(--ui-text-secondary)"
+      className="jarvis-context-rail flex h-full min-h-0 flex-col bg-(--ui-sidebar-surface-background) pt-(--titlebar-height) text-(--ui-text-secondary)"
       data-personal-overview=""
     >
-      <div className="mb-2 flex items-center justify-between px-1">
-        <div className="text-[0.68rem] font-semibold text-(--ui-text-primary)">{copy.workspace}</div>
+      <header className="flex h-10 shrink-0 items-center justify-between gap-2 px-4" data-context-rail-header="">
+        <h2 className="truncate text-[0.8125rem] font-semibold text-(--ui-text-primary)">{copy.workspace}</h2>
         <Button aria-label={systemLabels.hidePreview} onClick={() => setRightContextOpen(false)} size="icon-xs" variant="ghost">
           <Codicon name="close" />
         </Button>
-      </div>
+      </header>
 
-      <div className="flex flex-col gap-2.5">
-        <Card title={effectiveCwd ? copy.projectContext : systemLabels.assistantContext}>
-          {effectiveCwd ? (
-            <>
-              <div className="flex items-start gap-2">
-                <Codicon className="mt-0.5 shrink-0 text-(--ui-text-tertiary)" name="folder" size="0.8rem" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[0.76rem] font-semibold text-(--ui-text-primary)">{projectName}</div>
-                  <div className="mt-1 break-all font-mono text-[0.58rem] leading-4 text-(--ui-text-quaternary)">
-                    {effectiveCwd}
-                  </div>
-                </div>
-              </div>
-              <div className="mt-3 border-t border-(--ui-stroke-quaternary) pt-2">
-                <Metric label={copy.branch} value={<span className="font-mono">{branch}</span>} />
-                {effectiveRepoStatus && (
-                  <Metric label={copy.sync} value={copy.syncValue(effectiveRepoStatus.ahead, effectiveRepoStatus.behind)} />
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex items-start gap-2">
-              <Codicon className="mt-0.5 shrink-0 text-(--ui-text-tertiary)" name="comment" size="0.8rem" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[0.76rem] font-semibold text-(--ui-text-primary)">{sessionLabel}</div>
-                <div className="mt-1 text-[0.6rem] leading-4 text-(--ui-text-quaternary)">{assistantContextSummary}</div>
-              </div>
-            </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-1">
+        <div className="flex flex-col gap-5">
+          {activeSessionId && (
+            <SubagentSection defaultCollapsed={false} key={activeSessionId} sessionId={activeSessionId} />
           )}
-        </Card>
 
-        {showTaskCard && (
-          <Card title={copy.currentResult}>
-          <>
-              <div className="flex items-start gap-2.5">
-                <Codicon
-                  className={
-                    primaryWorking
-                      ? 'mt-0.5 shrink-0 text-(--theme-primary)'
-                      : 'mt-0.5 shrink-0 text-(--ui-text-tertiary)'
-                  }
+          {effectiveCwd && (
+            <Section title={copy.quickAccess}>
+              <div className="grid grid-cols-3 gap-1.5">
+                {WORKSPACE_TOOLS.map(tool => (
+                  <Button key={tool.id} onClick={() => revealDesktopPane(tool.id)} size="sm" variant="secondary">
+                    <Codicon name={tool.icon} />
+                    {copy[tool.id]}
+                  </Button>
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {showTaskCard && (
+            <Section title={copy.currentResult}>
+              <div className="flex min-w-0 items-start gap-2.5">
+                <IconTile
+                  className={primaryWorking ? 'text-(--theme-primary)' : undefined}
                   name={primaryAttention ? 'warning' : primaryWorking ? 'loading' : 'target'}
-                  size="0.82rem"
+                  spinning={primaryWorking && !primaryAttention}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[0.76rem] font-semibold text-(--ui-text-primary)">{sessionLabel}</div>
-                  <div className="mt-1 text-[0.64rem] leading-5 text-(--ui-text-tertiary)">{summary}</div>
-                  {displaySession?.model && (
-                    <div className="mt-1 truncate font-mono text-[0.56rem] text-(--ui-text-quaternary)">{displaySession.model}</div>
-                  )}
-                  {displayTaskStoredId && (primaryAttention || primaryWorking) && (
-                    <Button
-                      className="mt-2 w-full justify-center"
-                      onClick={() => navigate(sessionRoute(displayTaskStoredId))}
-                      size="sm"
-                      variant="outline"
-                    >
-                      <Codicon name="comment-discussion" size="0.72rem" />
-                      {copy.continueTask}
-                    </Button>
-                  )}
+                  <div className={TITLE_CLASS}>{sessionLabel}</div>
+                  <p className={cn('mt-0.5', BODY_CLASS)}>{summary}</p>
+                  {displaySession?.model && <div className={cn('mt-1 truncate font-mono', META_CLASS)}>{displaySession.model}</div>}
                 </div>
               </div>
+              {displayTaskStoredId && (primaryAttention || primaryWorking) && (
+                <Button className="w-full" onClick={() => navigate(sessionRoute(displayTaskStoredId))} size="sm" variant="secondary">
+                  <Codicon name="comment-discussion" />
+                  {copy.continueTask}
+                </Button>
+              )}
               {todoItems.length > 0 && (
-                <div className="mt-3 border-t border-(--ui-stroke-quaternary) pt-2.5">
-                  <div className="flex items-center justify-between gap-2 text-[0.6rem] text-(--ui-text-tertiary)">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between gap-2 text-[0.6875rem] leading-4 text-(--ui-text-tertiary)">
                     <span>{systemLabels.taskProgress}</span>
-                    <span className="font-mono text-(--ui-text-secondary)">{completedTodoCount}/{todoItems.length}</span>
+                    <span className="tabular-nums text-(--ui-text-secondary)">
+                      {completedTodoCount}/{todoItems.length}
+                    </span>
                   </div>
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-(--ui-bg-quaternary)">
+                  <div className="h-1 overflow-hidden rounded-full bg-(--ui-bg-quaternary)">
                     <div
                       className="h-full rounded-full bg-(--theme-primary) transition-[width] duration-200"
                       style={{ width: `${todoPercent}%` }}
                     />
                   </div>
                   {activeTodo && (
-                    <div className="mt-2 flex items-start gap-2 text-[0.58rem] leading-4 text-(--ui-text-tertiary)">
-                      <Codicon className="mt-0.5 shrink-0 text-(--theme-primary)" name="record" size="0.58rem" />
-                      <div className="min-w-0">
-                        <div className="text-[0.52rem] uppercase tracking-[0.08em] text-(--ui-text-quaternary)">
-                          {systemLabels.currentStep}
-                        </div>
-                        <div className="mt-0.5 line-clamp-2 text-(--ui-text-secondary)">{activeTodo.title}</div>
-                      </div>
-                    </div>
+                    <p className={cn('line-clamp-2', BODY_CLASS)}>
+                      <span className="text-(--ui-text-quaternary)">{systemLabels.currentStep} · </span>
+                      <span className="text-(--ui-text-secondary)">{activeTodo.title}</span>
+                    </p>
                   )}
                 </div>
               )}
-          </>
-        </Card>
-        )}
+            </Section>
+          )}
 
-        {secondaryActivityTasks.length > 0 && (
-          <Card title={systemLabels.activity}>
-            <div className="flex flex-col gap-2">
-              {secondaryActivityTasks.slice(0, 10).map(task => (
-                <div
-                  className="flex min-w-0 items-start gap-2"
-                  data-agent-activity-task=""
-                  key={task.id}
-                  style={{ paddingLeft: task.depth ? `${task.depth * 0.65}rem` : undefined }}
-                >
-                  <Codicon
-                    className={
-                      task.status === 'running'
-                        ? 'mt-0.5 shrink-0 text-(--theme-primary)'
-                        : task.status === 'waiting' ||
-                            task.status === 'error' ||
-                            task.status === 'interrupted'
-                          ? 'mt-0.5 shrink-0 text-(--ui-text-secondary)'
-                          : 'mt-0.5 shrink-0 text-(--ui-text-tertiary)'
-                    }
-                    name={activityIcon(task.status)}
-                    size="0.7rem"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[0.66rem] font-medium text-(--ui-text-secondary)">{task.label}</div>
-                    <div className="mt-0.5 line-clamp-2 text-[0.56rem] leading-4 text-(--ui-text-quaternary)">
-                      {task.detail}
-                    </div>
-                    <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[0.52rem] text-(--ui-text-quaternary)">
-                      <span>{activityStatusLabels[task.status]}</span>
-                      {task.durability && (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span>{durabilityLabels[task.durability]}</span>
-                        </>
+          {secondaryActivityTasks.length > 0 && (
+            <Section title={systemLabels.activity}>
+              <ul className="-mx-2 flex flex-col">
+                {secondaryActivityTasks.slice(0, 10).map(task => (
+                  <li
+                    className="flex min-w-0 items-start gap-2.5 rounded-lg px-2 py-1.5"
+                    data-agent-activity-task=""
+                    key={task.id}
+                    style={{ paddingLeft: task.depth ? `${0.5 + task.depth * 0.65}rem` : undefined }}
+                  >
+                    <Codicon
+                      className={cn(
+                        'mt-1 shrink-0',
+                        task.status === 'running'
+                          ? 'text-(--theme-primary)'
+                          : task.status === 'waiting' || task.status === 'error' || task.status === 'interrupted'
+                            ? 'text-(--ui-text-secondary)'
+                            : 'text-(--ui-text-tertiary)'
                       )}
-                      {task.artifactRefs?.length ? (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span>{systemLabels.activityFiles(task.artifactRefs.length)}</span>
-                        </>
-                      ) : null}
+                      name={activityIcon(task.status)}
+                      size="0.8125rem"
+                      spinning={task.status === 'running'}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[0.75rem] font-medium leading-5 text-(--ui-text-primary)">
+                        {task.label}
+                      </div>
+                      {task.detail && <div className={cn('line-clamp-2 text-(--ui-text-tertiary)', META_CLASS)}>{task.detail}</div>}
+                      <div className={cn('mt-0.5 flex min-w-0 items-center gap-1', META_CLASS)}>
+                        <span>{activityStatusLabels[task.status]}</span>
+                        {task.durability && (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>{durabilityLabels[task.durability]}</span>
+                          </>
+                        )}
+                        {task.artifactRefs?.length ? (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span>{systemLabels.activityFiles(task.artifactRefs.length)}</span>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                  {task.action && (
-                    <button
-                      className="shrink-0 rounded px-1.5 py-0.5 text-[0.54rem] font-medium text-(--ui-text-tertiary) hover:bg-(--ui-bg-tertiary) hover:text-(--ui-text-primary)"
-                      onClick={() => handleTaskAction(task)}
-                      type="button"
-                    >
-                      {task.action === 'stop-process'
-                        ? systemLabels.stopTask
-                        : task.action === 'manage-cron'
-                          ? systemLabels.manageTask
-                          : systemLabels.openTask}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
+                    {task.action && (
+                      <Button onClick={() => handleTaskAction(task)} size="xs" variant="ghost">
+                        {task.action === 'stop-process'
+                          ? systemLabels.stopTask
+                          : task.action === 'manage-cron'
+                            ? systemLabels.manageTask
+                            : systemLabels.openTask}
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
-        <Slot area={TASK_CENTER_AREAS.sections} />
+          <Slot area={TASK_CENTER_AREAS.sections} />
+
+          {!effectiveCwd && !showTaskCard && secondaryActivityTasks.length === 0 && (
+            <EmptyState description={systemLabels.emptyRail} title={copy.nothingPending} />
+          )}
+        </div>
       </div>
     </aside>
   )
@@ -554,10 +566,11 @@ export function registerWorkspaceOverviewPane(): () => void {
       placement: 'right',
       collapsible: true,
       uncloseable: true,
+      tabTitle: () => <CorePaneTitle id="overview" />,
       revealAliases: ['overview', 'workspace-overview'],
-      width: '420px',
-      minWidth: '320px',
-      maxWidth: '520px'
+      width: '340px',
+      minWidth: '300px',
+      maxWidth: '480px'
     },
     render: () => <WorkspaceOverview />
   })

@@ -54,6 +54,17 @@ class FailoverReason(enum.Enum):
     unknown = "unknown"                  # Unclassifiable — retry with backoff
 
 
+# A provider that did not answer this request but may answer the same request later: busy,
+# rate-limited, erroring or timing out. Durable orchestrators treat these as "not now" instead
+# of "failed" — kanban requeues the task without counting a failure, cron re-runs the fire on
+# its 5/15/30-minute ladder. Quota exhaustion (``billing``) is not here: only kanban's long
+# cooldown can outwait it.
+PROVIDER_UNAVAILABLE_REASONS = frozenset(reason.value for reason in (
+    FailoverReason.overloaded, FailoverReason.server_error, FailoverReason.rate_limit,
+    FailoverReason.upstream_rate_limit, FailoverReason.timeout,
+))
+
+
 @dataclass
 class ClassifiedError:
     """Structured classification of an API error with recovery hints."""
@@ -237,12 +248,19 @@ _CONTEXT_OVERFLOW_PATTERNS = (
     "maximum allowed input length",
 )
 
-# Last entry: OpenRouter 404 when no endpoint supports tool calling —
-# model_not_found triggers fallback instead of burning retries (#58446).
+# new-api / One API relays: no enabled channel in the key's group serves the model. They answer
+# with HTTP 503 (new-api adds ``model_not_found``), so the 5xx handlers check this too.
+_NO_CHANNEL_PATTERNS = ("no available channel for model", "无可用渠道")
+
+# "no endpoints found that support tool use" is OpenRouter's 404 when no endpoint supports tool
+# calling — model_not_found triggers fallback instead of burning retries (#58446).
 _MODEL_NOT_FOUND_PATTERNS = (
     "is not a valid model", "invalid model", "model not found", "model_not_found", "does not exist",
     "no such model", "unknown model", "unsupported model", "no endpoints found that support tool use",
-)
+) + _NO_CHANNEL_PATTERNS
+
+# Structured error codes naming the requested model as unservable on this route.
+_MODEL_UNAVAILABLE_CODES = ("model_not_found", "model_not_available", "invalid_model")
 
 # Qwen/vLLM chat-template "No user query found". Shared by the invalid-body
 # table (→ format_error) and the llama.cpp grammar guard so they cannot drift.
@@ -481,7 +499,7 @@ _ERROR_CODE_VERDICTS: Dict[str, Verdict] = {
     **dict.fromkeys(("resource_exhausted", "throttled", "rate_limit_exceeded"),
                     _v(_R.rate_limit, should_rotate_credential=True)),
     **dict.fromkeys(_BILLING_ERROR_CODES, _V_BILLING),
-    **dict.fromkeys(("model_not_found", "model_not_available", "invalid_model"), _V_MODEL_NOT_FOUND),
+    **dict.fromkeys(_MODEL_UNAVAILABLE_CODES, _V_MODEL_NOT_FOUND),
     **dict.fromkeys(("context_length_exceeded", "max_tokens_exceeded"), _V_CONTEXT_OVERFLOW),
     **dict.fromkeys(_MEMORY_CEILING_ERROR_CODES, _V_OVERLOADED),
     "invalid_encrypted_content": _V_INVALID_ENCRYPTED,
@@ -720,6 +738,14 @@ def classify_api_error(
     return ClassifiedError(**{**base, **verdict})
 
 
+def is_unservable_model_error(error: Exception) -> bool:
+    """Whether ``error`` says this route cannot serve the requested model (a structured
+    model-unavailable code, or a relay's "no channel serves this model"). Retrying the same
+    route cannot fix it; callers with their own retry loops share this answer."""
+    body = _extract_error_body(error)
+    return _cannot_serve_model(_extract_error_code(body).lower(), _build_error_msg(error, body))
+
+
 # ── Status code handlers ────────────────────────────────────────────────
 
 def _status_403(c: _Ctx) -> Verdict:
@@ -767,13 +793,29 @@ def _status_429(c: _Ctx) -> Verdict:
     return _V_RATE_LIMIT
 
 
+def _cannot_serve_model(code: str, msg: str) -> bool:
+    """A structured model-unavailable code, or a relay's "no channel serves this model" wording."""
+    return code in _MODEL_UNAVAILABLE_CODES or any(p in msg for p in _NO_CHANNEL_PATTERNS)
+
+
 def _status_5xx(c: _Ctx) -> Verdict:
     # Request-validation errors as 5xx (codex.nekos.me) fail fast instead of
     # retry-flooding — unless the parameter was injected server-side.
     validation = any(p in c.msg for p in _REQUEST_VALIDATION_PATTERNS) or c.code in _5XX_VALIDATION_CODES
     if validation and not _is_server_injected_param_rejection(c.msg, c.provider_slug):
         return _V_FORMAT_ERROR
+    if _cannot_serve_model(c.code, c.msg):
+        return _V_MODEL_NOT_FOUND
     return _first_match(c.msg, _OVERFLOW_AS_5XX_RULES) or _V_SERVER_ERROR
+
+
+def _status_503(c: _Ctx) -> Verdict:
+    # Relays answer "no channel in your key's group serves this model" with 503. That is
+    # deterministic for the route: read as overload it spent every backoff retry and then told
+    # the user the service was busy, instead of falling back or saying to pick another model.
+    if _cannot_serve_model(c.code, c.msg):
+        return _V_MODEL_NOT_FOUND
+    return _first_match(c.msg, _OVERFLOW_AS_5XX_RULES) or _V_OVERLOADED
 
 
 def _classify_402(error_msg: str, result_fn: Callable[..., Any]) -> Any:
@@ -853,8 +895,7 @@ _STATUS_HANDLERS: Dict[int, Callable[[_Ctx], Verdict]] = {
     400: _classify_400, 401: lambda c: _V_AUTH_ROTATE, 402: lambda c: _classify_402(c.msg, dict),
     403: _status_403, 404: _status_404, 408: lambda c: _V_TIMEOUT, 413: lambda c: _V_PAYLOAD_TOO_LARGE,
     422: lambda c: _first_match(c.msg, _IMAGE_TOOL_RULES) or _V_FORMAT_ERROR,
-    429: _status_429, 500: _status_5xx, 502: _status_5xx,
-    503: lambda c: _first_match(c.msg, _OVERFLOW_AS_5XX_RULES) or _V_OVERLOADED,
+    429: _status_429, 500: _status_5xx, 502: _status_5xx, 503: _status_503,
     529: lambda c: _first_match(c.msg, _OVERFLOW_AS_5XX_RULES) or _V_OVERLOADED,
 }
 

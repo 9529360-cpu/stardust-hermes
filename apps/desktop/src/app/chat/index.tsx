@@ -612,7 +612,7 @@ const ChatViewContent = memo(function ChatViewContent({
       },
       tools: {
         enabled: true,
-        label: 'Add context',
+        label: t.composer.addContext,
         suggestions: contextSuggestions
       },
       voice: {
@@ -628,7 +628,8 @@ const ChatViewContent = memo(function ChatViewContent({
       modelMenuContent,
       quickModels,
       reasoningMenuContent,
-      supportsReasoning
+      supportsReasoning,
+      t.composer.addContext
     ]
   )
 

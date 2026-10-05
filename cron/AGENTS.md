@@ -5,7 +5,18 @@ user docs `website/docs/user-guide/features/cron.md`, `kanban.md`.
 
 ## Cron
 
-`cron/jobs.py` (job store) + `cron/scheduler.py` (tick loop; `scheduler_*.py` siblings). Agents
+`cron/jobs.py` (job store) + `cron/scheduler.py` (tick loop, in-flight registry, `run_one_job`,
+`python -m cron.scheduler` entry). `jobs.py` keeps the store itself (paths, locks, load/save,
+record normalization, state predicates, run output, telemetry counters) and re-exports its
+`jobs_*` siblings: `schedule` (schedule grammar, next run), `records` (create/edit/pause/resume/
+remove), `runs` (run outcomes, dispatch/heartbeat/fire claims), `due` (repairs, catch-up,
+`get_due_jobs`), `ticker` (liveness markers); they reach it late-bound (`_jobs.<name>`).
+`scheduler.py` keeps the stateful parts and re-exports its
+`scheduler_*` siblings: `job_runtime` (toolsets, model/runtime, pool, agent construction),
+`agent_run` (prompt, watchdog, final response, `run_job`), `run_outcome` (compose/deliver/mark),
+`external_worker`, `failures` (notices, incidents), `delivery`, `prompt`, `preflight`, `script`,
+`provider`. Siblings reach it late-bound (`_sched.<name>`) so `monkeypatch.setattr(cron.scheduler,
+...)` keeps reaching every caller; the `__main__` entry stays below every split-module import. Agents
 schedule via the `cronjob` tool; users via `hermes cron list|add|edit|pause|resume|run|remove` or
 `/cron`. Schedules: duration (`"30m"`, `"2h"`, `"1d"`), "every" phrase (`"every 2h"`, `"every monday
 9am"`), 5-field cron (`"0 9 * * *"`), ISO one-shot (`"2026-06-01T09:00:00Z"`). Per-job fields:
@@ -51,8 +62,18 @@ Durable SQLite-backed board letting multiple profiles/workers collaborate. Users
 <verb>`; dispatcher-spawned workers use a dedicated `kanban_*` toolset so their schema footprint is
 zero outside a kanban task (footprint ladder rung 3).
 
-- **CLI:** `hermes_cli/kanban.py` facade + 14 `kanban_*.py` siblings (`boards`, `db`, `db_connect`,
-  `db_dispatch`, `db_notify`, `db_graph` (task initialization and decomposition), `workspace`, ...). Verbs: `init, create, list (ls), show, assign, link,
+- **Storage:** `hermes_cli/kanban_db.py` is the facade (data classes, schema SQL, task creation,
+  links, comments/events, runs, ready recompute) and re-exports its `kanban_db_*` siblings:
+  `boards` (slugs, paths, board.json), `connect` (connections, schema init/migrations), `claims`,
+  `completion`, `transitions` (block/review/unblock/reopen/schedule), `retirement`
+  (archive/delete), `worker_context`, `maintenance` (stats, GC, logs, assignees), `dispatch`
+  (liveness, respawn guard, caps, `dispatch_once`, daemon; re-exports `reclaim` — runtime/stale/
+  orphan/crash reclaim and failure accounting — and `worker_spawn`), `workspace`, `notify`,
+  `graph`. Siblings reach the facade late-bound (`_kb.<name>`; the dispatcher's own siblings reach
+  it as `_kbd.<name>`) so `monkeypatch.setattr(kanban_db, ...)` keeps reaching every caller; new
+  code follows that convention.
+- **CLI:** `hermes_cli/kanban.py` facade + `kanban_*.py` siblings (`boards`, `ops`, `parser`,
+  `output`, `transfer`, `decompose`, `swarm`, ...). Verbs: `init, create, list (ls), show, assign, link,
   unlink, comment, attach, attachments, attach-rm, complete, request-review, request-changes,
   reopen-review, block, unblock, archive, tail`, plus `watch, stats, runs, log, assignees, heartbeat,
   notify-*, dispatch, daemon, gc`. Argparse alias dispatch must accept both `list` and `ls` (root).

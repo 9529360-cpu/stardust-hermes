@@ -123,7 +123,13 @@ def test_commit_fence_publishes_its_shared_deadline():
     assert not fence.deadline_exceeded
 
     fence.set_total_ceiling_seconds(0.001)
-    time.sleep(0.01)
+    # Wait for the clock itself to pass the deadline: time.monotonic() ticks every ~15.6 ms on
+    # Windows before Python 3.13, so a fixed 10 ms sleep can leave it unchanged.
+    deadline = fence.deadline_monotonic
+    for _ in range(1000):
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.005)
     assert fence.deadline_exceeded
     assert fence.deadline_monotonic <= time.monotonic()
 

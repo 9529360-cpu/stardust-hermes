@@ -171,8 +171,9 @@ async function main() {
   // window: the renderer inits `configured` from a localStorage cache
   // (null on a fresh install) and only flips after gateway probes, so the
   // overlay can mount late - first as a buttonless boot-progress card,
-  // then as the provider picker with the real escape hatch, "I'll choose
-  // a provider later" (i18n en: chooseLater). Two traps this loop avoids:
+  // then as the provider picker with the real escape hatch, "I'll set this
+  // up later" (i18n en: chooseLater; older builds: "I'll choose a provider
+  // later"). Two traps this loop avoids:
   // a one-shot dismiss probe loses to the late mount, and visibility is
   // the wrong readiness signal - the settings gear is "visible" UNDER the
   // fullscreen overlay while the overlay intercepts every click. So:
@@ -180,7 +181,7 @@ async function main() {
   // clicks until a settings click actually LANDS (Playwright's hit-target
   // check makes a landed click proof the overlay is gone).
   phase('overlay-loop');
-  const later = window.getByRole('button', { name: /choose a provider later|skip/i }).first()
+  const later = window.getByRole('button', { name: /set this up later|choose a provider later|skip/i }).first()
   const settingsButton = window.getByRole('button', { name: /open settings|settings/i }).first()
 
   const overlayDeadline = Date.now() + 180_000

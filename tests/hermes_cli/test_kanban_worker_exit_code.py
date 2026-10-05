@@ -15,6 +15,18 @@ import pytest
 
 import cli
 from hermes_cli.kanban_db import KANBAN_RATE_LIMIT_EXIT_CODE
+from hermes_cli import kanban_db_dispatch as dispatch
+
+
+@pytest.mark.parametrize("goal_mode", [False, True])
+def test_worker_uses_quiet_exit_contract_for_both_modes(monkeypatch, goal_mode):
+    monkeypatch.setattr(dispatch, "_resolve_hermes_argv", lambda: ["hermes"])
+    monkeypatch.setattr(dispatch, "_resolve_worker_cli_toolsets", lambda _home: [])
+    task = SimpleNamespace(id="t_exitcode", skills=(), model_override=None,
+                    provider_override=None, reasoning_effort=None, goal_mode=goal_mode)
+    argv = dispatch._worker_argv(task, "default", None)
+    assert argv[-4:] == ["chat", "-q", "work kanban task t_exitcode", "-Q"]
+
 
 
 def _quiet_exit_code(monkeypatch, result: dict, *, kanban_task: bool = True) -> int:
@@ -30,6 +42,19 @@ def _quiet_exit_code(monkeypatch, result: dict, *, kanban_task: bool = True) -> 
     return exc.value.code
 
 
+def test_failed_first_turn_skips_goal_judge_and_preserves_provider_exit(monkeypatch):
+    monkeypatch.setenv("HERMES_KANBAN_GOAL_MODE", "1")
+    monkeypatch.setenv("HERMES_KANBAN_TASK", "t_exitcode")
+    called = []
+    monkeypatch.setattr(cli, "_run_kanban_goal_loop_q", lambda *_: called.append(True))
+    agent = SimpleNamespace(run_conversation=lambda **_kw: {
+        "failed": True, "failure_reason": "server_error", "error": "HTTP 503",
+    }, session_id="s-1")
+    with pytest.raises(SystemExit) as exc:
+        cli._run_quiet_single_query(
+            SimpleNamespace(agent=agent, conversation_history=[], session_id="s-1"), "work kanban task t_exitcode")
+    assert exc.value.code == KANBAN_RATE_LIMIT_EXIT_CODE
+    assert not called
 @pytest.mark.parametrize("reason", [
     "timeout", "overloaded", "server_error", "upstream_rate_limit",  # provider availability
     "rate_limit", "billing",  # the original quota-wall pair

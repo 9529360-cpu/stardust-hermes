@@ -1071,11 +1071,9 @@ def _load_tools(agent, enabled_toolsets, disabled_toolsets):
     )
 
     agent.valid_tool_names = {tool["function"]["name"] for tool in agent.tools} if agent.tools else set()
-    # Kanban guidance is session-static (kanban_show iff HERMES_KANBAN_TASK); resolve once.
-    from agent.prompt_builder import KANBAN_GUIDANCE
-    agent._kanban_worker_guidance = (
-        KANBAN_GUIDANCE if "kanban_show" in agent.valid_tool_names else ""
-    )
+    # Kanban worker protocol is session-static; resolve once.
+    from agent.prompt_builder import kanban_worker_guidance
+    agent._kanban_worker_guidance = kanban_worker_guidance(agent.valid_tool_names)
     if agent.quiet_mode:
         return
     if agent.tools:
@@ -1245,6 +1243,11 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
     agent._user_profile_enabled = False
     agent._memory_nudge_interval = 10
     agent._memory_persistence_enabled = True
+    agent._topic_summaries_enabled = False
+    agent._topic_recall_limit = 2
+    agent._topic_recall_char_budget = 1800
+    agent._topic_recall_session_id = ""
+    agent._topic_recall_versions = {}
     agent._turns_since_memory = 0
     agent._iters_since_skill = 0
 
@@ -1260,6 +1263,7 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
                 MemoryStore,
                 get_builtin_memory_config,
                 memory_persistence_enabled as _memory_persistence_enabled,
+                topic_summaries_enabled,
             )
             memory_persistence_enabled = _memory_persistence_enabled
             mem_config = get_builtin_memory_config(_agent_cfg)
@@ -1269,6 +1273,18 @@ def _init_memory(agent, _agent_cfg, skip_memory, platform):
                 for key in ("memory_enabled", "user_profile_enabled")
             )
             agent._memory_nudge_interval = int(mem_config.get("nudge_interval", 10))
+            agent._topic_summaries_enabled = (
+                not skip_memory
+                and agent._memory_persistence_enabled
+                and topic_summaries_enabled(
+                    _agent_cfg,
+                    store_flags=(agent._memory_enabled, agent._user_profile_enabled),
+                )
+            )
+            agent._topic_recall_limit = max(0, min(5, _parse_config_int(mem_config.get("topic_recall_limit"), 2)))
+            agent._topic_recall_char_budget = max(
+                256, min(4000, _parse_config_int(mem_config.get("topic_recall_char_budget"), 1800))
+            )
             if agent._memory_enabled or agent._user_profile_enabled:
                 agent._memory_store = MemoryStore(
                     memory_char_limit=mem_config.get("memory_char_limit", 2200),

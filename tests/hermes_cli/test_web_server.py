@@ -2049,6 +2049,37 @@ class TestWebServerEndpoints:
         assert not get_env_value(custom_endpoint_key_env("proxy"))
 
 
+    def test_custom_endpoint_create_only_refuses_to_overwrite_an_existing_service(self):
+        """Desktop Add is create-only: an ID/name collision must never mutate the saved service."""
+        from hermes_cli.config import load_config
+
+        first = self.client.post(
+            "/api/providers/custom-endpoints",
+            json={
+                "id": "relay",
+                "name": "Relay",
+                "base_url": "https://a.example/v1",
+                "model": "model-a",
+            },
+        )
+        assert first.status_code == 200, first.text
+
+        collision = self.client.post(
+            "/api/providers/custom-endpoints",
+            json={
+                "name": "Relay",
+                "base_url": "https://b.example/v1",
+                "model": "model-b",
+                "create_only": True,
+            },
+        )
+        assert collision.status_code == 409, collision.text
+
+        entry = load_config()["providers"]["relay"]
+        assert entry["name"] == "Relay"
+        assert entry["base_url"] == "https://a.example/v1"
+        assert entry["model"] == "model-a"
+
     def test_two_endpoints_on_one_host_keep_separate_credentials(self):
         """Two local servers must not share an .env slot.
 

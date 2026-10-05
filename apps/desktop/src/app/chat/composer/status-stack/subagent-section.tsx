@@ -15,10 +15,11 @@ import { SubagentTranscript } from './subagent-transcript'
 
 interface SubagentSectionProps {
   sessionId: string
+  defaultCollapsed?: boolean
 }
 
 /** A composer-local roster: never borrow the global Agents panel's scope. */
-export function SubagentSection({ sessionId }: SubagentSectionProps) {
+export function SubagentSection({ sessionId, defaultCollapsed = true }: SubagentSectionProps) {
   const { t } = useI18n()
   const items = useSessionSlice($subagentsBySession, sessionId)
   const live = items.filter(item => item.status === 'running' || item.status === 'queued')
@@ -71,6 +72,7 @@ export function SubagentSection({ sessionId }: SubagentSectionProps) {
             spinner="braille"
           />
         }
+        defaultCollapsed={defaultCollapsed}
         icon={<Codicon className="text-(--ui-purple)" name="agent" size="0.8rem" />}
         label={t.statusStack.subagents(live.length)}
       >

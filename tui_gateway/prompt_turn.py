@@ -703,10 +703,10 @@ def _complete_turn_payload(session: dict, st: _TurnRun, status_note: str | None,
     _error_surface = None
     if _result_status(result) == "error":
         try:
-            from agent.error_surface import build_error_surface_from_result
-            _error_surface = build_error_surface_from_result(
+            from agent.error_surface import build_error_surface_from_result, stamp_agent_context
+            _error_surface = stamp_agent_context(build_error_surface_from_result(
                 result, provider=str(getattr(agent, "provider", "") or ""),
-                model=str(getattr(agent, "model", "") or ""))
+                model=str(getattr(agent, "model", "") or "")), agent)
         except Exception:
             _error_surface = None
     raw, status, last_reasoning = _turn_outcome(result, _error_surface)
@@ -967,13 +967,8 @@ def _run_prompt_submit(
             # still run its turn, but its stamp stays (#106459).
             if registered is session:
                 _reopen_routed_session_row(routing_db, sid, session)
-            # Start before publishing: a reader (e.g. compute_host._run_real_turn) that observes
-            # this thread via `_run_thread` must never see one that has not actually begun yet —
-            # `is_alive()` is False both before `start()` and after the thread finishes, so
-            # publishing the handle first would let a reader mistake "not started" for "already
-            # done" and end the turn early.
-            run_thread.start()
-            session["_run_thread"] = run_thread
+            from tui_gateway.run_thread_handle import start_turn_thread
+            start_turn_thread(session, run_thread)
     if not can_start:
         with session["history_lock"]:
             session["running"] = False

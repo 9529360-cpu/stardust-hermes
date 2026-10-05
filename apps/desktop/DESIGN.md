@@ -57,10 +57,10 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
-- **Pages are secondary destinations.** Tasks, projects, knowledge, tools, and
-  settings may be reached from the left navigation or overlays. Returning to
-  Conversation restores the assistant transcript, never a separate Workspace
-  landing page.
+- **Pages are secondary destinations.** Tasks, projects, knowledge, and tools
+  render in the workspace when opened from the left navigation; settings and
+  focused utilities may still use overlays. Returning to Conversation restores
+  the assistant transcript, never a separate Workspace landing page.
 - **Panes are working context.** Browser/preview, agent activity, files, review,
   terminal, tests, and diff belong to the right stage and remain attached to
   the current task. Their state survives temporary hiding where the underlying
@@ -211,9 +211,19 @@ blurred backdrop.
 - **Gutters:** `PAGE_INSET_X` (`src/app/layout-constants.ts`) for page side
   padding; `PAGE_INSET_NEG_X` to bleed a child to the edge. Don't hardcode
   `px-6`/`px-8` on pages.
+- **Side rails:** section labels use `SidebarPanelLabel` (11px, sentence case,
+  tertiary text — no accent color, tracked caps or glyph). A rail hosting
+  several panes (conversations/agents, context/files/review) shows its tabs as
+  one segmented control, and core panes give the tab a localized `tabTitle`
+  (`CorePaneTitle`) instead of their raw id.
+- **Conversation measure:** `--conversation-column-width`
+  (`src/reference-shell.css`, at most 46rem) is the one width the transcript,
+  empty state, sync banner and composer share. Change the token, never one
+  surface's width.
 - **Master/detail overlays:** `OverlaySplitLayout` + `OverlaySidebar` /
-  `OverlayMain`. Cron, profiles, etc. ride this — don't rebuild a titlebar
-  shell.
+  `OverlayMain`. Profiles and other true overlays ride this — don't rebuild a
+  titlebar shell. Tasks/Cron is a workspace page and reuses the shared
+  list/detail primitives without the `OverlayView` wrapper.
 - **Rows:** `ListRow` (settings `primitives.tsx`) for label/description/action
   rows. Flat, flush-left; no per-row indentation that fights flush headers.
 - **No dividers between rows** unless the list genuinely needs them; prefer
@@ -292,6 +302,10 @@ so glass and message-bubble transparency do not reveal scrolling text.
   ambiguous exit-1 results use neutral notices, with details still available.
   Errors described inside returned data are not tool failures. Expanded failures
   show the actual explanation; supporting output keeps its normal text color.
+- Thinking starts collapsed: while the model thinks the row shows a live
+  timer, and the reasoning body opens only when the user opens it. The
+  Appearance preference restores live previews; it is stored only when the
+  user changes it, so a later default change still reaches everyone else.
 - Composer status groups start collapsed except todos. Progress updates and queue
   pause/resume preserve the user's disclosure choice. Error banners meet the
   stack's top edge without a blank padding strip. File and preview links remain

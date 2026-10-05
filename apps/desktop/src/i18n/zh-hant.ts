@@ -923,7 +923,8 @@ export const zhHant = defineLocale({
       validationReachable: '連線正常。',
       validationReachableModels: count => `連線正常，找到 ${count} 個模型。`,
       validationFailed: '連線測試失敗',
-      activationFailed: '切換預設服務失敗'
+      activationFailed: '切換預設服務失敗',
+      duplicateService: '已經有同名的模型服務。請在列表中編輯它，或換一個名稱。'
     },
     computerUse: {
       accessibility: '輔助使用',
@@ -1632,12 +1633,10 @@ export const zhHant = defineLocale({
       bundledNames: {
         'hermes-bots': '智能體',
         kanban: '任務看板',
-        radio: '電台'
       },
       bundledDescriptions: {
         'hermes-bots': '智能體名冊，為每個智能體提供獨立對話、定時任務、群聊與智能體間訊息。',
         kanban: '多智能體任務看板，包含看板頁面、命令面板入口與狀態列中的即時任務動態。',
-        radio: '線上電台，支援固定常用電台、搜尋與隨音訊變化的波形顯示。'
       },
       halfDesktop: '桌面',
       halfDesktopHint: '本應用，所有設定相同',
@@ -2413,6 +2412,7 @@ export const zhHant = defineLocale({
 
   sidebar: {
     recent: '最近',
+    filters: '篩選',
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -2562,8 +2562,8 @@ export const zhHant = defineLocale({
       untitledChat: id => `工作階段 ${id}`,
       ageNow: '剛才',
       ageDay: '天',
-      ageHour: '時',
-      ageMin: '分'
+      ageHour: '小時',
+      ageMin: '分鐘'
     },
     dateDivider: {
       today: '今天稍早',
@@ -2580,6 +2580,7 @@ export const zhHant = defineLocale({
 
   composer: {
     message: '訊息',
+    addContext: '新增上下文',
     wakingProfile: profile => `正在喚醒 ${profile}…`,
     placeholderStarting: '正在啟動助理...',
     placeholderReconnecting: '正在重新連線…',
@@ -3030,7 +3031,7 @@ export const zhHant = defineLocale({
     collapse: '收合',
     otherProviders: '其他提供方',
     haveApiKey: '我有 API 金鑰',
-    chooseLater: '稍後再選擇提供方',
+    chooseLater: '稍後再設定',
     recommended: '建議',
     connected: '已連線',
     featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Stardust 的建議方式',
@@ -3391,6 +3392,7 @@ export const zhHant = defineLocale({
   },
 
   zones: {
+    paneTitles: { overview: '上下文', files: '檔案', review: '審查', terminal: '終端機' },
     showTabStrip: '顯示分頁',
     hideTabStrip: '隱藏分頁',
     showStripTab: title => `顯示 ${title}`,
@@ -3481,22 +3483,142 @@ export const zhHant = defineLocale({
       react: '回應',
       dismissError: '关闭错误',
       errorLayers: {
-        auth: '認證錯誤',
-        billing: '額度不足',
+        auth: '登入或金鑰有問題',
+        billing: '額度用完了',
         disk: '磁碟已滿',
-        endpoint: '自訂端點錯誤',
-        gateway: '閘道錯誤',
-        generic: '本輪失敗',
-        provider: '模型服務商錯誤',
-        runtime: '本機執行環境錯誤',
-        streaming: '串流連線錯誤'
+        endpoint: '連不上你的模型伺服器',
+        gateway: '星塵遇到了問題',
+        generic: '星塵沒能完成這次回覆',
+        provider: '模型服務回傳了錯誤',
+        runtime: '星塵遇到了問題',
+        streaming: '回覆中途斷開了'
       },
+      errorLayerBodies: {
+        auth: '模型服務沒有接受你的登入憑證。檢查這個服務的金鑰或登入，然後重新傳送。',
+        billing: '這個服務的帳戶額度已用完。儲值或切換服務商，然後重新傳送。',
+        disk: '磁碟已滿，星塵無法儲存這段對話。清出一些空間後重試。',
+        endpoint: '星塵連不上你的自訂模型伺服器。確認它正在執行，然後重新傳送。',
+        gateway: '星塵開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
+        generic: '星塵回覆時出了問題。可以重試；如果反覆出現，請複製錯誤詳細資訊。',
+        provider: '模型服務沒能完成這次請求。稍後重試，或切換服務商。',
+        runtime: '星塵開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
+        streaming: '回覆還沒寫完連線就斷了。點「重試」重新傳送。'
+      },
+      errorCodes: {
+        auth: {
+          title: provider => `${provider} 沒有接受你的登入`,
+          body: provider => `${provider} 不接受已儲存的憑證。在設定中修正或切換服務商，然後重新傳送。`
+        },
+        auth_permanent: {
+          title: provider => `${provider} 沒有接受你的登入`,
+          body: provider => `${provider} 的憑證無效或已被撤銷。更新憑證或切換服務商，然後重新傳送。`
+        },
+        billing: {
+          title: '額度用完了',
+          body: provider => `你的 ${provider} 帳戶額度已用完。儲值或切換服務商，然後重新傳送。`
+        },
+        rate_limit: {
+          title: '模型服務正忙',
+          body: provider => `${provider} 正在限制請求次數。等一分鐘再重試。`
+        },
+        upstream_rate_limit: {
+          title: '模型服務正忙',
+          body: provider => `${provider} 正在限制請求次數。等一分鐘再重試。`
+        },
+        overloaded: {
+          title: '模型服務負載過高',
+          body: provider => `${provider} 現在出了狀況。稍後重試，或切換服務商。`
+        },
+        server_error: {
+          title: '模型服務出了問題',
+          body: provider => `${provider} 回傳了伺服器錯誤。稍後重試，或切換服務商。`
+        },
+        timeout: {
+          title: '回覆逾時了',
+          body: provider => `${provider} 沒有及時回應。點「重試」重新傳送。`
+        },
+        stream_drop: {
+          title: '回覆中途斷開了',
+          body: '回覆還沒寫完連線就斷了。點「重試」重新傳送。'
+        },
+        ssl_cert_verification: {
+          title: '安全連線失敗',
+          body: provider => `星塵無法驗證與 ${provider} 的安全連線。檢查網路或 Proxy 設定，或切換服務商，然後重新傳送。`
+        },
+        context_overflow: {
+          title: '這段對話太長了',
+          body: '這段對話已超出模型能處理的長度。壓縮對話或開始新對話，然後重新傳送。'
+        },
+        payload_too_large: {
+          title: '這則訊息太大了',
+          body: '這次請求對模型來說太大了。壓縮對話或開始新對話，然後重新傳送。'
+        },
+        model_not_found: {
+          title: '這個模型無法使用',
+          body: provider => `${provider} 在你的帳戶下不提供這個模型。換一個模型，然後重新傳送。`
+        },
+        provider_policy_blocked: {
+          title: '你的帳戶設定封鎖了這個模型',
+          body: provider => `依你帳戶的資料或隱私設定，${provider} 不會轉送這次請求。換一個模型或切換服務商。`
+        },
+        content_policy_blocked: {
+          title: '模型服務拒絕了這次請求',
+          body: provider => `${provider} 不願意回答這則訊息。修改後再傳送。`
+        },
+        format_error: {
+          title: '模型服務不接受這次請求',
+          body: provider => `${provider} 不接受這次請求的格式。切換服務商，或傳送診斷資訊方便我們排查。`
+        },
+        truncated: {
+          title: '回覆被截斷了',
+          body: '模型還沒寫完就停了。點「重試」取得完整回覆。'
+        },
+        invalid_response: {
+          title: '模型服務回傳了無法讀取的內容',
+          body: provider => `${provider} 回傳的內容星塵讀不懂。稍後重試。`
+        },
+        empty_response: {
+          title: '模型服務回傳了空白回覆',
+          body: provider => `${provider} 對這則訊息什麼也沒回傳。稍後重試。`
+        },
+        loop_error: {
+          title: '星塵陷入了迴圈',
+          body: '回覆一直重複同樣的步驟，星塵把它停了下來。可以重試；如果再次出現，開始新對話。'
+        },
+        SESSION_NOT_OWNED: {
+          title: '這段對話正在別處開啟',
+          body: '這段對話正在另一個星塵視窗或終端機中開啟。在那邊關閉後重新傳送，或在這裡開始新對話。'
+        },
+        disk_full: {
+          title: '磁碟已滿',
+          body: '磁碟已滿，星塵無法儲存這段對話。清出一些空間後重試。'
+        }
+      },
+      errorAuthKinds: {
+        api_key: {
+          title: provider => `${provider} 沒有接受你的 API 金鑰`,
+          body: provider => `為 ${provider} 儲存的金鑰無效或已被撤銷。更新後重試。`
+        },
+        oauth: {
+          title: provider => `你的 ${provider} 登入已過期`
+        }
+      },
+      errorDetails: '詳細資訊',
+      errorGenericProvider: '模型服務',
+      errorToastTitle: '星塵沒能完成這次回覆',
       errorRetry: '重試',
       errorStartNewSession: '開始新工作階段',
       errorSwitchProvider: '切換服務商',
+      errorSetUpFallback: '設定備用模型',
       errorSignInAgain: provider => `重新登入 ${provider}`,
       errorOauthExpired: provider =>
         `您的 ${provider} 登入已過期或被撤銷。請在終端機執行 hermes model，選擇 ${provider} 重新登入；或在「設定 → 模型服務」中改用模型 API。`,
+      errorChooseModel: '選擇模型',
+      errorCompressConversation: '壓縮對話',
+      errorCompressFailed: '無法壓縮對話',
+      errorOpenHermesFolder: '開啟星塵資料夾',
+      errorOpenHermesFolderFailed: '無法開啟星塵資料夾',
+      errorUpdateApiKey: '更新 API 金鑰',
       errorOpenLogs: '開啟日誌',
       errorOpenLogsFailed: '無法開啟日誌資料夾',
       errorOpenDesktopLogs: '開啟桌面端日誌',

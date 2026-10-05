@@ -423,9 +423,10 @@ def _emit_terminal_turn_error(
     agent = session.get("agent")
     if error_surface is None and isinstance(error, BaseException):
         with contextlib.suppress(Exception):
-            from agent.error_surface import build_error_surface_from_exception
-            error_surface = build_error_surface_from_exception(
-                error, provider=str(getattr(agent, "provider", "") or ""), model=str(getattr(agent, "model", "") or ""))
+            from agent.error_surface import build_error_surface_from_exception, stamp_agent_context
+            error_surface = stamp_agent_context(build_error_surface_from_exception(
+                error, provider=str(getattr(agent, "provider", "") or ""), model=str(getattr(agent, "model", "") or "")),
+                agent)
     with session["history_lock"]:
         _fail_inflight_turn(session, error, error_surface=error_surface)
         turn = session.get("inflight_turn") or {}

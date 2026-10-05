@@ -1143,7 +1143,8 @@ export const zh = defineLocale({
       validationReachable: '连接正常。',
       validationReachableModels: count => `连接正常，找到 ${count} 个模型。`,
       validationFailed: '连接测试失败',
-      activationFailed: '切换默认服务失败'
+      activationFailed: '切换默认服务失败',
+      duplicateService: '已经有同名的模型服务。请在列表里编辑它，或换一个名称。'
     },
     computerUse: {
       accessibility: '辅助功能',
@@ -2028,12 +2029,10 @@ export const zh = defineLocale({
       bundledNames: {
         'hermes-bots': '智能体',
         kanban: '任务看板',
-        radio: '电台'
       },
       bundledDescriptions: {
         'hermes-bots': '智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。',
         kanban: '多智能体任务看板，包含看板页面、命令面板入口和状态栏中的实时任务动态。',
-        radio: '在线电台，支持固定常用电台、搜索和随音频变化的波形显示。'
       },
       halfDesktop: '桌面',
       halfDesktopHint: '本应用，所有配置相同',
@@ -3105,6 +3104,7 @@ export const zh = defineLocale({
 
   sidebar: {
     recent: '最近',
+    filters: '筛选',
     gatewayGroups: {
       grouping: '网关与配置',
       rename: '重命名分组',
@@ -3267,8 +3267,8 @@ export const zh = defineLocale({
       todoProgress: '任务完成度',
       ageNow: '刚刚',
       ageDay: '天',
-      ageHour: '时',
-      ageMin: '分'
+      ageHour: '小时',
+      ageMin: '分钟'
     },
     dateDivider: {
       today: '今天早些时候',
@@ -3286,6 +3286,7 @@ export const zh = defineLocale({
 
   composer: {
     message: '消息',
+    addContext: '添加上下文',
     wakingProfile: profile => `正在唤醒 ${profile}…`,
     placeholderStarting: '正在启动助理…',
     placeholderReconnecting: '正在重新连接…',
@@ -3781,7 +3782,7 @@ export const zh = defineLocale({
     collapse: '收起',
     otherProviders: '其他提供方',
     haveApiKey: '我有 API 密钥',
-    chooseLater: '稍后再选择提供方',
+    chooseLater: '稍后再设置',
     recommended: '推荐',
     connected: '已连接',
     featuredPitch: '一个订阅，300+ 前沿模型 — 运行 Stardust 的推荐方式',
@@ -4218,6 +4219,7 @@ export const zh = defineLocale({
   },
 
   zones: {
+    paneTitles: { overview: '上下文', files: '文件', review: '审查', terminal: '终端' },
     showTabStrip: '显示标签',
     hideTabStrip: '隐藏标签',
     showStripTab: title => `显示 ${title}`,
@@ -4313,22 +4315,142 @@ export const zh = defineLocale({
       react: '回应',
       dismissError: '关闭错误',
       errorLayers: {
-        auth: '认证错误',
-        billing: '额度不足',
+        auth: '登录或密钥有问题',
+        billing: '额度用完了',
         disk: '磁盘已满',
-        endpoint: '自定义端点错误',
-        gateway: '网关错误',
-        generic: '本轮失败',
-        provider: '模型服务商错误',
-        runtime: '本地运行时错误',
-        streaming: '流式连接错误'
+        endpoint: '连不上你的模型服务器',
+        gateway: '星尘遇到了问题',
+        generic: '星尘没能完成这次回复',
+        provider: '模型服务返回了错误',
+        runtime: '星尘遇到了问题',
+        streaming: '回复中途断开了'
       },
+      errorLayerBodies: {
+        auth: '模型服务没有接受你的登录凭据。检查这个服务的密钥或登录，然后重新发送。',
+        billing: '这个服务的账户额度已用完。充值或切换服务商，然后重新发送。',
+        disk: '磁盘已满，星尘没法保存这段对话。清理一些空间后重试。',
+        endpoint: '星尘连不上你的自定义模型服务器。确认它正在运行，然后重新发送。',
+        gateway: '星尘开始回复时遇到内部问题。重新发送一次；如果反复出现，请发送诊断信息。',
+        generic: '星尘回复时出了问题。可以重试；如果反复出现，请复制错误详情。',
+        provider: '模型服务没能完成这次请求。稍后重试，或切换服务商。',
+        runtime: '星尘开始回复时遇到内部问题。重新发送一次；如果反复出现，请发送诊断信息。',
+        streaming: '回复还没写完连接就断了。点“重试”重新发送。'
+      },
+      errorCodes: {
+        auth: {
+          title: provider => `${provider} 没有接受你的登录`,
+          body: provider => `${provider} 不接受已保存的凭据。在设置里改正或切换服务商，然后重新发送。`
+        },
+        auth_permanent: {
+          title: provider => `${provider} 没有接受你的登录`,
+          body: provider => `${provider} 的凭据无效或已被撤销。更新凭据或切换服务商，然后重新发送。`
+        },
+        billing: {
+          title: '额度用完了',
+          body: provider => `你的 ${provider} 账户额度已用完。充值或切换服务商，然后重新发送。`
+        },
+        rate_limit: {
+          title: '模型服务正忙',
+          body: provider => `${provider} 正在限制请求次数。等一分钟再重试。`
+        },
+        upstream_rate_limit: {
+          title: '模型服务正忙',
+          body: provider => `${provider} 正在限制请求次数。等一分钟再重试。`
+        },
+        overloaded: {
+          title: '模型服务负载过高',
+          body: provider => `${provider} 现在出了状况。稍后重试，或切换服务商。`
+        },
+        server_error: {
+          title: '模型服务出了问题',
+          body: provider => `${provider} 返回了服务器错误。稍后重试，或切换服务商。`
+        },
+        timeout: {
+          title: '回复超时了',
+          body: provider => `${provider} 没有及时回应。点“重试”重新发送。`
+        },
+        stream_drop: {
+          title: '回复中途断开了',
+          body: '回复还没写完连接就断了。点“重试”重新发送。'
+        },
+        ssl_cert_verification: {
+          title: '安全连接失败',
+          body: provider => `星尘无法验证与 ${provider} 的安全连接。检查网络或代理设置，或切换服务商，然后重新发送。`
+        },
+        context_overflow: {
+          title: '这段对话太长了',
+          body: '这段对话已经超出模型能处理的长度。压缩对话或开始新对话，然后重新发送。'
+        },
+        payload_too_large: {
+          title: '这条消息太大了',
+          body: '这次请求对模型来说太大了。压缩对话或开始新对话，然后重新发送。'
+        },
+        model_not_found: {
+          title: '这个模型用不了',
+          body: provider => `${provider} 在你的账户下不提供这个模型。换一个模型，然后重新发送。`
+        },
+        provider_policy_blocked: {
+          title: '你的账户设置屏蔽了这个模型',
+          body: provider => `按你账户的数据或隐私设置，${provider} 不会转发这次请求。换一个模型或切换服务商。`
+        },
+        content_policy_blocked: {
+          title: '模型服务拒绝了这次请求',
+          body: provider => `${provider} 不愿意回答这条消息。修改后再发送。`
+        },
+        format_error: {
+          title: '模型服务不接受这次请求',
+          body: provider => `${provider} 不接受这次请求的格式。切换服务商，或发送诊断信息方便我们排查。`
+        },
+        truncated: {
+          title: '回复被截断了',
+          body: '模型没写完就停了。点“重试”获取完整回复。'
+        },
+        invalid_response: {
+          title: '模型服务返回了看不懂的内容',
+          body: provider => `${provider} 返回的内容星尘读不懂。稍后重试。`
+        },
+        empty_response: {
+          title: '模型服务返回了空回复',
+          body: provider => `${provider} 对这条消息什么也没返回。稍后重试。`
+        },
+        loop_error: {
+          title: '星尘陷入了循环',
+          body: '回复一直在重复同样的步骤，星尘把它停了下来。可以重试；如果再次出现，开始新对话。'
+        },
+        SESSION_NOT_OWNED: {
+          title: '这个对话正在别处打开',
+          body: '这个对话正在另一个星尘窗口或终端里打开。在那边关闭后重新发送，或在这里开始新对话。'
+        },
+        disk_full: {
+          title: '磁盘已满',
+          body: '磁盘已满，星尘没法保存这段对话。清理一些空间后重试。'
+        }
+      },
+      errorAuthKinds: {
+        api_key: {
+          title: provider => `${provider} 没有接受你的 API 密钥`,
+          body: provider => `为 ${provider} 保存的密钥无效或已被撤销。更新后重试。`
+        },
+        oauth: {
+          title: provider => `你的 ${provider} 登录已过期`
+        }
+      },
+      errorDetails: '详情',
+      errorGenericProvider: '模型服务',
+      errorToastTitle: '星尘没能完成这次回复',
       errorRetry: '重试',
       errorStartNewSession: '开始新会话',
       errorSwitchProvider: '切换服务商',
+      errorSetUpFallback: '设置备用模型',
       errorSignInAgain: provider => `重新登录 ${provider}`,
       errorOauthExpired: provider =>
         `您的 ${provider} 登录已过期或被撤销。请在终端运行 hermes model，选择 ${provider} 重新登录；或在“设置 → 模型服务”中改用模型 API。`,
+      errorChooseModel: '选择模型',
+      errorCompressConversation: '压缩对话',
+      errorCompressFailed: '无法压缩对话',
+      errorOpenHermesFolder: '打开星尘数据文件夹',
+      errorOpenHermesFolderFailed: '无法打开星尘数据文件夹',
+      errorUpdateApiKey: '更新 API 密钥',
       errorOpenLogs: '打开日志',
       errorOpenLogsFailed: '无法打开日志文件夹',
       errorOpenDesktopLogs: '打开桌面端日志',

@@ -129,6 +129,60 @@ def test_loop_stops_when_worker_already_completed(monkeypatch):
     assert turns == []  # no extra turns
 
 
+def _scripted_judge(monkeypatch, replies):
+    """judge_goal returning scripted (verdict, parse_failed, transport_failed) replies."""
+    seq = list(replies)
+
+    def _fake_judge(goal, response, **_kw):
+        verdict, parse_failed, transport_failed = seq.pop(0)
+        return verdict, f"scripted:{verdict}", parse_failed, None, transport_failed
+
+    monkeypatch.setattr(goals, "judge_goal", _fake_judge)
+
+
+_JUDGE_API_ERROR = ("continue", False, True)
+_JUDGE_GARBAGE = ("continue", True, False)
+
+
+@pytest.mark.parametrize(("failure", "limit"), [
+    (_JUDGE_API_ERROR, goals.DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES),
+    (_JUDGE_GARBAGE, goals.DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES),
+])
+def test_a_broken_judge_blocks_instead_of_spending_the_turn_budget(monkeypatch, failure, limit):
+    """GoalManager auto-pauses on a broken judge; the kanban loop used to fail open on every
+    turn and run the worker through its whole budget (20 real turns by default)."""
+    _scripted_judge(monkeypatch, [failure] * 20)
+    turns, blocks = [], []
+
+    res = goals.run_kanban_goal_loop(
+        task_id="t1", goal_text="ship the report", run_turn=lambda p: turns.append(p) or "progress",
+        task_status_fn=lambda: "running", block_fn=blocks.append, max_turns=20, first_response="started",
+    )
+
+    assert res["outcome"] == "blocked_judge_unavailable"
+    assert len(turns) == limit - 1  # the limit-th failed judgment stops before another turn
+    assert len(blocks) == 1 and "auxiliary.goal_judge" in blocks[0]
+
+
+def test_judge_hiccups_between_real_verdicts_do_not_stop_the_loop(monkeypatch):
+    _scripted_judge(monkeypatch, [_JUDGE_API_ERROR, ("continue", False, False)] * 4 + [("done", False, False)])
+    turns = []
+    state = {"completed": False}
+
+    def run_turn(prompt):
+        turns.append(prompt)
+        state["completed"] = len(turns) == 9  # the worker finalizes after the finalize nudge
+        return "progress"
+
+    res = goals.run_kanban_goal_loop(
+        task_id="t1", goal_text="ship the report", run_turn=run_turn,
+        task_status_fn=lambda: "done" if state["completed"] else "running",
+        block_fn=lambda reason: pytest.fail(f"should not block: {reason}"), max_turns=20, first_response="started",
+    )
+
+    assert res["outcome"] == "completed_by_worker"
+
+
 
 
 

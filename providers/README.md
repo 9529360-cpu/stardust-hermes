@@ -44,7 +44,7 @@ layer reads from it:
   when URL detection finds nothing.
 - `agent/model_metadata.py` maps hostname → provider via
   `profile.get_hostname()`.
-- `agent/auxiliary_client.py` reads `profile.default_aux_model` first
+- `agent/auxiliary_catalog.py` reads `profile.default_aux_model` first
   before falling back to the legacy hardcoded dict.
 - `agent/transports/chat_completions.py::_build_kwargs_from_profile()`
   invokes `profile.prepare_messages()`, `profile.build_extra_body()`,

@@ -508,18 +508,24 @@
 }
 
 
-/* The conversations/agents pair is a sidebar mode switch, not global app
-   navigation. Keep the enforced shared pane group, but render its titlebar
-   tabs as one quiet segmented control inside the rail. */
+/* Side-rail mode switches — conversations/agents on the left, context/files/review
+   on the right — are not global app navigation. Keep the shared pane groups, but
+   render their titlebar tabs as one quiet segmented control inside the rail. */
 :root[data-hermes-reference-shell='aurora']
-  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']) {
+  :is(
+    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
+    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
+  ) {
   background: transparent !important;
   box-shadow: none;
   --pane-tab-active-bg: var(--ui-control-active-background);
 }
 
 :root[data-hermes-reference-shell='aurora']
-  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  :is(
+    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
+    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
+  )
   > [role='tablist'] {
   align-self: center;
   flex: 0 0 auto;
@@ -531,7 +537,10 @@
   background: var(--ui-bg-quaternary);
 }
 :root[data-hermes-reference-shell='aurora']
-  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  :is(
+    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
+    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
+  )
   [data-slot='pane-tab'] {
   height: 22px;
   min-width: 0;
@@ -541,13 +550,19 @@
 }
 
 :root[data-hermes-reference-shell='aurora']
-  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  :is(
+    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
+    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
+  )
   [data-slot='pane-tab'][data-active='false'] {
   --tab-bg: transparent;
 }
 
 :root[data-hermes-reference-shell='aurora']
-  [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane'])
+  :is(
+    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
+    [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
+  )
   [data-slot='pane-tab'] .pane-tab-content > span > span {
   font-size: 0.67rem;
   font-weight: 520;
@@ -670,11 +685,6 @@
   background: var(--ui-panel-surface-background) !important;
 }
 
-:root[data-hermes-reference-shell='aurora'] .jarvis-context-rail > div:first-child {
-  border-bottom: 1px solid var(--ui-stroke-quaternary);
-  padding-bottom: 0.5rem;
-}
-
 :root[data-hermes-reference-shell='aurora'] .jarvis-context-rail section {
   background: transparent !important;
 }
@@ -783,9 +793,10 @@
 }
 
 /* One readable conversation grid: transcript, empty state, sync banner, and
-   composer share the same measure instead of each choosing a width. */
+   composer share the same measure instead of each choosing a width. At 52rem
+   the column read as a stretched bar on wide windows; 46rem keeps lines short. */
 :root[data-hermes-reference-shell='aurora'] {
-  --conversation-column-width: min(52rem, calc(100% - 2rem));
+  --conversation-column-width: min(46rem, calc(100% - 2rem));
   --composer-width: var(--conversation-column-width);
 }
 

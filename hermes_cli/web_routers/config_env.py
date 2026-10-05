@@ -482,6 +482,11 @@ def _write_custom_endpoint(cfg: Dict[str, Any], body: CustomEndpointUpdate) -> T
     if not isinstance(providers, dict):
         providers = {}
     stored_key, existing = find_provider_entry(providers, endpoint_id)
+    if body.create_only and existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="model service already exists; edit the existing service instead",
+        )
     if existing is None:
         existing = {}
 

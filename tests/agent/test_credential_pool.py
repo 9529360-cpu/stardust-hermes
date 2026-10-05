@@ -1407,6 +1407,41 @@ def test_load_pool_seeds_copilot_via_gh_auth_token(tmp_path, monkeypatch):
     assert entries[0].base_url == "https://api.githubcopilot.com"
 
 
+def test_degraded_copilot_exchange_is_reported_once_per_token(tmp_path, monkeypatch, caplog):
+    """Every pool load re-seeds Copilot (each provider listing, each new session), so the
+    degraded-exchange warning repeated on every load and became most of errors.log for anyone
+    signed in to the GitHub CLI. It describes a lasting state: once per token, and again only
+    after the exchange recovered and degraded anew."""
+    import logging
+
+    import agent.credential_pool as cp
+
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    _write_auth_store(tmp_path, {"version": 1, "credential_pool": {}})
+    monkeypatch.setattr(
+        "hermes_cli.copilot_auth.resolve_copilot_token",
+        lambda: ("gho_fake_token_abc123", "gh auth token"),
+    )
+    exchange = {"result": ("gho_fake_token_abc123", None)}  # degraded: the raw token comes back
+    monkeypatch.setattr("hermes_cli.copilot_auth.get_copilot_api_token", lambda token: exchange["result"])
+    monkeypatch.setattr(cp, "_copilot_degraded_reported", set())
+
+    def degraded_warnings():
+        return [r for r in caplog.records if "degraded to RAW token" in r.getMessage()]
+
+    with caplog.at_level(logging.WARNING, logger="agent.credential_pool"):
+        for _ in range(3):
+            assert cp.load_pool("copilot").has_credentials()
+        assert len(degraded_warnings()) == 1
+
+        exchange["result"] = ("tid=exchanged", "https://api.enterprise.githubcopilot.com")
+        cp.load_pool("copilot")
+        exchange["result"] = ("gho_fake_token_abc123", None)
+        cp.load_pool("copilot")
+
+    assert len(degraded_warnings()) == 2
+
+
 def test_load_pool_skips_exchange_for_suppressed_copilot(tmp_path, monkeypatch):
     """A suppressed copilot source must NOT run the token exchange.
 

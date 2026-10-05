@@ -60,7 +60,7 @@ export interface DesktopOnboardingState {
   providers: null | OAuthProvider[]
   reason: null | string
   requested: boolean
-  /** True when the user explicitly chose "I'll choose a provider later" on the
+  /** True when the user explicitly chose "I'll set this up later" on the
    *  first-run picker. Persisted to localStorage so the blocking overlay never
    *  re-nags on subsequent launches — the user can connect a provider any time
    *  from Settings → Models (or the model picker's "Add model API"). Distinct
@@ -599,7 +599,7 @@ export function completeDesktopOnboarding() {
   })
 }
 
-// "I'll choose a provider later" on the first-run picker. Persists the skip so
+// "I'll set this up later" on the first-run picker. Persists the skip so
 // the blocking overlay never re-nags on future launches, and dismisses it now
 // so the user lands in the app. Chat won't work until a provider is connected
 // (from Settings → Models or the model picker's "Add model API") — this only

@@ -224,7 +224,7 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          aria-label="Filters"
+          aria-label={t.sidebar.filters}
           className={cn(
             className,
             'data-[state=open]:bg-(--ui-control-active-background) data-[state=open]:text-foreground data-[state=open]:opacity-100',

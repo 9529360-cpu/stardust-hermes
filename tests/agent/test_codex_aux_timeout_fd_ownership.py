@@ -22,17 +22,20 @@ import pytest
 from agent.auxiliary_client import _CodexCompletionsAdapter
 
 
-def _adapter_with_recording_client(stream):
+def _adapter_with_recording_client(stream, on_shutdown=None):
     """Build an adapter whose client records (action, thread) events.
 
     The nested ``_client._transport._pool._connections`` shape is what
-    ``force_close_tcp_sockets`` traverses.
+    ``force_close_tcp_sockets`` traverses. ``on_shutdown`` runs after a socket
+    shutdown is recorded, so a stream double can wake like a real blocked read.
     """
     events = []
 
     class _Sock:
         def shutdown(self, how):
             events.append(("shutdown", threading.get_ident()))
+            if on_shutdown is not None:
+                on_shutdown()
 
         def close(self):
             events.append(("sock.close", threading.get_ident()))
@@ -71,13 +74,17 @@ class TestCodexAuxiliaryTimeoutFdOwnership:
         shutdown(); the real close() must land on the owning thread in the
         adapter's ``finally``."""
 
-        def _stalled():
-            deadline = time.monotonic() + 30.0
-            while time.monotonic() < deadline:
-                time.sleep(0.02)
-                yield SimpleNamespace(type="response.in_progress")
+        socket_shut = threading.Event()
 
-        adapter, events = _adapter_with_recording_client(_stalled())
+        def _stalled():
+            # One lifecycle frame, then a read that blocks until the socket is shut down —
+            # like a real stalled connection. A stream that kept yielding frames would let the
+            # owner's per-event deadline check race the Timer to the same deadline.
+            yield SimpleNamespace(type="response.in_progress")
+            if socket_shut.wait(30.0):
+                raise ConnectionResetError("connection shut down by the watchdog")
+
+        adapter, events = _adapter_with_recording_client(_stalled(), on_shutdown=socket_shut.set)
         owner_tid = threading.get_ident()
 
         def _consume(stream, *, model, on_event):

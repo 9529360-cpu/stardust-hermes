@@ -22,6 +22,8 @@ test('tasks opens the scheduled-task surface without exposing Cron as the produc
   await tasksButton.click()
   await expect(tasksButton).toHaveAttribute('aria-current', 'page')
   await expect(page.getByText('定时任务', { exact: true })).toBeVisible()
+  await expect(page.locator('[data-cron-page]')).toBeVisible()
+  await expect(page.locator('[data-overlay-surface]')).toHaveCount(0)
   await expect(page.getByText('正在加载定时任务…', { exact: true })).toHaveCount(0, { timeout: 15_000 })
   await expect(page.getByText('暂无排程任务', { exact: true })).toHaveCount(2)
   await expect(page.getByText(/设置一个提示词按计划自动运行/)).toBeVisible()

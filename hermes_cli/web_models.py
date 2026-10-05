@@ -42,6 +42,7 @@ class CustomEndpointUpdate(BaseModel):
     context_length: Optional[int] = None
     discover_models: bool = True
     make_default: bool = False
+    create_only: bool = False
     models: Optional[List[str]] = None
 
 class MessagingPlatformUpdate(BaseModel):
