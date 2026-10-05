@@ -259,9 +259,9 @@ function VirtualizedReviewList({
   )
 }
 
-// Depth-0 rows align their icon to the panel header's dither glyph: the tree
-// body has px-1 (4px) and the header glyph sits at px-2.5 (10px) + the label's
-// pl-2 (8px) = 18px, so the base inset is 18 − 4 = 14px.
+// Depth-0 rows align their icon to the panel header's label: the tree body has
+// px-1 (4px) and the label text starts at px-2.5 (10px) + its pl-2 (8px) = 18px,
+// so the base inset is 18 − 4 = 14px.
 const ROW_BASE_INSET = 14
 
 function rowStyle(depth: number): CSSProperties {

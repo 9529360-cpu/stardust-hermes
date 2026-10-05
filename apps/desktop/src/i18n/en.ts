@@ -2815,6 +2815,7 @@ export const en: Translations = {
 
   sidebar: {
     recent: 'Recent',
+    filters: 'Filters',
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',
@@ -2998,6 +2999,7 @@ export const en: Translations = {
 
   composer: {
     message: 'Message',
+    addContext: 'Add context',
     wakingProfile: profile => `Waking up ${profile}…`,
     placeholderStarting: 'Starting your assistant...',
     placeholderReconnecting: 'Reconnecting…',
@@ -3967,6 +3969,7 @@ export const en: Translations = {
   },
 
   zones: {
+    paneTitles: { overview: 'Context', files: 'Files', review: 'Review', terminal: 'Terminal' },
     showTabStrip: 'Show tabs',
     hideTabStrip: 'Hide tabs',
     showStripTab: title => `Show ${title}`,

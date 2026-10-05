@@ -2440,6 +2440,7 @@ export interface Translations {
 
   sidebar: {
     recent: string
+    filters: string
     gatewayGroups: {
       grouping: string
       rename: string
@@ -2612,6 +2613,7 @@ export interface Translations {
 
   composer: {
     message: string
+    addContext: string
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string
@@ -3486,6 +3488,7 @@ export interface Translations {
   }
 
   zones: {
+    paneTitles: { overview: string; files: string; review: string; terminal: string }
     showTabStrip: string
     hideTabStrip: string
     showStripTab: (title: string) => string

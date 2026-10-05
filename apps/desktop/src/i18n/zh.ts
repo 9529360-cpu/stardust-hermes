@@ -3104,6 +3104,7 @@ export const zh = defineLocale({
 
   sidebar: {
     recent: '最近',
+    filters: '筛选',
     gatewayGroups: {
       grouping: '网关与配置',
       rename: '重命名分组',
@@ -3285,6 +3286,7 @@ export const zh = defineLocale({
 
   composer: {
     message: '消息',
+    addContext: '添加上下文',
     wakingProfile: profile => `正在唤醒 ${profile}…`,
     placeholderStarting: '正在启动助理…',
     placeholderReconnecting: '正在重新连接…',
@@ -4217,6 +4219,7 @@ export const zh = defineLocale({
   },
 
   zones: {
+    paneTitles: { overview: '上下文', files: '文件', review: '审查', terminal: '终端' },
     showTabStrip: '显示标签',
     hideTabStrip: '隐藏标签',
     showStripTab: title => `显示 ${title}`,
