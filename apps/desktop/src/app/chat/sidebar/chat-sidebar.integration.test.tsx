@@ -7,6 +7,7 @@ import { group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { registry } from '@/contrib/registry'
+import { $pinnedSessionIds } from '@/store/layout'
 import { $selectedStoredSessionId, $sessions, $sessionsLoading } from '@/store/session'
 import { $removedSessionIds } from '@/store/session-removal'
 import { makeSessionInfo } from '@/test/session-info'
@@ -78,6 +79,7 @@ describe('ChatSidebar compact conversation surface', () => {
     $sessions.set([])
     $sessionsLoading.set(true)
     $removedSessionIds.set(new Set())
+    $pinnedSessionIds.set([])
     $layoutTree.set(null)
     noteActiveTreeGroup(null)
   })
@@ -85,7 +87,6 @@ describe('ChatSidebar compact conversation surface', () => {
   it('shows pinned/conversation content without feature nav or persistent search', () => {
     renderSidebar('/kanban', 'extension')
 
-    expect(screen.getByText('Pinned chats')).toBeTruthy()
     expect(screen.getByText('Tile one')).toBeTruthy()
     expect(screen.getByText('Tile two')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Kanban' })).toBeNull()
@@ -140,7 +141,7 @@ describe('ChatSidebar compact conversation surface', () => {
     }
   })
 
-  it('keeps the pinned and conversation sections when history is empty', () => {
+  it('keeps the conversation section when history is empty, with no empty Pinned section', () => {
     // A loaded-but-empty history. `$sessionsLoading` starts true (before the
     // first list fetch), which correctly paints skeletons instead of the copy.
     act(() => {
@@ -150,9 +151,27 @@ describe('ChatSidebar compact conversation surface', () => {
 
     renderSidebar('/', 'chat')
 
-    expect(screen.getByText('Pinned chats')).toBeTruthy()
+    expect(screen.queryByText('Pinned chats')).toBeNull()
     expect(screen.getByText('Chats')).toBeTruthy()
     expect(screen.getByText('No sessions yet')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'New project' })).toBeNull()
+  })
+
+  it('shows the Pinned section once a chat is pinned, holding that chat', () => {
+    act(() => {
+      $sessionsLoading.set(false)
+      $pinnedSessionIds.set(['tile-two'])
+    })
+
+    renderSidebar('/', 'chat')
+
+    const pinnedHeading = screen.getByText('Pinned chats')
+    expect(pinnedHeading).toBeTruthy()
+    expect(screen.getAllByText('Tile two')).toHaveLength(1)
+
+    act(() => $pinnedSessionIds.set([]))
+
+    expect(screen.queryByText('Pinned chats')).toBeNull()
+    expect(screen.getByText('Tile two')).toBeTruthy()
   })
 })

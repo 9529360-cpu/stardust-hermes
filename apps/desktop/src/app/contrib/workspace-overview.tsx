@@ -1,10 +1,11 @@
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useEffect, useMemo } from 'react'
+import { type ReactNode, useMemo } from 'react'
 import { useNavigate } from 'react-router'
 
 import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Slot } from '@/contrib/react/slot'
 import { registry } from '@/contrib/registry'
 import { TASK_CENTER_AREAS } from '@/contrib/task-center'
@@ -14,7 +15,6 @@ import { readKey, writeKey } from '@/lib/storage'
 import { useSessionSlice } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus } from '@/store/activity'
-import { registerRepoStatusCwd, repoStatusForCwd } from '@/store/coding-status'
 import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProcess } from '@/store/composer-status'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronJobs, $cronJobsScope, setCronFocusJobId } from '@/store/cron'
@@ -58,15 +58,6 @@ function Section({ children, title }: { children: ReactNode; title: string }) {
       <h3 className="text-[0.6875rem] font-medium leading-4 text-(--ui-text-tertiary)">{title}</h3>
       {children}
     </section>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex min-w-0 items-center justify-between gap-3 text-[0.75rem] leading-5">
-      <dt className="shrink-0 text-(--ui-text-tertiary)">{label}</dt>
-      <dd className="min-w-0 truncate text-right text-(--ui-text-secondary)">{value}</dd>
-    </div>
   )
 }
 
@@ -139,7 +130,8 @@ export function WorkspaceOverview() {
           needsInput: '等待你的输入',
           attentionSummary: '当前任务正在等待你的确认或补充信息；工作上下文会保留，回复后可以继续。',
           workingSummary: '有任务仍在执行；可以回到对应会话查看进度，也可以继续处理其他事情。',
-          hidePreview: '收起上下文'
+          hidePreview: '收起上下文',
+          emptyRail: '后台任务、子代理和进度会显示在这里。'
         }
       : locale === 'zh-hant'
         ? {
@@ -169,7 +161,8 @@ export function WorkspaceOverview() {
             needsInput: '等待你的輸入',
             attentionSummary: '目前任務正在等待你的確認或補充資訊；工作上下文會保留，回覆後可以繼續。',
             workingSummary: '有任務仍在執行；可以回到對應對話查看進度，也可以繼續處理其他事情。',
-            hidePreview: '收起上下文'
+            hidePreview: '收起上下文',
+            emptyRail: '背景任務、子代理與進度會顯示在這裡。'
           }
         : {
             assistantContext: 'Current context',
@@ -198,7 +191,8 @@ export function WorkspaceOverview() {
             needsInput: 'Waiting for your input',
             attentionSummary: 'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
             workingSummary: 'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
-            hidePreview: 'Hide context'
+            hidePreview: 'Hide context',
+            emptyRail: 'Background tasks, subagents and progress show up here.'
           }
 
   const cwd = useStore($currentCwd)
@@ -244,7 +238,6 @@ export function WorkspaceOverview() {
     projectScope === ALL_PROJECTS ? '' : projectRootCwd(projectTree.find(project => project.id === projectScope))
 
   const effectiveCwd = resolveTaskWorkspaceCwd(cwd, session, fallbackTaskSession, scopedProjectCwd)
-  const repoStatus = useStore(repoStatusForCwd(effectiveCwd))
 
   const fallbackTaskRuntimeId = fallbackTaskSession
     ? findLiveTaskRuntimeId(sessionStates, fallbackTaskSession)
@@ -291,10 +284,6 @@ export function WorkspaceOverview() {
     ]
   )
 
-  useEffect(() => registerRepoStatusCwd(effectiveCwd), [effectiveCwd])
-
-  const effectiveRepoStatus = repoStatus
-
   const selectedAttention = selectedStoredSessionId
     ? session
       ? attentionSessionIds.some(storedId => sessionMatchesStoredId(session, storedId))
@@ -333,9 +322,6 @@ export function WorkspaceOverview() {
         ? systemLabels.assistantSession
         : systemLabels.assistantSummary
 
-  const normalizedCwd = effectiveCwd.replace(/[/\\]+$/, '')
-  const projectName = normalizedCwd.split(/[/\\]/).filter(Boolean).at(-1) ?? copy.noProject
-  const branch = effectiveRepoStatus?.branch || copy.noRepository
   const todoItems = statusItems.filter(item => item.type === 'todo')
   const completedTodoCount = todoItems.filter(item => item.todoStatus === 'completed').length
   const activeTodo = todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
@@ -415,36 +401,6 @@ export function WorkspaceOverview() {
           {activeSessionId && (
             <SubagentSection defaultCollapsed={false} key={activeSessionId} sessionId={activeSessionId} />
           )}
-
-          <Section title={effectiveCwd ? copy.projectContext : systemLabels.assistantContext}>
-            {effectiveCwd ? (
-              <>
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <IconTile name="folder" />
-                  <div className="min-w-0 flex-1">
-                    <div className={TITLE_CLASS}>{projectName}</div>
-                    <div className="line-clamp-2 font-mono text-[0.6875rem] leading-4 text-(--ui-text-tertiary) [overflow-wrap:anywhere]">
-                      {effectiveCwd}
-                    </div>
-                  </div>
-                </div>
-                <dl className="flex flex-col">
-                  <Metric label={copy.branch} value={<span className="font-mono">{branch}</span>} />
-                  {effectiveRepoStatus && (
-                    <Metric label={copy.sync} value={copy.syncValue(effectiveRepoStatus.ahead, effectiveRepoStatus.behind)} />
-                  )}
-                </dl>
-              </>
-            ) : (
-              <div className="flex min-w-0 items-start gap-2.5">
-                <IconTile name="comment" />
-                <div className="min-w-0 flex-1">
-                  <div className={TITLE_CLASS}>{sessionLabel}</div>
-                  <p className={cn('mt-0.5', BODY_CLASS)}>{assistantContextSummary}</p>
-                </div>
-              </div>
-            )}
-          </Section>
 
           {effectiveCwd && (
             <Section title={copy.quickAccess}>
@@ -564,6 +520,10 @@ export function WorkspaceOverview() {
           )}
 
           <Slot area={TASK_CENTER_AREAS.sections} />
+
+          {!effectiveCwd && !showTaskCard && secondaryActivityTasks.length === 0 && (
+            <EmptyState description={systemLabels.emptyRail} title={copy.nothingPending} />
+          )}
         </div>
       </div>
     </aside>
