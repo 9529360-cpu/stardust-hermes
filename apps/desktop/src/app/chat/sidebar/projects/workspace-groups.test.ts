@@ -14,6 +14,7 @@ import {
   overlayLiveLanes,
   overlayLivePreviews,
   reconcileEnteredProjectSessions,
+  sessionInExplicitProject,
   sessionMatchesProjectFilter,
   sessionProjectColor,
   type SidebarProjectTree,
@@ -557,6 +558,16 @@ describe('liveSessionProjectId', () => {
     expect(liveSessionProjectId(makeCwdSession('/work/notes'), [makeProject('p_notes', ['/Work/Notes'])])).toBe(
       '/work/notes'
     )
+  })
+})
+
+describe('sessionInExplicitProject', () => {
+  it('recognizes a manually created project while leaving automatic repos and detached chats in recents', () => {
+    const projects = [makeProject('p_app', ['/www/app'])]
+
+    expect(sessionInExplicitProject(makeCwdSession('/www/app/src'), projects)).toBe(true)
+    expect(sessionInExplicitProject(makeCwdSession('/www/other', { git_repo_root: '/www/other' }), projects)).toBe(false)
+    expect(sessionInExplicitProject(makeCwdSession(null), projects)).toBe(false)
   })
 })
 
