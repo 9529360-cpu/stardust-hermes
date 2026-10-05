@@ -175,6 +175,7 @@ import { installEmbedReferer } from './embed-referer'
 import { createAmbientClaimArbiter } from './event-dedupe'
 import {
   buildTerminalScript,
+  launchExternalTerminal,
   resolveTerminalLaunch,
   terminalScriptEnv,
   terminalScriptExtension,
@@ -14489,10 +14490,11 @@ ipcMain.handle('hermes:window:openInTerminal', async (_event, sessionId, opts) =
 
     rememberLog(`[terminal] opening session ${sessionId} via ${launch.command}`)
 
-    // Detached + unref'd: the terminal window outlives the desktop app, and
-    // never inherits our stdio (a closed pipe would kill the TUI).
-    const child = spawn(launch.command, launch.args, { detached: true, stdio: 'ignore' })
-    child.unref()
+    // A failed spawn emits an asynchronous error; wait for 'spawn' before
+    // reporting success, and keep observing the detached process afterwards.
+    await launchExternalTerminal(launch, spawn, error => {
+      rememberLog(`[terminal] process failed: ${error.message}`)
+    })
 
     return { ok: true }
   } catch (error) {
