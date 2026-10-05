@@ -134,7 +134,7 @@ describe('CustomEndpointsSettings', () => {
     vi.mocked(validateCustomEndpoint).mockImplementationOnce(() => new Promise(resolve => {resolveProbe = resolve}))
     const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
     render(<CustomEndpointsSettings />)
-    await screen.findByText('Add model service')
+    fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
     fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), {
       target: { value: 'https://relay.example/v1' }
     })
