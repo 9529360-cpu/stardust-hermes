@@ -522,7 +522,7 @@ def test_openrouter_referer_headers_are_attribution_not_doc_links() -> None:
     attribution, not a "learn more" doc link -- out of scope for the docs-link migration."""
     for path in (
         "agent/anthropic_adapter.py",
-        "agent/auxiliary_client.py",
+        "agent/auxiliary_catalog.py",
         "hermes_cli/models.py",
         "plugins/model-providers/ai-gateway/__init__.py",
         "plugins/model-providers/fireworks/__init__.py",

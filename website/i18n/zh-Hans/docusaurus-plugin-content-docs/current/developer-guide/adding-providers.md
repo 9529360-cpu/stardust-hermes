@@ -29,7 +29,7 @@ Hermes 已经可以通过自定义 provider 路径与任何 OpenAI 兼容的端�
    - `source`
 3. `run_agent.py` 使用 `api_mode` 决定如何构建和发送请求。
 4. `hermes_cli/models.py` 和 `hermes_cli/main.py` 使 provider 在 CLI 中可见。（`hermes_cli/setup.py` 自动委托给 `main.py`——无需在此处做任何修改。）
-5. `agent/auxiliary_client.py` 和 `agent/model_metadata.py` 保持辅助任务和 token 预算正常运作。
+5. `agent/auxiliary_catalog.py` 和 `agent/model_metadata.py` 保持辅助任务和 token 预算正常运作。
 
 核心抽象是 `api_mode`。
 
@@ -78,7 +78,7 @@ Hermes 已经可以通过自定义 provider 路径与任何 OpenAI 兼容的端�
 2. `hermes_cli/models.py`
 3. `hermes_cli/runtime_provider.py`
 4. `hermes_cli/main.py`
-5. `agent/auxiliary_client.py`
+5. `agent/auxiliary_catalog.py`
 6. `agent/model_metadata.py`
 7. 测试
 8. `website/docs/` 下的用户文档
@@ -249,7 +249,7 @@ kimi:model-name
 
 这里有两个文件需要关注：
 
-### `agent/auxiliary_client.py`
+### `agent/auxiliary_catalog.py`
 
 如果这是一个直接 API key provider，在 `_API_KEY_PROVIDER_AUX_MODELS` 中添加一个廉价/快速的默认辅助模型。
 
@@ -390,7 +390,7 @@ python -m hermes_cli.main setup
 - [ ] 在 `hermes_cli/models.py` 中添加模型目录
 - [ ] 在 `hermes_cli/runtime_provider.py` 中添加运行时分支
 - [ ] 在 `hermes_cli/main.py` 中添加 CLI 接线（setup.py 自动继承）
-- [ ] 在 `agent/auxiliary_client.py` 中添加辅助模型
+- [ ] 在 `agent/auxiliary_catalog.py` 中添加辅助模型
 - [ ] 在 `agent/model_metadata.py` 中添加上下文长度
 - [ ] 更新运行时 / CLI 测试
 - [ ] 更新用户文档

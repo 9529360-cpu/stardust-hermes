@@ -80,7 +80,7 @@ That's it. After dropping these two files, the following **auto-wire** with no o
 | `hermes doctor` | `hermes_cli/doctor.py` | Health check for `ACME_API_KEY` + `{base_url}/models` probe |
 | `hermes setup` | `hermes_cli/config.py` | `ACME_API_KEY` appears in `OPTIONAL_ENV_VARS` and the setup wizard |
 | URL reverse-mapping | `agent/model_metadata.py` | Hostname → provider name for auto-detection |
-| Auxiliary model | `agent/auxiliary_client.py` | Uses `default_aux_model` for compression / summarization |
+| Auxiliary model | `agent/auxiliary_catalog.py` | Uses `default_aux_model` for compression / summarization |
 | Runtime resolution | `hermes_cli/runtime_provider.py` | Returns correct `base_url`, `api_key`, `api_mode` |
 | Transport | `agent/transports/chat_completions.py` | Profile path generates kwargs via `prepare_messages` / `build_extra_body` / `build_api_kwargs_extras` |
 
