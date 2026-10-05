@@ -11,9 +11,11 @@ import { cn } from '@/lib/utils'
 import { $sidebarGrouping, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
 import { $newChatProfile, $profileScope, ALL_PROFILES } from '@/store/profile'
 import {
+  $activeProjectId,
   $projectScope,
   $projectTree,
   enterProject,
+  exitProjectScope,
   fetchProjectSessions,
   openProjectCreate,
   projectRootCwd,
@@ -24,6 +26,7 @@ import { $currentCwd, setCurrentCwd } from '@/store/session'
 import { $focusedSessionIsTile } from '@/store/session-states'
 import type { SessionInfo } from '@/types/hermes'
 
+import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
 import { type AppView, CRON_ROUTE, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
@@ -89,6 +92,7 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
   const projects = useStore($projectTree)
   const profileScope = useStore($profileScope)
   const projectScope = useStore($projectScope)
+  const activeProjectId = useStore($activeProjectId)
   useEffect(() => {
     if (!projectsOpen || !expandedProjectId) {
       return
@@ -252,8 +256,8 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
             aria-label={t.sidebar.projects.sectionLabel}
             className="ml-5 flex max-h-56 flex-col gap-0.5 overflow-y-auto border-l border-(--ui-stroke-tertiary) pl-2"
           >
-            {projects.map(project => (
-              <div key={project.id}>
+            {projects.map(project => {
+              const row = (
                 <button
                   aria-expanded={expandedProjectId === project.id}
                   aria-pressed={projectScope === project.id}
@@ -270,31 +274,55 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
                     size="0.7rem"
                   />
                 </button>
-                {expandedProjectId === project.id && (
-                  <div className="ml-3 border-l border-(--ui-stroke-tertiary) pl-1.5">
-                    {projectLoadFailed && (
-                      <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projectLoadFailed}</div>
-                    )}
-                    {enteredProject?.id === project.id &&
-                      (shownProjectSessions.length ? (
-                        shownProjectSessions.map(session => (
-                          <button
-                            className="block min-h-8 w-full truncate rounded-md px-2 text-left text-[0.7rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
-                            key={session.id}
-                            onClick={() => onResumeSession?.(session.id, session)}
-                            title={session.title ?? session.preview ?? session.id}
-                            type="button"
-                          >
-                            {session.title ?? session.preview ?? session.id}
-                          </button>
-                        ))
-                      ) : (
-                        <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projectEmpty}</div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+
+              return (
+                <div key={project.id}>
+                  {/* Same right-click actions as the sessions sidebar's project rows; Home has none. */}
+                  {project.isNoProject ? (
+                    row
+                  ) : (
+                    <ProjectContextMenu
+                      isActive={project.id === activeProjectId}
+                      onExitScope={() => {
+                        setExpandedProjectId(null)
+
+                        if (projectScope === project.id) {
+                          exitProjectScope()
+                        }
+                      }}
+                      project={project}
+                      scoped={expandedProjectId === project.id || projectScope === project.id}
+                    >
+                      {row}
+                    </ProjectContextMenu>
+                  )}
+                  {expandedProjectId === project.id && (
+                    <div className="ml-3 border-l border-(--ui-stroke-tertiary) pl-1.5">
+                      {projectLoadFailed && (
+                        <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projectLoadFailed}</div>
+                      )}
+                      {enteredProject?.id === project.id &&
+                        (shownProjectSessions.length ? (
+                          shownProjectSessions.map(session => (
+                            <button
+                              className="block min-h-8 w-full truncate rounded-md px-2 text-left text-[0.7rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
+                              key={session.id}
+                              onClick={() => onResumeSession?.(session.id, session)}
+                              title={session.title ?? session.preview ?? session.id}
+                              type="button"
+                            >
+                              {session.title ?? session.preview ?? session.id}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projectEmpty}</div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
             <button
               className="flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[0.72rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
               onClick={openProjectCreate}

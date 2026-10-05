@@ -96,6 +96,7 @@ import { HudShell } from '../hud/hud-shell'
 import { $terminalTakeover, setTerminalTakeover } from '../right-sidebar/store'
 import { $workspaceIsPage } from '../routes'
 
+import { CorePaneTitle } from './core-pane-title'
 import { DEFAULT_TREE, registerLayoutPresets } from './layout-presets'
 import { FilesPane, LogsPane, ReviewPaneContent } from './panes'
 import { ContribWiring, WiredPane } from './wiring'
@@ -226,6 +227,7 @@ registry.registerMany([
     // its rail there). A real floor left a sliver of unusable terminal.
     data: {
       placement: 'bottom',
+      tabTitle: () => <CorePaneTitle id="terminal" />,
       dock: { pane: 'workspace', pos: 'bottom' },
       height: '20vh',
       maxHeight: '80vh',
@@ -242,6 +244,7 @@ registry.registerMany([
     data: {
       placement: 'right',
       collapsible: true,
+      tabTitle: () => <CorePaneTitle id="files" />,
       dock: { pane: 'workspace', pos: 'right' },
       revealAliases: ['file-browser'],
       width: FILE_BROWSER_DEFAULT_WIDTH,
@@ -259,6 +262,7 @@ registry.registerMany([
     data: {
       placement: 'right',
       collapsible: true,
+      tabTitle: () => <CorePaneTitle id="review" />,
       revealAliases: [REVIEW_PANE_ID],
       width: FILE_BROWSER_DEFAULT_WIDTH,
       minWidth: FILE_BROWSER_MIN_WIDTH,

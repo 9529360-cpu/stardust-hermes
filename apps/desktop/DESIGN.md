@@ -211,6 +211,11 @@ blurred backdrop.
 - **Gutters:** `PAGE_INSET_X` (`src/app/layout-constants.ts`) for page side
   padding; `PAGE_INSET_NEG_X` to bleed a child to the edge. Don't hardcode
   `px-6`/`px-8` on pages.
+- **Side rails:** section labels use `SidebarPanelLabel` (11px, sentence case,
+  tertiary text — no accent color, tracked caps or glyph). A rail hosting
+  several panes (conversations/agents, context/files/review) shows its tabs as
+  one segmented control, and core panes give the tab a localized `tabTitle`
+  (`CorePaneTitle`) instead of their raw id.
 - **Conversation measure:** `--conversation-column-width`
   (`src/reference-shell.css`, at most 46rem) is the one width the transcript,
   empty state, sync banner and composer share. Change the token, never one

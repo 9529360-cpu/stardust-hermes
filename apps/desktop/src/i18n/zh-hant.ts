@@ -2412,6 +2412,7 @@ export const zhHant = defineLocale({
 
   sidebar: {
     recent: '最近',
+    filters: '篩選',
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -2579,6 +2580,7 @@ export const zhHant = defineLocale({
 
   composer: {
     message: '訊息',
+    addContext: '新增上下文',
     wakingProfile: profile => `正在喚醒 ${profile}…`,
     placeholderStarting: '正在啟動助理...',
     placeholderReconnecting: '正在重新連線…',
@@ -3390,6 +3392,7 @@ export const zhHant = defineLocale({
   },
 
   zones: {
+    paneTitles: { overview: '上下文', files: '檔案', review: '審查', terminal: '終端機' },
     showTabStrip: '顯示分頁',
     hideTabStrip: '隱藏分頁',
     showStripTab: title => `顯示 ${title}`,

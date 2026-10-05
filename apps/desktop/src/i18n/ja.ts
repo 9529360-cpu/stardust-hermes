@@ -2200,6 +2200,7 @@ export const ja = defineLocale({
 
   sidebar: {
     recent: '最近',
+    filters: 'フィルター',
     gatewayGroups: {
       grouping: 'ゲートウェイとプロファイル',
       rename: 'グループ名を変更',
@@ -2371,6 +2372,7 @@ export const ja = defineLocale({
 
   composer: {
     message: 'メッセージ',
+    addContext: 'コンテキストを追加',
     wakingProfile: profile => `${profile} を起動中…`,
     placeholderStarting: 'アシスタントを起動中...',
     placeholderReconnecting: '再接続中…',
@@ -3207,6 +3209,7 @@ export const ja = defineLocale({
   },
 
   zones: {
+    paneTitles: { overview: 'コンテキスト', files: 'ファイル', review: 'レビュー', terminal: 'ターミナル' },
     showTabStrip: 'タブを表示',
     hideTabStrip: 'タブを隠す',
     showStripTab: title => `${title} を表示`,

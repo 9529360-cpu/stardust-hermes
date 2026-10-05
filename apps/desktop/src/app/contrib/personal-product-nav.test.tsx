@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -8,7 +8,7 @@ import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/s
 import { I18nProvider } from '@/i18n'
 import { $sidebarGrouping, setSidebarAgentsGrouped } from '@/store/layout'
 import { $newChatProfile } from '@/store/profile'
-import { $projectScope, $projectTree, ALL_PROJECTS, fetchProjectSessions } from '@/store/projects'
+import { $projectScope, $projectTree, ALL_PROJECTS, deleteProject, fetchProjectSessions } from '@/store/projects'
 import { $currentCwd } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -18,6 +18,7 @@ import { PersonalProductNav } from './personal-product-nav'
 
 vi.mock('@/store/projects', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
+  deleteProject: vi.fn().mockResolvedValue(undefined),
   fetchProjectSessions: vi.fn().mockResolvedValue(null)
 }))
 
@@ -102,6 +103,25 @@ describe('PersonalProductNav', () => {
 
     expect($newChatProfile.get()).toBeNull()
     expect(onNavigate).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers the project actions on right-click, so a project can be deleted (Home has none)', async () => {
+    $projectTree.set([
+      { id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 3 },
+      { id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 2 }
+    ])
+    renderNav('chat')
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Home' }))
+    expect(screen.queryByRole('menuitem')).toBeNull()
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Example' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '删除…' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: '删除' }))
+
+    await act(async () => {})
+    expect(deleteProject).toHaveBeenCalledWith('p_example')
   })
 
   it('expands projects beneath the nav without replacing recent conversations', () => {
