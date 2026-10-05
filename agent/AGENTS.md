@@ -93,6 +93,14 @@ cache break — keep it the only one. Full detail:
 - **Auxiliary (side-LLM) work** — curator, vision, embedding, title generation, session_search,
   compression — resolves through `agent/auxiliary_client.py::_resolve_auto_route`; each task can pin
   its own `provider/model/base_url/reasoning_effort` under `auxiliary:` in config.yaml.
+  `auxiliary_client.py` is the facade (`call_llm`/`async_call_llm`, call-scoped context, the
+  runtime-main override, every helper that rebinds module state) and re-exports its `auxiliary_*`
+  siblings: `catalog` (provider/model facts, headers), `adapters` (Codex/Anthropic/Bedrock wire),
+  `providers` (credentials, `_try_*` builders), `routing` (`resolve_provider_client`, vision),
+  `client_cache`, `task_config`, `request` (payload shaping, streaming), `errors` (failure
+  classes, health cache), `fallback` (refresh/retry/fallback chains), `ladder` (recovery ladder).
+  Siblings reach the facade late-bound (`_aux.<name>`), so `patch("agent.auxiliary_client.<name>")`
+  keeps reaching every caller.
 - Fallback models and credential pools are resolution-chain code: E2E them with real imports
   against a temp `HERMES_HOME`, not mocks (root rubric).
 

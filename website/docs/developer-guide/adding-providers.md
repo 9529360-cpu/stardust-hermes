@@ -29,7 +29,7 @@ A built-in provider has to line up across a few layers:
    - `source`
 3. `run_agent.py` uses `api_mode` to decide how requests are built and sent.
 4. `hermes_cli/models.py` and `hermes_cli/main.py` make the provider show up in the CLI. (`hermes_cli/setup.py` delegates to `main.py` automatically — no changes needed there.)
-5. `agent/auxiliary_client.py` and `agent/model_metadata.py` keep side tasks and token budgeting working.
+5. `agent/auxiliary_catalog.py` and `agent/model_metadata.py` keep side tasks and token budgeting working.
 
 The important abstraction is `api_mode`.
 
@@ -83,7 +83,7 @@ This path includes everything from Path A plus:
 2. `hermes_cli/models.py`
 3. `hermes_cli/runtime_provider.py`
 4. `hermes_cli/main.py`
-5. `agent/auxiliary_client.py`
+5. `agent/auxiliary_catalog.py`
 6. `agent/model_metadata.py`
 7. tests
 8. user-facing docs under `website/docs/`
@@ -254,7 +254,7 @@ Update these in `hermes_cli/main.py`:
 
 Two files matter here:
 
-### `agent/auxiliary_client.py`
+### `agent/auxiliary_catalog.py`
 
 Add a cheap / fast default aux model to `_API_KEY_PROVIDER_AUX_MODELS` if this is a direct API-key provider.
 
@@ -395,7 +395,7 @@ Use this if the provider is standard chat completions.
 - [ ] model catalog added in `hermes_cli/models.py`
 - [ ] runtime branch added in `hermes_cli/runtime_provider.py`
 - [ ] CLI wiring added in `hermes_cli/main.py` (setup.py inherits automatically)
-- [ ] aux model added in `agent/auxiliary_client.py`
+- [ ] aux model added in `agent/auxiliary_catalog.py`
 - [ ] context lengths added in `agent/model_metadata.py`
 - [ ] runtime / CLI tests updated
 - [ ] user docs updated
