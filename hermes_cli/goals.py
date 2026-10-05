@@ -1621,6 +1621,9 @@ def run_kanban_goal_loop(
     last_response = first_response or ""
     turns_used = 1   # the first turn already consumed one unit of budget
     nudged_to_finalize = False
+    # Same guard as GoalManager's auto-pause: a broken judge (bad key, unparseable model) must
+    # not spend the worker's whole turn budget on "continue" verdicts nobody actually reached.
+    judge_transport_failures = judge_parse_failures = 0
 
     while True:
         try:
@@ -1639,7 +1642,9 @@ def run_kanban_goal_loop(
             _log(f"kanban goal loop: task {task_id} status={status!r}; stopping")
             return _result("stopped", f"status={status}")
 
-        verdict, reason, _parse_failed, _wait, _transport_failed = judge_goal(goal_text, last_response)
+        verdict, reason, parse_failed, _wait, transport_failed = judge_goal(goal_text, last_response)
+        judge_transport_failures = judge_transport_failures + 1 if transport_failed else 0
+        judge_parse_failures = judge_parse_failures + 1 if parse_failed else 0
         if verdict == "wait":
             verdict = "continue"
         _log(f"kanban goal loop: turn {turns_used}/{max_turns} verdict={verdict} reason={_truncate(reason, 120)}")
@@ -1665,6 +1670,22 @@ def run_kanban_goal_loop(
             nudged_to_finalize = True
         else:
             prompt = KANBAN_GOAL_CONTINUATION_TEMPLATE.format(reason=_truncate(reason, 400))
+
+        judge_problem = (
+            f"its judge API returned errors {judge_transport_failures} turns in a row"
+            if judge_transport_failures >= DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES
+            else f"its judge model returned unparseable verdicts {judge_parse_failures} turns in a row"
+            if judge_parse_failures >= DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES
+            else ""
+        )
+        if judge_problem:
+            _log(f"kanban goal loop: task {task_id} stopped — {judge_problem}; blocking")
+            _block(
+                f"Goal-mode worker stopped: {judge_problem}, so progress could not be judged. "
+                f"Check auxiliary.goal_judge (provider/key/model) in config.yaml, then unblock. "
+                f"Last judge note: {_truncate(reason, 200)}"
+            )
+            return _result("blocked_judge_unavailable", judge_problem)
 
         # Budget check BEFORE spending another turn.
         if turns_used >= max_turns:
