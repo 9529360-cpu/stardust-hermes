@@ -44,6 +44,21 @@ DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES = 3
 # 401 every call and must not spend every turn on an unreachable judge.
 DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES = 5
 
+
+def judge_outage(transport_failures: int, parse_failures: int) -> str:
+    """Why a judged loop must stop consulting its judge, or "" while the judge still works.
+
+    A broken judge fails open to "continue", so without a stop a bad key or a model that cannot emit
+    the JSON verdict spends the whole turn / tick budget. Kanban goal mode and ``/loop --until`` use
+    this; ``GoalManager`` applies the same thresholds with its own config-specific pause messages.
+    """
+    if transport_failures >= DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES:
+        return f"its judge API returned errors {transport_failures} times in a row"
+    if parse_failures >= DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES:
+        return f"its judge model returned unparseable verdicts {parse_failures} times in a row"
+    return ""
+
+
 # Quality gates: deterministic shell commands that must pass before the judge may declare DONE. A
 # failed gate short-circuits the judge — its output IS the continuation prompt, so the agent works
 # on concrete evidence instead of a vibe check.
@@ -1621,8 +1636,8 @@ def run_kanban_goal_loop(
     last_response = first_response or ""
     turns_used = 1   # the first turn already consumed one unit of budget
     nudged_to_finalize = False
-    # Same guard as GoalManager's auto-pause: a broken judge (bad key, unparseable model) must
-    # not spend the worker's whole turn budget on "continue" verdicts nobody actually reached.
+    # A broken judge (bad key, unparseable model) must not spend the worker's whole turn budget
+    # on "continue" verdicts nobody actually reached (judge_outage, shared with /loop --until).
     judge_transport_failures = judge_parse_failures = 0
 
     while True:
@@ -1671,13 +1686,7 @@ def run_kanban_goal_loop(
         else:
             prompt = KANBAN_GOAL_CONTINUATION_TEMPLATE.format(reason=_truncate(reason, 400))
 
-        judge_problem = (
-            f"its judge API returned errors {judge_transport_failures} turns in a row"
-            if judge_transport_failures >= DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES
-            else f"its judge model returned unparseable verdicts {judge_parse_failures} turns in a row"
-            if judge_parse_failures >= DEFAULT_MAX_CONSECUTIVE_PARSE_FAILURES
-            else ""
-        )
+        judge_problem = judge_outage(judge_transport_failures, judge_parse_failures)
         if judge_problem:
             _log(f"kanban goal loop: task {task_id} stopped — {judge_problem}; blocking")
             _block(

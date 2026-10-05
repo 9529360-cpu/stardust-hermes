@@ -469,6 +469,48 @@ class TestTickLifecycle:
         assert decision["stopped"] is False  # fail-open: keep looping
 
 
+
+_JUDGE_API_ERROR = ("continue", "judge error: AuthenticationError", False, None, True)
+_JUDGE_GARBAGE = ("continue", "judge reply was not JSON", True, None, False)
+_JUDGE_NOT_YET = ("continue", "3 failures", False, None, False)
+
+
+class TestUntilJudgeOutage:
+    """/goal pauses after its judge fails 5 (API) / 3 (garbage) times in a row; /loop --until used
+    to fail open on every tick and run to its 100-tick backstop. Both now share goals.judge_outage."""
+
+    @staticmethod
+    def _tick(session_id: str, response: str = "3 tests still failing") -> dict:
+        from hermes_cli.loops import LoopManager
+
+        mgr = LoopManager(session_id=session_id)  # reloaded per tick, as the schedulers do
+        mgr.state.next_due_at = time.time() - 1
+        mgr.fire_tick()
+        return mgr.complete_tick(response)
+
+    @pytest.mark.parametrize(("judge_reply", "limit"), [(_JUDGE_API_ERROR, 5), (_JUDGE_GARBAGE, 3)])
+    def test_a_broken_until_judge_pauses_the_loop(self, hermes_home, judge_reply, limit):
+        from hermes_cli.loops import LoopManager
+
+        sid = f"outage-{limit}"
+        LoopManager(session_id=sid).set("poll", interval_seconds=300, until="the suite is green")
+        with patch("hermes_cli.goals.judge_goal", return_value=judge_reply):
+            decisions = [self._tick(sid) for _ in range(limit)]
+
+        assert [d["stopped"] for d in decisions] == [False] * (limit - 1) + [True]
+        assert decisions[-1]["status"] == "paused"
+        assert "auxiliary.goal_judge" in decisions[-1]["message"]
+
+    def test_judge_hiccups_between_real_verdicts_keep_looping(self, hermes_home):
+        from hermes_cli.loops import LoopManager
+
+        LoopManager(session_id="hiccups").set("poll", interval_seconds=300, until="the suite is green")
+        with patch("hermes_cli.goals.judge_goal", side_effect=[_JUDGE_API_ERROR, _JUDGE_NOT_YET] * 4):
+            decisions = [self._tick("hiccups") for _ in range(8)]
+
+        assert not any(d["stopped"] for d in decisions)
+
+
 class TestSelfPacedBackoff:
     def test_backoff_doubles_on_unchanged_and_resets_on_change(self, hermes_home):
         from hermes_cli.loops import LoopManager
