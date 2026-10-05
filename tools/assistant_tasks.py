@@ -430,8 +430,10 @@ def _list_tasks(
                     if not include_completed and task.status in _TERMINAL_STATUSES:
                         continue
                     run = kb.latest_run(conn, task.id)
+                    # A failed run's error carries the worker's own reason; the task's
+                    # last_failure_error is only the dispatcher's view of the exit.
                     detail = _bounded_text(
-                        (run.summary if run else None) or task.last_failure_error or task.result,
+                        ((run.summary or run.error) if run else None) or task.last_failure_error or task.result,
                         600,
                     )
                     attachments = [
