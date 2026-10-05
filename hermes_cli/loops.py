@@ -192,6 +192,9 @@ class LoopState:
     # double-firing mid-turn and tells the post-turn hook the turn that just ended was ours.
     awaiting_response: bool = False
     last_response_digest: str = ""    # self-paced change detection
+    # Consecutive --until judge failures (API errors / unparseable verdicts); see goals.judge_outage.
+    judge_transport_failures: int = 0
+    judge_parse_failures: int = 0
     paused_reason: Optional[str] = None
     last_stop_reason: Optional[str] = None
     # Gateway routing (platform / chat_id / chat_type / thread_id) captured at creation so the
@@ -555,12 +558,15 @@ class LoopManager:
 
         # 2. Evidence-based --until judge (reuses the /goal judge; fail-open).
         if s.until and (last_response or "").strip():
-            try:
-                from hermes_cli.goals import judge_goal
+            from hermes_cli.goals import judge_goal, judge_outage
 
-                verdict, reason, _pf, _wait, _tf = judge_goal(s.until, last_response)
+            try:
+                verdict, reason, parse_failed, _wait, transport_failed = judge_goal(s.until, last_response)
             except Exception as exc:
                 verdict, reason = "continue", f"judge unavailable: {type(exc).__name__}"
+                parse_failed, transport_failed = False, True
+            s.judge_transport_failures = s.judge_transport_failures + 1 if transport_failed else 0
+            s.judge_parse_failures = s.judge_parse_failures + 1 if parse_failed else 0
             if verdict == "done":
                 return self._stop("done", f"stop condition met: {reason}",
                                   f"✓ Loop finished after {ticks} — {reason}")
@@ -569,6 +575,15 @@ class LoopManager:
                 why = f"stop condition judged unachievable: {reason}"
                 return self._stop("paused", why,
                                   f"⏸ Loop paused — {why}. /loop resume to keep going, /loop stop to end it.")
+            outage = judge_outage(s.judge_transport_failures, s.judge_parse_failures)
+            if outage:
+                # Same rule as /goal: a broken judge must not run the loop to its tick budget.
+                why = f"the --until condition cannot be judged: {outage}"
+                return self._stop(
+                    "paused", why,
+                    f"⏸ Loop paused — {why}. Check auxiliary.goal_judge (provider/key/model) in "
+                    "config.yaml, then /loop resume.",
+                )
 
         # 3. --times user cap.
         if s.times and s.ticks_fired >= s.times:

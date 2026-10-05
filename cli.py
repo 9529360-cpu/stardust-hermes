@@ -45,6 +45,7 @@ from hermes_cli.cli_voice_mixin import CLIVoiceMixin
 from hermes_cli.cli_status_bar_mixin import CLIStatusBarMixin
 from hermes_cli.cli_tui_mixin import CLITuiMixin
 from hermes_cli.cli_process_notifications import CLIProcessNotificationsMixin
+from agent.error_classifier import PROVIDER_UNAVAILABLE_REASONS as _PROVIDER_UNAVAILABLE_REASONS
 from agent.interrupt_compat import request_hard_interrupt
 from agent.pet import render as pet_render
 
@@ -4125,12 +4126,11 @@ def _sync_cli_session_id_from_agent(cli) -> None:
         cli.session_id = cli.agent.session_id
 
 
-# Provider-side failures a later attempt can get past unchanged (quota walls, outages,
-# overload, timeouts). 2026-09-30: two ~3-minute relay timeouts each exited 1, the
-# dispatcher's failure limit (2) gave the card up, and it sat blocked for an hour.
-_KANBAN_REQUEUE_FAILURE_REASONS = frozenset({
-    "rate_limit", "billing", "upstream_rate_limit", "overloaded", "server_error", "timeout",
-})
+# Provider-side failures a later attempt can get past unchanged: a provider that did not answer
+# (shared with cron's re-run ladder) plus a quota wall, which the dispatcher's rate-limit
+# cooldown outwaits. 2026-09-30: two ~3-minute relay timeouts each exited 1, the dispatcher's
+# failure limit (2) gave the card up, and it sat blocked for an hour.
+_KANBAN_REQUEUE_FAILURE_REASONS = _PROVIDER_UNAVAILABLE_REASONS | {"billing"}
 
 
 def _run_quiet_single_query(cli, effective_query, emitter=None):
