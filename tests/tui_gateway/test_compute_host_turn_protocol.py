@@ -19,6 +19,7 @@ import pytest
 
 from tui_gateway import server
 from tui_gateway.compute_host import ComputeHost
+from tui_gateway.run_thread_handle import start_turn_thread
 
 
 def _frames(out: io.StringIO) -> list[dict]:
@@ -157,21 +158,10 @@ def test_turn_end_waits_for_chained_followup_thread(turn_env, monkeypatch):
         def _first():
             first_started.set()
             release_first.wait()
-            followup = threading.Thread(target=_followup)
-            # Start before publishing: a reader (compute_host._run_real_turn) that
-            # observes this thread via `_run_thread` must never see one that has not
-            # actually begun yet — `Thread.is_alive()` is False both before `start()`
-            # and after the thread finishes, so publishing the handle first can make a
-            # reader that polls in that gap mistake "not started" for "already done"
-            # and let ``turn.end`` fire while the chained follow-up is still pending.
-            followup.start()
-            with session["history_lock"]:
-                session["_run_thread"] = followup
+            # Chained follow-up, published the way production turn launchers publish.
+            start_turn_thread(session, threading.Thread(target=_followup))
 
-        first = threading.Thread(target=_first)
-        first.start()
-        with session["history_lock"]:
-            session["_run_thread"] = first
+        start_turn_thread(session, threading.Thread(target=_first))
         return True
 
     monkeypatch.setattr(host, "_reply", _reply)
