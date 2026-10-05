@@ -1801,7 +1801,11 @@ def _final_response_from_result(result: dict, job_id: str, job_name: str, AIAgen
         and bool(final_response_text)
     )
     if result.get("failed") is True or (result.get("completed") is False and not max_iteration_summary):
-        raise RuntimeError(result.get("error") or final_response_text or "agent reported failure")
+        failure = RuntimeError(result.get("error") or final_response_text or "agent reported failure")
+        # The classifier's verdict travels with it: cron/unreachable_retry.py re-runs a fire the
+        # provider was too busy (or slow) to answer before any model call completed.
+        failure.failure_reason = str(result.get("failure_reason") or "")
+        raise failure
     if max_iteration_summary:
         logger.warning(
             "Job '%s' reached the iteration limit but produced a final fallback response; "
@@ -2328,8 +2332,9 @@ def run_job(
         error_msg = f"{type(e).__name__}: {str(e)}"
         logger.exception("Job '%s' failed: %s", job_name, error_msg)
         # Cowork-style unreachable-model re-run (cron/unreachable_retry.py): flag failures where
-        # the model was never reached (transient network/DNS, zero API calls) so the bookkeeping
-        # tail can schedule a bounded automatic re-run instead of waiting a full period.
+        # no model call completed (transient network/DNS, or the provider busy / rate-limited /
+        # timing out) so the bookkeeping tail can schedule a bounded automatic re-run instead of
+        # waiting a full period.
         try:
             from cron.unreachable_retry import is_model_unreachable_failure
             if is_model_unreachable_failure(e, agent):
@@ -2714,8 +2719,9 @@ def _save_compose_deliver(
     # Whitespace-only == empty: skip delivery; the guard below marks it a soft failure.
     d.should_deliver = bool(deliver_content.strip()) and not _silent_alert
     if d.should_deliver and not d.success and job.get("_model_unreachable"):
-        # The model was never reached and a bounded automatic re-run will be scheduled
-        # (cron/unreachable_retry.py): hold the failure notice — the re-run either
+        # No model call completed (network down, or the provider did not answer) and a bounded
+        # automatic re-run will be scheduled (cron/unreachable_retry.py): hold the failure
+        # notice — the re-run either
         # delivers the real result or, once the ladder is exhausted, the next failure
         # alerts normally. Mirrors Cowork's silent 5/15/30-minute re-runs.
         from cron.unreachable_retry import will_retry
@@ -2839,7 +2845,7 @@ def _finish_completed_run(d: _RunDelivery, fire_owner: Optional[str], execution_
         job["last_delivery_queued"] = None
     mark_kwargs: dict = {"delivery_error": d.delivery_error}
     if not d.success and job.pop("_model_unreachable", False):
-        # Never-reached-the-model failure: schedule the Cowork-style bounded re-run
+        # No-model-call-completed failure: schedule the Cowork-style bounded re-run
         # (cron/unreachable_retry.py) inside the same fenced store write.
         mark_kwargs["model_unreachable"] = True
     if d.success and not d.delivery_error and d.should_deliver and job.get("last_delivery_queued"):
