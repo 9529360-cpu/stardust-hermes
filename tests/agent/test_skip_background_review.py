@@ -114,15 +114,18 @@ def test_finalize_turn_fires_review_when_flag_unset() -> None:
 def test_cron_construction_sets_skip_background_review() -> None:
     """The cron scheduler MUST construct AIAgent with skip_background_review=True.
 
-    Verified via source-text inspection — the cron scheduler is heavy to
-    boot in tests, so we assert that the source declares the flag rather
-    than running the scheduler. This catches accidental removal.
+    Verified via source inspection — the cron scheduler is heavy to boot in
+    tests, so we assert that the function that builds the cron agent declares
+    the flag rather than running the scheduler. Inspecting the function (not a
+    file path) follows it if the scheduler's modules are reorganized. This
+    catches accidental removal.
     """
-    import pathlib
+    import inspect
 
-    scheduler_src = pathlib.Path(__file__).resolve().parents[2] / "cron" / "scheduler.py"
-    text = scheduler_src.read_text(encoding="utf-8")
+    from cron import scheduler
 
-    assert "skip_background_review=True" in text, (
-        "cron/scheduler.py must construct AIAgent with skip_background_review=True."
+    source = inspect.getsource(scheduler._construct_cron_agent)
+
+    assert "AIAgent(" in source and "skip_background_review=True" in source, (
+        "the cron scheduler must construct AIAgent with skip_background_review=True."
     )
