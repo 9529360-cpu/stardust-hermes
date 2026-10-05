@@ -26,6 +26,7 @@ import logging
 from datetime import timedelta
 from typing import Any, Dict, Optional
 
+from agent.error_classifier import PROVIDER_UNAVAILABLE_REASONS  # shared with kanban's requeue rule
 from hermes_time import now as _hermes_now
 
 logger = logging.getLogger("cron.scheduler")
@@ -33,13 +34,6 @@ logger = logging.getLogger("cron.scheduler")
 # Cowork's ladder: re-run after 5, 15, then 30 minutes; then give up until the
 # schedule's own next occurrence.
 RETRY_DELAYS_SECONDS: tuple[int, ...] = (300, 900, 1800)
-
-# Failure reasons (agent/error_classifier FailoverReason values) for a provider that did not
-# answer and may well answer minutes later. Kanban requeues the same set
-# (cli._KANBAN_REQUEUE_FAILURE_REASONS) plus ``billing``, which this ladder cannot outwait.
-PROVIDER_UNAVAILABLE_REASONS = frozenset({
-    "overloaded", "server_error", "rate_limit", "upstream_rate_limit", "timeout",
-})
 
 # Persisted on the job while a retry cycle is active: {"attempt": <1-based count of
 # retries already scheduled>}. Cleared by any run that reached the model.

@@ -54,6 +54,17 @@ class FailoverReason(enum.Enum):
     unknown = "unknown"                  # Unclassifiable — retry with backoff
 
 
+# A provider that did not answer this request but may answer the same request later: busy,
+# rate-limited, erroring or timing out. Durable orchestrators treat these as "not now" instead
+# of "failed" — kanban requeues the task without counting a failure, cron re-runs the fire on
+# its 5/15/30-minute ladder. Quota exhaustion (``billing``) is not here: only kanban's long
+# cooldown can outwait it.
+PROVIDER_UNAVAILABLE_REASONS = frozenset(reason.value for reason in (
+    FailoverReason.overloaded, FailoverReason.server_error, FailoverReason.rate_limit,
+    FailoverReason.upstream_rate_limit, FailoverReason.timeout,
+))
+
+
 @dataclass
 class ClassifiedError:
     """Structured classification of an API error with recovery hints."""
