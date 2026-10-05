@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 
 from utils import safe_json_loads
 from agent.redact import redact_sensitive_text
-from agent.tool_result_classification import file_mutation_result_landed
+from agent.tool_result_classification import declared_tool_verdict, file_mutation_result_landed
 
 logger = logging.getLogger(__name__)
 
@@ -947,13 +947,18 @@ def _detect_tool_failure(tool_name: str, result: str | None) -> tuple[bool, str]
         return True, f" [{_trim_error(str(err_msg))}]" if err_msg else f" [exit {exit_code}]"
 
     if isinstance(data, dict):
-        failed = data.get("success") is False
+        verdict = declared_tool_verdict(data)
+        if verdict is True:
+            return False, ""
+        failed = verdict is False
         # Memory: distinguish "store full" from real errors.
         if tool_name == "memory" and failed and "exceed the limit" in data.get("error", ""):
             return True, " [full]"
         err = data.get("error") or data.get("message")
         if err and (failed or "error" in data):
             return True, f" [{_trim_error(str(err))}]"
+        if failed:
+            return True, " [error]"
     # Multimodal results (dicts) are successes; failures arrive as JSON-encoded strings.
     if isinstance(result, str) and (
         '"error"' in result[:500].lower() or '"failed"' in result[:500].lower() or result.startswith("Error")
