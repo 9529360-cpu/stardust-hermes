@@ -2562,8 +2562,8 @@ export const zhHant = defineLocale({
       untitledChat: id => `工作階段 ${id}`,
       ageNow: '剛才',
       ageDay: '天',
-      ageHour: '時',
-      ageMin: '分'
+      ageHour: '小時',
+      ageMin: '分鐘'
     },
     dateDivider: {
       today: '今天稍早',

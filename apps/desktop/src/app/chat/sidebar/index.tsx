@@ -1115,27 +1115,31 @@ export function ChatSidebar({
           data-sessions-mode={sessionsMode}
           data-sessions-project={inProject ? (enteredProjectId ?? undefined) : undefined}
         >
-          <SidebarSessionsSection
-            activeSessionId={activeSidebarSessionId}
-            contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
-            dndSensors={dndSensors}
-            emptyState={<SidebarPinnedEmptyState />}
-            label={s.pinned}
-            onArchiveSession={onArchiveSession}
-            onBranchSession={onBranchSession}
-            onDeleteSession={onDeleteSession}
-            onReorderSessions={reorderPinned}
-            onResumeSession={onResumeSession}
-            onToggle={() => setSidebarPinsOpen(!pinsOpen)}
-            onTogglePin={unpinSession}
-            onToggleUnread={toggleUnread}
-            open={pinsOpen}
-            pinned
-            rootClassName="shrink-0 p-0 pb-1"
-            sessions={pinnedSessions}
-            showProfileTags={showAllProfiles}
-            sortable={pinnedSessions.length > 1}
-          />
+          {/* Pinned exists only once something is pinned — an empty section with a how-to
+              line is chrome, not content (pin from a row's menu or with Shift-click). */}
+          {pinnedSessions.length > 0 && (
+            <SidebarSessionsSection
+              activeSessionId={activeSidebarSessionId}
+              contentClassName="flex flex-col gap-px rounded-lg pb-2 pt-1"
+              dndSensors={dndSensors}
+              emptyState={<SidebarPinnedEmptyState />}
+              label={s.pinned}
+              onArchiveSession={onArchiveSession}
+              onBranchSession={onBranchSession}
+              onDeleteSession={onDeleteSession}
+              onReorderSessions={reorderPinned}
+              onResumeSession={onResumeSession}
+              onToggle={() => setSidebarPinsOpen(!pinsOpen)}
+              onTogglePin={unpinSession}
+              onToggleUnread={toggleUnread}
+              open={pinsOpen}
+              pinned
+              rootClassName="shrink-0 p-0 pb-1"
+              sessions={pinnedSessions}
+              showProfileTags={showAllProfiles}
+              sortable={pinnedSessions.length > 1}
+            />
+          )}
 
           {inProject && projectLoadFailed && <SidebarLoadErrorState onRetry={retryProject} />}
           <SidebarSessionsSection

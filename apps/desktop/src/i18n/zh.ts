@@ -3267,8 +3267,8 @@ export const zh = defineLocale({
       todoProgress: '任务完成度',
       ageNow: '刚刚',
       ageDay: '天',
-      ageHour: '时',
-      ageMin: '分'
+      ageHour: '小时',
+      ageMin: '分钟'
     },
     dateDivider: {
       today: '今天早些时候',
