@@ -211,6 +211,10 @@ blurred backdrop.
 - **Gutters:** `PAGE_INSET_X` (`src/app/layout-constants.ts`) for page side
   padding; `PAGE_INSET_NEG_X` to bleed a child to the edge. Don't hardcode
   `px-6`/`px-8` on pages.
+- **Conversation measure:** `--conversation-column-width`
+  (`src/reference-shell.css`, at most 46rem) is the one width the transcript,
+  empty state, sync banner and composer share. Change the token, never one
+  surface's width.
 - **Master/detail overlays:** `OverlaySplitLayout` + `OverlaySidebar` /
   `OverlayMain`. Profiles and other true overlays ride this — don't rebuild a
   titlebar shell. Tasks/Cron is a workspace page and reuses the shared
@@ -293,6 +297,10 @@ so glass and message-bubble transparency do not reveal scrolling text.
   ambiguous exit-1 results use neutral notices, with details still available.
   Errors described inside returned data are not tool failures. Expanded failures
   show the actual explanation; supporting output keeps its normal text color.
+- Thinking starts collapsed: while the model thinks the row shows a live
+  timer, and the reasoning body opens only when the user opens it. The
+  Appearance preference restores live previews; it is stored only when the
+  user changes it, so a later default change still reaches everyone else.
 - Composer status groups start collapsed except todos. Progress updates and queue
   pause/resume preserve the user's disclosure choice. Error banners meet the
   stack's top edge without a blank padding strip. File and preview links remain
