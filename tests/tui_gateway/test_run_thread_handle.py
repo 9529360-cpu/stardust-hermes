@@ -52,6 +52,49 @@ def test_a_launcher_keeps_the_turn_its_wrapper_already_published():
         turn.join(5)
 
 
+class _StartGate(threading.Thread):
+    """``start()`` runs the thread, signals ``started``, then holds the launcher until ``go``."""
+
+    def __init__(self, started: threading.Event, go: threading.Event, **kwargs):
+        super().__init__(**kwargs)
+        self._started_evt, self._go = started, go
+
+    def start(self):
+        super().start()
+        self._started_evt.set()
+        assert self._go.wait(5)
+
+
+def test_the_newer_turn_wins_when_the_launchers_publish_out_of_order():
+    """Both launches start before either publishes; the OUTER one (older turn) publishes first.
+
+    Main CI (66fbde8649, after #273) still failed test_turn_end_waits_for_chained_followup_thread
+    this way: a compare-against-what-I-saw publish let the outer launcher record its finished
+    wrapper, then the inner launcher saw "changed" and never recorded the live follow-up.
+    """
+    session: dict = {}
+    inner_started, outer_published = threading.Event(), threading.Event()
+    wrapper_started, release_turn = threading.Event(), threading.Event()
+    turn = _StartGate(inner_started, outer_published, target=release_turn.wait)
+
+    def wrapper_body():
+        start_turn_thread(session, turn)  # inner launch: publishes only after the outer one did
+
+    # The outer launch publishes only after the inner launch has started its thread.
+    wrapper = _StartGate(wrapper_started, inner_started, target=wrapper_body)
+    try:
+        start_turn_thread(session, wrapper)
+        outer_published.set()
+        wrapper.join(5)
+
+        assert session["_run_thread"] is turn
+        assert turn.is_alive()
+    finally:
+        outer_published.set()
+        release_turn.set()
+        turn.join(5)
+
+
 def test_a_launcher_publishes_over_a_finished_previous_turn():
     session: dict = {}
     previous = threading.Thread(target=lambda: None)
