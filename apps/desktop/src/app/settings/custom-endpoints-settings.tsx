@@ -125,6 +125,9 @@ export function CustomEndpointsSettings({
 
   function updateForm(update: (current: EndpointForm) => EndpointForm) {
     probeRevision.current++
+    // An edit invalidates the in-flight probe; its stale finally must not leave
+    // the Test control disabled until the panel is reopened.
+    setTesting(false)
     setProbeMessage(null)
     setForm(current => {
       const next = update(current)

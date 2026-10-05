@@ -21,7 +21,7 @@ from hermes_cli.web_server_profiles import (
     _approval_mode_of, _broadcast_gateway_session_info, _is_other_profile, _parse_model_ids,
 )
 from fastapi import HTTPException, Request
-from hermes_cli.config import DEFAULT_CONFIG, OPTIONAL_ENV_VARS, read_raw_config, custom_endpoint_key_env, coerce_provider_id, find_provider_entry, redact_key, _deep_merge
+from hermes_cli.config import DEFAULT_CONFIG, OPTIONAL_ENV_VARS, read_raw_config, custom_endpoint_key_env, custom_endpoint_key_env_v2, coerce_provider_id, find_provider_entry, redact_key, _deep_merge
 from hermes_cli.web_models import ConfigUpdate, EnvVarUpdate, EnvVarDelete, EnvVarReveal, CustomEndpointUpdate
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -456,6 +456,14 @@ def _validated_custom_endpoint_base_url(raw: str) -> str:
     return base_url
 
 
+def _endpoint_key_is_shared(providers: Dict[str, Any], owner: Any, key_env: str) -> bool:
+    return bool(key_env and any(
+        other_id != owner and isinstance(other, dict)
+        and key_env in (other.get("key_env"), other.get("api_key_env"))
+        for other_id, other in providers.items()
+    ))
+
+
 def _write_custom_endpoint(cfg: Dict[str, Any], body: CustomEndpointUpdate) -> Tuple[str, Dict[str, Any]]:
     endpoint_id = _custom_endpoint_id(body.id or body.name)
     name = (body.name or "").strip()
@@ -514,22 +522,54 @@ def _write_custom_endpoint(cfg: Dict[str, Any], body: CustomEndpointUpdate) -> T
     # ``key_env`` — the indirection built-in providers use and that
     # runtime_provider.py resolves at load time.
     # See #69449.
-    env_var = custom_endpoint_key_env(endpoint_id)
+    # Keep a pre-existing .env pointer (including the legacy punctuation slug),
+    # but never overwrite one another endpoint also references. Fresh entries
+    # get a collision-checked V2 slot.
+    referenced_key = str(existing.get("key_env") or existing.get("api_key_env") or "").strip()
+    shared_key = _endpoint_key_is_shared(providers, stored_key, referenced_key)
+    legacy_key = custom_endpoint_key_env(endpoint_id)
+    new_key = custom_endpoint_key_env_v2(endpoint_id)
+    v2_prefix = new_key.removesuffix("_API_KEY")
+    suffix = referenced_key.removeprefix(v2_prefix).removesuffix("_API_KEY")
+    owned_keys = {legacy_key, new_key}
+    owned_v2 = referenced_key.startswith(v2_prefix) and suffix.startswith("_") and suffix[1:].isdigit()
+    if referenced_key and not shared_key and (referenced_key in owned_keys or owned_v2):
+        env_var = referenced_key
+    else:
+        # V2's byte encoding is injective among V2 IDs, but an older user may
+        # already have a legacy env pointer that happens to spell the same slot.
+        # Reserve every referenced slot before writing a newly generated one.
+        env_var = new_key
+        suffix = 2
+        while _endpoint_key_is_shared(providers, stored_key, env_var):
+            env_var = f"{new_key.removesuffix('_API_KEY')}_{suffix}_API_KEY"
+            suffix += 1
     submitted_key = body.api_key.strip() if body.api_key is not None else None
+    if referenced_key and referenced_key not in owned_keys and not owned_v2 and submitted_key is not None and not shared_key:
+        raise HTTPException(status_code=400, detail="External key_env cannot be changed in this editor")
+    if shared_key and submitted_key is None:
+        # An old release may have put two endpoints in one .env slot. The
+        # value's ownership is unknowable: require explicit re-entry instead
+        # of preserving or forwarding the other endpoint's credential.
+        raise HTTPException(status_code=409, detail="Shared endpoint API key; re-enter this endpoint's key")
     if submitted_key:
         save_env_value(env_var, submitted_key)
         entry["key_env"] = env_var
+        entry.pop("api_key_env", None)
         entry.pop("api_key", None)
     elif submitted_key is not None:
         # Blank field means "clear the key", not "leave it alone".
-        remove_env_value(env_var)
+        if not shared_key and (env_var in owned_keys or owned_v2):
+            remove_env_value(env_var)
         entry.pop("key_env", None)
+        entry.pop("api_key_env", None)
         entry.pop("api_key", None)
     elif str(entry.get("api_key") or "").strip() and not _config_api_key_is_env_ref(endpoint_id):
         # Migrate a plaintext key an earlier release wrote, on the next save,
         # without the user having to re-enter it.
         save_env_value(env_var, entry["api_key"].strip())
         entry["key_env"] = env_var
+        entry.pop("api_key_env", None)
         entry.pop("api_key", None)
 
     if stored_key is not None and stored_key != endpoint_id:
@@ -632,10 +672,16 @@ def delete_custom_endpoint(endpoint_id: str, profile: Optional[str] = None):
             stored_key, entry = find_provider_entry(providers, provider_key)
             if entry is None or not isinstance(providers, dict):
                 raise HTTPException(status_code=404, detail="custom endpoint not found")
+            key_env = str(entry.get("key_env") or entry.get("api_key_env") or "").strip()
             providers.pop(stored_key, None)
             cfg["providers"] = providers
             _detach_main_model_from_provider(cfg, provider_key)
-            remove_env_value(custom_endpoint_key_env(provider_key))
+            owned_keys = {custom_endpoint_key_env(provider_key), custom_endpoint_key_env_v2(provider_key)}
+            v2_prefix = custom_endpoint_key_env_v2(provider_key).removesuffix("_API_KEY")
+            v2_suffix = key_env.removeprefix(v2_prefix).removesuffix("_API_KEY")
+            is_v2_slot = key_env.startswith(v2_prefix) and v2_suffix.startswith("_") and v2_suffix[1:].isdigit()
+            if (key_env in owned_keys or is_v2_slot) and not _endpoint_key_is_shared(providers, None, key_env):
+                remove_env_value(key_env)
             save_config(cfg)
             response = _custom_endpoint_response(cfg)
         response["ok"] = True
@@ -658,12 +704,17 @@ def _custom_endpoint_probe_inputs(body: CustomEndpointUpdate, profile: Optional[
             return base_url, ""
 
         provider_key = _custom_endpoint_id(body.id)
-        _stored, entry = find_provider_entry(load_config().get("providers"), provider_key)
+        providers = load_config().get("providers")
+        _stored, entry = find_provider_entry(providers, provider_key)
         if not isinstance(entry, dict):
             return base_url, ""
 
         key_env = str(entry.get("key_env") or entry.get("api_key_env") or "").strip()
         if key_env:
+            if isinstance(providers, dict) and _endpoint_key_is_shared(providers, _stored, key_env):
+                # A historical slug collision has no knowable owner; never
+                # forward its bearer token to either user-entered host.
+                return base_url, ""
             saved = str(load_env().get(key_env) or "").strip()
             if saved:
                 return base_url, saved

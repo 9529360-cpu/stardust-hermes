@@ -257,6 +257,18 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   // so a request in flight when the user switches profiles can't paint profile
   // A's models/providers into profile B (or fire onMainModelChanged for A).
   const profileEpoch = useRef(0)
+  const previousScopeProfile = useRef(scopeProfile)
+  const moaSaveTimer = useRef<number | null>(null)
+  const moaSaveGeneration = useRef(0)
+
+  const invalidateMoaSave = useCallback(() => {
+    if (moaSaveTimer.current !== null) {
+      window.clearTimeout(moaSaveTimer.current)
+      moaSaveTimer.current = null
+    }
+
+    moaSaveGeneration.current += 1
+  }, [])
 
   const setCaughtError = useCallback(
     (err: unknown, fallback: string) => {
@@ -308,14 +320,22 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     }
   }, [m.loadFailed, scopeProfile, setCaughtError])
 
+  // eslint-disable-next-line no-restricted-syntax -- scope identity ref guards cross-profile async writes
   useEffect(() => {
+    if (previousScopeProfile.current !== scopeProfile) {
+      previousScopeProfile.current = scopeProfile
+      profileEpoch.current += 1
+      invalidateMoaSave()
+    }
+
     void refresh()
-  }, [refresh])
+  }, [invalidateMoaSave, refresh, scopeProfile])
 
   // A profile switch swaps the backend under the mounted panel — reload for the
   // new profile (bumping the epoch first so any in-flight A request is discarded).
   useOnProfileSwitch(() => {
     profileEpoch.current += 1
+    invalidateMoaSave()
     void refresh()
   })
 
@@ -357,19 +377,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     moaRef.current = moa
   }, [moa])
 
-  const moaSaveTimer = useRef<number | null>(null)
-
-  useEffect(
-    () => () => {
-      if (moaSaveTimer.current) {
-        window.clearTimeout(moaSaveTimer.current)
-      }
-    },
-    []
-  )
-
-  // Guard against stale save responses overwriting newer state.
-  const moaSaveGeneration = useRef(0)
+  useEffect(() => () => invalidateMoaSave(), [invalidateMoaSave])
 
   // Quiet debounced persist for inline MoA edits — mirrors the config page's
   // autosave so slot/aggregator tweaks save themselves, matching the
@@ -383,33 +391,35 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
   // repaint over the user's mid-edit state.
   const scheduleMoaSave = useCallback(
     (next: MoaConfigResponse) => {
-      if (moaSaveTimer.current) {
-        window.clearTimeout(moaSaveTimer.current)
-        moaSaveTimer.current = null
-      }
-
-      const generation = moaSaveGeneration.current + 1
-      moaSaveGeneration.current = generation
+      invalidateMoaSave()
+      const generation = moaSaveGeneration.current
+      const epoch = profileEpoch.current
 
       if (!moaConfigComplete(next)) {
         return
       }
 
       moaSaveTimer.current = window.setTimeout(() => {
+        moaSaveTimer.current = null
+
+        if (moaSaveGeneration.current !== generation || profileEpoch.current !== epoch) {
+          return
+        }
+
         void saveMoaModels(next, scopeProfile)
           .then(saved => {
-            if (moaSaveGeneration.current === generation) {
+            if (moaSaveGeneration.current === generation && profileEpoch.current === epoch) {
               setMoa(saved)
             }
           })
           .catch(err => {
-            if (moaSaveGeneration.current === generation) {
+            if (moaSaveGeneration.current === generation && profileEpoch.current === epoch) {
               setCaughtError(err, m.loadFailed)
             }
           })
       }, 600)
     },
-    [m.loadFailed, scopeProfile, setCaughtError]
+    [invalidateMoaSave, m.loadFailed, scopeProfile, setCaughtError]
   )
 
   const updateMoaPreset = useCallback(
@@ -455,12 +465,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
       // Explicit preset ops (set default / add / delete) supersede any pending
       // debounced slot autosave — cancel it and invalidate in-flight responses
       // so the two writers can't race each other's state.
-      if (moaSaveTimer.current) {
-        window.clearTimeout(moaSaveTimer.current)
-        moaSaveTimer.current = null
-      }
-
-      moaSaveGeneration.current += 1
+      invalidateMoaSave()
       setApplying(true)
       setError('')
 
@@ -478,7 +483,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         setApplying(false)
       }
     },
-    [m.loadFailed, scopeProfile, setCaughtError]
+    [invalidateMoaSave, m.loadFailed, scopeProfile, setCaughtError]
   )
 
   const auxiliaryTaskLabel = useCallback((key: string) => m.tasks[key]?.label ?? key, [m.tasks])

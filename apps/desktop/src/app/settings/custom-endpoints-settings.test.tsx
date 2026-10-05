@@ -129,6 +129,31 @@ describe('CustomEndpointsSettings', () => {
     expect(screen.queryByRole('button', { name: 'relay-model' })).toBeNull()
   })
 
+  it('allows another connection test after editing during a pending probe', async () => {
+    let resolveProbe!: (result: { ok: boolean; reachable: boolean; message: string; models: string[] }) => void
+    vi.mocked(validateCustomEndpoint).mockImplementationOnce(() => new Promise(resolve => {resolveProbe = resolve}))
+    const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
+    render(<CustomEndpointsSettings />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
+    fireEvent.change(screen.getByPlaceholderText('http://127.0.0.1:8081/v1'), {
+      target: { value: 'https://relay.example/v1' }
+    })
+    const testButton = screen.getByRole('button', { name: 'Test connection' })
+    fireEvent.click(testButton)
+    await waitFor(() => expect(validateCustomEndpoint).toHaveBeenCalledTimes(1))
+    expect(testButton).toHaveProperty('disabled', true)
+
+    fireEvent.change(screen.getByPlaceholderText('My model service'), { target: { value: 'Renamed relay' } })
+    expect(testButton).toHaveProperty('disabled', false)
+    await act(async () => {
+      resolveProbe({ ok: true, reachable: true, message: '', models: ['old-model'] })
+    })
+    expect(testButton).toHaveProperty('disabled', false)
+    expect(screen.queryByRole('button', { name: 'old-model' })).toBeNull()
+    await act(async () => { fireEvent.click(testButton) })
+    expect(validateCustomEndpoint).toHaveBeenCalledTimes(2)
+  })
+
   it('shows a plain-language Chinese setup first and keeps technical fields behind advanced options', async () => {
     const { CustomEndpointsSettings } = await import('./custom-endpoints-settings')
 

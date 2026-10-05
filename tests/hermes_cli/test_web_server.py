@@ -1817,8 +1817,8 @@ class TestWebServerEndpoints:
             "/api/providers/custom-endpoints/acme/activate", json={}
         ).status_code == 200
 
-        env_var = custom_endpoint_key_env("acme")
         cfg = load_config()
+        env_var = cfg["providers"]["acme"]["key_env"]
         assert cfg["model"]["key_env"] == env_var
         assert get_env_value(env_var) == "sk-acme-secret"
 
@@ -1887,7 +1887,7 @@ class TestWebServerEndpoints:
         never appeared for the profile the user was actually configuring.
         """
         from hermes_cli import profiles as profiles_mod
-        from hermes_cli.config import custom_endpoint_key_env
+        from hermes_cli.config import custom_endpoint_key_env_v2
         from hermes_constants import get_hermes_home
 
         default_home = get_hermes_home()
@@ -1909,15 +1909,15 @@ class TestWebServerEndpoints:
         # get_env_value(): save_env_value also mirrors the key into the shared
         # os.environ, so a reader-based check can't tell WHICH profile's store
         # actually received the write.
-        env_var = custom_endpoint_key_env("worker-proxy")
+        env_var = custom_endpoint_key_env_v2("worker-proxy")
 
-        worker_cfg = (worker_home / "config.yaml").read_text()
+        worker_cfg = (worker_home / "config.yaml").read_text(encoding="utf-8")
         assert "worker-proxy" in worker_cfg
         assert env_var in worker_cfg
-        assert "sk-worker-secret" in (worker_home / ".env").read_text()
+        assert "sk-worker-secret" in (worker_home / ".env").read_text(encoding="utf-8")
 
         for leaked in (default_home / "config.yaml", default_home / ".env"):
-            text = leaked.read_text() if leaked.exists() else ""
+            text = leaked.read_text(encoding="utf-8") if leaked.exists() else ""
             assert "worker-proxy" not in text, f"endpoint leaked into default profile ({leaked.name})"
             assert "sk-worker-secret" not in text, f"credential leaked into default profile ({leaked.name})"
 
@@ -2001,8 +2001,7 @@ class TestWebServerEndpoints:
 
         cfg = load_config()
         entry = cfg["providers"]["proxy"]
-        env_var = custom_endpoint_key_env("proxy")
-        assert entry["key_env"] == env_var
+        env_var = entry["key_env"]
         assert "api_key" not in entry
         assert "api_key" not in cfg["model"]
         assert get_env_value(env_var) == "sk-super-secret"
@@ -2088,7 +2087,7 @@ class TestWebServerEndpoints:
         and ``:8001`` onto one name, so saving the second silently overwrites
         the first's key.
         """
-        from hermes_cli.config import custom_endpoint_key_env, get_env_value
+        from hermes_cli.config import get_env_value, load_config
 
         for port, key in ((8000, "sk-first"), (8001, "sk-second")):
             self.client.post(
@@ -2102,8 +2101,104 @@ class TestWebServerEndpoints:
                 },
             )
 
-        assert get_env_value(custom_endpoint_key_env("local-8000")) == "sk-first"
-        assert get_env_value(custom_endpoint_key_env("local-8001")) == "sk-second"
+        providers = load_config()["providers"]
+        first_slot = providers["local-8000"]["key_env"]
+        second_slot = providers["local-8001"]["key_env"]
+        assert first_slot != second_slot
+        assert get_env_value(first_slot) == "sk-first"
+        assert get_env_value(second_slot) == "sk-second"
+
+    def test_punctuation_collision_keeps_endpoint_credentials_isolated(self):
+        from hermes_cli.config import get_env_value, load_config
+        from hermes_cli.web_routers.config_env import _custom_endpoint_probe_inputs
+        from hermes_cli.web_models import CustomEndpointUpdate
+
+        for endpoint_id, host, key in (
+            ("acme-a", "first.example.com", "first-secret"),
+            ("acme_a", "second.example.com", "second-secret"),
+        ):
+            response = self.client.post("/api/providers/custom-endpoints", json={
+                "id": endpoint_id, "name": endpoint_id,
+                "base_url": f"https://{host}/v1", "model": "m", "api_key": key,
+            })
+            assert response.status_code == 200, response.text
+
+        providers = load_config()["providers"]
+        first_key = providers["acme-a"]["key_env"]
+        second_key = providers["acme_a"]["key_env"]
+        assert first_key != second_key
+        assert get_env_value(first_key) == "first-secret"
+        assert get_env_value(second_key) == "second-secret"
+        url, probe_key = _custom_endpoint_probe_inputs(CustomEndpointUpdate(
+            id="acme-a", name="acme-a", base_url="https://first.example.com/v1", model="m"
+        ), None)
+        assert (url, probe_key) == ("https://first.example.com/v1", "first-secret")
+
+        assert self.client.request("DELETE", "/api/providers/custom-endpoints/acme-a").status_code == 200
+        assert not get_env_value(first_key)
+        assert get_env_value(second_key) == "second-secret"
+
+    def test_new_endpoint_avoids_existing_legacy_v2_looking_slot(self):
+        from hermes_cli.config import custom_endpoint_key_env, get_config_path, get_env_value, load_config, save_env_value
+
+        # A preexisting endpoint's legacy pointer may have exactly the same
+        # spelling as the new byte-encoded V2 slot of another endpoint.
+        legacy_owner = "v2_61636D652D61"
+        victim_key = custom_endpoint_key_env(legacy_owner)
+        save_env_value(victim_key, "legacy-secret")
+        get_config_path().write_text(yaml.safe_dump({"providers": {
+            legacy_owner: {"name": legacy_owner, "base_url": "https://legacy.example/v1",
+                           "model": "m", "key_env": victim_key}
+        }}), encoding="utf-8")
+        response = self.client.post("/api/providers/custom-endpoints", json={
+            "id": "acme-a", "name": "acme-a", "base_url": "https://new.example/v1",
+            "model": "m", "api_key": "new-secret",
+        })
+        assert response.status_code == 200, response.text
+        new_key = load_config()["providers"]["acme-a"]["key_env"]
+        assert new_key != victim_key
+        assert get_env_value(victim_key) == "legacy-secret"
+        assert get_env_value(new_key) == "new-secret"
+        assert self.client.request("DELETE", "/api/providers/custom-endpoints/acme-a").status_code == 200
+        assert get_env_value(victim_key) == "legacy-secret"
+        assert not get_env_value(new_key)
+
+    def test_legacy_single_endpoint_keeps_its_key_on_save_and_delete(self):
+        from hermes_cli.config import get_config_path, get_env_value, save_env_value
+
+        legacy = "HERMES_CUSTOM_ACME_A_API_KEY"
+        save_env_value(legacy, "legacy-secret")
+        get_config_path().write_text(yaml.safe_dump({"providers": {
+            "acme-a": {"name": "acme-a", "base_url": "https://first.example.com/v1",
+                       "model": "m", "key_env": legacy}
+        }}), encoding="utf-8")
+        assert self.client.post("/api/providers/custom-endpoints", json={
+            "id": "acme-a", "name": "acme-a", "base_url": "https://first.example.com/v1",
+            "model": "m", "api_key": "rotated-secret",
+        }).status_code == 200
+        assert get_env_value(legacy) == "rotated-secret"
+        assert self.client.request("DELETE", "/api/providers/custom-endpoints/acme-a").status_code == 200
+        assert not get_env_value(legacy)
+
+    def test_legacy_shared_slot_never_leaks_or_deletes_another_endpoint_key(self):
+        from hermes_cli.config import get_config_path, get_env_value, save_env_value
+        from hermes_cli.web_routers.config_env import _custom_endpoint_probe_inputs
+        from hermes_cli.web_models import CustomEndpointUpdate
+
+        shared = "HERMES_CUSTOM_ACME_A_API_KEY"
+        save_env_value(shared, "legacy-secret")
+        get_config_path().write_text(yaml.safe_dump({"providers": {
+            endpoint_id: {"name": endpoint_id, "base_url": f"https://{host}/v1",
+                          "model": "m", "key_env": shared}
+            for endpoint_id, host in (("acme-a", "first.example.com"),
+                                      ("acme_a", "second.example.com"))
+        }}), encoding="utf-8")
+        body = CustomEndpointUpdate(id="acme-a", name="acme-a",
+                                    base_url="https://first.example.com/v1", model="m")
+        assert _custom_endpoint_probe_inputs(body, None)[1] == ""
+        assert self.client.post("/api/providers/custom-endpoints", json=body.model_dump()).status_code == 409
+        assert self.client.request("DELETE", "/api/providers/custom-endpoints/acme-a").status_code == 200
+        assert get_env_value(shared) == "legacy-secret"
 
     def test_custom_endpoint_response_reports_a_key_held_in_env(self):
         """has_api_key must follow key_env, not just a plaintext api_key.
