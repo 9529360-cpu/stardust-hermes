@@ -72,3 +72,36 @@ def test_reaching_the_model_resets_ladder_and_oneshots_never_retry(tmp_cron_home
     assert mark_job_run(once["id"], False, "ConnectError: dns", model_unreachable=True)
     remaining = get_job(once["id"])
     assert remaining is None or remaining.get(ur.STATE_KEY) is None
+
+
+class _Agent:
+    def __init__(self, completed_calls: int):
+        self.session_api_calls = completed_calls
+
+
+def _failed_run(failure_reason: str) -> BaseException:
+    """The exception run_job's handler receives for an agent result that failed."""
+    from cron.scheduler import _final_response_from_result
+
+    result = {"failed": True, "completed": False, "final_response": "",
+              "error": "HTTP 503: provider did not answer", "failure_reason": failure_reason}
+    with pytest.raises(RuntimeError) as raised:
+        _final_response_from_result(result, "job1", "Morning brief", None)
+    return raised.value
+
+
+@pytest.mark.parametrize("reason", ["overloaded", "server_error", "rate_limit", "upstream_rate_limit", "timeout"])
+def test_a_provider_that_did_not_answer_gets_the_rerun_ladder(reason):
+    """Kanban requeues a busy / rate-limited / timed-out provider; a cron fire it never answered
+    executed nothing too, so it re-runs instead of losing the occurrence (2026-10-05)."""
+    assert ur.is_model_unreachable_failure(_failed_run(reason), _Agent(completed_calls=0))
+
+
+@pytest.mark.parametrize("reason", ["auth", "model_not_found", "billing", "content_policy_blocked", ""])
+def test_failures_a_rerun_cannot_fix_keep_their_notice(reason):
+    assert not ur.is_model_unreachable_failure(_failed_run(reason), _Agent(completed_calls=0))
+
+
+def test_a_fire_that_completed_a_model_call_never_reruns():
+    """A completed call may have run tools; re-running could repeat their side effects."""
+    assert not ur.is_model_unreachable_failure(_failed_run("overloaded"), _Agent(completed_calls=1))
