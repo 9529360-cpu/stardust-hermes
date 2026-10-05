@@ -431,6 +431,14 @@ export function liveSessionProjectId(session: SessionInfo, explicitProjects: Pro
   return repoRoot
 }
 
+/** True when a session belongs to a project the user created — not an auto-detected repo, whose
+ *  id is its root path rather than an explicit project's id. */
+export function sessionInExplicitProject(session: SessionInfo, explicitProjects: ProjectInfo[]): boolean {
+  const projectId = liveSessionProjectId(session, explicitProjects)
+
+  return projectId !== null && explicitProjects.some(project => project.id === projectId)
+}
+
 /** The lane a row files under: its live project, or Home for detached (cwd-less) rows. */
 export function sessionBucketId(session: SessionInfo, explicitProjects: ProjectInfo[]): null | string {
   return liveSessionProjectId(session, explicitProjects) ?? (isDetachedSession(session) ? NO_PROJECT_ID : null)

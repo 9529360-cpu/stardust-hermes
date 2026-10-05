@@ -119,6 +119,7 @@ import {
   ProjectMenu,
   projectTreeCwd,
   reconcileEnteredProjectSessions,
+  sessionInExplicitProject,
   sessionMatchesProjectFilter,
   sessionRecency as sessionTime,
   type SidebarProjectTree,
@@ -181,6 +182,9 @@ interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
    *  buttons), which land a fresh session exactly where it's dropped. The
    *  context-menu "Open in split" path passes just a `dir`. */
   onNewSessionSplit: NewSessionSplitHandler
+  /** The Stardust product nav lists each project the user created with its chats; the flat list
+   *  then leaves those chats to their project instead of showing them twice. */
+  projectChatsInNav?: boolean
 }
 
 export function ChatSidebar({
@@ -191,7 +195,8 @@ export function ChatSidebar({
   onArchiveSession,
   onBranchSession,
   onNewSessionInWorkspace,
-  onNewSessionSplit
+  onNewSessionSplit,
+  projectChatsInNav = false
 }: ChatSidebarProps) {
   const { t } = useI18n()
   const s = t.sidebar
@@ -928,9 +933,17 @@ export function ChatSidebar({
 
   const profileGroups = useGatewaySessionGroups(agentSessions, profileScope === ALL_PROFILES && grouping === 'profile')
 
-  // The flat Sessions list always shows ALL recent sessions; Projects is a
-  // parallel grouped view, not a filter on this one — nothing is hidden here.
-  const displayAgentSessions = agentSessions
+  // The flat Sessions list shows all recent sessions; Projects is a parallel grouped view, not a
+  // filter on this one. One exception: under the Stardust product nav a chat in a project the user
+  // created lives under that project, not here too. Auto-detected repos keep their chats here (the
+  // everyday chats of a repo-folder workflow would otherwise all leave the list).
+  const displayAgentSessions = useMemo(
+    () =>
+      projectChatsInNav && !agentsGrouped
+        ? agentSessions.filter(session => !sessionInExplicitProject(session, projects))
+        : agentSessions,
+    [agentSessions, agentsGrouped, projectChatsInNav, projects]
+  )
 
   // Pagination is scope-aware. In "All profiles" mode it tracks the global
   // unified set; scoped to one profile it tracks that profile's own truncation

@@ -28,6 +28,7 @@ import type { SessionInfo } from '@/types/hermes'
 
 import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
+import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
 import { type AppView, CRON_ROUTE, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
 
@@ -45,6 +46,8 @@ const NULL_ICON: SidebarNavItem['icon'] = () => null
 interface PersonalProductNavProps {
   currentView: AppView
   onNavigate: (item: SidebarNavItem) => void
+  /** Starts a chat in a folder; the project rows' "+" uses it so the chat belongs to that project. */
+  onNewSessionInWorkspace?: (path: null | string) => void
   onResumeSession?: (sessionId: string, session?: SessionInfo) => void
 }
 
@@ -81,7 +84,12 @@ function ProductNavButton({ active = false, expanded, icon, label, onClick, tour
   )
 }
 
-export function PersonalProductNav({ currentView: routeView, onNavigate, onResumeSession }: PersonalProductNavProps) {
+export function PersonalProductNav({
+  currentView: routeView,
+  onNavigate,
+  onNewSessionInWorkspace,
+  onResumeSession
+}: PersonalProductNavProps) {
   const { locale, t } = useI18n()
   const { search } = useLocation()
   const copy = PRODUCT_NAV_COPY[locale]
@@ -148,6 +156,10 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
     // A plain new chat lands in the live profile, matching the `session.new`
     // keybind; a prior per-profile quick-create must not leak into it.
     $newChatProfile.set(null)
+    // The top new chat is always an ordinary chat: leave any project first, so it neither starts
+    // in that project's folder nor files under it. A project's own "+" starts chats there.
+    exitProjectScope()
+    setExpandedProjectId(null)
     onNavigate({
       action: 'new-session',
       id: 'new-session',
@@ -215,6 +227,14 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
     }
   }
 
+  const newChatInProject = (project: SidebarProjectTree) => {
+    setSidebarAgentsGrouped(false)
+    $newChatProfile.set(null)
+    enterProject(project.id)
+    setExpandedProjectId(project.id)
+    onNewSessionInWorkspace?.(projectRootCwd(project))
+  }
+
   const projectLaneSessions = enteredProject?.repos.flatMap(repo => repo.groups.flatMap(group => group.sessions)) ?? []
 
   const shownProjectSessions = projectLaneSessions.length
@@ -257,23 +277,37 @@ export function PersonalProductNav({ currentView: routeView, onNavigate, onResum
             className="ml-5 flex max-h-56 flex-col gap-0.5 overflow-y-auto border-l border-(--ui-stroke-tertiary) pl-2"
           >
             {projects.map(project => {
+              // Home is a bucket of folder-less chats ("对话" already lists them), so only real
+              // projects get a "+".
+              const canStartChat = !project.isNoProject && Boolean(projectRootCwd(project)) && onNewSessionInWorkspace
+
               const row = (
-                <button
-                  aria-expanded={expandedProjectId === project.id}
-                  aria-pressed={projectScope === project.id}
-                  className="flex min-h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[0.72rem] text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-(--ui-text-primary)"
-                  onClick={() => selectProject(project.id)}
-                  title={project.label}
-                  type="button"
-                >
-                  <Codicon className="shrink-0" name="repo" size="0.75rem" />
-                  <span className="min-w-0 flex-1 truncate">{project.label}</span>
-                  <Codicon
-                    className="shrink-0 opacity-60"
-                    name={expandedProjectId === project.id ? 'chevron-down' : 'chevron-right'}
-                    size="0.7rem"
-                  />
-                </button>
+                <div className="group/workspace flex items-center rounded-md hover:bg-(--ui-control-hover-background)">
+                  <button
+                    aria-expanded={expandedProjectId === project.id}
+                    aria-pressed={projectScope === project.id}
+                    className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-left text-[0.72rem] text-(--ui-text-tertiary) hover:text-(--ui-text-primary)"
+                    onClick={() => selectProject(project.id)}
+                    title={project.label}
+                    type="button"
+                  >
+                    <Codicon className="shrink-0" name="repo" size="0.75rem" />
+                    <span className="min-w-0 flex-1 truncate">{project.label}</span>
+                    <Codicon
+                      className="shrink-0 opacity-60"
+                      name={expandedProjectId === project.id ? 'chevron-down' : 'chevron-right'}
+                      size="0.7rem"
+                    />
+                  </button>
+                  {canStartChat && (
+                    <div className="shrink-0 pr-1.5">
+                      <WorkspaceAddButton
+                        label={t.sidebar.newSessionIn(project.label)}
+                        onClick={() => newChatInProject(project)}
+                      />
+                    </div>
+                  )}
+                </div>
               )
 
               return (
