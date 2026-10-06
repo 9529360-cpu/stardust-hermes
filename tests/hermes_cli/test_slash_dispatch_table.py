@@ -1,6 +1,6 @@
 """Parity guard for the slash-command dispatch table in cli.HermesCLI.
 
-Every canonical command that had a branch in the old if/elif chain must
+Every retained canonical command from the old if/elif chain must
 resolve to a handler in ``_SLASH_DISPATCH``, and the pre-dispatch side effects
 (pre_command hook, pending-resume reset, unknown-command fallthrough) must
 keep their old semantics.
@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, patch
 
 from cli import HermesCLI
 
-# Command names that had an explicit branch in the pre-dispatch-table chain.
+# Retained command names with an explicit branch in the pre-dispatch-table chain.
 OLD_CHAIN_COMMANDS = [
     "exit", "quit", "help", "palette", "whoami", "profile", "tools", "toolsets",
     "config", "redraw", "clear", "history", "title", "handoff", "new", "resume",
     "sessions", "model", "codex-runtime", "personality", "pet", "hatch", "retry",
     "prompt", "undo", "branch", "worktree", "save", "cron", "suggestions",
-    "blueprint", "curator", "kanban", "skills", "learn", "init", "memory",
+    "blueprint", "curator", "skills", "learn", "init", "memory",
     "platforms", "status", "context", "egress", "statusbar", "diff", "battery",
     "timestamps", "verbose", "focus", "footer", "yolo", "approvals", "reasoning",
     "fast", "compress", "usage", "insights", "copy",
