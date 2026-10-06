@@ -1,5 +1,5 @@
 import { type ThreadMessage } from '@assistant-ui/react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { $activeSessionId } from '@/store/session'
@@ -75,6 +75,8 @@ describe('tool parts sealed without a result', () => {
     const command = 'hermes -p turqoise chat --in ~ -c "Bot Chat" -Q -q "Message from 🤖 Hermes (@hermes): hi"'
     const { container } = render(<Harness message={sealedMessage('terminal', { command })} />)
 
+    // A completed lone tool call now starts behind the work-summary disclosure.
+    fireEvent.click(await screen.findByText('Ran 1 command'))
     expect(await screen.findByText('Result unavailable')).toBeTruthy()
     expect(container.querySelector('[data-slot="aui_agent-delivery-notice"]')).toBeNull()
   })
