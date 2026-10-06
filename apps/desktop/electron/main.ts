@@ -12842,8 +12842,18 @@ function spawnSecondaryWindow({
       log: rememberLog,
       reload: () => {
         win.webContents.reload()
+      },
+      onFailedLoadBudgetExhausted: details => {
+        void loadRendererLoadErrorPage(win, {
+          errorCode: details?.errorCode,
+          errorDescription: 'The session window renderer failed to load after bounded retries.',
+          reloadUrl: details?.url,
+          url: details?.url,
+          repairHint: 'Restart Stardust or rebuild the desktop renderer.'
+        })
       }
     },
+    reloadOnFailedLoad: true,
     reloadWindowMs: RENDERER_RELOAD_WINDOW_MS,
     reloadMax: RENDERER_RELOAD_MAX,
     recentReloadTimesRef: rendererReloadTimesRef
@@ -12924,8 +12934,18 @@ function spawnBrowserWindow(tabId) {
       log: rememberLog,
       reload: () => {
         win.webContents.reload()
+      },
+      onFailedLoadBudgetExhausted: details => {
+        void loadRendererLoadErrorPage(win, {
+          errorCode: details?.errorCode,
+          errorDescription: 'The browser window renderer failed to load after bounded retries.',
+          reloadUrl: details?.url,
+          url: details?.url,
+          repairHint: 'Restart Stardust or rebuild the desktop renderer.'
+        })
       }
     },
+    reloadOnFailedLoad: true,
     reloadWindowMs: RENDERER_RELOAD_WINDOW_MS,
     reloadMax: RENDERER_RELOAD_MAX,
     recentReloadTimesRef: rendererReloadTimesRef
@@ -13023,8 +13043,18 @@ function createInstanceWindow() {
       log: rememberLog,
       reload: () => {
         win.webContents.reload()
+      },
+      onFailedLoadBudgetExhausted: details => {
+        void loadRendererLoadErrorPage(win, {
+          errorCode: details?.errorCode,
+          errorDescription: 'The instance window renderer failed to load after bounded retries.',
+          reloadUrl: details?.url,
+          url: details?.url,
+          repairHint: 'Restart Stardust or rebuild the desktop renderer.'
+        })
       }
     },
+    reloadOnFailedLoad: true,
     reloadWindowMs: RENDERER_RELOAD_WINDOW_MS,
     reloadMax: RENDERER_RELOAD_MAX,
     recentReloadTimesRef: rendererReloadTimesRef

@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
+import { ErrorBanner, ErrorState } from '@/components/ui/error-state'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -312,6 +313,15 @@ export function WebhooksView({ onClose }: WebhooksViewProps) {
 
   const banners = (
     <>
+      {error && data && (
+        <ErrorBanner className="mb-3 shrink-0">
+          {w.loadFailedStale}{' '}
+          <Button onClick={() => void refetch()} size="xs" variant="ghost">
+            {t.common.retry}
+          </Button>
+        </ErrorBanner>
+      )}
+
       {!enabled && (
         <Alert className="mb-4" variant="warning">
           <Globe />
@@ -351,6 +361,12 @@ export function WebhooksView({ onClose }: WebhooksViewProps) {
     <Panel onClose={onClose}>
       {loading ? (
         <PageLoader label={w.loading} />
+      ) : error && !data ? (
+        <ErrorState className="m-auto" description={w.loadFailedHelp} title={w.loadFailed}>
+          <Button onClick={() => void refetch()} size="sm" variant="outline">
+            {t.common.retry}
+          </Button>
+        </ErrorState>
       ) : subscriptions.length === 0 ? (
         <>
           {banners}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { ErrorBanner, ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import type {
   DesktopConnectionKind,
@@ -241,6 +242,7 @@ export function ConnectionsRegistrySection() {
   const activeConnectionId = useStore($activeConnectionId)
   const [registry, setRegistry] = useState<DesktopConnectionsRegistry | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [saving, setSaving] = useState(false)
   const [busyId, setBusyId] = useState<null | string>(null)
@@ -361,16 +363,19 @@ export function ConnectionsRegistrySection() {
 
   const load = useCallback(async () => {
     if (!bridge) {
+      setLoadError(false)
       setLoading(false)
 
       return
     }
 
     setLoading(true)
+    setLoadError(false)
 
     try {
       publishRegistry(await bridge.list())
     } catch (err) {
+      setLoadError(true)
       notifyError(err, s.loadFailed)
     } finally {
       setLoading(false)
@@ -671,10 +676,25 @@ export function ConnectionsRegistrySection() {
         />
       )}
 
+      {loadError && registry && (
+        <ErrorBanner className="mt-3">
+          {s.loadFailedStale}{' '}
+          <Button onClick={() => void load()} size="xs" variant="ghost">
+            {t.common.retry}
+          </Button>
+        </ErrorBanner>
+      )}
+
       {loading ? (
         <div className="flex items-center gap-2 py-3 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
           <Loader2 className="size-4 animate-spin" />
         </div>
+      ) : loadError && !registry ? (
+        <ErrorState className="my-4" description={s.loadFailedHelp} title={s.loadFailed}>
+          <Button onClick={() => void load()} size="sm" variant="outline">
+            {t.common.retry}
+          </Button>
+        </ErrorState>
       ) : !registry || registry.connections.length === 0 ? (
         <EmptyState title={s.empty} />
       ) : displayedConnections.length === 0 ? (

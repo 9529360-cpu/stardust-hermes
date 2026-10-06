@@ -935,6 +935,8 @@ export interface Translations {
       searchPlaceholder: string
       noSearchResults: string
       loadFailed: string
+      loadFailedHelp: string
+      loadFailedStale: string
       currentPill: string
       primaryPill: string
       managedPill: string
@@ -2065,6 +2067,8 @@ export interface Translations {
     search: string
     loading: string
     loadFailed: string
+    loadFailedHelp: string
+    loadFailedStale: string
     subscriptions: (count: number) => string
     hint: string
     empty: string

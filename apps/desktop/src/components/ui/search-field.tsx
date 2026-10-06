@@ -21,6 +21,7 @@ interface SearchFieldProps {
   inputClassName?: string
   loading?: boolean
   onClear?: () => void
+  autoFocus?: boolean
   inputRef?: RefObject<HTMLInputElement | null>
   trailingAction?: ReactNode
   'aria-label'?: string
@@ -41,6 +42,7 @@ export function SearchField({
   inputClassName,
   loading = false,
   onClear,
+  autoFocus = false,
   inputRef,
   trailingAction,
   'aria-label': ariaLabel
@@ -69,6 +71,7 @@ export function SearchField({
       <Search className="pointer-events-none size-3.5 shrink-0 text-muted-foreground/70" />
       <input
         aria-label={ariaLabel ?? placeholder}
+        autoFocus={autoFocus}
         className={cn(
           // `field-sizing: content` grows the input to fit the placeholder/typed
           // text; min-w-0 lets it shrink back below content size when the
