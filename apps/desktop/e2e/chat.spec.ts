@@ -90,10 +90,10 @@ test.describe('chat interaction with mock backend', () => {
     const page = fixture!.page
     const composer = page.locator('[contenteditable="true"]').first()
     const primary = page.locator('[data-slot="composer-root"] button[type="submit"]')
-    const queue = page.locator('[data-slot="composer-root"] button[aria-label="Queue message"]')
-    const dictation = page.locator('[data-slot="composer-root"] button[aria-label="Voice dictation"]')
+    const queue = page.locator('[data-slot="composer-root"] button[aria-label="排队消息"]')
+    const dictation = page.locator('[data-slot="composer-root"] button[aria-label="语音听写"]')
     const speakReplies = page.locator(
-      '[data-slot="composer-root"] button[aria-label="Read replies aloud"], [data-slot="composer-root"] button[aria-label="Stop reading replies aloud"]'
+      '[data-slot="composer-root"] button[aria-label="朗读回复"], [data-slot="composer-root"] button[aria-label="停止朗读回复"]'
     )
 
     await composer.click()
@@ -101,7 +101,7 @@ test.describe('chat interaction with mock backend', () => {
     await page.keyboard.press('Enter')
     await page.getByText(BLOCKING_CLARIFY_QUESTION).waitFor({ state: 'visible', timeout: 30_000 })
 
-    await expect(primary).toHaveAttribute('aria-label', 'Stop')
+    await expect(primary).toHaveAttribute('aria-label', '停止')
     await expect(primary.locator('span')).toHaveClass(/bg-current/)
 
     await composer.click()
@@ -109,7 +109,7 @@ test.describe('chat interaction with mock backend', () => {
     // Since "running is not busy" (3bc52fb9df) the primary keeps the Send
     // affordance mid-turn — steer is routed through the submit engine, not a
     // separate labeled button. Queue remains the explicit secondary action.
-    await expect(primary).toHaveAttribute('aria-label', 'Send')
+    await expect(primary).toHaveAttribute('aria-label', '发送')
     await expect(dictation).toBeVisible()
     await expect(speakReplies).toBeVisible()
     await expect(queue).toBeVisible()
@@ -118,22 +118,22 @@ test.describe('chat interaction with mock backend', () => {
       .locator('[data-slot="composer-root"] button')
       .evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-label')))
     const speakRepliesIndex = controlLabels.findIndex(
-      label => label === 'Read replies aloud' || label === 'Stop reading replies aloud'
+      label => label === '朗读回复' || label === '停止朗读回复'
     )
-    expect(controlLabels.indexOf('Voice dictation')).toBeLessThan(speakRepliesIndex)
-    expect(speakRepliesIndex).toBeLessThan(controlLabels.indexOf('Queue message'))
-    expect(controlLabels.indexOf('Queue message')).toBeLessThan(controlLabels.indexOf('Send'))
+    expect(controlLabels.indexOf('语音听写')).toBeLessThan(speakRepliesIndex)
+    expect(speakRepliesIndex).toBeLessThan(controlLabels.indexOf('排队消息'))
+    expect(controlLabels.indexOf('排队消息')).toBeLessThan(controlLabels.indexOf('发送'))
     await page.screenshot({ path: testInfo.outputPath('busy-composer-steer.png') })
     await expect(primary.locator('.codicon-arrow-up')).toBeVisible()
 
     await queue.click()
-    await expect(primary).toHaveAttribute('aria-label', 'Stop')
+    await expect(primary).toHaveAttribute('aria-label', '停止')
     await expect(queue).toHaveCount(0)
     await page.screenshot({ path: testInfo.outputPath('busy-composer-queue.png') })
-    await expect(page.getByText('1 Queued')).toBeVisible()
+    await expect(page.getByText('1 条排队')).toBeVisible()
 
     await primary.click()
-    await expect(page.getByText('1 Queued — paused')).toBeVisible()
+    await expect(page.getByText('1 条排队 — 已暂停')).toBeVisible()
     await page.screenshot({ path: testInfo.outputPath('busy-composer-queue-paused.png') })
   })
 })

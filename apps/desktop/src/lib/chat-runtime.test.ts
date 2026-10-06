@@ -221,6 +221,20 @@ describe('coalesceToolOnlyAssistants toolCallId uniqueness', () => {
     expect(ids).toEqual(['call-a', 'call-b', 'call-c'])
   })
 
+  it('does not merge an interim tool-only row into the preceding text', () => {
+    const merged = coalesceToolOnlyAssistants(
+      [
+        assistant('update', [{ type: 'text', text: 'Checking files.' } as ChatMessagePart]),
+        { ...assistant('tool', [tool('call-a')]), interim: true }
+      ],
+      createToolMergeCache()
+    )
+
+    expect(merged).toHaveLength(2)
+    expect(merged[0].parts.map(part => part.type)).toEqual(['text'])
+    expect(merged[1].parts.map(part => part.type)).toEqual(['tool-call'])
+  })
+
   it('folds a clean follow-up unchanged', () => {
     const merged = coalesceToolOnlyAssistants(
       [

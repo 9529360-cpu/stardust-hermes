@@ -22,6 +22,8 @@ export type ChatMessage = {
   parts: ChatMessagePart[]
   /** Result body only; the system text remains the compact completion label. */
   asyncResult?: string
+  /** Backend-authored synthetic continuation, not a new human turn. */
+  autoContinue?: boolean
   timestamp?: number
   completedAt?: number
   pending?: boolean

@@ -15,6 +15,17 @@ import {
 } from './tool-parts'
 import type { ChatMessage, ChatMessagePart } from './types'
 
+// Legacy stall-guard nudges are persisted without display_kind. Match only
+// this backend-authored exact text; arbitrary user/system instructions are not
+// a reliable continuation boundary.
+const LEGACY_ACK_CONTINUATION =
+  '[System: Continue now. Execute the required tool calls and only send your final answer after completing the task.]'
+
+const isAutoContinuation = (message: SessionMessage | undefined): boolean =>
+  message?.role === 'user' &&
+  (message.display_kind === 'auto_continue' ||
+    (message.display_kind == null && message.content === LEGACY_ACK_CONTINUATION))
+
 const ATTACHED_CONTEXT_MARKER_RE = /(?:^|\n)--- Attached Context ---\s*\n/
 const CONTEXT_WARNINGS_MARKER_RE = /(?:^|\n)--- Context Warnings ---[\s\S]*$/
 const CONTEXT_REF_RE = /@(file|folder|url|image|tool|terminal):(?:"[^"\n]+"|'[^'\n]+'|`[^`\n]+`|\S+)/g
@@ -266,12 +277,12 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
     return true
   }
 
-  const flushPendingTools = (index: number) => {
+  const flushPendingTools = (index: number, separate = false) => {
     if (!pendingToolParts.length) {
       return
     }
 
-    if (!appendPartsToActiveAssistant(pendingToolParts, pendingToolTimestamp)) {
+    if (separate || !appendPartsToActiveAssistant(pendingToolParts, pendingToolTimestamp)) {
       result.push({
         id: `${pendingToolTimestamp || Date.now()}-${index}-tools`,
         role: 'assistant',
@@ -318,7 +329,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       message.display_kind === 'model_switch' ||
       message.display_kind === 'async_delegation_complete' ||
       message.display_kind === 'process_complete' ||
-      message.display_kind === 'auto_continue' ||
+      isAutoContinuation(message) ||
       message.display_kind === 'personality_switch'
         ? 'system'
         : message.role
@@ -389,6 +400,18 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
     }
 
     if (message.role === 'assistant') {
+      // A persisted continuation nudge explicitly marks this text as interim.
+      // When a preceding assistant produced only tools, keep those tools in
+      // their own bubble instead of absorbing this separate text-only row.
+      const continuationAfterText =
+        parts.length > 0 &&
+        parts.every(part => part.type === 'text') &&
+        isAutoContinuation(messages[index + 1])
+
+      if (continuationAfterText && pendingToolParts.length) {
+        flushPendingTools(index, true)
+      }
+
       if (pendingToolParts.length) {
         if (!appendPartsToActiveAssistant(pendingToolParts, message.timestamp ?? pendingToolTimestamp)) {
           parts.unshift(...pendingToolParts)
@@ -405,7 +428,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       const currentHasToolCall = parts.some(part => part.type === 'tool-call')
       const activeHasToolCall = Boolean(activeAssistant?.parts.some(part => part.type === 'tool-call'))
 
-      if (activeAssistant && (currentHasToolCall || activeHasToolCall)) {
+      if (activeAssistant && (currentHasToolCall || activeHasToolCall) && !continuationAfterText) {
         activeAssistant.parts = [...activeAssistant.parts, ...parts]
         activeAssistant.timestamp = earliestTimestamp(
           activeAssistant.timestamp,
@@ -429,11 +452,17 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       id: `${message.timestamp || Date.now()}-${index}-${displayRole}`,
       role: displayRole,
       parts,
+      ...(isAutoContinuation(message) ? { autoContinue: true } : {}),
       ...(message.display_kind === 'async_delegation_complete' || message.display_kind === 'process_complete'
         ? { asyncResult: asyncResultBody(displayContentForMessage(message.role, message.content || content)) }
         : {}),
       timestamp: earliestTimestamp(message.timestamp, ...parts.map(part => part.timestamp)),
       ...(rowId !== undefined ? { rowId } : {}),
+      ...(message.role === 'assistant' &&
+      isAutoContinuation(messages[index + 1]) &&
+      parts.length > 0 && parts.every(part => part.type === 'text')
+        ? { interim: true }
+        : {}),
       ...(reactions.length ? { reactions } : {}),
       ...(extractedAttachmentRefs ? { attachmentRefs: extractedAttachmentRefs } : {})
     })

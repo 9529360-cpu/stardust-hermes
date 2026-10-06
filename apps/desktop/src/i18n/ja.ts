@@ -3282,6 +3282,7 @@ export const ja = defineLocale({
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',
+      workProgress: count => `作業の進捗 ${count} 件`,
       loadingResponse: 'Stardust が応答を読み込み中',
       resumeWhenBackgroundDone: count =>
         count === 1

@@ -137,6 +137,13 @@ describe('buildGroups', () => {
     ])
   })
 
+  it('keeps a typed backend continuation and its final answer within the originating turn', () => {
+    expect(buildGroups('0:u:user:1:0\n1:tool:assistant:2:0\n2:progress:assistant:1:0\n3:nudge:system:1:1\n4:final:assistant:1:0\n5:next:user:1:0')).toEqual([
+      { id: 'u', indices: [0, 1, 2, 3, 4], kind: 'turn', weight: 6 },
+      { id: 'next', indices: [5], kind: 'turn', weight: 1 }
+    ])
+  })
+
   it('keeps leading non-user messages as standalone groups', () => {
     const groups = buildGroups(
       signature([
