@@ -249,7 +249,7 @@ const StatusbarItemView = memo(function StatusbarItemView({
     // way profile-switcher.tsx stacks Popover/ContextMenu/Tooltip triggers.
     const trigger = (
       <DropdownMenuTrigger asChild>
-        <button className={cn(STATUSBAR_ACTION_CLASS, item.className)} disabled={item.disabled} type="button">
+        <button className={cn(STATUSBAR_ACTION_CLASS, item.className)} data-statusbar-item={item.id} disabled={item.disabled} type="button">
           {content}
         </button>
       </DropdownMenuTrigger>

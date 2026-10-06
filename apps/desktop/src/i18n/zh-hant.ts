@@ -3236,7 +3236,16 @@ export const zhHant = defineLocale({
         loading: '正在載入明細…',
         percentFull: percent => `已用 ${percent}%`,
         title: '上下文使用量',
-        tokenSummary: (used, max) => `${used} / ${max} Tokens`
+        tokenSummary: (used, max) => `${used} / ${max} Tokens`,
+        sessionTokens: '工作階段 Token 用量',
+        sessionTokensNote: '模型呼叫累計值，與目前上下文佔用不同；快取 Token 已計入提示總量，請勿另加至總計。',
+        inputTokens: '未快取輸入',
+        cacheReadTokens: '快取讀取',
+        cacheWriteTokens: '快取寫入',
+        outputTokens: '輸出',
+        totalTokens: '總計（提示 + 輸出）',
+        noSessionTokens: '尚無模型用量',
+        unavailable: '未回報'
       },
       session: '工作階段',
       yoloOn: 'YOLO 已開啟 — 自動核准危險指令。Shift+點擊可全域切換。',

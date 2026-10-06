@@ -3801,7 +3801,16 @@ export const en: Translations = {
         loading: 'Loading breakdown…',
         percentFull: percent => `${percent}% Full`,
         title: 'Context Usage',
-        tokenSummary: (used, max) => `${used} / ${max} Tokens`
+        tokenSummary: (used, max) => `${used} / ${max} Tokens`,
+        sessionTokens: 'Session token usage',
+        sessionTokensNote: 'Cumulative model calls; separate from current context occupancy. Cache tokens are part of the prompt, not added to the total.',
+        inputTokens: 'Uncached input',
+        cacheReadTokens: 'Cache read',
+        cacheWriteTokens: 'Cache write',
+        outputTokens: 'Output',
+        totalTokens: 'Total (prompt + output)',
+        noSessionTokens: 'No model usage yet',
+        unavailable: 'Not reported'
       },
       session: 'Session',
       yoloOn: 'YOLO on — auto-approving dangerous commands. Shift+click toggles globally.',

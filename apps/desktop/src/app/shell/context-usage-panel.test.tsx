@@ -122,6 +122,38 @@ describe('ContextUsagePanel', () => {
     expect(screen.getByText('Conversation')).toBeTruthy()
   })
 
+  it('shows cumulative provider buckets separately from context occupancy, without double-counting cache', () => {
+    render(
+      <ContextUsagePanel
+        breakdown={breakdown}
+        loading={false}
+        sessionUsage={{ calls: 3, input: 1_000, cache_read: 2_000, cache_write: 500, prompt: 3_500, output: 250, total: 3_750 }}
+        usage={usage}
+      />
+    )
+
+    const rows = screen.getByText('Session token usage').closest('[data-slot="session-token-usage"]')
+    expect(rows?.textContent).toContain('Uncached input1k')
+    expect(rows?.textContent).toContain('Cache read2k')
+    expect(rows?.textContent).toContain('Cache write500')
+    expect(rows?.textContent).toContain('Output250')
+    expect(rows?.textContent).toContain('Total (prompt + output)3.8k')
+    expect(screen.getByText('47% Full')).toBeTruthy()
+  })
+
+  it('distinguishes unsupported cache counters from reported zero', () => {
+    const { rerender } = render(
+      <ContextUsagePanel breakdown={null} loading={false}
+        sessionUsage={{ calls: 1, input: 10, output: 2, total: 12 }} usage={usage} />
+    )
+
+    expect(screen.getByText('Cache read').nextElementSibling?.textContent).toBe('Not reported')
+
+    rerender(<ContextUsagePanel breakdown={null} loading={false}
+      sessionUsage={{ calls: 1, input: 10, cache_read: 0, cache_write: 0, output: 2, total: 12 }} usage={usage} />)
+    expect(screen.getByText('Cache read').nextElementSibling?.textContent).toBe('0')
+  })
+
   it('says so when there is no breakdown rather than painting an empty bar', () => {
     render(<ContextUsagePanel breakdown={null} loading={false} usage={usage} />)
 

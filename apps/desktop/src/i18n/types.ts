@@ -3329,6 +3329,15 @@ export interface Translations {
         percentFull: (percent: number) => string
         title: string
         tokenSummary: (used: string, max: string) => string
+        sessionTokens: string
+        sessionTokensNote: string
+        inputTokens: string
+        cacheReadTokens: string
+        cacheWriteTokens: string
+        outputTokens: string
+        totalTokens: string
+        noSessionTokens: string
+        unavailable: string
       }
       session: string
       yoloOn: string

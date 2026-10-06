@@ -20305,11 +20305,14 @@ def test_get_usage_perf_readouts_present():
         model = "x"
         session_prompt_tokens = 27_873
         session_cache_read_tokens = 24_369
+        session_cache_write_tokens = 312
         _api_latency_history = deque([2.1, 4.3], maxlen=10)
         _api_output_history = deque([130, 190], maxlen=10)
 
     usage = server._get_usage(_PerfAgent())
     assert usage["cache_hit_pct"] == 87
+    assert usage["cache_read"] == 24_369
+    assert usage["cache_write"] == 312
     assert usage["avg_latency_s"] == 3.2
     assert usage["avg_tps"] == 50.0  # true throughput sum(out)/sum(lat), not mean of ratios
 
@@ -20324,6 +20327,8 @@ def test_get_usage_perf_readouts_omitted_without_data():
 
     usage = server._get_usage(_ColdAgent())
     assert "cache_hit_pct" not in usage
+    assert usage["cache_read"] == 0
+    assert usage["cache_write"] == 0
     assert "avg_latency_s" not in usage
     assert "avg_tps" not in usage
 

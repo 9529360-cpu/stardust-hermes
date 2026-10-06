@@ -733,6 +733,12 @@ export interface UsageStats {
   avg_tps?: number
   /** Session prompt-cache hit rate, 0–100. Omitted (not 0) when the provider reports no cache reads. */
   cache_hit_pct?: number
+  /** Session cumulative prompt-cache reads; absent on older gateways. */
+  cache_read?: number
+  /** Session cumulative prompt-cache writes; absent on older gateways. */
+  cache_write?: number
+  /** All prompt tokens, including uncached input and cache reads/writes. */
+  prompt?: number
   calls: number
   context_max?: number
   context_percent?: number
