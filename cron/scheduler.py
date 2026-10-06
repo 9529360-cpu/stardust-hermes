@@ -43,8 +43,6 @@ from hermes_cli.config import (
 from hermes_cli.fallback_config import get_fallback_chain
 from hermes_time import now as _hermes_now
 from agent.interrupt_compat import request_hard_interrupt
-from agent.delegation_context import (
-    enter_non_dispatcher_owned_context, exit_non_dispatcher_owned_context)
 from agent.memory_provider import ctx_bound
 
 logger = logging.getLogger(__name__)

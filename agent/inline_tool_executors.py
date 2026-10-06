@@ -213,21 +213,6 @@ def _latest_user_message(messages: Optional[list]) -> str:
         return "\n".join(texts).strip()
     return ""
 
-def _assistant_tasks(agent, args: dict, ctx: InlineToolContext) -> Any:
-    """Durable multi-task intake bound to the exact owning session and tool call."""
-    from tools.assistant_tasks import assistant_tasks_tool
-
-    return assistant_tasks_tool(
-        action=args.get("action", "create"),
-        tasks=args.get("tasks"),
-        include_completed=args.get("include_completed", True),
-        limit=args.get("limit", 20),
-        task_ids=args.get("task_ids"),
-        task_id=args.get("task_id"),
-        user_message=_latest_user_message(ctx.messages),
-        session_id=getattr(agent, "session_id", None),
-        request_id=ctx.tool_call_id,
-    )
 
 
 def _model_configure(agent, args: dict, ctx: InlineToolContext) -> Any:
@@ -257,7 +242,6 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
         "tools.todo_tool", "todo_tool", ("todos", "todos"), ("merge", "merge", False),
         store=lambda agent, ctx: agent._todo_store,
     ),
-    "assistant_tasks": _assistant_tasks,
     "model_configure": _model_configure,
     # Bot Mode teammate DM is injected, not registered: only a canonical Bot
     # Chat session carries the schema, and the tool re-gates on the title.

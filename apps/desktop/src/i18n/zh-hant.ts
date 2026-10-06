@@ -1261,8 +1261,6 @@ export const zhHant = defineLocale({
         mcp: { label: 'MCP', hint: 'MCP 工具路由' },
         title_generation: { label: '標題生成', hint: '工作階段標題' },
         review: { label: '評審', hint: '/review 評審子代理' },
-        triage_specifier: { label: '分類指定', hint: '看板任務規格補全' },
-        kanban_decomposer: { label: '看板分解', hint: '任務拆解' },
         profile_describer: { label: '設定檔描述', hint: '自動生成設定檔描述' },
         curator: { label: '策展器', hint: '技能使用審查' }
       }
@@ -1632,11 +1630,9 @@ export const zhHant = defineLocale({
       pageBlurb: '每個外掛一列。外掛可以擴充本應用、智能體或兩者 — 每個部分都有自己的開關。',
       bundledNames: {
         'hermes-bots': '智能體',
-        kanban: '任務看板',
       },
       bundledDescriptions: {
         'hermes-bots': '智能體名冊，為每個智能體提供獨立對話、定時任務、群聊與智能體間訊息。',
-        kanban: '多智能體任務看板，包含看板頁面、命令面板入口與狀態列中的即時任務動態。',
       },
       halfDesktop: '桌面',
       halfDesktopHint: '本應用，所有設定相同',

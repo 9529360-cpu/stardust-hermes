@@ -38,7 +38,6 @@ hermes profile create mybot
 hermes profile create researcher --description "Reads source code and external docs, writes findings."
 ```
 
-你也可以稍后通过 `hermes profile describe` 设置或自动生成描述——完整路由模型请参阅 [Kanban 指南](./features/kanban#auto-vs-manual-orchestration)。
 
 ### 仅克隆配置（`--clone`）
 

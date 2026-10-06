@@ -44,17 +44,8 @@ _TERMUX_INSTALL_ALL_FALLBACK_NOTES = (
 )
 
 
-def _is_kanban_worker_env_gate(item: dict) -> bool:
-    """Return True when Kanban is unavailable only because this is not a worker process."""
-    tools = item.get("tools") or []
-    return (item.get("name") == "kanban" and not os.environ.get("HERMES_KANBAN_TASK")
-            and bool(tools) and all(str(tool).startswith("kanban_") for tool in tools))
-
-
 def _doctor_tool_availability_detail(toolset: str) -> str:
     """Optional explanatory suffix for toolsets whose doctor status needs context."""
-    if toolset == "kanban" and not os.environ.get("HERMES_KANBAN_TASK"):
-        return "(runtime-gated; loaded only for dispatcher-spawned workers)"
     return ""
 
 
@@ -93,9 +84,7 @@ def _apply_doctor_tool_availability_overrides(available: list[str], unavailable:
     from hermes_cli.doctor_state import _honcho_is_configured_for_doctor
     updated_available, updated_unavailable = list(available), []
     for item in unavailable:
-        if _is_kanban_worker_env_gate(item):
-            gated = "kanban"
-        elif item.get("name") == "honcho" and _honcho_is_configured_for_doctor():
+        if item.get("name") == "honcho" and _honcho_is_configured_for_doctor():
             gated = "honcho"
         else:
             updated_unavailable.append(item)

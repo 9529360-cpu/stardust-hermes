@@ -20,7 +20,7 @@ from evals.assistant_scenarios.trace import ToolCall, Trace, Turn
 
 FILE_EDIT_TOOLS = frozenset({"write_file", "patch"})
 EXEC_TOOLS = frozenset({"terminal", "execute_code", "process_manage"})
-SPAWN_TOOLS = frozenset({"delegate_task", "cronjob_manage", "assistant_tasks", "kanban_create"})
+SPAWN_TOOLS = frozenset({"delegate_task", "cronjob_manage"})
 SIDE_WRITE_TOOLS = frozenset({"memory", "skill_manage", "todo_list"})
 
 ACK_LIMIT_SECONDS = 180.0
@@ -198,8 +198,8 @@ def grade_convert_and_send(obs: Observation) -> Verdict:
 
 # ── 4. 后台研究，做完回来汇报 ───────────────────────────────────────────────
 def _started_background(obs: Observation) -> bool:
-    durable_task = any(str(c.args.get("action", "")).lower() == "create" for c in obs.trace.calls("assistant_tasks"))
-    return bool(obs.delegations) or durable_task
+    scheduled_task = any(str(c.args.get("action", "")).lower() in {"create", "run"} for c in obs.trace.calls("cronjob_manage"))
+    return bool(obs.delegations) or scheduled_task
 
 
 def _reported_facts(turns: Iterable[Turn]) -> List[Turn]:

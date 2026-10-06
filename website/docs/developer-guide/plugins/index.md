@@ -945,15 +945,12 @@ Each hook is documented in full on the **[Event Hooks reference](/user-guide/fea
 | [`on_session_finalize`](/user-guide/features/hooks#on_session_finalize) | CLI/gateway tears down an active session | `session_id: str \| None, platform: str` | ignored |
 | [`on_session_reset`](/user-guide/features/hooks#on_session_reset) | Gateway swaps in a new session key (`/new`, `/reset`) | `session_id: str, platform: str` | ignored |
 | [`gateway_platform_event`](/user-guide/features/hooks#gateway_platform_event) | An authorized platform-native event is normalized at the gateway boundary (Telegram reactions currently) | `platform: str, event_type: str, payload: dict` | ignored |
-| `kanban_task_claimed` | A kanban task is claimed (dispatcher process, before the worker spawns) | `task_id: str, board: str \| None, assignee: str \| None, run_id: int \| None, profile_name: str` | ignored |
-| `kanban_task_completed` | A kanban task completes (worker process) | `task_id, board, assignee, run_id, profile_name, summary: str \| None` | ignored |
-| `kanban_task_blocked` | A kanban task is blocked (worker process) | `task_id, board, assignee, run_id, profile_name, reason: str \| None` | ignored |
 
 Most hooks are fire-and-forget observers — their return values are ignored. The exceptions are `pre_llm_call`, which can inject context into the conversation, and `pre_tool_call`, which can return a block/approve directive.
 
 All callbacks should accept `**kwargs` for forward compatibility. If a hook callback crashes, it's logged and skipped. Other hooks and the agent continue normally.
 
-The kanban lifecycle hooks fire **after** the board DB change commits, so a callback always sees durable state and can never hold the SQLite write lock. Because kanban workers run as separate `hermes -p <profile> chat -q` subprocesses, `kanban_task_claimed` fires in the **dispatcher** process while `kanban_task_completed` / `kanban_task_blocked` fire in the **worker** process — hook in the dispatcher to observe every transition centrally, or in the worker for per-task in-session context.
+The kanban lifecycle hooks fire **after** the board DB change commits, so a callback always sees durable state and can never hold the SQLite write lock. Because kanban workers run as separate `hermes -p <profile> chat -q` subprocesses fires in the **dispatcher** process while `kanban_task_completed` / `kanban_task_blocked` fire in the **worker** process — hook in the dispatcher to observe every transition centrally, or in the worker for per-task in-session context.
 
 The **API request hooks** are observers for the raw provider request, one level below the per-turn `pre_llm_call` / `post_llm_call` pair: a single turn that calls tools makes several API requests, and these hooks fire around each one. They exist for observability plugins (tracing, cost accounting, latency dashboards). The `request` and `response` kwargs are sanitized, size-capped JSON views of the provider payload (sensitive keys redacted, long strings truncated, SDK objects normalized), and `usage` is a plain token-summary dict. Every payload carries the correlation fields `turn_id`, `api_request_id`, `task_id`, `session_id`, and `api_call_count`, so a plugin can stitch requests, tool calls, and turns together. `api_request_error` fires when a provider call raises and adds `status_code`, `retry_count` / `max_retries`, `retryable`, `reason`, and an `error` dict with `type` and `message`.
 
@@ -1251,7 +1248,6 @@ def register(ctx):
             "task_id": task_id,
             "comment": f"[{ctx.profile_name}] auto-noted block: {reason}",
         })
-    ctx.register_hook("kanban_task_blocked", on_blocked)
 ```
 
 For running a full `hermes <subcommand>` (e.g. `hermes kanban show`), shell out with the `terminal` tool via `ctx.dispatch_tool("terminal", {"command": "hermes kanban show ..."})` — there is no in-process slash-command bridge for headless worker sessions, and tools are the supported way to drive Hermes from a hook.

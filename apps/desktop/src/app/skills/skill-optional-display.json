@@ -119,10 +119,6 @@
     "name": "IP 吉祥物标志",
     "description": "设计 32px 下清晰可辨的简约可爱标志"
   },
-  "kanban-video-orchestrator": {
-    "name": "看板式视频编排",
-    "description": "规划运行多代理视频制作流水线"
-  },
   "meme-generation": {
     "name": "表情包生成",
     "description": "用 Pillow 在模板叠字生成 PNG 表情包"

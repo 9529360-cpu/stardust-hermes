@@ -1071,9 +1071,6 @@ def _load_tools(agent, enabled_toolsets, disabled_toolsets):
     )
 
     agent.valid_tool_names = {tool["function"]["name"] for tool in agent.tools} if agent.tools else set()
-    # Kanban worker protocol is session-static; resolve once.
-    from agent.prompt_builder import kanban_worker_guidance
-    agent._kanban_worker_guidance = kanban_worker_guidance(agent.valid_tool_names)
     if agent.quiet_mode:
         return
     if agent.tools:

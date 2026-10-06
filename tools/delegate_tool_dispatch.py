@@ -197,7 +197,7 @@ _SYNC_FALLBACK_NOTES = {
     "no_async": (
         "background=true is not available in this session — it cannot "
         "receive a detached subagent result after the turn ends (a "
-        "finite chat using -Q, --oneshot, or non-TTY stdio, `hermes -z`, a cron job, a Kanban "
+        "finite chat using -Q, --oneshot, or non-TTY stdio, `hermes -z`, a cron job, a one-shot "
         "worker, or a stateless HTTP endpoint). The subagent(s) ran SYNCHRONOUSLY and the result is included above."
     ),
     "at_capacity": (

@@ -2,7 +2,6 @@ import pytest
 
 from agent.assistant_intent import (
     ASSISTANT_EXECUTION_GUIDANCE,
-    DURABLE_TASK_GUIDANCE,
     ATTENTION_TASK_STATES,
     EXECUTION_CONTRACTS,
     TERMINAL_TASK_STATES,
@@ -14,11 +13,9 @@ from agent.assistant_intent import (
     contract_for,
     cron_job_lifecycle_state,
     delegation_lifecycle_state,
-    kanban_lifecycle_state,
     process_lifecycle_state,
     project_cron_job,
     project_delegation,
-    project_kanban_task,
     project_process,
     rails_for,
 )
@@ -42,7 +39,6 @@ def test_schedule_or_watch_is_restart_durable():
     assert contract.background is True
     assert contract.durability == "restart_durable"
     assert "cron" in contract.description
-    assert "kanban" in contract.description
 
 
 def test_clarify_is_reserved_for_material_user_decisions():
@@ -57,12 +53,6 @@ def test_prompt_guidance_names_durability_and_focus_boundaries():
     assert "never as a promise of restart durability" in ASSISTANT_EXECUTION_GUIDANCE
     assert "must not steal focus" in ASSISTANT_EXECUTION_GUIDANCE
     assert "secure local credential capture or Vault resolution" in ASSISTANT_EXECUTION_GUIDANCE
-    assert "`assistant_tasks`" in DURABLE_TASK_GUIDANCE
-    assert "originating session is provenance, not ownership" in DURABLE_TASK_GUIDANCE
-    assert "Permanently delete durable work only from the CURRENT user's explicit deletion request" in DURABLE_TASK_GUIDANCE
-    assert "deletion stops active work and removes its durable record" in DURABLE_TASK_GUIDANCE
-    assert "cancellation preserves history" in DURABLE_TASK_GUIDANCE
-    assert "Existing user authorization continues only within its stated scope" in DURABLE_TASK_GUIDANCE
     assert "user decision, credential, authorization" not in ASSISTANT_EXECUTION_GUIDANCE
 
 
@@ -81,7 +71,6 @@ def test_modes_map_only_to_existing_runtime_owners():
     }
     assert rails_for(AssistantExecutionMode.SCHEDULE_OR_WATCH) == {
         AssistantExecutionRail.CRON,
-        AssistantExecutionRail.KANBAN,
     }
 
 
@@ -115,7 +104,6 @@ def test_stable_task_ids_namespace_native_owner_ids_by_rail():
     assert assistant_task_id(AssistantExecutionRail.PROCESS, "42") == "process:42"
     assert assistant_task_id(AssistantExecutionRail.DELEGATION, "42") == "delegation:42"
     assert assistant_task_id(AssistantExecutionRail.CRON, "42") == "cron:42"
-    assert assistant_task_id(AssistantExecutionRail.KANBAN, "42") == "kanban:42"
 
     with pytest.raises(ValueError, match="execution rail"):
         assistant_task_id(AssistantExecutionRail.NONE, "42")
@@ -193,19 +181,6 @@ def test_cron_states_include_terminal_scheduler_results():
 
     with pytest.raises(ValueError, match="unknown cron state"):
         cron_job_lifecycle_state("future-state")
-
-
-def test_kanban_states_map_from_canonical_board_statuses():
-    for native in ("triage", "todo", "scheduled", "ready"):
-        assert kanban_lifecycle_state(native) is AssistantTaskState.QUEUED
-    for native in ("running", "review"):
-        assert kanban_lifecycle_state(native) is AssistantTaskState.RUNNING
-    assert kanban_lifecycle_state("blocked") is AssistantTaskState.BLOCKED
-    assert kanban_lifecycle_state("done") is AssistantTaskState.COMPLETED
-    assert kanban_lifecycle_state("archived") is AssistantTaskState.COMPLETED
-
-    with pytest.raises(ValueError, match="unknown kanban state"):
-        kanban_lifecycle_state("failed")
 
 
 def test_durable_delegation_projection_preserves_recovery_provenance():
@@ -303,37 +278,6 @@ def test_cron_projection_is_restart_durable_and_preserves_workdir():
     assert completed.final_report == "export saved"
 
 
-def test_kanban_projection_preserves_project_workspace_artifacts_and_report():
-    projection = project_kanban_task(
-        {
-            "id": "k-1",
-            "title": "Fix the bug",
-            "status": "done",
-            "session_id": "parent-7",
-            "project_id": "project-42",
-            "workspace_path": "/repo/.worktrees/k-1",
-            "result": "task row result",
-        },
-        run={
-            "summary": "fixed and verified",
-            "metadata": {
-                "artifacts": ["/repo/report.txt"],
-                "approval_refs": ["approval-9"],
-            },
-        },
-    )
-
-    assert projection.task_id == "kanban:k-1"
-    assert projection.state is AssistantTaskState.COMPLETED
-    assert projection.durability == "restart_durable"
-    assert projection.parent_session_id == "parent-7"
-    assert projection.project_ref == "project-42"
-    assert projection.workspace == "/repo/.worktrees/k-1"
-    assert projection.artifact_refs == ("/repo/report.txt",)
-    assert projection.approval_refs == ("approval-9",)
-    assert projection.final_report == "fixed and verified"
-
-
 def test_projection_wire_shape_keeps_provenance_and_attention_machine_readable():
     projection = AssistantTaskProjection(
         task_id="current_session:s-1",
@@ -356,37 +300,3 @@ def test_projection_wire_shape_keeps_provenance_and_attention_machine_readable()
     assert wire["artifact_refs"] == ["diff://42"]
     assert wire["terminal"] is False
     assert wire["needs_attention"] is True
-
-
-
-def test_kanban_projection_maps_needs_input_block_to_waiting_for_user():
-    projection = project_kanban_task(
-        {
-            "id": "k-waiting",
-            "title": "Need a decision",
-            "status": "blocked",
-            "block_kind": "needs_input",
-        }
-    )
-
-    assert projection.state is AssistantTaskState.WAITING_FOR_USER
-    assert projection.requires_approval is False
-    assert projection.needs_attention is True
-    assert projection.terminal is False
-    assert projection.recovery_action == "unblock"
-
-
-def test_kanban_projection_maps_approval_block_to_waiting_for_user():
-    projection = project_kanban_task(
-        {
-            "id": "k-approval",
-            "title": "Approve the change",
-            "status": "blocked",
-        },
-        run={"metadata": {"requires_approval": True}},
-    )
-
-    assert projection.state is AssistantTaskState.WAITING_FOR_USER
-    assert projection.requires_approval is True
-    assert projection.needs_attention is True
-    assert projection.recovery_action == "unblock"

@@ -17,8 +17,6 @@ class TestGenerateTitle:
     """Unit tests for generate_title()."""
 
 
-
-
     def test_title_language_reads_config(self):
         cfg = {"auxiliary": {"title_generation": {"language": "  French "}}}
 
@@ -68,7 +66,6 @@ class TestGenerateTitle:
             assert generate_title("question") == "Reasoning Off"
 
         assert captured_kwargs.get("reasoning_config") == {"enabled": False}
-
 
 
     def test_strips_think_blocks(self):
@@ -193,7 +190,6 @@ class TestGenerateTitle:
             )
 
 
-
     def test_invokes_failure_callback_on_exception(self):
         """failure_callback must fire so the user sees a warning (issue #15775)."""
         captured = []
@@ -211,19 +207,8 @@ class TestGenerateTitle:
         assert captured[0][1] is exc
 
 
-
-
-
-
-
-
-
-
-
 class TestAutoTitleSession:
     """Tests for auto_title_session() — the sync worker function."""
-
-
 
 
     def test_does_not_overwrite_title_set_immediately_before_conditional_write(
@@ -289,7 +274,6 @@ class TestAutoTitleSession:
         assert db.get_session_title("sess-1") == "Fix flaky auth test"
 
 
-
     def test_body_exception_routed_to_failure_callback(self):
         db = MagicMock()
         db.get_session_title.return_value = None
@@ -305,7 +289,6 @@ class TestAutoTitleSession:
                 failure_callback=lambda task, exc: seen.append((task, exc)),
             )
         assert seen == [("title generation", boom)]
-
 
 
 class TestMaybeAutoTitle:
@@ -356,55 +339,6 @@ class TestMaybeAutoTitle:
                 runtime_validator=None,
             )
 
-    def test_kanban_worker_is_named_after_its_card_without_the_llm_thread(self, tmp_path, monkeypatch):
-        """A worker's session takes the board card's title synchronously; no auxiliary model call (#111166)."""
-        from hermes_cli import kanban_db, kanban_db_connect
-
-        with kanban_db_connect.connect_closing(board="default") as conn:
-            task_id = kanban_db.create_task(conn, title="Fix flaky worker startup", board="default")
-            conn.commit()
-        monkeypatch.setenv("HERMES_KANBAN_TASK", task_id)
-        db = SessionDB(tmp_path / "state.db")
-        db.create_session(session_id="sess-1", source="kanban")
-
-        with patch("agent.title_generator.auto_title_session") as mock_auto:
-            maybe_auto_title(db, "sess-1", f"work kanban task {task_id}", [])
-
-        assert db.get_session_title("sess-1") == "Fix flaky worker startup"
-        assert db.get_session_title_source("sess-1") == "llm"
-        mock_auto.assert_not_called()
-
-    def test_kanban_worker_with_an_overlong_card_title_is_still_named(self, tmp_path, monkeypatch):
-        """Cards have no length cap; the store rejects past MAX_TITLE_LENGTH, so the card title is trimmed, not dropped."""
-        from hermes_cli import kanban_db, kanban_db_connect
-
-        card = "Investigate why the swap modal intermittently fails to render its confirmation step on mobile Safari after a retry"
-        assert len(card) > SessionDB.MAX_TITLE_LENGTH
-        with kanban_db_connect.connect_closing(board="default") as conn:
-            task_id = kanban_db.create_task(conn, title=card, board="default")
-            conn.commit()
-        monkeypatch.setenv("HERMES_KANBAN_TASK", task_id)
-        db = SessionDB(tmp_path / "state.db")
-        for sid in ("sess-1", "sess-2"):  # a retried card must still get the ``#N`` suffix within the cap
-            db.create_session(session_id=sid, source="kanban")
-            with patch("agent.title_generator.auto_title_session"):
-                maybe_auto_title(db, sid, f"work kanban task {task_id}", [])
-
-        first, second = db.get_session_title("sess-1"), db.get_session_title("sess-2")
-        assert first and first.startswith(card[:40]) and first.endswith("…")
-        assert second == f"{first} #2"
-        assert len(second) <= SessionDB.MAX_TITLE_LENGTH
-
-    def test_kanban_worker_with_unreadable_card_falls_back_to_the_task_id(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_KANBAN_TASK", "t_missing")
-        db = SessionDB(tmp_path / "state.db")
-        db.create_session(session_id="sess-1", source="kanban")
-
-        with patch("agent.title_generator.auto_title_session") as mock_auto:
-            maybe_auto_title(db, "sess-1", "work kanban task t_missing", [])
-
-        assert db.get_session_title("sess-1") == "Kanban task t_missing"
-        mock_auto.assert_not_called()
 
     def test_writes_instant_title_before_the_model_runs(self, tmp_path):
         """The derived title lands synchronously — no LLM, no waiting."""
@@ -523,10 +457,6 @@ class TestMaybeAutoTitle:
         assert db.get_session_title("sess-1") is None
 
 
-
-
-
-
 class TestAutoTitleDuplicateHandling:
     """Duplicate auto-title handling and not-found hardening (#50537)."""
 
@@ -573,7 +503,6 @@ class TestAutoTitleDuplicateHandling:
         assert seen == ["Debugging Import Error #2"]
 
 
-
     def test_manual_title_race_skips_without_callback(self):
         # Precedence check fails (manual /title landed while generation was in
         # flight) -> nothing persisted, no callback fired.
@@ -586,11 +515,9 @@ class TestAutoTitleDuplicateHandling:
         db.set_session_title.assert_not_called()
 
 
-
 class TestRuntimeValidator:
     """runtime_validator gating (#19027): a stale background title request
     must not fire when the session's model/provider changed after spawn."""
-
 
 
     def test_broken_validator_fails_open(self):

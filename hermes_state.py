@@ -1538,26 +1538,6 @@ class SessionDB(
         else:
             self._write_sql(sql, (key, value))
 
-    def retag_kanban_worker_sessions(self, workspaces_root: str) -> int:
-        """Retag legacy kanban worker rows from ``cli`` to ``kanban`` by cwd under the board's workspaces
-        root; gated once per root via state_meta. Returns rows retagged."""
-        prefix = str(workspaces_root).rstrip("/\\")
-        if not prefix:
-            return 0
-        gate = f"kanban_worker_source_retagged:{prefix}"
-        if self.get_meta(gate) == "1":
-            return 0
-        def _do(conn):
-            cursor = conn.execute(
-                "UPDATE sessions SET source = 'kanban' "
-                "WHERE source = 'cli' AND (cwd = ? OR cwd LIKE ? ESCAPE '\\')",
-                (prefix, _escape_like(prefix) + "/%"),
-            )
-            # rowcount BEFORE set_meta reuses this cursor for its INSERT.
-            retagged = cursor.rowcount or 0
-            self.set_meta(gate, "1", cursor=cursor)
-            return retagged
-        return self._execute_write(_do)
 
     def list_meta_prefix(self, prefix: str) -> List[Tuple[str, str]]:
         """``[(key, value), ...]`` for state_meta keys starting with the literal

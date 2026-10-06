@@ -50,8 +50,8 @@ def _expand_parent_toolsets(parent_toolsets: set) -> set:
 
 def _strip_blocked_tools(toolsets: List[str]) -> List[str]:
     """Remove toolsets whose tools are ALL blocked (derived from DELEGATE_BLOCKED_TOOLS so the two can't drift) plus
-    composite toolsets children must never get (``delegation``, ``kanban``)."""
-    blocked_toolset_names = {"delegation", "kanban"} | {
+    composite toolsets children must never get (``delegation``)."""
+    blocked_toolset_names = {"delegation"} | {
         name for name, defn in TOOLSETS.items() if all(t in DELEGATE_BLOCKED_TOOLS for t in defn.get("tools", []))
     }
     return [t for t in toolsets if t not in blocked_toolset_names]
@@ -111,6 +111,6 @@ def _resolve_child_toolsets(
         if "delegation" not in child_toolsets:
             child_toolsets.append("delegation")
     child_disabled_toolsets = list(
-        dict.fromkeys(inherited_disabled + _blocked_toolsets_for_role(effective_role) + ["kanban"])
+        dict.fromkeys(inherited_disabled + _blocked_toolsets_for_role(effective_role))
     )
     return child_toolsets, child_disabled_toolsets

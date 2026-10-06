@@ -20,7 +20,6 @@ Neutral third-party resolution of agent merge conflicts.
 | Author | Hermes Agent |
 | License | MIT |
 | Platforms | linux, macos, windows |
-| Tags | `Multi-Agent`, `Git`, `Merge-Conflict`, `Kanban`, `Arbitration` |
 | Related skills | [`hermes-agent`](/docs/user-guide/skills/bundled/autonomous-ai-agents/autonomous-ai-agents-hermes-agent) |
 
 ## Reference: full SKILL.md

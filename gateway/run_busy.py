@@ -757,7 +757,7 @@ class GatewayBusySessionMixin:
     # Ordinary slash handlers shared by idle and busy dispatch.
     _PLAIN_COMMANDS = (
         "status", "context", "restart", "approve", "deny", "pause", "agents", "bg", "btw",
-        "kanban", "subgoal", "heartbeat", "busy", "yolo", "verbose", "footer", "help",
+        "subgoal", "heartbeat", "busy", "yolo", "verbose", "footer", "help",
         "commands", "profile", "login", "update", "version",
     )
     # Dispatched only on the idle path (busy dispatch has its own allowlist).
@@ -861,7 +861,7 @@ class GatewayBusySessionMixin:
         estop.engage(reason=args or None)
         suffix = f" (reason: {args})" if args else ""
         return (
-            f"⏸️ Paused{suffix}. New cron/kanban/gateway work is on hold; "
+            f"⏸️ Paused{suffix}. New cron/gateway work is on hold; "
             "in-flight work finishes normally. Use `/pause off` to resume."
         )
 

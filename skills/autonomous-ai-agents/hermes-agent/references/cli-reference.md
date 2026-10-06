@@ -118,7 +118,6 @@ Multiple credentials per provider form a pool that rotates automatically and ski
 hermes desktop / gui        Native desktop app
 hermes dashboard            Web admin panel + embedded chat (--stop / --status)
 hermes proxy                OpenAI-compatible local proxy backed by an OAuth provider
-hermes kanban <verb>        Multi-agent work-queue board
 hermes project              Named multi-folder workspaces
 hermes skin list|use|set    Switch/tweak skins (see references/themes.md)
 hermes pets <verb>          Pet mascots (see references/petdex.md)

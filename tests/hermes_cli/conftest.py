@@ -8,34 +8,6 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _forget_spawned_kanban_workers():
-    """Drop worker handles a test left in the dispatcher's module-level registry.
-
-    On Windows ``_default_spawn`` keeps each worker's Popen so ``reap_worker_zombies`` can read
-    its exit code; a test that swaps ``subprocess.Popen`` for a fake would otherwise leave that
-    fake there for every later reap in the same process.
-    """
-    yield
-    dispatch = sys.modules.get("hermes_cli.kanban_db_dispatch")
-    if dispatch is not None:
-        dispatch._spawned_worker_procs.clear()
-
-
-@pytest.fixture
-def all_assignees_spawnable(monkeypatch):
-    """Pretend every assignee maps to a real Hermes profile.
-
-    Most dispatcher tests use synthetic assignees ("alice", "bob") that
-    don't correspond to actual profile directories on disk. Without this
-    patch, the dispatcher's profile-exists guard (PR #20105) routes
-    those tasks into ``skipped_nonspawnable`` instead of spawning, which
-    would break tests that assert spawn behavior.
-    """
-    from hermes_cli import profiles
-    monkeypatch.setattr(profiles, "profile_exists", lambda name: True)
-
-
-@pytest.fixture(autouse=True)
 def _suppress_concurrent_hermes_gate(request, monkeypatch):
     """Default ``_detect_concurrent_hermes_instances`` to ``[]`` for every test.
 

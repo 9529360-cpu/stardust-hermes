@@ -18,9 +18,6 @@ Resolve = Callable[[str], Optional[dict]]
 # "does this directory still exist?"; always-True default keeps remote-host projects visible.
 Exists = Callable[[str], bool]
 
-# Only KANBAN-TASK worktrees (`<repo>/.worktrees/t_<hex>`, the id kanban_db mints)
-# collapse into one lane; user-named dirs under `.worktrees/` stay their own lanes.
-_KANBAN_DIR_RE = re.compile(r"^(.*[/\\]\.worktrees)[/\\]t_[0-9a-f]+[/\\]?$")
 _TRUNK_BRANCHES = {"main", "master", "trunk", "develop"}
 DEFAULT_BRANCH_LABEL = "main"
 
@@ -47,8 +44,6 @@ def _branch_lane_id(repo_root: str, branch: str = "") -> str:
     return f"{repo_root}::branch::{(branch or '').strip()}"
 
 
-def _kanban_lane_id(repo_root: str) -> str:
-    return f"{repo_root}::kanban"
 
 
 def _segments(path: str) -> list[str]:
@@ -87,10 +82,6 @@ def base_name(path: str) -> str:
     return segs[-1] if segs else ""
 
 
-def kanban_worktree_dir(path: str) -> Optional[str]:
-    """The ``<repo>/.worktrees`` dir for a ``.../.worktrees/<task>`` path, else None."""
-    m = _KANBAN_DIR_RE.match(path or "")
-    return m.group(1) if m else None
 
 
 def _with_base_name(path: str, name: str = "") -> str:
@@ -125,8 +116,6 @@ def _trunk_placement(repo_root: str, branch: str) -> dict:
     return _placement(repo_root, _branch_lane_id(repo_root, b), b, repo_root, True, False)
 
 
-def _kanban_placement(repo_root: str, kanban_dir: str) -> dict:
-    return _placement(repo_root, _kanban_lane_id(repo_root), "kanban", kanban_dir, False, True)
 
 
 def _probe_sibling_worktree(cwd: str, resolve: Resolve) -> str:
@@ -153,9 +142,6 @@ def _place_by_heuristic(path: str) -> Optional[dict]:
     base = base_name(path)
     if not base:
         return None
-    kanban_dir = kanban_worktree_dir(path)
-    if kanban_dir:
-        return _kanban_placement(_with_base_name(kanban_dir), kanban_dir)
     m = re.match(r"^(.+)-wt-(.+)$", base)
     if m:
         return _placement(_with_base_name(path, m.group(1)), path, m.group(2), path, False, False)
@@ -169,17 +155,11 @@ def _place(
         repo_root, worktree_root = info["repo_root"], info["worktree_root"]
         if _path_key(worktree_root) == _path_key(repo_root) or info.get("is_main"):
             return _trunk_placement(repo_root, branch)
-        kanban_dir = kanban_worktree_dir(worktree_root)
-        if kanban_dir:
-            return _kanban_placement(repo_root, kanban_dir)
         label = base_name(worktree_root) or worktree_root
         return _placement(repo_root, worktree_root, label, worktree_root, False, False)
 
     # No live probe: trust the persisted root; kanban tasks still collapse by path shape.
     if persisted_root:
-        kanban_dir = kanban_worktree_dir(cwd)
-        if kanban_dir:
-            return _kanban_placement(persisted_root, kanban_dir)
         return _trunk_placement(persisted_root, branch)
 
     # Unresolvable cwd: a deleted ``<repo>-<suffix>`` worktree still belongs to its parent.
