@@ -1911,7 +1911,7 @@ class TestAuxiliaryFallbackLayering:
                    return_value=(fallback_client, "deepseek-v4-pro", "fallback_chain[0](opencode-go)")) as mock_chain, \
              patch("agent.auxiliary_client._try_main_agent_model_fallback") as mock_main:
             result = call_llm(
-                task="kanban_decomposer",
+                task="profile_describer",
                 messages=[{"role": "user", "content": "decompose this"}],
             )
 

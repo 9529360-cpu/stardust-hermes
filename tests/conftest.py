@@ -715,19 +715,8 @@ def _neutralize_macos_keychain_creds(request, monkeypatch):
     return None
 
 
-# ── Kanban write guard (#69283) ─────────────────────────────────────────────
-# When hermetic isolation is bypassed (stale checkout, wrong rootdir, direct
-# invocation), kanban writes silently pollute the real ~/.hermes. This autouse
-# fixture patches ``kanban_db_connect.connect`` to refuse writes whose resolved DB
-# path lands under the REAL kanban root (captured at import time, before any
-# fixture rewires the environment). A deny-list is used instead of an
-# allow-list because test-level fixtures legitimately move HERMES_HOME to
-# sibling directories — an allow-list captured at setup time would see the
-# stale autouse-set value and falsely reject hermetic tests (#69385 review).
-
-
 # ── Live state.db write guard ───────────────────────────────────────────────
-# Companion to the kanban guard above, for the MAIN state database.
+# Protect the main state database from accidental host-state writes.
 # ``hermes_state._ensure_test_isolation`` (the single choke point every
 # ``SessionDB()`` construction goes through) refuses, under pytest, any DB
 # path that resolves inside the REAL Hermes root. This fixture wires the

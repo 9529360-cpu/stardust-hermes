@@ -315,12 +315,8 @@ class TestSpawnEnvIsolation:
         # And HOME still passes through unchanged
         assert captured["env"].get("HOME") == "/users/alice"
 
-    def test_kanban_worker_adds_only_kanban_writable_root(self, monkeypatch):
-        """Codex-runtime Kanban workers need to write board state outside
-        their scratch/worktree workspace, but should not fall back to
-        danger-full-access. Hermes passes a narrow app-server config override
-        for the Kanban root only.
-        """
+    def test_retired_board_environment_does_not_expand_sandbox_permissions(self, monkeypatch):
+        """Legacy environment flags cannot grant extra app-server writable roots."""
         import subprocess
         from agent.transports import codex_app_server as cas
 
@@ -362,12 +358,7 @@ class TestSpawnEnvIsolation:
 
         cmd = captured["cmd"]
         assert cmd[:2] == ["codex", "app-server"]
-        assert 'sandbox_mode="workspace-write"' in cmd
-        assert (
-            'sandbox_workspace_write.writable_roots=["/users/alice/.hermes/kanban/boards/smoke"]'
-            in cmd
-        )
-        assert "sandbox_workspace_write.network_access=false" in cmd
+        assert all("sandbox" not in part for part in cmd)
         assert all("danger" not in part for part in cmd)
 
 

@@ -28,7 +28,6 @@ import {
   Filter,
   Cloud,
   Sparkles,
-  LayoutDashboard,
   BookOpen,
   Route,
   History,

@@ -1,12 +1,4 @@
-"""A tool's own success flag decides whether its result is a failure.
-
-Both classifiers — the display/log/guardrail input (``_detect_tool_failure``)
-and the guardrail fallback (``classify_tool_failure``) — used to sniff the
-first 500 characters for ``"failed"``/``"error"``. Success payloads name those
-words legitimately, so every successful ``assistant_tasks`` create (which
-reports an empty ``failed`` list) was logged as a tool error and counted toward
-the same-tool failure loop warning.
-"""
+"""Declared tool success outranks failure words in payloads and loop guardrails."""
 
 import json
 
@@ -14,32 +6,21 @@ import pytest
 
 from agent.display import _detect_tool_failure
 from agent.tool_guardrails import ToolCallGuardrailConfig, ToolCallGuardrailController, classify_tool_failure
-from tools import assistant_tasks
 
 CLASSIFIERS = pytest.mark.parametrize("classify", [_detect_tool_failure, classify_tool_failure])
 
 
-def _created_task_result(monkeypatch) -> str:
-    """The real ``assistant_tasks`` create response for one successfully queued task."""
-    monkeypatch.setattr(assistant_tasks, "_active_profile_name", lambda: "default")
-    monkeypatch.setattr(
-        "tools.kanban_tools._handle_create",
-        lambda args: json.dumps({"ok": True, "task_id": "t_1", "status": "ready", "subscribed": True}),
-    )
-    return assistant_tasks.assistant_tasks_tool(
-        action="create",
-        session_id="session-1",
-        request_id="call-1",
-        tasks=[{"title": "Convert report", "instruction": "Convert report.docx to PDF and verify it opens."}],
-    )
+def _successful_result() -> str:
+    """A declared-success payload can legitimately describe earlier failures."""
+    return json.dumps({"ok": True, "created": [{"id": "1"}], "failed": []})
 
 
 @CLASSIFIERS
-def test_successful_assistant_task_create_is_not_a_failure(classify, monkeypatch):
-    result = _created_task_result(monkeypatch)
+def test_successful_result_with_empty_failed_list_is_not_a_failure(classify):
+    result = _successful_result()
     assert json.loads(result)["failed"] == []  # the word the old sniff tripped on
 
-    assert classify("assistant_tasks", result) == (False, "")
+    assert classify("test_task", result) == (False, "")
 
 
 @CLASSIFIERS
@@ -52,12 +33,12 @@ def test_declared_success_outranks_failure_words_in_the_payload(classify):
 @CLASSIFIERS
 @pytest.mark.parametrize("payload", [
     {"ok": False, "created": [{"index": 0}], "failed": [{"index": 1, "error": "bad task"}]},
-    {"ok": False, "reason": "board unavailable"},
+    {"ok": False, "reason": "service unavailable"},
     {"success": False, "message": "nothing to do"},
     {"success": True, "ok": False},
 ])
 def test_declared_failure_is_a_failure(classify, payload):
-    is_failure, _suffix = classify("assistant_tasks", json.dumps(payload))
+    is_failure, _suffix = classify("test_task", json.dumps(payload))
 
     assert is_failure is True
 
@@ -69,14 +50,14 @@ def test_undeclared_results_keep_the_error_heuristic(classify):
 
 
 @pytest.mark.parametrize("executor_verdict", [True, False], ids=["executor-path", "fallback-path"])
-def test_successful_creates_in_one_turn_raise_no_loop_warning(monkeypatch, executor_verdict):
+def test_successful_creates_in_one_turn_raise_no_loop_warning(executor_verdict):
     """tool_executor passes ``failed=_detect_tool_failure(...)``; other callers use the fallback."""
-    result = _created_task_result(monkeypatch)
+    result = _successful_result()
     controller = ToolCallGuardrailController(ToolCallGuardrailConfig(hard_stop_enabled=True))
-    failed = _detect_tool_failure("assistant_tasks", result)[0] if executor_verdict else None
+    failed = _detect_tool_failure("test_task", result)[0] if executor_verdict else None
 
     decisions = [
-        controller.after_call("assistant_tasks", {"action": "create", "n": n}, result, failed=failed)
+        controller.after_call("test_task", {"action": "create", "n": n}, result, failed=failed)
         for n in range(8)
     ]
 
