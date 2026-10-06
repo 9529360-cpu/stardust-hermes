@@ -461,7 +461,6 @@ class _CronRunScope:
         self._cron_session_token = None
         self._approval_mode = job.get("approval_mode")
         self._approval_mode_token = None
-        self._non_dispatcher_token = None
 
     def enter(self) -> None:
         # Scope cron approval policy; exit() RESETS via token (pinning "" would suppress the legacy
@@ -471,11 +470,6 @@ class _CronRunScope:
         # into the agent worker and delegated children without touching process globals.
         from tools.approval_context import set_cron_approval_mode_override
         self._approval_mode_token = set_cron_approval_mode_override(self._approval_mode)
-        # Mark NOT the kanban worker: a worker's cronjob(action="run") lands here with
-        # HERMES_KANBAN_TASK in env, and an unrelated job could close the worker's task. Must be a
-        # ContextVar, NOT an os.environ clear (env is shared with the worker heartbeat and
-        # concurrent jobs); copy_context() carries it into the agent thread.
-        self._non_dispatcher_token = _sched.enter_non_dispatcher_owned_context()
 
     def exit(self) -> None:
         from gateway.session_context import clear_session_vars
@@ -488,8 +482,6 @@ class _CronRunScope:
         if self._approval_mode_token is not None:
             from tools.approval_context import reset_cron_approval_mode_override
             reset_cron_approval_mode_override(self._approval_mode_token)
-        if self._non_dispatcher_token is not None:
-            _sched.exit_non_dispatcher_owned_context(self._non_dispatcher_token)
         for name in _CRON_DELIVERY_VARS:
             self._var_map[name].set("")
 

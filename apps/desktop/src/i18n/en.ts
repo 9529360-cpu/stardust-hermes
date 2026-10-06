@@ -1458,8 +1458,6 @@ export const en: Translations = {
         mcp: { label: 'MCP', hint: 'MCP tool routing' },
         title_generation: { label: 'Title gen', hint: 'Session titles' },
         review: { label: 'Review', hint: '/review reviewer subagent' },
-        triage_specifier: { label: 'Triage specifier', hint: 'Kanban spec fleshing' },
-        kanban_decomposer: { label: 'Kanban decomposer', hint: 'Task decomposition' },
         profile_describer: { label: 'Profile describer', hint: 'Auto profile descriptions' },
         curator: { label: 'Curator', hint: 'Skill-usage review' }
       }
@@ -1822,11 +1820,9 @@ export const en: Translations = {
       pageBlurb: 'One row per plugin. A plugin can extend this app, the agent, or both — each half has its own switch.',
       bundledNames: {
         'hermes-bots': 'Agents',
-        kanban: 'Task Board',
       },
       bundledDescriptions: {
         'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.',
-        kanban: 'Multi-agent task board with a board view, a command palette entry, and live task activity in the status bar.',
       },
       halfDesktop: 'Desktop',
       halfDesktopHint: 'this app, same for every profile',

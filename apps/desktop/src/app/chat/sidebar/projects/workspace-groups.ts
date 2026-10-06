@@ -517,11 +517,9 @@ function liveLaneForRepo(repoRoot: string, session: SessionInfo): null | Sidebar
   const wt = sessionPath.match(/^(.*[/\\]\.worktrees)[/\\]([^/\\]+)/)
 
   if (wt) {
-    const [worktreeRoot, worktreesDir, slug] = [wt[0], wt[1], wt[2]]
+    const [worktreeRoot, slug] = [wt[0], wt[2]]
 
-    return /^t_[0-9a-f]+$/.test(slug)
-      ? { id: `${repoRoot}::kanban`, isKanban: true, isMain: false, label: 'kanban', path: worktreesDir, sessions: [] }
-      : { id: worktreeRoot, isMain: false, label: slug, path: worktreeRoot, sessions: [] }
+    return { id: worktreeRoot, isMain: false, label: slug, path: worktreeRoot, sessions: [] }
   }
 
   const branch = (session.git_branch || '').trim() || DEFAULT_BRANCH_LABEL

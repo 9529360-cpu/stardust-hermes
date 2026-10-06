@@ -304,16 +304,10 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
             getattr(agent, "_user_profile_enabled", True),
             skill_manage_available="skill_manage" in names,
         )
-    # Kanban worker protocol: resolved once at __init__ (_kanban_worker_guidance);
-    # the fallback covers code paths that bypass agent_init.
-    _kanban_guidance = getattr(agent, "_kanban_worker_guidance", None)
-    if _kanban_guidance is None:
-        _kanban_guidance = _pb.kanban_worker_guidance(names)
     tool_guidance = [
         memory_guidance,
         SESSION_SEARCH_GUIDANCE if "session_search" in names else None,
         SKILLS_GUIDANCE if "skill_manage" in names else None,
-        _kanban_guidance,
     ]
     return " ".join(g for g in tool_guidance if g) or None
 

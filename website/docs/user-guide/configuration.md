@@ -1363,7 +1363,6 @@ $ hermes model
 [ ] compression          currently: auto / main model
 [ ] approval             currently: auto / main model
 [ ] triage_specifier     currently: auto / main model
-[ ] kanban_decomposer    currently: auto / main model
 [ ] profile_describer    currently: auto / main model
 [ ] delegation           currently: auto / inherit main agent
 ```
@@ -1529,17 +1528,6 @@ auxiliary:
     timeout: 30
     # max_concurrency: 2       # Optional: cap simultaneous title-generation calls
 
-  # Kanban triage specifier — `hermes kanban specify <id>` (or the
-  # dashboard's ✨ Specify button on Triage-column cards) uses this
-  # slot to expand a one-liner into a concrete spec and promote the
-  # task to `todo`. Cheap fast models work well here; spec expansion
-  # is short and doesn't need reasoning depth.
-  triage_specifier:
-    provider: "auto"
-    model: ""
-    base_url: ""
-    api_key: ""
-    timeout: 120
 ```
 
 :::tip

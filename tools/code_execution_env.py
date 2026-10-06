@@ -31,8 +31,7 @@ _SECRET_SUBSTRINGS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "PASSW
 
 # Non-secret runtime-location flags that repo-root modules a sandbox script
 # imports may read at import time. HERMES_DELEGATED_CHILD_CONTEXT must ride
-# along or a child that imports Hermes code loses the Kanban mutation guard
-# while still inheriting HERMES_HOME.
+# along so a child that imports Hermes code retains delegated-child identity.
 _HERMES_CHILD_ALLOWED = frozenset({
     "HERMES_HOME", "HERMES_PROFILE", "HERMES_CONFIG", "HERMES_ENV", "HERMES_DELEGATED_CHILD_CONTEXT",
 })
@@ -103,9 +102,7 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
     # Preserve location only when carrying the descendant fence, not for arbitrary
     # non-allowlisted HERMES_* values in otherwise ordinary execution environments.
     if scoped.get(DELEGATED_CHILD_ENV_MARKER):
-        for key in (DELEGATED_CHILD_ENV_MARKER, "HERMES_KANBAN_DB", "HERMES_KANBAN_BOARD"):
-            if key in scoped:
-                scrubbed[key] = scoped[key]
+        scrubbed[DELEGATED_CHILD_ENV_MARKER] = scoped[DELEGATED_CHILD_ENV_MARKER]
     return delegated_child_subprocess_env(scrubbed)
 
 

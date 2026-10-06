@@ -6,7 +6,7 @@ description: "How Hermes Agent remembers across sessions — MEMORY.md, USER.md,
 
 # Persistent Memory
 
-Stardust has bounded, curated memory that persists across sessions. It is the authority for user-profile facts and cross-project assistant knowledge. Project-scoped facts are owned by `projects.db`, session history by `state.db`, and durable task lifecycle by `kanban.db`; those domains are not promoted into global memory just because they appeared in a conversation.
+Stardust has bounded, curated memory that persists across sessions. It is the authority for user-profile facts and cross-project assistant knowledge. Project-scoped facts are owned by `projects.db`, session history by `state.db`, and scheduled task lifecycle by cron job state; those domains are not promoted into global memory just because they appeared in a conversation.
 
 ## How It Works
 
@@ -123,7 +123,7 @@ For information the agent needs across projects about the environment, workflows
 - Durable cross-project lessons
 - Skills and techniques that worked across contexts
 
-Project-specific conventions, versions, architecture facts, and repository decisions belong to the project's structured fact store in `projects.db`. Temporary in-session plan state belongs to the session todo snapshot in `state.db`; long-lived autonomous task lifecycle belongs to `kanban.db`, not memory.
+Project-specific conventions, versions, architecture facts, and repository decisions belong to the project's structured fact store in `projects.db`. Temporary in-session plan state belongs to the session todo snapshot in `state.db`; scheduled task lifecycle belongs to cron job state.
 
 ### `user` — User Profile
 

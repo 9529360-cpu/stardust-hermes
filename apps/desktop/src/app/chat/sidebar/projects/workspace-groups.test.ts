@@ -768,7 +768,7 @@ describe('overlayLiveLanes', () => {
     expect(lane?.sessions.map(s => s.id)).toEqual(['fresh'])
   })
 
-  it('folds a kanban-task worktree session into the kanban lane', () => {
+  it('keeps a legacy task worktree in its own lane', () => {
     const project = projectNode({
       id: '/www/app',
       isAuto: true,
@@ -778,9 +778,9 @@ describe('overlayLiveLanes', () => {
     const live = [makeCwdSession('/www/app/.worktrees/t_abc12345', { id: 'k' })]
 
     const overlaid = overlayLiveLanes(project, live)
-    const lane = overlaid.repos[0].groups.find(g => g.isKanban)
+    const lane = overlaid.repos[0].groups.find(g => g.id === '/www/app/.worktrees/t_abc12345')
 
-    expect(lane?.id).toBe('/www/app::kanban')
+    expect(lane?.isKanban).not.toBe(true)
     expect(lane?.sessions.map(s => s.id)).toEqual(['k'])
   })
 

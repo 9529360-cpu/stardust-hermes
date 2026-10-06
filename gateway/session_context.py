@@ -209,10 +209,7 @@ def declare_stateless_channel() -> None:
 
 def async_delivery_supported() -> bool:
     """Whether the current session can deliver a background completion later.  False for
-    stateless channels (:func:`declare_stateless_channel`) and Kanban workers
-    (``HERMES_KANBAN_TASK``: one-shot subprocesses whose parent disappears after the turn)."""
-    if os.environ.get("HERMES_KANBAN_TASK"):
-        return False
+    stateless channels (:func:`declare_stateless_channel`)."""
     value = _SESSION_ASYNC_DELIVERY.get()
     return True if value is _UNSET else bool(value)
 

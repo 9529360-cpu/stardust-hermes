@@ -245,28 +245,6 @@ After reviewing, post your review:
 确保 `gh` 使用的 token 具有 `repo` 权限范围。审查评论将以 `gh` 当前认证的用户身份发布。
 :::
 
-### 每周 PR 看板
-
-创建一个每周一早上的仓库概览：
-
-```bash
-hermes cron create "0 9 * * 1" \
-  "Generate a weekly PR dashboard:
-- myorg/backend-api
-- myorg/frontend-app
-- myorg/infra
-
-For each repo show:
-1. Open PR count and oldest PR age
-2. PRs merged this week
-3. Stale PRs (older than 5 days)
-4. PRs with no reviewer assigned
-
-Format as a clean summary." \
-  --name "weekly-dashboard" \
-  --deliver telegram
-```
-
 ### 多仓库监控
 
 在 prompt 中添加更多仓库即可扩展规模。Agent 会按顺序处理它们——无需额外配置。

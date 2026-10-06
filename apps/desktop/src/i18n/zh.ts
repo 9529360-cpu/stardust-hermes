@@ -1634,8 +1634,6 @@ export const zh = defineLocale({
         mcp: { label: 'MCP', hint: 'MCP 工具路由' },
         title_generation: { label: '标题生成', hint: '会话标题' },
         review: { label: '评审', hint: '/review 评审子智能体' },
-        triage_specifier: { label: '分类指定', hint: '看板任务规格补全' },
-        kanban_decomposer: { label: '看板分解', hint: '任务拆解' },
         profile_describer: { label: '配置描述', hint: '自动生成配置描述' },
         curator: { label: '维护器', hint: '技能使用审查' }
       }
@@ -2028,11 +2026,9 @@ export const zh = defineLocale({
       pageBlurb: '每个插件一行。插件可以扩展本应用、智能体，或两者 — 每一部分都有自己的开关。',
       bundledNames: {
         'hermes-bots': '智能体',
-        kanban: '任务看板',
       },
       bundledDescriptions: {
         'hermes-bots': '智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。',
-        kanban: '多智能体任务看板，包含看板页面、命令面板入口和状态栏中的实时任务动态。',
       },
       halfDesktop: '桌面',
       halfDesktopHint: '本应用，所有配置相同',
