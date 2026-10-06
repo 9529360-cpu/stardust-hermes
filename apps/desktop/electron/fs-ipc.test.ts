@@ -31,7 +31,11 @@ function register() {
     expandUserPath: value => value,
     resolveRequestedPathForIpc: (value, options) => {
       resolved.push({ purpose: options.purpose, value })
-      if (value === 'unsafe-device') throw new Error('Blocked unsafe path')
+
+      if (value === 'unsafe-device') {
+        throw new Error('Blocked unsafe path')
+      }
+
       return path.resolve(value)
     },
     directoryExists: () => true,
