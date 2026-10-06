@@ -231,7 +231,7 @@ describe('ModelSettings', () => {
     await openAdvancedModelSettings()
 
     expect(await screen.findByText('Vision')).toBeTruthy()
-    // #97297 — the three canonical slots the backend serves must have rows too.
+    // Retired board slots are absent; profile descriptions remain configurable.
     expect(screen.queryByText('Triage specifier')).toBeNull()
     expect(screen.queryByText('Kanban decomposer')).toBeNull()
     expect(screen.getByText('Profile describer')).toBeTruthy()

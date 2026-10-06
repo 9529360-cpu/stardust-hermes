@@ -28,8 +28,8 @@ def declared_tool_verdict(data: Any) -> Optional[bool]:
     (``False`` if either says so), else None.
 
     A declared verdict outranks text sniffing: success payloads legitimately
-    name ``failed``/``error`` — ``assistant_tasks`` create reports an empty
-    ``failed`` list, a cron listing shows a job whose last run errored.
+    name ``failed``/``error`` — a cron listing can show a job whose last run
+    errored without the listing itself failing.
     """
     if not isinstance(data, dict):
         return None
