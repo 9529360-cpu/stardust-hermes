@@ -4,7 +4,6 @@ import { useStore } from '@nanostores/react'
 import { type ReactNode, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 
-import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
@@ -18,7 +17,6 @@ import { revealDesktopPane } from '@/store/pane-focus'
 import { $previewTarget } from '@/store/preview'
 import { $projectScope, $projectTree, ALL_PROJECTS, openFolderAsProject, projectRootCwd } from '@/store/projects'
 import { openReviewForPath } from '@/store/review'
-import { setRightContextOpen } from '@/store/right-context'
 import {
   $activeSessionId,
   $currentCwd,
@@ -269,8 +267,6 @@ export function WorkspaceView() {
   useEffect(() => registerRepoStatusCwd(effectiveCwd), [effectiveCwd])
   useEffect(() => {
     setSidebarOpen(true)
-    setRightContextOpen(true)
-    revealTreePane('workspace-overview')
   }, [])
 
   const effectiveRepoStatus = repoStatus

@@ -12,7 +12,7 @@
 
 import { useStore } from '@nanostores/react'
 
-import { allPaneIds, findGroup } from '@/components/pane-shell/tree/model'
+import { findGroup } from '@/components/pane-shell/tree/model'
 import { $activeTreeGroup, $layoutTree, revealTreePane, treePanesWithPrefix } from '@/components/pane-shell/tree/store'
 import { type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { FileTypeIcon } from '@/components/ui/file-type-icon'
@@ -191,9 +191,7 @@ function existingPreviewAnchor(tabId: string): string | undefined {
     return previewPaneId(other.id)
   }
 
-  const tree = $layoutTree.get()
-
-  return tree && allPaneIds(tree).includes('workspace-overview') ? 'workspace-overview' : undefined
+  return undefined
 }
 
 /** Keep pane contributions mirroring `$previewTabs`, keep the store's selection

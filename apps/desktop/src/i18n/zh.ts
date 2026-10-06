@@ -4053,7 +4053,16 @@ export const zh = defineLocale({
         loading: '正在加载明细…',
         percentFull: percent => `已用 ${percent}%`,
         title: '上下文用量',
-        tokenSummary: (used, max) => `${used} / ${max} Tokens`
+        tokenSummary: (used, max) => `${used} / ${max} Tokens`,
+        sessionTokens: '会话 Token 消耗',
+        sessionTokensNote: '模型调用累计值，不等于当前上下文占用；缓存 Token 已计入提示总量，不另加到总计。',
+        inputTokens: '未缓存输入',
+        cacheReadTokens: '缓存读取',
+        cacheWriteTokens: '缓存写入',
+        outputTokens: '输出',
+        totalTokens: '总计（提示 + 输出）',
+        noSessionTokens: '暂无模型用量',
+        unavailable: '未报告'
       },
       session: '会话',
       yoloOn: 'YOLO 已开启 — 自动批准危险命令。Shift+点击可全局切换。',

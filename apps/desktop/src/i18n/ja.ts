@@ -3052,7 +3052,16 @@ export const ja = defineLocale({
         loading: '内訳を読み込み中…',
         percentFull: percent => `${percent}% 使用中`,
         title: 'コンテキスト使用状況',
-        tokenSummary: (used, max) => `${used} / ${max} Tokens`
+        tokenSummary: (used, max) => `${used} / ${max} Tokens`,
+        sessionTokens: 'セッションのトークン使用量',
+        sessionTokensNote: 'モデル呼び出しの累計値。現在のコンテキスト使用量とは異なります。キャッシュ分は総計に含まれ、重複加算しません。',
+        inputTokens: '非キャッシュ入力',
+        cacheReadTokens: 'キャッシュ読み込み',
+        cacheWriteTokens: 'キャッシュ書き込み',
+        outputTokens: '出力',
+        totalTokens: '合計（プロンプト + 出力）',
+        noSessionTokens: 'モデル使用量はまだありません',
+        unavailable: '報告なし'
       },
       session: 'セッション',
       yoloOn: 'YOLO オン — 危険なコマンドを自動承認中。Shift+クリックで全体に切り替え。',

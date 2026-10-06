@@ -8,6 +8,7 @@ import { useApprovalModeStatusbarItem } from '@/app/shell/approval-mode-menu'
 import { ContextUsagePanel } from '@/app/shell/context-usage-panel'
 import { GatewayMenuPanel } from '@/app/shell/gateway-menu-panel'
 import { useContextBreakdown } from '@/app/shell/hooks/use-context-breakdown'
+import { useSessionTokenUsage } from '@/app/shell/hooks/use-session-token-usage'
 import { useSystemResourcesStatusbarItem } from '@/app/shell/system-resources-statusbar'
 import { $paneVisible, togglePaneVisible } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
@@ -251,6 +252,12 @@ export function useStatusbarItems({
   const contextItemHidden = useStore($statusbarHiddenIds).includes('context-usage')
 
   const { breakdown: contextBreakdown, loading: contextBreakdownLoading } = useContextBreakdown({
+    busy,
+    enabled: !contextItemHidden,
+    requestGateway,
+    sessionId: activeSessionId
+  })
+  const sessionTokenUsage = useSessionTokenUsage({
     busy,
     enabled: !contextItemHidden,
     requestGateway,
@@ -566,16 +573,19 @@ export function useStatusbarItems({
       },
       {
         detail: contextBar || undefined,
-        // Never self-hide: the user opted this item in (it's hidden-by-
-        // default), so an empty label must render as a waiting placeholder,
-        // not a vanished item — an enabled-but-invisible toggle reads as
-        // "another item took its spot".
+        // Never self-hide: an enabled item with no measured context yet must
+        // render a waiting placeholder, not vanish from the bottom bar.
         id: 'context-usage',
         label: contextUsage || '—',
         menuAlign: 'end',
         menuClassName: 'w-auto border-(--ui-stroke-secondary) p-0',
         menuContent: (
-          <ContextUsagePanel breakdown={contextBreakdown} loading={contextBreakdownLoading} usage={gaugeUsage} />
+          <ContextUsagePanel
+            breakdown={contextBreakdown}
+            loading={contextBreakdownLoading}
+            sessionUsage={sessionTokenUsage}
+            usage={gaugeUsage}
+          />
         ),
         toggleLabel: copy.toggleContextUsage,
         variant: 'menu'
@@ -639,6 +649,7 @@ export function useStatusbarItems({
       contextUsage,
       copy,
       gaugeUsage,
+      sessionTokenUsage,
       sessionStartedAt,
       gatewayState,
       systemResourcesItem,

@@ -564,9 +564,8 @@ $panesFlipped.listen(flipped => {
 bindTreeSideVisibility('left', $sidebarOpen, setSidebarOpen)
 bindTreeSideVisibility('right', $rightContextOpen, setRightContextOpen)
 
-// Opening a tool is also intent to see the context rail that hosts it. Closing
-// a tool never collapses the overview rail; the rail has its own titlebar /
-// keybind toggle now.
+// Opening Files or Review reveals their shared right rail. Closing either
+// tool does not close other tabs or previews in that rail.
 $fileBrowserOpen.listen(open => {
   if (open) {
     setRightContextOpen(true)
@@ -579,8 +578,8 @@ $reviewOpen.listen(open => {
 })
 
 // Workspace-scoped surfaces: the file tree and git diff only mean something
-// inside a project. A detached chat (no cwd) hides them while the overview rail
-// remains useful for session/project context.
+// inside a project. A detached chat (no cwd) hides them without discarding
+// any open preview in the right rail.
 const $hasWorkspace = computed($currentCwd, cwd => Boolean(cwd.trim()))
 
 bindPaneVisibility(

@@ -3364,7 +3364,16 @@ export const ru = defineLocale({
         loading: 'Загрузка разбивки…',
         percentFull: percent => `${percent}% занято`,
         title: 'Использование контекста',
-        tokenSummary: (used, max) => `${used} / ${max} токенов`
+        tokenSummary: (used, max) => `${used} / ${max} токенов`,
+        sessionTokens: 'Токены за сеанс',
+        sessionTokensNote: 'Сумма вызовов модели, не текущий объём контекста. Токены кэша уже входят в промпт и не прибавляются к итогу повторно.',
+        inputTokens: 'Ввод без кэша',
+        cacheReadTokens: 'Чтение кэша',
+        cacheWriteTokens: 'Запись кэша',
+        outputTokens: 'Вывод',
+        totalTokens: 'Всего (промпт + вывод)',
+        noSessionTokens: 'Вызовов модели пока нет',
+        unavailable: 'Нет данных'
       },
       session: 'Сеанс',
       yoloOn: 'YOLO включён — автоматическое подтверждение опасных команд. Shift-клик переключает глобально.',
