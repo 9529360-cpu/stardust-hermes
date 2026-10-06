@@ -154,7 +154,12 @@ def _persist_dispatch(record: Dict[str, Any]) -> None:
             (record["delegation_id"], record.get("session_key", ""), record.get("origin_ui_session_id", ""),
              record.get("parent_session_id"), record["dispatched_at"], now, os.getpid(), owner_started_at,
              json.dumps(task_payload), record.get("origin_session_id", "")))
-    _prune_durable_records()
+    try:
+        _prune_durable_records()
+    except (sqlite3.Error, OSError):
+        # The dispatch row has already committed. Retention maintenance must
+        # not turn a durable admission into an apparent rejected task.
+        logger.warning("Async delegation retention pruning failed after dispatch", exc_info=True)
 
 
 def _prune_durable_records() -> None:
@@ -603,7 +608,7 @@ def _new_delegation_id() -> str:
 
 def _prune_completed_locked() -> None:
     """Drop the oldest completed records beyond the cap. Caller holds ``_records_lock``."""
-    completed = [(rid, r) for rid, r in _records.items() if r.get("status") != "running"]
+    completed = [(rid, r) for rid, r in _records.items() if r.get("status") not in _LIVE_STATES]
     completed.sort(key=lambda kv: kv[1].get("completed_at") or kv[1].get("dispatched_at") or 0)
     for rid, _ in completed[: max(0, len(completed) - _MAX_RETAINED_COMPLETED)]:
         _records.pop(rid, None)
@@ -676,8 +681,13 @@ def _dispatch(
         if record["slot_key"] not in active_slots and len(active_slots) >= max_async_children:
             return {"status": "rejected", "error": capacity_error}
         _records[delegation_id] = record
+        try:
+            _persist_dispatch(record)
+        except Exception:
+            # Admission is not complete until its recovery record is durable.
+            _records.pop(delegation_id, None)
+            raise
         live_units = sum(1 for r in _records.values() if r.get("status") in _LIVE_STATES)
-    _persist_dispatch(record)
     # Units of one call share a slot, so live units can exceed slots: size the pool by units or a
     # unit queues behind a full pool and the stale monitor kills it before its child ever starts.
     executor = _get_executor(max(max_async_children, live_units))
@@ -792,10 +802,34 @@ def _finalize(delegation_id: str, result: Any, status: str) -> None:
         record["interrupt_fn"] = None  # drop the closure; child is done
         record["progress_fn"] = None  # stop stale-monitor sampling
         snapshot = dict(record)
-    _push_completion_event(snapshot, result(snapshot) if callable(result) else result, status)
+        record["_pending_result"] = result(snapshot) if callable(result) else result
+        record["_pending_status"] = status
+    _retry_finalization(delegation_id)
+
+
+def _retry_finalization(delegation_id: str) -> None:
+    """Keep a finished result in memory until its durable receipt can be written."""
+    with _records_lock:
+        record = _records.get(delegation_id)
+        if not record or record.get("status") != "finalizing" or record.get("_finalizing_write"):
+            return
+        record["_finalizing_write"] = True
+        snapshot = dict(record)
+    try:
+        _push_completion_event(snapshot, snapshot["_pending_result"], snapshot["_pending_status"])
+    except Exception:
+        logger.exception("Async delegation %s completion persistence failed; will retry", delegation_id)
+        with _records_lock:
+            if delegation_id in _records:
+                _records[delegation_id]["_finalizing_write"] = False
+        _ensure_stale_monitor()
+        return
     with _records_lock:
         if delegation_id in _records:
-            _records[delegation_id]["status"] = status
+            _records[delegation_id]["status"] = snapshot["_pending_status"]
+            _records[delegation_id].pop("_pending_result", None)
+            _records[delegation_id].pop("_pending_status", None)
+            _records[delegation_id].pop("_finalizing_write", None)
         _prune_completed_locked()
 
 
@@ -808,10 +842,11 @@ def _push_completion_event(record: Dict[str, Any], result: Dict[str, Any], statu
     label = " batch" if is_batch else ""
     try:
         from tools.process_registry import process_registry
-    except Exception as exc:  # pragma: no cover
-        logger.error(f"Async delegation{label} %s finished but process_registry import failed; "
-                     "result lost: %s", record.get("delegation_id"), exc)
-        return
+    except Exception:  # pragma: no cover
+        # The result has not been persisted yet. Let finalization retain and retry it.
+        logger.exception("Async delegation%s %s cannot access completion registry",
+                         label, record.get("delegation_id"))
+        raise
     dispatched_at = record.get("dispatched_at") or time.time()
     completed_at = record.get("completed_at") or time.time()
     if is_batch:
@@ -956,6 +991,8 @@ def _stale_monitor_loop() -> None:
         now = time.time()
         with _records_lock:
             stalled, expired, any_monitorable = _sweep_stale_locked(now)
+            retrying = [rid for rid, r in _records.items() if r.get("status") == "finalizing"]
+            any_monitorable = any_monitorable or bool(retrying)
         for delegation_id, quiet_for, in_tool in stalled:
             logger.warning("Async delegation %s made no progress for %.0fs "
                            "(in_tool=%s) — interrupting; grace window %.0fs",
@@ -965,8 +1002,23 @@ def _stale_monitor_loop() -> None:
             _call_interrupt(fn, "Async delegation %s stall interrupt failed: %s", delegation_id)
         for delegation_id in expired:
             _finalize(delegation_id, lambda rec, d=delegation_id: _stalled_result(d, rec), "stalled")
+        for delegation_id in retrying:
+            _retry_finalization(delegation_id)
         if not any_monitorable:
-            return
+            # Coordinate with _ensure_stale_monitor: a failed finalization may
+            # arrive just as this idle monitor is exiting.
+            global _monitor_thread
+            with _monitor_lock:
+                with _records_lock:
+                    pending = any(
+                        r.get("status") == "finalizing" or
+                        (r.get("status") in _ACTIVE_STATES and r.get("progress_fn") is not None)
+                        for r in _records.values()
+                    )
+                if not pending:
+                    if _monitor_thread is threading.current_thread():
+                        _monitor_thread = None
+                    return
 
 
 def _stalled_error_text(event_record: Dict[str, Any]) -> str:

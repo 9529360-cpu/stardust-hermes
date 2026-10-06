@@ -67,6 +67,58 @@ def _drain_for(delegation_id, timeout=5.0):
     return None
 
 
+def test_dispatch_persistence_failure_releases_capacity(monkeypatch):
+    """A rejected admission cannot remain visible as a running child."""
+    def fail_persist(_record):
+        raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(ad, "_persist_dispatch", fail_persist)
+    with pytest.raises(sqlite3.OperationalError):
+        ad.dispatch_async_delegation(
+            goal="first", context=None, toolsets=None, role="leaf", model=None,
+            session_key="owner", runner=lambda: {"status": "completed", "summary": "done"},
+            max_async_children=1,
+        )
+    assert ad.active_count() == 0
+    assert ad.list_async_delegations() == []
+
+
+def test_completion_persistence_failure_retries_same_result(monkeypatch):
+    """A completed child remains recoverable in memory until its receipt is durable."""
+    real_persist = ad._persist_completion
+    attempts = 0
+    first_failure = threading.Event()
+    retry_allowed = threading.Event()
+
+    def fail_once(event, result):
+        nonlocal attempts
+        attempts += 1
+        if not retry_allowed.is_set():
+            first_failure.set()
+            raise sqlite3.OperationalError("database is locked")
+        return real_persist(event, result)
+
+    monkeypatch.setattr(ad, "_persist_completion", fail_once)
+    monkeypatch.setattr(ad, "_STALE_CHECK_INTERVAL", 0.02)
+    handle = ad.dispatch_async_delegation(
+        goal="persist result", context=None, toolsets=None, role="leaf", model=None,
+        session_key="owner", runner=lambda: {"status": "completed", "summary": "actual result"},
+    )
+    delegation_id = handle["delegation_id"]
+    assert first_failure.wait(5)
+    records = {r["delegation_id"]: r for r in ad.list_async_delegations()}
+    assert records[delegation_id]["status"] == "finalizing"
+    assert _drain_for(delegation_id, timeout=0.1) is None
+
+    retry_allowed.set()
+    event = _drain_for(delegation_id)
+    assert event["summary"] == "actual result"
+    assert attempts >= 2
+    receipt = ad.get_durable_delegation(delegation_id)
+    assert receipt["state"] == "completed"
+    assert receipt["result"]["summary"] == "actual result"
+
+
 def test_schema_init_preserves_shared_state_db_journal_mode(tmp_path):
     """The delegation ledger is a guest in state.db, not its mode owner."""
     conn = sqlite3.connect(tmp_path / "state.db")
