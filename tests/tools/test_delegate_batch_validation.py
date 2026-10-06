@@ -20,6 +20,17 @@ from unittest.mock import MagicMock, patch
 from tools.delegate_tool import delegate_task
 
 
+def test_model_facing_task_brief_names_completion_evidence():
+    from tools.delegate_tool import _build_dynamic_schema_overrides
+
+    task = _build_dynamic_schema_overrides()["parameters"]["properties"]["tasks"]["items"]
+    context = task["properties"]["context"]["description"].lower()
+    assert "constraints" in context
+    assert "verification" in context
+    assert "evidence" in context
+    assert "conversation" in context
+
+
 def _make_mock_parent(depth=0):
     parent = MagicMock()
     parent.base_url = "https://openrouter.ai/api/v1"

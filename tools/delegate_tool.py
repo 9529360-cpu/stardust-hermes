@@ -660,13 +660,15 @@ DELEGATE_TASK_SCHEMA = {
                     "properties": {
                         "goal": _p(
                             "string",
-                            "What this subagent should accomplish. Be specific and self-contained — it knows "
-                            "nothing about your conversation history.",
+                            "Concrete objective and deliverable for this subagent. It has no parent conversation "
+                            "history; a label such as 'investigate issue' is not a task brief.",
                         ),
                         "context": _p(
                             "string",
-                            "Background THIS child needs: file paths, error messages, constraints. Each child "
-                            "sees only its own context — repeat shared background in every task that needs it.",
+                            "Task brief for THIS child: relevant paths/URLs/IDs and observed state, user requirements "
+                            "and constraints, specific checks or edits, verification and expected evidence, output "
+                            "language, and what to do if blocked. Repeat shared facts for every child that needs them; "
+                            "children cannot see your conversation or sibling results.",
                         ),
                         "model": _p("string", "Optional model for this member; overrides the delegation default."),
                         "provider": _p(

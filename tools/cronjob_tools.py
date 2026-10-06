@@ -1116,7 +1116,7 @@ CRONJOB_SCHEMA = {
 
 'resnap' adopts the CURRENT global inference resolution for an unpinned job (job_id) or all unpinned jobs (all=true) WITHOUT pinning it, so it keeps tracking future global changes — use after deliberately changing the default model.
 
-Jobs run in a fresh session. Normally they have no current-chat context, so prompts must be self-contained. If future work depends on the current conversation, set attach_to_session=true: Hermes snapshots a bounded recent user/assistant tail at create/update time and supplies it as background context on future runs, instead of making you manually restate every piece of task context. It is a snapshot, not a live transcript link, so keep critical identifiers in the stored prompt. The agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. For bounded recurring follow-ups whose purpose ends when a real-world condition becomes true (package delivered, refund received, repair resolved, application decided), set stop_when_done=true so the existing job can retire itself into state=completed when the runtime confirms the goal. Prefer updating an existing job over creating near-duplicates.""",
+Jobs run in a fresh session. Normally they have no current-chat context, so prompts must be self-contained. For long-running work, the stored prompt must state the concrete objective, relevant IDs/links/paths and known state, the action or check to perform on each run, constraints, completion condition, and what evidence to report. A title or reminder alone is insufficient. If future work depends on the current conversation, set attach_to_session=true: Stardust snapshots a bounded recent user/assistant tail at create/update time and supplies it as background context on future runs. It is a snapshot, not a live transcript link, so keep critical identifiers in the stored prompt. The agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. For bounded recurring follow-ups whose purpose ends when a real-world condition becomes true (package delivered, refund received, repair resolved, application decided), set stop_when_done=true so the existing job can retire itself into state=completed when the runtime confirms the goal. Prefer updating an existing job over creating near-duplicates.""",
     "parameters": {
         "type": "object",
         "properties": {
@@ -1136,7 +1136,7 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
             },
             "prompt": {
                 "type": "string",
-                "description": "For create: the full self-contained prompt (paired with any skills as the task instruction). For run: optional transient context for that single fire (never persisted)."
+                "description": "For create: the full self-contained task brief: objective, relevant IDs/links/paths and known state, action/check on each run, constraints, completion condition, and evidence to report. A title alone is insufficient. For run: optional transient context for that single fire (never persisted)."
             },
             "schedule": {
                 "type": "string",
