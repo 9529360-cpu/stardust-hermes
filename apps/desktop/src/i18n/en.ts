@@ -4049,6 +4049,7 @@ export const en: Translations = {
     thread: {
       loadingSession: 'Loading session',
       showEarlier: 'Show earlier messages',
+      workProgress: count => count === 1 ? 'Work update' : `${count} work updates`,
       loadingResponse: 'Stardust is loading a response',
       loadingLocalModel: model => `Loading ${model} into memory`,
       processingPrompt: 'Processing prompt',

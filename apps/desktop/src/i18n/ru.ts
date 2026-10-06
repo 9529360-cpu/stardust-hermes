@@ -3590,6 +3590,7 @@ export const ru = defineLocale({
     thread: {
       loadingSession: 'Загрузка сеанса',
       showEarlier: 'Показать ранние сообщения',
+      workProgress: count => `Ход работы: ${count}`,
       loadingResponse: 'Stardust загружает ответ',
       resumeWhenBackgroundDone: count =>
         count === 1

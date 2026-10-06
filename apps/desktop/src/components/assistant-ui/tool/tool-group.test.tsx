@@ -417,13 +417,14 @@ describe('settled tool run', () => {
     })
   })
 
-  it('leaves a lone tool call as its own row, with no summary above it', async () => {
+  it('summarizes a lone settled call and keeps its result one click away', async () => {
     const { container } = render(<GroupHarness message={completedOnlyMessage()} />)
 
-    await waitFor(() => {
-      expect(container.querySelectorAll('[data-tool-row]').length).toBe(1)
-    })
-    expect(container.querySelector('[data-tool-summary]')).toBeNull()
+    const summary = await screen.findByText('Explored hosts')
+
+    expect(container.querySelectorAll('[data-tool-row]')).toHaveLength(0)
+    fireEvent.click(summary)
+    await waitFor(() => expect(container.querySelectorAll('[data-tool-row]')).toHaveLength(1))
   })
 })
 
@@ -470,12 +471,11 @@ describe('transcript fade', () => {
 })
 
 describe('live tool run', () => {
-  it('keeps its rows on screen instead of hiding them behind the summary', async () => {
+  it('shows only the current call in the live ticker until the user expands it', async () => {
     const { container } = render(<GroupHarness message={groupedPendingMessage()} />)
 
-    await waitFor(() => {
-      expect(container.querySelectorAll('[data-tool-row]').length).toBeGreaterThan(0)
-    })
+    await waitFor(() => expect(container.querySelector('[data-tool-ticker]')).not.toBeNull())
+    expect(container.querySelectorAll('[data-tool-summary]')).toHaveLength(1)
   })
 
   it('honors explicit disclosure across live updates and completion', async () => {
@@ -614,6 +614,7 @@ describe('flat tool list approval surfacing', () => {
   it('lets completed tool rows be dismissed', async () => {
     const { container } = render(<GroupHarness message={completedOnlyMessage()} />)
 
+    fireEvent.click(await screen.findByText('Explored hosts'))
     const dismiss = await screen.findByLabelText('Dismiss')
 
     expect(container.querySelectorAll('[data-slot="tool-block"]').length).toBeGreaterThan(0)
@@ -632,6 +633,7 @@ describe('flat tool list approval surfacing', () => {
     // and rendering the same message fresh.
     const first = render(<GroupHarness message={completedOnlyMessage()} />)
 
+    fireEvent.click(await screen.findByText('Explored hosts'))
     fireEvent.click(await screen.findByLabelText('Dismiss'))
 
     await waitFor(() => {
@@ -695,8 +697,8 @@ describe('tool error explanations', () => {
         />
       )
 
-      fireEvent.click(await screen.findByText('Read session-view.ts'))
-
+      await screen.findByText('Explored session-view.ts, 1 tool call failed')
+      fireEvent.click(container.querySelector('[data-tool-row] button')!)
       await waitFor(() => expect(container.textContent).toContain(error))
       expect(Boolean(container.querySelector('[data-tool-row] .text-destructive'))).toBe(destructive)
       unmount()
@@ -709,7 +711,7 @@ describe('tool lifecycle timestamps', () => {
   it('shows the precise call and completion times on a settled tool row', async () => {
     const { container } = render(<GroupHarness message={completedOnlyMessage()} />)
 
-    await screen.findByText(/Read/)
+    fireEvent.click(await screen.findByText('Explored hosts'))
 
     const timestamps = Array.from(container.querySelectorAll('[data-slot="timeline-timestamp"]')).map(node =>
       node.textContent?.trim()

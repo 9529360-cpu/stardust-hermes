@@ -14,13 +14,13 @@ $displayTimestamps.set(true)
 const timestamp = new Date('2026-05-01T00:00:00.000Z')
 stubThreadEnvironment()
 
-function Harness({ text, asyncResult }: { text: string; asyncResult?: string }) {
+function Harness({ text, asyncResult, autoContinue }: { text: string; asyncResult?: string; autoContinue?: boolean }) {
   const message = {
     id: 'system-1',
     role: 'system',
     content: [{ type: 'text', text }],
     createdAt: timestamp,
-    metadata: { custom: { timelineTimestamp: timestamp.getTime() / 1000, asyncResult } }
+    metadata: { custom: { timelineTimestamp: timestamp.getTime() / 1000, asyncResult, autoContinue } }
   } as unknown as ThreadMessage
 
   const runtime = useExternalStoreRuntime<ThreadMessage>({
@@ -45,6 +45,16 @@ function expectTimestampSeparated(container: HTMLElement, precedingText: string)
 }
 
 afterEach(cleanup)
+
+describe('backend continuation notice', () => {
+  it('keeps an internal prompt out of the visible transcript without hiding ordinary system messages', () => {
+    const prompt = '[System: Continue now. Execute the required tool calls and only send your final answer after completing the task.]'
+    const { container } = render(<Harness autoContinue text={prompt} />)
+
+    expect(container.textContent).not.toContain(prompt)
+    expect(container.querySelector('[data-slot="aui_system-message-root"]')).toBeNull()
+  })
+})
 
 describe('background report disclosure', () => {
   it('keeps result bodies out of the transcript until opened and removes them when collapsed', () => {

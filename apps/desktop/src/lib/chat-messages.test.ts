@@ -89,6 +89,46 @@ describe('toChatMessages', () => {
     expect((toolPart as { args: { command?: string } }).args.command).toBe(longCommand)
   })
 
+  it('keeps a persisted text-only continuation after tools separate and marked interim', () => {
+    const messages = toChatMessages([
+      { role: 'user', content: 'check files', timestamp: 1 },
+      { role: 'assistant', content: '', timestamp: 2, tool_calls: [
+        { id: 'tc', function: { name: 'terminal', arguments: '{}' } }
+      ] },
+      { role: 'tool', tool_call_id: 'tc', content: 'ok', timestamp: 3 },
+      { role: 'assistant', content: 'I will now check the files.', timestamp: 4 },
+      { role: 'user', content: 'continue', display_kind: 'auto_continue', timestamp: 5 },
+      { role: 'assistant', content: 'The file check is complete.', timestamp: 6 }
+    ])
+
+    const assistants = messages.filter(message => message.role === 'assistant')
+    expect(assistants).toHaveLength(3)
+    expect(assistants[0].parts.map(part => part.type)).toEqual(['tool-call'])
+    expect(assistants[1].parts.map(part => part.type)).toEqual(['text'])
+    expect(assistants[1].interim).toBe(true)
+    expect(assistants[2].interim).toBeFalsy()
+  })
+
+  it('recognizes the exact legacy untyped stall-guard nudge without treating normal users as continuation', () => {
+    const messages = toChatMessages([
+      { role: 'user', content: 'check files', timestamp: 1 },
+      { role: 'assistant', content: '', timestamp: 2, tool_calls: [
+        { id: 'tc', function: { name: 'terminal', arguments: '{}' } }
+      ] },
+      { role: 'tool', tool_call_id: 'tc', content: 'ok', timestamp: 3 },
+      { role: 'assistant', content: 'I will now check the files.', timestamp: 4 },
+      { role: 'user', content: '[System: Continue now. Execute the required tool calls and only send your final answer after completing the task.]', timestamp: 5 },
+      { role: 'assistant', content: 'The file check is complete.', timestamp: 6 }
+    ])
+
+    const assistants = messages.filter(message => message.role === 'assistant')
+    expect(assistants).toHaveLength(3)
+    expect(assistants[0].parts.map(part => part.type)).toEqual(['tool-call'])
+    expect(assistants[1].interim).toBe(true)
+    expect(messages[3].autoContinue).toBe(true)
+    expect(messages[3].role).toBe('system')
+  })
+
   it('keeps a turn with interleaved tool-only rows in a single bubble', () => {
     const messages = toChatMessages([
       { role: 'assistant', content: 'Planning.', timestamp: 1 },

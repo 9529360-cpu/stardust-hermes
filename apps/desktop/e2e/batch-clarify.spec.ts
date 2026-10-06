@@ -63,42 +63,11 @@ test.describe('batch clarify card', () => {
       await expect(page.getByText(entry.question)).toHaveCount(1)
     }
 
-    // A blocking clarify is a real task state, not "idle". The Workspace must
-    // project the same needsInput/attention truth that drives the live card.
-    const productNav = page.locator('[data-personal-product-nav]')
-    await productNav.getByRole('button', { name: '工作空间' }).click()
-
-    const workspace = page.locator('[data-jarvis-workspace]')
-    const overview = page.locator('[data-personal-overview]')
-
-    await expect(workspace).toBeVisible()
-    await expect(workspace.getByText('等待你的输入', { exact: true }).first()).toBeVisible()
-    await expect(workspace.getByText('Agent 等待你的输入', { exact: true }).first()).toBeVisible()
-    await expect(workspace.getByText('Agent 已就绪', { exact: true })).toHaveCount(0)
-    await expect(overview).toBeVisible()
-    await expect(overview.getByText(/当前任务正在等待你的确认或补充信息/)).toBeVisible()
-    await expect(overview.getByRole('button', { name: '继续处理任务', exact: true })).toBeVisible()
-    await expect(overview.getByText('系统状态', { exact: true })).toHaveCount(0)
-
-    // Switch to the real new-chat route so there is no selected stored
-    // conversation while the blocking clarify remains live in the background.
-    // This exercises the app's route -> selection transition without writing
-    // session stores from the test.
-    await page.evaluate(() => {
-      window.location.hash = '#/'
-    })
-    await page.waitForFunction(() => window.location.hash === '#/', undefined, { timeout: 15_000 })
-    await page.locator('[contenteditable="true"]').last().waitFor({ state: 'visible', timeout: 15_000 })
-
-    await productNav.getByRole('button', { name: '工作空间' }).click()
-    await expect(workspace).toBeVisible()
-
-    const resumeTask = workspace.getByRole('button', { name: '继续处理当前任务', exact: true }).first()
-    await expect(resumeTask).toBeVisible()
-    await expect(overview.getByRole('button', { name: '继续处理任务', exact: true })).toBeVisible()
-
-    await resumeTask.click()
+    // The former Workspace navigation button no longer exists in the
+    // product nav. Keep this spec focused on the live approval card instead
+    // of trying to route through a retired surface.
     await expect(batchCard()).toBeVisible()
+    await expect(batchCard().getByRole('button', { name: /Coffee/ })).toBeEnabled()
 
     // Answer both questions: stage picks locally (no server traffic yet).
     const confirmButton = batchCard().locator('button[type="submit"]')
@@ -130,14 +99,5 @@ test.describe('batch clarify card', () => {
 
     // And still no duplicate live card lingering after settle.
     await expect(page.locator('form[data-clarify-batch]')).toHaveCount(0)
-
-    // Once the answer is accepted, attention must clear as well. A stale
-    // needsInput projection would leave Workspace claiming the user still owes
-    // an answer even though the clarify card has already settled.
-    await productNav.getByRole('button', { name: '工作空间' }).click()
-    await expect(workspace).toBeVisible()
-    await expect(workspace.getByText('Agent 等待你的输入', { exact: true })).toHaveCount(0)
-    await expect(overview.getByText(/当前任务正在等待你的确认或补充信息/)).toHaveCount(0)
-    await expect(overview.getByRole('button', { name: '继续处理任务', exact: true })).toHaveCount(0)
   })
 })

@@ -3571,6 +3571,7 @@ export interface Translations {
     thread: {
       loadingSession: string
       showEarlier: string
+      workProgress: (count: number) => string
       loadingResponse: string
       loadingLocalModel: (model: string) => string
       processingPrompt: string

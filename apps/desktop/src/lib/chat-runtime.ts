@@ -413,7 +413,13 @@ export function toRuntimeMessage(message: ChatMessage): ThreadMessage {
       role,
       content: [textPart(text)],
       createdAt,
-      metadata: { custom: { ...timelineMeta, ...(message.asyncResult ? { asyncResult: message.asyncResult } : {}) } }
+      metadata: {
+        custom: {
+          ...timelineMeta,
+          ...(message.asyncResult ? { asyncResult: message.asyncResult } : {}),
+          ...(message.autoContinue ? { autoContinue: true } : {})
+        }
+      }
     } as ThreadMessage
   }
 
@@ -514,7 +520,8 @@ export function concatToolPartsUnique(
  * message so its calls join that message's tool group (and can collapse into
  * the auto-scrolling window). Render-only — never mutates the `$messages` store
  * — and settle-only: pending messages are left alone, so a live turn is never
- * merged/un-merged mid-stream. `cache` keys merged results by source identity,
+ * merged/un-merged mid-stream. Interim tool-only rows remain separate from
+ * later text-only continuation updates. `cache` keys merged results by source identity,
  * so a stable turn yields stable merged objects (no re-render churn).
  */
 export function coalesceToolOnlyAssistants(messages: ChatMessage[], cache: ToolMergeCache): ChatMessage[] {
@@ -523,7 +530,7 @@ export function coalesceToolOnlyAssistants(messages: ChatMessage[], cache: ToolM
   for (const message of messages) {
     const prev = out.at(-1)
 
-    if (prev && prev.role === 'assistant' && !prev.pending && !prev.hidden && isToolOnlyAssistant(message)) {
+    if (prev && prev.role === 'assistant' && !prev.pending && !prev.hidden && !message.interim && isToolOnlyAssistant(message)) {
       const cached = cache.get(message)
 
       const merged =

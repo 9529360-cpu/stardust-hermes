@@ -658,6 +658,29 @@ describe('ClarifyTool batch card', () => {
     expect(screen.getByText('0 of 2 answered')).toBeTruthy()
   })
 
+  it('stages the first click after request hydration, not with the waiting card callback', async () => {
+    $activeSessionId.set('session-1')
+    $gateway.set({ request: vi.fn() } as never)
+    const view = renderClarify(<ClarifyTool {...liveBatchProps()} />)
+
+    act(() => setClarifyRequest({
+      choices: null,
+      multiSelect: false,
+      question: '',
+      questions: [
+        { choices: ['red', 'blue'], multiSelect: false, qid: 'q0', question: 'Color?' },
+        { choices: null, multiSelect: false, qid: 'q1', question: 'Name?' }
+      ],
+      requestId: 'hydrated-request',
+      sessionId: 'session-1'
+    }))
+
+    await screen.findByText('Color?')
+    fireEvent.click(screen.getByRole('button', { name: /red/ }))
+    await waitFor(() => expect(screen.getByText('1 of 2 answered')).toBeTruthy())
+    view.unmount()
+  })
+
   it('stages locally and keeps the single confirm disabled until all answered', async () => {
     const { request } = renderLiveBatch()
     const confirm = screen.getByRole('button', { name: /Confirm and continue/ })

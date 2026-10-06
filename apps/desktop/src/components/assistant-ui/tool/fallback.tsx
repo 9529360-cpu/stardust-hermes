@@ -46,6 +46,7 @@ import { PrettyLink, LinkifiedText as SharedLinkifiedText, urlSlugTitleLabel } f
 import { AlertCircle, CheckCircle2 } from '@/lib/icons'
 import { isOnboardingEnabled } from '@/lib/onboarding-enabled'
 import { toolResultRecord } from '@/lib/tool-result-metadata'
+import { extractToolErrorMessage } from '@/lib/tool-result-summary'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
 import { openPreviewFromToolResult } from '@/store/preview'
@@ -867,9 +868,9 @@ function ToolRunHeader({
 
 interface ToolRunState {
   completedAt?: number
-  count: number
   /** Disclosure id of each row in the run, so the run can tell when one is open. */
   entryIds: readonly string[]
+  hasFailure: boolean
   key: string
   live: boolean
   startedAt?: number
@@ -938,8 +939,19 @@ function useToolRun(startIndex: number, endIndex: number): ToolRunState {
                   : Math.max(latest, tool.completedAt),
             undefined
           ),
-          count: tools.length,
           entryIds: tools.map(tool => toolEntryDisclosureId(state.message.id, tool)),
+          hasFailure: tools.some(tool => {
+            const result = toolResultRecord(tool)
+
+            return (
+              result.success !== true &&
+              result.ok !== true &&
+              (tool.isError === true ||
+                result.success === false ||
+                result.ok === false ||
+                Boolean(extractToolErrorMessage(tool.result)))
+            )
+          }),
           key: `${state.message.id}:${tools[0]?.toolCallId ?? ''}`,
           live,
           startedAt: timelineTools.reduce<number | undefined>(
@@ -984,7 +996,7 @@ const ToolRun: FC<PropsWithChildren<{ endIndex: number; startIndex: number }>> =
 }) => {
   const messageRunning = useAuiState(selectMessageRunning)
 
-  const { completedAt, count, entryIds, key, live, pendingApprovalTool, startedAt, summary } = useToolRun(
+  const { completedAt, entryIds, hasFailure, key, live, pendingApprovalTool, startedAt, summary } = useToolRun(
     startIndex,
     endIndex
   )
@@ -996,11 +1008,9 @@ const ToolRun: FC<PropsWithChildren<{ endIndex: number; startIndex: number }>> =
   const rowOpen = useStore(useMemo(() => $anyToolDisclosureOpen(entryIds), [entryIds]))
   const enterRef = useEnterAnimation(messageRunning, `tool-run:${key}`)
 
-  // A lone call is already its own one-line summary; heading it with a second
-  // line would say the same thing twice.
-  if (count < 2) {
-    return <ToolRunDisclosureContext.Provider value={disclosureId}>{children}</ToolRunDisclosureContext.Provider>
-  }
+  // A lone call used to bypass the disclosure, so interleaved short runs each
+  // left a row in the transcript. Give it the same expandable summary as a
+  // larger run; the active call still has a one-line ticker below it.
 
   // Two things a one-line window can't hold. An approval is a question the
   // user has to answer, and expanded output is one they went looking for —
@@ -1008,7 +1018,7 @@ const ToolRun: FC<PropsWithChildren<{ endIndex: number; startIndex: number }>> =
   // keeps going. Either one hands the run back its full height until the run
   // settles and the row can be reached through the summary instead.
   const blocked = Boolean(approval) && pendingApprovalTool
-  const expanded = blocked || (persistedOpen ?? rowOpen)
+  const expanded = blocked || (persistedOpen ?? (hasFailure || rowOpen))
 
   return (
     <ToolRunDisclosureContext.Provider value={disclosureId}>

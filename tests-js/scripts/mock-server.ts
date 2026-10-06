@@ -86,25 +86,38 @@ export interface ScriptedTurn {
   }>
 }
 
+export const WORK_PROGRESS_TRIGGER = 'E2E_WORK_PROGRESS_TRIGGER'
+export const WORK_PROGRESS_UPDATE = 'I will now check the files.'
+export const WORK_PROGRESS_FINAL = 'The file check is complete.'
+
+// After a real tool call, a short announced next action triggers the agent's
+// bounded continuation guard: a separate persisted text-only interim after the
+// tool-only row, then its legacy untyped internal nudge and the final answer.
+const WORK_PROGRESS_SCRIPT: ScriptedTurn[] = [
+  { text: '', toolCalls: [{ name: 'terminal', args: { command: 'echo work-progress-check' } }] },
+  { text: WORK_PROGRESS_UPDATE },
+  { text: WORK_PROGRESS_FINAL },
+]
+
 const INTERIM_SCRIPT: ScriptedTurn[] = [
   {
     text: 'Let me start by planning the approach.',
-    toolCalls: [{ name: 'todo', args: { todos: [{ id: '1', content: 'Plan', status: 'in_progress' }] } }],
+    toolCalls: [{ name: 'terminal', args: { command: 'echo interim-step-1' } }],
   },
   {
     text: 'Now checking the details before answering.',
-    toolCalls: [{ name: 'todo', args: { todos: [{ id: '2', content: 'Check details', status: 'in_progress' }] } }],
+    toolCalls: [{ name: 'terminal', args: { command: 'echo interim-step-2' } }],
   },
   {
     // No visible text alongside this tool call — should NOT produce an
     // interim message. The agent fires _emit_interim_assistant_message
     // but _interim_assistant_visible_text returns "" so it's a no-op.
     text: '',
-    toolCalls: [{ name: 'todo', args: { todos: [{ id: '3', content: 'Silent step', status: 'completed' }] } }],
+    toolCalls: [{ name: 'terminal', args: { command: 'echo interim-step-3' } }],
   },
   {
     text: 'Found something interesting worth noting.',
-    toolCalls: [{ name: 'todo', args: { todos: [{ id: '4', content: 'Note finding', status: 'completed' }] } }],
+    toolCalls: [{ name: 'terminal', args: { command: 'echo interim-step-4' } }],
   },
   {
     // Final answer — different from all interim texts.
@@ -114,6 +127,7 @@ const INTERIM_SCRIPT: ScriptedTurn[] = [
 
 /** Per-server request counter so we can walk through the script turns. */
 let _scriptIndex = 0
+let _workProgressIndex = 0
 
 /** Per-server counter for the sidebar-states script (independent from _scriptIndex). */
 let _sidebarScriptIndex = 0
@@ -139,6 +153,7 @@ const _receivedUserTexts: string[] = []
 /** Reset the script indices (called between tests via restartMockServer). */
 function resetScriptIndex(): void {
   _scriptIndex = 0
+  _workProgressIndex = 0
   _sidebarScriptIndex = 0
   _sidebarCrossIndex = 0
   _queueStopIndex = 0
@@ -539,6 +554,9 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           }
 
           const isInterimTrigger = userText.includes('E2E_INTERIM_TRIGGER')
+          const isWorkProgressTrigger = messages.some(
+            message => typeof message?.content === 'string' && message.content.includes(WORK_PROGRESS_TRIGGER),
+          )
           const isSidebarTrigger = userText.includes('E2E_SIDEBAR_TRIGGER')
           const isSidebarCrossTrigger = userText.includes('E2E_SIDEBAR_CROSS')
           const isQueueStopTrigger = userText.includes('E2E_QUEUE_STOP_TRIGGER')
@@ -664,6 +682,19 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           if (isSidebarTrigger) {
             const turn = SIDEBAR_SCRIPT[_sidebarScriptIndex] ?? SIDEBAR_SCRIPT[SIDEBAR_SCRIPT.length - 1]
             _sidebarScriptIndex++
+
+            if (stream) {
+              streamScriptedTurn(res, model, turn)
+            } else {
+              nonStreamingScriptedTurn(res, model, turn)
+            }
+
+            return
+          }
+
+          if (isWorkProgressTrigger) {
+            const turn = WORK_PROGRESS_SCRIPT[_workProgressIndex] ?? WORK_PROGRESS_SCRIPT[WORK_PROGRESS_SCRIPT.length - 1]
+            _workProgressIndex++
 
             if (stream) {
               streamScriptedTurn(res, model, turn)

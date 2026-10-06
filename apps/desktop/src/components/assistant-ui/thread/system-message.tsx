@@ -17,9 +17,13 @@ const REVIEW_NOTE_RE = /^review:(?<label>[^:\n]+):?\s*(?<detail>[\s\S]*)$/
 export const SystemMessage: FC = () => {
   const text = useAuiState(s => messageContentText(s.message.content))
   const asyncResult = useAuiState(s => s.message.metadata.custom?.asyncResult)
+  const autoContinue = useAuiState(s => s.message.metadata.custom?.autoContinue === true)
   const [reportOpen, setReportOpen] = useState(false)
 
-  if (!text) {
+  // This backend-authored nudge is a structural turn boundary, not a reply or
+  // a user instruction. Keep it in the runtime for grouping without showing
+  // its internal prompt in the transcript.
+  if (!text || autoContinue) {
     return null
   }
 
