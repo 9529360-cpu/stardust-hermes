@@ -154,6 +154,8 @@ CASES = {
     # install.ps1 is a shell script Python never imports, but it's also not
     # provably prose, so python stays on (fail-open) alongside the Windows lane.
     "install.ps1 → installer": (["scripts/install.ps1"], _lanes(python=True, installer=True)),
+    "Stardust Windows wrapper → installer": (["scripts/install-stardust.ps1"], _lanes(python=True, installer=True)),
+    "Stardust shell wrapper → installer": (["scripts/install-stardust.sh"], _lanes(python=True, installer=True)),
     "installer test → installer": (
         ["scripts/tests/test-install-ps1-longpath.ps1"],
         _lanes(python=True, installer=True),
