@@ -9,11 +9,16 @@ from tools.browser_use_compat import (
 
 def test_matrix_records_missing_surfaces_without_claiming_full_parity():
     matrix = capability_matrix()
-    assert set(matrix) == {"status", "console_errors", "vision_annotation", "structured_actions"}
+    assert set(matrix) == {"status", "console_errors", "vision_annotation", "structured_actions", "execution_errors"}
     assert matrix["status"]["legacy"] == "browser_status"
     assert matrix["console_errors"]["exec"] == "cdp('Runtime.enable')"
     assert matrix["vision_annotation"]["support"] == "partial"
     assert matrix["structured_actions"]["support"] == "mapping"
+    assert matrix["execution_errors"] == {
+        "legacy": "browser_* error JSON",
+        "exec": "success/error/error_type",
+        "support": "native",
+    }
 
 
 def test_status_is_explicitly_non_host_python():

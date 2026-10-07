@@ -11,6 +11,7 @@ revision; adapter names below are documented helper/CDP idioms, not claims that
 | Console and JS errors | `browser_console` returns console messages and uncaught JS errors from browser session | `cdp('Runtime.enable')` is a protocol primitive, not yet a complete buffered console/error reader | Missing; do not claim parity |
 | Vision annotation | `browser_vision(annotate=True)` captures screenshot and returns annotation metadata | `capture_screenshot()` plus CDP/DOM inspection can aid analysis, but there is no direct equivalent to persistent annotation rendering | Partial; preserve legacy capability until parity |
 | Structured actions | `browser_interact` exposes named interaction actions and results | `js`, `cdp`, `click_at_xy`, `fill_input` form action-specific primitives; `tools/browser_use_compat.py` makes the mapping explicit and rejects unknown actions | Mapping slice implemented; execution adapter remains future work |
+| Execution errors | Built-in browser tools return JSON error payloads | `browser_exec` now returns `success: false`, `error`, and a stable `error_type` for validation, routing, launch, timeout, and process failures | Structured envelope implemented; browser capability unchanged |
 
 ## Scope and safety
 
