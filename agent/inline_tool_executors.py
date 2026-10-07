@@ -93,6 +93,59 @@ def _callback_tool(module: str, func: str, callback_attr: str, *arg_specs: _ArgS
     return _tool(module, func, *arg_specs, callback=lambda agent, ctx: getattr(agent, callback_attr, None))
 
 
+def _approved_preview_callback(agent, ctx):
+    """Route Preview mutations through the existing shared approval gate.
+
+    This does not claim to sandbox browser execution; it only prevents a
+    mutation from reaching the renderer without the same human/guardian gate
+    used by computer_use. Inspection remains on the explicit happy path.
+    """
+    callback = getattr(agent, "drive_preview_callback", None)
+    if callback is None:
+        return None
+
+    from tools.approval import request_tool_approval
+
+    def guarded(payload):
+        action = str(payload.get("action") or "")
+        from tools.browser_preview_approval import classify_browser_preview_action
+
+        risk = classify_browser_preview_action("preview", action, payload)
+        if not risk.requires_approval:
+            return callback(payload)
+        decision = request_tool_approval(
+            "drive_preview",
+            risk.reason,
+            rule_key=risk.approval_key,
+        )
+        if not decision.get("approved"):
+            return json.dumps({"error": decision.get("message") or "Preview action denied", "success": False})
+        return callback(payload)
+
+    return guarded
+
+
+def _approved_annotate_callback(agent, ctx):
+    callback = getattr(agent, "drive_preview_callback", None)
+    if callback is None:
+        return None
+
+    from tools.approval import request_tool_approval
+
+    def guarded(payload):
+        from tools.browser_preview_approval import classify_browser_preview_action
+
+        risk = classify_browser_preview_action("preview", str(payload.get("action") or ""), payload)
+        if not risk.requires_approval:
+            return callback(payload)
+        decision = request_tool_approval("annotate_preview", risk.reason, rule_key=risk.approval_key)
+        if not decision.get("approved"):
+            return json.dumps({"error": decision.get("message") or "Preview action denied", "success": False})
+        return callback(payload)
+
+    return guarded
+
+
 def _session_search(agent, args: dict, ctx: InlineToolContext) -> Any:
     session_db = agent._get_session_db_for_recall()
     if not session_db:
@@ -262,14 +315,16 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
         ("start_line", "start_line"), ("count", "count"),
     ),
     "desktop_preview": _desktop_preview,
-    "drive_preview": _callback_tool(
-        "tools.drive_preview_tool", "drive_preview_tool", "drive_preview_callback",
+    "drive_preview": _tool(
+        "tools.drive_preview_tool", "drive_preview_tool",
         ("action", "action", ""), ("ref", "ref"), ("selector", "selector"), ("text", "text"),
         ("key", "key"), ("submit", "submit"), ("amount", "amount"), ("to", "to"), ("limit", "max"),
+        callback=_approved_preview_callback,
     ),
-    "annotate_preview": _callback_tool(
-        "tools.annotate_preview_tool", "annotate_preview_tool", "drive_preview_callback",
+    "annotate_preview": _tool(
+        "tools.annotate_preview_tool", "annotate_preview_tool",
         ("action", "action", "add"), ("ref", "ref"), ("selector", "selector"), ("label", "label"),
+        callback=_approved_annotate_callback,
     ),
     "read_window_below": _callback_tool(
         "tools.read_window_tool", "read_window_below_tool", "read_window_below_callback",
