@@ -143,7 +143,8 @@ export const en: Translations = {
       startingHermesDesktop: 'Starting Hermes Desktop…'
     },
     errors: {
-      backgroundExited: 'The service that runs your chats closed unexpectedly. Restart it to keep going — your chats and settings are safe.',
+      backgroundExited:
+        'The service that runs your chats closed unexpectedly. Restart it to keep going — your chats and settings are safe.',
       backgroundExitedDuringStartup: 'Hermes stopped right after it started.',
       backendStopped: 'Hermes stopped working in the background',
       restartHermes: 'Restart Hermes',
@@ -245,11 +246,13 @@ export const en: Translations = {
       storageFailure: "Hermes couldn't save to its data folder. Open Maintenance to check and repair it.",
       gatewayAuthFailed:
         'This Hermes no longer accepts your saved sign-in. Open Gateways and sign in again (or paste a new access token), then retry.',
-      methodNotAllowed: "Hermes' background service is out of step with the app, probably after an update. Restart it to fix this.",
+      methodNotAllowed:
+        "Hermes' background service is out of step with the app, probably after an update. Restart it to fix this.",
       microphonePermission: 'Microphone permission was denied.',
       openaiRejectedApiKey: "OpenAI didn't accept your API key. Update it in Settings → Keys, then try again.",
       openaiTtsNeedsKey: 'Voice needs an OpenAI key. Add one in Settings → Keys.',
-      codeSkewRestartRequired: 'Hermes was updated but is still running the old version. Restart it to finish the update.',
+      codeSkewRestartRequired:
+        'Hermes was updated but is still running the old version. Restart it to finish the update.',
       restartHermesFailed: "Couldn't restart Hermes"
     },
     actions: {
@@ -584,7 +587,8 @@ export const en: Translations = {
         desktopSuccess: name => `Desktop plugin ${name} installed`,
         agentFailed: 'Agent plugin install failed',
         desktopFailed: 'Desktop plugin install failed',
-        missingEnv: (name, vars) => `${name} is installed but needs a key before it can work: ${vars}. Add it now, or the plugin's tools will fail.`
+        missingEnv: (name, vars) =>
+          `${name} is installed but needs a key before it can work: ${vars}. Add it now, or the plugin's tools will fail.`
       }
     },
     vault: {
@@ -595,7 +599,7 @@ export const en: Translations = {
       loadFailed: 'Could not load vault items',
       empty: 'Nothing saved yet',
       emptyDesc:
-        "Save a login when Stardust first needs it, or add a dedicated low-limit payment card and address here for purchases you ask it to make.",
+        'Save a login when Stardust first needs it, or add a dedicated low-limit payment card and address here for purchases you ask it to make.',
       add: 'Add',
       addTitle: 'Add a login, card or address',
       addDescription: 'Stored encrypted on this machine. Stardust never sees passwords, card numbers or CVCs.',
@@ -799,7 +803,8 @@ export const en: Translations = {
         sidebar: 'Sidebar only'
       },
       backdropTitle: 'Window Background',
-      backdropDesc: 'Show one local image behind the entire Stardust window — sidebar, conversation and tool panes. The image stays on this device.',
+      backdropDesc:
+        'Show one local image behind the entire Stardust window — sidebar, conversation and tool panes. The image stays on this device.',
       userBubbleTitle: 'Message Bubble',
       userBubbleDesc: 'How see-through your own messages are. Solid at 0; only the outline remains at 100.',
       introSplashTitle: 'Intro Splash',
@@ -1143,7 +1148,8 @@ export const en: Translations = {
     gateway: {
       loading: 'Loading gateway settings...',
       unavailableTitle: 'Gateway settings unavailable',
-      unavailableDesc: 'Connection settings can only be changed from the Hermes Desktop app on the computer running it.',
+      unavailableDesc:
+        'Connection settings can only be changed from the Hermes Desktop app on the computer running it.',
       title: 'Gateway Connection',
       envOverride: 'env override',
       intro:
@@ -1196,7 +1202,8 @@ export const en: Translations = {
       remoteUrlTitle: 'Remote URL',
       remoteUrlDesc: 'Base URL for the remote dashboard backend. Path prefixes are supported, for example /hermes.',
       probing: 'Checking how this gateway authenticates…',
-      probeError: "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
+      probeError:
+        "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
       signedIn: 'Signed in',
       signIn: 'Sign in',
       signOut: 'Sign out',
@@ -1402,7 +1409,8 @@ export const en: Translations = {
       apiKeyUpdating: 'Updating…',
       connectProvider: provider => `Connect ${provider}`,
       setupApiKeyHint: provider => `${provider} needs an API key. Connect it to choose a model.`,
-      setupOauthHint: provider => `${provider} signs in through your browser. Stardust continues automatically when sign-in finishes.`,
+      setupOauthHint: provider =>
+        `${provider} signs in through your browser. Stardust continues automatically when sign-in finishes.`,
       currentService: 'Default',
       serviceNotConnected: 'Not connected',
       modelCount: count => `${count} model${count === 1 ? '' : 's'} available`,
@@ -1680,7 +1688,8 @@ export const en: Translations = {
       postSetupCompleteTitle: 'Setup complete',
       postSetupCompleteMessage: step => `${step} installed.`,
       postSetupErrorTitle: 'Setup finished with errors',
-      postSetupErrorMessage: step => `Setting up ${step} did not finish. Open the logs to see why, then run setup again.`,
+      postSetupErrorMessage: step =>
+        `Setting up ${step} did not finish. Open the logs to see why, then run setup again.`,
       postSetupOpenLogs: 'Open logs',
       postSetupRunAgain: 'Run again',
       postSetupFailed: step => `Failed to run ${step} setup`,
@@ -1819,10 +1828,10 @@ export const en: Translations = {
         'Extend the agent for the selected profile — tools, hooks, providers. Take effect after a gateway restart.',
       pageBlurb: 'One row per plugin. A plugin can extend this app, the agent, or both — each half has its own switch.',
       bundledNames: {
-        'hermes-bots': 'Agents',
+        'hermes-bots': 'Agents'
       },
       bundledDescriptions: {
-        'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.',
+        'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.'
       },
       halfDesktop: 'Desktop',
       halfDesktopHint: 'this app, same for every profile',
@@ -2558,9 +2567,11 @@ export const en: Translations = {
     nameLabel: 'Name',
     cloneFrom: 'Clone from',
     cloneFromNone: 'None (blank)',
-    cloneFromDesc: 'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from the selected profile. Sessions and scheduled jobs stay separate.',
+    cloneFromDesc:
+      'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from the selected profile. Sessions and scheduled jobs stay separate.',
     cloneFromDefault: 'Clone from default',
-    cloneFromDefaultDesc: 'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from your default profile. Sessions and scheduled jobs stay separate.',
+    cloneFromDefaultDesc:
+      'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from your default profile. Sessions and scheduled jobs stay separate.',
     invalidName: hint => `Invalid name. ${hint}`,
     nameRequired: 'Name is required.',
     creating: 'Creating...',
@@ -2751,7 +2762,7 @@ export const en: Translations = {
       dismissed: 'Suggestion dismissed',
       actionFailed: 'Could not update automation suggestion',
       needsConversation: 'Open a saved conversation first so scheduled results have a chat to return to.'
-    },
+    }
   },
 
   artifacts: {
@@ -3304,6 +3315,8 @@ export const en: Translations = {
       revertConfirm: 'Discard changes to this file and restore it to the committed state? This cannot be undone.',
       revertAllConfirm: 'Discard every change and restore files to the committed state? This cannot be undone.',
       staged: 'Staged',
+      unstaged: 'Unstaged',
+      untracked: 'Untracked',
       noChanges: 'No changes',
       notRepo: 'Not a git repository',
       noDiff: 'No diff to show',
@@ -3470,7 +3483,8 @@ export const en: Translations = {
     remoteUrlDesc: 'Use the base URL of the Hermes gateway, including https:// when remote.',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'Detecting gateway authentication...',
-    probeError: "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
+    probeError:
+      "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
     probeErrorDetails: 'Details',
     identityProvider: 'your identity provider',
     authTitle: 'Authentication',
@@ -3548,7 +3562,8 @@ export const en: Translations = {
       xai: { short: 'Grok models', description: 'Direct access to xAI Grok models.' },
       local: {
         short: 'self-hosted',
-        description: 'Point Stardust at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
+        description:
+          'Point Stardust at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
       }
     },
     backToSignIn: 'Back to sign in',
@@ -3814,7 +3829,8 @@ export const en: Translations = {
         title: 'Context Usage',
         tokenSummary: (used, max) => `${used} / ${max} Tokens`,
         sessionTokens: 'Session token usage',
-        sessionTokensNote: 'Cumulative model calls; separate from current context occupancy. Cache tokens are part of the prompt, not added to the total.',
+        sessionTokensNote:
+          'Cumulative model calls; separate from current context occupancy. Cache tokens are part of the prompt, not added to the total.',
         inputTokens: 'Uncached input',
         cacheReadTokens: 'Cache read',
         cacheWriteTokens: 'Cache write',
@@ -4069,7 +4085,7 @@ export const en: Translations = {
     thread: {
       loadingSession: 'Loading session',
       showEarlier: 'Show earlier messages',
-      workProgress: count => count === 1 ? 'Work update' : `${count} work updates`,
+      workProgress: count => (count === 1 ? 'Work update' : `${count} work updates`),
       loadingResponse: 'Stardust is loading a response',
       loadingLocalModel: model => `Loading ${model} into memory`,
       processingPrompt: 'Processing prompt',
@@ -4105,17 +4121,21 @@ export const en: Translations = {
         auth: 'The AI service rejected your sign-in. Check the credentials for this provider, then send your message again.',
         billing: 'Your account has no credits left for this provider. Top up or switch provider, then send again.',
         disk: 'Your disk is full, so Hermes could not save this conversation. Free some space, then retry.',
-        endpoint: "Hermes can't reach your custom model server. Check that it is running, then send your message again.",
-        gateway: 'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
+        endpoint:
+          "Hermes can't reach your custom model server. Check that it is running, then send your message again.",
+        gateway:
+          'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
         generic: 'Something went wrong while Hermes was replying. Retry, or copy the details if it keeps happening.',
         provider: 'The AI service could not complete this request. Retry in a moment or switch provider.',
-        runtime: 'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
+        runtime:
+          'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
         streaming: 'The connection dropped before the reply finished. Retry to send it again.'
       },
       errorCodes: {
         auth: {
           title: provider => `${provider} rejected your sign-in`,
-          body: provider => `The credentials saved for ${provider} were not accepted. Fix them in Settings or switch provider, then send your message again.`
+          body: provider =>
+            `The credentials saved for ${provider} were not accepted. Fix them in Settings or switch provider, then send your message again.`
         },
         auth_permanent: {
           title: provider => `${provider} rejected your sign-in`,
@@ -4165,7 +4185,8 @@ export const en: Translations = {
         },
         model_not_found: {
           title: 'This model is not available',
-          body: provider => `${provider} does not offer this model on your account. Choose another model, then send your message again.`
+          body: provider =>
+            `${provider} does not offer this model on your account. Choose another model, then send your message again.`
         },
         provider_policy_blocked: {
           title: 'This model is blocked by your account settings',
@@ -4421,8 +4442,10 @@ export const en: Translations = {
     sudoSendFailed: 'Could not send sudo password',
     secretSendFailed: 'Could not send secret',
     sudoTitle: 'Administrator password',
-    sudoDesc: 'Review the command before entering your sudo password. Your password is sent to the agent running it and cached for this session.',
-    sudoCommandUnavailable: 'This agent did not provide the command. Cancel if you cannot verify it in the conversation.',
+    sudoDesc:
+      'Review the command before entering your sudo password. Your password is sent to the agent running it and cached for this session.',
+    sudoCommandUnavailable:
+      'This agent did not provide the command. Cancel if you cannot verify it in the conversation.',
     sudoPlaceholder: 'sudo password',
     secretTitle: 'Secret required',
     secretDesc: 'Hermes needs a credential to continue.',
@@ -4534,7 +4557,8 @@ export const en: Translations = {
       success: platform => `Handed off to ${platform}. Resume here anytime.`,
       systemNote: platform => `↻ Handed off to ${platform} — resume here anytime.`,
       failed: error => `Handoff failed: ${error}`,
-      timedOut: "Hermes couldn't reach your messaging connection. Start it from Settings → Messaging, then try the handoff again.",
+      timedOut:
+        "Hermes couldn't reach your messaging connection. Start it from Settings → Messaging, then try the handoff again.",
       startMessaging: 'Start messaging'
     }
   },

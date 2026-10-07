@@ -254,8 +254,7 @@ export const zhHant = defineLocale({
     doneTitle: '診斷資訊已儲存',
     doneDescription: '已將遮罩後的診斷套件儲存到您的電腦。如需支援，可將此檔案附加到星塵的 GitHub Issue。',
     failedTitle: '無法儲存診斷資訊',
-    failedHint:
-      '請更新星塵與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
+    failedHint: '請更新星塵與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
     handoffLead: '需要協助？',
     links: {
       github: '星塵 GitHub Issues'
@@ -1368,8 +1367,7 @@ export const zhHant = defineLocale({
     providers: {
       connectAccount: '登入模型提供方',
       haveApiKey: '改用 API 金鑰？',
-      intro:
-        '可以使用提供方訂閱或網頁登入，無需複製 API 金鑰。Stardust 會在應用程式中完成提供方登入流程。',
+      intro: '可以使用提供方訂閱或網頁登入，無需複製 API 金鑰。Stardust 會在應用程式中完成提供方登入流程。',
       connected: '已連線',
       collapse: '收合',
       connectAnother: '連結其他提供方',
@@ -1599,24 +1597,65 @@ export const zhHant = defineLocale({
     },
     toolsetLabels: {
       a2a: 'A2A 智能體協作',
-      web: '聯網搜尋與網頁擷取', browser: '瀏覽器自動化', terminal: '終端與程序', file: '檔案操作',
-      code_execution: '程式碼執行', vision: '圖片分析', video: '影片分析', image_gen: '圖片生成', video_gen: '影片生成',
-      x_search: 'X 搜尋', tts: '文字轉語音', stt: '語音轉文字', skills: '技能', todo: '任務規劃', kanban: '看板',
-      memory: '記憶', context_engine: '上下文引擎', session_search: '對話搜尋', connections: '連接器', clarify: '釐清問題',
-      delegation: '任務委派', cronjob: '定時任務', homeassistant: 'Home Assistant', spotify: 'Spotify', discord: 'Discord',
-      discord_admin: 'Discord 管理', yuanbao: '元寶', computer_use: '電腦控制'
+      web: '聯網搜尋與網頁擷取',
+      browser: '瀏覽器自動化',
+      terminal: '終端與程序',
+      file: '檔案操作',
+      code_execution: '程式碼執行',
+      vision: '圖片分析',
+      video: '影片分析',
+      image_gen: '圖片生成',
+      video_gen: '影片生成',
+      x_search: 'X 搜尋',
+      tts: '文字轉語音',
+      stt: '語音轉文字',
+      skills: '技能',
+      todo: '任務規劃',
+      kanban: '看板',
+      memory: '記憶',
+      context_engine: '上下文引擎',
+      session_search: '對話搜尋',
+      connections: '連接器',
+      clarify: '釐清問題',
+      delegation: '任務委派',
+      cronjob: '定時任務',
+      homeassistant: 'Home Assistant',
+      spotify: 'Spotify',
+      discord: 'Discord',
+      discord_admin: 'Discord 管理',
+      yuanbao: '元寶',
+      computer_use: '電腦控制'
     },
     toolsetDescriptions: {
       a2a: '透過 A2A 協定探索、呼叫並協調其他智能體。',
-      web: '聯網搜尋並擷取網頁內容。', browser: '開啟網頁並完成點擊、輸入、捲動等互動。', terminal: '執行終端指令並管理背景程序。',
-      file: '讀取、寫入、修改並搜尋本機檔案。', code_execution: '執行可程式化的程式碼任務，減少多輪工具呼叫。', vision: '分析圖片與其他視覺內容。',
-      video: '理解和分析影片內容。', image_gen: '根據描述生成圖片。', video_gen: '根據文字、圖片或參考素材生成影片。',
-      x_search: '搜尋 X 上的公開貼文與討論。', tts: '將文字轉換為語音。', stt: '將語音內容轉換為文字。', skills: '使用和管理專業技能與知識。',
-      todo: '規劃並追蹤多步驟任務。', kanban: '透過任務看板協調多智能體工作。', memory: '跨對話保存長期記憶與個人偏好。',
-      context_engine: '使用目前上下文引擎提供的執行階段工具。', session_search: '搜尋並回顧過去的對話。', connections: '使用連接器、外部服務與帳戶授權。',
-      clarify: '在需要時向你提出釐清問題。', delegation: '將複雜子任務委派給獨立智能體。', cronjob: '建立、暫停、更新並執行定時任務。',
-      homeassistant: '控制和監控 Home Assistant 智慧家庭裝置。', spotify: '搜尋音樂並控制 Spotify 播放。', discord: '讀取並參與 Discord 對話。',
-      discord_admin: '管理 Discord 頻道、角色與置頂內容。', yuanbao: '使用元寶平台的群聊、成員與私聊能力。', computer_use: '在背景控制 macOS、Windows 或 Linux 桌面。'
+      web: '聯網搜尋並擷取網頁內容。',
+      browser: '開啟網頁並完成點擊、輸入、捲動等互動。',
+      terminal: '執行終端指令並管理背景程序。',
+      file: '讀取、寫入、修改並搜尋本機檔案。',
+      code_execution: '執行可程式化的程式碼任務，減少多輪工具呼叫。',
+      vision: '分析圖片與其他視覺內容。',
+      video: '理解和分析影片內容。',
+      image_gen: '根據描述生成圖片。',
+      video_gen: '根據文字、圖片或參考素材生成影片。',
+      x_search: '搜尋 X 上的公開貼文與討論。',
+      tts: '將文字轉換為語音。',
+      stt: '將語音內容轉換為文字。',
+      skills: '使用和管理專業技能與知識。',
+      todo: '規劃並追蹤多步驟任務。',
+      kanban: '透過任務看板協調多智能體工作。',
+      memory: '跨對話保存長期記憶與個人偏好。',
+      context_engine: '使用目前上下文引擎提供的執行階段工具。',
+      session_search: '搜尋並回顧過去的對話。',
+      connections: '使用連接器、外部服務與帳戶授權。',
+      clarify: '在需要時向你提出釐清問題。',
+      delegation: '將複雜子任務委派給獨立智能體。',
+      cronjob: '建立、暫停、更新並執行定時任務。',
+      homeassistant: '控制和監控 Home Assistant 智慧家庭裝置。',
+      spotify: '搜尋音樂並控制 Spotify 播放。',
+      discord: '讀取並參與 Discord 對話。',
+      discord_admin: '管理 Discord 頻道、角色與置頂內容。',
+      yuanbao: '使用元寶平台的群聊、成員與私聊能力。',
+      computer_use: '在背景控制 macOS、Windows 或 Linux 桌面。'
     },
     skillUpdated: '技能已更新',
     edit: '編輯',
@@ -1629,10 +1668,10 @@ export const zhHant = defineLocale({
       agentBlurb: '為所選設定擴充智能體 — 工具、掛鉤與模型提供方。重新啟動閘道後生效。',
       pageBlurb: '每個外掛一列。外掛可以擴充本應用、智能體或兩者 — 每個部分都有自己的開關。',
       bundledNames: {
-        'hermes-bots': '智能體',
+        'hermes-bots': '智能體'
       },
       bundledDescriptions: {
-        'hermes-bots': '智能體名冊，為每個智能體提供獨立對話、定時任務、群聊與智能體間訊息。',
+        'hermes-bots': '智能體名冊，為每個智能體提供獨立對話、定時任務、群聊與智能體間訊息。'
       },
       halfDesktop: '桌面',
       halfDesktopHint: '本應用，所有設定相同',
@@ -1659,7 +1698,8 @@ export const zhHant = defineLocale({
       catalogTitle: '外掛目錄',
       catalogBrowse: '瀏覽',
       catalogHide: '隱藏目錄瀏覽器',
-      catalogHint: '在目錄中選擇外掛後，經過審核的條目會以固定提交安裝到所選設定。包含智能體與桌面兩部分的外掛可一次完成安裝。',
+      catalogHint:
+        '在目錄中選擇外掛後，經過審核的條目會以固定提交安裝到所選設定。包含智能體與桌面兩部分的外掛可一次完成安裝。',
       alreadyInstalled: (name: string) => `${name} 已安裝在此設定中。`,
       catalogProvenance: (sha: string) => `從外掛目錄安裝${sha ? `，固定提交 ${sha}` : ''}。`,
       pinnedProvenance: (sha: string) => `已固定到提交 ${sha}。重新固定前將拒絕更新。`,
@@ -2052,15 +2092,13 @@ export const zhHant = defineLocale({
     platformIntro: {
       telegram:
         '在 Telegram 中與 @BotFather 對話，執行 /newbot，複製它提供的權杖，再從 @userinfobot 取得你的數字使用者 ID。',
-      discord:
-        '開啟 Discord Developer Portal，建立應用程式、加入 Bot，複製其權杖，再以正確權限把機器人邀請到伺服器。',
+      discord: '開啟 Discord Developer Portal，建立應用程式、加入 Bot，複製其權杖，再以正確權限把機器人邀請到伺服器。',
       slack: '建立 Slack 應用程式、啟用 Socket Mode、安裝到工作區，然後複製 bot 權杖和 app 層級權杖。',
       mattermost: '在 Mattermost 伺服器建立機器人帳號或個人存取權杖，然後在此貼上伺服器 URL 和權杖。',
       matrix: '使用機器人帳號登入 homeserver，然後複製存取權杖、使用者 ID 和 homeserver URL。',
       signal: '在可連線的位置執行 signal-cli REST 橋接，然後在這裡填入該 URL 和已註冊的電話號碼。',
       whatsapp: '啟動隨本應用程式提供的 WhatsApp 橋接，首次執行時掃描 QR 碼，然後啟用此平台。',
-      bluebubbles:
-        '在有 iMessage 的 Mac 上執行 BlueBubbles Server 並公開 API，然後在這裡填入該 URL 和伺服器密碼。',
+      bluebubbles: '在有 iMessage 的 Mac 上執行 BlueBubbles Server 並公開 API，然後在這裡填入該 URL 和伺服器密碼。',
       homeassistant: '在 Home Assistant 開啟個人資料並建立長期存取權杖，再把它和 HA URL 一起貼到這裡。',
       email: '使用專用信箱。Gmail / Workspace 可建立應用程式密碼，並使用 imap.gmail.com / smtp.gmail.com。',
       sms: '從 Twilio 控制台取得 Account SID、Auth Token，以及可傳送簡訊的電話號碼。',
@@ -2167,9 +2205,11 @@ export const zhHant = defineLocale({
     nameLabel: '名稱',
     cloneFrom: '複製來源',
     cloneFromNone: '無（空白）',
-    cloneFromDesc: '從選取的來源設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
+    cloneFromDesc:
+      '從選取的來源設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
     cloneFromDefault: '從預設設定檔複製設定',
-    cloneFromDefaultDesc: '從預設設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
+    cloneFromDefaultDesc:
+      '從預設設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
     invalidName: hint => `設定檔名稱無效。${hint}`,
     nameRequired: '名稱為必填',
     creating: '建立中…',
@@ -2348,7 +2388,7 @@ export const zhHant = defineLocale({
       dismissed: '已略過建議',
       actionFailed: '無法更新自動化建議',
       needsConversation: '請先開啟一個已儲存的對話，讓排程結果有可返回的對話。'
-    },
+    }
   },
 
   artifacts: {
@@ -2839,6 +2879,8 @@ export const zhHant = defineLocale({
       revertConfirm: '捨棄對此檔案的變更並將其還原至已提交狀態？此操作無法復原。',
       revertAllConfirm: '捨棄所有變更並將檔案還原至已提交狀態？此操作無法復原。',
       staged: '已暫存',
+      unstaged: '未暫存',
+      untracked: '未追蹤',
       noChanges: '沒有變更',
       notRepo: '不是 Git 儲存庫',
       noDiff: '沒有可顯示的差異',
@@ -3478,7 +3520,13 @@ export const zhHant = defineLocale({
   },
 
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: '今天想做什麼？', body: '直接問我，或者把一件事交給我。需要專案、檔案或預覽時，相關上下文會出現在對話右側。', start: '從一則訊息開始', actions: '瀏覽命令' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: '今天想做什麼？',
+      body: '直接問我，或者把一件事交給我。需要專案、檔案或預覽時，相關上下文會出現在對話右側。',
+      start: '從一則訊息開始',
+      actions: '瀏覽命令'
+    },
     thread: {
       loadingSession: '正在載入工作階段',
       showEarlier: '顯示較早的訊息',

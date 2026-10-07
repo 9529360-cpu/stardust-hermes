@@ -15,6 +15,60 @@ export interface ReviewTreeNode {
   children?: ReviewTreeNode[]
 }
 
+export type ReviewFileGroupKind = 'staged' | 'unstaged' | 'untracked'
+
+export interface ReviewFileGroup {
+  added: number
+  files: HermesReviewFile[]
+  kind: ReviewFileGroupKind
+  removed: number
+}
+
+const REVIEW_FILE_GROUP_ORDER: ReviewFileGroupKind[] = ['staged', 'unstaged', 'untracked']
+
+/** Keep the working-tree status categories visible without changing the git
+ * payload. Untracked files are their own group even though they are also
+ * unstaged from git's perspective: they have different stage/review actions
+ * and need a distinct visual cue. */
+export function reviewFileGroup(file: HermesReviewFile): ReviewFileGroupKind {
+  if (file.status === '?') {
+    return 'untracked'
+  }
+
+  return file.staged ? 'staged' : 'unstaged'
+}
+
+/** Partition the existing review rows into stable SCM sections. The input is
+ * never mutated; each section keeps the same file objects for row actions. */
+export function groupReviewFiles(files: readonly HermesReviewFile[]): ReviewFileGroup[] {
+  const grouped: Record<ReviewFileGroupKind, HermesReviewFile[]> = {
+    staged: [],
+    unstaged: [],
+    untracked: []
+  }
+
+  for (const file of files) {
+    grouped[reviewFileGroup(file)].push(file)
+  }
+
+  return REVIEW_FILE_GROUP_ORDER.flatMap(kind => {
+    const groupFiles = grouped[kind]
+
+    if (groupFiles.length === 0) {
+      return []
+    }
+
+    return [
+      {
+        added: groupFiles.reduce((total, file) => total + file.added, 0),
+        files: groupFiles,
+        kind,
+        removed: groupFiles.reduce((total, file) => total + file.removed, 0)
+      }
+    ]
+  })
+}
+
 // Flat changed-file list (VS Code's default SCM "List" view): one row per file,
 // filename + a dimmed parent-dir path, sorted by path. No folder nodes.
 export function buildReviewFlatList(files: HermesReviewFile[]): ReviewTreeNode[] {
