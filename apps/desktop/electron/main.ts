@@ -6539,7 +6539,7 @@ async function buildReadinessHealthProbe(baseUrl, authMode, token) {
   return { probeHealth: fetchPublicJson, probeIsCredentialed: false }
 }
 
-async function waitForHermes(baseUrl, token, signal?, authMode?, headers = {}) {
+async function waitForHermes(baseUrl, token, signal?, authMode?, headers = {}, alreadyBound = false) {
   const { probeHealth, probeIsCredentialed } = await buildReadinessHealthProbe(baseUrl, authMode, token)
 
   return waitForHermesReady(baseUrl, {
@@ -6550,7 +6550,8 @@ async function waitForHermes(baseUrl, token, signal?, authMode?, headers = {}) {
       ? (url, _token, options = {}) => probeHealth(url, requestOptionsWithHeaders(options, headers))
       : fetchJson,
     probeHealth: (url, options = {}) => probeHealth(url, requestOptionsWithHeaders(options, headers)),
-    probeIsCredentialed
+    probeIsCredentialed,
+    alreadyBound
   })
 }
 
@@ -12544,7 +12545,7 @@ async function runHermesStart() {
     const baseUrl = `http://127.0.0.1:${port}`
     await advanceBootProgress('backend.wait', 'Waiting for Hermes backend to become ready', 90)
     backendConnectionState.assertCurrentAttempt(connectionAttempt)
-    await Promise.race([waitForHermes(baseUrl, token), backendStartFailed])
+    await Promise.race([waitForHermes(baseUrl, token, undefined, undefined, {}, true), backendStartFailed])
     backendConnectionState.assertCurrentAttempt(connectionAttempt)
     backendReady = true
     backendStartFailure = null
