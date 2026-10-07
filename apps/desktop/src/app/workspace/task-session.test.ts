@@ -8,8 +8,10 @@ import {
   findLiveTaskRuntimeIdByStoredId,
   findLiveTaskSession,
   findLiveTaskStoredId,
+  resolveTaskPreviewId,
   resolveTaskTerminalId,
   resolveTaskWorkspaceCwd,
+  type TaskPreviewEntry,
   type TaskTerminalEntry
 } from './task-session'
 
@@ -192,6 +194,47 @@ function terminal(id: string, over: Partial<TaskTerminalEntry> = {}): TaskTermin
     ...over
   }
 }
+
+function preview(id: string, storedSessionId?: string): TaskPreviewEntry {
+  return { id, ...(storedSessionId ? { storedSessionId } : {}) }
+}
+
+describe('resolveTaskPreviewId', () => {
+  it('prefers the selected task owner over legacy previews and another task', () => {
+    expect(
+      resolveTaskPreviewId(
+        [preview('legacy'), preview('task-one-preview', 'task-one'), preview('task-two-preview', 'task-two')],
+        'legacy',
+        'task-two',
+        []
+      )
+    ).toBe('task-two-preview')
+  })
+
+  it('keeps the active preview when several previews share the selected owner', () => {
+    expect(
+      resolveTaskPreviewId(
+        [preview('task-preview-old', 'task-one'), preview('task-preview-current', 'task-one')],
+        'task-preview-current',
+        'task-one',
+        []
+      )
+    ).toBe('task-preview-current')
+  })
+
+  it('matches a compressed task owner through the loaded lineage row', () => {
+    const compressed = session('task-tip', { _lineage_ids: ['task-root', 'task-tip'], _lineage_root_id: 'task-root' })
+
+    expect(resolveTaskPreviewId([preview('task-preview', 'task-root')], null, 'task-tip', [compressed])).toBe(
+      'task-preview'
+    )
+  })
+
+  it('returns undefined without a selected owner or a matching owned preview', () => {
+    expect(resolveTaskPreviewId([preview('task-preview', 'task-one')], 'task-preview', null, [])).toBeUndefined()
+    expect(resolveTaskPreviewId([preview('task-preview', 'task-one')], 'task-preview', 'task-two', [])).toBeUndefined()
+  })
+})
 
 describe('resolveTaskTerminalId', () => {
   it('prefers the selected task owner when tasks share a cwd', () => {

@@ -1,5 +1,6 @@
 import { atom, computed } from 'nanostores'
 
+import { resolveTaskPreviewId } from '@/app/workspace/task-session'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { persistentAtom } from '@/lib/persisted'
 import { reachablePreviewUrl } from '@/lib/preview-reach'
@@ -8,6 +9,7 @@ import { normalize } from '@/lib/text'
 
 import { $rightRailActiveTabId, type RightRailTabId, selectRightRailTab } from './layout'
 import { setRightContextOpen } from './right-context'
+import { $selectedStoredSessionId, $sessions } from './session'
 import { canOpenBrowserWindow, openBrowserInNewWindow } from './windows'
 
 /**
@@ -62,6 +64,8 @@ export type PreviewRecordSource = 'explicit-link' | 'file-browser' | 'manual' | 
 
 export interface PreviewTab {
   id: RightRailTabId
+  /** Optional durable task owner. Missing values are legacy/global tabs. */
+  storedSessionId?: string
   target: PreviewTarget
 }
 
@@ -97,6 +101,29 @@ function isPreviewTab(value: unknown): value is PreviewTab {
   return typeof r.id === 'string' && (r.id.startsWith('file:') || r.id.startsWith('url:')) && isPreviewTarget(r.target)
 }
 
+const normalizedPreviewOwner = (value: null | string | undefined): string | undefined => {
+  const normalized = typeof value === 'string' ? value.trim() : ''
+
+  return normalized || undefined
+}
+
+/** Only tabs whose target can be reconstructed after a relaunch may carry a
+ * stored-session owner. Artifacts and transient/in-memory HTML previews are
+ * intentionally excluded from both ownership and persistence. */
+function isPersistablePreviewTarget(target: PreviewTarget): boolean {
+  return target.kind !== 'artifact' && !target.transient && !(target.previewKind === 'html' && target.dataUrl)
+}
+
+function normalizePreviewTab(tab: PreviewTab): PreviewTab {
+  const storedSessionId = normalizedPreviewOwner(tab.storedSessionId)
+
+  if (storedSessionId === tab.storedSessionId || (!storedSessionId && !tab.storedSessionId)) {
+    return tab
+  }
+
+  return storedSessionId ? { ...tab, storedSessionId } : { id: tab.id, target: tab.target }
+}
+
 function isPdfFileTarget(target: PreviewTarget): boolean {
   if (target.kind !== 'file') {
     return false
@@ -123,11 +150,15 @@ function isPdfFileTarget(target: PreviewTarget): boolean {
 export function decodePreviewTabs(raw: string): PreviewTab[] {
   const parsed = JSON.parse(raw) as unknown
 
-  return (Array.isArray(parsed) ? parsed.filter(isPreviewTab) : []).map(tab =>
-    isPdfFileTarget(tab.target) && tab.target.previewKind === 'binary'
-      ? { ...tab, target: { ...tab.target, previewKind: 'pdf' as const } }
-      : tab
-  )
+  return (
+    Array.isArray(parsed) ? parsed.filter(isPreviewTab).filter(tab => isPersistablePreviewTarget(tab.target)) : []
+  ).map(tab => {
+    const normalized = normalizePreviewTab(tab)
+
+    return isPdfFileTarget(normalized.target) && normalized.target.previewKind === 'binary'
+      ? { ...normalized, target: { ...normalized.target, previewKind: 'pdf' as const } }
+      : normalized
+  })
 }
 
 export const $previewTabs = persistentAtom<PreviewTab[]>(TABS_STORAGE_KEY, [], {
@@ -136,12 +167,7 @@ export const $previewTabs = persistentAtom<PreviewTab[]>(TABS_STORAGE_KEY, [], {
   // HTML and artifact tabs that cannot render without their in-memory payload.
   encode: tabs =>
     JSON.stringify(
-      tabs.filter(
-        tab =>
-          tab.target.kind !== 'artifact' &&
-          !tab.target.transient &&
-          !(tab.target.previewKind === 'html' && tab.target.dataUrl)
-      ),
+      tabs.filter(tab => isPersistablePreviewTarget(tab.target)),
       (key, value) => (key === 'dataUrl' ? undefined : value)
     )
 })
@@ -174,6 +200,29 @@ export const $previewTarget = computed(
   [$previewTabs, $rightRailActiveTabId],
   (tabs, activeTabId) => resolveActiveTab(tabs, activeTabId)?.target ?? null
 )
+
+// Session ↔ preview linking is selection only. Explicitly owned persistent
+// tabs win; unowned legacy tabs stay global and are left alone when there is no
+// safe owned match. This keeps task context from stealing a preview across
+// sessions without changing the old global-tab behavior.
+const selectPreviewForCurrentTask = () => {
+  const current = $rightRailActiveTabId.get()
+
+  const resolved = resolveTaskPreviewId(
+    $previewTabs.get().filter(tab => isPersistablePreviewTarget(tab.target)),
+    current,
+    $selectedStoredSessionId.get(),
+    $sessions.get()
+  )
+
+  if (resolved && resolved !== current) {
+    selectRightRailTab(resolved)
+  }
+}
+
+$selectedStoredSessionId.listen(selectPreviewForCurrentTask)
+$sessions.listen(selectPreviewForCurrentTask)
+selectPreviewForCurrentTask()
 
 /** Raw `source` strings of every open tab, for the composer rows that toggle a
  *  preview open and closed by the target they were handed. */
@@ -385,12 +434,17 @@ function previewTargetForSource(target: PreviewTarget, source: PreviewRecordSour
 /** Open (or re-front) the tab for `target`. Re-opening an existing tab refreshes
  *  its target so a stale label/path can't outlive the thing it points at. The
  *  only way anything reaches a preview. */
-export function openPreview(target: PreviewTarget, source: PreviewRecordSource = 'manual') {
+export function openPreview(
+  target: PreviewTarget,
+  source: PreviewRecordSource = 'manual',
+  storedSessionId: null | string | undefined = $selectedStoredSessionId.get()
+) {
   const resolved = previewTargetForSource(target, source)
   const current = $previewTabs.get()
   const id = resolved.kind === 'url' ? browserTabId(current) : previewTabId(resolved)
   const index = current.findIndex(tab => tab.id === id)
-  const tab: PreviewTab = { id, target: resolved }
+  const owner = isPersistablePreviewTarget(resolved) ? normalizedPreviewOwner(storedSessionId) : undefined
+  const tab: PreviewTab = { id, ...(owner ? { storedSessionId: owner } : {}), target: resolved }
 
   // `openPreview` is the explicit entry point: a user click, a project/file
   // action, or an on-screen agent preview request. That intent may reveal the
@@ -435,8 +489,9 @@ export function openBrowserTab() {
 /** Another Browser, always — the strip's "+". */
 export function newBrowserTab() {
   const id = mintBrowserTabId()
+  const owner = normalizedPreviewOwner($selectedStoredSessionId.get())
 
-  $previewTabs.set([...$previewTabs.get(), { id, target: blankPage() }])
+  $previewTabs.set([...$previewTabs.get(), { id, ...(owner ? { storedSessionId: owner } : {}), target: blankPage() }])
   selectRightRailTab(id)
 }
 
