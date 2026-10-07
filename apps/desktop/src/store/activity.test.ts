@@ -138,6 +138,9 @@ describe('task center projection', () => {
       }),
       task({ id: 'failed-ci', rail: 'session', status: 'running' }),
       task({ id: 'pending-ci', rail: 'session', status: 'success' }),
+      task({ id: 'unavailable-ci', rail: 'session', status: 'success' }),
+      task({ id: 'generic-error', rail: 'process', status: 'error' }),
+      task({ id: 'interrupted', rail: 'preview', status: 'interrupted' }),
       task({ action: 'review-cron-suggestion', id: 'cron-suggestion', rail: 'cron', status: 'waiting' }),
       task({ id: 'passed-test', testResult: { command: 'vitest run', exitCode: 0, status: 'passed' } }),
       task({ id: 'passed-ci', rail: 'session', status: 'success' }),
@@ -147,6 +150,7 @@ describe('task center projection', () => {
     const filtered = filterTaskCenterTasks(tasks, 'needs-attention', {
       'failed-ci': 'failed',
       'pending-ci': 'pending',
+      'unavailable-ci': 'unavailable',
       'passed-ci': 'passed'
     })
 
@@ -156,6 +160,9 @@ describe('task center projection', () => {
       'failed-test',
       'failed-ci',
       'pending-ci',
+      'unavailable-ci',
+      'generic-error',
+      'interrupted',
       'cron-suggestion'
     ])
     expect(filterTaskCenterTasks(tasks, 'all')).toBe(tasks)
