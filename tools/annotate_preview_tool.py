@@ -11,6 +11,7 @@ import json
 from typing import Callable, Optional
 
 from tools.registry import registry, tool_error
+from tools.browser_preview_approval import classify_browser_preview_action
 
 ACTIONS = ("add", "hold", "remove", "clear")
 
@@ -28,6 +29,9 @@ def annotate_preview_tool(
     verb = (action or "add").strip().lower()
     if verb not in ACTIONS:
         return tool_error(f"action must be one of: {', '.join(ACTIONS)}.")
+    risk = classify_browser_preview_action("preview", WIRE[verb])
+    if risk.requires_approval and callback is None:
+        return tool_error(f"{risk.reason}; approval is required before this action can run.")
     if verb in ("add", "remove") and not (ref or selector):
         return tool_error(f"{verb} needs a ref from drive_preview action='elements' (e.g. 'btn-sign-in') or a CSS selector.")
 

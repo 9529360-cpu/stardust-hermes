@@ -11,6 +11,7 @@ the platform-injected callback. ``desktop_ui`` toolset: desktop-sourced sessions
 from typing import Callable, Optional
 
 from tools.desktop_ui import passthrough_json
+from tools.browser_preview_approval import classify_browser_preview_action
 from tools.registry import registry, tool_error
 
 ACTIONS = ("elements", "click", "hover", "type", "scroll", "press", "strobe", "back", "forward", "reload")
@@ -32,6 +33,12 @@ def drive_preview_tool(
     verb = (action or "").strip().lower()
     if verb not in ACTIONS:
         return tool_error(f"action must be one of: {', '.join(ACTIONS)}.")
+    # The renderer is the approval boundary for Preview mutations.  Keep this
+    # shared classifier here as a defense-in-depth contract for direct callers;
+    # the actual prompt is supplied by the agent's normal approval middleware.
+    risk = classify_browser_preview_action("preview", verb)
+    if risk.requires_approval and callback is None:
+        return tool_error(f"{risk.reason}; approval is required before this action can run.")
     if verb in NEEDS_TARGET and not (ref or selector):
         return tool_error(f"{verb} needs a ref from action='elements' (e.g. 'btn-sign-in') or a CSS selector.")
     if verb == "type" and text is None:
