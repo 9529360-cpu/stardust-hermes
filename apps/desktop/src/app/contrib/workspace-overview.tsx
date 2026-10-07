@@ -9,8 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Textarea } from '@/components/ui/textarea'
-import { registry } from '@/contrib/registry'
 import { Slot } from '@/contrib/react/slot'
+import { registry } from '@/contrib/registry'
 import { TASK_CENTER_AREAS } from '@/contrib/task-center'
 import type { HermesBranchPullRequest } from '@/global'
 import { useI18n } from '@/i18n'
@@ -157,19 +157,24 @@ function UnifiedInputCard({ task, gateway }: { task: TaskCenterTask; gateway: Pa
   const [busy, setBusy] = useState(false)
   const request = task.approvalRequest
   const clarify = task.clarifyRequest
+
   if (!request && !clarify) {
     return null
   }
+
   const choices = clarify?.questions?.[0]?.choices ?? clarify?.choices ?? []
+
   const submit = async (answer: string) => {
-    if (busy || !answer.trim()) return
+    if (busy || !answer.trim()) {return}
     setBusy(true)
+
     if (request) {
       await answerApproval(gateway, request, answer)
     } else if (clarify) {
       answerClarifyRequest(clarify, answer)
     }
   }
+
   return (
     <div className="mt-2 rounded-lg border border-primary/25 bg-primary/5 p-2" data-task-center-input-card="">
       <div className="mb-1 text-[0.75rem] font-medium text-primary">{task.label}</div>
@@ -343,6 +348,7 @@ export function WorkspaceOverview() {
   const sessionStates = useStore($sessionStates)
   const subagentsBySession = useStore($subagentsBySession)
   const workingSessionIds = useStore($workingSessionIds)
+
   const currentSession = selectedStoredSessionId
     ? sessions.find(candidate => sessionMatchesStoredId(candidate, selectedStoredSessionId))
     : sessions.find(candidate => candidate.id === activeSessionId)
@@ -456,8 +462,10 @@ export function WorkspaceOverview() {
 
   const todoItems = statusItems.filter(item => item.type === 'todo')
   const completedTodoCount = todoItems.filter(item => item.todoStatus === 'completed').length
+
   const activeTodo =
     todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
+
   const todoPercent = todoItems.length > 0 ? Math.round((completedTodoCount / todoItems.length) * 100) : 0
   const showTaskCard = primaryAttention || primaryWorking
 

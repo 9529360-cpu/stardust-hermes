@@ -9,9 +9,9 @@ import { scanGitRepos } from './git-repo-scan'
 import {
   fileDiffVsHead,
   repoStatus,
+  reviewChecks,
   reviewCommit,
   reviewCommitContext,
-  reviewChecks,
   reviewCreatePr,
   reviewDiff,
   reviewFetchPrComment,

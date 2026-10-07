@@ -124,6 +124,7 @@ describe('task center projection', () => {
       subagentsBySession: {},
       workingSessionIds: []
     })
+
     expect(tasks[0].workspace).toBeUndefined()
   })
 
@@ -138,6 +139,7 @@ describe('task center projection', () => {
       subagentsBySession: { runtime: [subagent({ sessionId: 'child-1' })] },
       workingSessionIds: []
     })
+
     expect(tasks.map(task => [task.id, task.status, task.durability])).toEqual([
       ['session:tip', 'waiting', 'turn'],
       ['subagent:runtime:worker', 'running', 'process-local'],

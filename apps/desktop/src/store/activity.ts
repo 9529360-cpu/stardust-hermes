@@ -5,8 +5,8 @@ import type { PreviewServerRestart } from '@/store/preview'
 import { sessionMatchesStoredId } from '@/store/session'
 import type { ActionStatusResponse, CronJob, SessionInfo } from '@/types/hermes'
 
-import type { ComposerStatusItem } from './composer-status'
 import type { ClarifyRequest } from './clarify'
+import type { ComposerStatusItem } from './composer-status'
 import type { ApprovalRequest } from './prompts'
 import { buildSubagentTree, type SubagentNode, type SubagentProgress } from './subagents'
 
@@ -179,10 +179,11 @@ function workspaceContext(
   session: SessionInfo | undefined,
   projects: readonly { id: string; label: string; path?: null | string }[] = []
 ): TaskWorkspaceContext | undefined {
-  if (!session) return undefined
+  if (!session) {return undefined}
   const cwd = session.cwd?.trim() || undefined
   const repoRoot = session.git_repo_root?.trim() || undefined
   const normalizedCwd = cwd?.toLowerCase()
+
   const project = normalizedCwd
     ? [...projects]
         .filter(item => {
@@ -190,6 +191,7 @@ function workspaceContext(
             ?.trim()
             .replace(/[\\/]+$/, '')
             .toLowerCase()
+
           return (
             path &&
             (normalizedCwd === path || normalizedCwd.startsWith(`${path}/`) || normalizedCwd.startsWith(`${path}\\`))
@@ -197,12 +199,14 @@ function workspaceContext(
         })
         .sort((a, b) => (b.path?.length ?? 0) - (a.path?.length ?? 0))[0]?.label
     : undefined
+
   const context: TaskWorkspaceContext = {
     cwd,
     project,
     branch: session.git_branch?.trim() || undefined,
     worktree: repoRoot && cwd && cwd.toLowerCase() !== repoRoot.toLowerCase() ? cwd : undefined
   }
+
   return Object.values(context).some(Boolean) ? context : undefined
 }
 
@@ -322,12 +326,15 @@ const flattenSubagents = (
 export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask[] {
   const contextForSession = (id?: string) => {
     const session = id ? sources.sessions.find(candidate => sessionMatchesStoredId(candidate, id)) : undefined
+
     return workspaceContext(session, sources.projectTree)
   }
+
   const approvals = Object.entries(sources.approvalRequests ?? {}).map<TaskCenterTask>(([runtimeKey, request]) => {
     const runtimeSessionId = request.sessionId || runtimeKey
     const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
     const storedSessionCandidate = mappedStoredSessionId ?? runtimeSessionId
+
     const storedSessionId =
       sources.sessions.find(session => sessionMatchesStoredId(session, storedSessionCandidate))?.id ??
       mappedStoredSessionId
@@ -348,12 +355,15 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
       updatedAt: 0
     }
   })
+
   const clarifications = Object.entries(sources.clarifyRequests ?? {}).map<TaskCenterTask>(([runtimeKey, request]) => {
     const runtimeSessionId = request.sessionId || runtimeKey
     const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
+
     const storedSessionId =
       sources.sessions.find(session => sessionMatchesStoredId(session, mappedStoredSessionId ?? runtimeSessionId))
         ?.id ?? mappedStoredSessionId
+
     return {
       action: storedSessionId ? 'open-session' : undefined,
       clarifyRequest: request,

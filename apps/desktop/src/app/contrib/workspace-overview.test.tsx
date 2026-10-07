@@ -4,10 +4,10 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
+import { $projectTree } from '@/store/projects'
 import { $currentCwd } from '@/store/session'
 import { $sessions } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
-import { $projectTree } from '@/store/projects'
 
 import { WorkspaceOverview } from './workspace-overview'
 

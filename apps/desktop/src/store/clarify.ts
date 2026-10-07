@@ -121,6 +121,7 @@ export function normalizeQuestions(questions: unknown): ClarifyQuestion[] {
 // resolve it once they switch over — without a second concurrent clarify
 // clobbering the first. A request with no session id lands under the empty key.
 const keyFor = (sessionId: string | null | undefined): string => sessionId ?? ''
+
 const batchDraftKey = (requestId: string, sessionId: string | null | undefined): string =>
   `${keyFor(sessionId)}\u0000${requestId}`
 
@@ -275,6 +276,7 @@ export function answerClarifyRequest(request: ClarifyRequest, answer: string): b
 
   respondToServerRequest(request.requestId, { answer })
   clearClarifyRequest(request.requestId, request.sessionId)
+
   return true
 }
 

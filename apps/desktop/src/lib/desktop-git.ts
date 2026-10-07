@@ -4,9 +4,9 @@ import type {
   HermesGitWorktree,
   HermesRepoPullRequests,
   HermesRepoStatus,
+  HermesReviewChecks,
   HermesReviewList,
-  HermesReviewShipInfo,
-  HermesReviewChecks
+  HermesReviewShipInfo
 } from '@/global'
 import { hermesApi } from '@/hermes'
 
