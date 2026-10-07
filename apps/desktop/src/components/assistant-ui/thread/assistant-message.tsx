@@ -85,6 +85,29 @@ interface AssistantMessageProps {
   onDismissError?: (messageId: string) => void
 }
 
+const TurnActivitySummary: FC<{
+  durationS?: number
+  onToggle: () => void
+  open: boolean
+}> = ({ durationS, onToggle, open }) => {
+  const { t } = useI18n()
+  const duration = durationS === undefined ? null : formatElapsed(durationS)
+
+  return (
+    <button
+      aria-expanded={open}
+      className="mb-1 flex w-full items-center gap-1.5 text-left text-[length:var(--conversation-caption-font-size)] text-(--conversation-scaffold-text) opacity-70 hover:opacity-100"
+      data-slot="turn-activity-summary"
+      onClick={onToggle}
+      type="button"
+    >
+      <Codicon className="shrink-0" name={open ? 'chevron-down' : 'chevron-right'} size="0.75rem" />
+      <span>{duration ? t.assistant.thread.turnDuration(duration) : t.assistant.thread.thought}</span>
+    </button>
+  )
+}
+
+
 export const AssistantMessage: FC<AssistantMessageProps> = props => {
   // A reply to an inter-agent delivery is part of that exchange, not part of
   // the human conversation — collapse it under a compact notice ("Reply to
@@ -200,6 +223,8 @@ const AssistantMessageBody: FC<AssistantMessageProps & { collapsedNotice?: null 
   // Whole-turn wall-clock seconds (set once at completion — referentially
   // stable across the 30 Hz delta stream, so this adds no per-token renders).
   const turnDurationS = useAuiState(s => s.message.metadata?.custom?.durationS as number | undefined)
+  const hasActivitySummary = turnDurationS !== undefined
+  const [showActivity, setShowActivity] = useState(false)
 
   const getMessageText = useCallback(() => messageContentText(messageRuntime.getState().content), [messageRuntime])
 
@@ -236,8 +261,16 @@ const AssistantMessageBody: FC<AssistantMessageProps & { collapsedNotice?: null 
         <>
           <div
             className="wrap-anywhere min-w-0 max-w-full overflow-hidden text-pretty text-[length:var(--conversation-text-font-size)] leading-(--dt-line-height) text-foreground"
+            data-activity-collapsed={hasActivitySummary && !showActivity ? '' : undefined}
             data-slot="aui_assistant-message-content"
           >
+            {hasActivitySummary && (
+              <TurnActivitySummary
+                durationS={turnDurationS}
+                onToggle={() => setShowActivity(value => !value)}
+                open={showActivity}
+              />
+            )}
             {/* Todos render in the composer status stack now, not inline. */}
             {MESSAGE_PARTS}
             <AssistantStatusSlot />
