@@ -2877,6 +2877,10 @@ export interface Translations {
       noChanges: string
       notRepo: string
       noDiff: string
+      hunk: (current: number, total: number) => string
+      previousHunk: string
+      nextHunk: string
+      allHunks: string
       scopeUncommitted: string
       scopeBranch: string
       scopeLastTurn: string
