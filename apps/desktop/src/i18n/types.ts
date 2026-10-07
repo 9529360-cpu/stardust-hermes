@@ -2874,6 +2874,8 @@ export interface Translations {
       revertConfirm: string
       revertAllConfirm: string
       staged: string
+      unstaged: string
+      untracked: string
       noChanges: string
       notRepo: string
       noDiff: string

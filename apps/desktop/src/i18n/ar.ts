@@ -47,8 +47,7 @@ export const ar = defineLocale({
     doneDescription:
       'تم حفظ الحزمة المنقحة على جهازك. إذا احتجت إلى الدعم، فأرفق الملف بمشكلة في GitHub الخاص بـ Stardust.',
     failedTitle: 'تعذر حفظ معلومات التشخيص',
-    failedHint:
-      'حدّث Stardust والخادم الخلفي ثم أعد المحاولة. هذا المسار لا يعود إلى رفع سجلاتك إلى خدمة دعم.',
+    failedHint: 'حدّث Stardust والخادم الخلفي ثم أعد المحاولة. هذا المسار لا يعود إلى رفع سجلاتك إلى خدمة دعم.',
     handoffLead: 'هل تحتاج إلى مساعدة؟',
     links: {
       github: 'مشكلات Stardust على GitHub'
@@ -421,9 +420,11 @@ export const ar = defineLocale({
       expYearField: 'سنة الانتهاء',
       cvcField: 'CVC',
       delegatedPaymentLabel: 'بطاقة إنفاق Stardust',
-      delegatedPaymentDescription: 'يمكن استخدام هذه البطاقة مباشرةً للمشتريات أو الدفعات التي تطلب من Stardust تنفيذها صراحةً، من دون تأكيد إضافي لتعبئة البطاقة.',
+      delegatedPaymentDescription:
+        'يمكن استخدام هذه البطاقة مباشرةً للمشتريات أو الدفعات التي تطلب من Stardust تنفيذها صراحةً، من دون تأكيد إضافي لتعبئة البطاقة.',
       allowAnyOriginLabel: 'السماح في أي موقع دفع',
-      allowAnyOriginDescription: 'يفضل استخدام بطاقة مخصصة منخفضة الحد أو مسبقة الدفع أو افتراضية. يظل رصيد البطاقة أو حد الجهة المصدرة هو سقف الإنفاق الفعلي.',
+      allowAnyOriginDescription:
+        'يفضل استخدام بطاقة مخصصة منخفضة الحد أو مسبقة الدفع أو افتراضية. يظل رصيد البطاقة أو حد الجهة المصدرة هو سقف الإنفاق الفعلي.',
       delegatedPaymentBadge: 'دفع مفوض',
       anySiteBadge: 'أي موقع',
       postalField: 'الرمز البريدي',
@@ -579,7 +580,8 @@ export const ar = defineLocale({
         sidebar: 'الشريط الجانبي فقط'
       },
       backdropTitle: 'خلفية النافذة',
-      backdropDesc: 'اعرض صورة محلية خلف نافذة Stardust بالكامل، بما في ذلك الشريط الجانبي والمحادثة ولوحات الأدوات. تبقى الصورة على هذا الجهاز فقط.',
+      backdropDesc:
+        'اعرض صورة محلية خلف نافذة Stardust بالكامل، بما في ذلك الشريط الجانبي والمحادثة ولوحات الأدوات. تبقى الصورة على هذا الجهاز فقط.',
       userBubbleTitle: 'فقاعة الرسالة',
       userBubbleDesc: 'مدى شفافية رسائلك. معتمة عند 0؛ يبقى الإطار فقط عند 100.',
       introSplashTitle: 'شاشة المقدمة',
@@ -1664,9 +1666,11 @@ export const ar = defineLocale({
     nameLabel: 'الاسم',
     cloneFrom: 'استنساخ من',
     cloneFromNone: 'لا شيء (فارغ)',
-    cloneFromDesc: 'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي المحدد. لا يتم نسخ الجلسات أو المهام المجدولة.',
+    cloneFromDesc:
+      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي المحدد. لا يتم نسخ الجلسات أو المهام المجدولة.',
     cloneFromDefault: 'نسخ إعداد الافتراضي',
-    cloneFromDefaultDesc: 'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي الافتراضي. لا يتم نسخ الجلسات أو المهام المجدولة.',
+    cloneFromDefaultDesc:
+      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي الافتراضي. لا يتم نسخ الجلسات أو المهام المجدولة.',
     invalidName: hint => `اسم غير صالح: ${hint}`,
     nameRequired: 'الاسم مطلوب',
     creating: 'جار الإنشاء...',
@@ -1819,7 +1823,7 @@ export const ar = defineLocale({
       dismissed: 'تم تجاهل الاقتراح',
       actionFailed: 'تعذر تحديث اقتراح الأتمتة',
       needsConversation: 'افتح محادثة محفوظة أولا حتى تجد النتائج المجدولة محادثة تعود إليها.'
-    },
+    }
   },
   artifacts: {
     search: 'بحث',
@@ -2274,6 +2278,8 @@ export const ar = defineLocale({
       revertConfirm: 'هل تريد تجاهل التغييرات على هذا الملف واستعادته إلى الحالة المُودعة؟ لا يمكن التراجع عن هذا.',
       revertAllConfirm: 'هل تريد تجاهل كل التغييرات واستعادة الملفات إلى الحالة المُودعة؟ لا يمكن التراجع عن هذا.',
       staged: 'مُدرَج',
+      unstaged: 'غير مُدرَج',
+      untracked: 'غير متعقَّب',
       noChanges: 'لا توجد تغييرات',
       notRepo: 'ليس مستودع git',
       noDiff: 'لا يوجد فرق لعرضه',
@@ -2491,7 +2497,8 @@ export const ar = defineLocale({
     copyAuthCode: 'انسخ رمز التفويض وألصقه أدناه.',
     pasteAuthCode: 'ألصق رمز التفويض',
     reopenAuthPage: 'إعادة فتح صفحة التفويض',
-    autoBrowser: provider => `فتحنا ${provider} في المتصفح. صرّح لـ Stardust هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
+    autoBrowser: provider =>
+      `فتحنا ${provider} في المتصفح. صرّح لـ Stardust هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
     reopenSignInPage: 'إعادة فتح صفحة تسجيل الدخول',
     waitingAuthorize: 'بانتظار التفويض...',
     externalPending: provider =>
@@ -2820,7 +2827,13 @@ export const ar = defineLocale({
     }
   },
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: 'بماذا نبدأ؟', body: 'اسأل مباشرة، أو أعطني مهمة. يظهر سياق المشروع أو الملفات أو المعاينة بجانب المحادثة فقط عند الحاجة.', start: 'ابدأ برسالة', actions: 'استكشف الأوامر' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: 'بماذا نبدأ؟',
+      body: 'اسأل مباشرة، أو أعطني مهمة. يظهر سياق المشروع أو الملفات أو المعاينة بجانب المحادثة فقط عند الحاجة.',
+      start: 'ابدأ برسالة',
+      actions: 'استكشف الأوامر'
+    },
     thread: {
       loadingSession: 'جار تحميل الجلسة...',
       showEarlier: 'عرض الرسائل الأقدم',
@@ -3096,7 +3109,8 @@ export const ar = defineLocale({
     sudoSendFailed: 'فشل إرسال كلمة مرور sudo',
     secretSendFailed: 'فشل إرسال السر',
     sudoTitle: 'مطلوب sudo',
-    sudoDesc: 'راجع الأمر قبل إدخال كلمة مرور sudo. تُرسل كلمة المرور إلى الوكيل الذي ينفّذه وتُحفظ مؤقتًا لهذه الجلسة.',
+    sudoDesc:
+      'راجع الأمر قبل إدخال كلمة مرور sudo. تُرسل كلمة المرور إلى الوكيل الذي ينفّذه وتُحفظ مؤقتًا لهذه الجلسة.',
     sudoCommandUnavailable: 'لم يقدّم هذا الوكيل الأمر. ألغِ الطلب إذا لم تتمكن من التحقق منه في المحادثة.',
     sudoPlaceholder: 'كلمة المرور',
     secretTitle: 'مطلوب سر',

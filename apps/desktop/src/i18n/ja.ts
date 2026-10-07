@@ -366,9 +366,11 @@ export const ja = defineLocale({
       expYearField: '有効期限（年）',
       cvcField: 'CVC',
       delegatedPaymentLabel: 'Stardust 支払いカード',
-      delegatedPaymentDescription: 'Stardust に購入や支払いを明示的に依頼した場合、このカードを追加確認なしで使用できます。',
+      delegatedPaymentDescription:
+        'Stardust に購入や支払いを明示的に依頼した場合、このカードを追加確認なしで使用できます。',
       allowAnyOriginLabel: '任意のチェックアウトサイトで使用',
-      allowAnyOriginDescription: '専用の低限度額・プリペイド・バーチャルカード向けです。残高や発行会社の限度額が実際の上限になります。',
+      allowAnyOriginDescription:
+        '専用の低限度額・プリペイド・バーチャルカード向けです。残高や発行会社の限度額が実際の上限になります。',
       delegatedPaymentBadge: '委任支払い',
       anySiteBadge: '任意サイト',
       postalField: '郵便番号',
@@ -543,7 +545,8 @@ export const ja = defineLocale({
         sidebar: 'サイドバーのみ'
       },
       backdropTitle: 'ウィンドウ背景',
-      backdropDesc: 'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
+      backdropDesc:
+        'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
       userBubbleTitle: 'メッセージの吹き出し',
       userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で枠線だけが残ります。',
       introSplashTitle: 'イントロ表示',
@@ -1954,9 +1957,11 @@ export const ja = defineLocale({
     nameLabel: '名前',
     cloneFrom: '複製元',
     cloneFromNone: 'なし（空）',
-    cloneFromDesc: '選択したプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
+    cloneFromDesc:
+      '選択したプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     cloneFromDefault: 'デフォルトプロファイルから設定を複製',
-    cloneFromDefaultDesc: 'デフォルトプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
+    cloneFromDefaultDesc:
+      'デフォルトプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     invalidName: hint => `無効なプロファイル名。${hint}`,
     nameRequired: '名前は必須です',
     creating: '作成中...',
@@ -2138,7 +2143,7 @@ export const ja = defineLocale({
       dismissed: '提案を却下しました',
       actionFailed: '自動化の提案を更新できませんでした',
       needsConversation: 'スケジュール結果の返却先を確保するため、先に保存済みの会話を開いてください。'
-    },
+    }
   },
 
   artifacts: {
@@ -2634,6 +2639,8 @@ export const ja = defineLocale({
       revertConfirm: 'このファイルの変更を破棄してコミット済みの状態に戻しますか？この操作は元に戻せません。',
       revertAllConfirm: 'すべての変更を破棄してコミット済みの状態に戻しますか？この操作は元に戻せません。',
       staged: 'ステージ済み',
+      unstaged: '未ステージ',
+      untracked: '未追跡',
       noChanges: '変更なし',
       notRepo: 'Git リポジトリではありません',
       noDiff: '表示する差分がありません',
@@ -3065,7 +3072,8 @@ export const ja = defineLocale({
         title: 'コンテキスト使用状況',
         tokenSummary: (used, max) => `${used} / ${max} Tokens`,
         sessionTokens: 'セッションのトークン使用量',
-        sessionTokensNote: 'モデル呼び出しの累計値。現在のコンテキスト使用量とは異なります。キャッシュ分は総計に含まれ、重複加算しません。',
+        sessionTokensNote:
+          'モデル呼び出しの累計値。現在のコンテキスト使用量とは異なります。キャッシュ分は総計に含まれ、重複加算しません。',
         inputTokens: '非キャッシュ入力',
         cacheReadTokens: 'キャッシュ読み込み',
         cacheWriteTokens: 'キャッシュ書き込み',
@@ -3298,7 +3306,13 @@ export const ja = defineLocale({
   },
 
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: '今日は何を進めますか？', body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。', start: 'メッセージを始める', actions: 'コマンドを見る' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: '今日は何を進めますか？',
+      body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。',
+      start: 'メッセージを始める',
+      actions: 'コマンドを見る'
+    },
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',
@@ -3657,7 +3671,8 @@ export const ja = defineLocale({
     sudoTitle: '管理者パスワード',
     sudoDesc:
       'sudo パスワードを入力する前にコマンドを確認してください。パスワードは実行するエージェントに送信され、このセッション中キャッシュされます。',
-    sudoCommandUnavailable: 'エージェントからコマンドが提供されていません。会話で確認できない場合はキャンセルしてください。',
+    sudoCommandUnavailable:
+      'エージェントからコマンドが提供されていません。会話で確認できない場合はキャンセルしてください。',
     sudoPlaceholder: 'sudo パスワード',
     secretTitle: 'シークレットが必要です',
     secretDesc: 'Hermes は続行するための認証情報が必要です。',
