@@ -16,7 +16,7 @@ from contextvars import ContextVar
 import logging
 import threading
 import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Iterable, List, Mapping, Optional, Tuple
 
 from tools.registry import CHECK_FN_CACHE_BYPASS, check_fn_cache_scope, discover_builtin_tools, registry, tool_error
 from tools.registry import _MAX_TOOL_ERROR_CHARS as _TOOL_ERROR_MAX_LEN
@@ -27,6 +27,87 @@ from utils import path_signature
 logger = logging.getLogger(__name__)
 
 _post_tool_call_hook_suppressed: ContextVar[bool] = ContextVar("post_tool_call_hook_suppressed", default=False)
+
+
+@dataclass(frozen=True, slots=True)
+class ToolCapabilityContext:
+    """Task-local authority for one model-tool dispatch surface.
+
+    ``allowed_tools`` is deliberately optional: a context without an explicit grant is
+    still *not* an authority.  This prevents a copied parent context (for example in a
+    delegated child or a replay worker) from becoming an implicit allow-all grant.
+    Toolset fields are retained so callers can bind the same policy inputs used when the
+    model-visible tool list was assembled.
+    """
+
+    allowed_tools: Optional[frozenset[str]] = None
+    enabled_toolsets: Optional[Tuple[str, ...]] = None
+    disabled_toolsets: Tuple[str, ...] = ()
+    session_id: Optional[str] = None
+    internal: bool = False
+    bridge: bool = False
+    replay: bool = False
+
+
+_tool_capability_context: ContextVar[Optional[ToolCapabilityContext]] = ContextVar(
+    "model_tool_capability_context", default=None)
+_UNSET_TOOLSET_GRANT = object()
+_bridge_tool_dispatch: ContextVar[bool] = ContextVar("model_bridge_tool_dispatch", default=False)
+
+
+@contextmanager
+def tool_capability_context(
+    *,
+    allowed_tools: Optional[Iterable[str]] = None,
+    enabled_toolsets: Optional[Iterable[str]] = None,
+    disabled_toolsets: Optional[Iterable[str]] = None,
+    session_id: Optional[str] = None,
+    internal: bool = False,
+    bridge: bool = False,
+    replay: bool = False,
+):
+    """Bind an explicit capability grant for nested tool dispatches.
+
+    The binding is task-local and restored on exit.  ``internal`` and ``bridge`` are
+    explicit call-site exceptions, not inferred from a missing session id; a child or
+    replay context therefore cannot inherit the parent's authority accidentally.
+    """
+    context = ToolCapabilityContext(
+        allowed_tools=(frozenset(str(name) for name in allowed_tools)
+                       if allowed_tools is not None else None),
+        enabled_toolsets=(tuple(str(name) for name in enabled_toolsets)
+                          if enabled_toolsets is not None else None),
+        disabled_toolsets=tuple(str(name) for name in (disabled_toolsets or ())),
+        session_id=session_id,
+        internal=bool(internal),
+        bridge=bool(bridge),
+        replay=bool(replay),
+    )
+    token = _tool_capability_context.set(context)
+    try:
+        yield context
+    finally:
+        _tool_capability_context.reset(token)
+
+
+# Descriptive aliases for callers outside model_tools.py and for replay/transport code.
+session_tool_capability_context = tool_capability_context
+capability_context = tool_capability_context
+
+
+def current_tool_capability_context() -> Optional[ToolCapabilityContext]:
+    """Return the current task-local tool authority, without resolving a grant."""
+    return _tool_capability_context.get()
+
+
+@contextmanager
+def bridge_tool_dispatch_context():
+    """Mark calls that came from a validated deferred-tool bridge operation."""
+    token = _bridge_tool_dispatch.set(True)
+    try:
+        yield
+    finally:
+        _bridge_tool_dispatch.reset(token)
 
 
 @contextmanager
@@ -597,6 +678,154 @@ _LEGACY_TOOL_ALIASES = {
     "tour": "gui_tour", "tip": "show_tip",
 }
 _READ_SEARCH_TOOLS = {"read_file", "search_files"}
+_TOOL_SEARCH_BRIDGE_NAMES = frozenset({"tool_search", "tool_describe", "tool_call"})
+
+
+def _coerce_capability_context(value: Any) -> Optional[ToolCapabilityContext]:
+    """Accept the public context type plus a small mapping form for transports."""
+    if value is None:
+        return None
+    if isinstance(value, ToolCapabilityContext):
+        return value
+    if not isinstance(value, Mapping):
+        return None
+    allowed = value.get("allowed_tools", value.get("tools"))
+    enabled = value.get("enabled_toolsets")
+    disabled = value.get("disabled_toolsets")
+    return ToolCapabilityContext(
+        allowed_tools=(frozenset(str(name) for name in allowed)
+                       if allowed is not None else None),
+        enabled_toolsets=(tuple(str(name) for name in enabled)
+                          if enabled is not None else None),
+        disabled_toolsets=tuple(str(name) for name in (disabled or ())),
+        session_id=value.get("session_id"),
+        internal=bool(value.get("internal", False)),
+        bridge=bool(value.get("bridge", False)),
+        replay=bool(value.get("replay", False)),
+    )
+
+
+def _tool_capability_denial(function_name: str, reason: str) -> str:
+    """Stable, non-sensitive denial returned for model-visible authorization failures."""
+    return tool_error(
+        f"Tool '{function_name}' is not authorized in this session: {reason}."
+    )
+
+
+def _authorize_registry_dispatch(
+    function_name: str,
+    *,
+    enabled_tools: Optional[List[str]],
+    enabled_toolsets: Optional[List[str]],
+    toolsets_granted: bool,
+    disabled_toolsets: Optional[List[str]],
+    capability_grant: Any = None,
+    capability_context: Any = None,
+    internal: bool = False,
+    bridge: bool = False,
+    replay: bool = False,
+) -> Optional[str]:
+    """Return a denial result, or ``None`` when registry dispatch is authorized.
+
+    This is intentionally before middleware and before the handler.  A stale schema,
+    a direct hidden-tool call, a connector name, and a deferred bridge unwrap all hit
+    the same gate.  ``tool_search``/``tool_describe``/``tool_call`` are read/bridge
+    protocol operations and are the only implicit bridge exception; a bridge unwrap
+    is recursive and therefore must pass this gate again as the real tool.
+    """
+    explicit_context = (_coerce_capability_context(capability_context)
+                        or _coerce_capability_context(capability_grant))
+    context = explicit_context or _tool_capability_context.get()
+    bridge = bridge or (context is not None and context.bridge) or _bridge_tool_dispatch.get()
+
+    inherited_only = False
+    try:
+        inherited_only = _is_delegated_child_context()
+    except Exception:
+        inherited_only = True
+    explicit_call_grant = (
+        capability_grant is not None or capability_context is not None
+        or enabled_tools is not None or toolsets_granted
+    )
+    if inherited_only or replay:
+        # ContextVars are copied into child/replay work.  A copied context is not a
+        # fresh grant, even when it contains the parent's internal/bridge marker.
+        if explicit_context is None:
+            context = None if not explicit_call_grant else (
+                replace(context, internal=False, bridge=False, replay=False) if context else None
+            )
+
+    # Explicit internal callers are trusted by the Python call site, never by model
+    # arguments. A bridge exception applies only to the protocol's own bridge names.
+    if internal or (context is not None and context.internal):
+        return None
+    is_bridge_call = function_name in _TOOL_SEARCH_BRIDGE_NAMES
+    if is_bridge_call:
+        if enabled_tools is not None and function_name not in enabled_tools:
+            return _tool_capability_denial(function_name, "the bridge tool was not published to this session")
+        if context is not None and context.allowed_tools is not None and function_name not in context.allowed_tools:
+            return _tool_capability_denial(function_name, "the bridge tool was not granted")
+        has_grant = (
+            enabled_tools is not None or toolsets_granted
+            or (context is not None and context.enabled_toolsets is not None)
+        )
+        return None if has_grant else _tool_capability_denial(
+            function_name, "the session capability grant is missing")
+
+    # Delegated children and replay workers may inherit ContextVars from their parent;
+    # inherited authority is not a grant. Their agent/runtime must bind an explicit
+    # enabled_tools/toolset surface on the actual call.
+
+    # Call arguments are authoritative for a dispatch; otherwise use the bound grant.
+    allowed = None
+    grant_enabled = enabled_toolsets
+    grant_disabled = disabled_toolsets
+    if enabled_tools is not None and not bridge:
+        allowed = frozenset(str(name) for name in enabled_tools)
+    elif context is not None and context.allowed_tools is not None and not bridge:
+        allowed = context.allowed_tools
+    if grant_enabled is None and context is not None:
+        grant_enabled = list(context.enabled_toolsets) if context.enabled_toolsets is not None else None
+        toolsets_granted = toolsets_granted or context.enabled_toolsets is not None
+    if grant_disabled is None and context is not None:
+        grant_disabled = list(context.disabled_toolsets)
+
+    selected = None
+    if toolsets_granted or grant_enabled is not None or grant_disabled:
+        selected = _select_tool_names(grant_enabled, grant_disabled, quiet_mode=True)
+
+    # Dynamic connector names are not registered in the local catalog. Their
+    # session grant is the stable `connections`/`manage_connections` capability;
+    # bridge validation still proves the concrete remote name before execution.
+    if function_name.startswith("connectors__"):
+        if bridge:
+            bridge_scope = _select_tool_names(grant_enabled, grant_disabled, quiet_mode=True)
+            if "manage_connections" in bridge_scope:
+                return None
+        has_connector_grant = (
+            (allowed is not None and "manage_connections" in allowed)
+            or (selected is not None and "manage_connections" in selected)
+        )
+        if not has_connector_grant:
+            return _tool_capability_denial(function_name, "the connector capability was not granted")
+        return None
+
+    if allowed is None and grant_enabled is None and not toolsets_granted:
+        return _tool_capability_denial(function_name, "the session capability grant is missing")
+    if allowed is not None and function_name not in allowed:
+        return _tool_capability_denial(function_name, "the tool was not granted")
+
+    if selected is not None:
+        if function_name not in selected:
+            return _tool_capability_denial(function_name, "its toolset is disabled or not granted")
+
+    # A replay context must carry an explicit grant even when a caller accidentally
+    # supplies only a session id. The flags are mainly useful to transports that bind
+    # a context object rather than passing the long argument list.
+    if replay or (context is not None and context.replay):
+        if not explicit_call_grant and context is None:
+            return _tool_capability_denial(function_name, "replay has no session capability grant")
+    return None
 
 
 # --- Tool error sanitization --------------------------------------------------
@@ -688,6 +917,9 @@ def _dispatch_bridge_tool(
     enabled_tools: Optional[List[str]],
     enabled_toolsets: Optional[List[str]],
     disabled_toolsets: Optional[List[str]],
+    capability_grant: Any = None,
+    capability_context: Any = None,
+    replay: bool = False,
 ):
     """Handle a Tool Search bridge call (tool_search / tool_describe / tool_call).
 
@@ -833,6 +1065,13 @@ def _execute_tool(function_name: str, function_args: Dict[str, Any], original_ar
         from tools.connectors import dispatch_connector_call, is_connector_name
         if is_connector_name(function_name):
             return dispatch_connector_call(function_name, next_args, ids.tool_call_id)
+        if function_name == "execute_code":
+            # The sandbox makes nested model_tools calls over its RPC channel. Carry
+            # the cell's already-frozen allow-list task-locally so those calls use
+            # the same authority without changing the kernel/RPC transport seam.
+            allowed = dispatch_kwargs.get("enabled_tools")
+            with tool_capability_context(allowed_tools=allowed, session_id=ids.session_id):
+                return registry.dispatch(function_name, next_args, **dispatch_kwargs)
         return registry.dispatch(function_name, next_args, **dispatch_kwargs)
 
     with _approval_observability(ids):
@@ -873,7 +1112,9 @@ def handle_function_call(
     api_request_id: Optional[str] = None, user_task: Optional[str] = None, enabled_tools: Optional[List[str]] = None,
     skip_pre_tool_call_hook: bool = False, skip_tool_request_middleware: bool = False,
     skip_tool_execution_middleware: bool = False, tool_request_middleware_trace: Optional[List[Dict[str, Any]]] = None,
-    enabled_toolsets: Optional[List[str]] = None, disabled_toolsets: Optional[List[str]] = None,
+    enabled_toolsets: Any = _UNSET_TOOLSET_GRANT, disabled_toolsets: Optional[List[str]] = None,
+    capability_grant: Any = None, capability_context: Any = None,
+    internal: bool = False, bridge: bool = False, replay: bool = False,
 ) -> str:
     """Route a tool call through hooks/middleware to the registry; returns a JSON string.
 
@@ -883,15 +1124,27 @@ def handle_function_call(
     Search uses it to preserve the session-frozen eager/deferred contract.
     skip_pre_tool_call_hook: caller already fired it (single-fire contract).
     enabled/disabled_toolsets scope the Tool Search bridge catalog to this session's
-    grant (None = unrestricted).
+    grant.  capability_grant/capability_context bind the same authority explicitly
+    for transports that do not carry the long toolset argument list.  Registry calls
+    fail closed without an authority; internal=True is reserved for trusted Python
+    call sites and bridge_tool_dispatch_context is the explicit validated bridge exception.
     """
     function_args = coerce_tool_args(function_name, function_args)
     if not isinstance(function_args, dict):
         function_args = {}
+    toolsets_granted = enabled_toolsets is not _UNSET_TOOLSET_GRANT
+    if not toolsets_granted:
+        enabled_toolsets = None
     trace = list(tool_request_middleware_trace or [])
     function_name = _LEGACY_TOOL_ALIASES.get(function_name, function_name)
     ids = _CallIds(task_id, session_id, tool_call_id, turn_id, api_request_id)
     start = time.monotonic()
+
+    # These names are intercepted by the agent executor and never reach the
+    # registry.  Keep the defensive stub reachable without a session grant; it
+    # cannot execute a handler and preserves the agent-loop ownership boundary.
+    if function_name in _AGENT_LOOP_TOOLS:
+        return tool_error(f"{function_name} must be handled by the agent loop")
 
     def _emit(result: Any, **extra: Any) -> Any:
         """Emit post_tool_call with this call's identity fields; returns *result*."""
@@ -899,11 +1152,30 @@ def handle_function_call(
                                   **asdict(ids), middleware_trace=list(trace), **extra)
         return result
 
+    if function_name in _TOOL_SEARCH_BRIDGE_NAMES:
+        capability_error = _authorize_registry_dispatch(
+            function_name,
+            enabled_tools=enabled_tools,
+            enabled_toolsets=enabled_toolsets,
+            toolsets_granted=toolsets_granted,
+            disabled_toolsets=disabled_toolsets,
+            capability_grant=capability_grant,
+            capability_context=capability_context,
+            internal=internal,
+            bridge=bridge,
+            replay=replay,
+        )
+        if capability_error is not None:
+            return _emit(capability_error, duration_ms=_elapsed_ms(start), status="blocked",
+                         error_type="tool_capability_denied",
+                         error_message="tool capability grant missing or insufficient")
+
     # Tool Search bridge: tool_search / tool_describe are catalog reads handled
     # inline; tool_call is unwrapped so every downstream hook (pre/post, edit
     # approval, guardrails) sees the real tool name, never the bridge.
-    bridged = _dispatch_bridge_tool(
-        function_name, function_args, enabled_tools, enabled_toolsets, disabled_toolsets
+    bridged = None if _bridge_tool_dispatch.get() else _dispatch_bridge_tool(
+        function_name, function_args, enabled_tools, enabled_toolsets, disabled_toolsets,
+        capability_grant=capability_grant, capability_context=capability_context, replay=replay,
     )
     if bridged is not None:
         result, underlying = bridged
@@ -911,17 +1183,21 @@ def handle_function_call(
             return _emit(result, duration_ms=_elapsed_ms(start))
         from tools.connectors import CONNECTOR_BATCH_SENTINEL, dispatch_connector_batch
         if underlying[0] == CONNECTOR_BATCH_SENTINEL:
-            return _emit(dispatch_connector_batch(
-                underlying[1]["calls"], ids, user_task=user_task,
-                enabled_tools=enabled_tools, middleware_trace=trace,
+            with bridge_tool_dispatch_context():
+                return _emit(dispatch_connector_batch(
+                    underlying[1]["calls"], ids, user_task=user_task,
+                    enabled_tools=enabled_tools, middleware_trace=trace,
+                    enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
+                ), duration_ms=_elapsed_ms(start))
+        with bridge_tool_dispatch_context():
+            return handle_function_call(
+                *underlying, **asdict(ids), user_task=user_task, enabled_tools=enabled_tools,
+                skip_pre_tool_call_hook=skip_pre_tool_call_hook, skip_tool_request_middleware=skip_tool_request_middleware,
+                skip_tool_execution_middleware=skip_tool_execution_middleware, tool_request_middleware_trace=list(trace),
                 enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
-            ), duration_ms=_elapsed_ms(start))
-        return handle_function_call(
-            *underlying, **asdict(ids), user_task=user_task, enabled_tools=enabled_tools,
-            skip_pre_tool_call_hook=skip_pre_tool_call_hook, skip_tool_request_middleware=skip_tool_request_middleware,
-            skip_tool_execution_middleware=skip_tool_execution_middleware, tool_request_middleware_trace=list(trace),
-            enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
-        )
+                capability_grant=capability_grant, capability_context=capability_context, replay=replay,
+                internal=internal,
+            )
 
     from tools.connectors import is_connector_name
     from tools.connectors.gateway.names import parse_connector_name
@@ -931,14 +1207,31 @@ def handle_function_call(
         if is_connector_name(function_name) and parse_connector_name(function_name) is None:
             return _emit(tool_error("Malformed connector tool name; expected connectors__<connector>__<tool>."))
 
+    # The bridge protocol has already checked its session-scoped catalog and its
+    # recursive target is checked again at the handler boundary. Apply the grant
+    # before request hooks or I/O.
+    capability_error = _authorize_registry_dispatch(
+        function_name,
+        enabled_tools=enabled_tools,
+        enabled_toolsets=enabled_toolsets,
+        toolsets_granted=toolsets_granted,
+        disabled_toolsets=disabled_toolsets,
+        capability_grant=capability_grant,
+        capability_context=capability_context,
+        internal=internal,
+        bridge=bridge,
+        replay=replay,
+    )
+    if capability_error is not None:
+        return _emit(capability_error, duration_ms=_elapsed_ms(start), status="blocked",
+                     error_type="tool_capability_denied",
+                     error_message="tool capability grant missing or insufficient")
+
     original_args = dict(function_args)
     if not skip_tool_request_middleware:
         function_args, original_args, trace = _apply_request_middleware(function_name, function_args, ids, trace)
 
     try:
-        if function_name in _AGENT_LOOP_TOOLS:
-            return tool_error(f"{function_name} must be handled by the agent loop")
-
         function_args, blocked = _pre_dispatch_guards(function_name, function_args, skip_pre_tool_call_hook, ids, trace)
         if blocked is not None:
             result, error_type, error_message = blocked

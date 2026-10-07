@@ -19,7 +19,8 @@ def dispatch_connector_call(name, arguments, tool_call_id):
 
 
 def dispatch_connector_batch(calls, ids, *, user_task, enabled_tools,
-                             middleware_trace, enabled_toolsets, disabled_toolsets):
+                             middleware_trace, enabled_toolsets, disabled_toolsets,
+                             capability_grant=None, capability_context=None):
     from model_tools import handle_function_call
     from tools.interrupt import is_interrupted
 
@@ -38,13 +39,16 @@ def dispatch_connector_batch(calls, ids, *, user_task, enabled_tools,
                 code="INTERRUPTED"))
             break
         # Each entry must run its own policy and middleware.
-        payload = handle_function_call(
-            plan.name, plan.arguments, **asdict(ids), user_task=user_task,
-            enabled_tools=enabled_tools, tool_request_middleware_trace=list(middleware_trace),
-            skip_pre_tool_call_hook=False, skip_tool_request_middleware=False,
-            skip_tool_execution_middleware=False,
-            enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
-        )
+        from model_tools import bridge_tool_dispatch_context
+        with bridge_tool_dispatch_context():
+            payload = handle_function_call(
+                plan.name, plan.arguments, **asdict(ids), user_task=user_task,
+                enabled_tools=enabled_tools, tool_request_middleware_trace=list(middleware_trace),
+                skip_pre_tool_call_hook=False, skip_tool_request_middleware=False,
+                skip_tool_execution_middleware=False,
+                enabled_toolsets=enabled_toolsets, disabled_toolsets=disabled_toolsets,
+                capability_grant=capability_grant, capability_context=capability_context,
+            )
         try:
             value = json.loads(payload) if isinstance(payload, str) else payload
         except ValueError:
