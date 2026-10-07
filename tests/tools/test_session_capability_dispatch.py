@@ -48,6 +48,23 @@ def test_direct_hidden_tool_dispatch_fails_closed_without_grant(registered_tool)
     assert calls == []
 
 
+def test_missing_grant_blocks_before_request_middleware_or_handler(registered_tool, monkeypatch):
+    import model_tools
+
+    name, calls = registered_tool
+    request_calls = []
+    monkeypatch.setattr(
+        model_tools,
+        "_apply_request_middleware",
+        lambda *args: request_calls.append(args) or ({}, {}, []),
+    )
+    result = json.loads(model_tools.handle_function_call(name, {}, session_id="session-a"))
+
+    assert "not authorized" in result["error"]
+    assert request_calls == []
+    assert calls == []
+
+
 def test_grant_dispatches_but_disabled_toolset_still_denies(registered_tool):
     import model_tools
 
@@ -101,6 +118,24 @@ def test_delegated_child_does_not_inherit_parent_capability_context(registered_t
     assert calls == []
 
 
+def test_delegated_child_toolset_grant_does_not_reuse_parent_allow_list(registered_tool):
+    import model_tools
+    from agent.delegation_context import delegated_child_context
+
+    name, calls = registered_tool
+    with model_tools.tool_capability_context(allowed_tools=[name], session_id="parent"):
+        with delegated_child_context("child"):
+            result = json.loads(model_tools.handle_function_call(
+                name,
+                {},
+                session_id="child",
+                enabled_toolsets=["safe"],
+            ))
+
+    assert "not authorized" in result["error"]
+    assert calls == []
+
+
 def test_replay_requires_an_explicit_capability_grant(registered_tool):
     import model_tools
 
@@ -124,6 +159,19 @@ def test_replay_requires_an_explicit_capability_grant(registered_tool):
     assert len(calls) == 1
 
 
+def test_bound_capability_context_cannot_authorize_a_different_session(registered_tool):
+    import model_tools
+
+    name, calls = registered_tool
+    with model_tools.tool_capability_context(allowed_tools=[name], session_id="session-a"):
+        result = json.loads(model_tools.handle_function_call(
+            name, {}, session_id="session-b",
+        ))
+
+    assert "different session" in result["error"]
+    assert calls == []
+
+
 def test_bridge_unwrap_is_explicit_exception_but_direct_hidden_call_is_not(monkeypatch, registered_tool):
     import model_tools
 
@@ -138,7 +186,25 @@ def test_bridge_unwrap_is_explicit_exception_but_direct_hidden_call_is_not(monke
             {"name": name},
             session_id="session-a",
             enabled_tools=["tool_call"],
+            enabled_toolsets=[_TOOLSET],
         ))
+
+    assert result == {"ok": True}
+    assert len(calls) == 1
+
+
+def test_validated_bridge_marker_allows_deferred_target_outside_eager_surface(registered_tool):
+    import model_tools
+
+    name, calls = registered_tool
+    result = json.loads(model_tools.handle_function_call(
+        name,
+        {},
+        session_id="session-a",
+        enabled_tools=["tool_call"],
+        enabled_toolsets=[_TOOLSET],
+        bridge=True,
+    ))
 
     assert result == {"ok": True}
     assert len(calls) == 1

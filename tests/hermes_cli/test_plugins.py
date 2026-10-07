@@ -1431,6 +1431,7 @@ class TestForceReloadSymmetry:
                 {"query": "test"},
                 task_id="t1",
                 session_id="s1",
+                enabled_tools=["web_search"],
             )
 
         assert dispatch_calls == []

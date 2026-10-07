@@ -2109,6 +2109,14 @@ class TestConcurrentToolExecution:
             )
             assert result == "result"
 
+    def test_invoke_tool_marks_validated_bridge_unwrap(self, agent):
+        """A deferred target stays authorized after the executor unwraps tool_call."""
+        with patch("model_tools.handle_function_call", return_value="result") as mock_hfc:
+            result = agent._invoke_tool("mcp_hidden_tool", {}, "task-1", bridge_unwrapped=True)
+
+        assert result == "result"
+        assert mock_hfc.call_args.kwargs["bridge"] is True
+
     def test_sequential_tool_callbacks_fire_in_order(self, agent):
         tool_call = _mock_tool_call(name="web_search", arguments='{"query":"hello"}', call_id="c1")
         mock_msg = _mock_assistant_msg(content="", tool_calls=[tool_call])

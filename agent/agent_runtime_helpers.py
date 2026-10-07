@@ -2241,7 +2241,8 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
                  pre_tool_block_checked: bool = False,
                  skip_tool_request_middleware: bool = False,
                  tool_request_middleware_trace: Optional[List[Dict[str, Any]]] = None,
-                 skip_tool_execution_middleware: bool = False) -> str:
+                 skip_tool_execution_middleware: bool = False,
+                 bridge_unwrapped: bool = False) -> str:
     """Invoke a single tool (agent-level or registry-dispatched) and return the result string;
     no display logic. Used by the concurrent path; the sequential path keeps its own inline
     invocation for display."""
@@ -2297,7 +2298,10 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
                 tool_call_id=tool_call_id, session_id=agent.session_id or "",
                 turn_id=getattr(agent, "_current_turn_id", "") or "",
                 api_request_id=getattr(agent, "_current_api_request_id", "") or "",
-                enabled_tools=list(agent.valid_tool_names) if agent.valid_tool_names else None,
+                # An empty frozen session surface is still an explicit deny-all
+                # grant. Passing None here would turn it into an unrestricted
+                # dispatcher call and let a stale tool name run.
+                enabled_tools=list(agent.valid_tool_names or []),
                 skip_pre_tool_call_hook=True, skip_tool_request_middleware=True,
                 enabled_toolsets=getattr(agent, "enabled_toolsets", None),
                 disabled_toolsets=getattr(agent, "disabled_toolsets", None),
@@ -2305,6 +2309,8 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
             )
             if skip_tool_execution_middleware:
                 dispatch_kwargs["skip_tool_execution_middleware"] = True
+            if bridge_unwrapped:
+                dispatch_kwargs["bridge"] = True
             import model_tools
             return model_tools.handle_function_call(function_name, next_args, effective_task_id, **dispatch_kwargs)
     if skip_tool_execution_middleware:

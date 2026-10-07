@@ -60,6 +60,7 @@ def test_requester_exception_denies_and_does_not_mutate(tmp_path):
             "write_file",
             {"path": str(target), "content": "after\n"},
             task_id="acp-edit-exception",
+            enabled_tools=["write_file"],
         )
     )
 
@@ -84,6 +85,7 @@ def test_patch_replace_rejection_does_not_mutate(tmp_path):
                 "new_string": "gamma\n",
             },
             task_id="acp-patch-reject",
+            enabled_tools=["patch"],
         )
     )
 

@@ -47,6 +47,7 @@ def _run_handle_function_call(
         task_id="t1",
         session_id="s1",
         tool_call_id="tc1",
+        internal=True,
         skip_pre_tool_call_hook=True,
     )
 

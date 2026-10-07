@@ -489,6 +489,7 @@ class TestHandleFunctionCallIntegration:
         result = model_tools.handle_function_call(
             function_name="tool_search",
             function_args={"queries": ["nothing matches this"]},
+            internal=True,
         )
         parsed = json.loads(result)
         # Without a real registry, the matches will be empty, but the
@@ -526,6 +527,7 @@ class TestHandleFunctionCallIntegration:
             turn_id="private-turn",
             api_request_id="private-request",
             tool_call_id="private-call",
+            internal=True,
         )
 
         assert json.loads(result) == {"results": []}
