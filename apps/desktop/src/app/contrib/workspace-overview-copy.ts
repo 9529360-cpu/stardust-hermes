@@ -40,6 +40,12 @@ export interface WorkspaceOverviewCopy {
   needsAttention: string
   reviewQueue: string
   noNeedsAttention: string
+  taskDetails: string
+  taskContext: string
+  taskFolder: string
+  taskLifetime: string
+  taskProcess: string
+  taskArtifacts: string
   summaryWorkingClean: string
   summaryReadyClean: string
   syncValue: (ahead: number, behind: number) => string
@@ -91,6 +97,12 @@ const en: WorkspaceOverviewCopy = {
   needsAttention: 'Needs attention',
   reviewQueue: 'Review queue',
   noNeedsAttention: 'No tasks need attention.',
+  taskDetails: 'Task details',
+  taskContext: 'Task context',
+  taskFolder: 'Folder',
+  taskLifetime: 'Lifetime',
+  taskProcess: 'Process',
+  taskArtifacts: 'Files',
   summaryWorkingClean: 'Work is in progress. File changes will appear here as soon as they land.',
   summaryReadyClean: 'The workspace is clean and ready for the next task.',
   syncValue: (ahead, behind) => `${ahead} ahead · ${behind} behind`,
@@ -143,6 +155,12 @@ const zh: WorkspaceOverviewCopy = {
   needsAttention: '需要关注',
   reviewQueue: '审查队列',
   noNeedsAttention: '目前没有需要关注的任务。',
+  taskDetails: '任务详情',
+  taskContext: '任务上下文',
+  taskFolder: '文件夹',
+  taskLifetime: '生命周期',
+  taskProcess: '进程',
+  taskArtifacts: '产物文件',
   summaryWorkingClean: '任务正在进行，文件改动落地后会显示在这里。',
   summaryReadyClean: '工作区干净，可以开始下一个任务。',
   syncValue: (ahead, behind) => `超前 ${ahead} · 落后 ${behind}`,
@@ -194,6 +212,12 @@ const zhHant: WorkspaceOverviewCopy = {
   needsAttention: '需要關注',
   reviewQueue: '審查佇列',
   noNeedsAttention: '目前沒有需要關注的任務。',
+  taskDetails: '任務詳情',
+  taskContext: '任務上下文',
+  taskFolder: '資料夾',
+  taskLifetime: '生命週期',
+  taskProcess: '程序',
+  taskArtifacts: '產出檔案',
   summaryWorkingClean: '工作正在進行，檔案變更出現後會顯示在這裡。',
   summaryReadyClean: '工作區乾淨，可以開始下一個任務。',
   syncValue: (ahead, behind) => `超前 ${ahead} · 落後 ${behind}`,
@@ -245,6 +269,12 @@ const ja: WorkspaceOverviewCopy = {
   needsAttention: '要対応',
   reviewQueue: 'レビューキュー',
   noNeedsAttention: '要対応のタスクはありません。',
+  taskDetails: 'タスクの詳細',
+  taskContext: 'タスクのコンテキスト',
+  taskFolder: 'フォルダー',
+  taskLifetime: '存続期間',
+  taskProcess: 'プロセス',
+  taskArtifacts: 'ファイル',
   summaryWorkingClean: '作業中です。ファイル変更は反映され次第ここに表示されます。',
   summaryReadyClean: 'ワークスペースはクリーンで、次のタスクを開始できます。',
   syncValue: (ahead, behind) => `${ahead} ahead · ${behind} behind`,
@@ -296,6 +326,12 @@ const ru: WorkspaceOverviewCopy = {
   needsAttention: 'Требуют внимания',
   reviewQueue: 'Очередь проверки',
   noNeedsAttention: 'Нет задач, требующих внимания.',
+  taskDetails: 'Сведения о задаче',
+  taskContext: 'Контекст задачи',
+  taskFolder: 'Папка',
+  taskLifetime: 'Срок жизни',
+  taskProcess: 'Процесс',
+  taskArtifacts: 'Файлы',
   summaryWorkingClean: 'Работа продолжается. Изменения файлов появятся здесь сразу после записи.',
   summaryReadyClean: 'Рабочая область чистая и готова к следующей задаче.',
   syncValue: (ahead, behind) => `впереди ${ahead} · позади ${behind}`,
@@ -347,6 +383,12 @@ const ar: WorkspaceOverviewCopy = {
   needsAttention: 'يحتاج إلى انتباه',
   reviewQueue: 'قائمة المراجعة',
   noNeedsAttention: 'لا توجد مهام تحتاج إلى انتباه.',
+  taskDetails: 'تفاصيل المهمة',
+  taskContext: 'سياق المهمة',
+  taskFolder: 'المجلد',
+  taskLifetime: 'مدة المهمة',
+  taskProcess: 'العملية',
+  taskArtifacts: 'الملفات',
   summaryWorkingClean: 'العمل جارٍ. ستظهر تغييرات الملفات هنا فور تسجيلها.',
   summaryReadyClean: 'مساحة العمل نظيفة وجاهزة للمهمة التالية.',
   syncValue: (ahead, behind) => `${ahead} متقدم · ${behind} متأخر`,

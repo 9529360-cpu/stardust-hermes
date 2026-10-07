@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { openAgentTerminal } from '@/app/right-sidebar/terminal/terminals'
@@ -9,6 +9,7 @@ import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { EmptyState } from '@/components/ui/empty-state'
+import { RowButton } from '@/components/ui/row-button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Textarea } from '@/components/ui/textarea'
 import { Slot } from '@/contrib/react/slot'
@@ -169,6 +170,141 @@ function TaskPullRequestChecksBadge({
   return state ? <PrChecksBadge compact state={state} /> : null
 }
 
+function taskActionLabel(
+  task: TaskCenterTask,
+  labels: {
+    manageTask: string
+    openBesideTask: string
+    openTask: string
+    reviewTask: string
+    stopTask: string
+  }
+): string {
+  if (task.action === 'stop-process') {
+    return labels.stopTask
+  }
+
+  if (task.action === 'manage-cron') {
+    return labels.manageTask
+  }
+
+  if (task.action === 'review-cron-suggestion') {
+    return labels.reviewTask
+  }
+
+  return task.action === 'open-session' && task.rail !== 'subagent' ? labels.openBesideTask : labels.openTask
+}
+
+interface TaskCenterDetailProps {
+  activityStatusLabel: string
+  actionLabel?: string
+  durabilityLabel?: string
+  onAction?: () => void
+  task: TaskCenterTask
+  labels: {
+    taskArtifacts: string
+    taskBranch: string
+    taskContext: string
+    taskDetails: string
+    taskFolder: string
+    taskLifetime: string
+    taskProcess: string
+    taskProject: string
+    taskSession: string
+    taskWorktree: string
+  }
+}
+
+function TaskCenterDetail({
+  activityStatusLabel,
+  actionLabel,
+  durabilityLabel,
+  labels,
+  onAction,
+  task
+}: TaskCenterDetailProps) {
+  const contextRows = [
+    task.sessionId || task.ownerSessionId
+      ? { label: labels.taskSession, value: task.sessionId ?? task.ownerSessionId }
+      : null,
+    task.workspace?.project ? { label: labels.taskProject, value: task.workspace.project } : null,
+    task.workspace?.worktree ? { label: labels.taskWorktree, value: task.workspace.worktree } : null,
+    task.workspace?.branch ? { label: labels.taskBranch, value: task.workspace.branch } : null,
+    task.workspace?.cwd ? { label: labels.taskFolder, value: task.workspace.cwd } : null,
+    task.processId ? { label: labels.taskProcess, value: task.processId } : null,
+    durabilityLabel ? { label: labels.taskLifetime, value: durabilityLabel } : null
+  ].filter((row): row is { label: string; value: string } => Boolean(row))
+
+  return (
+    <div className="mt-2 border-t border-(--ui-stroke-tertiary) pt-2" data-task-center-detail={task.id}
+      data-testid="task-center-detail">
+      <div className={cn('mb-2', META_CLASS)}>{labels.taskDetails}</div>
+      <div className="flex items-start gap-2">
+        <Codicon
+          className={cn(
+            'mt-1 shrink-0',
+            task.status === 'running'
+              ? 'text-(--theme-primary)'
+              : task.status === 'waiting' || task.status === 'error' || task.status === 'interrupted'
+                ? 'text-(--ui-text-secondary)'
+                : 'text-(--ui-text-tertiary)'
+          )}
+          name={activityIcon(task.status)}
+          size="0.8125rem"
+          spinning={task.status === 'running'}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="text-[0.75rem] font-medium leading-5 text-(--ui-text-primary)">{task.label}</div>
+          <div className={META_CLASS}>
+            {activityStatusLabel}
+            {durabilityLabel && (
+              <>
+                <span aria-hidden> · </span>
+                {durabilityLabel}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {task.detail && <p className={cn('mt-2 whitespace-pre-wrap break-words', BODY_CLASS)}>{task.detail}</p>}
+
+      {contextRows.length > 0 && (
+        <div className="mt-3">
+          <div className={cn('mb-1', META_CLASS)}>{labels.taskContext}</div>
+          <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-[0.6875rem] leading-4">
+            {contextRows.map(row => (
+              <div className="contents" key={row.label}>
+                <dt className="truncate text-(--ui-text-quaternary)">{row.label}</dt>
+                <dd className="min-w-0 break-all text-(--ui-text-secondary)">{row.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+
+      {task.artifactRefs && task.artifactRefs.length > 0 && (
+        <div className="mt-3">
+          <div className={cn('mb-1', META_CLASS)}>{labels.taskArtifacts}</div>
+          <ul className="space-y-0.5 text-[0.6875rem] leading-4 text-(--ui-text-secondary)">
+            {task.artifactRefs.map(ref => (
+              <li className="break-all" key={ref}>
+                {ref}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {actionLabel && onAction && (
+        <Button className="mt-3" onClick={onAction} size="xs" variant="secondary">
+          {actionLabel}
+        </Button>
+      )}
+    </div>
+  )
+}
+
 function UnifiedInputCard({ task, gateway }: { task: TaskCenterTask; gateway: Parameters<typeof answerApproval>[0] }) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
@@ -236,6 +372,7 @@ export function WorkspaceOverview() {
   const navigate = useNavigate()
   const copy = WORKSPACE_OVERVIEW_COPY[locale]
   const [taskCenterView, setTaskCenterView] = useState<TaskCenterView>('all')
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
 
   const systemLabels =
     locale === 'zh'
@@ -258,6 +395,16 @@ export function WorkspaceOverview() {
           durabilityTurn: '当前回合',
           durabilityProcess: '进程内',
           durabilityRestart: '可跨重启',
+          taskDetails: '任务详情',
+          taskContext: '任务上下文',
+          taskFolder: '文件夹',
+          taskLifetime: '生命周期',
+          taskProcess: '进程',
+          taskArtifacts: '产物文件',
+          taskBranch: '分支',
+          taskProject: '项目',
+          taskSession: '会话',
+          taskWorktree: '工作树',
           openTask: '打开',
           openBesideTask: '在旁边打开',
           reviewTask: '查看',
@@ -291,6 +438,16 @@ export function WorkspaceOverview() {
             durabilityTurn: '目前回合',
             durabilityProcess: '程序內',
             durabilityRestart: '可跨重啟',
+            taskDetails: '任務詳情',
+            taskContext: '任務上下文',
+            taskFolder: '資料夾',
+            taskLifetime: '生命週期',
+            taskProcess: '程序',
+            taskArtifacts: '產出檔案',
+            taskBranch: '分支',
+            taskProject: '專案',
+            taskSession: '工作階段',
+            taskWorktree: '工作樹',
             openTask: '打開',
             openBesideTask: '在旁邊開啟',
             reviewTask: '檢視',
@@ -325,6 +482,16 @@ export function WorkspaceOverview() {
             durabilityTurn: 'Current turn',
             durabilityProcess: 'Process-local',
             durabilityRestart: 'Restart-durable',
+            taskDetails: 'Task details',
+            taskContext: 'Task context',
+            taskFolder: 'Folder',
+            taskLifetime: 'Lifetime',
+            taskProcess: 'Process',
+            taskArtifacts: 'Files',
+            taskBranch: 'Branch',
+            taskProject: 'Project',
+            taskSession: 'Session',
+            taskWorktree: 'Worktree',
             openTask: 'Open',
             openBesideTask: 'Open beside',
             reviewTask: 'Review',
@@ -544,6 +711,14 @@ export function WorkspaceOverview() {
       : currentActivityTaskId
         ? filteredActivityTasks.filter(task => task.id !== currentActivityTaskId)
         : filteredActivityTasks
+  const visibleActivityTasks = secondaryActivityTasks.slice(0, 10)
+  const selectedTask = visibleActivityTasks.find(task => task.id === selectedTaskId)
+
+  useEffect(() => {
+    if (selectedTaskId && !selectedTask) {
+      setSelectedTaskId(null)
+    }
+  }, [selectedTask, selectedTaskId])
 
   const showTaskCenterSection =
     secondaryActivityTasks.length > 0 || (taskCenterView === 'needs-attention' && activityTasks.length > 0)
@@ -564,7 +739,7 @@ export function WorkspaceOverview() {
     turn: systemLabels.durabilityTurn
   } as const
 
-  const handleTaskAction = (task: (typeof secondaryActivityTasks)[number]) => {
+  const handleTaskAction = (task: TaskCenterTask) => {
     if (task.action === 'open-session' && task.sessionId) {
       if (task.rail === 'subagent') {
         void openSessionInNewWindow(task.sessionId, { watch: true })
@@ -698,9 +873,12 @@ export function WorkspaceOverview() {
               </div>
               {secondaryActivityTasks.length > 0 ? (
                 <ul className="-mx-2 flex flex-col">
-                {secondaryActivityTasks.slice(0, 10).map(task => (
+                {visibleActivityTasks.map(task => (
                   <li
-                    className="flex min-w-0 items-start gap-2.5 rounded-lg px-2 py-1.5"
+                    className={cn(
+                      'flex min-w-0 items-start gap-2.5 rounded-lg px-2 py-1.5',
+                      selectedTaskId === task.id && 'bg-(--ui-bg-quaternary)'
+                    )}
                     data-agent-activity-task=""
                     key={task.id}
                     style={{ paddingLeft: task.depth ? `${0.5 + task.depth * 0.65}rem` : undefined }}
@@ -719,9 +897,17 @@ export function WorkspaceOverview() {
                       spinning={task.status === 'running'}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[0.75rem] font-medium leading-5 text-(--ui-text-primary)">
-                        {task.label}
-                      </div>
+                      <RowButton
+                        aria-expanded={selectedTaskId === task.id}
+                        className="-mx-1 w-full min-w-0 px-1 text-left"
+                        onClick={() => setSelectedTaskId(current => (current === task.id ? null : task.id))}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[0.75rem] font-medium leading-5 text-(--ui-text-primary)">
+                            {task.label}
+                          </div>
+                        </div>
+                      </RowButton>
                       <TaskPullRequestChecksBadge
                         pullRequestChecksByPr={pullRequestChecksByPr}
                         pullRequestsByBranch={pullRequestsByBranch}
@@ -776,21 +962,16 @@ export function WorkspaceOverview() {
                             .join(' · ')}
                         </div>
                       )}
-                      <div className={cn('mt-0.5 flex min-w-0 items-center gap-1', META_CLASS)}>
-                        <span>{activityStatusLabels[task.status]}</span>
-                        {task.durability && (
-                          <>
-                            <span aria-hidden>·</span>
-                            <span>{durabilityLabels[task.durability]}</span>
-                          </>
-                        )}
-                        {task.artifactRefs?.length ? (
-                          <>
-                            <span aria-hidden>·</span>
-                            <span>{systemLabels.activityFiles(task.artifactRefs.length)}</span>
-                          </>
-                        ) : null}
-                      </div>
+                      {selectedTaskId === task.id && (
+                        <TaskCenterDetail
+                          actionLabel={task.action ? taskActionLabel(task, systemLabels) : undefined}
+                          activityStatusLabel={activityStatusLabels[task.status]}
+                          durabilityLabel={task.durability ? durabilityLabels[task.durability] : undefined}
+                          labels={systemLabels}
+                          onAction={task.action ? () => handleTaskAction(task) : undefined}
+                          task={task}
+                        />
+                      )}
                     </div>
                     {task.clarifyRequest || task.approvalRequest ? (
                       <UnifiedInputCard gateway={gateway} task={task} />
