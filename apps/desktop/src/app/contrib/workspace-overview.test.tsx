@@ -127,6 +127,18 @@ describe('WorkspaceOverview (context rail)', () => {
     expect(screen.queryAllByText('pytest passed')).toHaveLength(0)
   })
 
+  it('drills into a Task Center item without losing its existing action', () => {
+    $backgroundStatusBySession.set({
+      runtime: [{ id: 'failed', state: 'failed', title: 'pytest failed', type: 'background', exitCode: 1 }]
+    })
+    renderOverview('en')
+
+    fireEvent.click(screen.getByRole('button', { name: 'pytest failed' }))
+
+    expect(screen.getByTestId('task-center-detail')).toBeTruthy()
+    expect(screen.getByText('Task details')).toBeTruthy()
+    expect(screen.getByText('Process-local')).toBeTruthy()
+  })
   it('opens a session beside the current work when the Task Center action is used', () => {
     $selectedStoredSessionId.set('other')
     $sessionStates.set({ runtime: { storedSessionId: 'tip', needsInput: true } as never })
