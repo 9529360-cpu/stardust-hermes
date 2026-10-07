@@ -100,29 +100,53 @@ class TestBrowserConsole:
         assert result["result"].startswith("ghp_")
 
 
-    def test_expression_allows_risky_eval_by_default(self):
-        """The sensitive-primitive denylist is opt-in — default config runs everything.
+    _RISKY_EXPRESSIONS = [
+        "document.cookie",
+        "fetch('/api/me')",
+        "localStorage.getItem('token')",
+        "document.querySelector('input[type=password]').value",
+        "document.querySelector('#fetch-results').innerText",
+    ]
 
-        The names-based denylist blocked legitimate DOM extraction (any selector
-        or expression containing 'fetch'/'cookie'/'input' etc.), so it is off
-        unless browser.restrict_evaluate is set. Egress to private addresses is
-        still guarded separately in _browser_eval.
-        """
+    def test_local_sidecar_eval_keeps_compatibility_without_approval(self):
+        """Local sidecars keep the compatibility behavior: risky expressions run without the approval gate."""
         from tools.browser_tool import browser_console
 
-        expressions = [
-            "document.cookie",
-            "fetch('/api/me')",
-            "localStorage.getItem('token')",
-            "document.querySelector('input[type=password]').value",
-            "document.querySelector('#fetch-results').innerText",
-        ]
-        with patch("tools.browser_tool._browser_eval", return_value=json.dumps({"success": True, "result": "ok"})) as mock_eval:
-            for expr in expressions:
+        with patch("tools.browser_tool_cloud._is_local_backend", return_value=True), \
+             patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
+             patch("tools.browser_tool._browser_eval", return_value=json.dumps({"success": True, "result": "ok"})) as mock_eval, \
+             patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
+            for expr in self._RISKY_EXPRESSIONS:
                 result = json.loads(browser_console(expression=expr, task_id="test"))
                 assert result == {"success": True, "result": "ok"}, expr
 
-        assert mock_eval.call_count == len(expressions)
+        assert mock_eval.call_count == len(self._RISKY_EXPRESSIONS)
+        approve.assert_not_called()
+
+    def test_cloud_sensitive_eval_is_approval_gated(self):
+        from tools.browser_tool import browser_console
+
+        with patch("tools.browser_tool_cloud._is_local_backend", return_value=False), \
+             patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
+             patch("tools.browser_tool._browser_eval", return_value=json.dumps({"success": True, "result": "ok"})) as mock_eval, \
+             patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
+            for expr in self._RISKY_EXPRESSIONS:
+                result = json.loads(browser_console(expression=expr, task_id="test"))
+                assert result == {"success": True, "result": "ok"}, expr
+
+        assert approve.call_count == len(self._RISKY_EXPRESSIONS)
+        assert mock_eval.call_count == len(self._RISKY_EXPRESSIONS)
+
+    def test_sensitive_eval_denial_does_not_execute(self):
+        from tools.browser_tool import browser_console
+        with patch("tools.browser_tool_cloud._is_local_backend", return_value=False), \
+             patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
+             patch("tools.approval.request_tool_approval", return_value={"approved": False, "message": "denied"}), \
+             patch("tools.browser_tool._browser_eval") as mock_eval:
+            result = json.loads(browser_console(expression="document.cookie", task_id="test"))
+        assert result["success"] is False
+        assert result["error"] == "denied"
+        mock_eval.assert_not_called()
 
     def test_expression_blocks_cookie_access_before_eval(self):
         from tools.browser_tool import browser_console
@@ -168,7 +192,9 @@ class TestBrowserConsole:
         with patch("hermes_cli.config.read_raw_config", return_value={"browser": {"restrict_evaluate": False}}):
             assert _restrict_browser_evaluate() is False
         # Default (key absent) is off — the denylist is opt-in.
-        with patch("hermes_cli.config.read_raw_config", return_value={}):
+        with patch("hermes_cli.config.read_raw_config", return_value={}), \
+             patch("tools.browser_tool_cloud._is_local_backend", return_value=True), \
+             patch("tools.browser_tool_cloud._use_real_profile", return_value=False):
             assert _restrict_browser_evaluate() is False
 
 

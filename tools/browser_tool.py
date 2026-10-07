@@ -1007,7 +1007,12 @@ def browser_console(clear: bool = False, expression: Optional[str] = None, task_
     if expression is not None:
         policy_error = _eval_policy._enforce_browser_eval_policy(expression)
         if policy_error:
-            return _dumps(_err(policy_error))
+            from tools.approval import request_tool_approval
+            approval = request_tool_approval(
+                "browser_console", policy_error, rule_key="browser_console_sensitive_eval"
+            )
+            if not approval.get("approved"):
+                return _dumps(_err(approval.get("message") or policy_error))
         return _browser_eval(expression, task_id)
 
     if _is_camofox_mode():

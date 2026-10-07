@@ -102,7 +102,14 @@ def _restrict_browser_evaluate() -> bool:
     by the SSRF/private-URL guards in ``_browser_eval`` regardless. Opt in via
     ``browser.restrict_evaluate: true`` (e.g. hostile pages with a logged-in profile).
     """
-    return _browser_eval_flag("restrict_evaluate")
+    if _browser_eval_flag("restrict_evaluate"):
+        return True
+    # Cloud and real-profile pages may contain authenticated data. Local
+    # sidecars retain the compatibility opt-in behavior.
+    try:
+        return not _cloud._is_local_backend() or bool(_cloud._use_real_profile())
+    except Exception:
+        return True
 
 
 def _decode_js_string_literal(literal: str) -> str:

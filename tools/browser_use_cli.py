@@ -84,6 +84,7 @@ _STDERR_CAP_CHARS = 4000
 _EXEC_ERROR_TYPES = frozenset({
     "invalid_request", "unsafe_url", "cli_unavailable", "invalid_session",
     "backend_unavailable", "timeout", "launch_failed", "process_failed",
+    "approval_denied",
 })
 
 
@@ -627,12 +628,29 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
 
     Every failure includes ``success: false``, ``error``, and ``error_type``;
     successful results retain the existing output/session/workspace fields.
+
+    The CLI runs arbitrary Python on the agent host, and Browser Use's browser
+    isolation does not sandbox that interpreter, so every call needs explicit
+    human approval (the same gate as sensitive page evaluation).
     """
+    from tools.approval import request_tool_approval
     from tools.registry import tool_result
     if not code or not code.strip():
         return _browser_exec_error(
             "No code provided. Pass Python that uses the pre-imported helpers, e.g. new_tab(\"https://example.com\") then print(page_info()).",
             "invalid_request",
+        )
+
+    preview = " ".join(code.split())[:200]
+    approval = request_tool_approval(
+        "browser_exec",
+        f"browser_exec wants to run Python on this machine through the browser-use CLI: {preview}",
+        rule_key="browser_exec_host_python",
+    )
+    if not approval.get("approved"):
+        return _browser_exec_error(
+            approval.get("message") or "browser_exec was not approved to run on this machine.",
+            "approval_denied",
         )
 
     blocked = _blocked_url_in_code(code)
