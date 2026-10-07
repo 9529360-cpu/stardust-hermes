@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 import { sessionTitle } from '@/lib/chat-runtime'
 import type { PreviewServerRestart } from '@/store/preview'
 import { sessionMatchesStoredId } from '@/store/session'
-import type { ActionStatusResponse, CronJob, SessionInfo } from '@/types/hermes'
+import type { ActionStatusResponse, CronJob, CronSuggestion, SessionInfo } from '@/types/hermes'
 
 import type { ClarifyRequest } from './clarify'
 import type { ComposerStatusItem } from './composer-status'
@@ -126,7 +126,11 @@ function prune(tasks: Record<string, DesktopActionTask>): Record<string, Desktop
 export type TaskCenterStatus = RailTaskStatus | 'interrupted' | 'paused' | 'queued'
 export type TaskDurability = 'process-local' | 'restart-durable' | 'turn'
 export type TaskCenterRail = 'action' | 'approval' | 'cron' | 'preview' | 'process' | 'session' | 'subagent'
-export type TaskCenterAction = 'manage-cron' | 'open-session' | 'stop-process'
+export type TaskCenterAction =
+  | 'manage-cron'
+  | 'open-session'
+  | 'review-cron-suggestion'
+  | 'stop-process'
 export type TestResultStatus = 'running' | 'passed' | 'failed'
 
 export interface TestResultCard {
@@ -149,6 +153,7 @@ export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   approvalRequest?: ApprovalRequest
   artifactRefs?: string[]
   clarifyRequest?: ClarifyRequest
+  cronSuggestion?: CronSuggestion
   depth?: number
   durability?: TaskDurability
   ownerSessionId?: string
@@ -167,6 +172,7 @@ export interface TaskCenterSources {
   attentionSessionIds: readonly string[]
   backgroundBySession: Record<string, ComposerStatusItem[]>
   cronJobs: readonly CronJob[]
+  cronSuggestions?: readonly CronSuggestion[]
   previewRestart: PreviewServerRestart | null
   runtimeStoredSessionIds?: Record<string, null | string>
   sessions: readonly SessionInfo[]
@@ -460,7 +466,19 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     updatedAt: parseTimestamp(job.last_run_at)
   }))
 
-  return [...approvals, ...clarifications, ...base, ...subagents, ...processes, ...cron].sort(
+  const cronSuggestions = (sources.cronSuggestions ?? []).map<TaskCenterTask>(suggestion => ({
+    action: 'review-cron-suggestion',
+    cronSuggestion: suggestion,
+    detail: suggestion.description || suggestion.job_spec.schedule || 'Suggested scheduled task',
+    durability: 'restart-durable',
+    id: `cron-suggestion:${suggestion.id}`,
+    label: suggestion.title || suggestion.job_spec.name || 'Suggested scheduled task',
+    rail: 'cron',
+    status: 'waiting',
+    updatedAt: parseTimestamp(suggestion.created_at)
+  }))
+
+  return [...approvals, ...clarifications, ...base, ...subagents, ...processes, ...cronSuggestions, ...cron].sort(
     (left, right) =>
       TASK_STATUS_PRIORITY[left.status] - TASK_STATUS_PRIORITY[right.status] ||
       right.updatedAt - left.updatedAt ||

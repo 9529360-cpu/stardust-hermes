@@ -1,4 +1,5 @@
 import { useStore } from '@nanostores/react'
+import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
@@ -13,6 +14,7 @@ import { Slot } from '@/contrib/react/slot'
 import { registry } from '@/contrib/registry'
 import { TASK_CENTER_AREAS } from '@/contrib/task-center'
 import type { HermesBranchPullRequest } from '@/global'
+import { getCronSuggestions } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { readKey, writeKey } from '@/lib/storage'
@@ -26,7 +28,13 @@ import { $cronJobs, $cronJobsScope, setCronFocusJobId } from '@/store/cron'
 import { $gateway } from '@/store/gateway'
 import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
-import { $profileScope, sidebarProfileForScope } from '@/store/profile'
+import {
+  $activeGatewayProfile,
+  $profileScope,
+  ALL_PROFILES,
+  normalizeProfileKey,
+  sidebarProfileForScope
+} from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
 import { $approvalRequests, answerApproval } from '@/store/prompts'
 import {
@@ -50,6 +58,7 @@ import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
 import type { SessionInfo } from '@/types/hermes'
 
 import { SubagentSection } from '../chat/composer/status-stack/subagent-section'
+import { openSession } from '../open-session'
 import { CRON_ROUTE, navigateToWorkspacePage, sessionRoute } from '../routes'
 import {
   findLiveTaskRuntimeId,
@@ -241,6 +250,8 @@ export function WorkspaceOverview() {
           durabilityProcess: '进程内',
           durabilityRestart: '可跨重启',
           openTask: '打开',
+          openBesideTask: '在旁边打开',
+          reviewTask: '查看',
           stopTask: '停止',
           manageTask: '管理',
           activityFiles: (count: number) => `${count} 个文件`,
@@ -272,6 +283,8 @@ export function WorkspaceOverview() {
             durabilityProcess: '程序內',
             durabilityRestart: '可跨重啟',
             openTask: '打開',
+            openBesideTask: '在旁邊開啟',
+            reviewTask: '檢視',
             stopTask: '停止',
             manageTask: '管理',
             activityFiles: (count: number) => `${count} 個檔案`,
@@ -304,6 +317,8 @@ export function WorkspaceOverview() {
             durabilityProcess: 'Process-local',
             durabilityRestart: 'Restart-durable',
             openTask: 'Open',
+            openBesideTask: 'Open beside',
+            reviewTask: 'Review',
             stopTask: 'Stop',
             manageTask: 'Manage',
             activityFiles: (count: number) => `${count} files`,
@@ -330,6 +345,7 @@ export function WorkspaceOverview() {
   const backgroundStatusBySession = useStore($backgroundStatusBySession)
   const cachedCronJobs = useStore($cronJobs)
   const cronJobsScope = useStore($cronJobsScope)
+  const activeGatewayProfile = useStore($activeGatewayProfile)
   const activeConnectionId = useStore($activeConnectionId)
   const profileScope = useStore($profileScope)
 
@@ -340,6 +356,17 @@ export function WorkspaceOverview() {
         : [],
     [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope]
   )
+
+  const suggestionProfile =
+    profileScope === ALL_PROFILES ? normalizeProfileKey(activeGatewayProfile) : normalizeProfileKey(profileScope)
+
+  const cronSuggestionsQuery = useQuery({
+    queryKey: ['cron-suggestions', activeConnectionId || 'local', suggestionProfile],
+    queryFn: () => getCronSuggestions(suggestionProfile),
+    retry: false
+  })
+
+  const cronSuggestions = cronSuggestionsQuery.data
 
   const desktopActionTasks = useStore($desktopActionTasks)
   const pullRequestsByBranch = useStore($pullRequestsByBranch)
@@ -399,6 +426,7 @@ export function WorkspaceOverview() {
         attentionSessionIds,
         backgroundBySession: backgroundStatusBySession,
         cronJobs,
+        cronSuggestions,
         previewRestart: previewServerRestart,
         projectTree,
         runtimeStoredSessionIds,
@@ -412,6 +440,7 @@ export function WorkspaceOverview() {
       attentionSessionIds,
       backgroundStatusBySession,
       cronJobs,
+      cronSuggestions,
       desktopActionTasks,
       previewServerRestart,
       projectTree,
@@ -506,8 +535,14 @@ export function WorkspaceOverview() {
       if (task.rail === 'subagent') {
         void openSessionInNewWindow(task.sessionId, { watch: true })
       } else {
-        navigate(sessionRoute(task.sessionId))
+        openSession(task.sessionId, navigate, 'stack')
       }
+
+      return
+    }
+
+    if (task.action === 'review-cron-suggestion') {
+      navigateToWorkspacePage(navigate, CRON_ROUTE)
 
       return
     }
@@ -720,7 +755,11 @@ export function WorkspaceOverview() {
                           ? systemLabels.stopTask
                           : task.action === 'manage-cron'
                             ? systemLabels.manageTask
-                            : systemLabels.openTask}
+                            : task.action === 'review-cron-suggestion'
+                              ? systemLabels.reviewTask
+                              : task.action === 'open-session' && task.rail !== 'subagent'
+                                ? systemLabels.openBesideTask
+                                : systemLabels.openTask}
                       </Button>
                     )}
                   </li>
