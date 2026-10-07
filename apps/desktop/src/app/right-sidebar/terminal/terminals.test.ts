@@ -5,12 +5,18 @@ const STORAGE_KEY = 'hermes.desktop.terminals.v1'
 
 async function loadTerminalStore() {
   const $currentCwd = atom('/workspace')
+  const $selectedStoredSessionId = atom<string | null>(null)
+  const $sessions = atom<unknown[]>([])
 
   vi.doMock('@/store/session', () => ({
-    $currentCwd
+    $currentCwd,
+    $selectedStoredSessionId,
+    $sessions,
+    sessionMatchesStoredId: (session: { _lineage_ids?: string[]; _lineage_root_id?: string; id: string }, id: string) =>
+      session.id === id || session._lineage_root_id === id || Boolean(session._lineage_ids?.includes(id))
   }))
 
-  return { ...(await import('./terminals')), $currentCwd }
+  return { ...(await import('./terminals')), $currentCwd, $selectedStoredSessionId, $sessions }
 }
 
 describe('terminal store persistence', () => {
@@ -40,6 +46,26 @@ describe('terminal store persistence', () => {
     ])
   })
 
+  it('restores optional stored-session ownership without changing legacy tabs', async () => {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        activeTerminalId: 'owned',
+        terminals: [
+          { auto: true, cwd: '/repo/one', id: 'legacy', title: 'zsh' },
+          { auto: false, cwd: '/repo/two', id: 'owned', storedSessionId: 'task-two', title: 'bash' }
+        ]
+      })
+    )
+
+    const { $terminals } = await loadTerminalStore()
+
+    expect($terminals.get()).toEqual([
+      { auto: true, cwd: '/repo/one', id: 'legacy', kind: 'user', title: 'zsh' },
+      { auto: false, cwd: '/repo/two', id: 'owned', kind: 'user', storedSessionId: 'task-two', title: 'bash' }
+    ])
+  })
+
   it('persists user tabs and history synchronously, skipping agent mirrors', async () => {
     const { createTerminal, ensureAgentTerminal, renameTerminal, selectTerminal, updateTerminalReviveBuffer } =
       await loadTerminalStore()
@@ -56,6 +82,16 @@ describe('terminal store persistence', () => {
       activeTerminalId: userId,
       terminals: [{ auto: false, cwd: '/repo', id: userId, reviveBuffer: 'recent scrollback', title: 'server' }]
     })
+  })
+
+  it('captures the selected stored session as optional terminal ownership', async () => {
+    const { $selectedStoredSessionId, $terminals, createTerminal } = await loadTerminalStore()
+
+    $selectedStoredSessionId.set('task-one')
+    const id = createTerminal('/repo')
+
+    expect($terminals.get().find(term => term.id === id)?.storedSessionId).toBe('task-one')
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').terminals[0].storedSessionId).toBe('task-one')
   })
 
   it('never attaches a revive buffer to an agent tab', async () => {
@@ -186,5 +222,42 @@ describe('session cwd → terminal tab linking', () => {
     selectTerminal(first)
     $currentCwd.set('/repo')
     expect($activeTerminalId.get()).toBe(first)
+  })
+
+  it('selects the returning task owner before cwd matches', async () => {
+    const { $activeTerminalId, $selectedStoredSessionId, createTerminal, selectTerminal } = await loadTerminalStore()
+
+    const taskOne = createTerminal('/repo', 'task-one')
+    const taskTwo = createTerminal('/repo', 'task-two')
+    selectTerminal(taskOne)
+
+    $selectedStoredSessionId.set('task-two')
+
+    expect($activeTerminalId.get()).toBe(taskTwo)
+  })
+
+  it('does not use another task owner as a cwd fallback', async () => {
+    const { $activeTerminalId, $currentCwd, $selectedStoredSessionId, createTerminal, selectTerminal } =
+      await loadTerminalStore()
+
+    const taskOne = createTerminal('/repo', 'task-one')
+    selectTerminal(taskOne)
+    $selectedStoredSessionId.set('task-two')
+    $currentCwd.set('/repo')
+
+    expect($activeTerminalId.get()).toBe(taskOne)
+  })
+
+  it('keeps the legacy cwd fallback for unowned tabs', async () => {
+    const { $activeTerminalId, $currentCwd, $selectedStoredSessionId, createTerminal, selectTerminal } =
+      await loadTerminalStore()
+
+    const legacy = createTerminal('/repo', null)
+    const owned = createTerminal('/repo', 'task-one')
+    selectTerminal(owned)
+    $selectedStoredSessionId.set('task-two')
+    $currentCwd.set('/repo/')
+
+    expect($activeTerminalId.get()).toBe(legacy)
   })
 })

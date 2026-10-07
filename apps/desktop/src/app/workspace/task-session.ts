@@ -8,6 +8,102 @@ const matchesAny = (session: SessionInfo, storedIds: readonly string[]): boolean
 const stateMatchesSession = (runtimeId: string, state: ClientSessionState, session: SessionInfo): boolean =>
   sessionMatchesStoredId(session, state.storedSessionId?.trim() || runtimeId)
 
+/** The terminal-tab fields used when resolving a task's terminal. Kept narrow
+ * so the resolver does not depend on the terminal store or renderer state. */
+export interface TaskTerminalEntry {
+  cwd: string
+  id: string
+  kind: 'agent' | 'user'
+  restoreCwd?: string
+  storedSessionId?: null | string
+}
+
+const normalizePath = (value: string): string => {
+  const trimmed = value.trim()
+
+  return trimmed.length > 1 ? trimmed.replace(/[\\/]+$/, '') || trimmed : trimmed
+}
+
+const normalizedStoredId = (value: null | string | undefined): string => value?.trim() ?? ''
+
+const terminalCwd = (terminal: TaskTerminalEntry): string => normalizePath(terminal.restoreCwd || terminal.cwd)
+
+const terminalBelongsToSession = (
+  terminal: TaskTerminalEntry,
+  selectedStoredSessionId: string,
+  sessions: readonly SessionInfo[]
+): boolean => {
+  const owner = normalizedStoredId(terminal.storedSessionId)
+
+  if (!owner) {
+    return false
+  }
+
+  if (owner === selectedStoredSessionId) {
+    return true
+  }
+
+  const selectedSession = sessions.find(session => sessionMatchesStoredId(session, selectedStoredSessionId))
+
+  return Boolean(selectedSession && sessionMatchesStoredId(selectedSession, owner))
+}
+
+const preferTerminal = (
+  candidates: readonly TaskTerminalEntry[],
+  activeTerminalId: null | string,
+  targetCwd: string
+): string | undefined => {
+  const active = candidates.find(terminal => terminal.id === activeTerminalId)
+  const activeMatchesTarget = active && (!targetCwd || terminalCwd(active) === targetCwd)
+
+  return (
+    (activeMatchesTarget ? active.id : undefined) ??
+    candidates.find(terminal => targetCwd && terminalCwd(terminal) === targetCwd)?.id ??
+    candidates[0]?.id
+  )
+}
+
+/**
+ * Resolve the user terminal that belongs with the current task context.
+ *
+ * An explicitly owned tab wins, including when the task's cwd has not hydrated
+ * yet. Tabs without an owner are the legacy global pool and remain eligible by
+ * cwd, preserving the pre-ownership behavior. A tab owned by another task is
+ * never a cwd fallback, which prevents two tasks sharing a repository from
+ * stealing each other's terminal. `undefined` means there is no safe tab to
+ * select, so callers must leave the current selection alone.
+ */
+export function resolveTaskTerminalId(
+  terminals: readonly TaskTerminalEntry[],
+  activeTerminalId: null | string,
+  selectedStoredSessionId: null | string,
+  sessions: readonly SessionInfo[],
+  currentCwd: string
+): string | undefined {
+  const userTerminals = terminals.filter(terminal => terminal.kind === 'user')
+  const selected = normalizedStoredId(selectedStoredSessionId)
+  const targetCwd = normalizePath(currentCwd)
+
+  if (selected) {
+    const owned = userTerminals.filter(terminal => terminalBelongsToSession(terminal, selected, sessions))
+
+    if (owned.length > 0) {
+      return preferTerminal(owned, activeTerminalId, targetCwd)
+    }
+  }
+
+  // Only truly unowned tabs participate in the legacy cwd lookup. In
+  // particular, never let task A's owned tab become task B's fallback.
+  if (!targetCwd) {
+    return undefined
+  }
+
+  const legacy = userTerminals.filter(terminal => !normalizedStoredId(terminal.storedSessionId))
+  const cwdMatches = legacy.filter(terminal => terminalCwd(terminal) === targetCwd)
+
+  return preferTerminal(cwdMatches, activeTerminalId, targetCwd)
+}
+
 /**
  * Pick the live task that deserves a primary "continue" entry when no
  * conversation is currently selected. A task blocked on user input outranks a
