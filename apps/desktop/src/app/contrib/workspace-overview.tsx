@@ -1,12 +1,14 @@
 import { useStore } from '@nanostores/react'
-import { type ReactNode, useMemo } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { $activePresetId } from '@/components/pane-shell/tree/store'
+import { openAgentTerminal } from '@/app/right-sidebar/terminal/terminals'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Slot } from '@/contrib/react/slot'
+import { Textarea } from '@/components/ui/textarea'
 import { registry } from '@/contrib/registry'
 import { TASK_CENTER_AREAS } from '@/contrib/task-center'
 import { useI18n } from '@/i18n'
@@ -14,7 +16,7 @@ import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { readKey, writeKey } from '@/lib/storage'
 import { useSessionSlice } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
-import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus } from '@/store/activity'
+import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus, type TaskCenterTask } from '@/store/activity'
 import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProcess } from '@/store/composer-status'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronJobs, $cronJobsScope, setCronFocusJobId } from '@/store/cron'
@@ -22,10 +24,12 @@ import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
 import { $profileScope, sidebarProfileForScope } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
-import { $approvalRequests } from '@/store/prompts'
+import { $clarifyRequests, answerClarifyRequest } from '@/store/clarify'
+import { $gateway } from '@/store/gateway'
 import { setRightContextOpen } from '@/store/right-context'
 import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
+import { $approvalRequests, answerApproval } from '@/store/prompts'
 import { $subagentsBySession } from '@/store/subagents'
 import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
 
@@ -94,6 +98,37 @@ function activityIcon(status: TaskCenterStatus): string {
   }
 
   return status === 'success' ? 'pass' : 'loading'
+}
+
+function UnifiedInputCard({ task, gateway }: { task: TaskCenterTask; gateway: Parameters<typeof answerApproval>[0] }) {
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const request = task.approvalRequest
+  const clarify = task.clarifyRequest
+  if (!request && !clarify) return null
+  const choices = clarify?.questions?.[0]?.choices ?? clarify?.choices ?? []
+  const submit = async (answer: string) => {
+    if (busy || !answer.trim()) return
+    setBusy(true)
+    if (request) {
+      await answerApproval(gateway, request, answer)
+    } else if (clarify) {
+      answerClarifyRequest(clarify, answer)
+    }
+  }
+  return (
+    <div className="mt-2 rounded-lg border border-primary/25 bg-primary/5 p-2" data-task-center-input-card="">
+      <div className="mb-1 text-[0.75rem] font-medium text-primary">{task.label}</div>
+      <div className={cn('mb-2 line-clamp-3', BODY_CLASS)}>{task.detail}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {request ? <>
+          <Button disabled={busy} onClick={() => void submit('once')} size="xs" variant="secondary">Run</Button>
+          <Button disabled={busy} onClick={() => void submit('deny')} size="xs" variant="ghost">Reject</Button>
+        </> : choices.map(choice => <Button disabled={busy} key={choice} onClick={() => void submit(choice)} size="xs" variant="secondary">{choice}</Button>)}
+      </div>
+      {clarify && choices.length === 0 && <div className="mt-1.5 flex gap-1.5"><Textarea className="min-h-8" onChange={event => setDraft(event.target.value)} placeholder="Your answer" value={draft} /><Button disabled={busy || !draft.trim()} onClick={() => void submit(draft)} size="xs" variant="secondary">Send</Button></div>}
+    </div>
+  )
 }
 
 export function WorkspaceOverview() {
@@ -203,6 +238,8 @@ export function WorkspaceOverview() {
   const activeSessionId = useStore($activeSessionId)
   const attentionSessionIds = useStore($attentionSessionIds)
   const approvalRequests = useStore($approvalRequests)
+  const clarifyRequests = useStore($clarifyRequests)
+  const gateway = useStore($gateway)
   const backgroundStatusBySession = useStore($backgroundStatusBySession)
   const cachedCronJobs = useStore($cronJobs)
   const cronJobsScope = useStore($cronJobsScope)
@@ -264,6 +301,7 @@ export function WorkspaceOverview() {
       buildTaskCenterTasks({
         actionTasks: desktopActionTasks,
         approvalRequests,
+        clarifyRequests,
         attentionSessionIds,
         backgroundBySession: backgroundStatusBySession,
         cronJobs,
@@ -276,6 +314,7 @@ export function WorkspaceOverview() {
       }),
     [
       approvalRequests,
+      clarifyRequests,
       attentionSessionIds,
       backgroundStatusBySession,
       cronJobs,
@@ -493,6 +532,44 @@ export function WorkspaceOverview() {
                       <div className="truncate text-[0.75rem] font-medium leading-5 text-(--ui-text-primary)">
                         {task.label}
                       </div>
+                      {task.testResult && (
+                        <div
+                          className={cn(
+                            'mt-1 rounded-md border px-2 py-1.5',
+                            task.testResult.status === 'failed'
+                              ? 'border-destructive/30 bg-destructive/5'
+                              : task.testResult.status === 'passed'
+                                ? 'border-emerald-500/25 bg-emerald-500/5'
+                                : 'border-(--ui-stroke-tertiary) bg-(--ui-bg-quaternary)'
+                          )}
+                          data-test-result-card=""
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-[0.6875rem] font-medium">{task.testResult.command}</span>
+                            <span className="shrink-0 text-[0.625rem] text-(--ui-text-tertiary)">
+                              {task.testResult.status === 'running'
+                                ? activityStatusLabels.running
+                                : task.testResult.status === 'passed'
+                                  ? activityStatusLabels.success
+                                  : activityStatusLabels.error}
+                            </span>
+                          </div>
+                          {typeof task.testResult.exitCode === 'number' && (
+                            <div className="mt-0.5 text-[0.625rem] text-(--ui-text-tertiary)">
+                              exit {task.testResult.exitCode}
+                            </div>
+                          )}
+                          <Button
+                            className="mt-1 h-6 px-1.5 text-[0.625rem]"
+                            onClick={() => openAgentTerminal(task.processId ?? '', task.label)}
+                            size="xs"
+                            variant="ghost"
+                          >
+                            <Codicon name="terminal" />
+                            {systemLabels.openTask}
+                          </Button>
+                        </div>
+                      )}
                       {task.detail && <div className={cn('line-clamp-2 text-(--ui-text-tertiary)', META_CLASS)}>{task.detail}</div>}
                       {task.workspace && (
                         <div className={cn('truncate text-(--ui-text-quaternary)', META_CLASS)}>
@@ -515,7 +592,8 @@ export function WorkspaceOverview() {
                         ) : null}
                       </div>
                     </div>
-                    {task.action && (
+                      {task.clarifyRequest || task.approvalRequest ? <UnifiedInputCard gateway={gateway} task={task} /> : null}
+                      {task.action && (
                       <Button onClick={() => handleTaskAction(task)} size="xs" variant="ghost">
                         {task.action === 'stop-process'
                           ? systemLabels.stopTask

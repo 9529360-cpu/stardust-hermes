@@ -6,6 +6,7 @@ import { sessionMatchesStoredId } from '@/store/session'
 import type { ActionStatusResponse, CronJob, SessionInfo } from '@/types/hermes'
 
 import type { ComposerStatusItem } from './composer-status'
+import type { ClarifyRequest } from './clarify'
 import type { ApprovalRequest } from './prompts'
 import { buildSubagentTree, type SubagentNode, type SubagentProgress } from './subagents'
 
@@ -126,6 +127,13 @@ export type TaskCenterStatus = RailTaskStatus | 'interrupted' | 'paused' | 'queu
 export type TaskDurability = 'process-local' | 'restart-durable' | 'turn'
 export type TaskCenterRail = 'action' | 'approval' | 'cron' | 'preview' | 'process' | 'session' | 'subagent'
 export type TaskCenterAction = 'manage-cron' | 'open-session' | 'stop-process'
+export type TestResultStatus = 'running' | 'passed' | 'failed'
+
+export interface TestResultCard {
+  command: string
+  exitCode?: number
+  status: TestResultStatus
+}
 
 /** Optional workspace facts projected from existing session/project caches. */
 export interface TaskWorkspaceContext {
@@ -138,7 +146,9 @@ export interface TaskWorkspaceContext {
 export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   action?: TaskCenterAction
   approvalRef?: string
+  approvalRequest?: ApprovalRequest
   artifactRefs?: string[]
+  clarifyRequest?: ClarifyRequest
   depth?: number
   durability?: TaskDurability
   ownerSessionId?: string
@@ -147,11 +157,13 @@ export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   rail: TaskCenterRail
   sessionId?: string
   status: TaskCenterStatus
+  testResult?: TestResultCard
 }
 
 export interface TaskCenterSources {
   actionTasks: Record<string, DesktopActionTask>
   approvalRequests?: Record<string, ApprovalRequest>
+  clarifyRequests?: Record<string, ClarifyRequest>
   attentionSessionIds: readonly string[]
   backgroundBySession: Record<string, ComposerStatusItem[]>
   cronJobs: readonly CronJob[]
@@ -246,6 +258,25 @@ const subagentStatus = (status: SubagentProgress['status']): TaskCenterStatus =>
   return status
 }
 
+// Only obvious test-runner commands become result cards. Counts are never
+// inferred from arbitrary process output.
+const testResultForProcess = (item: ComposerStatusItem): TestResultCard | undefined => {
+  if (
+    item.type !== 'background' ||
+    !/^(?:\.?\/?(?:node_modules\/\.bin\/)?(?:pytest|vitest|jest|mocha|cargo\s+test|go\s+test|dotnet\s+test)\b)/i.test(
+      item.title.trim()
+    )
+  ) {
+    return undefined
+  }
+
+  return {
+    command: item.title,
+    exitCode: item.exitCode,
+    status: item.state === 'running' ? 'running' : item.state === 'failed' ? 'failed' : 'passed'
+  }
+}
+
 const flattenSubagents = (
   runtimeSessionId: string,
   nodes: readonly SubagentNode[],
@@ -297,6 +328,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
       return {
         action: storedSessionId ? 'open-session' : undefined,
         approvalRef: request.requestId,
+        approvalRequest: request,
         detail: request.command,
         durability: 'turn',
         id: `approval:${request.requestId || runtimeSessionId}`,
@@ -310,8 +342,27 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
       }
     }
   )
+  const clarifications = Object.entries(sources.clarifyRequests ?? {}).map<TaskCenterTask>(([runtimeKey, request]) => {
+    const runtimeSessionId = request.sessionId || runtimeKey
+    const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
+    const storedSessionId = sources.sessions.find(session => sessionMatchesStoredId(session, mappedStoredSessionId ?? runtimeSessionId))?.id ?? mappedStoredSessionId
+    return {
+      action: storedSessionId ? 'open-session' : undefined,
+      clarifyRequest: request,
+      detail: request.question,
+      durability: 'turn',
+      id: `clarify:${request.requestId || runtimeSessionId}`,
+      label: 'Needs input',
+      ownerSessionId: runtimeSessionId,
+      workspace: contextForSession(storedSessionId ?? runtimeSessionId),
+      rail: 'approval',
+      sessionId: storedSessionId ?? undefined,
+      status: 'waiting',
+      updatedAt: 0
+    }
+  })
 
-  const approvalSessionIds = new Set(approvals.flatMap(task => (task.sessionId ? [task.sessionId] : [])))
+  const approvalSessionIds = new Set([...approvals, ...clarifications].flatMap(task => (task.sessionId ? [task.sessionId] : [])))
 
   const base = buildRailTasks(
     sources.workingSessionIds,
@@ -373,6 +424,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
         workspace: contextForSession(runtimeSessionId),
         rail: 'process',
         status: item.state === 'running' ? 'running' : item.state === 'failed' ? 'error' : 'success',
+        testResult: testResultForProcess(item),
         updatedAt: 0
       }))
   )
@@ -393,7 +445,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     updatedAt: parseTimestamp(job.last_run_at)
   }))
 
-  return [...approvals, ...base, ...subagents, ...processes, ...cron].sort(
+  return [...approvals, ...clarifications, ...base, ...subagents, ...processes, ...cron].sort(
     (left, right) =>
       TASK_STATUS_PRIORITY[left.status] - TASK_STATUS_PRIORITY[right.status] ||
       right.updatedAt - left.updatedAt ||

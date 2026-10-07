@@ -187,6 +187,37 @@ describe('task center projection', () => {
     ])
   })
 
+  it('creates typed test result cards without parsing output counts', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: [],
+      backgroundBySession: {
+        runtime: [
+          background({ title: 'pytest -q', state: 'done', exitCode: 0, output: '999 passed' }),
+          background({ id: 'failed', title: 'vitest run', state: 'failed', exitCode: 3, output: '1 passed' }),
+          background({ id: 'other', title: 'cat output.txt', state: 'done', exitCode: 0 })
+        ]
+      },
+      cronJobs: [],
+      previewRestart: null,
+      sessions: [],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks.find(task => task.id === 'process:proc-1')?.testResult).toEqual({
+      command: 'pytest -q',
+      exitCode: 0,
+      status: 'passed'
+    })
+    expect(tasks.find(task => task.id === 'process:failed')?.testResult).toEqual({
+      command: 'vitest run',
+      exitCode: 3,
+      status: 'failed'
+    })
+    expect(tasks.find(task => task.id === 'process:other')?.testResult).toBeUndefined()
+  })
+
   it('keeps process stop and cron management as owner actions', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},
