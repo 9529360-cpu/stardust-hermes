@@ -1264,6 +1264,7 @@ def _(rid, params: dict) -> dict:
         return _err(rid, 4090, f"server '{name}' already exists")
     raw_cfg = params.get("config")
     server_config: dict = dict(raw_cfg) if isinstance(raw_cfg, dict) else {}
+    server_config.setdefault("trust", mc.MCP_CREATE_TRUST)
     if preset:  # fills url/command/args when omitted; mutates server_config in place
         mc._apply_mcp_preset(
             name, preset_name=preset, url=server_config.get("url"), command=server_config.get("command"),

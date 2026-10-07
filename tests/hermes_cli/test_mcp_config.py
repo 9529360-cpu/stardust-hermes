@@ -206,6 +206,7 @@ class TestMcpAdd:
         config = load_config()
         assert "ink" in config.get("mcp_servers", {})
         assert config["mcp_servers"]["ink"]["url"] == "https://mcp.ml.ink/mcp"
+        assert config["mcp_servers"]["ink"]["trust"] == "untrusted"
 
 
     def test_add_stdio_server_with_env(self, tmp_path, capsys, monkeypatch):
@@ -855,4 +856,24 @@ def test_tool_filters_keeps_explicit_empty_include():
     assert _tool_filters({"tools": {"include": []}}) == ([], None)
     assert _tool_filters({"tools": {"include": "bad", "exclude": ["x"]}}) == (None, ["x"])
     assert _tool_filters({}) == (None, None)
+
+
+def test_legacy_omitted_trust_is_preserved(monkeypatch, tmp_path):
+    """The compatibility path still writes exactly the caller's config shape."""
+    from hermes_cli import mcp_config
+
+    saved = {}
+    monkeypatch.setattr(mcp_config, "load_config", lambda: {})
+    monkeypatch.setattr(mcp_config, "save_config", lambda cfg: saved.update(cfg))
+    assert mcp_config._save_mcp_server("legacy", {"command": "old-mcp"})
+    assert saved["mcp_servers"]["legacy"] == {"command": "old-mcp"}
+
+
+def test_dashboard_create_sets_explicit_safe_trust(monkeypatch):
+    from hermes_cli.web_models import MCPServerCreate
+    from hermes_cli.web_server_mcp import _normalize_mcp_server_create
+
+    monkeypatch.setattr("hermes_cli.mcp_security.validate_mcp_server_entry", lambda *args: [])
+    _, config, _ = _normalize_mcp_server_create(MCPServerCreate(name="new", command="new-mcp"))
+    assert config["trust"] == "untrusted"
 
