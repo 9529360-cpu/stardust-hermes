@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { CronJob, SessionInfo } from '@/types/hermes'
+import type { CronJob, CronSuggestion, SessionInfo } from '@/types/hermes'
 
 import { buildRailTasks, buildTaskCenterTasks } from './activity'
 import type { ComposerStatusItem } from './composer-status'
@@ -88,6 +88,15 @@ const cron = (overrides: Partial<CronJob> = {}): CronJob => ({
   id: 'cron-1',
   name: 'Morning check',
   state: 'scheduled',
+  ...overrides
+})
+
+const cronSuggestion = (overrides: Partial<CronSuggestion> = {}): CronSuggestion => ({
+  description: 'Review weekly notes',
+  id: 'suggestion-1',
+  job_spec: { schedule: '0 9 * * 1' },
+  source: 'catalog',
+  title: 'Review weekly notes',
   ...overrides
 })
 
@@ -262,6 +271,35 @@ describe('task center projection', () => {
       detail: 'network down',
       status: 'error'
     })
+  })
+
+  it('projects pending cron suggestions as restart-durable review tasks', () => {
+    const suggestion = cronSuggestion({ created_at: '2026-10-07T08:00:00Z' })
+
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: [],
+      backgroundBySession: {},
+      cronJobs: [],
+      cronSuggestions: [suggestion],
+      previewRestart: null,
+      sessions: [],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        action: 'review-cron-suggestion',
+        cronSuggestion: suggestion,
+        detail: suggestion.description,
+        durability: 'restart-durable',
+        id: 'cron-suggestion:suggestion-1',
+        label: suggestion.title,
+        rail: 'cron',
+        status: 'waiting'
+      })
+    ])
   })
 
   it('replaces a generic waiting row with the concrete approval provenance', () => {
