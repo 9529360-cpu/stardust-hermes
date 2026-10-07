@@ -127,6 +127,14 @@ export type TaskDurability = 'process-local' | 'restart-durable' | 'turn'
 export type TaskCenterRail = 'action' | 'approval' | 'cron' | 'preview' | 'process' | 'session' | 'subagent'
 export type TaskCenterAction = 'manage-cron' | 'open-session' | 'stop-process'
 
+/** Optional workspace facts projected from existing session/project caches. */
+export interface TaskWorkspaceContext {
+  cwd?: string
+  project?: string
+  worktree?: string
+  branch?: string
+}
+
 export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   action?: TaskCenterAction
   approvalRef?: string
@@ -135,6 +143,7 @@ export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   durability?: TaskDurability
   ownerSessionId?: string
   processId?: string
+  workspace?: TaskWorkspaceContext
   rail: TaskCenterRail
   sessionId?: string
   status: TaskCenterStatus
@@ -151,6 +160,32 @@ export interface TaskCenterSources {
   sessions: readonly SessionInfo[]
   subagentsBySession: Record<string, SubagentProgress[]>
   workingSessionIds: readonly string[]
+  projectTree?: readonly { id: string; label: string; path?: null | string }[]
+}
+
+function workspaceContext(
+  session: SessionInfo | undefined,
+  projects: readonly { id: string; label: string; path?: null | string }[] = []
+): TaskWorkspaceContext | undefined {
+  if (!session) return undefined
+  const cwd = session.cwd?.trim() || undefined
+  const repoRoot = session.git_repo_root?.trim() || undefined
+  const normalizedCwd = cwd?.toLowerCase()
+  const project = normalizedCwd
+    ? [...projects]
+        .filter(item => {
+          const path = item.path?.trim().replace(/[\\/]+$/, '').toLowerCase()
+          return path && (normalizedCwd === path || normalizedCwd.startsWith(`${path}/`) || normalizedCwd.startsWith(`${path}\\`))
+        })
+        .sort((a, b) => (b.path?.length ?? 0) - (a.path?.length ?? 0))[0]?.label
+    : undefined
+  const context: TaskWorkspaceContext = {
+    cwd,
+    project,
+    branch: session.git_branch?.trim() || undefined,
+    worktree: repoRoot && cwd && cwd.toLowerCase() !== repoRoot.toLowerCase() ? cwd : undefined
+  }
+  return Object.values(context).some(Boolean) ? context : undefined
 }
 
 const TASK_STATUS_PRIORITY: Record<TaskCenterStatus, number> = {
@@ -214,6 +249,7 @@ const subagentStatus = (status: SubagentProgress['status']): TaskCenterStatus =>
 const flattenSubagents = (
   runtimeSessionId: string,
   nodes: readonly SubagentNode[],
+  contextForSession: (id?: string) => TaskWorkspaceContext | undefined,
   depth = 0
 ): TaskCenterTask[] =>
   nodes.flatMap(node => {
@@ -227,13 +263,14 @@ const flattenSubagents = (
       id: `subagent:${runtimeSessionId}:${node.id}`,
       label: node.goal,
       rail: 'subagent',
+      workspace: contextForSession(runtimeSessionId),
       sessionId: node.sessionId,
       status: subagentStatus(node.status),
       detail,
       updatedAt: node.updatedAt
     }
 
-    return [task, ...flattenSubagents(runtimeSessionId, node.children, depth + 1)]
+    return [task, ...flattenSubagents(runtimeSessionId, node.children, contextForSession, depth + 1)]
   })
 
 /**
@@ -244,6 +281,10 @@ const flattenSubagents = (
  * actions. This store never writes lifecycle state back into those owners.
  */
 export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask[] {
+  const contextForSession = (id?: string) => {
+    const session = id ? sources.sessions.find(candidate => sessionMatchesStoredId(candidate, id)) : undefined
+    return workspaceContext(session, sources.projectTree)
+  }
   const approvals = Object.entries(sources.approvalRequests ?? {}).map<TaskCenterTask>(
     ([runtimeKey, request]) => {
       const runtimeSessionId = request.sessionId || runtimeKey
@@ -261,6 +302,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
         id: `approval:${request.requestId || runtimeSessionId}`,
         label: request.description || 'Approval required',
         ownerSessionId: runtimeSessionId,
+        workspace: contextForSession(storedSessionId ?? runtimeSessionId),
         rail: 'approval',
         sessionId: storedSessionId ?? undefined,
         status: 'waiting',
@@ -287,7 +329,8 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
           action: 'open-session',
           durability: 'turn',
           rail: 'session',
-          sessionId
+          sessionId,
+          workspace: contextForSession(sessionId)
         }
       }
 
@@ -308,7 +351,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     )
 
   const subagents = Object.entries(sources.subagentsBySession).flatMap(([runtimeSessionId, items]) =>
-    flattenSubagents(runtimeSessionId, buildSubagentTree(items))
+    flattenSubagents(runtimeSessionId, buildSubagentTree(items), contextForSession)
   )
 
   const processes = Object.entries(sources.backgroundBySession).flatMap(([runtimeSessionId, items]) =>
@@ -327,6 +370,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
         label: item.title,
         ownerSessionId: runtimeSessionId,
         processId: item.id,
+        workspace: contextForSession(runtimeSessionId),
         rail: 'process',
         status: item.state === 'running' ? 'running' : item.state === 'failed' ? 'error' : 'success',
         updatedAt: 0

@@ -32,7 +32,7 @@ function desktopApi<T>(path: string, body?: Record<string, unknown>): Promise<T>
   )
 }
 
-function gitGet<T>(route: string, params: Record<string, boolean | null | string | undefined>): Promise<T> {
+function gitGet<T>(route: string, params: Record<string, boolean | null | number | string | undefined>): Promise<T> {
   const query = new URLSearchParams()
 
   for (const [key, value] of Object.entries(params)) {

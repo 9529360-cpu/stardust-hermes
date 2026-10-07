@@ -218,6 +218,9 @@ export function WorkspaceOverview() {
   const sessionStates = useStore($sessionStates)
   const subagentsBySession = useStore($subagentsBySession)
   const workingSessionIds = useStore($workingSessionIds)
+  const currentSession = selectedStoredSessionId
+    ? sessions.find(candidate => sessionMatchesStoredId(candidate, selectedStoredSessionId))
+    : sessions.find(candidate => candidate.id === activeSessionId)
 
   const session = selectedStoredSessionId
     ? sessions.find(candidate => sessionMatchesStoredId(candidate, selectedStoredSessionId))
@@ -237,7 +240,7 @@ export function WorkspaceOverview() {
   const scopedProjectCwd =
     projectScope === ALL_PROJECTS ? '' : projectRootCwd(projectTree.find(project => project.id === projectScope))
 
-  const effectiveCwd = resolveTaskWorkspaceCwd(cwd, session, fallbackTaskSession, scopedProjectCwd)
+  const effectiveCwd = resolveTaskWorkspaceCwd(cwd, session ?? currentSession, fallbackTaskSession, scopedProjectCwd)
 
   const fallbackTaskRuntimeId = fallbackTaskSession
     ? findLiveTaskRuntimeId(sessionStates, fallbackTaskSession)
@@ -265,6 +268,7 @@ export function WorkspaceOverview() {
         backgroundBySession: backgroundStatusBySession,
         cronJobs,
         previewRestart: previewServerRestart,
+        projectTree,
         runtimeStoredSessionIds,
         sessions,
         subagentsBySession,
@@ -277,6 +281,7 @@ export function WorkspaceOverview() {
       cronJobs,
       desktopActionTasks,
       previewServerRestart,
+      projectTree,
       runtimeStoredSessionIds,
       sessions,
       subagentsBySession,
@@ -427,6 +432,7 @@ export function WorkspaceOverview() {
                   <div className={TITLE_CLASS}>{sessionLabel}</div>
                   <p className={cn('mt-0.5', BODY_CLASS)}>{summary}</p>
                   {displaySession?.model && <div className={cn('mt-1 truncate font-mono', META_CLASS)}>{displaySession.model}</div>}
+                  {effectiveCwd && <div className={cn('mt-1 truncate font-mono', META_CLASS)}>{effectiveCwd}</div>}
                 </div>
               </div>
               {displayTaskStoredId && (primaryAttention || primaryWorking) && (
@@ -488,6 +494,11 @@ export function WorkspaceOverview() {
                         {task.label}
                       </div>
                       {task.detail && <div className={cn('line-clamp-2 text-(--ui-text-tertiary)', META_CLASS)}>{task.detail}</div>}
+                      {task.workspace && (
+                        <div className={cn('truncate text-(--ui-text-quaternary)', META_CLASS)}>
+                          {[task.workspace.project, task.workspace.worktree, task.workspace.branch, task.workspace.cwd].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
                       <div className={cn('mt-0.5 flex min-w-0 items-center gap-1', META_CLASS)}>
                         <span>{activityStatusLabels[task.status]}</span>
                         {task.durability && (

@@ -99,26 +99,46 @@ const cron = (overrides: Partial<CronJob> = {}): CronJob => ({
 })
 
 describe('task center projection', () => {
-  it('projects owner-specific durability without becoming a second lifecycle owner', () => {
+  it('projects safe optional workspace context onto session-owned tasks', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},
       attentionSessionIds: ['tip'],
-      backgroundBySession: { runtime: [background()] },
-      cronJobs: [cron()],
+      backgroundBySession: {},
+      cronJobs: [],
       previewRestart: null,
-      sessions: [session()],
-      subagentsBySession: { runtime: [subagent({ sessionId: 'child-1' })] },
+      sessions: [session({ cwd: '/work/app/.worktrees/feature', git_repo_root: '/work/app', git_branch: 'feature' })],
+      projectTree: [{ id: 'p-app', label: 'App', path: '/work/app' }],
+      subagentsBySession: {},
       workingSessionIds: []
     })
 
-    expect(tasks.map(task => [task.id, task.status, task.durability])).toEqual([
-      ['session:tip', 'waiting', 'turn'],
-      ['subagent:runtime:worker', 'running', 'process-local'],
-      ['process:proc-1', 'running', 'process-local'],
-      ['cron:cron-1', 'queued', 'restart-durable']
-    ])
+    expect(tasks[0].workspace).toEqual({
+      cwd: '/work/app/.worktrees/feature',
+      project: 'App',
+      worktree: '/work/app/.worktrees/feature',
+      branch: 'feature'
+    })
   })
 
+  it('leaves context absent for sessions without workspace facts', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {}, attentionSessionIds: ['tip'], backgroundBySession: {}, cronJobs: [],
+      previewRestart: null, sessions: [session()], subagentsBySession: {}, workingSessionIds: []
+    })
+    expect(tasks[0].workspace).toBeUndefined()
+  })
+
+  it('projects owner-specific durability without becoming a second lifecycle owner', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {}, attentionSessionIds: ['tip'], backgroundBySession: { runtime: [background()] },
+      cronJobs: [cron()], previewRestart: null, sessions: [session()],
+      subagentsBySession: { runtime: [subagent({ sessionId: 'child-1' })] }, workingSessionIds: []
+    })
+    expect(tasks.map(task => [task.id, task.status, task.durability])).toEqual([
+      ['session:tip', 'waiting', 'turn'], ['subagent:runtime:worker', 'running', 'process-local'],
+      ['process:proc-1', 'running', 'process-local'], ['cron:cron-1', 'queued', 'restart-durable']
+    ])
+  })
   it('preserves subagent hierarchy, child session links, summaries, and artifacts', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},

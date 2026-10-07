@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { I18nProvider } from '@/i18n'
 import { $currentCwd } from '@/store/session'
+import { $sessions } from '@/store/session'
+import { $sessionStates } from '@/store/session-states'
+import { $projectTree } from '@/store/projects'
 
 import { WorkspaceOverview } from './workspace-overview'
 
@@ -21,6 +24,9 @@ function renderOverview() {
 afterEach(() => {
   cleanup()
   $currentCwd.set('')
+  $sessionStates.set({})
+  $sessions.set([])
+  $projectTree.set([])
 })
 
 describe('WorkspaceOverview (context rail)', () => {
@@ -43,5 +49,18 @@ describe('WorkspaceOverview (context rail)', () => {
     expect(screen.queryByText('D:/work/stardust-demo')).toBeNull()
     expect(screen.queryByText('分支')).toBeNull()
     expect(screen.queryByText('无待处理项')).toBeNull()
+  })
+
+  it('shows workspace context in the current task result card', () => {
+    $currentCwd.set('/work/app/.worktrees/feature')
+    $sessionStates.set({ runtime: { storedSessionId: 'tip', needsInput: true } as never })
+    $sessions.set([{
+      id: 'tip', _lineage_root_id: 'root', title: 'Build feature', cwd: '/work/app/.worktrees/feature',
+      git_branch: 'feature', git_repo_root: '/work/app', ended_at: null, is_active: true,
+      last_active: 1, started_at: 1, input_tokens: 0, output_tokens: 0, message_count: 0, model: null
+    } as never])
+    $projectTree.set([{ id: 'app', label: 'App', path: '/work/app', repos: [], sessionCount: 0, previewSessions: [] } as never])
+    renderOverview()
+    expect(screen.getByText('/work/app/.worktrees/feature')).toBeTruthy()
   })
 })
