@@ -42,7 +42,7 @@ class TestHandleFunctionCall:
             patch("hermes_cli.plugins.has_hook", return_value=True),
             patch("hermes_cli.plugins.invoke_hook") as mock_invoke_hook,
         ):
-            handle_function_call("web_search", {"q": "test"}, task_id="t1")
+            handle_function_call("web_search", {"q": "test"}, task_id="t1", internal=True)
 
         kwargs_by_hook = {
             c.args[0]: c.kwargs for c in mock_invoke_hook.call_args_list
@@ -66,7 +66,7 @@ class TestHandleFunctionCall:
             patch("hermes_cli.plugins.has_hook", return_value=True),
             patch("hermes_cli.plugins.invoke_hook") as mock_invoke_hook,
         ):
-            assert handle_function_call("terminal", {"command": "false"}) == result
+            assert handle_function_call("terminal", {"command": "false"}, internal=True) == result
 
         kwargs_by_hook = {
             hook.args[0]: hook.kwargs for hook in mock_invoke_hook.call_args_list
@@ -89,7 +89,7 @@ class TestHandleFunctionCall:
             patch("hermes_cli.plugins.has_hook", return_value=False),
             patch("hermes_cli.plugins.invoke_hook") as mock_invoke_hook,
         ):
-            result = handle_function_call("web_search", {"q": "test"}, task_id="t1")
+            result = handle_function_call("web_search", {"q": "test"}, task_id="t1", internal=True)
 
         assert result == '{"ok":true}'
         fired = {c.args[0] for c in mock_invoke_hook.call_args_list}
@@ -138,6 +138,7 @@ class TestHandleFunctionCall:
                 task_id="task-1",
                 tool_call_id="tool-1",
                 session_id="session-1",
+                internal=True,
             )
         )
 
@@ -173,6 +174,7 @@ class TestHandleFunctionCall:
                 task_id="task-1",
                 session_id="session-1",
                 tool_call_id="tool-1",
+                internal=True,
             )
         )
 
@@ -211,6 +213,7 @@ class TestHandleFunctionCall:
                 task_id="task-1",
                 session_id="session-1",
                 tool_call_id="tool-1",
+                internal=True,
             )
         )
 
@@ -264,7 +267,7 @@ class TestPreToolCallBlocking:
         monkeypatch.setattr("hermes_cli.plugins.has_hook", lambda name: True)
         monkeypatch.setattr("model_tools.registry.dispatch", fake_dispatch)
 
-        result = json.loads(handle_function_call("read_file", {"path": "test.txt"}, task_id="t1"))
+        result = json.loads(handle_function_call("read_file", {"path": "test.txt"}, task_id="t1", internal=True))
         assert result == {"error": "Blocked by policy"}
         assert not dispatch_called
         post_call = next(call for call in hook_calls if call[0] == "post_tool_call")
@@ -287,7 +290,7 @@ class TestPreToolCallBlocking:
         monkeypatch.setattr("tools.file_tools_read_tracking.notify_other_tool_call",
                             lambda task_id: notifications.append(task_id))
 
-        result = json.loads(handle_function_call("web_search", {"q": "test"}, task_id="t1"))
+        result = json.loads(handle_function_call("web_search", {"q": "test"}, task_id="t1", internal=True))
         assert result == {"error": "Blocked"}
         assert notifications == []
 
@@ -306,7 +309,7 @@ class TestPreToolCallBlocking:
         monkeypatch.setattr("model_tools.registry.dispatch",
                             lambda *a, **kw: json.dumps({"ok": True}))
 
-        result = json.loads(handle_function_call("read_file", {"path": "test.txt"}, task_id="t1"))
+        result = json.loads(handle_function_call("read_file", {"path": "test.txt"}, task_id="t1", internal=True))
         assert result == {"ok": True}
 
 
@@ -339,6 +342,7 @@ class TestPreToolCallBlocking:
             {"path": "original.txt"},
             task_id="t1",
             session_id="s1",
+            internal=True,
         )
 
         assert observed["pre_tool_args"]["path"] == "approved.txt"
@@ -542,14 +546,14 @@ class TestBridgeDispatch:
 
     def test_tool_search_and_describe_return_json_strings(self):
         with patch("model_tools.get_tool_definitions", return_value=[]):
-            out = handle_function_call("tool_search", {"queries": ["anything"]})
+            out = handle_function_call("tool_search", {"queries": ["anything"]}, internal=True)
             assert isinstance(out, str) and json.loads(out) is not None
-            out = handle_function_call("tool_describe", {"names": ["nope"]})
+            out = handle_function_call("tool_describe", {"names": ["nope"]}, internal=True)
             assert isinstance(out, str) and json.loads(out) is not None
 
     def test_tool_call_bad_args_error(self):
         with patch("model_tools.get_tool_definitions", return_value=[]):
-            result = json.loads(handle_function_call("tool_call", {}))
+            result = json.loads(handle_function_call("tool_call", {}, internal=True))
         assert "requires 'calls'" in result["error"]
 
     def test_bridge_rejects_call_when_not_published_to_session(self):
@@ -558,6 +562,7 @@ class TestBridgeDispatch:
                 "tool_search",
                 {"queries": ["files"]},
                 enabled_tools=["read_file"],
+                internal=True,
             ))
         assert "not available in this session" in result["error"]
 
@@ -596,7 +601,7 @@ class TestBridgeDispatch:
         with patch("model_tools.get_tool_definitions", return_value=[]), \
              patch.object(ts, "resolve_underlying_call", return_value=("mcp_x", {"a": 1}, None)), \
              patch.object(ts, "scoped_deferrable_names", return_value=frozenset()):
-            result = json.loads(handle_function_call("tool_call", {"name": "mcp_x"}))
+            result = json.loads(handle_function_call("tool_call", {"name": "mcp_x"}, internal=True))
         assert "not available in this session" in result["error"]
 
         with patch("model_tools.get_tool_definitions", return_value=[]), \
@@ -604,7 +609,7 @@ class TestBridgeDispatch:
              patch.object(ts, "scoped_deferrable_names", return_value=frozenset({"mcp_x"})), \
              patch.object(ts, "validate_deferred_call_args", return_value=None), \
              patch("model_tools.registry.dispatch", return_value='{"ok": true}') as disp:
-            out = handle_function_call("tool_call", {"name": "mcp_x"}, task_id="t")
+            out = handle_function_call("tool_call", {"name": "mcp_x"}, task_id="t", internal=True)
         assert json.loads(out) == {"ok": True}
         assert disp.call_args.args[0] == "mcp_x" and disp.call_args.args[1] == {"a": 1}
 
