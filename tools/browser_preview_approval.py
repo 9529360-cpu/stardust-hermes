@@ -27,7 +27,7 @@ class ActionRiskDecision:
         return self.risk is ActionRisk.HIGH
 
 
-_READ_ONLY_PREVIEW = frozenset({"elements", "hover", "scroll", "strobe", "pin", "unpin", "hold"})
+_READ_ONLY_PREVIEW = frozenset({"elements", "hover", "scroll", "strobe"})
 _NAV_PREVIEW = frozenset({"back", "forward", "reload"})
 
 

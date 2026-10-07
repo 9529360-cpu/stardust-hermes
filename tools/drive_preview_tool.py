@@ -28,8 +28,6 @@ def drive_preview_tool(
     to: Optional[str] = None, limit: Optional[int] = None, full: Optional[bool] = None,
     callback: Optional[Callable] = None) -> str:
     """Dispatch one interaction to the desktop renderer and return its outcome."""
-    if callback is None:
-        return tool_error("drive_preview is only available in the Hermes desktop app.")
     verb = (action or "").strip().lower()
     if verb not in ACTIONS:
         return tool_error(f"action must be one of: {', '.join(ACTIONS)}.")
@@ -37,8 +35,10 @@ def drive_preview_tool(
     # shared classifier here as a defense-in-depth contract for direct callers;
     # the actual prompt is supplied by the agent's normal approval middleware.
     risk = classify_browser_preview_action("preview", verb)
-    if risk.requires_approval and callback is None:
-        return tool_error(f"{risk.reason}; approval is required before this action can run.")
+    if callback is None:
+        if risk.requires_approval:
+            return tool_error(f"drive_preview is only available in the Hermes desktop app; {risk.reason}; approval is required before this action can run.")
+        return tool_error("drive_preview is only available in the Hermes desktop app.")
     if verb in NEEDS_TARGET and not (ref or selector):
         return tool_error(f"{verb} needs a ref from action='elements' (e.g. 'btn-sign-in') or a CSS selector.")
     if verb == "type" and text is None:

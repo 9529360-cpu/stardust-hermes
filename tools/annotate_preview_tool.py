@@ -24,14 +24,14 @@ def annotate_preview_tool(
     label: Optional[str] = None, callback: Optional[Callable] = None,
 ) -> str:
     """Put one annotation up, take one down, or clear them all."""
-    if callback is None:
-        return tool_error("annotate_preview is only available in the Hermes desktop app.")
     verb = (action or "add").strip().lower()
     if verb not in ACTIONS:
         return tool_error(f"action must be one of: {', '.join(ACTIONS)}.")
     risk = classify_browser_preview_action("preview", WIRE[verb])
     if risk.requires_approval and callback is None:
-        return tool_error(f"{risk.reason}; approval is required before this action can run.")
+        return tool_error(f"annotate_preview is only available in the Hermes desktop app; {risk.reason}; approval is required before this action can run.")
+    if callback is None:
+        return tool_error("annotate_preview is only available in the Hermes desktop app.")
     if verb in ("add", "remove") and not (ref or selector):
         return tool_error(f"{verb} needs a ref from drive_preview action='elements' (e.g. 'btn-sign-in') or a CSS selector.")
 
