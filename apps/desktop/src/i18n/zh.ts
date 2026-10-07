@@ -3611,6 +3611,13 @@ export const zh = defineLocale({
       branchOffFrom: base => `从 ${base} 新建分支`,
       switchTo: branch => `切换到 ${branch}`,
       switchFailed: branch => `无法切换到 ${branch}`,
+      checks: {
+        loading: '检查加载中',
+        unavailable: '检查不可用',
+        pending: '检查等待中',
+        passed: '检查已通过',
+        failed: '检查失败'
+      },
       worktrees: '工作树'
     }
   },

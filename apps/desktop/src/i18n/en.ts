@@ -3326,6 +3326,13 @@ export const en: Translations = {
       branchOffFrom: base => `New branch from ${base}`,
       switchTo: branch => `Switch to ${branch}`,
       switchFailed: branch => `Could not switch to ${branch}`,
+      checks: {
+        loading: 'Checks loading',
+        unavailable: 'Checks unavailable',
+        pending: 'Checks pending',
+        passed: 'Checks passed',
+        failed: 'Checks failed'
+      },
       worktrees: 'Worktrees'
     }
   },

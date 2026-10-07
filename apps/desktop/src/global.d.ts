@@ -462,6 +462,7 @@ declare global {
           commitContext: (repoPath: string) => Promise<{ diff: string; recent: string }>
           push: (repoPath: string) => Promise<{ ok: boolean }>
           shipInfo: (repoPath: string) => Promise<HermesReviewShipInfo>
+          checks: (repoPath: string, prNumber?: number, headSha?: string) => Promise<HermesReviewChecks>
           // The PR on each of the given branches — plus any known only by
           // number — for badging a list of sessions in one request instead of
           // one `pr view` per checkout.
@@ -1407,6 +1408,13 @@ export interface HermesPrComment {
 export interface HermesReviewShipInfo {
   ghReady: boolean
   pr: HermesReviewPr | null
+}
+
+export interface HermesReviewChecks {
+  status: 'completed' | 'pending' | 'unavailable'
+  conclusion: null | string
+  checks: Array<{ name: string; status: string; conclusion: null | string; url: string }>
+  workflowRuns: Array<{ name: string; status: string; conclusion: null | string; url: string }>
 }
 
 export interface HermesReadDirEntry {

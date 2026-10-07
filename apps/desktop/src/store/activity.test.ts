@@ -32,18 +32,12 @@ describe('activity task projection', () => {
   })
 
   it('normalizes backend session timestamps to milliseconds before sorting with renderer tasks', () => {
-    const tasks = buildRailTasks(
-      ['tip'],
-      [],
-      [session({ last_active: 10 })],
-      null,
-      {
-        doctor: {
-          status: { exit_code: null, lines: [], name: 'doctor', pid: 1, running: true },
-          updatedAt: 10_500
-        }
+    const tasks = buildRailTasks(['tip'], [], [session({ last_active: 10 })], null, {
+      doctor: {
+        status: { exit_code: null, lines: [], name: 'doctor', pid: 1, running: true },
+        updatedAt: 10_500
       }
-    )
+    })
 
     expect(tasks.map(task => task.id)).toEqual(['action:doctor', 'session:tip'])
   })
@@ -65,7 +59,6 @@ describe('activity task projection', () => {
     })
   })
 })
-
 
 const subagent = (overrides: Partial<SubagentProgress> = {}): SubagentProgress => ({
   id: 'worker',
@@ -99,6 +92,42 @@ const cron = (overrides: Partial<CronJob> = {}): CronJob => ({
 })
 
 describe('task center projection', () => {
+  it('projects safe optional workspace context onto session-owned tasks', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: ['tip'],
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      sessions: [session({ cwd: '/work/app/.worktrees/feature', git_repo_root: '/work/app', git_branch: 'feature' })],
+      projectTree: [{ id: 'p-app', label: 'App', path: '/work/app' }],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks[0].workspace).toEqual({
+      cwd: '/work/app/.worktrees/feature',
+      project: 'App',
+      worktree: '/work/app/.worktrees/feature',
+      branch: 'feature'
+    })
+  })
+
+  it('leaves context absent for sessions without workspace facts', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: ['tip'],
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      sessions: [session()],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks[0].workspace).toBeUndefined()
+  })
+
   it('projects owner-specific durability without becoming a second lifecycle owner', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},
@@ -118,7 +147,6 @@ describe('task center projection', () => {
       ['cron:cron-1', 'queued', 'restart-durable']
     ])
   })
-
   it('preserves subagent hierarchy, child session links, summaries, and artifacts', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},
@@ -167,15 +195,43 @@ describe('task center projection', () => {
     ])
   })
 
-  it('keeps process stop and cron management as owner actions', () => {
+  it('creates typed test result cards without parsing output counts', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},
       attentionSessionIds: [],
       backgroundBySession: {
         runtime: [
-          background(),
-          background({ id: 'proc-2', state: 'failed', exitCode: 7, title: 'build' })
+          background({ title: 'pytest -q', state: 'done', exitCode: 0, output: '999 passed' }),
+          background({ id: 'failed', title: 'vitest run', state: 'failed', exitCode: 3, output: '1 passed' }),
+          background({ id: 'other', title: 'cat output.txt', state: 'done', exitCode: 0 })
         ]
+      },
+      cronJobs: [],
+      previewRestart: null,
+      sessions: [],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks.find(task => task.id === 'process:proc-1')?.testResult).toEqual({
+      command: 'pytest -q',
+      exitCode: 0,
+      status: 'passed'
+    })
+    expect(tasks.find(task => task.id === 'process:failed')?.testResult).toEqual({
+      command: 'vitest run',
+      exitCode: 3,
+      status: 'failed'
+    })
+    expect(tasks.find(task => task.id === 'process:other')?.testResult).toBeUndefined()
+  })
+
+  it('keeps process stop and cron management as owner actions', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: [],
+      backgroundBySession: {
+        runtime: [background(), background({ id: 'proc-2', state: 'failed', exitCode: 7, title: 'build' })]
       },
       cronJobs: [
         cron({ enabled: false, id: 'paused', state: 'paused' }),
@@ -238,6 +294,41 @@ describe('task center projection', () => {
         id: 'approval:approval-1',
         label: 'Delete cached build output',
         ownerSessionId: 'runtime',
+        rail: 'approval',
+        sessionId: 'tip',
+        status: 'waiting'
+      })
+    ])
+  })
+
+  it('projects a clarification as an actionable Needs input card and suppresses generic waiting', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: ['tip'],
+      clarifyRequests: {
+        runtime: {
+          choices: ['safe', 'fast'],
+          multiSelect: false,
+          question: 'Which path?',
+          requestId: 'clarify-1',
+          sessionId: 'runtime'
+        }
+      },
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      runtimeStoredSessionIds: { runtime: 'root' },
+      sessions: [session()],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        clarifyRequest: expect.objectContaining({ requestId: 'clarify-1' }),
+        detail: 'Which path?',
+        id: 'clarify:clarify-1',
+        label: 'Needs input',
         rail: 'approval',
         sessionId: 'tip',
         status: 'waiting'

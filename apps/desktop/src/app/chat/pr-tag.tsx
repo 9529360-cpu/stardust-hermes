@@ -1,8 +1,9 @@
+import { PrChecksBadge } from '@/components/chat/pr-checks-badge'
 import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import type { HermesBranchPullRequest } from '@/global'
 import { cn } from '@/lib/utils'
-import { pullRequestBucket } from '@/store/pull-requests'
+import { pullRequestBucket, type PullRequestChecksState } from '@/store/pull-requests'
 
 // GitHub's own colour language, mapped onto our tokens: open is the "go" green,
 // merged the purple everyone reads as landed, draft and closed muted since
@@ -27,11 +28,13 @@ export function openPullRequest(pr: HermesBranchPullRequest): void {
  *  so the chip doesn't stack a second one beside it. */
 export function PrTag({
   className,
+  checksState,
   pr,
   showIcon = true
 }: {
   className?: string
   pr: HermesBranchPullRequest
+  checksState?: PullRequestChecksState
   showIcon?: boolean
 }) {
   const style = PR_STYLE[pullRequestBucket(pr)] ?? PR_STYLE.open
@@ -64,6 +67,7 @@ export function PrTag({
         {showIcon && <Codicon name={style.icon} size="0.75rem" />}
         {/* Without the glyph the number needs the `#` to still read as a PR. */}
         <span className="underline-offset-1 group-hover/pr:underline">{showIcon ? pr.number : `#${pr.number}`}</span>
+        <PrChecksBadge compact state={checksState ?? 'loading'} />
       </button>
     </Tip>
   )

@@ -2656,6 +2656,13 @@ export const ja = defineLocale({
       branchOffFrom: base => `${base} から新しいブランチ`,
       switchTo: branch => `${branch} に切り替え`,
       switchFailed: branch => `${branch} に切り替えできませんでした`,
+      checks: {
+        loading: 'チェックを読み込み中',
+        unavailable: 'チェックを利用できません',
+        pending: 'チェック待機中',
+        passed: 'チェックに合格',
+        failed: 'チェックに失敗'
+      },
       worktrees: 'ワークツリー'
     }
   },

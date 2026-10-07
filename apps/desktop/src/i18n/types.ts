@@ -2895,6 +2895,13 @@ export interface Translations {
       branchOffFrom: (base: string) => string
       switchTo: (branch: string) => string
       switchFailed: (branch: string) => string
+      checks: {
+        loading: string
+        unavailable: string
+        pending: string
+        passed: string
+        failed: string
+      }
       worktrees: string
     }
   }

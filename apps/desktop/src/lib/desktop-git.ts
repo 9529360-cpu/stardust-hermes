@@ -4,6 +4,7 @@ import type {
   HermesGitWorktree,
   HermesRepoPullRequests,
   HermesRepoStatus,
+  HermesReviewChecks,
   HermesReviewList,
   HermesReviewShipInfo
 } from '@/global'
@@ -31,7 +32,7 @@ function desktopApi<T>(path: string, body?: Record<string, unknown>): Promise<T>
   )
 }
 
-function gitGet<T>(route: string, params: Record<string, boolean | null | string | undefined>): Promise<T> {
+function gitGet<T>(route: string, params: Record<string, boolean | null | number | string | undefined>): Promise<T> {
   const query = new URLSearchParams()
 
   for (const [key, value] of Object.entries(params)) {
@@ -92,6 +93,9 @@ const remoteGit: GitBridge = {
     push: repoPath => gitPost('review/push', { path: repoPath }),
 
     shipInfo: repoPath => gitGet<HermesReviewShipInfo>('review/ship-info', { path: repoPath }),
+
+    checks: (repoPath, prNumber, headSha) =>
+      gitGet<HermesReviewChecks>('review/checks', { headSha, path: repoPath, prNumber }),
 
     prList: (repoPath, branches, numbers) =>
       gitPost<HermesRepoPullRequests>('review/pr-list', { branches, numbers: numbers ?? [], path: repoPath }),
