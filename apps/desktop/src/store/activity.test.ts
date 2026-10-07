@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { CronJob, CronSuggestion, SessionInfo } from '@/types/hermes'
 
-import { buildRailTasks, buildTaskCenterTasks } from './activity'
+import { buildRailTasks, buildTaskCenterTasks, filterTaskCenterTasks, type TaskCenterTask } from './activity'
 import type { ComposerStatusItem } from './composer-status'
 import type { SubagentProgress } from './subagents'
 
@@ -100,7 +100,67 @@ const cronSuggestion = (overrides: Partial<CronSuggestion> = {}): CronSuggestion
   ...overrides
 })
 
+const task = (overrides: Partial<TaskCenterTask> = {}): TaskCenterTask => ({
+  detail: 'Task detail',
+  id: 'task',
+  label: 'Task',
+  rail: 'process',
+  status: 'success',
+  updatedAt: 0,
+  ...overrides
+})
+
 describe('task center projection', () => {
+  it('filters the canonical projection into a needs-attention review queue', () => {
+    const tasks = [
+      task({
+        approvalRequest: { command: 'rm -rf cache', description: 'Remove cache', sessionId: 'runtime' },
+        id: 'approval',
+        rail: 'approval',
+        status: 'waiting'
+      }),
+      task({
+        clarifyRequest: {
+          choices: null,
+          multiSelect: false,
+          question: 'Which path?',
+          requestId: 'clarify-1',
+          sessionId: 'runtime'
+        },
+        id: 'needs-input',
+        rail: 'approval',
+        status: 'waiting'
+      }),
+      task({
+        id: 'failed-test',
+        status: 'error',
+        testResult: { command: 'vitest run', exitCode: 1, status: 'failed' }
+      }),
+      task({ id: 'failed-ci', rail: 'session', status: 'running' }),
+      task({ id: 'pending-ci', rail: 'session', status: 'success' }),
+      task({ action: 'review-cron-suggestion', id: 'cron-suggestion', rail: 'cron', status: 'waiting' }),
+      task({ id: 'passed-test', testResult: { command: 'vitest run', exitCode: 0, status: 'passed' } }),
+      task({ id: 'passed-ci', rail: 'session', status: 'success' }),
+      task({ id: 'ordinary', status: 'running' })
+    ]
+
+    const filtered = filterTaskCenterTasks(tasks, 'needs-attention', {
+      'failed-ci': 'failed',
+      'pending-ci': 'pending',
+      'passed-ci': 'passed'
+    })
+
+    expect(filtered.map(item => item.id)).toEqual([
+      'approval',
+      'needs-input',
+      'failed-test',
+      'failed-ci',
+      'pending-ci',
+      'cron-suggestion'
+    ])
+    expect(filterTaskCenterTasks(tasks, 'all')).toBe(tasks)
+  })
+
   it('projects safe optional workspace context onto session-owned tasks', () => {
     const tasks = buildTaskCenterTasks({
       actionTasks: {},

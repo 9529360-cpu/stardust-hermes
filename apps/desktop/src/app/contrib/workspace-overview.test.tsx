@@ -20,6 +20,7 @@ vi.mock('@/app/open-session', () => ({
 }))
 
 import { I18nProvider } from '@/i18n'
+import { $backgroundStatusBySession } from '@/store/composer-status'
 import { setCronJobs } from '@/store/cron'
 import { $projectTree } from '@/store/projects'
 import { $currentCwd, $selectedStoredSessionId, $sessions } from '@/store/session'
@@ -27,13 +28,13 @@ import { $sessionStates } from '@/store/session-states'
 
 import { WorkspaceOverview } from './workspace-overview'
 
-function renderOverview() {
+function renderOverview(initialLocale: 'en' | 'zh' = 'zh') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
   render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <I18nProvider configClient={null} initialLocale="zh">
+        <I18nProvider configClient={null} initialLocale={initialLocale}>
           <WorkspaceOverview />
         </I18nProvider>
       </MemoryRouter>
@@ -55,6 +56,7 @@ afterEach(() => {
   $sessionStates.set({})
   $sessions.set([])
   $projectTree.set([])
+  $backgroundStatusBySession.set({})
 })
 
 describe('WorkspaceOverview (context rail)', () => {
@@ -106,6 +108,25 @@ describe('WorkspaceOverview (context rail)', () => {
     expect(screen.getByRole('button', { name: '查看' })).toBeTruthy()
   })
 
+  it('filters the Task Center to failed tests while keeping the existing task cards', () => {
+    $backgroundStatusBySession.set({
+      runtime: [
+        { id: 'failed', state: 'failed', title: 'pytest failed', type: 'background', exitCode: 1 },
+        { id: 'passed', state: 'done', title: 'pytest passed', type: 'background', exitCode: 0 }
+      ]
+    })
+    renderOverview('en')
+
+    expect(screen.queryAllByText('pytest failed').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('pytest passed').length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Needs attention' }))
+
+    expect(screen.getByText('Review queue')).toBeTruthy()
+    expect(screen.queryAllByText('pytest failed').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('pytest passed')).toHaveLength(0)
+  })
+
   it('opens a session beside the current work when the Task Center action is used', () => {
     $selectedStoredSessionId.set('other')
     $sessionStates.set({ runtime: { storedSessionId: 'tip', needsInput: true } as never })
@@ -115,6 +136,7 @@ describe('WorkspaceOverview (context rail)', () => {
     } as never])
     renderOverview()
 
+    fireEvent.click(screen.getByRole('button', { name: '需要关注' }))
     fireEvent.click(screen.getByRole('button', { name: '在旁边打开' }))
 
     expect(openSession).toHaveBeenCalledWith('tip', expect.any(Function), 'stack')

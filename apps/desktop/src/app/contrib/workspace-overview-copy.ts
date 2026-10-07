@@ -35,6 +35,11 @@ export interface WorkspaceOverviewCopy {
   clean: string
   notStaged: string
   nothingPending: string
+  taskCenterView: string
+  taskCenterAll: string
+  needsAttention: string
+  reviewQueue: string
+  noNeedsAttention: string
   summaryWorkingClean: string
   summaryReadyClean: string
   syncValue: (ahead: number, behind: number) => string
@@ -81,6 +86,11 @@ const en: WorkspaceOverviewCopy = {
   clean: 'Clean',
   notStaged: 'Not staged',
   nothingPending: 'Nothing pending',
+  taskCenterView: 'View',
+  taskCenterAll: 'All',
+  needsAttention: 'Needs attention',
+  reviewQueue: 'Review queue',
+  noNeedsAttention: 'No tasks need attention.',
   summaryWorkingClean: 'Work is in progress. File changes will appear here as soon as they land.',
   summaryReadyClean: 'The workspace is clean and ready for the next task.',
   syncValue: (ahead, behind) => `${ahead} ahead · ${behind} behind`,
@@ -128,6 +138,11 @@ const zh: WorkspaceOverviewCopy = {
   clean: '干净',
   notStaged: '未暂存',
   nothingPending: '无待处理项',
+  taskCenterView: '查看',
+  taskCenterAll: '全部',
+  needsAttention: '需要关注',
+  reviewQueue: '审查队列',
+  noNeedsAttention: '目前没有需要关注的任务。',
   summaryWorkingClean: '任务正在进行，文件改动落地后会显示在这里。',
   summaryReadyClean: '工作区干净，可以开始下一个任务。',
   syncValue: (ahead, behind) => `超前 ${ahead} · 落后 ${behind}`,
@@ -174,6 +189,11 @@ const zhHant: WorkspaceOverviewCopy = {
   clean: '乾淨',
   notStaged: '未暫存',
   nothingPending: '沒有待處理項目',
+  taskCenterView: '檢視',
+  taskCenterAll: '全部',
+  needsAttention: '需要關注',
+  reviewQueue: '審查佇列',
+  noNeedsAttention: '目前沒有需要關注的任務。',
   summaryWorkingClean: '工作正在進行，檔案變更出現後會顯示在這裡。',
   summaryReadyClean: '工作區乾淨，可以開始下一個任務。',
   syncValue: (ahead, behind) => `超前 ${ahead} · 落後 ${behind}`,
@@ -220,6 +240,11 @@ const ja: WorkspaceOverviewCopy = {
   clean: 'クリーン',
   notStaged: '未ステージ',
   nothingPending: '保留なし',
+  taskCenterView: '表示',
+  taskCenterAll: 'すべて',
+  needsAttention: '要対応',
+  reviewQueue: 'レビューキュー',
+  noNeedsAttention: '要対応のタスクはありません。',
   summaryWorkingClean: '作業中です。ファイル変更は反映され次第ここに表示されます。',
   summaryReadyClean: 'ワークスペースはクリーンで、次のタスクを開始できます。',
   syncValue: (ahead, behind) => `${ahead} ahead · ${behind} behind`,
@@ -266,6 +291,11 @@ const ru: WorkspaceOverviewCopy = {
   clean: 'Чисто',
   notStaged: 'Не подготовлено',
   nothingPending: 'Нет ожидающих изменений',
+  taskCenterView: 'Вид',
+  taskCenterAll: 'Все',
+  needsAttention: 'Требуют внимания',
+  reviewQueue: 'Очередь проверки',
+  noNeedsAttention: 'Нет задач, требующих внимания.',
   summaryWorkingClean: 'Работа продолжается. Изменения файлов появятся здесь сразу после записи.',
   summaryReadyClean: 'Рабочая область чистая и готова к следующей задаче.',
   syncValue: (ahead, behind) => `впереди ${ahead} · позади ${behind}`,
@@ -312,6 +342,11 @@ const ar: WorkspaceOverviewCopy = {
   clean: 'نظيف',
   notStaged: 'غير مجهز',
   nothingPending: 'لا شيء معلق',
+  taskCenterView: 'العرض',
+  taskCenterAll: 'الكل',
+  needsAttention: 'يحتاج إلى انتباه',
+  reviewQueue: 'قائمة المراجعة',
+  noNeedsAttention: 'لا توجد مهام تحتاج إلى انتباه.',
   summaryWorkingClean: 'العمل جارٍ. ستظهر تغييرات الملفات هنا فور تسجيلها.',
   summaryReadyClean: 'مساحة العمل نظيفة وجاهزة للمهمة التالية.',
   syncValue: (ahead, behind) => `${ahead} متقدم · ${behind} متأخر`,
