@@ -16,6 +16,7 @@ CAPABILITY_MATRIX = {
     "console_errors": {"legacy": "browser_console", "exec": "cdp('Runtime.enable')", "support": "adapter"},
     "vision_annotation": {"legacy": "browser_vision(annotate=True)", "exec": "capture_screenshot + cdp", "support": "partial"},
     "structured_actions": {"legacy": "browser_interact", "exec": "js/cdp/click_at_xy", "support": "mapping"},
+    "execution_errors": {"legacy": "browser_* error JSON", "exec": "success/error/error_type", "support": "native"},
 }
 
 _ACTIONS = {
