@@ -465,6 +465,11 @@ atexit.register(_lifecycle._stop_browser_cleanup_thread)
 # ----------------------------------------------------------------------------
 BROWSER_TOOL_SCHEMAS = [
     {
+        "name": "browser_status",
+        "description": "Return the browser backend, profile mode, session/tab identity, origin, available actions, and degraded/fallback state.",
+        "parameters": {"type": "object", "properties": {}},
+    },
+    {
         "name": "browser_navigate",
         "description": "Navigate to a URL in the browser. Initializes the session and loads the page. Must be called before other browser tools. For simple information retrieval, prefer a lightweight retrieval tool when one is available (faster, cheaper). For plain-text endpoints — URLs ending in .md, .txt, .json, .yaml, .yml, .csv, .xml, raw.githubusercontent.com, or any documented API endpoint — prefer an available text-extraction or terminal-fetch tool; the browser stack is overkill and much slower for these. Use browser tools when you need to interact with a page (click, fill forms, dynamic content). Returns a compact page snapshot with interactive elements and ref IDs — no need to call browser_snapshot separately after navigating.",
         "parameters": {
@@ -773,6 +778,7 @@ def browser_navigate(url: str, task_id: Optional[str] = None) -> str:
     data = result.get("data", {})
     title = data.get("title", "")
     final_url = data.get("url", url)
+    session_info["current_url"] = final_url
     blocked = _post_redirect_block(nav_session_key, url, final_url, auto_local_this_nav)
     if blocked is not None:
         return blocked
@@ -1330,6 +1336,31 @@ def check_browser_interact_requirements() -> bool:
     )
 
 
+def browser_status(task_id: Optional[str] = None) -> str:
+    """Return the observable browser capability/session manifest without creating a session."""
+    from tools.browser_tool_manifest import serialize_manifest
+
+    requested_task = task_id or "default"
+    owner_key = _registry_session_key(requested_task)
+    session_key = _last_active_session_key.get(owner_key, owner_key)
+    with _cleanup_lock:
+        session = _active_sessions.get(session_key)
+        session = dict(session) if session else None
+    provider = _cloud._get_cloud_provider()
+    configured = ("camofox" if _is_camofox_mode() else "browser-use" if _is_browser_use_cli_mode()
+                 else "cdp" if _cdp._get_cdp_override() else
+                 type(provider).__name__ if provider else "local")
+    actions = (["navigate", "snapshot", "interact", "evaluate", "screenshot"]
+               if configured == "browser-use" else
+               ["navigate", "snapshot", "click", "type", "scroll", "back", "press"])
+    if configured != "browser-use" and check_browser_interact_requirements():
+        actions.append("interact")
+    if _install.check_browser_vision_requirements():
+        actions.append("screenshot")
+    return serialize_manifest(task_id=requested_task, session=session, configured_backend=configured,
+                              profile_key=hermes_home_key(), actions=actions)
+
+
 def _fallback_call(fn_name: str, arg_defaults: Dict[str, Any], extra_kw: tuple = ()):
     """Adapter from the registry's ``(args, kw)`` to ``<fn_name>(**schema_args, task_id=...)``;
     the function is looked up in module globals at call time so monkeypatching works."""
@@ -1346,6 +1377,7 @@ def _fallback_call(fn_name: str, arg_defaults: Dict[str, Any], extra_kw: tuple =
 # function is the module global of the same name. Routed-through-extension tools (gate None)
 # use the per-action gate; get_images/console/vision keep the plain requirement checks.
 _BROWSER_TOOL_TABLE = (
+    ("browser_status", "ℹ️", None, {}),
     ("browser_navigate", "🌐", None, {"url": ""}),
     ("browser_snapshot", "📸", None, {"full": False}, ("user_task",)),
     ("browser_click", "👆", None, {"ref": ""}),
