@@ -592,6 +592,31 @@ const PR_QUERY_BRANCH_CAP = 300
 
 const PR_NODE_FIELDS = 'number state isDraft isCrossRepository title url headRefName'
 
+const CHECKS_QUERY_FIELDS = 'statusCheckRollup { state conclusion } checkSuites(first: 50) { nodes { status conclusion workflowRun { workflowName url } checkRuns(first: 50) { nodes { name status conclusion detailsUrl htmlUrl } } } }'
+const unavailableChecks = () => ({ status: 'unavailable', conclusion: null, checks: [], workflowRuns: [] })
+function checksPayload(pr) {
+  if (!pr) return unavailableChecks()
+  const checks = [], workflowRuns = []
+  for (const suite of pr.checkSuites?.nodes || []) {
+    for (const run of suite.checkRuns?.nodes || []) checks.push({ name: String(run?.name || ''), status: String(run?.status || '').toLowerCase(), conclusion: run?.conclusion ? String(run.conclusion).toLowerCase() : null, url: String(run?.detailsUrl || run?.htmlUrl || '') })
+    if (suite.workflowRun) workflowRuns.push({ name: String(suite.workflowRun.workflowName || ''), url: String(suite.workflowRun.url || ''), status: String(suite.status || '').toLowerCase(), conclusion: suite.conclusion ? String(suite.conclusion).toLowerCase() : null })
+  }
+  const rollup = pr.statusCheckRollup || {}, conclusion = rollup.conclusion ? String(rollup.conclusion).toLowerCase() : null
+  return { status: String(rollup.state || (conclusion ? 'completed' : 'pending')).toLowerCase(), conclusion, checks, workflowRuns }
+}
+async function reviewChecks(repoPath, ghBin, prNumber, headSha) {
+  let cwd
+  try { cwd = resolveRequestedPathForIpc(repoPath, { purpose: 'Review checks' }) } catch { return unavailableChecks() }
+  if (!prNumber && !headSha) return unavailableChecks()
+  const repo = await runGh(['repo', 'view', '--json', 'nameWithOwner', '-q', '.nameWithOwner'], cwd, ghBin), [owner, name] = repo.stdout.trim().split('/')
+  if (!repo.ok || !owner || !name) return unavailableChecks()
+  const target = prNumber ? `pullRequest(number: ${Number(prNumber)})` : `object(expression: ${JSON.stringify(String(headSha))})`
+  const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { ${target} { ... on PullRequest { ${CHECKS_QUERY_FIELDS} } } } }`
+  const result = await runGh(['api', 'graphql', '-f', `query=${query}`], cwd, ghBin)
+  if (!result.ok) return unavailableChecks()
+  try { return checksPayload(JSON.parse(result.stdout)?.data?.repository?.[prNumber ? 'pullRequest' : 'object']) } catch { return unavailableChecks() }
+}
+
 function prQueryFor(owner, name, branches, numbers) {
   const fields = [
     ...branches.map(
@@ -894,6 +919,7 @@ export {
   reviewFetchPrComment,
   reviewList,
   reviewPrList,
+  reviewChecks,
   reviewPush,
   reviewRevert,
   reviewRevParse,

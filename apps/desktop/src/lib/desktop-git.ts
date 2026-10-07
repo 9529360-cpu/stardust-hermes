@@ -5,7 +5,8 @@ import type {
   HermesRepoPullRequests,
   HermesRepoStatus,
   HermesReviewList,
-  HermesReviewShipInfo
+  HermesReviewShipInfo,
+  HermesReviewChecks
 } from '@/global'
 import { hermesApi } from '@/hermes'
 
@@ -92,6 +93,9 @@ const remoteGit: GitBridge = {
     push: repoPath => gitPost('review/push', { path: repoPath }),
 
     shipInfo: repoPath => gitGet<HermesReviewShipInfo>('review/ship-info', { path: repoPath }),
+
+    checks: (repoPath, prNumber, headSha) =>
+      gitGet<HermesReviewChecks>('review/checks', { headSha, path: repoPath, prNumber }),
 
     prList: (repoPath, branches, numbers) =>
       gitPost<HermesRepoPullRequests>('review/pr-list', { branches, numbers: numbers ?? [], path: repoPath }),
