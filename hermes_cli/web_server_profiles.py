@@ -161,7 +161,7 @@ def _write_profile_mcp_servers(profile_dir: Path, servers: List["MCPServerCreate
     profile-create write is one config save. Returns the number of servers written.
     """
     from hermes_cli.config import load_config, save_config
-    from hermes_cli.mcp_config import _save_bearer_auth_token
+    from hermes_cli.mcp_config import MCP_CREATE_TRUST, _save_bearer_auth_token
     written = 0
     with _hermes_home_scope(profile_dir):
         cfg = load_config()
@@ -175,6 +175,8 @@ def _write_profile_mcp_servers(profile_dir: Path, servers: List["MCPServerCreate
                 continue
             if bearer_token is not None:
                 entry["headers"] = _save_bearer_auth_token(name, bearer_token)
+            # Creating a profile explicitly creates new MCP entries too.
+            entry.setdefault("trust", MCP_CREATE_TRUST)
             mcp[name] = entry
             written += 1
         if written:
