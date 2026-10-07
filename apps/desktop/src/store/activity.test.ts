@@ -32,18 +32,12 @@ describe('activity task projection', () => {
   })
 
   it('normalizes backend session timestamps to milliseconds before sorting with renderer tasks', () => {
-    const tasks = buildRailTasks(
-      ['tip'],
-      [],
-      [session({ last_active: 10 })],
-      null,
-      {
-        doctor: {
-          status: { exit_code: null, lines: [], name: 'doctor', pid: 1, running: true },
-          updatedAt: 10_500
-        }
+    const tasks = buildRailTasks(['tip'], [], [session({ last_active: 10 })], null, {
+      doctor: {
+        status: { exit_code: null, lines: [], name: 'doctor', pid: 1, running: true },
+        updatedAt: 10_500
       }
-    )
+    })
 
     expect(tasks.map(task => task.id)).toEqual(['action:doctor', 'session:tip'])
   })
@@ -65,7 +59,6 @@ describe('activity task projection', () => {
     })
   })
 })
-
 
 const subagent = (overrides: Partial<SubagentProgress> = {}): SubagentProgress => ({
   id: 'worker',
@@ -122,21 +115,34 @@ describe('task center projection', () => {
 
   it('leaves context absent for sessions without workspace facts', () => {
     const tasks = buildTaskCenterTasks({
-      actionTasks: {}, attentionSessionIds: ['tip'], backgroundBySession: {}, cronJobs: [],
-      previewRestart: null, sessions: [session()], subagentsBySession: {}, workingSessionIds: []
+      actionTasks: {},
+      attentionSessionIds: ['tip'],
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      sessions: [session()],
+      subagentsBySession: {},
+      workingSessionIds: []
     })
     expect(tasks[0].workspace).toBeUndefined()
   })
 
   it('projects owner-specific durability without becoming a second lifecycle owner', () => {
     const tasks = buildTaskCenterTasks({
-      actionTasks: {}, attentionSessionIds: ['tip'], backgroundBySession: { runtime: [background()] },
-      cronJobs: [cron()], previewRestart: null, sessions: [session()],
-      subagentsBySession: { runtime: [subagent({ sessionId: 'child-1' })] }, workingSessionIds: []
+      actionTasks: {},
+      attentionSessionIds: ['tip'],
+      backgroundBySession: { runtime: [background()] },
+      cronJobs: [cron()],
+      previewRestart: null,
+      sessions: [session()],
+      subagentsBySession: { runtime: [subagent({ sessionId: 'child-1' })] },
+      workingSessionIds: []
     })
     expect(tasks.map(task => [task.id, task.status, task.durability])).toEqual([
-      ['session:tip', 'waiting', 'turn'], ['subagent:runtime:worker', 'running', 'process-local'],
-      ['process:proc-1', 'running', 'process-local'], ['cron:cron-1', 'queued', 'restart-durable']
+      ['session:tip', 'waiting', 'turn'],
+      ['subagent:runtime:worker', 'running', 'process-local'],
+      ['process:proc-1', 'running', 'process-local'],
+      ['cron:cron-1', 'queued', 'restart-durable']
     ])
   })
   it('preserves subagent hierarchy, child session links, summaries, and artifacts', () => {
@@ -223,10 +229,7 @@ describe('task center projection', () => {
       actionTasks: {},
       attentionSessionIds: [],
       backgroundBySession: {
-        runtime: [
-          background(),
-          background({ id: 'proc-2', state: 'failed', exitCode: 7, title: 'build' })
-        ]
+        runtime: [background(), background({ id: 'proc-2', state: 'failed', exitCode: 7, title: 'build' })]
       },
       cronJobs: [
         cron({ enabled: false, id: 'paused', state: 'paused' }),
@@ -289,6 +292,41 @@ describe('task center projection', () => {
         id: 'approval:approval-1',
         label: 'Delete cached build output',
         ownerSessionId: 'runtime',
+        rail: 'approval',
+        sessionId: 'tip',
+        status: 'waiting'
+      })
+    ])
+  })
+
+  it('projects a clarification as an actionable Needs input card and suppresses generic waiting', () => {
+    const tasks = buildTaskCenterTasks({
+      actionTasks: {},
+      attentionSessionIds: ['tip'],
+      clarifyRequests: {
+        runtime: {
+          choices: ['safe', 'fast'],
+          multiSelect: false,
+          question: 'Which path?',
+          requestId: 'clarify-1',
+          sessionId: 'runtime'
+        }
+      },
+      backgroundBySession: {},
+      cronJobs: [],
+      previewRestart: null,
+      runtimeStoredSessionIds: { runtime: 'root' },
+      sessions: [session()],
+      subagentsBySession: {},
+      workingSessionIds: []
+    })
+
+    expect(tasks).toEqual([
+      expect.objectContaining({
+        clarifyRequest: expect.objectContaining({ requestId: 'clarify-1' }),
+        detail: 'Which path?',
+        id: 'clarify:clarify-1',
+        label: 'Needs input',
         rail: 'approval',
         sessionId: 'tip',
         status: 'waiting'

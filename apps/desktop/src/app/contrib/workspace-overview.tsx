@@ -27,7 +27,13 @@ import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/sto
 import { $clarifyRequests, answerClarifyRequest } from '@/store/clarify'
 import { $gateway } from '@/store/gateway'
 import { setRightContextOpen } from '@/store/right-context'
-import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions, sessionMatchesStoredId } from '@/store/session'
+import {
+  $activeSessionId,
+  $currentCwd,
+  $selectedStoredSessionId,
+  $sessions,
+  sessionMatchesStoredId
+} from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
 import { $approvalRequests, answerApproval } from '@/store/prompts'
 import { $subagentsBySession } from '@/store/subagents'
@@ -121,12 +127,36 @@ function UnifiedInputCard({ task, gateway }: { task: TaskCenterTask; gateway: Pa
       <div className="mb-1 text-[0.75rem] font-medium text-primary">{task.label}</div>
       <div className={cn('mb-2 line-clamp-3', BODY_CLASS)}>{task.detail}</div>
       <div className="flex flex-wrap gap-1.5">
-        {request ? <>
-          <Button disabled={busy} onClick={() => void submit('once')} size="xs" variant="secondary">Run</Button>
-          <Button disabled={busy} onClick={() => void submit('deny')} size="xs" variant="ghost">Reject</Button>
-        </> : choices.map(choice => <Button disabled={busy} key={choice} onClick={() => void submit(choice)} size="xs" variant="secondary">{choice}</Button>)}
+        {request ? (
+          <>
+            <Button disabled={busy} onClick={() => void submit('once')} size="xs" variant="secondary">
+              Run
+            </Button>
+            <Button disabled={busy} onClick={() => void submit('deny')} size="xs" variant="ghost">
+              Reject
+            </Button>
+          </>
+        ) : (
+          choices.map(choice => (
+            <Button disabled={busy} key={choice} onClick={() => void submit(choice)} size="xs" variant="secondary">
+              {choice}
+            </Button>
+          ))
+        )}
       </div>
-      {clarify && choices.length === 0 && <div className="mt-1.5 flex gap-1.5"><Textarea className="min-h-8" onChange={event => setDraft(event.target.value)} placeholder="Your answer" value={draft} /><Button disabled={busy || !draft.trim()} onClick={() => void submit(draft)} size="xs" variant="secondary">Send</Button></div>}
+      {clarify && choices.length === 0 && (
+        <div className="mt-1.5 flex gap-1.5">
+          <Textarea
+            className="min-h-8"
+            onChange={event => setDraft(event.target.value)}
+            placeholder="Your answer"
+            value={draft}
+          />
+          <Button disabled={busy || !draft.trim()} onClick={() => void submit(draft)} size="xs" variant="secondary">
+            Send
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -204,8 +234,10 @@ export function WorkspaceOverview() {
             assistantTitle: 'Stardust assistant',
             activeTaskTitle: 'Active task',
             currentConversationTitle: 'Current conversation',
-            assistantSummary: 'Project, file, preview, and tool context appears here when the current conversation needs it; ordinary chat needs no project.',
-            assistantSession: 'The current conversation is ready. Expand project, file, or preview context only when it is useful.',
+            assistantSummary:
+              'Project, file, preview, and tool context appears here when the current conversation needs it; ordinary chat needs no project.',
+            assistantSession:
+              'The current conversation is ready. Expand project, file, or preview context only when it is useful.',
             taskProgress: 'Task progress',
             activity: 'Task center',
             activityRunning: 'Running',
@@ -224,8 +256,10 @@ export function WorkspaceOverview() {
             activityFiles: (count: number) => `${count} files`,
             currentStep: 'Current step',
             needsInput: 'Waiting for your input',
-            attentionSummary: 'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
-            workingSummary: 'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
+            attentionSummary:
+              'The current task is waiting for your input. Its working context is preserved so you can reply and continue.',
+            workingSummary:
+              'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
             hidePreview: 'Hide context',
             emptyRail: 'Background tasks, subagents and progress show up here.'
           }
@@ -246,9 +280,13 @@ export function WorkspaceOverview() {
   const activeConnectionId = useStore($activeConnectionId)
   const profileScope = useStore($profileScope)
 
-  const cronJobs = useMemo(() => (
-    cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}` ? cachedCronJobs : []
-  ), [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope])
+  const cronJobs = useMemo(
+    () =>
+      cronJobsScope === `${activeConnectionId ?? ''}\u0000${sidebarProfileForScope(profileScope)}`
+        ? cachedCronJobs
+        : [],
+    [activeConnectionId, cachedCronJobs, cronJobsScope, profileScope]
+  )
 
   const desktopActionTasks = useStore($desktopActionTasks)
   const previewServerRestart = useStore($previewServerRestart)
@@ -368,7 +406,8 @@ export function WorkspaceOverview() {
 
   const todoItems = statusItems.filter(item => item.type === 'todo')
   const completedTodoCount = todoItems.filter(item => item.todoStatus === 'completed').length
-  const activeTodo = todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
+  const activeTodo =
+    todoItems.find(item => item.todoStatus === 'in_progress') ?? todoItems.find(item => item.todoStatus === 'pending')
   const todoPercent = todoItems.length > 0 ? Math.round((completedTodoCount / todoItems.length) * 100) : 0
   const showTaskCard = primaryAttention || primaryWorking
 
@@ -435,7 +474,12 @@ export function WorkspaceOverview() {
     >
       <header className="flex h-10 shrink-0 items-center justify-between gap-2 px-4" data-context-rail-header="">
         <h2 className="truncate text-[0.8125rem] font-semibold text-(--ui-text-primary)">{copy.workspace}</h2>
-        <Button aria-label={systemLabels.hidePreview} onClick={() => setRightContextOpen(false)} size="icon-xs" variant="ghost">
+        <Button
+          aria-label={systemLabels.hidePreview}
+          onClick={() => setRightContextOpen(false)}
+          size="icon-xs"
+          variant="ghost"
+        >
           <Codicon name="close" />
         </Button>
       </header>
@@ -470,12 +514,19 @@ export function WorkspaceOverview() {
                 <div className="min-w-0 flex-1">
                   <div className={TITLE_CLASS}>{sessionLabel}</div>
                   <p className={cn('mt-0.5', BODY_CLASS)}>{summary}</p>
-                  {displaySession?.model && <div className={cn('mt-1 truncate font-mono', META_CLASS)}>{displaySession.model}</div>}
+                  {displaySession?.model && (
+                    <div className={cn('mt-1 truncate font-mono', META_CLASS)}>{displaySession.model}</div>
+                  )}
                   {effectiveCwd && <div className={cn('mt-1 truncate font-mono', META_CLASS)}>{effectiveCwd}</div>}
                 </div>
               </div>
               {displayTaskStoredId && (primaryAttention || primaryWorking) && (
-                <Button className="w-full" onClick={() => navigate(sessionRoute(displayTaskStoredId))} size="sm" variant="secondary">
+                <Button
+                  className="w-full"
+                  onClick={() => navigate(sessionRoute(displayTaskStoredId))}
+                  size="sm"
+                  variant="secondary"
+                >
                   <Codicon name="comment-discussion" />
                   {copy.continueTask}
                 </Button>
@@ -570,10 +621,14 @@ export function WorkspaceOverview() {
                           </Button>
                         </div>
                       )}
-                      {task.detail && <div className={cn('line-clamp-2 text-(--ui-text-tertiary)', META_CLASS)}>{task.detail}</div>}
+                      {task.detail && (
+                        <div className={cn('line-clamp-2 text-(--ui-text-tertiary)', META_CLASS)}>{task.detail}</div>
+                      )}
                       {task.workspace && (
                         <div className={cn('truncate text-(--ui-text-quaternary)', META_CLASS)}>
-                          {[task.workspace.project, task.workspace.worktree, task.workspace.branch, task.workspace.cwd].filter(Boolean).join(' · ')}
+                          {[task.workspace.project, task.workspace.worktree, task.workspace.branch, task.workspace.cwd]
+                            .filter(Boolean)
+                            .join(' · ')}
                         </div>
                       )}
                       <div className={cn('mt-0.5 flex min-w-0 items-center gap-1', META_CLASS)}>
@@ -592,8 +647,10 @@ export function WorkspaceOverview() {
                         ) : null}
                       </div>
                     </div>
-                      {task.clarifyRequest || task.approvalRequest ? <UnifiedInputCard gateway={gateway} task={task} /> : null}
-                      {task.action && (
+                    {task.clarifyRequest || task.approvalRequest ? (
+                      <UnifiedInputCard gateway={gateway} task={task} />
+                    ) : null}
+                    {task.action && (
                       <Button onClick={() => handleTaskAction(task)} size="xs" variant="ghost">
                         {task.action === 'stop-process'
                           ? systemLabels.stopTask

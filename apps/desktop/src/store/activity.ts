@@ -186,8 +186,14 @@ function workspaceContext(
   const project = normalizedCwd
     ? [...projects]
         .filter(item => {
-          const path = item.path?.trim().replace(/[\\/]+$/, '').toLowerCase()
-          return path && (normalizedCwd === path || normalizedCwd.startsWith(`${path}/`) || normalizedCwd.startsWith(`${path}\\`))
+          const path = item.path
+            ?.trim()
+            .replace(/[\\/]+$/, '')
+            .toLowerCase()
+          return (
+            path &&
+            (normalizedCwd === path || normalizedCwd.startsWith(`${path}/`) || normalizedCwd.startsWith(`${path}\\`))
+          )
         })
         .sort((a, b) => (b.path?.length ?? 0) - (a.path?.length ?? 0))[0]?.label
     : undefined
@@ -221,7 +227,9 @@ const parseTimestamp = (value: null | string | undefined): number => {
 }
 
 const cronStatus = (job: CronJob): TaskCenterStatus => {
-  const state = String(job.state ?? '').trim().toLowerCase()
+  const state = String(job.state ?? '')
+    .trim()
+    .toLowerCase()
 
   if (state === 'running' || state === 'active') {
     return 'running'
@@ -316,36 +324,36 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     const session = id ? sources.sessions.find(candidate => sessionMatchesStoredId(candidate, id)) : undefined
     return workspaceContext(session, sources.projectTree)
   }
-  const approvals = Object.entries(sources.approvalRequests ?? {}).map<TaskCenterTask>(
-    ([runtimeKey, request]) => {
-      const runtimeSessionId = request.sessionId || runtimeKey
-      const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
-      const storedSessionCandidate = mappedStoredSessionId ?? runtimeSessionId
-      const storedSessionId =
-        sources.sessions.find(session => sessionMatchesStoredId(session, storedSessionCandidate))?.id ??
-        mappedStoredSessionId
+  const approvals = Object.entries(sources.approvalRequests ?? {}).map<TaskCenterTask>(([runtimeKey, request]) => {
+    const runtimeSessionId = request.sessionId || runtimeKey
+    const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
+    const storedSessionCandidate = mappedStoredSessionId ?? runtimeSessionId
+    const storedSessionId =
+      sources.sessions.find(session => sessionMatchesStoredId(session, storedSessionCandidate))?.id ??
+      mappedStoredSessionId
 
-      return {
-        action: storedSessionId ? 'open-session' : undefined,
-        approvalRef: request.requestId,
-        approvalRequest: request,
-        detail: request.command,
-        durability: 'turn',
-        id: `approval:${request.requestId || runtimeSessionId}`,
-        label: request.description || 'Approval required',
-        ownerSessionId: runtimeSessionId,
-        workspace: contextForSession(storedSessionId ?? runtimeSessionId),
-        rail: 'approval',
-        sessionId: storedSessionId ?? undefined,
-        status: 'waiting',
-        updatedAt: 0
-      }
+    return {
+      action: storedSessionId ? 'open-session' : undefined,
+      approvalRef: request.requestId,
+      approvalRequest: request,
+      detail: request.command,
+      durability: 'turn',
+      id: `approval:${request.requestId || runtimeSessionId}`,
+      label: request.description || 'Approval required',
+      ownerSessionId: runtimeSessionId,
+      workspace: contextForSession(storedSessionId ?? runtimeSessionId),
+      rail: 'approval',
+      sessionId: storedSessionId ?? undefined,
+      status: 'waiting',
+      updatedAt: 0
     }
-  )
+  })
   const clarifications = Object.entries(sources.clarifyRequests ?? {}).map<TaskCenterTask>(([runtimeKey, request]) => {
     const runtimeSessionId = request.sessionId || runtimeKey
     const mappedStoredSessionId = sources.runtimeStoredSessionIds?.[runtimeSessionId] ?? null
-    const storedSessionId = sources.sessions.find(session => sessionMatchesStoredId(session, mappedStoredSessionId ?? runtimeSessionId))?.id ?? mappedStoredSessionId
+    const storedSessionId =
+      sources.sessions.find(session => sessionMatchesStoredId(session, mappedStoredSessionId ?? runtimeSessionId))
+        ?.id ?? mappedStoredSessionId
     return {
       action: storedSessionId ? 'open-session' : undefined,
       clarifyRequest: request,
@@ -362,7 +370,9 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
     }
   })
 
-  const approvalSessionIds = new Set([...approvals, ...clarifications].flatMap(task => (task.sessionId ? [task.sessionId] : [])))
+  const approvalSessionIds = new Set(
+    [...approvals, ...clarifications].flatMap(task => (task.sessionId ? [task.sessionId] : []))
+  )
 
   const base = buildRailTasks(
     sources.workingSessionIds,
@@ -431,12 +441,7 @@ export function buildTaskCenterTasks(sources: TaskCenterSources): TaskCenterTask
 
   const cron = sources.cronJobs.map<TaskCenterTask>(job => ({
     action: 'manage-cron',
-    detail:
-      job.last_error ||
-      job.schedule_display ||
-      job.schedule?.display ||
-      job.next_run_at ||
-      'Scheduled task',
+    detail: job.last_error || job.schedule_display || job.schedule?.display || job.next_run_at || 'Scheduled task',
     durability: 'restart-durable',
     id: `cron:${job.id}`,
     label: job.name || job.prompt || job.script || 'Scheduled task',
