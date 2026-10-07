@@ -185,6 +185,7 @@ export function isTaskCenterNeedsAttention(
     (task.status === 'waiting' && (task.rail === 'approval' || task.rail === 'session'))
 
   const failedTest = task.testResult?.status === 'failed'
+
   const failedOrPendingChecks =
     pullRequestChecks === 'failed' || pullRequestChecks === 'pending' || pullRequestChecks === 'unavailable'
 
