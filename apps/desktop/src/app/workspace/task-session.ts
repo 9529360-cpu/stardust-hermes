@@ -104,6 +104,59 @@ export function resolveTaskTerminalId(
   return preferTerminal(cwdMatches, activeTerminalId, targetCwd)
 }
 
+/** The preview-tab fields used when resolving a task's persistent preview.
+ * Kept narrow so the resolver does not depend on the preview store or target
+ * rendering details. */
+export interface TaskPreviewEntry<Id extends string = string> {
+  id: Id
+  storedSessionId?: null | string
+}
+
+const previewBelongsToSession = (
+  preview: TaskPreviewEntry,
+  selectedStoredSessionId: string,
+  sessions: readonly SessionInfo[]
+): boolean => {
+  const owner = normalizedStoredId(preview.storedSessionId)
+
+  if (!owner) {
+    return false
+  }
+
+  if (owner === selectedStoredSessionId) {
+    return true
+  }
+
+  const selectedSession = sessions.find(session => sessionMatchesStoredId(session, selectedStoredSessionId))
+
+  return Boolean(selectedSession && sessionMatchesStoredId(selectedSession, owner))
+}
+
+/**
+ * Resolve the persistent preview that belongs with the current task context.
+ *
+ * An explicitly owned preview wins over every legacy/unowned tab. Unowned tabs
+ * remain outside this resolver so existing global preview behavior is left
+ * unchanged. `undefined` means there is no safe owned preview to select, so
+ * callers must leave the current selection alone.
+ */
+export function resolveTaskPreviewId<Id extends string>(
+  previews: readonly TaskPreviewEntry<Id>[],
+  activePreviewId: null | string,
+  selectedStoredSessionId: null | string,
+  sessions: readonly SessionInfo[]
+): Id | undefined {
+  const selected = normalizedStoredId(selectedStoredSessionId)
+
+  if (!selected) {
+    return undefined
+  }
+
+  const owned = previews.filter(preview => previewBelongsToSession(preview, selected, sessions))
+
+  return owned.find(preview => preview.id === activePreviewId)?.id ?? owned[0]?.id
+}
+
 /**
  * Pick the live task that deserves a primary "continue" entry when no
  * conversation is currently selected. A task blocked on user input outranks a

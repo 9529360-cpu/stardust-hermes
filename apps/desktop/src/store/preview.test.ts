@@ -18,6 +18,7 @@ import {
   type PreviewTarget,
   progressPreviewServerRestart
 } from './preview'
+import { $selectedStoredSessionId } from './session'
 
 function fileTarget(source: string): PreviewTarget {
   return { kind: 'file', label: source, path: source, previewKind: 'html', source, url: `file://${source}` }
@@ -34,12 +35,14 @@ function artifactTarget(id: string): PreviewTarget {
 describe('preview store', () => {
   beforeEach(() => {
     $previewServerRestart.set(null)
+    $selectedStoredSessionId.set(null)
     closeRightRail()
     window.localStorage.clear()
   })
 
   afterEach(() => {
     $previewServerRestart.set(null)
+    $selectedStoredSessionId.set(null)
     closeRightRail()
     window.localStorage.clear()
   })
@@ -219,6 +222,42 @@ describe('preview store', () => {
     expect(stored).not.toContain('dashboard')
   })
 
+  it('captures the selected stored session as optional ownership for persistent tabs', () => {
+    $selectedStoredSessionId.set('task-one')
+    openPreview(fileTarget('/work/task-one.html'), 'file-browser')
+
+    expect($previewTabs.get()[0]?.storedSessionId).toBe('task-one')
+    expect(JSON.parse(window.localStorage.getItem('hermes.desktop.previewTabs.v2') ?? '[]')[0].storedSessionId).toBe(
+      'task-one'
+    )
+  })
+
+  it('re-selects the returning task owner and leaves legacy previews global', () => {
+    $selectedStoredSessionId.set('task-one')
+    openPreview(fileTarget('/work/task-one.html'), 'file-browser')
+    const taskOneTab = $previewTabs.get()[0]?.id
+
+    $selectedStoredSessionId.set('task-two')
+    openPreview(fileTarget('/work/task-two.html'), 'file-browser')
+    const taskTwoTab = $previewTabs.get()[1]?.id
+
+    selectRightRailTab(taskOneTab ?? null)
+    $selectedStoredSessionId.set('task-one')
+    $selectedStoredSessionId.set('task-two')
+    expect($rightRailActiveTabId.get()).toBe(taskTwoTab)
+
+    $selectedStoredSessionId.set('task-one')
+    expect($rightRailActiveTabId.get()).toBe(taskOneTab)
+
+    closeRightRail()
+    $selectedStoredSessionId.set(null)
+    openPreview(fileTarget('/work/legacy.html'), 'file-browser')
+    const legacyTab = $previewTabs.get()[0]?.id
+    $selectedStoredSessionId.set('task-without-preview')
+
+    expect($rightRailActiveTabId.get()).toBe(legacyTab)
+  })
+
   it('strips inline image bytes rather than pushing megabytes into storage', () => {
     openPreview({ ...fileTarget('/work/shot.png'), dataUrl: 'data:image/png;base64,AAAA', previewKind: 'image' })
 
@@ -240,8 +279,18 @@ describe('preview store', () => {
   it('does not persist transient remote HTML source fallbacks', () => {
     const target = { ...fileTarget('/remote/report.html'), renderMode: 'source' as const, transient: true }
 
+    $selectedStoredSessionId.set('task-one')
     openPreview(target, 'tool-result')
 
+    expect($previewTabs.get()[0]?.storedSessionId).toBeUndefined()
+    expect(window.localStorage.getItem('hermes.desktop.previewTabs.v2')).toBe('[]')
+  })
+
+  it('does not attach ownership to artifact previews', () => {
+    $selectedStoredSessionId.set('task-one')
+    openPreview(artifactTarget('session-1:dashboard'))
+
+    expect($previewTabs.get()[0]?.storedSessionId).toBeUndefined()
     expect(window.localStorage.getItem('hermes.desktop.previewTabs.v2')).toBe('[]')
   })
 })
