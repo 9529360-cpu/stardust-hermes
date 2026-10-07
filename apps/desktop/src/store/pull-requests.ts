@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
 
-import type { HermesBranchPullRequest } from '@/global'
+import type { HermesBranchPullRequest, HermesReviewChecks } from '@/global'
 import { scanSessionPullRequests, type SessionInfo } from '@/hermes'
 import { desktopGit } from '@/lib/desktop-git'
 import { Codecs, persistentAtom } from '@/lib/persisted'
@@ -17,6 +17,13 @@ const PR_STALE_MS = 60_000
 /** Every known PR keyed by `${repoRoot}\n${branch}` — the join a session row
  *  makes with its own `git_repo_root` + `git_branch`. */
 export const $pullRequestsByBranch = atom<Record<string, HermesBranchPullRequest>>({})
+
+/** The bounded aggregate shown beside a PR. Raw check runs stay at the bridge
+ * boundary; renderer surfaces only need an honest, five-state summary. */
+export type PullRequestChecksState = 'failed' | 'loading' | 'passed' | 'pending' | 'unavailable'
+
+/** CI summaries keyed by the same repo + PR-number identity as recovered PRs. */
+export const $pullRequestChecksByPr = atom<Record<string, PullRequestChecksState>>({})
 
 /** Sessions whose PR isn't on the branch they recorded at start — the checkout
  *  moved mid-conversation, or the work went off to a worktree. Written when the
@@ -38,6 +45,22 @@ const fetchedAt = new Map<string, number>()
 const inFlight = new Set<string>()
 let scanUnavailable = false
 let scanInFlight = false
+const checksFetchedAt = new Map<string, number>()
+const checksInFlight = new Set<string>()
+const CHECKS_STALE_MS = 60_000
+
+const FAILED_CHECK_VALUES = new Set([
+  'action_required',
+  'cancelled',
+  'error',
+  'failure',
+  'startup_failure',
+  'stale',
+  'timed_out'
+])
+
+const PASSED_CHECK_VALUES = new Set(['neutral', 'skipped', 'success'])
+const PENDING_CHECK_VALUES = new Set(['expected', 'in_progress', 'pending', 'queued', 'requested', 'waiting'])
 
 // A session sitting on the trunk has no PR of its own, and asking GitHub about
 // "main" is how a stranger's fork branch — forks share our branch namespace —
@@ -48,6 +71,91 @@ export const branchPrKey = (repoRoot: string, branch: string): string => `${repo
 /** A PR known only by number (recovered from a transcript), keyed so it can
  *  share the one map. GitHub answers by number just as happily as by branch. */
 export const numberPrKey = (repoRoot: string, number: number): string => `${repoRoot}\n#${number}`
+
+/** Join a branch/number PR lookup back to the stable key used by check state. */
+export function pullRequestChecksKey(prKey: null | string, number: number): null | string {
+  const separator = prKey?.lastIndexOf('\n') ?? -1
+
+  return prKey && separator > 0 ? numberPrKey(prKey.slice(0, separator), number) : null
+}
+
+function setPullRequestChecksState(key: string, state: PullRequestChecksState): void {
+  const current = $pullRequestChecksByPr.get()
+
+  if (current[key] === state) {
+    return
+  }
+
+  $pullRequestChecksByPr.set({ ...current, [key]: state })
+}
+
+/** Reduce the bridge contract to the renderer's explicit state vocabulary. */
+export function pullRequestChecksState(result: HermesReviewChecks | null | undefined): PullRequestChecksState {
+  if (!result || String(result.status).toLowerCase() === 'unavailable') {
+    return 'unavailable'
+  }
+
+  const items = [...(result.checks ?? []), ...(result.workflowRuns ?? [])]
+
+  const values = [result.status, result.conclusion, ...items.flatMap(item => [item.status, item.conclusion])]
+    .filter(Boolean)
+    .map(value => String(value).trim().toLowerCase())
+
+  if (values.some(value => FAILED_CHECK_VALUES.has(value))) {
+    return 'failed'
+  }
+
+  if (values.some(value => PENDING_CHECK_VALUES.has(value))) {
+    return 'pending'
+  }
+
+  if (values.some(value => PASSED_CHECK_VALUES.has(value))) {
+    return 'passed'
+  }
+
+  // Unknown non-terminal GitHub states are safer as pending than as a false
+  // green result. The backend contract remains read-only and may meet newer
+  // GitHub enum values before the renderer does.
+  return 'pending'
+}
+
+/** Fetch one PR's aggregate checks without introducing a polling owner. */
+export async function refreshPullRequestChecks(repoRoot: string, prNumber: number, force = false): Promise<void> {
+  const root = repoRoot.trim()
+
+  if (!root || !Number.isFinite(prNumber) || prNumber <= 0) {
+    return
+  }
+
+  const key = numberPrKey(root, prNumber)
+  const review = desktopGit()?.review
+
+  if (!review?.checks) {
+    setPullRequestChecksState(key, 'unavailable')
+    checksFetchedAt.set(key, Date.now())
+
+    return
+  }
+
+  const now = Date.now()
+
+  if (checksInFlight.has(key) || (!force && now - (checksFetchedAt.get(key) ?? 0) <= CHECKS_STALE_MS)) {
+    return
+  }
+
+  checksInFlight.add(key)
+  setPullRequestChecksState(key, 'loading')
+
+  try {
+    const result = await review.checks(root, prNumber)
+    setPullRequestChecksState(key, pullRequestChecksState(result))
+  } catch {
+    setPullRequestChecksState(key, 'unavailable')
+  } finally {
+    checksFetchedAt.set(key, Date.now())
+    checksInFlight.delete(key)
+  }
+}
 
 export function sessionPrKey(session: SessionInfo): null | string {
   const stamped = $prBranchBySession.get()[session.id]
@@ -182,6 +290,22 @@ export async function refreshPullRequests(lookupsByRepo: Record<string, string[]
         }
 
         $pullRequestsByBranch.set(next)
+
+        // Check status follows the same bounded PR load. It is deliberately
+        // fire-and-forget so a slow CI provider never delays the PR badge.
+        const prsToCheck = lookups
+          .map(lookup =>
+            lookup.startsWith('#')
+              ? next[numberPrKey(root, Number(lookup.slice(1)))]
+              : next[branchPrKey(root, lookup)]
+          )
+          .filter((pr): pr is HermesBranchPullRequest => Boolean(pr))
+
+        void Promise.all(
+          [...new Map(prsToCheck.map(pr => [pr.number, pr])).values()].map(pr =>
+            refreshPullRequestChecks(root, pr.number, force)
+          )
+        )
       } catch {
         // gh missing, unauthenticated, or off-repo — leave what we had.
         fetchedAt.set(root, Date.now())

@@ -2,30 +2,40 @@ import { useStore } from '@nanostores/react'
 import { type ReactNode, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { openAgentTerminal } from '@/app/right-sidebar/terminal/terminals'
+import { PrChecksBadge } from '@/components/chat/pr-checks-badge'
+import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Slot } from '@/contrib/react/slot'
 import { Textarea } from '@/components/ui/textarea'
 import { registry } from '@/contrib/registry'
+import { Slot } from '@/contrib/react/slot'
 import { TASK_CENTER_AREAS } from '@/contrib/task-center'
+import type { HermesBranchPullRequest } from '@/global'
 import { useI18n } from '@/i18n'
 import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { readKey, writeKey } from '@/lib/storage'
 import { useSessionSlice } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
 import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus, type TaskCenterTask } from '@/store/activity'
+import { $clarifyRequests, answerClarifyRequest } from '@/store/clarify'
 import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProcess } from '@/store/composer-status'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronJobs, $cronJobsScope, setCronFocusJobId } from '@/store/cron'
+import { $gateway } from '@/store/gateway'
 import { applyDesktopLayoutPreset, revealDesktopPane } from '@/store/pane-focus'
 import { $previewServerRestart } from '@/store/preview'
 import { $profileScope, sidebarProfileForScope } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, projectRootCwd } from '@/store/projects'
-import { $clarifyRequests, answerClarifyRequest } from '@/store/clarify'
-import { $gateway } from '@/store/gateway'
+import { $approvalRequests, answerApproval } from '@/store/prompts'
+import {
+  $pullRequestChecksByPr,
+  $pullRequestsByBranch,
+  pullRequestChecksKey,
+  type PullRequestChecksState,
+  sessionPrKey
+} from '@/store/pull-requests'
 import { setRightContextOpen } from '@/store/right-context'
 import {
   $activeSessionId,
@@ -35,9 +45,9 @@ import {
   sessionMatchesStoredId
 } from '@/store/session'
 import { $attentionSessionIds, $sessionStates, $workingSessionIds } from '@/store/session-states'
-import { $approvalRequests, answerApproval } from '@/store/prompts'
 import { $subagentsBySession } from '@/store/subagents'
 import { isAuxiliaryWindow, openSessionInNewWindow } from '@/store/windows'
+import type { SessionInfo } from '@/types/hermes'
 
 import { SubagentSection } from '../chat/composer/status-stack/subagent-section'
 import { CRON_ROUTE, navigateToWorkspacePage, sessionRoute } from '../routes'
@@ -106,12 +116,50 @@ function activityIcon(status: TaskCenterStatus): string {
   return status === 'success' ? 'pass' : 'loading'
 }
 
+function taskPullRequestChecksState(
+  task: TaskCenterTask,
+  sessions: readonly SessionInfo[],
+  pullRequestsByBranch: Record<string, HermesBranchPullRequest>,
+  pullRequestChecksByPr: Record<string, PullRequestChecksState>
+) {
+  const taskSessionId = task.sessionId
+
+  if (!taskSessionId) {
+    return undefined
+  }
+
+  const session = sessions.find(candidate => sessionMatchesStoredId(candidate, taskSessionId))
+  const prKey = session ? sessionPrKey(session) : null
+  const pr = prKey ? pullRequestsByBranch[prKey] : undefined
+  const checksKey = prKey && pr ? pullRequestChecksKey(prKey, pr.number) : null
+
+  return checksKey ? (pullRequestChecksByPr[checksKey] ?? 'loading') : undefined
+}
+
+function TaskPullRequestChecksBadge({
+  pullRequestChecksByPr,
+  pullRequestsByBranch,
+  sessions,
+  task
+}: {
+  pullRequestChecksByPr: Record<string, PullRequestChecksState>
+  pullRequestsByBranch: Record<string, HermesBranchPullRequest>
+  sessions: readonly SessionInfo[]
+  task: TaskCenterTask
+}) {
+  const state = taskPullRequestChecksState(task, sessions, pullRequestsByBranch, pullRequestChecksByPr)
+
+  return state ? <PrChecksBadge compact state={state} /> : null
+}
+
 function UnifiedInputCard({ task, gateway }: { task: TaskCenterTask; gateway: Parameters<typeof answerApproval>[0] }) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const request = task.approvalRequest
   const clarify = task.clarifyRequest
-  if (!request && !clarify) return null
+  if (!request && !clarify) {
+    return null
+  }
   const choices = clarify?.questions?.[0]?.choices ?? clarify?.choices ?? []
   const submit = async (answer: string) => {
     if (busy || !answer.trim()) return
@@ -289,6 +337,8 @@ export function WorkspaceOverview() {
   )
 
   const desktopActionTasks = useStore($desktopActionTasks)
+  const pullRequestsByBranch = useStore($pullRequestsByBranch)
+  const pullRequestChecksByPr = useStore($pullRequestChecksByPr)
   const previewServerRestart = useStore($previewServerRestart)
   const sessionStates = useStore($sessionStates)
   const subagentsBySession = useStore($subagentsBySession)
@@ -583,6 +633,12 @@ export function WorkspaceOverview() {
                       <div className="truncate text-[0.75rem] font-medium leading-5 text-(--ui-text-primary)">
                         {task.label}
                       </div>
+                      <TaskPullRequestChecksBadge
+                        pullRequestChecksByPr={pullRequestChecksByPr}
+                        pullRequestsByBranch={pullRequestsByBranch}
+                        sessions={sessions}
+                        task={task}
+                      />
                       {task.testResult && (
                         <div
                           className={cn(

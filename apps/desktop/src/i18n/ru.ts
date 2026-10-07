@@ -2973,6 +2973,13 @@ export const ru = defineLocale({
       branchOffFrom: base => `Новая ветка от ${base}`,
       switchTo: branch => `Переключиться на ${branch}`,
       switchFailed: branch => `Не удалось переключиться на ${branch}`,
+      checks: {
+        loading: 'Проверки загружаются',
+        unavailable: 'Проверки недоступны',
+        pending: 'Проверки ожидают',
+        passed: 'Проверки пройдены',
+        failed: 'Проверки не пройдены'
+      },
       worktrees: 'Worktrees'
     }
   },

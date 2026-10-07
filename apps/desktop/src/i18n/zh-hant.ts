@@ -2860,6 +2860,13 @@ export const zhHant = defineLocale({
       branchOffFrom: base => `從 ${base} 建立新分支`,
       switchTo: branch => `切換到 ${branch}`,
       switchFailed: branch => `無法切換到 ${branch}`,
+      checks: {
+        loading: '檢查載入中',
+        unavailable: '檢查無法使用',
+        pending: '檢查等待中',
+        passed: '檢查已通過',
+        failed: '檢查失敗'
+      },
       worktrees: '工作樹'
     }
   },

@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useState } from 'react'
 
 import { requestComposerSubmit } from '@/app/chat/composer/focus'
+import { PrChecksBadge } from '@/components/chat/pr-checks-badge'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { GenerateButton } from '@/components/ui/generate-button'
@@ -12,6 +13,7 @@ import { useI18n } from '@/i18n'
 import { isSubmitEnter } from '@/lib/ime'
 import { formatCombo } from '@/lib/keybinds/combo'
 import { notifyError } from '@/store/notifications'
+import { $pullRequestChecksByPr, numberPrKey } from '@/store/pull-requests'
 import {
   $reviewCommitDefault,
   $reviewCommitMsgBusy,
@@ -23,7 +25,8 @@ import {
   type CommitAction,
   commitChanges,
   createOrOpenPr,
-  generateCommitMessage
+  generateCommitMessage,
+  reviewRepoCwd
 } from '@/store/review'
 
 // One size for every glyph in the bar so the row reads as a set of peers.
@@ -37,12 +40,17 @@ export function ReviewShipBar() {
   const c = t.statusStack.coding
   const files = useStore($reviewFiles)
   const ship = useStore($reviewShipInfo)
+  const pullRequestChecks = useStore($pullRequestChecksByPr)
   const scopeTarget = useStore($reviewScopeTarget)
   const busy = useStore($reviewShipBusy)
   const generating = useStore($reviewCommitMsgBusy)
   const commitDefault = useStore($reviewCommitDefault)
   const [message, setMessage] = useState('')
   const prLabel = ship.pr?.url ? c.openPr : c.createPr
+  const reviewCwd = reviewRepoCwd()
+
+  const prChecksState =
+    ship.pr && reviewCwd ? (pullRequestChecks[numberPrKey(reviewCwd, ship.pr.number)] ?? 'loading') : undefined
 
   const hasFiles = files.length > 0
   const canCommit = hasFiles && message.trim().length > 0 && !busy
@@ -124,6 +132,12 @@ export function ReviewShipBar() {
           variant="default"
         />
       </div>
+
+      {ship.pr && prChecksState && (
+        <div className="flex justify-end px-1">
+          <PrChecksBadge state={prChecksState} />
+        </div>
+      )}
 
       {/* Hand it to the agent (one click sends a commit+PR task to the composer).
           The PR button floats on the right (out of flow) so the label centers on
