@@ -165,6 +165,45 @@ export interface TaskCenterTask extends Omit<RailTask, 'status'> {
   testResult?: TestResultCard
 }
 
+export type TaskCenterView = 'all' | 'needs-attention'
+export type TaskCenterCheckStatus = 'failed' | 'loading' | 'passed' | 'pending' | 'unavailable'
+
+/**
+ * Return whether a projected task belongs in the user-actionable review queue.
+ *
+ * Pull-request checks are owned by the PR store rather than the task
+ * projection, so callers provide the already-derived check state separately.
+ * This keeps the queue a view over existing owners instead of adding a second
+ * task lifecycle or duplicating CI state.
+ */
+export function isTaskCenterNeedsAttention(
+  task: TaskCenterTask,
+  pullRequestChecks: TaskCenterCheckStatus | undefined = undefined
+): boolean {
+  const needsInput =
+    Boolean(task.approvalRequest || task.clarifyRequest) ||
+    (task.status === 'waiting' && (task.rail === 'approval' || task.rail === 'session'))
+
+  const failedTest = task.testResult?.status === 'failed'
+  const failedOrPendingChecks = pullRequestChecks === 'failed' || pullRequestChecks === 'pending'
+  const cronSuggestion = task.action === 'review-cron-suggestion'
+
+  return needsInput || failedTest || failedOrPendingChecks || cronSuggestion
+}
+
+/** Filter the canonical projection without changing task ownership or order. */
+export function filterTaskCenterTasks(
+  tasks: TaskCenterTask[],
+  view: TaskCenterView,
+  pullRequestChecksByTask: Readonly<Record<string, TaskCenterCheckStatus | undefined>> = {}
+): TaskCenterTask[] {
+  if (view === 'all') {
+    return tasks
+  }
+
+  return tasks.filter(task => isTaskCenterNeedsAttention(task, pullRequestChecksByTask[task.id]))
+}
+
 export interface TaskCenterSources {
   actionTasks: Record<string, DesktopActionTask>
   approvalRequests?: Record<string, ApprovalRequest>

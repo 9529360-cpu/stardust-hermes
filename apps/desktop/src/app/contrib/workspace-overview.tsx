@@ -9,6 +9,7 @@ import { $activePresetId } from '@/components/pane-shell/tree/store'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { EmptyState } from '@/components/ui/empty-state'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Textarea } from '@/components/ui/textarea'
 import { Slot } from '@/contrib/react/slot'
 import { registry } from '@/contrib/registry'
@@ -20,7 +21,14 @@ import { sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
 import { readKey, writeKey } from '@/lib/storage'
 import { useSessionSlice } from '@/lib/use-session-slice'
 import { cn } from '@/lib/utils'
-import { $desktopActionTasks, buildTaskCenterTasks, type TaskCenterStatus, type TaskCenterTask } from '@/store/activity'
+import {
+  $desktopActionTasks,
+  buildTaskCenterTasks,
+  filterTaskCenterTasks,
+  type TaskCenterStatus,
+  type TaskCenterTask,
+  type TaskCenterView
+} from '@/store/activity'
 import { $clarifyRequests, answerClarifyRequest } from '@/store/clarify'
 import { $backgroundStatusBySession, $statusItemsBySession, stopBackgroundProcess } from '@/store/composer-status'
 import { $activeConnectionId } from '@/store/connections'
@@ -227,6 +235,7 @@ export function WorkspaceOverview() {
   const { locale } = useI18n()
   const navigate = useNavigate()
   const copy = WORKSPACE_OVERVIEW_COPY[locale]
+  const [taskCenterView, setTaskCenterView] = useState<TaskCenterView>('all')
 
   const systemLabels =
     locale === 'zh'
@@ -451,6 +460,25 @@ export function WorkspaceOverview() {
     ]
   )
 
+  const taskCenterCheckStatuses = useMemo(() => {
+    const statuses: Record<string, PullRequestChecksState> = {}
+
+    for (const task of activityTasks) {
+      const state = taskPullRequestChecksState(task, sessions, pullRequestsByBranch, pullRequestChecksByPr)
+
+      if (state) {
+        statuses[task.id] = state
+      }
+    }
+
+    return statuses
+  }, [activityTasks, pullRequestChecksByPr, pullRequestsByBranch, sessions])
+
+  const filteredActivityTasks = useMemo(
+    () => filterTaskCenterTasks(activityTasks, taskCenterView, taskCenterCheckStatuses),
+    [activityTasks, taskCenterCheckStatuses, taskCenterView]
+  )
+
   const selectedAttention = selectedStoredSessionId
     ? session
       ? attentionSessionIds.some(storedId => sessionMatchesStoredId(session, storedId))
@@ -510,9 +538,15 @@ export function WorkspaceOverview() {
       ? `session:${displayTaskStoredId}`
       : null
 
-  const secondaryActivityTasks = currentActivityTaskId
-    ? activityTasks.filter(task => task.id !== currentActivityTaskId)
-    : activityTasks
+  const secondaryActivityTasks =
+    taskCenterView === 'needs-attention'
+      ? filteredActivityTasks
+      : currentActivityTaskId
+        ? filteredActivityTasks.filter(task => task.id !== currentActivityTaskId)
+        : filteredActivityTasks
+
+  const showTaskCenterSection =
+    secondaryActivityTasks.length > 0 || (taskCenterView === 'needs-attention' && activityTasks.length > 0)
 
   const activityStatusLabels: Record<TaskCenterStatus, string> = {
     error: systemLabels.activityFailed,
@@ -649,9 +683,21 @@ export function WorkspaceOverview() {
             </Section>
           )}
 
-          {secondaryActivityTasks.length > 0 && (
-            <Section title={systemLabels.activity}>
-              <ul className="-mx-2 flex flex-col">
+          {showTaskCenterSection && (
+            <Section title={taskCenterView === 'needs-attention' ? copy.reviewQueue : systemLabels.activity}>
+              <div className="flex items-center justify-between gap-2" data-task-center-view={taskCenterView}>
+                <span className={META_CLASS}>{copy.taskCenterView}</span>
+                <SegmentedControl
+                  onChange={setTaskCenterView}
+                  options={[
+                    { id: 'all', label: copy.taskCenterAll },
+                    { id: 'needs-attention', label: copy.needsAttention }
+                  ]}
+                  value={taskCenterView}
+                />
+              </div>
+              {secondaryActivityTasks.length > 0 ? (
+                <ul className="-mx-2 flex flex-col">
                 {secondaryActivityTasks.slice(0, 10).map(task => (
                   <li
                     className="flex min-w-0 items-start gap-2.5 rounded-lg px-2 py-1.5"
@@ -764,7 +810,10 @@ export function WorkspaceOverview() {
                     )}
                   </li>
                 ))}
-              </ul>
+                </ul>
+              ) : taskCenterView === 'needs-attention' ? (
+                <EmptyState description={copy.noNeedsAttention} title={copy.needsAttention} />
+              ) : null}
             </Section>
           )}
 
