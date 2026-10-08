@@ -1478,7 +1478,7 @@ export const zhHant = defineLocale({
         needsSetupHint: '現在即可選擇此後端——但在完成設定前命令將會失敗。'
       },
       browserRealProfile: {
-        label: '使用我的真實瀏覽器設定檔',
+        label: '使用瀏覽器設定檔副本',
         description:
           '將預設瀏覽器的登入資訊與 Cookie 複製到受管理的快照中，代理使用該快照進行瀏覽。絕不會直接開啟你的真實設定檔。將套用於新工作階段。',
         enabledTitle: '真實設定檔瀏覽：已開啟',
