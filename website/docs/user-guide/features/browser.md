@@ -20,6 +20,43 @@ Hermes Agent includes a full browser automation toolset with multiple backend op
 
 In all modes, the agent can navigate websites, interact with page elements, fill forms, and extract information.
 
+## Stardust Desktop: in-app vs. your existing browser
+
+These are **two separate foreground targets**, not two windows showing the same
+session:
+
+- **In-app browser (default for desktop web interaction).** The agent opens the
+  right-rail Browser via `desktop_preview`, then clicks/types/scrolls on that
+  *same* Electron WebView with `drive_preview`. The rail appears when foreground
+  in-app browsing begins; hiding it does not cancel the task or require a new
+  page. Ordinary navigation reuses the tab unless a new tab is requested.
+- **Existing host browser (explicit user choice).** To work with a tab or signed-in
+  account **already open** in Chrome/Edge/Brave, the agent must use an authorized
+  controller of that actual window. On a local gateway, the optional
+  `computer_use` toolset can inspect and act on the window via OS
+  accessibility and screenshots, subject to its normal action approvals.
+  Alternatively, an explicitly configured CDP endpoint may attach to an
+  already running browser that exposes one. Host control does not expand
+  Stardust's right-rail WebView.
+
+**Do not confuse profile import with host control:** the
+`browser.use_real_profile` feature copies browser profile data to a managed
+**separate** Chrome process. It does not interact with tabs in the user's
+running browser, and does not import its cookies into the in-app WebView.
+`/browser connect` may launch an isolated debug browser if the endpoint is
+not running; merely connecting is not proof that an existing personal tab
+was attached. An external Chrome extension is another possible host bridge,
+but Stardust does not ship a comparable extension-based browser controller
+yet.
+
+Computer Use currently runs on the **gateway host**. With an SSH/cloud/remote
+gateway, that may not be the machine running Stardust Desktop; do not use it
+to assume access to the user's local Chrome. Explicitly selecting a browser
+target never authorizes switching to another browser or account on failure.
+Browser actions still require applicable site-level permissions and approval
+for sensitive changes. Headless/cloud browser backends remain available for
+independent/background tasks, not as a fake in-app live preview.
+
 ## Overview
 
 Pages are represented as **accessibility trees** (text-based snapshots), making them ideal for LLM agents. Interactive elements get ref IDs (like `@e1`, `@e2`) that the agent uses for clicking and typing.
