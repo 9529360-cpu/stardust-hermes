@@ -305,7 +305,7 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
             skill_manage_available="skill_manage" in names,
         )
     desktop_browser_guidance = None
-    if (agent.platform or "").lower() == "desktop" and {"desktop_preview", "drive_preview"} <= set(names):
+    if str(getattr(agent, "platform", "") or "").lower() == "desktop" and {"desktop_preview", "drive_preview"} <= set(names):
         # A browser target is an authority boundary, NOT a second synchronized
         # tab. The model selects the surface by the user's request; each driver
         # remains the sole owner of its navigation, cookies, tabs and history.
