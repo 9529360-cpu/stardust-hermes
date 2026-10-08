@@ -437,7 +437,8 @@ function previewTargetForSource(target: PreviewTarget, source: PreviewRecordSour
 export function openPreview(
   target: PreviewTarget,
   source: PreviewRecordSource = 'manual',
-  storedSessionId: null | string | undefined = $selectedStoredSessionId.get()
+  storedSessionId: null | string | undefined = $selectedStoredSessionId.get(),
+  reveal = true
 ) {
   const resolved = previewTargetForSource(target, source)
   const current = $previewTabs.get()
@@ -449,7 +450,9 @@ export function openPreview(
   // `openPreview` is the explicit entry point: a user click, a project/file
   // action, or an on-screen agent preview request. That intent may reveal the
   // contextual rail. Passive tab persistence/navigation updates must not.
-  setRightContextOpen(true)
+  if (reveal) {
+    setRightContextOpen(true)
+  }
   // A repeated open of the same target is a re-front, NOT a navigation. Writing
   // a new target re-creates the Electron webview and wipes its in-page state,
   // even when the URL is identical. Keep the live guest and its scroll/history.
