@@ -1,6 +1,7 @@
 import type { GatewayEvent } from '@hermes/shared'
 import { useCallback, useEffect, useRef } from 'react'
 
+import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { gatewayEventCompletedFileDiff } from '@/lib/gateway-events'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { reachablePreviewUrl } from '@/lib/preview-reach'
@@ -120,6 +121,11 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         if (isLiveBrowserAction && !browserVisibility.current.dismissed.has(sessionId)) {
           browserVisibility.current.revealed.add(sessionId)
           setRightContextOpen(true)
+          // The right rail may already be showing Files or Review. Front the
+          // active live tab even when the visibility atom was already true.
+          if (hasLivePreview && $rightRailActiveTabId.get()) {
+            revealTreePane(`preview-tile:${$rightRailActiveTabId.get()}`)
+          }
         }
       }
 
