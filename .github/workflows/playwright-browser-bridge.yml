@@ -1,0 +1,38 @@
+name: Playwright Browser Bridge Prototype
+
+on:
+  pull_request:
+    paths:
+      - 'experiments/playwright-mcp-host-bridge/**'
+      - '.github/workflows/playwright-browser-bridge.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'experiments/playwright-mcp-host-bridge/**'
+      - '.github/workflows/playwright-browser-bridge.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tests:
+    name: Bridge protocol and package checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: experiments/playwright-mcp-host-bridge
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install exact audited dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run broker and MCP adapter contract tests
+        run: npm test
+      - name: Confirm pinned official Playwright CLI supports Chrome extension
+        run: |
+          node node_modules/@playwright/mcp/cli.js --version
+          node node_modules/@playwright/mcp/cli.js --help | grep -q -- '--extension'
+          node node_modules/@playwright/mcp/cli.js --help | grep -q -- '--profile-dir-name'
