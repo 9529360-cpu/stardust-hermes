@@ -20,6 +20,7 @@ import { ToolIcon } from '@/components/ui/tool-icon'
 import { translateNow } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
 import { $rightRailActiveTabId, type RightRailTabId, selectRightRailTab } from '@/store/layout'
+import { $rightContextOpen } from '@/store/right-context'
 import {
   $browserPages,
   $dockedPreviewTabs,
@@ -213,13 +214,21 @@ export function watchPreviewTiles(): void {
   const reveal = () => {
     const tabId = $rightRailActiveTabId.get()
 
-    if (tabId && targetFor(tabId)) {
+    // A hidden viewer stays hidden while the agent navigates its browser.
+    // revealTreePane itself expands a collapsed side even when openPreview
+    // requested reveal=false, so this mirror must respect the user's choice.
+    if ($rightContextOpen.get() && tabId && targetFor(tabId)) {
       revealTreePane(`${PREVIEW_TILE_PREFIX}:${tabId}`)
     }
   }
 
   $rightRailActiveTabId.listen(reveal)
   $previewTabs.listen(reveal)
+  $rightContextOpen.listen(open => {
+    if (open) {
+      reveal()
+    }
+  })
 
   // And the reverse: clicking a preview TAB activates its pane in the TREE
   // only, so the store's selection must follow or `$previewTarget` (⌘L quote
