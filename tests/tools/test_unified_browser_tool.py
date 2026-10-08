@@ -62,7 +62,6 @@ def test_explicit_target_is_pinned_for_one_turn_and_cleared_for_next(monkeypatch
     run(owner, action="elements")
 
     changed = run(owner, action="open", target="host", url="https://example.com")
-    assert changed["success"] is False
     assert "Cannot switch" in changed["error"]
 
     owner._current_turn_id = "turn-2"
@@ -86,9 +85,10 @@ def test_missing_host_extension_fails_closed_without_copying_or_opening_webview(
         lambda *_args, **_kw: pytest.fail("must not dispatch to legacy browser"),
     )
     failed = run(owner, action="open", target="host", url="https://example.com")
-    assert failed["success"] is False
     assert "authorized host browser controller" in failed["error"]
-    assert owner._stardust_browser_turn["target"] is None
+    assert owner._stardust_browser_turn["target"] == "host"
+    refused_switch = run(owner, action="open", target="in_app", url="https://example.com")
+    assert "Cannot switch" in refused_switch["error"]
 
 
 def test_host_actions_reuse_the_authenticated_broker_and_require_permission(monkeypatch):
@@ -129,11 +129,11 @@ def test_denied_host_input_does_not_fall_back_to_unrelated_page(monkeypatch):
     )
     monkeypatch.setattr("tools.approval.request_tool_approval", lambda *a, **kw: {"approved": False})
     refused = run(owner, action="click", target="host", ref="@e2")
-    assert refused["success"] is False
-    assert owner._stardust_browser_turn["target"] is None
+    assert "error" in refused
+    assert owner._stardust_browser_turn["target"] == "host"
 
 
-def test_host_errors_do_not_pin_or_retry_another_driver(monkeypatch):
+def test_host_errors_pin_selected_target_and_do_not_retry_another_driver(monkeypatch):
     owner = agent()
     monkeypatch.setattr("tools.browser_extension_router.extension_controller_available", lambda *_: True)
     monkeypatch.setattr(
@@ -142,7 +142,9 @@ def test_host_errors_do_not_pin_or_retry_another_driver(monkeypatch):
     )
     failed = run(owner, action="elements", target="host")
     assert failed["ok"] is False
-    assert owner._stardust_browser_turn["target"] is None
+    assert owner._stardust_browser_turn["target"] == "host"
+    attempted_fallback = run(owner, action="elements", target="in_app")
+    assert "Cannot switch" in attempted_fallback["error"]
 
 
 @pytest.mark.parametrize("raw", [
@@ -152,18 +154,18 @@ def test_host_errors_do_not_pin_or_retry_another_driver(monkeypatch):
 def test_rejects_non_web_or_credentialed_urls_before_dispatch(raw, monkeypatch):
     monkeypatch.setattr("tools.desktop_ui.emit", lambda *_: pytest.fail("invalid URL reached GUI"))
     result = run(agent(), action="open", url=raw)
-    assert result["success"] is False
+    assert "error" in result
 
 
 def test_unsupported_host_actions_and_wrong_ref_types_fail_closed(monkeypatch):
     owner = agent()
     unsupported = run(owner, action="hover", target="host", ref="@e2")
-    assert unsupported["success"] is False
+    assert "error" in unsupported
     assert "does not support" in unsupported["error"] or "authorized host" in unsupported["error"]
     selector = run(owner, action="click", target="host", selector="#pay")
-    assert selector["success"] is False
+    assert "error" in selector
     submit = run(owner, action="type", target="host", ref="@e1", text="x", submit=True)
-    assert submit["success"] is False
+    assert "error" in submit
 
 
 def test_status_reports_real_availability_without_claiming_connection(monkeypatch):
@@ -178,8 +180,8 @@ def test_status_reports_real_availability_without_claiming_connection(monkeypatc
 
 
 def test_non_desktop_and_missing_turn_have_no_browser_authority():
-    assert run(agent(platform="cli"), action="elements")["success"] is False
-    assert run(agent(turn=""), action="elements")["success"] is False
+    assert "error" in run(agent(platform="cli"), action="elements")
+    assert "error" in run(agent(turn=""), action="elements")
 
 
 def test_browser_registry_handler_cannot_bypass_agent_bound_gui_callbacks():
@@ -189,4 +191,4 @@ def test_browser_registry_handler_cannot_bypass_agent_bound_gui_callbacks():
     assert definition[0]["function"]["name"] == "browser"
     assert "target" in definition[0]["function"]["parameters"]["required"]
     result = registry.dispatch("browser", {"action": "open", "target": "in_app", "url": "https://example.com"})
-    assert json.loads(result)["success"] is False
+    assert "error" in json.loads(result)
