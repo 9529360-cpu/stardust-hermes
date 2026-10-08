@@ -113,7 +113,7 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         // revealing an unrelated webview would be a fake live preview.
         const isLiveBrowserAction =
           (name === 'desktop_preview' && (action === 'open' || (action === 'read' && hasLivePreview))) ||
-          (name === 'drive_preview' && hasLivePreview)
+          ((name === 'drive_preview' || name === 'annotate_preview') && hasLivePreview)
         if (isLiveBrowserAction && !browserVisibility.current.dismissed.has(sessionId)) {
           browserVisibility.current.revealed.add(sessionId)
           setRightContextOpen(true)
