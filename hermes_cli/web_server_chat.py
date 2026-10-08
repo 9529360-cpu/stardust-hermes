@@ -286,6 +286,8 @@ def _ws_auth_reason(ws: "WebSocket") -> tuple[Optional[str], str]:
     if not token:
         return "no_credential", "none"
     if hmac.compare_digest(token.encode(), _SESSION_TOKEN.encode()):
+        if ws.client and ws.client.host in {"127.0.0.1", "::1"}:
+            ws._hermes_auth_identity = {"user_id": "local-desktop", "provider": "loopback-session"}
         return None, "token"
     return "token_mismatch", "token"
 

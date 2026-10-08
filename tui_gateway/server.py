@@ -1303,6 +1303,17 @@ def _set_session_context(session_key: str, cwd: str | None = None, *, ui_session
             if _methods_browser_control._is_authenticated_identity(identity):
                 browser_control_principal = _methods_browser_control._principal_digest(identity)
                 browser_control_transport_family = _methods_browser_control._CLOUD_TRANSPORT_FAMILY
+            elif any(getattr(peer, "auth_identity", None) == {
+                    "user_id": "local-desktop", "provider": "loopback-session"}
+                    for peer in _session_live_transports(sess)):
+                with _sessions_lock:
+                    browser_session_id = (ui_session_id if _sessions.get(ui_session_id) is sess
+                                          else next((sid for sid, record in _sessions.items() if record is sess), ""))
+                if browser_session_id:
+                    ui_session_id = ui_session_id or browser_session_id
+                    browser_control_principal = _methods_browser_control.local_desktop_principal(
+                        _methods_browser_control._session_profile(sess), browser_session_id)
+                    browser_control_transport_family = _methods_browser_control.LOCAL_DESKTOP_TRANSPORT_FAMILY
         return set_session_vars(
             session_key=session_key, session_id=session_id, source=source,
             browser_control_principal=browser_control_principal,

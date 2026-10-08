@@ -1501,7 +1501,7 @@ export const zhHant = defineLocale({
         disconnectFailed: '無法中斷 Chrome 連接',
         noSession: '請先開啟或選取 Desktop 工作階段。',
         invalidProfile: '只輸入 Chrome 設定檔目錄名稱，例如 Default 或 Profile 1。',
-        warning: '請先在 Chrome 中安裝並啟用 Stardust 瀏覽器擴充功能。連接僅限此工作階段，中斷連接後即會停止。',
+        warning: '請先在 Chrome 中安裝並啟用官方 Playwright MCP Browser Extension，並在擴充功能提示中核准要控制的分頁。連接僅限此工作階段，中斷連接後即會停止。',
         status: {
           inactive: '未連接',
           starting: '連接中…',

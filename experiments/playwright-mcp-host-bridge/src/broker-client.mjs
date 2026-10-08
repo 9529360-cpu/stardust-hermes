@@ -11,10 +11,10 @@ const MAX_QUEUE = 16;
 
 export class StardustBrowserBrokerClient {
   constructor({ gateway, token, grant, sessionId, driver, fetchImpl = fetch, WS = WebSocket, retryMax = 3,
-                controllerId = randomUUID(), browserProfileId = 'playwright-chrome-user-profile', capabilities }) {
+                controllerId = randomUUID(), browserProfileId = 'playwright-chrome-user-profile', capabilities, onDisconnect = () => {} }) {
     this.gateway = validateGateway(gateway).toString();
     if ((!token && !grant) || (token && grant)) throw new Error('Exactly one browser registration credential is required');
-    if (grant !== undefined && (typeof grant !== 'string' || !grant || grant.length > 4096 || /[\\r\\n]/.test(grant))) throw new Error('Invalid one-time browser grant');
+    if (grant !== undefined && (typeof grant !== 'string' || !grant || grant.length > 4096 || /[\r\n]/.test(grant))) throw new Error('Invalid one-time browser grant');
     if (!driver || typeof driver.run !== 'function') throw new Error('An initialized Playwright driver is required');
     this.token = token;
     this.grant = grant;
@@ -34,13 +34,14 @@ export class StardustBrowserBrokerClient {
     this.generation = 0;
     this.error = null;
     this.negotiated = new Set();
+    this.onDisconnect = onDisconnect;
   }
 
   async register() {
     const reply = await this.fetchImpl(new URL('/v1/browser-control/register', this.gateway), {
       method: 'POST', headers: {
-        Authorization: this.token ? `Bearer ${this.token}` : undefined,
-        'X-Stardust-Browser-Control-Grant': this.grant, 'Content-Type': 'application/json',
+        ...(this.token ? { Authorization: `Bearer ${this.token}` } : { 'X-Stardust-Browser-Control-Grant': this.grant }),
+        'Content-Type': 'application/json',
       }, body: JSON.stringify(this.requested),
     });
     if (reply.status !== 201) throw new Error(`Stardust Browser registration refused (HTTP ${reply.status})`);
@@ -74,6 +75,7 @@ export class StardustBrowserBrokerClient {
         if (generation !== this.generation) return;
         this.connected = false;
         this.socket = null;
+        if (opened && !this.stopped) this.onDisconnect();
         if (!opened) reject(new Error('Stardust controller WebSocket was rejected'));
         if (opened && !this.stopped) this.scheduleReconnect();
       });
@@ -84,7 +86,7 @@ export class StardustBrowserBrokerClient {
   }
 
   scheduleReconnect() {
-    if (this.stopped || ++this.attempts > this.retryMax) {
+    if (this.grant || this.stopped || ++this.attempts > this.retryMax) {
       this.error = new Error('Stardust controller connection lost; restart pairing explicitly');
       return;
     }
@@ -149,7 +151,7 @@ export class StardustBrowserBrokerClient {
     const args = Object.freeze({ ...params.arguments });
     this.pending = this.pending.catch(() => {}).then(async () => {
       try {
-        if (this.canceled.has(toolCallId)) return;
+        if (generation !== this.generation || !this.connected || this.stopped || this.canceled.has(toolCallId)) return;
         const result = await this.driver.run(action, args);
         if (!this.canceled.has(toolCallId)) this.send({ method: 'browser.controller.result', params: {
           command_id: commandId, ok: true, result,
