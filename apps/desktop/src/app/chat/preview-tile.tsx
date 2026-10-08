@@ -20,7 +20,6 @@ import { ToolIcon } from '@/components/ui/tool-icon'
 import { translateNow } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
 import { $rightRailActiveTabId, type RightRailTabId, selectRightRailTab } from '@/store/layout'
-import { $rightContextOpen } from '@/store/right-context'
 import {
   $browserPages,
   $dockedPreviewTabs,
@@ -34,6 +33,7 @@ import {
   popOutBrowserTab,
   type PreviewTarget
 } from '@/store/preview'
+import { $rightContextOpen } from '@/store/right-context'
 import { canOpenBrowserWindow } from '@/store/windows'
 
 import { paneMirror } from './pane-mirror'
