@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { $rightRailActiveTabId, selectRightRailTab } from './layout'
+import { $rightContextOpen, setRightContextOpen } from './right-context'
 import {
   $previewServerRestart,
   $previewServerRestartStatus,
@@ -98,6 +99,28 @@ describe('preview store', () => {
     expect($previewTabs.get()).toBe(before)
     expect($previewTabs.get()[0].target).toBe(target)
     expect($previewTabs.get()).toHaveLength(1)
+  })
+
+  it('does not auto-reveal a hidden viewer when a running task changes pages', () => {
+    openPreview(urlTarget('https://example.com'), 'tool-result')
+    setRightContextOpen(false)
+
+    openPreview(urlTarget('https://example.org'), 'tool-result', undefined, false)
+
+    expect($rightContextOpen.get()).toBe(false)
+    expect($previewTabs.get()).toHaveLength(1)
+    expect($previewTabs.get()[0].target.url).toBe('https://example.org')
+  })
+
+  it('keeps the current tab id but updates the owner when the next session opens the same URL', () => {
+    openPreview(urlTarget('https://example.com'), 'tool-result', 'session-one')
+    const tabId = $previewTabs.get()[0].id
+
+    openPreview(urlTarget('https://example.com'), 'tool-result', 'session-two')
+
+    expect($previewTabs.get()).toHaveLength(1)
+    expect($previewTabs.get()[0].id).toBe(tabId)
+    expect($previewTabs.get()[0].storedSessionId).toBe('session-two')
   })
 
   it('commits the live page onto a Browser tab without changing its id', () => {
