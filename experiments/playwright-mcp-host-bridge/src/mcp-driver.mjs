@@ -1,5 +1,6 @@
 /** The only browser engine used here is Microsoft's Playwright MCP + official Chrome extension. */
 import { normalizeResult, toolMapping } from './protocol.mjs';
+import { fileURLToPath } from 'node:url';
 
 export class PlaywrightExtensionDriver {
   constructor({ packageSpec = process.env.PLAYWRIGHT_MCP_PACKAGE,
@@ -31,9 +32,12 @@ export class PlaywrightExtensionDriver {
                         'LOCALAPPDATA', 'SYSTEMROOT', 'TEMP', 'TMP', 'TMPDIR']) {
       if (process.env[name]) childEnv[name] = process.env[name];
     }
+    // Launch the local, lockfile-installed package directly. npx could download
+    // a fresh executable or resolve a different global version on Windows.
+    const cliPath = fileURLToPath(new URL('../node_modules/@playwright/mcp/cli.js', import.meta.url));
     const transport = new StdioClientTransport({
-      command: 'npx', args: ['--no-install', this.packageSpec, '--extension',
-                            '--profile-dir-name', this.profileDirName],
+      command: process.execPath,
+      args: [cliPath, '--extension', '--profile-dir-name', this.profileDirName],
       env: childEnv,
       stderr: 'inherit',
     });
