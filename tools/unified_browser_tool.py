@@ -192,6 +192,10 @@ def run_unified_browser(agent: Any, args: dict, *, drive_callback, read_callback
     if action == "press" and target == "in_app" and not (args.get("ref") or args.get("selector")):
         return tool_error("In-app press requires an element ref or selector.")
 
+    # Lock the selected surface BEFORE dispatch, including denied/disconnected
+    # actions. A failed host action must never let a later call in the same turn
+    # drift onto an unrelated in-app page as an implicit retry.
+    state["target"] = target
     if target == "host":
         result = _host_action(action, args, task_id=task_id,
                               session_id=str(getattr(agent, "session_id", "") or ""),
@@ -199,8 +203,6 @@ def run_unified_browser(agent: Any, args: dict, *, drive_callback, read_callback
     else:
         result = _in_app_action(action, args, drive_callback=drive_callback, read_callback=read_callback)
 
-    if _success(result):
-        state["target"] = target
     return result
 
 
