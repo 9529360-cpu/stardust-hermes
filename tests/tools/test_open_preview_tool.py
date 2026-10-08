@@ -5,16 +5,15 @@ import json
 import pytest
 
 from tools import desktop_ui, open_preview_tool as op
-from tools.preview_tool import PREVIEW_SCHEMA
 from tools.drive_preview_tool import ACT_PREVIEW_SCHEMA
+from tools.preview_tool import PREVIEW_SCHEMA
+from tools.registry import registry
 
 
 def test_desktop_browser_schema_prefers_live_visible_session():
     assert "FIRST choice" in PREVIEW_SCHEMA["description"]
     assert "same in-app Browser" in PREVIEW_SCHEMA["description"]
     assert "SAME live page" in ACT_PREVIEW_SCHEMA["description"]
-
-from tools.registry import registry
 
 
 @pytest.fixture(autouse=True)
