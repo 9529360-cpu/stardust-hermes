@@ -18,6 +18,7 @@ import tui_gateway.server as server
 from toolsets import TOOLSETS, resolve_toolset
 
 GUI_TOOLS = {
+    "browser",
     "annotate_preview",
     "desktop_preview",
     "drive_preview",
