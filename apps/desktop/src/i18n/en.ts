@@ -1731,7 +1731,7 @@ export const en: Translations = {
         switchedToLocal: 'Terminal commands now run locally. Applies to new sessions.'
       },
       browserRealProfile: {
-        label: 'Use My Real Browser Profile',
+        label: 'Use a Copy of My Browser Profile',
         description:
           "Copies your default browser's logins and cookies into a managed snapshot the agent browses with. Your live profile is never opened directly. Applies to new sessions.",
         enabledTitle: 'Real-profile browsing on',
