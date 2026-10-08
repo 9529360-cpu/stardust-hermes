@@ -92,11 +92,20 @@ class TestRegistration:
 
 class TestDispatch:
 
-    def test_unknown_action_returns_error(self):
-        from tools.computer_use.tool import handle_computer_use
-        out = handle_computer_use({"action": "nope"})
-        parsed = json.loads(out)
-        assert "error" in parsed
+    def test_approval_classification_matches_every_declared_action(self):
+        """Every schema verb maps to one action policy; mutations gate, inspection does not."""
+        from tools.computer_use import tool as cu_tool
+        from tools.computer_use.schema import COMPUTER_USE_SCHEMA
+
+        declared = set(COMPUTER_USE_SCHEMA["parameters"]["properties"]["action"]["enum"])
+        assert declared == set(cu_tool._ACTIONS)
+        assert {name for name, spec in cu_tool._ACTIONS.items() if spec.destructive} == {
+            "click", "double_click", "right_click", "middle_click", "drag", "scroll",
+            "type", "key", "set_value", "focus_app",
+        }
+        assert {name for name, spec in cu_tool._ACTIONS.items() if not spec.destructive} == {
+            "capture", "wait", "list_apps", "list_windows",
+        }
 
 
     def test_type_action_routes_to_type_text_backend(self, noop_backend):
