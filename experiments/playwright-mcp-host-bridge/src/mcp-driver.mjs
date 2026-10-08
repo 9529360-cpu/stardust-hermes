@@ -1,6 +1,6 @@
 /** The only browser engine used here is Microsoft's Playwright MCP + official Chrome extension. */
+import { createRequire } from 'node:module';
 import { normalizeResult, toolMapping } from './protocol.mjs';
-import { fileURLToPath } from 'node:url';
 
 export class PlaywrightExtensionDriver {
   constructor({ packageSpec = process.env.PLAYWRIGHT_MCP_PACKAGE,
@@ -34,7 +34,7 @@ export class PlaywrightExtensionDriver {
     }
     // Launch the local, lockfile-installed package directly. npx could download
     // a fresh executable or resolve a different global version on Windows.
-    const cliPath = fileURLToPath(new URL('../node_modules/@playwright/mcp/cli.js', import.meta.url));
+    const cliPath = createRequire(import.meta.url).resolve('@playwright/mcp/cli.js');
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [cliPath, '--extension', '--profile-dir-name', this.profileDirName],
@@ -59,8 +59,12 @@ export class PlaywrightExtensionDriver {
     if (!schema) throw new Error(`Playwright MCP does not support: ${candidate.name}`);
     // Resolve variant 'target' vs 'ref' against the actual installed MCP version.
     const resolved = toolMapping(action, args, schema);
-    const value = await this.client.callTool({ name: resolved.name, arguments: resolved.arguments });
-    return normalizeResult(value);
+    try {
+      const result = await this.client.callTool({ name: resolved.name, arguments: resolved.arguments });
+      return normalizeResult(result);
+    } catch (error) {
+      throw new Error(String(error?.message || error).replace(/(?:grant|token|secret|authorization|bearer)[^ ]*/gi, '[REDACTED]').slice(0, 500));
+    }
   }
 
   async close() { await this.client?.close(); this.client = null; }

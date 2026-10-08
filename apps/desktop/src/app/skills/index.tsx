@@ -60,6 +60,7 @@ import {
 import { PanelEmpty, PanelPill } from '../overlays/panel'
 import { PageSearchShell } from '../page-search-shell'
 import { SETTINGS_ROUTE } from '../routes'
+import { BrowserHostControlPanel } from '../settings/browser-host-control-panel'
 import { BrowserRealProfilePanel } from '../settings/browser-real-profile-panel'
 import { ComputerUsePanel } from '../settings/computer-use-panel'
 import { asText, includesQuery, prettyName, toolNames, toolsetDisplayLabel } from '../settings/helpers'
@@ -1655,6 +1656,7 @@ function ToolsetDetail({
           config option users kept missing because its only GUI home was the
           generic Settings → Config editor. */}
       {toolset.name === 'browser' && <BrowserRealProfilePanel profile={profile} />}
+      {toolset.name === 'browser' && <BrowserHostControlPanel profile={profile} />}
       {toolset.name === 'terminal' && <TerminalBackendPanel onConfiguredChange={onConfiguredChange} />}
       <ToolsetConfigPanel
         key={`${toolset.name}:${profileScopeKey(profile)}`}

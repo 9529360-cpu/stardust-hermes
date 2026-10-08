@@ -15,7 +15,14 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import secrets
 
+from gateway.browser_control_broker import (
+    BROWSER_CONTROL_PROTOCOL_VERSION,
+    LOCAL_DESKTOP_TRANSPORT_FAMILY,
+    ControllerScope,
+    local_desktop_principal,
+)
 from hermes_cli.dashboard_auth.ws_tickets import (
     INTERNAL_PROVIDER as _INTERNAL_PROVIDER, INTERNAL_USER_ID as _INTERNAL_USER_ID)
 
@@ -210,6 +217,113 @@ def _(rid, params: dict, transport, _identity, _session_id, broker, scope, _sess
     """Hard-detach only the controller owned by this authenticated transport."""
     broker.detach(scope, owner=transport, notify_controller=False)
     return _ok(rid, {"detached": True})
+
+
+def _desktop_bridge_scope(session_id: str, profile_id: str, browser_profile_id: str,
+                          controller_id: str, capabilities: frozenset) -> ControllerScope:
+    return ControllerScope(
+        principal_id=local_desktop_principal(profile_id, session_id),
+        profile_id=profile_id,
+        session_id=session_id,
+        controller_id=controller_id,
+        browser_profile_id=browser_profile_id,
+        transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY,
+        capabilities=capabilities,
+    )
+
+
+def _session_profile(session: dict) -> str:
+    return str(session.get('profile') or session.get('profile_id') or '').strip()
+
+
+def _session_by_id(session_id: str):
+    with _sessions_lock:
+        return _sessions.get(session_id)
+
+
+def _desktop_bridge_params(rid: str, params: dict):
+    session_id = str(params.get('session_id') or '').strip()
+    browser_profile_id = str(params.get('browser_profile_id') or '').strip()
+    controller_id = str(params.get('controller_id') or '').strip()
+    if not session_id:
+        return None, _err(rid, _ERR_FORBIDDEN, 'session_id is required')
+    session = _session_by_id(session_id)
+    if not isinstance(session, dict):
+        return None, _err(rid, _ERR_FORBIDDEN, 'session is not available on this Desktop gateway')
+    profile_id = _session_profile(session)
+    if not profile_id:
+        return None, _err(rid, _ERR_FORBIDDEN, 'session profile is unavailable')
+    return (session_id, profile_id, browser_profile_id, controller_id, session), None
+
+
+@_controller_method('browser.controller.bridge_prepare', lookup_scope=False, precheck=_register_precheck)
+def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, session) -> dict:
+    prepared, denied = _desktop_bridge_params(rid, params)
+    if denied is not None:
+        return denied
+    session_id, profile_id, browser_profile_id, _controller_id, _session = prepared
+    if not browser_profile_id:
+        return _err(rid, _ERR_FORBIDDEN, 'browser_profile_id is required')
+    if not browser_control_protocol_supported(params.get('protocol_version')):
+        return _err(rid, _ERR_FORBIDDEN, 'unsupported browser-control protocol version')
+    capabilities = browser_control_broker.filter_browser_control_capabilities(params.get('capabilities'))
+    if not capabilities:
+        return _err(rid, _ERR_FORBIDDEN, 'no permitted controller capabilities requested')
+    controller_id = f'chrome-{secrets.token_urlsafe(12)}'
+    scope = _desktop_bridge_scope(session_id, profile_id, browser_profile_id, controller_id, capabilities)
+    grant = broker.mint_bridge_grant(scope)
+    return _ok(rid, {
+        'launch_context': {
+            'grant': grant.value,
+            'session_id': session_id,
+            'controller_id': controller_id,
+            'browser_profile_id': browser_profile_id,
+            'capabilities': sorted(capabilities),
+            'protocol_version': BROWSER_CONTROL_PROTOCOL_VERSION,
+            'profile_id': profile_id,
+        },
+        'expires_in_seconds': broker.launch_grant_ttl_seconds,
+    })
+
+
+@_controller_method('browser.controller.bridge_status', lookup_scope=False)
+def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, _session) -> dict:
+    prepared, denied = _desktop_bridge_params(rid, params)
+    if denied is not None:
+        return denied
+    session_id, profile_id, browser_profile_id, controller_id, _session = prepared
+    scope = broker.scope_for_session(
+        session_id=session_id,
+        principal_id=local_desktop_principal(profile_id, session_id),
+        transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY,
+    )
+    result = {'status': 'connected' if scope is not None else 'inactive'}
+    if scope is not None:
+        result.update({
+            'session_id': scope.session_id,
+            'controller_id': scope.controller_id,
+            'browser_profile_id': scope.browser_profile_id,
+            'capabilities': sorted(scope.capabilities),
+        })
+    return _ok(rid, result)
+
+
+@_controller_method('browser.controller.bridge_revoke', lookup_scope=False)
+def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, _session) -> dict:
+    prepared, denied = _desktop_bridge_params(rid, params)
+    if denied is not None:
+        return denied
+    session_id, profile_id, browser_profile_id, controller_id, _session = prepared
+    identity = local_desktop_principal(profile_id, session_id)
+    scope = broker.scope_for_session(session_id=session_id, principal_id=identity,
+                                    transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY)
+    if scope is not None and controller_id and scope.controller_id != controller_id:
+        return _err(rid, _ERR_FORBIDDEN, 'controller does not match this Desktop session')
+    if scope is not None:
+        broker.detach(scope, notify_controller=False)
+    target = scope or _desktop_bridge_scope(session_id, profile_id, browser_profile_id or 'unknown', controller_id or 'unknown', frozenset())
+    revoked = broker.revoke_bridge_grants(target)
+    return _ok(rid, {'revoked': revoked, 'status': 'inactive'})
 
 
 def register(server) -> None:

@@ -17,18 +17,22 @@ export function validateGateway(url) {
   return parsed;
 }
 
-export function requestRegistration({ sessionId, controllerId, browserProfileId }) {
+export function requestRegistration({ sessionId, controllerId, browserProfileId, capabilities = CAPABILITIES }) {
   for (const value of [sessionId, controllerId, browserProfileId]) {
     if (typeof value !== 'string' || !value.trim() || value.length > 128) {
       throw new Error('Browser registration requires bounded session, controller and profile identifiers');
     }
+  }
+  if (!Array.isArray(capabilities) || capabilities.length === 0 ||
+      capabilities.some(cap => typeof cap !== 'string' || !CAPSET.has(cap))) {
+    throw new Error('Browser registration requested unsupported capabilities');
   }
   return {
     protocol_version: PROTOCOL_VERSION,
     session_id: sessionId,
     controller_id: controllerId,
     browser_profile_id: browserProfileId,
-    capabilities: [...CAPABILITIES],
+    capabilities: [...new Set(capabilities)],
   };
 }
 
@@ -43,7 +47,8 @@ export function validateRegistration(data, requested) {
     throw new Error('Gateway controller registration was not scoped to the requested session/identity');
   }
   const negotiated = data.scope.capabilities;
-  if (negotiated.some(cap => !CAPSET.has(cap)) || negotiated.length === 0) {
+  const requestedCaps = new Set(requested.capabilities);
+  if (negotiated.some(cap => !CAPSET.has(cap) || !requestedCaps.has(cap)) || negotiated.length === 0) {
     throw new Error('Gateway supplied unsupported browser capabilities');
   }
   return new Set(negotiated);

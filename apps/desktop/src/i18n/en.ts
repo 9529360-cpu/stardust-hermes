@@ -1739,6 +1739,29 @@ export const en: Translations = {
         disabledTitle: 'Real-profile browsing off',
         disabledMessage: 'The profile snapshot will be deleted; new sessions use a clean browser.',
         failedSave: 'Could not save the real-profile setting',
+      },
+      browserHostControl: {
+        label: 'Connect to an Open Chrome Profile',
+        description: 'Explicitly pair this session with one already-open Chrome profile through the approved browser extension. Stardust never copies your Chrome cookies.',
+        statusLabel: 'Status',
+        profileLabel: 'Chrome profile directory',
+        connect: 'Connect Chrome',
+        disconnect: 'Disconnect',
+        working: 'Working…',
+        connectedTitle: 'Chrome connected',
+        connectedMessage: 'This session can now use the paired Chrome profile after each action is approved.',
+        connectFailed: 'Could not connect to Chrome',
+        disconnectFailed: 'Could not disconnect from Chrome',
+        noSession: 'Open or select a Desktop session first.',
+        invalidProfile: 'Use only the Chrome profile directory name, such as Default or Profile 1.',
+        warning: 'Install and enable the Stardust browser extension in Chrome first. The connection is session-scoped and stops when you disconnect.',
+        status: {
+          inactive: 'Not connected',
+          starting: 'Connecting…',
+          connected: 'Connected',
+          stopping: 'Disconnecting…',
+          error: 'Error'
+        }
       }
     }
   },

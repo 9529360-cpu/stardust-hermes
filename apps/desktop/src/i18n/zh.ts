@@ -1882,6 +1882,29 @@ export const zh = defineLocale({
         disabledTitle: '真实配置文件浏览：已关闭',
         disabledMessage: '配置文件快照将被删除；新会话使用干净的浏览器。',
         failedSave: '无法保存真实配置文件设置',
+      },
+      browserHostControl: {
+        label: '连接到已打开的 Chrome 配置文件',
+        description: '通过已批准的浏览器扩展，明确将此会话配对到一个已打开的 Chrome 配置文件。Stardust 不会复制你的 Chrome Cookie。',
+        statusLabel: '状态',
+        profileLabel: 'Chrome 配置文件目录',
+        connect: '连接 Chrome',
+        disconnect: '断开连接',
+        working: '处理中…',
+        connectedTitle: 'Chrome 已连接',
+        connectedMessage: '每个操作获得批准后，此会话即可使用已配对的 Chrome 配置文件。',
+        connectFailed: '无法连接 Chrome',
+        disconnectFailed: '无法断开 Chrome 连接',
+        noSession: '请先打开或选择一个 Desktop 会话。',
+        invalidProfile: '只输入 Chrome 配置文件目录名称，例如 Default 或 Profile 1。',
+        warning: '请先在 Chrome 中安装并启用 Stardust 浏览器扩展。连接仅限此会话，断开后即停止。',
+        status: {
+          inactive: '未连接',
+          starting: '连接中…',
+          connected: '已连接',
+          stopping: '断开中…',
+          error: '错误'
+        }
       }
     }
   },

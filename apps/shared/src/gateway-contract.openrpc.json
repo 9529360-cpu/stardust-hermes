@@ -241,6 +241,60 @@
       }
     },
     {
+      "name": "browser.controller.bridge_prepare",
+      "summary": "Mint a short-lived, single-use, session-bound Desktop bridge launch grant.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/BrowserControllerBridgePrepareParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/BrowserControllerBridgePrepareResult"
+        }
+      }
+    },
+    {
+      "name": "browser.controller.bridge_revoke",
+      "summary": "Revoke the session-bound Desktop Chrome bridge and outstanding launch grants.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/BrowserControllerBridgeRevokeParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/BrowserControllerBridgeRevokeResult"
+        }
+      }
+    },
+    {
+      "name": "browser.controller.bridge_status",
+      "summary": "Read the session-bound Desktop Chrome bridge status.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/BrowserControllerParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/BrowserControllerBridgeStatusResult"
+        }
+      }
+    },
+    {
       "name": "browser.controller.detach",
       "summary": "Hard-detach only the controller owned by this authenticated transport.",
       "params": [
@@ -6442,6 +6496,224 @@
         ],
         "title": "BrowserAction",
         "type": "string"
+      },
+      "BrowserControllerBridgeLaunchContext": {
+        "additionalProperties": false,
+        "properties": {
+          "grant": {
+            "title": "Grant",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "controller_id": {
+            "title": "Controller Id",
+            "type": "string"
+          },
+          "browser_profile_id": {
+            "title": "Browser Profile Id",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "protocol_version": {
+            "title": "Protocol Version",
+            "type": "integer"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant",
+          "session_id",
+          "controller_id",
+          "browser_profile_id",
+          "capabilities",
+          "protocol_version",
+          "profile_id"
+        ],
+        "title": "BrowserControllerBridgeLaunchContext",
+        "type": "object"
+      },
+      "BrowserControllerBridgePrepareParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "browser_profile_id": {
+            "title": "Browser Profile Id",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "protocol_version": {
+            "title": "Protocol Version"
+          }
+        },
+        "required": [
+          "session_id",
+          "browser_profile_id",
+          "capabilities",
+          "protocol_version"
+        ],
+        "title": "BrowserControllerBridgePrepareParams",
+        "type": "object"
+      },
+      "BrowserControllerBridgePrepareResult": {
+        "additionalProperties": false,
+        "properties": {
+          "launch_context": {
+            "$ref": "#/components/schemas/BrowserControllerBridgeLaunchContext"
+          },
+          "expires_in_seconds": {
+            "title": "Expires In Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "launch_context",
+          "expires_in_seconds"
+        ],
+        "title": "BrowserControllerBridgePrepareResult",
+        "type": "object"
+      },
+      "BrowserControllerBridgeRevokeParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "controller_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Controller Id"
+          },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Browser Profile Id"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "BrowserControllerBridgeRevokeParams",
+        "type": "object"
+      },
+      "BrowserControllerBridgeRevokeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revoked",
+          "status"
+        ],
+        "title": "BrowserControllerBridgeRevokeResult",
+        "type": "object"
+      },
+      "BrowserControllerBridgeStatusResult": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "controller_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Controller Id"
+          },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Browser Profile Id"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Capabilities"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "BrowserControllerBridgeStatusResult",
+        "type": "object"
       },
       "BrowserControllerCancelPayload": {
         "additionalProperties": false,

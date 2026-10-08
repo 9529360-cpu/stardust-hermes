@@ -30,6 +30,7 @@ import {
 } from 'electron'
 
 import { classifyActiveRuntime } from './active-runtime-state'
+import { BrowserControlBridgeSupervisor } from './browser-control-bridge-supervisor'
 import {
   destroyKeepaliveAgents,
   downloadAgentFor,
@@ -14208,6 +14209,25 @@ function createWindow() {
   })
 }
 
+const browserControlBridgeSupervisor = new BrowserControlBridgeSupervisor({
+  resourcesPath: app.getAppPath(),
+  packagedBridgeEntry: app.isPackaged ? appPath => path.join(appPath, 'experiments', 'playwright-mcp-host-bridge', 'src', 'main.mjs') : undefined
+})
+
+ipcMain.handle('hermes:browser-control:bridge:start', async (event, payload) => {
+  const connection = await ensureBackend(payload?.profile)
+  const backendUrl = new URL(connection.baseUrl)
+  const isLoopback = backendUrl.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(backendUrl.hostname) && !backendUrl.username && !backendUrl.password && !backendUrl.search && !backendUrl.hash
+  if (connection.mode === 'remote' || !isLoopback) throw new Error('Browser control requires a local loopback backend')
+  const launchContext = payload?.launchContext
+  if (!launchContext || typeof launchContext !== 'object') throw new Error('Server-issued browser launch context is required')
+  const status = await browserControlBridgeSupervisor.start({ gatewayUrl: connection.baseUrl, launchContext, chromeProfileDir: payload.chromeProfileDir, packageSpec: payload.packageSpec })
+  event.sender.send('hermes:browser-control:bridge:status', status)
+  return status
+})
+ipcMain.handle('hermes:browser-control:bridge:stop', async event => { const status = await browserControlBridgeSupervisor.stop(); event.sender.send('hermes:browser-control:bridge:status', status); return status })
+ipcMain.handle('hermes:browser-control:bridge:status', () => browserControlBridgeSupervisor.status())
+
 ipcMain.handle('hermes:connection', async (_event, profile, extra) => {
   // Coalesce concurrent renderer dials for one profile scope (#90812): the
   // renderer-side reconnect lock is per-window, so two windows waking at once
@@ -16513,6 +16533,7 @@ app.on('before-quit', () => {
 // Close the pooled keep-alive sockets on quit so lingering connections can't
 // hold the event loop open or leak FDs past app teardown.
 app.on('will-quit', () => {
+  browserControlBridgeSupervisor.stop()
   sshIsolatedKeepalives.stopAll()
   destroyKeepaliveAgents()
 })

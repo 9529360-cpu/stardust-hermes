@@ -1409,6 +1409,29 @@ export const ja = defineLocale({
         disabledTitle: '実プロファイルブラウジング：オフ',
         disabledMessage: 'プロファイルのスナップショットは削除され、新しいセッションはクリーンなブラウザを使用します。',
         failedSave: '実プロファイル設定を保存できませんでした',
+      },
+      browserHostControl: {
+        label: '開いている Chrome プロファイルに接続',
+        description: '承認済みブラウザー拡張機能を通して、このセッションを開いている Chrome プロファイルに明示的にペアリングします。Chrome の Cookie はコピーしません。',
+        statusLabel: '状態',
+        profileLabel: 'Chrome プロファイルのディレクトリ',
+        connect: 'Chrome に接続',
+        disconnect: '切断',
+        working: '処理中…',
+        connectedTitle: 'Chrome に接続しました',
+        connectedMessage: '各操作の承認後、このセッションでペアリングした Chrome プロファイルを使用できます。',
+        connectFailed: 'Chrome に接続できませんでした',
+        disconnectFailed: 'Chrome を切断できませんでした',
+        noSession: '先に Desktop セッションを開くか選択してください。',
+        invalidProfile: 'Default や Profile 1 のような Chrome プロファイル名だけを入力してください。',
+        warning: '先に Chrome に Stardust ブラウザー拡張機能をインストールして有効にしてください。接続はセッション単位で、切断すると停止します。',
+        status: {
+          inactive: '未接続',
+          starting: '接続中…',
+          connected: '接続済み',
+          stopping: '切断中…',
+          error: 'エラー'
+        }
       }
     }
   },

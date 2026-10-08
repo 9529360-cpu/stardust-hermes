@@ -608,6 +608,60 @@ method("browser.controller.register", params=BrowserControllerRegisterParams,
        doc="Attach this connection as the browser controller for one session; fails closed (4403).")
 
 
+class BrowserControllerBridgePrepareParams(BrowserControllerParams):
+    browser_profile_id: str
+    capabilities: list[str]
+    protocol_version: JsonValue
+
+
+class BrowserControllerBridgeLaunchContext(Result):
+    grant: str
+    session_id: str
+    controller_id: str
+    browser_profile_id: str
+    capabilities: list[str]
+    protocol_version: int
+    profile_id: str
+
+
+class BrowserControllerBridgePrepareResult(Result):
+    launch_context: BrowserControllerBridgeLaunchContext
+    expires_in_seconds: float
+
+
+method("browser.controller.bridge_prepare", params=BrowserControllerBridgePrepareParams,
+       result=BrowserControllerBridgePrepareResult,
+       doc="Mint a short-lived, single-use, session-bound Desktop bridge launch grant.")
+
+
+class BrowserControllerBridgeStatusResult(Result):
+    status: str
+    session_id: str | None = None
+    controller_id: str | None = None
+    browser_profile_id: str | None = None
+    capabilities: list[str] | None = None
+
+
+method("browser.controller.bridge_status", params=BrowserControllerParams,
+       result=BrowserControllerBridgeStatusResult,
+       doc="Read the session-bound Desktop Chrome bridge status.")
+
+
+class BrowserControllerBridgeRevokeParams(BrowserControllerParams):
+    controller_id: str | None = None
+    browser_profile_id: str | None = None
+
+
+class BrowserControllerBridgeRevokeResult(Result):
+    revoked: int
+    status: str
+
+
+method("browser.controller.bridge_revoke", params=BrowserControllerBridgeRevokeParams,
+       result=BrowserControllerBridgeRevokeResult,
+       doc="Revoke the session-bound Desktop Chrome bridge and outstanding launch grants.")
+
+
 class BrowserControllerResultParams(BrowserControllerParams):
     command_id: str
     ok: JsonValue | None = None  # only the exact ``true`` counts as success

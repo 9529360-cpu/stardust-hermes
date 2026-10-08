@@ -323,6 +323,20 @@ class BrowserControlBroker:
     ) -> ControllerScope:
         return self.consume_launch_grant(value, scope=scope)
 
+    def revoke_launch_grants(self, scope: ControllerScope) -> int:
+        """Invalidate outstanding launch grants for an exact stable identity."""
+        with self._lock:
+            values = [
+                value for value, record in self._launch_grants.items()
+                if _same_scope_identity(record.scope, scope)
+            ]
+            for value in values:
+                self._launch_grants.pop(value, None)
+        return len(values)
+
+    def revoke_bridge_grants(self, scope: ControllerScope) -> int:
+        return self.revoke_launch_grants(scope)
+
     def _controller_for_identity_locked(self, scope: ControllerScope) -> Optional[_Controller]:
         """Attached controller sharing ``scope``'s stable identity (any capabilities)."""
         return next((c for c in self._controllers.values() if _same_scope_identity(c.scope, scope)), None)
@@ -592,6 +606,11 @@ class BrowserControlBroker:
     def ticket_ttl_seconds(self) -> float:
         """Configured lifetime for newly minted one-shot tickets."""
         return self._ticket_ttl
+
+    @property
+    def launch_grant_ttl_seconds(self) -> float:
+        """Configured lifetime for newly minted one-shot Desktop launch grants."""
+        return self._launch_grant_ttl
 
     @property
     def pending_count(self) -> int:

@@ -10,16 +10,18 @@ const MAX_FRAME_BYTES = 250_000;
 const MAX_QUEUE = 16;
 
 export class StardustBrowserBrokerClient {
-  constructor({ gateway, token, sessionId, driver, fetchImpl = fetch, WS = WebSocket, retryMax = 3,
-                controllerId = randomUUID(), browserProfileId = 'playwright-chrome-user-profile' }) {
+  constructor({ gateway, token, grant, sessionId, driver, fetchImpl = fetch, WS = WebSocket, retryMax = 3,
+                controllerId = randomUUID(), browserProfileId = 'playwright-chrome-user-profile', capabilities }) {
     this.gateway = validateGateway(gateway).toString();
-    if (!token || typeof token !== 'string') throw new Error('A session-scoped gateway bearer token is required');
+    if ((!token && !grant) || (token && grant)) throw new Error('Exactly one browser registration credential is required');
+    if (grant !== undefined && (typeof grant !== 'string' || !grant || grant.length > 4096 || /[\\r\\n]/.test(grant))) throw new Error('Invalid one-time browser grant');
     if (!driver || typeof driver.run !== 'function') throw new Error('An initialized Playwright driver is required');
     this.token = token;
+    this.grant = grant;
     this.driver = driver;
     this.fetchImpl = fetchImpl;
     this.WS = WS;
-    this.requested = requestRegistration({ sessionId, controllerId, browserProfileId });
+    this.requested = requestRegistration({ sessionId, controllerId, browserProfileId, capabilities });
     this.retryMax = retryMax;
     this.attempts = 0;
     this.socket = null;
@@ -37,7 +39,8 @@ export class StardustBrowserBrokerClient {
   async register() {
     const reply = await this.fetchImpl(new URL('/v1/browser-control/register', this.gateway), {
       method: 'POST', headers: {
-        Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json',
+        Authorization: this.token ? `Bearer ${this.token}` : undefined,
+        'X-Stardust-Browser-Control-Grant': this.grant, 'Content-Type': 'application/json',
       }, body: JSON.stringify(this.requested),
     });
     if (reply.status !== 201) throw new Error(`Stardust Browser registration refused (HTTP ${reply.status})`);
@@ -176,6 +179,7 @@ export class StardustBrowserBrokerClient {
       await this.driver.close?.();
       // No token is written to disk or logs; drop this reference on shutdown.
       this.token = '';
+      this.grant = '';
     }
   }
 }

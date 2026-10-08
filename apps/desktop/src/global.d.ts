@@ -195,6 +195,12 @@ declare global {
         // its draft and re-focus the input on every open.
         onShown: (callback: () => void) => () => void
       }
+      browserControl: {
+        start: (payload: { profile?: string | null; launchContext: object; chromeProfileDir: string; packageSpec: string }) => Promise<BrowserBridgeStatus>
+        stop: () => Promise<BrowserBridgeStatus>
+        status: () => Promise<BrowserBridgeStatus>
+        onStatus: (callback: (status: BrowserBridgeStatus) => void) => () => void
+      }
       getBootProgress: () => Promise<DesktopBootProgress>
       getConnectionConfig: (profile?: null | string) => Promise<DesktopConnectionConfig>
       saveConnectionConfig: (payload: DesktopConnectionConfigInput) => Promise<DesktopConnectionConfig>
@@ -794,6 +800,15 @@ export interface DesktopPluginProfileRoute {
   mode: 'local' | 'remote'
   profile: string
   targetProfile: string
+}
+
+export type BrowserBridgeStatus = {
+  status: 'inactive' | 'starting' | 'connected' | 'stopping' | 'error'
+  error?: string
+  session_id?: string
+  controller_id?: string
+  browser_profile_id?: string
+  capabilities?: string[]
 }
 
 export interface HermesConnection {
