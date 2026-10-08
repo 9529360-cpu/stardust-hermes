@@ -91,7 +91,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
 
   useEffect(() => {
     void refresh()
-    const off = window.hermesDesktop.browserControl?.onStatus?.(next => setStatus(next))
+    const off = window.hermesDesktop?.browserControl?.onStatus?.(next => setStatus(next))
     return () => off?.()
   }, [refresh])
 
