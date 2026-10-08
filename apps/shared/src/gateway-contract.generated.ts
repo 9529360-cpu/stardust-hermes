@@ -1362,6 +1362,45 @@ export interface ControllerScope {
   transport_family: string
   capabilities: string[]
 }
+export interface BrowserControllerBridgePrepareParams {
+  session_id: string
+  browser_profile_id: string
+  capabilities: string[]
+  protocol_version: unknown
+}
+export interface BrowserControllerBridgePrepareResult {
+  launch_context: BrowserControllerBridgeLaunchContext
+  expires_in_seconds: number
+}
+export interface BrowserControllerBridgeLaunchContext {
+  grant: string
+  session_id: string
+  controller_id: string
+  browser_profile_id: string
+  capabilities: string[]
+  protocol_version: number
+  profile_id: string
+}
+export interface BrowserControllerBridgeStatusParams {
+  session_id: string
+  browser_profile_id?: string | null
+}
+export interface BrowserControllerBridgeStatusResult {
+  status: string
+  session_id?: string | null
+  controller_id?: string | null
+  browser_profile_id?: string | null
+  capabilities?: string[] | null
+}
+export interface BrowserControllerBridgeRevokeParams {
+  session_id: string
+  controller_id?: string | null
+  browser_profile_id?: string | null
+}
+export interface BrowserControllerBridgeRevokeResult {
+  revoked: number
+  status: string
+}
 export interface BrowserControllerResultParams {
   session_id: string
   command_id: string
@@ -4211,6 +4250,12 @@ export interface RpcMethods {
   'bot_relay.reply': { params: BotRelayReplyParams; result: OkResult }
   /** Replace this gateway's view of agents on other connections; answers the accepted row count. */
   'bot_relay.roster.sync': { params: BotRelayRosterSyncParams; result: BotRelayRosterSyncResult }
+  /** Mint a short-lived, single-use, session-bound Desktop bridge launch grant. */
+  'browser.controller.bridge_prepare': { params: BrowserControllerBridgePrepareParams; result: BrowserControllerBridgePrepareResult }
+  /** Revoke the session-bound Desktop Chrome bridge and outstanding launch grants. */
+  'browser.controller.bridge_revoke': { params: BrowserControllerBridgeRevokeParams; result: BrowserControllerBridgeRevokeResult }
+  /** Read the session-bound Desktop Chrome bridge status. */
+  'browser.controller.bridge_status': { params: BrowserControllerBridgeStatusParams; result: BrowserControllerBridgeStatusResult }
   /** Hard-detach only the controller owned by this authenticated transport. */
   'browser.controller.detach': { params: BrowserControllerParams; result: BrowserControllerDetachResult }
   /** Acknowledge a heartbeat only for this transport's own attached controller. */
@@ -4637,6 +4682,9 @@ export const RPC_METHODS = [
   'bot_relay.outbox.drain',
   'bot_relay.reply',
   'bot_relay.roster.sync',
+  'browser.controller.bridge_prepare',
+  'browser.controller.bridge_revoke',
+  'browser.controller.bridge_status',
   'browser.controller.detach',
   'browser.controller.heartbeat',
   'browser.controller.register',

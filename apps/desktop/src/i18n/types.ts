@@ -1537,6 +1537,29 @@ export interface Translations {
         disabledMessage: string
         failedSave: string
       }
+      browserHostControl: {
+        label: string
+        description: string
+        statusLabel: string
+        profileLabel: string
+        connect: string
+        disconnect: string
+        working: string
+        connectedTitle: string
+        connectedMessage: string
+        connectFailed: string
+        disconnectFailed: string
+        noSession: string
+        invalidProfile: string
+        warning: string
+        status: {
+          inactive: string
+          starting: string
+          connected: string
+          stopping: string
+          error: string
+        }
+      }
     }
   }
 

@@ -1486,6 +1486,29 @@ export const zhHant = defineLocale({
         disabledTitle: '真實設定檔瀏覽：已關閉',
         disabledMessage: '設定檔快照將被刪除；新工作階段使用乾淨的瀏覽器。',
         failedSave: '無法儲存真實設定檔設定',
+      },
+      browserHostControl: {
+        label: '連接至已開啟的 Chrome 設定檔',
+        description: '透過核准的瀏覽器擴充功能，明確將此工作階段配對至已開啟的 Chrome 設定檔。Stardust 不會複製 Chrome Cookie。',
+        statusLabel: '狀態',
+        profileLabel: 'Chrome 設定檔目錄',
+        connect: '連接 Chrome',
+        disconnect: '中斷連接',
+        working: '處理中…',
+        connectedTitle: 'Chrome 已連接',
+        connectedMessage: '每個操作獲得核准後，此工作階段即可使用已配對的 Chrome 設定檔。',
+        connectFailed: '無法連接 Chrome',
+        disconnectFailed: '無法中斷 Chrome 連接',
+        noSession: '請先開啟或選取 Desktop 工作階段。',
+        invalidProfile: '只輸入 Chrome 設定檔目錄名稱，例如 Default 或 Profile 1。',
+        warning: '請先在 Chrome 中安裝並啟用 Stardust 瀏覽器擴充功能。連接僅限此工作階段，中斷連接後即會停止。',
+        status: {
+          inactive: '未連接',
+          starting: '連接中…',
+          connected: '已連接',
+          stopping: '中斷連接中…',
+          error: '錯誤'
+        }
       }
     }
   },
