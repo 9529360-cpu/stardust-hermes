@@ -123,6 +123,12 @@ class TestClassification:
         # project_list is NOT in the curated defer set → stays direct.
         assert "project_list" in names
 
+    def test_visible_desktop_browser_tools_are_not_deferred(self):
+        from tools.tool_search import _DEFAULT_DEFERRED_TOOLS, is_deferrable_tool_name
+        for name in ("desktop_preview", "drive_preview"):
+            assert name not in _DEFAULT_DEFERRED_TOOLS
+            assert not is_deferrable_tool_name(name)
+
     def test_defer_override_restores_legacy_direct_gui(self):
         """tools.tool_search.defer: [] restores the everything-eager legacy:
         GUI tools alone no longer activate the bridge."""
