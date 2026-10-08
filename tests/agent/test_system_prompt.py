@@ -198,7 +198,7 @@ def test_unified_desktop_browser_prompt_chooses_one_tool_and_never_crosses_sessi
     assert "browser target=host" in prompt
     assert "Never mix tabs, login state" in prompt
     assert "No host-window controller is available" not in prompt
-    assert "use computer_use" not in prompt
+    assert "For the user's existing host browser, use computer_use" not in prompt
     assert "Use the in-app Browser" not in prompt
 
 
