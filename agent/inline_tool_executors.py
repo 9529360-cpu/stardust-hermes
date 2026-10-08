@@ -205,6 +205,19 @@ def _desktop_preview(agent, args: dict, ctx: InlineToolContext) -> Any:
     return _handle_preview(args)
 
 
+def _unified_browser(agent, args: dict, ctx: InlineToolContext) -> Any:
+    # The same agent-bound Preview callbacks and approval policy own both the
+    # legacy GUI tools and the new single Browser controller. Do not dispatch
+    # a renderer operation via the registry (which has no window binding).
+    from tools.unified_browser_tool import run_unified_browser
+
+    return run_unified_browser(
+        agent, args, drive_callback=_approved_preview_callback(agent, ctx),
+        read_callback=getattr(agent, "read_preview_callback", None),
+        task_id=ctx.effective_task_id, tool_call_id=ctx.tool_call_id or "",
+    )
+
+
 def _manage_connections(agent, args: dict, ctx: InlineToolContext) -> Any:
     # The GUI callback lives on the agent; registry dispatch never forwards it.
     from tools.connectors import manage_connections
@@ -314,6 +327,7 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
         "tools.read_terminal_tool", "read_terminal_tool", "read_terminal_callback",
         ("start_line", "start_line"), ("count", "count"),
     ),
+    "browser": _unified_browser,
     "desktop_preview": _desktop_preview,
     "drive_preview": _tool(
         "tools.drive_preview_tool", "drive_preview_tool",
