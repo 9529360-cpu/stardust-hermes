@@ -30,7 +30,6 @@ import {
 } from 'electron'
 
 import { classifyActiveRuntime } from './active-runtime-state'
-import { BrowserControlBridgeSupervisor } from './browser-control-bridge-supervisor'
 import {
   destroyKeepaliveAgents,
   downloadAgentFor,
@@ -84,6 +83,7 @@ import {
 } from './bootstrap-platform'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
+import { BrowserControlBridgeSupervisor } from './browser-control-bridge-supervisor'
 import {
   BROWSER_WINDOW_HEIGHT,
   BROWSER_WINDOW_MIN_HEIGHT,
@@ -14218,9 +14218,13 @@ ipcMain.handle('hermes:browser-control:bridge:start', async (event, payload) => 
   const connection = await ensureBackend(payload?.profile)
   const backendUrl = new URL(connection.baseUrl)
   const isLoopback = backendUrl.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(backendUrl.hostname) && !backendUrl.username && !backendUrl.password && !backendUrl.search && !backendUrl.hash
-  if (connection.mode === 'remote' || !isLoopback) throw new Error('Browser control requires a local loopback backend')
+  if (connection.mode === 'remote' || !isLoopback) {
+    throw new Error('Browser control requires a local loopback backend')
+  }
   const launchContext = payload?.launchContext
-  if (!launchContext || typeof launchContext !== 'object') throw new Error('Server-issued browser launch context is required')
+  if (!launchContext || typeof launchContext !== 'object') {
+    throw new Error('Server-issued browser launch context is required')
+  }
   const status = await browserControlBridgeSupervisor.start({ gatewayUrl: connection.baseUrl, launchContext, chromeProfileDir: payload.chromeProfileDir, packageSpec: payload.packageSpec })
   event.sender.send('hermes:browser-control:bridge:status', status)
   return status
