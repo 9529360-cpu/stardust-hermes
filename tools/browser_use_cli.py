@@ -807,10 +807,12 @@ def _dynamic_schema_overrides() -> dict:
         props = dict(BROWSER_EXEC_SCHEMA["parameters"]["properties"])
         props["local"] = {
             "type": "boolean", "default": False,
-            "description": ("Drive the user's own local browser (a Hermes-managed copy of their real "
-                            "default-Chromium profile, logins/cookies included) instead of the configured "
-                            "cloud browser backend. Use when the user asks to act as themselves — their "
-                            "accounts, their sessions. No-op when the backend is already local. Default false."),
+            "description": ("Use a separate, Hermes-managed local Chromium with a COPY of the "
+                            "default browser profile (logins/cookies included) rather than the "
+                            "configured cloud backend. This does NOT control any existing Chrome "
+                            "window or tab. For the user's live browser use an authorized native "
+                            "computer_use controller or verified CDP attachment instead. "
+                            "No-op when the backend is already local. Default false."),
         }
         overrides["parameters"] = {**BROWSER_EXEC_SCHEMA["parameters"], "properties": props}
     return overrides
