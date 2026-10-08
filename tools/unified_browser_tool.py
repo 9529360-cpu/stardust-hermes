@@ -35,7 +35,7 @@ def _success(raw: str) -> bool:
         data = json.loads(raw)
     except (TypeError, ValueError):
         return False
-    return isinstance(data, dict) and data.get("success") is not False and not (
+    return isinstance(data, dict) and data.get("success") is not False and data.get("ok") is not False and not (
         "error" in data and data.get("success") is not True
     )
 
@@ -151,18 +151,27 @@ def run_unified_browser(agent: Any, args: dict, *, drive_callback, read_callback
         )
 
     if action == "status":
-        return json.dumps({"success": True, "target": selected, "requested_target": target,
-                           "connected": selected is not None}, ensure_ascii=False)
+        if target == "host":
+            from tools.browser_extension_router import extension_controller_available
+            available = extension_controller_available("browser_snapshot")
+        else:
+            available = drive_callback is not None and read_callback is not None
+        return json.dumps({
+            "success": True, "active_target": selected, "requested_target": target,
+            "available": available,
+        }, ensure_ascii=False)
 
     if action == "open":
         raw_url = str(args.get("url") or "").strip()
-        from tools.open_preview_tool import _normalize_target
         from urllib.parse import urlsplit
+        from tools.open_preview_tool import _normalize_target
         from tools.browser_tool import _secret_url_error
 
         url = _normalize_target(raw_url)
-        if not url or urlsplit(url).scheme.lower() not in ("http", "https"):
-            return tool_error("open requires a valid http(s) URL; use desktop_preview for local files.")
+        parsed = urlsplit(url)
+        if (not url or parsed.scheme.lower() not in ("http", "https")
+                or not parsed.hostname or parsed.username or parsed.password):
+            return tool_error("open requires an http(s) URL without embedded credentials.")
         blocked = _secret_url_error(url)
         if blocked is not None:
             return json.dumps(blocked, ensure_ascii=False)
@@ -170,6 +179,10 @@ def run_unified_browser(agent: Any, args: dict, *, drive_callback, read_callback
 
     if action in ("click", "type", "hover") and not (args.get("ref") or args.get("selector")):
         return tool_error(f"{action} requires a ref from elements or a selector.")
+    if target == "host" and action in ("click", "type") and not args.get("ref"):
+        return tool_error("Host browser actions require a ref returned by that browser's elements action.")
+    if target == "host" and action == "type" and args.get("submit"):
+        return tool_error("Host browser type does not support submit; use press with key=Enter separately.")
     if action == "type" and args.get("text") is None:
         return tool_error("type requires text.")
     if action == "press" and not args.get("key"):
@@ -205,7 +218,11 @@ UNIFIED_BROWSER_SCHEMA = {
         "Do not send actions to the other target or copy its URL to a second "
         "window. Hiding the right rail does not cancel in-app browsing. Host "
         "mode never copies Chrome cookies or switches to another browser on "
-        "disconnect. Start with open and then elements."
+        "disconnect. Never type passwords, OTPs or payment secrets via model "
+        "text; ask the user to enter them in the exact active browser, or "
+        "use a secure vault ONLY when verified to address that same session. "
+        "Start with open and then elements. Host control currently supports "
+        "only open, elements/read, click, type, scroll, back and press."
     ),
     "parameters": {
         "type": "object",
