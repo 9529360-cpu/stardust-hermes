@@ -305,7 +305,29 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
             skill_manage_available="skill_manage" in names,
         )
     desktop_browser_guidance = None
-    if str(getattr(agent, "platform", "") or "").lower() == "desktop" and {"desktop_preview", "drive_preview"} <= set(names):
+    if str(getattr(agent, "platform", "") or "").lower() == "desktop" and "browser" in names:
+        desktop_browser_guidance = (
+            "Stardust has ONE browser control tool: browser. For ordinary "
+            "interactive web browsing in Desktop, use browser target=in_app "
+            "with action=open, then elements, click, type, read, scroll, or "
+            "other supported actions on the SAME live right-rail WebView; "
+            "navigation reuses its tab. The right rail can be hidden without "
+            "terminating the task. When the user explicitly requests their "
+            "already-open Chrome/Edge, choose browser target=host ONLY if an "
+            "authenticated, approved browser extension controller is attached "
+            "to the exact session. If none is attached, explain that host "
+            "control is not yet available; do not launch another browser, "
+            "import a copy of their profile, or silently use computer_use/ "
+            "browser_navigate/browser_exec instead. The browser tool pins "
+            "the selected target within a turn. Never mix tabs, login state, "
+            "cookies, or refs across targets. The host controller owns the "
+            "actual native browser; a copied URL in the right rail is NOT a "
+            "view of that host session. Use secure vault tools for passwords, "
+            "card details, and verification codes instead of passing secrets "
+            "to the browser type action. Respect site-level authorization "
+            "and high-risk action approvals."
+        )
+    elif str(getattr(agent, "platform", "") or "").lower() == "desktop" and {"desktop_preview", "drive_preview"} <= set(names):
         # A browser target is an authority boundary, NOT a second synchronized
         # tab. The model selects the surface by the user's request; each driver
         # remains the sole owner of its navigation, cookies, tabs and history.
