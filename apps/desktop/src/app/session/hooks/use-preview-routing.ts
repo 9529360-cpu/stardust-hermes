@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef } from 'react'
 import { gatewayEventCompletedFileDiff } from '@/lib/gateway-events'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { reachablePreviewUrl } from '@/lib/preview-reach'
+import { $rightRailActiveTabId } from '@/store/layout'
 import {
+  $dockedPreviewTabs,
   $previewTabs,
   beginPreviewServerRestart,
   closePreviewMatching,
@@ -103,10 +105,13 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
       if (event.type === 'tool.start' && sessionId && sessionIsOnScreen(sessionId)) {
         const { name, args } = asRecord(event.payload)
         const action = asRecord(args).action
-        const hasLivePreview = $previewTabs.get().some(
+        const hasLivePreview = $dockedPreviewTabs.get().some(
           tab =>
+            tab.id === $rightRailActiveTabId.get() &&
+            (
             tab.target.kind === 'url' ||
             (tab.target.kind === 'file' && tab.target.previewKind === 'html' && tab.target.renderMode !== 'source')
+            )
         )
         // Only follow tools that drive the ACTUAL in-app guest. browser_exec
         // and browser_navigate own a separate backend Chromium/CDP session:
