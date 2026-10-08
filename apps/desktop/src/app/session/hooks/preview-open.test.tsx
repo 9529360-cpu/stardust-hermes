@@ -226,6 +226,7 @@ describe('preview routing', () => {
       const existing = $previewTabs.get()
       setRightContextOpen(false)
 
+      await emitToolStart('annotate_preview', { action: 'pin' })
       await emitToolStart('drive_preview', { action: 'elements' })
 
       expect($rightContextOpen.get()).toBe(true)
