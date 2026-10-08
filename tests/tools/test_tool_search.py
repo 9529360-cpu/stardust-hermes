@@ -129,6 +129,48 @@ class TestClassification:
             assert name not in _DEFAULT_DEFERRED_TOOLS
             assert not is_deferrable_tool_name(name)
 
+    def test_desktop_exposes_host_browser_only_when_controller_is_enabled(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        desktop_tools = [
+            _td("desktop_preview", "In-app browser"),
+            _td("drive_preview", "Drive visible page"),
+            _td("computer_use", "Drive real host window"),
+        ]
+        result = assemble_tool_defs(
+            desktop_tools, config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        names = {tool["function"]["name"] for tool in result.tool_defs}
+        assert {"desktop_preview", "drive_preview", "computer_use"} <= names
+
+        # An unavailable host controller cannot be surfaced by the router.
+        unavailable = assemble_tool_defs(
+            desktop_tools[:-1], config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        assert "computer_use" not in {
+            tool["function"]["name"] for tool in unavailable.tool_defs
+        }
+
+    def test_host_browser_deferral_remains_for_non_desktop_and_user_overrides(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        non_desktop = assemble_tool_defs(
+            [_td("computer_use", "Host desktop control")],
+            config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        assert "computer_use" not in {
+            tool["function"]["name"] for tool in non_desktop.tool_defs
+        }
+
+        explicit_defer = assemble_tool_defs(
+            [_td("desktop_preview", "In-app browser"),
+             _td("computer_use", "Drive real host")],
+            config=ToolSearchConfig.from_raw({"enabled": "on", "defer": ["computer_use"]}),
+        )
+        assert "computer_use" not in {
+            tool["function"]["name"] for tool in explicit_defer.tool_defs
+        }
+
     def test_defer_override_restores_legacy_direct_gui(self):
         """tools.tool_search.defer: [] restores the everything-eager legacy:
         GUI tools alone no longer activate the bridge."""
