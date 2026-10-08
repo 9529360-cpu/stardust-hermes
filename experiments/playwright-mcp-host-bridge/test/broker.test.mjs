@@ -94,6 +94,7 @@ test('cancel frame suppresses late result, malformed frames are ignored',async()
   await client.stop();
 });
 
+
 test('duplicate command IDs never cause a second click', async()=>{
   let clicks=0;
   const {client}=setup({driverRun:async()=>{clicks++;return {success:true};}});
@@ -105,4 +106,3 @@ test('duplicate command IDs never cause a second click', async()=>{
   assert.equal(ws.sent.length,1);
   await client.stop();
 });
-
