@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from hermes_constants import get_hermes_home
 from utils import is_truthy_value
+from tools.browser_use_snapshot import STRUCTURED_SNAPSHOT_PREAMBLE
 
 logger = logging.getLogger(__name__)
 
@@ -661,6 +662,7 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
         return _browser_exec_error(route_err, "backend_unavailable")
     _attach_vault_supervisor(env, task_id)
 
+    code = STRUCTURED_SNAPSHOT_PREAMBLE + "\n" + code
     # SHARED browser (/browser connect CDP override): pin each named session to its own tab (see
     # _OWN_TAB_PREAMBLE). Private per-name browsers skip this — nothing to collide with.
     private_browser = env.pop(_PRIVATE_BROWSER_SENTINEL, None)  # always pop: never exported to the CLI
@@ -755,7 +757,14 @@ _HEADER_LIGHTPANDA = (
 # ``browser-use skill`` fetch (uncontrolled third-party text in every schema: version
 # drift, supply-chain exposure, byte-unstable prompt). A/B benchmarked ~equal.
 _HELPERS_DIGEST = (
-    "\n\nHELPERS (pre-imported): new_tab(url) opens/navigates (use for the FIRST navigation), goto_url(url) "
+    "\n\nSTARDUST STRUCTURED REFS: every exec call provides browser_snapshot_refs(max_items=200), returning "
+    "{contract, url, elements:[{ref, role, name, disabled}], total_elements, truncated}. Refs are opaque "
+    "@ax1 tokens bound to the current top-frame document; browser_click_ref(ref) and "
+    "browser_fill_ref(ref, text) revalidate the live node before acting and reject stale refs. "
+    "Only visible, enabled elements can be clicked; fill is limited to text inputs, textareas, and "
+    "contenteditable fields, and does not echo the entered value. Re-snapshot after navigation or when "
+    "the page replaces an element. This contract requires CDP Page/Accessibility/DOM/Runtime support.\n\n"
+    "HELPERS (pre-imported): new_tab(url) opens/navigates (use for the FIRST navigation), goto_url(url) "
     "navigates the current tab, wait_for_load() after navigation, page_info() summarizes the current page "
     "state, js(expr) evaluates a JS expression and returns its value (js('document.title'); wrap function "
     "bodies as js('(() => {...})()') — a bare '() => {...}' returns the function itself, uncalled), "
