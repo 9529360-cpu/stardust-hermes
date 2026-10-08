@@ -450,6 +450,14 @@ export function openPreview(
   // action, or an on-screen agent preview request. That intent may reveal the
   // contextual rail. Passive tab persistence/navigation updates must not.
   setRightContextOpen(true)
+  // A repeated open of the same target is a re-front, NOT a navigation. Writing
+  // a new target re-creates the Electron webview and wipes its in-page state,
+  // even when the URL is identical. Keep the live guest and its scroll/history.
+  if (index !== -1 && current[index].target.kind === 'url' && resolved.kind === 'url' &&
+      current[index].target.url === resolved.url) {
+    selectRightRailTab(id)
+    return
+  }
   $previewTabs.set(index === -1 ? [...current, tab] : current.map((item, i) => (i === index ? tab : item)))
   selectRightRailTab(id)
 }
