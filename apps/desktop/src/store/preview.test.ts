@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { $rightRailActiveTabId, selectRightRailTab } from './layout'
-import { $rightContextOpen, setRightContextOpen } from './right-context'
 import {
   $previewServerRestart,
   $previewServerRestartStatus,
@@ -19,6 +18,7 @@ import {
   type PreviewTarget,
   progressPreviewServerRestart
 } from './preview'
+import { $rightContextOpen, setRightContextOpen } from './right-context'
 import { $selectedStoredSessionId } from './session'
 
 function fileTarget(source: string): PreviewTarget {
