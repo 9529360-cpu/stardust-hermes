@@ -57,6 +57,13 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
+- **Browser use is observable, never a second copy.** When a foreground task
+  starts using the *in-app* browser, its actual live tab is revealed on the
+  right. The user can hide it without cancelling the task; further browser
+  actions during that turn must not repeatedly reopen it. A new turn may
+  reveal it again. Off-screen sessions never steal the rail. An independent
+  headless, CDP, or cloud browser is not represented by loading its URL into
+  an unrelated WebView — visibility requires a real shared session or stream.
 - **Pages are secondary destinations.** Tasks, projects, knowledge, and tools
   render in the workspace when opened from the left navigation; settings and
   focused utilities may still use overlays. Returning to Conversation restores
@@ -296,8 +303,10 @@ so glass and message-bubble transparency do not reveal scrolling text.
 - Interactive directive chips in the composer expose their action on hover.
   The action stays visible for a 500ms grace period while the pointer crosses
   from the chip to the floating pill; leaving both dismisses it.
-- A tool result may expose an inline action that opens a preview. It must not
-  open the rail automatically.
+- A passive tool result may expose an inline action that opens a preview;
+  it must not open the rail automatically. A foreground action that actually
+  uses the in-app browser is the exception defined above: it reveals the live
+  browser once, while respecting a user's subsequent dismissal.
 - Tool rows reserve destructive red for explicit failures. Missing read paths and
   ambiguous exit-1 results use neutral notices, with details still available.
   Errors described inside returned data are not tool failures. Expanded failures
