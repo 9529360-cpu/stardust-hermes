@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useStore } from '@nanostores/react'
-
-import { type ProfileScope, profileScopeKey } from '@/hermes'
-import { useI18n } from '@/i18n'
-import { requestGatewayForProfile } from '@/store/gateway'
-import { $activeSessionId } from '@/store/session'
-import { notify, notifyError } from '@/store/notifications'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { type ProfileScope, profileScopeKey } from '@/hermes'
+import { useI18n } from '@/i18n'
+import { requestGatewayForProfile } from '@/store/gateway'
+import { notify, notifyError } from '@/store/notifications'
+import { $activeSessionId } from '@/store/session'
 
 import { ListRow } from './primitives'
 
 const PLAYWRIGHT_MCP_PACKAGE = '@playwright/mcp@0.0.83'
 const DEFAULT_CHROME_PROFILE_DIR = 'Default'
+
 const BROWSER_CONTROL_CAPABILITIES = [
   'browser_navigate',
   'browser_snapshot',
@@ -42,16 +42,31 @@ interface BrowserHostControlPanelProps {
 }
 
 function profileName(profile: ProfileScope | undefined): string {
-  if (!profile) return 'default'
+  if (!profile) {
+    return 'default'
+  }
   const key = profileScopeKey(profile)
+
   return key || 'default'
 }
 
 function statusKey(status: BridgeStatus | 'stopped' | undefined): BridgeStatus {
-  if (status === 'connected') return 'connected'
-  if (status === 'starting') return 'starting'
-  if (status === 'stopping') return 'stopping'
-  if (status === 'error') return 'error'
+  if (status === 'connected') {
+    return 'connected'
+  }
+
+  if (status === 'starting') {
+    return 'starting'
+  }
+
+  if (status === 'stopping') {
+    return 'stopping'
+  }
+
+  if (status === 'error') {
+    return 'error'
+  }
+
   return 'inactive'
 }
 
@@ -73,6 +88,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
   const refresh = useCallback(async () => {
     if (!activeSessionId) {
       setStatus({ state: 'inactive', status: 'inactive' })
+
       return
     }
 
@@ -82,8 +98,12 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
         'browser.controller.bridge_status',
         { session_id: activeSessionId }
       )
+
       setStatus(result || { state: 'inactive', status: 'inactive' })
-      if (result?.controller_id) setControllerId(result.controller_id)
+
+      if (result?.controller_id) {
+        setControllerId(result.controller_id)
+      }
     } catch (error) {
       setStatus({ state: 'error', error: error instanceof Error ? error.message : String(error) })
     }
@@ -92,20 +112,26 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
   useEffect(() => {
     void refresh()
     const off = window.hermesDesktop?.browserControl?.onStatus?.(next => setStatus(next))
+
     return () => off?.()
   }, [refresh])
 
   useEffect(() => {
-    if (status.status !== 'starting' && status.state !== 'starting') return
+    if (status.status !== 'starting' && status.state !== 'starting') {return}
     let active = true
+
     const timer = window.setInterval(async () => {
       try {
         const next = await window.hermesDesktop.browserControl.status()
-        if (active) setStatus(next)
+
+        if (active) {
+          setStatus(next)
+        }
       } catch {
         // The backend status refresh below remains authoritative for the session.
       }
     }, 500)
+
     return () => {
       active = false
       window.clearInterval(timer)
@@ -115,18 +141,23 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
   const connect = useCallback(async () => {
     if (!activeSessionId) {
       notifyError(new Error(copy.noSession), copy.connectFailed)
+
       return
     }
 
     const profileDir = chromeProfileDir.trim()
+
     if (!/^[\w .-]{1,90}$/.test(profileDir)) {
       notifyError(new Error(copy.invalidProfile), copy.connectFailed)
+
       return
     }
 
     setBusy(true)
+
     try {
       const browserProfileId = `chrome-${profileDir}`
+
       const prepared = await requestGatewayForProfile<Record<string, unknown>>(
         profileKey,
         'browser.controller.bridge_prepare',
@@ -137,15 +168,21 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
           protocol_version: 1
         }
       )
+
       const launchContext = prepared?.launch_context || prepared
+
       const started = await window.hermesDesktop.browserControl.start({
         profile: profileKey,
         launchContext,
         chromeProfileDir: profileDir,
         packageSpec: PLAYWRIGHT_MCP_PACKAGE
       })
+
       setStatus(started)
-      if (started?.controller_id) setControllerId(started.controller_id)
+
+      if (started?.controller_id) {
+        setControllerId(started.controller_id)
+      }
       notify({ kind: 'info', title: copy.connectedTitle, message: copy.connectedMessage })
     } catch (error) {
       setStatus({ state: 'error', error: error instanceof Error ? error.message : String(error) })
@@ -156,9 +193,10 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
   }, [activeSessionId, chromeProfileDir, copy, profileKey])
 
   const disconnect = useCallback(async () => {
-    if (!activeSessionId) return
+    if (!activeSessionId) {return}
 
     setBusy(true)
+
     try {
       const stopped = await window.hermesDesktop.browserControl.stop()
       setStatus(stopped)
@@ -174,6 +212,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
       } catch (error) {
         notifyError(error, copy.disconnectFailed)
       }
+
       setControllerId('')
       setBusy(false)
       await refresh()
@@ -186,9 +225,6 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
 
   return (
     <ListRow
-      title={copy.label}
-      description={copy.description}
-      wide
       below={
         <div className="grid max-w-xl gap-2 pt-2">
           <div className="flex flex-wrap items-center gap-2 text-xs text-(--ui-text-tertiary)">
@@ -215,6 +251,9 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
           <p className="text-xs leading-5 text-(--ui-text-tertiary)">{copy.warning}</p>
         </div>
       }
+      description={copy.description}
+      title={copy.label}
+      wide
     />
   )
 }

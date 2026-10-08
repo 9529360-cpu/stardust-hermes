@@ -283,7 +283,7 @@
         {
           "name": "params",
           "schema": {
-            "$ref": "#/components/schemas/BrowserControllerParams"
+            "$ref": "#/components/schemas/BrowserControllerBridgeStatusParams"
           }
         }
       ],
@@ -6648,6 +6648,32 @@
           "status"
         ],
         "title": "BrowserControllerBridgeRevokeResult",
+        "type": "object"
+      },
+      "BrowserControllerBridgeStatusParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Browser Profile Id"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "BrowserControllerBridgeStatusParams",
         "type": "object"
       },
       "BrowserControllerBridgeStatusResult": {

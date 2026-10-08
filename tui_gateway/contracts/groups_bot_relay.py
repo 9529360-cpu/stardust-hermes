@@ -634,6 +634,10 @@ method("browser.controller.bridge_prepare", params=BrowserControllerBridgePrepar
        doc="Mint a short-lived, single-use, session-bound Desktop bridge launch grant.")
 
 
+class BrowserControllerBridgeStatusParams(BrowserControllerParams):
+    browser_profile_id: str | None = None
+
+
 class BrowserControllerBridgeStatusResult(Result):
     status: str
     session_id: str | None = None
@@ -642,7 +646,7 @@ class BrowserControllerBridgeStatusResult(Result):
     capabilities: list[str] | None = None
 
 
-method("browser.controller.bridge_status", params=BrowserControllerParams,
+method("browser.controller.bridge_status", params=BrowserControllerBridgeStatusParams,
        result=BrowserControllerBridgeStatusResult,
        doc="Read the session-bound Desktop Chrome bridge status.")
 

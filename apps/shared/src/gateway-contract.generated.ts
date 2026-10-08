@@ -1381,9 +1381,9 @@ export interface BrowserControllerBridgeLaunchContext {
   protocol_version: number
   profile_id: string
 }
-/** Every controller call names the session the controller is attached to. */
-export interface BrowserControllerParams {
+export interface BrowserControllerBridgeStatusParams {
   session_id: string
+  browser_profile_id?: string | null
 }
 export interface BrowserControllerBridgeStatusResult {
   status: string
@@ -1410,6 +1410,10 @@ export interface BrowserControllerResultParams {
 }
 export interface BrowserControllerResultResult {
   accepted: boolean
+}
+/** Every controller call names the session the controller is attached to. */
+export interface BrowserControllerParams {
+  session_id: string
 }
 export interface BrowserControllerDetachResult {
   detached?: boolean
@@ -4251,7 +4255,7 @@ export interface RpcMethods {
   /** Revoke the session-bound Desktop Chrome bridge and outstanding launch grants. */
   'browser.controller.bridge_revoke': { params: BrowserControllerBridgeRevokeParams; result: BrowserControllerBridgeRevokeResult }
   /** Read the session-bound Desktop Chrome bridge status. */
-  'browser.controller.bridge_status': { params: BrowserControllerParams; result: BrowserControllerBridgeStatusResult }
+  'browser.controller.bridge_status': { params: BrowserControllerBridgeStatusParams; result: BrowserControllerBridgeStatusResult }
   /** Hard-detach only the controller owned by this authenticated transport. */
   'browser.controller.detach': { params: BrowserControllerParams; result: BrowserControllerDetachResult }
   /** Acknowledge a heartbeat only for this transport's own attached controller. */

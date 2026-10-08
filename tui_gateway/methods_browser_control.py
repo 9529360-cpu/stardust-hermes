@@ -27,6 +27,8 @@ from hermes_cli.dashboard_auth.ws_tickets import (
     INTERNAL_PROVIDER as _INTERNAL_PROVIDER, INTERNAL_USER_ID as _INTERNAL_USER_ID)
 
 from .method_ctx import HandlerRegistry, bind_module
+from .session_transports import _session_transport_contains
+from .transport import current_transport
 
 logger = logging.getLogger(__name__)
 
