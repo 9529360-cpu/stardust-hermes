@@ -57,13 +57,18 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
-- **Browser use is observable, never a second copy.** When a foreground task
-  starts using the *in-app* browser, its actual live tab is revealed on the
-  right. The user can hide it without cancelling the task; further browser
-  actions during that turn must not repeatedly reopen it. A new turn may
-  reveal it again. Off-screen sessions never steal the rail. An independent
-  headless, CDP, or cloud browser is not represented by loading its URL into
-  an unrelated WebView — visibility requires a real shared session or stream.
+- **Two browser surfaces, one task at a time.** In-app browser automation
+  controls the live WebView shown in the right rail. Real host-browser control
+  targets the user's existing native browser window (when a trusted host-side
+  controller is available). Do not mirror a URL into a second WebView, share
+  cookies implicitly, or switch targets silently. A snapshot of the default
+  Chrome profile is NOT control of that already-open Chrome session.
+- **Browser use is observable without demanding attention.** A foreground
+  in-app browser action reveals its own live tab; the user may hide it without
+  cancelling that task. Later browser actions in the turn do not reopen it,
+  but a fresh turn may. Real host-browser actions use the actual OS window,
+  not the in-app rail. Off-screen sessions never steal focus. Independent
+  cloud/CDP/headless sessions are not passed off as live in-app tabs.
 - **Pages are secondary destinations.** Tasks, projects, knowledge, and tools
   render in the workspace when opened from the left navigation; settings and
   focused utilities may still use overlays. Returning to Conversation restores
