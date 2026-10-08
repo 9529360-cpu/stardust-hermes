@@ -106,6 +106,7 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
       if (event.type === 'tool.start' && sessionId && sessionIsOnScreen(sessionId)) {
         const { name, args } = asRecord(event.payload)
         const action = asRecord(args).action
+        const browserTarget = asRecord(args).target
         const hasLivePreview = $dockedPreviewTabs.get().some(
           tab =>
             tab.id === $rightRailActiveTabId.get() &&
@@ -117,7 +118,10 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         // revealing an unrelated webview would be a fake live preview.
         const isLiveBrowserAction =
           (name === 'desktop_preview' && (action === 'open' || (action === 'read' && hasLivePreview))) ||
-          ((name === 'drive_preview' || name === 'annotate_preview') && hasLivePreview)
+          ((name === 'drive_preview' || name === 'annotate_preview') && hasLivePreview) ||
+          (name === 'browser' &&
+            browserTarget === 'in_app' &&
+            (action === 'open' || (action !== 'status' && hasLivePreview)))
         if (isLiveBrowserAction && !browserVisibility.current.dismissed.has(sessionId)) {
           browserVisibility.current.revealed.add(sessionId)
           setRightContextOpen(true)
