@@ -105,3 +105,4 @@ test('duplicate command IDs never cause a second click', async()=>{
   assert.equal(ws.sent.length,1);
   await client.stop();
 });
+
