@@ -108,10 +108,8 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         const hasLivePreview = $dockedPreviewTabs.get().some(
           tab =>
             tab.id === $rightRailActiveTabId.get() &&
-            (
-            tab.target.kind === 'url' ||
-            (tab.target.kind === 'file' && tab.target.previewKind === 'html' && tab.target.renderMode !== 'source')
-            )
+            (tab.target.kind === 'url' ||
+              (tab.target.kind === 'file' && tab.target.previewKind === 'html' && tab.target.renderMode !== 'source'))
         )
         // Only follow tools that drive the ACTUAL in-app guest. browser_exec
         // and browser_navigate own a separate backend Chromium/CDP session:
