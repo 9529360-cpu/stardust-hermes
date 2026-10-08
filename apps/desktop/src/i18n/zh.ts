@@ -1874,7 +1874,7 @@ export const zh = defineLocale({
         needsSetupHint: '现在即可选择此后端——但在完成设置前命令将会失败。'
       },
       browserRealProfile: {
-        label: '使用我的真实浏览器配置文件',
+        label: '使用浏览器配置文件副本',
         description:
           '将默认浏览器的登录信息和 Cookie 复制到托管快照中，代理使用该快照进行浏览。绝不会直接打开你的真实配置文件。将应用于新会话。',
         enabledTitle: '真实配置文件浏览：已开启',
