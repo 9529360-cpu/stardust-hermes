@@ -88,6 +88,18 @@ describe('preview store', () => {
     expect($rightRailActiveTabId.get()).toBe(urlTabs[0].id)
   })
 
+  it('re-fronts an identical browser URL without re-creating its webview target', () => {
+    openPreview(urlTarget('https://example.com'), 'tool-result')
+    const before = $previewTabs.get()
+    const target = before[0].target
+
+    openPreview(urlTarget('https://example.com'), 'tool-result')
+
+    expect($previewTabs.get()).toBe(before)
+    expect($previewTabs.get()[0].target).toBe(target)
+    expect($previewTabs.get()).toHaveLength(1)
+  })
+
   it('commits the live page onto a Browser tab without changing its id', () => {
     openPreview(urlTarget('https://news.ycombinator.com'), 'tool-result')
     const id = $previewTabs.get()[0].id
