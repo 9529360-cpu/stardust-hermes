@@ -57,12 +57,15 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
-- **Two browser surfaces, one task at a time.** In-app browser automation
-  controls the live WebView shown in the right rail. Real host-browser control
-  targets the user's existing native browser window (when a trusted host-side
-  controller is available). Do not mirror a URL into a second WebView, share
-  cookies implicitly, or switch targets silently. A snapshot of the default
-  Chrome profile is NOT control of that already-open Chrome session.
+- **One Browser tool, two explicit real targets.** Frontground desktop web
+  automation enters through the session-scoped `browser` tool. Target
+  `in_app` drives the actual right-rail WebView using the existing preview
+  controller. Target `host` requires an authenticated and approved extension
+  bound to the session's own `browser_control_broker` scope; an absent
+  controller is a refusal, not a silent new Chromium/OS fallback. A turn pins
+  its target. Do not mirror a URL into a second WebView, share cookies
+  implicitly, or switch targets silently. The host Chrome extension itself
+  is not bundled yet; a copied Chrome profile is NOT live host control.
 - **Browser use is observable without demanding attention.** A foreground
   in-app browser action reveals its own live tab; the user may hide it without
   cancelling that task. Later browser actions in the turn do not reopen it,

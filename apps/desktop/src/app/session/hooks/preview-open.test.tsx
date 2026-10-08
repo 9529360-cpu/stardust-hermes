@@ -220,6 +220,39 @@ describe('preview routing', () => {
   })
 
   describe('automatic browser viewer', () => {
+    it('auto-reveals unified in-app Browser work and honors a manual dismissal', async () => {
+      render(<Harness />)
+      await emitToolStart('browser', { action: 'open', target: 'in_app', url: 'https://example.com' })
+      expect($rightContextOpen.get()).toBe(true)
+      expect($previewTabs.get()).toHaveLength(0)
+
+      await emitPreviewOpen('/tmp/browser-page.html')
+      await waitFor(() => expect($previewTabs.get()).toHaveLength(1))
+      const liveTabs = $previewTabs.get()
+      setRightContextOpen(false)
+
+      await emitToolStart('browser', { action: 'elements', target: 'in_app' })
+      expect($rightContextOpen.get()).toBe(false)
+      expect($previewTabs.get()).toBe(liveTabs)
+
+      await act(async () => {
+        handleEvent({ session_id: RUNTIME_SESSION_ID, type: 'message.complete', payload: {} } as GatewayEvent)
+        handleEvent({ session_id: RUNTIME_SESSION_ID, type: 'message.start', payload: {} } as GatewayEvent)
+      })
+      await emitToolStart('browser', { action: 'elements', target: 'in_app' })
+      expect($rightContextOpen.get()).toBe(true)
+    })
+
+    it('never opens an unrelated right-side WebView for a host browser action', async () => {
+      render(<Harness />)
+      await emitToolStart('browser', { action: 'open', target: 'host', url: 'https://example.com' })
+      await emitToolStart('browser', { action: 'click', target: 'host', ref: '@e1' })
+      await emitToolStart('browser', { action: 'status', target: 'in_app' })
+      expect($rightContextOpen.get()).toBe(false)
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+
+
     it('reveals the existing in-app browser when foreground interaction begins, without another tab', async () => {
       render(<Harness />)
       openPreview({ kind: 'url', label: 'Example', source: 'https://example.com', url: 'https://example.com' })

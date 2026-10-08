@@ -171,6 +171,47 @@ class TestClassification:
             tool["function"]["name"] for tool in explicit_defer.tool_defs
         }
 
+    def test_unified_browser_is_only_eager_browser_when_desktop_surface_is_present(self):
+        from tools.registry import discover_builtin_tools
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        discover_builtin_tools()
+        tools = [
+            _td("browser", "Unified control"), _td("desktop_preview", "Legacy GUI"),
+            _td("drive_preview", "Legacy GUI"), _td("browser_navigate", "Legacy engine"),
+            _td("browser_click", "Legacy engine"), _td("computer_use", "Host OS control"),
+        ]
+        assembled = assemble_tool_defs(tools, config=ToolSearchConfig.from_raw({"enabled": "on"}))
+        names = {tool["function"]["name"] for tool in assembled.tool_defs}
+        assert assembled.activated
+        assert "browser" in names
+        assert "desktop_preview" in names
+        assert "computer_use" in names
+        assert "browser_click" not in names
+        assert "browser_navigate" not in names
+        assert "drive_preview" not in names
+
+    def test_non_desktop_browser_tools_preserve_legacy_tool_visibility(self):
+        from tools.registry import discover_builtin_tools
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        discover_builtin_tools()
+        tools = [_td("browser_navigate", "Browser"), _td("browser_click", "Browser")]
+        result = assemble_tool_defs(tools, config=ToolSearchConfig.from_raw({"enabled": "on"}))
+        assert {"browser_navigate", "browser_click"} <= {
+            td["function"]["name"] for td in result.tool_defs
+        }
+
+    def test_explicit_defer_override_restores_the_old_browser_surface(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        tools = [_td("browser", "Unified"), _td("browser_navigate", "Legacy"),
+                 _td("drive_preview", "Legacy")]
+        result = assemble_tool_defs(tools, config=ToolSearchConfig.from_raw({"enabled": "on", "defer": []}))
+        assert {td["function"]["name"] for td in result.tool_defs} == {
+            "browser", "browser_navigate", "drive_preview"
+        }
+
     def test_defer_override_restores_legacy_direct_gui(self):
         """tools.tool_search.defer: [] restores the everything-eager legacy:
         GUI tools alone no longer activate the bridge."""
