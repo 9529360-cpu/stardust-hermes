@@ -453,12 +453,21 @@ export function openPreview(
   if (reveal) {
     setRightContextOpen(true)
   }
-  // A repeated open of the same target is a re-front, NOT a navigation. Writing
-  // a new target re-creates the Electron webview and wipes its in-page state,
-  // even when the URL is identical. Keep the live guest and its scroll/history.
-  if (index !== -1 && current[index].target.kind === 'url' && resolved.kind === 'url' &&
-      current[index].target.url === resolved.url) {
+  // A repeated open of the SAME browser target is a re-front, not a
+  // navigation. Rewriting its tab loses identity and can remount the webview.
+  // A metadata/owner change still has to propagate (another session may now
+  // own this browser); same-URL metadata updates never change its webview src.
+  if (
+    index !== -1 &&
+    current[index].target.kind === 'url' &&
+    resolved.kind === 'url' &&
+    current[index].target.url === resolved.url &&
+    current[index].target.label === resolved.label &&
+    current[index].target.source === resolved.source &&
+    current[index].storedSessionId === tab.storedSessionId
+  ) {
     selectRightRailTab(id)
+
     return
   }
   $previewTabs.set(index === -1 ? [...current, tab] : current.map((item, i) => (i === index ? tab : item)))
