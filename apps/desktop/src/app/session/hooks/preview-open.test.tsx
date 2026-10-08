@@ -249,6 +249,10 @@ describe('preview routing', () => {
       expect($rightContextOpen.get()).toBe(true)
 
       setRightContextOpen(false)
+      // Duplicate turn-start announcements must not erase the viewer dismissal.
+      await act(async () => {
+        handleEvent({ session_id: RUNTIME_SESSION_ID, type: 'message.start', payload: {} } as GatewayEvent)
+      })
       await emitToolStart('desktop_preview', { action: 'open', url: '/tmp/two.html' })
       await emitPreviewOpen('/tmp/two.html')
 
