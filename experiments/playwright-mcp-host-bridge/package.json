@@ -1,0 +1,9 @@
+{
+  "name": "stardust-playwright-host-bridge-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22"},
+  "scripts": {"test": "node --test test/*.test.mjs", "start": "node src/main.mjs"},
+  "dependencies": {"@modelcontextprotocol/sdk": "1.20.0"}
+}
