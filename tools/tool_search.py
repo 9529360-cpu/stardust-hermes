@@ -375,6 +375,15 @@ def assemble_tool_defs(tool_defs: List[Dict[str, Any]], *, context_length: Optio
         # messaging sessions it stays deferred. Explicit user defer overrides
         # still win.
         defer_tools = defer_tools - {"computer_use"}
+    if config.defer_tools is None and any(_fn(tool).get("name") == "browser" for tool in incoming):
+        # Browser is the unified desktop entry. The old browser_* engines and
+        # drive_preview remain callable through the existing search bridge for
+        # advanced/backward-compatible work, not a competing eager browser UI.
+        # An explicit user's defer config always wins.
+        defer_tools = defer_tools | {
+            name for name in _tool_def_names(incoming)
+            if name.startswith("browser_") and not name.startswith("browser_vault_")
+        } | {"drive_preview"}
     visible, deferrable = classify_tools(incoming, defer_tools)
     connections_granted = connections_in_scope(incoming)
     if not deferrable:
