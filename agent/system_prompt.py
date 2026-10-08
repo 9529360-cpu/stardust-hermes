@@ -322,9 +322,11 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
             "the selected target within a turn. Never mix tabs, login state, "
             "cookies, or refs across targets. The host controller owns the "
             "actual native browser; a copied URL in the right rail is NOT a "
-            "view of that host session. Use secure vault tools for passwords, "
-            "card details, and verification codes instead of passing secrets "
-            "to the browser type action. Respect site-level authorization "
+            "view of that host session. Never pass passwords, card "
+            "details, or verification codes through browser action=type. "
+            "Only use a secure vault if verified to fill this SAME selected "
+            "browser session; otherwise ask the user to enter secrets "
+            "directly into that browser. Respect site-level authorization "
             "and high-risk action approvals."
         )
     elif str(getattr(agent, "platform", "") or "").lower() == "desktop" and {"desktop_preview", "drive_preview"} <= set(names):
