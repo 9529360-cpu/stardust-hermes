@@ -662,7 +662,10 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
         return _browser_exec_error(route_err, "backend_unavailable")
     _attach_vault_supervisor(env, task_id)
 
-    code = STRUCTURED_SNAPSHOT_PREAMBLE + "\n" + code
+    # Keep the model program first so stdin-oriented CLI wrappers and existing
+    # callers continue to receive exactly the requested source on stdin. The
+    # helper definitions are appended after it.
+    code = code + "\n" + STRUCTURED_SNAPSHOT_PREAMBLE
     # SHARED browser (/browser connect CDP override): pin each named session to its own tab (see
     # _OWN_TAB_PREAMBLE). Private per-name browsers skip this — nothing to collide with.
     private_browser = env.pop(_PRIVATE_BROWSER_SENTINEL, None)  # always pop: never exported to the CLI

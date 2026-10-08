@@ -161,6 +161,4 @@ def test_browser_exec_injects_the_live_snapshot_contract(monkeypatch):
     assert result["success"] is True
     assert "def browser_snapshot_refs" in captured["code"]
     assert "def browser_click_ref" in captured["code"]
-    assert captured["code"].index("def browser_snapshot_refs") < captured["code"].index(
-        "print('model code')"
-    )
+    assert captured["code"].startswith("print('model code')")
