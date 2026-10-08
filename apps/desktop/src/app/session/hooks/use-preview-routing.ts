@@ -91,9 +91,10 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
       baseHandleGatewayEvent(event)
 
       const sessionId = event.session_id
-      if (sessionId && event.type === 'message.start') {
+      if (sessionId && event.type === 'message.start' && !browserVisibility.current.revealed.has(sessionId)) {
+        // A session can emit a duplicate start while the same turn is still
+        // running. Do not forget a manual dismissal until its completion.
         browserVisibility.current.dismissed.delete(sessionId)
-        browserVisibility.current.revealed.delete(sessionId)
       } else if (sessionId && event.type === 'message.complete') {
         browserVisibility.current.dismissed.delete(sessionId)
         browserVisibility.current.revealed.delete(sessionId)
@@ -136,7 +137,10 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         if (target && (!event.session_id || sessionIsOnScreen(event.session_id))) {
           void normalizeOrLocalPreviewTarget(target, $currentCwd.get() || currentCwd || undefined).then(
             async resolved => {
-              if (!resolved) {
+              // URL normalization / reachability is asynchronous. A user may
+              // switch sessions while it resolves; a stale foreground event
+              // must not reveal another session's browser.
+              if (!resolved || (event.session_id && !sessionIsOnScreen(event.session_id))) {
                 return
               }
 
