@@ -57,6 +57,18 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
+- **Two browser surfaces, one task at a time.** In-app browser automation
+  controls the live WebView shown in the right rail. Real host-browser control
+  targets the user's existing native browser window (when a trusted host-side
+  controller is available). Do not mirror a URL into a second WebView, share
+  cookies implicitly, or switch targets silently. A snapshot of the default
+  Chrome profile is NOT control of that already-open Chrome session.
+- **Browser use is observable without demanding attention.** A foreground
+  in-app browser action reveals its own live tab; the user may hide it without
+  cancelling that task. Later browser actions in the turn do not reopen it,
+  but a fresh turn may. Real host-browser actions use the actual OS window,
+  not the in-app rail. Off-screen sessions never steal focus. Independent
+  cloud/CDP/headless sessions are not passed off as live in-app tabs.
 - **Pages are secondary destinations.** Tasks, projects, knowledge, and tools
   render in the workspace when opened from the left navigation; settings and
   focused utilities may still use overlays. Returning to Conversation restores
@@ -296,8 +308,10 @@ so glass and message-bubble transparency do not reveal scrolling text.
 - Interactive directive chips in the composer expose their action on hover.
   The action stays visible for a 500ms grace period while the pointer crosses
   from the chip to the floating pill; leaving both dismisses it.
-- A tool result may expose an inline action that opens a preview. It must not
-  open the rail automatically.
+- A passive tool result may expose an inline action that opens a preview;
+  it must not open the rail automatically. A foreground action that actually
+  uses the in-app browser is the exception defined above: it reveals the live
+  browser once, while respecting a user's subsequent dismissal.
 - Tool rows reserve destructive red for explicit failures. Missing read paths and
   ambiguous exit-1 results use neutral notices, with details still available.
   Errors described inside returned data are not tool failures. Expanded failures

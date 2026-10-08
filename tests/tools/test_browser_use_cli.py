@@ -933,6 +933,20 @@ class TestSkillTextDescription:
         assert overrides["description"].startswith(bu_cli._HEADER_BASE)
         assert overrides["description"].endswith(bu_cli._HELPERS_DIGEST)
 
+    def test_browser_description_teaches_tab_reuse_and_desktop_surface(self):
+        assert "goto_url(url)" in bu_cli._HEADER_BASE
+        assert "new_tab(url) is only for a genuinely NEW tab" in bu_cli._HEADER_BASE
+        assert "desktop_preview and drive_preview" in bu_cli._HEADER_BASE
+
+    def test_real_profile_copy_is_not_described_as_host_browser(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_real_profile_consented", lambda: True)
+        properties = bu_cli._dynamic_schema_overrides()["parameters"]["properties"]
+        description = properties["local"]["description"]
+        assert "separate, Hermes-managed local Chromium" in description
+        assert "COPY of the" in description
+        assert "does NOT control any existing Chrome" in description
+        assert "computer_use" in description
+
     def test_digest_names_core_helpers(self):
         for helper in ("new_tab(", "page_info()", "js(", "fill_input(",
                        "click_at_xy(", "capture_screenshot()", "cdp("):

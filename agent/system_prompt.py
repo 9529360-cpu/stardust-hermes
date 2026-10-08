@@ -304,10 +304,50 @@ def _tool_guidance_block(agent: Any) -> Optional[str]:
             getattr(agent, "_user_profile_enabled", True),
             skill_manage_available="skill_manage" in names,
         )
+    desktop_browser_guidance = None
+    if str(getattr(agent, "platform", "") or "").lower() == "desktop" and {"desktop_preview", "drive_preview"} <= set(names):
+        # A browser target is an authority boundary, NOT a second synchronized
+        # tab. The model selects the surface by the user's request; each driver
+        # remains the sole owner of its navigation, cookies, tabs and history.
+        desktop_browser_guidance = (
+            "Desktop browser targets: use the in-app Browser by default for "
+            "website interaction in this chat. Open it with desktop_preview "
+            "action=open and interact with that SAME live page using drive_preview; "
+            "keep reusing its tab. The right rail reveals browser work and can be "
+            "hidden without stopping the task. Do not also navigate a separate "
+            "browser_exec/browser_navigate session for that task. "
+            "If the user explicitly asks to act on their already-open Chrome, "
+            "Edge, Brave, or other real desktop browser, the in-app Browser is "
+            "NOT the requested target. browser.use_real_profile only copies "
+            "logins into another profile; it does NOT control the user's active "
+            "window. A configured CDP connection is suitable only when verified "
+            "to attach to the exact browser the user authorized. "
+            "Never copy a URL into the in-app Browser and claim to be controlling "
+            "the host browser. Never silently switch between these surfaces. "
+        )
+        if "computer_use" in names:
+            desktop_browser_guidance += (
+                "For the user's existing host browser, use computer_use: list or "
+                "capture the actual browser app/window (e.g. app='Google Chrome') "
+                "before input, then act on that same window and verify. "
+                "computer_use operates on the machine running the agent backend; "
+                "when the GUI is connected to a remote gateway, first establish "
+                "that the target is the user's intended machine. Do not operate "
+                "an ambiguous remote browser. Follow normal approvals for site "
+                "access and sensitive actions; do not move logins between modes."
+            )
+        else:
+            desktop_browser_guidance += (
+                "No host-window controller is available among your direct tools. "
+                "If the user requests their existing browser, explain the missing "
+                "capability and how to enable Computer Use; do not substitute a "
+                "copied profile or a new browser session."
+            )
     tool_guidance = [
         memory_guidance,
         SESSION_SEARCH_GUIDANCE if "session_search" in names else None,
         SKILLS_GUIDANCE if "skill_manage" in names else None,
+        desktop_browser_guidance,
     ]
     return " ".join(g for g in tool_guidance if g) or None
 

@@ -71,6 +71,9 @@ ACT_PREVIEW_SCHEMA = {
     # re-reads pages or loops strobe.
     # See #95681.
     "description": (
+        "For visible desktop browsing, prefer this tool over launching a "
+        "separate automated browser; it acts on the SAME live page the user "
+        "sees, preserving login, navigation and scroll state. "
         "Use the web page open in the desktop preview pane (the one "
         "`desktop_preview` opens): log in, fill forms, click through flows. ALWAYS "
         "start with action='elements' — it inventories clickable/typable "

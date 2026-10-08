@@ -4,7 +4,8 @@ import { useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { assistantTextPart, type ChatMessage } from '@/lib/chat-messages'
-import { $previewTabs, $previewTarget, closeRightRail, type PreviewTarget } from '@/store/preview'
+import { $previewTabs, $previewTarget, closeRightRail, openPreview, type PreviewTarget } from '@/store/preview'
+import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import { $activeSessionId, $currentCwd, $messages, $selectedStoredSessionId } from '@/store/session'
 
 import { usePreviewRouting } from './use-preview-routing'
@@ -45,6 +46,16 @@ async function emitPreviewOpen(url = '/tmp/artifact-test.html', sessionId = RUNT
   })
 }
 
+async function emitToolStart(name: string, args: Record<string, unknown> = {}, sessionId = RUNTIME_SESSION_ID) {
+  await act(async () => {
+    handleEvent({
+      payload: { args, name, tool_id: 'call-browser' },
+      session_id: sessionId,
+      type: 'tool.start'
+    } as unknown as GatewayEvent)
+  })
+}
+
 async function emitPreviewClose(url?: string, sessionId = RUNTIME_SESSION_ID) {
   await act(async () => {
     handleEvent({
@@ -62,6 +73,7 @@ describe('preview routing', () => {
     $currentCwd.set('/work')
     $messages.set([])
     closeRightRail()
+    setRightContextOpen(false)
     window.localStorage.clear()
 
     Object.defineProperty(window, 'hermesDesktop', {
@@ -74,6 +86,7 @@ describe('preview routing', () => {
     cleanup()
     $messages.set([])
     closeRightRail()
+    setRightContextOpen(false)
     $activeSessionId.set(null)
     $selectedStoredSessionId.set(null)
     window.localStorage.clear()
@@ -202,6 +215,67 @@ describe('preview routing', () => {
         } as unknown as GatewayEvent)
       })
 
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+  })
+
+  describe('automatic browser viewer', () => {
+    it('reveals the existing in-app browser when foreground interaction begins, without another tab', async () => {
+      render(<Harness />)
+      openPreview({ kind: 'url', label: 'Example', source: 'https://example.com', url: 'https://example.com' })
+      const existing = $previewTabs.get()
+      setRightContextOpen(false)
+
+      await emitToolStart('annotate_preview', { action: 'pin' })
+      await emitToolStart('drive_preview', { action: 'elements' })
+
+      expect($rightContextOpen.get()).toBe(true)
+      expect($previewTabs.get()).toBe(existing)
+      expect($previewTabs.get()).toHaveLength(1)
+    })
+
+    it('automatically reveals a browser about to open, but not an unrelated tool', async () => {
+      render(<Harness />)
+      await emitToolStart('terminal', { command: 'ls' })
+      expect($rightContextOpen.get()).toBe(false)
+
+      await emitToolStart('desktop_preview', { action: 'open', url: 'https://example.com' })
+      expect($rightContextOpen.get()).toBe(true)
+      expect($previewTabs.get()).toHaveLength(0)
+    })
+
+    it('does not re-open the viewer after the user hides it during a browser task', async () => {
+      render(<Harness />)
+      await emitToolStart('desktop_preview', { action: 'open', url: '/tmp/one.html' })
+      expect($rightContextOpen.get()).toBe(true)
+
+      setRightContextOpen(false)
+      // Duplicate turn-start announcements must not erase the viewer dismissal.
+      await act(async () => {
+        handleEvent({ session_id: RUNTIME_SESSION_ID, type: 'message.start', payload: {} } as GatewayEvent)
+      })
+      await emitToolStart('desktop_preview', { action: 'open', url: '/tmp/two.html' })
+      await emitPreviewOpen('/tmp/two.html')
+
+      await waitFor(() => expect($previewTarget.get()?.path).toBe('/tmp/two.html'))
+      expect($rightContextOpen.get()).toBe(false)
+      expect($previewTabs.get()).toHaveLength(1)
+
+      await act(async () => {
+        handleEvent({ session_id: RUNTIME_SESSION_ID, type: 'message.complete', payload: { text: 'done' } } as GatewayEvent)
+        handleEvent({ session_id: RUNTIME_SESSION_ID, type: 'message.start', payload: {} } as GatewayEvent)
+      })
+      await emitToolStart('drive_preview', { action: 'elements' })
+      // The current tab is an HTML preview and the next turn may show it again.
+      expect($rightContextOpen.get()).toBe(true)
+    })
+
+    it('never opens the foreground for a background session or a separate CDP browser', async () => {
+      render(<Harness />)
+      await emitToolStart('desktop_preview', { action: 'open' }, 'off-screen-session')
+      await emitToolStart('browser_exec', { code: 'print(page_info())' })
+      await emitToolStart('browser_navigate', { url: 'https://example.com' })
+      expect($rightContextOpen.get()).toBe(false)
       expect($previewTabs.get()).toHaveLength(0)
     })
   })

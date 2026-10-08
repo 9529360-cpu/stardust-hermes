@@ -133,8 +133,10 @@ _DIRECT_SURFACE_TOOLSETS = frozenset({"desktop_ui", "project"})
 _DEFAULT_DEFERRED_TOOLS = frozenset({
     "computer_use", "session_search", "image_generate",
     "todo_list", "process_manage", "cronjob_manage",
-    # Desktop GUI surface (desktop_ui + project toolsets)
-    "drive_preview", "gui_tour", "desktop_preview", "annotate_preview",
+    # The visible desktop browser must stay directly callable: deferring its
+    # open/drive tools makes models reach for a second, headless browser instead.
+    # Other desktop GUI affordances remain on-demand.
+    "gui_tour", "annotate_preview",
     "show_tip", "desktop_project", "close_terminal",
     "apply_layout", "read_terminal", "read_window_below", "focus_pane"})
 
@@ -363,7 +365,17 @@ def assemble_tool_defs(tool_defs: List[Dict[str, Any]], *, context_length: Optio
     config = config or load_config()
     incoming = [td for td, name in zip(tool_defs, _tool_def_names(tool_defs))
                 if name not in BRIDGE_TOOL_NAMES]
-    visible, deferrable = classify_tools(incoming, config.effective_defer_tools)
+    defer_tools = config.effective_defer_tools
+    if config.defer_tools is None and any(
+        _fn(tool).get("name") == "desktop_preview" for tool in incoming
+    ):
+        # Computer Use is the existing *real host-window* browser controller.
+        # Offer it directly beside the in-app browser in GUI sessions only,
+        # when the toolset/driver actually supplied it. In terminal, cron and
+        # messaging sessions it stays deferred. Explicit user defer overrides
+        # still win.
+        defer_tools = defer_tools - {"computer_use"}
+    visible, deferrable = classify_tools(incoming, defer_tools)
     connections_granted = connections_in_scope(incoming)
     if not deferrable:
         if should_activate(config, 0, context_length, connections_granted=connections_granted):

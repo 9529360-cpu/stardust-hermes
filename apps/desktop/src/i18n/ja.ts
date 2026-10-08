@@ -1401,7 +1401,7 @@ export const ja = defineLocale({
         needsSetupHint: 'このバックエンドは今すぐ選択できますが、セットアップが完了するまでコマンドは失敗します。'
       },
       browserRealProfile: {
-        label: '実際のブラウザプロファイルを使用',
+        label: 'ブラウザープロファイルのコピーを使用',
         description:
           '既定ブラウザのログイン情報と Cookie を管理されたスナップショットにコピーし、エージェントはそれを使ってブラウジングします。実際のプロファイルが直接開かれることはありません。新しいセッションに適用されます。',
         enabledTitle: '実プロファイルブラウジング：オン',
@@ -1409,16 +1409,6 @@ export const ja = defineLocale({
         disabledTitle: '実プロファイルブラウジング：オフ',
         disabledMessage: 'プロファイルのスナップショットは削除され、新しいセッションはクリーンなブラウザを使用します。',
         failedSave: '実プロファイル設定を保存できませんでした',
-        prompt: {
-          title: 'サイトにログインしたまま利用',
-          body: 'Hermes が既定ブラウザプロファイルのスナップショットでブラウジングできるようにすると、サイトはログイン済みの状態で開きます。',
-          bulletSnapshot: 'Cookie とログイン情報は管理されたスナップショットにコピーされます。',
-          bulletLiveProfile: '実際のブラウザプロファイルが直接開かれることはありません。',
-          bulletLocal: 'データがこのコンピュータの外に出ることはありません。',
-          dontShowAgain: '今後表示しない',
-          notNow: '今はしない',
-          enable: 'プロファイルを使用'
-        }
       }
     }
   },

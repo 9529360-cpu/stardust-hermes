@@ -449,7 +449,7 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
   browser: {
     allowPrivateUrls: 'Browser Private URLs',
     autoLocalForPrivateUrls: 'Local Browser For Private URLs',
-    useRealProfile: 'Use My Real Browser Profile'
+    useRealProfile: 'Use a Copy of My Browser Profile'
   },
   checkpoints: {
     enabled: 'File Checkpoints',

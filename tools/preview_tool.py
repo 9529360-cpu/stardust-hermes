@@ -43,7 +43,13 @@ def _handle_preview(args, **kw):
 PREVIEW_SCHEMA = {
     "name": "desktop_preview",
     "description": (
-        "Open, close, or read the preview pane beside the chat. open: show "
+        "For desktop sessions, this is the FIRST choice when the user asks you to "
+        "open a website visibly or watch you browse. Reuse the same in-app Browser "
+        "for subsequent pages; use drive_preview to interact with it. Do not "
+        "also open a separate browser_navigate/browser_exec session for the same "
+        "task unless the in-app browser is unavailable or the user explicitly "
+        "requests a separate/background browser. Open, close, or read the "
+        "preview pane beside the chat. open: show "
         "a web URL (bare domains fine), a localhost dev server, or a file path "
         "(HTML renders live) — opens for the current window only. close: dismiss "
         "the whole pane, or one tab via url. read: what the pane currently shows "

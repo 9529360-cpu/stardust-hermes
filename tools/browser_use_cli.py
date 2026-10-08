@@ -730,6 +730,11 @@ _HEADER_BASE = (
     "('all N products / every entry'), append each batch to a JSON/CSV file in the workspace, then read it "
     "back and aggregate in code — dedupe/count/sort with Python, not in your head — and verify the "
     "collected count against what was asked before answering.\n\n"
+    "When continuing a browser session, reuse its current tab: goto_url(url) "
+    "navigates it; new_tab(url) is only for a genuinely NEW tab, not for each "
+    "step or repeated call. In desktop sessions, prefer desktop_preview and "
+    "drive_preview when the user wants visible in-app browsing; do not open "
+    "a second hidden copy of the same page.\n\n"
     "Batch each sub-procedure (navigate, wait, extract, act) into one call — do not spend a call per "
     "action — but for long extractions prefer several medium calls that append to workspace files over "
     "one giant call, so progress survives timeouts."
@@ -802,10 +807,12 @@ def _dynamic_schema_overrides() -> dict:
         props = dict(BROWSER_EXEC_SCHEMA["parameters"]["properties"])
         props["local"] = {
             "type": "boolean", "default": False,
-            "description": ("Drive the user's own local browser (a Hermes-managed copy of their real "
-                            "default-Chromium profile, logins/cookies included) instead of the configured "
-                            "cloud browser backend. Use when the user asks to act as themselves — their "
-                            "accounts, their sessions. No-op when the backend is already local. Default false."),
+            "description": ("Use a separate, Hermes-managed local Chromium with a COPY of the "
+                            "default browser profile (logins/cookies included) rather than the "
+                            "configured cloud backend. This does NOT control any existing Chrome "
+                            "window or tab. For the user's live browser use an authorized native "
+                            "computer_use controller or verified CDP attachment instead. "
+                            "No-op when the backend is already local. Default false."),
         }
         overrides["parameters"] = {**BROWSER_EXEC_SCHEMA["parameters"], "properties": props}
     return overrides
