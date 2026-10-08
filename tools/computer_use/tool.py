@@ -298,6 +298,10 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
         return err
     scopes = ([action] if action in _ACTIONS and _ACTIONS[action].destructive else []) + (
         ["bring_to_front"] if args.get("bring_to_front") or (action == "focus_app" and args.get("raise_window")) else [])
+    # Composited screen/desktop captures can expose unrelated applications,
+    # credentials, and private messages; classify them separately from app-scoped captures.
+    if action == "capture" and str(args.get("app") or "").strip().lower() in {"screen", "desktop"}:
+        scopes.append("capture_fullscreen")
     for scope in scopes:
         if (err := _request_approval(scope, args)) is not None:
             return err

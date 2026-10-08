@@ -39,6 +39,7 @@ def _install_backend(cu_tool):
             return ActionResult(ok=True, action="click")
 
         def capture(self, mode="som", app=None):
+            self.calls.append(("capture", app))
             from tools.computer_use.backend import CaptureResult
 
             return CaptureResult(
@@ -78,6 +79,16 @@ def test_no_callback_refuses_unless_yolo(_nobody_to_ask, monkeypatch):
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", True)
     result = cu_tool.handle_computer_use({"action": "click", "element": 3})
     assert [name for name, _ in backend.calls] == ["click"], result
+
+
+def test_app_scoped_capture_stays_available_without_approval(_nobody_to_ask):
+    """Capturing one selected app does not gain the broader desktop disclosure scope."""
+    from tools.computer_use import tool as cu_tool
+
+    backend = _install_backend(cu_tool)
+    result = json.loads(cu_tool.handle_computer_use({"action": "capture", "app": "Calculator"}))
+    assert result.get("mode") == "som", result
+    assert backend.calls == [("capture", "Calculator")]
 
 
 def test_always_grant_lands_in_the_shared_store(monkeypatch):
