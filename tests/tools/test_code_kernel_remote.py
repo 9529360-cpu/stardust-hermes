@@ -390,6 +390,44 @@ class TestDispatchIntegration(unittest.TestCase):
         self.assertEqual(result["status"], "success")
         self.assertIn("per-call ran", result["output"])
 
+    def test_remote_kernel_rpc_receives_frozen_session_grant(self):
+        from model_tools import tool_capability_context
+        from tools.code_kernel_remote import _run_attached_cell
+
+        env = ScriptedEnv([])
+        kernel = RemoteKernel(
+            env=env, env_type="ssh", kernel_dir="/tmp/kernel", pid="42",
+            rpc_token="secret-token", owner="owner",
+        )
+        captured = []
+
+        class CapturingThread:
+            def __init__(self, *args, **kwargs):
+                captured.append(kwargs)
+
+            def start(self):
+                return None
+
+            def join(self, timeout=None):
+                return None
+
+        frozen_tools = ["read_file"]
+        grant = {"allowed_tools": frozen_tools, "session_id": "remote-kernel-session"}
+        fake_result = {"status": "ok", "stdout": "ok", "stderr": "", "execution_count": 1}
+        with tool_capability_context(allowed_tools=frozen_tools, session_id="remote-kernel-session"):
+            with patch("tools.code_kernel_remote.threading.Thread", CapturingThread), \
+                 patch("tools.code_kernel_remote._run_remote_cell", return_value=("ok", fake_result)):
+                result = _run_attached_cell(
+                    kernel, ("owner", "remote"), "print(1)", env=env, task_env_id="remote-task",
+                    sandbox_tools=frozenset(frozen_tools), timeout=10, max_tool_calls=5,
+                    reused=False, state_reset=False, state_lost=False,
+                )
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(captured[0]["kwargs"]["session_id"], "remote-kernel-session")
+        self.assertEqual(captured[0]["kwargs"]["enabled_tools"], frozen_tools)
+        self.assertEqual(captured[0]["kwargs"]["capability_grant"].session_id, "remote-kernel-session")
+
 
 if __name__ == "__main__":
     unittest.main()

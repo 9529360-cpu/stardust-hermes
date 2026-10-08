@@ -344,6 +344,10 @@ def _run_attached_cell(kernel: RemoteKernel, key: Tuple, code: str, *, env, task
                        reused: bool, state_reset: bool, state_lost: bool) -> Dict[str, Any]:
     from tools.code_execution_tool import _rpc_poll_loop
     from tools.thread_context import propagate_context_to_thread
+    from model_tools import current_tool_capability_context
+    capability_context = current_tool_capability_context()
+    session_id = getattr(capability_context, "session_id", None)
+    explicit_tools = list(getattr(capability_context, "allowed_tools", ()) or sandbox_tools)
     # Clean stale tool-RPC requests from a previous cell before arming this cell's poll loop, so
     # a background thread the last cell leaked cannot smuggle a call into this authority window.
     q_rpc = shlex.quote(kernel.kernel_dir + '/rpc')
@@ -357,7 +361,9 @@ def _run_attached_cell(kernel: RemoteKernel, key: Tuple, code: str, *, env, task
     rpc_thread = threading.Thread(
         target=propagate_context_to_thread(_rpc_poll_loop), daemon=True,
         args=(env, f"{kernel.kernel_dir}/rpc", task_env_id, [], tool_call_counter,
-              max_tool_calls, sandbox_tools, stop_event, kernel.rpc_token))
+              max_tool_calls, sandbox_tools, stop_event, kernel.rpc_token),
+        kwargs={"session_id": session_id, "enabled_tools": explicit_tools,
+                "capability_grant": capability_context})
     rpc_thread.start()
     cell_status, cell_payload = "no-result", {}
     try:
