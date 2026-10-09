@@ -3912,6 +3912,110 @@ class TestStatusMemoryBlock:
         assert resp.json()["disk"] == {"pressure": "unknown"}
 
 
+class TestMemoryEntriesApi:
+    @pytest.fixture(autouse=True)
+    def _setup_test_client(self, monkeypatch, _hermetic_environment):
+        from starlette.testclient import TestClient
+        from hermes_cli.web_server import app, _SESSION_HEADER_NAME, _SESSION_TOKEN
+
+        monkeypatch.setenv("HERMES_HOME", str(_hermetic_environment))
+        self.client = TestClient(app)
+        self.client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
+
+    def test_reads_and_removes_only_the_selected_builtin_entry(self, tmp_path, monkeypatch):
+        from tools.memory_tool import MemoryStore
+
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        path = memories / "MEMORY.md"
+        path.write_text("Likes tea daily\n§\nLikes tea\n§\nLives in Berlin", encoding="utf-8")
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        store = MemoryStore()
+        store.load_from_disk()
+        monkeypatch.setattr("tools.memory_tool.load_on_disk_store", lambda: store)
+
+        response = self.client.get("/api/memory/entries?target=memory")
+        assert response.status_code == 200
+        assert response.json() == {
+            "target": "memory",
+            "available": True,
+            "entries": ["Likes tea daily", "Likes tea", "Lives in Berlin"],
+        }
+
+        response = self.client.request("DELETE", "/api/memory/entries?target=memory", json={"entry": "Likes tea"})
+        assert response.status_code == 200
+        assert path.read_text(encoding="utf-8") == "Likes tea daily\n§\nLives in Berlin"
+        assert response.json()["active_session_behavior"] == "refresh_on_next_turn"
+
+    def test_rejects_stale_entry_without_mutating_memory(self, tmp_path, monkeypatch):
+        from tools.memory_tool import MemoryStore
+
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        path = memories / "MEMORY.md"
+        path.write_text("Changed outside the UI", encoding="utf-8")
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        store = MemoryStore()
+        store.load_from_disk()
+        path.write_text("External edit\n§\nKeep this fact", encoding="utf-8")
+        monkeypatch.setattr("tools.memory_tool.load_on_disk_store", lambda: store)
+
+        response = self.client.request("DELETE", "/api/memory/entries?target=memory", json={"entry": "Changed outside the UI"})
+        assert response.status_code == 409
+        assert path.read_text(encoding="utf-8") == "External edit\n§\nKeep this fact"
+
+    def test_rejects_unknown_target(self):
+        assert self.client.get("/api/memory/entries?target=topics").status_code == 400
+
+    def test_reports_disabled_memory_as_unavailable_not_empty(self, monkeypatch):
+        monkeypatch.setattr("tools.memory_tool.memory_persistence_enabled", lambda fail_closed=False: False)
+        response = self.client.get("/api/memory/entries?target=memory")
+        assert response.status_code == 200
+        assert response.json() == {"target": "memory", "available": False, "entries": []}
+
+    def test_refuses_delete_when_memory_persistence_is_disabled(self, tmp_path, monkeypatch):
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        path = memories / "MEMORY.md"
+        path.write_bytes(b"Private fact\n\xc2\xa7\nKeep this fact")
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        monkeypatch.setattr("tools.memory_tool.memory_persistence_enabled", lambda fail_closed=False: False)
+
+        response = self.client.request(
+            "DELETE", "/api/memory/entries?target=memory", json={"entry": "Private fact"}
+        )
+
+        assert response.status_code == 409
+        assert path.read_bytes() == b"Private fact\n\xc2\xa7\nKeep this fact"
+
+    def test_reports_disk_read_failure_instead_of_a_successful_empty_file(self, tmp_path, monkeypatch):
+        from tools.memory_tool import MemoryStore
+
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        (memories / "MEMORY.md").write_text("Private fact", encoding="utf-8")
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        monkeypatch.setattr(MemoryStore, "_read_raw_checked", staticmethod(lambda _path: ("", False)))
+
+        response = self.client.get("/api/memory/entries?target=memory")
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Built-in memory could not be read; retry later"
+
+    def test_routes_read_to_the_selected_profile(self, tmp_path, monkeypatch):
+        from hermes_cli.profiles import get_profile_dir
+
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        profile_home = get_profile_dir("research")
+        (tmp_path / "memories").mkdir(parents=True, exist_ok=True)
+        (profile_home / "memories").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "memories" / "MEMORY.md").write_text("Default fact", encoding="utf-8")
+        (profile_home / "memories" / "MEMORY.md").write_text("Research fact", encoding="utf-8")
+
+        response = self.client.get("/api/memory/entries?target=memory&profile=research")
+        assert response.status_code == 200
+        assert response.json()["entries"] == ["Research fact"]
+
+
 class TestGatewayUpdatedAtContract:
     """Contract tests for /api/status ``gateway_updated_at``.
 

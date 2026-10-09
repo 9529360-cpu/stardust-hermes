@@ -229,6 +229,73 @@ class TestMemoryStoreRemove:
 
         assert store.remove("memory", "  ")["success"] is False
 
+    def test_remove_exact_does_not_match_substrings_or_delete_duplicates(self, store):
+        store.add("memory", "Likes tea daily")
+        store.add("memory", "Likes tea")
+        assert store.remove_exact("memory", "Likes tea")["success"] is True
+        assert store.memory_entries == ["Likes tea daily"]
+        assert store.remove_exact("memory", "Likes tea")["success"] is False
+
+    def test_remove_exact_preserves_other_entries_and_rejects_noncanonical_or_duplicate_disk_data(self, store, tmp_path, monkeypatch):
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        path = memories / "MEMORY.md"
+        path.write_text("Likes tea\n§\nLives in Berlin", encoding="utf-8")
+        store.load_from_disk()
+        result = store.remove_exact("memory", "Likes tea")
+        assert result["success"] is True
+        assert path.read_bytes() == b"Lives in Berlin"
+
+        path.write_text("Likes tea\n§\nLives in Berlin\n", encoding="utf-8")
+        store.load_from_disk()
+        noncanonical = path.read_bytes()
+        assert store.remove_exact("memory", "Likes tea")["success"] is False
+        assert path.read_bytes() == noncanonical
+
+        path.write_text("Likes tea\n§\nLikes tea", encoding="utf-8")
+        store.load_from_disk()
+        duplicated = path.read_bytes()
+        assert store.remove_exact("memory", "Likes tea")["success"] is False
+        assert path.read_bytes() == duplicated
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            (
+                b"Remove me\n\xc2\xa7\nKeep LF\nwith line\n\xc2\xa7\nKeep second",
+                b"Keep LF\nwith line\n\xc2\xa7\nKeep second",
+            ),
+            (
+                b"Remove me\r\n\xc2\xa7\r\nKeep CRLF\r\nwith line\r\n\xc2\xa7\r\nKeep second",
+                b"Keep CRLF\r\nwith line\n\xc2\xa7\nKeep second",
+            ),
+            (
+                b"Remove me\r\n\xc2\xa7\nKeep LF\nwith CRLF\r\nline\r\n\xc2\xa7\r\nKeep second",
+                b"Keep LF\nwith CRLF\r\nline\n\xc2\xa7\nKeep second",
+            ),
+            (
+                b"\xef\xbb\xbfRemove me\r\n\xc2\xa7\r\nKeep BOM\nwith LF\n\xc2\xa7\nKeep second",
+                b"\xef\xbb\xbfKeep BOM\nwith LF\n\xc2\xa7\nKeep second",
+            ),
+        ],
+        ids=("lf", "crlf", "mixed", "bom"),
+    )
+    def test_remove_exact_preserves_remaining_multiline_entry_bytes(
+        self, store, tmp_path, monkeypatch, raw, expected
+    ):
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        path = memories / "MEMORY.md"
+        path.write_bytes(raw)
+        store.load_from_disk()
+
+        result = store.remove_exact("memory", "Remove me")
+
+        assert result["success"] is True
+        assert path.read_bytes() == expected
+
 
 class TestMemoryConsolidationGracefulDegrade:
     """Fix #3 for #42405: a failed at-capacity consolidation must never loop the

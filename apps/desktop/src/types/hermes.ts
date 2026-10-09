@@ -1666,6 +1666,12 @@ export interface MemoryStatusResponse {
   builtin_files: { memory: number; user: number }
 }
 
+export interface MemoryEntriesResponse {
+  target: 'memory' | 'user'
+  available: boolean
+  entries: string[]
+}
+
 /** `GET /api/curator` — background skill-curator status. */
 export interface CuratorStatusResponse {
   enabled: boolean

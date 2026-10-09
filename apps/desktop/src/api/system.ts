@@ -8,6 +8,7 @@ import type {
   CuratorStatusResponse,
   DebugShareResponse,
   ElevenLabsVoicesResponse,
+  MemoryEntriesResponse,
   MemoryProviderConfig,
   MemoryProviderOAuthStatus,
   MemoryStatusResponse
@@ -98,6 +99,26 @@ export function getMemoryStatus(): Promise<MemoryStatusResponse> {
   return hermesApi<MemoryStatusResponse>({
     ...profileScoped(),
     path: '/api/memory'
+  })
+}
+
+export function getMemoryEntries(target: 'memory' | 'user', profile?: null | string): Promise<MemoryEntriesResponse> {
+  return hermesApi<MemoryEntriesResponse>({
+    ...profileScoped(typeof profile === 'string' || profile === null ? profile : undefined),
+    path: `/api/memory/entries?target=${target}`
+  })
+}
+
+export function deleteMemoryEntry(
+  target: 'memory' | 'user',
+  entry: string,
+  profile?: null | string
+): Promise<MemoryResetResponse> {
+  return hermesApi<MemoryResetResponse>({
+    ...profileScoped(typeof profile === 'string' || profile === null ? profile : undefined),
+    path: `/api/memory/entries?target=${target}`,
+    method: 'DELETE',
+    body: { entry }
   })
 }
 
