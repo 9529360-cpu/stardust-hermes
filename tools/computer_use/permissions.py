@@ -102,10 +102,11 @@ def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:
     if not binary:
         print("cua-driver: not installed. Run: hermes computer-use install")
         return 2
-    print("Requesting Accessibility + Screen Recording for CuaDriver.\n"
-          "macOS will show a dialog attributed to CuaDriver (com.trycua.driver) — approve it, then return here.")
     try:
-        return int(subprocess.run([binary, "permissions", "grant"], env=_child_env(), stdin=subprocess.DEVNULL).returncode)
+        env = _child_env()
+        print("Requesting Accessibility + Screen Recording for CuaDriver.\n"
+              "macOS will show a dialog attributed to CuaDriver (com.trycua.driver) — approve it, then return here.")
+        return int(subprocess.run([binary, "permissions", "grant"], env=env, stdin=subprocess.DEVNULL).returncode)
     except KeyboardInterrupt:  # pragma: no cover - interactive
         return 130
     except Exception as exc:  # pragma: no cover - defensive

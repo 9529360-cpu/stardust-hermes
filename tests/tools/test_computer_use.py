@@ -1801,6 +1801,27 @@ class TestCuaEnvironmentScrubbing:
         assert "sanitized environment" in result["error"]
         run.assert_not_called()
 
+    @pytest.mark.macos_only
+    def test_grant_reports_sanitizer_failure_before_claiming_to_request_permission(self, monkeypatch, capsys):
+        from tools.computer_use.permissions import request_permissions_grant
+
+        monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-forwarded")
+
+        def fail_sanitization(_env):
+            raise ImportError("simulated sanitizer import failure")
+
+        monkeypatch.setattr("tools.computer_use.cua_backend_driver.resolve_cua_driver_cmd",
+                            lambda _driver_cmd=None: "cua-driver")
+        monkeypatch.setattr("tools.environments.local._sanitize_subprocess_env", fail_sanitization)
+        with patch("subprocess.run") as run:
+            result = request_permissions_grant()
+
+        output = capsys.readouterr()
+        assert result == 2
+        assert "Could not prepare a sanitized environment" in output.err
+        assert "Requesting Accessibility" not in output.out
+        run.assert_not_called()
+
 
 class TestCuaCliFallbackResolution:
     def test_cli_fallback_uses_resolved_driver_under_thin_path(self):
