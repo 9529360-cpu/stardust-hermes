@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { type ProfileScope, profileScopeKey } from '@/hermes'
+import { type ProfileScope, profileScopeKey, saveHermesConfigRecord } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { requestGatewayForProfile } from '@/store/gateway'
 import { notify, notifyError } from '@/store/notifications'
@@ -45,6 +45,7 @@ function profileName(profile: ProfileScope | undefined): string {
   if (!profile) {
     return 'default'
   }
+
   const key = profileScopeKey(profile)
 
   return key || 'default'
@@ -111,32 +112,45 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
 
   useEffect(() => {
     void refresh()
-    const off = window.hermesDesktop?.browserControl?.onStatus?.(next => setStatus(next))
+
+    const off = window.hermesDesktop?.browserControl?.onStatus?.(next => {
+      if (!next.session_id || next.session_id === activeSessionId) {
+        setStatus(next)
+      }
+    })
 
     return () => off?.()
-  }, [refresh])
+  }, [refresh, activeSessionId])
 
   useEffect(() => {
-    if (status.status !== 'starting' && status.state !== 'starting') {return}
+    const current = statusKey(status.status || status.state)
+
+    if (current !== 'starting' && current !== 'connected' && current !== 'stopping') {
+      return
+    }
+
     let active = true
 
-    const timer = window.setInterval(async () => {
-      try {
-        const next = await window.hermesDesktop.browserControl.status()
+    const timer = window.setInterval(
+      async () => {
+        try {
+          const next = await window.hermesDesktop.browserControl.status()
 
-        if (active) {
-          setStatus(next)
+          if (active && (!next.session_id || next.session_id === activeSessionId)) {
+            setStatus(next)
+          }
+        } catch {
+          // The backend status refresh below remains authoritative for the session.
         }
-      } catch {
-        // The backend status refresh below remains authoritative for the session.
-      }
-    }, 500)
+      },
+      current === 'starting' ? 500 : 1500
+    )
 
     return () => {
       active = false
       window.clearInterval(timer)
     }
-  }, [status.state, status.status])
+  }, [status.state, status.status, activeSessionId])
 
   const connect = useCallback(async () => {
     if (!activeSessionId) {
@@ -156,7 +170,8 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
     setBusy(true)
 
     try {
-      const browserProfileId = `chrome-${profileDir}`
+      const browserProfileId = `chrome-${btoa(profileDir).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')}`
+      await saveHermesConfigRecord({ browser: { extension_control: { enabled: true } } }, profile)
 
       const prepared = await requestGatewayForProfile<Record<string, unknown>>(
         profileKey,
@@ -183,17 +198,22 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
       if (started?.controller_id) {
         setControllerId(started.controller_id)
       }
-      notify({ kind: 'info', title: copy.connectedTitle, message: copy.connectedMessage })
+
+      if (started?.status === 'connected') {
+        notify({ kind: 'info', title: copy.connectedTitle, message: copy.connectedMessage })
+      }
     } catch (error) {
       setStatus({ state: 'error', error: error instanceof Error ? error.message : String(error) })
       notifyError(error, copy.connectFailed)
     } finally {
       setBusy(false)
     }
-  }, [activeSessionId, chromeProfileDir, copy, profileKey])
+  }, [activeSessionId, chromeProfileDir, copy, profileKey, profile])
 
   const disconnect = useCallback(async () => {
-    if (!activeSessionId) {return}
+    if (!activeSessionId) {
+      return
+    }
 
     setBusy(true)
 
@@ -228,7 +248,9 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
       below={
         <div className="grid max-w-xl gap-2 pt-2">
           <div className="flex flex-wrap items-center gap-2 text-xs text-(--ui-text-tertiary)">
-            <span>{copy.statusLabel}: {copy.status[state]}</span>
+            <span>
+              {copy.statusLabel}: {copy.status[state]}
+            </span>
             {status.error && <span className="max-w-full truncate text-(--ui-text-tertiary)">{status.error}</span>}
           </div>
           <label className="grid gap-1 text-xs text-(--ui-text-secondary)">
@@ -241,10 +263,21 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
             />
           </label>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={isBusy || isConnected || !activeSessionId} onClick={() => void connect()} size="sm" type="button">
+            <Button
+              disabled={isBusy || isConnected || !activeSessionId}
+              onClick={() => void connect()}
+              size="sm"
+              type="button"
+            >
               {isBusy ? copy.working : copy.connect}
             </Button>
-            <Button disabled={isBusy || !isConnected} onClick={() => void disconnect()} size="sm" type="button" variant="secondary">
+            <Button
+              disabled={isBusy || state === 'inactive'}
+              onClick={() => void disconnect()}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
               {copy.disconnect}
             </Button>
           </div>

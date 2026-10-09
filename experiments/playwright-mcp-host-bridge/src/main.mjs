@@ -12,8 +12,10 @@ if (!sessionId || (!token && !grant) || !packageSpec || !profileDirName) {
   process.exit(2);
 }
 let client;
+let driver;
 async function shutdown() {
-  await client?.stop();
+  if (client) await client.stop();
+  else await driver?.close();
   console.log(JSON.stringify({ event: 'stopped' }));
   process.exit(0);
 }
@@ -27,15 +29,20 @@ try {
   if (grant && (!controllerId || !browserProfileId)) throw new Error('One-time browser grant requires an exact controller and browser profile');
   if (protocolVersion && protocolVersion !== '1') throw new Error('Unsupported browser protocol version');
   const capabilities = capabilitiesRaw ? JSON.parse(capabilitiesRaw) : undefined;
-  const driver = new PlaywrightExtensionDriver({ packageSpec, profileDirName });
+  driver = new PlaywrightExtensionDriver({ packageSpec, profileDirName });
   await driver.connect();
   client = new StardustBrowserBrokerClient({
-    gateway, token: token || undefined, grant, sessionId, controllerId, capabilities: capabilities ? JSON.parse(capabilities) : undefined, browserProfileId: browserProfileId || `chrome-${profileDirName}`, driver,
+    gateway, token: token || undefined, grant, sessionId, controllerId, capabilities, browserProfileId: browserProfileId || `chrome-${profileDirName}`, driver,
+    onDisconnect: grant ? () => {
+      console.error(JSON.stringify({ event: 'error', message: 'Browser connection lost; pair again explicitly' }));
+      client.stop().finally(() => { process.exitCode = 1; });
+    } : undefined,
   });
   await client.connect();
   console.log(JSON.stringify({ event: 'ready', session_id: sessionId, controller_id: process.env.STARDUST_CONTROLLER_ID || null }));
 } catch (e) {
   console.error(JSON.stringify({ event: 'error', message: String(e.message || e).replace(/grant|token|secret|bearer/gi, '[REDACTED]').slice(0, 320) }));
-  await client?.stop();
+  if (client) await client.stop();
+  else await driver?.close();
   process.exitCode = 1;
 }

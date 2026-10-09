@@ -280,7 +280,7 @@ class BrowserControlBroker:
         with self._lock:
             self._launch_grants = {
                 value: record for value, record in self._launch_grants.items()
-                if record.expires_at > now and not record.consumed
+                if record.expires_at + self._ticket_ttl > now
             }
             value = secrets.token_urlsafe(32)
             self._launch_grants[value] = record = _LaunchGrantRecord(
@@ -337,6 +337,43 @@ class BrowserControlBroker:
     def revoke_bridge_grants(self, scope: ControllerScope) -> int:
         return self.revoke_launch_grants(scope)
 
+    def revoke_bridge_session(self, *, principal_id: str, profile_id: str,
+                              session_id: str, controller_id: str = "") -> int:
+        """Revoke pending/consumed Desktop credentials and detach this session's controllers.
+
+        Retaining spent launch records through the ticket lifetime lets attach reject a
+        ticket consumed just before revocation, without introducing another authority store.
+        """
+        def matches(scope):
+            return (scope.principal_id, scope.profile_id, scope.session_id, scope.transport_family) == (
+                principal_id, profile_id, session_id, LOCAL_DESKTOP_TRANSPORT_FAMILY
+            ) and (not controller_id or scope.controller_id == controller_id)
+
+        with self._lock:
+            scopes = {scope for scope in self._controllers if matches(scope)}
+            revoked = 0
+            for records in (self._launch_grants, self._tickets):
+                for value, record in list(records.items()):
+                    if matches(record.scope):
+                        scopes.add(record.scope)
+                        del records[value]
+                        revoked += 1
+        # detach may take the send lock and emit/fail pending work; never do that
+        # while holding the broker state lock. New Desktop pairing uses a new id.
+        for scope in scopes:
+            self.detach(scope, notify_controller=False)
+        return revoked
+
+    def _validate_bridge_attach_locked(self, scope: ControllerScope) -> None:
+        if (scope.transport_family != LOCAL_DESKTOP_TRANSPORT_FAMILY
+                or scope.principal_id != local_desktop_principal(scope.profile_id, scope.session_id)):
+            return
+        now = self._clock()
+        if not any(record.scope == scope and record.consumed
+                   and record.expires_at + self._ticket_ttl > now
+                   for record in self._launch_grants.values()):
+            raise ControllerRejected("Desktop bridge authorization expired or revoked")
+
     def _controller_for_identity_locked(self, scope: ControllerScope) -> Optional[_Controller]:
         """Attached controller sharing ``scope``'s stable identity (any capabilities)."""
         return next((c for c in self._controllers.values() if _same_scope_identity(c.scope, scope)), None)
@@ -352,6 +389,7 @@ class BrowserControlBroker:
         authenticated session lane hard-replaces it."""
         while True:
             with self._lock:
+                self._validate_bridge_attach_locked(scope)
                 existing = self._controller_for_identity_locked(scope)
                 lane_scopes = [
                     c for c in self._controllers if not _same_scope_identity(c, scope)
@@ -373,6 +411,7 @@ class BrowserControlBroker:
                 with self._lock:
                     if self._controllers.get(existing.scope) is not existing:
                         continue
+                    self._validate_bridge_attach_locked(scope)
                     self._controllers.pop(existing.scope, None)
                     existing.scope, existing.send, existing.owner, existing.connected = scope, send, owner, False
                     for pending in self._pending_for_scope_locked(scope):
@@ -392,6 +431,7 @@ class BrowserControlBroker:
                     raise ConnectionError("browser controller reconnect could not flush deferred cancels")
                 with self._lock:
                     if self._controllers.get(scope) is existing:
+                        self._validate_bridge_attach_locked(scope)
                         existing.connected = True
                 return
 

@@ -1897,7 +1897,7 @@ export const zh = defineLocale({
         disconnectFailed: '无法断开 Chrome 连接',
         noSession: '请先打开或选择一个 Desktop 会话。',
         invalidProfile: '只输入 Chrome 配置文件目录名称，例如 Default 或 Profile 1。',
-        warning: '请先在 Chrome 中安装并启用 Stardust 浏览器扩展。连接仅限此会话，断开后即停止。',
+        warning: '请先在 Chrome 中安装并启用官方 Playwright MCP Browser Extension，并在扩展提示中批准要控制的标签页。连接仅限此会话，断开后即停止。',
         status: {
           inactive: '未连接',
           starting: '连接中…',

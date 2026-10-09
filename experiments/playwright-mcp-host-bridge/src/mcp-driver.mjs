@@ -1,5 +1,7 @@
 /** The only browser engine used here is Microsoft's Playwright MCP + official Chrome extension. */
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { normalizeResult, toolMapping } from './protocol.mjs';
 
 export class PlaywrightExtensionDriver {
@@ -32,24 +34,36 @@ export class PlaywrightExtensionDriver {
                         'LOCALAPPDATA', 'SYSTEMROOT', 'TEMP', 'TMP', 'TMPDIR']) {
       if (process.env[name]) childEnv[name] = process.env[name];
     }
+    // Desktop's executable is Electron, including in a packaged install.
+    childEnv.ELECTRON_RUN_AS_NODE = '1';
     // Launch the local, lockfile-installed package directly. npx could download
     // a fresh executable or resolve a different global version on Windows.
-    const cliPath = createRequire(import.meta.url).resolve('@playwright/mcp/cli.js');
+    const manifestPath = createRequire(import.meta.url).resolve('@playwright/mcp/package.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    if (`@playwright/mcp@${manifest.version}` !== this.packageSpec) {
+      throw new Error('Installed Playwright MCP does not match the pinned package version');
+    }
+    const cliPath = resolve(dirname(manifestPath), manifest.bin['playwright-mcp']);
     const transport = new StdioClientTransport({
       command: process.execPath,
-      args: [cliPath, '--extension', '--profile-dir-name', this.profileDirName],
+      args: [cliPath, '--extension', '--profile-dir-name', this.profileDirName, '--caps', 'vision'],
       env: childEnv,
       stderr: 'inherit',
     });
-    await client.connect(transport);
-    const catalog = await client.listTools();
-    this.schemas = new Map((catalog.tools || []).map(t => [t.name, t.inputSchema]));
-    const required = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type'];
-    if (required.some(name => !this.schemas.has(name))) {
+    try {
+      await client.connect(transport);
+      const catalog = await client.listTools();
+      this.schemas = new Map((catalog.tools || []).map(t => [t.name, t.inputSchema]));
+      const required = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type',
+        'browser_mouse_wheel', 'browser_press_key', 'browser_navigate_back', 'browser_tabs'];
+      if (required.some(name => !this.schemas.has(name))) {
+        throw new Error('Playwright MCP did not advertise the required Chrome extension tools');
+      }
+      this.client = client;
+    } catch (error) {
       await client.close();
-      throw new Error('Playwright MCP did not advertise the required Chrome extension tools');
+      throw error;
     }
-    this.client = client;
   }
 
   async run(action, args) {

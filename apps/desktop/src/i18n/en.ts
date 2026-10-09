@@ -1754,7 +1754,7 @@ export const en: Translations = {
         disconnectFailed: 'Could not disconnect from Chrome',
         noSession: 'Open or select a Desktop session first.',
         invalidProfile: 'Use only the Chrome profile directory name, such as Default or Profile 1.',
-        warning: 'Install and enable the Stardust browser extension in Chrome first. The connection is session-scoped and stops when you disconnect.',
+        warning: 'Install and enable the official Playwright MCP Browser Extension in Chrome, then approve the intended tab when prompted. The connection is session-scoped and stops when you disconnect.',
         status: {
           inactive: 'Not connected',
           starting: 'Connecting…',

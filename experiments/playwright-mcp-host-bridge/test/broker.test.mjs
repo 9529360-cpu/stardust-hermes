@@ -106,3 +106,40 @@ test('duplicate command IDs never cause a second click', async()=>{
   assert.equal(ws.sent.length,1);
   await client.stop();
 });
+
+test('one-time grants accept ordinary letters and reject CR/LF before registration', async () => {
+  const options = { gateway: 'http://127.0.0.1:8642/', sessionId: 's', controllerId: 'c',
+    browserProfileId: 'p', driver: { run() {} } };
+  for (const grant of ['normal-grant', 'r', 'n', 'a_b-123']) {
+    assert.doesNotThrow(() => new StardustBrowserBrokerClient({ ...options, grant }));
+  }
+  for (const grant of ['abc\ndef', 'abc\rdef']) {
+    assert.throws(() => new StardustBrowserBrokerClient({ ...options, grant }), /Invalid one-time/);
+  }
+});
+
+test('disconnect drops queued actions and never retries a consumed Desktop grant', async () => {
+  let finish;
+  let calls = 0;
+  const { client, requests } = setup({ driverRun: async () => {
+    calls++;
+    return await new Promise(resolve => { finish = resolve; });
+  } });
+  client.token = undefined;
+  client.grant = 'one-use-grant';
+  let disconnected = false;
+  client.onDisconnect = () => { disconnected = true; };
+  await client.connect();
+  const ws = FakeSocket.instances[0];
+  for (const command_id of ['first', 'queued']) ws.receive({ method: 'browser.controller.command',
+    params: { command_id, action: 'browser_click', arguments: { ref: 'e1' } } });
+  await new Promise(resolve => setImmediate(resolve));
+  ws.close();
+  finish({ success: true });
+  await flush(client);
+  assert.equal(calls, 1);
+  assert.equal(disconnected, true);
+  assert.match(client.error.message, /restart pairing/);
+  assert.equal(requests.length, 1);
+  await client.stop();
+});
