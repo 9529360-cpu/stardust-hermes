@@ -40,6 +40,19 @@ def noop_backend():
 # Schema & registration
 # ---------------------------------------------------------------------------
 
+@pytest.mark.parametrize("requested, actual", [(60.0, 30.0), (-1.0, 0.0), (2.5, 2.5)])
+def test_wait_reports_the_bounded_duration(monkeypatch, requested, actual):
+    from tools.computer_use import backend as computer_use_backend
+    from tools.computer_use.tool import handle_computer_use
+
+    slept = []
+    monkeypatch.setattr(computer_use_backend.time, "sleep", slept.append)
+
+    result = json.loads(handle_computer_use({"action": "wait", "seconds": requested}))
+
+    assert slept == [actual]
+    assert result["message"] == f"waited {actual:.2f}s"
+
 class TestSchema:
 
     def test_schema_lists_all_expected_actions(self):
