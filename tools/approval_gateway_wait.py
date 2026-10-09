@@ -196,5 +196,7 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict, *,
         entry.result = "once"
         entry.event.set()
     _drop_entry("answered" if state == "set" else state)
-    return _finish(payload, state != "timeout", entry.result, entry.reason,
-                   bypassed=state == "bypassed")
+    return _finish(
+        payload, state != "timeout", entry.result, entry.reason,
+        **({"bypassed": True} if state == "bypassed" else {}),
+    )

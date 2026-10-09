@@ -4363,6 +4363,11 @@
             },
             "title": "Approvals",
             "type": "array"
+          },
+          "approval_mode": {
+            "default": "manual",
+            "title": "Approval Mode",
+            "type": "string"
           }
         },
         "required": [
@@ -4480,6 +4485,18 @@
             ],
             "default": null,
             "title": "Smart Denied"
+          },
+          "policy_locked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy Locked"
           },
           "tool_name": {
             "anyOf": [
@@ -16725,6 +16742,18 @@
             ],
             "default": null,
             "title": "Smart Denied"
+          },
+          "policy_locked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy Locked"
           },
           "choices": {
             "anyOf": [

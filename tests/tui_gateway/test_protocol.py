@@ -430,13 +430,16 @@ def test_approval_pending_replays_unresolved_requests(server, monkeypatch):
 
     server._sessions["ui-1"] = {"session_key": "agent-1", "history": []}
     pending = [{"request_id": "req-1", "command": "danger"}]
-    monkeypatch.setattr(approval, "list_gateway_approvals", lambda key: pending if key == "agent-1" else [])
+    monkeypatch.setattr(
+        approval, "list_gateway_approvals",
+        lambda key, **_kwargs: pending if key == "agent-1" else [],
+    )
 
     response = server.handle_request(
         {"id": "r1", "method": "approval.pending", "params": {"session_id": "ui-1"}}
     )
 
-    assert response["result"] == {"approvals": pending}
+    assert response["result"] == {"approvals": pending, "approval_mode": "smart"}
 
 
 def test_approval_received_acknowledges_exact_request(server, monkeypatch):
