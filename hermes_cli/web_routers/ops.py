@@ -469,11 +469,16 @@ async def get_memory_entries(target: str, profile: Optional[str] = None):
         raise HTTPException(status_code=400, detail="target must be memory or user")
 
     def _read():
-        from tools.memory_tool import load_on_disk_store
+        from tools.memory_tool import load_on_disk_store, memory_persistence_enabled
+
+        if not memory_persistence_enabled(fail_closed=True):
+            return {"target": target, "available": False, "entries": []}
 
         store = load_on_disk_store()
         if not store.target_enabled(target):
             return {"target": target, "available": False, "entries": []}
+        if store.load_failed(target):
+            raise HTTPException(status_code=503, detail="Built-in memory could not be read; retry later")
         return {"target": target, "available": True, "entries": list(store._entries_for(target))}
 
     return await scoped_to_thread(profile, _read)

@@ -3967,6 +3967,25 @@ class TestMemoryEntriesApi:
     def test_rejects_unknown_target(self):
         assert self.client.get("/api/memory/entries?target=topics").status_code == 400
 
+    def test_reports_disabled_memory_as_unavailable_not_empty(self, monkeypatch):
+        monkeypatch.setattr("tools.memory_tool.memory_persistence_enabled", lambda fail_closed=False: False)
+        response = self.client.get("/api/memory/entries?target=memory")
+        assert response.status_code == 200
+        assert response.json() == {"target": "memory", "available": False, "entries": []}
+
+    def test_reports_disk_read_failure_instead_of_a_successful_empty_file(self, tmp_path, monkeypatch):
+        from tools.memory_tool import MemoryStore
+
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        (memories / "MEMORY.md").write_text("Private fact", encoding="utf-8")
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        monkeypatch.setattr(MemoryStore, "_read_raw_checked", staticmethod(lambda _path: ("", False)))
+
+        response = self.client.get("/api/memory/entries?target=memory")
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Built-in memory could not be read; retry later"
+
     def test_routes_read_to_the_selected_profile(self, tmp_path, monkeypatch):
         from hermes_cli.profiles import get_profile_dir
 

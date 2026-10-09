@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { deleteMemoryEntry, getMemoryEntries, getMemoryStatus, resetMemory } from '@/hermes'
 import { confirm } from '@/store/confirm'
-import { requestFreshSession } from '@/store/profile'
+import { $activeGatewayProfile, requestFreshSession } from '@/store/profile'
 
 import { MaintenancePanel } from './maintenance'
 
@@ -43,6 +43,7 @@ afterEach(cleanup)
 describe('Command Center memory reset forget boundary', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    $activeGatewayProfile.set('default')
     vi.mocked(getMemoryStatus).mockResolvedValue({
       active: '',
       providers: [],
@@ -82,6 +83,67 @@ describe('Command Center memory reset forget boundary', () => {
     render(<MaintenancePanel />)
     fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
     expect(await screen.findByText('No entries')).toBeTruthy()
+  })
+
+  it('distinguishes unavailable built-in memory from an empty file', async () => {
+    vi.mocked(getMemoryEntries).mockResolvedValueOnce({ available: false, entries: [], target: 'memory' })
+    render(<MaintenancePanel />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    expect(await screen.findByText('Built-in memory is unavailable for this profile.')).toBeTruthy()
+    expect(screen.queryByText('No entries')).toBeNull()
+  })
+
+  it('does not delete the original profile entry after confirmation if the profile changed', async () => {
+    let resolveConfirmation!: (confirmed: boolean) => void
+    vi.mocked(confirm).mockImplementationOnce(() => new Promise(resolve => (resolveConfirmation = resolve)))
+    render(<MaintenancePanel />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove entry' }))[0]!)
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
+
+    act(() => $activeGatewayProfile.set('research'))
+    resolveConfirmation(true)
+    await waitFor(() => expect(deleteMemoryEntry).not.toHaveBeenCalled())
+    act(() => $activeGatewayProfile.set('default'))
+  })
+
+  it('suppresses stale delete completion after a profile switch', async () => {
+    let resolveDelete!: (result: Awaited<ReturnType<typeof deleteMemoryEntry>>) => void
+    vi.mocked(confirm).mockResolvedValueOnce(true)
+    vi.mocked(deleteMemoryEntry).mockImplementationOnce(() => new Promise(resolve => (resolveDelete = resolve)))
+    render(<MaintenancePanel />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove entry' }))[0]!)
+    await waitFor(() => expect(deleteMemoryEntry).toHaveBeenCalledTimes(1))
+
+    act(() => $activeGatewayProfile.set('research'))
+    resolveDelete({ active_session_behavior: 'refresh_on_next_turn', deleted: ['MEMORY.md'], ok: true })
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
+    expect(requestFreshSession).not.toHaveBeenCalled()
+    act(() => $activeGatewayProfile.set('default'))
+  })
+
+  it('ignores a stale entry-read rejection across an A-to-B-to-A profile switch', async () => {
+    let rejectFirstRead!: (error: Error) => void
+    vi.mocked(getMemoryEntries)
+      .mockImplementationOnce(
+        () =>
+          new Promise<Awaited<ReturnType<typeof getMemoryEntries>>>((_resolve, reject) => (rejectFirstRead = reject))
+      )
+      .mockResolvedValueOnce({ available: true, entries: ['Likes tea'], target: 'memory' })
+    render(<MaintenancePanel />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    await waitFor(() => expect(getMemoryEntries).toHaveBeenCalledTimes(1))
+
+    act(() => {
+      $activeGatewayProfile.set('research')
+      $activeGatewayProfile.set('default')
+    })
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    expect(await screen.findByText('Likes tea')).toBeTruthy()
+    rejectFirstRead(new Error('stale read'))
+    await waitFor(() => expect(getMemoryEntries).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('Built-in memory is unavailable for this profile.')).toBeNull()
   })
 
   it('explains stale chats before reset and offers a fresh session after success', async () => {

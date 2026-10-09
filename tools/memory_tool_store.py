@@ -90,12 +90,17 @@ class MemoryStore:
         # prompt snapshot; an older generation may still answer from its cached context,
         # but it must never write those forgotten facts back to disk.
         self._reset_generations: Dict[str, Optional[str]] = {"memory": "", "user": ""}
+        self._load_errors: set[str] = set()
         self._consolidation_failures = 0  # per turn; reset by reset_consolidation_failures()
 
     # Per-turn counter of failed at-capacity consolidation attempts; reset at each turn boundary by
     # reset_consolidation_failures() (#42405).
     def target_enabled(self, target: str) -> bool:
         return self.user_profile_enabled if target == "user" else self.memory_enabled
+
+    def load_failed(self, target: str) -> bool:
+        """Whether the last disk snapshot for this target could not be read."""
+        return target in self._load_errors
 
     def reset_consolidation_failures(self) -> None:
         """Call at turn start."""
@@ -195,6 +200,7 @@ class MemoryStore:
                     path.name,
                 )
             if not read_ok:
+                self._load_errors.add(target)
                 logger.warning(
                     "Could not refresh %s; keeping the previous in-memory snapshot and retrying on a later turn.",
                     path.name,
@@ -204,6 +210,7 @@ class MemoryStore:
                 # closed until a later reload captures both bytes and generation.
                 self._system_prompt_disk_state[target] = None
                 continue
+            self._load_errors.discard(target)
             # Deduplicate (order-preserving, first occurrence wins).
             entries = list(dict.fromkeys(self._parse_entries(raw)))
             self._set_entries(target, entries)
@@ -436,18 +443,32 @@ class MemoryStore:
         return self._edit(target, old_text.strip(), None)
 
     def remove_exact(self, target: str, entry: str) -> Dict[str, Any]:
-        """Remove exactly one complete entry, refusing stale or duplicate matches."""
+        """Remove one canonical, unique entry without normalizing other disk content."""
         if not entry:
             return _error("entry cannot be empty.")
-
-        def _apply(entries, _limit):
+        path = self._path_for(target)
+        with self._file_lock(path):
+            current_generation = self._read_reset_generation(path)
+            if current_generation is None or current_generation != self._reset_generations.get(target):
+                return self._reset_conflict(target)
+            raw, read_ok = self._read_raw_checked(path)
+            if not read_ok:
+                return _read_failed_error(path)
+            entries = self._parse_entries(raw)
+            if raw != ENTRY_DELIMITER.join(entries):
+                backup = self._detect_external_drift(target, raw)
+                return _drift_error(path, backup or "(snapshot unavailable)")
+            if len(entries) != len(set(entries)):
+                return _error("Memory entries are duplicated on disk; resolve duplicates before deleting one.")
             matches = [index for index, current in enumerate(entries) if current == entry]
             if len(matches) != 1:
                 return _error("Selected memory entry is stale or ambiguous; reload the list and retry.")
             index = matches[0]
-            return entries[:index] + entries[index + 1:], "Entry removed."
-
-        return self._mutate(target, _apply)
+            remaining = entries[:index] + entries[index + 1:]
+            self._set_entries(target, remaining)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._write_file(path, remaining)
+            return self._success_response(target, "Entry removed.")
 
     def _edit(self, target: str, old_text: str, new_content: Optional[str]) -> Dict[str, Any]:
         """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*."""

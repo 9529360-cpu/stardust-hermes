@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { PageLoader } from '@/components/page-loader'
 import { Badge } from '@/components/ui/badge'
@@ -56,6 +56,7 @@ function formatBytes(size: number): string {
  *  /api/actions status endpoint. */
 export function MaintenancePanel() {
   const activeProfile = useStore($activeGatewayProfile)
+  const profileGeneration = useRef(0)
   const { t } = useI18n()
   const mm = t.commandCenter.maintenance
 
@@ -74,12 +75,15 @@ export function MaintenancePanel() {
   const [sharing, setSharing] = useState(false)
   const [error, setError] = useState('')
 
+  useEffect(() => $activeGatewayProfile.subscribe(() => (profileGeneration.current += 1)), [])
+
   useEffect(() => {
     setMemoryEntries({})
     setMemoryAvailable({})
     setMemoryLoading({})
     setMemoryErrors({})
     setMemoryExpanded({})
+    setMemoryBusy(false)
     let cancelled = false
 
     getCuratorStatus()
@@ -253,13 +257,18 @@ export function MaintenancePanel() {
 
   const loadMemoryEntries = useCallback(
     async (target: 'memory' | 'user') => {
+      const requestedProfile = activeProfile
+      const requestedGeneration = profileGeneration.current
+
+      const isCurrentRequest = () =>
+        requestedProfile === $activeGatewayProfile.get() && requestedGeneration === profileGeneration.current
+
       setMemoryLoading(current => ({ ...current, [target]: true }))
 
       try {
-        const requestedProfile = activeProfile
         const result = await getMemoryEntries(target, requestedProfile)
 
-        if (requestedProfile !== $activeGatewayProfile.get()) {
+        if (!isCurrentRequest()) {
           return
         }
 
@@ -267,11 +276,15 @@ export function MaintenancePanel() {
         setMemoryAvailable(current => ({ ...current, [target]: result.available }))
         setMemoryErrors(current => ({ ...current, [target]: undefined }))
       } catch {
+        if (!isCurrentRequest()) {
+          return
+        }
+
         setMemoryEntries(current => ({ ...current, [target]: undefined }))
         setMemoryAvailable(current => ({ ...current, [target]: undefined }))
         setMemoryErrors(current => ({ ...current, [target]: mm.entriesUnavailable }))
       } finally {
-        if (activeProfile === $activeGatewayProfile.get()) {
+        if (isCurrentRequest()) {
           setMemoryLoading(current => ({ ...current, [target]: false }))
         }
       }
@@ -298,6 +311,12 @@ export function MaintenancePanel() {
 
   const removeMemoryEntry = useCallback(
     async (target: 'memory' | 'user', entry: string) => {
+      const requestedProfile = activeProfile
+      const requestedGeneration = profileGeneration.current
+
+      const isCurrentRequest = () =>
+        requestedProfile === $activeGatewayProfile.get() && requestedGeneration === profileGeneration.current
+
       if (
         !(await confirm({
           destructive: true,
@@ -308,10 +327,18 @@ export function MaintenancePanel() {
         return
       }
 
+      if (!isCurrentRequest()) {
+        return
+      }
+
       setMemoryBusy(true)
 
       try {
-        const result = await deleteMemoryEntry(target, entry, activeProfile)
+        const result = await deleteMemoryEntry(target, entry, requestedProfile)
+
+        if (!isCurrentRequest()) {
+          return
+        }
 
         // The delete response is authoritative; a follow-up read must not turn
         // a committed removal into a failure notification.
@@ -332,12 +359,18 @@ export function MaintenancePanel() {
             title: mm.resetFreshTitle
           }))
         ) {
-          requestFreshSession()
+          if (isCurrentRequest()) {
+            requestFreshSession()
+          }
         }
       } catch (err) {
-        notifyError(err, mm.removeEntryFailed)
+        if (isCurrentRequest()) {
+          notifyError(err, mm.removeEntryFailed)
+        }
       } finally {
-        setMemoryBusy(false)
+        if (isCurrentRequest()) {
+          setMemoryBusy(false)
+        }
       }
     },
     [activeProfile, loadMemoryEntries, mm]
@@ -627,6 +660,8 @@ function MemoryFileRow({
             <span>{viewLabel}…</span>
           ) : error ? (
             <span className="text-destructive">{error}</span>
+          ) : available === false ? (
+            <span className="text-(--ui-text-tertiary)">{unavailableLabel}</span>
           ) : entries ? (
             <ul>
               {entries.length === 0 ? (

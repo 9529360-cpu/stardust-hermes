@@ -236,6 +236,29 @@ class TestMemoryStoreRemove:
         assert store.memory_entries == ["Likes tea daily"]
         assert store.remove_exact("memory", "Likes tea")["success"] is False
 
+    def test_remove_exact_preserves_other_entries_and_rejects_noncanonical_or_duplicate_disk_data(self, store, tmp_path, monkeypatch):
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        path = memories / "MEMORY.md"
+        path.write_text("Likes tea\n§\nLives in Berlin", encoding="utf-8")
+        store.load_from_disk()
+        result = store.remove_exact("memory", "Likes tea")
+        assert result["success"] is True
+        assert path.read_bytes() == b"Lives in Berlin"
+
+        path.write_text("Likes tea\n§\nLives in Berlin\n", encoding="utf-8")
+        store.load_from_disk()
+        noncanonical = path.read_bytes()
+        assert store.remove_exact("memory", "Likes tea")["success"] is False
+        assert path.read_bytes() == noncanonical
+
+        path.write_text("Likes tea\n§\nLikes tea", encoding="utf-8")
+        store.load_from_disk()
+        duplicated = path.read_bytes()
+        assert store.remove_exact("memory", "Likes tea")["success"] is False
+        assert path.read_bytes() == duplicated
+
 
 class TestMemoryConsolidationGracefulDegrade:
     """Fix #3 for #42405: a failed at-capacity consolidation must never loop the
