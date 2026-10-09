@@ -43,6 +43,11 @@ _NO_DESKTOP_IMAGE_MSG = ("<get_desktop_state returned no image; the driver may p
 _NO_CAPTURE_SCOPE_MSG = ("<could not read the current capture_scope; full-screen capture was skipped to avoid "
                          "leaving the computer-use session in desktop capture mode — try "
                          "capture(app='<AppName>') for a specific window>")
+_SET_CAPTURE_SCOPE_MSG = ("<could not switch capture_scope to desktop; full-screen capture was skipped — "
+                          "try capture(app='<AppName>') for a specific window>")
+_RESTORE_CAPTURE_SCOPE_MSG = ("<full-screen capture could not restore the previous capture_scope; the session may "
+                              "remain in desktop mode — use a specific app target or reconnect the computer-use "
+                              "session>")
 _FULL_SCREEN_NOTE = ("full-screen capture has no interactable elements; to act on what you see, call "
                      "capture(app='<AppName>') for that app's clickable element list, or capture(app='desktop') for "
                      "the desktop shell (wallpaper icons / taskbar) with elements")
@@ -328,16 +333,41 @@ class _CaptureMixin:
             return self._failed_capture(mode, _NO_CAPTURE_SCOPE_MSG)
         _set_scope = lambda value: self._session.call_tool(  # noqa: E731
             "set_config", {"key": "capture_scope", "value": value, "session": self._session_id}, timeout=10.0)
+        def set_scope_checked(value: str) -> None:
+            result = _set_scope(value)
+            if not isinstance(result, dict) or result.get("isError") is True:
+                raise RuntimeError("cua-driver set_config returned an error")
+
+        out: Optional[Dict[str, Any]] = None
+        switch_failed = False
+        capture_error: Optional[Exception] = None
+        restore_failed = False
         try:
             if previous_scope != "desktop":
-                _set_scope("desktop")
-            out = self._call_capture_tool("get_desktop_state", {"session": self._session_id})
+                try:
+                    set_scope_checked("desktop")
+                except Exception as e:
+                    logger.debug("cua-driver switch capture_scope to desktop failed: %s", e)
+                    switch_failed = True
+            if not switch_failed:
+                out = self._call_capture_tool("get_desktop_state", {"session": self._session_id})
+        except Exception as e:
+            capture_error = e
         finally:
             if previous_scope and previous_scope != "desktop":
                 try:
-                    _set_scope(previous_scope)
+                    set_scope_checked(previous_scope)
                 except Exception as e:
                     logger.debug("cua-driver restore capture_scope failed: %s", e)
+                    restore_failed = True
+        if restore_failed:
+            return self._failed_capture(mode, _RESTORE_CAPTURE_SCOPE_MSG)
+        if switch_failed:
+            return self._failed_capture(mode, _SET_CAPTURE_SCOPE_MSG)
+        if capture_error is not None:
+            raise capture_error
+        if out is None:
+            return self._failed_capture(mode, _SET_CAPTURE_SCOPE_MSG)
         png_b64, image_mime_type = _image_from_tool_result(out)
         if not png_b64:
             return self._failed_capture(mode, _NO_DESKTOP_IMAGE_MSG)
