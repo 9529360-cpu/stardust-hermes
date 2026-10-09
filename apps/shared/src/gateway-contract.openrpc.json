@@ -1700,7 +1700,7 @@
     },
     {
       "name": "memory.list",
-      "summary": "List curated entries with zero-based per-target indices; indices are stable until the list changes.",
+      "summary": "List enabled curated targets with zero-based indices and explicit target status. Unreadable enabled targets return an error; disabled targets expose no entries.",
       "params": [
         {
           "name": "params",
@@ -15651,10 +15651,28 @@
             },
             "title": "Entries",
             "type": "array"
+          },
+          "targets": {
+            "additionalProperties": {
+              "enum": [
+                "enabled",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "memory",
+                "user"
+              ]
+            },
+            "title": "Targets",
+            "type": "object"
           }
         },
         "required": [
-          "entries"
+          "entries",
+          "targets"
         ],
         "title": "MemoryListResult",
         "type": "object"

@@ -92,10 +92,10 @@ def read_approval_audit(limit=100, session_key=None):
         path = _path()
         for source in (path.with_name("approvals.jsonl.1"), path):
             try:
-                with source.open(encoding="utf-8") as stream:
+                with source.open("rb") as stream:
                     for line in stream:
                         try:
-                            entry = json.loads(line)
+                            entry = json.loads(line.decode("utf-8", errors="strict"))
                             if isinstance(entry, dict) and (session_key is None or entry.get("session_key") == session_key):
                                 entries.append(entry)
                         except (ValueError, TypeError):

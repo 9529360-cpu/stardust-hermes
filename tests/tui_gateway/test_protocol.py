@@ -1550,6 +1550,10 @@ def test_approval_audit_rpc(server):
     write_approval_audit(session_key="audit-rpc", kind="tool", tool_name="write_file",
                          description="test", pattern_key="rule", outcome="denied",
                          mode="manual", command_preview="test")
+    from hermes_constants import get_hermes_home
+    path = get_hermes_home() / "audit" / "approvals.jsonl"
+    with path.open("ab") as stream:
+        stream.write(b'{"session_key":"audit-rpc","outcome":"bad\xff"}\n')
     reply = server._methods["approval.audit"](42, {"limit": 1, "session_key": "audit-rpc"})
     assert reply["result"]["entries"][0]["outcome"] == "denied"
     assert reply["result"]["entries"][0]["session_key"] == "audit-rpc"

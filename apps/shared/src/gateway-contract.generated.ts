@@ -1438,6 +1438,7 @@ export interface MemoryListParams {
 }
 export interface MemoryListResult {
   entries: MemoryEntry[]
+  targets: Record<string, 'enabled' | 'disabled'>
 }
 export interface MemoryEntry {
   target: 'memory' | 'user'
@@ -4520,7 +4521,7 @@ export interface RpcMethods {
   'mcp.servers.test': { params: McpServerNameParams; result: McpServersTestResult }
   /** Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write. */
   'memory.forget': { params: MemoryForgetParams; result: MemoryMutationResult }
-  /** List curated entries with zero-based per-target indices; indices are stable until the list changes. */
+  /** List enabled curated targets with zero-based indices and explicit target status. Unreadable enabled targets return an error; disabled targets expose no entries. */
   'memory.list': { params: MemoryListParams; result: MemoryListResult }
   /** Persist a curated entry using the agent memory content and size guards. */
   'memory.remember': { params: MemoryRememberParams; result: MemoryMutationResult }

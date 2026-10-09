@@ -134,3 +134,38 @@ def test_profile_home_resolved_per_call(rpc, tmp_path, monkeypatch):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     assert rpc("memory.list")["result"]["entries"] == [
         {"target": "memory", "index": 0, "text": "Profile one note"}]
+
+
+@pytest.mark.parametrize("target,filename", [("memory", "MEMORY.md"), ("user", "USER.md")])
+@pytest.mark.parametrize("unreadable", [False, True])
+def test_list_read_failure_is_not_empty_success(rpc, tmp_path, target, filename, unreadable):
+    path = tmp_path / "memories" / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if unreadable:
+        path.mkdir()  # Deterministic unreadable target on Windows and POSIX.
+    else:
+        path.write_bytes(b"valid note\n\xff\n")
+    for selection in (target, "both"):
+        response = rpc("memory.list", target=selection)
+        assert response["error"]["code"] == 4000
+        assert "failed to load" in response["error"]["message"]
+        assert "result" not in response
+    other = "user" if target == "memory" else "memory"
+    assert rpc("memory.list", target=other)["result"]["targets"] == {other: "enabled"}
+
+
+@pytest.mark.parametrize("flag,disabled", [
+    ("memory_enabled", {"memory"}), ("user_profile_enabled", {"user"}),
+    ("enabled", {"memory", "user"}),
+])
+def test_list_disabled_targets_do_not_expose_disk_entries(rpc, tmp_path, flag, disabled):
+    directory = tmp_path / "memories"
+    directory.mkdir(exist_ok=True)
+    (directory / "MEMORY.md").write_text("Private agent note", encoding="utf-8")
+    (directory / "USER.md").write_text("Private profile note", encoding="utf-8")
+    (tmp_path / "config.yaml").write_text(f"memory:\n  {flag}: false\n", encoding="utf-8")
+    for selection in ("memory", "user", "both"):
+        result = rpc("memory.list", target=selection)["result"]
+        selected = {"memory", "user"} if selection == "both" else {selection}
+        assert result["targets"] == {name: "disabled" if name in disabled else "enabled" for name in selected}
+        assert {entry["target"] for entry in result["entries"]} == selected - disabled

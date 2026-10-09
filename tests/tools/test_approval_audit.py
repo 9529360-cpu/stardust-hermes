@@ -136,3 +136,17 @@ def test_cached_approval(gate, monkeypatch):
     monkeypatch.setattr(approval, "_is_permanently_approved", lambda *a: False)
     assert gate()["approved"]
     assert read_audit()[0]["outcome"] == "approved_session"
+
+
+@pytest.mark.parametrize("rotated", [False, True])
+def test_reader_skips_invalid_utf8_lines_and_preserves_valid_entries(rotated):
+    path = get_hermes_home() / "audit" / "approvals.jsonl"
+    path.parent.mkdir(exist_ok=True)
+    source = path.with_name("approvals.jsonl.1") if rotated else path
+    source.write_bytes(b'{"session_key":"one","outcome":"first"}\n'
+                       b'{"session_key":"one","outcome":"bad\xff"}\n'
+                       b'not json\n'
+                       b'{"session_key":"two","outcome":"other"}\n'
+                       b'{"session_key":"one","outcome":"last"}\n')
+    assert [e["outcome"] for e in read_audit(session_key="one")] == ["last", "first"]
+    assert [e["outcome"] for e in read_audit(limit=2)] == ["last", "other"]

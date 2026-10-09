@@ -40,11 +40,19 @@ def _(rid, params):
     store = _memory_rpc_store()
     target = params.get("target", "both")
     targets = ("memory", "user") if target == "both" else (target,)
+    from tools.memory_tool import memory_persistence_enabled
+
+    enabled = memory_persistence_enabled(fail_closed=True)
+    status = {name: "enabled" if enabled and store.target_enabled(name) else "disabled"
+              for name in targets}
+    for name in targets:
+        if status[name] == "enabled" and store.load_failed(name):
+            return _err(rid, 4000, f"Cannot read {name} memory: disk snapshot failed to load.")
     return _ok(rid, {"entries": [
         {"target": name, "index": i, "text": text}
-        for name in targets
+        for name in targets if status[name] == "enabled"
         for i, text in enumerate(store.user_entries if name == "user" else store.memory_entries)
-    ]})
+    ], "targets": status})
 
 
 @method("memory.remember")

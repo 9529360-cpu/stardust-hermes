@@ -20,6 +20,7 @@ class MemoryEntry(Result):
 
 class MemoryListResult(Result):
     entries: list[MemoryEntry]
+    targets: dict[Literal["memory", "user"], Literal["enabled", "disabled"]]
 
 
 class MemoryRememberParams(Params):
@@ -39,7 +40,7 @@ class MemoryMutationResult(Result):
 
 
 method("memory.list", params=MemoryListParams, result=MemoryListResult,
-       doc="List curated entries with zero-based per-target indices; indices are stable until the list changes.")
+       doc="List enabled curated targets with zero-based indices and explicit target status. Unreadable enabled targets return an error; disabled targets expose no entries.")
 method("memory.remember", params=MemoryRememberParams, result=MemoryMutationResult,
        doc="Persist a curated entry using the agent memory content and size guards.")
 method("memory.forget", params=MemoryForgetParams, result=MemoryMutationResult,

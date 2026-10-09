@@ -199,3 +199,62 @@ class TestRequestToolApproval:
         )
         res = request_tool_approval("computer_use", "click", rule_key="cua")
         assert res == {"approved": True, "message": None}
+
+
+@pytest.mark.parametrize("choice", ["once", "deny", "session", "always"])
+def test_once_only_actual_cli_callback_options(monkeypatch, choice):
+    monkeypatch.setattr(approval, "_presence", lambda cb=None: (cb, True, False, False))
+    monkeypatch.setattr(approval.approval_context, "_get_approval_mode", lambda: "manual")
+    monkeypatch.setattr(approval, "_persist_choice", lambda *a: pytest.fail("once-only must not persist"))
+    seen = []
+    def callback(command, description, **options):
+        seen.append(options)
+        return choice
+    result = request_tool_approval("write_file", "one operation", once_only=True, approval_callback=callback)
+    assert seen == [{"allow_permanent": False, "allow_session": False}]
+    # Existing callback compatibility: older clients' long scope is reduced to once.
+    assert result["approved"] == (choice != "deny")
+
+
+@pytest.mark.parametrize("choice", ["once", "deny", "session", "always"])
+def test_once_only_gateway_request_and_forged_scopes(monkeypatch, choice):
+    monkeypatch.setattr(approval, "_presence", lambda cb=None: (None, False, True, True))
+    monkeypatch.setattr(approval.approval_context, "_get_approval_mode", lambda: "manual")
+    monkeypatch.setattr(approval, "_persist_choice", lambda *a: pytest.fail("once-only must not persist"))
+    seen = []
+    def notify(data):
+        seen.append(data.copy())
+        assert approval.resolve_gateway_approval("test-session", choice, request_id=data["request_id"]) == 1
+    approval.register_gateway_notify("test-session", notify)
+    try:
+        result = request_tool_approval("write_file", "one operation", once_only=True)
+    finally:
+        approval.unregister_gateway_notify("test-session")
+    assert len(seen) == 1
+    assert seen[0]["allow_session"] is False
+    assert seen[0]["allow_permanent"] is False
+    assert result["approved"] == (choice == "once")
+
+
+def test_once_only_plain_cli_menu_rejects_long_scope(monkeypatch, capsys):
+    monkeypatch.setattr(approval, "_presence", lambda cb=None: (None, True, False, False))
+    monkeypatch.setattr(approval.approval_context, "_get_approval_mode", lambda: "manual")
+    def read_choice(prompt, timeout):
+        assert "[s]" not in prompt and "[a]" not in prompt
+        return "always"
+    monkeypatch.setattr(approval_prompt, "_read_choice", read_choice)
+    assert not request_tool_approval("write_file", "one operation", once_only=True)["approved"]
+    output = capsys.readouterr().out
+    assert "[s]" not in output and "[a]" not in output
+
+
+def test_once_only_pending_snapshot_options(monkeypatch):
+    monkeypatch.setattr(approval, "_presence", lambda cb=None: (None, False, True, True))
+    monkeypatch.setattr(approval.approval_context, "_get_approval_mode", lambda: "manual")
+    monkeypatch.setattr(approval, "_gateway_notify_cbs", {})
+    monkeypatch.setattr(approval, "_pending", {})
+    result = request_tool_approval("write_file", "one operation", once_only=True)
+    assert result["status"] == "approval_required"
+    pending = approval._pending[approval._state_key("test-session")]
+    assert pending["allow_session"] is False
+    assert pending["allow_permanent"] is False
