@@ -231,6 +231,19 @@ class TestFullScreenLane:
         assert not session.called("get_desktop_state")
         assert session._scope == "window"
 
+    @pytest.mark.parametrize("scope", ["bogus", " window ", "AUTO"])
+    def test_unsupported_prior_scope_is_not_rewritten(self, scope):
+        session = _FakeSession(capture_scope=scope)
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "not a supported value" in cap.window_title
+        assert not session.called("set_config")
+        assert not session.called("get_desktop_state")
+        assert session._scope == scope
+
     def test_imageless_desktop_state_fails_closed_with_guidance(self):
         session = _FakeSession(desktop_image=None)
         backend = _make_backend(session)
