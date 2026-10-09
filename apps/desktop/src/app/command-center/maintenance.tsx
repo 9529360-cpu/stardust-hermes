@@ -348,6 +348,10 @@ export function MaintenancePanel() {
           // loadMemoryEntries already records and displays its own read error.
         }
 
+        if (!isCurrentRequest()) {
+          return
+        }
+
         notify({ kind: 'success', title: mm.entryRemoved, message: mm.resetCurrentChats })
 
         if (

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { deleteMemoryEntry, getMemoryEntries, getMemoryStatus, resetMemory } from '@/hermes'
 import { confirm } from '@/store/confirm'
+import { notify } from '@/store/notifications'
 import { $activeGatewayProfile, requestFreshSession } from '@/store/profile'
 
 import { MaintenancePanel } from './maintenance'
@@ -33,6 +34,7 @@ vi.mock('@/hermes', async importOriginal => ({
 }))
 
 vi.mock('@/store/confirm', () => ({ confirm: vi.fn() }))
+vi.mock('@/store/notifications', () => ({ notify: vi.fn(), notifyError: vi.fn() }))
 vi.mock('@/store/profile', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   requestFreshSession: vi.fn()
@@ -121,6 +123,30 @@ describe('Command Center memory reset forget boundary', () => {
     await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
     expect(requestFreshSession).not.toHaveBeenCalled()
     act(() => $activeGatewayProfile.set('default'))
+  })
+
+  it('suppresses success and fresh-session UI when profile changes during the post-delete read', async () => {
+    let resolveRefresh!: (result: Awaited<ReturnType<typeof getMemoryEntries>>) => void
+    vi.mocked(confirm).mockResolvedValueOnce(true)
+    render(<MaintenancePanel />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    expect(await screen.findByText('Likes tea')).toBeTruthy()
+
+    vi.mocked(getMemoryEntries).mockImplementationOnce(() => new Promise(resolve => (resolveRefresh = resolve)))
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove entry' }))[0]!)
+    await waitFor(() => expect(deleteMemoryEntry).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(getMemoryEntries).toHaveBeenCalledTimes(2))
+
+    act(() => {
+      $activeGatewayProfile.set('research')
+      $activeGatewayProfile.set('default')
+    })
+    resolveRefresh({ available: true, entries: ['Lives in Berlin'], target: 'memory' })
+
+    await waitFor(() => expect(getMemoryEntries).toHaveBeenCalledTimes(2))
+    expect(notify).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'success' }))
+    expect(confirm).toHaveBeenCalledTimes(1)
+    expect(requestFreshSession).not.toHaveBeenCalled()
   })
 
   it('ignores a stale entry-read rejection across an A-to-B-to-A profile switch', async () => {
