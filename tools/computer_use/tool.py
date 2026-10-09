@@ -304,12 +304,12 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
     # beyond the selected app. Ignore schema-filled placeholder IDs exactly as
     # the backend does, or `pid=0, window_id=0` could bypass this gate.
     app_target = str(args.get("app") or "").strip().lower()
-    exact_window_target = any(
+    has_effective_target_id = any(
         value is not None and not _is_placeholder_id(value)
         for value in (args.get("pid"), args.get("window_id"))
     )
     full_screen_capture = (
-        app_target in {"screen", "fullscreen", "full screen", "all"} and not exact_window_target
+        app_target in {"screen", "fullscreen", "full screen", "all"} and not has_effective_target_id
     )
     desktop_shell_capture = app_target == "desktop"
     if action == "capture" and (full_screen_capture or desktop_shell_capture):
