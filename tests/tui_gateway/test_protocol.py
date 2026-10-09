@@ -1543,3 +1543,13 @@ def test_unregister_live_transport_stops_delivery(capture):
     assert a.frames == []
     # No live transports left → fell back to stdio.
     assert json.loads(buf.getvalue())["params"]["type"] == "skin.changed"
+
+
+def test_approval_audit_rpc(server):
+    from tools.approval_audit import write_approval_audit
+    write_approval_audit(session_key="audit-rpc", kind="tool", tool_name="write_file",
+                         description="test", pattern_key="rule", outcome="denied",
+                         mode="manual", command_preview="test")
+    reply = server._methods["approval.audit"](42, {"limit": 1, "session_key": "audit-rpc"})
+    assert reply["result"]["entries"][0]["outcome"] == "denied"
+    assert reply["result"]["entries"][0]["session_key"] == "audit-rpc"

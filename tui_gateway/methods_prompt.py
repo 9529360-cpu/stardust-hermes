@@ -1192,6 +1192,13 @@ def _approval_reply(rid, result_key, call):
         return _err(rid, 5004, str(e))
 
 
+@method("approval.audit")
+def _(rid, params: dict) -> dict:
+    from tools.approval_audit import read_approval_audit
+    return _ok(rid, {"entries": read_approval_audit(
+        limit=params.get("limit", 100), session_key=params.get("session_key"))})
+
+
 @method("approval.pending")
 def _(rid, params: dict) -> dict:
     session, err = _sess(params, rid)

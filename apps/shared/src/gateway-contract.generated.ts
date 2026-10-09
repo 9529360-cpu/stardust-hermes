@@ -2329,6 +2329,24 @@ export interface RequestAnswerParams {
 export interface RequestAnswerResult {
   status: ClarifyLockStatus
 }
+export interface ApprovalAuditParams {
+  limit?: number
+  session_key?: string | null
+}
+export interface ApprovalAuditResult {
+  entries: ApprovalAuditEntry[]
+}
+export interface ApprovalAuditEntry {
+  ts: string
+  session_key: string
+  kind: string
+  tool_name: string
+  description: string
+  pattern_key: string
+  outcome: string
+  mode: string
+  command_preview: string
+}
 export interface ApprovalPendingParams {
   session_id: string
   profile?: string | null
@@ -4229,6 +4247,8 @@ export interface RequestCancelPayload {
 export interface RpcMethods {
   /** Selected profile's background process summary for ``/agents``. */
   'agents.list': { params: AgentsListParams; result: AgentsListResult }
+  /** Read recent redacted approval decisions in the active profile, newest first. */
+  'approval.audit': { params: ApprovalAuditParams; result: ApprovalAuditResult }
   /** Replay the approvals still waiting on this session (reconnect / polling). */
   'approval.pending': { params: ApprovalPendingParams; result: ApprovalPendingResult }
   /** Tell the backend the card is on screen, so its timeout clock starts. */
@@ -4673,6 +4693,7 @@ export interface RpcMethods {
 export type RpcMethod = keyof RpcMethods
 export const RPC_METHODS = [
   'agents.list',
+  'approval.audit',
   'approval.pending',
   'approval.received',
   'approval.respond',

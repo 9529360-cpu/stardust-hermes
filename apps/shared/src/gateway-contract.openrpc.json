@@ -25,6 +25,24 @@
       }
     },
     {
+      "name": "approval.audit",
+      "summary": "Read recent redacted approval decisions in the active profile, newest first.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalAuditParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalAuditResult"
+        }
+      }
+    },
+    {
       "name": "approval.pending",
       "summary": "Replay the approvals still waiting on this session (reconnect / polling).",
       "params": [
@@ -4316,6 +4334,103 @@
           }
         },
         "title": "AgentsListResult",
+        "type": "object"
+      },
+      "ApprovalAuditEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "ts": {
+            "title": "Ts",
+            "type": "string"
+          },
+          "session_key": {
+            "title": "Session Key",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "pattern_key": {
+            "title": "Pattern Key",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "command_preview": {
+            "title": "Command Preview",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "session_key",
+          "kind",
+          "tool_name",
+          "description",
+          "pattern_key",
+          "outcome",
+          "mode",
+          "command_preview"
+        ],
+        "title": "ApprovalAuditEntry",
+        "type": "object"
+      },
+      "ApprovalAuditParams": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 100,
+            "maximum": 10000,
+            "minimum": 0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "session_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Key"
+          }
+        },
+        "title": "ApprovalAuditParams",
+        "type": "object"
+      },
+      "ApprovalAuditResult": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalAuditEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "ApprovalAuditResult",
         "type": "object"
       },
       "ApprovalChoice": {

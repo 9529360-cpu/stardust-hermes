@@ -284,6 +284,31 @@ method("request.answer", params=RequestAnswerParams, result=RequestAnswerResult,
 # ── approvals ─────────────────────────────────────────────────────────────────────────────────
 
 
+class ApprovalAuditParams(Params):
+    limit: int = Field(default=100, ge=0, le=10000)
+    session_key: str | None = None
+
+
+class ApprovalAuditEntry(Result):
+    ts: str
+    session_key: str
+    kind: str
+    tool_name: str
+    description: str
+    pattern_key: str
+    outcome: str
+    mode: str
+    command_preview: str
+
+
+class ApprovalAuditResult(Result):
+    entries: list[ApprovalAuditEntry]
+
+
+method("approval.audit", params=ApprovalAuditParams, result=ApprovalAuditResult,
+       doc="Read recent redacted approval decisions in the active profile, newest first.")
+
+
 class ApprovalPendingParams(SessionParams):
     pass
 
