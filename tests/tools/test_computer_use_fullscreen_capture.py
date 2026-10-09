@@ -38,6 +38,7 @@ class _FakeSession:
         config_error: bool = False,
         config_scope: Optional[str] = None,
         config_has_scope: bool = True,
+        desktop_state_error: bool = False,
     ):
         self.calls: List[tuple] = []
         self._windows = windows or []
@@ -46,6 +47,7 @@ class _FakeSession:
         self._config_error = config_error
         self._config_scope = config_scope if config_scope is not None else capture_scope
         self._config_has_scope = config_has_scope
+        self._desktop_state_error = desktop_state_error
         self.capabilities_discovered = True
 
     def _has_tool(self, name: str) -> bool:
@@ -67,6 +69,8 @@ class _FakeSession:
             return {"data": "ok", "images": [], "structuredContent": None,
                     "isError": False}
         if name == "get_desktop_state":
+            if self._desktop_state_error:
+                raise RuntimeError("desktop capture failed")
             images = [self._desktop_image] if self._desktop_image else []
             return {
                 "data": "desktop state",
@@ -155,6 +159,19 @@ class TestFullScreenLane:
         backend.capture(mode="vision", app="screen")
 
         assert not session.called("set_config")
+
+    def test_scope_restored_when_desktop_capture_raises(self):
+        session = _FakeSession(capture_scope="window", desktop_state_error=True)
+        backend = _make_backend(session)
+
+        with pytest.raises(RuntimeError, match="desktop capture failed"):
+            backend.capture(mode="vision", app="screen")
+
+        assert session._scope == "window"
+        assert session.called("set_config") == [
+            {"key": "capture_scope", "value": "desktop", "session": "test-session"},
+            {"key": "capture_scope", "value": "window", "session": "test-session"},
+        ]
 
     @pytest.mark.parametrize("session", [
         _FakeSession(config_error=True),
