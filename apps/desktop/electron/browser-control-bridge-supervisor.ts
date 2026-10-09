@@ -352,6 +352,7 @@ export class BrowserControlBridgeSupervisor {
         this.clearStartupTimer()
         this.state = 'error'
         this.error = bounded(error)
+
         if (child.pid === undefined) {
           this.child = null
         }

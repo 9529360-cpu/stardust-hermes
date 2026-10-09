@@ -80,7 +80,11 @@ async def controller_ws(ws: WebSocket):
         # Broker dispatch is synchronous and runs off-loop; report write failures to it.
         asyncio.run_coroutine_threadsafe(ws.send_json(frame), loop).result(timeout=10)
 
-    await asyncio.to_thread(broker.attach, scope, send, owner=ws)
+    try:
+        await asyncio.to_thread(broker.attach, scope, send, owner=ws)
+    except control.ControllerRejected:
+        await ws.close(code=4403)
+        return
     try:
         while True:
             frame = await ws.receive_json()

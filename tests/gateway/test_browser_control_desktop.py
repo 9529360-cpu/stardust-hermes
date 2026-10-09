@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from gateway import browser_control_broker as control
 from gateway.session_context import clear_session_vars, get_session_env
 from hermes_cli import web_server, web_server_chat
@@ -42,6 +44,10 @@ def test_local_session_token_mints_bridge_grant_and_binds_ui_session(monkeypatch
         status = server.dispatch({"jsonrpc": "2.0", "id": 3,
             "method": "browser.controller.bridge_status", "params": {"session_id": sid}}, transport)
         assert status["result"]["status"] == "connected"
+        broker.disconnect(scope)
+        offline = server.dispatch({"jsonrpc": "2.0", "id": 5,
+            "method": "browser.controller.bridge_status", "params": {"session_id": sid}}, transport)
+        assert offline["result"]["status"] == "error"
         revoked = server.dispatch({"jsonrpc": "2.0", "id": 4,
             "method": "browser.controller.bridge_revoke", "params": {
                 "session_id": sid, "controller_id": scope.controller_id}}, transport)
@@ -62,3 +68,35 @@ def test_remote_token_never_becomes_local_desktop_identity(monkeypatch):
                          client=SimpleNamespace(host="192.0.2.1"))
     assert web_server_chat._ws_auth_reason(ws) == (None, "token")
     assert not hasattr(ws, "_hermes_auth_identity")
+
+
+def test_revoke_before_attach_invalidates_prepared_grant_and_consumed_ticket(monkeypatch):
+    broker = control.BrowserControlBroker()
+    monkeypatch.setattr(control, "get_browser_control_broker", lambda: broker)
+    sid = 'pending-desktop'
+    transport = SimpleNamespace(auth_identity={'user_id': 'local-desktop', 'provider': 'loopback-session'})
+    server._sessions[sid] = {'transport': transport, 'profile_home': None}
+    scopes = [control.ControllerScope(
+        principal_id=control.local_desktop_principal('default', sid), profile_id='default',
+        session_id=sid, controller_id=controller, browser_profile_id='chrome-Default',
+        transport_family='local-api', capabilities=frozenset({'browser_snapshot'}))
+        for controller in ('prepared', 'registered')]
+    prepared = broker.mint_bridge_grant(scopes[0])
+    registered = broker.mint_bridge_grant(scopes[1])
+    scope = broker.consume_bridge_grant(registered.value)
+    ticket = broker.mint_ticket(scope)
+    consumed = broker.consume_ticket(ticket.value)
+    try:
+        revoked = server.dispatch({'jsonrpc': '2.0', 'id': 1,
+            'method': 'browser.controller.bridge_revoke', 'params': {'session_id': sid}}, transport)
+        assert revoked['result']['status'] == 'inactive'
+        with pytest.raises(control.LaunchGrantInvalid):
+            broker.consume_bridge_grant(prepared.value)
+        with pytest.raises(control.ControllerRejected, match='revoked'):
+            broker.attach(consumed, lambda frame: None)
+        fresh = broker.mint_bridge_grant(scopes[0])
+        broker.consume_bridge_grant(fresh.value)
+        broker.attach(scopes[0], lambda frame: None)
+        assert broker.select(scopes[0], 'browser_snapshot') is not None
+    finally:
+        server._sessions.pop(sid, None)

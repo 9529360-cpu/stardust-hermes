@@ -45,6 +45,7 @@ describe('BrowserControlBridgeSupervisor', () => {
       if (signal === 'SIGKILL') {
         queueMicrotask(() => spawned.emit('exit', 1))
       }
+
       return true
     })
     const supervisor = new BrowserControlBridgeSupervisor({ spawn: () => spawned, bridgeEntry: 'bridge.mjs' })

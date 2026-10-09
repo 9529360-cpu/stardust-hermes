@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from gateway import browser_control_broker as control
 from hermes_cli.web_routers.browser_control import router
@@ -70,3 +71,17 @@ def test_registration_fails_closed_for_scope_remote_and_disabled(bridge, monkeyp
     app.state.auth_required = True
     with TestClient(app, client=("127.0.0.1", 12345)) as client:
         assert exchange(client, broker, scope)[0].status_code == 403
+
+
+def test_disconnect_revokes_registration_ticket_before_websocket_attach(bridge):
+    app, broker, scope = bridge
+    with TestClient(app, client=("127.0.0.1", 12345)) as client:
+        response, _, _ = exchange(client, broker, scope)
+        assert response.status_code == 201
+        broker.revoke_bridge_session(principal_id=scope.principal_id, profile_id=scope.profile_id,
+                                    session_id=scope.session_id)
+        with pytest.raises(WebSocketDisconnect) as denied:
+            with client.websocket_connect('/v1/browser-control/ws', subprotocols=[
+                    'hermes-browser-control-v1', 'hermes-browser-control-ticket.' + response.json()['ticket']]):
+                pytest.fail('revoked ticket attached')
+        assert denied.value.code == 4401

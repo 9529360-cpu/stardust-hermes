@@ -319,7 +319,8 @@ def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, _se
         principal_id=local_desktop_principal(profile_id, session_id),
         transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY,
     )
-    result = {'status': 'connected' if scope is not None else 'inactive'}
+    connected = scope is not None and any(broker.select(scope, cap) is not None for cap in scope.capabilities)
+    result = {'status': 'connected' if connected else 'error' if scope is not None else 'inactive'}
     if scope is not None:
         result.update({
             'session_id': scope.session_id,
@@ -342,10 +343,8 @@ def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, _se
                                     transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY)
     if scope is not None and controller_id and scope.controller_id != controller_id:
         return _err(rid, _ERR_FORBIDDEN, 'controller does not match this Desktop session')
-    if scope is not None:
-        broker.detach(scope, notify_controller=False)
-    target = scope or _desktop_bridge_scope(session_id, profile_id, browser_profile_id or 'unknown', controller_id or 'unknown', frozenset())
-    revoked = broker.revoke_bridge_grants(target)
+    revoked = broker.revoke_bridge_session(principal_id=identity, profile_id=profile_id,
+                                           session_id=session_id, controller_id=controller_id)
     return _ok(rid, {'revoked': revoked, 'status': 'inactive'})
 
 
