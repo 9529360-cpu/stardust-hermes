@@ -35,11 +35,17 @@ class _FakeSession:
         windows: Optional[List[Dict[str, Any]]] = None,
         desktop_image: Optional[str] = _PNG_B64,
         capture_scope: str = "window",
+        config_error: bool = False,
+        config_scope: Optional[str] = None,
+        config_has_scope: bool = True,
     ):
         self.calls: List[tuple] = []
         self._windows = windows or []
         self._desktop_image = desktop_image
         self._scope = capture_scope
+        self._config_error = config_error
+        self._config_scope = config_scope if config_scope is not None else capture_scope
+        self._config_has_scope = config_has_scope
         self.capabilities_discovered = True
 
     def _has_tool(self, name: str) -> bool:
@@ -48,10 +54,12 @@ class _FakeSession:
     def call_tool(self, name: str, args: Dict[str, Any], timeout: float = 30.0):
         self.calls.append((name, dict(args or {})))
         if name == "get_config":
+            if self._config_error:
+                raise RuntimeError("config unavailable")
             return {
                 "data": "",
                 "images": [],
-                "structuredContent": {"capture_scope": self._scope},
+                "structuredContent": {"capture_scope": self._config_scope} if self._config_has_scope else {},
                 "isError": False,
             }
         if name == "set_config":
@@ -147,6 +155,22 @@ class TestFullScreenLane:
         backend.capture(mode="vision", app="screen")
 
         assert not session.called("set_config")
+
+    @pytest.mark.parametrize("session", [
+        _FakeSession(config_error=True),
+        _FakeSession(config_has_scope=False),
+        _FakeSession(config_scope=""),
+    ])
+    def test_unknown_prior_scope_skips_capture_without_mutating_session(self, session):
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "could not read the current capture_scope" in cap.window_title
+        assert not session.called("set_config")
+        assert not session.called("get_desktop_state")
+        assert session._scope == "window"
 
     def test_imageless_desktop_state_fails_closed_with_guidance(self):
         session = _FakeSession(desktop_image=None)
