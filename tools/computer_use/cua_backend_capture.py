@@ -40,6 +40,9 @@ _NO_APP_MATCH_MSG = ("<no on-screen window matched app={app!r}; call list_apps t
                      "only resolve via list_apps metadata)>")
 _NO_DESKTOP_IMAGE_MSG = ("<get_desktop_state returned no image; the driver may predate the desktop capture lane — "
                          "try capture(app='<AppName>') for a specific window>")
+_NO_CAPTURE_SCOPE_MSG = ("<could not read the current capture_scope; full-screen capture was skipped to avoid "
+                         "leaving the computer-use session in desktop capture mode — try "
+                         "capture(app='<AppName>') for a specific window>")
 _FULL_SCREEN_NOTE = ("full-screen capture has no interactable elements; to act on what you see, call "
                      "capture(app='<AppName>') for that app's clickable element list, or capture(app='desktop') for "
                      "the desktop shell (wallpaper icons / taskbar) with elements")
@@ -313,10 +316,16 @@ class _CaptureMixin:
         self._clear_active_target()
         previous_scope: Optional[str] = None
         try:
-            sc = self._session.call_tool("get_config", {"session": self._session_id}, timeout=10.0).get("structuredContent")
-            previous_scope = sc["capture_scope"] if isinstance(sc, dict) and isinstance(sc.get("capture_scope"), str) else None
+            config = self._session.call_tool("get_config", {"session": self._session_id}, timeout=10.0)
+            sc = config.get("structuredContent") if isinstance(config, dict) else None
+            scope = sc.get("capture_scope") if isinstance(sc, dict) else None
+            if (not isinstance(config, dict) or config.get("isError") is True
+                    or not isinstance(scope, str) or not scope.strip()):
+                return self._failed_capture(mode, _NO_CAPTURE_SCOPE_MSG)
+            previous_scope = scope
         except Exception as e:
             logger.debug("cua-driver get_config before full-screen capture failed: %s", e)
+            return self._failed_capture(mode, _NO_CAPTURE_SCOPE_MSG)
         _set_scope = lambda value: self._session.call_tool(  # noqa: E731
             "set_config", {"key": "capture_scope", "value": value, "session": self._session_id}, timeout=10.0)
         try:
