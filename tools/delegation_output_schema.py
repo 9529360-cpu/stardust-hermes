@@ -155,6 +155,14 @@ def extract_json_candidate(text: str) -> str:
 def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """``(True, [])`` or ``(False, errors)`` with strings suitable for the retry turn."""
     raw = _candidate_source(text or "")
+    # An explicit final marker establishes the answer boundary even when the
+    # final answer contains no object/array candidate. Earlier examples must
+    # never become the result merely because final text is prose, empty, or a
+    # scalar. Keep scanning within that final segment so prose/fence wrappers
+    # around a valid JSON value remain supported.
+    final_matches = list(re.finditer(r"(?i)\bfinal\s*:", raw))
+    if final_matches:
+        raw = raw[final_matches[-1].end() :]
     # Labels are prose, but should not obscure fenced JSON that follows them.
     raw = re.sub(r"(?im)(\bfinal\s*:\s*)```(?:json)?\s*", r"\1", raw)
     candidates = _json_candidates(raw)

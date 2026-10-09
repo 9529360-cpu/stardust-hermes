@@ -139,6 +139,24 @@ class TestValidateOutput:
         assert ok is True
         assert errors == []
 
+    def test_valid_example_does_not_mask_final_refusal(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: I cannot produce the requested result.'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors
+
+    def test_valid_example_does_not_mask_empty_final(self):
+        text = 'Example: {"city": "Berlin"}\nFinal:'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors
+
+    def test_valid_example_does_not_mask_schema_incompatible_scalar_final(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: null'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors
+
     def test_nested_object_cannot_mask_malformed_final_candidate(self):
         text = 'Final: {"city": nope, "example": {"city": "Lima"}}'
         ok, errors = validate_output(text, ADDRESS_SCHEMA)
