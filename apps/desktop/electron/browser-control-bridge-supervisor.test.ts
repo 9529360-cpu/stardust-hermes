@@ -55,6 +55,20 @@ describe('BrowserControlBridgeSupervisor', () => {
     expect(spawned.kill).toHaveBeenCalledWith('SIGTERM')
     expect(spawned.kill).toHaveBeenCalledWith('SIGKILL')
   })
+  it('allows explicit retry after a child could not be spawned', async () => {
+    const failed = child()
+    failed.pid = undefined
+    const recovered = child()
+    const spawn = vi.fn().mockReturnValueOnce(failed).mockReturnValueOnce(recovered)
+    const supervisor = new BrowserControlBridgeSupervisor({ spawn, bridgeEntry: 'bridge.mjs' })
+    await supervisor.start(payload)
+    failed.emit('error', new Error('ENOENT'))
+    expect(supervisor.status().status).toBe('error')
+    expect((await supervisor.start(payload)).status).toBe('starting')
+    expect(failed.kill).not.toHaveBeenCalled()
+    expect(spawn).toHaveBeenCalledTimes(2)
+    await supervisor.stop()
+  })
   it('rejects unknown launch fields, remote gateways and invalid grants before spawning', async () => {
     const spawn = vi.fn()
     const s = new BrowserControlBridgeSupervisor({ spawn, bridgeEntry: 'bridge.mjs' })
