@@ -190,10 +190,12 @@ def resolve_gateway_approval(session_key: str, choice: str,
     return len(targets)
 
 
-def list_gateway_approvals(session_key: str) -> list[dict]:
+def list_gateway_approvals(session_key: str, *, policy_locked_only: bool = False) -> list[dict]:
     """Return replay-safe snapshots of unresolved approvals for one session."""
     with _lock:
-        return [dict(entry.data) for entry in _gateway_queues.get(_state_key(session_key), [])]
+        entries = _gateway_queues.get(_state_key(session_key), [])
+        return [dict(entry.data) for entry in entries
+                if not policy_locked_only or entry.data.get("policy_locked") is True]
 
 
 def register_gateway_settle(session_key: str, request_id: str, settle) -> bool:

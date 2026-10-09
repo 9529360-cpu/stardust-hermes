@@ -21,6 +21,25 @@ import { requestForOwnedSession } from './session-states'
 // prompt never hijacks the foreground.
 
 const keyFor = (sessionId: string | null | undefined): string => sessionId ?? ''
+const approvalModesBySession = new Map<string, string>()
+const approvalReplayRevisions = new Map<string, number>()
+
+export function reconcileApprovalModeForSession(sessionId: string | null | undefined, mode: string): void {
+  const key = keyFor(sessionId)
+  const normalized = mode === 'off' || mode === 'smart' ? mode : 'manual'
+  const previous = approvalModesBySession.get(key)
+
+  if (previous !== normalized) {
+    approvalReplayRevisions.set(key, (approvalReplayRevisions.get(key) ?? 0) + 1)
+    approvalModesBySession.set(key, normalized)
+  }
+
+  if (normalized === 'off') {
+    if (approval.$all.get()[key]?.policyLocked !== true) {
+      clearApprovalRequest(key)
+    }
+  }
+}
 
 interface KeyedPrompt {
   sessionId: string | null
@@ -87,6 +106,7 @@ export interface ApprovalRequest extends KeyedPrompt {
   requestId?: string
   serverRequestId?: string
   smartDenied?: boolean
+  policyLocked?: boolean
 }
 
 interface ApprovalGateway {
@@ -100,6 +120,7 @@ interface PendingApprovalPayload {
   description?: unknown
   request_id?: unknown
   smart_denied?: boolean
+  policy_locked?: boolean
 }
 
 export interface SudoRequest extends KeyedPrompt {
@@ -156,6 +177,22 @@ export const setApprovalRequest = approval.set
 export const clearApprovalRequest = approval.clear
 
 export async function receiveApprovalRequest(gateway: ApprovalGateway | null, request: ApprovalRequest): Promise<void> {
+  if (approvalModesBySession.get(keyFor(request.sessionId)) === 'off' && request.policyLocked !== true) {
+    clearApprovalRequest(request.sessionId, request.requestId)
+
+    if (respondToServerRequest(request.serverRequestId, { choice: 'once' })) {
+      return
+    }
+
+    if (gateway && request.requestId) {
+      await requestForOwnedSession(request.sessionId, ambientRequestFor(gateway), 'approval.respond', {
+        choice: 'once', request_id: request.requestId, session_id: request.sessionId
+      })
+    }
+
+    return
+  }
+
   // A prompt restored from `approval.pending` must not clobber the live server
   // request that already carries the same queue entry (it knows how to answer).
   const current = approval.$all.get()[keyFor(request.sessionId)]
@@ -190,6 +227,8 @@ export async function replayPendingApproval(gateway: ApprovalGateway | null, ses
   }
 
   const previous = approval.$all.get()[keyFor(sessionId)]
+  const sessionKey = keyFor(sessionId)
+  const replayRevision = approvalReplayRevisions.get(sessionKey) ?? 0
   let rawResult: unknown
 
   try {
@@ -207,14 +246,33 @@ export async function replayPendingApproval(gateway: ApprovalGateway | null, ses
   }
 
   const result =
-    rawResult && typeof rawResult === 'object' ? (rawResult as { approvals?: PendingApprovalPayload[] }) : {}
+    rawResult && typeof rawResult === 'object'
+      ? (rawResult as { approvals?: PendingApprovalPayload[]; approval_mode?: string })
+      : {}
 
-  // Live requests/responses outrank a replay that was already in flight.
-  if (approval.$all.get()[keyFor(sessionId)] !== previous || !Array.isArray(result.approvals)) {
+  // A live mode event can invalidate a reconnect response already in flight. Never restore a
+  // stale card after the profile switched to off, even if that response contains an older queue.
+  if ((approvalReplayRevisions.get(sessionKey) ?? 0) !== replayRevision) {
     return
   }
 
-  const pending = result.approvals[0]
+  if (typeof result.approval_mode === 'string') {
+    reconcileApprovalModeForSession(sessionId, result.approval_mode)
+  }
+
+  // Live requests/responses outrank a replay that was already in flight.
+  const current = approval.$all.get()[keyFor(sessionId)]
+
+  if (
+    (current !== previous && (result.approval_mode !== 'off' || current !== undefined)) ||
+    !Array.isArray(result.approvals)
+  ) {
+    return
+  }
+
+  const pending = result.approval_mode === 'off'
+    ? result.approvals.find(item => item.policy_locked === true)
+    : result.approvals[0]
 
   if (!pending) {
     clearApprovalRequest(sessionId, previous?.requestId)
@@ -237,7 +295,8 @@ export async function replayPendingApproval(gateway: ApprovalGateway | null, ses
     description: typeof pending.description === 'string' ? pending.description : 'dangerous command',
     requestId: pending.request_id,
     sessionId,
-    smartDenied: pending.smart_denied === true
+    smartDenied: pending.smart_denied === true,
+    policyLocked: pending.policy_locked === true
   })
 }
 

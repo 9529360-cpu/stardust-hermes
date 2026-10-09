@@ -177,6 +177,16 @@ def test_write_json(capture):
     assert json.loads(buf.getvalue()) == {"test": True}
 
 
+def test_approval_request_payload_preserves_target_policy_lock():
+    from tui_gateway.server import _approval_request_payload
+
+    payload = _approval_request_payload({
+        "request_id": "room-approval", "command": "echo safe", "policy_locked": True,
+    })
+
+    assert payload["policy_locked"] is True
+
+
 def test_live_session_payload_replays_pending_approval(server, monkeypatch):
     """A reattached client receives the approval that was emitted while detached."""
     from tools import approval
@@ -420,13 +430,16 @@ def test_approval_pending_replays_unresolved_requests(server, monkeypatch):
 
     server._sessions["ui-1"] = {"session_key": "agent-1", "history": []}
     pending = [{"request_id": "req-1", "command": "danger"}]
-    monkeypatch.setattr(approval, "list_gateway_approvals", lambda key: pending if key == "agent-1" else [])
+    monkeypatch.setattr(
+        approval, "list_gateway_approvals",
+        lambda key, **_kwargs: pending if key == "agent-1" else [],
+    )
 
     response = server.handle_request(
         {"id": "r1", "method": "approval.pending", "params": {"session_id": "ui-1"}}
     )
 
-    assert response["result"] == {"approvals": pending}
+    assert response["result"] == {"approvals": pending, "approval_mode": "smart"}
 
 
 def test_approval_received_acknowledges_exact_request(server, monkeypatch):

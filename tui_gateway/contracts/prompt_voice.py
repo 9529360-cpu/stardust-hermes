@@ -290,6 +290,7 @@ class ApprovalPendingParams(SessionParams):
 
 class ApprovalPendingResult(Result):
     approvals: list[PendingApproval]
+    approval_mode: str = "manual"
 
 
 method("approval.pending", params=ApprovalPendingParams, result=ApprovalPendingResult,

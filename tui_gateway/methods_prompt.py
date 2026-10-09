@@ -1200,8 +1200,14 @@ def _(rid, params: dict) -> dict:
     if params.get("profile") is not None and not _live_profile_matches(session, _profile_home(params["profile"])):
         return _err(rid, 4001, "session not found")
     with _session_profile_runtime_scope(session):
-        return _approval_reply(
-            rid, "approvals", lambda a: a.list_gateway_approvals(session["session_key"]))
+        mode = _load_approval_mode()
+        from tools import approval
+        pending = approval.list_gateway_approvals(
+            session["session_key"], policy_locked_only=mode == "off")
+        return _ok(rid, {
+            "approvals": pending,
+            "approval_mode": mode,
+        })
 
 
 @method("approval.received")

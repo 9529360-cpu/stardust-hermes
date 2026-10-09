@@ -39,6 +39,14 @@ def register_timeout_notice(
     timeout_s = approval_timeout_seconds()
 
     def settle(reason: str) -> None:
+        if reason == "bypassed":
+            still_current = getattr(runner._ctx, "_run_still_current", None)
+            if callable(still_current) and not still_current():
+                return
+            runner._schedule(
+                _post_auto_approved_notice(runner._ctx, command, card_message_id),
+                "Approval bypass notice scheduling error")
+            return
         if reason != "timeout":
             return  # answered / interrupted / notify_failed already produced their own feedback
         # Same guard as every other late notice in TurnRunner: after /stop, /new or a restart the
@@ -66,6 +74,22 @@ async def _post_timeout_notice(ctx, command: str, card_message_id: Optional[str]
         await adapter.send(ctx._status_chat_id, notice, metadata=metadata)
     except Exception:
         logger.debug("Approval timeout notice failed", exc_info=True)
+
+
+async def _post_auto_approved_notice(ctx, command: str, card_message_id: Optional[str]) -> None:
+    """Withdraw an already-sent request and explain that mode off allowed the action."""
+    from gateway.run import _interim_metadata
+
+    adapter = ctx._status_adapter
+    notice = "Approval mode changed to off; this pending action was allowed."
+    metadata = _interim_metadata(ctx._status_thread_metadata)
+    try:
+        if card_message_id and await _edit_card(adapter, ctx._status_chat_id, card_message_id,
+                                                f"{notice}\n```\n{command}\n```"):
+            return
+        await adapter.send(ctx._status_chat_id, notice, metadata=metadata)
+    except Exception:
+        logger.debug("Approval bypass notice failed", exc_info=True)
 
 
 async def _edit_card(adapter, chat_id: str, message_id: str, content: str) -> bool:

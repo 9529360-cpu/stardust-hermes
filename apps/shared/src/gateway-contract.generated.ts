@@ -2335,6 +2335,7 @@ export interface ApprovalPendingParams {
 }
 export interface ApprovalPendingResult {
   approvals: PendingApproval[]
+  approval_mode?: string
 }
 /** One unresolved ``tools/approval.py`` gateway queue entry as ``server._approval_request_payload`` renders it (command redacted; ``choices`` precomputed). The key set is owned by the approval tool. */
 export interface PendingApproval {
@@ -2346,6 +2347,7 @@ export interface PendingApproval {
   allow_permanent?: boolean | null
   allow_session?: boolean | null
   smart_denied?: boolean | null
+  policy_locked?: boolean | null
   choices?: string[] | null
   tool_name?: string | null
   [key: string]: unknown
@@ -3766,6 +3768,7 @@ export interface ApprovalRequestParams {
   allow_permanent?: boolean | null
   allow_session?: boolean | null
   smart_denied?: boolean | null
+  policy_locked?: boolean | null
   tool_name?: string | null
   gateway_session_id?: string | null
   [key: string]: unknown
