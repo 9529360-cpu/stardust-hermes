@@ -48,6 +48,9 @@ _SET_CAPTURE_SCOPE_MSG = ("<could not switch capture_scope to desktop; full-scre
 _RESTORE_CAPTURE_SCOPE_MSG = ("<full-screen capture could not restore the previous capture_scope; the session may "
                               "remain in desktop mode — use a specific app target or reconnect the computer-use "
                               "session>")
+_CAPTURE_AND_RESTORE_SCOPE_MSG = ("<full-screen capture failed and could not restore the previous capture_scope; "
+                                  "the session may remain in desktop mode — use a specific app target or reconnect "
+                                  "the computer-use session>")
 _FULL_SCREEN_NOTE = ("full-screen capture has no interactable elements; to act on what you see, call "
                      "capture(app='<AppName>') for that app's clickable element list, or capture(app='desktop') for "
                      "the desktop shell (wallpaper icons / taskbar) with elements")
@@ -361,7 +364,8 @@ class _CaptureMixin:
                     logger.debug("cua-driver restore capture_scope failed: %s", e)
                     restore_failed = True
         if restore_failed:
-            return self._failed_capture(mode, _RESTORE_CAPTURE_SCOPE_MSG)
+            message = _CAPTURE_AND_RESTORE_SCOPE_MSG if capture_error is not None else _RESTORE_CAPTURE_SCOPE_MSG
+            return self._failed_capture(mode, message)
         if switch_failed:
             return self._failed_capture(mode, _SET_CAPTURE_SCOPE_MSG)
         if capture_error is not None:

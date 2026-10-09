@@ -203,6 +203,18 @@ class TestFullScreenLane:
         assert "could not restore the previous capture_scope" in cap.window_title
         assert session._scope == "desktop"
 
+    def test_capture_and_restore_failures_are_both_reported(self):
+        session = _FakeSession(capture_scope="window", desktop_state_error=True,
+                               set_config_errors={"window"})
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "capture failed" in cap.window_title
+        assert "could not restore the previous capture_scope" in cap.window_title
+        assert session._scope == "desktop"
+
     @pytest.mark.parametrize("session", [
         _FakeSession(config_error=True),
         _FakeSession(config_has_scope=False),
