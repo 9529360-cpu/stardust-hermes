@@ -1,6 +1,5 @@
 """Small opt-in OpenAI-compatible health probe; never expose remote bodies or exceptions."""
 
-import json
 import math
 import socket
 import time
@@ -26,7 +25,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 def probe_model_health(runtime, timeout_s=8):
-    """Probe /models, or a one-token completion on 404, within one timeout budget.
+    """Probe /models endpoint reachability only; never claim model inference health.
 
     ``ok`` at the RPC layer remains credential readiness; ``live_ok`` is reachability.
     Error messages are deliberately local constants: remote bodies, reason phrases,
@@ -40,7 +39,9 @@ def probe_model_health(runtime, timeout_s=8):
 
     def result(ok, kind=None, message=None):
         return {"live_ok": ok, "latency_ms": round((time.monotonic() - started) * 1000, 2),
-                "error_kind": kind, "error": message}
+                "error_kind": kind, "error": message,
+                "probe_kind": "endpoint_reachability", "inference_ok": None,
+                "reason": "HTTP reachability only; model inference was not tested."}
 
     try:
         timeout = float(timeout_s)
@@ -71,12 +72,6 @@ def probe_model_health(runtime, timeout_s=8):
                 return status
 
         status = request("/models")
-        if status == 404:
-            headers["Content-Type"] = "application/json"
-            body = json.dumps({"model": runtime.get("model"),
-                               "messages": [{"role": "user", "content": "Hi"}],
-                               "max_tokens": 1, "stream": False}).encode()
-            status = request("/chat/completions", body)
         if 200 <= status < 300:
             return result(True)
         kind = ({401: "auth", 403: "auth", 404: "not_found", 429: "rate_limit"}.get(status)

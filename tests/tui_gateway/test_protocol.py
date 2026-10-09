@@ -1564,17 +1564,22 @@ def test_work_ledger_rpc(server, monkeypatch, tmp_path):
     monkeypatch.setattr(work_ledger, "list_work", lambda **kw: [item])
     monkeypatch.setattr(work_ledger, "cancel_work", lambda id, **kw: {
         "id": id, "status": "already_finished", "message": "Work is already completed."})
-    assert server._methods["work.list"](1, {})["result"] == {"work": [item]}
-    assert server._methods["work.cancel"](2, {"id": item["id"]})["result"]["status"] == "already_finished"
+    assert server._methods["work.list"](1, {})["error"]["code"] == 4001
+    assert server._methods["work.cancel"](2, {"id": item["id"]})["error"]["code"] == 4001
     assert server._methods["work.cancel"](3, {"id": "subagent:foreign"})["error"]["code"] == 4001
 
 
 def test_approval_grants_rpc(server):
     reply = server._methods["approval.grants.add"](1, {
-        "action_kind": "purchase", "target": "shop", "max_amount": 10})
+        "action_kind": "send_message", "target": "telegram:123"})
     grant = reply["result"]["grant"]
     assert server._methods["approval.grants.list"](2, {})["result"]["grants"] == [grant]
     assert server._methods["approval.grants.revoke"](3, {"id": grant["id"]})["result"]["revoked"]
     assert server._methods["approval.grants.list"](4, {})["result"]["grants"] == []
     assert "error" in server._methods["approval.grants.add"](5, {
-        "action_kind": "purchase", "target": "shop", "expires_at": "not a date"})
+        "action_kind": "purchase", "target": "shop", "max_amount": 10})
+    assert "error" in server._methods["approval.grants.add"](6, {
+        "action_kind": "send_message", "target": "telegram:123", "expires_at": "not a date"})
+    assert "error" in server.dispatch({"id": 7, "method": "approval.grants.add", "params": {
+        "action_kind": "purchase", "target": "shop", "max_amount": 10}})
+    assert server.dispatch({"id": 8, "method": "approval.grants.list", "params": {}})["result"]["grants"] == []

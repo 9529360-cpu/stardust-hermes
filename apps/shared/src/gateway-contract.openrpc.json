@@ -44,7 +44,7 @@
     },
     {
       "name": "approval.grants.add",
-      "summary": "Create an explicit scoped standing authorization.",
+      "summary": "Store a non-monetary scoped record. Automatic approval is disabled; purchase/payment grants are unsupported.",
       "params": [
         {
           "name": "params",
@@ -62,7 +62,7 @@
     },
     {
       "name": "approval.grants.list",
-      "summary": "List standing authorizations in the active profile.",
+      "summary": "List management records in the active profile; not used for automatic approval.",
       "params": [
         {
           "name": "params",
@@ -1682,7 +1682,7 @@
     },
     {
       "name": "memory.forget",
-      "summary": "Remove by zero-based index or uniquely matching text (exactly one selector required).",
+      "summary": "Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write.",
       "params": [
         {
           "name": "params",
@@ -4112,7 +4112,7 @@
     },
     {
       "name": "work.cancel",
-      "summary": "",
+      "summary": "Cooperatively interrupt an owned live subagent. Process/delegation IDs fail closed without generation authority.",
       "params": [
         {
           "name": "params",
@@ -4130,7 +4130,7 @@
     },
     {
       "name": "work.list",
-      "summary": "",
+      "summary": "List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable.",
       "params": [
         {
           "name": "params",
@@ -4656,7 +4656,10 @@
             "title": "Profile"
           },
           "action_kind": {
-            "minLength": 1,
+            "enum": [
+              "command_pattern",
+              "send_message"
+            ],
             "title": "Action Kind",
             "type": "string"
           },
@@ -4666,17 +4669,9 @@
             "type": "string"
           },
           "max_amount": {
-            "anyOf": [
-              {
-                "minimum": 0,
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "default": null,
-            "title": "Max Amount"
+            "title": "Max Amount",
+            "type": "null"
           },
           "expires_at": {
             "anyOf": [
@@ -15610,6 +15605,18 @@
             ],
             "default": null,
             "title": "Text"
+          },
+          "expected_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expected Text"
           }
         },
         "required": [
@@ -28393,6 +28400,31 @@
             ],
             "default": null,
             "title": "Live Ok"
+          },
+          "probe_kind": {
+            "anyOf": [
+              {
+                "const": "endpoint_reachability",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Probe Kind"
+          },
+          "inference_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Inference Ok"
           },
           "latency_ms": {
             "anyOf": [

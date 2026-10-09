@@ -33,7 +33,10 @@ def test_persistent_round_trip(rpc, target, selector):
     fresh = MemoryStore()
     fresh.load_from_disk()
     assert (fresh.memory_entries if target == "memory" else fresh.user_entries) == ["Prefers green tea"]
-    assert rpc("memory.forget", target=target, **{selector: entries[0][selector]})["result"] == {"success": True}
+    selection = {selector: entries[0][selector]}
+    if selector == "index":
+        selection["expected_text"] = entries[0]["text"]
+    assert rpc("memory.forget", target=target, **selection)["result"] == {"success": True}
     assert rpc("memory.list", target=target)["result"]["entries"] == []
     fresh = MemoryStore()
     fresh.load_from_disk()
@@ -83,10 +86,44 @@ def test_privacy_and_target_flags(rpc, tmp_path):
 def test_index_removes_selected_entry_even_when_text_is_ambiguous(rpc):
     for content in ("Tea", "Tea with milk"):
         assert "result" in rpc("memory.remember", target="memory", content=content)
-    assert "error" in rpc("memory.forget", target="memory", text="Tea")
-    assert "result" in rpc("memory.forget", target="memory", index=0)
+    assert "error" in rpc("memory.forget", target="memory", text="Tea with")
+    assert "result" in rpc("memory.forget", target="memory", index=0, expected_text="Tea")
     assert rpc("memory.list")["result"]["entries"] == [
         {"target": "memory", "index": 0, "text": "Tea with milk"}]
+
+
+@pytest.mark.parametrize("selector", ["text", "index"])
+def test_forget_preserves_bytes_and_stale_selection_zero_writes(rpc, tmp_path, selector):
+    path = tmp_path / "memories" / "MEMORY.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    first, selected, last = "第一\r\n行".encode(), b"Selected", b"Last\r\nline"
+    sep = b"\n\xc2\xa7\n"
+    path.write_bytes(b"\xef\xbb\xbf" + sep.join([first, selected, last]))
+    params = {"text": "Selected"} if selector == "text" else {"index": 1, "expected_text": "Selected"}
+    assert "result" in rpc("memory.forget", target="memory", **params)
+    assert path.read_bytes() == b"\xef\xbb\xbf" + sep.join([first, last])
+    before = {p.name: p.read_bytes() for p in path.parent.iterdir() if p.is_file()}
+    assert "error" in rpc("memory.forget", target="memory", **params)
+    assert before == {p.name: p.read_bytes() for p in path.parent.iterdir() if p.is_file()}
+
+
+def test_shifted_index_never_deletes_another_entry(rpc, tmp_path):
+    for content in ("First", "Selected", "Third"):
+        assert "result" in rpc("memory.remember", target="memory", content=content)
+    assert "result" in rpc("memory.forget", target="memory", text="First")
+    path = tmp_path / "memories" / "MEMORY.md"
+    before = path.read_bytes()
+    assert "error" in rpc("memory.forget", target="memory", index=1, expected_text="Selected")
+    assert path.read_bytes() == before
+
+
+def test_duplicate_entries_fail_without_deduplicating(rpc, tmp_path):
+    path = tmp_path / "memories" / "MEMORY.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = b"Same\n\xc2\xa7\nSame\n\xc2\xa7\nOther"
+    path.write_bytes(payload)
+    assert "error" in rpc("memory.forget", target="memory", index=0, expected_text="Same")
+    assert path.read_bytes() == payload
 
 
 def test_profile_home_resolved_per_call(rpc, tmp_path, monkeypatch):

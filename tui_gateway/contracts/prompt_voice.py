@@ -7,6 +7,8 @@ and voice / wake-word control (``methods_voice.py``).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from .base import JsonValue, Params, Result, WireEnum
@@ -288,7 +290,7 @@ class ApprovalGrant(Result):
     id: str
     action_kind: str
     target: str
-    max_amount: float | None = None
+    max_amount: float | None = None  # legacy metadata only; not payment authority
     expires_at: str | None = None
     created_at: str
 
@@ -302,9 +304,9 @@ class ApprovalGrantsListResult(Result):
 
 
 class ApprovalGrantsAddParams(ApprovalGrantsListParams):
-    action_kind: str = Field(min_length=1)
+    action_kind: Literal["command_pattern", "send_message"]
     target: str = Field(min_length=1)
-    max_amount: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    max_amount: None = None
     expires_at: str | None = None
 
 
@@ -321,9 +323,9 @@ class ApprovalGrantsRevokeResult(Result):
 
 
 method("approval.grants.list", params=ApprovalGrantsListParams, result=ApprovalGrantsListResult,
-       doc="List standing authorizations in the active profile.")
+       doc="List management records in the active profile; not used for automatic approval.")
 method("approval.grants.add", params=ApprovalGrantsAddParams, result=ApprovalGrantsAddResult,
-       doc="Create an explicit scoped standing authorization.")
+       doc="Store a non-monetary scoped record. Automatic approval is disabled; purchase/payment grants are unsupported.")
 method("approval.grants.revoke", params=ApprovalGrantsRevokeParams, result=ApprovalGrantsRevokeResult,
        doc="Revoke a standing authorization by id.")
 

@@ -38,11 +38,13 @@ def send_message_tool(args, **kw):
     if action in ("react", "unreact"):
         return _handle_react(args, remove=action == "unreact")
     # CLI/cron sends are explicit delivery. The MCP agent-callable surface
-    # opts into approval; grants never bypass the relay egress floor below.
+    # opts into once-only approval. Stored grant records are never consulted;
+    # input aliases cannot safely confer persistent recipient authority.
     if kw.get("require_approval", False):
         from tools.approval import request_tool_approval
         target = args.get("target", "")
-        decision = request_tool_approval("send_message", f"Send a message to {target}", target=target)
+        decision = request_tool_approval("send_message", f"Send a message to {target}",
+                                         target=target, once_only=True)
         if not decision["approved"]:
             return tool_error(decision["message"])
     return _handle_send(args)

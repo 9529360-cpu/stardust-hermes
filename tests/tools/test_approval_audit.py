@@ -7,6 +7,11 @@ from hermes_constants import get_hermes_home
 from tools import approval, approval_audit as audit
 
 
+def read_audit(**kwargs):
+    assert audit.flush_approval_audit()
+    return audit.read_approval_audit(**kwargs)
+
+
 @pytest.fixture
 def gate(monkeypatch):
     monkeypatch.setattr(approval, "get_current_session_key", lambda: "audit-session")
@@ -24,7 +29,7 @@ def test_human_decisions(gate, monkeypatch, choice, outcome):
     monkeypatch.setattr(approval, "prompt_dangerous_approval", lambda *a, **k: choice)
     result = gate()
     assert result["approved"] == (choice != "deny")
-    entries = audit.read_approval_audit()
+    entries = read_audit()
     assert len(entries) == 1
     assert entries[0]["outcome"] == outcome
     assert entries[0]["kind"] == "tool"
@@ -53,9 +58,9 @@ def test_filter_limit_and_rotation(monkeypatch):
     append("two")
     append("one", "last")
     assert (get_hermes_home() / "audit/approvals.jsonl.1").exists()
-    assert audit.read_approval_audit(limit=1)[0]["command_preview"] == "last"
-    assert all(e["session_key"] == "one" for e in audit.read_approval_audit(session_key="one"))
-    assert audit.read_approval_audit(limit=0) == []
+    assert read_audit(limit=1)[0]["command_preview"] == "last"
+    assert all(e["session_key"] == "one" for e in read_audit(session_key="one"))
+    assert read_audit(limit=0) == []
 
 
 def test_write_failure_keeps_gate_working(gate, monkeypatch):
@@ -67,10 +72,10 @@ def test_write_failure_keeps_gate_working(gate, monkeypatch):
 
 def test_floor_and_yolo(gate, monkeypatch):
     assert not approval.check_dangerous_command("rm -rf /", "local")["approved"]
-    assert audit.read_approval_audit()[0]["mode"] == "floor"
+    assert read_audit()[0]["mode"] == "floor"
     monkeypatch.setattr(approval, "_yolo_active", lambda: True)
     assert gate()["approved"]
-    assert audit.read_approval_audit()[0]["mode"] == "yolo"
+    assert read_audit()[0]["mode"] == "yolo"
 
 
 def test_smart_and_unattended(gate, monkeypatch):
@@ -79,20 +84,20 @@ def test_smart_and_unattended(gate, monkeypatch):
     result = approval._run_approval_gate(pattern_key="smart", description="test", display_target="echo test",
                                         autoapprove_log_prefix="test", respect_smart_mode=True)
     assert result["approved"]
-    assert audit.read_approval_audit()[0]["mode"] == "smart"
-    assert audit.read_approval_audit()[0]["outcome"] == "auto_approved"
+    assert read_audit()[0]["mode"] == "smart"
+    assert read_audit()[0]["outcome"] == "auto_approved"
     monkeypatch.setattr(approval, "_presence", lambda cb=None: (cb, False, False, False))
     monkeypatch.setattr(approval, "_unattended_contexts", lambda: [])
     result = approval._run_approval_gate(pattern_key="test", description="test", display_target="test",
                                         autoapprove_log_prefix="test")
     assert result["approved"]
-    assert audit.read_approval_audit()[0]["mode"] == "unattended"
+    assert read_audit()[0]["mode"] == "unattended"
 
 
 def test_deny_rule_audited(gate, monkeypatch):
     monkeypatch.setattr(approval, "_match_user_deny_rule", lambda command: "curl *")
     assert not approval.check_dangerous_command("curl example.test", "local")["approved"]
-    entry = audit.read_approval_audit()[0]
+    entry = read_audit()[0]
     assert entry["mode"] == "deny_rule"
     assert entry["outcome"] == "blocked"
 
@@ -101,12 +106,33 @@ def test_reader_order_and_filter():
     append("one", "first")
     append("two", "second")
     append("one", "third")
-    assert [e["command_preview"] for e in audit.read_approval_audit(limit=2)] == ["third", "second"]
-    assert [e["command_preview"] for e in audit.read_approval_audit(session_key="one")] == ["third", "first"]
+    assert [e["command_preview"] for e in read_audit(limit=2)] == ["third", "second"]
+    assert [e["command_preview"] for e in read_audit(session_key="one")] == ["third", "first"]
+
+
+def test_blocked_audit_writer_cannot_delay_decisions(gate, monkeypatch):
+    import threading
+    assert audit.flush_approval_audit()
+    entered, release, done = threading.Event(), threading.Event(), threading.Event()
+    def blocked(**kwargs):
+        entered.set()
+        assert release.wait(5)
+    monkeypatch.setattr(audit, "write_approval_audit", blocked)
+    monkeypatch.setattr(approval, "prompt_dangerous_approval", lambda *a, **k: "once")
+    gate()
+    assert entered.wait(2)
+    worker = threading.Thread(target=lambda: (gate(), done.set()))
+    worker.start()
+    try:
+        assert done.wait(1), "audit disk I/O blocked approval delivery"
+    finally:
+        release.set()
+        worker.join(5)
+        assert audit.flush_approval_audit()
 
 
 def test_cached_approval(gate, monkeypatch):
     monkeypatch.setattr(approval, "is_approved", lambda *a: True)
     monkeypatch.setattr(approval, "_is_permanently_approved", lambda *a: False)
     assert gate()["approved"]
-    assert audit.read_approval_audit()[0]["outcome"] == "approved_session"
+    assert read_audit()[0]["outcome"] == "approved_session"

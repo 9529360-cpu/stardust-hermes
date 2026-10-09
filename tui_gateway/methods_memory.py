@@ -64,12 +64,18 @@ def _(rid, params):
     index, text = params.get("index"), params.get("text")
     if (index is None) == (text is None):
         return _err(rid, 4000, "Provide exactly one of index or text.")
+    expected_text = params.get("expected_text")
+    if index is not None and (not isinstance(expected_text, str) or not expected_text):
+        return _err(rid, 4000, "Index requires expected_text from memory.list.")
+    if text is not None and expected_text is not None:
+        return _err(rid, 4000, "expected_text is only valid with index.")
     store = _memory_rpc_store()
     target = params["target"]
     error = _memory_target_error(store, target)
     if error:
         return _memory_rpc_result(rid, error)
-    result = store.remove_index(target, index) if index is not None else store.remove(target, text)
+    result = (store.remove_index(target, index, expected_text) if index is not None
+              else store.remove_exact(target, text))
     return _memory_rpc_result(rid, result)
 
 

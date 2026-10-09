@@ -757,8 +757,8 @@ _ACTION_GATE = _GateSpec(
 def _audit_decision(result, *, command, description="", pattern_key="", outcome=None,
                     mode=None, kind="command", tool_name="terminal"):
     try:
-        from tools.approval_audit import write_approval_audit
-        write_approval_audit(
+        from tools.approval_audit import enqueue_approval_audit
+        enqueue_approval_audit(
             session_key=get_current_session_key(), kind=kind, tool_name=tool_name,
             description=description, pattern_key=pattern_key,
             outcome=outcome or ("approved_once" if result.get("approved") else "denied"),
@@ -820,7 +820,8 @@ def _human_decision_impl(spec: _GateSpec, *, command: str, description: str,
                     session_key: str, approval_callback, is_cli: bool, is_gateway: bool,
                     is_ask: bool, smart: bool = False,
                     permanent_capable: bool = True, pending_body=None,
-                    audit_kind="command", audit_tool_name="terminal", audit_choice=None) -> dict:
+                    audit_kind="command", audit_tool_name="terminal", audit_choice=None,
+                    once_only=False) -> dict:
     """Ask a human (after the optional guardian-LLM step) and turn the answer into the gate result.
 
     ``warnings`` are the ``(key, _, is_tirith)`` tuples :func:`_persist_choice` stores on
@@ -851,12 +852,12 @@ def _human_decision_impl(spec: _GateSpec, *, command: str, description: str,
                        outcome=outcome, noun=spec.noun, **extra)
 
     def grant(choice: str) -> dict:
-        scope = "once" if smart_denied else choice
+        scope = "once" if smart_denied or once_only else choice
         if scope == "always":
             scope = "permanent" if permanent_capable else "session"
         audit_choice["outcome"] = "approved_" + scope
         # A smart-DENY owner override is always one operation, even if an older client returns "session" or "always".
-        if not smart_denied:
+        if not smart_denied and not once_only:
             _persist_choice(session_key, choice, warnings)
         if spec.user_approved:
             return _user_approved(session_key, description)
@@ -972,6 +973,7 @@ def _run_approval_gate(
     cron_deny_message: str = "", single_query_deny_message: str = "", unattended_deny_message: str = "",
     autoapprove_log_prefix: str, fail_closed_when_no_human: bool = False, no_human_block_message: str = "",
     respect_smart_mode: bool = False, audit_kind: str = "command", audit_tool_name: str = "terminal",
+    once_only: bool = False,
 ) -> dict:
     """Shared human-approval gate for a flagged action (tool call or write): decision core for
     :func:`request_tool_approval` and the file-tool write gates.
@@ -997,7 +999,7 @@ def _run_approval_gate(
     if _yolo_active() or approval_context._get_approval_mode() == "off":
         return audited(_approved(), "auto_approved", "yolo" if _yolo_active() else "off")
     session_key = get_current_session_key()
-    if is_approved(session_key, pattern_key):
+    if not once_only and is_approved(session_key, pattern_key):
         return audited(_approved(), "approved_permanent" if _is_permanently_approved(pattern_key) else "approved_session")
 
     approval_callback, is_cli, is_gateway, is_ask = _presence(approval_callback)
@@ -1043,7 +1045,7 @@ def _run_approval_gate(
         pattern_keys=[pattern_key], warnings=[(pattern_key, None, False)], session_key=session_key,
         approval_callback=approval_callback, is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask,
         smart=respect_smart_mode and approval_context._get_approval_mode() == "smart",
-        audit_kind=audit_kind, audit_tool_name=audit_tool_name,
+        audit_kind=audit_kind, audit_tool_name=audit_tool_name, once_only=once_only,
     )
 
 
@@ -1097,9 +1099,6 @@ def check_dangerous_command(command: str, env_type: str,
     blocked = _floor_block(command)
     if blocked is not None:
         return blocked
-    result = _grant_decision("command_pattern", command)
-    if result is not None:
-        return result
     if _yolo_active():
         return _audit_decision(_approved(), command=command, outcome="auto_approved", mode="yolo")
     if _command_matches_permanent_allowlist(command):
@@ -1115,18 +1114,8 @@ def check_dangerous_command(command: str, env_type: str,
     )
 
 
-def _grant_decision(action_kind, target, amount=None, *, tool_name="terminal"):
-    from tools.approval_grants import matching_grant
-    grant = matching_grant(action_kind, target, amount)
-    if grant is None:
-        return None
-    return _audit_decision(_approved(), command=target, pattern_key=f"grant:{grant['id']}",
-                           outcome="grant", tool_name=tool_name,
-                           kind="command" if action_kind == "command_pattern" else "tool")
-
-
 def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", approval_callback=None,
-                          action_kind=None, target=None, amount=None) -> dict:
+                          action_kind=None, target=None, amount=None, once_only=False) -> dict:
     """Escalate an arbitrary tool call to the human-approval gate.
 
     Entry point for a plugin ``pre_tool_call`` hook returning ``{"action": "approve", ...}``:
@@ -1135,13 +1124,10 @@ def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", ap
     the LLM cannot skip it. Cron honors ``approvals.cron_mode``; any OTHER non-interactive
     non-gateway context fails CLOSED. ``rule_key`` controls the ``[a]lways`` allowlist grain;
     when empty it is ``tool_name`` + a hash of ``reason`` so DISTINCT reasons on the same tool
-    persist independently. Structured ``action_kind`` (defaults to tool_name),
-    ``target`` and ``amount`` allow explicit standing grants; no scope is inferred
-    from reason text. Returns the ``check_dangerous_command`` result shape.
+    persist independently. Structured scope fields partition prompt decisions only;
+    stored standing grants are not consulted for automatic approval.
+    Returns the ``check_dangerous_command`` result shape.
     """
-    result = _grant_decision(action_kind or tool_name, target, amount, tool_name=tool_name)
-    if result is not None:
-        return result
     description = reason or f"Plugin requires approval for {tool_name}"
     if not rule_key:
         rule_key = f"{tool_name}:{hashlib.sha256(description.encode('utf-8')).hexdigest()[:12]}"
@@ -1156,7 +1142,7 @@ def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", ap
         # Namespaced so plugin-rule approvals share the allowlist machinery without ever colliding with a real
         # command pattern key; the display target is a synthetic label for the display/allowlist layer.
         pattern_key=f"plugin_rule:{rule_key}", description=description,
-        audit_kind="tool", audit_tool_name=tool_name,
+        audit_kind="tool", audit_tool_name=tool_name, once_only=once_only,
         display_target=f"<{tool_name}> (plugin approval rule)", approval_callback=approval_callback,
         subject=subject, advice="Find an alternative approach.",
         autoapprove_log_prefix=f"plugin-escalated tool call '{tool_name}' in non-interactive non-gateway context",
@@ -1254,9 +1240,6 @@ def check_all_command_guards(command: str, env_type: str,
                                    if _is_permanently_approved(pattern_key) else "approved_session")
         return _approved()
 
-    result = _grant_decision("command_pattern", command)
-    if result is not None:
-        return result
     combined_desc = "; ".join(desc for _, desc, _ in warnings)
     primary_key = warnings[0][0]
     all_keys = [key for key, _, _ in warnings]

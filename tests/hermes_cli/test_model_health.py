@@ -52,6 +52,8 @@ def test_http_status_and_redaction(endpoint, status, kind, caplog):
     state["status"] = status
     result = probe_model_health(runtime)
     assert result["live_ok"] is (status == 200)
+    assert result["inference_ok"] is None
+    assert "inference was not tested" in result["reason"]
     assert result["error_kind"] == kind
     assert result["latency_ms"] >= 0
     assert state["requests"][0][:3] == ("GET", "/v1/models", f"Bearer {KEY}")
@@ -63,13 +65,11 @@ def test_completion_fallback(endpoint, status, kind):
     runtime, state = endpoint
     state.update(status=404, post_status=status)
     result = probe_model_health(runtime)
-    assert result["error_kind"] == kind
-    assert result["live_ok"] is (status == 200)
-    assert [(r[0], r[1]) for r in state["requests"]] == [
-        ("GET", "/v1/models"), ("POST", "/v1/chat/completions")]
-    body = state["requests"][1][3]
-    assert body["max_tokens"] == 1
-    assert body["model"] == "test-model"
+    assert result["error_kind"] == "not_found"
+    assert result["live_ok"] is False
+    assert result["inference_ok"] is None
+    assert result["probe_kind"] == "endpoint_reachability"
+    assert [(r[0], r[1]) for r in state["requests"]] == [("GET", "/v1/models")]
     assert KEY not in json.dumps(result)
 
 

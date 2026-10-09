@@ -34,5 +34,7 @@ class WorkCancelResult(Result):
     message: str
 
 
-method("work.list", params=WorkListParams, result=WorkListResult)
-method("work.cancel", params=WorkCancelParams, result=WorkCancelResult)
+method("work.list", params=WorkListParams, result=WorkListResult,
+       doc="List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable.")
+method("work.cancel", params=WorkCancelParams, result=WorkCancelResult,
+       doc="Cooperatively interrupt an owned live subagent. Process/delegation IDs fail closed without generation authority.")

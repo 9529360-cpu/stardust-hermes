@@ -140,7 +140,9 @@ class SetupRuntimeCheckResult(Result):
     """``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the
     selected route is the welcome host. ``live_ok`` independently reports an opt-in HTTP probe."""
 
-    live_ok: bool | None = None
+    live_ok: bool | None = None  # endpoint reachability, NOT inference success
+    probe_kind: Literal["endpoint_reachability"] | None = None
+    inference_ok: bool | None = None
     latency_ms: float | None = None
     error_kind: Literal["auth", "not_found", "rate_limit", "network", "timeout", "server", "unknown"] | None = None
     reason: str | None = None

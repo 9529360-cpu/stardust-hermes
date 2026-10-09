@@ -2,6 +2,7 @@
 import json
 import logging
 import threading
+import queue
 from collections import deque
 from datetime import datetime, timezone
 
@@ -16,7 +17,7 @@ def _path():
 
 
 def write_approval_audit(*, session_key, kind, tool_name, description, pattern_key,
-                         outcome, mode, command_preview):
+                         outcome, mode, command_preview, _audit_path=None):
     """Append a redacted decision; filesystem/redaction failures never affect approval."""
     try:
         from agent.redact import redact_sensitive_text
@@ -30,7 +31,7 @@ def write_approval_audit(*, session_key, kind, tool_name, description, pattern_k
                  "outcome": outcome, "mode": mode, "command_preview": scrub(command_preview)[:300]}
         line = json.dumps(entry, ensure_ascii=False) + "\n"
         with _lock:
-            path = _path()
+            path = _audit_path if _audit_path is not None else _path()
             path.parent.mkdir(parents=True, exist_ok=True)
             if path.exists() and path.stat().st_size + len(line.encode("utf-8")) > MAX_AUDIT_BYTES:
                 path.replace(path.with_name("approvals.jsonl.1"))
@@ -39,6 +40,46 @@ def write_approval_audit(*, session_key, kind, tool_name, description, pattern_k
     except Exception:
         # Do not include exception text: filesystem paths may themselves contain secrets.
         logger.warning("Unable to write approval audit entry")
+
+
+# A slow disk/redactor must never hold approval/interrupt notification delivery.
+_pending = queue.Queue(maxsize=256)
+
+
+def _writer():
+    while True:
+        item = _pending.get()
+        try:
+            if isinstance(item, threading.Event):
+                item.set()
+            else:
+                write_approval_audit(**item)
+        finally:
+            _pending.task_done()
+
+
+threading.Thread(target=_writer, name="approval-audit", daemon=True).start()
+
+
+def enqueue_approval_audit(**entry):
+    """Nonblocking best-effort enqueue, pinned to the caller's profile path."""
+    entry["_audit_path"] = _path()
+    try:
+        _pending.put_nowait(entry)
+    except queue.Full:
+        # Drop telemetry rather than delaying security decisions.
+        return False
+    return True
+
+
+def flush_approval_audit(timeout=2):
+    """Bounded barrier for readers/tests, never called by an approval gate."""
+    done = threading.Event()
+    try:
+        _pending.put_nowait(done)
+    except queue.Full:
+        return False
+    return done.wait(timeout)
 
 
 def read_approval_audit(limit=100, session_key=None):

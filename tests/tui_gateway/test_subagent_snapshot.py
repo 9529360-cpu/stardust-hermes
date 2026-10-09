@@ -16,6 +16,10 @@ def runtime(monkeypatch):
     owner = {"session_key": "parent", "history": [], "transport": transport}
     monkeypatch.setattr(server, "_sessions", {"ui-owner": owner})
     monkeypatch.setattr(delegate_tool_registry, "_active_subagents", {})
+    # Progress imports the registry mapping by identity; keep fixture replacements
+    # aligned across tests even when an earlier work RPC imported the relay.
+    from tools import delegate_tool_progress
+    monkeypatch.setattr(delegate_tool_progress, "_active_subagents", delegate_tool_registry._active_subagents)
     monkeypatch.setattr(delegate_tool_registry, "_recent_subagents", {})
     monkeypatch.setattr(async_delegation, "_records", {})
 
@@ -24,6 +28,37 @@ def runtime(monkeypatch):
                                 "params": {"session_id": "ui-owner", **params}}, transport=via)
 
     return server, owner, transport, call
+
+
+def test_work_rpc_restricts_categories_and_foreign_generations(runtime, monkeypatch):
+    from tools.delegate_tool_child_run import _register_child
+    from tools.delegate_tool_registry import _unregister_subagent
+    from tools import work_ledger
+    server, owner, transport, call = runtime
+    monkeypatch.setattr(work_ledger, "list_work", lambda **kw: pytest.fail("profile-wide records accessed"))
+    monkeypatch.setattr(work_ledger, "cancel_work", lambda *a, **kw: pytest.fail("unscoped cancellation"))
+    stopped = []
+    child = SimpleNamespace(_subagent_id="child", _delegate_depth=1, model="test",
+                            hard_interrupt=lambda text: stopped.append(text))
+    _register_child(child, None, "owned", owner_session_id="ui-owner",
+                    owner_transport=transport, owner_session_record=owner)
+    try:
+        assert [r["id"] for r in call("work.list")["result"]["work"]] == ["subagent:child"]
+        for sid in ("process:foreign", "delegation:foreign"):
+            assert call("work.cancel", id=sid)["error"]["code"] == 4001
+        for params in ({"session_id": ""}, {"session_id": "missing"},
+                       {"via": SimpleNamespace(write=lambda frame: True)}):
+            assert "error" in call("work.list", **params)
+            assert "error" in call("work.cancel", id="subagent:child", **params)
+        server._sessions["ui-owner"] = {**owner}
+        assert call("work.list")["result"]["work"] == []
+        assert call("work.cancel", id="subagent:child")["result"]["status"] == "not_found"
+        assert stopped == []
+        server._sessions["ui-owner"] = owner
+        assert call("work.cancel", id="subagent:child")["result"]["status"] == "interrupt_requested"
+        assert len(stopped) == 1
+    finally:
+        _unregister_subagent("child")
 
 
 def test_snapshot_projects_only_this_sessions_runtime_records(runtime):

@@ -91,7 +91,7 @@ def cancel_work(id: str, *, include_subagents: bool = True) -> dict:
         return result("already_finished", f"Work is already {record['status']}.")
     kind, raw_id = id.split(":", 1)
     if kind == "process":
-        outcome = process_registry.kill_process(raw_id, source="work.cancel")
+        outcome = process_registry.kill_process(raw_id, source="work.cancel", consume_output=False)
         if outcome["status"] == "killed":
             return result("cancelled", "Background process killed.")
         if outcome["status"] == "already_exited":

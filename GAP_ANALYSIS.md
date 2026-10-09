@@ -61,6 +61,28 @@ multi-agent delegation, chat-first UX).
    `apps/desktop` to the RPCs above, with vitest coverage. Ranked last for the autonomous loop because
    AGENTS.md requires real Electron-window inspection for UI acceptance, which the loop cannot do.
 
+## PR333 reviewed implementation boundaries
+
+- Approval auditing is best-effort and nonblocking: a bounded daemon queue pins each
+  entry to its originating profile. Saturation, disk failure or process exit can lose
+  telemetry; audit persistence is not an approval/interrupt delivery prerequisite.
+- `live: true` checks `/models` HTTP reachability only (`probe_kind: endpoint_reachability`,
+  `inference_ok: null`). A 2xx is **not** evidence that the selected model can infer.
+  No implicit completion request or paid inference fallback is made on 404.
+- `memory.forget` uses exact unique text, or index **plus expected_text** from the
+  displayed entry. Both are checked under the existing file lock; stale selections
+  cause zero writes. Deletion reuses the byte-preserving exact-entry path rather than
+  rewriting/deduplicating all entries. Index alone is deliberately rejected.
+- The Work RPC exposes/cancels only live subagents with exact session/transport/
+  generation authority. Profile-wide process and persisted async-delegation records
+  lack that proof and are not exposed or cancellable through this RPC. The internal
+  profile ledger remains available, with process cancellation preserving output delivery.
+- Grant CRUD remains management-only: records do **not** automatically approve
+  commands or sends. Only non-monetary command/send records can be added; purchase,
+  payment and amount-bearing grants are unsupported. No payment capability is claimed.
+  MCP send approvals are once-only: alias/home-channel changes cannot inherit an old
+  session/permanent send approval. Safe resolved-recipient automatic grants remain deferred.
+
 ## Notes
 - Items 1–4 are backend-only and verifiable with `scripts/run_tests.sh`; they are the loop's first targets.
 - Every item must add focused regression tests and keep existing related suites green.

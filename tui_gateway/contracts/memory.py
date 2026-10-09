@@ -31,6 +31,7 @@ class MemoryForgetParams(Params):
     target: Literal["memory", "user"]
     index: StrictInt | None = None
     text: str | None = None
+    expected_text: str | None = None
 
 
 class MemoryMutationResult(Result):
@@ -42,4 +43,4 @@ method("memory.list", params=MemoryListParams, result=MemoryListResult,
 method("memory.remember", params=MemoryRememberParams, result=MemoryMutationResult,
        doc="Persist a curated entry using the agent memory content and size guards.")
 method("memory.forget", params=MemoryForgetParams, result=MemoryMutationResult,
-       doc="Remove by zero-based index or uniquely matching text (exactly one selector required).")
+       doc="Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write.")

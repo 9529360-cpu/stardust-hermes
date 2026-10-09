@@ -663,6 +663,8 @@ export interface SetupRuntimeCheckParams {
 /** ``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the selected route is the welcome host. ``live_ok`` independently reports an opt-in HTTP probe. */
 export interface SetupRuntimeCheckResult {
   live_ok?: boolean | null
+  probe_kind?: 'endpoint_reachability' | null
+  inference_ok?: boolean | null
   latency_ms?: number | null
   error_kind?: 'auth' | 'not_found' | 'rate_limit' | 'network' | 'timeout' | 'server' | 'unknown' | null
   reason?: string | null
@@ -1453,6 +1455,7 @@ export interface MemoryForgetParams {
   target: 'memory' | 'user'
   index?: number | null
   text?: string | null
+  expected_text?: string | null
 }
 /** ``word`` is the token under the cursor (``@`` prefix = context reference); ``cwd`` / ``session_id`` pick the directory the listing resolves against. */
 export interface CompletePathParams {
@@ -2374,9 +2377,9 @@ export interface ApprovalGrant {
 }
 export interface ApprovalGrantsAddParams {
   profile?: string | null
-  action_kind: string
+  action_kind: 'command_pattern' | 'send_message'
   target: string
-  max_amount?: number | null
+  max_amount?: null
   expires_at?: string | null
 }
 export interface ApprovalGrantsAddResult {
@@ -4333,9 +4336,9 @@ export interface RpcMethods {
   'agents.list': { params: AgentsListParams; result: AgentsListResult }
   /** Read recent redacted approval decisions in the active profile, newest first. */
   'approval.audit': { params: ApprovalAuditParams; result: ApprovalAuditResult }
-  /** Create an explicit scoped standing authorization. */
+  /** Store a non-monetary scoped record. Automatic approval is disabled; purchase/payment grants are unsupported. */
   'approval.grants.add': { params: ApprovalGrantsAddParams; result: ApprovalGrantsAddResult }
-  /** List standing authorizations in the active profile. */
+  /** List management records in the active profile; not used for automatic approval. */
   'approval.grants.list': { params: ApprovalGrantsListParams; result: ApprovalGrantsListResult }
   /** Revoke a standing authorization by id. */
   'approval.grants.revoke': { params: ApprovalGrantsRevokeParams; result: ApprovalGrantsRevokeResult }
@@ -4515,7 +4518,7 @@ export interface RpcMethods {
   'mcp.servers.status': { params: ProfileParams; result: McpServersStatusResult }
   /** Connect, list tools, disconnect — an OAuth server with no token on disk is reported as not ok. */
   'mcp.servers.test': { params: McpServerNameParams; result: McpServersTestResult }
-  /** Remove by zero-based index or uniquely matching text (exactly one selector required). */
+  /** Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write. */
   'memory.forget': { params: MemoryForgetParams; result: MemoryMutationResult }
   /** List curated entries with zero-based per-target indices; indices are stable until the list changes. */
   'memory.list': { params: MemoryListParams; result: MemoryListResult }
@@ -4785,7 +4788,9 @@ export interface RpcMethods {
   'wake.status': { params: WakeStatusParams; result: WakeStatusResult }
   /** Stop this surface's listener; persist also writes wake_word.enabled: false. */
   'wake.stop': { params: WakeStopParams; result: WakeStopResult }
+  /** Cooperatively interrupt an owned live subagent. Process/delegation IDs fail closed without generation authority. */
   'work.cancel': { params: WorkCancelParams; result: WorkCancelResult }
+  /** List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable. */
   'work.list': { params: WorkListParams; result: WorkListResult }
 }
 export type RpcMethod = keyof RpcMethods

@@ -54,7 +54,7 @@ def test_normalization_and_targeted_cancel(monkeypatch):
             {"session_id": "live", "command": "sleep", "status": "running", "started_at": 101.0},
             {"session_id": "bad", "command": "false", "status": "exited", "exit_code": 1},
             {"session_id": "killed", "status": "exited", "completion_reason": "killed"}],
-        kill_process=lambda id, **kw: killed.append(id) or {"status": "killed"}))
+        kill_process=lambda id, **kw: killed.append((id, kw)) or {"status": "killed"}))
     monkeypatch.setattr(ledger, "list_active_subagents", lambda: [
         {"subagent_id": "child", "goal": "Think", "started_at": 102.0, "status": "running"}])
     records = {r["id"]: r for r in ledger.list_work()}
@@ -66,7 +66,7 @@ def test_normalization_and_targeted_cancel(monkeypatch):
     assert ledger.cancel_work("delegation:live")["status"] == "interrupt_requested"
     assert interrupted == ["live"]
     assert ledger.cancel_work("process:live")["status"] == "cancelled"
-    assert killed == ["live"]
+    assert killed == [("live", {"source": "work.cancel", "consume_output": False})]
     assert ledger.cancel_work("process:bad")["status"] == "already_finished"
 
 

@@ -1,8 +1,8 @@
 """Explicit profile-local standing authorizations, never inferred from conversation text.
 
-Targets are exact strings, except command_pattern targets which are whole-command
-shell globs (not regexes or substring matches). Amounts use the caller's currency
-unit; callers must not mix currencies for a merchant target.
+Management records only: these records are NOT used for automatic approval.
+Purchase/payment grants are unsupported (no currency-bound payment integration).
+Targets are exact strings, except command_pattern whole-command shell globs.
 """
 import fnmatch
 import json
@@ -11,7 +11,6 @@ import tempfile
 import threading
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
 
 _lock = threading.RLock()
 
@@ -26,16 +25,6 @@ def _timestamp(value):
     if parsed.tzinfo is None:
         raise ValueError("expires_at must include a timezone")
     return parsed
-
-
-def _amount(value):
-    try:
-        amount = Decimal(str(value))
-    except InvalidOperation:
-        raise ValueError("amount must be a finite non-negative number") from None
-    if not amount.is_finite() or amount < 0:
-        raise ValueError("amount must be a finite non-negative number")
-    return amount
 
 
 def list_grants():
@@ -68,12 +57,12 @@ def add_grant(action_kind, target, max_amount=None, expires_at=None):
         raise ValueError("action_kind is required")
     if not isinstance(target, str) or not target.strip():
         raise ValueError("target is required")
-    if max_amount is not None:
-        _amount(max_amount)
+    if action_kind not in {"command_pattern", "send_message"} or max_amount is not None:
+        raise ValueError("Only non-monetary command_pattern/send_message records are supported; automatic approval is disabled")
     if expires_at is not None:
         _timestamp(expires_at)
     grant = {"id": uuid.uuid4().hex, "action_kind": action_kind, "target": target,
-             "max_amount": float(max_amount) if max_amount is not None else None,
+             "max_amount": None,
              "expires_at": expires_at, "created_at": datetime.now(timezone.utc).isoformat()}
     with _lock:
         grants = list_grants()
@@ -93,6 +82,8 @@ def revoke_grant(grant_id):
 
 
 def matching_grant(action_kind, target, amount=None):
+    if action_kind not in {"command_pattern", "send_message"} or amount is not None:
+        return None
     if not isinstance(target, str) or not target:
         return None
     for grant in list_grants():
@@ -108,10 +99,8 @@ def matching_grant(action_kind, target, amount=None):
             if grant.get("expires_at") and _timestamp(grant["expires_at"]) <= datetime.now(timezone.utc):
                 continue
             maximum = grant.get("max_amount")
-            if maximum is not None and (amount is None or _amount(amount) > _amount(maximum)):
+            if maximum is not None:
                 continue
-            if amount is not None:
-                _amount(amount)
             return grant
         except (KeyError, TypeError, ValueError, AttributeError):
             # Malformed persisted records never confer authority.
