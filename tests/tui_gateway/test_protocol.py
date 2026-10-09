@@ -177,6 +177,16 @@ def test_write_json(capture):
     assert json.loads(buf.getvalue()) == {"test": True}
 
 
+def test_approval_request_payload_preserves_target_policy_lock():
+    from tui_gateway.server import _approval_request_payload
+
+    payload = _approval_request_payload({
+        "request_id": "room-approval", "command": "echo safe", "policy_locked": True,
+    })
+
+    assert payload["policy_locked"] is True
+
+
 def test_live_session_payload_replays_pending_approval(server, monkeypatch):
     """A reattached client receives the approval that was emitted while detached."""
     from tools import approval

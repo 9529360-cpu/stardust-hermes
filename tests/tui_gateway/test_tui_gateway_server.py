@@ -8668,19 +8668,62 @@ def test_config_get_approval_mode_normalizes_yaml_off(tmp_path, monkeypatch):
     assert response["result"]["value"] == "off"
 
 
+def test_approval_pending_off_hides_unlocked_entries_but_preserves_room_policy_requests(tmp_path, monkeypatch):
+    import yaml
+
+    from tools import approval
+    from tools.approval_gateway_wait import _ApprovalEntry
+
+    monkeypatch.setattr(server, "_hermes_home", tmp_path)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setattr(server, "_start_agent_build", lambda *args, **kwargs: None)
+    (tmp_path / "config.yaml").write_text(yaml.safe_dump({"approvals": {"mode": "off"}}))
+    sid, session_key = "approval-off-sid", "approval-off-session"
+    agent_ready = threading.Event()
+    agent_ready.set()
+    server._sessions[sid] = {
+        "session_key": session_key,
+        "agent": object(),
+        "agent_ready": agent_ready,
+        "profile_home": None,
+    }
+    entry = _ApprovalEntry({"request_id": "stale", "command": "old", "pattern_keys": ["dangerous"]})
+    locked = _ApprovalEntry({"request_id": "room", "command": "room command", "policy_locked": True})
+    approval._gateway_queues[approval._state_key(session_key)] = [entry, locked]
+
+    try:
+        response = server.handle_request({
+            "id": "approval-pending-off",
+            "method": "approval.pending",
+            "params": {"session_id": sid},
+        })
+        assert response["result"]["approval_mode"] == "off"
+        assert response["result"]["approvals"] == [locked.data]
+        assert not entry.event.is_set() and entry.result is None
+        assert not locked.event.is_set() and locked.result is None
+    finally:
+        server._sessions.pop(sid, None)
+        approval._gateway_queues.pop(approval._state_key(session_key), None)
+
+
 def test_config_set_approval_mode_persists_three_way_value_and_emits_live_status(
     tmp_path, monkeypatch
 ):
     import yaml
+    from tools import approval
+    from tools.approval_gateway_wait import _ApprovalEntry
 
     monkeypatch.setattr(server, "_hermes_home", tmp_path)
     # config.set writes via server._hermes_home, but the post-write
     # session.info emit resolves the effective mode through the canonical
     # tools.approval resolver (load_config → env HERMES_HOME).
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setattr(server, "_start_agent_build", lambda *args, **kwargs: None)
     emitted = []
     monkeypatch.setattr(server, "_emit", lambda *args: emitted.append(args))
     server._sessions["sid"] = {"agent": object(), "session_key": "profile-session"}
+    entry = _ApprovalEntry({"request_id": "pending-before-off", "command": "old"})
+    approval._gateway_queues[approval._state_key("profile-session")] = [entry]
 
     try:
         resp = server.handle_request(
@@ -8690,13 +8733,23 @@ def test_config_set_approval_mode_persists_three_way_value_and_emits_live_status
                 "params": {"key": "approvals.mode", "value": "manual"},
             }
         )
+        off_resp = server.handle_request(
+            {
+                "id": "2",
+                "method": "config.set",
+                "params": {"key": "approvals.mode", "value": "off"},
+            }
+        )
     finally:
         server._sessions.clear()
+        approval._gateway_queues.pop(approval._state_key("profile-session"), None)
 
     assert resp["result"] == {"key": "approvals.mode", "value": "manual"}
-    assert yaml.safe_load((tmp_path / "config.yaml").read_text())["approvals"]["mode"] == "manual"
+    assert yaml.safe_load((tmp_path / "config.yaml").read_text())["approvals"]["mode"] == "off"
     assert emitted and emitted[0][0:2] == ("session.info", "sid")
     assert emitted[0][2]["approval_mode"] == "manual"
+    assert off_resp["result"] == {"key": "approvals.mode", "value": "off"}
+    assert emitted[-1][2]["approval_mode"] == "off"
 
 
 def test_pet_gallery_quoted_false_enabled_reports_disabled(tmp_path, monkeypatch):

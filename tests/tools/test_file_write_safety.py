@@ -383,14 +383,15 @@ class TestBomHandling:
 
 
 class TestProtectedInstructionFiles:
-    """Writes to agent-instruction files ALWAYS require approval.
+    """Protected instruction writes require approval in manual/smart modes.
 
     AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules / project-local .hermes
     config steer future agent behavior, so a prompt-injected agent writing
-    them is a persistence vector. The gate must ask the human every time —
-    even under yolo/auto-approve — and fail closed when no human channel
-    exists. Ported from: RooCodeInc/Roo-Code RooProtectedController
-    (Apache-2.0); symlink lesson from #41351.
+    them is a persistence vector. The gate asks the human in manual/smart modes
+    even under session yolo/auto-approve, and fails closed when no human channel
+    exists. The explicit global ``approvals.mode: off`` bypass applies uniformly.
+    Ported from: RooCodeInc/Roo-Code RooProtectedController (Apache-2.0);
+    symlink lesson from #41351.
     """
 
     @pytest.fixture(autouse=True)
@@ -488,6 +489,20 @@ class TestProtectedInstructionFiles:
         res = self._write(target)
         assert res.get("error") and "BLOCKED" in res["error"]
         assert not target.exists()
+
+    @pytest.mark.parametrize("mode, should_prompt", [("manual", True), ("smart", True), ("off", False)])
+    def test_global_approval_mode_controls_protected_instruction_gate(
+        self, tmp_path, approvals, monkeypatch, mode, should_prompt
+    ):
+        from tools import approval_context
+        monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: mode)
+        approvals["answer"] = "once"
+
+        result = self._write(tmp_path / "AGENTS.md", "explicitly allowed")
+
+        assert not result.get("error"), result
+        assert (len(approvals["calls"]) == 1) is should_prompt
+        assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "explicitly allowed"
 
     def test_config_disabled_skips_gate(self, tmp_path, approvals, monkeypatch):
         import tools.file_tools_write_guards as ft

@@ -1,6 +1,7 @@
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
 import { modelOptionsQueryKey } from '@/lib/model-options'
 import { reconcileApprovalModeForProfile } from '@/store/approval-mode'
+import { reconcileApprovalModeForSession } from '@/store/prompts'
 import { reconcileSessionCompacting } from '@/store/compaction'
 import { requestDesktopOnboardingForCredentialWarning } from '@/store/onboarding'
 import { followActiveSessionCwd } from '@/store/projects'
@@ -188,6 +189,9 @@ export function handleSessionInfoEvent(ctx: GatewayEventContext): boolean {
     // attributed to the newly active profile.
     if (isActiveEvent && typeof payload?.approval_mode === 'string' && event.profile && fromActiveSource()) {
       reconcileApprovalModeForProfile(event.profile, payload.approval_mode)
+    }
+    if (sessionId && typeof payload?.approval_mode === 'string') {
+      reconcileApprovalModeForSession(sessionId, payload.approval_mode)
     }
 
     if (apply) {
