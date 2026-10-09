@@ -27,6 +27,7 @@ logger = logging.getLogger("tools.computer_use.cua_backend")
 # shell window via list_windows, WITH interactable elements (icons, taskbar).
 _FULL_SCREEN_SENTINELS = {"screen", "fullscreen", "full screen", "all"}
 _DESKTOP_SHELL_SENTINELS = {"desktop"}
+_VALID_CAPTURE_SCOPES = {"auto", "window", "desktop"}
 # Shell window identifiers (substring of app_name + title, case-insensitive). Windows: Progman/WorkerW =
 # desktop, Shell_TrayWnd = taskbar; macOS: Finder/Dock. The backdrop subset is preferred over the taskbar.
 _DESKTOP_WINDOW_NAMES = ("progman", "workerw", "program manager", "shell_traywnd", "taskbar", "finder", "desktop", "dock")
@@ -43,6 +44,9 @@ _NO_DESKTOP_IMAGE_MSG = ("<get_desktop_state returned no image; the driver may p
 _NO_CAPTURE_SCOPE_MSG = ("<could not read the current capture_scope; full-screen capture was skipped to avoid "
                          "leaving the computer-use session in desktop capture mode — try "
                          "capture(app='<AppName>') for a specific window>")
+_INVALID_CAPTURE_SCOPE_MSG = ("<the current capture_scope is not a supported value; full-screen capture was "
+                              "skipped without changing the session — use auto, window, or desktop, or "
+                              "capture(app='<AppName>') for a specific window>")
 _SET_CAPTURE_SCOPE_MSG = ("<could not switch capture_scope to desktop; full-screen capture was skipped — "
                           "try capture(app='<AppName>') for a specific window>")
 _RESTORE_CAPTURE_SCOPE_MSG = ("<full-screen capture could not restore the previous capture_scope; the session may "
@@ -330,6 +334,8 @@ class _CaptureMixin:
             if (not isinstance(config, dict) or config.get("isError") is True
                     or not isinstance(scope, str) or not scope.strip()):
                 return self._failed_capture(mode, _NO_CAPTURE_SCOPE_MSG)
+            if scope not in _VALID_CAPTURE_SCOPES:
+                return self._failed_capture(mode, _INVALID_CAPTURE_SCOPE_MSG)
             previous_scope = scope
         except Exception as e:
             logger.debug("cua-driver get_config before full-screen capture failed: %s", e)
