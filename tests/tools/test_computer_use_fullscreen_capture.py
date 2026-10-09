@@ -177,6 +177,27 @@ class TestFullScreenLane:
             "an exact pid/window target must win over the app sentinel"
         )
 
+    def test_placeholder_ids_keep_full_screen_lane(self):
+        """Schema-filled zero IDs are ignored, so they cannot redirect a screen grab to window discovery."""
+        session = _FakeSession()
+        backend = _make_backend(session)
+
+        backend.capture(mode="vision", app="screen", pid=0, window_id=0)
+
+        assert session.called("get_desktop_state")
+        assert not session.called("list_windows")
+
+    def test_incomplete_exact_target_fails_before_any_screen_capture(self):
+        """A lone real ID is rejected rather than falling through to a broader screen grab."""
+        session = _FakeSession()
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen", pid=123, window_id=0)
+
+        assert "requires both pid and window_id" in cap.window_title
+        assert not session.called("get_desktop_state")
+        assert not session.called("screenshot")
+
 
 class TestDesktopShellLane:
     _PROGMAN = {

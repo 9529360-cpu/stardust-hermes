@@ -34,8 +34,9 @@ _PROPERTIES: Dict[str, Any] = {
             "focus_app",
         ],
         "description": (
-            "Which action to perform. `capture` is free (no side effects). All other actions "
-            "require approval unless auto-approved. Use `set_value` for select/popup elements and "
+            "Which action to perform. App-window capture is a read; full-screen and desktop-shell "
+            "captures require approval. Actions that change the desktop also require approval "
+            "unless auto-approved. Use `set_value` for select/popup elements and "
             "sliders — it selects the matching option directly without opening the native menu (no "
             "focus steal)."
         ),
@@ -54,9 +55,9 @@ _PROPERTIES: Dict[str, Any] = {
         "type": "string",
         "description": (
             "Optional. Limit capture/action to one app (name e.g. 'Safari', or bundle ID). Omitted "
-            "= frontmost window. app='screen' = composited full-screen grab (image only, no "
-            "clickable elements); app='desktop' = the OS desktop/shell surface (wallpaper, icons, "
-            "taskbar) with its elements."
+            "= frontmost window. app='screen', 'fullscreen', 'full screen', or 'all' = composited "
+            "full-screen grab (approval required; image only, no clickable elements); app='desktop' "
+            "= the OS desktop/shell surface (approval required; wallpaper, icons, taskbar) with its elements."
         ),
     },
     "pid": {

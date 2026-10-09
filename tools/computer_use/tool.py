@@ -22,6 +22,7 @@ from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from tools.computer_use.backend import ActionResult, CaptureResult, ComputerUseBackend, UIElement, image_dimensions_from_bytes
+from tools.computer_use.cua_backend_parse import _is_placeholder_id
 from tools.browser_preview_approval import classify_browser_preview_action
 
 logger = logging.getLogger(__name__)
@@ -298,9 +299,20 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
         return err
     scopes = ([action] if action in _ACTIONS and _ACTIONS[action].destructive else []) + (
         ["bring_to_front"] if args.get("bring_to_front") or (action == "focus_app" and args.get("raise_window")) else [])
-    # Composited screen/desktop captures can expose unrelated applications,
-    # credentials, and private messages; classify them separately from app-scoped captures.
-    if action == "capture" and str(args.get("app") or "").strip().lower() in {"screen", "desktop"}:
+    # Match the backend's whole-screen sentinels, while retaining the explicit
+    # desktop-shell approval boundary. These captures can disclose information
+    # beyond the selected app. Ignore schema-filled placeholder IDs exactly as
+    # the backend does, or `pid=0, window_id=0` could bypass this gate.
+    app_target = str(args.get("app") or "").strip().lower()
+    has_effective_target_id = any(
+        value is not None and not _is_placeholder_id(value)
+        for value in (args.get("pid"), args.get("window_id"))
+    )
+    full_screen_capture = (
+        app_target in {"screen", "fullscreen", "full screen", "all"} and not has_effective_target_id
+    )
+    desktop_shell_capture = app_target == "desktop"
+    if action == "capture" and (full_screen_capture or desktop_shell_capture):
         scopes.append("capture_fullscreen")
     for scope in scopes:
         if (err := _request_approval(scope, args)) is not None:
