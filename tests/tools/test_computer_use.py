@@ -2681,10 +2681,13 @@ class TestCaptureScreenshotPersistence:
         assert screenshot_path.startswith(str(tmp_path / "cache" / "images"))
         assert Path(screenshot_path).read_bytes() == base64.b64decode(self._PNG_B64)
 
-    def test_invalid_base64_capture_degrades_to_text_with_diagnostic(self):
+    def test_invalid_base64_capture_degrades_to_text_without_image_side_effects(self, tmp_path, monkeypatch):
         from tools.computer_use.backend import UIElement
         from tools.computer_use import tool as cu_tool
 
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision",
+                            lambda: pytest.fail("invalid image must not route to auxiliary vision"))
         cap = self._capture()
         cap.png_b64 = "not-base64%%"
         cap.elements = [UIElement(index=1, role="Button", label="OK")]
@@ -2696,6 +2699,7 @@ class TestCaptureScreenshotPersistence:
         assert payload["image_invalid"] is True
         assert "malformed or truncated" in payload["summary"]
         assert payload["elements"][0]["label"] == "OK"
+        assert not (tmp_path / "cache" / "images").exists()
 
     def test_truncated_png_capture_degrades_to_text_with_diagnostic(self):
         from tools.computer_use import tool as cu_tool
