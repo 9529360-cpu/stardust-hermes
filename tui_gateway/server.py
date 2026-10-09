@@ -670,13 +670,18 @@ def _broadcast_global_event(event: str, payload: dict | None = None) -> None:
 def _approval_request_payload(data: dict | None) -> dict:
     """Build the client-safe representation of a pending approval."""
     payload = dict(data or {})
-    if "choices" not in payload:
-        choices = ["once"]
-        if not payload.get("smart_denied") and payload.get("allow_session") is not False:
-            choices.append("session")
-            if payload.get("allow_permanent") is not False:
-                choices.append("always")
-        payload["choices"] = choices + ["deny"]
+    choices = ["once"]
+    if not payload.get("smart_denied") and payload.get("allow_session") is not False:
+        choices.append("session")
+        if payload.get("allow_permanent") is not False:
+            choices.append("always")
+    choices.append("deny")
+    if isinstance(payload.get("choices"), list):
+        permitted = set(choices)
+        payload["choices"] = [choice for choice in payload["choices"]
+                               if isinstance(choice, str) and choice in permitted]
+    else:
+        payload["choices"] = choices
     if "command" in payload:
         from gateway.run import _redact_approval_command
         payload["command"] = _redact_approval_command(payload.get("command"))

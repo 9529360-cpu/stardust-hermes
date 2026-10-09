@@ -187,6 +187,24 @@ def test_approval_request_payload_preserves_target_policy_lock():
     assert payload["policy_locked"] is True
 
 
+def test_approval_request_payload_never_offers_forbidden_scopes():
+    from tui_gateway.server import _approval_request_payload
+
+    once_only = _approval_request_payload({
+        "allow_permanent": False,
+        "allow_session": False,
+        "choices": ["once", "session", "always", "deny"],
+    })
+    assert once_only["choices"] == ["once", "deny"]
+
+    no_permanent = _approval_request_payload({
+        "allow_permanent": False,
+        "allow_session": True,
+        "choices": ["once", "session", "always", "deny"],
+    })
+    assert no_permanent["choices"] == ["once", "session", "deny"]
+
+
 def test_live_session_payload_replays_pending_approval(server, monkeypatch):
     """A reattached client receives the approval that was emitted while detached."""
     from tools import approval

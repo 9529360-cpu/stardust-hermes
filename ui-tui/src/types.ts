@@ -97,6 +97,8 @@ export interface DelegationStatus {
 export interface ApprovalReq {
   // false when the backend won't honor a permanent allow (tirith warning) → hide "Always allow".
   allowPermanent?: boolean
+  // false when this operation must be approved once only → hide session and permanent grants.
+  allowSession?: boolean
   choices?: string[]
   command: string
   description: string
