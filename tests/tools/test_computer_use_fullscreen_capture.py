@@ -211,7 +211,7 @@ class TestFullScreenLane:
         cap = backend.capture(mode="vision", app="screen")
 
         assert cap.png_b64 is None
-        assert "capture failed" in cap.window_title
+        assert "desktop capture failed" in cap.window_title
         assert "could not restore the previous capture_scope" in cap.window_title
         assert session._scope == "desktop"
 
