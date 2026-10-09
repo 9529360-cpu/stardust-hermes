@@ -197,8 +197,6 @@ def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]
     final_end = _last_final_label_end(raw)
     if final_end is not None:
         raw = raw[final_end:]
-    # Labels are prose, but should not obscure fenced JSON that follows them.
-    raw = re.sub(r"(?im)(\bfinal\s*:\s*)```(?:json)?\s*", r"\1", raw)
     candidates = _json_candidates(raw)
     if not candidates:
         candidate = extract_json_candidate(raw)

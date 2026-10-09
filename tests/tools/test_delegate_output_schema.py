@@ -169,6 +169,34 @@ class TestValidateOutput:
         assert ok is True
         assert errors == []
 
+    def test_final_fence_text_inside_json_string_is_preserved(self):
+        value = "Final: ```json Lima"
+        schema = {"type": "object", "properties": {"city": {"const": value}}}
+        ok, errors = validate_output(json.dumps({"city": value}), schema)
+        assert ok is True
+        assert errors == []
+
+    def test_final_fence_text_inside_json_string_is_not_normalized(self):
+        text = json.dumps({"city": "Final: ```json Lima"})
+        schema = {"type": "object", "properties": {"city": {"const": "Final: Lima"}}}
+        ok, errors = validate_output(text, schema)
+        assert ok is False
+        assert errors
+
+    def test_outer_final_keeps_fenced_text_inside_json_string(self):
+        value = "Final: ```json Lima"
+        schema = {"type": "object", "properties": {"city": {"const": value}}}
+        ok, errors = validate_output(f"Final: {json.dumps({'city': value})}", schema)
+        assert ok is True
+        assert errors == []
+
+    def test_outer_final_does_not_normalize_fenced_text_inside_json_string(self):
+        text = 'Final: {"city": "Final: ```json Lima"}'
+        schema = {"type": "object", "properties": {"city": {"const": "Final: Lima"}}}
+        ok, errors = validate_output(text, schema)
+        assert ok is False
+        assert errors
+
     def test_nested_object_cannot_mask_malformed_final_candidate(self):
         text = 'Final: {"city": nope, "example": {"city": "Lima"}}'
         ok, errors = validate_output(text, ADDRESS_SCHEMA)
