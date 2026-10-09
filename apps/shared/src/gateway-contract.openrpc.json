@@ -43,6 +43,60 @@
       }
     },
     {
+      "name": "approval.grants.add",
+      "summary": "Create an explicit scoped standing authorization.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalGrantsAddParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalGrantsAddResult"
+        }
+      }
+    },
+    {
+      "name": "approval.grants.list",
+      "summary": "List standing authorizations in the active profile.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalGrantsListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalGrantsListResult"
+        }
+      }
+    },
+    {
+      "name": "approval.grants.revoke",
+      "summary": "Revoke a standing authorization by id.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalGrantsRevokeParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalGrantsRevokeResult"
+        }
+      }
+    },
+    {
       "name": "approval.pending",
       "summary": "Replay the approvals still waiting on this session (reconnect / polling).",
       "params": [
@@ -4532,6 +4586,206 @@
         ],
         "title": "ApprovalChoice",
         "type": "string"
+      },
+      "ApprovalGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "action_kind": {
+            "title": "Action Kind",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "max_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Amount"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action_kind",
+          "target",
+          "created_at"
+        ],
+        "title": "ApprovalGrant",
+        "type": "object"
+      },
+      "ApprovalGrantsAddParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "action_kind": {
+            "minLength": 1,
+            "title": "Action Kind",
+            "type": "string"
+          },
+          "target": {
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          },
+          "max_amount": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Amount"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          }
+        },
+        "required": [
+          "action_kind",
+          "target"
+        ],
+        "title": "ApprovalGrantsAddParams",
+        "type": "object"
+      },
+      "ApprovalGrantsAddResult": {
+        "additionalProperties": false,
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/ApprovalGrant"
+          }
+        },
+        "required": [
+          "grant"
+        ],
+        "title": "ApprovalGrantsAddResult",
+        "type": "object"
+      },
+      "ApprovalGrantsListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "title": "ApprovalGrantsListParams",
+        "type": "object"
+      },
+      "ApprovalGrantsListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalGrant"
+            },
+            "title": "Grants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "grants"
+        ],
+        "title": "ApprovalGrantsListResult",
+        "type": "object"
+      },
+      "ApprovalGrantsRevokeParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ApprovalGrantsRevokeParams",
+        "type": "object"
+      },
+      "ApprovalGrantsRevokeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "title": "ApprovalGrantsRevokeResult",
+        "type": "object"
       },
       "ApprovalPendingParams": {
         "additionalProperties": false,

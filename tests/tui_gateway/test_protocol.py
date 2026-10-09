@@ -1567,3 +1567,14 @@ def test_work_ledger_rpc(server, monkeypatch, tmp_path):
     assert server._methods["work.list"](1, {})["result"] == {"work": [item]}
     assert server._methods["work.cancel"](2, {"id": item["id"]})["result"]["status"] == "already_finished"
     assert server._methods["work.cancel"](3, {"id": "subagent:foreign"})["error"]["code"] == 4001
+
+
+def test_approval_grants_rpc(server):
+    reply = server._methods["approval.grants.add"](1, {
+        "action_kind": "purchase", "target": "shop", "max_amount": 10})
+    grant = reply["result"]["grant"]
+    assert server._methods["approval.grants.list"](2, {})["result"]["grants"] == [grant]
+    assert server._methods["approval.grants.revoke"](3, {"id": grant["id"]})["result"]["revoked"]
+    assert server._methods["approval.grants.list"](4, {})["result"]["grants"] == []
+    assert "error" in server._methods["approval.grants.add"](5, {
+        "action_kind": "purchase", "target": "shop", "expires_at": "not a date"})

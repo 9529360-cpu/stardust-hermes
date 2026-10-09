@@ -2358,6 +2358,37 @@ export interface RequestAnswerParams {
 export interface RequestAnswerResult {
   status: ClarifyLockStatus
 }
+export interface ApprovalGrantsListParams {
+  profile?: string | null
+}
+export interface ApprovalGrantsListResult {
+  grants: ApprovalGrant[]
+}
+export interface ApprovalGrant {
+  id: string
+  action_kind: string
+  target: string
+  max_amount?: number | null
+  expires_at?: string | null
+  created_at: string
+}
+export interface ApprovalGrantsAddParams {
+  profile?: string | null
+  action_kind: string
+  target: string
+  max_amount?: number | null
+  expires_at?: string | null
+}
+export interface ApprovalGrantsAddResult {
+  grant: ApprovalGrant
+}
+export interface ApprovalGrantsRevokeParams {
+  profile?: string | null
+  id: string
+}
+export interface ApprovalGrantsRevokeResult {
+  revoked: boolean
+}
 export interface ApprovalAuditParams {
   limit?: number
   session_key?: string | null
@@ -4302,6 +4333,12 @@ export interface RpcMethods {
   'agents.list': { params: AgentsListParams; result: AgentsListResult }
   /** Read recent redacted approval decisions in the active profile, newest first. */
   'approval.audit': { params: ApprovalAuditParams; result: ApprovalAuditResult }
+  /** Create an explicit scoped standing authorization. */
+  'approval.grants.add': { params: ApprovalGrantsAddParams; result: ApprovalGrantsAddResult }
+  /** List standing authorizations in the active profile. */
+  'approval.grants.list': { params: ApprovalGrantsListParams; result: ApprovalGrantsListResult }
+  /** Revoke a standing authorization by id. */
+  'approval.grants.revoke': { params: ApprovalGrantsRevokeParams; result: ApprovalGrantsRevokeResult }
   /** Replay the approvals still waiting on this session (reconnect / polling). */
   'approval.pending': { params: ApprovalPendingParams; result: ApprovalPendingResult }
   /** Tell the backend the card is on screen, so its timeout clock starts. */
@@ -4755,6 +4792,9 @@ export type RpcMethod = keyof RpcMethods
 export const RPC_METHODS = [
   'agents.list',
   'approval.audit',
+  'approval.grants.add',
+  'approval.grants.list',
+  'approval.grants.revoke',
   'approval.pending',
   'approval.received',
   'approval.respond',

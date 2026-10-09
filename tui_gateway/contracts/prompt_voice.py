@@ -284,6 +284,50 @@ method("request.answer", params=RequestAnswerParams, result=RequestAnswerResult,
 # ── approvals ─────────────────────────────────────────────────────────────────────────────────
 
 
+class ApprovalGrant(Result):
+    id: str
+    action_kind: str
+    target: str
+    max_amount: float | None = None
+    expires_at: str | None = None
+    created_at: str
+
+
+class ApprovalGrantsListParams(Params):
+    profile: str | None = None
+
+
+class ApprovalGrantsListResult(Result):
+    grants: list[ApprovalGrant]
+
+
+class ApprovalGrantsAddParams(ApprovalGrantsListParams):
+    action_kind: str = Field(min_length=1)
+    target: str = Field(min_length=1)
+    max_amount: float | None = Field(default=None, ge=0, allow_inf_nan=False)
+    expires_at: str | None = None
+
+
+class ApprovalGrantsAddResult(Result):
+    grant: ApprovalGrant
+
+
+class ApprovalGrantsRevokeParams(ApprovalGrantsListParams):
+    id: str
+
+
+class ApprovalGrantsRevokeResult(Result):
+    revoked: bool
+
+
+method("approval.grants.list", params=ApprovalGrantsListParams, result=ApprovalGrantsListResult,
+       doc="List standing authorizations in the active profile.")
+method("approval.grants.add", params=ApprovalGrantsAddParams, result=ApprovalGrantsAddResult,
+       doc="Create an explicit scoped standing authorization.")
+method("approval.grants.revoke", params=ApprovalGrantsRevokeParams, result=ApprovalGrantsRevokeResult,
+       doc="Revoke a standing authorization by id.")
+
+
 class ApprovalAuditParams(Params):
     limit: int = Field(default=100, ge=0, le=10000)
     session_key: str | None = None

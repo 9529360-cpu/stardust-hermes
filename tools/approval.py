@@ -1097,6 +1097,9 @@ def check_dangerous_command(command: str, env_type: str,
     blocked = _floor_block(command)
     if blocked is not None:
         return blocked
+    result = _grant_decision("command_pattern", command)
+    if result is not None:
+        return result
     if _yolo_active():
         return _audit_decision(_approved(), command=command, outcome="auto_approved", mode="yolo")
     if _command_matches_permanent_allowlist(command):
@@ -1112,7 +1115,18 @@ def check_dangerous_command(command: str, env_type: str,
     )
 
 
-def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", approval_callback=None) -> dict:
+def _grant_decision(action_kind, target, amount=None, *, tool_name="terminal"):
+    from tools.approval_grants import matching_grant
+    grant = matching_grant(action_kind, target, amount)
+    if grant is None:
+        return None
+    return _audit_decision(_approved(), command=target, pattern_key=f"grant:{grant['id']}",
+                           outcome="grant", tool_name=tool_name,
+                           kind="command" if action_kind == "command_pattern" else "tool")
+
+
+def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", approval_callback=None,
+                          action_kind=None, target=None, amount=None) -> dict:
     """Escalate an arbitrary tool call to the human-approval gate.
 
     Entry point for a plugin ``pre_tool_call`` hook returning ``{"action": "approve", ...}``:
@@ -1121,11 +1135,22 @@ def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", ap
     the LLM cannot skip it. Cron honors ``approvals.cron_mode``; any OTHER non-interactive
     non-gateway context fails CLOSED. ``rule_key`` controls the ``[a]lways`` allowlist grain;
     when empty it is ``tool_name`` + a hash of ``reason`` so DISTINCT reasons on the same tool
-    persist independently. Returns the ``check_dangerous_command`` result shape.
+    persist independently. Structured ``action_kind`` (defaults to tool_name),
+    ``target`` and ``amount`` allow explicit standing grants; no scope is inferred
+    from reason text. Returns the ``check_dangerous_command`` result shape.
     """
+    result = _grant_decision(action_kind or tool_name, target, amount, tool_name=tool_name)
+    if result is not None:
+        return result
     description = reason or f"Plugin requires approval for {tool_name}"
     if not rule_key:
         rule_key = f"{tool_name}:{hashlib.sha256(description.encode('utf-8')).hexdigest()[:12]}"
+    if target is not None:
+        # A session/always choice on one concrete action cannot authorize a
+        # different recipient or amount merely because its reason is identical.
+        import json
+        scope = json.dumps([action_kind or tool_name, target, str(amount)], ensure_ascii=False)
+        rule_key += ":scope:" + hashlib.sha256(scope.encode("utf-8")).hexdigest()[:16]
     subject = f"Tool '{tool_name}' requires approval ({description})"
     return _run_approval_gate(
         # Namespaced so plugin-rule approvals share the allowlist machinery without ever colliding with a real
@@ -1229,6 +1254,9 @@ def check_all_command_guards(command: str, env_type: str,
                                    if _is_permanently_approved(pattern_key) else "approved_session")
         return _approved()
 
+    result = _grant_decision("command_pattern", command)
+    if result is not None:
+        return result
     combined_desc = "; ".join(desc for _, desc, _ in warnings)
     primary_key = warnings[0][0]
     all_keys = [key for key, _, _ in warnings]
