@@ -25,6 +25,7 @@ from tools.delegation_output_schema import (
     append_output_contract,
     build_retry_message,
     coerce_output_schema,
+    extract_json_candidate,
     validate_output,
 )
 
@@ -70,6 +71,25 @@ class TestValidateOutput:
         text = 'Here is the result:\n{"city": "Lima"}\nHope that helps!'
         ok, _ = validate_output(text, ADDRESS_SCHEMA)
         assert ok is True
+
+    def test_final_candidate_wins_over_nonmatching_example(self):
+        text = 'Example: {"city": 7}\nFinal: {"city": "Lima"}'
+        assert extract_json_candidate(text) == '{"city": "Lima"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
+    def test_error_describes_final_candidate(self):
+        text = 'Example: {"zip": "10115"}\nFinal: {"zip": 7}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("$.zip: 7" in error for error in errors)
+
+    def test_valid_example_does_not_mask_invalid_final_candidate(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": 7}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("$.city: 7" in error for error in errors)
 
     def test_empty_text_is_invalid(self):
         ok, errors = validate_output("", ADDRESS_SCHEMA)
@@ -288,6 +308,19 @@ class TestRunSingleChildSchemaValidation:
         child._delegate_output_schema = {"type": "array", "items": {"type": "object"}}
         entry = _run(child)
         assert entry["schema_valid"] is True and len(child.calls) == 1
+
+    def test_valid_final_answer_after_json_example_does_not_retry(self):
+        text = 'Example: {"ignored": true}\nFinal: [1, 2]'
+        child = _StubChild([text])
+        child._delegate_output_schema = {
+            "type": "array",
+            "items": {"type": "integer"},
+        }
+        entry = _run(child)
+        assert entry["schema_valid"] is True
+        assert "schema_retries" not in entry
+        assert entry["summary"] == text
+        assert len(child.calls) == 1
 
     def test_schema_valid_entry_still_completed(self):
         """Guard: schema_valid=True keeps status="completed" untouched."""
