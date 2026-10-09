@@ -4055,6 +4055,42 @@
           "$ref": "#/components/schemas/WakeStopResult"
         }
       }
+    },
+    {
+      "name": "work.cancel",
+      "summary": "",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/WorkCancelParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/WorkCancelResult"
+        }
+      }
+    },
+    {
+      "name": "work.list",
+      "summary": "",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/WorkListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/WorkListResult"
+        }
+      }
     }
   ],
   "components": {
@@ -34269,6 +34305,158 @@
           "disabled_persisted"
         ],
         "title": "WakeStopResult",
+        "type": "object"
+      },
+      "WorkCancelParams": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "WorkCancelParams",
+        "type": "object"
+      },
+      "WorkCancelResult": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "not_found",
+              "already_finished",
+              "cancelled",
+              "interrupt_requested",
+              "unavailable",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "message"
+        ],
+        "title": "WorkCancelResult",
+        "type": "object"
+      },
+      "WorkItem": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "delegation",
+              "process",
+              "subagent"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "started_at",
+          "updated_at",
+          "detail"
+        ],
+        "title": "WorkItem",
+        "type": "object"
+      },
+      "WorkListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "title": "WorkListParams",
+        "type": "object"
+      },
+      "WorkListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "work": {
+            "items": {
+              "$ref": "#/components/schemas/WorkItem"
+            },
+            "title": "Work",
+            "type": "array"
+          }
+        },
+        "required": [
+          "work"
+        ],
+        "title": "WorkListResult",
         "type": "object"
       },
       "_SessionScoped": {

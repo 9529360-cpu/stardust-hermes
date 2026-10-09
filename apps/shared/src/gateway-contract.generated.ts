@@ -3785,6 +3785,30 @@ export interface AgentPluginRow {
   update_available?: boolean | null
   pinned_sha?: string | null
 }
+export interface WorkListParams {
+  session_id?: string
+}
+export interface WorkListResult {
+  work: WorkItem[]
+}
+export interface WorkItem {
+  id: string
+  kind: 'delegation' | 'process' | 'subagent'
+  title: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
+  started_at: number | null
+  updated_at: number | null
+  detail: Record<string, unknown>
+}
+export interface WorkCancelParams {
+  id: string
+  session_id?: string
+}
+export interface WorkCancelResult {
+  id: string
+  status: 'not_found' | 'already_finished' | 'cancelled' | 'interrupt_requested' | 'unavailable' | 'error'
+  message: string
+}
 /** Single question: ``question`` / ``choices`` (/ ``multi_select``); batch: ``questions``. ``answers`` rides only on a reconnect replay (locks the server already accepted). */
 export interface ClarifyRequestParams {
   session_id: string
@@ -4724,6 +4748,8 @@ export interface RpcMethods {
   'wake.status': { params: WakeStatusParams; result: WakeStatusResult }
   /** Stop this surface's listener; persist also writes wake_word.enabled: false. */
   'wake.stop': { params: WakeStopParams; result: WakeStopResult }
+  'work.cancel': { params: WorkCancelParams; result: WorkCancelResult }
+  'work.list': { params: WorkListParams; result: WorkListResult }
 }
 export type RpcMethod = keyof RpcMethods
 export const RPC_METHODS = [
@@ -4951,7 +4977,9 @@ export const RPC_METHODS = [
   'wake.resume',
   'wake.start',
   'wake.status',
-  'wake.stop'
+  'wake.stop',
+  'work.cancel',
+  'work.list'
 ] as const satisfies readonly RpcMethod[]
 
 // ── Server→client requests ──

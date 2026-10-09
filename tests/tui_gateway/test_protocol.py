@@ -1553,3 +1553,17 @@ def test_approval_audit_rpc(server):
     reply = server._methods["approval.audit"](42, {"limit": 1, "session_key": "audit-rpc"})
     assert reply["result"]["entries"][0]["outcome"] == "denied"
     assert reply["result"]["entries"][0]["session_key"] == "audit-rpc"
+
+
+def test_work_ledger_rpc(server, monkeypatch, tmp_path):
+    from tools import work_ledger
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    item = {"id": "delegation:test", "kind": "delegation", "title": "Research",
+            "status": "completed", "started_at": 1.0, "updated_at": 2.0,
+            "detail": {"summary": "Done"}}
+    monkeypatch.setattr(work_ledger, "list_work", lambda **kw: [item])
+    monkeypatch.setattr(work_ledger, "cancel_work", lambda id, **kw: {
+        "id": id, "status": "already_finished", "message": "Work is already completed."})
+    assert server._methods["work.list"](1, {})["result"] == {"work": [item]}
+    assert server._methods["work.cancel"](2, {"id": item["id"]})["result"]["status"] == "already_finished"
+    assert server._methods["work.cancel"](3, {"id": "subagent:foreign"})["error"]["code"] == 4001
