@@ -3973,6 +3973,21 @@ class TestMemoryEntriesApi:
         assert response.status_code == 200
         assert response.json() == {"target": "memory", "available": False, "entries": []}
 
+    def test_refuses_delete_when_memory_persistence_is_disabled(self, tmp_path, monkeypatch):
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        path = memories / "MEMORY.md"
+        path.write_bytes(b"Private fact\n\xc2\xa7\nKeep this fact")
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        monkeypatch.setattr("tools.memory_tool.memory_persistence_enabled", lambda fail_closed=False: False)
+
+        response = self.client.request(
+            "DELETE", "/api/memory/entries?target=memory", json={"entry": "Private fact"}
+        )
+
+        assert response.status_code == 409
+        assert path.read_bytes() == b"Private fact\n\xc2\xa7\nKeep this fact"
+
     def test_reports_disk_read_failure_instead_of_a_successful_empty_file(self, tmp_path, monkeypatch):
         from tools.memory_tool import MemoryStore
 

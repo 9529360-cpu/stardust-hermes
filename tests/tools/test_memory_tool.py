@@ -259,6 +259,43 @@ class TestMemoryStoreRemove:
         assert store.remove_exact("memory", "Likes tea")["success"] is False
         assert path.read_bytes() == duplicated
 
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            (
+                b"Remove me\n\xc2\xa7\nKeep LF\nwith line\n\xc2\xa7\nKeep second",
+                b"Keep LF\nwith line\n\xc2\xa7\nKeep second",
+            ),
+            (
+                b"Remove me\r\n\xc2\xa7\r\nKeep CRLF\r\nwith line\r\n\xc2\xa7\r\nKeep second",
+                b"Keep CRLF\r\nwith line\n\xc2\xa7\nKeep second",
+            ),
+            (
+                b"Remove me\r\n\xc2\xa7\nKeep LF\nwith CRLF\r\nline\r\n\xc2\xa7\r\nKeep second",
+                b"Keep LF\nwith CRLF\r\nline\n\xc2\xa7\nKeep second",
+            ),
+            (
+                b"\xef\xbb\xbfRemove me\r\n\xc2\xa7\r\nKeep BOM\nwith LF\n\xc2\xa7\nKeep second",
+                b"\xef\xbb\xbfKeep BOM\nwith LF\n\xc2\xa7\nKeep second",
+            ),
+        ],
+        ids=("lf", "crlf", "mixed", "bom"),
+    )
+    def test_remove_exact_preserves_remaining_multiline_entry_bytes(
+        self, store, tmp_path, monkeypatch, raw, expected
+    ):
+        memories = tmp_path / "memories"
+        memories.mkdir()
+        monkeypatch.setattr("tools.memory_tool.get_memory_dir", lambda: memories)
+        path = memories / "MEMORY.md"
+        path.write_bytes(raw)
+        store.load_from_disk()
+
+        result = store.remove_exact("memory", "Remove me")
+
+        assert result["success"] is True
+        assert path.read_bytes() == expected
+
 
 class TestMemoryConsolidationGracefulDegrade:
     """Fix #3 for #42405: a failed at-capacity consolidation must never loop the

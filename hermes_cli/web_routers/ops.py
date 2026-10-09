@@ -494,7 +494,10 @@ async def delete_memory_entry(target: str, body: Dict[str, str], profile: Option
         raise HTTPException(status_code=400, detail="entry is required")
 
     def _remove():
-        from tools.memory_tool import load_on_disk_store
+        from tools.memory_tool import load_on_disk_store, memory_persistence_enabled
+
+        if not memory_persistence_enabled(fail_closed=True):
+            raise HTTPException(status_code=409, detail="Built-in memory persistence is disabled")
 
         store = load_on_disk_store()
         if not store.target_enabled(target):
