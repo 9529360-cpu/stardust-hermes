@@ -1431,6 +1431,29 @@ export interface PingResult {
 export interface GatewayCapabilitiesResult {
   per_session_exclusive_submit: boolean
 }
+export interface MemoryListParams {
+  target?: 'memory' | 'user' | 'both'
+}
+export interface MemoryListResult {
+  entries: MemoryEntry[]
+}
+export interface MemoryEntry {
+  target: 'memory' | 'user'
+  index: number
+  text: string
+}
+export interface MemoryRememberParams {
+  target: 'memory' | 'user'
+  content: string
+}
+export interface MemoryMutationResult {
+  success: boolean
+}
+export interface MemoryForgetParams {
+  target: 'memory' | 'user'
+  index?: number | null
+  text?: string | null
+}
 /** ``word`` is the token under the cursor (``@`` prefix = context reference); ``cwd`` / ``session_id`` pick the directory the listing resolves against. */
 export interface CompletePathParams {
   profile?: string | null
@@ -4431,6 +4454,12 @@ export interface RpcMethods {
   'mcp.servers.status': { params: ProfileParams; result: McpServersStatusResult }
   /** Connect, list tools, disconnect — an OAuth server with no token on disk is reported as not ok. */
   'mcp.servers.test': { params: McpServerNameParams; result: McpServersTestResult }
+  /** Remove by zero-based index or uniquely matching text (exactly one selector required). */
+  'memory.forget': { params: MemoryForgetParams; result: MemoryMutationResult }
+  /** List curated entries with zero-based per-target indices; indices are stable until the list changes. */
+  'memory.list': { params: MemoryListParams; result: MemoryListResult }
+  /** Persist a curated entry using the agent memory content and size guards. */
+  'memory.remember': { params: MemoryRememberParams; result: MemoryMutationResult }
   /** Set/clear one author's emoji reaction on a message; returns the row's full reaction list. */
   'message.react': { params: MessageReactParams; result: MessageReactResult }
   /** Remove every credential (env keys and OAuth state) for a provider. */
@@ -4788,6 +4817,9 @@ export const RPC_METHODS = [
   'mcp.servers.set_api_key',
   'mcp.servers.status',
   'mcp.servers.test',
+  'memory.forget',
+  'memory.list',
+  'memory.remember',
   'message.react',
   'model.disconnect',
   'model.options',

@@ -1627,6 +1627,60 @@
       }
     },
     {
+      "name": "memory.forget",
+      "summary": "Remove by zero-based index or uniquely matching text (exactly one selector required).",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/MemoryForgetParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/MemoryMutationResult"
+        }
+      }
+    },
+    {
+      "name": "memory.list",
+      "summary": "List curated entries with zero-based per-target indices; indices are stable until the list changes.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/MemoryListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/MemoryListResult"
+        }
+      }
+    },
+    {
+      "name": "memory.remember",
+      "summary": "Persist a curated entry using the agent memory content and size guards.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/MemoryRememberParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/MemoryMutationResult"
+        }
+      }
+    },
+    {
       "name": "message.react",
       "summary": "Set/clear one author's emoji reaction on a message; returns the row's full reaction list.",
       "params": [
@@ -15202,6 +15256,147 @@
           "oauth_needed"
         ],
         "title": "McpServersTestResult",
+        "type": "object"
+      },
+      "MemoryEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "enum": [
+              "memory",
+              "user"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "index",
+          "text"
+        ],
+        "title": "MemoryEntry",
+        "type": "object"
+      },
+      "MemoryForgetParams": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "enum": [
+              "memory",
+              "user"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Index"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Text"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "title": "MemoryForgetParams",
+        "type": "object"
+      },
+      "MemoryListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "default": "both",
+            "enum": [
+              "memory",
+              "user",
+              "both"
+            ],
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "title": "MemoryListParams",
+        "type": "object"
+      },
+      "MemoryListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "MemoryListResult",
+        "type": "object"
+      },
+      "MemoryMutationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "title": "MemoryMutationResult",
+        "type": "object"
+      },
+      "MemoryRememberParams": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "enum": [
+              "memory",
+              "user"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "content"
+        ],
+        "title": "MemoryRememberParams",
         "type": "object"
       },
       "MessageCompletePayload": {

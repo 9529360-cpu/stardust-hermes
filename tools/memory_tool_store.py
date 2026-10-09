@@ -503,6 +503,19 @@ class MemoryStore:
                 raise RuntimeError(f"Failed to write memory file {path}: {exc}") from exc
             return self._success_response(target, "Entry removed.")
 
+    def remove_index(self, target: str, index: int) -> Dict[str, Any]:
+        """Remove a zero-based entry index against the locked, current disk list."""
+        if target not in {"memory", "user"}:
+            return _error("target must be memory or user")
+        if type(index) is not int or index < 0:
+            return _error("index must be a non-negative integer")
+
+        def _remove(entries, limit):
+            if index >= len(entries):
+                return _error("No entry matched index.")
+            return entries[:index] + entries[index + 1:], "Entry removed."
+        return self._mutate(target, _remove)
+
     def _edit(self, target: str, old_text: str, new_content: Optional[str]) -> Dict[str, Any]:
         """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*."""
         def _apply(entries, limit):
