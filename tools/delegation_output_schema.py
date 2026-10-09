@@ -101,34 +101,10 @@ def _json_candidate_end(raw: str, start: int) -> Optional[int]:
     return None
 
 
-def _explicit_final_candidate(raw: str) -> Optional[Tuple[str, Optional[Any], Optional[str]]]:
-    """Return the candidate after the last explicit ``Final:`` label.
-
-    ``parsed`` is absent when the labeled final value is malformed or truncated;
-    that state must not fall back to a valid example earlier in the response.
-    """
-    matches = list(re.finditer(r"(?im)^\s*final\s*:\s*", raw))
-    if not matches:
-        return None
-
-    start = matches[-1].end()
-    while start < len(raw) and raw[start].isspace():
-        start += 1
-    if start >= len(raw) or raw[start] not in "[{":
-        return (raw[start:].strip(), None, "Final response did not contain a JSON object or array.")
-
+def _json_candidates(raw: str) -> List[Tuple[str, Optional[Any], Optional[str]]]:
+    """Return outer JSON candidates in text order, preserving malformed candidates too."""
     decoder = json.JSONDecoder()
-    try:
-        parsed, end = decoder.raw_decode(raw, start)
-    except json.JSONDecodeError as exc:
-        return (raw[start:].strip(), None, f"Response is not valid JSON: {exc}")
-    return (raw[start:end], parsed, None)
-
-
-def _json_candidates(raw: str) -> List[Tuple[str, Any]]:
-    """Return complete object/array candidates in text order, skipping nested spans once parsed."""
-    decoder = json.JSONDecoder()
-    candidates: List[Tuple[str, Any]] = []
+    candidates: List[Tuple[str, Optional[Any], Optional[str]]] = []
     cursor = 0
     while cursor < len(raw):
         object_start = raw.find("{", cursor)
@@ -139,15 +115,17 @@ def _json_candidates(raw: str) -> List[Tuple[str, Any]]:
         start = min(starts)
         try:
             parsed, end = decoder.raw_decode(raw, start)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
             # Do not promote a valid-looking nested value from inside a malformed
             # outer object/array. It is not an independent final JSON candidate.
             end = _json_candidate_end(raw, start)
             if end is None:
+                candidates.append((raw[start:].strip(), None, f"Response is not valid JSON: {exc}"))
                 break
+            candidates.append((raw[start:end], None, f"Response is not valid JSON: {exc}"))
             cursor = end
             continue
-        candidates.append((raw[start:end], parsed))
+        candidates.append((raw[start:end], parsed, None))
         cursor = end
     return candidates
 
@@ -177,14 +155,9 @@ def extract_json_candidate(text: str) -> str:
 def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """``(True, [])`` or ``(False, errors)`` with strings suitable for the retry turn."""
     raw = _candidate_source(text or "")
-    explicit_final = _explicit_final_candidate(raw)
-    if explicit_final is not None:
-        candidate, parsed, parse_error = explicit_final
-        if parse_error:
-            return False, [parse_error]
-        candidates = [(candidate, parsed)]
-    else:
-        candidates = _json_candidates(raw)
+    # Labels are prose, but should not obscure fenced JSON that follows them.
+    raw = re.sub(r"(?im)(\bfinal\s*:\s*)```(?:json)?\s*", r"\1", raw)
+    candidates = _json_candidates(raw)
     if not candidates:
         candidate = extract_json_candidate(raw)
         if not candidate.strip():
@@ -193,7 +166,10 @@ def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]
             json.loads(candidate)
         except (ValueError, TypeError) as exc:
             return False, [f"Response is not valid JSON: {exc}"]
-        candidates = [(candidate, json.loads(candidate))]
+        candidates = [(candidate, json.loads(candidate), None)]
+    _candidate, parsed, parse_error = candidates[-1]
+    if parse_error:
+        return False, [parse_error]
     try:
         from jsonschema.validators import validator_for  # type: ignore[import-untyped]
     except ImportError:
@@ -203,7 +179,6 @@ def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]
     validator = validator_for(schema)(schema)
     # The last complete JSON value is the child's final candidate. Earlier values
     # may be examples, so they must not override a malformed final answer.
-    _candidate, parsed = candidates[-1]
     errors = sorted(validator.iter_errors(parsed), key=lambda e: list(e.absolute_path))
     rendered = [  # bound error volume for the retry prompt
         "$" + "".join(f"[{p}]" if isinstance(p, int) else f".{p}" for p in err.absolute_path) + f": {err.message}"

@@ -115,6 +115,30 @@ class TestValidateOutput:
         assert ok is False
         assert errors and any("not valid JSON" in error for error in errors)
 
+    def test_valid_example_does_not_mask_unlabeled_malformed_outer_candidate(self):
+        text = 'Example: {"city": "Berlin"}\n{"city": nope}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_unlabeled_truncated_outer_candidate(self):
+        text = 'Example: {"city": "Berlin"}\n{"city": "Lima"'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_inline_final_label_malformed_candidate_is_rejected(self):
+        text = 'Example: {"city": "Berlin"} Final: {"city": nope}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_final_label_accepts_fenced_json_after_newline(self):
+        text = 'Final:\n```json\n{"city": "Lima"}\n```'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
     def test_nested_object_cannot_mask_malformed_final_candidate(self):
         text = 'Final: {"city": nope, "example": {"city": "Lima"}}'
         ok, errors = validate_output(text, ADDRESS_SCHEMA)
