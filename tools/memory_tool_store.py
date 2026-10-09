@@ -435,6 +435,20 @@ class MemoryStore:
             return _error("old_text cannot be empty.")
         return self._edit(target, old_text.strip(), None)
 
+    def remove_exact(self, target: str, entry: str) -> Dict[str, Any]:
+        """Remove exactly one complete entry, refusing stale or duplicate matches."""
+        if not entry:
+            return _error("entry cannot be empty.")
+
+        def _apply(entries, _limit):
+            matches = [index for index, current in enumerate(entries) if current == entry]
+            if len(matches) != 1:
+                return _error("Selected memory entry is stale or ambiguous; reload the list and retry.")
+            index = matches[0]
+            return entries[:index] + entries[index + 1:], "Entry removed."
+
+        return self._mutate(target, _apply)
+
     def _edit(self, target: str, old_text: str, new_content: Optional[str]) -> Dict[str, Any]:
         """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*."""
         def _apply(entries, limit):

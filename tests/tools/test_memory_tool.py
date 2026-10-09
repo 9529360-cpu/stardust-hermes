@@ -229,6 +229,13 @@ class TestMemoryStoreRemove:
 
         assert store.remove("memory", "  ")["success"] is False
 
+    def test_remove_exact_does_not_match_substrings_or_delete_duplicates(self, store):
+        store.add("memory", "Likes tea daily")
+        store.add("memory", "Likes tea")
+        assert store.remove_exact("memory", "Likes tea")["success"] is True
+        assert store.memory_entries == ["Likes tea daily"]
+        assert store.remove_exact("memory", "Likes tea")["success"] is False
+
 
 class TestMemoryConsolidationGracefulDegrade:
     """Fix #3 for #42405: a failed at-capacity consolidation must never loop the

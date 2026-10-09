@@ -1,3 +1,4 @@
+import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { PageLoader } from '@/components/page-loader'
@@ -7,8 +8,10 @@ import {
   type ActionResponse,
   type CuratorStatusResponse,
   type DebugShareResponse,
+  deleteMemoryEntry,
   getActionStatus,
   getCuratorStatus,
+  getMemoryEntries,
   getMemoryStatus,
   type MemoryStatusResponse,
   resetMemory,
@@ -25,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { upsertDesktopActionTask } from '@/store/activity'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
-import { requestFreshSession } from '@/store/profile'
+import { $activeGatewayProfile, requestFreshSession } from '@/store/profile'
 import type { ActionStatusResponse } from '@/types/hermes'
 
 const ACTION_POLL_MS = 1200
@@ -52,6 +55,7 @@ function formatBytes(size: number): string {
  *  ops section). Spawn-based actions tail their logs inline via the shared
  *  /api/actions status endpoint. */
 export function MaintenancePanel() {
+  const activeProfile = useStore($activeGatewayProfile)
   const { t } = useI18n()
   const mm = t.commandCenter.maintenance
 
@@ -61,11 +65,21 @@ export function MaintenancePanel() {
   const [curatorBusy, setCuratorBusy] = useState(false)
   const [memory, setMemory] = useState<MemoryStatusResponse | null>(null)
   const [memoryBusy, setMemoryBusy] = useState(false)
+  const [memoryEntries, setMemoryEntries] = useState<Partial<Record<'memory' | 'user', string[]>>>({})
+  const [memoryAvailable, setMemoryAvailable] = useState<Partial<Record<'memory' | 'user', boolean>>>({})
+  const [memoryLoading, setMemoryLoading] = useState<Partial<Record<'memory' | 'user', boolean>>>({})
+  const [memoryErrors, setMemoryErrors] = useState<Partial<Record<'memory' | 'user', string>>>({})
+  const [memoryExpanded, setMemoryExpanded] = useState<Partial<Record<'memory' | 'user', boolean>>>({})
   const [share, setShare] = useState<DebugShareResponse | null>(null)
   const [sharing, setSharing] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
+    setMemoryEntries({})
+    setMemoryAvailable({})
+    setMemoryLoading({})
+    setMemoryErrors({})
+    setMemoryExpanded({})
     let cancelled = false
 
     getCuratorStatus()
@@ -76,7 +90,7 @@ export function MaintenancePanel() {
       .catch(() => {})
 
     return () => void (cancelled = true)
-  }, [])
+  }, [activeProfile])
 
   // Tail the most recently launched spawn action.
   useEffect(() => {
@@ -190,6 +204,7 @@ export function MaintenancePanel() {
           result = await resetMemory(target)
         } catch (err) {
           notifyError(err, mm.resetFailed)
+
           return
         }
 
@@ -234,6 +249,98 @@ export function MaintenancePanel() {
       }
     },
     [mm]
+  )
+
+  const loadMemoryEntries = useCallback(
+    async (target: 'memory' | 'user') => {
+      setMemoryLoading(current => ({ ...current, [target]: true }))
+
+      try {
+        const requestedProfile = activeProfile
+        const result = await getMemoryEntries(target, requestedProfile)
+
+        if (requestedProfile !== $activeGatewayProfile.get()) {
+          return
+        }
+
+        setMemoryEntries(current => ({ ...current, [target]: result.entries }))
+        setMemoryAvailable(current => ({ ...current, [target]: result.available }))
+        setMemoryErrors(current => ({ ...current, [target]: undefined }))
+      } catch {
+        setMemoryEntries(current => ({ ...current, [target]: undefined }))
+        setMemoryAvailable(current => ({ ...current, [target]: undefined }))
+        setMemoryErrors(current => ({ ...current, [target]: mm.entriesUnavailable }))
+      } finally {
+        if (activeProfile === $activeGatewayProfile.get()) {
+          setMemoryLoading(current => ({ ...current, [target]: false }))
+        }
+      }
+    },
+    [activeProfile, mm.entriesUnavailable]
+  )
+
+  const toggleMemoryEntries = useCallback(
+    (target: 'memory' | 'user') => {
+      if (memoryExpanded[target]) {
+        setMemoryExpanded(current => ({ ...current, [target]: false }))
+
+        return
+      }
+
+      setMemoryExpanded(current => ({ ...current, [target]: true }))
+
+      if (memoryEntries[target] === undefined) {
+        void loadMemoryEntries(target)
+      }
+    },
+    [loadMemoryEntries, memoryEntries, memoryExpanded]
+  )
+
+  const removeMemoryEntry = useCallback(
+    async (target: 'memory' | 'user', entry: string) => {
+      if (
+        !(await confirm({
+          destructive: true,
+          description: entry,
+          title: mm.removeEntryConfirm
+        }))
+      ) {
+        return
+      }
+
+      setMemoryBusy(true)
+
+      try {
+        const result = await deleteMemoryEntry(target, entry, activeProfile)
+
+        // The delete response is authoritative; a follow-up read must not turn
+        // a committed removal into a failure notification.
+        try {
+          await loadMemoryEntries(target)
+        } catch {
+          // loadMemoryEntries already records and displays its own read error.
+        }
+
+        notify({ kind: 'success', title: mm.entryRemoved, message: mm.resetCurrentChats })
+
+        if (
+          result.active_session_behavior === 'refresh_on_next_turn' &&
+          (await confirm({
+            cancelLabel: mm.keepCurrentSession,
+            confirmLabel: mm.startFreshSession,
+            description: mm.resetFreshDescription,
+            title: mm.resetFreshTitle
+          }))
+        ) {
+          requestFreshSession()
+        }
+      } catch (err) {
+        notifyError(err, mm.removeEntryFailed)
+      } finally {
+        setMemoryBusy(false)
+      }
+    },
+    [activeProfile, loadMemoryEntries, mm]
   )
 
   return (
@@ -371,20 +478,44 @@ export function MaintenancePanel() {
               {mm.memoryProvider(memory.active || mm.builtinMemory)}
             </div>
             <MemoryFileRow
+              available={memoryAvailable.memory}
               busy={memoryBusy}
+              emptyEntriesLabel={mm.noEntries}
+              entries={memoryEntries.memory}
+              error={memoryErrors.memory}
+              expanded={memoryExpanded.memory === true}
+              hideEntriesLabel={mm.hideEntries}
               label={mm.memoryFile}
+              loading={memoryLoading.memory === true}
+              onRemove={entry => void removeMemoryEntry('memory', entry)}
               onReset={() => void doResetMemory('memory', mm.memoryFile)}
+              onView={() => toggleMemoryEntries('memory')}
+              removeLabel={mm.removeEntry}
               resetLabel={mm.resetMemory}
               size={memory.builtin_files.memory}
               sizeLabel={memory.builtin_files.memory > 0 ? formatBytes(memory.builtin_files.memory) : mm.empty}
+              unavailableLabel={mm.entriesUnavailable}
+              viewLabel={mm.viewEntries}
             />
             <MemoryFileRow
+              available={memoryAvailable.user}
               busy={memoryBusy}
+              emptyEntriesLabel={mm.noEntries}
+              entries={memoryEntries.user}
+              error={memoryErrors.user}
+              expanded={memoryExpanded.user === true}
+              hideEntriesLabel={mm.hideEntries}
               label={mm.userFile}
+              loading={memoryLoading.user === true}
+              onRemove={entry => void removeMemoryEntry('user', entry)}
               onReset={() => void doResetMemory('user', mm.userFile)}
+              onView={() => toggleMemoryEntries('user')}
+              removeLabel={mm.removeEntry}
               resetLabel={mm.resetUser}
               size={memory.builtin_files.user}
               sizeLabel={memory.builtin_files.user > 0 ? formatBytes(memory.builtin_files.user) : mm.empty}
+              unavailableLabel={mm.entriesUnavailable}
+              viewLabel={mm.viewEntries}
             />
           </div>
         )}
@@ -429,11 +560,23 @@ function OpRow({
 
 function MemoryFileRow({
   busy,
+  available,
+  error,
+  expanded,
+  emptyEntriesLabel,
+  entries,
   label,
+  loading,
+  onRemove,
   onReset,
+  onView,
+  removeLabel,
   resetLabel,
   size,
-  sizeLabel
+  sizeLabel,
+  unavailableLabel,
+  viewLabel,
+  hideEntriesLabel
 }: {
   busy: boolean
   label: string
@@ -441,24 +584,75 @@ function MemoryFileRow({
   resetLabel: string
   size: number
   sizeLabel: string
+  entries?: string[]
+  available?: boolean
+  error?: string
+  expanded: boolean
+  loading: boolean
+  viewLabel: string
+  hideEntriesLabel: string
+  unavailableLabel: string
+  emptyEntriesLabel: string
+  removeLabel: string
+  onView: () => void
+  onRemove: (entry: string) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-2">
-      <div className="min-w-0">
-        <span className="text-[length:var(--conversation-text-font-size)] font-medium">{label}</span>
-        <span className="ml-2 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-          {sizeLabel}
-        </span>
+    <div className="py-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[length:var(--conversation-text-font-size)] font-medium">{label}</span>
+          <span className="ml-2 text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
+            {sizeLabel}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button aria-expanded={expanded} disabled={busy || loading} onClick={onView} size="xs" variant="text">
+            {expanded ? hideEntriesLabel : viewLabel}
+          </Button>
+          <Button
+            className="text-destructive hover:text-destructive"
+            disabled={busy || size <= 0}
+            onClick={onReset}
+            size="xs"
+            variant="text"
+          >
+            {resetLabel}
+          </Button>
+        </div>
       </div>
-      <Button
-        className="text-destructive hover:text-destructive"
-        disabled={busy || size <= 0}
-        onClick={onReset}
-        size="xs"
-        variant="text"
-      >
-        {resetLabel}
-      </Button>
+      {expanded && (loading || entries || available === false || error) && (
+        <div className="w-full py-2">
+          {loading ? (
+            <span>{viewLabel}…</span>
+          ) : error ? (
+            <span className="text-destructive">{error}</span>
+          ) : entries ? (
+            <ul>
+              {entries.length === 0 ? (
+                <li className="text-(--ui-text-tertiary)">{emptyEntriesLabel}</li>
+              ) : (
+                entries.map((entry, index) => (
+                  <li className="flex items-start justify-between gap-3 py-2" key={`${index}:${entry}`}>
+                    <span className="whitespace-pre-wrap break-words">{entry}</span>
+                    <Button
+                      className="shrink-0 text-destructive"
+                      disabled={busy}
+                      onClick={() => onRemove(entry)}
+                      size="xs"
+                      variant="text"
+                    >
+                      {removeLabel}
+                    </Button>
+                  </li>
+                ))
+              )}
+            </ul>
+          ) : (
+            <span className="text-(--ui-text-tertiary)">{unavailableLabel}</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

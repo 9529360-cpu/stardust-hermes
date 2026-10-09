@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getMemoryStatus, resetMemory } from '@/hermes'
+import { deleteMemoryEntry, getMemoryEntries, getMemoryStatus, resetMemory } from '@/hermes'
 import { confirm } from '@/store/confirm'
 import { requestFreshSession } from '@/store/profile'
 
@@ -10,9 +10,7 @@ import { MaintenancePanel } from './maintenance'
 vi.mock('@/hermes', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getActionStatus: vi.fn(() => Promise.resolve({ lines: [], running: false })),
-  getCuratorStatus: vi.fn(() =>
-    Promise.resolve({ enabled: false, last_run_at: null, paused: false })
-  ),
+  getCuratorStatus: vi.fn(() => Promise.resolve({ enabled: false, last_run_at: null, paused: false })),
   getMemoryStatus: vi.fn(() =>
     Promise.resolve({
       active: '',
@@ -20,6 +18,10 @@ vi.mock('@/hermes', async importOriginal => ({
       builtin_files: { memory: 12, user: 8 }
     })
   ),
+  getMemoryEntries: vi.fn(() =>
+    Promise.resolve({ available: true, entries: ['Likes tea', 'Lives in Berlin'], target: 'memory' })
+  ),
+  deleteMemoryEntry: vi.fn(() => Promise.resolve({ active_session_behavior: 'refresh_on_next_turn', ok: true })),
   resetMemory: vi.fn(() =>
     Promise.resolve({
       active_session_behavior: 'refresh_on_next_turn',
@@ -46,6 +48,40 @@ describe('Command Center memory reset forget boundary', () => {
       providers: [],
       builtin_files: { memory: 12, user: 8 }
     })
+  })
+
+  it('shows individual entries and asks before removing exactly the selected one', async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    render(<MaintenancePanel />)
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    expect(await screen.findByText('Likes tea')).toBeTruthy()
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove entry' }))[0]!)
+
+    await waitFor(() => expect(deleteMemoryEntry).toHaveBeenCalledWith('memory', 'Likes tea', 'default'))
+    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        destructive: true,
+        description: 'Likes tea'
+      })
+    )
+    expect(requestFreshSession).not.toHaveBeenCalled()
+  })
+
+  it('does not call the delete endpoint when entry confirmation is cancelled', async () => {
+    vi.mocked(confirm).mockResolvedValueOnce(false)
+    render(<MaintenancePanel />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Remove entry' }))[0]!)
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1))
+    expect(deleteMemoryEntry).not.toHaveBeenCalled()
+  })
+
+  it('distinguishes a successfully loaded empty file', async () => {
+    vi.mocked(getMemoryEntries).mockResolvedValueOnce({ available: true, entries: [], target: 'memory' })
+    render(<MaintenancePanel />)
+    fireEvent.click((await screen.findAllByRole('button', { name: 'View entries' }))[0]!)
+    expect(await screen.findByText('No entries')).toBeTruthy()
   })
 
   it('explains stale chats before reset and offers a fresh session after success', async () => {

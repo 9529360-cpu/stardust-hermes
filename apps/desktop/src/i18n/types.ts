@@ -1955,6 +1955,14 @@ export interface Translations {
       builtinMemory: string
       memoryFile: string
       userFile: string
+      viewEntries: string
+      hideEntries: string
+      noEntries: string
+      entriesUnavailable: string
+      removeEntry: string
+      removeEntryConfirm: string
+      entryRemoved: string
+      removeEntryFailed: string
       bytes: (size: string) => string
       empty: string
       resetMemory: string
