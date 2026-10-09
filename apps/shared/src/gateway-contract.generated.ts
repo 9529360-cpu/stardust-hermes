@@ -657,9 +657,15 @@ export interface SetupStatusResult {
 export interface SetupRuntimeCheckParams {
   profile?: string | null
   provider?: string | null
+  live?: boolean
+  timeout_s?: number
 }
-/** ``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the selected route is the welcome host. */
+/** ``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the selected route is the welcome host. ``live_ok`` independently reports an opt-in HTTP probe. */
 export interface SetupRuntimeCheckResult {
+  live_ok?: boolean | null
+  latency_ms?: number | null
+  error_kind?: 'auth' | 'not_found' | 'rate_limit' | 'network' | 'timeout' | 'server' | 'unknown' | null
+  reason?: string | null
   ok: boolean
   provider?: string | null
   model?: string | null

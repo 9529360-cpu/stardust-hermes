@@ -132,12 +132,18 @@ method("setup.status", params=ProfileParams, result=SetupStatusResult,
 
 class SetupRuntimeCheckParams(ProfileParams):
     provider: str | None = None
+    live: bool = False
+    timeout_s: float = Field(default=8, gt=0, le=30)
 
 
 class SetupRuntimeCheckResult(Result):
     """``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the
-    selected route is the welcome host."""
+    selected route is the welcome host. ``live_ok`` independently reports an opt-in HTTP probe."""
 
+    live_ok: bool | None = None
+    latency_ms: float | None = None
+    error_kind: Literal["auth", "not_found", "rate_limit", "network", "timeout", "server", "unknown"] | None = None
+    reason: str | None = None
     ok: bool
     provider: str | None = None
     model: str | None = None

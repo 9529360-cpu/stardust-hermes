@@ -1240,7 +1240,10 @@ def _load_cfg_raw() -> dict:
     global _cfg_cache, _cfg_sig, _cfg_path
     with contextlib.suppress(Exception):
         p = _active_config_path()
-        sig = path_signature(p) if p.exists() else None
+        # Some virtual filesystems preserve even ctime on a same-size rewrite.
+        # This write-back cache must never return stale data based only on metadata.
+        import hashlib
+        sig = (path_signature(p), hashlib.blake2b(p.read_bytes(), digest_size=16).digest()) if p.exists() else None
         with _cfg_lock:
             if _cfg_cache is not None and _cfg_sig == sig and _cfg_path == p:
                 return copy.deepcopy(_cfg_cache)

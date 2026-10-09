@@ -27876,6 +27876,18 @@
             ],
             "default": null,
             "title": "Provider"
+          },
+          "live": {
+            "default": false,
+            "title": "Live",
+            "type": "boolean"
+          },
+          "timeout_s": {
+            "default": 8,
+            "exclusiveMinimum": 0,
+            "maximum": 30,
+            "title": "Timeout S",
+            "type": "number"
           }
         },
         "title": "SetupRuntimeCheckParams",
@@ -27883,8 +27895,65 @@
       },
       "SetupRuntimeCheckResult": {
         "additionalProperties": false,
-        "description": "``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the\nselected route is the welcome host.",
+        "description": "``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the\nselected route is the welcome host. ``live_ok`` independently reports an opt-in HTTP probe.",
         "properties": {
+          "live_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Live Ok"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Latency Ms"
+          },
+          "error_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auth",
+                  "not_found",
+                  "rate_limit",
+                  "network",
+                  "timeout",
+                  "server",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Kind"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
           "ok": {
             "title": "Ok",
             "type": "boolean"
