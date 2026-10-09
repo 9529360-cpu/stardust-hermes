@@ -1895,6 +1895,8 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
         if _should_skip_fallback_candidate(agent, fb, fb_key, fb_provider, fb_model, unavailable):
             continue
 
+        candidate_probe_id = None
+        candidate_probe_route = None
         try:
             from agent.auxiliary_client import resolve_provider_client
             from hermes_cli.fallback_config import resolve_entry_api_key
@@ -1922,10 +1924,12 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
             # Re-check the final resolved route for every entry. Explicit base URLs were
             # preflighted without claiming a half-open lease, so this is the single claim
             # point and cannot self-block on the lease it just created.
-            from agent.route_health import allow_route
-            allowed, retry_after, resolved_health_state = allow_route(
-                fb_provider, fb_model, fb_base_url, claim_probe=True,
+            from agent.route_health import allow_route_with_probe_id
+            allowed, retry_after, resolved_health_state, candidate_probe_id = allow_route_with_probe_id(
+                fb_provider, fb_model, fb_base_url,
             )
+            if candidate_probe_id:
+                candidate_probe_route = (fb_provider, fb_model, fb_base_url)
             if not allowed:
                 logger.info(
                     "Fallback skip after resolution: %s/%s circuit is %s (retry in ~%ss)",
@@ -1990,6 +1994,9 @@ def try_activate_fallback(agent, reason: "FailoverReason | None" = None) -> bool
                 model=agent.model, base_url=agent.base_url, provider=fb_provider, is_codex_backend=fb_provider == "openai-codex")
             return True
         except Exception as e:
+            if candidate_probe_id and candidate_probe_route:
+                from agent.route_health import release_probe
+                release_probe(*candidate_probe_route, candidate_probe_id)
             if fb_provider == "nous":
                 unavailable.add(fb_key)
             logger.error("Failed to activate fallback %s: %s", fb_model, e)

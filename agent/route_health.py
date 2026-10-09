@@ -12,6 +12,7 @@ import errno
 import json
 import logging
 import os
+import secrets
 import threading
 import time
 from pathlib import Path
@@ -223,6 +224,7 @@ def record_failure(provider: str, model: str, base_url: str = "", reason: Failov
                     "consecutive_failures": failures,
                     "cooldown_until": now + cooldown,
                     "probe_until": 0,
+                    "probe_id": None,
                     "last_failure_at": now,
                     "last_success_at": previous.get("last_success_at"),
                 }
@@ -236,15 +238,15 @@ def record_failure(provider: str, model: str, base_url: str = "", reason: Failov
             return 0
 
 
-def allow_route(provider: str, model: str, base_url: str = "", *, claim_probe: bool = True) -> tuple[bool, int, str]:
-    """Return ``(allowed, retry_after_seconds, state)``.
-
-    Once an open route's cooldown expires, exactly one local caller claims a short
-    half-open probe lease.  Other sessions keep using fallbacks until that probe either
-    succeeds or its lease expires.  File errors fail open.
-    """
+def _allow_route(
+    provider: str,
+    model: str,
+    base_url: str,
+    *,
+    claim_probe: bool,
+) -> tuple[bool, int, str, str | None]:
     if not enabled() or not provider or not model:
-        return True, 0, "disabled"
+        return True, 0, "disabled", None
     now = time.time()
     key, identity = route_identity(provider, model, base_url)
     with _LOCK:
@@ -253,27 +255,84 @@ def allow_route(provider: str, model: str, base_url: str = "", *, claim_probe: b
                 state = _read_state()
                 row = state["routes"].get(key)
                 if not isinstance(row, dict):
-                    return True, 0, "healthy"
+                    return True, 0, "healthy", None
                 cooldown_until = float(row.get("cooldown_until") or 0)
                 if cooldown_until > now:
-                    return False, max(1, int(cooldown_until - now + 0.999)), "open"
+                    return False, max(1, int(cooldown_until - now + 0.999)), "open", None
                 probe_until = float(row.get("probe_until") or 0)
                 if probe_until > now:
-                    return False, max(1, int(probe_until - now + 0.999)), "half_open_busy"
+                    return False, max(1, int(probe_until - now + 0.999)), "half_open_busy", None
                 if not claim_probe or row.get("status") == "healthy":
-                    return True, 0, "healthy"
+                    return True, 0, "healthy", None
                 lease = max(5, int(_config().get("probe_lease_seconds") or _DEFAULT_PROBE_LEASE_S))
+                probe_id = secrets.token_hex(16)
                 state["routes"][key] = {
-                    **row, **identity, "status": "half_open", "probe_until": now + lease,
+                    **row,
+                    **identity,
+                    "status": "half_open",
+                    "probe_until": now + lease,
+                    "probe_id": probe_id,
                 }
                 try:
                     _write_state(state)
                 except Exception as exc:
                     logger.warning("Could not claim route health probe; failing open: %s", exc)
-                return True, 0, "half_open_probe"
+                return True, 0, "half_open_probe", probe_id
         except (OSError, TimeoutError) as exc:
             logger.warning("Could not lock route health probe state; failing open: %s", exc)
-            return True, 0, "healthy"
+            return True, 0, "healthy", None
+
+
+def allow_route(provider: str, model: str, base_url: str = "", *, claim_probe: bool = True) -> tuple[bool, int, str]:
+    """Return ``(allowed, retry_after_seconds, state)``.
+
+    Once an open route's cooldown expires, exactly one local caller claims a short
+    half-open probe lease.  Other sessions keep using fallbacks until that probe either
+    succeeds or its lease expires.  File errors fail open.
+    """
+    allowed, retry_after, health_state, _probe_id = _allow_route(
+        provider, model, base_url, claim_probe=claim_probe,
+    )
+    return allowed, retry_after, health_state
+
+
+def allow_route_with_probe_id(
+    provider: str,
+    model: str,
+    base_url: str = "",
+) -> tuple[bool, int, str, str | None]:
+    """Claim a route probe and return its unique ID for failure cleanup."""
+    return _allow_route(provider, model, base_url, claim_probe=True)
+
+
+def release_probe(provider: str, model: str, base_url: str, probe_id: str) -> None:
+    """Release a half-open lease if it is still owned by this failed activation."""
+    if not enabled() or not provider or not model or not probe_id:
+        return
+    key, _identity = route_identity(provider, model, base_url)
+    with _LOCK:
+        try:
+            with _state_file_lock():
+                state = _read_state()
+                row = state["routes"].get(key)
+                if (
+                    not isinstance(row, dict)
+                    or row.get("status") != "half_open"
+                    or row.get("probe_id") != probe_id
+                ):
+                    return
+                state["routes"][key] = {
+                    **row,
+                    "status": "open",
+                    "probe_until": 0,
+                    "probe_id": None,
+                }
+                try:
+                    _write_state(state)
+                except Exception as exc:
+                    logger.warning("Could not release route health probe; lease will expire: %s", exc)
+        except (OSError, TimeoutError) as exc:
+            logger.warning("Could not lock route health probe release; lease will expire: %s", exc)
 
 
 def record_success(provider: str, model: str, base_url: str = "") -> None:
@@ -294,6 +353,7 @@ def record_success(provider: str, model: str, base_url: str = "") -> None:
                     "consecutive_failures": 0,
                     "cooldown_until": 0,
                     "probe_until": 0,
+                    "probe_id": None,
                     "last_failure_at": previous.get("last_failure_at"),
                     "last_success_at": now,
                 }
