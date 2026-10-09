@@ -8,7 +8,6 @@ detail into one payload for the desktop card, the ``permissions`` CLI and ``/api
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 from contextlib import suppress
@@ -20,30 +19,28 @@ _RUNTIME_PLATFORMS = frozenset({"darwin", "win32", "linux"})  # mirrors the tool
 _BOOLS = ("accessibility", "screen_recording", "screen_recording_capturable")
 
 def _child_env() -> Dict[str, str]:
-    """cua-driver child env (telemetry policy + provider secrets stripped); ``os.environ`` on import error.
+    """cua-driver child env (telemetry policy + provider secrets stripped).
 
     cua-driver is a third-party binary — it must never inherit provider API keys (#53503/#55709/#58889
-    lineage). Each layer degrades gracefully so permission probes never break on a helper import error.
+    lineage). If the sanitizer is unavailable, fail closed and do not launch the driver.
     """
-    try:
-        from tools.computer_use.cua_backend import sanitized_cua_driver_env
-        return sanitized_cua_driver_env()
-    except Exception:
-        return dict(os.environ)
+    from tools.computer_use.cua_backend import sanitized_cua_driver_env
+    return sanitized_cua_driver_env()
 
-def _run(binary: str, *args: str, timeout: float) -> subprocess.CompletedProcess:
+def _run(binary: str, *args: str, timeout: float, env: Optional[Dict[str, str]] = None) -> subprocess.CompletedProcess:
     return subprocess.run([binary, *args], capture_output=True, text=True, encoding='utf-8', errors='replace',
-                          timeout=timeout, env=_child_env(), stdin=subprocess.DEVNULL, creationflags=windows_hide_flags())
+                          timeout=timeout, env=_child_env() if env is None else env, stdin=subprocess.DEVNULL,
+                          creationflags=windows_hide_flags())
 
-def _json_out(binary: str, *args: str, timeout: float) -> Any:
+def _json_out(binary: str, *args: str, timeout: float, env: Optional[Dict[str, str]] = None) -> Any:
     """Run ``binary args`` and parse stdout as JSON (``None`` on empty output)."""
-    raw = (_run(binary, *args, timeout=timeout).stdout or "").strip()
+    raw = (_run(binary, *args, timeout=timeout, env=env).stdout or "").strip()
     return json.loads(raw) if raw else None
 
-def _doctor(binary: str) -> Optional[Dict[str, Any]]:
+def _doctor(binary: str, env: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
     """``cua-driver doctor --json`` → ``{ok, checks:[{label,status,message}]}`` (None on any failure)."""
     try:
-        data = _json_out(binary, "doctor", "--json", timeout=12)
+        data = _json_out(binary, "doctor", "--json", timeout=12, env=env)
     except Exception:
         data = None
     if not isinstance(data, dict):
@@ -51,10 +48,10 @@ def _doctor(binary: str) -> Optional[Dict[str, Any]]:
     checks = [{k: str(p.get(k, "")) for k in ("label", "status", "message")} for p in data.get("probes", []) if isinstance(p, dict)]
     return {"ok": bool(data.get("ok")), "checks": checks}
 
-def _mac_permissions(binary: str, out: Dict[str, Any]) -> None:
+def _mac_permissions(binary: str, out: Dict[str, Any], env: Optional[Dict[str, str]] = None) -> None:
     """Fold ``cua-driver permissions status --json`` booleans (+ ``source``) into ``out``."""
     try:
-        data = _json_out(binary, "permissions", "status", "--json", timeout=10)
+        data = _json_out(binary, "permissions", "status", "--json", timeout=10, env=env)
     except subprocess.TimeoutExpired:
         out["error"] = "cua-driver permissions status timed out"
     except Exception as exc:  # spawn failure or malformed JSON
@@ -76,13 +73,18 @@ def computer_use_status(driver_cmd: Optional[str] = None) -> Dict[str, Any]:
                            "checks": [], "source": None, "error": None, **{k: None for k in _BOOLS}}
     if not binary:
         return out
+    try:
+        child_env = _child_env()
+    except Exception:
+        out["error"] = "Could not prepare a sanitized environment; cua-driver was not launched"
+        return out
     with suppress(Exception):
-        out["version"] = (_run(binary, "--version", timeout=5).stdout or "").strip() or None
-    doctor = _doctor(binary)
+        out["version"] = (_run(binary, "--version", timeout=5, env=child_env).stdout or "").strip() or None
+    doctor = _doctor(binary, child_env)
     if doctor is not None:
         out["checks"] = doctor["checks"]
     if plat == "darwin":
-        _mac_permissions(binary, out)
+        _mac_permissions(binary, out, child_env)
         if out["error"] is None:
             out["ready"] = out["accessibility"] is True and out["screen_recording"] is True
     elif doctor is not None:
@@ -100,10 +102,11 @@ def request_permissions_grant(driver_cmd: Optional[str] = None) -> int:
     if not binary:
         print("cua-driver: not installed. Run: hermes computer-use install")
         return 2
-    print("Requesting Accessibility + Screen Recording for CuaDriver.\n"
-          "macOS will show a dialog attributed to CuaDriver (com.trycua.driver) — approve it, then return here.")
     try:
-        return int(subprocess.run([binary, "permissions", "grant"], env=_child_env(), stdin=subprocess.DEVNULL).returncode)
+        env = _child_env()
+        print("Requesting Accessibility + Screen Recording for CuaDriver.\n"
+              "macOS will show a dialog attributed to CuaDriver (com.trycua.driver) — approve it, then return here.")
+        return int(subprocess.run([binary, "permissions", "grant"], env=env, stdin=subprocess.DEVNULL).returncode)
     except KeyboardInterrupt:  # pragma: no cover - interactive
         return 130
     except Exception as exc:  # pragma: no cover - defensive

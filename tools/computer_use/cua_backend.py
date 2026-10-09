@@ -114,14 +114,17 @@ def cua_driver_child_env(base_env: Optional[Dict[str, str]] = None) -> Dict[str,
 
 def sanitized_cua_driver_env() -> Dict[str, str]:
     """``cua_driver_child_env()`` with Hermes provider secrets stripped — cua-driver is a third-party binary and must
-    never inherit API keys. Falls back to the unsanitized telemetry env if the sanitizer can't import."""
+    never inherit API keys. If sanitization is unavailable, refuse to launch it rather than leaking credentials."""
     env = cua_driver_child_env()
-    with contextlib.suppress(Exception):
+    try:
         # cua-driver is a third-party binary — never hand it provider API keys via inherited env (same
         # policy as the manifest probe and MCP spawn; #53503/#55709/#58889 lineage).
         from tools.environments.local import _sanitize_subprocess_env
         return _sanitize_subprocess_env(env)
-    return env
+    except Exception as exc:
+        raise RuntimeError(
+            "Could not prepare a sanitized environment; refusing to launch cua-driver"
+        ) from exc
 
 def _run_quiet(argv: List[str], *, timeout: float, swallow: Any = (), **kw: Any) -> Any:
     """``subprocess.run`` for short probe verbs: text mode, stdin=DEVNULL unless overridden (older drivers fall into a
