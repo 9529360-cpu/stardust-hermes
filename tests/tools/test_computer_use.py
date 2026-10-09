@@ -1978,6 +1978,15 @@ class TestImageMimeTypePropagation:
     fallback for older cua-driver builds.
     """
 
+    _JPEG_B64 = (
+        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////"
+        "////////////////////////////////////////////////////////2wBDAf//"
+        "////////////////////////////////////////////////////////////////"
+        "////////////////////wAARCAAIAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAA"
+        "AAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAA"
+        "AAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKAA/9k="
+    )
+
     def test_extract_tool_result_captures_mime_alongside_image(self):
         from unittest.mock import MagicMock
         from tools.computer_use.cua_backend_parse import _extract_tool_result
@@ -1996,25 +2005,25 @@ class TestImageMimeTypePropagation:
         assert out["images"] == ["iVBORw0K..."]
         assert out["image_mime_types"] == ["image/png"]
 
-    def test_capture_response_uses_explicit_mime_when_provided(self):
+    def test_capture_response_uses_explicit_mime_when_provided(self, monkeypatch):
+        from tools.computer_use import tool as cu_tool
         from tools.computer_use.backend import CaptureResult
-        from tools.computer_use.tool import _capture_response
+
+        monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision", lambda: False)
 
         cap = CaptureResult(
             mode="vision",
             width=100, height=100,
-            png_b64="anything-not-a-real-jpeg-prefix-but-mime-says-jpeg",
+            png_b64=self._JPEG_B64,
             image_mime_type="image/jpeg",
             png_bytes_len=10,
         )
-        resp = _capture_response(cap)
-        # _capture_response only returns the _multimodal envelope when the
-        # image is wired into the response.
-        if isinstance(resp, dict) and resp.get("_multimodal"):
-            url = resp["content"][1]["image_url"]["url"]
-            assert url.startswith("data:image/jpeg;base64,"), (
-                f"explicit mime=image/jpeg should win over sniff; got {url[:32]}"
-            )
+        resp = cu_tool._capture_response(cap)
+        assert resp["_multimodal"] is True
+        url = resp["content"][1]["image_url"]["url"]
+        assert url.startswith("data:image/jpeg;base64,"), (
+            f"explicit mime=image/jpeg should win over sniff; got {url[:32]}"
+        )
 
 class TestMcpInvocationResolution:
     """Surface 8 (NousResearch/hermes-agent#47072): instead of hardcoding
@@ -2671,6 +2680,50 @@ class TestCaptureScreenshotPersistence:
         assert "MEDIA:" not in out["text_summary"]
         assert screenshot_path.startswith(str(tmp_path / "cache" / "images"))
         assert Path(screenshot_path).read_bytes() == base64.b64decode(self._PNG_B64)
+
+    def test_invalid_base64_capture_degrades_to_text_without_image_side_effects(self, tmp_path, monkeypatch):
+        from tools.computer_use.backend import UIElement
+        from tools.computer_use import tool as cu_tool
+
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision",
+                            lambda: pytest.fail("invalid image must not route to auxiliary vision"))
+        cap = self._capture()
+        cap.png_b64 = "not-base64%%"
+        cap.elements = [UIElement(index=1, role="Button", label="OK")]
+
+        out = cu_tool._capture_response(cap)
+
+        assert isinstance(out, str)
+        payload = json.loads(out)
+        assert payload["image_invalid"] is True
+        assert "malformed or truncated" in payload["summary"]
+        assert payload["elements"][0]["label"] == "OK"
+        assert not (tmp_path / "cache" / "images").exists()
+
+    def test_truncated_png_capture_degrades_to_text_with_diagnostic(self):
+        from tools.computer_use import tool as cu_tool
+
+        cap = self._capture()
+        raw_png = base64.b64decode(self._PNG_B64)[:-12]
+        cap.png_b64 = base64.b64encode(raw_png).decode("ascii")
+
+        out = cu_tool._capture_response(cap)
+
+        assert isinstance(out, str)
+        payload = json.loads(out)
+        assert payload["image_invalid"] is True
+        assert "malformed or truncated" in payload["summary"]
+
+    def test_valid_png_remains_multimodal(self, monkeypatch):
+        from tools.computer_use import tool as cu_tool
+
+        monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision", lambda: False)
+
+        out = cu_tool._capture_response(self._capture())
+
+        assert out["_multimodal"] is True
+        assert out["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
 
     def test_capture_cache_is_bounded(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
