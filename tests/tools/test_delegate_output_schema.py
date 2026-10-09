@@ -91,6 +91,18 @@ class TestValidateOutput:
         assert ok is False
         assert errors and any("$.city: 7" in error for error in errors)
 
+    def test_nested_object_cannot_mask_malformed_final_candidate(self):
+        text = 'Final: {"city": nope, "example": {"city": "Lima"}}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_malformed_example_does_not_hide_later_final_candidate(self):
+        text = 'Example: {"city": nope}\nFinal: {"city": "Lima"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
     def test_empty_text_is_invalid(self):
         ok, errors = validate_output("", ADDRESS_SCHEMA)
         assert ok is False

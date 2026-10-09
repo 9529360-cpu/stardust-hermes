@@ -70,6 +70,36 @@ def _candidate_source(text: str) -> str:
     return raw
 
 
+def _json_candidate_end(raw: str, start: int) -> Optional[int]:
+    """Return the end of a balanced object/array span, or ``None`` if unbalanced."""
+    pairs = {"}": "{", "]": "["}
+    stack = [raw[start]]
+    in_string = False
+    escaped = False
+
+    for index in range(start + 1, len(raw)):
+        char = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char in "}]":
+            if not stack or stack[-1] != pairs[char]:
+                return None
+            stack.pop()
+            if not stack:
+                return index + 1
+    return None
+
+
 def _json_candidates(raw: str) -> List[Tuple[str, Any]]:
     """Return complete object/array candidates in text order, skipping nested spans once parsed."""
     decoder = json.JSONDecoder()
@@ -85,7 +115,12 @@ def _json_candidates(raw: str) -> List[Tuple[str, Any]]:
         try:
             parsed, end = decoder.raw_decode(raw, start)
         except json.JSONDecodeError:
-            cursor = start + 1
+            # Do not promote a valid-looking nested value from inside a malformed
+            # outer object/array. It is not an independent final JSON candidate.
+            end = _json_candidate_end(raw, start)
+            if end is None:
+                break
+            cursor = end
             continue
         candidates.append((raw[start:end], parsed))
         cursor = end
