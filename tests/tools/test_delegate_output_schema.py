@@ -157,6 +157,18 @@ class TestValidateOutput:
         assert ok is False
         assert errors
 
+    def test_final_marker_inside_json_string_is_not_an_answer_boundary(self):
+        text = '{"city": "Final: Lima"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
+    def test_final_marker_inside_json_string_after_outer_label_is_not_a_boundary(self):
+        text = 'Final: {"city": "Lima", "note": "Final: draft"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
     def test_nested_object_cannot_mask_malformed_final_candidate(self):
         text = 'Final: {"city": nope, "example": {"city": "Lima"}}'
         ok, errors = validate_output(text, ADDRESS_SCHEMA)

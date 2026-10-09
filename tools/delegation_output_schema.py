@@ -130,6 +130,40 @@ def _json_candidates(raw: str) -> List[Tuple[str, Optional[Any], Optional[str]]]
     return candidates
 
 
+def _last_final_label_end(raw: str) -> Optional[int]:
+    """Find the last prose-level ``Final:`` marker outside JSON containers/strings."""
+    pairs = {"}": "{", "]": "["}
+    stack: List[str] = []
+    in_string = False
+    escaped = False
+    final_end: Optional[int] = None
+    index = 0
+    while index < len(raw):
+        if not stack and not in_string:
+            match = re.match(r"(?i)\bfinal\s*:", raw[index:])
+            if match:
+                final_end = index + match.end()
+                index = final_end
+                continue
+        char = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char in "}]":
+            if stack and stack[-1] == pairs[char]:
+                stack.pop()
+        index += 1
+    return final_end
+
+
 def extract_json_candidate(text: str) -> str:
     """Strip prose/fences and return the last complete object or array candidate."""
     raw = _candidate_source(text)
@@ -160,9 +194,9 @@ def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]
     # never become the result merely because final text is prose, empty, or a
     # scalar. Keep scanning within that final segment so prose/fence wrappers
     # around a valid JSON value remain supported.
-    final_matches = list(re.finditer(r"(?i)\bfinal\s*:", raw))
-    if final_matches:
-        raw = raw[final_matches[-1].end() :]
+    final_end = _last_final_label_end(raw)
+    if final_end is not None:
+        raw = raw[final_end:]
     # Labels are prose, but should not obscure fenced JSON that follows them.
     raw = re.sub(r"(?im)(\bfinal\s*:\s*)```(?:json)?\s*", r"\1", raw)
     candidates = _json_candidates(raw)
