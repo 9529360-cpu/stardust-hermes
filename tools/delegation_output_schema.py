@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,30 @@ def _json_candidate_end(raw: str, start: int) -> Optional[int]:
     return None
 
 
+def _explicit_final_candidate(raw: str) -> Optional[Tuple[str, Optional[Any], Optional[str]]]:
+    """Return the candidate after the last explicit ``Final:`` label.
+
+    ``parsed`` is absent when the labeled final value is malformed or truncated;
+    that state must not fall back to a valid example earlier in the response.
+    """
+    matches = list(re.finditer(r"(?im)^\s*final\s*:\s*", raw))
+    if not matches:
+        return None
+
+    start = matches[-1].end()
+    while start < len(raw) and raw[start].isspace():
+        start += 1
+    if start >= len(raw) or raw[start] not in "[{":
+        return (raw[start:].strip(), None, "Final response did not contain a JSON object or array.")
+
+    decoder = json.JSONDecoder()
+    try:
+        parsed, end = decoder.raw_decode(raw, start)
+    except json.JSONDecodeError as exc:
+        return (raw[start:].strip(), None, f"Response is not valid JSON: {exc}")
+    return (raw[start:end], parsed, None)
+
+
 def _json_candidates(raw: str) -> List[Tuple[str, Any]]:
     """Return complete object/array candidates in text order, skipping nested spans once parsed."""
     decoder = json.JSONDecoder()
@@ -152,7 +177,14 @@ def extract_json_candidate(text: str) -> str:
 def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """``(True, [])`` or ``(False, errors)`` with strings suitable for the retry turn."""
     raw = _candidate_source(text or "")
-    candidates = _json_candidates(raw)
+    explicit_final = _explicit_final_candidate(raw)
+    if explicit_final is not None:
+        candidate, parsed, parse_error = explicit_final
+        if parse_error:
+            return False, [parse_error]
+        candidates = [(candidate, parsed)]
+    else:
+        candidates = _json_candidates(raw)
     if not candidates:
         candidate = extract_json_candidate(raw)
         if not candidate.strip():

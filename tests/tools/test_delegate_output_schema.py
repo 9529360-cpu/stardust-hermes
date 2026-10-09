@@ -91,6 +91,30 @@ class TestValidateOutput:
         assert ok is False
         assert errors and any("$.city: 7" in error for error in errors)
 
+    def test_valid_example_does_not_mask_syntax_error_in_final_candidate(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": nope}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_nested_object_in_malformed_final(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": nope, "nested": {"city": "Lima"}}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_truncated_final_candidate(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": "Lima"'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_truncated_final_with_nested_object(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": "Lima", "nested": {"city": "Oslo"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
     def test_nested_object_cannot_mask_malformed_final_candidate(self):
         text = 'Final: {"city": nope, "example": {"city": "Lima"}}'
         ok, errors = validate_output(text, ADDRESS_SCHEMA)
