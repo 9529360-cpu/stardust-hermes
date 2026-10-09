@@ -55,6 +55,30 @@ class CopilotACPClientSafetyTests(unittest.TestCase):
         )
         self.assertEqual(chunks[1].choices, [])
 
+    def test_tool_call_arguments_may_contain_the_closing_tag_text(self) -> None:
+        arguments = json.dumps({"query": "include literal }</tool_call> text"})
+        tool_response = "Before.\n<tool_call>" + json.dumps({
+            "function": {"name": "memory", "arguments": arguments},
+            "type": "function",
+            "id": "call_boundary",
+        }) + "</tool_call>\nAfter."
+
+        with patch.object(self.client, "_run_prompt", return_value=(tool_response, "")):
+            completion = self.client._create_chat_completion(
+                model="copilot-acp",
+                messages=[{"role": "user", "content": "search the query"}],
+                stream=False,
+            )
+
+        choice = completion.choices[0]
+        self.assertEqual(choice.finish_reason, "tool_calls")
+        self.assertEqual(choice.message.content, "Before.\nAfter.")
+        self.assertEqual(len(choice.message.tool_calls), 1)
+        call = choice.message.tool_calls[0]
+        self.assertEqual(call.id, "call_boundary")
+        self.assertEqual(call.function.name, "memory")
+        self.assertEqual(json.loads(call.function.arguments), {"query": "include literal }</tool_call> text"})
+
 
     def _dispatch(self, message: dict, *, cwd: str) -> dict:
         process = _FakeProcess()
