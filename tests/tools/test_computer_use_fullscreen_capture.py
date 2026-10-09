@@ -144,8 +144,9 @@ class TestFullScreenLane:
         assert "capture(app='desktop')" in cap.note
         assert "capture(app='<AppName>')" in cap.note
 
-    def test_capture_scope_switched_and_restored(self):
-        session = _FakeSession(capture_scope="window")
+    @pytest.mark.parametrize("scope", ["window", "auto"])
+    def test_capture_scope_switched_and_restored(self, scope):
+        session = _FakeSession(capture_scope=scope)
         backend = _make_backend(session)
 
         backend.capture(mode="vision", app="screen")
@@ -153,9 +154,9 @@ class TestFullScreenLane:
         set_calls = session.called("set_config")
         assert {"key": "capture_scope", "value": "desktop",
                 "session": "test-session"} in set_calls
-        assert {"key": "capture_scope", "value": "window",
+        assert {"key": "capture_scope", "value": scope,
                 "session": "test-session"} in set_calls
-        assert session._scope == "window", "prior scope must be restored"
+        assert session._scope == scope, "prior scope must be restored"
 
     def test_scope_untouched_when_already_desktop(self):
         session = _FakeSession(capture_scope="desktop")
