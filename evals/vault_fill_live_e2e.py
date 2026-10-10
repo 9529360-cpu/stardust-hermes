@@ -60,6 +60,11 @@ def _exec(code: str) -> dict:
 
 
 def main() -> int:
+    # This live harness runs the browser-use CLI on purpose. It records the standing "always" decision a user
+    # would make for browser_exec host Python, in memory only, so the approval gate is exercised without a prompt.
+    from tools import approval
+
+    approval.approve_permanent("plugin_rule:browser_exec_host_python")
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     origin = f"http://127.0.0.1:{srv.server_address[1]}"

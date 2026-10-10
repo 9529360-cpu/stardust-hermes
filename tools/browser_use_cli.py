@@ -633,6 +633,7 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
     isolation does not sandbox that interpreter, so every call needs explicit
     human approval (the same gate as sensitive page evaluation).
     """
+    from agent.redact import redact_sensitive_text
     from tools.approval import request_tool_approval
     from tools.registry import tool_result
     if not code or not code.strip():
@@ -640,11 +641,22 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
             "No code provided. Pass Python that uses the pre-imported helpers, e.g. new_tab(\"https://example.com\") then print(page_info()).",
             "invalid_request",
         )
+    if session and not _SESSION_RE.match(session):
+        return _browser_exec_error(
+            f"Invalid session name {session!r}: use 1-64 letters, digits, "
+            "dashes, or underscores (e.g. 'r7k2').",
+            "invalid_session",
+        )
+    blocked = _blocked_url_in_code(code)
+    if blocked:
+        return _browser_exec_error(blocked, "unsafe_url")
 
-    preview = " ".join(code.split())[:200]
+    # Pure validation runs first, so a call that can never succeed never prompts the user. The prompt
+    # shows the whole program, redacted the same way the audit log redacts it, so nothing is hidden.
     approval = request_tool_approval(
         "browser_exec",
-        f"browser_exec wants to run Python on this machine through the browser-use CLI: {preview}",
+        "browser_exec wants to run this Python on this machine through the browser-use CLI:\n"
+        + redact_sensitive_text(code, force=True, redact_url_credentials=True),
         rule_key="browser_exec_host_python",
     )
     if not approval.get("approved"):
@@ -652,10 +664,6 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
             approval.get("message") or "browser_exec was not approved to run on this machine.",
             "approval_denied",
         )
-
-    blocked = _blocked_url_in_code(code)
-    if blocked:
-        return _browser_exec_error(blocked, "unsafe_url")
 
     cmd = _find_cli()
     if not cmd:
@@ -668,12 +676,6 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
 
     env = _base_subprocess_env()
     if session:
-        if not _SESSION_RE.match(session):
-            return _browser_exec_error(
-                f"Invalid session name {session!r}: use 1-64 letters, digits, "
-                "dashes, or underscores (e.g. 'r7k2').",
-                "invalid_session",
-            )
         env["BU_NAME"] = session
     route_err = _route_backend(env, session, task_id, bool(local))
     if route_err:
