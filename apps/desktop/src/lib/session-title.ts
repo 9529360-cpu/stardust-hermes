@@ -1,14 +1,28 @@
 /** Longest first-message excerpt a session falls back to, counted in characters. */
 export const SESSION_TITLE_EXCERPT_CHARS = 40
 
+/** The bot plugin's registry title (`CANONICAL_CHAT_TITLE` in
+ *  plugins/hermes-bots/canonical-chat.ts). Restated here because the core
+ *  sidebar must not import a plugin module. */
+export const CANONICAL_BOT_CHAT_TITLE = 'Bot Chat'
+
+/**
+ * Is this row a bot's canonical Bot Chat? The backend decides it the same way
+ * (hermes_state_titles.py): the registry title on a HIDDEN session. A visible
+ * session that merely has the name is an ordinary chat, and a hidden side-chat
+ * keeps its own name, so neither is canonical.
+ */
+export function isCanonicalBotChatSession(session: { hidden?: boolean | number | null; title?: null | string }): boolean {
+  return Boolean(session.hidden) && session.title?.trim() === CANONICAL_BOT_CHAT_TITLE
+}
+
 /**
  * Titles that name plumbing, not a conversation: the bot plugin's registry row
- * (`CANONICAL_CHAT_TITLE` in plugins/hermes-bots/canonical-chat.ts) and the
- * `handoff-<8 chars>` row a handoff writes. A person never chose either, so a
- * row or tab must not show them.
+ * (`CANONICAL_BOT_CHAT_TITLE`) and the `handoff-<8 chars>` row a handoff writes.
+ * A person never chose either, so a row or tab must not show them.
  */
 export function isInternalSessionTitle(title: string): boolean {
-  return title === 'Bot Chat' || /^handoff-[\w-]{8}$/.test(title)
+  return title === CANONICAL_BOT_CHAT_TITLE || /^handoff-[\w-]{8}$/.test(title)
 }
 
 /** The text on one line, at most `max` characters (code points), with an ellipsis when cut. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  isCanonicalBotChatSession,
   isInternalSessionTitle,
   oneLineExcerpt,
   SESSION_TITLE_EXCERPT_CHARS,
@@ -57,5 +58,19 @@ describe('isInternalSessionTitle', () => {
     expect(isInternalSessionTitle('handoff-20260101')).toBe(true)
     expect(isInternalSessionTitle('Bot Chat notes')).toBe(false)
     expect(isInternalSessionTitle('handoff-notes')).toBe(false)
+  })
+})
+
+describe('isCanonicalBotChatSession', () => {
+  it('is the hidden session holding the registry title, as the backend decides it', () => {
+    expect(isCanonicalBotChatSession({ hidden: 1, title: 'Bot Chat' })).toBe(true)
+    expect(isCanonicalBotChatSession({ hidden: true, title: ' Bot Chat ' })).toBe(true)
+  })
+
+  it('is not a visible session that merely has the name, a hidden side-chat, or an untitled hidden row', () => {
+    expect(isCanonicalBotChatSession({ hidden: 0, title: 'Bot Chat' })).toBe(false)
+    expect(isCanonicalBotChatSession({ hidden: 1, title: 'Side question' })).toBe(false)
+    expect(isCanonicalBotChatSession({ hidden: 1, title: null })).toBe(false)
+    expect(isCanonicalBotChatSession({ title: 'Bot Chat' })).toBe(false)
   })
 })
