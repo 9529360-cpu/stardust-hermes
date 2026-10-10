@@ -21,7 +21,8 @@
 
 - Work ID 为 `cron:<execution_id>`。没有 `id` 的记录直接跳过。
 - `detail` 只保留白名单字段：`job_id`、`source`、`delivery_outcome`、`error`。`error` 在台账边界强制脱敏，调用的是 `redact_sensitive_text(force=True, redact_url_credentials=True)`。
-- 标题取任务名。读不到任务名时回退为 `Cron job <job_id>`。
+- 标题固定为 `Cron job <job_id>`，不读取任务名。未显式命名的任务，任务名取自提示词的前 50 个字符，因此名字不能离开服务端。
+- 账本文件不存在时返回空列表，读取路径不会创建它（`executions_db_exists`）。
 - 执行记录读取失败时，记录 warning 并跳过 cron 项，其它工作照常返回（`cron_work_items`）。
 - 取消：cron 执行派发后不可取消。`cancel_work` 对运行中的 cron 项返回 `unavailable`，对已结束的返回 `already_finished`。
 
@@ -38,7 +39,8 @@
 
 **profile 级只读视图 `cron.executions.list`（已决定，后端已实现）**
 
-- 授权与现有的 `cron.manage` list 完全相同：都经 `_scoped_rpc`（`tui_gateway/methods_tools.py`）解析 `profile`。未知 profile 返回 4064，函数体在该 profile 的 HERMES_HOME 下执行。它不要求 session、transport 或 generation 证明，因为数据不属于某个会话，而是 profile 自己的定时任务历史。能读到 cron.manage list 的调用方才能读到它，它不授予任何新权限。
+- 授权：`profile` 的解析与 `cron.manage` list 相同（`_profile_home`），未知或已删除（墓碑）的 profile 返回 4064。它不要求 session、transport 或 generation 证明，因为数据不属于某个会话，而是 profile 自己的定时任务历史。能读到 cron.manage list 的调用方才能读到它，它不授予任何新权限。
+- 绑定范围：函数体只绑定该 profile 的 HERMES_HOME（`_home_scoped_rpc`），不绑定密钥和终端环境。`_scoped_rpc` 会绑定这些，每次调用都会重新拉取外部密钥源，而桌面每 5 秒轮询一次，所以这里不能用它。
 - 只读：没有新增、修改、暂停、删除或取消。定时任务派发后不可取消，`work.cancel` 对 cron 项的行为不变。
 - 数据最小化：只返回白名单字段（work item 的 id、kind、title、status、started_at、updated_at，以及 detail 中的 job_id、source、delivery_outcome、error）。error 经 `redact_sensitive_text(force=True)` 脱敏。不返回提示词、投递目标、pid、process_id、输出或密钥。
 - 数量：limit 默认 20，夹在 1 到 50 之间，按时间倒序。
