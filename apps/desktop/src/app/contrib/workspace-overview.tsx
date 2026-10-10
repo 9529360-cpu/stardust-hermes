@@ -1,10 +1,8 @@
-import type { WorkCancelResult, WorkItem, WorkListResult } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { openAgentTerminal } from '@/app/right-sidebar/terminal/terminals'
 import { PrChecksBadge } from '@/components/chat/pr-checks-badge'
 import { $activePresetId } from '@/components/pane-shell/tree/store'
@@ -86,7 +84,6 @@ export const WORKSPACE_OVERVIEW_PANE_ID = 'workspace-overview'
 
 const PERSONAL_LAYOUT_VERSION = 3
 const PERSONAL_LAYOUT_VERSION_KEY = 'hermes.desktop.personalLayoutVersion'
-const WORK_POLL_MS = 3000
 
 // One type scale for the whole rail: 13px titles, 12px body, 11px labels and meta.
 const TITLE_CLASS = 'truncate text-[0.8125rem] font-medium leading-5 text-(--ui-text-primary)'
@@ -171,72 +168,6 @@ function TaskPullRequestChecksBadge({
   const state = taskPullRequestChecksState(task, sessions, pullRequestsByBranch, pullRequestChecksByPr)
 
   return state ? <PrChecksBadge compact state={state} /> : null
-}
-
-function workStatusIcon(status: WorkItem['status']): string {
-  if (status === 'running') {
-    return 'loading'
-  }
-
-  if (status === 'failed' || status === 'interrupted') {
-    return 'warning'
-  }
-
-  if (status === 'completed') {
-    return 'pass'
-  }
-
-  return 'circle-slash'
-}
-
-export function WorkLedgerSection({
-  items,
-  labels,
-  onCancel
-}: {
-  items: WorkItem[]
-  labels: {
-    cancel: string
-    empty: string
-    kinds: Record<WorkItem['kind'], string>
-    statuses: Record<WorkItem['status'], string>
-    title: string
-  }
-  onCancel: (item: WorkItem) => void
-}) {
-  return (
-    <Section title={labels.title}>
-      {items.length === 0 ? (
-        <div className={cn(META_CLASS, 'py-1')}>{labels.empty}</div>
-      ) : (
-        <ul className="-mx-2 flex flex-col">
-          {items.map(item => (
-            <li className="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5" key={item.id}>
-              <Codicon
-                className={item.status === 'running' ? 'text-(--theme-primary)' : 'text-(--ui-text-tertiary)'}
-                name={workStatusIcon(item.status)}
-                size="0.8125rem"
-                spinning={item.status === 'running'}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[0.75rem] font-medium leading-5 text-(--ui-text-primary)">
-                  {item.title}
-                </div>
-                <div className={META_CLASS}>
-                  {labels.kinds[item.kind]} · {labels.statuses[item.status]}
-                </div>
-              </div>
-              {item.status === 'running' && item.kind === 'subagent' && (
-                <Button aria-label={`${labels.cancel}: ${item.title}`} onClick={() => onCancel(item)} size="icon-xs" variant="ghost">
-                  <Codicon name="debug-stop" />
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  )
 }
 
 function taskActionLabel(
@@ -442,7 +373,6 @@ export function WorkspaceOverview() {
   const copy = WORKSPACE_OVERVIEW_COPY[locale]
   const [taskCenterView, setTaskCenterView] = useState<TaskCenterView>('all')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [workItems, setWorkItems] = useState<WorkItem[]>([])
 
   const systemLabels =
     locale === 'zh'
@@ -486,15 +416,7 @@ export function WorkspaceOverview() {
           attentionSummary: '当前任务正在等待你的确认或补充信息；工作上下文会保留，回复后可以继续。',
           workingSummary: '有任务仍在执行；可以回到对应会话查看进度，也可以继续处理其他事情。',
           hidePreview: '收起上下文',
-          emptyRail: '后台任务、子代理和进度会显示在这里。',
-          workTitle: '后台工作',
-          workEmpty: '当前会话没有后台工作。',
-          workCancel: '停止工作',
-          workKindCron: '定时任务',
-          workKindDelegation: '委派任务',
-          workKindProcess: '后台进程',
-          workKindSubagent: '子代理',
-          workStatusCancelled: '已取消'
+          emptyRail: '后台任务、子代理和进度会显示在这里。'
         }
       : locale === 'zh-hant'
         ? {
@@ -537,15 +459,7 @@ export function WorkspaceOverview() {
             attentionSummary: '目前任務正在等待你的確認或補充資訊；工作上下文會保留，回覆後可以繼續。',
             workingSummary: '有任務仍在執行；可以回到對應對話查看進度，也可以繼續處理其他事情。',
             hidePreview: '收起上下文',
-            emptyRail: '背景任務、子代理與進度會顯示在這裡。',
-            workTitle: '背景工作',
-            workEmpty: '目前工作階段沒有背景工作。',
-            workCancel: '停止工作',
-            workKindCron: '排程任務',
-            workKindDelegation: '委派任務',
-            workKindProcess: '背景程序',
-            workKindSubagent: '子代理',
-            workStatusCancelled: '已取消'
+            emptyRail: '背景任務、子代理與進度會顯示在這裡。'
           }
         : {
             assistantContext: 'Current context',
@@ -591,15 +505,7 @@ export function WorkspaceOverview() {
             workingSummary:
               'A task is still running. Open its conversation to follow progress, or keep working elsewhere.',
             hidePreview: 'Hide context',
-            emptyRail: 'Background tasks, subagents and progress show up here.',
-            workTitle: 'Background work',
-            workEmpty: 'No background work for this session.',
-            workCancel: 'Stop work',
-            workKindCron: 'Scheduled run',
-            workKindDelegation: 'Delegation',
-            workKindProcess: 'Background process',
-            workKindSubagent: 'Subagent',
-            workStatusCancelled: 'Cancelled'
+            emptyRail: 'Background tasks, subagents and progress show up here.'
           }
 
   const cwd = useStore($currentCwd)
@@ -612,7 +518,6 @@ export function WorkspaceOverview() {
   const approvalRequests = useStore($approvalRequests)
   const clarifyRequests = useStore($clarifyRequests)
   const gateway = useStore($gateway)
-  const { requestGateway } = useGatewayRequest()
   const backgroundStatusBySession = useStore($backgroundStatusBySession)
   const cachedCronJobs = useStore($cronJobs)
   const cronJobsScope = useStore($cronJobsScope)
@@ -761,49 +666,6 @@ export function WorkspaceOverview() {
     displaySession?.id ??
     (primaryAttention || primaryWorking ? (selectedStoredSessionId ?? fallbackTaskStoredId) : fallbackTaskStoredId)
 
-  useEffect(() => {
-    let disposed = false
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    // Clear immediately so the previous session's work cannot remain visible while
-    // the new session's ownership-scoped request is in flight.
-    setWorkItems([])
-
-    const loadWork = async (): Promise<void> => {
-      if (!activeSessionId || !gateway) {
-        return
-      }
-
-      try {
-        const result = await requestGateway<WorkListResult>('work.list', { session_id: activeSessionId })
-
-        if (disposed) {
-          return
-        }
-
-        const next = result.work ?? []
-        // Keep polling while the session is active so work that starts later shows up
-        // without a session switch. An unchanged snapshot keeps the previous array.
-        setWorkItems(current => (JSON.stringify(current) === JSON.stringify(next) ? current : next))
-        timer = setTimeout(() => void loadWork(), WORK_POLL_MS)
-      } catch {
-        if (!disposed) {
-          setWorkItems([])
-        }
-      }
-    }
-
-    void loadWork()
-
-    return () => {
-      disposed = true
-
-      if (timer !== null) {
-        clearTimeout(timer)
-      }
-    }
-  }, [activeSessionId, gateway, requestGateway])
-
   const sessionLabel = displaySession
     ? storedSessionTitle(displaySession)
     : selectedStoredSessionId
@@ -849,7 +711,6 @@ export function WorkspaceOverview() {
       : currentActivityTaskId
         ? filteredActivityTasks.filter(task => task.id !== currentActivityTaskId)
         : filteredActivityTasks
-
   const visibleActivityTasks = secondaryActivityTasks.slice(0, 10)
   const selectedTask = visibleActivityTasks.find(task => task.id === selectedTaskId)
 
@@ -877,21 +738,6 @@ export function WorkspaceOverview() {
     'restart-durable': systemLabels.durabilityRestart,
     turn: systemLabels.durabilityTurn
   } as const
-
-  const workKindLabels: Record<WorkItem['kind'], string> = {
-    cron: systemLabels.workKindCron,
-    delegation: systemLabels.workKindDelegation,
-    process: systemLabels.workKindProcess,
-    subagent: systemLabels.workKindSubagent
-  }
-
-  const workStatusLabels: Record<WorkItem['status'], string> = {
-    cancelled: systemLabels.workStatusCancelled,
-    completed: systemLabels.activityCompleted,
-    failed: systemLabels.activityFailed,
-    interrupted: systemLabels.activityInterrupted,
-    running: systemLabels.activityRunning
-  }
 
   const handleTaskAction = (task: TaskCenterTask) => {
     if (task.action === 'open-session' && task.sessionId) {
@@ -1010,28 +856,6 @@ export function WorkspaceOverview() {
                 </div>
               )}
             </Section>
-          )}
-
-          {activeSessionId && (
-            <WorkLedgerSection
-              items={workItems}
-              labels={{
-                cancel: systemLabels.workCancel,
-                empty: systemLabels.workEmpty,
-                kinds: workKindLabels,
-                statuses: workStatusLabels,
-                title: systemLabels.workTitle
-              }}
-              onCancel={item => {
-                void requestGateway<WorkCancelResult>('work.cancel', { id: item.id, session_id: activeSessionId })
-                  .then(result => {
-                    if (result.status === 'interrupt_requested' || result.status === 'cancelled' || result.status === 'already_finished') {
-                      setWorkItems(current => current.filter(candidate => candidate.id !== item.id))
-                    }
-                  })
-                  .catch(() => undefined)
-              }}
-            />
           )}
 
           {showTaskCenterSection && (
