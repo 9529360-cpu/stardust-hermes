@@ -103,6 +103,12 @@ type BotsMessages = {
     editTitle: string
     editMenu: string
     helpPromptPlaceholder: string
+    leadPreset: string
+    leadSoul: string
+    repoLabel: string
+    repoHint: string
+    repoChoose: string
+    repoClear: string
     descriptionHint: string
     newChatWith: string
     /** Re-opens the forever-chat on purpose. A plain row click only returns to
@@ -346,6 +352,13 @@ const en: BotsMessages = {
     editTitle: 'Edit profile',
     editMenu: 'Edit…',
     helpPromptPlaceholder: 'What should this bot help with?',
+    leadPreset: 'Project lead',
+    leadSoul:
+      "You are now the project lead for this repository.\nFirst read the repository (AGENTS.md, recent commits, unfinished work) to understand the goals, constraints, and current progress.\nThen form a development team that fits the project's needs: decide which roles you need (for example product, architecture, backend, frontend, testing, review), create a member for each role (run `hermes profile create <name>` in the terminal, then write its SOUL.md), and coordinate the work, hand-offs, and progress in a group chat. Review the team's output before it is merged.\nWorking rules: read before you change anything, and back up files before you modify them. When a task arrives, reply right away with what you are doing; run long work in the background and report only results or blockers. Ask my approval before sending messages to others, spending money, deleting things, pushing, or merging.\nReport progress, risks, and decisions that need me on a regular basis.",
+    repoLabel: 'Repository folder (optional)',
+    repoHint: 'Terminal and file work start in this folder.',
+    repoChoose: 'Choose…',
+    repoClear: 'Clear',
     descriptionHint: 'Leave blank to generate from the bot’s name and description.',
     newChatWith: 'New chat with this bot',
     openBotChat: 'Open Bot Chat',
@@ -574,6 +587,13 @@ const ja: BotsMessages = {
     editTitle: 'プロファイルを編集',
     editMenu: '編集…',
     helpPromptPlaceholder: 'このボットは何を手伝いますか？',
+    leadPreset: 'プロジェクトリード',
+    leadSoul:
+      'あなたは今からこのリポジトリのプロジェクトリードです。\nまずリポジトリ（AGENTS.md、最近のコミット、未完了の作業）を読み、目標・制約・現在の進捗を把握してください。\nそのうえでプロジェクトの必要に応じて開発チームを組み、役割ごと（プロダクト、設計、バックエンド、フロントエンド、テスト、レビューなど）にメンバーを作成してください（端末で hermes profile create <名前> を実行し、その SOUL.md を書きます）。グループチャットで分担・引き継ぎ・進捗を調整し、チームの成果物は統合前にあなたがレビューしてください。\n作業ルール：変更の前に必ず読み、ファイルを変更する前にバックアップを取ること。依頼を受けたらすぐに何をするかを一言返し、長い作業はバックグラウンドで行い、結果や詰まった時だけ報告すること。他者へのメッセージ送信、お金の支払い、削除、プッシュ、マージの前には私の承認を得てください。\n進捗、リスク、私の判断が必要な事項を定期的に報告してください。',
+    repoLabel: 'リポジトリのフォルダ（任意）',
+    repoHint: 'ターミナルとファイルの作業はこのフォルダから始まります。',
+    repoChoose: '選択…',
+    repoClear: 'クリア',
     descriptionHint: '空欄のままにすると、ボットの名前と説明から生成します。',
     newChatWith: 'このボットと新しいチャット',
     openBotChat: 'ボットチャットを開く',
@@ -798,6 +818,13 @@ const zh: BotsMessages = {
     editTitle: '编辑配置档案',
     editMenu: '编辑…',
     helpPromptPlaceholder: '这个机器人应该帮你做什么？',
+    leadPreset: '项目负责人',
+    leadSoul:
+      '你现在是这个项目的负责人。\n先阅读项目仓库（AGENTS.md、近期提交和未完成的工作），弄清目标、约束和当前进展。\n根据项目需求组建开发团队：确定需要的角色（如产品、架构、后端、前端、测试、评审），为每个角色创建成员（在终端运行 hermes profile create <名字>，再写好它的 SOUL.md），并在群聊里协调分工、交接和进度。团队的成果在合入前由你审阅。\n做事规则：先只读再动手，改动文件前先备份。收到任务先回一句在做什么，长活放后台，只在有结果或卡住时汇报。对外发消息、花钱、删除东西、推送和合并，先征得我的同意。\n定期向我汇报进展、风险和需要我决定的事。',
+    repoLabel: '仓库目录（可选）',
+    repoHint: '智能体的终端和文件操作将从这个目录开始。',
+    repoChoose: '选择…',
+    repoClear: '清除',
     descriptionHint: '留空则根据机器人的名称和描述生成。',
     newChatWith: '与此机器人开新聊天',
     openBotChat: '打开机器人聊天',
@@ -1021,6 +1048,13 @@ const zhHant: BotsMessages = {
     editTitle: '編輯設定檔',
     editMenu: '編輯…',
     helpPromptPlaceholder: '這個機器人應該幫你做什麼？',
+    leadPreset: '專案負責人',
+    leadSoul:
+      '你現在是這個專案的負責人。\n先閱讀專案倉庫（AGENTS.md、近期提交和未完成的工作），弄清目標、限制和目前進度。\n依專案需求組建開發團隊：決定需要的角色（如產品、架構、後端、前端、測試、審查），為每個角色建立成員（在終端機執行 hermes profile create <名稱>，再寫好它的 SOUL.md），並在群聊中協調分工、交接和進度。團隊的成果在合併前由你審閱。\n做事規則：先唯讀再動手，修改檔案前先備份。收到任務先回一句目前在做什麼，長時間的工作放到背景，只在有結果或卡住時回報。對外發訊息、花錢、刪除東西、推送和合併，先徵得我的同意。\n定期向我回報進度、風險和需要我決定的事。',
+    repoLabel: '倉庫資料夾（選填）',
+    repoHint: '智能體的終端機和檔案操作會從這個資料夾開始。',
+    repoChoose: '選擇…',
+    repoClear: '清除',
     descriptionHint: '留空則依機器人的名稱和描述產生。',
     newChatWith: '與此機器人開新聊天',
     openBotChat: '開啟機器人聊天',

@@ -20492,6 +20492,18 @@
             ],
             "default": null,
             "title": "Mcp Servers"
+          },
+          "terminal_cwd": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Terminal Cwd"
           }
         },
         "title": "ProfilesConfigureApplied",
@@ -20660,6 +20672,18 @@
             ],
             "default": null,
             "title": "Enabled Mcp Servers"
+          },
+          "terminal_cwd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Terminal Cwd"
           }
         },
         "title": "ProfilesConfigureParams",

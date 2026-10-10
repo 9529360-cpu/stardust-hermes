@@ -270,6 +270,7 @@ class ProfilesConfigureParams(ProfileParams):
     disabled_skills: list[str] | None = None
     enabled_toolsets: list[str] | None = None
     enabled_mcp_servers: list[str] | None = None
+    terminal_cwd: str | None = None
 
 
 class UiMetaConflict(Result):
@@ -289,6 +290,7 @@ class ProfilesConfigureApplied(Result):
     skills: bool | None = None
     toolsets: bool | None = None
     mcp_servers: bool | None = None
+    terminal_cwd: bool | None = None
 
 
 class ProfilesConfigureResult(Result):

@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { group, split } from '@/components/pane-shell/tree/model'
-import { $layoutTree, noteActiveTreeGroup } from '@/components/pane-shell/tree/store'
+import { $layoutTree, noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import { I18nProvider } from '@/i18n'
 import { $sidebarGrouping, setSidebarAgentsGrouped } from '@/store/layout'
 import { $newChatProfile } from '@/store/profile'
@@ -21,6 +21,16 @@ vi.mock('@/store/projects', async importOriginal => ({
   deleteProject: vi.fn().mockResolvedValue(undefined),
   fetchProjectSessions: vi.fn().mockResolvedValue(null)
 }))
+
+// Spy on the real pane reveal so the agent-space row's call can be asserted without changing its behavior.
+vi.mock('@/components/pane-shell/tree/store', async importOriginal => {
+  const actual = await importOriginal<Record<string, unknown>>()
+
+  return {
+    ...actual,
+    revealTreePane: vi.fn(actual.revealTreePane as (paneId: string) => void)
+  }
+})
 
 afterEach(() => {
   cleanup()
@@ -91,6 +101,7 @@ describe('PersonalProductNav', () => {
 
     expect(screen.getAllByRole('button').map(button => button.textContent?.trim())).toEqual([
       '新建对话',
+      '智能体空间',
       '任务',
       '工具',
       '插件',
@@ -99,6 +110,15 @@ describe('PersonalProductNav', () => {
     expect(screen.queryByRole('button', { name: '对话' })).toBeNull()
     expect(screen.queryByRole('button', { name: '知识库' })).toBeNull()
     expect(screen.queryByRole('button', { name: '设置' })).toBeNull()
+  })
+
+  it('opens the agent space roster from its own row without changing the route', () => {
+    const onNavigate = renderNav('chat')
+
+    fireEvent.click(screen.getByRole('button', { name: '智能体空间' }))
+
+    expect(revealTreePane).toHaveBeenCalledWith('hermes-bots:pane')
+    expect(onNavigate).not.toHaveBeenCalled()
   })
 
   it('routes new chat, tasks, tools, and plugins through their existing owners', () => {

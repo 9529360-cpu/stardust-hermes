@@ -59,8 +59,8 @@ export interface PluginOs {
    *  when unavailable. The path is on the BACKEND's filesystem, so hand it
    *  to a `rest` call rather than trying to write it from the renderer. */
   pickSavePath: (options?: PluginFileDialogOptions) => Promise<null | string>
-  /** Native open dialog, single file. Resolves the chosen path, or null on
-   *  cancel / when unavailable. */
+  /** Native open dialog, one file or (with `directories: true`) one folder.
+   *  Resolves the chosen path, or null on cancel / when unavailable. */
   pickOpenPath: (options?: PluginFileDialogOptions) => Promise<null | string>
   /** Write text to the system clipboard. Resolves false when unavailable. */
   writeClipboard: (text: string) => Promise<boolean>
@@ -68,6 +68,8 @@ export interface PluginOs {
 
 export interface PluginFileDialogOptions {
   defaultPath?: string
+  /** Open dialogs only: choose a folder instead of a file. */
+  directories?: boolean
   filters?: Array<{ extensions: string[]; name: string }>
   title?: string
 }
