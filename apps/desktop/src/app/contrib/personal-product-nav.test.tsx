@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { group, split } from '@/components/pane-shell/tree/model'
 import { $layoutTree, noteActiveTreeGroup, revealTreePane } from '@/components/pane-shell/tree/store'
 import { I18nProvider } from '@/i18n'
-import { $sidebarGrouping, setSidebarAgentsGrouped } from '@/store/layout'
+import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped } from '@/store/layout'
 import { $newChatProfile } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS, deleteProject, fetchProjectSessions } from '@/store/projects'
 import { $currentCwd } from '@/store/session'
@@ -29,6 +29,16 @@ vi.mock('@/components/pane-shell/tree/store', async importOriginal => {
   return {
     ...actual,
     revealTreePane: vi.fn(actual.revealTreePane as (paneId: string) => void)
+  }
+})
+
+// The overlay close is a no-op at full width (jsdom has no narrow query), so spy on it to assert the nav asks for it.
+vi.mock('@/store/layout', async importOriginal => {
+  const actual = await importOriginal<Record<string, unknown>>()
+
+  return {
+    ...actual,
+    dismissNarrowSidebar: vi.fn(actual.dismissNarrowSidebar as () => void)
   }
 })
 
@@ -112,13 +122,27 @@ describe('PersonalProductNav', () => {
     expect(screen.queryByRole('button', { name: '设置' })).toBeNull()
   })
 
-  it('opens the agent space roster from its own row without changing the route', () => {
+  it('opens the agent space as a page beside the nav, like tools and plugins', () => {
     const onNavigate = renderNav('chat')
 
     fireEvent.click(screen.getByRole('button', { name: '智能体空间' }))
 
-    expect(revealTreePane).toHaveBeenCalledWith('hermes-bots:pane')
-    expect(onNavigate).not.toHaveBeenCalled()
+    expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'bots', route: '/bots' }))
+    expect(revealTreePane).not.toHaveBeenCalledWith('hermes-bots:pane')
+  })
+
+  it('closes the narrow overlay when a page or a new chat is picked, but not when projects expand', () => {
+    vi.mocked(dismissNarrowSidebar).mockClear()
+    renderNav('chat')
+
+    for (const name of ['新建对话', '智能体空间', '任务', '工具', '插件']) {
+      fireEvent.click(screen.getByRole('button', { name }))
+    }
+
+    expect(dismissNarrowSidebar).toHaveBeenCalledTimes(5)
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+    expect(dismissNarrowSidebar).toHaveBeenCalledTimes(5)
   })
 
   it('routes new chat, tasks, tools, and plugins through their existing owners', () => {

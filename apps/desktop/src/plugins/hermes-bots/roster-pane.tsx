@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { BotRow } from './bot-row'
 import {
   $botChatFocused,
+  $botsPageOpen,
   $botsPaneVisible,
   $focusedBotOwner,
   $openBotChat,
@@ -220,6 +221,17 @@ function useReconcileRosterOwner(
       }
     }
   }, [data, error, selectionHydrated, roster, sourceSnapshot, allMeta])
+}
+
+/** The roster as a full page in the workspace, beside Tools and Plugins. */
+export function BotsPage() {
+  useEffect(() => {
+    $botsPageOpen.set(true)
+
+    return () => $botsPageOpen.set(false)
+  }, [])
+
+  return <BotsPane />
 }
 
 export function BotsPane() {

@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { routeSessionId, sessionRoute } from '../routes'
+import { BOTS_ROUTE, routeSessionId, sessionRoute } from '../routes'
 
 import { isRouteSessionMismatch } from './route-session-state'
+
+describe('routeSessionId', () => {
+  it('never reads the agent space path as a session, even before its plugin registers', () => {
+    expect(routeSessionId(BOTS_ROUTE)).toBeNull()
+  })
+})
 
 describe('isRouteSessionMismatch', () => {
   it('keeps the composer mounted when auto-compression rotates root to tip', () => {

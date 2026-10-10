@@ -4,11 +4,11 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router'
 
-import { $paneVisible, revealTreePane } from '@/components/pane-shell/tree/store'
+import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $sidebarGrouping, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
+import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
 import { $newChatProfile, $profileScope, ALL_PROFILES } from '@/store/profile'
 import {
   $activeProjectId,
@@ -29,7 +29,7 @@ import type { SessionInfo } from '@/types/hermes'
 import { ProjectContextMenu } from '../chat/sidebar/projects/project-menu'
 import type { SidebarProjectTree } from '../chat/sidebar/projects/workspace-groups'
 import { WorkspaceAddButton } from '../chat/sidebar/projects/workspace-header'
-import { type AppView, CRON_ROUTE, SKILLS_ROUTE } from '../routes'
+import { type AppView, BOTS_ROUTE, CRON_ROUTE, routePathname, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
 
 const PRODUCT_NAV_COPY = {
@@ -112,7 +112,7 @@ export function PersonalProductNav({
   onResumeSession
 }: PersonalProductNavProps) {
   const { locale, t } = useI18n()
-  const { search } = useLocation()
+  const { pathname, search } = useLocation()
   const copy = PRODUCT_NAV_COPY[locale]
   const [projectsOpen, setProjectsOpen] = useState(false)
   const [expandedProjectId, setExpandedProjectId] = useState<null | string>(null)
@@ -169,8 +169,15 @@ export function PersonalProductNav({
   const focusedSessionIsTile = useStore($focusedSessionIsTile)
   const currentView = focusedSessionIsTile ? 'chat' : routeView
   const skillsTab = new URLSearchParams(search).get('tab')
-  // The agent roster (Bot Mode) lives in the sessions column; this row opens it.
-  const agentSpaceShowing = useStore($paneVisible('hermes-bots:pane'))
+  // The agent roster is a page at its own route, like Tools and Plugins.
+  const agentSpaceShowing = routePathname(pathname) === BOTS_ROUTE
+
+  // Picking a page or a new chat closes the overlay on a narrow window, so the
+  // choice shows in the main area instead of under the nav.
+  const pick = (item: SidebarNavItem) => {
+    dismissNarrowSidebar()
+    onNavigate(item)
+  }
 
   const newChat = () => {
     setSidebarAgentsGrouped(false)
@@ -183,7 +190,7 @@ export function PersonalProductNav({
     // in that project's folder nor files under it. A project's own "+" starts chats there.
     exitProjectScope()
     setExpandedProjectId(null)
-    onNavigate({
+    pick({
       action: 'new-session',
       id: 'new-session',
       icon: NULL_ICON,
@@ -191,13 +198,16 @@ export function PersonalProductNav({
     })
   }
 
-  const openAgentSpace = () => {
-    setSidebarOpen(true)
-    revealTreePane('hermes-bots:pane')
-  }
+  const openAgentSpace = () =>
+    pick({
+      id: 'bots',
+      label: copy.agentSpace,
+      icon: NULL_ICON,
+      route: BOTS_ROUTE
+    })
 
   const openTasks = () =>
-    onNavigate({
+    pick({
       id: 'cron',
       label: copy.tasks,
       icon: NULL_ICON,
@@ -205,7 +215,7 @@ export function PersonalProductNav({
     })
 
   const openTools = () =>
-    onNavigate({
+    pick({
       id: 'skills',
       label: copy.tools,
       icon: NULL_ICON,
@@ -213,7 +223,7 @@ export function PersonalProductNav({
     })
 
   const openPlugins = () =>
-    onNavigate({
+    pick({
       id: 'plugins',
       label: copy.plugins,
       icon: NULL_ICON,

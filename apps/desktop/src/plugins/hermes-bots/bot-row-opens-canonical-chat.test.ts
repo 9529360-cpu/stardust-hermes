@@ -28,7 +28,8 @@ vi.mock('./canonical-chat', () => ({
 }))
 
 const { host } = await import('@hermes/plugin-sdk')
-const { $openBotChat, $selectedBot } = await import('./bot-state')
+const { $botsPageOpen, $botsPaneVisible, $openBotChat, $selectedBot } = await import('./bot-state')
+const { getBotOpenGeneration } = await import('./shared')
 const { openRosterBot, trackInboundActivity } = await import('./roster-actions')
 const { $selectedStoredSessionId } = await import('@/store/session')
 
@@ -112,6 +113,46 @@ describe('a row click lands on the canonical chat, never a remembered side tab',
     await expect(openRosterBot(bot)).resolves.toBe(false)
 
     expect($openBotChat.get()).toBeNull()
+  })
+})
+
+describe('an open that navigates off the roster page', () => {
+  afterEach(() => {
+    $botsPageOpen.set(false)
+  })
+
+  it('keeps Bot Mode on, lands its claim, and is not superseded by its own navigation', async () => {
+    $botsPageOpen.set(true)
+    const hidden = vi.fn()
+
+    const stop = $botsPaneVisible.listen(visible => {
+      if (!visible) {
+        hidden()
+      }
+    })
+
+    const generation = getBotOpenGeneration()
+
+    openBotCanonicalChat.mockImplementationOnce(async () => {
+      // The open's own navigation unmounts the roster page before the center reports the session route.
+      $botsPageOpen.set(false)
+
+      return { openedId: 'bot-chat-tip', registryId: 'bot-chat' }
+    })
+
+    try {
+      await expect(openRosterBot(bot)).resolves.toBe(true)
+    } finally {
+      stop()
+    }
+
+    expect(hidden, 'Bot Mode dropped out during the open').not.toHaveBeenCalled()
+    expect(getBotOpenGeneration(), 'the open superseded itself').toBe(generation + 1)
+    expect($openBotChat.get()).toEqual({
+      key: 'local::alpha',
+      openedRegistryId: 'bot-chat',
+      openedSessionId: 'bot-chat-tip'
+    })
   })
 })
 
