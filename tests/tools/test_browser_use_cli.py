@@ -137,7 +137,9 @@ class TestBrowserExecApproval:
             "tools.approval.request_tool_approval",
             lambda *a, **k: {"approved": False, "message": "denied by user"},
         )
-        monkeypatch.setattr(bu_cli, "_find_cli", lambda: pytest.fail("host CLI must not launch without approval"))
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: ["browser-use"])
+        monkeypatch.setattr(bu_cli, "_run_cli_killing_process_group",
+                            lambda *a, **k: pytest.fail("host CLI must not launch without approval"))
         result = json.loads(bu_cli.browser_exec("open('/tmp/browser-exec-pwned', 'w').close()"))
         assert result["success"] is False
         assert result["error_type"] == "approval_denied"
@@ -150,6 +152,7 @@ class TestBrowserExecApproval:
             seen.update(tool_name=tool_name, reason=reason, **kwargs)
             return {"approved": False, "message": "no"}
 
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: ["browser-use"])
         monkeypatch.setattr("tools.approval.request_tool_approval", record)
         bu_cli.browser_exec("print(1)")
         assert seen["tool_name"] == "browser_exec"

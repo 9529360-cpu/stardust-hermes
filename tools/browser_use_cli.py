@@ -651,8 +651,18 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
     if blocked:
         return _browser_exec_error(blocked, "unsafe_url")
 
-    # Pure validation runs first, so a call that can never succeed never prompts the user. The prompt
-    # shows the whole program, redacted the same way the audit log redacts it, so nothing is hidden.
+    # Discovery only (PATH probes, nothing runs), so an unavailable CLI fails here without ever prompting.
+    cmd = _find_cli()
+    if not cmd:
+        return _browser_exec_error(
+            "browser-use CLI not found on PATH, and uvx is unavailable for a zero-install run. "
+            "Install it with `uv tool install browser-use` (or `pipx install browser-use`), "
+            "then run `browser-use --doctor` to verify the setup.",
+            "cli_unavailable",
+        )
+
+    # Everything above is pure validation or discovery, so a call that can never succeed never prompts the user.
+    # The prompt shows the whole program, redacted the same way the audit log redacts it, so nothing is hidden.
     approval = request_tool_approval(
         "browser_exec",
         "browser_exec wants to run this Python on this machine through the browser-use CLI:\n"
@@ -663,15 +673,6 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
         return _browser_exec_error(
             approval.get("message") or "browser_exec was not approved to run on this machine.",
             "approval_denied",
-        )
-
-    cmd = _find_cli()
-    if not cmd:
-        return _browser_exec_error(
-            "browser-use CLI not found on PATH, and uvx is unavailable for a zero-install run. "
-            "Install it with `uv tool install browser-use` (or `pipx install browser-use`), "
-            "then run `browser-use --doctor` to verify the setup.",
-            "cli_unavailable",
         )
 
     env = _base_subprocess_env()
