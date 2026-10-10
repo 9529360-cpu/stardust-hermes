@@ -425,6 +425,37 @@ export interface Translations {
   }
 
   settings: {
+    activity: {
+      grantsTitle: string
+      decisionsTitle: string
+      noGrants: string
+      noDecisions: string
+      loadFailed: string
+      retry: string
+      revoke: string
+      revokeTitle: string
+      revokeDescription: string
+      revokeConfirm: string
+      revokeFailed: string
+      grantKind: {
+        command_pattern: string
+        send_message: string
+      }
+      memoryTitle: string
+      memoryAgentNotes: string
+      memoryAboutYou: string
+      memoryEmpty: string
+      memoryDisabled: string
+      memoryAddPlaceholder: string
+      memoryAdd: string
+      memoryForget: string
+      memoryForgetTitle: string
+      memoryForgetDescription: string
+      memoryForgetConfirm: string
+      memoryChanged: string
+      memorySaveFailed: string
+      memoryLoadFailed: string
+    }
     closeSettings: string
     exportConfig: string
     importConfig: string

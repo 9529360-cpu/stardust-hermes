@@ -32,6 +32,7 @@ import { hermesConfigCacheWriter, useHermesConfigRecord } from '../hooks/use-con
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 import { PanelEmpty } from '../overlays/panel'
 
+import { ApprovalActivity } from './activity/approval-activity'
 import { ConfigField } from './config-field'
 import {
   clearsEnabledToolsets,
@@ -44,6 +45,7 @@ import {
   voiceFieldVisible
 } from './helpers'
 import { MemoryConnect } from './memory/connect'
+import { MemoryNotes } from './memory/memory-notes'
 import { ProviderConfigPanel } from './memory/provider-config-panel'
 import { ModelSettings, ModelSettingsSkeleton } from './model-settings'
 import { PoolLimitsSetting } from './pool-limits-setting'
@@ -464,6 +466,10 @@ function ConfigSettingsInner({
           ))}
         </div>
       )}
+      {/* The approvals the safety fields govern: standing grants you can revoke, and recent decisions. */}
+      {activeSectionId === 'safety' ? <ApprovalActivity /> : null}
+      {/* Notes the assistant keeps for memory: list, remember and forget. */}
+      {activeSectionId === 'memory' ? <MemoryNotes /> : null}
       <input
         accept=".json,application/json"
         className="hidden"
