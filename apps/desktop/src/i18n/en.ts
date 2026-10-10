@@ -4486,6 +4486,16 @@ export const en: Translations = {
         runningPrefixedTool: (prefix, action) => `Running ${prefix.toLowerCase()} ${action.toLowerCase()}`,
         runningTool: action => `Running ${action.toLowerCase()}`
       },
+      cron: {
+        preview: 'Cron job preview',
+        previewWithSchedule: schedule => `Cron job preview · ${schedule}`,
+        previousSchedule: 'Previous schedule',
+        nextRuns: 'Next runs',
+        delivery: 'Delivery',
+        deliveryCurrentChat: 'Current chat',
+        deliverySaveOnly: 'Save only',
+        notSaved: 'Not saved'
+      },
       titles: {
         browser_click: { done: 'Clicked page element', pending: 'Clicking page element', pendingAction: 'Clicking' },
         browser_fill: { done: 'Filled form field', pending: 'Filling form field', pendingAction: 'Filling' },

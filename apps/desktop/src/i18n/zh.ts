@@ -4746,6 +4746,16 @@ export const zh = defineLocale({
         runningPrefixedTool: (prefix, action) => `正在运行${prefix}${action}`,
         runningTool: action => `正在运行 ${action}`
       },
+      cron: {
+        preview: '定时任务预览',
+        previewWithSchedule: schedule => `定时任务预览 · ${schedule}`,
+        previousSchedule: '原排程',
+        nextRuns: '下次运行',
+        delivery: '投递',
+        deliveryCurrentChat: '当前对话',
+        deliverySaveOnly: '仅保存',
+        notSaved: '未保存'
+      },
       titles: {
         browser_click: { done: '已点击页面元素', pending: '正在点击页面元素', pendingAction: '正在点击' },
         browser_fill: { done: '已填写表单字段', pending: '正在填写表单字段', pendingAction: '正在填写' },
