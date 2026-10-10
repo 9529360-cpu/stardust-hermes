@@ -24,6 +24,7 @@ import type { ReactNode } from 'react'
 import { capabilityScoped } from '@/api/client'
 import { PRIMARY_SESSION_VIEW } from '@/app/chat/session-view'
 import { openSession, type OpenSessionIntent } from '@/app/open-session'
+import { $workspaceIsPage } from '@/app/routes'
 import type { ClientSessionState } from '@/app/types'
 import {
   $narrowViewport,
@@ -625,6 +626,9 @@ export const host = {
     model: readonlyAtom<string>($currentModel),
     /** Profile the live gateway is routed to. */
     profile: readonlyAtom<string>($activeGatewayProfile),
+    /** True while a full page (Tools, Plugins, Tasks, a plugin's own route) holds the workspace instead of a
+     *  session. Overlays don't count: they float over whatever the workspace shows. */
+    workspaceIsPage: readonlyAtom<boolean>($workspaceIsPage),
     /** Window geometry ({ width, height, narrow }). */
     viewport: readonlyAtom<ViewportRect>($viewport)
   },
