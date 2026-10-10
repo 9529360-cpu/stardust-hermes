@@ -148,6 +148,20 @@ class TestBrowserConsole:
         assert result["error"] == "denied"
         mock_eval.assert_not_called()
 
+    def test_explicit_restrict_evaluate_is_never_approvable(self):
+        """An operator's explicit browser.restrict_evaluate is a hard limit, so no approval can override it."""
+        from tools.browser_tool import browser_console
+
+        flags = {"restrict_evaluate": True}
+        with patch("tools.browser_tool_eval_policy._browser_eval_flag", side_effect=lambda key: flags.get(key, False)), \
+             patch("tools.browser_tool._browser_eval") as mock_eval, \
+             patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
+            result = json.loads(browser_console(expression="document.cookie", task_id="test"))
+        assert result["success"] is False
+        assert "browser.restrict_evaluate" in result["error"]
+        approve.assert_not_called()
+        mock_eval.assert_not_called()
+
     def test_expression_blocks_cookie_access_before_eval(self):
         from tools.browser_tool import browser_console
 

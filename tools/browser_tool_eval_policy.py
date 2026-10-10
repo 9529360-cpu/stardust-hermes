@@ -158,6 +158,20 @@ def _enforce_browser_eval_policy(expression: str) -> Optional[str]:
             "browser.restrict_evaluate: false in config.yaml to allow programmatic evaluation.")
 
 
+def _sensitive_eval_refusal(policy_error: str, tool_name: str, rule_key: str) -> Optional[str]:
+    """Why a sensitive evaluation may not run, or ``None`` once a human has approved it.
+
+    An explicit ``browser.restrict_evaluate: true`` is the operator's hard limit and is never approvable.
+    Only the implicit cloud/real-profile policy asks a human, one decision per rule key."""
+    if _browser_eval_flag("restrict_evaluate"):
+        return policy_error
+    from tools.approval import request_tool_approval
+    approval = request_tool_approval(tool_name, policy_error, rule_key=rule_key)
+    if approval.get("approved"):
+        return None
+    return approval.get("message") or policy_error
+
+
 def _camofox_current_page_private_url(tab_id: str, user_id: str) -> Optional[str]:
     """Camofox analogue of ``_current_page_private_url`` (evaluate endpoint instead of the CLI). Fail-open
     on probe failure, matching the snapshot/vision guards — do not make fail-closed without the sibling."""
