@@ -54,6 +54,13 @@ multi-agent delegation, chat-first UX).
    failure yields a structured, user-visible, retryable error event (no secret leakage, partial text kept,
    session usable for next turn), and that `session.interrupt` stops a stream promptly. Add tests at the
    `tui_gateway` seam with a fake streaming provider; fix any gaps found.
+   **Done (2026-10-10):** Added `redact_sensitive_text(force=True)` to all user-visible error exits
+   (`_fail_inflight_turn`, `turn_error_text`, `_emit_terminal_turn_error`, `_complete_turn_payload`,
+   `_recover_turn_exception`, `_summarize_api_error` fallback, `agent_init_failed_message`,
+   `resume_failed_message`). 10 new contract tests in `tests/tui_gateway/test_chat_error_recovery_contract.py`
+   pin mid-stream failure → structured `message.complete` (`status: "error"`, `error_surface`,
+   `recoverable`, `partial`), no API key leakage (exception + returned-error paths), partial text retention,
+   next-turn usability, and `session.interrupt` cancel-flag + agent-interrupt dispatch.
 7. **Routine creation from chat (Muse/Grok "routines").** Ensure a natural-language routine
    ("every weekday 8:00 summarize my inbox") maps to a cron job with delivery target, can be listed/paused/
    deleted via RPC, and its runs appear in the Work ledger (#4). Mostly wiring + tests.
