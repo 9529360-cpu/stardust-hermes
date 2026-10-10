@@ -1,6 +1,8 @@
 """Stored grants are management records, not automatic security authority."""
 import importlib
-import threading
+import builtins
+import os
+from pathlib import Path
 
 import pytest
 from tools import approval, approval_grants as grants
@@ -28,30 +30,47 @@ def test_records_persist_revoke_but_never_autoapprove(prompt):
     assert grants.list_grants() == []
 
 
-def test_grant_lock_never_delays_prompt(prompt, monkeypatch):
-    # Model a grant-management call parked on filesystem I/O while holding its lock.
-    entered, release = threading.Event(), threading.Event()
-    def hold():
-        with grants._lock:
-            entered.set()
-            assert release.wait(5)
-    thread = threading.Thread(target=hold)
-    thread.start()
-    assert entered.wait(2)
-    done = threading.Event()
-    def check():
-        try:
-            assert not approval.request_tool_approval("send_message", "send", target="alias")["approved"]
-        finally:
-            done.set()
-    worker = threading.Thread(target=check)
-    worker.start()
-    try:
-        assert done.wait(1), "approval prompt blocked on grant storage"
-    finally:
-        release.set()
-        thread.join(5)
-        worker.join(5)
+def test_request_approval_never_reads_or_matches_stored_grants(prompt, monkeypatch):
+    # A persisted record must neither approve this action nor put the prompt
+    # path behind the grant-store lock or filesystem I/O.
+    grants.add_grant("send_message", "alias")
+    grant_path = grants._path().resolve()
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("request_tool_approval must not consult stored grants")
+
+    monkeypatch.setattr(grants, "list_grants", forbidden)
+    monkeypatch.setattr(grants, "matching_grant", forbidden)
+
+    class ForbiddenGrantLock:
+        def __enter__(self):
+            pytest.fail("request_tool_approval must not acquire the grant-store lock")
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(grants, "_lock", ForbiddenGrantLock())
+
+    original_path_open = Path.open
+
+    def guarded_path_open(path, *args, **kwargs):
+        if path.resolve() == grant_path:
+            pytest.fail("request_tool_approval must not read the grant file")
+        return original_path_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded_path_open)
+
+    original_builtin_open = builtins.open
+
+    def guarded_builtin_open(file, *args, **kwargs):
+        if isinstance(file, (str, bytes, os.PathLike)) and Path(os.fsdecode(file)).resolve() == grant_path:
+            pytest.fail("request_tool_approval must not read the grant file")
+        return original_builtin_open(file, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "open", guarded_builtin_open)
+
+    result = approval.request_tool_approval("send_message", "send", target="alias")
+    assert not result["approved"]
     assert prompt
 
 
