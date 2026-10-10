@@ -371,17 +371,34 @@ export function PanelPill({ children, tone = 'muted' }: { children: ReactNode; t
   )
 }
 
-// Self-describing centered "+" that sits as the LAST item in a PanelList. The
-// label rides aria/title only — no visible text.
+// The "+" that adds an item to a PanelList. By default it is a centered icon whose
+// label rides aria/title only. `labeled` shows the label as a left-aligned row, for a
+// list whose add control should say what it adds.
 export function PanelAddButton({
   icon = 'add',
   label,
+  labeled = false,
   onClick
 }: {
   icon?: string
   label: string
+  labeled?: boolean
   onClick: () => void
 }) {
+  if (labeled) {
+    return (
+      <Button
+        className="h-7 w-full shrink-0 justify-start gap-1.5 px-2 text-xs font-normal text-muted-foreground/80 hover:bg-(--ui-row-hover-background) hover:text-foreground"
+        onClick={onClick}
+        size="sm"
+        variant="ghost"
+      >
+        <Codicon name={icon} size="0.875rem" />
+        <span className="truncate">{label}</span>
+      </Button>
+    )
+  }
+
   return (
     <Tip label={label}>
       <Button
