@@ -2754,6 +2754,20 @@ class TestListSessionsRich:
         assert db.get_session("s1")["last_activity_at"] == heartbeat
         assert db.get_session("s1")["last_activity_description"] == "starting API call #1"
 
+    def test_same_timestamp_stamp_lands_and_older_stamp_still_loses(self, db):
+        """Coarse clocks (Windows time.time() ticks ~15ms) can give two stamps one timestamp: the later
+        write must win, and a genuinely older stamp must still be ignored."""
+        db.create_session("s1", "cli")
+        tick = 1_700_000_900.0
+        db.touch_session_activity("s1", tick, description="context compression in progress")
+        db.touch_session_activity("s1", tick, description="context compression completed")
+        row = db.get_session("s1")
+        assert row["last_activity_at"] == tick
+        assert row["last_activity_description"] == "context compression completed"
+
+        db.touch_session_activity("s1", tick - 1, description="stale")
+        assert db.get_session("s1")["last_activity_description"] == "context compression completed"
+
     def test_clear_session_activity_labels_keeps_timestamp(self, db):
         """Turn-end label clear must wipe desc/provenance without moving ts."""
         db.create_session("s1", "cli")

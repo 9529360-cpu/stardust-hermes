@@ -535,6 +535,8 @@ export type ProfileConfigurePayload = {
   name: string
   provider?: string
   soul?: string
+  /** Authorized project folder: the profile's terminal and file work starts here. */
+  terminal_cwd?: string
 }
 /** What `profiles.configure` answers: per-section success, plus the #95293
  *  expensive-model / data-policy confirmation gate. */

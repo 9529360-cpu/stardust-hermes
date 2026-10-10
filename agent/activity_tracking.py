@@ -4,6 +4,7 @@
 Extracted from ``run_agent.py``; every method resolves through ``AIAgent``'s MRO unchanged.
 """
 import logging
+import math
 import threading
 import time
 from contextlib import suppress
@@ -89,7 +90,8 @@ class ActivityTrackingMixin:
         )
 
         now_mono = time.monotonic()
-        last_mono = getattr(self, "_session_activity_last_persist_mono", 0.0)
+        # -inf = never persisted: due on any clock (see reset_session_activity_persist_window).
+        last_mono = getattr(self, "_session_activity_last_persist_mono", -math.inf)
         if (now_mono - last_mono) < SESSION_ACTIVITY_HEARTBEAT_MIN_INTERVAL_SECONDS:
             return
         self._session_activity_last_persist_mono = now_mono

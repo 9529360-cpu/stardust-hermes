@@ -4,7 +4,7 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router'
 
-import { revealTreePane } from '@/components/pane-shell/tree/store'
+import { $paneVisible, revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -33,12 +33,33 @@ import { type AppView, CRON_ROUTE, SKILLS_ROUTE } from '../routes'
 import type { SidebarNavItem } from '../types'
 
 const PRODUCT_NAV_COPY = {
-  ar: { newChat: 'محادثة جديدة', plugins: 'الإضافات', project: 'المشروع', tasks: 'المهام', tools: 'الأدوات' },
-  en: { newChat: 'New chat', plugins: 'Plugins', project: 'Project', tasks: 'Tasks', tools: 'Tools' },
-  ja: { newChat: '新しいチャット', plugins: 'プラグイン', project: 'プロジェクト', tasks: 'タスク', tools: 'ツール' },
-  ru: { newChat: 'Новый чат', plugins: 'Плагины', project: 'Проект', tasks: 'Задачи', tools: 'Инструменты' },
-  zh: { newChat: '新建对话', plugins: '插件', project: '项目', tasks: '任务', tools: '工具' },
-  'zh-hant': { newChat: '新增對話', plugins: '外掛', project: '專案', tasks: '任務', tools: '工具' }
+  ar: {
+    agentSpace: 'مساحة الوكلاء',
+    newChat: 'محادثة جديدة',
+    plugins: 'الإضافات',
+    project: 'المشروع',
+    tasks: 'المهام',
+    tools: 'الأدوات'
+  },
+  en: { agentSpace: 'Agent space', newChat: 'New chat', plugins: 'Plugins', project: 'Project', tasks: 'Tasks', tools: 'Tools' },
+  ja: {
+    agentSpace: 'エージェント空間',
+    newChat: '新しいチャット',
+    plugins: 'プラグイン',
+    project: 'プロジェクト',
+    tasks: 'タスク',
+    tools: 'ツール'
+  },
+  ru: {
+    agentSpace: 'Пространство агентов',
+    newChat: 'Новый чат',
+    plugins: 'Плагины',
+    project: 'Проект',
+    tasks: 'Задачи',
+    tools: 'Инструменты'
+  },
+  zh: { agentSpace: '智能体空间', newChat: '新建对话', plugins: '插件', project: '项目', tasks: '任务', tools: '工具' },
+  'zh-hant': { agentSpace: '智能體空間', newChat: '新增對話', plugins: '外掛', project: '專案', tasks: '任務', tools: '工具' }
 } as const
 
 const NULL_ICON: SidebarNavItem['icon'] = () => null
@@ -148,6 +169,8 @@ export function PersonalProductNav({
   const focusedSessionIsTile = useStore($focusedSessionIsTile)
   const currentView = focusedSessionIsTile ? 'chat' : routeView
   const skillsTab = new URLSearchParams(search).get('tab')
+  // The agent roster (Bot Mode) lives in the sessions column; this row opens it.
+  const agentSpaceShowing = useStore($paneVisible('hermes-bots:pane'))
 
   const newChat = () => {
     setSidebarAgentsGrouped(false)
@@ -166,6 +189,11 @@ export function PersonalProductNav({
       icon: NULL_ICON,
       label: copy.newChat
     })
+  }
+
+  const openAgentSpace = () => {
+    setSidebarOpen(true)
+    revealTreePane('hermes-bots:pane')
   }
 
   const openTasks = () =>
@@ -250,6 +278,12 @@ export function PersonalProductNav({
       <div className="mb-3 px-2 text-[0.82rem] font-semibold tracking-[-0.01em] text-(--ui-text-primary)">Stardust</div>
       <div className="flex flex-col gap-0.5">
         <ProductNavButton icon="add" label={copy.newChat} onClick={newChat} tour="sidebar-nav-new-session" />
+        <ProductNavButton
+          active={agentSpaceShowing}
+          icon="hubot"
+          label={copy.agentSpace}
+          onClick={openAgentSpace}
+        />
         <ProductNavButton
           active={currentView === 'cron'}
           icon="checklist"

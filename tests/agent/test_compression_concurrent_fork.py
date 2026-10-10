@@ -497,7 +497,8 @@ def test_compression_heartbeat_stop_persists_completed_over_in_progress(
     hb = _CompressionActivityHeartbeat(agent, interval_seconds=3600.0)
     hb.start()
 
-    agent._session_activity_last_persist_mono = 0.0
+    # -inf: the in-progress stamp is due now, whatever time.monotonic() reads on this host.
+    agent._session_activity_last_persist_mono = float("-inf")
     agent._touch_activity(
         "context compression in progress",
         provenance=ActivityProvenance.AGENT_COMPRESSION,

@@ -570,11 +570,39 @@ def _configure_cfg_sections(profile_dir, params, applied) -> None:
                 load_config() or {}, params["enabled_mcp_servers"], launch_mcp, save_config))
 
 
+def _configure_terminal_cwd(profile_dir, params, applied) -> None:
+    """Authorize a project folder: ``terminal.cwd`` is where the profile's terminal and file work starts.
+    An empty value restores the default (``.``); a folder that does not exist is refused and nothing is written."""
+    raw = params.get("terminal_cwd")
+    if not isinstance(raw, str):
+        return
+    import os
+    from pathlib import Path
+    text = raw.strip()
+    if text:
+        folder = Path(os.path.expanduser(text))
+        if not folder.is_dir():
+            applied["terminal_cwd"] = False
+            return
+        value = str(folder.resolve())
+    else:
+        value = "."
+
+    def write() -> None:
+        with _hermes_home_scope(profile_dir):
+            from hermes_cli.config import load_config, save_config
+            cfg = load_config() or {}
+            terminal = cfg.get("terminal") if isinstance(cfg.get("terminal"), dict) else {}
+            save_config({**cfg, "terminal": {**terminal, "cwd": value}})
+
+    applied["terminal_cwd"] = _best_effort(write)
+
+
 @_profile_handler("profiles.configure", 5064)
 def _(rid, params: dict) -> dict:
     """Editor Save: ``name`` plus any of ``ui_meta`` (+ ``ui_meta_expected_revisions``), ``soul``,
     ``description``, ``model`` + ``provider`` (+ ``confirm_expensive_model``), ``disabled_skills``,
-    ``enabled_toolsets``, ``enabled_mcp_servers``; sections are independent, ``applied`` reports each."""
+    ``enabled_toolsets``, ``enabled_mcp_servers``, ``terminal_cwd``; sections are independent, ``applied`` reports each."""
     _name, profile_dir, err = _resolve_profile(rid, params)
     if err is not None:
         return err
@@ -590,6 +618,7 @@ def _(rid, params: dict) -> dict:
     confirm_message = _configure_model(profile_dir, params, applied)
     if any(isinstance(params.get(k), list) for k in ("disabled_skills", "enabled_toolsets", "enabled_mcp_servers")):
         _configure_cfg_sections(profile_dir, params, applied)
+    _configure_terminal_cwd(profile_dir, params, applied)
     # confirm_* is the shape config.set returns, so clients reuse one confirm handler.
     return _ok(rid, {"ok": all(applied.values()) if applied else True, "applied": applied,
                      **({"confirm_required": True, "confirm_message": confirm_message}

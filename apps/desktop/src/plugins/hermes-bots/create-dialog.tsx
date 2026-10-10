@@ -69,6 +69,7 @@ import type {
 import { CheckList, SkillsView, skillsViewRoutesConnections } from './profile-config'
 import { deleteBot } from './profile-ops'
 import { botRosterMeta } from './routing'
+import { getPluginCtx } from './shared'
 import { HubSkillsSection } from './skills-hub'
 import { composeSoul } from './soul'
 import type { BotMeta, ConnectionRow, RosterRow } from './types'
@@ -140,6 +141,8 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
   const [model, setModel] = useState('')
   const [provider, setProvider] = useState('')
   const [soul, setSoul] = useState('')
+  // Authorized project folder (optional). Written to the profile's terminal.cwd after create.
+  const [repoDir, setRepoDir] = useState('')
   const [noSkills, setNoSkills] = useState(false)
   const [shareAuth, setShareAuth] = useState(true)
   const [advTab, setAdvTab] = useState('general')
@@ -414,7 +417,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
       try {
         const capPayload: Pick<
           ProfileConfigurePayload,
-          'disabled_skills' | 'enabled_mcp_servers' | 'enabled_toolsets'
+          'disabled_skills' | 'enabled_mcp_servers' | 'enabled_toolsets' | 'terminal_cwd'
         > = {}
 
         if (dirtyCaps.skills && caps) {
@@ -428,6 +431,10 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
 
         if (dirtyCaps.mcp && caps) {
           capPayload.enabled_mcp_servers = caps.mcp.filter(m => m.enabled).map(m => m.name)
+        }
+
+        if (repoDir.trim() && !remoteTarget) {
+          capPayload.terminal_cwd = repoDir.trim()
         }
 
         if (Object.keys(capPayload).length) {
@@ -672,6 +679,21 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
           {remoteTarget ? (
             <div className="text-[0.7rem] leading-5 text-(--ui-text-tertiary)">{`The agent is created on ${targetLabel} and appears in the roster as a Connections bot. Chat routes to that machine.`}</div>
           ) : null}
+          <div className="flex justify-start">
+            <Button
+              onClick={() => {
+                setTitle(b.bot.leadPreset)
+                setSoul(b.bot.leadSoul)
+
+                if (!name.trim()) {
+                  setName('project-lead')
+                }
+              }}
+              type="button"
+            >
+              {b.bot.leadPreset}
+            </Button>
+          </div>
           {labeled(
             'Title',
             <Input onChange={event => setTitle(event.target.value)} placeholder="Inbox Triage" value={title} />
@@ -685,6 +707,39 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
               value={description}
             />
           )}
+          {remoteTarget
+            ? null
+            : labeled(
+                b.bot.repoLabel,
+                <div className="grid gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="min-w-0 flex-1 truncate rounded-md border border-(--ui-stroke-tertiary) px-2.5 py-1.5 text-xs text-(--ui-text-primary)"
+                      title={repoDir}
+                    >
+                      {repoDir || '—'}
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        const dir = await getPluginCtx()?.os.pickOpenPath({ directories: true })
+
+                        if (dir) {
+                          setRepoDir(dir)
+                        }
+                      }}
+                      type="button"
+                    >
+                      {b.bot.repoChoose}
+                    </Button>
+                    {repoDir ? (
+                      <Button onClick={() => setRepoDir('')} type="button">
+                        {b.bot.repoClear}
+                      </Button>
+                    ) : null}
+                  </div>
+                  <div className="text-[0.7rem] leading-5 text-(--ui-text-tertiary)">{b.bot.repoHint}</div>
+                </div>
+              )}
           <Button
             className="flex items-center gap-1 text-xs font-medium text-(--ui-text-tertiary) hover:text-(--ui-text-secondary)"
             onClick={() => {

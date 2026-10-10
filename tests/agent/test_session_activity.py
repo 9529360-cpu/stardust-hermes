@@ -1,5 +1,6 @@
 """Unit tests for the shared session activity observation contract."""
 
+import math
 import sys
 from types import SimpleNamespace
 
@@ -40,7 +41,7 @@ def test_bound_activity_description_truncates():
 def test_reset_session_activity_persist_window_clears_rate_limit():
     agent = SimpleNamespace(_session_activity_last_persist_mono=1234.5)
     reset_session_activity_persist_window(agent)
-    assert agent._session_activity_last_persist_mono == 0.0
+    assert agent._session_activity_last_persist_mono == -math.inf
 
 
 def test_reset_session_activity_persist_window_swallows_missing_attr():

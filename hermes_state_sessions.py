@@ -586,7 +586,9 @@ class SessionSessionsMixin:
         self._write_sql(
             "UPDATE sessions SET last_activity_at = ?, "
             "last_activity_description = ?, last_activity_provenance = ? "
-            "WHERE id = ? AND (last_activity_at IS NULL OR last_activity_at < ?)",
+            # `<=`, not `<`: on coarse clocks (Windows time.time() ticks ~15ms) a later stamp can carry the same
+            # timestamp as the previous one; the later write must still win, and an older `when` still loses.
+            "WHERE id = ? AND (last_activity_at IS NULL OR last_activity_at <= ?)",
             (
                 when, bound_activity_description(description),
                 normalize_activity_provenance(provenance).value, session_id, when,

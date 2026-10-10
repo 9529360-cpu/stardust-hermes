@@ -4,6 +4,7 @@ only (notification, timeout, kill and retry policy live elsewhere). Provenance i
 
 from __future__ import annotations
 
+import math
 import sys
 import time
 from contextlib import suppress
@@ -62,9 +63,13 @@ def format_iteration_progress(api_call_count: Any, max_iterations: Any) -> str:
 
 
 def reset_session_activity_persist_window(agent: Any) -> None:
-    """Clear the persist rate-limit so the next stamp writes through (terminal compression labels must not stick on mid-compress text)."""
+    """Clear the persist rate-limit so the next stamp writes through (terminal compression labels must not stick on mid-compress text).
+
+    ``-inf``, not ``0.0``: the gate compares ``time.monotonic()`` against this value, and ``0.0`` only reads as
+    "long ago" once the clock has run past the interval. On a freshly booted host the first stamp would be dropped.
+    """
     with suppress(Exception):
-        agent._session_activity_last_persist_mono = 0.0
+        agent._session_activity_last_persist_mono = -math.inf
 
 
 def build_activity_snapshot(
