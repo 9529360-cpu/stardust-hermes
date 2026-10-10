@@ -36,7 +36,7 @@ describe('shouldResumeSessionTile', () => {
 describe('sessionTileResumeFailure', () => {
   it('keeps a confirmed durable session retryable instead of repeating a stale 404', () => {
     expect(sessionTileResumeFailure('session not found', true, true)).toBe(
-      'Session is still available — retry resuming it.'
+      'Chat is still available — retry resuming it.'
     )
   })
 
