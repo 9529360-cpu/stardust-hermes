@@ -75,6 +75,15 @@ type BotsMessages = {
     unavailable: string
     retryNow: string
     rosterUnavailable: (reason: string) => string
+    activityToastsOn: string
+    activityToastsOff: string
+    newMenu: string
+    filterRoster: string
+    filtersActive: (count: number) => string
+    filterRosterActive: (count: number) => string
+    allGateways: string
+    /** Attention badge tooltips, keyed by attention class. */
+    attentionHints: Record<string, string>
     waitingForGateway: string
   }
   /** User-made roster sections (folders the user files bots into). */
@@ -154,6 +163,9 @@ type BotsMessages = {
     removeImage: string
     removeBackToShape: string
     describePlaceholder: string
+    keepFaceHint: string
+    lockFace: string
+    unlockFace: string
     describeHint: string
     matchTheName: string
     pickPet: string
@@ -231,6 +243,17 @@ type BotsMessages = {
     answerFailed: (handle: string, error: string) => string
     wantsToRunCommand: (handle: string) => string
     asks: (handle: string) => string
+    openGroupChat: string
+    pickAtLeastTwo: string
+    createGroup: string
+    createGroupWithCount: (count: number) => string
+    createAndJoin: string
+    newGroupPlaceholder: string
+    namePlaceholderExample: string
+    answerOwn: string
+    answerTyped: string
+    showHandle: string
+    hideHandle: string
     answerTo: (member: string) => string
   }
   /** Skills hub + MCP setup surfaces embedded in the bot editor. */
@@ -323,6 +346,19 @@ const en: BotsMessages = {
     retryNow: 'Retry now',
     rosterUnavailable: reason =>
       `Roster unavailable: ${reason}. If your gateway predates profiles.list, update Hermes and restart the gateway.`,
+    activityToastsOn: 'Activity toasts on — click to silence',
+    activityToastsOff: 'Activity toasts off — click to enable',
+    newMenu: 'New…',
+    filterRoster: 'Filter roster',
+    filtersActive: count => `Filters (${count} active)`,
+    filterRosterActive: count => `Filter roster, ${count} active`,
+    allGateways: 'All gateways',
+    attentionHints: {
+      provider_auth_or_access: 'Sign in again for this profile',
+      provider_quota_limit: 'Quota or balance exhausted',
+      missing_config: 'Provider not configured — run hermes model',
+      agent_blocked: 'Bot is blocked — see its last message'
+    },
     waitingForGateway:
       'Waiting for the gateway connection… (remote gateways can take a few seconds; retries automatically)'
   },
@@ -397,6 +433,9 @@ const en: BotsMessages = {
     removeImage: 'Remove image — use shape',
     removeBackToShape: 'Remove — back to shape avatar',
     describePlaceholder: 'Describe your avatar…',
+    keepFaceHint: 'Keep this exact face even if the name changes',
+    lockFace: 'Lock face',
+    unlockFace: 'Unlock',
     describeHint: 'Leave blank to auto-generate from name/title/description + agent-messaging roster.',
     matchTheName: 'Match the name',
     pickPet: 'Pick a pet as this bot’s profile picture.',
@@ -473,6 +512,17 @@ const en: BotsMessages = {
     answerFailed: (handle, error) => `Could not send the answer to @${handle}: ${error}`,
     wantsToRunCommand: handle => `@${handle} wants to run a command:`,
     asks: handle => `@${handle} asks:`,
+    openGroupChat: 'Open Group Chat',
+    pickAtLeastTwo: 'Pick at least 2 bots',
+    createGroup: 'Create Group',
+    createGroupWithCount: count => `Create Group (${count})`,
+    createAndJoin: 'Create & join',
+    newGroupPlaceholder: 'New group…',
+    namePlaceholderExample: 'Group name (e.g. Research)',
+    answerOwn: 'Or type your own answer…',
+    answerTyped: 'Type your answer…',
+    showHandle: 'Show full handle',
+    hideHandle: 'Hide full handle',
     answerTo: member => `Answer @${member}`
   },
   tools: {
@@ -560,6 +610,19 @@ const ja: BotsMessages = {
     retryNow: '今すぐ再試行',
     rosterUnavailable: reason =>
       `名簿を取得できません: ${reason}。ゲートウェイが profiles.list より前の場合は、Hermes を更新してゲートウェイを再起動してください。`,
+    activityToastsOn: 'アクティビティ通知: オン — クリックでオフ',
+    activityToastsOff: 'アクティビティ通知: オフ — クリックでオン',
+    newMenu: '新規…',
+    filterRoster: 'リストを絞り込む',
+    filtersActive: count => `絞り込み（${count} 件有効）`,
+    filterRosterActive: count => `リストを絞り込む、${count} 件有効`,
+    allGateways: 'すべてのゲートウェイ',
+    attentionHints: {
+      provider_auth_or_access: 'このプロファイルで再度サインインしてください',
+      provider_quota_limit: 'クォータまたは残高が不足しています',
+      missing_config: 'プロバイダーが未設定です — hermes model を実行してください',
+      agent_blocked: 'ボットがブロックされています — 最後のメッセージを確認してください'
+    },
     waitingForGateway: 'ゲートウェイ接続を待っています…（リモートは数秒かかることがあります。自動で再試行します）'
   },
   sections: {
@@ -633,6 +696,9 @@ const ja: BotsMessages = {
     removeImage: '画像を削除してシェイプを使う',
     removeBackToShape: '削除 — シェイプアバターに戻す',
     describePlaceholder: 'アバターを説明…',
+    keepFaceHint: '名前を変えてもこのアバターを維持',
+    lockFace: 'アバターを固定',
+    unlockFace: '固定を解除',
     describeHint: '空欄のままにすると、名前・タイトル・説明と agent-messaging の名簿から自動生成します。',
     matchTheName: '名前に合わせる',
     pickPet: 'このボットのプロフィール画像としてペットを選びます。',
@@ -709,6 +775,17 @@ const ja: BotsMessages = {
     answerFailed: (handle, error) => `@${handle}に回答を送信できませんでした: ${error}`,
     wantsToRunCommand: handle => `@${handle}がコマンドを実行しようとしています:`,
     asks: handle => `@${handle}からの質問:`,
+    openGroupChat: 'グループチャットを開く',
+    pickAtLeastTwo: 'ボットを 2 つ以上選んでください',
+    createGroup: 'グループを作成',
+    createGroupWithCount: count => `グループを作成（${count}）`,
+    createAndJoin: '作成して参加',
+    newGroupPlaceholder: '新しいグループ…',
+    namePlaceholderExample: 'グループ名（例：リサーチ）',
+    answerOwn: '自分で回答を入力することもできます…',
+    answerTyped: '回答を入力…',
+    showHandle: '完全な識別子を表示',
+    hideHandle: '完全な識別子を隠す',
     answerTo: member => `@${member}に回答`
   },
   tools: {
@@ -795,6 +872,19 @@ const zh: BotsMessages = {
     unavailable: '不可用',
     retryNow: '立即重试',
     rosterUnavailable: reason => `无法获取名单：${reason}。如果网关早于 profiles.list，请更新 Hermes 并重启网关。`,
+    activityToastsOn: '活动通知已开启 — 点击关闭',
+    activityToastsOff: '活动通知已关闭 — 点击开启',
+    newMenu: '新建…',
+    filterRoster: '筛选列表',
+    filtersActive: count => `筛选（${count} 项生效）`,
+    filterRosterActive: count => `筛选列表，${count} 项生效`,
+    allGateways: '全部网关',
+    attentionHints: {
+      provider_auth_or_access: '请为此配置档案重新登录',
+      provider_quota_limit: '配额或余额已用完',
+      missing_config: '未配置服务商 — 请运行 hermes model',
+      agent_blocked: '机器人已被阻止 — 查看它的最后一条消息'
+    },
     waitingForGateway: '正在等待网关连接…（远程网关可能需要几秒；会自动重试）'
   },
   sections: {
@@ -865,6 +955,9 @@ const zh: BotsMessages = {
     removeImage: '移除图片，改用形状',
     removeBackToShape: '移除 — 回到形状头像',
     describePlaceholder: '描述你的头像…',
+    keepFaceHint: '即使改名也保留这个头像',
+    lockFace: '锁定头像',
+    unlockFace: '解除锁定',
     describeHint: '留空则根据名称/标题/描述和 agent-messaging 名册自动生成。',
     matchTheName: '匹配名称',
     pickPet: '选择一只宠物作为此机器人的头像。',
@@ -940,6 +1033,17 @@ const zh: BotsMessages = {
     answerFailed: (handle, error) => `无法将回答发送给 @${handle}：${error}`,
     wantsToRunCommand: handle => `@${handle} 想执行一个命令：`,
     asks: handle => `@${handle} 的提问：`,
+    openGroupChat: '打开群聊',
+    pickAtLeastTwo: '至少选择 2 个机器人',
+    createGroup: '创建群组',
+    createGroupWithCount: count => `创建群组（${count}）`,
+    createAndJoin: '创建并加入',
+    newGroupPlaceholder: '新建群组…',
+    namePlaceholderExample: '群组名称（例如：研究）',
+    answerOwn: '或者输入你自己的回答…',
+    answerTyped: '输入你的回答…',
+    showHandle: '显示完整标识',
+    hideHandle: '隐藏完整标识',
     answerTo: member => `回答 @${member}`
   },
   tools: {
@@ -1026,6 +1130,19 @@ const zhHant: BotsMessages = {
     unavailable: '不可用',
     retryNow: '立即重試',
     rosterUnavailable: reason => `無法取得名單：${reason}。如果閘道早於 profiles.list，請更新 Hermes 並重新啟動閘道。`,
+    activityToastsOn: '活動通知已開啟 — 點擊關閉',
+    activityToastsOff: '活動通知已關閉 — 點擊開啟',
+    newMenu: '新增…',
+    filterRoster: '篩選列表',
+    filtersActive: count => `篩選（${count} 項生效）`,
+    filterRosterActive: count => `篩選列表，${count} 項生效`,
+    allGateways: '全部閘道',
+    attentionHints: {
+      provider_auth_or_access: '請為此設定檔重新登入',
+      provider_quota_limit: '配額或餘額已用完',
+      missing_config: '未設定服務商 — 請執行 hermes model',
+      agent_blocked: '機器人已被阻擋 — 查看它的最後一則訊息'
+    },
     waitingForGateway: '正在等待閘道連線…（遠端閘道可能需要幾秒；會自動重試）'
   },
   sections: {
@@ -1096,6 +1213,9 @@ const zhHant: BotsMessages = {
     removeImage: '移除圖片，改用形狀',
     removeBackToShape: '移除 — 回到形狀頭像',
     describePlaceholder: '描述你的頭像…',
+    keepFaceHint: '即使改名也保留這個頭像',
+    lockFace: '鎖定頭像',
+    unlockFace: '解除鎖定',
     describeHint: '留空則依名稱／標題／描述與 agent-messaging 名冊自動產生。',
     matchTheName: '符合名稱',
     pickPet: '選擇一隻寵物作為此機器人的頭像。',
@@ -1171,6 +1291,17 @@ const zhHant: BotsMessages = {
     answerFailed: (handle, error) => `無法將回答傳送給 @${handle}：${error}`,
     wantsToRunCommand: handle => `@${handle} 想執行一個命令：`,
     asks: handle => `@${handle} 的提問：`,
+    openGroupChat: '開啟群組聊天',
+    pickAtLeastTwo: '至少選擇 2 個機器人',
+    createGroup: '建立群組',
+    createGroupWithCount: count => `建立群組（${count}）`,
+    createAndJoin: '建立並加入',
+    newGroupPlaceholder: '新增群組…',
+    namePlaceholderExample: '群組名稱（例如：研究）',
+    answerOwn: '或者輸入你自己的回答…',
+    answerTyped: '輸入你的回答…',
+    showHandle: '顯示完整識別碼',
+    hideHandle: '隱藏完整識別碼',
     answerTo: member => `回覆 @${member}`
   },
   tools: {

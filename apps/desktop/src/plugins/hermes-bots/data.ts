@@ -61,14 +61,6 @@ const BOT_ATTENTION_CLASSES: ReadonlySet<string> = new Set<AttentionClass>([
   'missing_config'
 ])
 
-/** One-line user hint per attention class (roster badge tooltip). */
-export const BOT_ATTENTION_HINTS: Record<string, string> = {
-  provider_auth_or_access: 'Sign in again for this profile',
-  provider_quota_limit: 'Quota or balance exhausted',
-  missing_config: 'Provider not configured — run hermes model',
-  agent_blocked: 'Bot is blocked — see its last message'
-}
-
 /** Map an error (a #93091 reason code or raw error text) to an attention
  *  class, or null when the failure is transient (rate limit, server error,
  *  timeout) — transient classes must NEVER badge. Pure; tested directly. */
