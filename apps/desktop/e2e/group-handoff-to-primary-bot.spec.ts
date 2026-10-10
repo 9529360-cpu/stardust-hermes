@@ -23,10 +23,7 @@ interface RoomLogEntry {
 }
 
 async function openBots(page: Page): Promise<void> {
-  const tab = page
-    .getByRole('button', { name: 'Bots', exact: true })
-    .or(page.getByRole('tab', { name: 'Bots', exact: true }))
-    .first()
+  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
 
   await tab.click()
   await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()

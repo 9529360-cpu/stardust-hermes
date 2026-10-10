@@ -18,6 +18,8 @@ export const ARTIFACTS_ROUTE = '/artifacts'
 export const CRON_ROUTE = '/cron'
 export const PROFILES_ROUTE = '/profiles'
 export const AGENTS_ROUTE = '/agents'
+// Bot Mode's roster page: a plugin route (ROUTES_AREA), not a core APP_ROUTES entry.
+export const BOTS_ROUTE = '/bots'
 export const STARMAP_ROUTE = '/starmap'
 export const WORKSPACE_ROUTE = '/workspace'
 

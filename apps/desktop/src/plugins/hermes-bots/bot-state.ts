@@ -9,6 +9,7 @@
  */
 
 import { atom, host } from '@hermes/plugin-sdk'
+import { computed } from 'nanostores'
 
 import { botRosterKey, botSelectionKey } from './data'
 import { getPluginCtx } from './shared'
@@ -38,14 +39,16 @@ export const $selectedBot = atom('default')
 export const $selectedRosterKey = atom('')
 export const $selectedRosterHydrated = atom(false)
 export const $rosterHydrated = atom(false)
-/** Mirrors host.paneVisibility('hermes-bots:pane') — wired in register(). */
-export const $botsPaneVisible = atom(false)
+/** The roster page (BotsPage) is mounted. */
+export const $botsPageOpen = atom(false)
 /** An explicit open landed: {key, openedRegistryId, openedSessionId}. The
  *  registry id is empty for the legacy newChat draft fallback and for a click
  *  that came back to the bot's already-open tabs (only openedSessionId set — no
  *  canonical chat was resolved). This transient view observation is never an
  *  identity preference. */
 export const $openBotChat = atom<{ key: string; openedRegistryId: string; openedSessionId?: string } | null>(null)
+/** Bot Mode is on screen: the roster page is open, or a bot chat owns the workspace. */
+export const $botsPaneVisible = computed([$botsPageOpen, $openBotChat], (page, chat) => page || chat !== null)
 /** A session owns the main workspace. The roster highlight and the Cronjobs
  *  lifecycle both key off this rather than reading host.state conditionally
  *  from render. */

@@ -15,7 +15,6 @@ import {
 import { botSourceStatus } from './data'
 import type { useBots } from './i18n'
 import { setActivityToasts } from './roster-actions'
-import { RosterBackButton } from './roster-back-button'
 import { GatewayKindGlyph } from './roster-sections'
 import type { rosterGatewayOptions } from './roster-sections'
 import type { RosterActivityFilter, RosterKindFilter, RosterRow } from './types'
@@ -68,10 +67,7 @@ export function renderRosterToolbar({
   return (
     <>
       <div className="flex items-center justify-between gap-2 px-2.5 pt-2.5 pb-1.5">
-        <div className="flex min-w-0 items-center gap-0.5">
-          <RosterBackButton label={b.roster.backToConversations} />
-          <SidebarPanelLabel>{b.paneTitle}</SidebarPanelLabel>
-        </div>
+        <SidebarPanelLabel>{b.paneTitle}</SidebarPanelLabel>
         <div className="flex items-center gap-0.5">
           <Tip
             label={activityToasts ? b.roster.activityToastsOn : b.roster.activityToastsOff}

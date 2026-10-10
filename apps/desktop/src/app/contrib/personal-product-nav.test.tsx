@@ -112,13 +112,13 @@ describe('PersonalProductNav', () => {
     expect(screen.queryByRole('button', { name: '设置' })).toBeNull()
   })
 
-  it('opens the agent space roster from its own row without changing the route', () => {
+  it('opens the agent space as a page beside the nav, like tools and plugins', () => {
     const onNavigate = renderNav('chat')
 
     fireEvent.click(screen.getByRole('button', { name: '智能体空间' }))
 
-    expect(revealTreePane).toHaveBeenCalledWith('hermes-bots:pane')
-    expect(onNavigate).not.toHaveBeenCalled()
+    expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'bots', route: '/bots' }))
+    expect(revealTreePane).not.toHaveBeenCalledWith('hermes-bots:pane')
   })
 
   it('routes new chat, tasks, tools, and plugins through their existing owners', () => {
