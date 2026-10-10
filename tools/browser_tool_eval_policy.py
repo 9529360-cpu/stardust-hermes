@@ -102,7 +102,14 @@ def _restrict_browser_evaluate() -> bool:
     by the SSRF/private-URL guards in ``_browser_eval`` regardless. Opt in via
     ``browser.restrict_evaluate: true`` (e.g. hostile pages with a logged-in profile).
     """
-    return _browser_eval_flag("restrict_evaluate")
+    if _browser_eval_flag("restrict_evaluate"):
+        return True
+    # Cloud and real-profile pages may contain authenticated data. Local
+    # sidecars retain the compatibility opt-in behavior.
+    try:
+        return not _cloud._is_local_backend() or bool(_cloud._use_real_profile())
+    except Exception:
+        return True
 
 
 def _decode_js_string_literal(literal: str) -> str:
@@ -149,6 +156,20 @@ def _enforce_browser_eval_policy(expression: str) -> Optional[str]:
             "enabled. Use browser_snapshot/browser_get_images/browser_console "
             "without expression for normal inspection, or set "
             "browser.restrict_evaluate: false in config.yaml to allow programmatic evaluation.")
+
+
+def _sensitive_eval_refusal(policy_error: str, tool_name: str, rule_key: str) -> Optional[str]:
+    """Why a sensitive evaluation may not run, or ``None`` once a human has approved it.
+
+    An explicit ``browser.restrict_evaluate: true`` is the operator's hard limit and is never approvable.
+    Only the implicit cloud/real-profile policy asks a human, one decision per rule key."""
+    if _browser_eval_flag("restrict_evaluate"):
+        return policy_error
+    from tools.approval import request_tool_approval
+    approval = request_tool_approval(tool_name, policy_error, rule_key=rule_key)
+    if approval.get("approved"):
+        return None
+    return approval.get("message") or policy_error
 
 
 def _camofox_current_page_private_url(tab_id: str, user_id: str) -> Optional[str]:

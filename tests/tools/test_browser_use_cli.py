@@ -125,6 +125,38 @@ class TestModeDetection:
         assert bu_cli.is_browser_use_cli_mode() is False
 
 
+@pytest.fixture(autouse=True)
+def _approve_host_python_exec(monkeypatch):
+    """browser_exec asks a human before it runs Python on the host; the tests below exercise what runs after approval."""
+    monkeypatch.setattr("tools.approval.request_tool_approval", lambda *a, **k: {"approved": True})
+
+
+class TestBrowserExecApproval:
+    def test_denied_approval_blocks_before_any_host_work(self, monkeypatch):
+        monkeypatch.setattr(
+            "tools.approval.request_tool_approval",
+            lambda *a, **k: {"approved": False, "message": "denied by user"},
+        )
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: pytest.fail("host CLI must not launch without approval"))
+        result = json.loads(bu_cli.browser_exec("open('/tmp/browser-exec-pwned', 'w').close()"))
+        assert result["success"] is False
+        assert result["error_type"] == "approval_denied"
+        assert result["error"] == "denied by user"
+
+    def test_approval_names_the_rule_and_shows_the_code(self, monkeypatch):
+        seen = {}
+
+        def record(tool_name, reason, **kwargs):
+            seen.update(tool_name=tool_name, reason=reason, **kwargs)
+            return {"approved": False, "message": "no"}
+
+        monkeypatch.setattr("tools.approval.request_tool_approval", record)
+        bu_cli.browser_exec("print(1)")
+        assert seen["tool_name"] == "browser_exec"
+        assert seen["rule_key"] == "browser_exec_host_python"
+        assert "print(1)" in seen["reason"]
+
+
 class TestSubprocessEnvironment:
     def test_browser_use_telemetry_defaults_off(self, monkeypatch):
         import sys

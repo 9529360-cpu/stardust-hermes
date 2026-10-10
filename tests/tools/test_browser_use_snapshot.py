@@ -143,6 +143,8 @@ def test_browser_exec_injects_the_live_snapshot_contract(monkeypatch):
     import subprocess
 
     captured = {}
+    # browser_exec asks a human before running host Python; approve it here so the test reaches the CLI launch.
+    monkeypatch.setattr("tools.approval.request_tool_approval", lambda *a, **k: {"approved": True})
     monkeypatch.setattr(browser_use_cli, "_find_cli", lambda: ["browser-use"])
     monkeypatch.setattr(browser_use_cli, "_route_backend", lambda *args: None)
     monkeypatch.setattr(browser_use_cli, "_base_subprocess_env", lambda: {})

@@ -135,6 +135,32 @@ _METHOD_PARAM_GUARDS = {
                          "Blocked: CDP Runtime.evaluate expression targets a private or internal address ({})."),
 }
 
+# Raw CDP reaches the same page data as browser_console, so the same sensitive-data policy applies:
+# page JavaScript evaluation, and cookie or storage reads that need no JavaScript at all.
+_CDP_EVAL_METHODS = frozenset({"Runtime.evaluate", "Runtime.callFunctionOn"})
+_CDP_SENSITIVE_READ_METHODS = frozenset({
+    "Network.getAllCookies", "Network.getCookies", "Storage.getCookies",
+    "DOMStorage.getDOMStorageItems", "IndexedDB.requestData",
+})
+
+
+def _browser_cdp_sensitive_refusal(method: str, params: Dict[str, Any]) -> Optional[str]:
+    """Refusal for a raw CDP call that reaches sensitive page data without the browser_console policy."""
+    from tools import browser_tool_eval_policy as policy
+    if method in _CDP_EVAL_METHODS:
+        source = params.get("expression") or params.get("functionDeclaration") or ""
+        policy_error = policy._enforce_browser_eval_policy(str(source))
+    elif method in _CDP_SENSITIVE_READ_METHODS and policy._restrict_browser_evaluate() \
+            and not policy._allow_unsafe_browser_evaluate():
+        policy_error = (f"Blocked: browser_cdp({method}) reads cookies or storage while the sensitive-data "
+                        "policy is active (browser.restrict_evaluate, or a cloud or real-profile session). "
+                        "Use browser_snapshot for normal inspection.")
+    else:
+        return None
+    if not policy_error:
+        return None
+    return policy._sensitive_eval_refusal(policy_error, "browser_cdp", f"browser_cdp_sensitive:{method}")
+
 
 def _browser_cdp_private_guard(*, task_id: str, method: str, params: Dict[str, Any]) -> Optional[str]:
     """Apply the browser SSRF/private-page guard to raw CDP calls.
@@ -265,6 +291,11 @@ def browser_cdp(method: str, params: Optional[Dict[str, Any]] = None, target_id:
     hit signed-URL expiry (Browserbase). Both paths share the same private-page/SSRF guard. Returns JSON
     ``{"success": True, "method", "result"}`` or ``{"error": ...}``."""
     effective_task_id = task_id or "default"
+
+    if isinstance(method, str) and method:
+        refusal = _browser_cdp_sensitive_refusal(method, params if isinstance(params, dict) else {})
+        if refusal:
+            return tool_error(refusal, method=method)
 
     if frame_id:
         blocked = _browser_cdp_private_guard(task_id=effective_task_id, method=method, params=params or {})
