@@ -110,6 +110,9 @@ import {
   validateCronEditor
 } from './cron-job-model'
 import { jobState, jobTitle, STATE_DOT } from './job-state'
+import { RecentRunDetail } from './recent-run-detail'
+import { jobLookupKey, RUN_DOT, runJob, runKey, runStatus, runTimeLabel, runTitle } from './recent-runs'
+import { useRecentCronRuns } from './use-recent-cron-runs'
 
 const DEFAULT_DELIVER = 'local'
 
@@ -355,7 +358,7 @@ export function CronView({
   setStatusbarItemGroup: _setStatusbarItemGroup,
   ...props
 }: CronViewProps) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const c = t.cron
   // Source of truth is the shared atom (also fed by the controller poll), so the
   // sidebar and this overlay never drift — a delete here clears the sidebar row
@@ -405,6 +408,7 @@ export function CronView({
   const [editor, setEditor] = useState<EditorState>({ mode: 'closed' })
   const [pendingDelete, setPendingDelete] = useState<CronJob | null>(null)
   const [selectedSuggestionId, setSelectedSuggestionId] = useState<null | string>(null)
+  const [selectedRunKey, setSelectedRunKey] = useState<null | string>(null)
   const [busySuggestionId, setBusySuggestionId] = useState<null | string>(null)
 
   // Jobs live per-profile on disk and the list endpoint aggregates 'all' by
@@ -417,6 +421,48 @@ export function CronView({
   const profile = cronProfileForScope(profileScope)
   const loadScope = `${activeConnectionId ?? ''}\u0000${profile}`
   const jobs = useMemo(() => jobsScope === loadScope ? cachedJobs : [], [cachedJobs, jobsScope, loadScope])
+
+  // Scheduled runs for the profiles in view. "All profiles" reads every profile that owns a job.
+  const launchProfile = normalizeProfileKey(activeGatewayProfile)
+  const runScopeProfile = profileScope === ALL_PROFILES ? '' : normalizeProfileKey(profileScope)
+
+  const runProfiles = useMemo(() => {
+    if (runScopeProfile) {
+      return [runScopeProfile]
+    }
+
+    const owners = new Set(cachedJobs.map(job => normalizeProfileKey(job.profile || launchProfile)))
+
+    return owners.size > 0 ? [...owners] : [launchProfile]
+  }, [cachedJobs, launchProfile, runScopeProfile])
+
+  const recentRuns = useRecentCronRuns(runProfiles, true)
+
+  const jobsByKey = useMemo(() => {
+    const byKey = new Map<string, CronJob>()
+
+    for (const job of cachedJobs) {
+      byKey.set(jobLookupKey(job.profile || runScopeProfile || launchProfile, job.id), job)
+    }
+
+    return byKey
+  }, [cachedJobs, launchProfile, runScopeProfile])
+
+  const runningRuns = recentRuns.filter(run => runStatus(run) === 'running')
+  // Finished runs are the recent history; the newest twelve are enough to see what ran lately.
+  const finishedRuns = recentRuns.filter(run => runStatus(run) !== 'running').slice(0, 12)
+
+  const selectedRun = useMemo(
+    () => recentRuns.find(run => runKey(run) === selectedRunKey) ?? null,
+    [recentRuns, selectedRunKey]
+  )
+
+  const selectRun = (key: string) => {
+    setSelectedJobId(null)
+    setSelectedSuggestionId(null)
+    setSelectedRunKey(key)
+  }
+
   const loadFailed = jobsLoad?.scope === loadScope && jobsLoad.status === 'error'
   const loading = jobsLoad?.scope === loadScope && jobsLoad.status === 'loading'
 
@@ -424,16 +470,19 @@ export function CronView({
   // from an aggregated list; copied jobs can share an ID across profiles.
   const jobOwner = (job: CronJob) => job.profile || (profile !== 'all' ? profile : null)
   const jobKey = useCallback((job: CronJob) => `${job.profile || (profile !== 'all' ? profile : '')}\u0000${job.id}`, [profile])
+
   const routeIsCurrent = () => getApiRequestConnection() === activeConnectionId &&
     getApiRequestProfile() === $activeGatewayProfile.get() &&
     $activeConnectionId.get() === activeConnectionId &&
     cronProfileForScope($profileScope.get()) === profile &&
     $cronJobsScope.get() === loadScope
+
   // A concrete desktop alias can map to a different backend profile on SSH.
   // Trust the owner annotated by the scoped backend response, not a comparison
   // between two distinct namespaces (the live route and row identity still gate writes).
   const canMutateJob = (job: CronJob) => routeIsCurrent() && Boolean(jobOwner(job)) &&
     !($cronJobsLoad.get()?.scope === loadScope && $cronJobsLoad.get()?.status === 'loading')
+
   const jobIsCurrent = (job: CronJob) => canMutateJob(job) && $cronJobs.get().includes(job)
 
   // Consent decisions are profile-local. Even while the jobs view is aggregated,
@@ -529,15 +578,20 @@ export function CronView({
     return list.filter(item => {
       const title = blueprintDisplayTitle(item, c)
       const description = blueprintDisplayDescription(item, c)
+
       return `${title} ${description} ${item.title} ${item.description}`.toLowerCase().includes(needle)
     })
   }, [blueprintsQuery.data, c, query])
 
   // Detail always reflects a concrete job: the explicitly selected one, else the
   // first visible row, so the right pane is never empty while jobs exist.
+  // A selected run owns the detail pane, so the first-job fallback must not show over it.
   const selectedJob = useMemo(
-    () => (selectedSuggestion ? null : (visibleJobs.find(job => jobKey(job) === selectedJobId) ?? visibleJobs[0] ?? null)),
-    [jobKey, selectedSuggestion, selectedJobId, visibleJobs]
+    () =>
+      selectedSuggestion || selectedRun
+        ? null
+        : (visibleJobs.find(job => jobKey(job) === selectedJobId) ?? visibleJobs[0] ?? null),
+    [jobKey, selectedRun, selectedSuggestion, selectedJobId, visibleJobs]
   )
 
   // Scroll a sidebar-opened job into view once its list row is mounted.
@@ -741,6 +795,7 @@ export function CronView({
     }
 
     setBusySuggestionId(suggestion.id)
+
     try {
       const {
         value: job,
@@ -749,11 +804,13 @@ export function CronView({
       } = await mutateAndRefreshCronJobs(profile, () =>
         acceptCronSuggestion(suggestion.id, suggestionProfile, selectedStoredSessionId)
       )
+
       await suggestionsQuery.refetch()
 
       if (stale || !job) {
         return
       }
+
       if (refreshError) {
         notifyError(refreshError, c.failedLoad)
       }
@@ -781,6 +838,7 @@ export function CronView({
     }
 
     setBusySuggestionId(suggestion.id)
+
     try {
       await dismissCronSuggestion(suggestion.id, suggestionProfile)
       await suggestionsQuery.refetch()
@@ -797,6 +855,7 @@ export function CronView({
       setBusySuggestionId(current => (current === suggestion.id ? null : current))
     }
   }
+
   // Blueprint instantiation is a distinct backend path (fills typed slots, then
   // creates the job) so it can't share the raw-cron onSave contract. Merge the
   // created job into $cronJobs like every other create path. A blueprint writes a
@@ -887,6 +946,23 @@ export function CronView({
               searchPlaceholder={c.search}
               searchValue={query}
             >
+              {runningRuns.length > 0 && (
+                <>
+                  <PanelSectionLabel className="px-2">{c.recentRuns.runningTitle}</PanelSectionLabel>
+                  {runningRuns.map(run => (
+                    <PanelListRow
+                      active={selectedRunKey === runKey(run)}
+                      dotClassName={RUN_DOT[runStatus(run)]}
+                      key={runKey(run)}
+                      meta={runTimeLabel(run.started_at, locale)}
+                      onSelect={() => selectRun(runKey(run))}
+                      rowKey={`run-${runKey(run)}`}
+                      title={runTitle(run, jobsByKey, c.recentRuns)}
+                    />
+                  ))}
+                </>
+              )}
+              {visibleJobs.length > 0 && <PanelSectionLabel className="px-2">{c.title}</PanelSectionLabel>}
               {visibleJobs.map(job => (
                 <CronJobListRow
                   active={selectedJob === job}
@@ -899,6 +975,7 @@ export function CronView({
                   menuLabel={c.manage}
                   onSelect={() => {
                     setSelectedSuggestionId(null)
+                    setSelectedRunKey(null)
                     setSelectedJobId(jobKey(job))
                   }}
                   rowKey={jobKey(job)}
@@ -910,6 +987,28 @@ export function CronView({
                 </p>
               )}
               <PanelAddButton label={c.newCron} onClick={() => setEditor({ mode: 'create' })} />
+              {finishedRuns.length === 0 && visibleJobs.length > 0 && (
+                <>
+                  <PanelSectionLabel className="mt-3 px-2">{c.recentRuns.recentTitle}</PanelSectionLabel>
+                  <p className="px-2 pb-1 text-xs leading-relaxed text-muted-foreground/70">{c.recentRuns.recentEmpty}</p>
+                </>
+              )}
+              {finishedRuns.length > 0 && (
+                <>
+                  <PanelSectionLabel className="mt-3 px-2">{c.recentRuns.recentTitle}</PanelSectionLabel>
+                  {finishedRuns.map(run => (
+                    <PanelListRow
+                      active={selectedRunKey === runKey(run)}
+                      dotClassName={RUN_DOT[runStatus(run)]}
+                      key={runKey(run)}
+                      meta={runTimeLabel(run.updated_at ?? run.started_at, locale)}
+                      onSelect={() => selectRun(runKey(run))}
+                      rowKey={`run-${runKey(run)}`}
+                      title={runTitle(run, jobsByKey, c.recentRuns)}
+                    />
+                  ))}
+                </>
+              )}
               {visibleSuggestions.length > 0 && (
                 <>
                   <PanelSectionLabel className="mt-3 px-2">{c.suggestions.tab}</PanelSectionLabel>
@@ -920,6 +1019,7 @@ export function CronView({
                       key={item.id}
                       onSelect={() => {
                         setSelectedJobId(null)
+                        setSelectedRunKey(null)
                         setSelectedSuggestionId(item.id)
                       }}
                       rowKey={`suggestion-${item.id}`}
@@ -966,6 +1066,22 @@ export function CronView({
                 onTrigger={() => void handleTrigger(selectedJob)}
                 ownerProfile={jobOwner(selectedJob)}
                 runsScope={loadScope}
+              />
+            ) : selectedRun ? (
+              <RecentRunDetail
+                c={c}
+                job={runJob(selectedRun, jobsByKey)}
+                locale={locale}
+                onOpenJob={() => {
+                  const job = runJob(selectedRun, jobsByKey)
+
+                  if (job) {
+                    setSelectedRunKey(null)
+                    setSelectedJobId(jobKey(job))
+                  }
+                }}
+                run={selectedRun}
+                title={runTitle(selectedRun, jobsByKey, c.recentRuns)}
               />
             ) : query.trim() ? (
               // A search with no selected job: search-flavored copy is right.
@@ -1285,6 +1401,7 @@ function CronJobRuns({
 // platforms without a cron home channel get a "set a home channel first" hint.
 function deliverTargetLabel(target: CronDeliveryTarget, c: Translations['cron']): string {
   const botChatPrefix = 'bot-chat:'
+
   const base =
     target.id === 'local'
       ? c.deliveryLabels.local

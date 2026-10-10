@@ -18,20 +18,27 @@ const AUDIT_ENTRY = {
   tool_name: 'terminal',
   description: 'run a command',
   pattern_key: 'git status',
-  outcome: 'approved-once',
+  outcome: 'approved_once',
   mode: 'manual',
   command_preview: 'git status'
 }
+
+// The grant was allowed today, so its detail is today's short date (no year), whatever day the suite runs.
+const NOW_ISO = new Date().toISOString()
+const TODAY = new Date().toLocaleDateString('en', { day: 'numeric', month: 'short' })
 
 const GRANT = {
   id: 'grant-1',
   action_kind: 'command_pattern',
   target: 'git status*',
-  created_at: '2026-10-09T10:00:00Z'
+  created_at: NOW_ISO
 }
 
-/** A tiny in-memory backend: writes mutate it, reads return the current state. */
-function fakeBackend(state: { grants: (typeof GRANT)[]; audit: (typeof AUDIT_ENTRY)[] }) {
+type Audit = (typeof AUDIT_ENTRY)[]
+type Grants = (typeof GRANT)[]
+
+/** A small in-memory backend: writes mutate it, reads return the current state. */
+function fakeBackend(state: { grants: Grants; audit: Audit }) {
   requestGateway.mockImplementation(async (method: string, params: Record<string, unknown>) => {
     if (method === 'approval.audit') {
       return { entries: state.audit }
@@ -60,6 +67,16 @@ function renderPanel() {
   )
 }
 
+function confirmRevoke() {
+  return findDialogButton('Revoke')
+}
+
+async function findDialogButton(name: string) {
+  const dialog = await screen.findByRole('dialog')
+
+  return within(dialog).getByRole('button', { name })
+}
+
 describe('ApprovalActivity', () => {
   beforeEach(() => {
     requestGateway.mockReset()
@@ -69,36 +86,34 @@ describe('ApprovalActivity', () => {
     cleanup()
   })
 
-  it('shows standing grants and recent decisions from the gateway', async () => {
+  it('states each permission in plain words and lists recent confirmations', async () => {
     fakeBackend({ grants: [GRANT], audit: [AUDIT_ENTRY] })
 
     renderPanel()
 
-    expect(await screen.findByText('git status*')).toBeTruthy()
-    expect(screen.getByText('terminal · approved-once')).toBeTruthy()
-    expect(screen.getByText('git status')).toBeTruthy()
+    expect(await screen.findByText('Run git status* without asking')).toBeTruthy()
+    expect(screen.getByText(`Allowed ${TODAY}`)).toBeTruthy()
+    expect(screen.getByText('Run git status')).toBeTruthy()
+    expect(screen.getByText('Allowed once')).toBeTruthy()
   })
 
-  it('revokes a grant by id after confirmation, then reloads the authoritative list', async () => {
+  it('revokes a permission after confirmation, then reloads the authoritative list', async () => {
     const state = { grants: [GRANT], audit: [AUDIT_ENTRY] }
 
     fakeBackend(state)
     renderPanel()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }))
-    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(await confirmRevoke())
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Revoke' }))
-
-    await waitFor(() => expect(screen.getByText('No standing grants. Approvals ask again each time.')).toBeTruthy())
+    expect(await screen.findByText('No standing permissions yet. I ask before anything that needs your approval.')).toBeTruthy()
     expect(requestGateway).toHaveBeenCalledWith('approval.grants.revoke', { id: 'grant-1' })
-    expect(screen.queryByText('git status*')).toBeNull()
+    expect(screen.queryByText('Run git status* without asking')).toBeNull()
   })
 
-  it('restores a grant the backend refused to revoke and says it is still active', async () => {
-    const state = { grants: [GRANT], audit: [] as (typeof AUDIT_ENTRY)[] }
+  it('restores a permission the backend refused to revoke and says it is still allowed', async () => {
+    const state = { grants: [GRANT], audit: [] as Audit }
 
-    fakeBackend(state)
     requestGateway.mockImplementation(async (method: string, params: Record<string, unknown>) => {
       if (method === 'approval.grants.revoke') {
         expect(params).toEqual({ id: 'grant-1' })
@@ -106,22 +121,22 @@ describe('ApprovalActivity', () => {
         return { revoked: false }
       }
 
-      return method === 'approval.audit' ? { entries: [] } : { grants: state.grants }
+      return method === 'approval.audit' ? { entries: state.audit } : { grants: state.grants }
     })
 
     renderPanel()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Revoke' }))
+    fireEvent.click(await confirmRevoke())
 
     expect(await screen.findByRole('alert')).toBeTruthy()
-    expect(screen.getByText("Couldn't revoke the grant. It is still active.")).toBeTruthy()
-    expect(screen.getByText('git status*')).toBeTruthy()
+    expect(screen.getByText("Couldn't revoke that. It's still allowed.")).toBeTruthy()
+    expect(screen.getByText('Run git status* without asking')).toBeTruthy()
   })
 
   it('never lets an earlier load overwrite a newer one', async () => {
     const state = { grants: [GRANT], audit: [AUDIT_ENTRY] }
-    let releaseStaleAudit: (value: { entries: (typeof AUDIT_ENTRY)[] }) => void = () => undefined
+    let releaseStaleAudit: (value: { entries: Audit }) => void = () => undefined
     let auditCalls = 0
 
     requestGateway.mockImplementation(async (method: string) => {
@@ -151,14 +166,14 @@ describe('ApprovalActivity', () => {
 
     // Revoke while the first load is still waiting on its audit read.
     fireEvent.click(await screen.findByRole('button', { name: 'Revoke' }))
-    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Revoke' }))
+    fireEvent.click(await confirmRevoke())
 
-    expect(await screen.findByText('terminal · denied')).toBeTruthy()
+    expect(await screen.findByText('Declined')).toBeTruthy()
 
     // The stale first response arrives last and must not win.
-    releaseStaleAudit({ entries: [{ ...AUDIT_ENTRY, outcome: 'approved-once' }] })
-    await waitFor(() => expect(screen.getByText('terminal · denied')).toBeTruthy())
-    expect(screen.queryByText('terminal · approved-once')).toBeNull()
+    releaseStaleAudit({ entries: [{ ...AUDIT_ENTRY, outcome: 'approved_once' }] })
+    await waitFor(() => expect(screen.getByText('Declined')).toBeTruthy())
+    expect(screen.queryByText('Allowed once')).toBeNull()
   })
 
   it('shows an honest error with a way to retry', async () => {
@@ -167,11 +182,11 @@ describe('ApprovalActivity', () => {
 
     renderPanel()
 
-    expect(await screen.findByText("Couldn't load approval activity.")).toBeTruthy()
+    expect(await screen.findByText("Couldn't load your permissions.")).toBeTruthy()
 
     fakeBackend({ grants: [], audit: [] })
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByText('No approval decisions yet.')).toBeTruthy()
+    expect(await screen.findByText('Nothing has needed your confirmation yet.')).toBeTruthy()
   })
 })

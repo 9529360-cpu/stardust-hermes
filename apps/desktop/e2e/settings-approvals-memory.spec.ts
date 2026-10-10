@@ -33,9 +33,9 @@ test('safety shows the approval activity empty states from the real backend', as
 
   await openSettingsTab('config:safety')
 
-  await expect(page.getByText('长期授权', { exact: true })).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('没有长期授权。每次审批都会重新询问。')).toBeVisible()
-  await expect(page.getByText('还没有审批决定。')).toBeVisible()
+  await expect(page.getByText('我的权限', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('还没有长期权限。需要你批准的事，我都会先问你。')).toBeVisible()
+  await expect(page.getByText('还没有需要你确认的操作。')).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('safety-approval-activity.png') })
 })
 
@@ -47,7 +47,7 @@ test('memory notes are remembered and forgotten through the real backend', async
 
   const note = `E2E 偏好公制单位 ${Date.now()}`
 
-  await page.getByPlaceholder('添加一条助手应当记住的内容').fill(note)
+  await page.getByPlaceholder('例如：我喜欢简短的回答').fill(note)
   await page.getByRole('button', { name: '记住', exact: true }).click()
   await expect(page.getByText(note, { exact: true })).toBeVisible({ timeout: 30_000 })
   await page.screenshot({ path: testInfo.outputPath('memory-notes-remembered.png') })
