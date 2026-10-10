@@ -5,6 +5,7 @@ import { PANE_TOGGLE_REVEAL_EVENT } from '@/components/pane-shell'
 import {
   restoreHiddenTreeSideTabs,
   restoreMinimizedTreeSide,
+  revealTreePane,
   setTreeSideCollapsed
 } from '@/components/pane-shell/tree/store'
 import { matchesQuery } from '@/hooks/use-media-query'
@@ -515,6 +516,16 @@ function revealNarrowPane(id: string, mode: 'close' | 'open' | 'toggle'): boolea
   window.dispatchEvent(new CustomEvent(PANE_TOGGLE_REVEAL_EVENT, { detail: { id, mode } }))
 
   return true
+}
+
+// An explicit user reveal (the agent-space row, a plugin's back control). The
+// tree fronts the pane, and below the collapse breakpoint the edge overlay opens
+// it too: the overlay keeps its own reveal state, so a tree-only reveal leaves it
+// on whichever pane it showed last. Background reveals keep calling
+// revealTreePane and never open an overlay.
+export function revealPaneFromUser(paneId: string): void {
+  revealTreePane(paneId)
+  revealNarrowPane(paneId, 'open')
 }
 
 export function setSidebarOpen(open: boolean) {

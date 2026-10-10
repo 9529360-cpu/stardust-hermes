@@ -3,10 +3,11 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { PANE_TOGGLE_REVEAL_EVENT } from '@/components/pane-shell'
 import { registry } from '@/contrib/registry'
+import { revealPaneFromUser } from '@/store/layout'
 import { stubResizeObserver } from '@/test/jsdom'
 
 import { group, split } from '../model'
-import { $hiddenTreePanes, $layoutTree, $narrowViewport, declareDefaultTree } from '../store'
+import { $hiddenTreePanes, $layoutTree, $narrowViewport, declareDefaultTree, revealTreePane } from '../store'
 
 import { NarrowOverlays } from './narrow-overlays'
 
@@ -90,5 +91,39 @@ describe('narrow overlay of a stacked zone', () => {
 
     expect(getByTestId('sessions-body')).toBeTruthy()
     expect(overlayTab('sessions')).toBeNull()
+  })
+
+  it('moves the overlay for an explicit app reveal, even when another pane is showing', () => {
+    // The app's explicit reveals (the agent-space row, the roster's back control)
+    // check the breakpoint before they route into the overlay.
+    const matchMedia = window.matchMedia
+    window.matchMedia = (query: string) => ({ matches: true, media: query }) as MediaQueryList
+
+    try {
+      const { getByTestId, queryByTestId } = render(<NarrowOverlays />)
+
+      revealPane('bots')
+      expect(getByTestId('bots-body')).toBeTruthy()
+
+      act(() => {
+        revealPaneFromUser('sessions')
+      })
+
+      expect(getByTestId('sessions-body')).toBeTruthy()
+      expect(queryByTestId('bots-body')).toBeNull()
+    } finally {
+      window.matchMedia = matchMedia
+    }
+  })
+
+  it('leaves the overlay closed for a background tree reveal', () => {
+    const { queryByTestId } = render(<NarrowOverlays />)
+
+    act(() => {
+      revealTreePane('bots')
+    })
+
+    expect(queryByTestId('bots-body')).toBeNull()
+    expect(queryByTestId('sessions-body')).toBeNull()
   })
 })

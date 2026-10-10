@@ -8,7 +8,7 @@ import { $paneVisible, revealTreePane } from '@/components/pane-shell/tree/store
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $sidebarGrouping, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
+import { $sidebarGrouping, revealPaneFromUser, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
 import { $newChatProfile, $profileScope, ALL_PROFILES } from '@/store/profile'
 import {
   $activeProjectId,
@@ -193,7 +193,7 @@ export function PersonalProductNav({
 
   const openAgentSpace = () => {
     setSidebarOpen(true)
-    revealTreePane('hermes-bots:pane')
+    revealPaneFromUser('hermes-bots:pane')
   }
 
   const openTasks = () =>
