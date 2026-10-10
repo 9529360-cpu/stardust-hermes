@@ -34674,7 +34674,8 @@
             "enum": [
               "delegation",
               "process",
-              "subagent"
+              "subagent",
+              "cron"
             ],
             "title": "Kind",
             "type": "string"

@@ -3828,7 +3828,7 @@ export interface WorkListResult {
 }
 export interface WorkItem {
   id: string
-  kind: 'delegation' | 'process' | 'subagent'
+  kind: 'delegation' | 'process' | 'subagent' | 'cron'
   title: string
   status: 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
   started_at: number | null

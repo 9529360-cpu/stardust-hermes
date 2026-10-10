@@ -11,7 +11,7 @@ class WorkListParams(Params):
 
 class WorkItem(Result):
     id: str
-    kind: Literal["delegation", "process", "subagent"]
+    kind: Literal["delegation", "process", "subagent", "cron"]
     title: str
     status: Literal["running", "completed", "failed", "cancelled", "interrupted"]
     started_at: float | None

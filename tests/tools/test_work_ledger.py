@@ -1,4 +1,5 @@
 """Unified ledger behavior without model calls or real child processes."""
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -76,6 +77,48 @@ def test_foreign_home_and_uncontrollable_live_record(monkeypatch):
     with async_work._records_lock:
         async_work._records["foreign"] = {**live, "delegation_id": "foreign", "owner_home": "other"}
     assert "delegation:foreign" not in {r["id"] for r in ledger.list_work()}
+
+
+def test_cron_execution_history_is_normalized(monkeypatch):
+    from cron import executions
+
+    monkeypatch.setattr(executions, "list_executions", lambda **kwargs: [{
+        "id": "exec-1", "job_id": "job-1", "source": "scheduler", "status": "failed",
+        "claimed_at": "2026-10-10T08:00:00+00:00", "finished_at": "2026-10-10T08:01:00+00:00",
+        "error": "provider unavailable Authorization: Bearer sk-proj-12345678901234567890",
+        "delivery_outcome": "local",
+    }, {
+        "id": "exec-running", "job_id": "job-1", "source": "scheduler", "status": "claimed",
+        "claimed_at": "2026-10-10T08:02:00+00:00",
+    }, {"job_id": "job-1", "status": "failed"}])
+    monkeypatch.setattr("cron.jobs.list_jobs", lambda **kwargs: [{"id": "job-1", "name": "Inbox digest"}])
+
+    records = {row["id"]: row for row in ledger.list_work(include_subagents=False)}
+    run = records["cron:exec-1"]
+    assert run["kind"] == "cron"
+    assert run["title"] == "Inbox digest"
+    assert run["status"] == "failed"
+    assert run["detail"]["job_id"] == "job-1"
+    assert set(run["detail"]) <= {"job_id", "source", "delivery_outcome", "error"}
+    assert "sk-proj-12345678901234567890" not in run["detail"]["error"]
+    assert records["cron:exec-running"]["status"] == "running"
+    assert "cron:None" not in records
+    assert ledger.cancel_work("cron:exec-1")["status"] == "already_finished"
+
+
+def test_unreadable_cron_store_is_logged_and_other_work_still_listed(monkeypatch, caplog):
+    from cron import executions
+
+    def unreadable(**kwargs):
+        raise RuntimeError("cron store corrupted")
+
+    monkeypatch.setattr(executions, "list_executions", unreadable)
+    persist("survivor")
+    with caplog.at_level(logging.WARNING, logger="tools.work_ledger"):
+        records = {row["id"]: row for row in ledger.list_work(include_subagents=False)}
+    assert "delegation:survivor" in records
+    assert not any(row_id.startswith("cron:") for row_id in records)
+    assert "Work ledger skipped cron execution history" in caplog.text
 
 
 def test_subagent_control_is_cooperative(monkeypatch):
