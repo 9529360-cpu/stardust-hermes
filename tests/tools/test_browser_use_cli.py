@@ -284,6 +284,15 @@ class TestToolSurfaceSwap:
         names = {t["function"]["name"] for t in defs}
         assert "browser_exec" not in names
 
+    def test_browser_toolset_covers_every_registered_browser_tool(self):
+        from model_tools import TOOL_TO_TOOLSET_MAP
+        from toolsets import TOOLSETS
+
+        registered = {name for name in TOOL_TO_TOOLSET_MAP if name.startswith("browser_")}
+        advertised = {name for name in TOOLSETS["browser"]["tools"] if name.startswith("browser_")}
+
+        assert registered == advertised
+
     def test_browser_exec_present_with_terminal(self, monkeypatch):
         monkeypatch.setattr(bu_cli, "is_browser_use_cli_mode", lambda: True)
         from tools.registry import registry

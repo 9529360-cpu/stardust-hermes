@@ -263,6 +263,8 @@ class TestInstallCuaDriverUpgrade:
                  return_value="/usr/local/bin/cua-driver",
              ), \
              patch.object(tools_config, "_clear_stale_cua_install_lock"), \
+             patch.object(tools_config, "_cua_install_lock_held", return_value=False), \
+             patch.object(tools_config, "_cua_release_endpoint_reachable", return_value=True), \
              patch.object(
                  tools_config,
                  "_repair_cua_driver_autostart_windows",
@@ -270,6 +272,8 @@ class TestInstallCuaDriverUpgrade:
              ), \
              patch.object(tools_config, "_print_info"), \
              patch.object(tools_config, "_print_success"):
+            # The unattended preflight probes github.com and the install lock. Both are stubbed here so the
+            # test checks stdin and the timeout only, and does not depend on the runner's network.
             assert tools_config._run_cua_driver_installer(
                 label="Refreshing",
                 verbose=False,
