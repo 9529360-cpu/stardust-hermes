@@ -7,10 +7,6 @@ import { useViewedInterval } from '@/hooks/use-viewed-interval'
 // anonymous timers (no key) start fresh each mount.
 const startedAtByKey = new Map<string, number>()
 
-// Durations of things that have already finished, kept beside the origins that
-// measured them. See `useMeasuredDuration`.
-const durationByKey = new Map<string, number>()
-
 function startedAt(key?: string): number {
   if (!key) {
     return Date.now()
@@ -28,12 +24,37 @@ function startedAt(key?: string): number {
   return now
 }
 
+const twoDigits = (value: number) => String(value).padStart(2, '0')
+
+/** Clock-style elapsed time for live timers: `12s`, `1:05`, `1:02:05`. */
 export function formatElapsed(seconds: number): string {
   if (seconds < 60) {
     return `${seconds}s`
   }
 
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+  if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)}:${twoDigits(seconds % 60)}`
+  }
+
+  return `${Math.floor(seconds / 3600)}:${twoDigits(Math.floor((seconds % 3600) / 60))}:${twoDigits(seconds % 60)}`
+}
+
+/**
+ * Seconds a reasoning block was open, from the timeline stamps the stream wrote
+ * on it: `timestamp` when its first delta arrived, `completedAt` when the next
+ * visible segment began or the turn settled. Null until both ends exist, and
+ * when they disagree (mixed clocks), since a made-up duration is worse than
+ * none. History rows carry no stamps, so a reloaded block has no duration.
+ */
+export function reasoningSeconds(timestamp: number | undefined, completedAt: number | undefined): null | number {
+  const valid = (value: number | undefined): value is number =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0
+
+  if (!valid(timestamp) || !valid(completedAt) || completedAt < timestamp) {
+    return null
+  }
+
+  return completedAt - timestamp
 }
 
 /**
@@ -73,43 +94,6 @@ export function useElapsedSeconds(active = true, timerKey?: string, since?: numb
   return elapsed
 }
 
-/**
- * How long something took, measured by watching it finish and remembered
- * afterwards. `null` until it has been watched at least once.
- *
- * Some durations exist nowhere but in the watching. A reasoning block is the
- * case this was written for: the persisted turn records the text the model
- * thought, never how long it spent thinking it, so the only way to know is to
- * have been there. Watching alone isn't enough either — the thread virtualizes,
- * so the component that saw a block finish is usually gone by the time anyone
- * scrolls back to read it. Keeping the number in the same registry as the
- * timer's origin lets it outlive the component that measured it.
- *
- * A block that was never watched running — history loaded from an earlier app
- * session, or reasoning that arrived already complete — has no duration and
- * says so, rather than reporting a timer that never ran.
- */
-export function useMeasuredDuration(active: boolean, timerKey: string): null | number {
-  const elapsed = useElapsedSeconds(active, timerKey)
-  const [watching, setWatching] = useState(false)
-  const [measured, setMeasured] = useState<null | number>(() => durationByKey.get(timerKey) ?? null)
-
-  useEffect(() => {
-    if (active) {
-      setWatching(true)
-    } else if (watching) {
-      const finalElapsed = Math.max(elapsed, Math.floor((Date.now() - startedAt(timerKey)) / 1000))
-
-      setWatching(false)
-      durationByKey.set(timerKey, finalElapsed)
-      setMeasured(finalElapsed)
-    }
-  }, [active, elapsed, timerKey, watching])
-
-  return measured
-}
-
 export function __resetElapsedTimerRegistryForTests() {
   startedAtByKey.clear()
-  durationByKey.clear()
 }

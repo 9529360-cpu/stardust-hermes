@@ -1,18 +1,17 @@
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { __resetElapsedTimerRegistryForTests, useElapsedSeconds, useMeasuredDuration } from './activity-timer'
+import {
+  __resetElapsedTimerRegistryForTests,
+  formatElapsed,
+  reasoningSeconds,
+  useElapsedSeconds
+} from './activity-timer'
 
 function Probe({ active, since, timerKey }: { active: boolean; since?: number; timerKey?: string }) {
   const elapsed = useElapsedSeconds(active, timerKey, since)
 
   return <span data-testid="elapsed">{elapsed}</span>
-}
-
-function DurationProbe({ active, timerKey }: { active: boolean; timerKey: string }) {
-  const measured = useMeasuredDuration(active, timerKey)
-
-  return <span data-testid="measured">{measured === null ? 'unknown' : measured}</span>
 }
 
 describe('useElapsedSeconds', () => {
@@ -91,98 +90,33 @@ describe('useElapsedSeconds', () => {
   })
 })
 
-describe('useMeasuredDuration', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
-    vi.spyOn(document, 'hasFocus').mockReturnValue(true)
-    __resetElapsedTimerRegistryForTests()
+describe('formatElapsed', () => {
+  it('reads seconds, then minutes and seconds, then hours and minutes', () => {
+    expect(formatElapsed(0)).toBe('0s')
+    expect(formatElapsed(59)).toBe('59s')
+    expect(formatElapsed(65)).toBe('1:05')
+    expect(formatElapsed(3_599)).toBe('59:59')
+    expect(formatElapsed(3_600)).toBe('1:00:00')
+    expect(formatElapsed(3_725)).toBe('1:02:05')
+  })
+})
+
+describe('reasoningSeconds', () => {
+  it('is the span from the first delta to the segment that ended the block', () => {
+    expect(reasoningSeconds(1_000.25, 1_012.75)).toBeCloseTo(12.5)
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-    vi.useRealTimers()
-    __resetElapsedTimerRegistryForTests()
+  it('has no span until both ends are stamped', () => {
+    expect(reasoningSeconds(undefined, 1_012)).toBeNull()
+    expect(reasoningSeconds(1_000, undefined)).toBeNull()
   })
 
-  it('has nothing to report until it has watched something finish', () => {
-    render(<DurationProbe active timerKey="reasoning:m1:0" />)
-
-    act(() => {
-      vi.advanceTimersByTime(4_000)
-    })
-
-    expect(screen.getByTestId('measured').textContent).toBe('unknown')
+  it('refuses a span whose ends disagree rather than inventing one', () => {
+    expect(reasoningSeconds(1_012, 1_000)).toBeNull()
   })
 
-  it('freezes the duration at the moment the thing finishes', () => {
-    const { rerender } = render(<DurationProbe active timerKey="reasoning:m1:0" />)
-
-    act(() => {
-      vi.advanceTimersByTime(4_000)
-    })
-
-    rerender(<DurationProbe active={false} timerKey="reasoning:m1:0" />)
-
-    expect(screen.getByTestId('measured').textContent).toBe('4')
-
-    // Time keeps passing; the block is over and its duration must not creep up
-    // with it.
-    act(() => {
-      vi.advanceTimersByTime(9_000)
-    })
-
-    expect(screen.getByTestId('measured').textContent).toBe('4')
-  })
-
-  // The thread virtualizes, so the component that watched a block finish is
-  // usually gone by the time anyone scrolls back to read it.
-  it('remembers the duration for a component that mounts after the fact', () => {
-    const first = render(<DurationProbe active timerKey="reasoning:m1:0" />)
-
-    act(() => {
-      vi.advanceTimersByTime(6_000)
-    })
-
-    first.rerender(<DurationProbe active={false} timerKey="reasoning:m1:0" />)
-    first.unmount()
-
-    render(<DurationProbe active={false} timerKey="reasoning:m1:0" />)
-
-    expect(screen.getByTestId('measured').textContent).toBe('6')
-  })
-
-  it('measures each key separately', () => {
-    const first = render(<DurationProbe active timerKey="reasoning:m1:0" />)
-
-    act(() => {
-      vi.advanceTimersByTime(3_000)
-    })
-
-    first.rerender(<DurationProbe active={false} timerKey="reasoning:m1:0" />)
-    first.unmount()
-
-    const second = render(<DurationProbe active timerKey="reasoning:m1:7" />)
-
-    act(() => {
-      vi.advanceTimersByTime(2_000)
-    })
-
-    second.rerender(<DurationProbe active={false} timerKey="reasoning:m1:7" />)
-
-    expect(screen.getByTestId('measured').textContent).toBe('2')
-  })
-
-  it('records the real finish time even if the UI clock was paused', () => {
-    const probe = render(<DurationProbe active timerKey="reasoning:background" />)
-    vi.mocked(document.hasFocus).mockReturnValue(false)
-    window.dispatchEvent(new Event('blur'))
-
-    act(() => {
-      vi.advanceTimersByTime(5_000)
-    })
-    probe.rerender(<DurationProbe active={false} timerKey="reasoning:background" />)
-
-    expect(screen.getByTestId('measured').textContent).toBe('5')
+  it('ignores stamps that are not real unix times', () => {
+    expect(reasoningSeconds(0, 1_012)).toBeNull()
+    expect(reasoningSeconds(Number.NaN, 1_012)).toBeNull()
   })
 })

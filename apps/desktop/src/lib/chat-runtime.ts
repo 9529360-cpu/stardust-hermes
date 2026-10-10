@@ -4,7 +4,9 @@ import type { ModelOptionsResult } from '@hermes/shared'
 import type { QuickModelOption } from '@/app/chat/composer/types'
 import type { ClientSessionState } from '@/app/types'
 import { formatRefValue } from '@/components/assistant-ui/directive-text'
+import { translateNow } from '@/i18n'
 import { type ChatMessage, type ChatMessagePart, chatMessageText, textPart } from '@/lib/chat-messages'
+import { sessionDisplayTitle } from '@/lib/session-title'
 import { normalize } from '@/lib/text'
 import type { ComposerAttachment } from '@/store/composer'
 import type { SessionInfo } from '@/types/hermes'
@@ -48,8 +50,9 @@ export function createClientSessionState(
   }
 }
 
+/** The name a session row, tab, or header shows; see `sessionDisplayTitle`. */
 export function sessionTitle(session: SessionInfo): string {
-  return session.title?.trim() || session.preview?.trim() || 'Untitled session'
+  return sessionDisplayTitle(session, translateNow('sidebar.row.untitledPlaceholder'))
 }
 
 /** What a session is called before it has been sent — and before its composer

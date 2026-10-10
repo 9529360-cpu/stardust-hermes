@@ -277,7 +277,7 @@ def generate_title(
     model the runtime already unloaded (#19027).
     """
     if not _auto_title_enabled():
-        logger.debug("Auto-title skipped: auxiliary.title_generation.enabled=false")
+        logger.info("Auto-title skipped: auxiliary.title_generation.enabled=false")
         return None
     try:
         if runtime_validator is not None and not runtime_validator():
@@ -487,7 +487,7 @@ def maybe_auto_title(
     if not is_titleable_user_message(user_message):
         return
     if not _auto_title_enabled():  # config read after the cheap guards so the file isn't touched every turn
-        logger.debug("Auto-title skipped: auxiliary.title_generation.enabled=false")
+        logger.info("Auto-title skipped: auxiliary.title_generation.enabled=false")
         return
     apply_instant_title(session_db, session_id, user_message, title_callback)
     # The thread must resolve auxiliary.title_generation (config, provider key, language) for the
