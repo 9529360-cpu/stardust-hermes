@@ -101,11 +101,13 @@ const REFUSED_MODEL: LocalCatalogModel = {
   start_window_label: undefined
 }
 
-function renderPane() {
+// `noDefaultModel` defaults to a machine with no default model configured,
+// where the setup card is the front door.
+function renderPane({ noDefaultModel = true }: { noDefaultModel?: boolean } = {}) {
   return render(
     <MemoryRouter>
       <I18nProvider>
-        <LocalModelsSettings />
+        <LocalModelsSettings noDefaultModel={noDefaultModel} />
       </I18nProvider>
     </MemoryRouter>
   )
@@ -474,6 +476,15 @@ describe('quickstart', () => {
     })
   })
 
+  it('offers the full pane, not the setup card, when a default model is already configured', async () => {
+    // Setup makes a local model the default for new chats, so a machine that
+    // already has a default is not offered it; the runtime install stays put.
+    renderPane({ noDefaultModel: false })
+
+    expect(await screen.findByText('Install the local runtime')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /set up for me/i })).toBeNull()
+  })
+
   it('pins the quickstart progress view while the job runs', async () => {
     $localRuntimeJobs.set([
       {
@@ -572,7 +583,7 @@ describe('BrowseSection', () => {
       render(
         <MemoryRouter>
           <I18nProvider>
-            <LocalModelsSettings />
+            <LocalModelsSettings noDefaultModel />
           </I18nProvider>
         </MemoryRouter>
       )
@@ -677,7 +688,7 @@ describe('quickstart completion navigation', () => {
     render(
       <MemoryRouter initialEntries={['/settings']}>
         <I18nProvider>
-          <LocalModelsSettings />
+          <LocalModelsSettings noDefaultModel />
         </I18nProvider>
         <Probe />
       </MemoryRouter>
