@@ -161,10 +161,10 @@ profile 级定时任务的只读 RPC 和 composer 中的只读展示都已实现
 
 ### 4.2 Gap #7：自然语言创建例程
 
-- 已存在：`cron/jobs_schedule.py::parse_schedule`。
-- 计划：新增薄包装 `parse_nl_schedule`，返回预览结构。解析失败时抛出可读的 `ValueError`，不写入错误任务。
-- 计划：`cronjob_manage` 的 create 与 edit 增加 `dry_run` 参数。预览不落库。正式创建仍须经过现有的确认与授权上下文。
-- 计划：deliver target 只在唯一可推断时自动填入，否则返回候选项让用户确认。
+- 已实现：`cron/jobs_schedule.py::parse_nl_schedule` 返回解析结果、显示文本和接下来的 N 次运行时间。运行时间逐次沿用 `compute_next_run`，与调度器的规则一致。解析失败抛出可读的 `ValueError`，不写入任何任务。
+- 已实现：`cronjob` 工具的 create 与 update（只预览日程变化）接受 `dry_run=true`。预览运行全部校验，不落库，也不向调度器注册。聊天中提出的例程应先预览，用户确认后再正式创建。
+- 未实现（保留为计划）：deliver 有多个候选目标时返回候选项。当前 deliver 缺省为来源会话（origin）；在桌面对话中这个值是唯一的，不需要候选项。
+- 另一个 PR：桌面端的工具结果卡片识别 `cronjob_manage`（此前只识别 `cronjob`，所以卡片从未渲染），并把预览显示为下次运行时间与投递目标。
 
 ### 4.3 Gap #8：Approvals / Memory 工作台
 

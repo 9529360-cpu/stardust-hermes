@@ -307,8 +307,12 @@ def create_job(
     paused: bool = False,
     paused_reason: Optional[str] = None,
     approval_mode: Optional[str] = None,
+    dry_run: bool = False,
 ) -> Dict[str, Any]:
     """Create a new cron job and return the stored record.
+
+    dry_run runs every check below and returns the record that would be stored, without saving it
+    (the caller registers nothing either). Its ``id`` is a placeholder and must not be used.
 
     deliver defaults to "origin" when ``origin`` is given, else "local"; repeat None = forever.
     script: stdout is injected as prompt context, or with ``no_agent=True`` IS the job (stdout
@@ -414,6 +418,8 @@ def create_job(
         if value is not None:
             job[key] = value
 
+    if dry_run:
+        return job
     with _jobs._jobs_lock():
         _jobs.save_jobs(_jobs.load_jobs() + [job])
     return job
