@@ -238,7 +238,7 @@ function MarketplaceThemeResults({
 
   const header = (
     <p className="mb-2 mt-4 text-[length:var(--conversation-caption-font-size)] font-medium text-(--ui-text-tertiary)">
-      From the VS Code Marketplace
+      {t.settings.appearance.vscodeMarketplace}
     </p>
   )
 
@@ -518,7 +518,7 @@ export function AppearanceSettings() {
         filters: [
           {
             extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'],
-            name: 'Images'
+            name: t.settings.appearance.imageFilterName
           }
         ],
         multiple: false,
@@ -580,7 +580,7 @@ export function AppearanceSettings() {
                   {filteredThemes.length === 0 ? (
                     needle ? (
                       <p className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">
-                        No installed themes match "{query.trim()}".
+                        {t.settings.appearance.noThemeMatch(query.trim())}
                       </p>
                     ) : null
                   ) : (

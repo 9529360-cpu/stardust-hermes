@@ -356,7 +356,7 @@ export function TelegramQrSetup({ onApplied, platform, scopeProfile }: TelegramQ
           </div>
 
           <div className="flex flex-col items-center gap-2">
-            <img alt="Telegram setup QR code" className="size-56 rounded-md bg-white p-2" src={qrDataUrl} />
+            <img alt={q.qrAlt} className="size-56 rounded-md bg-white p-2" src={qrDataUrl} />
             <Badge variant={expiresIn ? 'outline' : 'destructive'}>
               {expiresIn ? q.expiresIn(expiresIn) : q.expired}
             </Badge>

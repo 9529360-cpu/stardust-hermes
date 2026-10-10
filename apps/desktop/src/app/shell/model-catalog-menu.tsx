@@ -617,7 +617,7 @@ export function ModelCatalogMenu({
       {shownMoaPresets.length > 0 ? (
         <div className={cn(quietRows)}>
           <DropdownMenuSeparator className="mx-0" />
-          <DropdownMenuLabel className={dropdownMenuSectionLabel}>MoA presets</DropdownMenuLabel>
+          <DropdownMenuLabel className={dropdownMenuSectionLabel}>{copy.moaPresets}</DropdownMenuLabel>
           {shownMoaPresets.map(preset => {
             const isCurrentMoa = current.provider === 'moa' && current.model === preset
 
@@ -631,7 +631,7 @@ export function ModelCatalogMenu({
                 {...kbRowProps(`moa:${preset}`)}
               >
                 <span className="min-w-0 flex-1 truncate">
-                  MoA: <HighlightMatches foldSeparators query={search} text={preset} />
+                  {copy.moaPrefix} <HighlightMatches foldSeparators query={search} text={preset} />
                 </span>
                 {isCurrentMoa ? <Codicon className="ml-auto text-foreground" name="check" size="0.75rem" /> : null}
               </DropdownMenuItem>

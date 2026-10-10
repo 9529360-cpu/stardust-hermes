@@ -82,7 +82,7 @@ export function PoolLimitsSetting() {
             />
           </div>
         }
-        description="How many bot backends stay running for instant switching. Higher = faster switches, more memory (~60MB per backend). Applies immediately."
+        description={t.settings.poolLimits.warmBotBackendsDesc}
         title={t.settings.poolLimits.warmBotBackendsTitle}
       />
       <ListRow
@@ -107,7 +107,7 @@ export function PoolLimitsSetting() {
             <span className="text-[length:var(--conversation-caption-font-size)] text-(--ui-text-tertiary)">ms</span>
           </div>
         }
-        description="How long an unused bot backend stays warm before it is shut down. Raise this so bots you revisit every few minutes never pay a cold start."
+        description={t.settings.poolLimits.backendIdleTimeoutDesc}
         title={t.settings.poolLimits.backendIdleTimeoutTitle}
       />
     </>

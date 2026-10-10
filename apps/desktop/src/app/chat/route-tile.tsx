@@ -11,6 +11,7 @@ import { lazy, type ReactNode, Suspense } from 'react'
 
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
 import { useContributions } from '@/contrib/react/use-contributions'
+import { translateNow, useI18n } from '@/i18n'
 import { $routeTiles, closeRouteTile, type RouteTile } from '@/store/route-tiles'
 
 import { ARTIFACTS_ROUTE, contributedRoutes, MESSAGING_ROUTE, ROUTES_AREA, SKILLS_ROUTE } from '../routes'
@@ -22,10 +23,10 @@ const MessagingView = lazy(async () => ({ default: (await import('../messaging')
 const ArtifactsView = lazy(async () => ({ default: (await import('../artifacts')).ArtifactsView }))
 
 // Built-in page views + their pane titles, keyed by route.
-const BUILTIN_PAGES: Record<string, { render: () => ReactNode; title: string }> = {
-  [ARTIFACTS_ROUTE]: { render: () => <ArtifactsView />, title: 'Artifacts' },
-  [MESSAGING_ROUTE]: { render: () => <MessagingView />, title: 'Messaging' },
-  [SKILLS_ROUTE]: { render: () => <SkillsView />, title: 'Capabilities' }
+const BUILTIN_PAGES: Record<string, { render: () => ReactNode; titleKey: string }> = {
+  [ARTIFACTS_ROUTE]: { render: () => <ArtifactsView />, titleKey: 'sidebar.nav.artifacts' },
+  [MESSAGING_ROUTE]: { render: () => <MessagingView />, titleKey: 'sidebar.nav.messaging' },
+  [SKILLS_ROUTE]: { render: () => <SkillsView />, titleKey: 'sidebar.nav.skills' }
 }
 
 /** Humanize a route path into a tab title: `/my-atlas` → `My Atlas`. */
@@ -41,13 +42,14 @@ const humanizePath = (path: string): string =>
  *  else a humanized path — never the internal `${source}:${id}` key. */
 function routeTitle(path: string): string {
   if (BUILTIN_PAGES[path]) {
-    return BUILTIN_PAGES[path].title
+    return translateNow(BUILTIN_PAGES[path].titleKey)
   }
 
   return contributedRoutes().find(r => r.path === path)?.title ?? humanizePath(path)
 }
 
 function RouteTilePane({ path }: { path: string }) {
+  const { t } = useI18n()
   const builtin = BUILTIN_PAGES[path]
 
   // Subscribe so a plugin page tile appears the moment its route registers.
@@ -74,7 +76,7 @@ function RouteTilePane({ path }: { path: string }) {
 
   return (
     <div className="grid h-full place-items-center font-mono text-[11px] text-(--ui-text-quaternary)">
-      no page at {path}
+      {t.shell.tiles.noPageAt(path)}
     </div>
   )
 }

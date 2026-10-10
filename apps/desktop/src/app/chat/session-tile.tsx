@@ -33,7 +33,7 @@ import { $workspaceOwnerLabels, workspaceOwnerTitle } from '@/components/pane-sh
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { transcribeAudio } from '@/hermes'
-import { useI18n } from '@/i18n'
+import { translateNow, useI18n } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { NEW_SESSION_TITLE, sessionTitle } from '@/lib/chat-runtime'
 import { transcribeAudioClientDirect } from '@/lib/voice-client-direct'
@@ -95,10 +95,10 @@ export function sessionTileResumeFailure(
   }
 
   if (durableSessionFound) {
-    return 'Session is still available — retry resuming it.'
+    return translateNow('shell.tiles.resumeStillAvailable')
   }
 
-  return 'Session unavailable — you can retry resuming it.'
+  return translateNow('shell.tiles.resumeUnavailable')
 }
 
 /** Should this tile dispatch a `session.resume`?
@@ -358,6 +358,7 @@ function TileChat({
 }
 
 export function SessionTilePane({ storedSessionId }: { storedSessionId: string }) {
+  const { t } = useI18n()
   const tiles = useStore($sessionTiles)
   const tile = tiles.find(t => t.storedSessionId === storedSessionId)
   const ownerRoute = tile?.ownerRoute
@@ -487,10 +488,10 @@ export function SessionTilePane({ storedSessionId }: { storedSessionId: string }
     return (
       <div className="grid h-full place-items-center p-4">
         <div className="max-w-[24rem] space-y-2 text-center font-mono text-[11px]">
-          <div className="text-(--ui-danger,#f87171)">Couldn't open this session</div>
+          <div className="text-(--ui-danger,#f87171)">{t.shell.tiles.sessionOpenFailed}</div>
           <div className="break-words text-(--ui-text-quaternary)">{tile.error}</div>
           <Button onClick={() => patchSessionTile(storedSessionId, { error: undefined })} size="sm" variant="outline">
-            Retry
+            {t.common.retry}
           </Button>
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { deleteLearningNode, editLearningNode, getLearningNode } from '@/hermes'
+import { useI18n } from '@/i18n'
 import { notifyError } from '@/store/notifications'
 import { evictStarmapNode, loadStarmapGraph } from '@/store/starmap'
 
@@ -40,6 +41,7 @@ interface EditState {
 
 /** Right-click actions for a star-map node: edit (modal) or delete (confirm). */
 export function NodeContextMenu({ onClose, onNodeRemoved, target }: NodeContextMenuProps) {
+  const { t } = useI18n()
   const [editing, setEditing] = useState<EditState | null>(null)
   const [deleting, setDeleting] = useState<Omit<NodeMenuTarget, 'x' | 'y'> | null>(null)
   const [loading, setLoading] = useState(false)
@@ -136,13 +138,13 @@ export function NodeContextMenu({ onClose, onNodeRemoved, target }: NodeContextM
                 void openEdit()
               }}
             >
-              Edit {noun}…
+              {noun === 'memory' ? t.starmap.nodeMenu.editMemory : t.starmap.nodeMenu.editSkill}
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={() => setDeleting({ id: target.id, kind: target.kind, label: target.label })}
               variant="destructive"
             >
-              {target.kind === 'skill' ? 'Archive skill' : 'Delete memory'}
+              {target.kind === 'skill' ? t.starmap.nodeMenu.archiveSkill : t.starmap.nodeMenu.deleteMemory}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -151,7 +153,7 @@ export function NodeContextMenu({ onClose, onNodeRemoved, target }: NodeContextM
       <Dialog onOpenChange={value => !value && !saving && setEditing(null)} open={Boolean(editing)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit {editing?.label}</DialogTitle>
+            <DialogTitle>{t.starmap.nodeMenu.editTitle(editing?.label ?? '')}</DialogTitle>
           </DialogHeader>
           <div className="h-80">
             {editing && (
@@ -169,10 +171,10 @@ export function NodeContextMenu({ onClose, onNodeRemoved, target }: NodeContextM
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <DialogFooter>
             <Button disabled={saving} onClick={() => setEditing(null)} type="button" variant="ghost">
-              Cancel
+              {t.common.cancel}
             </Button>
             <Button disabled={saving} onClick={() => void save()}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? t.common.saving : t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -194,7 +196,7 @@ export function NodeContextMenu({ onClose, onNodeRemoved, target }: NodeContextM
       ) : (
         <ConfirmDialog
           confirmLabel="Delete"
-          description="This memory is removed permanently."
+          description={t.starmap.nodeMenu.removedForever}
           destructive
           dismissOnConfirm
           onClose={() => setDeleting(null)}
@@ -218,7 +220,7 @@ export function NodeContextMenu({ onClose, onNodeRemoved, target }: NodeContextM
             )
           }}
           open={Boolean(deleting)}
-          title={`Delete ${deleting?.label ?? ''}?`}
+          title={t.starmap.nodeMenu.deleteTitle(deleting?.label ?? '')}
         />
       )}
     </>

@@ -23,6 +23,7 @@ import type { LayoutNode } from '@/components/pane-shell/tree/model'
 import { ConnectorLogo } from '@/components/ui/connector-logo'
 import { SearchField } from '@/components/ui/search-field'
 import { registry } from '@/contrib/registry'
+import { useI18n } from '@/i18n'
 import { connectorTitle } from '@/lib/connector-tools'
 import { useConnectorCatalog } from '@/store/connector-catalog'
 import { $onboardingAnswers, setOnboardingAnswers } from '@/store/onboarding-answers'
@@ -30,6 +31,7 @@ import { useTheme } from '@/themes'
 import { setAccentOverride } from '@/themes/accent-override'
 
 export function ConnectorsCard({ locked }: CardProps) {
+  const { t } = useI18n()
   const view = useSessionView()
   const storedId = useStore(view.$storedId)
   const runtimeId = useStore(view.$runtimeId)
@@ -57,21 +59,19 @@ export function ConnectorsCard({ locked }: CardProps) {
   if (catalog.status === 'unavailable' || (catalog.status === 'ready' && rows.length === 0)) {
     return (
       <CardFrame
-        continueLabel="Skip this"
+        continueLabel={t.connectors.skipThis}
         done={done}
         locked={locked}
         onContinue={() => commit('apps I use: none for now')}
       >
-        <p className="text-sm text-muted-foreground">
-          Connections aren’t available right now — this can be set up later.
-        </p>
+        <p className="text-sm text-muted-foreground">{t.connectors.setupUnavailable}</p>
       </CardFrame>
     )
   }
 
   return (
     <CardFrame
-      continueLabel={picked.length > 0 ? `Continue with ${picked.length}` : 'None of these'}
+      continueLabel={picked.length > 0 ? t.connectors.continueWithCount(picked.length) : t.connectors.noneOfThese}
       disabled={catalog.status === 'loading'}
       done={done}
       locked={locked}
@@ -89,7 +89,9 @@ export function ConnectorsCard({ locked }: CardProps) {
         </div>
       ) : (
         <>
-          {rows.length > 12 ? <SearchField onChange={setQuery} placeholder="Find an app" value={query} /> : null}
+          {rows.length > 12 ? (
+            <SearchField onChange={setQuery} placeholder={t.connectors.search} value={query} />
+          ) : null}
           <div className="grid max-h-72 grid-cols-3 gap-2 overflow-y-auto">
             {shown.map(row => (
               <Chip
@@ -112,8 +114,7 @@ export function ConnectorsCard({ locked }: CardProps) {
           here. Saying so is what keeps the Connect cards later from reading as
           a second ask for the same thing. */}
       <p className="text-xs text-muted-foreground">
-        <strong className="font-medium text-foreground">Nothing connects yet.</strong> Hermes will offer to link these
-        when a task needs them, and asks before reading anything.
+        <strong className="font-medium text-foreground">{t.connectors.nothingYet}</strong> {t.connectors.nothingYetBody}
       </p>
     </CardFrame>
   )

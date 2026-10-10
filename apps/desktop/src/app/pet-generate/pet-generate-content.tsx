@@ -261,7 +261,7 @@ export function PetGenerateContent() {
                   type="button"
                 >
                   <ImageIcon className="size-3" />
-                  Add a reference
+                  {copy.addReference}
                 </button>
               )}
             </div>

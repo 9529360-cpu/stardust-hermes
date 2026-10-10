@@ -727,7 +727,10 @@ export const ru = defineLocale({
         noneAvailable: 'Сейчас нет доступных питомцев для включения.',
         turnOnFailed: 'Не удалось включить питомца.',
         turnOffFailed: 'Не удалось выключить питомца.'
-      }
+      },
+      vscodeMarketplace: 'Из VS Code Marketplace',
+      noThemeMatch: (query: string) => `Нет установленных тем, подходящих под «${query}».`,
+      imageFilterName: 'Изображения'
     },
     fieldLabels: defineFieldCopy({
       model: 'Модель по умолчанию',
@@ -1052,7 +1055,13 @@ export const ru = defineLocale({
       shortcutDesc: 'Нужен хотя бы один модификатор, например CommandOrControl+Shift+Space.',
       active: 'Горячий ключ активен.',
       takenBy: 'Это сочетание уже занято другим приложением — выберите другое.',
-      invalidShortcut: 'Некорректное сочетание. Включите хотя бы одну модифицирующую клавишу.'
+      invalidShortcut: 'Некорректное сочетание. Включите хотя бы одну модифицирующую клавишу.',
+      askPlaceholder: 'Спросите Stardust…',
+      disconnectedPlaceholder: 'Нет подключения — откройте Stardust, чтобы переподключиться',
+      sendTo: 'Отправить в',
+      targetLabel: 'Сеанс назначения',
+      currentChat: 'Текущий чат',
+      newSession: 'Новый сеанс'
     },
     credentials: {
       pasteKey: 'Вставить ключ',
@@ -1390,7 +1399,8 @@ export const ru = defineLocale({
         'Вставьте фрагмент mcp.json, команду npx/docker, строку claude mcp add, URL или ссылку Cursor…',
       importNoMatch: 'В вставленном тексте не распознана конфигурация сервера.',
       importConfirm: 'Добавить в mcp.json',
-      importConfirmMany: count => `Добавить ${count} ${RU_PLURAL(count, 'сервер', 'сервера', 'серверов')} в mcp.json`
+      importConfirmMany: count => `Добавить ${count} ${RU_PLURAL(count, 'сервер', 'сервера', 'серверов')} в mcp.json`,
+      apiKeyTag: 'API-ключ'
     },
     model: {
       loading: 'Загрузка конфигурации модели…',
@@ -1424,7 +1434,13 @@ export const ru = defineLocale({
         mcp: { label: 'MCP', hint: 'Маршрутизация MCP-инструментов' },
         title_generation: { label: 'Ген. заголовка', hint: 'Заголовки сеансов' },
         curator: { label: 'Куратор', hint: 'Просмотр использования навыков' }
-      }
+      },
+      auxiliaryRunOn:
+        (count: number, names: string) => ({ before: `Вспомогательные задачи (${count}: ${names}) всё ещё работают на `, after: ', а не на основной модели.' }),
+      otherProviders: 'другие провайдеры',
+      slotProviderAria: (label: string) => `${label}: провайдер`,
+      slotModelAria: (label: string) => `${label}: модель`,
+      slotReasoningAria: (label: string) => `${label}: уровень рассуждений`
     },
     providers: {
       connectAccount: 'Подключить аккаунт',
@@ -1560,6 +1576,67 @@ export const ru = defineLocale({
         failedSelect: backend => `Не удалось выбрать ${backend}`,
         needsSetupHint: 'Этот бэкенд можно выбрать сейчас — команды будут падать, пока настройка не завершена.'
       }
+    },
+    computerUse: {
+      checking: 'Проверка состояния Computer Use…',
+      notSupported: (platform: string) => `Computer Use не поддерживается на этой платформе (${platform}).`,
+      installBackend: 'Установите бэкенд cua-driver ниже, чтобы управлять этим компьютером.',
+      grantHint: ' Затем разрешите здесь «Универсальный доступ» и «Запись экрана».',
+      grantIdentity:
+        'Разрешения выдаются самому CuaDriver (com.trycua.driver), а не Stardust, поэтому диалог относится к процессу, управляющему вашим Mac.',
+      recheck: 'Проверить снова',
+      ready: 'Computer Use готов. Попросите агента снять снимок приложения и поработать в нём.',
+      platformNoteLinux:
+        'Управляет рабочим столом через стек специальных возможностей X11/XWayland — без запроса разрешения.',
+      platformNoteWin32:
+        'При первом запуске Windows SmartScreen может запросить подтверждение для процесса cua-driver UIAccess — разрешите его.',
+      granted: 'Разрешено',
+      notGranted: 'Не разрешено',
+      unknownState: 'Неизвестно',
+      pillReady: 'Готово',
+      pillNotReady: 'Не готово',
+      approveTitle: 'Подтвердите в Системных настройках',
+      approveMessage: 'macOS покажет диалог разрешения от имени CuaDriver. Подтвердите его и вернитесь сюда.',
+      waitingApproval: 'Ожидание подтверждения…',
+      grantPermissions: 'Выдать разрешения',
+      hintAccessibility:
+        'Позволяет cua-driver отправлять клики и нажатия клавиш и читать дерево специальных возможностей.',
+      hintScreenRecording: 'Позволяет cua-driver делать снимки окон приложений.',
+      requestFailed: 'Не удалось запросить разрешения',
+      readFailed: 'Не удалось прочитать состояние Computer Use'
+    },
+    memoryProvider: {
+      waitingForConsent: 'Ожидание подтверждения в браузере…',
+      loadFailed: (error: string) => `Не удалось загрузить настройки провайдера памяти: ${error}`,
+      loadingLabel: 'Загрузка настроек провайдера памяти…',
+      settingsTitle: (label: string) => `Настройки: ${label}`,
+      setLabel: (label: string) => `${label}: задано`,
+      notSetLabel: (label: string) => `${label}: не задано`,
+      fullConfig: 'Полная настройка…',
+      modalTitle: (label: string) => `${label} — полная настройка`,
+      modalDescription:
+        (label: string) => ({ before: `Все параметры ${label} для профиля «`, after: '». Пустые поля берут значение из найденного хоста или встроенное по умолчанию.' }),
+      docsLink: (label: string) => `Справка по настройке: ${label}`,
+      saveChanges: 'Сохранить изменения',
+      keepCurrentValue: 'Оставьте пустым, чтобы сохранить текущее значение',
+      apiKeySet: 'API-ключ задан',
+      oauthSet: 'OAuth задан',
+      saved: 'Настройки провайдера памяти обновлены.',
+      savedTitle: (label: string) => `${label}: сохранено`,
+      aboutField: (label: string) => `Подробнее: ${label}`,
+      startFailedDetail: 'Не удалось начать подключение.',
+      startFailedToast: 'Не удалось начать подключение',
+      timedOut: 'Время ожидания истекло — попробуйте снова.',
+      connectionFailed: 'Не удалось подключиться.',
+      connectViaOauth: 'Подключить через OAuth',
+      reconnect: 'Переподключить',
+      loadFailedPlain: 'Не удалось загрузить настройки провайдера памяти'
+    },
+    poolLimits: {
+      warmBotBackendsDesc:
+        'Сколько серверных процессов ботов держать запущенными для мгновенного переключения. Больше — быстрее переключение, но больше памяти (около 60 МБ на процесс). Применяется сразу.',
+      backendIdleTimeoutDesc:
+        'Сколько времени неиспользуемый серверный процесс бота остаётся запущенным, прежде чем будет остановлен. Увеличьте, если боты, к которым вы возвращаетесь каждые несколько минут, не должны запускаться заново.'
     }
   },
   skills: {
@@ -1704,7 +1781,24 @@ export const ru = defineLocale({
     importEmpty: 'Вставьте код карты для загрузки.',
     importSuccess: nodes => `Загружена карта с ${nodes} ${RU_NOUN(nodes, 'узлом', 'узла', 'узлов')}.`,
     importedBadge: 'импортированная карта',
-    resetToMine: 'Вернуться к моей карте'
+    resetToMine: 'Вернуться к моей карте',
+    legendCoreOuter: 'центр = старее · внешний круг = новее',
+    legendMemory: 'память',
+    nodeMenu: {
+      editMemory: 'Изменить память…',
+      editSkill: 'Изменить навык…',
+      editTitle: (label: string) => `Изменить: ${label}`,
+      archiveSkill: 'Архивировать навык',
+      deleteMemory: 'Удалить память',
+      removedForever: 'Эта запись памяти будет удалена безвозвратно.',
+      deleteTitle: (label: string) => `Удалить ${label}?`
+    },
+    timeline: {
+      pause: 'Пауза',
+      playTimeline: 'Воспроизвести хронологию',
+      scrubber: 'Ползунок хронологии'
+    },
+    badShareCode: 'Не удалось прочитать этот код карты.'
   },
   agents: {
     extendedTranscript: 'Подробный журнал',
@@ -1810,7 +1904,15 @@ export const ru = defineLocale({
       referenceImageTooLarge: 'Изображение-референс слишком большое. Используйте меньше 16 МБ.',
       referenceImageInvalid: 'Не удалось прочитать это изображение-референс. Попробуйте PNG, JPG, WebP или GIF.',
       adopt: 'Усыновить',
-      startOver: 'Начать заново'
+      startOver: 'Начать заново',
+      unavailableTitle: 'Добавьте бэкенд для генерации изображений',
+      unavailableBody:
+        'Для создания своего питомца нужен провайдер, который умеет опираться на референсное изображение.',
+      setupImageGeneration: 'Настроить генерацию изображений',
+      grabKeyFrom: 'Ключ можно получить на',
+      addReference: 'Добавить референс',
+      removeReference: 'Удалить референс',
+      referenceFallback: 'Референс'
     },
     installTheme: {
       title: 'Установить тему…',
@@ -2052,7 +2154,8 @@ export const ru = defineLocale({
       pairingExpired: 'Срок QR-настройки истёк. Начните новую.',
       stillWaiting: detail => `Всё ещё ждём Telegram. Повтор после: ${detail}`,
       savedRestarting: 'Telegram сохранён; шлюз перезапускается…',
-      savedRestartFailed: detail => `Telegram сохранён; перезапуск шлюза не удался${detail}`
+      savedRestartFailed: detail => `Telegram сохранён; перезапуск шлюза не удался${detail}`,
+      qrAlt: 'QR-код для настройки Telegram'
     },
     fieldCopy: {
       TELEGRAM_BOT_TOKEN: {
@@ -2537,6 +2640,7 @@ export const ru = defineLocale({
   },
   sidebar: {
     recent: 'Недавние',
+    filters: 'Фильтры',
     gatewayGroups: {
       grouping: 'Шлюз и профиль',
       rename: 'Переименовать группу',
@@ -2715,7 +2819,36 @@ export const ru = defineLocale({
       working: 'Работает',
       done: 'Готово'
     },
-    markAllRead: 'Отметить все как прочитанные'
+    markAllRead: 'Отметить все как прочитанные',
+    filterMenu: {
+      grouping: 'Группировка',
+      ordering: 'Сортировка',
+      show: 'Показать',
+      status: 'Статус',
+      pullRequest: 'Запрос на слияние',
+      profile: 'Профиль',
+      project: 'Проект',
+      resetDefaults: 'Сбросить по умолчанию',
+      updated: 'Обновлено',
+      created: 'Создано',
+      tokens: 'Токены',
+      cost: 'Стоимость',
+      manual: 'Вручную',
+      preview: 'Предпросмотр',
+      prOpen: 'Открыт',
+      draft: 'Черновик',
+      merged: 'Слит',
+      closed: 'Закрыт',
+      noPr: 'Без PR',
+      needsInput: 'Нужен ввод',
+      working: 'Работает',
+      unread: 'Непрочитанные',
+      idle: 'Простаивает',
+      inboxStyle: 'Стиль «Входящие»',
+      archived: 'Архивные',
+      expandAll: 'Развернуть все',
+      collapseAll: 'Свернуть все'
+    }
   },
   composer: {
     message: 'Сообщение',
@@ -3294,7 +3427,13 @@ export const ru = defineLocale({
     price: (input, output) => `${input} вход / ${output} выход за Mtok`,
     change: 'Изменить',
     startChatting: 'Начать',
-    docs: provider => `Документация ${provider}`
+    docs: provider => `Документация ${provider}`,
+    skipSetup: 'Пропустить настройку',
+    retryFirstBuild: 'Повторить первую сборку',
+    firstBuildFailed: 'Не удалось запустить первую сборку. Повторите попытку, чтобы проверить её сеанс.',
+    buildStarted: (title: string) => `${title} запущен — найдите его в своих сеансах`,
+    buildOpening: (title: string) => `Открываем ${title}…`,
+    workingOnIt: 'Работаю над этим'
   },
   modelPicker: {
     title: 'Сменить модель',
@@ -3328,7 +3467,9 @@ export const ru = defineLocale({
       noModels: 'Модели не найдены',
       editModels: 'Изменить модели…',
       refreshModels: 'Обновить модели',
-      fast: 'Быстрая'
+      fast: 'Быстрая',
+      moaPresets: 'Пресеты MoA',
+      moaPrefix: 'MoA:'
     },
     modelOptions: {
       noOptions: 'Для этой модели нет опций',
@@ -3469,6 +3610,12 @@ export const ru = defineLocale({
       modelPinned: 'закреплено вами; новые чаты используют её вместо модели по умолчанию из настроек',
       modelTitle: (provider, model) => `Модель · ${provider}: ${model}`,
       providerModelTitle: (provider, model) => `${provider} · ${model}`
+    },
+    tiles: {
+      sessionOpenFailed: 'Не удалось открыть этот сеанс',
+      noPageAt: (path: string) => `Страница не найдена: ${path}`,
+      resumeStillAvailable: 'Сеанс всё ещё доступен — повторите возобновление.',
+      resumeUnavailable: 'Сеанс недоступен — можно повторить возобновление.'
     }
   },
   rightSidebar: {
@@ -3728,7 +3875,25 @@ export const ru = defineLocale({
       restoreNext: 'Восстановить следующий чекпоинт',
       goForward: 'Двигаться вперёд',
       sendEdited: 'Отправить изменённое сообщение',
-      attachingFile: 'Прикрепление…'
+      attachingFile: 'Прикрепление…',
+      messageFrom: (sender: string) => `Сообщение от ${sender}`,
+      showMessage: 'показать сообщение',
+      repliedTo: (sender: string) => `Ответ для ${sender}`,
+      showReply: 'показать ответ',
+      conversationTimeline: 'Хронология диалога',
+      hermesWorking: 'Stardust работает',
+      toolPayload: 'Данные инструмента',
+      toolSearch: 'Поиск',
+      emojiSearch: 'Поиск…',
+      loadingEmoji: 'Загрузка эмодзи…',
+      noEmoji: 'Эмодзи не найдены.',
+      moreEmoji: 'Больше эмодзи',
+      reactedByHermes: 'Реакция от Stardust',
+      deliveryPending: 'Отправка:',
+      deliveryDone: 'Отправлено:',
+      removeReaction: (emoji: string) => `Убрать реакцию ${emoji}`,
+      summarizingThread: 'Сводка диалога',
+      searchResults: 'Результаты поиска'
     },
     approval: {
       gatewayDisconnected: 'Шлюз Hermes не подключён',
@@ -3892,6 +4057,23 @@ export const ru = defineLocale({
         web_search: { done: 'Поиск в вебе выполнен', pending: 'Ищу в вебе', pendingAction: 'Ищу' },
         write_file: { done: 'Файл изменён', pending: 'Изменяю файл', pendingAction: 'Изменяю' }
       }
+    },
+    media: {
+      fetchFailed:
+        (name: string) => `Не удалось получить ${name} от шлюза (файл отсутствует, не читается или слишком большой).`,
+      openMediaFile: (kind: 'audio' | 'video') => (kind === 'audio' ? 'Открыть аудиофайл' : 'Открыть видеофайл'),
+      couldntLoad: (name: string) => `Не удалось загрузить ${name}.`,
+      openImage: 'Открыть изображение',
+      loadingName: (name: string) => `Загрузка ${name}…`,
+      generatedImage: 'Сгенерированное изображение',
+      openNamed: (name: string) => `Открыть ${name}`
+    },
+    embeds: {
+      failed: (label: string) => `Не удалось загрузить встраивание ${label}`,
+      openDiagram: 'Открыть диаграмму',
+      holdToZoom: 'Удерживайте ⌘, чтобы масштабировать',
+      spotifyTitle: 'Встраивание Spotify',
+      youtubeTitle: 'Встраивание YouTube'
     }
   },
   prompts: {
@@ -4006,6 +4188,23 @@ export const ru = defineLocale({
       title: 'Боковая панель',
       description: 'Показывает мобильную боковую панель.',
       toggle: open => `${open ? 'Показать' : 'Скрыть'} боковую панель`
-    }
+    },
+    zoomable: {
+      zoomOut: 'Уменьшить',
+      zoomIn: 'Увеличить',
+      reset: 'Сбросить'
+    },
+    moreActions: 'Другие действия',
+    hatchingProgress: 'Ход вылупления'
+  },
+  connectors: {
+    skipThis: 'Пропустить',
+    search: 'Поиск приложений',
+    setupUnavailable: 'Подключения сейчас недоступны — настроить их можно позже.',
+    nothingYet: 'Пока ничего не подключено.',
+    nothingYetBody:
+      'Stardust предложит подключить их, когда задача потребует, и спросит разрешение, прежде чем что-либо читать.',
+    noneOfThese: 'Ничего из этого',
+    continueWithCount: (count: number) => `Продолжить (${count})`
   }
 })

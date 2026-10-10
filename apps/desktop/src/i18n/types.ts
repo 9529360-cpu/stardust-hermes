@@ -90,6 +90,12 @@ export interface Translations {
     empty: string
     disclaimer: string
     execution: string
+    skipThis: string
+    setupUnavailable: string
+    nothingYet: string
+    nothingYetBody: string
+    noneOfThese: string
+    continueWithCount: (count: number) => string
   }
   sessionImport: {
     title: string
@@ -807,6 +813,9 @@ export interface Translations {
         turnOnFailed: string
         turnOffFailed: string
       }
+      vscodeMarketplace: string
+      noThemeMatch: (query: string) => string
+      imageFilterName: string
     }
     fieldLabels: Record<string, string>
     fieldDescriptions: Record<string, string>
@@ -836,6 +845,8 @@ export interface Translations {
       warmBotBackendsTitle: string
       backendIdleTimeoutAria: string
       backendIdleTimeoutTitle: string
+      warmBotBackendsDesc: string
+      backendIdleTimeoutDesc: string
     }
     customEndpoints: {
       title: string
@@ -884,6 +895,28 @@ export interface Translations {
       accessibility: string
       screenRecording: string
       driverHealth: string
+      checking: string
+      notSupported: (platform: string) => string
+      installBackend: string
+      grantHint: string
+      grantIdentity: string
+      recheck: string
+      ready: string
+      platformNoteLinux: string
+      platformNoteWin32: string
+      granted: string
+      notGranted: string
+      unknownState: string
+      pillReady: string
+      pillNotReady: string
+      approveTitle: string
+      approveMessage: string
+      waitingApproval: string
+      grantPermissions: string
+      hintAccessibility: string
+      hintScreenRecording: string
+      requestFailed: string
+      readFailed: string
     }
     about: {
       heading: string
@@ -954,6 +987,12 @@ export interface Translations {
       active: string
       takenBy: string
       invalidShortcut: string
+      askPlaceholder: string
+      disconnectedPlaceholder: string
+      sendTo: string
+      targetLabel: string
+      currentChat: string
+      newSession: string
     }
     credentials: {
       pasteKey: string
@@ -1281,6 +1320,7 @@ export interface Translations {
       importNoMatch: string
       importConfirm: string
       importConfirmMany: (count: number) => string
+      apiKeyTag: string
     }
     model: {
       loading: string
@@ -1344,6 +1384,11 @@ export interface Translations {
       moaDisableReference: (index: number) => string
       moaAddReference: string
       tasks: Record<string, AuxTaskCopy>
+      auxiliaryRunOn: (count: number, names: string) => { before: string; after: string }
+      otherProviders: string
+      slotProviderAria: (label: string) => string
+      slotModelAria: (label: string) => string
+      slotReasoningAria: (label: string) => string
     }
     localModels: {
       title: string
@@ -1613,6 +1658,32 @@ export interface Translations {
         }
       }
     }
+    memoryProvider: {
+      waitingForConsent: string
+      loadFailed: (error: string) => string
+      loadingLabel: string
+      settingsTitle: (label: string) => string
+      setLabel: (label: string) => string
+      notSetLabel: (label: string) => string
+      fullConfig: string
+      modalTitle: (label: string) => string
+      modalDescription: (label: string) => { before: string; after: string }
+      docsLink: (label: string) => string
+      saveChanges: string
+      keepCurrentValue: string
+      apiKeySet: string
+      oauthSet: string
+      saved: string
+      savedTitle: (label: string) => string
+      aboutField: (label: string) => string
+      startFailedDetail: string
+      startFailedToast: string
+      timedOut: string
+      connectionFailed: string
+      connectViaOauth: string
+      reconnect: string
+      loadFailedPlain: string
+    }
   }
 
   skills: {
@@ -1801,6 +1872,23 @@ export interface Translations {
     importSuccess: (nodes: number) => string
     importedBadge: string
     resetToMine: string
+    legendCoreOuter: string
+    legendMemory: string
+    nodeMenu: {
+      editMemory: string
+      editSkill: string
+      editTitle: (label: string) => string
+      archiveSkill: string
+      deleteMemory: string
+      removedForever: string
+      deleteTitle: (label: string) => string
+    }
+    timeline: {
+      pause: string
+      playTimeline: string
+      scrubber: string
+    }
+    badShareCode: string
   }
   agents: {
     extendedTranscript: string
@@ -1906,6 +1994,13 @@ export interface Translations {
       referenceImageInvalid: string
       adopt: string
       startOver: string
+      unavailableTitle: string
+      unavailableBody: string
+      setupImageGeneration: string
+      grabKeyFrom: string
+      addReference: string
+      removeReference: string
+      referenceFallback: string
     }
     installTheme: {
       title: string
@@ -2128,6 +2223,7 @@ export interface Translations {
       stillWaiting: (detail: string) => string
       savedRestarting: string
       savedRestartFailed: (detail: string) => string
+      qrAlt: string
     }
     fieldCopy: Record<string, { label?: string; help?: string; placeholder?: string }>
     platformDescriptions: Record<string, string>
@@ -2711,6 +2807,35 @@ export interface Translations {
       done: string
     }
     markAllRead: string
+    filterMenu: {
+      grouping: string
+      ordering: string
+      show: string
+      status: string
+      pullRequest: string
+      profile: string
+      project: string
+      resetDefaults: string
+      updated: string
+      created: string
+      tokens: string
+      cost: string
+      manual: string
+      preview: string
+      prOpen: string
+      draft: string
+      merged: string
+      closed: string
+      noPr: string
+      needsInput: string
+      working: string
+      unread: string
+      idle: string
+      inboxStyle: string
+      archived: string
+      expandAll: string
+      collapseAll: string
+    }
   }
 
   composer: {
@@ -3227,6 +3352,12 @@ export interface Translations {
     change: string
     startChatting: string
     docs: (provider: string) => string
+    skipSetup: string
+    retryFirstBuild: string
+    firstBuildFailed: string
+    buildStarted: (title: string) => string
+    buildOpening: (title: string) => string
+    workingOnIt: string
   }
 
   freeTier: {
@@ -3315,6 +3446,8 @@ export interface Translations {
       editModels: string
       refreshModels: string
       fast: string
+      moaPresets: string
+      moaPrefix: string
     }
     modelOptions: {
       noOptions: string
@@ -3465,6 +3598,12 @@ export interface Translations {
       modelPinned: string
       modelTitle: (provider: string, model: string) => string
       providerModelTitle: (provider: string, model: string) => string
+    }
+    tiles: {
+      sessionOpenFailed: string
+      noPageAt: (path: string) => string
+      resumeStillAvailable: string
+      resumeUnavailable: string
     }
   }
 
@@ -3795,6 +3934,24 @@ export interface Translations {
       goForward: string
       sendEdited: string
       attachingFile: string
+      messageFrom: (sender: string) => string
+      showMessage: string
+      repliedTo: (sender: string) => string
+      showReply: string
+      conversationTimeline: string
+      hermesWorking: string
+      toolPayload: string
+      toolSearch: string
+      emojiSearch: string
+      loadingEmoji: string
+      noEmoji: string
+      moreEmoji: string
+      reactedByHermes: string
+      deliveryPending: string
+      deliveryDone: string
+      removeReaction: (emoji: string) => string
+      summarizingThread: string
+      searchResults: string
     }
     approval: {
       gatewayDisconnected: string
@@ -3912,6 +4069,22 @@ export interface Translations {
         runningTool: (action: string) => string
       }
       titles: Record<ToolTitleKey, ToolTitleCopy>
+    }
+    media: {
+      fetchFailed: (name: string) => string
+      openMediaFile: (kind: 'audio' | 'video') => string
+      couldntLoad: (name: string) => string
+      openImage: string
+      loadingName: (name: string) => string
+      generatedImage: string
+      openNamed: (name: string) => string
+    }
+    embeds: {
+      failed: (label: string) => string
+      openDiagram: string
+      holdToZoom: string
+      spotifyTitle: string
+      youtubeTitle: string
     }
   }
 
@@ -4068,5 +4241,12 @@ export interface Translations {
       description: string
       toggle: (open: boolean) => string
     }
+    zoomable: {
+      zoomOut: string
+      zoomIn: string
+      reset: string
+    }
+    moreActions: string
+    hatchingProgress: string
   }
 }
