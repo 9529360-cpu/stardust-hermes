@@ -508,12 +508,11 @@
 }
 
 
-/* Side-rail mode switches — conversations/agents on the left, context/files/review
-   on the right — are not global app navigation. Keep the shared pane groups, but
-   render their titlebar tabs as one quiet segmented control inside the rail. */
+/* Side-rail mode switches — the workspace overview's tabs — are not global app
+   navigation. Keep the shared pane groups, but render their titlebar tabs as one
+   quiet segmented control inside the rail. */
 :root[data-hermes-reference-shell='aurora']
   :is(
-    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
     [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
   ) {
   background: transparent !important;
@@ -523,7 +522,6 @@
 
 :root[data-hermes-reference-shell='aurora']
   :is(
-    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
     [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
   )
   > [role='tablist'] {
@@ -538,7 +536,6 @@
 }
 :root[data-hermes-reference-shell='aurora']
   :is(
-    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
     [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
   )
   [data-slot='pane-tab'] {
@@ -551,7 +548,6 @@
 
 :root[data-hermes-reference-shell='aurora']
   :is(
-    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
     [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
   )
   [data-slot='pane-tab'][data-active='false'] {
@@ -560,7 +556,6 @@
 
 :root[data-hermes-reference-shell='aurora']
   :is(
-    [data-zone-tabstrip]:has([data-tree-tab='sessions']):has([data-tree-tab='hermes-bots:pane']),
     [data-zone-tabstrip]:has([data-tree-tab='workspace-overview'])
   )
   [data-slot='pane-tab'] .pane-tab-content > span > span {

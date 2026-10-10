@@ -1,19 +1,15 @@
 /**
- * Bot Mode's pane layout contract, asserted by running the real `register()`
+ * Bot Mode's lifecycle contract, asserted by running the real `register()`
  * against a recording plugin context:
  *
- *  - the Bots pane center-stacks into the sessions zone (a SESSIONS | BOTS tab
- *    strip), never splits below it, and carries the ENFORCED dock invariant so
- *    every boot re-homes a stacked install. No heal token, no user-placed
- *    exemption — the retired one-shot heal burned its token even when its
- *    guards skipped the move, so exactly the users who had dragged their panes
- *    stayed stacked forever;
+ *  - the roster is a page at its own route, and Bot Mode is on screen while that
+ *    page is mounted or a bot chat owns the workspace ($botsPaneVisible);
  *  - the Scheduled jobs (internally `routines`) pane only exists while a BOT
- *    CHAT owns the main workspace and the Bots pane is on screen. It is
- *    registered and unregistered through the contribution disposer, driven by
- *    the feature-detected `host.paneVisibility` export, with the
- *    always-registered fallback kept for older desktops. Cron jobs are
- *    bot-scoped, so the tile must not sit beside a group chat.
+ *    CHAT owns the main workspace and Bot Mode is on screen. It is registered
+ *    and unregistered through the contribution disposer, driven by the
+ *    feature-detected `host.paneVisibility` export, with the always-registered
+ *    fallback kept for older desktops. Cron jobs are bot-scoped, so the tile must
+ *    not sit beside a group chat.
  */
 
 import type * as HermesSdk from '@hermes/plugin-sdk'
@@ -21,6 +17,7 @@ import type { PluginContext } from '@hermes/plugin-sdk'
 import { atom } from 'nanostores'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { $botsPageOpen, $openBotChat } from './bot-state'
 import type * as DataModule from './data'
 import type * as RoutingModule from './routing'
 
@@ -56,7 +53,7 @@ vi.mock('./hygiene', () => ({ annotateOrphanedGroupChatMembers: () => ({ changed
 vi.mock('./cron', () => ({ bindProfileSync: () => () => undefined, RoutinesPane: () => null }))
 vi.mock('./roster-pane', () => ({
   botChatOwnsWorkspace: mocks.botChatOwnsWorkspace,
-  BotsPane: () => null,
+  BotsPage: () => null,
   releaseStaleOpenBotChat: vi.fn(),
   selectedRosterBot: () => null,
   sessionOwnsWorkspace: mocks.sessionOwnsWorkspace
@@ -152,29 +149,27 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 
 beforeEach(() => {
   vi.clearAllMocks()
+  $botsPageOpen.set(false)
+  $openBotChat.set(null)
   mocks.botChatOwnsWorkspace.mockReturnValue(false)
   mocks.sessionOwnsWorkspace.mockReturnValue(false)
 })
 
 afterEach(() => {
   vi.useRealTimers()
+  $botsPageOpen.set(false)
+  $openBotChat.set(null)
 })
 
-describe('the Bots pane dock', () => {
-  it('center-stacks into the sessions zone as a standing invariant', () => {
+describe('the roster page', () => {
+  it('is a route page at /bots beside the nav, not a sidebar pane', () => {
     paneStores()
-
     const harness = recordingContext()
 
     plugin.register(harness.ctx)
 
-    const data = harness.find('pane')!.data!
-
-    expect(data.dock).toEqual({ enforce: true, pane: 'sessions', pos: 'center' })
-    // A 'bottom' split was the old workaround for the lone-pane auto-hide trap.
-    expect((data.dock as { pos: string }).pos).not.toBe('bottom')
-    // No heal token: the invariant runs at every adoption, unconditionally.
-    expect(data).not.toHaveProperty('heal')
+    expect(harness.find('pane')).toBeUndefined()
+    expect(harness.find('page')).toMatchObject({ area: 'routes', data: { path: '/bots' } })
 
     harness.dispose()
   })
@@ -182,7 +177,7 @@ describe('the Bots pane dock', () => {
 
 describe('the Scheduled jobs pane', () => {
   it('stays unregistered until a bot chat owns the workspace', async () => {
-    const store = paneStores()
+    paneStores()
     const harness = recordingContext()
 
     plugin.register(harness.ctx)
@@ -191,7 +186,7 @@ describe('the Scheduled jobs pane', () => {
     expect(harness.find('routines')).toBeUndefined()
 
     mocks.botChatOwnsWorkspace.mockReturnValue(true)
-    store(`hermes-bots:pane`).set(true)
+    $botsPageOpen.set(true)
 
     const routines = harness.find('routines')!
 
@@ -208,7 +203,7 @@ describe('the Scheduled jobs pane', () => {
   })
 
   it('unregisters when Bot Mode leaves the screen', async () => {
-    const store = paneStores()
+    paneStores()
     const harness = recordingContext()
 
     mocks.botChatOwnsWorkspace.mockReturnValue(true)
@@ -218,8 +213,8 @@ describe('the Scheduled jobs pane', () => {
     expect(harness.find('routines')).toBeTruthy()
 
     mocks.botChatOwnsWorkspace.mockReturnValue(false)
-    store(`hermes-bots:pane`).set(true)
-    store(`hermes-bots:pane`).set(false)
+    $botsPageOpen.set(true)
+    $botsPageOpen.set(false)
 
     expect(harness.unregisters.get('routines')).toHaveBeenCalled()
     expect(harness.find('routines')).toBeUndefined()
@@ -239,7 +234,7 @@ describe('the Scheduled jobs pane', () => {
     // must never unregister itself out from under its own click.
     store(`hermes-bots:routines`).set(true)
     mocks.botChatOwnsWorkspace.mockReturnValue(false)
-    store(`hermes-bots:pane`).set(true)
+    $botsPageOpen.set(true)
 
     expect(harness.unregisters.get('routines')).not.toHaveBeenCalled()
     expect(harness.find('routines')).toBeTruthy()
@@ -248,7 +243,7 @@ describe('the Scheduled jobs pane', () => {
   })
 
   it('stops every lifecycle listener when the plugin is disabled', async () => {
-    const store = paneStores()
+    paneStores()
     const harness = recordingContext()
 
     plugin.register(harness.ctx)
@@ -257,7 +252,7 @@ describe('the Scheduled jobs pane', () => {
 
     // A disable → re-enable cycle used to stack a duplicate listener per cycle.
     mocks.botChatOwnsWorkspace.mockReturnValue(true)
-    store(`hermes-bots:pane`).set(true)
+    $botsPageOpen.set(true)
 
     expect(harness.find('routines')).toBeUndefined()
   })

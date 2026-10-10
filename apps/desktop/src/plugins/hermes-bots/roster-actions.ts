@@ -10,7 +10,7 @@
 
 import { ackStoredSessionId, atom, haptic, host, markSessionUnreadFinished } from '@hermes/plugin-sdk'
 
-import { $openBotChat, $selectedBot, rosterWatermarks, saveSelectedRosterBot } from './bot-state'
+import { $botOpenPending, $openBotChat, $selectedBot, rosterWatermarks, saveSelectedRosterBot } from './bot-state'
 import { CANONICAL_CHAT_TITLE, notifyBotOpenFailure, openBotCanonicalChat, prepareBotSource } from './canonical-chat'
 import { $botMeta, botActivitySession, botRosterKey, botSelectionKey, newBotChat } from './data'
 import { $groupChats, $groupChatWorkspace } from './group-chat'
@@ -186,6 +186,21 @@ function focusExistingBotTab(bot: RosterRow): null | { registryId: string; store
  *  resolves a canonical-chat id. */
 export async function openRosterBot(bot: RosterRow): Promise<boolean> {
   const generation = bumpBotOpenGeneration()
+
+  // The open navigates, and that unmounts the roster page. Hold Bot Mode on until the open settles, so the
+  // unmount is not read as leaving Bot Mode (which would supersede this very open).
+  $botOpenPending.set(generation)
+
+  try {
+    return await openRosterBotChat(bot, generation)
+  } finally {
+    if ($botOpenPending.get() === generation) {
+      $botOpenPending.set(null)
+    }
+  }
+}
+
+async function openRosterBotChat(bot: RosterRow, generation: number): Promise<boolean> {
   const key = botRosterKey(bot)
   const meta = botRosterMeta(bot, $botMeta.get())
   // Keep the currently visible group as a fallback until this explicit action

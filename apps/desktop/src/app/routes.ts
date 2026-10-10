@@ -18,6 +18,8 @@ export const ARTIFACTS_ROUTE = '/artifacts'
 export const CRON_ROUTE = '/cron'
 export const PROFILES_ROUTE = '/profiles'
 export const AGENTS_ROUTE = '/agents'
+// Bot Mode's roster page: a plugin route (ROUTES_AREA), not a core APP_ROUTES entry.
+export const BOTS_ROUTE = '/bots'
 export const STARMAP_ROUTE = '/starmap'
 export const WORKSPACE_ROUTE = '/workspace'
 
@@ -80,6 +82,10 @@ export const APP_ROUTES = [
 
 const APP_VIEW_BY_PATH = new Map<string, AppView>(APP_ROUTES.map(route => [route.path, route.view]))
 const RESERVED_PATHS: ReadonlySet<string> = new Set(APP_ROUTES.map(route => route.path))
+
+// The agent space's path belongs to the nav, not to the plugin that renders it. A cold start that restores
+// it can run before the Bots plugin registers its page, and the path must not read as a session id then.
+const NAV_OWNED_PATHS: ReadonlySet<string> = new Set([BOTS_ROUTE])
 
 // ── Contributed routes — the `routes` registry area ─────────────────────────
 // A contribution mounts a FULL PAGE in the workspace pane at `data.path`
@@ -173,7 +179,12 @@ export function isNewChatRoute(pathname: string): boolean {
 export function routeSessionId(pathname: string): string | null {
   const path = routePathname(pathname)
 
-  if (!path.startsWith(SESSION_ROUTE_PREFIX) || RESERVED_PATHS.has(path) || isContributedPath(path)) {
+  if (
+    !path.startsWith(SESSION_ROUTE_PREFIX) ||
+    RESERVED_PATHS.has(path) ||
+    NAV_OWNED_PATHS.has(path) ||
+    isContributedPath(path)
+  ) {
     return null
   }
 

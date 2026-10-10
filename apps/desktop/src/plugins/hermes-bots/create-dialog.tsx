@@ -1142,11 +1142,11 @@ export function GroupDialog({ bot, onClose }: GroupDialogProps) {
           <Input
             autoFocus
             onChange={event => setName(event.target.value)}
-            placeholder={groups.length ? 'New group…' : 'Group name (e.g. Research)'}
+            placeholder={groups.length ? b.group.newGroupPlaceholder : b.group.namePlaceholderExample}
             value={name}
           />
           <Button disabled={!name.trim()} size="sm" type="submit">
-            Create & join
+            {b.group.createAndJoin}
           </Button>
         </form>
         {current.length ? (
@@ -1395,12 +1395,12 @@ export function CreateGroupChatDialog({ open, roster, onClose, onCreated }: Crea
             {t.common.cancel}
           </Button>
           {canCreate ? (
-            <Button onClick={create}>{`Create Group${selected.length ? ` (${selected.length})` : ''}`}</Button>
+            <Button onClick={create}>{selected.length ? b.group.createGroupWithCount(selected.length) : b.group.createGroup}</Button>
           ) : (
-            <Tip label="Pick at least 2 bots">
+            <Tip label={b.group.pickAtLeastTwo}>
               <span className="inline-flex">
                 <Button disabled onClick={create}>
-                  Create Group
+                  {b.group.createGroup}
                 </Button>
               </span>
             </Tip>

@@ -540,6 +540,13 @@ export function setSidebarOpen(open: boolean) {
   revealNarrowPane(CHAT_SIDEBAR_PANE_ID, open ? 'open' : 'close')
 }
 
+/** Close the narrow sessions overlay once the user has picked a page or chat
+ *  from it, so the choice shows in the main area instead of under the nav.
+ *  At full width the sidebar is docked, so there is no overlay and this is a no-op. */
+export function dismissNarrowSidebar() {
+  revealNarrowPane(CHAT_SIDEBAR_PANE_ID, 'close')
+}
+
 export function toggleSidebarOpen() {
   if (!revealNarrowPane(CHAT_SIDEBAR_PANE_ID, 'toggle')) {
     const open = restoreMinimizedTreeSide('left') || !$sidebarOpen.get()

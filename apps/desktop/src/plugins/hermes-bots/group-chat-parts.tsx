@@ -541,7 +541,7 @@ export function GroupClarifyCard({ entry, members }: GroupClarifyCardProps) {
                   void submit()
                 }
               }}
-              placeholder={q.choices.length ? 'Or type your own answer…' : 'Type your answer…'}
+              placeholder={q.choices.length ? b.group.answerOwn : b.group.answerTyped}
               value={drafts[q.qid] || ''}
             />
           )}

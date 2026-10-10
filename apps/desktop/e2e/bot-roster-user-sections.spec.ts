@@ -1,6 +1,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
@@ -10,7 +12,6 @@ import {
   writeEnvFile,
   writeMockProviderConfig
 } from './fixtures'
-import { startMockServer } from '../../../tests-js/scripts/mock-server'
 import { RealSessionBuilder } from './real-session-builder'
 import { expect, test } from './test'
 
@@ -112,10 +113,7 @@ test('file bots into user sections by menu and drag; rename; delete returns them
   test.setTimeout(300_000)
   const page = fixture!.page
 
-  const tab = page
-    .getByRole('button', { name: 'Bots', exact: true })
-    .or(page.getByRole('tab', { name: 'Bots', exact: true }))
-    .first()
+  const tab = page.getByRole('button', { name: /智能体空间|Agent space/ }).first()
 
   await tab.click()
   await expect(page.getByRole('button', { name: 'New bot or group chat' })).toBeVisible()

@@ -51,6 +51,17 @@ describe('host.state focused-session atoms', () => {
     expect(host.state.focusedStoredSessionId.get()).toBe(states.$focusedStoredSessionId.get())
   })
 
+  it('mirrors whether a full page holds the workspace', async () => {
+    const { host } = await setup()
+    const { $workspaceIsPage } = await import('@/app/routes')
+
+    $workspaceIsPage.set(true)
+    expect(host.state.workspaceIsPage.get()).toBe(true)
+
+    $workspaceIsPage.set(false)
+    expect(host.state.workspaceIsPage.get()).toBe(false)
+  })
+
   it('focusedUsage projects the focused session usage, null while unresolved', async () => {
     const { host, states } = await setup()
 

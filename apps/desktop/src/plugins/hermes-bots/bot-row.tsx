@@ -43,7 +43,6 @@ import {
   $botAttention,
   $botMeta,
   $lastRoster,
-  BOT_ATTENTION_HINTS,
   botActivitySession,
   botHandle,
   botRosterKey,
@@ -276,7 +275,7 @@ export function BotRow({ bot, onDelete, onEdit, onGroup, onNewSection, showHandl
             </Tip>
           </div>
           {attention ? (
-            <Tip label={BOT_ATTENTION_HINTS[attention.reason] || 'Needs attention'}>
+            <Tip label={b.roster.attentionHints[attention.reason] || b.roster.needsAttention}>
               <Codicon
                 aria-label={b.roster.needsAttention}
                 className="shrink-0 text-[0.6875rem] text-amber-600 dark:text-amber-300"
@@ -552,7 +551,7 @@ export function GroupRow({ active, group, members, needsYou, onOpen, onDisband }
     <ContextMenu>
       <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={() => onOpen(group)}>Open Group Chat</ContextMenuItem>
+        <ContextMenuItem onSelect={() => onOpen(group)}>{b.group.openGroupChat}</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
           className="text-destructive focus:text-destructive"

@@ -1004,7 +1004,7 @@ export function GroupChatWorkspace({ group, members, onBack, visible = true }: G
                 className="text-left text-[0.7rem] font-semibold text-(--ui-accent)"
                 onClick={() => setRevealedSpeaker(revealed ? null : entryKey)}
                 size="inline"
-                title={revealed ? 'Hide full handle' : 'Show full handle'}
+                title={revealed ? b.group.hideHandle : b.group.showHandle}
                 variant="text"
               >
                 {label}

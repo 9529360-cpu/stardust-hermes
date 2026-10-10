@@ -9,6 +9,7 @@
  */
 
 import { atom, host } from '@hermes/plugin-sdk'
+import { computed, type ReadableAtom } from 'nanostores'
 
 import { botRosterKey, botSelectionKey } from './data'
 import { getPluginCtx } from './shared'
@@ -38,14 +39,36 @@ export const $selectedBot = atom('default')
 export const $selectedRosterKey = atom('')
 export const $selectedRosterHydrated = atom(false)
 export const $rosterHydrated = atom(false)
-/** Mirrors host.paneVisibility('hermes-bots:pane') — wired in register(). */
-export const $botsPaneVisible = atom(false)
+/** The roster page (BotsPage) is mounted. */
+export const $botsPageOpen = atom(false)
 /** An explicit open landed: {key, openedRegistryId, openedSessionId}. The
  *  registry id is empty for the legacy newChat draft fallback and for a click
  *  that came back to the bot's already-open tabs (only openedSessionId set — no
  *  canonical chat was resolved). This transient view observation is never an
  *  identity preference. */
 export const $openBotChat = atom<{ key: string; openedRegistryId: string; openedSessionId?: string } | null>(null)
+/** The generation of a bot open still in flight. Its navigation unmounts the roster page, and Bot Mode must
+ *  not drop out in that gap: the drop would supersede the open it came from. Cleared when the open settles. */
+export const $botOpenPending = atom<null | number>(null)
+/** A full page holds the workspace (Tools, Plugins, Tasks, the roster) instead of a session. A bot chat claim
+ *  describes the center only while no page holds it. Shells without the state keep the claim-only rule. */
+export const $centerShowsPage: ReadableAtom<boolean> = host.state.workspaceIsPage ?? atom(false)
+
+/** Bot Mode is on screen: the roster page is open, a bot open is in flight, or a bot chat owns the center. */
+export function botModeOnScreen(state: {
+  centerPage: boolean
+  chat: boolean
+  page: boolean
+  pending: boolean
+}): boolean {
+  return state.page || state.pending || (!state.centerPage && state.chat)
+}
+
+export const $botsPaneVisible = computed(
+  [$botsPageOpen, $openBotChat, $botOpenPending, $centerShowsPage],
+  (page, chat, pending, centerPage) =>
+    botModeOnScreen({ centerPage, chat: chat !== null, page, pending: pending !== null })
+)
 /** A session owns the main workspace. The roster highlight and the Cronjobs
  *  lifecycle both key off this rather than reading host.state conditionally
  *  from render. */
