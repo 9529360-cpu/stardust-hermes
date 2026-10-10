@@ -130,3 +130,24 @@ def test_subagent_control_is_cooperative(monkeypatch):
     assert calls == ["child"]
     assert ledger.cancel_work("subagent:child", include_subagents=False)["status"] == "not_found"
     assert ledger.list_work()[0]["status"] == "running"
+
+
+def test_cron_items_follow_the_active_profile_home(tmp_path):
+    from cron import executions
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    homes = {name: tmp_path / name for name in ("coder", "research")}
+    for name, home in homes.items():
+        token = set_hermes_home_override(home)
+        try:
+            executions.create_execution(f"job-{name}", source="scheduler")
+        finally:
+            reset_hermes_home_override(token)
+
+    for name, home in homes.items():
+        token = set_hermes_home_override(home)
+        try:
+            items = ledger.cron_work_items()
+        finally:
+            reset_hermes_home_override(token)
+        assert [item["detail"]["job_id"] for item in items] == [f"job-{name}"]

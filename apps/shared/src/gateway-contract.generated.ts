@@ -3820,11 +3820,13 @@ export interface AgentPluginRow {
   update_available?: boolean | null
   pinned_sha?: string | null
 }
-export interface WorkListParams {
-  session_id?: string
+export interface CronExecutionsListParams {
+  profile?: string
+  limit?: number
 }
-export interface WorkListResult {
+export interface CronExecutionsListResult {
   work: WorkItem[]
+  scoped?: string
 }
 export interface WorkItem {
   id: string
@@ -3834,6 +3836,12 @@ export interface WorkItem {
   started_at: number | null
   updated_at: number | null
   detail: Record<string, unknown>
+}
+export interface WorkListParams {
+  session_id?: string
+}
+export interface WorkListResult {
+  work: WorkItem[]
 }
 export interface WorkCancelParams {
   id: string
@@ -4413,6 +4421,8 @@ export interface RpcMethods {
   'connectors.list': { params: ConnectorsListParams; result: ConnectorsListResult }
   /** The current snapshot of one open operation on an owned session. */
   'connectors.operation.status': { params: ConnectionOperationParams; result: ConnectionOperationStatus }
+  /** Read-only recent cron executions for one profile, newest first. Same profile scope as cron.manage list; allowlisted fields only; limit clamped to 1..50. Cron runs cannot be cancelled after dispatch. */
+  'cron.executions.list': { params: CronExecutionsListParams; result: CronExecutionsListResult }
   /** List/add/remove/pause/resume cron jobs in the (optionally profile-scoped) cron store. */
   'cron.manage': { params: CronManageParams; result: CronManageResult }
   /** Block/unblock NEW spawns globally (active children keep running); returns the new state. */
@@ -4836,6 +4846,7 @@ export const RPC_METHODS = [
   'connectors.connect',
   'connectors.list',
   'connectors.operation.status',
+  'cron.executions.list',
   'cron.manage',
   'delegation.pause',
   'delegation.status',

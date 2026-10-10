@@ -1124,6 +1124,15 @@ def _(rid, params: dict) -> dict:
     return _err(rid, 4016, f"unknown cron action: {action}")
 
 
+@_scoped_rpc("cron.executions.list", 5023)
+def _(rid, params: dict) -> dict:
+    """Read-only recent cron runs for the requested profile. The scope is the one cron.manage uses, so
+    no new authority is granted: an unknown profile is 4064 and the body reads only that profile's store."""
+    limit = min(max(int(params.get("limit") or 20), 1), 50)
+    work = _tools_mod("tools.work_ledger").cron_work_items(limit=limit)
+    return _ok(rid, {"work": work, "scoped": _str_arg(params, "profile")})
+
+
 @_rpc("learning.frames", 5000, "learning.frames failed: ")
 def _(rid, params: dict) -> dict:
     """Pre-render the ``/journey`` timeline (frames + legend/summary metadata) so Ink walks it locally."""

@@ -34,6 +34,19 @@ class WorkCancelResult(Result):
     message: str
 
 
+class CronExecutionsListParams(Params):
+    profile: str = ""
+    limit: int = 20
+
+
+class CronExecutionsListResult(Result):
+    work: list[WorkItem]
+    scoped: str = ""
+
+
+method("cron.executions.list", params=CronExecutionsListParams, result=CronExecutionsListResult,
+       doc="Read-only recent cron executions for one profile, newest first. Same profile scope as cron.manage list; "
+           "allowlisted fields only; limit clamped to 1..50. Cron runs cannot be cancelled after dispatch.")
 method("work.list", params=WorkListParams, result=WorkListResult,
        doc="List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable.")
 method("work.cancel", params=WorkCancelParams, result=WorkCancelResult,
