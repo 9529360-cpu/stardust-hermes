@@ -451,9 +451,11 @@ DEFAULT_CONFIG = {
         # 2"). Empty = browser's last-used profile, which on multi-profile machines can hand the
         # agent the wrong identity. A pin naming a missing directory FAILS CLOSED.
         "real_profile_pin": "",
-        # restrict_evaluate: opt-in denylist blocking sensitive JS primitives (cookies/storage/
-        # clipboard/network/form values) in browser_console(expression=...); allow_unsafe_evaluate
-        # is the legacy override that bypasses that denylist entirely.
+        # restrict_evaluate: true turns on a denylist of sensitive JS primitives (cookies/storage/
+        # clipboard/network/form values) for browser_console(expression=...) and for raw browser_cdp
+        # calls that can reach page data, as a hard limit. Browsers that hold authenticated state
+        # (cloud, attached over CDP, real profile) ask for approval even when this is false.
+        # allow_unsafe_evaluate: true lifts both the denylist and those approval prompts.
         "allow_unsafe_evaluate": False,
         "restrict_evaluate": False,
         # CDP supervisor: dialog + frame detection over a persistent WebSocket; active only with a
