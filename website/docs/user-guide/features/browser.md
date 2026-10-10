@@ -783,7 +783,7 @@ browser_console(expression="JSON.stringify(performance.timing)")
 
 When a CDP supervisor is active for the current session (typical for any session that's run `browser_navigate` against a CDP-capable backend), evaluation runs over the supervisor's persistent WebSocket — no subprocess startup cost. Falls through to the standard agent-browser CLI path otherwise. Behaviour is identical either way; only latency changes.
 
-Evaluation is unrestricted by default — the agent can use `fetch`, read storage, query form values, and run any DOM extraction. Requests targeting private/internal addresses are still blocked on non-local backends (the SSRF guard is independent of this setting). If you browse hostile pages with a logged-in profile and want a strict denylist over sensitive JS primitives (cookies, storage, clipboard, network calls, form values), opt in with `browser.restrict_evaluate: true` in `config.yaml`. Note the denylist matches primitive *names*, so it also blocks legitimate expressions that merely contain words like `fetch` or `cookie`.
+On a local browser, evaluation is unrestricted by default — the agent can use `fetch`, read storage, query form values, and run any DOM extraction. A browser that holds authenticated state asks for your approval first: a cloud provider, a Chrome attached over CDP (`browser.cdp_url` or `/browser connect`), a browser under extension control, or a real profile. While extension browser control is on, every call counts as attached to your own browser. The approval applies to the session that actually runs the call: if a dead or suspect session is replaced by a cloud session when the call runs, the cloud session is what gets judged. That applies to sensitive evaluation, and to raw `browser_cdp` calls that can reach page data, cookies, storage, or response bodies. Approve once, for the session, or always. Requests targeting private/internal addresses are still blocked on non-local backends (the SSRF guard is independent of this setting). To turn the denylist on everywhere as a hard limit, set `browser.restrict_evaluate: true` in `config.yaml`; those calls are then refused, not approved. `browser.allow_unsafe_evaluate: true` lifts the denylist and the prompts. Note the denylist matches primitive *names*, so it also blocks legitimate expressions that merely contain words like `fetch` or `cookie`.
 
 ### `browser_cdp`
 
@@ -812,6 +812,8 @@ browser_cdp(method="Runtime.evaluate",
 # Get all cookies
 browser_cdp(method="Network.getAllCookies")
 ```
+
+`Target.getTargets` returns every tab's URL and title, so it needs approval in a browser that holds authenticated state (attached over CDP, cloud, extension-controlled, or real-profile), the same as the other sensitive methods. Under `browser.restrict_evaluate: true` it is refused outright.
 
 Browser-level methods (`Target.*`, `Browser.*`, `Storage.*`) omit `target_id`. Page-level methods (`Page.*`, `Runtime.*`, `DOM.*`, `Emulation.*`) require a `target_id` from `Target.getTargets`. Each stateless call is independent — sessions do not persist between calls.
 

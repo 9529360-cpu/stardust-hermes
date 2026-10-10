@@ -11,6 +11,12 @@ from tools import approval
 from tools.approval import request_tool_approval as _real_request_tool_approval
 
 
+@pytest.fixture(autouse=True)
+def _cli_installed(monkeypatch):
+    """Discovery runs before the prompt, so these tests need a CLI on the path; no test launches it here."""
+    monkeypatch.setattr(bu_cli, "_find_cli", lambda: ["browser-use"])
+
+
 @pytest.fixture
 def standing_approvals(monkeypatch, tmp_path):
     """Permanent approvals for one test only: HERMES_HOME is temporary and the allowlist is in memory."""
@@ -66,9 +72,17 @@ class TestPromptAndValidation:
         assert result["success"] is False
         assert result["error_type"] == "invalid_request"
 
+    def test_missing_cli_fails_before_any_prompt(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: None)
+        monkeypatch.setattr("tools.approval.request_tool_approval",
+                            lambda *a, **k: pytest.fail("an unavailable CLI must never prompt"))
+        result = json.loads(bu_cli.browser_exec("print(1)"))
+        assert result["success"] is False
+        assert result["error_type"] == "cli_unavailable"
+
 
 class TestRegistryDispatch:
-    """Through the tool registry with the real approval engine: nothing is patched except the CLI."""
+    """Through the tool registry with the real approval engine: nothing is patched except the CLI launch."""
 
     @pytest.fixture(autouse=True)
     def _real_engine(self, monkeypatch):
@@ -78,7 +92,8 @@ class TestRegistryDispatch:
         from tools.registry import discover_builtin_tools, registry
 
         discover_builtin_tools()
-        monkeypatch.setattr(bu_cli, "_find_cli", lambda: pytest.fail("the CLI must not launch without approval"))
+        monkeypatch.setattr(bu_cli, "_run_cli_killing_process_group",
+                            lambda *a, **k: pytest.fail("the CLI must not launch without approval"))
         result = _as_dict(registry.dispatch("browser_exec", {"code": "print('hi')"}))
         assert result["success"] is False
         assert result["error_type"] == "approval_denied"
@@ -89,7 +104,6 @@ class TestRegistryDispatch:
         discover_builtin_tools()
         standing_approvals.add("plugin_rule:browser_exec_host_python")
         launched = {}
-        monkeypatch.setattr(bu_cli, "_find_cli", lambda: ["browser-use"])
         monkeypatch.setattr(bu_cli, "_base_subprocess_env", lambda: {})
         monkeypatch.setattr(bu_cli, "_route_backend", lambda *args: None)
         monkeypatch.setattr(bu_cli, "_attach_vault_supervisor", lambda *args: None)

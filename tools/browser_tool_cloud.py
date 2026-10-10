@@ -5,7 +5,7 @@ Split out of ``tools/browser_tool.py``. Facade-owned state is read through ``_bt
 from __future__ import annotations
 
 import os
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from agent.browser_provider import BrowserProvider as CloudBrowserProvider
 from agent.browser_registry import get_provider as _registry_get_browser_provider
@@ -181,6 +181,52 @@ def _is_local_backend() -> bool:
     # treat as non-local. See #68559.
     from tools.terminal_scope import terminal_env
     return terminal_env("TERMINAL_ENV", "local").strip().lower() in ("local", "")
+
+
+def _session_is_local(session: Dict[str, Any]) -> bool:
+    """True when this session record is the ordinary local sidecar: local Chromium, including a cloud session that
+    fell back to it. A CDP override and a real profile are never the local sidecar, and a record without the local
+    marker (a cloud session) is not local."""
+    features = session.get("features") or {}
+    return bool(features.get("local")) and not features.get("cdp_override") and not features.get("real_profile")
+
+
+def _browser_control_enabled() -> bool:
+    """Extension browser control drives the user's own browser, with their logins, so it is never the local sidecar."""
+    try:
+        from gateway.browser_control_broker import browser_control_enabled
+    except Exception:  # pragma: no cover — gateway always present
+        return False
+    return browser_control_enabled()
+
+
+def _browser_is_local_sidecar(task_id: Optional[str] = None, session: Optional[Dict[str, Any]] = None) -> bool:
+    """True when the browser that serves this call is the ordinary local sidecar, whatever the terminal backend is.
+
+    The session decides, not the configuration: a cloud provider can be configured while a private URL goes to
+    the local ``::local`` sidecar, or while a failed cloud session falls back to local Chromium. A session record
+    says which browser it is. A caller that runs a command passes the record that will run it, because a dead or
+    suspect record is replaced at use and the replacement may be a different browser. Without a record, the one
+    the task's last-used key holds stands in.
+
+    ``_is_local_backend`` also requires a local terminal, because SSRF protection must assume the browser can
+    reach networks the terminal cannot. The sensitive-data policy asks a different question: does this browser
+    hold the operator's authenticated state? So the terminal does not count here. While browser control is on, a
+    call may be served by the user's own browser, so it is never judged local.
+    """
+    _bt = _origin()
+    if _cdp._get_cdp_override_raw() or _browser_control_enabled():
+        return False
+    if _bt._is_camofox_mode():
+        return True
+    if session is not None:
+        return _session_is_local(session)
+    key = _bt._last_session_key(task_id or "default")
+    record = _bt._active_sessions.get(_bt._registry_session_key(key))
+    if record is not None:
+        return _session_is_local(record)
+    # No live session yet: judge where a new session for this key would run.
+    return _bt._is_local_sidecar_key(key) or _get_cloud_provider() is None
 
 
 def _get_browser_engine() -> str:

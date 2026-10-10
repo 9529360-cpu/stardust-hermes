@@ -484,7 +484,7 @@ browser_console(expression="JSON.stringify(performance.timing)")
 
 当当前会话存在活跃的 CDP 监督器时（通常适用于任何对 CDP 兼容后端运行过 `browser_navigate` 的会话），执行通过监督器的持久 WebSocket 进行 — 无子进程启动开销。否则回退到标准 agent-browser CLI 路径。两种方式行为完全相同，仅延迟有差异。
 
-默认情况下执行不受限制 — 代理可以使用 `fetch`、读取存储、查询表单值并执行任何 DOM 提取。针对私有/内部地址的请求在非本地后端上仍会被拦截（SSRF 防护与此设置无关）。如果你在已登录的浏览器配置文件中浏览不可信页面，希望对敏感 JS 原语（Cookie、存储、剪贴板、网络调用、表单值）启用严格的黑名单，可在 `config.yaml` 中设置 `browser.restrict_evaluate: true`。注意该黑名单按原语*名称*匹配，因此也会拦截仅包含 `fetch` 或 `cookie` 等词的合法表达式。
+在本地浏览器上，执行默认不受限制 — 代理可以使用 `fetch`、读取存储、查询表单值并执行任何 DOM 提取。持有已认证状态的浏览器会先请求你的批准：云端提供商、通过 CDP 附加的 Chrome（`browser.cdp_url` 或 `/browser connect`）、由扩展控制的浏览器，或真实配置文件。开启浏览器扩展控制时，所有调用都按附加到你自己的浏览器处理。批准作用于实际执行调用的会话：若调用时已失效或可疑的会话被替换为云端会话，判定的是这个云端会话。这适用于敏感的脚本执行，以及可能读取页面数据、Cookie、存储或响应体的原始 `browser_cdp` 调用。批准可以按次、按会话或永久生效。针对私有/内部地址的请求在非本地后端上仍会被拦截（SSRF 防护与此设置无关）。若要在所有位置启用黑名单作为硬性限制，可在 `config.yaml` 中设置 `browser.restrict_evaluate: true`；此时这些调用会被直接拒绝，而不是请求批准。`browser.allow_unsafe_evaluate: true` 会同时取消黑名单与批准提示。注意该黑名单按原语*名称*匹配，因此也会拦截仅包含 `fetch` 或 `cookie` 等词的合法表达式。
 
 ### `browser_cdp`
 
@@ -513,6 +513,8 @@ browser_cdp(method="Runtime.evaluate",
 # Get all cookies
 browser_cdp(method="Network.getAllCookies")
 ```
+
+`Target.getTargets` 会返回每个标签页的 URL 和标题，因此在持有已认证状态的浏览器中（CDP 附加、云端、扩展控制或真实配置文件）调用时需要批准，与其他敏感方法相同。开启 `browser.restrict_evaluate: true` 时直接拒绝。
 
 浏览器级方法（`Target.*`、`Browser.*`、`Storage.*`）省略 `target_id`。页面级方法（`Page.*`、`Runtime.*`、`DOM.*`、`Emulation.*`）需要来自 `Target.getTargets` 的 `target_id`。每次无状态调用相互独立 — 调用间不保留会话状态。
 

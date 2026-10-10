@@ -13,6 +13,9 @@ from unittest.mock import MagicMock
 import pytest
 from tools import browser_tool_session as bt_session
 
+CLOUD_CDP = "wss://cloud.test/devtools/browser/abc"
+CLOUD_SESSION = {"session_name": "h_cloud", "bb_session_id": "bb-1", "cdp_url": CLOUD_CDP, "features": {}}
+
 
 # ---------------------------------------------------------------------------
 # Fast-path dispatch: tools.browser_tool._browser_eval
@@ -21,11 +24,13 @@ from tools import browser_tool_session as bt_session
 
 @pytest.fixture(autouse=True)
 def _disable_camofox(monkeypatch):
-    """Force the non-camofox path so our supervisor branch is reached."""
+    """Force the non-camofox path so our supervisor branch is reached. The task's record is the cloud session whose
+    supervisor these tests attach."""
     import tools.browser_tool as bt
 
     monkeypatch.setattr(bt, "_is_camofox_mode", lambda: False)
     monkeypatch.setattr(bt, "_last_session_key", lambda task_id: "test-task")
+    monkeypatch.setattr(bt_session, "command_session", lambda task_id: (CLOUD_SESSION, None))
 
 
 def _patch_supervisor(monkeypatch, supervisor):
@@ -45,6 +50,7 @@ class TestBrowserEvalSupervisorPath:
         import tools.browser_tool as bt
 
         sup = MagicMock()
+        sup.cdp_url = CLOUD_CDP
         sup.evaluate_runtime.return_value = {
             "ok": True,
             "result": 42,
@@ -68,6 +74,7 @@ class TestBrowserEvalSupervisorPath:
         import tools.browser_tool as bt
 
         sup = MagicMock()
+        sup.cdp_url = CLOUD_CDP
         sup.evaluate_runtime.return_value = {
             "ok": True,
             "result": '{"a": 1, "b": [2, 3]}',
@@ -85,6 +92,30 @@ class TestBrowserEvalSupervisorPath:
         # result_type reflects the parsed Python type, not the raw JS type.
         assert out["result_type"] == "dict"
 
+    def test_supervisor_of_an_earlier_record_never_serves_a_local_record(self, monkeypatch):
+        """A supervisor is keyed by task. One still attached to a replaced cloud browser must not run an expression that
+        the policy judged against the local record which replaced it."""
+        import tools.browser_tool as bt
+
+        stale = MagicMock()
+        stale.cdp_url = CLOUD_CDP
+        stale.evaluate_runtime.side_effect = AssertionError("stale supervisor must not run the expression")
+        _patch_supervisor(monkeypatch, stale)
+        local = {"session_name": "h_local", "features": {"local": True}}
+        monkeypatch.setattr(bt_session, "command_session", lambda task_id: (local, None))
+        ran_on = []
+
+        def fake_subprocess(task_id, cmd, args, **kwargs):
+            ran_on.append(kwargs["session_info"])
+            return {"success": True, "data": {"result": "local page"}}
+
+        monkeypatch.setattr(bt_session, "_run_browser_command", fake_subprocess)
+
+        out = json.loads(bt._browser_eval("document.title"))
+
+        stale.evaluate_runtime.assert_not_called()
+        assert out["result"] == "local page"
+        assert ran_on == [local]
 
     def test_subprocess_reference_chain_error_becomes_guidance(self, monkeypatch):
         """The CLI subprocess can't retry with returnByValue=False, so the
@@ -95,7 +126,7 @@ class TestBrowserEvalSupervisorPath:
         # No supervisor → subprocess path runs.
         _patch_supervisor(monkeypatch, None)
 
-        def _fake_subprocess(task_id, cmd, args):
+        def _fake_subprocess(task_id, cmd, args, **kwargs):
             assert cmd == "eval"
             return {
                 "success": False,
@@ -304,3 +335,42 @@ class TestEvaluateRuntimeDomNodeCrashRetry:
             assert calls == [True]
         finally:
             _stop_supervisor(sup)
+
+
+class TestSupervisorBindsToOneRecord:
+    """A supervisor serves exactly the session record whose browser it is attached to."""
+
+    @pytest.fixture
+    def registry(self, monkeypatch):
+        import tools.browser_supervisor as bs
+        from tools import browser_tool_cdp as cdp
+
+        registry = MagicMock()
+        monkeypatch.setattr(bs, "SUPERVISOR_REGISTRY", registry)
+        monkeypatch.setattr(cdp, "_get_cdp_override", lambda: "")
+        monkeypatch.setattr(cdp, "_resolve_cdp_override", lambda url: url)
+        return registry
+
+    def test_supervisor_on_the_records_cdp_url_is_bound_to_it(self, registry):
+        from tools import browser_tool_cdp as cdp
+
+        sup = MagicMock()
+        sup.cdp_url = CLOUD_CDP
+        registry.get.return_value = sup
+        assert cdp._supervisor_for_session("t", dict(CLOUD_SESSION)) is sup
+
+    def test_supervisor_on_another_browser_is_not_bound_to_the_record(self, registry):
+        from tools import browser_tool_cdp as cdp
+
+        sup = MagicMock()
+        sup.cdp_url = "wss://old.test/devtools/browser/old"
+        registry.get.return_value = sup
+        assert cdp._supervisor_for_session("t", dict(CLOUD_SESSION)) is None
+
+    def test_local_record_is_never_bound_to_a_leftover_supervisor(self, registry):
+        from tools import browser_tool_cdp as cdp
+
+        sup = MagicMock()
+        sup.cdp_url = CLOUD_CDP
+        registry.get.return_value = sup
+        assert cdp._supervisor_for_session("t", {"session_name": "h_local", "features": {"local": True}}) is None

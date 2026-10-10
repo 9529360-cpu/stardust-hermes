@@ -17,7 +17,7 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Tuple, Union
 from pathlib import Path
 from agent.redact import redact_cdp_url
 from hermes_constants import get_hermes_home, hermes_home_key
@@ -1005,12 +1005,9 @@ def browser_console(clear: bool = False, expression: Optional[str] = None, task_
     """Console messages + uncaught JS errors (optionally ``clear``ing the buffers),
     or — when ``expression`` is given — evaluate JS in the page like the DevTools console."""
     if expression is not None:
-        policy_error = _eval_policy._enforce_browser_eval_policy(expression)
-        if policy_error:
-            refusal = _eval_policy._sensitive_eval_refusal(
-                policy_error, "browser_console", "browser_console_sensitive_eval")
-            if refusal:
-                return _dumps(_err(refusal))
+        refusal = _eval_policy._explicit_eval_refusal(expression)
+        if refusal:
+            return _dumps(_err(refusal))
         return _browser_eval(expression, task_id)
 
     if _is_camofox_mode():
@@ -1068,14 +1065,13 @@ def _eval_result_or_blocked(effective_task_id: str, parsed: Any, result: Dict[st
     return _dumps(_lp._copy_fallback_warning(_eval_ok_response(parsed, **extra), result), default=str)
 
 
-def _eval_supervisor_fast_path(effective_task_id: str, expression: str) -> Optional[str]:
-    """``Runtime.evaluate`` on the CDP supervisor's persistent WebSocket (no subprocess cost).
-    Tool JSON when the supervisor gave a definitive answer (value, blocked page, or a real
-    JS-side exception — NOT retried via subprocess, that would just reproduce it slower);
-    None to fall through to the subprocess path."""
+def _eval_supervisor_fast_path(effective_task_id: str, expression: str, session_info: Dict[str, Any]) -> Optional[str]:
+    """``Runtime.evaluate`` on the CDP supervisor's persistent WebSocket (no subprocess cost), when that supervisor is
+    attached to ``session_info``, the record the policy judged. Tool JSON when the supervisor gave a definitive answer
+    (value, blocked page, or a real JS-side exception — NOT retried via subprocess, that would just reproduce it
+    slower); None to fall through to the subprocess path."""
     try:
-        from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
-        supervisor = SUPERVISOR_REGISTRY.get(_registry_session_key(effective_task_id))
+        supervisor = _cdp._supervisor_for_session(effective_task_id, session_info)
         if supervisor is None:
             return None
         sup_result = supervisor.evaluate_runtime(expression)
@@ -1086,8 +1082,6 @@ def _eval_supervisor_fast_path(effective_task_id: str, expression: str) -> Optio
         if "supervisor" not in err.lower():
             return _dumps(_err(err))
         logger.debug("browser_eval: supervisor path unavailable (%s), falling back to subprocess", err)
-    except ImportError:
-        pass
     except Exception as exc:  # pragma: no cover — defensive
         logger.debug("browser_eval: supervisor path errored (%s), falling back", exc)
     return None
@@ -1110,6 +1104,29 @@ def _eval_failure_response(result: Dict[str, Any]) -> str:
     return json.dumps(_lp._copy_fallback_warning(_err(err), result))
 
 
+def _judged_eval_session(expression: str, task_id: Optional[str], effective_task_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """The record an eval runs on, cleared by the sensitive-data policy for that record. Returns ``(record, None)``, or
+    ``(None, tool JSON)`` when no record can be made or the call is refused. A dead or suspect record is replaced here,
+    before the verdict. An approval can outlast the inactivity timeout, and the reaper may replace the record while the
+    prompt is open, so the record is resolved again once the human has decided: if it changed, the record that now runs
+    is judged too. The approval always covers the record that runs."""
+    session_info, error = _session.command_session(effective_task_id)
+    if error is not None:
+        return None, _eval_failure_response(error)
+    refusal = _eval_policy._eval_refusal(expression, task_id, session_info, "browser_console", "browser_console_sensitive_eval")
+    if refusal is not None:
+        return None, _dumps(_err(refusal))
+    current, error = _session.command_session(effective_task_id)
+    if error is not None:
+        return None, _eval_failure_response(error)
+    if current is session_info:
+        return session_info, None
+    refusal = _eval_policy._eval_refusal(expression, task_id, current, "browser_console", "browser_console_sensitive_eval")
+    if refusal is not None:
+        return None, _dumps(_err(refusal))
+    return current, None
+
+
 def _browser_eval(expression: str, task_id: Optional[str] = None) -> str:
     """Evaluate JS in the page context. Private-network guard in two halves: the literal
     pre-scan closes direct fetches (they never update ``location.href``); the post-eval
@@ -1126,15 +1143,23 @@ def _browser_eval(expression: str, task_id: Optional[str] = None) -> str:
                 "browser mode."
             ))
 
-    # Camofox keeps its own raw-task_id-keyed session map, so pass the raw id.
+    # Camofox keeps its own raw-task_id-keyed session map, so pass the raw id. It has no CLI record to judge: the
+    # policy reaches it only when an attached browser (CDP override or browser control) is configured.
     if _is_camofox_mode():
+        refusal = _eval_policy._eval_refusal(expression, task_id, None, "browser_console", "browser_console_sensitive_eval")
+        if refusal is not None:
+            return _dumps(_err(refusal))
         return _camofox_eval(expression, task_id)
 
-    fast = _eval_supervisor_fast_path(effective_task_id, expression)
+    session_info, refusal = _judged_eval_session(expression, task_id, effective_task_id)
+    if refusal is not None:
+        return refusal
+
+    fast = _eval_supervisor_fast_path(effective_task_id, expression, session_info)
     if fast is not None:
         return fast
 
-    result = _session._run_browser_command(effective_task_id, "eval", [expression])
+    result = _session._run_browser_command(effective_task_id, "eval", [expression], session_info=session_info)
     if not result.get("success"):
         return _eval_failure_response(result)
     return _eval_result_or_blocked(effective_task_id, _parse_eval_value(result.get("data", {}).get("result")), result)

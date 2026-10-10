@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from hermes_cli._subprocess_compat import windows_hide_flags
 from tools.browser_tool_origin import origin as _bt
@@ -603,16 +603,38 @@ def _spawn_and_collect(
     return result
 
 
+def _resolve_command_session(task_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """The session record a command for ``task_id`` runs on, or the error result when none can be made."""
+    try:
+        return _get_session_info(task_id), None
+    except Exception as e:
+        _bt.logger.warning("Failed to create browser session for task=%s: %s", task_id, e)
+        return None, {"success": False, "error": f"Failed to create browser session: {str(e)}"}
+
+
+def command_session(task_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Resolve the record a command for ``task_id`` would run on, after the same preflight ``_run_browser_command``
+    runs. Returns ``(record, None)`` or ``(None, error result)``. A caller that judges the record passes it back as
+    ``session_info``, so the command runs on the record that was judged rather than on whatever the task holds then."""
+    preflight = _browser_command_preflight()
+    if "browser_cmd" not in preflight:
+        return None, preflight
+    return _resolve_command_session(task_id)
+
+
 def _run_browser_command(
     task_id: str,
     command: str,
     args: List[str] = None,
     timeout: Optional[int] = None,
     _engine_override: Optional[str] = None,
+    *,
+    session_info: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Run one agent-browser CLI command against the task's session; returns its parsed JSON.
     ``timeout=None`` reads ``browser.command_timeout``; ``_engine_override`` forces an engine
-    for this call only (Lightpanda fallback retries with Chrome without touching global state)."""
+    for this call only (Lightpanda fallback retries with Chrome without touching global state).
+    ``session_info`` runs the command on a record the caller already resolved with ``command_session``."""
     if timeout is None:
         timeout = _bt._safe_command_timeout()
     args = args or []
@@ -622,11 +644,10 @@ def _run_browser_command(
         return preflight
     browser_cmd = preflight["browser_cmd"]
 
-    try:
-        session_info = _get_session_info(task_id)
-    except Exception as e:
-        _bt.logger.warning("Failed to create browser session for task=%s: %s", task_id, e)
-        return {"success": False, "error": f"Failed to create browser session: {str(e)}"}
+    if session_info is None:
+        session_info, error = _resolve_command_session(task_id)
+        if error is not None:
+            return error
     # Cleanup stops the supervisor before closing the backend; keep it stopped.
     if command != "close" and session_info.get("cdp_url"):
         _cdp._ensure_cdp_supervisor(task_id)
