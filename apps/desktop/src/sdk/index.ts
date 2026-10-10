@@ -57,6 +57,7 @@ import {
   retainGatewayForRelay,
   retireLocalProfileGateways
 } from '@/store/gateway'
+import { revealPaneFromUser } from '@/store/layout'
 import { notify, notifyError } from '@/store/notifications'
 import {
   $activeGatewayProfile,
@@ -1273,7 +1274,8 @@ export const host = {
    *  (`typeof host.paneVisibility === 'function'`). */
   paneVisibility: (paneId: string): ReadableAtom<boolean> => $paneVisible(paneId),
 
-  /** Reveal a contributed pane and its zone from an explicit user action. */
+  /** Reveal a contributed pane and its zone from an explicit user action. Below
+   *  the collapse breakpoint the edge overlay opens the pane as well. */
   revealPane: (paneId: string): void => {
     const id = (paneId ?? '').trim()
 
@@ -1281,7 +1283,7 @@ export const host = {
       return
     }
 
-    revealTreePane(id)
+    revealPaneFromUser(id)
   },
 
   /** HEAR the gateway stream (message deltas, session lifecycle, tool
