@@ -132,6 +132,26 @@ afterEach(() => {
 // all 11 tests (2× in a row on PR #93612, plus a main run the same hour).
 // Give this file headroom; the tests are not slow individually.
 describe('SkillsView toolset management', { timeout: 60_000 }, () => {
+  it('titles the routed Tools page like Tasks, and leaves the embedded copy without a page title', async () => {
+    await renderSkills()
+    expect(screen.getByRole('heading', { name: 'Tools' })).toBeTruthy()
+    cleanup()
+
+    // Bot Mode dialogs mount the same view embedded; the dialog already frames it.
+    await act(async () => {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/skills?tab=toolsets']}>
+            <SkillsView embedded />
+          </MemoryRouter>
+        </QueryClientProvider>
+      )
+    })
+
+    expect(screen.queryByRole('heading', { name: 'Skills' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Tools' })).toBeNull()
+  })
+
   it('renders a switch for each toolset and toggles it off', async () => {
     await renderSkills()
 
