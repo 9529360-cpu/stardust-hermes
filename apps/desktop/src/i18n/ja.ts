@@ -2423,6 +2423,7 @@ export const ja = defineLocale({
       home: 'ホーム',
       autoDiscovered: '自動検出',
       newButton: '新規プロジェクト',
+      emptyTitle: 'プロジェクトはまだありません',
       createTitle: '新規プロジェクト',
       createDesc: 'ワークスペースに名前を付け、1つ以上のフォルダを追加します。',
       renameTitle: 'プロジェクト名を変更',
@@ -3212,11 +3213,13 @@ export const ja = defineLocale({
       smart: 'スマート',
       smartDescription: '必要な場合にのみ確認します',
       off: 'オフ',
-      offDescription: '承認プロンプトなしで実行します'
+      offDescription: '承認プロンプトなしで実行します',
+      unknown: '不明'
     },
     statusbar: {
       toggleApprovalMode: '承認',
       unknown: '不明',
+      reading: '読み込み中',
       restart: '再起動',
       update: '更新',
       updateInProgress: '更新中',

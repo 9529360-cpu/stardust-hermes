@@ -1,10 +1,9 @@
 import { useStore } from '@nanostores/react'
 import { useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 
 import { ConnectionSwitcher } from '@/app/chat/sidebar/connection-switcher'
 import type { CommandCenterSection } from '@/app/command-center'
-import { BOTS_ROUTE, routePathname } from '@/app/routes'
 import { useApprovalModeStatusbarItem } from '@/app/shell/approval-mode-menu'
 import { ContextUsagePanel } from '@/app/shell/context-usage-panel'
 import { GatewayMenuPanel } from '@/app/shell/gateway-menu-panel'
@@ -51,12 +50,7 @@ import {
   idsShareLineage,
   sessionMatchesStoredId
 } from '@/store/session'
-import {
-  $focusedRuntimeId,
-  $focusedSessionIsTile,
-  $focusedSessionState,
-  $focusedStoredSessionId
-} from '@/store/session-states'
+import { $focusedRuntimeId, $focusedSessionState, $focusedStoredSessionId } from '@/store/session-states'
 import { $statusbarHiddenIds } from '@/store/statusbar-prefs'
 import { $subagentsBySession, activeSubagentCount, failedSubagentCount } from '@/store/subagents'
 import { $gatewayRestarting } from '@/store/system-actions'
@@ -115,10 +109,6 @@ export function useStatusbarItems({
   // minimized zone, which lit the button for a pane the user couldn't see.
   const terminalShowing = useStore($paneVisible('terminal'))
   const sessionsShowing = useStore($paneVisible('sessions'))
-  const { pathname } = useLocation()
-  // The roster page keeps its route while a tile takes focus; the tile is the chat on screen then.
-  const focusedTile = useStore($focusedSessionIsTile)
-  const botsShowing = routePathname(pathname) === BOTS_ROUTE && !focusedTile
   const primaryBusy = useStore($busy)
   // Draft / primary composer atom — used only while the focused surface is the
   // primary (or a draft with no runtime slice yet). A focused TILE keeps its
@@ -302,7 +292,7 @@ export function useStatusbarItems({
   const cacheHit = cacheHitLabel(currentUsage)
   const tokensPerSecond = tokensPerSecondLabel(currentUsage)
 
-  const approvalModeItem = useApprovalModeStatusbarItem(activeGatewayProfile, requestGateway)
+  const approvalModeItem = useApprovalModeStatusbarItem(activeGatewayProfile, requestGateway, gatewayState === 'open')
   const systemResourcesItem = useSystemResourcesStatusbarItem()
 
   const gatewayMenuContent = useMemo(
@@ -451,7 +441,6 @@ export function useStatusbarItems({
       {
         className: gatewayRestarting ? undefined : gatewayClassName,
         detail: gatewayRestarting ? copy.gatewayRestarting : gatewayDetail,
-        hidden: botsShowing,
         icon: gatewayRestarting ? (
           <GlyphSpinner ariaLabel={copy.gatewayRestarting} className="size-3" />
         ) : inferenceReady ? (
@@ -547,7 +536,6 @@ export function useStatusbarItems({
     ],
     [
       agentsOpen,
-      botsShowing,
       commandCenterOpen,
       copy,
       currentCwd,
@@ -582,10 +570,11 @@ export function useStatusbarItems({
       },
       {
         detail: contextBar || undefined,
-        // Never self-hide: an enabled item with no measured context yet must
-        // render a waiting placeholder, not vanish from the bottom bar.
+        // A readout with no value is not rendered. While its breakdown is still
+        // being read it shows the reading label instead of a dash.
+        hidden: !contextUsage && !contextBreakdownLoading,
         id: 'context-usage',
-        label: contextUsage || '—',
+        label: contextUsage || (contextBreakdownLoading ? copy.reading : undefined),
         menuAlign: 'end',
         menuClassName: 'w-auto border-(--ui-stroke-secondary) p-0',
         menuContent: (
@@ -600,19 +589,19 @@ export function useStatusbarItems({
         variant: 'menu'
       },
       {
+        hidden: !cacheHit,
         icon: <Layers3 className="size-3" />,
         id: 'cache-hit-rate',
-        // Same never-self-hide rule as the context meter: opted in means a
-        // placeholder until the first cached turn reports, not a vanished item.
-        label: cacheHit || '—',
+        label: cacheHit,
         title: copy.cacheHitRateTitle,
         toggleLabel: copy.toggleCacheHitRate,
         variant: 'text'
       },
       {
+        hidden: !tokensPerSecond,
         icon: <Zap className="size-3" />,
         id: 'tokens-per-second',
-        label: tokensPerSecond || '—',
+        label: tokensPerSecond,
         title: copy.tokensPerSecondTitle,
         toggleLabel: copy.toggleTokensPerSecond,
         variant: 'text'

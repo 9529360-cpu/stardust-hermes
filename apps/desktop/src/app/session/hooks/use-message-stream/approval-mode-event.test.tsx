@@ -40,7 +40,7 @@ describe('live session.info approval mode reconciliation', () => {
     )
 
     expect(approvalModeForProfile('work')).toBe('off')
-    expect(approvalModeForProfile('default')).toBe('smart')
+    expect(approvalModeForProfile('default')).toBeUndefined()
     expect($approvalRequests.get()[ACTIVE_SID]).toBeUndefined()
   })
 
@@ -74,7 +74,7 @@ describe('live session.info approval mode reconciliation', () => {
       })
     )
 
-    expect(approvalModeForProfile('work')).toBe('smart')
+    expect(approvalModeForProfile('work')).toBeUndefined()
   })
 
   it('does not cache an event under a different active profile when its source profile is absent', () => {
@@ -83,7 +83,7 @@ describe('live session.info approval mode reconciliation', () => {
 
     act(() => stream.handleEvent({ payload: { approval_mode: 'off' }, session_id: ACTIVE_SID, type: 'session.info' }))
 
-    expect(approvalModeForProfile('personal')).toBe('smart')
-    expect(approvalModeForProfile('work')).toBe('smart')
+    expect(approvalModeForProfile('personal')).toBeUndefined()
+    expect(approvalModeForProfile('work')).toBeUndefined()
   })
 })

@@ -1,13 +1,16 @@
 import { atom } from 'nanostores'
 
 export type ApprovalMode = 'manual' | 'off' | 'smart'
+/** What the cache can say about a profile. A profile with no entry is still loading;
+ *  `unknown` means a read or write failed and no mode was ever confirmed for it. */
+export type ApprovalModeReading = ApprovalMode | 'unknown'
 export type ApprovalModeRequester = (method: string, params?: Record<string, unknown>) => Promise<unknown>
 
 const APPROVAL_MODES = new Set<ApprovalMode>(['manual', 'smart', 'off'])
 const revisions = new Map<string, number>()
 const confirmedModes = new Map<string, ApprovalMode>()
 
-export const $approvalModes = atom<Record<string, ApprovalMode>>({})
+export const $approvalModes = atom<Record<string, ApprovalModeReading>>({})
 
 function profileKey(profile: string): string {
   return profile.trim() || 'default'
@@ -20,26 +23,40 @@ function nextRevision(profile: string): number {
   return revision
 }
 
-function normalizeApprovalMode(value: unknown): ApprovalMode {
+/** Null when the value is not a mode the backend can mean. Never a default: an
+ *  unreadable value must not be shown as one of the modes. */
+function parseApprovalMode(value: unknown): ApprovalMode | null {
   const normalized = String(value ?? '')
     .trim()
-    .toLowerCase() as ApprovalMode
+    .toLowerCase()
 
-  return APPROVAL_MODES.has(normalized) ? normalized : 'manual'
+  return APPROVAL_MODES.has(normalized as ApprovalMode) ? (normalized as ApprovalMode) : null
 }
 
-export function approvalModeForProfile(profile: string): ApprovalMode {
-  return $approvalModes.get()[profileKey(profile)] ?? 'smart'
+export function approvalModeForProfile(profile: string): ApprovalModeReading | undefined {
+  return $approvalModes.get()[profileKey(profile)]
 }
 
-function cacheApprovalMode(profile: string, mode: ApprovalMode): void {
+function cacheApprovalMode(profile: string, reading: ApprovalModeReading): void {
   const key = profileKey(profile)
-  $approvalModes.set({ ...$approvalModes.get(), [key]: mode })
+  $approvalModes.set({ ...$approvalModes.get(), [key]: reading })
 }
 
-export function reconcileApprovalModeForProfile(profile: string, value: unknown): ApprovalMode {
+/** A failed read or write keeps the last mode the backend confirmed. With none, the
+ *  profile is unknown rather than shown as a default. */
+function cacheUnconfirmed(profile: string): void {
+  cacheApprovalMode(profile, confirmedModes.get(profileKey(profile)) ?? 'unknown')
+}
+
+/** A backend event that does not name a mode says nothing about it, so it is ignored. */
+export function reconcileApprovalModeForProfile(profile: string, value: unknown): ApprovalMode | undefined {
   const key = profileKey(profile)
-  const mode = normalizeApprovalMode(value)
+  const mode = parseApprovalMode(value)
+
+  if (!mode) {
+    return undefined
+  }
+
   nextRevision(key)
   confirmedModes.set(key, mode)
   cacheApprovalMode(key, mode)
@@ -53,15 +70,28 @@ export async function syncApprovalModeForProfile(
 ): Promise<ApprovalMode> {
   const key = profileKey(profile)
   const revision = nextRevision(key)
-  const result = (await requestGateway('config.get', { key: 'approvals.mode' })) as { value?: string }
-  const mode = normalizeApprovalMode(result?.value)
 
-  if (revisions.get(key) === revision) {
-    confirmedModes.set(key, mode)
-    cacheApprovalMode(key, mode)
+  try {
+    const result = (await requestGateway('config.get', { key: 'approvals.mode' })) as { value?: unknown } | undefined
+    const mode = parseApprovalMode(result?.value)
+
+    if (!mode) {
+      throw new Error('approvals.mode could not be read')
+    }
+
+    if (revisions.get(key) === revision) {
+      confirmedModes.set(key, mode)
+      cacheApprovalMode(key, mode)
+    }
+
+    return mode
+  } catch (error) {
+    if (revisions.get(key) === revision) {
+      cacheUnconfirmed(key)
+    }
+
+    throw error
   }
-
-  return mode
 }
 
 export async function setApprovalModeForProfile(
@@ -77,9 +107,10 @@ export async function setApprovalModeForProfile(
     const result = (await requestGateway('config.set', {
       key: 'approvals.mode',
       value: mode
-    })) as { value?: string }
+    })) as { value?: unknown } | undefined
 
-    const authoritative = normalizeApprovalMode(result?.value)
+    // An accepted write that echoes no mode confirms the one the user chose.
+    const authoritative = parseApprovalMode(result?.value) ?? mode
 
     if (revisions.get(key) === revision) {
       confirmedModes.set(key, authoritative)
@@ -89,7 +120,7 @@ export async function setApprovalModeForProfile(
     return authoritative
   } catch (error) {
     if (revisions.get(key) === revision) {
-      cacheApprovalMode(key, confirmedModes.get(key) ?? 'smart')
+      cacheUnconfirmed(key)
     }
 
     throw error

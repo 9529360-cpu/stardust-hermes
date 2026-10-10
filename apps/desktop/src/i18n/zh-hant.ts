@@ -2662,6 +2662,7 @@ export const zhHant = defineLocale({
       home: '主頁',
       autoDiscovered: '自動探索',
       newButton: '新增專案',
+      emptyTitle: '尚無專案',
       createTitle: '新增專案',
       createDesc: '為工作區命名並新增一個或多個資料夾。',
       renameTitle: '重新命名專案',
@@ -3425,11 +3426,13 @@ export const zhHant = defineLocale({
       smart: '智慧',
       smartDescription: '自動評估操作，並在需要時詢問',
       off: '關閉',
-      offDescription: '不顯示核准提示，直接執行'
+      offDescription: '不顯示核准提示，直接執行',
+      unknown: '未知'
     },
     statusbar: {
       toggleApprovalMode: '核准',
       unknown: '未知',
+      reading: '讀取中',
       restart: '重新啟動',
       update: '更新',
       updateInProgress: '更新中',
