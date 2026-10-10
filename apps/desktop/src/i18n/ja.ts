@@ -3080,6 +3080,7 @@ export const ja = defineLocale({
       offDescription: '承認プロンプトなしで実行します'
     },
     statusbar: {
+      toggleApprovalMode: '承認',
       unknown: '不明',
       restart: '再起動',
       update: '更新',

@@ -65,6 +65,17 @@ describe('approval mode statusbar item', () => {
     })
   })
 
+  it('names the approvals subject on the bar and shows the mode beside it', () => {
+    // A bare "Off" on the bar read as a close action; the subject says what it controls.
+    $approvalModes.set({ default: 'off' })
+    render(<Harness requestGateway={vi.fn(() => new Promise<never>(() => undefined))} />)
+
+    const trigger = screen.getByRole('button', { name: /Approvals/ })
+
+    expect(within(trigger).getByText('Approvals')).toBeTruthy()
+    expect(within(trigger).getByText('Off')).toBeTruthy()
+  })
+
   it('renders the shared trigger and menu in the active locale', async () => {
     const response = new Promise<never>(() => undefined)
     render(
@@ -73,7 +84,7 @@ describe('approval mode statusbar item', () => {
       </I18nProvider>
     )
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'スマート' }), { button: 0 })
+    fireEvent.pointerDown(screen.getByRole('button', { name: /スマート/ }), { button: 0 })
 
     expect(await screen.findByText('必要な場合にのみ確認します')).toBeTruthy()
     expect(screen.getByText('承認プロンプトなしで実行します')).toBeTruthy()
