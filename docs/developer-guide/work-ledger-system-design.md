@@ -2,7 +2,7 @@
 
 > 本文取代 2026-10-10 的初稿。第 1 至 3 节描述本分支已经实现的内容，与代码一一对应。第 4 节是尚未实现的计划，其中的文件路径是拟定的，仓库里可能还不存在。
 >
-> **范围（2026-10-10 更新）：本分支只包含后端。** 桌面端的“后台工作”区块已经移除。原因：工作区概览面板已在提交 `69ef54d60b`（2026-10-06，token 缓存用量移到底栏）中退役，该区块从未挂载；而 composer 里的子代理列表已经显示同一批运行中的子代理，`subagent.list` 与 `work.list` 使用同一个后端函数 `_owned_subagent_records`。再加一个区块只会重复轮询，不会多出任何内容。
+> **范围（2026-10-10 更新）：** 工作区概览面板已在提交 `69ef54d60b`（2026-10-06，token 缓存用量移到底栏）中退役，所以原先的“后台工作”区块从未挂载，已经从本分支移除。子代理仍由 composer 的子代理列表显示。本分支新增两件事：后端只读的 profile 级 `cron.executions.list`（授权沿用 cron.manage list），以及 composer 子代理列表里对运行中定时任务的只读展示（见 1.3 与 1.4）。
 
 ## 1. 已实现的部分
 
@@ -30,19 +30,39 @@
 - `tui_gateway/contracts/work.py`：`WorkItem.kind` 增加 `cron`。
 - `apps/shared/src/gateway-contract.generated.ts` 与 `gateway-contract.openrpc.json` 由 `scripts/gen_gateway_contracts.py` 生成。`tests/tui_gateway/contracts/test_generated.py` 会在它们过期时失败。
 
-### 1.3 授权边界（不变，也不得放宽）
+### 1.3 授权边界
 
 - 公开 RPC `work.list`（`tui_gateway/methods_work.py::_work_list`）只返回当前 session、transport、generation 能证明归属的**活动子代理**。它调用 `subagent_work()`，**不调用** `list_work()`。
 - 因此 cron 历史目前**不会**出现在界面里。`kind = cron` 是内部台账和协议的能力，并不代表 `work.list` 会返回 cron 项。
 - `work.cancel` 对非子代理的 ID 返回错误 4001（无授权）。
 
-### 1.4 子代理列表（已有，本分支未改动）
+**profile 级只读视图 `cron.executions.list`（已决定，后端已实现）**
 
-用户在 composer 中看到的运行中子代理，来自 `apps/desktop/src/app/chat/composer/status-stack/subagent-section.tsx`：
+- 授权与现有的 `cron.manage` list 完全相同：都经 `_scoped_rpc`（`tui_gateway/methods_tools.py`）解析 `profile`。未知 profile 返回 4064，函数体在该 profile 的 HERMES_HOME 下执行。它不要求 session、transport 或 generation 证明，因为数据不属于某个会话，而是 profile 自己的定时任务历史。能读到 cron.manage list 的调用方才能读到它，它不授予任何新权限。
+- 只读：没有新增、修改、暂停、删除或取消。定时任务派发后不可取消，`work.cancel` 对 cron 项的行为不变。
+- 数据最小化：只返回白名单字段（work item 的 id、kind、title、status、started_at、updated_at，以及 detail 中的 job_id、source、delivery_outcome、error）。error 经 `redact_sensitive_text(force=True)` 脱敏。不返回提示词、投递目标、pid、process_id、输出或密钥。
+- 数量：limit 默认 20，夹在 1 到 50 之间，按时间倒序。
+- 响应中的 `scoped` 回显函数体实际运行所在的 profile；启动 profile 为空字符串。客户端发现不一致时应放弃结果。
+- 后台进程不做 profile 级列表：`process.list` 是按会话限定的（live_session），保持不变。
+
+### 1.4 composer 子代理列表（子代理部分原有；定时任务为新增的只读行）
+
+composer 的子代理列表位于 `apps/desktop/src/app/chat/composer/status-stack/subagent-section.tsx`。
+
+子代理部分（原有，未改动）：
 
 - 数据来自 `use-subagent-snapshot.ts`：每 5 秒、以及窗口重新获得焦点时，调用 `subagent.list` 拉取快照；实时事件优先于快照。
 - 每个子代理可以展开，发送转向消息（`subagent.steer`），或请求停止（`subagent.interrupt`）。
 - `subagent.list` 与 `work.list` 都调用 `_owned_subagent_records(session_id, transport, owner)`，因此返回的是同一批子代理。
+
+定时任务部分（新增，只读）：
+
+- `use-running-cron-runs.ts` 调用 `cron.executions.list`，参数为 `{ profile, limit: 20 }`。profile 取当前活动连接的 profile；启动 profile 发送空字符串，与 cron.manage 的约定一致。
+- 只显示 `status === 'running'` 的运行记录，每行是标题加“定时任务”标签，没有停止、转向或详情控件。
+- 每 5 秒刷新一次，窗口获得焦点时也刷新；连续失败 3 次后停止轮询，失败期间不显示任何定时任务行。
+- 响应里的 `scoped` 与请求的 profile 不一致时，整个响应丢弃。
+- 会话本身没有记录所属的 profile，这里用的是当前活动连接的 profile，这是一个已知的近似。
+- 没有子代理、只有定时任务在运行时，区块同样显示；标题计数改为“后台任务”的总数。
 
 ### 1.5 测试
 
@@ -103,6 +123,7 @@ classDiagram
 ```mermaid
 sequenceDiagram
     participant Roster as composer subagent roster
+    participant CronRpc as cron.executions.list
     participant SubList as subagent.list
     participant Owned as _owned_subagent_records
     participant WorkRpc as work.list
@@ -115,6 +136,12 @@ sequenceDiagram
         Owned-->>SubList: live subagent records
         SubList-->>Roster: subagents
     end
+    loop every 5 s while the composer is mounted
+        Roster->>CronRpc: cron.executions.list(profile, limit)
+        CronRpc->>Ledger: cron_work_items(limit) under the profile scope
+        Ledger-->>CronRpc: recent runs
+        CronRpc-->>Roster: work and scoped (only running runs with a matching scope are shown)
+    end
     WorkRpc->>Owned: same helper, subagent items only
     Note over Ledger,Cron: No RPC calls list_work() yet
     Ledger->>Cron: list_executions(limit=100) and list_jobs(include_disabled=True)
@@ -126,9 +153,9 @@ sequenceDiagram
 
 以下内容都没有合入本分支。文件路径是拟定的。
 
-### 4.1 profile 级 cron 与后台进程的只读视图
+### 4.1 已实现
 
-这是“后台工作”里真正能多出来的内容。展示它们必须新增**独立且显式授权**的只读 RPC，不能通过放宽 `work.list` 的授权检查来实现。授权策略需要主理人确认（见第 5 节）。
+profile 级定时任务的只读 RPC 和 composer 中的只读展示都已实现，见 1.3 与 1.4。后台进程仍只按会话限定，不做 profile 级列表。
 
 ### 4.2 Gap #7：自然语言创建例程
 
@@ -150,7 +177,7 @@ T01 接口与契约 → T02 解析与 dry-run → T03 台账与 cron 取消 → 
 
 ## 5. 待明确事项
 
-1. 桌面端是否允许查看 profile 级 cron 执行历史和后台进程？这需要新的、显式授权的只读 RPC，授权策略待主理人确认。
+1. （已决定）profile 级定时任务执行历史的读取授权沿用 cron.manage list，见 1.3。后台进程仍只按会话限定，不做 profile 级列表。
 2. cron 执行能否安全取消，取决于 runner 的归属与执行阶段。目前统一返回 `unavailable`。
 3. dry-run 的确认令牌或提案哈希，如何与现有的 agent 提案机制对齐？
 4. deliver target 的唯一性规则，以及候选项的展示格式。
