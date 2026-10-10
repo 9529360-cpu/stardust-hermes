@@ -629,7 +629,15 @@ if (IS_WINDOWS) {
     )
   }
 
-  writeSandboxMarker(windowsUserData, sandboxDecision.nextMarker)
+  // Some managed test/user-data directories disallow writes even though they
+  // can be read. The marker improves crash recovery across launches, but a
+  // failed marker write must not turn an otherwise usable desktop into an
+  // uncaught main-process exception.
+  try {
+    writeSandboxMarker(windowsUserData, sandboxDecision.nextMarker)
+  } catch (error) {
+    console.warn(`[hermes] Windows sandbox recovery marker unavailable: ${error}`)
+  }
 
   // Catch the first GPU breakpoint death and relaunch before Chromium's
   // "GPU process isn't usable" FATAL abort ends the process with no recovery.
