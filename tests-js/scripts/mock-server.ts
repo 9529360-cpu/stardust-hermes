@@ -33,6 +33,8 @@ export const MOCK_REPLY = 'Hello from the mock inference server! The full boot c
 export interface MockServerOptions {
   /** Choose distinct replies from the latest input without replaying history. */
   replyForPrompt?: (prompt: string) => string
+  /** Reasoning to stream ahead of the reply for a prompt, so the thinking row has a live block to show. */
+  reasoningForPrompt?: (prompt: string) => string | undefined
 
   /** Pause the matching stream after its first token for session-switch E2E coverage. */
   holdFirstStreamForPrompt?: string
@@ -764,7 +766,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
               resolveHeldStreamStarted?.()
 
               return heldStreamReleased
-            } : undefined)
+            } : undefined, options.reasoningForPrompt?.(userText))
           } else {
             if (holdThisCompletion) {
               heldCompletionCount++
@@ -849,6 +851,7 @@ function streamTextResponse(
   model: string,
   text: string,
   waitForRelease?: () => Promise<void>,
+  reasoning?: string,
 ): void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -856,11 +859,29 @@ function streamTextResponse(
     Connection: 'keep-alive',
   })
 
+  // Reasoning goes first, four characters a chunk and slowly enough that a live
+  // thinking row shows a running timer before the reply starts.
+  const thinking: string[] = []
+  const reasoningCharacters = Array.from(reasoning ?? '')
+
+  for (let index = 0; index < reasoningCharacters.length; index += 4) {
+    thinking.push(reasoningCharacters.slice(index, index + 4).join(''))
+  }
+
+  let thoughtIndex = 0
   const words = text.split(' ')
   let i = 0
 
   const sendChunk = (): void => {
     if (res.destroyed) {
+      return
+    }
+
+    if (thoughtIndex < thinking.length) {
+      res.write(sseChunk(model, { reasoning_content: thinking[thoughtIndex] }))
+      thoughtIndex++
+      setTimeout(sendChunk, 150)
+
       return
     }
 

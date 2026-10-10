@@ -1,4 +1,6 @@
+import { translateNow } from '@/i18n'
 import { isArtifactFilePath, mediaExternalUrl, resolveMediaDisplaySrc } from '@/lib/media'
+import { sessionDisplayTitle } from '@/lib/session-title'
 import type { SessionInfo, SessionMessage } from '@/types/hermes'
 
 export type ArtifactKind = 'image' | 'file' | 'link'
@@ -52,7 +54,7 @@ const PRODUCER_TOOL_ARTIFACT_KEY_RE =
 const SCREENSHOT_PATH_RE = /Screenshot path:\s*([^\r\n<>]+)/gi
 
 function artifactSessionTitle(session: SessionInfo): string {
-  return session.title?.trim() || session.preview?.trim() || 'Untitled session'
+  return sessionDisplayTitle(session, translateNow('sidebar.row.untitledPlaceholder'))
 }
 
 function normalizeValue(value: string): string {

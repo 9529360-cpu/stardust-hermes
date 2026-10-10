@@ -3705,6 +3705,9 @@ export interface Translations {
       thought: string
       thoughtBriefly: string
       thoughtFor: (duration: string) => string
+      durationSeconds: (seconds: number) => string
+      durationMinutes: (minutes: number, seconds: number) => string
+      durationHours: (hours: number, minutes: number) => string
       turnDuration: (duration: string) => string
       today: (time: string) => string
       yesterday: (time: string) => string

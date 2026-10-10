@@ -1,5 +1,7 @@
 """Tests for agent.title_generator — auto-generated session titles."""
 
+import logging
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -293,6 +295,22 @@ class TestAutoTitleSession:
 
 class TestMaybeAutoTitle:
     """Tests for maybe_auto_title() — the fire-and-forget entry point."""
+
+    def test_disabled_title_model_skip_is_logged_at_info(self, caplog):
+        """A disabled title model is the usual reason a session stays blank. The skip must show in
+        agent.log at INFO, not be hidden at DEBUG where nobody looks."""
+        db = MagicMock()
+        db.get_session_title.return_value = None
+
+        with patch("agent.title_generator._auto_title_enabled", return_value=False):
+            with patch("agent.title_generator.auto_title_session") as mock_auto:
+                with caplog.at_level(logging.DEBUG, logger="agent.title_generator"):
+                    maybe_auto_title(db, "sess-1", "hello", [{"role": "user", "content": "hello"}])
+
+        mock_auto.assert_not_called()
+        skips = [r for r in caplog.records if "auxiliary.title_generation.enabled=false" in r.getMessage()]
+        assert skips, "the disabled skip was not logged"
+        assert all(r.levelno == logging.INFO for r in skips)
 
     def test_skips_if_not_first_exchange(self):
         """Should not fire once the conversation is past its opening turn."""

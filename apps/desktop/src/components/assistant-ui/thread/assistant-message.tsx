@@ -26,11 +26,11 @@ import { MessageTimelineTimestamp } from '@/components/assistant-ui/thread/timel
 import { useMessageReactions, useTapbackDoubleClick } from '@/components/assistant-ui/thread/use-message-reactions'
 import { AGENT_MESSAGE_RE } from '@/components/assistant-ui/thread/user-message'
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button'
-import { formatElapsed } from '@/components/chat/activity-timer'
 import { PreviewAttachment } from '@/components/chat/preview-attachment'
 import { Codicon } from '@/components/ui/codicon'
 import { CopyButton } from '@/components/ui/copy-button'
 import { useI18n } from '@/i18n'
+import { formatDurationLabel } from '@/lib/duration-label'
 import { errorRecoveryPlan, type ErrorSurface, formatErrorDiagnostics } from '@/lib/error-surface'
 import { errorCardText } from '@/lib/error-surface-copy'
 import { triggerHaptic } from '@/lib/haptics'
@@ -91,7 +91,7 @@ const TurnActivitySummary: FC<{
   open: boolean
 }> = ({ durationS, onToggle, open }) => {
   const { t } = useI18n()
-  const duration = durationS === undefined ? null : formatElapsed(durationS)
+  const duration = durationS === undefined ? null : formatDurationLabel(durationS, t.assistant.thread)
 
   return (
     <button
@@ -783,9 +783,9 @@ const AssistantActionBar: FC<MessageActionProps & { durationS?: number }> = ({
         <span
           className="mr-auto select-none px-0.5 text-[0.6875rem] leading-5 tabular-nums text-muted-foreground"
           data-slot="aui_turn-duration"
-          title={t.assistant.thread.turnDuration(formatElapsed(durationS))}
+          title={t.assistant.thread.turnDuration(formatDurationLabel(durationS, t.assistant.thread))}
         >
-          ⏱ {formatElapsed(durationS)}
+          ⏱ {formatDurationLabel(durationS, t.assistant.thread)}
         </span>
       )}
       <ActionBarPrimitive.Root

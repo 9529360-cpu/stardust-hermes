@@ -16,12 +16,13 @@ import { AgentDeliveryNotice, deliveryTargetFromCommand } from '@/components/ass
 import { TimelineTimestamp } from '@/components/assistant-ui/thread/timeline-timestamp'
 import { DelegateTool } from '@/components/assistant-ui/tool/delegate'
 import { ToolFallback, ToolGroupSlot } from '@/components/assistant-ui/tool/fallback'
-import { formatElapsed, useElapsedSeconds, useMeasuredDuration } from '@/components/chat/activity-timer'
+import { reasoningSeconds, useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { GeneratedImage } from '@/components/chat/generated-image-result'
 import { SCAFFOLD_LABEL_CLASS, SCAFFOLD_META_CLASS, ScaffoldRow } from '@/components/chat/scaffold-row'
 import { useI18n } from '@/i18n'
 import { connectorCalls, mcpTargets } from '@/lib/connector-tools'
+import { formatDurationLabel } from '@/lib/duration-label'
 import { generatedImageFromResult } from '@/lib/generated-images'
 import { separateGluedReasoningBlocks } from '@/lib/reasoning-blocks'
 import { isTodoToolName } from '@/lib/todos'
@@ -149,8 +150,7 @@ const ThinkingDisclosure: FC<{
   messageRunning?: boolean
   pending?: boolean
   timestamp?: number
-  // Required: the block's duration is remembered against this key, so a
-  // component that mounts after the block finished can still report it.
+  // Keys the live timer, so a remount keeps counting from the same origin.
   timerKey: string
 }> = ({ children, completedAt, messageRunning = false, pending = false, timestamp, timerKey }) => {
   const { t } = useI18n()
@@ -158,8 +158,13 @@ const ThinkingDisclosure: FC<{
   // `null` = no explicit user toggle yet. Live reasoning remains visible by
   // default, unless the user opts into the low-jitter collapsed presentation.
   const [userOpen, setUserOpen] = useState<boolean | null>(null)
-  const elapsed = useElapsedSeconds(pending, timerKey)
-  const thoughtFor = useMeasuredDuration(pending, timerKey)
+  // The live timer starts at the block's first delta, not at mount, so a block
+  // that mounts late still counts from when the model began thinking.
+  const elapsed = useElapsedSeconds(pending, timerKey, timestamp === undefined ? undefined : timestamp * 1000)
+  // A finished block reads its span from the timeline the stream stamped on it,
+  // not from a registry keyed by message id: a settled turn is re-keyed when it
+  // is rehydrated, and that registry lost the duration with the old key.
+  const thoughtFor = pending ? null : reasoningSeconds(timestamp, completedAt)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const enterRef = useEnterAnimation(messageRunning, timerKey)
@@ -179,11 +184,11 @@ const ThinkingDisclosure: FC<{
   const open = userOpen ?? showPreview
   const isPreview = userOpen === null && showPreview
 
-  // Three ways a finished block can report itself. With a measured duration it
-  // says so, unless the timer's whole seconds round it to "0s" — accurate and
-  // useless — in which case it just says it was quick. With no duration at all
-  // it still has to read as finished; a turn that ended must not go on saying
-  // "Thinking".
+  // Three ways a finished block can report itself. With a span it says how long
+  // (whole seconds), unless that is under a second — accurate and useless — in
+  // which case it just says it was quick. With no span at all (history reloaded
+  // from the backend, which keeps no timing) it still has to read as finished;
+  // a turn that ended must not go on saying "Thinking".
   let thoughtLabel = t.assistant.thread.thinking
 
   if (!pending) {
@@ -192,7 +197,7 @@ const ThinkingDisclosure: FC<{
     } else if (thoughtFor < 1) {
       thoughtLabel = t.assistant.thread.thoughtBriefly
     } else {
-      thoughtLabel = t.assistant.thread.thoughtFor(formatElapsed(thoughtFor))
+      thoughtLabel = t.assistant.thread.thoughtFor(formatDurationLabel(thoughtFor, t.assistant.thread))
     }
   }
 
