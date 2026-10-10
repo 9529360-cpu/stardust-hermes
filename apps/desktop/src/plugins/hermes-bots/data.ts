@@ -49,6 +49,46 @@ const migratedLocalRoutes = new Map<string, ProfileRoute>()
 /** Live roster snapshot for imperative handlers (context menus). */
 export const $lastRoster = atom<RosterRow[]>([])
 
+/** Fold a Bot Chat open's result into the roster snapshot. The snapshot only
+ *  refreshes while the roster page is mounted, so a chat created after that
+ *  fetch is missing from `canonical_session` — and every reader of that field
+ *  (the empty-chat state, the /new guard, the Routines owner, the row preview)
+ *  would treat the bot as chatless until the page reopens. The open just
+ *  resolved the registry row, so write that answer back. A no-op returns the
+ *  same array, so subscribers never re-render for nothing. */
+export function recordOpenedCanonicalChat(key: string, opened: { openedId: string; registryId: string }): void {
+  let changed = false
+
+  const next = $lastRoster.get().map(row => {
+    if (botRosterKey(row) !== key) {
+      return row
+    }
+
+    const current = row.canonical_session
+
+    if (current?.id === opened.registryId && current?.resolved_id === opened.openedId) {
+      return row
+    }
+
+    changed = true
+
+    return {
+      ...row,
+      // Keep the registry row's own fields (preview, last_active) only while it
+      // is still the same row; a different row has nothing to inherit.
+      canonical_session: {
+        ...(current?.id === opened.registryId ? current : {}),
+        id: opened.registryId,
+        resolved_id: opened.openedId
+      }
+    }
+  })
+
+  if (changed) {
+    $lastRoster.set(next)
+  }
+}
+
 // ── needs-attention badge (#93091 item 3) ───────────────────────────────────
 // Attention-worthy failure classes — matches the #93091 item-1 reason-code
 // enum (shipped separately). Until reason codes flow end-to-end,

@@ -4,15 +4,16 @@
  * Core's splash is Hermes' own wordmark and belongs to a fresh draft; a bot
  * chat is neither. It gets the same lettering with the bot's name in it, over
  * the same face the roster row and tab carry, so an empty conversation still
- * says whose it is.
+ * says whose it is. A greeting and a few starter prompts sit under the name.
+ * A starter only fills the composer: the user reads it and sends it themselves.
  */
 
-import { host, useValue, Wordmark } from '@hermes/plugin-sdk'
+import { Button, host, useValue, Wordmark } from '@hermes/plugin-sdk'
 
 import { avatarColor, botAppearance, BotFace } from './avatar'
 import { isBackfilledFacePng } from './avatar-image'
 import { $botMeta, $lastRoster } from './data'
-import { useBots } from './i18n'
+import { type BotsText, useBots } from './i18n'
 import { displayName } from './labels'
 import { botRosterMeta } from './routing'
 import type { RosterRow } from './types'
@@ -54,6 +55,11 @@ function botForChat(roster: readonly RosterRow[], sessionId: string): null | Ros
   return botForStoredId(roster, sessionId) ?? botForStoredId(roster, focusedStoredId())
 }
 
+/** The starter prompts, in display order. Each is a localized user line. */
+function starterPrompts(b: BotsText): string[] {
+  return [b.bot.starterIntro, b.bot.starterPlan, b.bot.starterSteps]
+}
+
 export function BotChatEmpty({ sessionId }: { sessionId: string }) {
   const b = useBots()
   // Subscribed, not read once: roster, metadata and focus all land after the
@@ -83,11 +89,10 @@ export function BotChatEmpty({ sessionId }: { sessionId: string }) {
     <div
       className="pointer-events-none flex w-full min-w-0 flex-col items-center justify-center px-0.5 py-6 text-center text-muted-foreground sm:px-6 lg:px-8"
       data-slot="bot_chat_empty"
-      // The name reads as the title of the chat, so it — not the stack as a
-      // whole — is what should sit on the optical center line. Lifting the
-      // stack by half the face's block does exactly that: the face hangs above
-      // the line and the text lands on it, the same balance the splash strikes
-      // with nothing above its lettering.
+      // Lifted by half the face's block so the face and name sit near the
+      // optical centre, the balance the splash strikes with nothing above its
+      // lettering. The greeting and starters hang below the name; they pull the
+      // group's centre down a little, which is accepted rather than compensated.
       style={{ transform: `translateY(-${FACE_BLOCK / 2}px)` }}
     >
       <div className="w-full min-w-0">
@@ -105,6 +110,17 @@ export function BotChatEmpty({ sessionId }: { sessionId: string }) {
         <Wordmark className="mb-1" text={name} width="calc(80% - 1rem)" />
 
         <p className="m-0 text-center leading-normal tracking-tight">{b.bot.chatEmpty}</p>
+
+        <div
+          className="pointer-events-auto mx-auto mt-4 flex max-w-md flex-wrap justify-center gap-2"
+          data-slot="bot_chat_starters"
+        >
+          {starterPrompts(b).map(prompt => (
+            <Button key={prompt} onClick={() => host.fillComposer(prompt)} size="sm" variant="outline">
+              {prompt}
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   )

@@ -488,6 +488,7 @@ export function BotsPane() {
       })}
       {renderRosterContent({
         b,
+        onCreateBot: () => setCreateOpen(true),
         staleNotice,
         isLoading,
         initialRosterLoading,

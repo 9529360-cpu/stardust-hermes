@@ -11,6 +11,8 @@ import type { RosterRow } from './types'
 
 interface RosterContentProps {
   b: ReturnType<typeof useBots>
+  /** Opens the new-bot dialog from the empty roster's own action. */
+  onCreateBot: () => void
   staleNotice: string | number | null
   isLoading: boolean
   initialRosterLoading: boolean
@@ -42,6 +44,7 @@ interface RosterContentProps {
 
 export function renderRosterContent({
   b,
+  onCreateBot,
   staleNotice,
   isLoading,
   initialRosterLoading,
@@ -93,7 +96,16 @@ export function renderRosterContent({
           </Button>
         </div>
       ) : roster.length === 0 ? (
-        <PanelEmpty description={b.roster.emptyDesc} icon="hubot" title={b.roster.emptyTitle} />
+        <PanelEmpty
+          action={
+            <Button onClick={onCreateBot} size="sm" variant="default">
+              {b.bot.newTitle}
+            </Button>
+          }
+          description={b.roster.emptyDesc}
+          icon="hubot"
+          title={b.roster.emptyTitle}
+        />
       ) : allBotsHidden && !hiddenExpanded ? (
         <div className="grid content-start gap-2 px-3 py-4 text-xs text-(--ui-text-tertiary)">
           <div className="flex items-center gap-1.5 font-medium text-(--ui-text-secondary)">
