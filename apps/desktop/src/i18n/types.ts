@@ -425,6 +425,56 @@ export interface Translations {
   }
 
   settings: {
+    activity: {
+      permissionsTitle: string
+      permissionsIntro: string
+      permissionsEmpty: string
+      grantCommand: (pattern: string) => string
+      grantSend: (target: string) => string
+      grantSince: (date: string) => string
+      revoke: string
+      revokeTitle: string
+      revokeDescription: string
+      revokeConfirm: string
+      revokeFailed: string
+      confirmationsTitle: string
+      confirmationsEmpty: string
+      confirmationCommand: (command: string) => string
+      confirmationTool: (tool: string) => string
+      outcome: {
+        approved_once: string
+        approved_session: string
+        approved_permanent: string
+        auto_approved: string
+        denied: string
+        blocked: string
+        notify_failed: string
+        unknown: string
+      }
+      dayToday: string
+      dayYesterday: string
+      loadFailed: string
+      retry: string
+      memoryTitle: string
+      memoryIntro: string
+      memoryAboutYou: string
+      memoryAboutYouHint: string
+      memoryNotes: string
+      memoryNotesHint: string
+      memoryEmpty: string
+      memoryDisabled: string
+      memoryPlaceholderUser: string
+      memoryPlaceholderNotes: string
+      memoryAdd: string
+      memoryForget: string
+      memoryForgetTitle: string
+      memoryForgetDescription: string
+      memoryForgetConfirm: string
+      memoryChanged: string
+      memorySaveFailed: string
+      memoryLoadFailed: string
+      advancedTitle: string
+    }
     closeSettings: string
     exportConfig: string
     importConfig: string
@@ -2270,6 +2320,33 @@ export interface Translations {
   }
 
   cron: {
+    recentRuns: {
+      runningTitle: string
+      recentTitle: string
+      recentEmpty: string
+      status: {
+        running: string
+        completed: string
+        failed: string
+        interrupted: string
+        unknown: string
+      }
+      startedAt: (time: string) => string
+      finishedAt: (time: string) => string
+      startedLabel: string
+      finishedLabel: string
+      deliveryDelivered: string
+      deliveryLabel: string
+      deliveryQueued: string
+      deliveryFailed: string
+      deliveryLocal: string
+      deliveryNotConfigured: string
+      deliverySilent: string
+      errorTitle: string
+      openJob: string
+      jobRemoved: string
+      unknownJob: string
+    }
     close: string
     title: string
     count: (count: number) => string
