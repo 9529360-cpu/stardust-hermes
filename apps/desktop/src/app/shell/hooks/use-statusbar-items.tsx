@@ -51,7 +51,12 @@ import {
   idsShareLineage,
   sessionMatchesStoredId
 } from '@/store/session'
-import { $focusedRuntimeId, $focusedSessionState, $focusedStoredSessionId } from '@/store/session-states'
+import {
+  $focusedRuntimeId,
+  $focusedSessionIsTile,
+  $focusedSessionState,
+  $focusedStoredSessionId
+} from '@/store/session-states'
 import { $statusbarHiddenIds } from '@/store/statusbar-prefs'
 import { $subagentsBySession, activeSubagentCount, failedSubagentCount } from '@/store/subagents'
 import { $gatewayRestarting } from '@/store/system-actions'
@@ -111,7 +116,9 @@ export function useStatusbarItems({
   const terminalShowing = useStore($paneVisible('terminal'))
   const sessionsShowing = useStore($paneVisible('sessions'))
   const { pathname } = useLocation()
-  const botsShowing = routePathname(pathname) === BOTS_ROUTE
+  // The roster page keeps its route while a tile takes focus; the tile is the chat on screen then.
+  const focusedTile = useStore($focusedSessionIsTile)
+  const botsShowing = routePathname(pathname) === BOTS_ROUTE && !focusedTile
   const primaryBusy = useStore($busy)
   // Draft / primary composer atom — used only while the focused surface is the
   // primary (or a draft with no runtime slice yet). A focused TILE keeps its
