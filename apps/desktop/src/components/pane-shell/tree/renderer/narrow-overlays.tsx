@@ -7,8 +7,9 @@
  */
 
 import { useStore } from '@nanostores/react'
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
+import { TITLEBAR_HEIGHT } from '@/app/shell/titlebar'
 import { $chatOnboardingSolo } from '@/components/onboarding-chat/assembly'
 import { PaneTab, PaneTabLabel, PaneTabStrip } from '@/components/ui/pane-tab'
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
@@ -22,6 +23,7 @@ import { PANE_TOGGLE_REVEAL_EVENT } from '../..'
 import { allPaneIds, findGroupOfPane } from '../model'
 import { $hiddenTreePanes, $layoutTree, $narrowViewport } from '../store'
 
+import { usePanelTitlebar } from './panel-titlebar'
 import { paneChrome } from './track-model'
 
 /** The panes the edge overlay can show: collapsible, docked in the tree, not hidden. */
@@ -40,6 +42,44 @@ function narrowOverlayPanes(
   const inTree = new Set(tree ? allPaneIds(tree) : [])
 
   return panes.filter(p => paneChrome(p).collapsible && inTree.has(p.id) && !hidden.has(p.id))
+}
+
+/**
+ * The overlay's titlebar band, placed the way the docked zone header is. The
+ * window's own clusters (sidebar toggle, right tools, native controls) sit in
+ * the top band, so the band reserves their space and the pane body starts
+ * below it. The zone's tabs ride in the band beside the toggle when the measured
+ * clusters leave room, and drop to a row beneath the band when they don't.
+ */
+function NarrowOverlayTitlebar({ tabs }: { tabs: ((titlebar: boolean) => ReactNode) | null }) {
+  const ref = useRef<HTMLDivElement>(null)
+  // The same resolver the docked zone header uses: it measures the clusters.
+  const tabsBelowControls = usePanelTitlebar(ref, true, false)
+  const tabsInBand = tabs !== null && !tabsBelowControls
+
+  return (
+    <>
+      <div
+        className="relative flex min-w-0 shrink-0 bg-(--ui-sidebar-surface-background)"
+        data-narrow-overlay-titlebar=""
+        ref={ref}
+        style={{ height: TITLEBAR_HEIGHT }}
+      >
+        <div aria-hidden="true" className="shrink-0" style={{ width: 'var(--panel-titlebar-left, 100%)' }} />
+        {tabsInBand ? (
+          tabs(true)
+        ) : (
+          <div
+            className="min-w-0 flex-1 self-start [-webkit-app-region:drag]"
+            data-window-drag-handle=""
+            style={{ height: TITLEBAR_HEIGHT }}
+          />
+        )}
+        <div aria-hidden="true" className="shrink-0" style={{ width: 'var(--panel-titlebar-right, 0px)' }} />
+      </div>
+      {tabs !== null && tabsBelowControls && tabs(false)}
+    </>
+  )
 }
 
 export function NarrowOverlays() {
@@ -179,36 +219,46 @@ export function NarrowOverlays() {
           // panes beneath it — a see-through overlay reads as text bleeding
           // through text. Contract: `[data-glass-opaque]` in styles.css.
           data-glass-opaque=""
+          data-narrow-overlay=""
           onMouseLeave={() => setReveal(current => (current?.pinned ? current : null))}
           // Match the pane's docked width (sessions ~237px, files its rail
           // width) instead of a fat fixed 20rem — capped for tiny screens.
           style={{ width: `min(${(revealed.data as { width?: string } | undefined)?.width ?? '18rem'}, 85vw)` }}
         >
           {/* Zone-mates share the overlay through the zone's own tab strip
-              (SESSIONS | BOTS) — a lone pane keeps the stripless form. */}
-          {zonePanes.length > 1 && (
-            <PaneTabStrip>
-              {zonePanes.map(pane => (
-                <PaneTab
-                  active={pane.id === revealed.id}
-                  aria-selected={pane.id === revealed.id}
-                  data-narrow-overlay-tab={pane.id}
-                  key={pane.id}
-                  onPointerDown={event => {
-                    if (event.button === 0) {
-                      event.preventDefault()
-                      setReveal(current => ({ id: pane.id, pinned: current?.pinned ?? false }))
-                    }
-                  }}
-                >
-                  <PaneTabLabel>{paneChrome(pane).tabTitle?.() ?? pane.title ?? pane.id}</PaneTabLabel>
-                </PaneTab>
-              ))}
-            </PaneTabStrip>
-          )}
-          <ContribBoundary id={revealed.id}>
-            {revealed.render && <ContribRender render={revealed.render} />}
-          </ContribBoundary>
+              (SESSIONS | BOTS) — a lone pane keeps the stripless form. The band
+              above the body clears the window's titlebar controls. */}
+          <NarrowOverlayTitlebar
+            tabs={
+              zonePanes.length > 1
+                ? titlebar => (
+                    <PaneTabStrip titlebar={titlebar}>
+                      {zonePanes.map(pane => (
+                        <PaneTab
+                          active={pane.id === revealed.id}
+                          aria-selected={pane.id === revealed.id}
+                          data-narrow-overlay-tab={pane.id}
+                          key={pane.id}
+                          onPointerDown={event => {
+                            if (event.button === 0) {
+                              event.preventDefault()
+                              setReveal(current => ({ id: pane.id, pinned: current?.pinned ?? false }))
+                            }
+                          }}
+                        >
+                          <PaneTabLabel>{paneChrome(pane).tabTitle?.() ?? pane.title ?? pane.id}</PaneTabLabel>
+                        </PaneTab>
+                      ))}
+                    </PaneTabStrip>
+                  )
+                : null
+            }
+          />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <ContribBoundary id={revealed.id}>
+              {revealed.render && <ContribRender render={revealed.render} />}
+            </ContribBoundary>
+          </div>
         </div>
       )}
     </>

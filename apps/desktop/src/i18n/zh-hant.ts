@@ -3299,6 +3299,7 @@ export const zhHant = defineLocale({
       offDescription: '不顯示核准提示，直接執行'
     },
     statusbar: {
+      toggleApprovalMode: '核准',
       unknown: '未知',
       restart: '重新啟動',
       update: '更新',

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
+import { TITLEBAR_HEIGHT } from '@/app/shell/titlebar'
 import { PANE_TOGGLE_REVEAL_EVENT } from '@/components/pane-shell'
 import { registry } from '@/contrib/registry'
 import { revealPaneFromUser } from '@/store/layout'
@@ -61,6 +62,36 @@ const revealPane = (id: string) => {
 }
 
 const overlayTab = (paneId: string) => document.querySelector<HTMLElement>(`[data-narrow-overlay-tab="${paneId}"]`)
+
+describe('narrow overlay titlebar band', () => {
+  it('starts the pane body below the titlebar band, not under the window clusters', () => {
+    const { container, getByTestId } = render(<NarrowOverlays />)
+
+    revealPane('sessions')
+
+    const band = container.querySelector<HTMLElement>('[data-narrow-overlay-titlebar]')
+    const body = getByTestId('sessions-body')
+
+    expect(band?.style.height).toBe(`${TITLEBAR_HEIGHT}px`)
+    expect(band!.contains(body)).toBe(false)
+    expect(band!.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('never rides the zone tabs in the band before the clusters are measured', () => {
+    // jsdom has no layout, so the band cannot prove there is room beside the
+    // toggle. The tabs drop to their own row beneath the band instead.
+    const { container } = render(<NarrowOverlays />)
+
+    revealPane('sessions')
+
+    const band = container.querySelector<HTMLElement>('[data-narrow-overlay-titlebar]')
+    const tab = container.querySelector<HTMLElement>('[data-narrow-overlay-tab="sessions"]')
+
+    expect(tab).toBeTruthy()
+    expect(band!.contains(tab)).toBe(false)
+    expect(band!.compareDocumentPosition(tab!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})
 
 describe('narrow overlay of a stacked zone', () => {
   it('mirrors the zone tab strip so every stacked collapsible stays reachable', () => {

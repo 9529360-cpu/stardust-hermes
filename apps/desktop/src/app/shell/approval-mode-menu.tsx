@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from '@/i18n'
-import { Zap, ZapFilled } from '@/lib/icons'
+import { Shield, ShieldOff } from '@/lib/icons'
 import {
   $approvalModes,
   type ApprovalMode,
@@ -21,6 +21,9 @@ import {
 export function useApprovalModeStatusbarItem(profile: string, requestGateway: ApprovalModeRequester): StatusbarItem {
   const { t } = useI18n()
   const copy = t.shell.approvalMode
+  // The bar names the subject, then shows the mode beside it, the way the gateway
+  // item does. A bare mode name such as "Off" reads as an action, not a state.
+  const subject = t.shell.statusbar.toggleApprovalMode
   const modes = useStore($approvalModes)
   const mode = modes[profile.trim() || 'default'] ?? 'smart'
 
@@ -44,9 +47,10 @@ export function useApprovalModeStatusbarItem(profile: string, requestGateway: Ap
 
   return {
     className: mode === 'off' ? 'bg-(--chrome-action-hover) text-foreground' : undefined,
-    icon: mode === 'off' ? <ZapFilled className="size-3.5" /> : <Zap className="size-3.5 opacity-70" />,
+    detail: labels[mode],
+    icon: mode === 'off' ? <ShieldOff className="size-3.5" /> : <Shield className="size-3.5 opacity-70" />,
     id: 'approval-mode',
-    label: labels[mode],
+    label: subject,
     menuAlign: 'end',
     menuClassName: 'w-72 p-1',
     menuContent: (
