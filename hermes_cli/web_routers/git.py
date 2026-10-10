@@ -133,6 +133,10 @@ async def git_rev_parse_route(path: str, ref: Optional[str] = None):
 async def git_ship_info_route(path: str):
     return await _git_op(_web_git.review_ship_info, _git_path(path))
 
+@router.get("/api/git/review/checks")
+async def git_review_checks_route(path: str, prNumber: Optional[int] = None, headSha: Optional[str] = None):
+    return await _git_op(_web_git.review_checks, _git_path(path), prNumber, headSha)
+
 
 @router.post("/api/git/review/pr-list")
 async def git_pr_list_route(body: GitPrListBody):

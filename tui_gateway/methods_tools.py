@@ -1124,6 +1124,59 @@ def _(rid, params: dict) -> dict:
     return _err(rid, 4016, f"unknown cron action: {action}")
 
 
+def _home_scoped_rpc(name: str, fail_code: int):
+    """``@method(name)`` for read-only stores that need only the profile's HERMES_HOME.
+
+    The profile resolves exactly as ``_scoped_rpc`` resolves it, so an unknown profile is 4064, and a
+    deleted profile (tombstone) is 4064 as well. The body runs with the home alone. ``_scoped_rpc`` also
+    binds the profile's secrets and terminal policy, which re-hydrates external secret sources on every
+    call, and a 5-second poll must not do that.
+    """
+
+    def deco(body):
+        def handler(rid, params: dict) -> dict:
+            from hermes_constants import named_profile_is_deleted, reset_hermes_home_override, set_hermes_home_override
+
+            profile = _str_arg(params, "profile")
+            try:
+                home = _profile_home(profile)
+            except ProfileUnavailableError:
+                return _err(rid, 4064, f"profile '{profile}' not found")
+            if home is not None and named_profile_is_deleted(home):
+                return _err(rid, 4064, f"profile '{profile}' not found")
+            token = set_hermes_home_override(str(home)) if home is not None else None
+            try:
+                return body(rid, params)
+            except Exception as e:
+                return _err(rid, fail_code, str(e))
+            finally:
+                if token is not None:
+                    reset_hermes_home_override(token)
+
+        handler.__doc__ = body.__doc__
+        return handler
+
+    return lambda body: method(name)(deco(body))
+
+
+def _ran_under_profile_name() -> str:
+    """The profile the body actually ran under, for the client's scope check: '' for the launch or the
+    default profile, otherwise the canonical profile id of the bound home."""
+    from hermes_constants import get_hermes_home, profile_name_for_home
+
+    name = profile_name_for_home(get_hermes_home())
+    return "" if name in (None, "default") else name
+
+
+@_home_scoped_rpc("cron.executions.list", 5023)
+def _(rid, params: dict) -> dict:
+    """Read-only recent cron runs of the requested profile, newest first, titled by job id only. The
+    response's `scoped` is the profile the body ran under, so the client can refuse a mismatch."""
+    limit = min(max(int(params.get("limit") or 20), 1), 50)
+    work = _tools_mod("tools.work_ledger").cron_work_items(limit=limit)
+    return _ok(rid, {"work": work, "scoped": _ran_under_profile_name()})
+
+
 @_rpc("learning.frames", 5000, "learning.frames failed: ")
 def _(rid, params: dict) -> dict:
     """Pre-render the ``/journey`` timeline (frames + legend/summary metadata) so Ink walks it locally."""
@@ -1264,6 +1317,7 @@ def _(rid, params: dict) -> dict:
         return _err(rid, 4090, f"server '{name}' already exists")
     raw_cfg = params.get("config")
     server_config: dict = dict(raw_cfg) if isinstance(raw_cfg, dict) else {}
+    server_config.setdefault("trust", mc.MCP_CREATE_TRUST)
     if preset:  # fills url/command/args when omitted; mutates server_config in place
         mc._apply_mcp_preset(
             name, preset_name=preset, url=server_config.get("url"), command=server_config.get("command"),

@@ -298,6 +298,47 @@ export const ja = defineLocale({
   },
 
   settings: {
+    activity: {
+      permissionsTitle: '権限',
+      permissionsIntro: '確認なしで実行してよいと許可した操作です。いつでも取り消せます。',
+      permissionsEmpty: '継続的な権限はまだありません。承認が必要な操作は必ず確認します。',
+      grantCommand: (pattern: string) => `確認なしで ${pattern} を実行`,
+      grantSend: (target: string) => `確認なしで ${target} にメッセージを送信`,
+      grantSince: (date: string) => `${date} に許可`,
+      revoke: '取り消す',
+      revokeTitle: 'この許可を取り消しますか？',
+      revokeDescription: '次に必要になったときは、また確認します。',
+      revokeConfirm: '取り消す',
+      revokeFailed: '取り消せませんでした。まだ許可されています。',
+      confirmationsTitle: '最近の確認',
+      confirmationsEmpty: 'まだ確認が必要な操作はありません。',
+      confirmationCommand: (command: string) => `${command} を実行`,
+      confirmationTool: (tool: string) => `${tool} を使用`,
+      outcome: { approved_once: '1回許可', approved_session: 'このセッションで許可', approved_permanent: '常に許可', auto_approved: '自動で許可', denied: '拒否', blocked: 'ブロック', notify_failed: '通知できませんでした', unknown: '記録済み' },
+      dayToday: '今日',
+      dayYesterday: '昨日',
+      loadFailed: '権限を読み込めませんでした。',
+      retry: '再試行',
+      memoryTitle: '覚えていること',
+      memoryIntro: '会話の中でこれらを参考にします。いつでも追加・削除できます。',
+      memoryAboutYou: 'あなたについて',
+      memoryAboutYouHint: 'あなたの好みや背景。',
+      memoryNotes: 'メモ',
+      memoryNotesHint: '作業中に書き留めた環境やプロジェクトの情報。',
+      memoryEmpty: 'まだ何もありません。',
+      memoryDisabled: 'この種類の記憶はオフです。下の詳細設定でオンにできます。',
+      memoryPlaceholderUser: '例：短い回答が好きです',
+      memoryPlaceholderNotes: '例：テストは pnpm test で実行します',
+      memoryAdd: '覚える',
+      memoryForget: '忘れる',
+      memoryForgetTitle: 'この内容を忘れますか？',
+      memoryForgetDescription: '今後は使わなくなります。',
+      memoryForgetConfirm: '忘れる',
+      memoryChanged: 'その内容は今変更されたため、一覧を更新しました。',
+      memorySaveFailed: '保存できませんでした。もう一度お試しください。',
+      memoryLoadFailed: '覚えている内容を読み込めませんでした。',
+      advancedTitle: '詳細設定',
+    },
     plugins: {
       installModal: {
         installFromGit: 'Git からインストール',
@@ -366,9 +407,11 @@ export const ja = defineLocale({
       expYearField: '有効期限（年）',
       cvcField: 'CVC',
       delegatedPaymentLabel: 'Stardust 支払いカード',
-      delegatedPaymentDescription: 'Stardust に購入や支払いを明示的に依頼した場合、このカードを追加確認なしで使用できます。',
+      delegatedPaymentDescription:
+        'Stardust に購入や支払いを明示的に依頼した場合、このカードを追加確認なしで使用できます。',
       allowAnyOriginLabel: '任意のチェックアウトサイトで使用',
-      allowAnyOriginDescription: '専用の低限度額・プリペイド・バーチャルカード向けです。残高や発行会社の限度額が実際の上限になります。',
+      allowAnyOriginDescription:
+        '専用の低限度額・プリペイド・バーチャルカード向けです。残高や発行会社の限度額が実際の上限になります。',
       delegatedPaymentBadge: '委任支払い',
       anySiteBadge: '任意サイト',
       postalField: '郵便番号',
@@ -543,7 +586,8 @@ export const ja = defineLocale({
         sidebar: 'サイドバーのみ'
       },
       backdropTitle: 'ウィンドウ背景',
-      backdropDesc: 'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
+      backdropDesc:
+        'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
       userBubbleTitle: 'メッセージの吹き出し',
       userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で枠線だけが残ります。',
       introSplashTitle: 'イントロ表示',
@@ -1398,7 +1442,7 @@ export const ja = defineLocale({
         needsSetupHint: 'このバックエンドは今すぐ選択できますが、セットアップが完了するまでコマンドは失敗します。'
       },
       browserRealProfile: {
-        label: '実際のブラウザプロファイルを使用',
+        label: 'ブラウザープロファイルのコピーを使用',
         description:
           '既定ブラウザのログイン情報と Cookie を管理されたスナップショットにコピーし、エージェントはそれを使ってブラウジングします。実際のプロファイルが直接開かれることはありません。新しいセッションに適用されます。',
         enabledTitle: '実プロファイルブラウジング：オン',
@@ -1406,15 +1450,28 @@ export const ja = defineLocale({
         disabledTitle: '実プロファイルブラウジング：オフ',
         disabledMessage: 'プロファイルのスナップショットは削除され、新しいセッションはクリーンなブラウザを使用します。',
         failedSave: '実プロファイル設定を保存できませんでした',
-        prompt: {
-          title: 'サイトにログインしたまま利用',
-          body: 'Hermes が既定ブラウザプロファイルのスナップショットでブラウジングできるようにすると、サイトはログイン済みの状態で開きます。',
-          bulletSnapshot: 'Cookie とログイン情報は管理されたスナップショットにコピーされます。',
-          bulletLiveProfile: '実際のブラウザプロファイルが直接開かれることはありません。',
-          bulletLocal: 'データがこのコンピュータの外に出ることはありません。',
-          dontShowAgain: '今後表示しない',
-          notNow: '今はしない',
-          enable: 'プロファイルを使用'
+      },
+      browserHostControl: {
+        label: '開いている Chrome プロファイルに接続',
+        description: '承認済みブラウザー拡張機能を通して、このセッションを開いている Chrome プロファイルに明示的にペアリングします。Chrome の Cookie はコピーしません。',
+        statusLabel: '状態',
+        profileLabel: 'Chrome プロファイルのディレクトリ',
+        connect: 'Chrome に接続',
+        disconnect: '切断',
+        working: '処理中…',
+        connectedTitle: 'Chrome に接続しました',
+        connectedMessage: '各操作の承認後、このセッションでペアリングした Chrome プロファイルを使用できます。',
+        connectFailed: 'Chrome に接続できませんでした',
+        disconnectFailed: 'Chrome を切断できませんでした',
+        noSession: '先に Desktop セッションを開くか選択してください。',
+        invalidProfile: 'Default や Profile 1 のような Chrome プロファイル名だけを入力してください。',
+        warning: '先に Chrome に Stardust ブラウザー拡張機能をインストールして有効にしてください。接続はセッション単位で、切断すると停止します。',
+        status: {
+          inactive: '未接続',
+          starting: '接続中…',
+          connected: '接続済み',
+          stopping: '切断中…',
+          error: 'エラー'
         }
       }
     }
@@ -1954,9 +2011,11 @@ export const ja = defineLocale({
     nameLabel: '名前',
     cloneFrom: '複製元',
     cloneFromNone: 'なし（空）',
-    cloneFromDesc: '選択したプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
+    cloneFromDesc:
+      '選択したプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     cloneFromDefault: 'デフォルトプロファイルから設定を複製',
-    cloneFromDefaultDesc: 'デフォルトプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
+    cloneFromDefaultDesc:
+      'デフォルトプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     invalidName: hint => `無効なプロファイル名。${hint}`,
     nameRequired: '名前は必須です',
     creating: '作成中...',
@@ -1981,6 +2040,27 @@ export const ja = defineLocale({
   },
 
   cron: {
+    recentRuns: {
+      runningTitle: '実行中',
+      recentTitle: '最近の実行',
+      recentEmpty: '定期タスクが実行されると、ここに記録が表示されます。',
+      status: { running: '実行中', completed: '完了', failed: '失敗', interrupted: '中断', unknown: '不明' },
+      startedAt: (time: string) => `${time} に開始`,
+      finishedAt: (time: string) => `${time} に完了`,
+      startedLabel: '開始',
+      finishedLabel: '完了',
+      deliveryDelivered: '送信済み',
+      deliveryLabel: '送信',
+      deliveryQueued: '送信待ち',
+      deliveryFailed: '送信できませんでした',
+      deliveryLocal: 'このデバイスにのみ保存',
+      deliveryNotConfigured: '送信先が未設定です',
+      deliverySilent: '今回は送信する内容がありませんでした',
+      errorTitle: 'エラーの内容',
+      openJob: 'このタスクを開く',
+      jobRemoved: 'このタスクは削除されました',
+      unknownJob: '定期タスク',
+    },
     close: 'Cron を閉じる',
     title: 'スケジュール済みジョブ',
     count: count => `${count} 件のジョブ`,
@@ -2138,7 +2218,7 @@ export const ja = defineLocale({
       dismissed: '提案を却下しました',
       actionFailed: '自動化の提案を更新できませんでした',
       needsConversation: 'スケジュール結果の返却先を確保するため、先に保存済みの会話を開いてください。'
-    },
+    }
   },
 
   artifacts: {
@@ -2520,6 +2600,7 @@ export const ja = defineLocale({
     subagents: count => `サブエージェント ${count} 件`,
     todos: (done, total) => `タスク ${done}/${total}`,
     running: '実行中',
+    cronRun: 'スケジュール実行',
     stop: '停止',
     dismiss: '閉じる',
     exit: code => `終了コード ${code}`,
@@ -2634,9 +2715,15 @@ export const ja = defineLocale({
       revertConfirm: 'このファイルの変更を破棄してコミット済みの状態に戻しますか？この操作は元に戻せません。',
       revertAllConfirm: 'すべての変更を破棄してコミット済みの状態に戻しますか？この操作は元に戻せません。',
       staged: 'ステージ済み',
+      unstaged: '未ステージ',
+      untracked: '未追跡',
       noChanges: '変更なし',
       notRepo: 'Git リポジトリではありません',
       noDiff: '表示する差分がありません',
+      hunk: (current, total) => `ハンク ${current}/${total}`,
+      previousHunk: '前のハンク',
+      nextHunk: '次のハンク',
+      allHunks: 'すべてのハンク',
       scopeUncommitted: '未コミット',
       scopeBranch: 'ブランチ',
       scopeLastTurn: '前のターン',
@@ -2656,6 +2743,13 @@ export const ja = defineLocale({
       branchOffFrom: base => `${base} から新しいブランチ`,
       switchTo: branch => `${branch} に切り替え`,
       switchFailed: branch => `${branch} に切り替えできませんでした`,
+      checks: {
+        loading: 'チェックを読み込み中',
+        unavailable: 'チェックを利用できません',
+        pending: 'チェック待機中',
+        passed: 'チェックに合格',
+        failed: 'チェックに失敗'
+      },
       worktrees: 'ワークツリー'
     }
   },
@@ -3054,7 +3148,8 @@ export const ja = defineLocale({
         title: 'コンテキスト使用状況',
         tokenSummary: (used, max) => `${used} / ${max} Tokens`,
         sessionTokens: 'セッションのトークン使用量',
-        sessionTokensNote: 'モデル呼び出しの累計値。現在のコンテキスト使用量とは異なります。キャッシュ分は総計に含まれ、重複加算しません。',
+        sessionTokensNote:
+          'モデル呼び出しの累計値。現在のコンテキスト使用量とは異なります。キャッシュ分は総計に含まれ、重複加算しません。',
         inputTokens: '非キャッシュ入力',
         cacheReadTokens: 'キャッシュ読み込み',
         cacheWriteTokens: 'キャッシュ書き込み',
@@ -3287,7 +3382,13 @@ export const ja = defineLocale({
   },
 
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: '今日は何を進めますか？', body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。', start: 'メッセージを始める', actions: 'コマンドを見る' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: '今日は何を進めますか？',
+      body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。',
+      start: 'メッセージを始める',
+      actions: 'コマンドを見る'
+    },
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',
@@ -3646,7 +3747,8 @@ export const ja = defineLocale({
     sudoTitle: '管理者パスワード',
     sudoDesc:
       'sudo パスワードを入力する前にコマンドを確認してください。パスワードは実行するエージェントに送信され、このセッション中キャッシュされます。',
-    sudoCommandUnavailable: 'エージェントからコマンドが提供されていません。会話で確認できない場合はキャンセルしてください。',
+    sudoCommandUnavailable:
+      'エージェントからコマンドが提供されていません。会話で確認できない場合はキャンセルしてください。',
     sudoPlaceholder: 'sudo パスワード',
     secretTitle: 'シークレットが必要です',
     secretDesc: 'Hermes は続行するための認証情報が必要です。',

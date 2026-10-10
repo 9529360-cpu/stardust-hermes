@@ -36,6 +36,8 @@ export interface MockServerOptions {
 
   /** Pause the matching stream after its first token for session-switch E2E coverage. */
   holdFirstStreamForPrompt?: string
+  /** Fail the first matching completions to exercise the explicit Retry action. */
+  failCompletionsContaining?: { prompt: string; count: number }
 /** Pause the first completion whose request JSON contains this text. */
 holdFirstCompletionContaining?: string
 /** Absolute sandbox path written by the verify-on-stop scripted tool call. */
@@ -58,6 +60,7 @@ export interface MockServer {
   waitForHeldCompletion: () => Promise<void>
   releaseHeldStream: () => void
   heldCompletionCount: () => number
+  failedCompletionCount: () => number
   close: () => Promise<void>
 }
 
@@ -462,6 +465,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
     let resolveHeldStreamStarted: (() => void) | null = null
     let releaseHeldStream: (() => void) | null = null
     let heldCompletionCount = 0
+    let failedCompletionCount = 0
 
     const heldStreamStarted = new Promise<void>(resolveHeld => {
       resolveHeldStreamStarted = resolveHeld
@@ -548,6 +552,17 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           const messages: any[] = Array.isArray(parsed.messages) ? parsed.messages : []
           const lastUserMsg = [...messages].reverse().find(m => m?.role === 'user')
           const userText = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : ''
+
+          const failurePlan = options.failCompletionsContaining
+
+          if (failurePlan && userText.includes(failurePlan.prompt) && failedCompletionCount < failurePlan.count) {
+            failedCompletionCount++
+
+            res.writeHead(503, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: { message: 'Injected E2E provider failure' } }))
+
+            return
+          }
 
           if (userText) {
             _receivedUserTexts.push(userText)
@@ -796,6 +811,7 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
         waitForHeldCompletion: () => heldStreamStarted,
         releaseHeldStream: () => releaseHeldStream?.(),
         heldCompletionCount: () => heldCompletionCount,
+        failedCompletionCount: () => failedCompletionCount,
         close: () =>
           new Promise((resolveClose, rejectClose) => {
             server.close((err) => {
@@ -844,6 +860,10 @@ function streamTextResponse(
   let i = 0
 
   const sendChunk = (): void => {
+    if (res.destroyed) {
+      return
+    }
+
     if (i >= words.length) {
       res.write(sseChunk(model, {}, 'stop'))
       res.write('data: [DONE]\n\n')

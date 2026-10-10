@@ -33,6 +33,7 @@ import {
   popOutBrowserTab,
   type PreviewTarget
 } from '@/store/preview'
+import { $rightContextOpen } from '@/store/right-context'
 import { canOpenBrowserWindow } from '@/store/windows'
 
 import { paneMirror } from './pane-mirror'
@@ -213,13 +214,21 @@ export function watchPreviewTiles(): void {
   const reveal = () => {
     const tabId = $rightRailActiveTabId.get()
 
-    if (tabId && targetFor(tabId)) {
+    // A hidden viewer stays hidden while the agent navigates its browser.
+    // revealTreePane itself expands a collapsed side even when openPreview
+    // requested reveal=false, so this mirror must respect the user's choice.
+    if ($rightContextOpen.get() && tabId && targetFor(tabId)) {
       revealTreePane(`${PREVIEW_TILE_PREFIX}:${tabId}`)
     }
   }
 
   $rightRailActiveTabId.listen(reveal)
   $previewTabs.listen(reveal)
+  $rightContextOpen.listen(open => {
+    if (open) {
+      reveal()
+    }
+  })
 
   // And the reverse: clicking a preview TAB activates its pane in the TREE
   // only, so the store's selection must follow or `$previewTarget` (⌘L quote

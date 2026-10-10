@@ -33,6 +33,12 @@ export interface HermesReadyOptions {
    * two very different meanings of a 401 (see `waitForHermesReady`).
    */
   probeIsCredentialed?: boolean
+  /** The local child has already announced its bound port. */
+  alreadyBound?: boolean
+}
+
+export function isConnectionRefusedError(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === 'ECONNREFUSED'
 }
 
 export const REMOTE_SESSION_EXPIRED_MESSAGE =
@@ -274,6 +280,13 @@ export async function waitForHermesReady(baseUrl: string, options: HermesReadyOp
       return
     } catch (error) {
       lastError = error
+
+      // A local child that already announced its bound port is no longer
+      // starting. ECONNREFUSED means it died; fail now instead of polling a
+      // dead backend until the whole readiness budget expires.
+      if (options.alreadyBound && isConnectionRefusedError(error)) {
+        throw new Error(`Hermes backend did not become ready: ${(error as Error).message}`)
+      }
 
       // A confirmed 401/403 from a CREDENTIALED probe means the session was
       // rejected, not that the route is missing. Fail fast into a reauth

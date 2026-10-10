@@ -19,7 +19,13 @@ import { useI18n } from '@/i18n'
 import { displayPath } from '@/lib/display-path'
 import { openWorktreeDialog, registerRepoStatusCwd, repoStatusForCwd, repoWorktreesForCwd } from '@/store/coding-status'
 import { notifyError } from '@/store/notifications'
-import { $pullRequestsByBranch, branchPrKey, refreshPullRequests } from '@/store/pull-requests'
+import {
+  $pullRequestChecksByPr,
+  $pullRequestsByBranch,
+  branchPrKey,
+  numberPrKey,
+  refreshPullRequests
+} from '@/store/pull-requests'
 
 // Tiny uppercase section header, matching the composer "+" menu's labels.
 const MENU_SECTION = 'text-[0.625rem] font-semibold uppercase tracking-wider text-(--ui-text-tertiary)'
@@ -92,6 +98,11 @@ export const CodingStatusRow = memo(function CodingStatusRow({
 
   const pr =
     useStore($pullRequestsByBranch)[resolvedRepoPath && prBranch ? branchPrKey(resolvedRepoPath, prBranch) : '']
+
+  const prChecks = useStore($pullRequestChecksByPr)
+
+  const prChecksState =
+    pr && resolvedRepoPath ? (prChecks[numberPrKey(resolvedRepoPath, pr.number)] ?? 'loading') : undefined
 
   const switchToBranch = async (branch: string) => {
     if (!onSwitchBranch) {
@@ -223,7 +234,7 @@ export const CodingStatusRow = memo(function CodingStatusRow({
             {/* PR number first, right against the leading git glyph — the chip
                 borrows that icon instead of carrying a second one of its own
                 (`showIcon={false}`), so the row reads glyph → #number → branch. */}
-            {pr && <PrTag pr={pr} showIcon={false} />}
+            {pr && <PrTag checksState={prChecksState} pr={pr} showIcon={false} />}
 
             {/* Branch name — the other half of the review-pane target. `contents`
                 so the button lays out nothing of its own: the label stays the

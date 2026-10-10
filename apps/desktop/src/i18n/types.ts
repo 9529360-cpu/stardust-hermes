@@ -425,6 +425,56 @@ export interface Translations {
   }
 
   settings: {
+    activity: {
+      permissionsTitle: string
+      permissionsIntro: string
+      permissionsEmpty: string
+      grantCommand: (pattern: string) => string
+      grantSend: (target: string) => string
+      grantSince: (date: string) => string
+      revoke: string
+      revokeTitle: string
+      revokeDescription: string
+      revokeConfirm: string
+      revokeFailed: string
+      confirmationsTitle: string
+      confirmationsEmpty: string
+      confirmationCommand: (command: string) => string
+      confirmationTool: (tool: string) => string
+      outcome: {
+        approved_once: string
+        approved_session: string
+        approved_permanent: string
+        auto_approved: string
+        denied: string
+        blocked: string
+        notify_failed: string
+        unknown: string
+      }
+      dayToday: string
+      dayYesterday: string
+      loadFailed: string
+      retry: string
+      memoryTitle: string
+      memoryIntro: string
+      memoryAboutYou: string
+      memoryAboutYouHint: string
+      memoryNotes: string
+      memoryNotesHint: string
+      memoryEmpty: string
+      memoryDisabled: string
+      memoryPlaceholderUser: string
+      memoryPlaceholderNotes: string
+      memoryAdd: string
+      memoryForget: string
+      memoryForgetTitle: string
+      memoryForgetDescription: string
+      memoryForgetConfirm: string
+      memoryChanged: string
+      memorySaveFailed: string
+      memoryLoadFailed: string
+      advancedTitle: string
+    }
     closeSettings: string
     exportConfig: string
     importConfig: string
@@ -1538,15 +1588,28 @@ export interface Translations {
         disabledTitle: string
         disabledMessage: string
         failedSave: string
-        prompt: {
-          title: string
-          body: string
-          bulletSnapshot: string
-          bulletLiveProfile: string
-          bulletLocal: string
-          dontShowAgain: string
-          notNow: string
-          enable: string
+      }
+      browserHostControl: {
+        label: string
+        description: string
+        statusLabel: string
+        profileLabel: string
+        connect: string
+        disconnect: string
+        working: string
+        connectedTitle: string
+        connectedMessage: string
+        connectFailed: string
+        disconnectFailed: string
+        noSession: string
+        invalidProfile: string
+        warning: string
+        status: {
+          inactive: string
+          starting: string
+          connected: string
+          stopping: string
+          error: string
         }
       }
     }
@@ -1944,6 +2007,14 @@ export interface Translations {
       builtinMemory: string
       memoryFile: string
       userFile: string
+      viewEntries: string
+      hideEntries: string
+      noEntries: string
+      entriesUnavailable: string
+      removeEntry: string
+      removeEntryConfirm: string
+      entryRemoved: string
+      removeEntryFailed: string
       bytes: (size: string) => string
       empty: string
       resetMemory: string
@@ -2253,6 +2324,33 @@ export interface Translations {
   }
 
   cron: {
+    recentRuns: {
+      runningTitle: string
+      recentTitle: string
+      recentEmpty: string
+      status: {
+        running: string
+        completed: string
+        failed: string
+        interrupted: string
+        unknown: string
+      }
+      startedAt: (time: string) => string
+      finishedAt: (time: string) => string
+      startedLabel: string
+      finishedLabel: string
+      deliveryDelivered: string
+      deliveryLabel: string
+      deliveryQueued: string
+      deliveryFailed: string
+      deliveryLocal: string
+      deliveryNotConfigured: string
+      deliverySilent: string
+      errorTitle: string
+      openJob: string
+      jobRemoved: string
+      unknownJob: string
+    }
     close: string
     title: string
     count: (count: number) => string
@@ -2764,6 +2862,7 @@ export interface Translations {
     subagents: (count: number) => string
     todos: (done: number, total: number) => string
     running: string
+    cronRun: string
     stop: string
     dismiss: string
     exit: (code: number) => string
@@ -2878,9 +2977,15 @@ export interface Translations {
       revertConfirm: string
       revertAllConfirm: string
       staged: string
+      unstaged: string
+      untracked: string
       noChanges: string
       notRepo: string
       noDiff: string
+      hunk: (current: number, total: number) => string
+      previousHunk: string
+      nextHunk: string
+      allHunks: string
       scopeUncommitted: string
       scopeBranch: string
       scopeLastTurn: string
@@ -2899,6 +3004,13 @@ export interface Translations {
       branchOffFrom: (base: string) => string
       switchTo: (branch: string) => string
       switchFailed: (branch: string) => string
+      checks: {
+        loading: string
+        unavailable: string
+        pending: string
+        passed: string
+        failed: string
+      }
       worktrees: string
     }
   }

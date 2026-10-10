@@ -183,6 +183,10 @@ _MCP_PRESETS: Dict[str, Dict[str, Any]] = {
     "codex": {"command": "codex", "args": ["mcp-server"]},
 }
 
+# New creation surfaces opt into least-privileged MCP policy. Omitted trust
+# remains a compatibility value for legacy config entries.
+MCP_CREATE_TRUST = "untrusted"
+
 
 def _info(text: str): print(color(f"  {text}", Colors.DIM))
 def _success(text: str): print(color(f"  ✓ {text}", Colors.GREEN))
@@ -597,6 +601,7 @@ def cmd_mcp_add(args):
     raw_connect_timeout = getattr(args, "connect_timeout", None)
 
     server_config: Dict[str, Any] = {}
+    server_config["trust"] = MCP_CREATE_TRUST
     try:
         explicit_env = _parse_env_assignments(getattr(args, "env", None))
         url, command, cmd_args, _preset_applied = _apply_mcp_preset(

@@ -236,9 +236,15 @@ class CellAuthority:
     refused instead of running under a stale approval/session/turn identity.
     """
 
-    def __init__(self, task_id: str):
+    def __init__(self, task_id: str, *, session_id: Optional[str] = None,
+                 enabled_tools: Optional[List[str]] = None,
+                 capability_grant: Any = None):
         import contextvars
         self.task_id = task_id
+        self.session_id = session_id
+        self.enabled_tools = (frozenset(str(name) for name in enabled_tools)
+                              if enabled_tools is not None else None)
+        self.capability_grant = capability_grant
         self.ctx = contextvars.copy_context()
         self.active = True
         # ((getter, setter), captured value) per thread-local prompt callback (approval, sudo, vault unlock…)
@@ -272,7 +278,15 @@ class CellAuthority:
             except Exception:
                 previous = None
         try:
-            return handle_function_call(tool_name, tool_args, task_id=self.task_id)
+            dispatch_kwargs = {"task_id": self.task_id}
+            if self.session_id is not None:
+                dispatch_kwargs.update(
+                    session_id=self.session_id,
+                    enabled_tools=(list(self.enabled_tools)
+                                    if self.enabled_tools is not None else None),
+                    capability_grant=self.capability_grant,
+                )
+            return handle_function_call(tool_name, tool_args, **dispatch_kwargs)
         finally:
             if previous is not None:
                 try:
@@ -501,7 +515,8 @@ def _rpc_forever(kernel: SessionKernel, max_tool_calls: int,
             return tool_error("No active execute_code cell: this kernel has no cell authority installed.")
         return authority.dispatch(tool_name, tool_args)
     while not kernel.stop_event.is_set():
-        _rpc_server_loop(kernel.server_sock, "", kernel.tool_call_log, kernel.tool_call_counter,
+        _rpc_server_loop(kernel.server_sock, kernel.cell_authority.task_id if kernel.cell_authority else "",
+                         kernel.tool_call_log, kernel.tool_call_counter,
                          max_tool_calls, sandbox_tools, kernel.stop_event, kernel.rpc_token,
                          dispatch=_dispatch)
 
@@ -815,7 +830,14 @@ def _run_cell(kernel: SessionKernel, key: Tuple, code: str, *, task_id: str, chi
     reused = kernel.proc is not None
     # Captured on the calling thread BEFORE the cell runs (the snapshot a per-call RPC thread
     # would get) and installed on the kernel so RPC dispatches under THIS cell's identity.
-    authority = CellAuthority(task_id)
+    from model_tools import current_tool_capability_context
+    capability_context = current_tool_capability_context()
+    authority = CellAuthority(
+        task_id,
+        session_id=getattr(capability_context, "session_id", None),
+        enabled_tools=list(getattr(capability_context, "allowed_tools", ()) or sandbox_tools),
+        capability_grant=capability_context,
+    )
     with kernel.lock:
         try:
             if kernel.proc is None:

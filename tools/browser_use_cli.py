@@ -19,6 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from hermes_constants import get_hermes_home
 from utils import is_truthy_value
+from tools.browser_use_snapshot import STRUCTURED_SNAPSHOT_PREAMBLE
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,24 @@ _DEFAULT_TIMEOUT_S = 300
 _MIN_TIMEOUT_S = 5
 _MAX_TIMEOUT_S = 1800
 _STDERR_CAP_CHARS = 4000
+
+# ``browser_exec`` has two failure paths: early validation/routing failures use
+# ``tool_error`` while a launched CLI can return a non-zero process result. Keep
+# both paths on one small, additive contract so callers do not need to infer the
+# failure shape from whether a subprocess started.
+_EXEC_ERROR_TYPES = frozenset({
+    "invalid_request", "unsafe_url", "cli_unavailable", "invalid_session",
+    "backend_unavailable", "timeout", "launch_failed", "process_failed",
+})
+
+
+def _browser_exec_error(message: str, error_type: str, **extra: Any) -> str:
+    """Return the stable structured failure envelope for ``browser_exec``."""
+    if error_type not in _EXEC_ERROR_TYPES:
+        raise ValueError(f"Unsupported browser_exec error type: {error_type}")
+    from tools.registry import tool_error
+
+    return tool_error(message, success=False, error_type=error_type, **extra)
 
 _TASK_ID_SAFE_RE = re.compile(r"[^A-Za-z0-9._-]+")  # filesystem-safe task ids
 # Screenshot paths printed by capture_screenshot(): POSIX or Windows drive-letter absolute.
@@ -604,32 +623,49 @@ def _run_cli_killing_process_group(cmd, code, env, timeout):
 
 def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT_S,
                  task_id: Optional[str] = None, local: bool = False):
-    """Run Python code through the browser-use CLI, and return its output"""
-    from tools.registry import tool_error, tool_result
+    """Run Python code through the browser-use CLI, and return its output.
+
+    Every failure includes ``success: false``, ``error``, and ``error_type``;
+    successful results retain the existing output/session/workspace fields.
+    """
+    from tools.registry import tool_result
     if not code or not code.strip():
-        return tool_error("No code provided. Pass Python that uses the pre-imported helpers, e.g. new_tab(\"https://example.com\") then print(page_info()).")
+        return _browser_exec_error(
+            "No code provided. Pass Python that uses the pre-imported helpers, e.g. new_tab(\"https://example.com\") then print(page_info()).",
+            "invalid_request",
+        )
 
     blocked = _blocked_url_in_code(code)
     if blocked:
-        return tool_error(blocked)
+        return _browser_exec_error(blocked, "unsafe_url")
 
     cmd = _find_cli()
     if not cmd:
-        return tool_error("browser-use CLI not found on PATH, and uvx is unavailable for a zero-install run. "
-                          "Install it with `uv tool install browser-use` (or `pipx install browser-use`), "
-                          "then run `browser-use --doctor` to verify the setup.")
+        return _browser_exec_error(
+            "browser-use CLI not found on PATH, and uvx is unavailable for a zero-install run. "
+            "Install it with `uv tool install browser-use` (or `pipx install browser-use`), "
+            "then run `browser-use --doctor` to verify the setup.",
+            "cli_unavailable",
+        )
 
     env = _base_subprocess_env()
     if session:
         if not _SESSION_RE.match(session):
-            return tool_error(f"Invalid session name {session!r}: use 1-64 letters, digits, "
-                              "dashes, or underscores (e.g. 'r7k2').")
+            return _browser_exec_error(
+                f"Invalid session name {session!r}: use 1-64 letters, digits, "
+                "dashes, or underscores (e.g. 'r7k2').",
+                "invalid_session",
+            )
         env["BU_NAME"] = session
     route_err = _route_backend(env, session, task_id, bool(local))
     if route_err:
-        return tool_error(route_err)
+        return _browser_exec_error(route_err, "backend_unavailable")
     _attach_vault_supervisor(env, task_id)
 
+    # Keep the model program first so stdin-oriented CLI wrappers and existing
+    # callers continue to receive exactly the requested source on stdin. The
+    # helper definitions are appended after it.
+    code = code + "\n" + STRUCTURED_SNAPSHOT_PREAMBLE
     # SHARED browser (/browser connect CDP override): pin each named session to its own tab (see
     # _OWN_TAB_PREAMBLE). Private per-name browsers skip this — nothing to collide with.
     private_browser = env.pop(_PRIVATE_BROWSER_SENTINEL, None)  # always pop: never exported to the CLI
@@ -650,11 +686,14 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
     try:
         proc = _run_cli_killing_process_group(cmd, code, env, timeout)
     except subprocess.TimeoutExpired:
-        return tool_error(f"browser-use exec timed out after {timeout}s. The daemon may still be working; retry "
-                          f"with a larger timeout_s (max {_MAX_TIMEOUT_S}), or split the work into several calls that "
-                          "append to workspace files — anything already written to the workspace is preserved.")
+        return _browser_exec_error(
+            f"browser-use exec timed out after {timeout}s. The daemon may still be working; retry "
+            f"with a larger timeout_s (max {_MAX_TIMEOUT_S}), or split the work into several calls that "
+            "append to workspace files — anything already written to the workspace is preserved.",
+            "timeout",
+        )
     except OSError as e:
-        return tool_error(f"Failed to launch browser-use CLI: {e}")
+        return _browser_exec_error(f"Failed to launch browser-use CLI: {e}", "launch_failed")
 
     result = {"success": proc.returncode == 0, "exit_code": proc.returncode, "output": proc.stdout}
     if workspace:
@@ -666,10 +705,15 @@ def browser_exec(code: str, session: str = "", timeout_s: int = _DEFAULT_TIMEOUT
         stderr = stderr[:_STDERR_CAP_CHARS] + "\n… (stderr truncated)"
     if stderr:
         result["stderr"] = stderr
+    if proc.returncode != 0:
+        result["error"] = f"browser-use CLI exited with code {proc.returncode}"
+        result["error_type"] = "process_failed"
     screenshot = _find_screenshot(proc.stdout, started)
     if screenshot:
         result["screenshot_path"] = screenshot
-        native = _native_screenshot_result(result, screenshot)
+        # A failed CLI must remain a structured failure even if its stdout
+        # happens to contain a screenshot path from a partially completed run.
+        native = _native_screenshot_result(result, screenshot) if proc.returncode == 0 else None
         if native is not None:
             return native
     return tool_result(result)
@@ -686,6 +730,11 @@ _HEADER_BASE = (
     "('all N products / every entry'), append each batch to a JSON/CSV file in the workspace, then read it "
     "back and aggregate in code — dedupe/count/sort with Python, not in your head — and verify the "
     "collected count against what was asked before answering.\n\n"
+    "When continuing a browser session, reuse its current tab: goto_url(url) "
+    "navigates it; new_tab(url) is only for a genuinely NEW tab, not for each "
+    "step or repeated call. In desktop sessions, prefer desktop_preview and "
+    "drive_preview when the user wants visible in-app browsing; do not open "
+    "a second hidden copy of the same page.\n\n"
     "Batch each sub-procedure (navigate, wait, extract, act) into one call — do not spend a call per "
     "action — but for long extractions prefer several medium calls that append to workspace files over "
     "one giant call, so progress survives timeouts."
@@ -716,7 +765,14 @@ _HEADER_LIGHTPANDA = (
 # ``browser-use skill`` fetch (uncontrolled third-party text in every schema: version
 # drift, supply-chain exposure, byte-unstable prompt). A/B benchmarked ~equal.
 _HELPERS_DIGEST = (
-    "\n\nHELPERS (pre-imported): new_tab(url) opens/navigates (use for the FIRST navigation), goto_url(url) "
+    "\n\nSTARDUST STRUCTURED REFS: every exec call provides browser_snapshot_refs(max_items=200), returning "
+    "{contract, url, elements:[{ref, role, name, disabled}], total_elements, truncated}. Refs are opaque "
+    "@ax1 tokens bound to the current top-frame document; browser_click_ref(ref) and "
+    "browser_fill_ref(ref, text) revalidate the live node before acting and reject stale refs. "
+    "Only visible, enabled elements can be clicked; fill is limited to text inputs, textareas, and "
+    "contenteditable fields, and does not echo the entered value. Re-snapshot after navigation or when "
+    "the page replaces an element. This contract requires CDP Page/Accessibility/DOM/Runtime support.\n\n"
+    "HELPERS (pre-imported): new_tab(url) opens/navigates (use for the FIRST navigation), goto_url(url) "
     "navigates the current tab, wait_for_load() after navigation, page_info() summarizes the current page "
     "state, js(expr) evaluates a JS expression and returns its value (js('document.title'); wrap function "
     "bodies as js('(() => {...})()') — a bare '() => {...}' returns the function itself, uncalled), "
@@ -751,10 +807,12 @@ def _dynamic_schema_overrides() -> dict:
         props = dict(BROWSER_EXEC_SCHEMA["parameters"]["properties"])
         props["local"] = {
             "type": "boolean", "default": False,
-            "description": ("Drive the user's own local browser (a Hermes-managed copy of their real "
-                            "default-Chromium profile, logins/cookies included) instead of the configured "
-                            "cloud browser backend. Use when the user asks to act as themselves — their "
-                            "accounts, their sessions. No-op when the backend is already local. Default false."),
+            "description": ("Use a separate, Hermes-managed local Chromium with a COPY of the "
+                            "default browser profile (logins/cookies included) rather than the "
+                            "configured cloud backend. This does NOT control any existing Chrome "
+                            "window or tab. For the user's live browser use an authorized native "
+                            "computer_use controller or verified CDP attachment instead. "
+                            "No-op when the backend is already local. Default false."),
         }
         overrides["parameters"] = {**BROWSER_EXEC_SCHEMA["parameters"], "properties": props}
     return overrides

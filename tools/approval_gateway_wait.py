@@ -29,6 +29,11 @@ class _ApprovalEntry:
     def __init__(self, data: dict):
         self.event = threading.Event()
         self.data = dict(data)
+        # Hosted-room approvals are fixed by target-issued policy, even if the
+        # profile's ordinary approval mode changes while the request is pending.
+        from gateway.hosted_room_execution_policy import current_room_execution_policy
+        if current_room_execution_policy() is not None:
+            self.data["policy_locked"] = True
         self.data.setdefault("request_id", uuid.uuid4().hex)
         self.acknowledged = False
         # Surface hook run once when the wait ends by ANY path (answer, timeout, interrupt, /approve from
@@ -39,7 +44,8 @@ class _ApprovalEntry:
         self.reason: str | None = None
 
 
-def _poll_event(event: threading.Event, session_key: str, *, interrupt_log: str) -> str:
+def _poll_event(event: threading.Event, session_key: str, *, interrupt_log: str,
+                bypass_when_off: bool = False) -> str:
     """Wait on *event* until it fires, the turn is interrupted, or approvals.timeout
     elapses; returns ``"set"`` | ``"interrupted"`` | ``"timeout"``. Polls in ~1s
     slices so activity heartbeats reach the agent's inactivity tracker every ~10s —
@@ -62,6 +68,8 @@ def _poll_event(event: threading.Event, session_key: str, *, interrupt_log: str)
             if is_interrupted():
                 logger.info(interrupt_log, session_key)
                 return "interrupted"
+            if bypass_when_off and _ctx._get_approval_mode() == "off":
+                return "bypassed"
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return "timeout"
@@ -90,10 +98,14 @@ def _await_coalesced_leader(session_key: str, leader, payload: dict):
     _ctx._fire_approval_hook("pre_approval_request", **payload, coalesced=True)
     state = _poll_event(leader.event, session_key,
                         interrupt_log="Coalesced approval wait interrupted by user signal — "
-                                      "returning deny for session %s")
+                                      "returning deny for session %s", bypass_when_off=True)
+    if state == "set" and _ctx._get_approval_mode() == "off":
+        state = "bypassed"
     if state == "interrupted":
         # Deny only OUR follower; the leader thread handles its own signal.
         choice, resolved = "deny", True
+    elif state == "bypassed":
+        choice, resolved = "once", True
     elif state == "timeout":
         choice, resolved = None, False
     else:
@@ -128,6 +140,8 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict, *,
         "pattern_keys": list(approval_data.get("pattern_keys", [primary_key])),
         "session_key": session_key, "surface": surface,
     }
+    if _ctx._get_approval_mode() == "off":
+        return _finish(payload, True, "once", None, bypassed=True)
     keys = list(approval_data.get("pattern_keys") or [])
     state_key = _approval._state_key(session_key)
     with _approval._lock:
@@ -168,10 +182,21 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict, *,
         _ctx._fire_approval_hook("post_approval_response", **payload, choice="notify_failed")
         return {"resolved": False, "choice": None, "notify_failed": True}
 
-    state = _poll_event(entry.event, session_key,
-                        interrupt_log="Approval wait interrupted by user signal — returning deny for session %s")
+    state = _poll_event(
+        entry.event, session_key,
+        interrupt_log="Approval wait interrupted by user signal — returning deny for session %s",
+        bypass_when_off=True,
+    )
+    if state == "set" and _ctx._get_approval_mode() == "off":
+        state = "bypassed"
     if state == "interrupted":
         entry.result = "deny"
         entry.event.set()
+    elif state == "bypassed":
+        entry.result = "once"
+        entry.event.set()
     _drop_entry("answered" if state == "set" else state)
-    return _finish(payload, state != "timeout", entry.result, entry.reason)
+    return _finish(
+        payload, state != "timeout", entry.result, entry.reason,
+        **({"bypassed": True} if state == "bypassed" else {}),
+    )

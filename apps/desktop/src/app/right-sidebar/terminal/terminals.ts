@@ -1,8 +1,9 @@
 import { atom, computed } from 'nanostores'
 
 import { readKey, writeKey } from '@/lib/storage'
-import { $currentCwd } from '@/store/session'
+import { $currentCwd, $selectedStoredSessionId, $sessions } from '@/store/session'
 
+import { resolveTaskTerminalId } from '../../workspace/task-session'
 import { setTerminalTakeover } from '../store'
 
 import { seedAgentTerminalCommand } from './agent-terminal-stream'
@@ -33,6 +34,8 @@ export interface TerminalEntry {
    *  background process (`terminal(background=true)`), keyed by `procId`. */
   kind: 'user' | 'agent'
   procId?: string
+  /** Optional durable task owner. Missing values are legacy/global tabs. */
+  storedSessionId?: string
 }
 
 interface PersistedTerminalEntry {
@@ -41,6 +44,7 @@ interface PersistedTerminalEntry {
   id: string
   restoreCwd?: string
   reviveBuffer?: string
+  storedSessionId?: string
   title: string
 }
 
@@ -67,6 +71,7 @@ function sanitizePersistedTerminal(value: unknown): PersistedTerminalEntry | nul
   const cwd = typeof record.cwd === 'string' ? record.cwd : ''
   const restoreCwd = typeof record.restoreCwd === 'string' && record.restoreCwd ? record.restoreCwd : undefined
   const reviveBuffer = typeof record.reviveBuffer === 'string' ? record.reviveBuffer : undefined
+  const storedSessionId = typeof record.storedSessionId === 'string' ? record.storedSessionId.trim() : ''
 
   if (!id) {
     return null
@@ -78,6 +83,7 @@ function sanitizePersistedTerminal(value: unknown): PersistedTerminalEntry | nul
     id,
     ...(restoreCwd ? { restoreCwd } : {}),
     ...(reviveBuffer ? { reviveBuffer } : {}),
+    ...(storedSessionId ? { storedSessionId } : {}),
     title: title || 'Terminal'
   }
 }
@@ -126,6 +132,7 @@ function persistTerminals(list: readonly TerminalEntry[], activeTerminalId: null
       id: term.id,
       ...(term.restoreCwd ? { restoreCwd: term.restoreCwd } : {}),
       ...(term.reviveBuffer ? { reviveBuffer: term.reviveBuffer } : {}),
+      ...(term.storedSessionId ? { storedSessionId: term.storedSessionId } : {}),
       title: term.title
     }))
 
@@ -158,10 +165,18 @@ const newId = () =>
   globalThis.crypto?.randomUUID?.() ?? `term-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 
 /** Append a fresh terminal and focus it. Captures the current cwd once (its only
- *  tie to session/project state); pass an explicit cwd to override. Returns the id. */
-export function createTerminal(cwd: string = $currentCwd.get()): string {
+ *  tie to session/project state); pass an explicit cwd or owner to override.
+ *  Returns the id. */
+export function createTerminal(
+  cwd: string = $currentCwd.get(),
+  storedSessionId: null | string | undefined = $selectedStoredSessionId.get()
+): string {
   const id = newId()
-  $terminals.set([...$terminals.get(), { id, title: 'Terminal', auto: true, cwd, kind: 'user' }])
+  const owner = storedSessionId?.trim() || undefined
+  $terminals.set([
+    ...$terminals.get(),
+    { id, title: 'Terminal', auto: true, cwd, kind: 'user', ...(owner ? { storedSessionId: owner } : {}) }
+  ])
   $activeTerminalId.set(id)
 
   return id
@@ -224,44 +239,29 @@ export function selectTerminal(id: string): void {
   }
 }
 
-// Compare-ready form of a directory path: trimmed, trailing separators dropped
-// (keeping a bare root intact) so `/repo/` and `/repo` are the same place.
-const normalizePath = (value: string) => {
-  const trimmed = value.trim()
+// Session ↔ terminal linking. The task-session resolver owns precedence:
+// explicit task ownership first, then the legacy unowned cwd pool. Selection
+// only — it never creates, closes, or reveals a shell. `listen` (not
+// `subscribe`) keeps the persisted active tab on boot.
+const selectTerminalForCurrentTask = () => {
+  const current = $activeTerminalId.get()
 
-  return trimmed.length > 1 ? trimmed.replace(/[\\/]+$/, '') || trimmed : trimmed
+  const resolved = resolveTaskTerminalId(
+    $terminals.get(),
+    current,
+    $selectedStoredSessionId.get(),
+    $sessions.get(),
+    $currentCwd.get()
+  )
+
+  if (resolved && resolved !== current) {
+    $activeTerminalId.set(resolved)
+  }
 }
 
-/** The directory a tab points at right now — the live shell cwd once observed
- *  (survives a `cd`), else the launch dir. */
-const terminalCwd = (term: TerminalEntry) => normalizePath(term.restoreCwd || term.cwd)
-
-// Session ↔ terminal linking. Entering a session whose cwd already has a user
-// terminal pointed at it re-selects that tab, so the terminal pane follows the
-// workspace you're in. Selection ONLY — it never creates a shell, never closes
-// one, and never reveals the pane; a detached session (empty cwd) or a cwd no
-// tab lives in leaves the tabs exactly where they were. `listen` (not
-// `subscribe`) so boot keeps the persisted active tab.
-$currentCwd.listen(cwd => {
-  const target = normalizePath(cwd)
-
-  if (!target) {
-    return
-  }
-
-  const list = $terminals.get()
-  const active = list.find(term => term.id === $activeTerminalId.get())
-
-  if (active?.kind === 'user' && terminalCwd(active) === target) {
-    return
-  }
-
-  const match = list.find(term => term.kind === 'user' && terminalCwd(term) === target)
-
-  if (match) {
-    $activeTerminalId.set(match.id)
-  }
-})
+$currentCwd.listen(selectTerminalForCurrentTask)
+$selectedStoredSessionId.listen(selectTerminalForCurrentTask)
+$sessions.listen(selectTerminalForCurrentTask)
 
 /** Move the active tab by `direction` (+1 next / -1 prev), wrapping around. */
 export function cycleTerminal(direction: 1 | -1): void {

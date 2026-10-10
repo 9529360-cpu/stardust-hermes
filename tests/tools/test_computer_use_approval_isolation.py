@@ -13,6 +13,7 @@ A leaked callback still poisons later tests (a raising one becomes deny, a block
 reset in ``tests/conftest.py`` stays and the polluter/observer pair below keeps proving it.
 """
 
+import importlib
 import json
 
 import pytest
@@ -38,7 +39,8 @@ def _install_backend(cu_tool):
 
             return ActionResult(ok=True, action="click")
 
-        def capture(self, mode="som", app=None):
+        def capture(self, mode="som", app=None, **target):
+            self.calls.append(("capture", app, target))
             from tools.computer_use.backend import CaptureResult
 
             return CaptureResult(
@@ -64,6 +66,35 @@ def _nobody_to_ask(monkeypatch):
     yield
 
 
+@pytest.mark.parametrize("app,pid,window_id", [
+    ("screen", None, None), ("Screen", None, None), ("fullscreen", None, None),
+    ("FULLSCREEN", None, None), (" fullscreen ", None, None), ("full screen", None, None),
+    ("all", None, None), ("screen", 0, 0),
+    ("screen", "0", "-1"), ("desktop", None, None), ("desktop", 123, 456),
+])
+def test_broad_capture_requires_approval_through_registry(_nobody_to_ask, app, pid, window_id):
+    """Broad screen/desktop reads are gated before the registered handler reaches the backend."""
+    from tools.computer_use import tool as cu_tool
+    from tools.registry import registry
+
+    backend = _install_backend(cu_tool)
+    args = {"action": "capture", "app": app, "pid": pid, "window_id": window_id}
+    importlib.import_module("tools.computer_use_tool")
+    result = json.loads(registry.dispatch("computer_use", args))
+    assert result["error"].startswith("BLOCKED"), result
+    assert result["action"] == "capture_fullscreen"
+    assert backend.calls == []
+
+
+def test_exact_window_capture_overrides_fullscreen_sentinel(_nobody_to_ask):
+    """An explicit PID/window target selects an app window, not the composited screen lane."""
+    from tools.computer_use import tool as cu_tool
+
+    backend = _install_backend(cu_tool)
+    result = cu_tool.handle_computer_use({"action": "capture", "app": "screen", "pid": 123, "window_id": 456})
+    assert '"error"' not in result, result
+    assert backend.calls == [("capture", "screen", {"pid": 123, "window_id": 456})]
+
 def test_no_callback_refuses_unless_yolo(_nobody_to_ask, monkeypatch):
     """Fail closed: with no human reachable the click is blocked and the backend sees nothing; yolo lets it run."""
     from tools import approval
@@ -78,6 +109,16 @@ def test_no_callback_refuses_unless_yolo(_nobody_to_ask, monkeypatch):
     monkeypatch.setattr(approval, "_YOLO_MODE_FROZEN", True)
     result = cu_tool.handle_computer_use({"action": "click", "element": 3})
     assert [name for name, _ in backend.calls] == ["click"], result
+
+
+def test_app_scoped_capture_stays_available_without_approval(_nobody_to_ask):
+    """Capturing one selected app does not gain the broader desktop disclosure scope."""
+    from tools.computer_use import tool as cu_tool
+
+    backend = _install_backend(cu_tool)
+    result = json.loads(cu_tool.handle_computer_use({"action": "capture", "app": "Calculator"}))
+    assert result.get("mode") == "som", result
+    assert backend.calls == [("capture", "Calculator", {})]
 
 
 def test_always_grant_lands_in_the_shared_store(monkeypatch):

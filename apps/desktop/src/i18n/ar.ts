@@ -47,8 +47,7 @@ export const ar = defineLocale({
     doneDescription:
       'تم حفظ الحزمة المنقحة على جهازك. إذا احتجت إلى الدعم، فأرفق الملف بمشكلة في GitHub الخاص بـ Stardust.',
     failedTitle: 'تعذر حفظ معلومات التشخيص',
-    failedHint:
-      'حدّث Stardust والخادم الخلفي ثم أعد المحاولة. هذا المسار لا يعود إلى رفع سجلاتك إلى خدمة دعم.',
+    failedHint: 'حدّث Stardust والخادم الخلفي ثم أعد المحاولة. هذا المسار لا يعود إلى رفع سجلاتك إلى خدمة دعم.',
     handoffLead: 'هل تحتاج إلى مساعدة؟',
     links: {
       github: 'مشكلات Stardust على GitHub'
@@ -363,6 +362,47 @@ export const ar = defineLocale({
     noResults: 'لا توجد لغة مطابقة'
   },
   settings: {
+    activity: {
+      permissionsTitle: 'الأذونات',
+      permissionsIntro: 'أشياء سمحت لي بفعلها دون أن أسألك مرة أخرى. يمكنك سحب أي منها في أي وقت.',
+      permissionsEmpty: 'لا توجد أذونات دائمة بعد. أسألك قبل أي شيء يحتاج إلى موافقتك.',
+      grantCommand: (pattern: string) => `تشغيل ${pattern} دون سؤال`,
+      grantSend: (target: string) => `إرسال رسائل إلى ${target} دون سؤال`,
+      grantSince: (date: string) => `مسموح منذ ${date}`,
+      revoke: 'سحب',
+      revokeTitle: 'إيقاف السماح بهذا؟',
+      revokeDescription: 'سأسألك مرة أخرى في المرة القادمة التي أحتاج فيها إلى ذلك.',
+      revokeConfirm: 'سحب',
+      revokeFailed: 'تعذر السحب. ما زال هذا الإذن نشطًا.',
+      confirmationsTitle: 'آخر التأكيدات',
+      confirmationsEmpty: 'لم يحتج أي شيء إلى تأكيدك بعد.',
+      confirmationCommand: (command: string) => `تشغيل ${command}`,
+      confirmationTool: (tool: string) => `استخدام ${tool}`,
+      outcome: { approved_once: 'مسموح مرة واحدة', approved_session: 'مسموح لهذه الجلسة', approved_permanent: 'مسموح دائمًا', auto_approved: 'مسموح تلقائيًا', denied: 'مرفوض', blocked: 'محظور', notify_failed: 'تعذر إبلاغك', unknown: 'مسجّل' },
+      dayToday: 'اليوم',
+      dayYesterday: 'أمس',
+      loadFailed: 'تعذر تحميل أذوناتك.',
+      retry: 'إعادة المحاولة',
+      memoryTitle: 'ما أتذكره',
+      memoryIntro: 'أستعين بهذه المعلومات في محادثاتنا. أضف أو احذف ما تشاء في أي وقت.',
+      memoryAboutYou: 'عنك',
+      memoryAboutYouHint: 'تفضيلاتك وخلفيتك.',
+      memoryNotes: 'ملاحظاتي',
+      memoryNotesHint: 'تفاصيل البيئة والمشاريع التي دوّنتها أثناء العمل.',
+      memoryEmpty: 'لا شيء هنا بعد.',
+      memoryDisabled: 'هذا النوع من الذاكرة متوقف. يمكنك تفعيله من الإعدادات المتقدمة أدناه.',
+      memoryPlaceholderUser: 'مثال: أفضّل الإجابات المختصرة',
+      memoryPlaceholderNotes: 'مثال: تُشغَّل الاختبارات بالأمر pnpm test',
+      memoryAdd: 'احفظ',
+      memoryForget: 'انسَ',
+      memoryForgetTitle: 'هل تريد نسيان هذا؟',
+      memoryForgetDescription: 'لن أستخدمه بعد الآن.',
+      memoryForgetConfirm: 'انسَ',
+      memoryChanged: 'تغيّر هذا البند للتو، والقائمة محدّثة الآن.',
+      memorySaveFailed: 'تعذر الحفظ. حاول مرة أخرى.',
+      memoryLoadFailed: 'تعذر تحميل ما أتذكره.',
+      advancedTitle: 'متقدم',
+    },
     closeSettings: 'إغلاق الإعدادات',
     exportConfig: 'تصدير الإعدادات',
     importConfig: 'استيراد الإعدادات',
@@ -421,9 +461,11 @@ export const ar = defineLocale({
       expYearField: 'سنة الانتهاء',
       cvcField: 'CVC',
       delegatedPaymentLabel: 'بطاقة إنفاق Stardust',
-      delegatedPaymentDescription: 'يمكن استخدام هذه البطاقة مباشرةً للمشتريات أو الدفعات التي تطلب من Stardust تنفيذها صراحةً، من دون تأكيد إضافي لتعبئة البطاقة.',
+      delegatedPaymentDescription:
+        'يمكن استخدام هذه البطاقة مباشرةً للمشتريات أو الدفعات التي تطلب من Stardust تنفيذها صراحةً، من دون تأكيد إضافي لتعبئة البطاقة.',
       allowAnyOriginLabel: 'السماح في أي موقع دفع',
-      allowAnyOriginDescription: 'يفضل استخدام بطاقة مخصصة منخفضة الحد أو مسبقة الدفع أو افتراضية. يظل رصيد البطاقة أو حد الجهة المصدرة هو سقف الإنفاق الفعلي.',
+      allowAnyOriginDescription:
+        'يفضل استخدام بطاقة مخصصة منخفضة الحد أو مسبقة الدفع أو افتراضية. يظل رصيد البطاقة أو حد الجهة المصدرة هو سقف الإنفاق الفعلي.',
       delegatedPaymentBadge: 'دفع مفوض',
       anySiteBadge: 'أي موقع',
       postalField: 'الرمز البريدي',
@@ -579,7 +621,8 @@ export const ar = defineLocale({
         sidebar: 'الشريط الجانبي فقط'
       },
       backdropTitle: 'خلفية النافذة',
-      backdropDesc: 'اعرض صورة محلية خلف نافذة Stardust بالكامل، بما في ذلك الشريط الجانبي والمحادثة ولوحات الأدوات. تبقى الصورة على هذا الجهاز فقط.',
+      backdropDesc:
+        'اعرض صورة محلية خلف نافذة Stardust بالكامل، بما في ذلك الشريط الجانبي والمحادثة ولوحات الأدوات. تبقى الصورة على هذا الجهاز فقط.',
       userBubbleTitle: 'فقاعة الرسالة',
       userBubbleDesc: 'مدى شفافية رسائلك. معتمة عند 0؛ يبقى الإطار فقط عند 100.',
       introSplashTitle: 'شاشة المقدمة',
@@ -1664,9 +1707,11 @@ export const ar = defineLocale({
     nameLabel: 'الاسم',
     cloneFrom: 'استنساخ من',
     cloneFromNone: 'لا شيء (فارغ)',
-    cloneFromDesc: 'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي المحدد. لا يتم نسخ الجلسات أو المهام المجدولة.',
+    cloneFromDesc:
+      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي المحدد. لا يتم نسخ الجلسات أو المهام المجدولة.',
     cloneFromDefault: 'نسخ إعداد الافتراضي',
-    cloneFromDefaultDesc: 'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي الافتراضي. لا يتم نسخ الجلسات أو المهام المجدولة.',
+    cloneFromDefaultDesc:
+      'ينسخ الإعدادات وأسرار .env والمهارات وSOUL.md والذاكرة المنسقة (MEMORY.md وUSER.md) من الملف الشخصي الافتراضي. لا يتم نسخ الجلسات أو المهام المجدولة.',
     invalidName: hint => `اسم غير صالح: ${hint}`,
     nameRequired: 'الاسم مطلوب',
     creating: 'جار الإنشاء...',
@@ -1690,6 +1735,27 @@ export const ar = defineLocale({
     failedRename: 'فشل إعادة التسمية'
   },
   cron: {
+    recentRuns: {
+      runningTitle: 'قيد التشغيل',
+      recentTitle: 'آخر عمليات التشغيل',
+      recentEmpty: 'ستظهر هنا سجلات تشغيل مهامك المجدولة.',
+      status: { running: 'قيد التشغيل', completed: 'اكتمل', failed: 'فشل', interrupted: 'توقف', unknown: 'غير معروف' },
+      startedAt: (time: string) => `بدأ ${time}`,
+      finishedAt: (time: string) => `اكتمل ${time}`,
+      startedLabel: 'بدأ',
+      finishedLabel: 'اكتمل',
+      deliveryDelivered: 'تم التسليم',
+      deliveryLabel: 'الإرسال',
+      deliveryQueued: 'في قائمة الإرسال',
+      deliveryFailed: 'تعذر التسليم',
+      deliveryLocal: 'محفوظ على هذا الجهاز فقط',
+      deliveryNotConfigured: 'لم يتم تحديد وجهة للإرسال',
+      deliverySilent: 'لم يكن هناك ما يُرسل هذه المرة',
+      errorTitle: 'سبب الخطأ',
+      openJob: 'فتح هذه المهمة',
+      jobRemoved: 'تم حذف هذه المهمة',
+      unknownJob: 'مهمة مجدولة',
+    },
     close: 'إغلاق',
     modelImpact: {
       title: 'تبقى المهام المجدولة على نموذجها الأصلي',
@@ -1819,7 +1885,7 @@ export const ar = defineLocale({
       dismissed: 'تم تجاهل الاقتراح',
       actionFailed: 'تعذر تحديث اقتراح الأتمتة',
       needsConversation: 'افتح محادثة محفوظة أولا حتى تجد النتائج المجدولة محادثة تعود إليها.'
-    },
+    }
   },
   artifacts: {
     search: 'بحث',
@@ -2161,6 +2227,7 @@ export const ar = defineLocale({
     subagents: count => `${count} ${count === 1 ? 'وكيل فرعي' : 'وكيل فرعي'}`,
     todos: (done, total) => `المهام ${done}/${total}`,
     running: 'قيد التشغيل',
+    cronRun: 'تشغيل مجدول',
     stop: 'إيقاف',
     dismiss: 'تجاهل',
     exit: code => `خروج ${code}`,
@@ -2274,9 +2341,15 @@ export const ar = defineLocale({
       revertConfirm: 'هل تريد تجاهل التغييرات على هذا الملف واستعادته إلى الحالة المُودعة؟ لا يمكن التراجع عن هذا.',
       revertAllConfirm: 'هل تريد تجاهل كل التغييرات واستعادة الملفات إلى الحالة المُودعة؟ لا يمكن التراجع عن هذا.',
       staged: 'مُدرَج',
+      unstaged: 'غير مُدرَج',
+      untracked: 'غير متعقَّب',
       noChanges: 'لا توجد تغييرات',
       notRepo: 'ليس مستودع git',
       noDiff: 'لا يوجد فرق لعرضه',
+      hunk: (current, total) => `المقطع ${current} من ${total}`,
+      previousHunk: 'المقطع السابق',
+      nextHunk: 'المقطع التالي',
+      allHunks: 'كل المقاطع',
       scopeUncommitted: 'غير مُودَع',
       scopeBranch: 'فرع',
       scopeLastTurn: 'آخر دور',
@@ -2487,7 +2560,8 @@ export const ar = defineLocale({
     copyAuthCode: 'انسخ رمز التفويض وألصقه أدناه.',
     pasteAuthCode: 'ألصق رمز التفويض',
     reopenAuthPage: 'إعادة فتح صفحة التفويض',
-    autoBrowser: provider => `فتحنا ${provider} في المتصفح. صرّح لـ Stardust هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
+    autoBrowser: provider =>
+      `فتحنا ${provider} في المتصفح. صرّح لـ Stardust هناك وسيتم الاتصال تلقائياً دون نسخ أو لصق.`,
     reopenSignInPage: 'إعادة فتح صفحة تسجيل الدخول',
     waitingAuthorize: 'بانتظار التفويض...',
     externalPending: provider =>
@@ -2816,7 +2890,13 @@ export const ar = defineLocale({
     }
   },
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: 'بماذا نبدأ؟', body: 'اسأل مباشرة، أو أعطني مهمة. يظهر سياق المشروع أو الملفات أو المعاينة بجانب المحادثة فقط عند الحاجة.', start: 'ابدأ برسالة', actions: 'استكشف الأوامر' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: 'بماذا نبدأ؟',
+      body: 'اسأل مباشرة، أو أعطني مهمة. يظهر سياق المشروع أو الملفات أو المعاينة بجانب المحادثة فقط عند الحاجة.',
+      start: 'ابدأ برسالة',
+      actions: 'استكشف الأوامر'
+    },
     thread: {
       loadingSession: 'جار تحميل الجلسة...',
       showEarlier: 'عرض الرسائل الأقدم',
@@ -3092,7 +3172,8 @@ export const ar = defineLocale({
     sudoSendFailed: 'فشل إرسال كلمة مرور sudo',
     secretSendFailed: 'فشل إرسال السر',
     sudoTitle: 'مطلوب sudo',
-    sudoDesc: 'راجع الأمر قبل إدخال كلمة مرور sudo. تُرسل كلمة المرور إلى الوكيل الذي ينفّذه وتُحفظ مؤقتًا لهذه الجلسة.',
+    sudoDesc:
+      'راجع الأمر قبل إدخال كلمة مرور sudo. تُرسل كلمة المرور إلى الوكيل الذي ينفّذه وتُحفظ مؤقتًا لهذه الجلسة.',
     sudoCommandUnavailable: 'لم يقدّم هذا الوكيل الأمر. ألغِ الطلب إذا لم تتمكن من التحقق منه في المحادثة.',
     sudoPlaceholder: 'كلمة المرور',
     secretTitle: 'مطلوب سر',

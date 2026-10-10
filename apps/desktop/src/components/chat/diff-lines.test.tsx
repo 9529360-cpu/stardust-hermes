@@ -24,7 +24,7 @@ vi.mock('./syntax-diff', () => ({
 
 import { ErrorBoundary } from '@/components/error-boundary'
 
-import { FileDiffPanel } from './diff-lines'
+import { FileDiffPanel, parseDiffHunks } from './diff-lines'
 
 afterEach(cleanup)
 
@@ -68,5 +68,39 @@ describe('FileDiffPanel survives a failed lazy syntax-diff chunk', () => {
     expect(container.textContent).toContain('const b = 2')
     expect(container.textContent).toContain('const b = 3')
     expect(container.textContent).not.toContain(WORKSPACE_FALLBACK_TEXT)
+  })
+})
+
+describe('parseDiffHunks', () => {
+  it('keeps each unified hunk intact without file-header text', () => {
+    const hunks = parseDiffHunks(
+      [
+        'diff --git a/file.ts b/file.ts',
+        '--- a/file.ts',
+        '+++ b/file.ts',
+        '@@ -1,2 +1,2 @@ first block',
+        ' const a = 1',
+        '-const b = 2',
+        '+const b = 3',
+        '@@ -10 +10 @@ second block',
+        '-oldValue()',
+        '+newValue()'
+      ].join('\n')
+    )
+
+    expect(hunks).toEqual([
+      {
+        header: '@@ -1,2 +1,2 @@ first block',
+        diff: ['@@ -1,2 +1,2 @@ first block', ' const a = 1', '-const b = 2', '+const b = 3'].join('\n')
+      },
+      {
+        header: '@@ -10 +10 @@ second block',
+        diff: ['@@ -10 +10 @@ second block', '-oldValue()', '+newValue()'].join('\n')
+      }
+    ])
+  })
+
+  it('ignores malformed hunk headers instead of turning them into selectable hunks', () => {
+    expect(parseDiffHunks('@@ malformed @@\n-old\n@@ -1 +1 @@\n-new\n+new')).toHaveLength(1)
   })
 })

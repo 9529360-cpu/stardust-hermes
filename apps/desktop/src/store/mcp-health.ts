@@ -14,6 +14,7 @@
  * the other just learned.
  */
 
+import { getApiRequestConnection } from '@/api/client'
 import { getHermesConfigRecord, type McpTestResult, setMcpServerEnabled, testMcpServer } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { classifyProbe, freshProbe, probeCache, probeKey } from '@/lib/mcp-probe-cache'
@@ -101,9 +102,13 @@ function openMcpServerPage(name: string): void {
 // listed on the MCP page for a later re-enable). The backend follows the edit
 // on its own — the gateway's config reconcile and the serve backend's next
 // reload both drop a disabled server — so no reload RPC is issued here.
-async function disableServer(profileKey: string, name: string): Promise<void> {
+async function disableServer(
+  profileKey: string,
+  name: string,
+  connectionId: string
+): Promise<void> {
   try {
-    await setMcpServerEnabled(name, false)
+    await setMcpServerEnabled(name, false, { connectionId, profile: profileKey })
     lastStatus.delete(`${profileKey}::${name}`)
     notify({
       kind: 'success',
@@ -126,6 +131,10 @@ function recordResult(profileKey: string, name: string, status: McpHealthStatus)
   snooze(key)
 
   const needsAuth = status === 'needs-auth'
+  // Pin the toast action to the backend that produced the finding. Use an
+  // explicit local pin too: otherwise a later registry-primary switch could
+  // reinterpret the untagged request and disable a same-name remote server.
+  const connectionId = getApiRequestConnection() ?? 'local'
 
   notify({
     action: {
@@ -137,7 +146,7 @@ function recordResult(profileKey: string, name: string, status: McpHealthStatus)
     message: translateNow(needsAuth ? 'notifications.mcp.needsAuthMessage' : 'notifications.mcp.errorMessage', name),
     secondaryAction: {
       label: translateNow('notifications.mcp.disable'),
-      onClick: () => void disableServer(profileKey, name)
+      onClick: () => void disableServer(profileKey, name, connectionId)
     },
     title: translateNow(needsAuth ? 'notifications.mcp.needsAuthTitle' : 'notifications.mcp.errorTitle')
   })

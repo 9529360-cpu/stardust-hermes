@@ -11,7 +11,7 @@ import { requestOneShot } from '@/lib/oneshot'
 import { Codecs, persistentAtom } from '@/lib/persisted'
 
 import { refreshRepoStatus, repoStatusForCwd } from './coding-status'
-import { stampSessionPrBranch } from './pull-requests'
+import { refreshPullRequestChecks, stampSessionPrBranch } from './pull-requests'
 import { $busy, $currentCwd, $selectedStoredSessionId, $sessions } from './session'
 import { $workspaceChangeTick } from './workspace-events'
 
@@ -246,6 +246,12 @@ export async function refreshShipInfo(): Promise<void> {
     if (seq === shipInfoSeq && repoCwd() === ctx.cwd) {
       $reviewShipInfo.set(info)
       shipInfoLastCheckedAt = Date.now()
+
+      if (info.pr) {
+        // Use the existing ship-info refresh as the check refresh edge. CI is
+        // read-only and must not get its own polling owner.
+        void refreshPullRequestChecks(ctx.cwd, info.pr.number)
+      }
     }
   } catch {
     if (seq === shipInfoSeq) {

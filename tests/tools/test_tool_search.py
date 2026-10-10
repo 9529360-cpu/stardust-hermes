@@ -123,6 +123,95 @@ class TestClassification:
         # project_list is NOT in the curated defer set → stays direct.
         assert "project_list" in names
 
+    def test_visible_desktop_browser_tools_are_not_deferred(self):
+        from tools.tool_search import _DEFAULT_DEFERRED_TOOLS, is_deferrable_tool_name
+        for name in ("desktop_preview", "drive_preview"):
+            assert name not in _DEFAULT_DEFERRED_TOOLS
+            assert not is_deferrable_tool_name(name)
+
+    def test_desktop_exposes_host_browser_only_when_controller_is_enabled(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        desktop_tools = [
+            _td("desktop_preview", "In-app browser"),
+            _td("drive_preview", "Drive visible page"),
+            _td("computer_use", "Drive real host window"),
+        ]
+        result = assemble_tool_defs(
+            desktop_tools, config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        names = {tool["function"]["name"] for tool in result.tool_defs}
+        assert {"desktop_preview", "drive_preview", "computer_use"} <= names
+
+        # An unavailable host controller cannot be surfaced by the router.
+        unavailable = assemble_tool_defs(
+            desktop_tools[:-1], config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        assert "computer_use" not in {
+            tool["function"]["name"] for tool in unavailable.tool_defs
+        }
+
+    def test_host_browser_deferral_remains_for_non_desktop_and_user_overrides(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        non_desktop = assemble_tool_defs(
+            [_td("computer_use", "Host desktop control")],
+            config=ToolSearchConfig.from_raw({"enabled": "on"}),
+        )
+        assert "computer_use" not in {
+            tool["function"]["name"] for tool in non_desktop.tool_defs
+        }
+
+        explicit_defer = assemble_tool_defs(
+            [_td("desktop_preview", "In-app browser"),
+             _td("computer_use", "Drive real host")],
+            config=ToolSearchConfig.from_raw({"enabled": "on", "defer": ["computer_use"]}),
+        )
+        assert "computer_use" not in {
+            tool["function"]["name"] for tool in explicit_defer.tool_defs
+        }
+
+    def test_unified_browser_is_only_eager_browser_when_desktop_surface_is_present(self):
+        from tools.registry import discover_builtin_tools
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        discover_builtin_tools()
+        tools = [
+            _td("browser", "Unified control"), _td("desktop_preview", "Legacy GUI"),
+            _td("drive_preview", "Legacy GUI"), _td("browser_navigate", "Legacy engine"),
+            _td("browser_click", "Legacy engine"), _td("computer_use", "Host OS control"),
+        ]
+        assembled = assemble_tool_defs(tools, config=ToolSearchConfig.from_raw({"enabled": "on"}))
+        names = {tool["function"]["name"] for tool in assembled.tool_defs}
+        assert assembled.activated
+        assert "browser" in names
+        assert "desktop_preview" in names
+        assert "computer_use" in names
+        assert "browser_click" not in names
+        assert "browser_navigate" not in names
+        assert "drive_preview" not in names
+
+    def test_non_desktop_browser_tools_preserve_legacy_tool_visibility(self):
+        from tools.registry import discover_builtin_tools
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        discover_builtin_tools()
+        tools = [_td("browser_navigate", "Browser"), _td("browser_click", "Browser")]
+        result = assemble_tool_defs(tools, config=ToolSearchConfig.from_raw({"enabled": "on"}))
+        assert {"browser_navigate", "browser_click"} <= {
+            td["function"]["name"] for td in result.tool_defs
+        }
+
+    def test_explicit_defer_override_restores_the_old_browser_surface(self):
+        from tools.tool_search import ToolSearchConfig, assemble_tool_defs
+
+        tools = [_td("browser", "Unified"), _td("browser_navigate", "Legacy"),
+                 _td("drive_preview", "Legacy")]
+        result = assemble_tool_defs(tools, config=ToolSearchConfig.from_raw({"enabled": "on", "defer": []}))
+        assert {td["function"]["name"] for td in result.tool_defs} == {
+            "browser", "browser_navigate", "drive_preview"
+        }
+
     def test_defer_override_restores_legacy_direct_gui(self):
         """tools.tool_search.defer: [] restores the everything-eager legacy:
         GUI tools alone no longer activate the bridge."""
@@ -489,6 +578,7 @@ class TestHandleFunctionCallIntegration:
         result = model_tools.handle_function_call(
             function_name="tool_search",
             function_args={"queries": ["nothing matches this"]},
+            internal=True,
         )
         parsed = json.loads(result)
         # Without a real registry, the matches will be empty, but the
@@ -526,6 +616,7 @@ class TestHandleFunctionCallIntegration:
             turn_id="private-turn",
             api_request_id="private-request",
             tool_call_id="private-call",
+            internal=True,
         )
 
         assert json.loads(result) == {"results": []}

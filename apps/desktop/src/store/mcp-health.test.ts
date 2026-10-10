@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     activeProfile: makeAtom('default'),
+    apiConnection: null as null | string,
     gatewayState: makeAtom<'closed' | 'open'>('closed'),
     getHermesConfigRecord: vi.fn(),
     notify: vi.fn(),
@@ -42,6 +43,10 @@ vi.mock('@/hermes', () => ({
   getHermesConfigRecord: mocks.getHermesConfigRecord,
   setMcpServerEnabled: mocks.setMcpServerEnabled,
   testMcpServer: mocks.testMcpServer
+}))
+
+vi.mock('@/api/client', () => ({
+  getApiRequestConnection: () => mocks.apiConnection
 }))
 
 vi.mock('@/i18n', () => ({
@@ -72,6 +77,7 @@ afterEach(() => {
   stopMcpHealthChecker()
   mocks.gatewayState.set('closed')
   mocks.activeProfile.set('default')
+  mocks.apiConnection = null
   mocks.getHermesConfigRecord.mockReset()
   mocks.notify.mockReset()
   mocks.testMcpServer.mockReset()
@@ -147,10 +153,37 @@ it('shows the toast with Sign in + Disable, then stays quiet for a day and re-nu
     // Disable from the toast flips enabled:false on the backend.
     toast.secondaryAction.onClick()
     await flush()
-    expect(mocks.setMcpServerEnabled).toHaveBeenCalledWith('linear', false)
+    expect(mocks.setMcpServerEnabled).toHaveBeenCalledWith('linear', false, {
+      connectionId: 'local',
+      profile: 'default'
+    })
   } finally {
     nowSpy.mockRestore()
   }
+})
+
+it('keeps a stale toast pinned to its original connection and profile', async () => {
+  mocks.apiConnection = 'gateway-a'
+  mocks.activeProfile.set('work')
+  mocks.getHermesConfigRecord.mockResolvedValue({ mcp_servers: { linear: { url: 'https://a.example/mcp' } } })
+  mocks.testMcpServer.mockResolvedValue({ ok: false, error: 'down', tools: [] })
+  window.localStorage.clear()
+
+  startMcpHealthChecker()
+  mocks.gatewayState.set('open')
+  await flush()
+  await flush()
+
+  const toast = mocks.notify.mock.calls[0][0]
+  mocks.apiConnection = 'gateway-b'
+  mocks.activeProfile.set('default')
+  toast.secondaryAction.onClick()
+  await flush()
+
+  expect(mocks.setMcpServerEnabled).toHaveBeenCalledWith('linear', false, {
+    connectionId: 'gateway-a',
+    profile: 'work'
+  })
 })
 
 it('coalesces reconnects during a sweep into one fresh follow-up sweep', async () => {

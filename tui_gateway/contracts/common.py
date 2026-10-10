@@ -174,6 +174,7 @@ class PendingApproval(OpenModel):
     allow_permanent: bool | None = None
     allow_session: bool | None = None
     smart_denied: bool | None = None
+    policy_locked: bool | None = None
     choices: list[str] | None = None
     tool_name: str | None = None
 

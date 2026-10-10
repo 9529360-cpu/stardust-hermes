@@ -678,6 +678,7 @@ export interface SessionResumeResult {
     description?: string
     request_id?: string
     smart_denied?: boolean
+    policy_locked?: boolean
   }
   // Server→client requests still unanswered for this session (clarify, sudo,
   // vault prompts, …). The shared channel re-delivers them to the request
@@ -1663,6 +1664,12 @@ export interface MemoryStatusResponse {
   active: string
   providers: { name: string; description: string; configured: boolean }[]
   builtin_files: { memory: number; user: number }
+}
+
+export interface MemoryEntriesResponse {
+  target: 'memory' | 'user'
+  available: boolean
+  entries: string[]
 }
 
 /** `GET /api/curator` — background skill-curator status. */

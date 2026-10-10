@@ -133,8 +133,10 @@ _DIRECT_SURFACE_TOOLSETS = frozenset({"desktop_ui", "project"})
 _DEFAULT_DEFERRED_TOOLS = frozenset({
     "computer_use", "session_search", "image_generate",
     "todo_list", "process_manage", "cronjob_manage",
-    # Desktop GUI surface (desktop_ui + project toolsets)
-    "drive_preview", "gui_tour", "desktop_preview", "annotate_preview",
+    # The visible desktop browser must stay directly callable: deferring its
+    # open/drive tools makes models reach for a second, headless browser instead.
+    # Other desktop GUI affordances remain on-demand.
+    "gui_tour", "annotate_preview",
     "show_tip", "desktop_project", "close_terminal",
     "apply_layout", "read_terminal", "read_window_below", "focus_pane"})
 
@@ -363,7 +365,26 @@ def assemble_tool_defs(tool_defs: List[Dict[str, Any]], *, context_length: Optio
     config = config or load_config()
     incoming = [td for td, name in zip(tool_defs, _tool_def_names(tool_defs))
                 if name not in BRIDGE_TOOL_NAMES]
-    visible, deferrable = classify_tools(incoming, config.effective_defer_tools)
+    defer_tools = config.effective_defer_tools
+    if config.defer_tools is None and any(
+        _fn(tool).get("name") == "desktop_preview" for tool in incoming
+    ):
+        # Computer Use is the existing *real host-window* browser controller.
+        # Offer it directly beside the in-app browser in GUI sessions only,
+        # when the toolset/driver actually supplied it. In terminal, cron and
+        # messaging sessions it stays deferred. Explicit user defer overrides
+        # still win.
+        defer_tools = defer_tools - {"computer_use"}
+    if config.defer_tools is None and any(_fn(tool).get("name") == "browser" for tool in incoming):
+        # Browser is the unified desktop entry. The old browser_* engines and
+        # drive_preview remain callable through the existing search bridge for
+        # advanced/backward-compatible work, not a competing eager browser UI.
+        # An explicit user's defer config always wins.
+        defer_tools = defer_tools | {
+            name for name in _tool_def_names(incoming)
+            if name.startswith("browser_") and not name.startswith("browser_vault_")
+        } | {"drive_preview"}
+    visible, deferrable = classify_tools(incoming, defer_tools)
     connections_granted = connections_in_scope(incoming)
     if not deferrable:
         if should_activate(config, 0, context_length, connections_granted=connections_granted):
@@ -438,11 +459,46 @@ def _mcp_health_snapshot(catalog: List[CatalogEntry]) -> Tuple[Dict[str, float],
     return weights, details
 
 
-def _shared_tool_record(entry: CatalogEntry, health: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _mcp_permission_snapshot(catalog: List[CatalogEntry]) -> Dict[str, Dict[str, Any]]:
+    """Describe MCP write risk from the same scoped metadata used at call time.
+
+    Unknown annotations are write-capable; trust is the *consumer's* policy even
+    when the connection belongs to an adopting profile. This is a routing hint,
+    never a substitute for the call-time approval check.
+    """
+    details: Dict[str, Dict[str, Any]] = {}
+    try:
+        from tools import mcp_tool as core
+        from tools.mcp_tool_scope import _resolve_server_key, _server_key
+    except Exception:
+        return details
+
+    with core._lock:
+        for entry in catalog:
+            if entry.source != "mcp":
+                continue
+            server = core._mcp_tool_server_names.get(entry.name)
+            if not server:
+                continue
+            read_only = core._tool_read_only_hints.get(_resolve_server_key(server), {}).get(
+                entry.name.split("__", 2)[-1]
+            ) is True
+            trust = core._server_trust_levels.get(_server_key(server), core._TRUST_FULL)
+            details[entry.name] = {
+                "read_only": read_only,
+                "approval_required": trust == core._TRUST_UNTRUSTED and not read_only,
+            }
+    return details
+
+
+def _shared_tool_record(entry: CatalogEntry, health: Optional[Dict[str, Any]] = None,
+                        permission: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """One record for the shared tools map (per-query groups carry names only).
 
     required lets the model attempt a trivial call without a tool_describe round-trip.
-    Degraded MCP health is attached only when relevant so healthy catalogs stay compact.
+    Degraded MCP health and approval requirements are attached only when relevant so healthy
+    catalogs stay compact. approval_required tells the model that calling the tool will ask the
+    user first; the call-time approval check still decides.
     """
     try:
         required = entry.schema["function"]["parameters"]["required"]
@@ -454,6 +510,8 @@ def _shared_tool_record(entry: CatalogEntry, health: Optional[Dict[str, Any]] = 
                            if isinstance(r, str)][:32]}
     if health:
         record["health"] = health
+    if permission and permission.get("approval_required"):
+        record["approval_required"] = True
     return record
 
 
@@ -510,11 +568,13 @@ def dispatch_tool_search(args: Dict[str, Any], *, current_tool_defs: List[Dict[s
     tools_map: Dict[str, Dict[str, Any]] = {}
     available_sources = _available_source_summary(catalog) if catalog else []
     health_weights, health_details = _mcp_health_snapshot(catalog)
+    permission_details = _mcp_permission_snapshot(catalog)
     for position, query in enumerate(queries):
         corpus = catalog + remote_entries[position]
         hits = search_catalog(corpus, query, limit=limit, score_weights=health_weights)
         for h in hits:
-            tools_map.setdefault(h.name, _shared_tool_record(h, health_details.get(h.name)))
+            tools_map.setdefault(h.name, _shared_tool_record(
+                h, health_details.get(h.name), permission_details.get(h.name)))
         matches = [h.name for h in hits]
         group: Dict[str, Any] = {"query": query, "matches": matches}
         if not matches and catalog:

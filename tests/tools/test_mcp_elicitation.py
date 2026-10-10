@@ -21,6 +21,31 @@ from mcp.types import ElicitResult  # noqa: E402  -- after importorskip
 from tools.mcp_tool_sampling import ElicitationHandler, _format_elicitation_schema_summary  # noqa: E402
 
 
+@pytest.mark.parametrize("mode", ["manual", "smart"])
+def test_elicitation_still_uses_human_consent_in_manual_and_smart_modes(monkeypatch, mode):
+    from tools import approval_context, approval_prompt
+
+    monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: mode)
+    monkeypatch.setattr(approval_context, "get_current_session_key", lambda: "test-session")
+    monkeypatch.setattr(approval_context, "_is_gateway_approval_context", lambda: False)
+    monkeypatch.setattr(approval_prompt, "prompt_dangerous_approval", lambda *args, **kwargs: "once")
+
+    assert approval_prompt.request_elicitation_consent("confirm", "description") == "accept"
+
+
+def test_elicitation_is_auto_accepted_without_prompt_when_mode_is_off(monkeypatch):
+    from tools import approval_context, approval_prompt
+
+    monkeypatch.setattr(approval_context, "_get_approval_mode", lambda: "off")
+    monkeypatch.setattr(
+        approval_prompt,
+        "prompt_dangerous_approval",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected prompt")),
+    )
+
+    assert approval_prompt.request_elicitation_consent("confirm", "description") == "accept"
+
+
 def _form_params(message="please confirm", schema=None):
     """Build a stand-in for ElicitRequestFormParams.
 

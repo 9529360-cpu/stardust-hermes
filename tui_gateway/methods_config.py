@@ -295,7 +295,9 @@ def _(rid, params: dict) -> dict:
     """Strict provider check via the same resolve_runtime_provider() the agent uses on session
     creation (setup.status is True if ANY provider auth state is discoverable): ok=False + the auth
     error when the model can't be served, so UIs surface onboarding before a doomed prompt.
-    ``profile`` answers for THAT profile's pin and ``.env``; unknown -> ``ok=False``."""
+    ``profile`` answers for THAT profile's pin and ``.env``; unknown -> ``ok=False``.
+    ``live=True`` additionally probes the selected HTTP route; ``live_ok`` is separate from
+    credential readiness (``ok``). ``timeout_s`` defaults to 8 seconds, with a 30-second maximum."""
     try:
         from hermes_cli.runtime_provider import resolve_runtime_provider
         from hermes_cli.auth import has_usable_secret
@@ -308,9 +310,16 @@ def _(rid, params: dict) -> dict:
             provider = runtime.get("provider") or "provider"
             source = str(runtime.get("source") or "")
 
+            from hermes_cli.model_health import probe_model_health, redact
+            secret = runtime.get("api_key")
+            secret = secret if isinstance(secret, str) else ""
+
             def fail(error, src):
-                return {"ok": False, "provider": provider, "model": runtime.get("model"),
-                        "source": src, "error": error, **scoped}
+                payload = {"ok": False, "provider": provider, "model": runtime.get("model"),
+                           "source": src, "error": error, **scoped}
+                if params.get("live"):
+                    payload.update(live_ok=False, latency_ms=None, error_kind="auth")
+                return redact(payload, secret)
             if (not provider_configured and provider == "bedrock"
                     and source in {"iam-role", "aws-sdk-default-chain"}):
                 return fail("No Hermes provider is configured.", source)
@@ -322,13 +331,17 @@ def _(rid, params: dict) -> dict:
             from hermes_cli.anon_auth import route_is_welcome_host
             # free_tier is keyed on the SELECTED route (the welcome host serves only nous/welcome), not
             # on profile state: a paid Nous key beside a free-tier identity must not read as free.
-            return {"ok": True, "provider": runtime.get("provider"), "model": runtime.get("model"),
-                    "source": runtime.get("source"),
-                    "free_tier": provider == "nous" and route_is_welcome_host(runtime.get("base_url")),
-                    **scoped}
+            payload = {"ok": True, "provider": runtime.get("provider"), "model": runtime.get("model"),
+                       "source": runtime.get("source"),
+                       "free_tier": provider == "nous" and route_is_welcome_host(runtime.get("base_url")),
+                       **scoped}
+            if params.get("live"):
+                payload.update(probe_model_health(runtime, params.get("timeout_s", 8)))
+            return redact(payload, secret)
         return _readiness_check(rid, params, probe)
-    except Exception as e:
-        return _ok(rid, {"ok": False, "error": str(e)})
+    except Exception:
+        # Resolver errors may contain a URL or credential; never return raw exception text.
+        return _ok(rid, {"ok": False, "error": "Could not resolve runtime provider credentials."})
 
 
 def _safe_client_label(label: str) -> str:

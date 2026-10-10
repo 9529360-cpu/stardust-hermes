@@ -286,8 +286,7 @@ export const zh = defineLocale({
     doneTitle: '诊断信息已保存',
     doneDescription: '脱敏诊断包已保存到您的电脑。如需支持，可将该文件附加到星尘的 GitHub Issue。',
     failedTitle: '无法保存诊断信息',
-    failedHint:
-      '请更新星尘及后端后重试。此流程不会退回到把日志上传到支持服务的旧路径。',
+    failedHint: '请更新星尘及后端后重试。此流程不会退回到把日志上传到支持服务的旧路径。',
     handoffLead: '需要帮助？',
     links: {
       github: '星尘 GitHub Issues'
@@ -434,6 +433,47 @@ export const zh = defineLocale({
   },
 
   settings: {
+    activity: {
+      permissionsTitle: '我的权限',
+      permissionsIntro: '这些是你允许我不用再问就能做的事。随时可以撤销。',
+      permissionsEmpty: '还没有长期权限。需要你批准的事，我都会先问你。',
+      grantCommand: (pattern: string) => `无需确认即可运行 ${pattern}`,
+      grantSend: (target: string) => `无需确认即可给 ${target} 发消息`,
+      grantSince: (date: string) => `${date}允许`,
+      revoke: '撤销',
+      revokeTitle: '不再允许这项操作？',
+      revokeDescription: '之后再遇到这类操作，我会先问你。',
+      revokeConfirm: '撤销',
+      revokeFailed: '没能撤销，这项权限仍然有效。',
+      confirmationsTitle: '最近的确认',
+      confirmationsEmpty: '还没有需要你确认的操作。',
+      confirmationCommand: (command: string) => `运行 ${command}`,
+      confirmationTool: (tool: string) => `使用 ${tool}`,
+      outcome: { approved_once: '已允许一次', approved_session: '本次会话允许', approved_permanent: '已长期允许', auto_approved: '自动允许', denied: '已拒绝', blocked: '已阻止', notify_failed: '没能通知你', unknown: '已记录' },
+      dayToday: '今天',
+      dayYesterday: '昨天',
+      loadFailed: '没能读取你的权限。',
+      retry: '重试',
+      memoryTitle: '记住的事',
+      memoryIntro: '我会在对话中参考这些内容。随时可以添加或删除。',
+      memoryAboutYou: '关于你',
+      memoryAboutYouHint: '你的偏好和背景。',
+      memoryNotes: '我的笔记',
+      memoryNotesHint: '我在工作中记下的环境和项目信息。',
+      memoryEmpty: '这里还没有内容。',
+      memoryDisabled: '这类记忆已关闭，可以在下方的高级设置中打开。',
+      memoryPlaceholderUser: '例如：我喜欢简短的回答',
+      memoryPlaceholderNotes: '例如：这个项目的测试用 pnpm test 运行',
+      memoryAdd: '记住',
+      memoryForget: '忘记',
+      memoryForgetTitle: '忘记这条内容？',
+      memoryForgetDescription: '之后我不会再参考它。',
+      memoryForgetConfirm: '忘记',
+      memoryChanged: '这条内容刚刚被改动，列表已更新。',
+      memorySaveFailed: '没能保存，请再试一次。',
+      memoryLoadFailed: '没能读取记住的内容。',
+      advancedTitle: '高级设置',
+    },
     closeSettings: '关闭设置',
     exportConfig: '导出配置',
     importConfig: '导入配置',
@@ -466,7 +506,8 @@ export const zh = defineLocale({
       count: n => `已保存 ${n} 项`,
       loadFailed: '无法加载保险库条目',
       empty: '尚未保存任何内容',
-      emptyDesc: '登录信息可以在 Stardust 第一次需要时再保存；也可以在这里提前放一张专用低额度银行卡和地址，供它按你的购买指令使用。',
+      emptyDesc:
+        '登录信息可以在 Stardust 第一次需要时再保存；也可以在这里提前放一张专用低额度银行卡和地址，供它按你的购买指令使用。',
       add: '添加',
       addTitle: '添加登录信息、银行卡或地址',
       addDescription: '加密保存在本机。Stardust 永远看不到密码、卡号或 CVC。',
@@ -1751,8 +1792,7 @@ export const zh = defineLocale({
     providers: {
       connectAccount: '登录模型提供方',
       haveApiKey: '改用 API 密钥？',
-      intro:
-        '可以使用提供方订阅或网页登录，无需复制 API 密钥。Stardust 会在应用中完成提供方登录流程。',
+      intro: '可以使用提供方订阅或网页登录，无需复制 API 密钥。Stardust 会在应用中完成提供方登录流程。',
       connected: '已连接',
       collapse: '收起',
       connectAnother: '连接其他提供方',
@@ -1877,23 +1917,38 @@ export const zh = defineLocale({
         needsSetupHint: '现在即可选择此后端——但在完成设置前命令将会失败。'
       },
       browserRealProfile: {
-        label: '使用我的真实浏览器配置文件',
+        label: '使用浏览器配置文件副本',
         description:
           '将默认浏览器的登录信息和 Cookie 复制到托管快照中，代理使用该快照进行浏览。绝不会直接打开你的真实配置文件。将应用于新会话。',
         enabledTitle: '真实配置文件浏览：已开启',
         enabledMessage: '新会话将使用默认浏览器配置文件的快照进行浏览。',
         disabledTitle: '真实配置文件浏览：已关闭',
         disabledMessage: '配置文件快照将被删除；新会话使用干净的浏览器。',
-        failedSave: '无法保存真实配置文件设置',
-        prompt: {
-          title: '让网站保持登录状态',
-          body: '让 Hermes 使用默认浏览器配置文件的快照进行浏览，网站打开时即已登录。',
-          bulletSnapshot: 'Cookie 和登录信息会复制到托管快照中。',
-          bulletLiveProfile: '绝不会直接打开你的真实浏览器配置文件。',
-          bulletLocal: '所有数据都不会离开这台电脑。',
-          dontShowAgain: '不再显示',
-          notNow: '暂不',
-          enable: '使用我的配置文件'
+        failedSave: '无法保存真实配置文件设置'
+      },
+      browserHostControl: {
+        label: '连接到已打开的 Chrome 配置文件',
+        description:
+          '通过已批准的浏览器扩展，明确将此会话配对到一个已打开的 Chrome 配置文件。Stardust 不会复制你的 Chrome Cookie。',
+        statusLabel: '状态',
+        profileLabel: 'Chrome 配置文件目录',
+        connect: '连接 Chrome',
+        disconnect: '断开连接',
+        working: '处理中…',
+        connectedTitle: 'Chrome 已连接',
+        connectedMessage: '每个操作获得批准后，此会话即可使用已配对的 Chrome 配置文件。',
+        connectFailed: '无法连接 Chrome',
+        disconnectFailed: '无法断开 Chrome 连接',
+        noSession: '请先打开或选择一个 Desktop 会话。',
+        invalidProfile: '只输入 Chrome 配置文件目录名称，例如 Default 或 Profile 1。',
+        warning:
+          '请先在 Chrome 中安装并启用官方 Playwright MCP Browser Extension，并在扩展提示中批准要控制的标签页。连接仅限此会话，断开后即停止。',
+        status: {
+          inactive: '未连接',
+          starting: '连接中…',
+          connected: '已连接',
+          stopping: '断开中…',
+          error: '错误'
         }
       }
     }
@@ -1997,24 +2052,65 @@ export const zh = defineLocale({
     },
     toolsetLabels: {
       a2a: 'A2A 智能体协作',
-      web: '联网搜索与网页提取', browser: '浏览器自动化', terminal: '终端与进程', file: '文件操作',
-      code_execution: '代码执行', vision: '图片分析', video: '视频分析', image_gen: '图片生成', video_gen: '视频生成',
-      x_search: 'X 搜索', tts: '文字转语音', stt: '语音转文字', skills: '技能', todo: '任务规划', kanban: '看板',
-      memory: '记忆', context_engine: '上下文引擎', session_search: '对话搜索', connections: '连接器', clarify: '澄清问题',
-      delegation: '任务委派', cronjob: '定时任务', homeassistant: 'Home Assistant', spotify: 'Spotify', discord: 'Discord',
-      discord_admin: 'Discord 管理', yuanbao: '元宝', computer_use: '电脑控制'
+      web: '联网搜索与网页提取',
+      browser: '浏览器自动化',
+      terminal: '终端与进程',
+      file: '文件操作',
+      code_execution: '代码执行',
+      vision: '图片分析',
+      video: '视频分析',
+      image_gen: '图片生成',
+      video_gen: '视频生成',
+      x_search: 'X 搜索',
+      tts: '文字转语音',
+      stt: '语音转文字',
+      skills: '技能',
+      todo: '任务规划',
+      kanban: '看板',
+      memory: '记忆',
+      context_engine: '上下文引擎',
+      session_search: '对话搜索',
+      connections: '连接器',
+      clarify: '澄清问题',
+      delegation: '任务委派',
+      cronjob: '定时任务',
+      homeassistant: 'Home Assistant',
+      spotify: 'Spotify',
+      discord: 'Discord',
+      discord_admin: 'Discord 管理',
+      yuanbao: '元宝',
+      computer_use: '电脑控制'
     },
     toolsetDescriptions: {
       a2a: '通过 A2A 协议发现、调用并协调其他智能体。',
-      web: '联网搜索并提取网页内容。', browser: '打开网页并完成点击、输入、滚动等交互。', terminal: '执行终端命令并管理后台进程。',
-      file: '读取、写入、修改并搜索本地文件。', code_execution: '运行可编程代码任务，减少多轮工具调用。', vision: '分析图片和其他视觉内容。',
-      video: '理解和分析视频内容。', image_gen: '根据描述生成图片。', video_gen: '根据文字、图片或参考素材生成视频。',
-      x_search: '搜索 X 上的公开帖子与讨论。', tts: '将文字转换为语音。', stt: '将语音内容转换为文字。', skills: '使用和管理专业技能与知识。',
-      todo: '规划并跟踪多步骤任务。', kanban: '通过任务看板协调多智能体工作。', memory: '跨会话保存长期记忆与个人偏好。',
-      context_engine: '使用当前上下文引擎提供的运行时工具。', session_search: '搜索并回忆过去的对话。', connections: '使用连接器、外部服务和账户授权。',
-      clarify: '在需要时向你提出澄清问题。', delegation: '将复杂子任务分派给独立智能体。', cronjob: '创建、暂停、更新并运行定时任务。',
-      homeassistant: '控制和监控 Home Assistant 智能家居设备。', spotify: '搜索音乐并控制 Spotify 播放。', discord: '读取并参与 Discord 对话。',
-      discord_admin: '管理 Discord 频道、角色和置顶内容。', yuanbao: '使用元宝平台的群聊、成员与私聊能力。', computer_use: '在后台控制 macOS、Windows 或 Linux 桌面。'
+      web: '联网搜索并提取网页内容。',
+      browser: '打开网页并完成点击、输入、滚动等交互。',
+      terminal: '执行终端命令并管理后台进程。',
+      file: '读取、写入、修改并搜索本地文件。',
+      code_execution: '运行可编程代码任务，减少多轮工具调用。',
+      vision: '分析图片和其他视觉内容。',
+      video: '理解和分析视频内容。',
+      image_gen: '根据描述生成图片。',
+      video_gen: '根据文字、图片或参考素材生成视频。',
+      x_search: '搜索 X 上的公开帖子与讨论。',
+      tts: '将文字转换为语音。',
+      stt: '将语音内容转换为文字。',
+      skills: '使用和管理专业技能与知识。',
+      todo: '规划并跟踪多步骤任务。',
+      kanban: '通过任务看板协调多智能体工作。',
+      memory: '跨会话保存长期记忆与个人偏好。',
+      context_engine: '使用当前上下文引擎提供的运行时工具。',
+      session_search: '搜索并回忆过去的对话。',
+      connections: '使用连接器、外部服务和账户授权。',
+      clarify: '在需要时向你提出澄清问题。',
+      delegation: '将复杂子任务分派给独立智能体。',
+      cronjob: '创建、暂停、更新并运行定时任务。',
+      homeassistant: '控制和监控 Home Assistant 智能家居设备。',
+      spotify: '搜索音乐并控制 Spotify 播放。',
+      discord: '读取并参与 Discord 对话。',
+      discord_admin: '管理 Discord 频道、角色和置顶内容。',
+      yuanbao: '使用元宝平台的群聊、成员与私聊能力。',
+      computer_use: '在后台控制 macOS、Windows 或 Linux 桌面。'
     },
     skillUpdated: '技能已更新',
     edit: '编辑',
@@ -2027,10 +2123,10 @@ export const zh = defineLocale({
       agentBlurb: '为所选配置扩展智能体 — 工具、钩子、模型提供方。重启网关后生效。',
       pageBlurb: '每个插件一行。插件可以扩展本应用、智能体，或两者 — 每一部分都有自己的开关。',
       bundledNames: {
-        'hermes-bots': '智能体',
+        'hermes-bots': '智能体'
       },
       bundledDescriptions: {
-        'hermes-bots': '智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。',
+        'hermes-bots': '智能体名册，为每个智能体提供独立对话、定时任务、群聊和智能体间消息。'
       },
       halfDesktop: '桌面',
       halfDesktopHint: '本应用，所有配置相同',
@@ -2368,11 +2464,19 @@ export const zh = defineLocale({
       resume: '恢复',
       runNow: '立即运行',
       memoryData: '记忆数据',
-      memoryDataDesc: '注入每个会话的内置记忆文件',
+      memoryDataDesc: '查看内置记忆条目。已有聊天会保留缓存提示词，直到开始新会话。',
       memoryProvider: name => `当前提供方：${name}`,
       builtinMemory: '内置',
       memoryFile: '智能体记忆（MEMORY.md）',
       userFile: '用户画像（USER.md）',
+      viewEntries: '查看条目',
+      hideEntries: '收起条目',
+      noEntries: '暂无条目',
+      entriesUnavailable: '此配置中的内置记忆不可用。',
+      removeEntry: '删除条目',
+      removeEntryConfirm: '删除这条记忆？',
+      entryRemoved: '记忆条目已删除',
+      removeEntryFailed: '无法删除记忆条目',
       bytes: size => size,
       empty: '空',
       resetMemory: '重置记忆',
@@ -2384,8 +2488,7 @@ export const zh = defineLocale({
       resetDone: files => `已删除 ${files}。`,
       resetCurrentChats: '现有聊天会在下一轮刷新内置记忆；如果想立刻去掉旧提示词快照，请新建会话。',
       resetFreshTitle: '现在开始一个新会话？',
-      resetFreshDescription:
-        '新会话不会带入刚删除的内置记忆。继续当前聊天也是安全的，但旧快照可能会保留到下一轮刷新。',
+      resetFreshDescription: '新会话不会带入刚删除的内置记忆。继续当前聊天也是安全的，但旧快照可能会保留到下一轮刷新。',
       startFreshSession: '开始新会话',
       keepCurrentSession: '继续当前聊天',
       resetFailed: '记忆重置失败',
@@ -2582,8 +2685,7 @@ export const zh = defineLocale({
       matrix: '用机器人账户登录你的 homeserver，然后复制访问令牌、用户 ID 和 homeserver URL。',
       signal: '在可访问的位置运行 signal-cli REST 桥接，然后在这里填写该 URL 和已注册的电话号码。',
       whatsapp: '启动随本应用提供的 WhatsApp 桥接，首次运行时扫描二维码，然后启用该平台。',
-      bluebubbles:
-        '在装有 iMessage 的 Mac 上运行 BlueBubbles Server，暴露其 API，然后在这里填写该 URL 和服务器密码。',
+      bluebubbles: '在装有 iMessage 的 Mac 上运行 BlueBubbles Server，暴露其 API，然后在这里填写该 URL 和服务器密码。',
       homeassistant: '在 Home Assistant 中打开你的个人资料并创建长期访问令牌。把它连同你的 HA URL 一起粘贴到这里。',
       email: '使用专用邮箱。对于 Gmail/Workspace,创建应用专用密码并使用 imap.gmail.com / smtp.gmail.com。',
       sms: '从 Twilio 控制台获取你的 Account SID 和 Auth Token，以及一个可发送短信的电话号码。',
@@ -2594,8 +2696,7 @@ export const zh = defineLocale({
       weixin:
         '运行 `hermes gateway setup`，选择 Weixin，然后使用个人微信账号扫描并确认二维码。本应用会通过腾讯 iLink Bot API 连接并保存凭据。',
       qqbot: '在 QQ 开放平台 (q.qq.com) 注册一个应用，复制 App ID 和 Client Secret。',
-      api_server:
-        '把助理暴露为兼容 OpenAI 的 API。设置一个鉴权密钥，然后把 Open WebUI / LobeChat 等指向 host:port。',
+      api_server: '把助理暴露为兼容 OpenAI 的 API。设置一个鉴权密钥，然后把 Open WebUI / LobeChat 等指向 host:port。',
       webhook: '运行一个 HTTP 服务器，供其他工具 (GitHub、GitLab、自定义应用)POST。用 secret 验证签名。'
     }
   },
@@ -2768,9 +2869,11 @@ export const zh = defineLocale({
     nameLabel: '名称',
     cloneFrom: '克隆来源',
     cloneFromNone: '无（空白）',
-    cloneFromDesc: '从选中的来源档案复制配置、.env 中的密钥、技能、SOUL.md，以及精选记忆（MEMORY.md 和 USER.md）。会话和定时任务不会复制。',
+    cloneFromDesc:
+      '从选中的来源档案复制配置、.env 中的密钥、技能、SOUL.md，以及精选记忆（MEMORY.md 和 USER.md）。会话和定时任务不会复制。',
     cloneFromDefault: '从默认档案克隆',
-    cloneFromDefaultDesc: '从默认档案复制配置、.env 中的密钥、技能、SOUL.md，以及精选记忆（MEMORY.md 和 USER.md）。会话和定时任务不会复制。',
+    cloneFromDefaultDesc:
+      '从默认档案复制配置、.env 中的密钥、技能、SOUL.md，以及精选记忆（MEMORY.md 和 USER.md）。会话和定时任务不会复制。',
     invalidName: hint => `名称无效。${hint}`,
     nameRequired: '名称为必填项。',
     creating: '创建中…',
@@ -2798,6 +2901,27 @@ export const zh = defineLocale({
   },
 
   cron: {
+    recentRuns: {
+      runningTitle: '正在运行',
+      recentTitle: '最近运行',
+      recentEmpty: '定时任务运行过之后，记录会出现在这里。',
+      status: { running: '运行中', completed: '已完成', failed: '失败', interrupted: '已中断', unknown: '未知' },
+      startedAt: (time: string) => `开始于 ${time}`,
+      finishedAt: (time: string) => `完成于 ${time}`,
+      startedLabel: '开始',
+      finishedLabel: '完成',
+      deliveryDelivered: '已送达',
+      deliveryLabel: '发送',
+      deliveryQueued: '排队中，等待发送',
+      deliveryFailed: '没能送达',
+      deliveryLocal: '只保存在这台设备上',
+      deliveryNotConfigured: '还没有设置发送目的地',
+      deliverySilent: '这次没有需要发送的内容',
+      errorTitle: '出错原因',
+      openJob: '查看这个任务',
+      jobRemoved: '这个任务已被删除',
+      unknownJob: '定时任务',
+    },
     close: '关闭定时任务',
     title: '定时任务',
     count: count => `${count} 个任务`,
@@ -3026,7 +3150,10 @@ export const zh = defineLocale({
           fields: { what: { label: '哪项费用或续订？' } }
         },
         'price-watch': { title: '价格与可用性监控', description: '监控指定商品、航班、酒店或列表，条件满足时提醒。' },
-        'competitor-watch': { title: '竞品动态监控', description: '跟踪指定公司的重要新闻，如发布、定价、融资和公告。' },
+        'competitor-watch': {
+          title: '竞品动态监控',
+          description: '跟踪指定公司的重要新闻，如发布、定价、融资和公告。'
+        },
         'habit-checkin': { title: '习惯打卡', description: '定期提醒你坚持习惯，并简单回顾是否完成。' },
         'hydration-move': { title: '喝水与活动提醒', description: '白天定期提醒喝水、起身和伸展。' },
         'meal-plan': { title: '每周饮食计划', description: '根据饮食偏好和烹饪时间生成一周餐单及合并购物清单。' },
@@ -3044,7 +3171,7 @@ export const zh = defineLocale({
       dismissed: '已忽略建议',
       actionFailed: '无法更新自动化建议',
       needsConversation: '请先打开一个已保存的对话，这样定时任务的结果才有可返回的会话。'
-    },
+    }
   },
 
   artifacts: {
@@ -3480,6 +3607,7 @@ export const zh = defineLocale({
     subagents: count => `${count} 个子代理`,
     todos: (done, total) => `任务 ${done}/${total}`,
     running: '运行中',
+    cronRun: '定时任务',
     stop: '停止',
     dismiss: '关闭',
     exit: code => `退出码 ${code}`,
@@ -3594,9 +3722,15 @@ export const zh = defineLocale({
       revertConfirm: '放弃对此文件的更改并将其恢复到已提交状态？此操作无法撤销。',
       revertAllConfirm: '放弃所有更改并将文件恢复到已提交状态？此操作无法撤销。',
       staged: '已暂存',
+      unstaged: '未暂存',
+      untracked: '未跟踪',
       noChanges: '没有更改',
       notRepo: '不是 Git 仓库',
       noDiff: '没有可显示的差异',
+      hunk: (current, total) => `第 ${current} 个变更块，共 ${total} 个`,
+      previousHunk: '上一个变更块',
+      nextHunk: '下一个变更块',
+      allHunks: '全部变更块',
       scopeUncommitted: '未提交',
       scopeBranch: '分支',
       scopeLastTurn: '上一轮',
@@ -3615,6 +3749,13 @@ export const zh = defineLocale({
       branchOffFrom: base => `从 ${base} 新建分支`,
       switchTo: branch => `切换到 ${branch}`,
       switchFailed: branch => `无法切换到 ${branch}`,
+      checks: {
+        loading: '检查加载中',
+        unavailable: '检查不可用',
+        pending: '检查等待中',
+        passed: '检查已通过',
+        failed: '检查失败'
+      },
       worktrees: '工作树'
     }
   },
@@ -4301,7 +4442,13 @@ export const zh = defineLocale({
   },
 
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: '今天想做什么？', body: '直接问我，或者把一件事交给我。需要项目、文件或预览时，相关上下文会出现在对话右侧。', start: '从一条消息开始', actions: '浏览命令' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: '今天想做什么？',
+      body: '直接问我，或者把一件事交给我。需要项目、文件或预览时，相关上下文会出现在对话右侧。',
+      start: '从一条消息开始',
+      actions: '浏览命令'
+    },
     thread: {
       loadingSession: '正在加载会话',
       showEarlier: '显示更早的消息',

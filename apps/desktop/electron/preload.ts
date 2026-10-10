@@ -207,6 +207,16 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
       return () => ipcRenderer.removeListener('hermes:quick-entry:shown', listener)
     }
   },
+  browserControl: {
+    start: (payload: { profile?: string | null; launchContext: object; chromeProfileDir: string; packageSpec: string }) => ipcRenderer.invoke('hermes:browser-control:bridge:start', payload),
+    stop: () => ipcRenderer.invoke('hermes:browser-control:bridge:stop'),
+    status: () => ipcRenderer.invoke('hermes:browser-control:bridge:status'),
+    onStatus: callback => {
+      const listener = (_event, status) => callback(status)
+      ipcRenderer.on('hermes:browser-control:bridge:status', listener)
+      return () => ipcRenderer.removeListener('hermes:browser-control:bridge:status', listener)
+    }
+  },
   getBootProgress: () => ipcRenderer.invoke('hermes:boot-progress:get'),
   getConnectionConfig: profile => ipcRenderer.invoke('hermes:connection-config:get', profile),
   saveConnectionConfig: payload => ipcRenderer.invoke('hermes:connection-config:save', payload),

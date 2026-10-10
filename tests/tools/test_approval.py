@@ -1707,6 +1707,95 @@ class TestApprovalTimeoutIsNotConsent:
         thread.join(timeout=5)
         assert result_holder["result"]["approved"] is True
 
+    def test_switching_to_off_releases_an_already_queued_gateway_approval(self, monkeypatch):
+        """A live config change must resume the real queue wait as one-operation consent."""
+        from tools import approval as mod
+
+        mode = {"value": "manual"}
+        monkeypatch.setattr(
+            approval_context, "_get_approval_config",
+            lambda: {"mode": mode["value"], "timeout": 5},
+        )
+        notified = threading.Event()
+        settled = []
+        result_holder = {}
+
+        def notify(data):
+            mod.register_gateway_settle(self.SESSION_KEY, data["request_id"], settled.append)
+            notified.set()
+
+        thread = threading.Thread(target=lambda: result_holder.setdefault(
+            "decision", mod._await_gateway_decision(self.SESSION_KEY, notify, {
+                "command": "write AGENTS.md", "description": "protected instruction file",
+                "pattern_key": "protected_instruction_file",
+                "pattern_keys": ["protected_instruction_file"],
+                "allow_permanent": False, "allow_session": False,
+            })
+        ))
+        thread.start()
+        assert notified.wait(timeout=2), "gateway approval was not queued and delivered"
+        assert mod.list_gateway_approvals(self.SESSION_KEY)
+
+        mode["value"] = "off"
+        thread.join(timeout=2)
+
+        assert not thread.is_alive(), "switching approvals.mode off left the tool blocked"
+        assert result_holder["decision"]["resolved"] is True
+        assert result_holder["decision"]["choice"] == "once"
+        assert result_holder["decision"]["bypassed"] is True
+        assert settled == ["bypassed"]
+        assert not mod.list_gateway_approvals(self.SESSION_KEY)
+
+    def test_profile_off_does_not_release_room_policy_locked_approval(self, monkeypatch):
+        from gateway.hosted_room_execution_policy import (
+            RoomExecutionPolicy, bind_room_execution_policy, execution_policy_mapping,
+            reset_room_execution_policy,
+        )
+        from tools import approval as mod
+
+        mode = {"value": "manual"}
+        monkeypatch.setattr(
+            approval_context, "_get_approval_config",
+            lambda: {"mode": mode["value"], "timeout": 5},
+        )
+        policy = RoomExecutionPolicy.from_mapping(execution_policy_mapping(
+            target_profile="reviewer", config={
+                "tools": {"platform_toolsets": {"api_server": ["bot_room"]}},
+                "approvals": {"mode": "manual"}, "agent": {"max_turns": 10},
+            },
+        ))
+        notified = threading.Event()
+        settled = []
+        result_holder = {}
+
+        def wait_with_room_policy():
+            token = bind_room_execution_policy(policy)
+            try:
+                result_holder["decision"] = mod._await_gateway_decision(self.SESSION_KEY, lambda data: (
+                    mod.register_gateway_settle(self.SESSION_KEY, data["request_id"], settled.append),
+                    notified.set(),
+                ), {"command": "room-protected action", "pattern_key": "dangerous",
+                    "pattern_keys": ["dangerous"]})
+            finally:
+                reset_room_execution_policy(token)
+
+        thread = threading.Thread(target=wait_with_room_policy)
+        thread.start()
+        assert notified.wait(timeout=2)
+        queued = mod.list_gateway_approvals(self.SESSION_KEY)
+        assert len(queued) == 1 and queued[0]["policy_locked"] is True
+
+        mode["value"] = "off"
+        thread.join(timeout=1.2)
+        assert thread.is_alive(), "profile mode off overrode target-issued manual policy"
+        assert mod.list_gateway_approvals(self.SESSION_KEY)
+        assert mod.resolve_gateway_approval(self.SESSION_KEY, "once") == 1
+        thread.join(timeout=2)
+        assert not thread.is_alive()
+        assert result_holder["decision"]["choice"] == "once"
+        assert not result_holder["decision"].get("bypassed", False)
+        assert settled == ["answered"]
+
     def test_stale_request_id_cannot_resolve_current_approval(self, monkeypatch):
         from tools import approval as mod
 

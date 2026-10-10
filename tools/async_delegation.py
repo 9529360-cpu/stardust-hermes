@@ -1114,6 +1114,30 @@ def list_async_delegations() -> List[Dict[str, Any]]:
     return items
 
 
+def list_durable_delegations() -> List[Dict[str, Any]]:
+    """Profile-scoped persisted snapshots, including results from previous processes."""
+    recover_abandoned_delegations()
+    with _DB_LOCK, _transaction() as conn:
+        rows = conn.execute("""SELECT delegation_id, state, dispatched_at, completed_at,
+            updated_at, task_json, result_json FROM async_delegations""").fetchall()
+    return [{**json.loads(task or "{}"), "delegation_id": rid, "status": state,
+             "dispatched_at": started, "completed_at": completed, "updated_at": updated,
+             "result": json.loads(result or "{}")}
+            for rid, state, started, completed, updated, task, result in rows]
+
+
+def interrupt_delegation(delegation_id: str) -> bool:
+    """Request a single live delegation stop; completion remains runner-owned."""
+    with _records_lock:
+        record = _records.get(delegation_id)
+        if not record or record.get("status") not in _ACTIVE_STATES:
+            return False
+        if record.get(_OWNER_KEY) not in (None, "", hermes_home_key()):
+            return False
+        fn = record.get("interrupt_fn")
+    return _call_interrupt(fn, "Async delegation %s interrupt failed: %s", delegation_id)
+
+
 def _interrupt_records(targets: List[Dict[str, Any]], caller: str, reason: str, msg: str) -> int:
     """Call ``interrupt_fn`` on each record; log ``msg`` once; returns how many succeeded."""
     count = sum(

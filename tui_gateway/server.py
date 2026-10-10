@@ -163,7 +163,7 @@ _LONG_HANDLERS = frozenset({
     "browser.manage", "cli.exec", "complete.path", "complete.slash", "llm.oneshot", "model.options",
     "pet.cells", "pet.gallery", "pet.generate", "pet.hatch", "pet.info", "pet.select", "pet.thumb",
     "learning.frames", "plugins.manage", "reload.mcp", "mcp.servers.test", "mcp.servers.oauth.start",
-    "process.list", "profiles.configure", "profiles.create", "profiles.describe", "profiles.get_asset",
+    "cron.executions.list", "process.list", "profiles.configure", "profiles.create", "profiles.describe", "profiles.get_asset",
     "profiles.list", "profiles.set_asset", "bot_relay.roster.sync", "bot_relay.outbox.drain",
     "bot_relay.deliver", "bot_relay.reply", "image.generate", "projects.discover_repos",
     "projects.record_repos", "projects.for_cwd", "projects.tree", "projects.project_sessions",
@@ -670,13 +670,18 @@ def _broadcast_global_event(event: str, payload: dict | None = None) -> None:
 def _approval_request_payload(data: dict | None) -> dict:
     """Build the client-safe representation of a pending approval."""
     payload = dict(data or {})
-    if "choices" not in payload:
-        choices = ["once"]
-        if not payload.get("smart_denied") and payload.get("allow_session") is not False:
-            choices.append("session")
-            if payload.get("allow_permanent") is not False:
-                choices.append("always")
-        payload["choices"] = choices + ["deny"]
+    choices = ["once"]
+    if not payload.get("smart_denied") and payload.get("allow_session") is not False:
+        choices.append("session")
+        if payload.get("allow_permanent") is not False:
+            choices.append("always")
+    choices.append("deny")
+    if isinstance(payload.get("choices"), list):
+        permitted = set(choices)
+        payload["choices"] = [choice for choice in payload["choices"]
+                               if isinstance(choice, str) and choice in permitted]
+    else:
+        payload["choices"] = choices
     if "command" in payload:
         from gateway.run import _redact_approval_command
         payload["command"] = _redact_approval_command(payload.get("command"))
@@ -1240,7 +1245,10 @@ def _load_cfg_raw() -> dict:
     global _cfg_cache, _cfg_sig, _cfg_path
     with contextlib.suppress(Exception):
         p = _active_config_path()
-        sig = path_signature(p) if p.exists() else None
+        # Some virtual filesystems preserve even ctime on a same-size rewrite.
+        # This write-back cache must never return stale data based only on metadata.
+        import hashlib
+        sig = (path_signature(p), hashlib.blake2b(p.read_bytes(), digest_size=16).digest()) if p.exists() else None
         with _cfg_lock:
             if _cfg_cache is not None and _cfg_sig == sig and _cfg_path == p:
                 return copy.deepcopy(_cfg_cache)
@@ -1303,6 +1311,17 @@ def _set_session_context(session_key: str, cwd: str | None = None, *, ui_session
             if _methods_browser_control._is_authenticated_identity(identity):
                 browser_control_principal = _methods_browser_control._principal_digest(identity)
                 browser_control_transport_family = _methods_browser_control._CLOUD_TRANSPORT_FAMILY
+            elif any(getattr(peer, "auth_identity", None) == {
+                    "user_id": "local-desktop", "provider": "loopback-session"}
+                    for peer in _session_live_transports(sess)):
+                with _sessions_lock:
+                    browser_session_id = (ui_session_id if _sessions.get(ui_session_id) is sess
+                                          else next((sid for sid, record in _sessions.items() if record is sess), ""))
+                if browser_session_id:
+                    ui_session_id = ui_session_id or browser_session_id
+                    browser_control_principal = _methods_browser_control.local_desktop_principal(
+                        _methods_browser_control._session_profile(sess), browser_session_id)
+                    browser_control_transport_family = _methods_browser_control.LOCAL_DESKTOP_TRANSPORT_FAMILY
         return set_session_vars(
             session_key=session_key, session_id=session_id, source=source,
             browser_control_principal=browser_control_principal,
@@ -3296,7 +3315,7 @@ from . import (  # noqa: E402
     methods_projects as _methods_projects, methods_session_foreign as _methods_session_foreign,
     methods_session_control as _methods_session_control, methods_subagents as _methods_subagents,
     methods_vault as _methods_vault, methods_free_tier as _methods_free_tier,
-    methods_connectors as _methods_connectors)
+    methods_connectors as _methods_connectors, methods_memory as _methods_memory, methods_work as _methods_work)
 
 for _m in (
     _session_transports, _session_reaper, _session_lifecycle, _session_workdir, _compute_host_bridge, _model_switch,
@@ -3306,6 +3325,6 @@ for _m in (
     _methods_browser_control, _methods_session, _methods_prompt, _methods_config,
     _methods_config_set, _methods_complete, _methods_tools, _methods_profiles, _methods_images,
     _methods_bot_relay, _prompt_turn, _billing_view, _methods_projects, _methods_session_foreign,
-    _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors):
+    _methods_session_control, _methods_subagents, _methods_vault, _methods_free_tier, _methods_connectors, _methods_memory, _methods_work):
     _m.register(sys.modules[__name__])
 del _m

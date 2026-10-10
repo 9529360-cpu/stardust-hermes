@@ -275,6 +275,9 @@ def request_elicitation_consent(message: str, description: str, *,
     gateway session, timeouts, and exceptions map to ``"decline"`` so a server
     treats them as "user did not approve" rather than retrying or hanging.
     Returns ``"accept" | "decline" | "cancel"``."""
+    if _ctx._get_approval_mode() == "off":
+        return "accept"
+
     from tools import approval as _a
     try:
         session_key = _ctx.get_current_session_key()

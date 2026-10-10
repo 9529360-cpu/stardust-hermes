@@ -25,6 +25,7 @@ from tools.delegation_output_schema import (
     append_output_contract,
     build_retry_message,
     coerce_output_schema,
+    extract_json_candidate,
     validate_output,
 )
 
@@ -70,6 +71,143 @@ class TestValidateOutput:
         text = 'Here is the result:\n{"city": "Lima"}\nHope that helps!'
         ok, _ = validate_output(text, ADDRESS_SCHEMA)
         assert ok is True
+
+    def test_final_candidate_wins_over_nonmatching_example(self):
+        text = 'Example: {"city": 7}\nFinal: {"city": "Lima"}'
+        assert extract_json_candidate(text) == '{"city": "Lima"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
+    def test_error_describes_final_candidate(self):
+        text = 'Example: {"zip": "10115"}\nFinal: {"zip": 7}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("$.zip: 7" in error for error in errors)
+
+    def test_valid_example_does_not_mask_invalid_final_candidate(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": 7}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("$.city: 7" in error for error in errors)
+
+    def test_valid_example_does_not_mask_syntax_error_in_final_candidate(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": nope}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_nested_object_in_malformed_final(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": nope, "nested": {"city": "Lima"}}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_truncated_final_candidate(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": "Lima"'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_truncated_final_with_nested_object(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: {"city": "Lima", "nested": {"city": "Oslo"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_unlabeled_malformed_outer_candidate(self):
+        text = 'Example: {"city": "Berlin"}\n{"city": nope}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_valid_example_does_not_mask_unlabeled_truncated_outer_candidate(self):
+        text = 'Example: {"city": "Berlin"}\n{"city": "Lima"'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_inline_final_label_malformed_candidate_is_rejected(self):
+        text = 'Example: {"city": "Berlin"} Final: {"city": nope}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_final_label_accepts_fenced_json_after_newline(self):
+        text = 'Final:\n```json\n{"city": "Lima"}\n```'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
+    def test_valid_example_does_not_mask_final_refusal(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: I cannot produce the requested result.'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors
+
+    def test_valid_example_does_not_mask_empty_final(self):
+        text = 'Example: {"city": "Berlin"}\nFinal:'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors
+
+    def test_valid_example_does_not_mask_schema_incompatible_scalar_final(self):
+        text = 'Example: {"city": "Berlin"}\nFinal: null'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors
+
+    def test_final_marker_inside_json_string_is_not_an_answer_boundary(self):
+        text = '{"city": "Final: Lima"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
+    def test_final_marker_inside_json_string_after_outer_label_is_not_a_boundary(self):
+        text = 'Final: {"city": "Lima", "note": "Final: draft"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
+
+    def test_final_fence_text_inside_json_string_is_preserved(self):
+        value = "Final: ```json Lima"
+        schema = {"type": "object", "properties": {"city": {"const": value}}}
+        ok, errors = validate_output(json.dumps({"city": value}), schema)
+        assert ok is True
+        assert errors == []
+
+    def test_final_fence_text_inside_json_string_is_not_normalized(self):
+        text = json.dumps({"city": "Final: ```json Lima"})
+        schema = {"type": "object", "properties": {"city": {"const": "Final: Lima"}}}
+        ok, errors = validate_output(text, schema)
+        assert ok is False
+        assert errors
+
+    def test_outer_final_keeps_fenced_text_inside_json_string(self):
+        value = "Final: ```json Lima"
+        schema = {"type": "object", "properties": {"city": {"const": value}}}
+        ok, errors = validate_output(f"Final: {json.dumps({'city': value})}", schema)
+        assert ok is True
+        assert errors == []
+
+    def test_outer_final_does_not_normalize_fenced_text_inside_json_string(self):
+        text = 'Final: {"city": "Final: ```json Lima"}'
+        schema = {"type": "object", "properties": {"city": {"const": "Final: Lima"}}}
+        ok, errors = validate_output(text, schema)
+        assert ok is False
+        assert errors
+
+    def test_nested_object_cannot_mask_malformed_final_candidate(self):
+        text = 'Final: {"city": nope, "example": {"city": "Lima"}}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is False
+        assert errors and any("not valid JSON" in error for error in errors)
+
+    def test_malformed_example_does_not_hide_later_final_candidate(self):
+        text = 'Example: {"city": nope}\nFinal: {"city": "Lima"}'
+        ok, errors = validate_output(text, ADDRESS_SCHEMA)
+        assert ok is True
+        assert errors == []
 
     def test_empty_text_is_invalid(self):
         ok, errors = validate_output("", ADDRESS_SCHEMA)
@@ -288,6 +426,19 @@ class TestRunSingleChildSchemaValidation:
         child._delegate_output_schema = {"type": "array", "items": {"type": "object"}}
         entry = _run(child)
         assert entry["schema_valid"] is True and len(child.calls) == 1
+
+    def test_valid_final_answer_after_json_example_does_not_retry(self):
+        text = 'Example: {"ignored": true}\nFinal: [1, 2]'
+        child = _StubChild([text])
+        child._delegate_output_schema = {
+            "type": "array",
+            "items": {"type": "integer"},
+        }
+        entry = _run(child)
+        assert entry["schema_valid"] is True
+        assert "schema_retries" not in entry
+        assert entry["summary"] == text
+        assert len(child.calls) == 1
 
     def test_schema_valid_entry_still_completed(self):
         """Guard: schema_valid=True keeps status="completed" untouched."""

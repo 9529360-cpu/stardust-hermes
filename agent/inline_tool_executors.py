@@ -93,6 +93,59 @@ def _callback_tool(module: str, func: str, callback_attr: str, *arg_specs: _ArgS
     return _tool(module, func, *arg_specs, callback=lambda agent, ctx: getattr(agent, callback_attr, None))
 
 
+def _approved_preview_callback(agent, ctx):
+    """Route Preview mutations through the existing shared approval gate.
+
+    This does not claim to sandbox browser execution; it only prevents a
+    mutation from reaching the renderer without the same human/guardian gate
+    used by computer_use. Inspection remains on the explicit happy path.
+    """
+    callback = getattr(agent, "drive_preview_callback", None)
+    if callback is None:
+        return None
+
+    from tools.approval import request_tool_approval
+
+    def guarded(payload):
+        action = str(payload.get("action") or "")
+        from tools.browser_preview_approval import classify_browser_preview_action
+
+        risk = classify_browser_preview_action("preview", action, payload)
+        if not risk.requires_approval:
+            return callback(payload)
+        decision = request_tool_approval(
+            "drive_preview",
+            risk.reason,
+            rule_key=risk.approval_key,
+        )
+        if not decision.get("approved"):
+            return json.dumps({"error": decision.get("message") or "Preview action denied", "success": False})
+        return callback(payload)
+
+    return guarded
+
+
+def _approved_annotate_callback(agent, ctx):
+    callback = getattr(agent, "drive_preview_callback", None)
+    if callback is None:
+        return None
+
+    from tools.approval import request_tool_approval
+
+    def guarded(payload):
+        from tools.browser_preview_approval import classify_browser_preview_action
+
+        risk = classify_browser_preview_action("preview", str(payload.get("action") or ""), payload)
+        if not risk.requires_approval:
+            return callback(payload)
+        decision = request_tool_approval("annotate_preview", risk.reason, rule_key=risk.approval_key)
+        if not decision.get("approved"):
+            return json.dumps({"error": decision.get("message") or "Preview action denied", "success": False})
+        return callback(payload)
+
+    return guarded
+
+
 def _session_search(agent, args: dict, ctx: InlineToolContext) -> Any:
     session_db = agent._get_session_db_for_recall()
     if not session_db:
@@ -150,6 +203,19 @@ def _desktop_preview(agent, args: dict, ctx: InlineToolContext) -> Any:
     from tools.preview_tool import _handle_preview
 
     return _handle_preview(args)
+
+
+def _unified_browser(agent, args: dict, ctx: InlineToolContext) -> Any:
+    # The same agent-bound Preview callbacks and approval policy own both the
+    # legacy GUI tools and the new single Browser controller. Do not dispatch
+    # a renderer operation via the registry (which has no window binding).
+    from tools.unified_browser_tool import run_unified_browser
+
+    return run_unified_browser(
+        agent, args, drive_callback=_approved_preview_callback(agent, ctx),
+        read_callback=getattr(agent, "read_preview_callback", None),
+        task_id=ctx.effective_task_id, tool_call_id=ctx.tool_call_id or "",
+    )
 
 
 def _manage_connections(agent, args: dict, ctx: InlineToolContext) -> Any:
@@ -261,15 +327,18 @@ INLINE_TOOL_EXECUTORS: Dict[str, InlineToolExecutor] = {
         "tools.read_terminal_tool", "read_terminal_tool", "read_terminal_callback",
         ("start_line", "start_line"), ("count", "count"),
     ),
+    "browser": _unified_browser,
     "desktop_preview": _desktop_preview,
-    "drive_preview": _callback_tool(
-        "tools.drive_preview_tool", "drive_preview_tool", "drive_preview_callback",
+    "drive_preview": _tool(
+        "tools.drive_preview_tool", "drive_preview_tool",
         ("action", "action", ""), ("ref", "ref"), ("selector", "selector"), ("text", "text"),
         ("key", "key"), ("submit", "submit"), ("amount", "amount"), ("to", "to"), ("limit", "max"),
+        callback=_approved_preview_callback,
     ),
-    "annotate_preview": _callback_tool(
-        "tools.annotate_preview_tool", "annotate_preview_tool", "drive_preview_callback",
+    "annotate_preview": _tool(
+        "tools.annotate_preview_tool", "annotate_preview_tool",
         ("action", "action", "add"), ("ref", "ref"), ("selector", "selector"), ("label", "label"),
+        callback=_approved_annotate_callback,
     ),
     "read_window_below": _callback_tool(
         "tools.read_window_tool", "read_window_below_tool", "read_window_below_callback",
