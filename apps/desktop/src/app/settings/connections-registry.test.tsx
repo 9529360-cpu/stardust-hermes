@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { DesktopConnectionsRegistry } from '@/global'
+import { en } from '@/i18n/en'
 import { _resetFleetRosterForTests, refreshFleetRoster } from '@/store/fleet-roster'
 import { $connection } from '@/store/session'
 
@@ -69,6 +70,20 @@ afterEach(() => {
 })
 
 describe('ConnectionsRegistrySection', () => {
+  it('does not show an unknown empty registry and recovers through Retry', async () => {
+    list.mockReset().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(registry)
+    render(<ConnectionsRegistrySection />)
+
+    expect(await screen.findByText(en.settings.connections.loadFailed)).toBeTruthy()
+    expect(screen.queryByText(en.settings.connections.empty)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: en.common.retry }))
+
+    await waitFor(() => expect(screen.getByText('Homelab')).toBeTruthy())
+    expect(screen.queryByText(en.settings.connections.loadFailed)).toBeNull()
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
   it('refreshes a cached roster immediately after a successful connection test', async () => {
     _resetFleetRosterForTests()
     const getAgentRoster = vi.fn().mockResolvedValue({ agents: [], sources: [] })

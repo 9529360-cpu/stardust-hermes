@@ -1223,11 +1223,9 @@ export function CreateGroupChatDialog({ open, roster, onClose, onCreated }: Crea
           <DialogTitle>{b.group.newTitle}</DialogTitle>
           <DialogDescription>{`Pick 2–${GROUP_CHAT_MAX_MEMBERS} bots. Local memberships sync through each Bot profile; cross-machine members stay scoped to this room.`}</DialogDescription>
         </DialogHeader>
-        {/* TODO(bot-mode-types): this search box never takes focus when the dialog
-            opens — SearchField accepts no `autoFocus` prop and forwards no extra
-            props, so the `autoFocus` that used to sit here was inert. */}
         <SearchField
           aria-label={b.group.searchToAdd}
+          autoFocus
           containerClassName="w-full"
           inputClassName="w-full"
           onChange={setQuery}
