@@ -1520,6 +1520,7 @@ export {
   ModelMenuCloseContext,
   type ModelMenuController
 } from '@/app/shell/model-catalog-menu'
+export { SidebarPanelLabel } from '@/app/shell/sidebar-label'
 export type { StatusbarItem } from '@/app/shell/statusbar-controls'
 export type { TitlebarTool } from '@/app/shell/titlebar-controls'
 /** THE whole Capabilities surface (Skills / Tools / MCP tabs, installed

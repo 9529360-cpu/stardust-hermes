@@ -192,12 +192,12 @@ export function AvatarPicker({ shape, color, image, onShape, onColor, onImage, g
                   <Button
                     onClick={() => onShape(blobShapeString(locked ? '' : pickerName, kind))}
                     size="sm"
-                    title={locked ? b.avatar.unlockFollowsName : 'Keep this exact face even if the name changes'}
+                    title={locked ? b.avatar.unlockFollowsName : b.avatar.keepFaceHint}
                     type="button"
                     variant="ghost"
                   >
                     <Codicon className="mr-1 text-[0.8rem]" name={locked ? 'unlock' : 'lock'} />
-                    {locked ? 'Unlock' : 'Lock face'}
+                    {locked ? b.avatar.unlockFace : b.avatar.lockFace}
                   </Button>
                 </div>
                 <div className="text-center text-[0.65rem] text-(--ui-text-quaternary)">
