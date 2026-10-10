@@ -618,6 +618,50 @@ def _with_guidance(result: Dict[str, Any], job: Dict[str, Any], deliver: Optiona
     return result
 
 
+def _preview_create(a: Dict[str, Any], *, prompt, deliver, canonical_skills, context_from,
+                    requested_approval_mode) -> str:
+    """Dry run for create: every check of the real create runs, nothing is saved, and no trigger
+    is registered with the scheduler. The handoff capture is skipped: it does not change the preview."""
+    from cron.jobs import create_job
+    from cron.jobs_schedule import parse_nl_schedule
+    try:
+        job = create_job(
+            prompt=prompt or "", schedule=a["schedule"], name=a["name"], repeat=a["repeat"],
+            deliver=_resolve_cron_context_deliver(deliver), origin=_origin_from_env(),
+            skills=canonical_skills,
+            model=_normalize_optional_job_value(a["model"]), provider=_normalize_optional_job_value(a["provider"]),
+            base_url=_normalize_optional_job_value(a["base_url"], strip_trailing_slash=True),
+            script=_normalize_optional_job_value(a["script"]), context_from=context_from,
+            enabled_toolsets=a["enabled_toolsets"] or None, workdir=_normalize_optional_job_value(a["workdir"]),
+            no_agent=bool(a["no_agent"]), attach_to_session=a["attach_to_session"],
+            stop_when_done=a["stop_when_done"],
+            monitor_script=_normalize_optional_job_value(a["monitor_script"]),
+            monitor_url=_normalize_optional_job_value(a["monitor_url"]),
+            reasoning_effort=a["reasoning_effort"],
+            failure_deliver=_resolve_cron_context_deliver(_normalize_deliver_param(a["failure_deliver"])),
+            approval_mode=requested_approval_mode,
+            paused=bool(a["paused"]), paused_reason=a["paused_reason"],
+            dry_run=True,
+        )
+    except ValueError as exc:
+        return tool_error(str(exc), success=False, dry_run=True)
+    return _dumps({
+        "success": True,
+        "dry_run": True,
+        "saved": False,
+        "preview": {
+            "name": job["name"],
+            "schedule": job["schedule_display"],
+            "next_runs": parse_nl_schedule(a["schedule"])["next_runs"],
+            "deliver": job["deliver"],
+            "repeat": job["repeat"]["times"],
+            "paused": not job["enabled"],
+        },
+        "message": ("Preview only, nothing was saved. Show the user the schedule, the next run times and the "
+                    "delivery target, and create the routine only after they confirm."),
+    })
+
+
 def _action_create(a: Dict[str, Any]) -> str:
     prompt, script = a["prompt"], a["script"]
     deliver = _normalize_deliver_param(a["deliver"])
@@ -666,6 +710,10 @@ def _action_create(a: Dict[str, Any]) -> str:
     )
     if approval_error:
         return tool_error(approval_error, success=False)
+
+    if a["dry_run"]:
+        return _preview_create(a, prompt=prompt, deliver=deliver, canonical_skills=canonical_skills,
+                               context_from=context_from, requested_approval_mode=requested_approval_mode)
 
     handoff_context = None
     if a["attach_to_session"] is True and not _no_agent:
@@ -938,7 +986,34 @@ def _update_run_fields(job: Dict[str, Any], a: Dict[str, Any], updates: Dict[str
 _UPDATE_STEPS = (_update_core_fields, _update_script_fields, _update_context_from, _update_run_fields)
 
 
+def _preview_update(job: Dict[str, Any], a: Dict[str, Any]) -> str:
+    """Dry run for update: previews a schedule change. Nothing is written."""
+    if not a["schedule"]:
+        return tool_error(
+            "dry_run for update previews a schedule change: pass schedule (other fields apply directly).",
+            success=False, dry_run=True)
+    from cron.jobs_schedule import parse_nl_schedule
+    try:
+        preview = parse_nl_schedule(a["schedule"])
+    except ValueError as exc:
+        return tool_error(str(exc), success=False, dry_run=True)
+    return _dumps({
+        "success": True,
+        "dry_run": True,
+        "saved": False,
+        "preview": {
+            "name": job.get("name"),
+            "schedule": preview["display"],
+            "previous_schedule": job.get("schedule_display"),
+            "next_runs": preview["next_runs"],
+        },
+        "message": "Preview only, nothing was changed. Show the user the new schedule and the next run times, and update only after they confirm.",
+    })
+
+
 def _action_update(job: Dict[str, Any], a: Dict[str, Any]) -> str:
+    if a["dry_run"]:
+        return _preview_update(job, a)
     updates: Dict[str, Any] = {}
     requested_approval_mode = _normalize_requested_approval_mode(a["approval_mode"])
     if requested_approval_mode is not None:
@@ -1071,7 +1146,8 @@ def cronjob(
     paused: bool = False,
     paused_reason: Optional[str] = None,
     approval_mode: Optional[str] = None,
-    approval_mode_confirmed: bool = False) -> str:
+    approval_mode_confirmed: bool = False,
+    dry_run: bool = False) -> str:
     """Unified cron job management tool."""
     a = dict(locals())
     del a["task_id"]  # unused but kept for handler signature compatibility
@@ -1116,7 +1192,7 @@ CRONJOB_SCHEMA = {
 
 'resnap' adopts the CURRENT global inference resolution for an unpinned job (job_id) or all unpinned jobs (all=true) WITHOUT pinning it, so it keeps tracking future global changes — use after deliberately changing the default model.
 
-Jobs run in a fresh session. Normally they have no current-chat context, so prompts must be self-contained. For long-running work, the stored prompt must state the concrete objective, relevant IDs/links/paths and known state, the action or check to perform on each run, constraints, completion condition, and what evidence to report. A title or reminder alone is insufficient. If future work depends on the current conversation, set attach_to_session=true: Stardust snapshots a bounded recent user/assistant tail at create/update time and supplies it as background context on future runs. It is a snapshot, not a live transcript link, so keep critical identifiers in the stored prompt. The agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. For bounded recurring follow-ups whose purpose ends when a real-world condition becomes true (package delivered, refund received, repair resolved, application decided), set stop_when_done=true so the existing job can retire itself into state=completed when the runtime confirms the goal. Prefer updating an existing job over creating near-duplicates.""",
+Jobs run in a fresh session. Normally they have no current-chat context, so prompts must be self-contained. For long-running work, the stored prompt must state the concrete objective, relevant IDs/links/paths and known state, the action or check to perform on each run, constraints, completion condition, and what evidence to report. A title or reminder alone is insufficient. If future work depends on the current conversation, set attach_to_session=true: Stardust snapshots a bounded recent user/assistant tail at create/update time and supplies it as background context on future runs. It is a snapshot, not a live transcript link, so keep critical identifiers in the stored prompt. The agent's FINAL RESPONSE is what gets delivered — cron runs are autonomous and cannot ask questions. For bounded recurring follow-ups whose purpose ends when a real-world condition becomes true (package delivered, refund received, repair resolved, application decided), set stop_when_done=true so the existing job can retire itself into state=completed when the runtime confirms the goal. Prefer updating an existing job over creating near-duplicates. For a routine requested in chat, call create with dry_run=true first, show the user the preview (schedule, next run times, delivery), and save only after they confirm.""",
     "parameters": {
         "type": "object",
         "properties": {
@@ -1142,6 +1218,10 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
                 "type": "string",
                 "type": "string",
                 "description": "REQUIRED for create. Schedule forms: (1) recurring interval — '30m', 'every 2h', 'every hour' (EVERY 30 minutes / 2 hours / hour, forever by default); (2) explicit one-shot by duration — 'in 30m', 'in 2h' (fires ONCE that far from now; use this for 'remind me in N minutes' — do NOT hand-compute an absolute timestamp); (3) natural day/time — 'every monday 9am', 'weekdays at 9am', 'every day at 9am' (recurring weekly/daily); (4) cron syntax — '0 9 * * *' (daily 9am); (5) absolute one-shot — ISO timestamp '2026-06-01T09:00:00'."
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "Preview only, nothing is saved or registered. For create: validate and describe the routine (schedule, next run times, delivery target). For update: preview a new schedule. Use it first when a user asks for a routine in chat, then save only after they confirm."
             },
             "name": {
                 "type": "string",

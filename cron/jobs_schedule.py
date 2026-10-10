@@ -471,6 +471,29 @@ def compute_next_run(schedule: Dict[str, Any], last_run_at: Optional[str] = None
     return None
 
 
+def parse_nl_schedule(schedule: str, count: int = 3) -> Dict[str, Any]:
+    """Preview a schedule string before anything is saved.
+
+    Returns the parsed stored shape (``schedule``), its human ``display``, and up to ``count``
+    upcoming run times as ISO strings in the configured timezone (``next_runs``). Each run is
+    chained from the previous one with :func:`compute_next_run`, the same rule the scheduler
+    uses, so the preview cannot disagree with what the job will do. Invalid input raises the
+    same readable ``ValueError`` as :func:`parse_schedule`. Nothing is persisted here.
+    """
+    parsed = parse_schedule(schedule)
+    next_runs: list = []
+    last: Optional[str] = None
+    for _ in range(max(0, int(count))):
+        upcoming = compute_next_run(parsed, last_run_at=last)
+        if not upcoming:
+            break
+        next_runs.append(upcoming)
+        if parsed.get("kind") == "once":
+            break
+        last = upcoming
+    return {"schedule": parsed, "display": parsed.get("display", schedule), "next_runs": next_runs}
+
+
 # Late-bound origin namespace: imported LAST so this module is fully populated
 # before ``cron.jobs`` re-exports from it.
 from cron import jobs as _jobs  # noqa: E402
