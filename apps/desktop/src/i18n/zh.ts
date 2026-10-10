@@ -1300,9 +1300,9 @@ export const zh = defineLocale({
       askPlaceholder: '问问 Stardust…',
       disconnectedPlaceholder: '未连接，请打开 Stardust 重新连接',
       sendTo: '发送到',
-      targetLabel: '目标会话',
+      targetLabel: '目标对话',
       currentChat: '当前对话',
-      newSession: '新会话'
+      newSession: '新对话'
     },
     credentials: {
       pasteKey: '粘贴密钥',
@@ -4116,8 +4116,8 @@ export const zh = defineLocale({
     docs: provider => `${provider} 文档`,
     skipSetup: '跳过设置',
     retryFirstBuild: '重试首次构建',
-    firstBuildFailed: '无法开始首次构建。请重试以查看其会话。',
-    buildStarted: (title: string) => `${title} 已开始 — 可在你的会话中找到它`,
+    firstBuildFailed: '无法开始首次构建。请重试以查看其对话。',
+    buildStarted: (title: string) => `${title} 已开始 — 可在你的对话中找到它`,
     buildOpening: (title: string) => `正在打开 ${title}…`,
     workingOnIt: '正在处理'
   },
@@ -4360,10 +4360,10 @@ export const zh = defineLocale({
       providerModelTitle: (provider, model) => `${provider} · ${model}`
     },
     tiles: {
-      sessionOpenFailed: '无法打开此会话',
+      sessionOpenFailed: '无法打开此对话',
       noPageAt: (path: string) => `没有页面：${path}`,
-      resumeStillAvailable: '会话仍然可用，请重试恢复。',
-      resumeUnavailable: '会话不可用，你可以重试恢复。'
+      resumeStillAvailable: '对话仍然可用，请重试恢复。',
+      resumeUnavailable: '对话不可用，你可以重试恢复。'
     }
   },
 

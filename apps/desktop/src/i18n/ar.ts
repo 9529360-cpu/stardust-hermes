@@ -894,9 +894,9 @@ export const ar = defineLocale({
       askPlaceholder: 'اسأل Stardust…',
       disconnectedPlaceholder: 'غير متصل — افتح Stardust لإعادة الاتصال',
       sendTo: 'إرسال إلى',
-      targetLabel: 'الجلسة المستهدفة',
+      targetLabel: 'المحادثة المستهدفة',
       currentChat: 'المحادثة الحالية',
-      newSession: 'جلسة جديدة'
+      newSession: 'محادثة جديدة'
     },
     credentials: {
       pasteKey: 'لصق المفتاح',
@@ -2696,8 +2696,8 @@ export const ar = defineLocale({
     docs: provider => `وثائق ${provider}`,
     skipSetup: 'تخطي الإعداد',
     retryFirstBuild: 'إعادة محاولة البناء الأول',
-    firstBuildFailed: 'تعذّر بدء البناء الأول. أعد المحاولة للتحقق من جلسته.',
-    buildStarted: (title: string) => `تم بدء ${title} — ابحث عنه في جلساتك`,
+    firstBuildFailed: 'تعذّر بدء البناء الأول. أعد المحاولة للتحقق من محادثته.',
+    buildStarted: (title: string) => `تم بدء ${title} — ابحث عنه في محادثاتك`,
     buildOpening: (title: string) => `جارٍ فتح ${title}…`,
     workingOnIt: 'جارٍ العمل على ذلك'
   },
@@ -2818,10 +2818,10 @@ export const ar = defineLocale({
       providerModelTitle: (provider, model) => `${provider}: ${model}`
     },
     tiles: {
-      sessionOpenFailed: 'تعذّر فتح هذه الجلسة',
+      sessionOpenFailed: 'تعذّر فتح هذه المحادثة',
       noPageAt: (path: string) => `لا توجد صفحة في ${path}`,
-      resumeStillAvailable: 'الجلسة ما زالت متاحة — أعد محاولة استئنافها.',
-      resumeUnavailable: 'الجلسة غير متاحة — يمكنك إعادة محاولة استئنافها.'
+      resumeStillAvailable: 'المحادثة ما زالت متاحة — أعد محاولة استئنافها.',
+      resumeUnavailable: 'المحادثة غير متاحة — يمكنك إعادة محاولة استئنافها.'
     }
   },
   rightSidebar: {

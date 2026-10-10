@@ -1065,9 +1065,9 @@ export const zhHant = defineLocale({
       askPlaceholder: '問問 Stardust…',
       disconnectedPlaceholder: '未連線，請開啟 Stardust 重新連線',
       sendTo: '傳送到',
-      targetLabel: '目標工作階段',
+      targetLabel: '目標對話',
       currentChat: '目前對話',
-      newSession: '新工作階段'
+      newSession: '新對話'
     },
     credentials: {
       pasteKey: '貼上金鑰',
@@ -3345,8 +3345,8 @@ export const zhHant = defineLocale({
     docs: provider => `${provider} 文件`,
     skipSetup: '跳過設定',
     retryFirstBuild: '重試首次建置',
-    firstBuildFailed: '無法開始首次建置。請重試以查看其工作階段。',
-    buildStarted: (title: string) => `${title} 已開始 — 可在你的工作階段中找到它`,
+    firstBuildFailed: '無法開始首次建置。請重試以查看其對話。',
+    buildStarted: (title: string) => `${title} 已開始 — 可在你的對話中找到它`,
     buildOpening: (title: string) => `正在開啟 ${title}…`,
     workingOnIt: '正在處理'
   },
@@ -3525,10 +3525,10 @@ export const zhHant = defineLocale({
       providerModelTitle: (provider, model) => `${provider} · ${model}`
     },
     tiles: {
-      sessionOpenFailed: '無法開啟此工作階段',
+      sessionOpenFailed: '無法開啟此對話',
       noPageAt: (path: string) => `沒有頁面：${path}`,
-      resumeStillAvailable: '工作階段仍可使用，請重試恢復。',
-      resumeUnavailable: '工作階段無法使用，你可以重試恢復。'
+      resumeStillAvailable: '對話仍可使用，請重試恢復。',
+      resumeUnavailable: '對話無法使用，你可以重試恢復。'
     }
   },
 

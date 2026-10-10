@@ -1059,9 +1059,9 @@ export const ru = defineLocale({
       askPlaceholder: 'Спросите Stardust…',
       disconnectedPlaceholder: 'Нет подключения — откройте Stardust, чтобы переподключиться',
       sendTo: 'Отправить в',
-      targetLabel: 'Сеанс назначения',
+      targetLabel: 'Чат назначения',
       currentChat: 'Текущий чат',
-      newSession: 'Новый сеанс'
+      newSession: 'Новый чат'
     },
     credentials: {
       pasteKey: 'Вставить ключ',
@@ -3433,8 +3433,8 @@ export const ru = defineLocale({
     docs: provider => `Документация ${provider}`,
     skipSetup: 'Пропустить настройку',
     retryFirstBuild: 'Повторить первую сборку',
-    firstBuildFailed: 'Не удалось запустить первую сборку. Повторите попытку, чтобы проверить её сеанс.',
-    buildStarted: (title: string) => `${title} запущен — найдите его в своих сеансах`,
+    firstBuildFailed: 'Не удалось запустить первую сборку. Повторите попытку, чтобы проверить её чат.',
+    buildStarted: (title: string) => `${title} запущен — найдите его в своих чатах`,
     buildOpening: (title: string) => `Открываем ${title}…`,
     workingOnIt: 'Работаю над этим'
   },
@@ -3617,10 +3617,10 @@ export const ru = defineLocale({
       providerModelTitle: (provider, model) => `${provider} · ${model}`
     },
     tiles: {
-      sessionOpenFailed: 'Не удалось открыть этот сеанс',
+      sessionOpenFailed: 'Не удалось открыть этот чат',
       noPageAt: (path: string) => `Страница не найдена: ${path}`,
-      resumeStillAvailable: 'Сеанс всё ещё доступен — повторите возобновление.',
-      resumeUnavailable: 'Сеанс недоступен — можно повторить возобновление.'
+      resumeStillAvailable: 'Чат всё ещё доступен — повторите возобновление.',
+      resumeUnavailable: 'Чат недоступен — можно повторить возобновление.'
     }
   },
   rightSidebar: {

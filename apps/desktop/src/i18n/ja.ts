@@ -971,9 +971,9 @@ export const ja = defineLocale({
       askPlaceholder: 'Stardust に質問…',
       disconnectedPlaceholder: '未接続です。Stardust を開いて再接続してください',
       sendTo: '送信先',
-      targetLabel: '送信先のセッション',
+      targetLabel: '送信先のチャット',
       currentChat: '現在のチャット',
-      newSession: '新しいセッション'
+      newSession: '新しいチャット'
     },
     credentials: {
       pasteKey: 'キーを貼り付け',
@@ -3131,8 +3131,8 @@ export const ja = defineLocale({
     docs: provider => `${provider} ドキュメント`,
     skipSetup: 'セットアップをスキップ',
     retryFirstBuild: '最初のビルドを再試行',
-    firstBuildFailed: '最初のビルドを開始できませんでした。再試行してセッションを確認してください。',
-    buildStarted: (title: string) => `${title} を開始しました — セッションから確認できます`,
+    firstBuildFailed: '最初のビルドを開始できませんでした。再試行してチャットを確認してください。',
+    buildStarted: (title: string) => `${title} を開始しました — チャットから確認できます`,
     buildOpening: (title: string) => `${title} を開いています…`,
     workingOnIt: '作業中'
   },
@@ -3312,10 +3312,10 @@ export const ja = defineLocale({
       providerModelTitle: (provider, model) => `${provider} · ${model}`
     },
     tiles: {
-      sessionOpenFailed: 'このセッションを開けませんでした',
+      sessionOpenFailed: 'このチャットを開けませんでした',
       noPageAt: (path: string) => `ページがありません: ${path}`,
-      resumeStillAvailable: 'セッションはまだ利用できます。再開を再試行してください。',
-      resumeUnavailable: 'セッションを利用できません。再開を再試行できます。'
+      resumeStillAvailable: 'チャットはまだ利用できます。再開を再試行してください。',
+      resumeUnavailable: 'チャットを利用できません。再開を再試行できます。'
     }
   },
 

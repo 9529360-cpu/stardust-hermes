@@ -41,7 +41,7 @@ describe('sessionTileResumeFailure', () => {
   })
 
   it('fails safe on an inconclusive durable lookup', () => {
-    expect(sessionTileResumeFailure('404', false, true)).toBe('Session unavailable — you can retry resuming it.')
+    expect(sessionTileResumeFailure('404', false, true)).toBe('Chat unavailable — you can retry resuming it.')
   })
 
   it('does not overwrite a tile that rebound while the lookup was pending', () => {

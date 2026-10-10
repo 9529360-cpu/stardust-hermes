@@ -1124,9 +1124,9 @@ export const en: Translations = {
       askPlaceholder: 'Ask Hermes…',
       disconnectedPlaceholder: 'Not connected — open Hermes to reconnect',
       sendTo: 'Send to',
-      targetLabel: 'Target session',
+      targetLabel: 'Target chat',
       currentChat: 'Current chat',
-      newSession: 'New session'
+      newSession: 'New chat'
     },
     credentials: {
       pasteKey: 'Paste key',
@@ -3842,8 +3842,8 @@ export const en: Translations = {
     docs: provider => `${provider} docs`,
     skipSetup: 'Skip setup',
     retryFirstBuild: 'Retry first build',
-    firstBuildFailed: 'The first build could not be started. Retry to check its session.',
-    buildStarted: (title: string) => `${title} was started — find it in your sessions`,
+    firstBuildFailed: 'The first build could not be started. Retry to check its chat.',
+    buildStarted: (title: string) => `${title} was started — find it in your chats`,
     buildOpening: (title: string) => `Opening ${title}…`,
     workingOnIt: 'Working on it'
   },
@@ -4085,10 +4085,10 @@ export const en: Translations = {
       providerModelTitle: (provider, model) => `${provider} · ${model}`
     },
     tiles: {
-      sessionOpenFailed: 'Couldn\'t open this session',
+      sessionOpenFailed: 'Couldn\'t open this chat',
       noPageAt: (path: string) => `no page at ${path}`,
-      resumeStillAvailable: 'Session is still available — retry resuming it.',
-      resumeUnavailable: 'Session unavailable — you can retry resuming it.'
+      resumeStillAvailable: 'Chat is still available — retry resuming it.',
+      resumeUnavailable: 'Chat unavailable — you can retry resuming it.'
     }
   },
 
