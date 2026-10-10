@@ -67,14 +67,17 @@ test.afterEach(async () => {
   fixture = null
 })
 
-// The Command Center opens on its sessions section. Wait for that section's own copy, not the nav's.
+// The Command Center opens on its sessions section. Wait for copy that shows at every width (the
+// section description is hidden in the narrow overlay), and check the old noun is gone.
 async function openCommandCenter(page: MockBackendFixture['page']): Promise<void> {
   await page.evaluate(() => {
     window.location.hash = '/command-center'
   })
   await expect(page.getByRole('button', { name: '关闭命令中心', exact: true })).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('搜索与管理对话', { exact: true })).toBeVisible({ timeout: 20_000 })
-  await expect(page.getByText('搜索与管理会话', { exact: true })).toHaveCount(0)
+  await expect(page.getByPlaceholder('搜索对话、视图与操作', { exact: true })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('暂无对话。', { exact: true })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByPlaceholder('搜索会话、视图与操作', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('暂无会话。', { exact: true })).toHaveCount(0)
 }
 
 test('Tools and Plugins share the Tasks title row, and the Projects list names the empty state', async () => {
