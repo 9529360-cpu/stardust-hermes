@@ -97,7 +97,7 @@ describe('ChatSidebar compact conversation surface', () => {
     expect(screen.queryByRole('button', { name: 'Messaging' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Artifacts' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Scheduled jobs' })).toBeNull()
-    expect(screen.queryByRole('textbox', { name: 'Search sessions' })).toBeNull()
+    expect(screen.queryByRole('textbox', { name: 'Search chats' })).toBeNull()
   })
 
   it('keeps session selection coherent with the focused pane', () => {
@@ -137,7 +137,7 @@ describe('ChatSidebar compact conversation surface', () => {
 
       expect(screen.getByText('Tile one')).toBeTruthy()
       expect(screen.getByText('Tile two')).toBeTruthy()
-      expect(screen.queryByRole('textbox', { name: 'Search sessions' })).toBeNull()
+      expect(screen.queryByRole('textbox', { name: 'Search chats' })).toBeNull()
       expectOnlySelectedSession(null)
 
       focus('tile-one-group')
@@ -157,7 +157,7 @@ describe('ChatSidebar compact conversation surface', () => {
 
     expect(screen.queryByText('Pinned chats')).toBeNull()
     expect(screen.getByText('Chats')).toBeTruthy()
-    expect(screen.getByText('No sessions yet')).toBeTruthy()
+    expect(screen.getByText('No chats yet')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'New project' })).toBeNull()
   })
 

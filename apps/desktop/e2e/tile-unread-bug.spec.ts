@@ -15,13 +15,8 @@
  * Prerequisite: `npm run build` must have been run so dist/ exists.
  */
 
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
-import {
-  type MockBackendFixture,
-  setupMockBackend,
-  waitForAppReady,
-} from './fixtures'
 import {
   type BackgroundReleaseHandle,
   createBackgroundReleaseHandle,
@@ -29,12 +24,18 @@ import {
   SIDEBAR_CROSS_TEXTS,
 } from '../../../tests-js/scripts/mock-server'
 
+import {
+  type MockBackendFixture,
+  setupMockBackend,
+  waitForAppReady,
+} from './fixtures'
+
 /** Finished-unread dot aria-label. */
 const UNREAD_DOT_LABEL = 'Finished — unread'
 /** Background-running dot aria-label. */
 const BG_DOT_LABEL = 'Background task running'
 /** Foreground turn-running dot aria-label. */
-const SESSION_RUNNING_DOT_LABEL = 'Session running'
+const SESSION_RUNNING_DOT_LABEL = 'Chat running'
 
 /**
  * The auto-title auxiliary call hits the SAME mock provider as the chat turn,
@@ -49,14 +50,14 @@ const SESSION_RUNNING_DOT_LABEL = 'Session running'
 const DISABLE_AUTO_TITLE = 'auxiliary:\n  title_generation:\n    enabled: false'
 
 /** Locate a session's sidebar row by its preview text. */
-function sessionRow(page: import('@playwright/test').Page, text: string) {
+function sessionRow(page: Page, text: string) {
   return page.locator('[data-slot="sidebar"] button').filter({ hasText: text }).first()
 }
 
 /** Common setup: start a turn with a held bg process + subagent, wait for
  *  the turn to complete, then switch to a new session so the first session is
  *  no longer $selectedStoredSessionId (required before opening a tile). */
-async function startTurnAndSwitchAway(page: import('@playwright/test').Page) {
+async function startTurnAndSwitchAway(page: Page) {
   // Send E2E_SIDEBAR_CROSS — starts a turn with sleep 5 + subagent.
   const composer = page.locator('[contenteditable="true"]').first()
   await composer.waitFor({ state: 'visible', timeout: 10_000 })
@@ -72,7 +73,7 @@ async function startTurnAndSwitchAway(page: import('@playwright/test').Page) {
   )
 
   // NOTE: while the turn is busy the dot-state priority paints the session as
-  // "working" ('Session running'), which OUTRANKS the background claim — the
+  // "working" ('Chat running'), which OUTRANKS the background claim — the
   // 'Background task running' dot only appears once the turn completes while
   // the (sentinel-held) process is still alive. Polling for the bg dot mid-turn
   // races the turn length (two model trips + a real subagent spawn) against
@@ -108,13 +109,13 @@ async function startTurnAndSwitchAway(page: import('@playwright/test').Page) {
 
   // Switch to a new session — session A is no longer $selectedStoredSessionId.
   // This is required: openSessionTile bails if the session is already selected.
-  await page.locator('button:has-text("New session")').first().click()
+  await page.locator('button:has-text("New chat")').first().click()
   await page.waitForTimeout(2000)
 }
 
 /** Release the held background process, then wait for its dot to clear. */
 async function waitForBgProcessToFinish(
-  page: import('@playwright/test').Page,
+  page: Page,
   release?: BackgroundReleaseHandle,
 ) {
   release?.release()
@@ -248,12 +249,14 @@ test.describe.skip('sidebar states — split (visible) unread bug (RED)', () => 
     const targetX = wsBox!.x + wsBox!.width - 20
     const targetY = wsBox!.y + wsBox!.height / 2
     const steps = 10
+
     for (let i = 1; i <= steps; i++) {
       const x = rowBox!.x + rowBox!.width / 2 + (targetX - (rowBox!.x + rowBox!.width / 2)) * (i / steps)
       const y = rowBox!.y + rowBox!.height / 2 + (targetY - (rowBox!.y + rowBox!.height / 2)) * (i / steps)
       await page.mouse.move(x, y)
       await page.waitForTimeout(30)
     }
+
     await page.mouse.up()
     await page.waitForTimeout(2000)
 

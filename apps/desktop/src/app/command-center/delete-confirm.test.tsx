@@ -64,7 +64,7 @@ describe('Command Center session delete confirmation (#99410)', () => {
     const onDeleteSession = vi.fn(() => Promise.resolve())
     renderCommandCenter(onDeleteSession)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete session' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete chat' }))
 
     expect(onDeleteSession).not.toHaveBeenCalled()
     expect(await screen.findByRole('dialog')).toBeTruthy()
@@ -74,7 +74,7 @@ describe('Command Center session delete confirmation (#99410)', () => {
     const onDeleteSession = vi.fn(() => Promise.resolve())
     renderCommandCenter(onDeleteSession)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete session' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete chat' }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
 
@@ -86,7 +86,7 @@ describe('Command Center session delete confirmation (#99410)', () => {
     const onDeleteSession = vi.fn(() => Promise.resolve())
     renderCommandCenter(onDeleteSession)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Delete session' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete chat' }))
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
