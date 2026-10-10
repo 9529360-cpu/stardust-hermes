@@ -459,11 +459,46 @@ def _mcp_health_snapshot(catalog: List[CatalogEntry]) -> Tuple[Dict[str, float],
     return weights, details
 
 
-def _shared_tool_record(entry: CatalogEntry, health: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _mcp_permission_snapshot(catalog: List[CatalogEntry]) -> Dict[str, Dict[str, Any]]:
+    """Describe MCP write risk from the same scoped metadata used at call time.
+
+    Unknown annotations are write-capable; trust is the *consumer's* policy even
+    when the connection belongs to an adopting profile. This is a routing hint,
+    never a substitute for the call-time approval check.
+    """
+    details: Dict[str, Dict[str, Any]] = {}
+    try:
+        from tools import mcp_tool as core
+        from tools.mcp_tool_scope import _resolve_server_key, _server_key
+    except Exception:
+        return details
+
+    with core._lock:
+        for entry in catalog:
+            if entry.source != "mcp":
+                continue
+            server = core._mcp_tool_server_names.get(entry.name)
+            if not server:
+                continue
+            read_only = core._tool_read_only_hints.get(_resolve_server_key(server), {}).get(
+                entry.name.split("__", 2)[-1]
+            ) is True
+            trust = core._server_trust_levels.get(_server_key(server), core._TRUST_FULL)
+            details[entry.name] = {
+                "read_only": read_only,
+                "approval_required": trust == core._TRUST_UNTRUSTED and not read_only,
+            }
+    return details
+
+
+def _shared_tool_record(entry: CatalogEntry, health: Optional[Dict[str, Any]] = None,
+                        permission: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """One record for the shared tools map (per-query groups carry names only).
 
     required lets the model attempt a trivial call without a tool_describe round-trip.
-    Degraded MCP health is attached only when relevant so healthy catalogs stay compact.
+    Degraded MCP health and approval requirements are attached only when relevant so healthy
+    catalogs stay compact. approval_required tells the model that calling the tool will ask the
+    user first; the call-time approval check still decides.
     """
     try:
         required = entry.schema["function"]["parameters"]["required"]
@@ -475,6 +510,8 @@ def _shared_tool_record(entry: CatalogEntry, health: Optional[Dict[str, Any]] = 
                            if isinstance(r, str)][:32]}
     if health:
         record["health"] = health
+    if permission and permission.get("approval_required"):
+        record["approval_required"] = True
     return record
 
 
@@ -531,11 +568,13 @@ def dispatch_tool_search(args: Dict[str, Any], *, current_tool_defs: List[Dict[s
     tools_map: Dict[str, Dict[str, Any]] = {}
     available_sources = _available_source_summary(catalog) if catalog else []
     health_weights, health_details = _mcp_health_snapshot(catalog)
+    permission_details = _mcp_permission_snapshot(catalog)
     for position, query in enumerate(queries):
         corpus = catalog + remote_entries[position]
         hits = search_catalog(corpus, query, limit=limit, score_weights=health_weights)
         for h in hits:
-            tools_map.setdefault(h.name, _shared_tool_record(h, health_details.get(h.name)))
+            tools_map.setdefault(h.name, _shared_tool_record(
+                h, health_details.get(h.name), permission_details.get(h.name)))
         matches = [h.name for h in hits]
         group: Dict[str, Any] = {"query": query, "matches": matches}
         if not matches and catalog:
