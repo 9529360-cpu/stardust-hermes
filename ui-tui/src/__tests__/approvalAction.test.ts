@@ -82,4 +82,27 @@ describe('approvalAction — pure key dispatch for ApprovalPrompt', () => {
       })
     ).toEqual(['once', 'deny'])
   })
+
+  it('hides session and permanent choices for once-only requests, including explicit choices', () => {
+    expect(
+      approvalOptions({
+        allowPermanent: false,
+        allowSession: false,
+        choices: ['once', 'session', 'always', 'deny'],
+        command: 'write one file',
+        description: 'single-operation approval',
+        requestId: 'once-only'
+      })
+    ).toEqual(['once', 'deny'])
+
+    expect(
+      approvalOptions({
+        allowPermanent: true,
+        allowSession: false,
+        command: 'write one file',
+        description: 'single-operation approval',
+        requestId: 'once-only-fallback'
+      })
+    ).toEqual(['once', 'deny'])
+  })
 })

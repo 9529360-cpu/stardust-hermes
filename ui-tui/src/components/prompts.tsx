@@ -19,15 +19,18 @@ const CMD_PREVIEW_LINES = 10
 type ApprovalChoice = 'always' | 'deny' | 'once' | 'session'
 
 export function approvalOptions(req: ApprovalReq): readonly ApprovalChoice[] {
+  const permitted: readonly ApprovalChoice[] =
+    req.smartDenied || req.allowSession === false
+      ? APPROVAL_OPTS_SMART_DENY
+      : req.allowPermanent === false
+        ? APPROVAL_OPTS_NO_ALWAYS
+        : APPROVAL_OPTS
+
   if (req.choices) {
-    return req.choices.filter((choice): choice is ApprovalChoice => APPROVAL_OPTS.includes(choice as ApprovalChoice))
+    return req.choices.filter((choice): choice is ApprovalChoice => permitted.includes(choice as ApprovalChoice))
   }
 
-  if (req.smartDenied) {
-    return APPROVAL_OPTS_SMART_DENY
-  }
-
-  return req.allowPermanent === false ? APPROVAL_OPTS_NO_ALWAYS : APPROVAL_OPTS
+  return permitted
 }
 
 type ApprovalKey = {
