@@ -491,6 +491,10 @@ def test_compression_heartbeat_stop_persists_completed_over_in_progress(
     db = SessionDB(db_path=tmp_path / "state.db")
     session_id = "HEARTBEAT_PERSIST_COMPLETED_TEST"
     db.create_session(session_id, source="test")
+    # Activity stamps are observation-only: they wait only the sub-second activity budget, then drop
+    # fail-open. Under CI lock contention that dropped this test's own stamps (the row read back as None).
+    # Give this test's stamps a real write budget; the assertions below are unchanged.
+    db._ACTIVITY_WRITE_PATIENCE_S = 10.0
 
     agent = _build_agent_with_db(db, session_id)
     # Long interval: only start/stop touch; we inject the progress stamp.
