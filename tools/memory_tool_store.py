@@ -6,13 +6,14 @@ in ``tools.memory_tool`` and is read lazily."""
 import hashlib
 import logging
 import os
+import re
 import secrets
 import time
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from utils import atomic_write_text, fsync_directory, path_signature
+from utils import atomic_write_bytes, atomic_write_text, fsync_directory, path_signature
 from tools.threat_patterns import first_threat_message as _first_threat_message
 
 logger = logging.getLogger("tools.memory_tool")
@@ -23,6 +24,7 @@ MEMORY_BLOCK_HEADERS = {
     "memory": "MEMORY (your personal notes)", "user": "USER PROFILE (who the user is)"}
 
 ENTRY_DELIMITER = "\n§\n"
+_ENTRY_DELIMITER_BYTES = re.compile(rb"(?:\r\n|\n|\r)\xc2\xa7(?:\r\n|\n|\r)")
 
 
 def _scan_memory_content(content: str) -> Optional[str]:
@@ -90,12 +92,17 @@ class MemoryStore:
         # prompt snapshot; an older generation may still answer from its cached context,
         # but it must never write those forgotten facts back to disk.
         self._reset_generations: Dict[str, Optional[str]] = {"memory": "", "user": ""}
+        self._load_errors: set[str] = set()
         self._consolidation_failures = 0  # per turn; reset by reset_consolidation_failures()
 
     # Per-turn counter of failed at-capacity consolidation attempts; reset at each turn boundary by
     # reset_consolidation_failures() (#42405).
     def target_enabled(self, target: str) -> bool:
         return self.user_profile_enabled if target == "user" else self.memory_enabled
+
+    def load_failed(self, target: str) -> bool:
+        """Whether the last disk snapshot for this target could not be read."""
+        return target in self._load_errors
 
     def reset_consolidation_failures(self) -> None:
         """Call at turn start."""
@@ -195,6 +202,7 @@ class MemoryStore:
                     path.name,
                 )
             if not read_ok:
+                self._load_errors.add(target)
                 logger.warning(
                     "Could not refresh %s; keeping the previous in-memory snapshot and retrying on a later turn.",
                     path.name,
@@ -204,6 +212,7 @@ class MemoryStore:
                 # closed until a later reload captures both bytes and generation.
                 self._system_prompt_disk_state[target] = None
                 continue
+            self._load_errors.discard(target)
             # Deduplicate (order-preserving, first occurrence wins).
             entries = list(dict.fromkeys(self._parse_entries(raw)))
             self._set_entries(target, entries)
@@ -434,6 +443,75 @@ class MemoryStore:
         if not old_text.strip():
             return _error("old_text cannot be empty.")
         return self._edit(target, old_text.strip(), None)
+
+    def remove_exact(self, target: str, entry: str, *, expected_index: int | None = None) -> Dict[str, Any]:
+        """Remove one exact entry while preserving the raw bytes of every other entry."""
+        if not entry:
+            return _error("entry cannot be empty.")
+        path = self._path_for(target)
+        with self._file_lock(path):
+            current_generation = self._read_reset_generation(path)
+            if current_generation is None or current_generation != self._reset_generations.get(target):
+                return self._reset_conflict(target)
+            try:
+                raw_bytes = path.read_bytes()
+            except FileNotFoundError:
+                raw_bytes = b""
+            except OSError:
+                return _read_failed_error(path)
+
+            bom = b"\xef\xbb\xbf" if raw_bytes.startswith(b"\xef\xbb\xbf") else b""
+            content_bytes = raw_bytes[len(bom):]
+            try:
+                raw = content_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                return _read_failed_error(path)
+            normalized_raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+            entries = self._parse_entries(normalized_raw)
+            # Check selectors before drift detection (which may create a backup).
+            # Stale selections must cause zero writes, including auxiliary files.
+            matches = [i for i, current in enumerate(entries) if current == entry]
+            if len(matches) != 1 or (expected_index is not None and matches[0] != expected_index):
+                return _error("Selected memory entry is stale or ambiguous; reload the list and retry.")
+            if normalized_raw != ENTRY_DELIMITER.join(entries):
+                backup = self._detect_external_drift(target, normalized_raw)
+                return _drift_error(path, backup or "(snapshot unavailable)")
+            backup = self._detect_external_drift(target, normalized_raw)
+            if backup:
+                return _drift_error(path, backup)
+
+            raw_entry_bytes = _ENTRY_DELIMITER_BYTES.split(content_bytes) if content_bytes else []
+            try:
+                byte_entries = [
+                    piece.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n").strip()
+                    for piece in raw_entry_bytes
+                ]
+            except UnicodeDecodeError:
+                return _read_failed_error(path)
+            if byte_entries != entries:
+                backup = self._detect_external_drift(target, normalized_raw)
+                return _drift_error(path, backup or "(snapshot unavailable)")
+            if len(entries) != len(set(entries)):
+                return _error("Memory entries are duplicated on disk; resolve duplicates before deleting one.")
+            index = matches[0]
+            remaining = entries[:index] + entries[index + 1:]
+            remaining_bytes = raw_entry_bytes[:index] + raw_entry_bytes[index + 1:]
+            self._set_entries(target, remaining)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = bom + b"\n\xc2\xa7\n".join(remaining_bytes) if remaining_bytes else b""
+            try:
+                atomic_write_bytes(path, payload, tmp_prefix=".mem_")
+            except OSError as exc:
+                raise RuntimeError(f"Failed to write memory file {path}: {exc}") from exc
+            return self._success_response(target, "Entry removed.")
+
+    def remove_index(self, target: str, index: int, expected_text: str) -> Dict[str, Any]:
+        """Validate index AND exact selected text under the byte-preserving delete lock."""
+        if target not in {"memory", "user"}:
+            return _error("target must be memory or user")
+        if type(index) is not int or index < 0:
+            return _error("index must be a non-negative integer")
+        return self.remove_exact(target, expected_text, expected_index=index)
 
     def _edit(self, target: str, old_text: str, new_content: Optional[str]) -> Dict[str, Any]:
         """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*."""

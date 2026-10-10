@@ -4,6 +4,7 @@ import { reconcileApprovalModeForProfile } from '@/store/approval-mode'
 import { reconcileSessionCompacting } from '@/store/compaction'
 import { requestDesktopOnboardingForCredentialWarning } from '@/store/onboarding'
 import { followActiveSessionCwd } from '@/store/projects'
+import { reconcileApprovalModeForSession } from '@/store/prompts'
 import {
   $activeSessionId,
   $currentCwd,
@@ -188,6 +189,10 @@ export function handleSessionInfoEvent(ctx: GatewayEventContext): boolean {
     // attributed to the newly active profile.
     if (isActiveEvent && typeof payload?.approval_mode === 'string' && event.profile && fromActiveSource()) {
       reconcileApprovalModeForProfile(event.profile, payload.approval_mode)
+    }
+
+    if (sessionId && typeof payload?.approval_mode === 'string') {
+      reconcileApprovalModeForSession(sessionId, payload.approval_mode)
     }
 
     if (apply) {

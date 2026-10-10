@@ -11,16 +11,14 @@ makes Hermes redo finished work.
 from __future__ import annotations
 
 import json
-import re
 from types import SimpleNamespace
 from typing import Any, Iterable
 
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall, Function
 
-TOOL_CALL_BLOCK_RE = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.DOTALL)
-TOOL_CALL_JSON_RE = re.compile(
-    r"\{\s*\"id\"\s*:\s*\"[^\"]+\"\s*,\s*\"type\"\s*:\s*\"function\"\s*,\s*\"function\"\s*:\s*\{.*?\}\s*\}", re.DOTALL
-)
+_TOOL_CALL_OPEN = "<tool_call>"
+_TOOL_CALL_CLOSE = "</tool_call>"
+_JSON_DECODER = json.JSONDecoder()
 
 TOOL_CALL_CONTRACT = (
     "Available tools (OpenAI function schema). "
@@ -29,7 +27,7 @@ TOOL_CALL_CONTRACT = (
 )
 
 __all__ = [
-    "TOOL_CALL_BLOCK_RE", "TOOL_CALL_JSON_RE", "TOOL_CALL_CONTRACT", "StreamChunks", "build_openai_tool_call",
+    "TOOL_CALL_CONTRACT", "StreamChunks", "build_openai_tool_call",
     "tool_specs_from_openai_tools", "render_tool_bridge_sections", "extract_tool_calls_from_text",
     "completion_to_stream_chunks",
 ]
@@ -114,12 +112,8 @@ def render_tool_bridge_sections(
     return sections
 
 
-def _parse_tool_call(raw_json: str, ordinal: int) -> ChatCompletionMessageToolCall | None:
-    """One ``<tool_call>`` JSON body → tool call, or None when malformed. Missing id → ``acp_call_<ordinal>``."""
-    try:
-        obj = json.loads(raw_json)
-    except Exception:
-        return None
+def _tool_call_from_object(obj: Any, ordinal: int) -> ChatCompletionMessageToolCall | None:
+    """One decoded tool-call object → tool call, or None when malformed. Missing id → ``acp_call_<ordinal>``."""
     named = _named_function(obj)
     if named is None:
         return None
@@ -133,21 +127,86 @@ def _parse_tool_call(raw_json: str, ordinal: int) -> ChatCompletionMessageToolCa
     return build_openai_tool_call(call_id=call_id, name=fn_name, arguments=fn_args)
 
 
+def _extract_tagged_calls(text: str) -> tuple[list[ChatCompletionMessageToolCall], list[tuple[int, int]]]:
+    """Decode JSON by its structural boundary, then verify its closing tag; strings may contain tag-like text."""
+    calls: list[ChatCompletionMessageToolCall] = []
+    spans: list[tuple[int, int]] = []
+    cursor = 0
+    while (opening := text.find(_TOOL_CALL_OPEN, cursor)) != -1:
+        json_start = opening + len(_TOOL_CALL_OPEN)
+        while json_start < len(text) and text[json_start].isspace():
+            json_start += 1
+        if json_start >= len(text) or text[json_start] != "{":
+            cursor = json_start
+            continue
+
+        try:
+            obj, json_end = _JSON_DECODER.raw_decode(text, json_start)
+        except json.JSONDecodeError:
+            # Keep the historical behavior for malformed closed blocks: consume them without exposing raw JSON.
+            next_open = text.find(_TOOL_CALL_OPEN, json_start)
+            close = text.find(_TOOL_CALL_CLOSE, json_start)
+            if next_open != -1 and (close == -1 or next_open < close):
+                spans.append((opening, next_open))
+                cursor = next_open
+            elif close == -1:
+                cursor = json_start
+            else:
+                end = close + len(_TOOL_CALL_CLOSE)
+                spans.append((opening, end))
+                cursor = end
+            continue
+
+        close = json_end
+        while close < len(text) and text[close].isspace():
+            close += 1
+        if not text.startswith(_TOOL_CALL_CLOSE, close):
+            # Trailing non-whitespace means this was not a complete tagged JSON block.
+            cursor = json_start
+            continue
+
+        end = close + len(_TOOL_CALL_CLOSE)
+        spans.append((opening, end))
+        if isinstance(obj, dict):
+            call = _tool_call_from_object(obj, len(calls) + 1)
+            if call is not None:
+                calls.append(call)
+        cursor = end
+    return calls, spans
+
+
+def _extract_bare_calls(text: str) -> tuple[list[ChatCompletionMessageToolCall], list[tuple[int, int]]]:
+    """Fallback for bare function-call JSON, accepting any key order and optional IDs."""
+    calls: list[ChatCompletionMessageToolCall] = []
+    spans: list[tuple[int, int]] = []
+    cursor = 0
+    while (start := text.find("{", cursor)) != -1:
+        try:
+            obj, end = _JSON_DECODER.raw_decode(text, start)
+        except json.JSONDecodeError:
+            cursor = start + 1
+            continue
+        # Keep bare parsing specific to the advertised OpenAI call shape; ordinary JSON in prose is text.
+        if isinstance(obj, dict) and obj.get("type") == "function":
+            call = _tool_call_from_object(obj, len(calls) + 1)
+            if call is not None:
+                calls.append(call)
+                spans.append((start, end))
+        # A valid non-call object is ordinary text as a whole; don't reinterpret a nested object as a call.
+        cursor = end
+    return calls, spans
+
+
 def extract_tool_calls_from_text(text: str) -> tuple[list[ChatCompletionMessageToolCall], str]:
     """Pull ``<tool_call>`` blocks out of an ACP response → ``(tool_calls, cleaned_text)`` with the consumed blocks
-    removed so the assistant message doesn't show raw JSON. Bare-JSON fallback runs only when no XML block parsed."""
+    removed so the assistant message doesn't show raw JSON. JSON decoding determines object boundaries, not regex."""
     if not isinstance(text, str) or not text.strip():
         return [], ""
-    extracted: list[ChatCompletionMessageToolCall] = []
-    consumed_spans: list[tuple[int, int]] = []
-    for pattern, group in ((TOOL_CALL_BLOCK_RE, 1), (TOOL_CALL_JSON_RE, 0)):
-        for m in pattern.finditer(text):
-            call = _parse_tool_call(m.group(group), len(extracted) + 1)
-            if call is not None:
-                extracted.append(call)
-            consumed_spans.append((m.start(), m.end()))
-        if extracted:
-            break
+    extracted, consumed_spans = _extract_tagged_calls(text)
+    if not extracted:
+        fallback_calls, fallback_spans = _extract_bare_calls(text)
+        extracted.extend(fallback_calls)
+        consumed_spans.extend(fallback_spans)
     if not consumed_spans:
         return extracted, text.strip()
 

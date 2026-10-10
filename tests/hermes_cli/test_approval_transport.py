@@ -570,3 +570,24 @@ def test_hardline_blocks_before_selected_transport(monkeypatch):
 
     assert result["approved"] is False
     assert calls == []
+
+
+@pytest.mark.parametrize("choice", ["once", "deny", "session", "always"])
+def test_once_only_shared_gate_transport_request(monkeypatch, choice):
+    from tools import approval
+
+    manager = PluginManager()
+    seen = []
+    _context(manager).register_approval_transport(
+        "phone", lambda request: seen.append(request) or request.respond(choice)
+    )
+    _configure_manual_guard(monkeypatch, approval, manager)
+    monkeypatch.setattr(approval, "_persist_choice", lambda *a: pytest.fail("once-only must not persist"))
+    result = approval._human_decision(
+        approval._COMMAND_GATE, command="one operation", description="test", pattern_key="test",
+        pattern_keys=["test"], warnings=[("test", None, False)], session_key="session-a",
+        approval_callback=None, is_cli=True, is_gateway=False, is_ask=False, once_only=True,
+    )
+    assert len(seen) == 1
+    assert seen[0].allowed_choices == ("once", "deny")
+    assert result["approved"] == (choice == "once")

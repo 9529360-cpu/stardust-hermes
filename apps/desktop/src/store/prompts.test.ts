@@ -12,18 +12,21 @@ import {
   clearSecretRequest,
   clearSudoRequest,
   receiveApprovalRequest,
+  reconcileApprovalModeForSession,
   replayPendingApproval,
   setApprovalRequest,
   setSecretRequest,
   setSudoRequest
 } from './prompts'
 import { isSessionGone, resetBackgroundPollingGuard } from './runtime-gone'
+import { forgetServerRequest, rememberServerRequest, resetServerRequestsForTests } from './server-requests'
 import { $activeSessionId, setActiveSessionId } from './session'
 
 // Prompts are parked per-session; the exported $*Request views are scoped to the
 // active session, so each test focuses the session it's asserting on.
 beforeEach(() => {
   $activeSessionId.set('s1')
+  reconcileApprovalModeForSession('s1', 'manual')
 })
 
 afterEach(() => {
@@ -31,6 +34,7 @@ afterEach(() => {
   clearClarifyRequest()
   $activeSessionId.set(null)
   resetBackgroundPollingGuard()
+  resetServerRequestsForTests()
 })
 
 describe('approval prompt store', () => {
@@ -156,6 +160,68 @@ describe('approval prompt store', () => {
     resolve({ approvals: [] })
     await pending
     expect($approvalRequest.get()?.requestId).toBe('new')
+  })
+
+  it('does not restore a stale pending card when the backend reports approval mode off', async () => {
+    setApprovalRequest({ command: 'old', description: 'd', requestId: 'old', sessionId: 's1' })
+    const request = vi.fn(async () => ({
+      approval_mode: 'off',
+      approvals: [{ command: 'stale', description: 'd', request_id: 'stale' }]
+    }))
+
+    await replayPendingApproval({ request }, 's1')
+
+    expect($approvalRequest.get()).toBeNull()
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(request).toHaveBeenCalledWith('approval.pending', { session_id: 's1' })
+  })
+
+  it('restores and keeps target-policy locked approvals when the profile mode is off', async () => {
+    setApprovalRequest({ command: 'stale', description: 'd', requestId: 'stale', sessionId: 's1' })
+    const request = vi.fn(async () => ({
+      approval_mode: 'off',
+      approvals: [{ command: 'protected', description: 'd', request_id: 'room', policy_locked: true }]
+    }))
+
+    await replayPendingApproval({ request }, 's1')
+    expect($approvalRequest.get()).toMatchObject({ requestId: 'room', policyLocked: true })
+
+    reconcileApprovalModeForSession('s1', 'off')
+    expect($approvalRequest.get()).toMatchObject({ requestId: 'room', policyLocked: true })
+  })
+
+  it('does not let an in-flight replay restore a card after an off event', async () => {
+    let resolve!: (value: unknown) => void
+    const pending = replayPendingApproval(
+      {
+        request: () => new Promise(done => { resolve = done })
+      },
+      's1'
+    )
+
+    reconcileApprovalModeForSession('s1', 'off')
+    resolve({ approvals: [{ command: 'stale', description: 'd', request_id: 'stale' }] })
+    await pending
+
+    expect($approvalRequest.get()).toBeNull()
+  })
+
+  it('auto-resolves a live request that arrives after the session learned mode is off', async () => {
+    const respond = vi.fn()
+    rememberServerRequest({ fail: vi.fn(), id: 'server-1', method: 'approval', params: {}, respond })
+    reconcileApprovalModeForSession('s1', 'off')
+
+    await receiveApprovalRequest(null, {
+      command: 'stale',
+      description: 'd',
+      requestId: 'r1',
+      serverRequestId: 'server-1',
+      sessionId: 's1'
+    })
+
+    expect($approvalRequest.get()).toBeNull()
+    expect(respond).toHaveBeenCalledWith({ choice: 'once' })
+    forgetServerRequest('server-1')
   })
 
   it('does not replay a pending approval after the runtime is rejected as gone', async () => {

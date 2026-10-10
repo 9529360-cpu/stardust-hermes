@@ -261,6 +261,7 @@ class _ToolCallRef:
     task_id: str
     call_id: str
     trace: list
+    bridge_unwrapped: bool = False
 
     def middleware_kwargs(self) -> dict[str, Any]:
         """Keyword form ``_run_agent_tool_execution_middleware`` (and tests patching it) expect."""
@@ -466,18 +467,25 @@ class _ParsedCall:
     middleware_trace: list
     parse_error: Optional[str]
     scope_block: Optional[str]
+    bridge_unwrapped: bool = False
 
     def ref(self, task_id: str) -> _ToolCallRef:
-        return _ToolCallRef(self.name, self.args, task_id, _pairing_tool_call_id(self.tool_call), self.middleware_trace)
+        return _ToolCallRef(
+            self.name, self.args, task_id, _pairing_tool_call_id(self.tool_call), self.middleware_trace,
+            bridge_unwrapped=self.bridge_unwrapped,
+        )
 
 
 def _parse_tool_call(agent, tool_call, *, flatten_probe: bool = False) -> _ParsedCall:
     name = _canonical_tool_name(tool_call.function.name)
     args, parse_error = _parse_tool_arguments(tool_call.function.arguments)
     scope_block = None
+    bridge_unwrapped = False
     if parse_error is None:
+        original_name = name
         name, args, scope_block = _unwrap_tool_search_call(agent, name, args, flatten_probe=flatten_probe)
-    return _ParsedCall(tool_call, name, args, [], parse_error, scope_block)
+        bridge_unwrapped = original_name == "tool_call" and name != original_name and scope_block is None
+    return _ParsedCall(tool_call, name, args, [], parse_error, scope_block, bridge_unwrapped)
 
 
 @dataclass
@@ -742,6 +750,7 @@ def _run_agent_tool_execution_middleware(
     scope_block: str | None = None,
     display_index: int | None = None,
     middleware_trace: list[dict[str, Any]] | None = None,
+    bridge_unwrapped: bool = False,
     begin_execution=None,
     authorization_gate: _ConcurrentToolAuthorizationGate | None = None,
 ) -> _ManagedToolResult:
@@ -766,7 +775,10 @@ def _run_agent_tool_execution_middleware(
         return _dispatch_authorized_once(
             agent,
             state,
-            _ToolCallRef(function_name, final_args, effective_task_id, tool_call_id, trace),
+            _ToolCallRef(
+                function_name, final_args, effective_task_id, tool_call_id, trace,
+                bridge_unwrapped=bridge_unwrapped,
+            ),
             execute=execute,
             scope_block=scope_block,
             display_index=display_index,
@@ -875,13 +887,20 @@ def _run_sequential_tool_execution_middleware(
     scope_block: str | None = None,
     display_index: int | None = None,
     middleware_trace: list[dict[str, Any]] | None = None,
+    bridge_unwrapped: bool = False,
 ) -> _ManagedToolResult:
     """Run one sequential call on a worker thread under the concurrent executor's deadline.
     Interactive tools (``clarify``) own their wait via ``agent.clarify_timeout``; the
     generic deadline would report ``tool_timeout`` while the prompt is still live."""
     timeout_s = None if function_name in _SEQUENTIAL_DEADLINE_EXEMPT_TOOLS else _resolve_sequential_tool_timeout()
-    ref = _ToolCallRef(function_name, function_args, effective_task_id, tool_call_id, middleware_trace)
-    kwargs = dict(ref.middleware_kwargs(), execute=execute, scope_block=scope_block, display_index=display_index)
+    ref = _ToolCallRef(
+        function_name, function_args, effective_task_id, tool_call_id, middleware_trace,
+        bridge_unwrapped=bridge_unwrapped,
+    )
+    kwargs = dict(
+        ref.middleware_kwargs(), execute=execute, scope_block=scope_block, display_index=display_index,
+        bridge_unwrapped=bridge_unwrapped,
+    )
     if function_name in _NEVER_PARALLEL_TOOLS:
         return _run_agent_tool_execution_middleware(agent, **kwargs)
 
@@ -1249,11 +1268,13 @@ class _ConcurrentBatch:
                     skip_tool_request_middleware=True,
                     skip_tool_execution_middleware=True,
                     tool_request_middleware_trace=list(ref.trace),
+                    bridge_unwrapped=ref.bridge_unwrapped,
                 ),
                 scope_block=scope_block,
                 display_index=index + 1,
                 begin_execution=start_gate.advance,
                 authorization_gate=self.authorization_gate,
+                bridge_unwrapped=ref.bridge_unwrapped,
             )
             result, ref.args, ref.trace = managed.result, managed.args, managed.middleware_trace
             blocked, dispatched = managed.blocked, managed.dispatched
@@ -1609,22 +1630,27 @@ def _resolve_sequential_dispatch(agent, ref: _ToolCallRef, messages: list) -> _S
     def _execute(next_args: dict) -> Any:
         import model_tools
 
+        dispatch_kwargs = dict(
+            tool_call_id=tool_call_id,
+            session_id=agent.session_id or "",
+            turn_id=getattr(agent, "_current_turn_id", "") or "",
+            api_request_id=getattr(agent, "_current_api_request_id", "") or "",
+            enabled_tools=list(agent.valid_tool_names or []),
+            skip_pre_tool_call_hook=True,
+            skip_tool_request_middleware=True,
+            skip_tool_execution_middleware=True,
+            tool_request_middleware_trace=list(middleware_trace),
+            enabled_toolsets=getattr(agent, "enabled_toolsets", None),
+            disabled_toolsets=getattr(agent, "disabled_toolsets", None),
+        )
+        if ref.bridge_unwrapped:
+            dispatch_kwargs["bridge"] = True
         with model_tools.suppress_post_tool_call_hook():
             return model_tools.handle_function_call(
                 function_name,
                 next_args,
                 effective_task_id,
-                tool_call_id=tool_call_id,
-                session_id=agent.session_id or "",
-                turn_id=getattr(agent, "_current_turn_id", "") or "",
-                api_request_id=getattr(agent, "_current_api_request_id", "") or "",
-                enabled_tools=list(agent.valid_tool_names) if agent.valid_tool_names else None,
-                skip_pre_tool_call_hook=True,
-                skip_tool_request_middleware=True,
-                skip_tool_execution_middleware=True,
-                tool_request_middleware_trace=list(middleware_trace),
-                enabled_toolsets=getattr(agent, "enabled_toolsets", None),
-                disabled_toolsets=getattr(agent, "disabled_toolsets", None),
+                **dispatch_kwargs,
             )
 
     return _SequentialDispatch(
@@ -1670,7 +1696,11 @@ def _run_sequential_call(
     try:
         managed = _run_sequential_tool_execution_middleware(
             agent,
-            **dict(ref.middleware_kwargs(), middleware_trace=dispatch.middleware_trace_arg),
+            **dict(
+                ref.middleware_kwargs(),
+                middleware_trace=dispatch.middleware_trace_arg,
+                bridge_unwrapped=ref.bridge_unwrapped,
+            ),
             execute=dispatch.execute,
             scope_block=scope_block,
             display_index=display_index,

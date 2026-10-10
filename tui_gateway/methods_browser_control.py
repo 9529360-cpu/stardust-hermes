@@ -16,10 +16,18 @@ from __future__ import annotations
 import hashlib
 import logging
 
+from gateway.browser_control_broker import (
+    BROWSER_CONTROL_PROTOCOL_VERSION,
+    LOCAL_DESKTOP_TRANSPORT_FAMILY,
+    ControllerScope,
+    local_desktop_principal,
+)
 from hermes_cli.dashboard_auth.ws_tickets import (
     INTERNAL_PROVIDER as _INTERNAL_PROVIDER, INTERNAL_USER_ID as _INTERNAL_USER_ID)
 
 from .method_ctx import HandlerRegistry, bind_module
+from .session_transports import _session_transport_contains
+from .transport import current_transport
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +46,8 @@ _NO_CONTROLLER = "no controller registered for this session"
 def _is_authenticated_identity(identity: object) -> bool:
     """True for a server-minted, non-internal ``{user_id, provider}`` identity."""
     if not isinstance(identity, dict):
+        return False
+    if identity.get("provider") == "loopback-session":
         return False
     user_id, provider = identity.get("user_id"), identity.get("provider")
     if not isinstance(user_id, str) or not user_id.strip():
@@ -79,7 +89,7 @@ def _broker_event_writer(transport: object, session_id: str):
 
 def _controller_method(
     name: str, *, identity_message: str = _IDENTITY_REQUIRED, lookup_scope: bool = True,
-    missing_scope_message: str = _NO_CONTROLLER, precheck=None):
+    missing_scope_message: str = _NO_CONTROLLER, precheck=None, desktop_bridge=False):
     """Register a handler behind the shared fail-closed (4403) controller gates.
 
     Order: ``precheck(rid, params)`` (may return an error envelope) → caller holds a
@@ -94,13 +104,17 @@ def _controller_method(
         def handler(rid, params: dict) -> dict:
             from gateway import browser_control_broker
 
-            if precheck is not None:
+            if precheck is not None and not desktop_bridge:
                 denied = precheck(rid, params)
                 if denied is not None:
                     return denied
             transport = current_transport()
             identity = getattr(transport, "auth_identity", None)
-            if not _is_authenticated_identity(identity):
+            if desktop_bridge and identity != {"user_id": "local-desktop", "provider": "loopback-session"}:
+                return _err(rid, _ERR_FORBIDDEN, "local Desktop connection required")
+            if not desktop_bridge and isinstance(identity, dict) and identity.get("provider") == "loopback-session":
+                return _err(rid, _ERR_FORBIDDEN, identity_message)
+            if not desktop_bridge and not _is_authenticated_identity(identity):
                 return _err(rid, _ERR_FORBIDDEN, identity_message)
             session_id = str(params.get("session_id") or "")
             with _sessions_lock:
@@ -112,6 +126,13 @@ def _controller_method(
                 if not _session_transport_contains(session, transport):
                     return _err(rid, _ERR_FORBIDDEN, "session is not owned by this transport")
             broker = browser_control_broker.get_browser_control_broker()
+            if desktop_bridge:
+                with _session_profile_runtime_scope(session):
+                    if precheck is not None:
+                        denied = precheck(rid, params)
+                        if denied is not None:
+                            return denied
+                    return fn(rid, params, transport, identity, session_id, broker, None, session)
             scope = None
             if lookup_scope:
                 scope = broker.scope_for_session(
@@ -157,7 +178,7 @@ def _(rid, params: dict, transport, identity, session_id, broker, _scope, sessio
 
     controller_id = str(params.get("controller_id") or "").strip()
     browser_profile_id = str(params.get("browser_profile_id") or "").strip()
-    profile_id = str(session.get("profile") or "").strip()
+    profile_id = _session_profile(session)
     if not controller_id or not browser_profile_id or not profile_id:
         return _err(
             rid, _ERR_FORBIDDEN,
@@ -210,6 +231,121 @@ def _(rid, params: dict, transport, _identity, _session_id, broker, scope, _sess
     """Hard-detach only the controller owned by this authenticated transport."""
     broker.detach(scope, owner=transport, notify_controller=False)
     return _ok(rid, {"detached": True})
+
+
+def _desktop_bridge_scope(session_id: str, profile_id: str, browser_profile_id: str,
+                          controller_id: str, capabilities: frozenset) -> ControllerScope:
+    from gateway.browser_control_broker import ControllerScope, local_desktop_principal
+    return ControllerScope(
+        principal_id=local_desktop_principal(profile_id, session_id),
+        profile_id=profile_id,
+        session_id=session_id,
+        controller_id=controller_id,
+        browser_profile_id=browser_profile_id,
+        transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY,
+        capabilities=capabilities,
+    )
+
+
+def _session_profile(session: dict) -> str:
+    from hermes_constants import profile_name_for_home
+    from tui_gateway.server import _current_profile_name
+    return str(session.get('profile') or session.get('profile_id')
+               or (profile_name_for_home(session['profile_home']) if session.get('profile_home')
+                   else _current_profile_name()) or '').strip()
+
+
+def _session_by_id(session_id: str):
+    with _sessions_lock:
+        return _sessions.get(session_id)
+
+
+def _desktop_bridge_params(rid: str, params: dict):
+    session_id = str(params.get('session_id') or '').strip()
+    browser_profile_id = str(params.get('browser_profile_id') or '').strip()
+    controller_id = str(params.get('controller_id') or '').strip()
+    if not session_id:
+        return None, _err(rid, _ERR_FORBIDDEN, 'session_id is required')
+    session = _session_by_id(session_id)
+    if not isinstance(session, dict):
+        return None, _err(rid, _ERR_FORBIDDEN, 'session is not available on this Desktop gateway')
+    profile_id = _session_profile(session)
+    if not profile_id:
+        return None, _err(rid, _ERR_FORBIDDEN, 'session profile is unavailable')
+    return (session_id, profile_id, browser_profile_id, controller_id, session), None
+
+
+@_controller_method('browser.controller.bridge_prepare', lookup_scope=False, precheck=_register_precheck, desktop_bridge=True)
+def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, session) -> dict:
+    import secrets
+    from gateway import browser_control_broker
+    prepared, denied = _desktop_bridge_params(rid, params)
+    if denied is not None:
+        return denied
+    session_id, profile_id, browser_profile_id, _controller_id, _session = prepared
+    if not browser_profile_id:
+        return _err(rid, _ERR_FORBIDDEN, 'browser_profile_id is required')
+    if not browser_control_broker.browser_control_protocol_supported(params.get('protocol_version')):
+        return _err(rid, _ERR_FORBIDDEN, 'unsupported browser-control protocol version')
+    capabilities = browser_control_broker.filter_browser_control_capabilities(params.get('capabilities'))
+    if not capabilities:
+        return _err(rid, _ERR_FORBIDDEN, 'no permitted controller capabilities requested')
+    controller_id = f'chrome-{secrets.token_urlsafe(12)}'
+    scope = _desktop_bridge_scope(session_id, profile_id, browser_profile_id, controller_id, capabilities)
+    grant = broker.mint_bridge_grant(scope)
+    return _ok(rid, {
+        'launch_context': {
+            'grant': grant.value,
+            'session_id': session_id,
+            'controller_id': controller_id,
+            'browser_profile_id': browser_profile_id,
+            'capabilities': sorted(capabilities),
+            'protocol_version': BROWSER_CONTROL_PROTOCOL_VERSION,
+            'profile_id': profile_id,
+        },
+        'expires_in_seconds': broker.launch_grant_ttl_seconds,
+    })
+
+
+@_controller_method('browser.controller.bridge_status', lookup_scope=False, desktop_bridge=True)
+def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, _session) -> dict:
+    from gateway.browser_control_broker import local_desktop_principal
+    prepared, denied = _desktop_bridge_params(rid, params)
+    if denied is not None:
+        return denied
+    session_id, profile_id, browser_profile_id, controller_id, _session = prepared
+    scope = broker.scope_for_session(
+        session_id=session_id,
+        principal_id=local_desktop_principal(profile_id, session_id),
+        transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY,
+    )
+    connected = scope is not None and any(broker.select(scope, cap) is not None for cap in scope.capabilities)
+    result = {'status': 'connected' if connected else 'error' if scope is not None else 'inactive'}
+    if scope is not None:
+        result.update({
+            'session_id': scope.session_id,
+            'controller_id': scope.controller_id,
+            'browser_profile_id': scope.browser_profile_id,
+            'capabilities': sorted(scope.capabilities),
+        })
+    return _ok(rid, result)
+
+
+@_controller_method('browser.controller.bridge_revoke', lookup_scope=False, desktop_bridge=True)
+def _(rid, params: dict, _transport, _identity, _session_id, broker, _scope, _session) -> dict:
+    from gateway.browser_control_broker import local_desktop_principal
+    prepared, denied = _desktop_bridge_params(rid, params)
+    if denied is not None:
+        return denied
+    session_id, profile_id, browser_profile_id, controller_id, _session = prepared
+    identity = local_desktop_principal(profile_id, session_id)
+    scope = broker.scope_for_session(session_id=session_id, principal_id=identity,
+                                    transport_family=LOCAL_DESKTOP_TRANSPORT_FAMILY)
+    if scope is not None and controller_id and scope.controller_id != controller_id:
+        return _err(rid, _ERR_FORBIDDEN, 'controller does not match this Desktop session')
+    revoked = broker.revoke_bridge_session(principal_id=identity, profile_id=profile_id,
+                                           session_id=session_id, controller_id=controller_id)
+    return _ok(rid, {'revoked': revoked, 'status': 'inactive'})
 
 
 def register(server) -> None:

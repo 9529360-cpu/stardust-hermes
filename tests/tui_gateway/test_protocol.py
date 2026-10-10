@@ -177,6 +177,34 @@ def test_write_json(capture):
     assert json.loads(buf.getvalue()) == {"test": True}
 
 
+def test_approval_request_payload_preserves_target_policy_lock():
+    from tui_gateway.server import _approval_request_payload
+
+    payload = _approval_request_payload({
+        "request_id": "room-approval", "command": "echo safe", "policy_locked": True,
+    })
+
+    assert payload["policy_locked"] is True
+
+
+def test_approval_request_payload_never_offers_forbidden_scopes():
+    from tui_gateway.server import _approval_request_payload
+
+    once_only = _approval_request_payload({
+        "allow_permanent": False,
+        "allow_session": False,
+        "choices": ["once", "session", "always", "deny"],
+    })
+    assert once_only["choices"] == ["once", "deny"]
+
+    no_permanent = _approval_request_payload({
+        "allow_permanent": False,
+        "allow_session": True,
+        "choices": ["once", "session", "always", "deny"],
+    })
+    assert no_permanent["choices"] == ["once", "session", "deny"]
+
+
 def test_live_session_payload_replays_pending_approval(server, monkeypatch):
     """A reattached client receives the approval that was emitted while detached."""
     from tools import approval
@@ -420,13 +448,16 @@ def test_approval_pending_replays_unresolved_requests(server, monkeypatch):
 
     server._sessions["ui-1"] = {"session_key": "agent-1", "history": []}
     pending = [{"request_id": "req-1", "command": "danger"}]
-    monkeypatch.setattr(approval, "list_gateway_approvals", lambda key: pending if key == "agent-1" else [])
+    monkeypatch.setattr(
+        approval, "list_gateway_approvals",
+        lambda key, **_kwargs: pending if key == "agent-1" else [],
+    )
 
     response = server.handle_request(
         {"id": "r1", "method": "approval.pending", "params": {"session_id": "ui-1"}}
     )
 
-    assert response["result"] == {"approvals": pending}
+    assert response["result"] == {"approvals": pending, "approval_mode": "smart"}
 
 
 def test_approval_received_acknowledges_exact_request(server, monkeypatch):
@@ -1530,3 +1561,47 @@ def test_unregister_live_transport_stops_delivery(capture):
     assert a.frames == []
     # No live transports left → fell back to stdio.
     assert json.loads(buf.getvalue())["params"]["type"] == "skin.changed"
+
+
+def test_approval_audit_rpc(server):
+    from tools.approval_audit import write_approval_audit
+    write_approval_audit(session_key="audit-rpc", kind="tool", tool_name="write_file",
+                         description="test", pattern_key="rule", outcome="denied",
+                         mode="manual", command_preview="test")
+    from hermes_constants import get_hermes_home
+    path = get_hermes_home() / "audit" / "approvals.jsonl"
+    with path.open("ab") as stream:
+        stream.write(b'{"session_key":"audit-rpc","outcome":"bad\xff"}\n')
+    reply = server._methods["approval.audit"](42, {"limit": 1, "session_key": "audit-rpc"})
+    assert reply["result"]["entries"][0]["outcome"] == "denied"
+    assert reply["result"]["entries"][0]["session_key"] == "audit-rpc"
+
+
+def test_work_ledger_rpc(server, monkeypatch, tmp_path):
+    from tools import work_ledger
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    item = {"id": "delegation:test", "kind": "delegation", "title": "Research",
+            "status": "completed", "started_at": 1.0, "updated_at": 2.0,
+            "detail": {"summary": "Done"}}
+    monkeypatch.setattr(work_ledger, "list_work", lambda **kw: [item])
+    monkeypatch.setattr(work_ledger, "cancel_work", lambda id, **kw: {
+        "id": id, "status": "already_finished", "message": "Work is already completed."})
+    assert server._methods["work.list"](1, {})["error"]["code"] == 4001
+    assert server._methods["work.cancel"](2, {"id": item["id"]})["error"]["code"] == 4001
+    assert server._methods["work.cancel"](3, {"id": "subagent:foreign"})["error"]["code"] == 4001
+
+
+def test_approval_grants_rpc(server):
+    reply = server._methods["approval.grants.add"](1, {
+        "action_kind": "send_message", "target": "telegram:123"})
+    grant = reply["result"]["grant"]
+    assert server._methods["approval.grants.list"](2, {})["result"]["grants"] == [grant]
+    assert server._methods["approval.grants.revoke"](3, {"id": grant["id"]})["result"]["revoked"]
+    assert server._methods["approval.grants.list"](4, {})["result"]["grants"] == []
+    assert "error" in server._methods["approval.grants.add"](5, {
+        "action_kind": "purchase", "target": "shop", "max_amount": 10})
+    assert "error" in server._methods["approval.grants.add"](6, {
+        "action_kind": "send_message", "target": "telegram:123", "expires_at": "not a date"})
+    assert "error" in server.dispatch({"id": 7, "method": "approval.grants.add", "params": {
+        "action_kind": "purchase", "target": "shop", "max_amount": 10}})
+    assert server.dispatch({"id": 8, "method": "approval.grants.list", "params": {}})["result"]["grants"] == []

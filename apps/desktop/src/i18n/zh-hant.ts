@@ -1478,7 +1478,7 @@ export const zhHant = defineLocale({
         needsSetupHint: '現在即可選擇此後端——但在完成設定前命令將會失敗。'
       },
       browserRealProfile: {
-        label: '使用我的真實瀏覽器設定檔',
+        label: '使用瀏覽器設定檔副本',
         description:
           '將預設瀏覽器的登入資訊與 Cookie 複製到受管理的快照中，代理使用該快照進行瀏覽。絕不會直接開啟你的真實設定檔。將套用於新工作階段。',
         enabledTitle: '真實設定檔瀏覽：已開啟',
@@ -1486,15 +1486,28 @@ export const zhHant = defineLocale({
         disabledTitle: '真實設定檔瀏覽：已關閉',
         disabledMessage: '設定檔快照將被刪除；新工作階段使用乾淨的瀏覽器。',
         failedSave: '無法儲存真實設定檔設定',
-        prompt: {
-          title: '讓網站保持登入狀態',
-          body: '讓 Hermes 使用預設瀏覽器設定檔的快照進行瀏覽，網站開啟時即已登入。',
-          bulletSnapshot: 'Cookie 與登入資訊會複製到受管理的快照中。',
-          bulletLiveProfile: '絕不會直接開啟你的真實瀏覽器設定檔。',
-          bulletLocal: '所有資料都不會離開這台電腦。',
-          dontShowAgain: '不再顯示',
-          notNow: '暫不',
-          enable: '使用我的設定檔'
+      },
+      browserHostControl: {
+        label: '連接至已開啟的 Chrome 設定檔',
+        description: '透過核准的瀏覽器擴充功能，明確將此工作階段配對至已開啟的 Chrome 設定檔。Stardust 不會複製 Chrome Cookie。',
+        statusLabel: '狀態',
+        profileLabel: 'Chrome 設定檔目錄',
+        connect: '連接 Chrome',
+        disconnect: '中斷連接',
+        working: '處理中…',
+        connectedTitle: 'Chrome 已連接',
+        connectedMessage: '每個操作獲得核准後，此工作階段即可使用已配對的 Chrome 設定檔。',
+        connectFailed: '無法連接 Chrome',
+        disconnectFailed: '無法中斷 Chrome 連接',
+        noSession: '請先開啟或選取 Desktop 工作階段。',
+        invalidProfile: '只輸入 Chrome 設定檔目錄名稱，例如 Default 或 Profile 1。',
+        warning: '請先在 Chrome 中安裝並啟用官方 Playwright MCP Browser Extension，並在擴充功能提示中核准要控制的分頁。連接僅限此工作階段，中斷連接後即會停止。',
+        status: {
+          inactive: '未連接',
+          starting: '連接中…',
+          connected: '已連接',
+          stopping: '中斷連接中…',
+          error: '錯誤'
         }
       }
     }

@@ -22,7 +22,7 @@ vi.mock('@/i18n', () => ({
       settings: {
         toolsets: {
           browserRealProfile: {
-            label: 'Use My Real Browser Profile',
+            label: 'Use a Copy of My Browser Profile',
             description: 'Copies your default browser profile into a managed snapshot.',
             enabledTitle: 'Real-profile browsing on',
             enabledMessage: 'New sessions use the snapshot.',
@@ -76,7 +76,7 @@ describe('BrowserRealProfilePanel', () => {
 
   it('renders off for a config without the key and turns it on', async () => {
     render(<BrowserRealProfilePanel />)
-    const toggle = screen.getByRole('switch', { name: 'Use My Real Browser Profile' })
+    const toggle = screen.getByRole('switch', { name: 'Use a Copy of My Browser Profile' })
 
     expect(toggle).toHaveProperty('ariaChecked', 'false')
 
@@ -97,7 +97,7 @@ describe('BrowserRealProfilePanel', () => {
   it('turns an enabled toggle off', async () => {
     mocks.loadedConfig = { browser: { use_real_profile: true } }
     render(<BrowserRealProfilePanel />)
-    const toggle = screen.getByRole('switch', { name: 'Use My Real Browser Profile' })
+    const toggle = screen.getByRole('switch', { name: 'Use a Copy of My Browser Profile' })
 
     expect(toggle).toHaveProperty('ariaChecked', 'true')
 
@@ -118,7 +118,7 @@ describe('BrowserRealProfilePanel', () => {
     render(<BrowserRealProfilePanel />)
 
     await act(async () => {
-      fireEvent.click(screen.getByRole('switch', { name: 'Use My Real Browser Profile' }))
+      fireEvent.click(screen.getByRole('switch', { name: 'Use a Copy of My Browser Profile' }))
       await Promise.resolve()
     })
 

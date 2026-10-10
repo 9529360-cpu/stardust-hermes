@@ -82,7 +82,11 @@ def _build_server() -> Any:
         def _dispatch(**kwargs: Any) -> str:
             try:
                 # Drop None so unset optionals aren't forwarded to the handler.
-                return handle_function_call(tool_name, {k: v for k, v in kwargs.items() if v is not None})
+                return handle_function_call(
+                    tool_name,
+                    {k: v for k, v in kwargs.items() if v is not None},
+                    enabled_tools=list(EXPOSED_TOOLS),
+                )
             except Exception as exc:
                 logger.exception("tool %s raised", tool_name)
                 return json.dumps({"error": str(exc), "tool": tool_name})

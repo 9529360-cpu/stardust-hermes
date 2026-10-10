@@ -26,6 +26,7 @@ import { requestGatewayForAgent, requestGatewayForProfile } from '@/store/gatewa
 import { $pinnedSessionIds } from '@/store/layout'
 import { $activeGatewayProfile, $newChatProfile, $newChatRoute, $profiles, ensureGatewayProfile } from '@/store/profile'
 import { $projectScope, $projectTree, ALL_PROJECTS } from '@/store/projects'
+import { $approvalRequest, clearAllPrompts, reconcileApprovalModeForSession } from '@/store/prompts'
 import {
   $activeSessionId,
   $activeSessionStoredIdRotation,
@@ -1199,6 +1200,7 @@ describe('resumeSession failure recovery', () => {
     $removedSessionIds.set(new Set())
     $sessionMutationsInFlight.set(new Set())
     clearClarifyRequest()
+    clearAllPrompts()
     vi.restoreAllMocks()
   })
 
@@ -1294,6 +1296,44 @@ describe('resumeSession failure recovery', () => {
     expect(clarifyMessages[0].pending).toBe(true)
     expect(state?.streamId).toBe(clarifyMessages[0].id)
     expect($clarifyRequests.get()['runtime-1']).toMatchObject({ requestId: 'req-resumed', question: 'Which path?' })
+  })
+
+  it('preserves a policy-locked approval when restoring a pending request under profile off mode', async () => {
+    reconcileApprovalModeForSession('runtime-1', 'off')
+    setSessions([storedSession({ id: 'stored-1', message_count: 0 })])
+    vi.mocked(getLatestSessionMessages).mockResolvedValue({ messages: [], session_id: 'stored-1' } as never)
+
+    const requestGateway = vi.fn(async (method: string) => {
+      if (method === 'session.resume') {
+        return {
+          info: {},
+          message_count: 0,
+          messages: [],
+          pending_approval: {
+            command: 'protected room action',
+            description: 'RoomLink target requires approval',
+            policy_locked: true,
+            request_id: 'room-approval',
+            smart_denied: false
+          },
+          resumed: 'stored-1',
+          session_id: 'runtime-1',
+          session_key: 'stored-1'
+        } as never
+      }
+
+      return {} as never
+    })
+
+    await runResume(requestGateway)
+
+    expect($approvalRequest.get()).toMatchObject({
+      command: 'protected room action',
+      policyLocked: true,
+      requestId: 'room-approval',
+      sessionId: 'runtime-1'
+    })
+    expect(requestGateway).not.toHaveBeenCalledWith('approval.respond', expect.anything())
   })
 
   it('restores a pending batch clarify whose resume snapshot has no top-level question', async () => {

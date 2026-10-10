@@ -1731,23 +1731,38 @@ export const en: Translations = {
         switchedToLocal: 'Terminal commands now run locally. Applies to new sessions.'
       },
       browserRealProfile: {
-        label: 'Use My Real Browser Profile',
+        label: 'Use a Copy of My Browser Profile',
         description:
           "Copies your default browser's logins and cookies into a managed snapshot the agent browses with. Your live profile is never opened directly. Applies to new sessions.",
         enabledTitle: 'Real-profile browsing on',
         enabledMessage: 'New sessions will browse with a snapshot of your default browser profile.',
         disabledTitle: 'Real-profile browsing off',
         disabledMessage: 'The profile snapshot will be deleted; new sessions use a clean browser.',
-        failedSave: 'Could not save the real-profile setting',
-        prompt: {
-          title: 'Stay signed in to your sites',
-          body: 'Let Hermes browse with a snapshot of your default browser profile, so sites open already signed in.',
-          bulletSnapshot: 'Cookies and logins are copied into a managed snapshot.',
-          bulletLiveProfile: 'Your live browser profile is never opened directly.',
-          bulletLocal: 'Nothing leaves this computer.',
-          dontShowAgain: "Don't show again",
-          notNow: 'Not now',
-          enable: 'Use my profile'
+        failedSave: 'Could not save the real-profile setting'
+      },
+      browserHostControl: {
+        label: 'Connect to an Open Chrome Profile',
+        description:
+          'Explicitly pair this session with one already-open Chrome profile through the approved browser extension. Stardust never copies your Chrome cookies.',
+        statusLabel: 'Status',
+        profileLabel: 'Chrome profile directory',
+        connect: 'Connect Chrome',
+        disconnect: 'Disconnect',
+        working: 'Working…',
+        connectedTitle: 'Chrome connected',
+        connectedMessage: 'This session can now use the paired Chrome profile after each action is approved.',
+        connectFailed: 'Could not connect to Chrome',
+        disconnectFailed: 'Could not disconnect from Chrome',
+        noSession: 'Open or select a Desktop session first.',
+        invalidProfile: 'Use only the Chrome profile directory name, such as Default or Profile 1.',
+        warning:
+          'Install and enable the official Playwright MCP Browser Extension in Chrome, then approve the intended tab when prompted. The connection is session-scoped and stops when you disconnect.',
+        status: {
+          inactive: 'Not connected',
+          starting: 'Connecting…',
+          connected: 'Connected',
+          stopping: 'Disconnecting…',
+          error: 'Error'
         }
       }
     }
@@ -2179,11 +2194,19 @@ export const en: Translations = {
       resume: 'Resume',
       runNow: 'Run now',
       memoryData: 'Memory data',
-      memoryDataDesc: 'Built-in memory files injected into every session',
+      memoryDataDesc: 'Review built-in entries. Existing chats keep their cached prompt until a fresh session.',
       memoryProvider: name => `Active provider: ${name}`,
       builtinMemory: 'built-in',
       memoryFile: 'Agent memory (MEMORY.md)',
       userFile: 'User profile (USER.md)',
+      viewEntries: 'View entries',
+      hideEntries: 'Hide entries',
+      noEntries: 'No entries',
+      entriesUnavailable: 'Built-in memory is unavailable for this profile.',
+      removeEntry: 'Remove entry',
+      removeEntryConfirm: 'Remove this memory entry?',
+      entryRemoved: 'Memory entry removed',
+      removeEntryFailed: 'Could not remove memory entry',
       bytes: size => size,
       empty: 'empty',
       resetMemory: 'Reset memory',

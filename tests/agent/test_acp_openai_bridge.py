@@ -97,6 +97,54 @@ def test_multiple_blocks_are_all_parsed():
     assert cleaned == ""
 
 
+def test_tag_text_inside_json_string_does_not_truncate_tool_call():
+    arguments = json.dumps({"query": "literal }</tool_call> text and more"})
+    payload = json.dumps({
+        "function": {"arguments": arguments, "name": "memory"},
+        "type": "function",
+        "id": "c-boundary",
+    })
+
+    calls, cleaned = extract_tool_calls_from_text(f"Before.\n<tool_call>{payload}</tool_call>\nAfter.")
+
+    assert len(calls) == 1
+    assert calls[0].id == "c-boundary"
+    assert calls[0].function.name == "memory"
+    assert json.loads(calls[0].function.arguments) == {"query": "literal }</tool_call> text and more"}
+    assert cleaned == "Before.\nAfter."
+
+
+def test_bare_json_fallback_accepts_reordered_fields_and_missing_id():
+    bare = json.dumps({
+        "function": {"arguments": json.dumps({"command": "echo ok"}), "name": "terminal"},
+        "type": "function",
+    })
+
+    calls, cleaned = extract_tool_calls_from_text(f"Run this: {bare} when ready.")
+
+    assert len(calls) == 1
+    assert calls[0].id == "acp_call_1"
+    assert calls[0].function.name == "terminal"
+    assert json.loads(calls[0].function.arguments) == {"command": "echo ok"}
+    assert cleaned == "Run this:\nwhen ready."
+
+
+def test_malformed_unclosed_block_does_not_consume_following_valid_call():
+    valid = json.dumps({
+        "id": "recovered",
+        "type": "function",
+        "function": {"name": "todo", "arguments": "{}"},
+    })
+    text = f"Before.\n<tool_call>{{not-json\n<tool_call>{valid}</tool_call>\nAfter."
+
+    calls, cleaned = extract_tool_calls_from_text(text)
+
+    assert len(calls) == 1
+    assert calls[0].id == "recovered"
+    assert calls[0].function.name == "todo"
+    assert cleaned == "Before.\nAfter."
+
+
 def test_non_string_arguments_are_json_encoded_and_missing_ids_synthesised():
     calls, _ = extract_tool_calls_from_text(
         '<tool_call>{"type": "function", "function": '

@@ -1874,23 +1874,38 @@ export const zh = defineLocale({
         needsSetupHint: '现在即可选择此后端——但在完成设置前命令将会失败。'
       },
       browserRealProfile: {
-        label: '使用我的真实浏览器配置文件',
+        label: '使用浏览器配置文件副本',
         description:
           '将默认浏览器的登录信息和 Cookie 复制到托管快照中，代理使用该快照进行浏览。绝不会直接打开你的真实配置文件。将应用于新会话。',
         enabledTitle: '真实配置文件浏览：已开启',
         enabledMessage: '新会话将使用默认浏览器配置文件的快照进行浏览。',
         disabledTitle: '真实配置文件浏览：已关闭',
         disabledMessage: '配置文件快照将被删除；新会话使用干净的浏览器。',
-        failedSave: '无法保存真实配置文件设置',
-        prompt: {
-          title: '让网站保持登录状态',
-          body: '让 Hermes 使用默认浏览器配置文件的快照进行浏览，网站打开时即已登录。',
-          bulletSnapshot: 'Cookie 和登录信息会复制到托管快照中。',
-          bulletLiveProfile: '绝不会直接打开你的真实浏览器配置文件。',
-          bulletLocal: '所有数据都不会离开这台电脑。',
-          dontShowAgain: '不再显示',
-          notNow: '暂不',
-          enable: '使用我的配置文件'
+        failedSave: '无法保存真实配置文件设置'
+      },
+      browserHostControl: {
+        label: '连接到已打开的 Chrome 配置文件',
+        description:
+          '通过已批准的浏览器扩展，明确将此会话配对到一个已打开的 Chrome 配置文件。Stardust 不会复制你的 Chrome Cookie。',
+        statusLabel: '状态',
+        profileLabel: 'Chrome 配置文件目录',
+        connect: '连接 Chrome',
+        disconnect: '断开连接',
+        working: '处理中…',
+        connectedTitle: 'Chrome 已连接',
+        connectedMessage: '每个操作获得批准后，此会话即可使用已配对的 Chrome 配置文件。',
+        connectFailed: '无法连接 Chrome',
+        disconnectFailed: '无法断开 Chrome 连接',
+        noSession: '请先打开或选择一个 Desktop 会话。',
+        invalidProfile: '只输入 Chrome 配置文件目录名称，例如 Default 或 Profile 1。',
+        warning:
+          '请先在 Chrome 中安装并启用官方 Playwright MCP Browser Extension，并在扩展提示中批准要控制的标签页。连接仅限此会话，断开后即停止。',
+        status: {
+          inactive: '未连接',
+          starting: '连接中…',
+          connected: '已连接',
+          stopping: '断开中…',
+          error: '错误'
         }
       }
     }
@@ -2406,11 +2421,19 @@ export const zh = defineLocale({
       resume: '恢复',
       runNow: '立即运行',
       memoryData: '记忆数据',
-      memoryDataDesc: '注入每个会话的内置记忆文件',
+      memoryDataDesc: '查看内置记忆条目。已有聊天会保留缓存提示词，直到开始新会话。',
       memoryProvider: name => `当前提供方：${name}`,
       builtinMemory: '内置',
       memoryFile: '智能体记忆（MEMORY.md）',
       userFile: '用户画像（USER.md）',
+      viewEntries: '查看条目',
+      hideEntries: '收起条目',
+      noEntries: '暂无条目',
+      entriesUnavailable: '此配置中的内置记忆不可用。',
+      removeEntry: '删除条目',
+      removeEntryConfirm: '删除这条记忆？',
+      entryRemoved: '记忆条目已删除',
+      removeEntryFailed: '无法删除记忆条目',
       bytes: size => size,
       empty: '空',
       resetMemory: '重置记忆',

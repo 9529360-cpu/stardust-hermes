@@ -1536,15 +1536,28 @@ export interface Translations {
         disabledTitle: string
         disabledMessage: string
         failedSave: string
-        prompt: {
-          title: string
-          body: string
-          bulletSnapshot: string
-          bulletLiveProfile: string
-          bulletLocal: string
-          dontShowAgain: string
-          notNow: string
-          enable: string
+      }
+      browserHostControl: {
+        label: string
+        description: string
+        statusLabel: string
+        profileLabel: string
+        connect: string
+        disconnect: string
+        working: string
+        connectedTitle: string
+        connectedMessage: string
+        connectFailed: string
+        disconnectFailed: string
+        noSession: string
+        invalidProfile: string
+        warning: string
+        status: {
+          inactive: string
+          starting: string
+          connected: string
+          stopping: string
+          error: string
         }
       }
     }
@@ -1942,6 +1955,14 @@ export interface Translations {
       builtinMemory: string
       memoryFile: string
       userFile: string
+      viewEntries: string
+      hideEntries: string
+      noEntries: string
+      entriesUnavailable: string
+      removeEntry: string
+      removeEntryConfirm: string
+      entryRemoved: string
+      removeEntryFailed: string
       bytes: (size: string) => string
       empty: string
       resetMemory: string

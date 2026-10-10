@@ -27,6 +27,7 @@ logger = logging.getLogger("tools.computer_use.cua_backend")
 # shell window via list_windows, WITH interactable elements (icons, taskbar).
 _FULL_SCREEN_SENTINELS = {"screen", "fullscreen", "full screen", "all"}
 _DESKTOP_SHELL_SENTINELS = {"desktop"}
+_VALID_CAPTURE_SCOPES = {"auto", "window", "desktop"}
 # Shell window identifiers (substring of app_name + title, case-insensitive). Windows: Progman/WorkerW =
 # desktop, Shell_TrayWnd = taskbar; macOS: Finder/Dock. The backdrop subset is preferred over the taskbar.
 _DESKTOP_WINDOW_NAMES = ("progman", "workerw", "program manager", "shell_traywnd", "taskbar", "finder", "desktop", "dock")
@@ -40,6 +41,20 @@ _NO_APP_MATCH_MSG = ("<no on-screen window matched app={app!r}; call list_apps t
                      "only resolve via list_apps metadata)>")
 _NO_DESKTOP_IMAGE_MSG = ("<get_desktop_state returned no image; the driver may predate the desktop capture lane — "
                          "try capture(app='<AppName>') for a specific window>")
+_NO_CAPTURE_SCOPE_MSG = ("<could not read the current capture_scope; full-screen capture was skipped to avoid "
+                         "leaving the computer-use session in desktop capture mode — try "
+                         "capture(app='<AppName>') for a specific window>")
+_INVALID_CAPTURE_SCOPE_MSG = ("<the current capture_scope is not a supported value; full-screen capture was "
+                              "skipped without changing the session — use auto, window, or desktop, or "
+                              "capture(app='<AppName>') for a specific window>")
+_SET_CAPTURE_SCOPE_MSG = ("<could not switch capture_scope to desktop; full-screen capture was skipped — "
+                          "try capture(app='<AppName>') for a specific window>")
+_RESTORE_CAPTURE_SCOPE_MSG = ("<full-screen capture could not restore the previous capture_scope; the session may "
+                              "remain in desktop mode — use a specific app target or reconnect the computer-use "
+                              "session>")
+_CAPTURE_AND_RESTORE_SCOPE_MSG = ("<full-screen capture failed ({error}) and could not restore the previous "
+                                  "capture_scope; the session may remain in desktop mode — use a specific app target "
+                                  "or reconnect the computer-use session>")
 _FULL_SCREEN_NOTE = ("full-screen capture has no interactable elements; to act on what you see, call "
                      "capture(app='<AppName>') for that app's clickable element list, or capture(app='desktop') for "
                      "the desktop shell (wallpaper icons / taskbar) with elements")
@@ -313,22 +328,60 @@ class _CaptureMixin:
         self._clear_active_target()
         previous_scope: Optional[str] = None
         try:
-            sc = self._session.call_tool("get_config", {"session": self._session_id}, timeout=10.0).get("structuredContent")
-            previous_scope = sc["capture_scope"] if isinstance(sc, dict) and isinstance(sc.get("capture_scope"), str) else None
+            config = self._session.call_tool("get_config", {"session": self._session_id}, timeout=10.0)
+            sc = config.get("structuredContent") if isinstance(config, dict) else None
+            scope = sc.get("capture_scope") if isinstance(sc, dict) else None
+            if (not isinstance(config, dict) or config.get("isError") is True
+                    or not isinstance(scope, str) or not scope.strip()):
+                return self._failed_capture(mode, _NO_CAPTURE_SCOPE_MSG)
+            if scope not in _VALID_CAPTURE_SCOPES:
+                return self._failed_capture(mode, _INVALID_CAPTURE_SCOPE_MSG)
+            previous_scope = scope
         except Exception as e:
             logger.debug("cua-driver get_config before full-screen capture failed: %s", e)
+            return self._failed_capture(mode, _NO_CAPTURE_SCOPE_MSG)
         _set_scope = lambda value: self._session.call_tool(  # noqa: E731
             "set_config", {"key": "capture_scope", "value": value, "session": self._session_id}, timeout=10.0)
+        def set_scope_checked(value: str) -> None:
+            result = _set_scope(value)
+            if not isinstance(result, dict) or result.get("isError") is True:
+                raise RuntimeError("cua-driver set_config returned an error")
+
+        out: Optional[Dict[str, Any]] = None
+        switch_failed = False
+        capture_error: Optional[Exception] = None
+        restore_failed = False
         try:
             if previous_scope != "desktop":
-                _set_scope("desktop")
-            out = self._call_capture_tool("get_desktop_state", {"session": self._session_id})
+                try:
+                    set_scope_checked("desktop")
+                except Exception as e:
+                    logger.debug("cua-driver switch capture_scope to desktop failed: %s", e)
+                    switch_failed = True
+            if not switch_failed:
+                out = self._call_capture_tool("get_desktop_state", {"session": self._session_id})
+        except Exception as e:
+            capture_error = e
         finally:
             if previous_scope and previous_scope != "desktop":
                 try:
-                    _set_scope(previous_scope)
+                    set_scope_checked(previous_scope)
                 except Exception as e:
                     logger.debug("cua-driver restore capture_scope failed: %s", e)
+                    restore_failed = True
+        if restore_failed:
+            if capture_error is not None:
+                error_detail = str(capture_error).replace("\r", " ").replace("\n", " ").strip()[:200]
+                message = _CAPTURE_AND_RESTORE_SCOPE_MSG.format(error=error_detail)
+            else:
+                message = _RESTORE_CAPTURE_SCOPE_MSG
+            return self._failed_capture(mode, message)
+        if switch_failed:
+            return self._failed_capture(mode, _SET_CAPTURE_SCOPE_MSG)
+        if capture_error is not None:
+            raise capture_error
+        if out is None:
+            return self._failed_capture(mode, _SET_CAPTURE_SCOPE_MSG)
         png_b64, image_mime_type = _image_from_tool_result(out)
         if not png_b64:
             return self._failed_capture(mode, _NO_DESKTOP_IMAGE_MSG)

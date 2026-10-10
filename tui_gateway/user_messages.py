@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from agent.redact import redact_sensitive_text
+
 # Provider-layer failure codes → (title, hint). Codes are ``agent.error_classifier.FailoverReason``
 # values carried in ``error_surface.code``; anything unlisted falls back on the layer table.
 _TURN_ERROR_CODE_COPY: dict[str, tuple[str, str]] = {
@@ -75,6 +77,7 @@ def turn_error_text(error: Any, surface: dict | None = None, *, recoverable: boo
     detail = " ".join(str(error or "").split())
     if len(detail) > _DETAIL_LIMIT:
         detail = detail[:_DETAIL_LIMIT - 1] + "…"
+    detail = redact_sensitive_text(detail, force=True)
     lines = [f"{turn_error_title(surface)}. Your message was not answered."]
     if detail:
         lines.append(f"Details: {detail}")
@@ -91,7 +94,7 @@ def busy_message(command: str) -> str:
 
 
 def agent_init_failed_message(exc: Any) -> str:
-    return (f"Hermes could not start the assistant for this session. Details: {exc}. "
+    return (f"Hermes could not start the assistant for this session. Details: {redact_sensitive_text(str(exc), force=True)}. "
             "Check the model and provider with /model, or run `hermes setup` in a terminal to reconfigure.")
 
 
@@ -101,5 +104,5 @@ AGENT_STILL_STARTING = (
 
 
 def resume_failed_message(exc: Any) -> str:
-    return (f"Could not reopen that session (its transcript could not be read). Details: {exc}. "
+    return (f"Could not reopen that session (its transcript could not be read). Details: {redact_sensitive_text(str(exc), force=True)}. "
             "Start a new session (/new), or pick another from /sessions.")

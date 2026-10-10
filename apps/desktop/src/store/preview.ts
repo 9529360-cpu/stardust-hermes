@@ -437,7 +437,8 @@ function previewTargetForSource(target: PreviewTarget, source: PreviewRecordSour
 export function openPreview(
   target: PreviewTarget,
   source: PreviewRecordSource = 'manual',
-  storedSessionId: null | string | undefined = $selectedStoredSessionId.get()
+  storedSessionId: null | string | undefined = $selectedStoredSessionId.get(),
+  reveal = true
 ) {
   const resolved = previewTargetForSource(target, source)
   const current = $previewTabs.get()
@@ -449,7 +450,26 @@ export function openPreview(
   // `openPreview` is the explicit entry point: a user click, a project/file
   // action, or an on-screen agent preview request. That intent may reveal the
   // contextual rail. Passive tab persistence/navigation updates must not.
-  setRightContextOpen(true)
+  if (reveal) {
+    setRightContextOpen(true)
+  }
+  // A repeated open of the SAME browser target is a re-front, not a
+  // navigation. Rewriting its tab loses identity and can remount the webview.
+  // A metadata/owner change still has to propagate (another session may now
+  // own this browser); same-URL metadata updates never change its webview src.
+  if (
+    index !== -1 &&
+    current[index].target.kind === 'url' &&
+    resolved.kind === 'url' &&
+    current[index].target.url === resolved.url &&
+    current[index].target.label === resolved.label &&
+    current[index].target.source === resolved.source &&
+    current[index].storedSessionId === tab.storedSessionId
+  ) {
+    selectRightRailTab(id)
+
+    return
+  }
   $previewTabs.set(index === -1 ? [...current, tab] : current.map((item, i) => (i === index ? tab : item)))
   selectRightRailTab(id)
 }

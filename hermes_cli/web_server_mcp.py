@@ -38,7 +38,9 @@ def _normalize_mcp_server_create(body: MCPServerCreate) -> tuple[str, Dict[str, 
     if auth not in {"none", "header", "oauth"}:
         raise ValueError(f"Unsupported auth mode: {auth}")
 
-    server_config: Dict[str, Any] = {}
+    from hermes_cli.mcp_config import MCP_CREATE_TRUST
+    # Creation is explicit; omitted trust remains the legacy compatibility path.
+    server_config: Dict[str, Any] = {"trust": MCP_CREATE_TRUST}
     if url:
         if body.args:
             raise ValueError("Arguments are only supported for stdio MCP servers")

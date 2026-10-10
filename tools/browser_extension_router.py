@@ -30,11 +30,15 @@ def _bound_identity() -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """(session_id, principal_id, transport_family) from the session context."""
     from gateway.session_context import get_session_env
 
-    return tuple(  # type: ignore[return-value]
+    identity = tuple(
         get_session_env(key, "") or None
         for key in ("HERMES_SESSION_ID", "HERMES_BROWSER_CONTROL_PRINCIPAL",
                     "HERMES_BROWSER_CONTROL_TRANSPORT_FAMILY")
     )
+    session_id, principal_id, family = identity
+    if family == "local-api" and (principal_id or "").startswith("principal:desktop:"):
+        session_id = get_session_env("HERMES_UI_SESSION_ID", "") or session_id
+    return session_id, principal_id, family
 
 
 def _controller_unavailable(message: str) -> Exception:
@@ -129,6 +133,10 @@ def routed_browser_handler(
     except Exception:
         env_session = env_principal = env_transport = None
 
+    # Tool orchestration supplies the durable conversation id. Desktop grants
+    # belong to the live UI session instead; use its server-stamped identity.
+    if env_transport == "local-api" and (env_principal or "").startswith("principal:desktop:"):
+        session_id = env_session
     return route_browser_tool(
         action, args, fallback=fallback, broker=get_browser_control_broker(), enabled=True,
         session_id=session_id or env_session, task_id=task_id, principal_id=principal_id or env_principal,

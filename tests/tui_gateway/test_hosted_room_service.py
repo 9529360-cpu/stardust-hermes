@@ -592,6 +592,9 @@ def test_same_thread_followup_migrates_and_delivers_committed_peer_reply(
             for event in service._events("room-1")
         )
     )
+    # Simulate a legacy database only after the policy worker has stopped.
+    # Clearing its projection while running can race with checkpoint replay.
+    assert service.stop(timeout=5.0)
     with sqlite3.connect(db) as conn:
         assert conn.execute(
             """SELECT COUNT(*) FROM hosted_room_policy_transcript
@@ -602,6 +605,7 @@ def test_same_thread_followup_migrates_and_delivers_committed_peer_reply(
             """DELETE FROM hosted_room_policy_transcript_state
                WHERE room_id='room-1'"""
         )
+    service.start()
     service.send(
         room_id="room-1",
         event_id="user-2",

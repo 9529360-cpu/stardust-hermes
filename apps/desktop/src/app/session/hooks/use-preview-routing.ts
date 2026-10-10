@@ -1,10 +1,13 @@
 import type { GatewayEvent } from '@hermes/shared'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
+import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { gatewayEventCompletedFileDiff } from '@/lib/gateway-events'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { reachablePreviewUrl } from '@/lib/preview-reach'
+import { $rightRailActiveTabId } from '@/store/layout'
 import {
+  $dockedPreviewTabs,
   $previewTabs,
   beginPreviewServerRestart,
   closePreviewMatching,
@@ -14,6 +17,7 @@ import {
   progressPreviewServerRestart,
   requestPreviewReload
 } from '@/store/preview'
+import { $rightContextOpen, setRightContextOpen } from '@/store/right-context'
 import { $activeSessionId, $currentCwd } from '@/store/session'
 import { $focusedRuntimeId, $sessionTiles } from '@/store/session-states'
 
@@ -38,6 +42,23 @@ function sessionIsOnScreen(sessionId: string): boolean {
 }
 
 export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestGateway }: PreviewRoutingOptions) {
+  // A browser action is foreground intent once per turn. Hiding the viewer is
+  // not permission to reopen it after every click; the live page keeps working
+  // until a new turn, even if another preview.open navigates the same tab.
+  const browserVisibility = useRef({ dismissed: new Set<string>(), revealed: new Set<string>() })
+
+  useEffect(
+    () =>
+      $rightContextOpen.listen(open => {
+        if (!open) {
+          for (const sessionId of browserVisibility.current.revealed) {
+            browserVisibility.current.dismissed.add(sessionId)
+          }
+        }
+      }),
+    []
+  )
+
   const restartPreviewServer = useCallback(
     async (url: string, context?: string) => {
       const sessionId = $focusedRuntimeId.get()
@@ -72,6 +93,46 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
     event => {
       baseHandleGatewayEvent(event)
 
+      const sessionId = event.session_id
+      if (sessionId && event.type === 'message.start' && !browserVisibility.current.revealed.has(sessionId)) {
+        // A session can emit a duplicate start while the same turn is still
+        // running. Do not forget a manual dismissal until its completion.
+        browserVisibility.current.dismissed.delete(sessionId)
+      } else if (sessionId && event.type === 'message.complete') {
+        browserVisibility.current.dismissed.delete(sessionId)
+        browserVisibility.current.revealed.delete(sessionId)
+      }
+
+      if (event.type === 'tool.start' && sessionId && sessionIsOnScreen(sessionId)) {
+        const { name, args } = asRecord(event.payload)
+        const action = asRecord(args).action
+        const browserTarget = asRecord(args).target
+        const hasLivePreview = $dockedPreviewTabs.get().some(
+          tab =>
+            tab.id === $rightRailActiveTabId.get() &&
+            (tab.target.kind === 'url' ||
+              (tab.target.kind === 'file' && tab.target.previewKind === 'html' && tab.target.renderMode !== 'source'))
+        )
+        // Only follow tools that drive the ACTUAL in-app guest. browser_exec
+        // and browser_navigate own a separate backend Chromium/CDP session:
+        // revealing an unrelated webview would be a fake live preview.
+        const isLiveBrowserAction =
+          (name === 'desktop_preview' && (action === 'open' || (action === 'read' && hasLivePreview))) ||
+          ((name === 'drive_preview' || name === 'annotate_preview') && hasLivePreview) ||
+          (name === 'browser' &&
+            browserTarget === 'in_app' &&
+            (action === 'open' || (action !== 'status' && hasLivePreview)))
+        if (isLiveBrowserAction && !browserVisibility.current.dismissed.has(sessionId)) {
+          browserVisibility.current.revealed.add(sessionId)
+          setRightContextOpen(true)
+          // The right rail may already be showing Files or Review. Front the
+          // active live tab even when the visibility atom was already true.
+          if (hasLivePreview && $rightRailActiveTabId.get()) {
+            revealTreePane(`preview-tile:${$rightRailActiveTabId.get()}`)
+          }
+        }
+      }
+
       if (event.type === 'preview.open') {
         // Agent-driven open in response to an explicit user request ("show
         // cnn.com in the preview pane"). Honor it for any session that's ON
@@ -89,7 +150,10 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
         if (target && (!event.session_id || sessionIsOnScreen(event.session_id))) {
           void normalizeOrLocalPreviewTarget(target, $currentCwd.get() || currentCwd || undefined).then(
             async resolved => {
-              if (!resolved) {
+              // URL normalization / reachability is asynchronous. A user may
+              // switch sessions while it resolves; a stale foreground event
+              // must not reveal another session's browser.
+              if (!resolved || (event.session_id && !sessionIsOnScreen(event.session_id))) {
                 return
               }
 
@@ -100,7 +164,12 @@ export function usePreviewRouting({ baseHandleGatewayEvent, currentCwd, requestG
               const url = resolved.kind === 'url' ? await reachablePreviewUrl(resolved.url) : resolved.url
               const reached = url === resolved.url ? resolved : { ...resolved, label: resolved.label || target, url }
 
-              openPreview(trimmedLabel ? { ...reached, label: trimmedLabel } : reached, 'tool-result')
+              openPreview(
+                trimmedLabel ? { ...reached, label: trimmedLabel } : reached,
+                'tool-result',
+                undefined,
+                !event.session_id || !browserVisibility.current.dismissed.has(event.session_id)
+              )
             }
           )
         }

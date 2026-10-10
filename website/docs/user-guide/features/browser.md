@@ -20,6 +20,56 @@ Hermes Agent includes a full browser automation toolset with multiple backend op
 
 In all modes, the agent can navigate websites, interact with page elements, fill forms, and extract information.
 
+## Stardust Desktop: one Browser tool, two real destinations
+
+A desktop-originated Stardust conversation now exposes one model-facing
+`browser` controller for foreground website interaction. It accepts the
+`action` and a concrete `target` (`in_app` or `host`) on each call. The target
+is pinned for that agent turn; switching targets mid-turn fails instead of
+leaking actions or silently creating another session.
+
+- **`target=in_app` — default.** Opening a URL navigates the current right-rail
+  Browser tab (or creates the first tab), then `elements`, `click`, `type`,
+  `scroll`, `read` etc. act on that *same* live Electron WebView using the
+  existing Desktop Preview driver. The right rail opens for foreground browser
+  activity. The user can hide it without cancelling work, and it remains hidden
+  for subsequent actions in that turn.
+- **`target=host` — explicit request only.** This routes supported Browser
+  actions to the current session's **authenticated, capability-negotiated**
+  extension controller via `browser_control_broker`. It **requires a
+  compatible controller already registered and approved by the user**.
+  Stardust currently ships the protocol/broker, **not a bundled Chrome
+  extension capable of pairing with it**. Until such a controller is installed
+  and registered, `target=host` refuses with an actionable error. It does
+  **not** use `computer_use`, import browser-profile cookies, start a separate
+  Chrome, or mirror a copied URL into the right rail as a fallback.
+
+Host controller actions currently supported by this unified tool are open,
+elements/read, click, type, scroll, back and press. Other host actions are
+rejected explicitly (the in-app target supports hover, forward and reload).
+Element refs and cookies belong to one target only.
+
+Legacy `browser_*`, Browser Use CLI, CDP, independent cloud browsers and
+`desktop_preview` remain present for backward compatibility, non-desktop
+sessions and explicitly independent/background work. With normal desktop
+tool discovery, those old foreground-browser tools are deferred behind tool
+search; the unified `browser` tool is the default direct entry.
+
+**Permissions and safety.** Site permissions and sensitive-action approvals
+remain required. User credentials and 2FA codes must not be passed as tool
+arguments; a vault may fill a secret only when it is proven to operate on the
+same chosen browser session, otherwise the user enters it in the browser.
+Remote gateways cannot claim to operate Chrome on the Desktop user's machine
+without a separately trusted, authenticated browser controller. On disconnect,
+the system refuses rather than moving the task to another browser.
+
+**Terminology:** `browser.use_real_profile` creates another Hermes-managed
+Chrome with a **copy** of a profile, not access to an existing live tab.
+`/browser connect` attaches to a CDP endpoint on its own host; it is not the
+same as an authenticated extension controlling an existing desktop Chrome
+session. `computer_use` acts on the gateway machine's OS windows; it is
+available separately when authorized, but is not a browser-session substitute.
+
 ## Overview
 
 Pages are represented as **accessibility trees** (text-based snapshots), making them ideal for LLM agents. Interactive elements get ref IDs (like `@e1`, `@e2`) that the agent uses for clicking and typing.

@@ -366,7 +366,8 @@ function restorePendingApproval(response: SessionResumeResult, sessionId: string
     description: pending.description ?? 'dangerous command',
     requestId: typeof pending.request_id === 'string' ? pending.request_id : undefined,
     sessionId,
-    smartDenied: pending.smart_denied === true
+    smartDenied: pending.smart_denied === true,
+    policyLocked: pending.policy_locked === true
   })
 
   return true

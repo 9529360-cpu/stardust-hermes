@@ -28,6 +28,7 @@ class TestSessionIdForwarding:
                 {"query": "test"},
                 task_id="t1",
                 session_id="sess-abc",
+                enabled_tools=["web_search"],
                 skip_pre_tool_call_hook=True,
             )
         assert captured.get("session_id") == "sess-abc"
@@ -42,6 +43,7 @@ class TestSessionIdForwarding:
                 {"code": "print(1)"},
                 task_id="t1",
                 session_id="sess-xyz",
+                enabled_tools=["execute_code"],
                 skip_pre_tool_call_hook=True,
             )
         assert captured.get("session_id") == "sess-xyz"
@@ -55,6 +57,7 @@ class TestSessionIdForwarding:
                 "web_search",
                 {"query": "test"},
                 task_id="t1",
+                enabled_tools=["web_search"],
                 skip_pre_tool_call_hook=True,
             )
         assert "session_id" in captured
@@ -70,6 +73,7 @@ class TestSessionIdForwarding:
                 {"query": "test"},
                 task_id="task-999",
                 session_id="sess-1",
+                enabled_tools=["web_search"],
                 skip_pre_tool_call_hook=True,
             )
         assert captured.get("task_id") == "task-999"
