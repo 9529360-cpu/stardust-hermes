@@ -1727,8 +1727,9 @@ export { PROFILE_SWATCHES, profileColor, profileColorSoft } from '@/lib/profile-
  *  `ctx.socket` frame invalidating a query). Inside components keep using
  *  `useQueryClient`. */
 export { queryClient } from '@/lib/query-client'
-/** Compact labels for the reasoning levels exported from @hermes/shared, so a
- *  plugin surfacing a thinking depth uses the same spelling as the app. */
+/** Labels for the reasoning levels exported from @hermes/shared, in the active
+ *  locale (or the `t` from `useI18n()`), so a plugin surfacing a thinking depth
+ *  uses the same words as the app. */
 export { reasoningEffortLabel } from '@/lib/reasoning-effort'
 
 export const PANES_AREA = 'panes'

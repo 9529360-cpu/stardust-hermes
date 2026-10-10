@@ -1301,6 +1301,8 @@ export const zhHant = defineLocale({
       advancedModelSettingsHide: '收起進階模型設定',
       advancedModelSettingsDesc: '輔助模型與混合代理等進階功能。日常使用通常不需要修改。',
       defaultsLabel: '回答偏好',
+      reasoning: '推理',
+      reasoningOff: '關閉',
       loadFailed: '無法載入模型',
       restartRequired: '更新後此後端仍在執行舊程式碼。請重新啟動以載入新程式碼。',
       restartBackend: '重新啟動後端',
