@@ -3843,6 +3843,16 @@ export const ja = defineLocale({
         runningPrefixedTool: (prefix, action) => `${prefix} ${action}を実行中`,
         runningTool: action => `${action}を実行中`
       },
+      cron: {
+        preview: 'Cron ジョブのプレビュー',
+        previewWithSchedule: schedule => `Cron ジョブのプレビュー · ${schedule}`,
+        previousSchedule: '変更前のスケジュール',
+        nextRuns: '次回の実行',
+        delivery: '配信先',
+        deliveryCurrentChat: '現在の会話',
+        deliverySaveOnly: '保存のみ',
+        notSaved: '未保存'
+      },
       titles: {
         browser_click: {
           done: 'ページ要素をクリックしました',

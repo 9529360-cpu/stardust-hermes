@@ -4071,6 +4071,17 @@ export interface Translations {
         runningPrefixedTool: (prefix: string, action: string) => string
         runningTool: (action: string) => string
       }
+      /** Cron card for a dry-run preview: nothing is saved yet. */
+      cron: {
+        preview: string
+        previewWithSchedule: (schedule: string) => string
+        previousSchedule: string
+        nextRuns: string
+        delivery: string
+        deliveryCurrentChat: string
+        deliverySaveOnly: string
+        notSaved: string
+      }
       titles: Record<ToolTitleKey, ToolTitleCopy>
     }
     media: {

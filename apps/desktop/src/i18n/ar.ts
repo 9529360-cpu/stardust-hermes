@@ -3196,6 +3196,16 @@ export const ar = defineLocale({
         runningPrefixedTool: (prefix, action) => `جار تشغيل ${prefix.toLowerCase()} ${action.toLowerCase()}`,
         runningTool: action => `جار تشغيل ${action.toLowerCase()}`
       },
+      cron: {
+        preview: 'معاينة مهمة مجدولة',
+        previewWithSchedule: schedule => `معاينة مهمة مجدولة · ${schedule}`,
+        previousSchedule: 'الجدول السابق',
+        nextRuns: 'عمليات التشغيل التالية',
+        delivery: 'التسليم',
+        deliveryCurrentChat: 'المحادثة الحالية',
+        deliverySaveOnly: 'الحفظ فقط',
+        notSaved: 'لم يُحفظ'
+      },
       titles: {
         browser_click: {
           done: 'تم النقر على عنصر الصفحة',
