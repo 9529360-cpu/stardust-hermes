@@ -24,7 +24,7 @@ _HERMES_FOUNDATION_TOOLS = [
 # out of the always-present model surface without redefining the narrow waist.
 _HERMES_DEFAULT_EDGE_TOOLS = [
     "image_generate",
-    "browser_navigate", "browser_snapshot", "browser_click",
+    "browser_status", "browser_navigate", "browser_snapshot", "browser_click",
     "browser_type", "browser_interact", "browser_scroll", "browser_back",
     "browser_press", "browser_get_images",
     "browser_vision", "browser_console", "browser_cdp", "browser_dialog",
@@ -120,7 +120,7 @@ TOOLSETS = {
     "browser": _ts(
         "Browser automation for web interaction (navigate, click, type, scroll, "
         "iframes, hold-click)",
-        [t for t in _HERMES_DEFAULT_TOOLS if t.startswith("browser_")] + ["browser_status"],
+        [t for t in _HERMES_DEFAULT_TOOLS if t.startswith("browser_")],
     ),
     "cronjob": _ts(
         "Cronjob management tool - create, list, update, pause, resume, remove, and "
