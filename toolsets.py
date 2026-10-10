@@ -120,7 +120,7 @@ TOOLSETS = {
     "browser": _ts(
         "Browser automation for web interaction (navigate, click, type, scroll, "
         "iframes, hold-click)",
-        [t for t in _HERMES_DEFAULT_TOOLS if t.startswith("browser_")],
+        [t for t in _HERMES_DEFAULT_TOOLS if t.startswith("browser_")] + ["browser_status"],
     ),
     "cronjob": _ts(
         "Cronjob management tool - create, list, update, pause, resume, remove, and "
