@@ -1,8 +1,8 @@
-# Gap #7 / #8 系统设计：Work 台账与工作区后台工作
+# Gap #7 / #8 系统设计：Work 台账（cron 执行记录）
 
-> 本文取代 2026-10-10 的初稿。第 1 至 3 节描述已经在本分支实现的内容，与代码一一对应。第 4 节是尚未实现的计划，其中的文件路径是拟定的，仓库里可能还不存在。
+> 本文取代 2026-10-10 的初稿。第 1 至 3 节描述本分支已经实现的内容，与代码一一对应。第 4 节是尚未实现的计划，其中的文件路径是拟定的，仓库里可能还不存在。
 >
-> **状态（2026-10-10）：桌面端的“后台工作”区块目前不会显示给用户。** 工作区概览面板（`workspace-overview.tsx`）已在提交 `69ef54d60b`（2026-10-06，token 缓存用量移到底栏）中退役：`registerWorkspaceOverviewPane()` 没有调用方，组件不会挂载，默认布局也不包含该面板。Electron 中的探测结果与此一致。是否恢复该面板，或把这一区块迁移到其它位置（例如 composer 中已有的子代理列表），需要主理人决定。
+> **范围（2026-10-10 更新）：本分支只包含后端。** 桌面端的“后台工作”区块已经移除。原因：工作区概览面板已在提交 `69ef54d60b`（2026-10-06，token 缓存用量移到底栏）中退役，该区块从未挂载；而 composer 里的子代理列表已经显示同一批运行中的子代理，`subagent.list` 与 `work.list` 使用同一个后端函数 `_owned_subagent_records`。再加一个区块只会重复轮询，不会多出任何内容。
 
 ## 1. 已实现的部分
 
@@ -34,26 +34,20 @@
 
 - 公开 RPC `work.list`（`tui_gateway/methods_work.py::_work_list`）只返回当前 session、transport、generation 能证明归属的**活动子代理**。它调用 `subagent_work()`，**不调用** `list_work()`。
 - 因此 cron 历史目前**不会**出现在界面里。`kind = cron` 是内部台账和协议的能力，并不代表 `work.list` 会返回 cron 项。
-- `work.cancel` 对非子代理的 ID 返回错误 4001（无授权）。界面只会对子代理发起取消。
+- `work.cancel` 对非子代理的 ID 返回错误 4001（无授权）。
 
-### 1.4 桌面：工作区的“后台工作”
+### 1.4 子代理列表（已有，本分支未改动）
 
-实现位于 `apps/desktop/src/app/contrib/workspace-overview.tsx`。该组件目前没有被注册或挂载，见文首的状态说明，因此下列行为在应用中不可见，仅由单元测试覆盖：
+用户在 composer 中看到的运行中子代理，来自 `apps/desktop/src/app/chat/composer/status-stack/subagent-section.tsx`：
 
-- 通过 `useGatewayRequest` 调用 `work.list`，参数只有当前 `session_id`，结果渲染为 `WorkLedgerSection`。
-- 停止按钮只出现在 `running` 且 `kind === "subagent"` 的项上。
-- `work.cancel` 返回 `interrupt_requested`、`cancelled` 或 `already_finished` 时，从列表移除该项；返回其它结果（如 `unavailable`、`not_found`）时保留该项，界面不假装成功。
-- 取消是协作式的。收到 `interrupt_requested` 之后，子代理可能仍在运行；下一次轮询会把它重新显示出来。
-- 切换会话时立即清空列表。RPC 失败时清空列表并停止轮询（fail-closed），直到会话或网关变化后重新加载。
-- 会话活跃期间每 3 秒轮询一次。快照没有变化时保留原数组引用，避免无谓更新。
-- effect 的清理函数把 `disposed` 置位，丢弃切换前发出的异步响应。
-- kind 和状态文案随界面语言切换（中文、繁体中文、英文）。
+- 数据来自 `use-subagent-snapshot.ts`：每 5 秒、以及窗口重新获得焦点时，调用 `subagent.list` 拉取快照；实时事件优先于快照。
+- 每个子代理可以展开，发送转向消息（`subagent.steer`），或请求停止（`subagent.interrupt`）。
+- `subagent.list` 与 `work.list` 都调用 `_owned_subagent_records(session_id, transport, owner)`，因此返回的是同一批子代理。
 
 ### 1.5 测试
 
 - `tests/tools/test_work_ledger.py`：cron 归一化、白名单与脱敏、取消结果、执行记录不可读时的降级。
 - `tests/tui_gateway/contracts/test_generated.py`：协议生成物是否为最新。
-- `apps/desktop/src/app/contrib/workspace-overview.test.tsx`：切换会话后清空、轮询发现后来的工作、取消被拒时保留、cron 项没有停止按钮。
 
 ## 2. 类图（已实现）
 
@@ -81,40 +75,47 @@ classDiagram
     class CronJobs {
         +list_jobs(include_disabled)
     }
+    class OwnedSubagentRecords {
+        +_owned_subagent_records(session_id, transport, owner)
+    }
     class WorkRpc {
         +work_list(session_id)
         +work_cancel(id, session_id)
     }
-    class WorkspaceOverview {
-        +pollWorkList()
-        +stopSubagent(item)
+    class SubagentListRpc {
+        +subagent_list(session_id)
+        +subagent_interrupt(session_id, subagent_id)
+    }
+    class SubagentRoster {
+        +snapshot every 5 s
+        +stop via subagent.interrupt
     }
     WorkLedger --> WorkItem : returns
     WorkLedger ..> CronExecutions : reads execution rows
     WorkLedger ..> CronJobs : reads job names
-    WorkRpc ..> WorkItem : subagent items only
-    WorkspaceOverview --> WorkRpc : JSON-RPC
+    WorkRpc ..> OwnedSubagentRecords : subagent items only
+    SubagentListRpc ..> OwnedSubagentRecords : same records
+    SubagentRoster --> SubagentListRpc : JSON-RPC
 ```
 
 ## 3. 调用流程（已实现）
 
 ```mermaid
 sequenceDiagram
-    participant UI as WorkspaceOverview
-    participant RPC as work.list and work.cancel
-    participant Live as live subagents of this session
+    participant Roster as composer subagent roster
+    participant SubList as subagent.list
+    participant Owned as _owned_subagent_records
+    participant WorkRpc as work.list
     participant Ledger as internal profile ledger
     participant Cron as cron executions and jobs
 
-    loop every 3 s while the session is active
-        UI->>RPC: work.list(session_id)
-        RPC->>Live: records owned by exact session, transport and generation
-        Live-->>RPC: subagent records
-        RPC-->>UI: subagent items
+    loop every 5 s while the session is open
+        Roster->>SubList: subagent.list(session_id)
+        SubList->>Owned: records for exact session, transport and generation
+        Owned-->>SubList: live subagent records
+        SubList-->>Roster: subagents
     end
-    UI->>RPC: work.cancel(subagent id, session_id)
-    RPC-->>UI: interrupt_requested or not_found
-
+    WorkRpc->>Owned: same helper, subagent items only
     Note over Ledger,Cron: No RPC calls list_work() yet
     Ledger->>Cron: list_executions(limit=100) and list_jobs(include_disabled=True)
     Cron-->>Ledger: execution rows and job names
@@ -125,9 +126,9 @@ sequenceDiagram
 
 以下内容都没有合入本分支。文件路径是拟定的。
 
-### 4.1 profile 级 cron 只读视图
+### 4.1 profile 级 cron 与后台进程的只读视图
 
-如果工作区要展示 profile 级的 cron 历史，必须新增**独立且显式授权**的只读 RPC。不能通过放宽 `work.list` 的授权检查来实现。这一策略需要主理人确认（见第 5 节）。
+这是“后台工作”里真正能多出来的内容。展示它们必须新增**独立且显式授权**的只读 RPC，不能通过放宽 `work.list` 的授权检查来实现。授权策略需要主理人确认（见第 5 节）。
 
 ### 4.2 Gap #7：自然语言创建例程
 
@@ -136,23 +137,24 @@ sequenceDiagram
 - 计划：`cronjob_manage` 的 create 与 edit 增加 `dry_run` 参数。预览不落库。正式创建仍须经过现有的确认与授权上下文。
 - 计划：deliver target 只在唯一可推断时自动填入，否则返回候选项让用户确认。
 
-### 4.3 Gap #8：Work / Approvals / Memory 工作台
+### 4.3 Gap #8：Approvals / Memory 工作台
 
 - 后端已有：`approval.audit`，以及 `memory.list`、`memory.remember`、`memory.forget`（见 `tui_gateway/methods_memory.py` 与 `tui_gateway/methods_prompt.py`）。
-- 计划：独立的工作台视图。目前 `apps/desktop/src/app/workbench/` 还不存在。Approvals 按时间倒序排列。Memory 删除前需要二次确认，`memory.forget` 必须携带 `expected_text`。
+- 计划：独立的工作台视图（`apps/desktop/src/app/workbench/` 目前不存在）。Approvals 按时间倒序排列。Memory 删除前需要二次确认，`memory.forget` 必须携带 `expected_text`。
 - 计划：入口通过 `apps/desktop/src/app/contrib/wiring.tsx` 注册，具体位置待定。
+- 已取消：“后台工作”区块（见文首）。
 
 ### 4.4 任务依赖（计划）
 
-T01 接口与契约 → T02 解析与 dry-run → T03 台账与 cron 取消 → T04 面板与入口 → T05 集成测试与回归。
+T01 接口与契约 → T02 解析与 dry-run → T03 台账与 cron 取消 → T04 Approvals / Memory 面板与入口 → T05 集成测试与回归。
 
 ## 5. 待明确事项
 
-1. 工作区是否允许查看 profile 级 cron 执行历史？这需要新的、显式授权的 RPC。
+1. 桌面端是否允许查看 profile 级 cron 执行历史和后台进程？这需要新的、显式授权的只读 RPC，授权策略待主理人确认。
 2. cron 执行能否安全取消，取决于 runner 的归属与执行阶段。目前统一返回 `unavailable`。
 3. dry-run 的确认令牌或提案哈希，如何与现有的 agent 提案机制对齐？
 4. deliver target 的唯一性规则，以及候选项的展示格式。
-5. 工作台入口放在哪个区域（命令中心，还是独立 overlay）？
+5. Approvals / Memory 工作台的入口放在哪个区域（命令中心，还是独立 overlay）？
 
 ## 6. 共享约定
 
