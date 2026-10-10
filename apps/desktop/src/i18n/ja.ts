@@ -2538,6 +2538,7 @@ export const ja = defineLocale({
     subagents: count => `サブエージェント ${count} 件`,
     todos: (done, total) => `タスク ${done}/${total}`,
     running: '実行中',
+    cronRun: 'スケジュール実行',
     stop: '停止',
     dismiss: '閉じる',
     exit: code => `終了コード ${code}`,

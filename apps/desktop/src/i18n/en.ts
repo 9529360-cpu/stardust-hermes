@@ -3224,6 +3224,7 @@ export const en: Translations = {
     subagents: count => `${count} Subagent${count === 1 ? '' : 's'}`,
     todos: (done, total) => `Tasks ${done}/${total}`,
     running: 'Running',
+    cronRun: 'Scheduled run',
     stop: 'Stop',
     dismiss: 'Dismiss',
     exit: code => `exit ${code}`,

@@ -11,7 +11,7 @@ class WorkListParams(Params):
 
 class WorkItem(Result):
     id: str
-    kind: Literal["delegation", "process", "subagent"]
+    kind: Literal["delegation", "process", "subagent", "cron"]
     title: str
     status: Literal["running", "completed", "failed", "cancelled", "interrupted"]
     started_at: float | None
@@ -34,6 +34,20 @@ class WorkCancelResult(Result):
     message: str
 
 
+class CronExecutionsListParams(Params):
+    profile: str = ""
+    limit: int = 20
+
+
+class CronExecutionsListResult(Result):
+    work: list[WorkItem]
+    scoped: str = ""
+
+
+method("cron.executions.list", params=CronExecutionsListParams, result=CronExecutionsListResult,
+       doc="Read-only recent cron runs of one profile home, newest first. The profile resolves as in cron.manage list "
+           "(unknown or deleted: 4064); titles are job ids; allowlisted fields only; limit clamped to 1..50; "
+           "`scoped` is the profile the request ran under. Cron runs cannot be cancelled after dispatch.")
 method("work.list", params=WorkListParams, result=WorkListResult,
        doc="List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable.")
 method("work.cancel", params=WorkCancelParams, result=WorkCancelResult,

@@ -2778,6 +2778,7 @@ export const zhHant = defineLocale({
     subagents: count => `${count} 個子代理`,
     todos: (done, total) => `任務 ${done}/${total}`,
     running: '執行中',
+    cronRun: '排程任務',
     stop: '停止',
     dismiss: '關閉',
     exit: code => `結束碼 ${code}`,

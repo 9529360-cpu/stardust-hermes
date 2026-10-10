@@ -44,6 +44,11 @@ def _connect() -> sqlite3.Connection:
     return open_db(path, db_label="cron/executions.db", synchronous_full=True, initialize=_initialize_schema)
 
 
+def executions_db_exists() -> bool:
+    """Whether the ledger file exists. Read-only callers check this first, because ``_connect`` creates it."""
+    return (EXECUTIONS_FILE or (get_hermes_home().resolve() / "cron" / "executions.db")).exists()
+
+
 def _initialize_schema(conn: sqlite3.Connection) -> None:
     from hermes_cli.sqlite_util import add_column_if_missing
 

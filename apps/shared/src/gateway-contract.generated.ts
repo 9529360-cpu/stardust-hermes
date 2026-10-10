@@ -3820,20 +3820,28 @@ export interface AgentPluginRow {
   update_available?: boolean | null
   pinned_sha?: string | null
 }
-export interface WorkListParams {
-  session_id?: string
+export interface CronExecutionsListParams {
+  profile?: string
+  limit?: number
 }
-export interface WorkListResult {
+export interface CronExecutionsListResult {
   work: WorkItem[]
+  scoped?: string
 }
 export interface WorkItem {
   id: string
-  kind: 'delegation' | 'process' | 'subagent'
+  kind: 'delegation' | 'process' | 'subagent' | 'cron'
   title: string
   status: 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
   started_at: number | null
   updated_at: number | null
   detail: Record<string, unknown>
+}
+export interface WorkListParams {
+  session_id?: string
+}
+export interface WorkListResult {
+  work: WorkItem[]
 }
 export interface WorkCancelParams {
   id: string
@@ -4413,6 +4421,8 @@ export interface RpcMethods {
   'connectors.list': { params: ConnectorsListParams; result: ConnectorsListResult }
   /** The current snapshot of one open operation on an owned session. */
   'connectors.operation.status': { params: ConnectionOperationParams; result: ConnectionOperationStatus }
+  /** Read-only recent cron runs of one profile home, newest first. The profile resolves as in cron.manage list (unknown or deleted: 4064); titles are job ids; allowlisted fields only; limit clamped to 1..50; `scoped` is the profile the request ran under. Cron runs cannot be cancelled after dispatch. */
+  'cron.executions.list': { params: CronExecutionsListParams; result: CronExecutionsListResult }
   /** List/add/remove/pause/resume cron jobs in the (optionally profile-scoped) cron store. */
   'cron.manage': { params: CronManageParams; result: CronManageResult }
   /** Block/unblock NEW spawns globally (active children keep running); returns the new state. */
@@ -4836,6 +4846,7 @@ export const RPC_METHODS = [
   'connectors.connect',
   'connectors.list',
   'connectors.operation.status',
+  'cron.executions.list',
   'cron.manage',
   'delegation.pause',
   'delegation.status',

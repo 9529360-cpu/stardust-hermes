@@ -2839,6 +2839,7 @@ export const ru = defineLocale({
     subagents: count => `${count} ${RU_PLURAL(count, 'субагент', 'субагента', 'субагентов')}`,
     todos: (done, total) => `Задачи ${done}/${total}`,
     running: 'Выполняется',
+    cronRun: 'Запланированный запуск',
     stop: 'Стоп',
     dismiss: 'Скрыть',
     exit: code => `exit ${code}`,

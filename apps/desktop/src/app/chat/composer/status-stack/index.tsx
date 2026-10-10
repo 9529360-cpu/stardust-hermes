@@ -36,6 +36,7 @@ import { SessionControlSections } from './session-control'
 import { useSessionValue } from './session-control-utils'
 import { StatusItemRow } from './status-row'
 import { SubagentSection } from './subagent-section'
+import { useRunningCronRuns } from './use-running-cron-runs'
 import { useSubagentSnapshot } from './use-subagent-snapshot'
 
 // Slow safety-net poll for silent exits (processes without notify_on_complete
@@ -95,6 +96,7 @@ export function ComposerStatusStack({ onSubmit, queue, sessionId }: ComposerStat
   const { t } = useI18n()
   const navigate = useNavigate()
   useSubagentSnapshot(sessionId)
+  const cronRuns = useRunningCronRuns(Boolean(sessionId))
   // Subscribe to THIS session's slice only. Both maps churn on other
   // sessions' activity (subagent ticks, background polls, preview updates in
   // any tile); a whole-map `useStore` re-rendered every mounted stack — one
@@ -200,7 +202,10 @@ export function ComposerStatusStack({ onSubmit, queue, sessionId }: ComposerStat
 
   for (const group of groups) {
     if (group.type === 'subagent' && sessionId) {
-      sections.push({ key: group.type, node: <SubagentSection key={sessionId} sessionId={sessionId} /> })
+      sections.push({
+        key: group.type,
+        node: <SubagentSection cronRuns={cronRuns} key={sessionId} sessionId={sessionId} />
+      })
 
       continue
     }
@@ -249,6 +254,11 @@ export function ComposerStatusStack({ onSubmit, queue, sessionId }: ComposerStat
         </StatusSection>
       )
     })
+  }
+
+  // Running cron runs can exist without any subagent group, so the roster renders on their own.
+  if (sessionId && cronRuns.length > 0 && !groups.some(group => group.type === 'subagent')) {
+    sections.push({ key: 'subagent', node: <SubagentSection cronRuns={cronRuns} key={sessionId} sessionId={sessionId} /> })
   }
 
   if (queue) {

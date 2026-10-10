@@ -727,6 +727,24 @@
       }
     },
     {
+      "name": "cron.executions.list",
+      "summary": "Read-only recent cron runs of one profile home, newest first. The profile resolves as in cron.manage list (unknown or deleted: 4064); titles are job ids; allowlisted fields only; limit clamped to 1..50; `scoped` is the profile the request ran under. Cron runs cannot be cancelled after dispatch.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/CronExecutionsListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/CronExecutionsListResult"
+        }
+      }
+    },
+    {
       "name": "cron.manage",
       "summary": "List/add/remove/pause/resume cron jobs in the (optionally profile-scoped) cron store.",
       "params": [
@@ -9932,6 +9950,45 @@
         ],
         "title": "CronAction",
         "type": "string"
+      },
+      "CronExecutionsListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "default": "",
+            "title": "Profile",
+            "type": "string"
+          },
+          "limit": {
+            "default": 20,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "CronExecutionsListParams",
+        "type": "object"
+      },
+      "CronExecutionsListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "work": {
+            "items": {
+              "$ref": "#/components/schemas/WorkItem"
+            },
+            "title": "Work",
+            "type": "array"
+          },
+          "scoped": {
+            "default": "",
+            "title": "Scoped",
+            "type": "string"
+          }
+        },
+        "required": [
+          "work"
+        ],
+        "title": "CronExecutionsListResult",
+        "type": "object"
       },
       "CronJobRow": {
         "additionalProperties": true,
@@ -34674,7 +34731,8 @@
             "enum": [
               "delegation",
               "process",
-              "subagent"
+              "subagent",
+              "cron"
             ],
             "title": "Kind",
             "type": "string"
