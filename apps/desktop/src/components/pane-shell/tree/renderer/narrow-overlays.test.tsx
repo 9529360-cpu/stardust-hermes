@@ -126,4 +126,29 @@ describe('narrow overlay of a stacked zone', () => {
     expect(queryByTestId('bots-body')).toBeNull()
     expect(queryByTestId('sessions-body')).toBeNull()
   })
+
+  it('opens an explicit reveal of a pane the app had hidden, in the same update', () => {
+    // revealTreePane restores a hidden pane before the narrow reveal is dispatched.
+    // The overlay has to see the restored pane in that same update, not after
+    // React's next render.
+    const matchMedia = window.matchMedia
+    window.matchMedia = (query: string) => ({ matches: true, media: query }) as MediaQueryList
+
+    try {
+      const { getByTestId, queryByTestId } = render(<NarrowOverlays />)
+
+      act(() => {
+        $hiddenTreePanes.set(new Set(['bots']))
+      })
+      expect(queryByTestId('bots-body')).toBeNull()
+
+      act(() => {
+        revealPaneFromUser('bots')
+      })
+
+      expect(getByTestId('bots-body')).toBeTruthy()
+    } finally {
+      window.matchMedia = matchMedia
+    }
+  })
 })

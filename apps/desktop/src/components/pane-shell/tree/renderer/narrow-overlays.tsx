@@ -7,12 +7,13 @@
  */
 
 import { useStore } from '@nanostores/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { $chatOnboardingSolo } from '@/components/onboarding-chat/assembly'
 import { PaneTab, PaneTabLabel, PaneTabStrip } from '@/components/ui/pane-tab'
 import { ContribBoundary, ContribRender } from '@/contrib/react/boundary'
 import { useContributions } from '@/contrib/react/use-contributions'
+import { registry } from '@/contrib/registry'
 import type { Contribution } from '@/contrib/types'
 import { ESCAPE_PRIORITY, isTopEscapeLayer, pushEscapeLayer } from '@/lib/escape-layers'
 import { cn } from '@/lib/utils'
@@ -22,6 +23,24 @@ import { allPaneIds, findGroupOfPane } from '../model'
 import { $hiddenTreePanes, $layoutTree, $narrowViewport } from '../store'
 
 import { paneChrome } from './track-model'
+
+/** The panes the edge overlay can show: collapsible, docked in the tree, not hidden. */
+function narrowOverlayPanes(
+  panes: readonly Contribution[],
+  tree: Parameters<typeof allPaneIds>[0] | null,
+  hidden: ReadonlySet<string>,
+  solo: boolean
+): Contribution[] {
+  // Solo adopts sidebar panes without their surrounding sidebar chrome.
+  // Suppress every reveal path while those panes are intentionally hidden.
+  if (solo) {
+    return []
+  }
+
+  const inTree = new Set(tree ? allPaneIds(tree) : [])
+
+  return panes.filter(p => paneChrome(p).collapsible && inTree.has(p.id) && !hidden.has(p.id))
+}
 
 export function NarrowOverlays() {
   const narrow = useStore($narrowViewport)
@@ -36,17 +55,10 @@ export function NarrowOverlays() {
   const revealActive = reveal !== null
   useEffect(() => (revealActive ? pushEscapeLayer(ESCAPE_PRIORITY.narrowOverlay) : undefined), [revealActive])
 
-  const inTree = useMemo(() => new Set(tree ? allPaneIds(tree) : []), [tree])
-
   const collapsibles = useMemo(
-    // Solo adopts sidebar panes without their surrounding sidebar chrome.
-    // Suppress every reveal path while those panes are intentionally hidden.
-    () => (solo ? [] : panes.filter(p => paneChrome(p).collapsible && inTree.has(p.id) && !hiddenPanes.has(p.id))),
-    [solo, panes, inTree, hiddenPanes]
+    () => narrowOverlayPanes(panes, tree, hiddenPanes, solo),
+    [panes, tree, hiddenPanes, solo]
   )
-
-  const collapsiblesRef = useRef(collapsibles)
-  collapsiblesRef.current = collapsibles
 
   // ⌘B / ⌘G's narrow branch dispatches the app's toggle-reveal event with the
   // REAL pane id — accept those via each contribution's revealAliases.
@@ -65,7 +77,16 @@ export function NarrowOverlays() {
         return
       }
 
-      const match = collapsiblesRef.current.find(p => p.id === id || paneChrome(p).revealAliases?.includes(id))
+      // Read live state, not the render-time list: a pane that an explicit reveal
+      // has just restored is not in that list yet, and the overlay must open it now.
+      const live = narrowOverlayPanes(
+        registry.getArea('panes'),
+        $layoutTree.get(),
+        $hiddenTreePanes.get(),
+        $chatOnboardingSolo.get()
+      )
+
+      const match = live.find(p => p.id === id || paneChrome(p).revealAliases?.includes(id))
 
       if (!match) {
         return
