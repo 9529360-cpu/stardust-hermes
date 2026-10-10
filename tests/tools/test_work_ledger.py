@@ -1,4 +1,5 @@
 """Unified ledger behavior without model calls or real child processes."""
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -16,6 +17,10 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(ledger, "list_active_subagents", lambda: [])
     yield
     async_work._reset_for_tests()
+
+
+def _no_job_reads(**kwargs):
+    raise AssertionError("the work ledger must not read the jobs store")
 
 
 def persist(rid, status="running"):
@@ -78,6 +83,50 @@ def test_foreign_home_and_uncontrollable_live_record(monkeypatch):
     assert "delegation:foreign" not in {r["id"] for r in ledger.list_work()}
 
 
+def test_cron_execution_history_is_normalized(monkeypatch):
+    from cron import executions
+
+    monkeypatch.setattr(executions, "list_executions", lambda **kwargs: [{
+        "id": "exec-1", "job_id": "job-1", "source": "scheduler", "status": "failed",
+        "claimed_at": "2026-10-10T08:00:00+00:00", "finished_at": "2026-10-10T08:01:00+00:00",
+        "error": "provider unavailable Authorization: Bearer sk-proj-12345678901234567890",
+        "delivery_outcome": "local",
+    }, {
+        "id": "exec-running", "job_id": "job-1", "source": "scheduler", "status": "claimed",
+        "claimed_at": "2026-10-10T08:02:00+00:00",
+    }, {"job_id": "job-1", "status": "failed"}])
+    monkeypatch.setattr(executions, "executions_db_exists", lambda: True)
+    monkeypatch.setattr("cron.jobs.list_jobs", _no_job_reads)
+
+    records = {row["id"]: row for row in ledger.list_work(include_subagents=False)}
+    run = records["cron:exec-1"]
+    assert run["kind"] == "cron"
+    assert run["title"] == "Cron job job-1"
+    assert run["status"] == "failed"
+    assert run["detail"]["job_id"] == "job-1"
+    assert set(run["detail"]) <= {"job_id", "source", "delivery_outcome", "error"}
+    assert "sk-proj-12345678901234567890" not in run["detail"]["error"]
+    assert records["cron:exec-running"]["status"] == "running"
+    assert "cron:None" not in records
+    assert ledger.cancel_work("cron:exec-1")["status"] == "already_finished"
+
+
+def test_unreadable_cron_store_is_logged_and_other_work_still_listed(monkeypatch, caplog):
+    from cron import executions
+
+    def unreadable(**kwargs):
+        raise RuntimeError("cron store corrupted")
+
+    monkeypatch.setattr(executions, "executions_db_exists", lambda: True)
+    monkeypatch.setattr(executions, "list_executions", unreadable)
+    persist("survivor")
+    with caplog.at_level(logging.WARNING, logger="tools.work_ledger"):
+        records = {row["id"]: row for row in ledger.list_work(include_subagents=False)}
+    assert "delegation:survivor" in records
+    assert not any(row_id.startswith("cron:") for row_id in records)
+    assert "Work ledger skipped cron execution history" in caplog.text
+
+
 def test_subagent_control_is_cooperative(monkeypatch):
     monkeypatch.setattr(ledger, "list_active_subagents", lambda: [
         {"subagent_id": "child", "goal": "Think", "status": "running"}])
@@ -87,3 +136,29 @@ def test_subagent_control_is_cooperative(monkeypatch):
     assert calls == ["child"]
     assert ledger.cancel_work("subagent:child", include_subagents=False)["status"] == "not_found"
     assert ledger.list_work()[0]["status"] == "running"
+
+
+def test_cron_items_follow_the_active_profile_home(tmp_path):
+    from cron import executions
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    homes = {name: tmp_path / name for name in ("coder", "research")}
+    for name, home in homes.items():
+        token = set_hermes_home_override(home)
+        try:
+            executions.create_execution(f"job-{name}", source="scheduler")
+        finally:
+            reset_hermes_home_override(token)
+
+    for name, home in homes.items():
+        token = set_hermes_home_override(home)
+        try:
+            items = ledger.cron_work_items()
+        finally:
+            reset_hermes_home_override(token)
+        assert [item["detail"]["job_id"] for item in items] == [f"job-{name}"]
+
+
+def test_absent_ledger_is_empty_and_is_not_created(tmp_path):
+    assert ledger.cron_work_items() == []
+    assert not (tmp_path / "cron" / "executions.db").exists()

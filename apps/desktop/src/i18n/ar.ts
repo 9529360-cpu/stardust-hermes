@@ -2165,6 +2165,7 @@ export const ar = defineLocale({
     subagents: count => `${count} ${count === 1 ? 'وكيل فرعي' : 'وكيل فرعي'}`,
     todos: (done, total) => `المهام ${done}/${total}`,
     running: 'قيد التشغيل',
+    cronRun: 'تشغيل مجدول',
     stop: 'إيقاف',
     dismiss: 'تجاهل',
     exit: code => `خروج ${code}`,
