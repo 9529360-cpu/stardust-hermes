@@ -183,20 +183,29 @@ def _is_local_backend() -> bool:
     return terminal_env("TERMINAL_ENV", "local").strip().lower() in ("local", "")
 
 
-def _browser_is_local_sidecar() -> bool:
-    """True when the browser itself is the ordinary local sidecar, whatever the terminal backend is.
+def _browser_is_local_sidecar(task_id: Optional[str] = None) -> bool:
+    """True when the browser that serves this call is the ordinary local sidecar, whatever the terminal backend is.
+
+    The session decides, not the configuration: a cloud provider can be configured while a private URL goes to
+    the local ``::local`` sidecar, or while a failed cloud session falls back to local Chromium. A session record
+    says which browser it is. A CDP override, a cloud session and a real profile are never the local sidecar.
 
     ``_is_local_backend`` also requires a local terminal, because SSRF protection must assume the browser can
     reach networks the terminal cannot. The sensitive-data policy asks a different question: does this browser
-    hold the operator's authenticated state? Only the browser's own placement counts here. A CDP override and
-    a cloud provider are never local. Keep this in agreement with ``_is_local_backend``.
+    hold the operator's authenticated state? So the terminal does not count here.
     """
     _bt = _origin()
     if _cdp._get_cdp_override_raw():
         return False
     if _bt._is_camofox_mode():
         return True
-    return _get_cloud_provider() is None
+    key = _bt._last_session_key(task_id or "default")
+    session = _bt._active_sessions.get(_bt._registry_session_key(key))
+    if session is not None:
+        features = session.get("features") or {}
+        return bool(features.get("local")) and not features.get("cdp_override") and not features.get("real_profile")
+    # No live session yet: judge where a new session for this key would run.
+    return _bt._is_local_sidecar_key(key) or _get_cloud_provider() is None
 
 
 def _get_browser_engine() -> str:

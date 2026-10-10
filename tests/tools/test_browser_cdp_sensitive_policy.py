@@ -6,6 +6,7 @@ import json
 import pytest
 
 from tools import browser_cdp_tool as cdp
+from tools import browser_tool as bt
 from tools import browser_tool_cloud as cloud
 from tools.registry import registry
 
@@ -14,7 +15,7 @@ from tools.registry import registry
 def implicit_policy(monkeypatch):
     """A cloud, attached, or real-profile session: the implicit sensitive-data policy is on and the operator set nothing."""
     monkeypatch.setattr("tools.browser_tool_eval_policy._browser_eval_flag", lambda key: False)
-    monkeypatch.setattr("tools.browser_tool_eval_policy._restrict_browser_evaluate", lambda: True)
+    monkeypatch.setattr("tools.browser_tool_eval_policy._restrict_browser_evaluate", lambda *a, **k: True)
     monkeypatch.setattr(cdp, "_resolve_cdp_endpoint", lambda: "")  # reached only once the policy allows the call
 
 
@@ -52,6 +53,7 @@ class TestSensitiveCdpPolicy:
         "DOM.getOuterHTML",                    # page markup, including form values
         "Accessibility.getFullAXTree",         # accessible text, including input values
         "Debugger.evaluateOnCallFrame",        # runs JavaScript in a paused frame
+        "Page.reload",                         # scriptToEvaluateOnLoad runs page JavaScript in every frame
     ])
     def test_unlisted_sensitive_methods_are_default_denied(self, monkeypatch, implicit_policy, method):
         asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "denied by user"})
@@ -60,10 +62,30 @@ class TestSensitiveCdpPolicy:
         assert "denied by user" in result["error"]
         assert asked == [f"browser_cdp_sensitive:{method}"]
 
-    @pytest.mark.parametrize("method", ["Page.navigate", "Page.reload", "Target.attachToTarget", "Browser.getVersion"])
-    def test_methods_that_return_no_page_data_run_without_a_prompt(self, monkeypatch, implicit_policy, method):
+    def test_reload_with_a_load_script_needs_approval(self, monkeypatch, implicit_policy):
+        asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "denied by user"})
+        monkeypatch.setattr(cdp, "_resolve_cdp_endpoint", lambda: pytest.fail("no CDP call without approval"))
+        result = json.loads(cdp.browser_cdp("Page.reload", {"scriptToEvaluateOnLoad": "document.cookie"}))
+        assert "denied by user" in result["error"]
+        assert asked == ["browser_cdp_sensitive:Page.reload"]
+
+    @pytest.mark.parametrize("url", ["javascript:document.cookie", "data:text/html,<script>1</script>", ""])
+    def test_navigation_that_can_run_page_code_needs_approval(self, monkeypatch, implicit_policy, url):
+        asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "denied by user"})
+        monkeypatch.setattr(cdp, "_resolve_cdp_endpoint", lambda: pytest.fail("no CDP call without approval"))
+        result = json.loads(cdp.browser_cdp("Page.navigate", {"url": url}))
+        assert "denied by user" in result["error"]
+        assert asked == ["browser_cdp_sensitive:Page.navigate"]
+
+    @pytest.mark.parametrize("method, params", [
+        ("Page.navigate", {"url": "https://example.test/"}),
+        ("Page.navigate", {"url": "about:blank"}),
+        ("Target.attachToTarget", {"targetId": "t"}),
+        ("Browser.getVersion", {}),
+    ])
+    def test_methods_that_return_no_page_data_run_without_a_prompt(self, monkeypatch, implicit_policy, method, params):
         asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "must not be asked"})
-        result = json.loads(cdp.browser_cdp(method, {}))
+        result = json.loads(cdp.browser_cdp(method, params))
         assert asked == []
         assert "No CDP endpoint" in result["error"]
 
@@ -103,7 +125,7 @@ class TestSensitiveCdpPolicy:
 
     def test_local_sidecars_keep_the_compatibility_behavior(self, monkeypatch):
         monkeypatch.setattr("tools.browser_tool_eval_policy._browser_eval_flag", lambda key: False)
-        monkeypatch.setattr("tools.browser_tool_eval_policy._restrict_browser_evaluate", lambda: False)
+        monkeypatch.setattr("tools.browser_tool_eval_policy._restrict_browser_evaluate", lambda *a, **k: False)
         monkeypatch.setattr(cdp, "_resolve_cdp_endpoint", lambda: "")
         asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "must not be asked"})
         result = json.loads(cdp.browser_cdp("Runtime.evaluate", {"expression": "document.cookie"}))
@@ -151,14 +173,23 @@ class TestRegisteredHandlerGate:
 
 
 class TestBrowserLocality:
-    """The sensitive-data policy asks whether the browser holds authenticated state. The terminal backend answers a
-    different question (SSRF trust), so a Docker or SSH terminal must not make a local browser look sensitive."""
+    """The sensitive-data policy asks whether the browser serving this call holds authenticated state. The terminal
+    backend answers a different question (SSRF trust), and a configured cloud provider only predicts placement.
+    The session record is what decides, once a session exists."""
 
     @pytest.fixture
     def local_browser(self, monkeypatch):
         monkeypatch.setattr(cloud, "_get_cloud_provider", lambda: None)
         monkeypatch.setattr(cloud._cdp, "_get_cdp_override_raw", lambda: "")
         monkeypatch.setattr(cloud._origin(), "_is_camofox_mode", lambda: False)
+
+    @pytest.fixture
+    def session(self, monkeypatch):
+        """Install a session record for task ``t`` in the registry the policy reads, and remove it afterwards."""
+        def install(features, **extra):
+            key = bt._registry_session_key("t")
+            monkeypatch.setitem(bt._active_sessions, key, {"features": features, **extra})
+        return install
 
     def test_remote_terminal_does_not_make_a_local_browser_sensitive(self, monkeypatch, local_browser):
         monkeypatch.setenv("TERMINAL_ENV", "docker")
@@ -170,6 +201,29 @@ class TestBrowserLocality:
         monkeypatch.setattr(cloud._cdp, "_get_cdp_override_raw", lambda: "ws://attached.example:9222/devtools")
         assert cloud._browser_is_local_sidecar() is False
 
-    def test_cloud_provider_is_sensitive(self, monkeypatch, local_browser):
+    def test_cloud_provider_predicts_a_sensitive_session_when_none_exists(self, monkeypatch, local_browser):
         monkeypatch.setattr(cloud, "_get_cloud_provider", lambda: object())
-        assert cloud._browser_is_local_sidecar() is False
+        assert cloud._browser_is_local_sidecar("t") is False
+
+    def test_hybrid_local_sidecar_is_local_even_with_a_cloud_provider(self, monkeypatch, local_browser, session):
+        monkeypatch.setattr(cloud, "_get_cloud_provider", lambda: object())
+        session({"local": True})
+        assert cloud._browser_is_local_sidecar("t") is True
+
+    def test_cloud_session_is_sensitive_even_when_the_terminal_is_local(self, monkeypatch, local_browser, session):
+        monkeypatch.setenv("TERMINAL_ENV", "local")
+        session({"cloud": True})
+        assert cloud._browser_is_local_sidecar("t") is False
+
+    def test_cloud_fallback_to_local_chromium_is_local(self, monkeypatch, local_browser, session):
+        monkeypatch.setattr(cloud, "_get_cloud_provider", lambda: object())
+        session({"local": True}, fallback_from_cloud=True)
+        assert cloud._browser_is_local_sidecar("t") is True
+
+    def test_real_profile_is_sensitive_even_as_a_local_session(self, monkeypatch, local_browser, session):
+        session({"local": True, "real_profile": True})
+        assert cloud._browser_is_local_sidecar("t") is False
+
+    def test_session_record_cdp_override_is_sensitive(self, monkeypatch, local_browser, session):
+        session({"local": True, "cdp_override": True})
+        assert cloud._browser_is_local_sidecar("t") is False

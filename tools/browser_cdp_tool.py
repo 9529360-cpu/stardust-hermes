@@ -143,14 +143,27 @@ _CDP_EVAL_METHODS = frozenset({"Runtime.evaluate", "Runtime.callFunctionOn"})
 _CDP_SAFE_METHODS = frozenset({
     "Browser.getVersion",
     "Target.getTargets", "Target.attachToTarget", "Target.detachFromTarget", "Target.setDiscoverTargets",
-    "Page.enable", "Page.disable", "Page.navigate", "Page.reload",
+    "Page.enable", "Page.disable",
     "Runtime.enable", "Runtime.disable",
     "DOM.enable", "DOM.disable",
     "Network.enable", "Network.disable",
 })
+# Some methods accept parameters that run page code, so they are safe only for the plain form:
+# Page.navigate to a document URL (a javascript: URL would run page code in the target frame), and never
+# Page.reload, whose scriptToEvaluateOnLoad runs JavaScript in every frame after the reload.
+_CDP_SAFE_NAVIGATE_URLS = ("http://", "https://")
 
 
-def _browser_cdp_sensitive_refusal(method: Any, params: Any) -> Optional[str]:
+def _cdp_method_is_safe(method: str, params: Dict[str, Any]) -> bool:
+    if method in _CDP_SAFE_METHODS:
+        return True
+    if method == "Page.navigate":
+        url = str(params.get("url") or "").strip().lower()
+        return url.startswith(_CDP_SAFE_NAVIGATE_URLS) or url == "about:blank"
+    return False
+
+
+def _browser_cdp_sensitive_refusal(method: Any, params: Any, task_id: Optional[str] = None) -> Optional[str]:
     """Refusal text for a raw CDP call that could reach sensitive browser data, or ``None`` when it may run.
     Applied once per call, before the call is routed (extension controller) or sent (local CDP)."""
     if not isinstance(method, str) or not method:
@@ -159,8 +172,8 @@ def _browser_cdp_sensitive_refusal(method: Any, params: Any) -> Optional[str]:
     from tools import browser_tool_eval_policy as policy
     if method in _CDP_EVAL_METHODS:
         source = params.get("expression") or params.get("functionDeclaration") or ""
-        policy_error = policy._enforce_browser_eval_policy(str(source))
-    elif method in _CDP_SAFE_METHODS or not policy._restrict_browser_evaluate() \
+        policy_error = policy._enforce_browser_eval_policy(str(source), task_id)
+    elif _cdp_method_is_safe(method, params) or not policy._restrict_browser_evaluate(task_id) \
             or policy._allow_unsafe_browser_evaluate():
         return None
     elif policy._browser_eval_flag("restrict_evaluate"):
@@ -304,7 +317,7 @@ def browser_cdp(method: str, params: Optional[Dict[str, Any]] = None, target_id:
     WebSocket instead — the only reliable way to evaluate inside an iframe where fresh per-call connections
     hit signed-URL expiry (Browserbase). Both paths share the same private-page/SSRF guard. Returns JSON
     ``{"success": True, "method", "result"}`` or ``{"error": ...}``."""
-    refusal = _browser_cdp_sensitive_refusal(method, params)
+    refusal = _browser_cdp_sensitive_refusal(method, params, task_id)
     if refusal:
         return tool_error(refusal, method=method)
     return _browser_cdp_call(method=method, params=params, target_id=target_id, frame_id=frame_id,
@@ -448,7 +461,7 @@ def _browser_cdp_registered_handler(args: Dict[str, Any], **kw: Any) -> Any:
     is covered as well as local CDP. ``browser_cdp`` is the fallback when routing is off."""
     method = args.get("method", "")
     params = args.get("params")
-    refusal = _browser_cdp_sensitive_refusal(method, params)
+    refusal = _browser_cdp_sensitive_refusal(method, params, kw.get("task_id"))
     if refusal:
         return tool_error(refusal, method=method)
     return routed_browser_handler(

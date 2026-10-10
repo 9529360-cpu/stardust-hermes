@@ -94,7 +94,7 @@ def _allow_unsafe_browser_evaluate() -> bool:
     return _browser_eval_flag("allow_unsafe_evaluate")
 
 
-def _restrict_browser_evaluate() -> bool:
+def _restrict_browser_evaluate(task_id: Optional[str] = None) -> bool:
     """Whether the sensitive-primitive eval denylist is enabled (off by default).
 
     It blocks the *names* of common primitives (``fetch``, ``cookie``, ``querySelector(...input...)``),
@@ -105,9 +105,9 @@ def _restrict_browser_evaluate() -> bool:
     if _browser_eval_flag("restrict_evaluate"):
         return True
     # A browser that holds authenticated state (cloud, attached over CDP, or a real profile) keeps the policy
-    # even when restrict_evaluate is false. Only the browser's own placement counts, not the terminal's.
+    # even when restrict_evaluate is false. The session that serves this task decides, not the terminal.
     try:
-        return not _cloud._browser_is_local_sidecar() or bool(_cloud._use_real_profile())
+        return not _cloud._browser_is_local_sidecar(task_id) or bool(_cloud._use_real_profile())
     except Exception:
         return True
 
@@ -143,10 +143,10 @@ def _risky_browser_eval_reason(expression: str) -> Optional[str]:
     return hit or _sensitive_browser_eval_token_reason(expression)
 
 
-def _enforce_browser_eval_policy(expression: str) -> Optional[str]:
+def _enforce_browser_eval_policy(expression: str, task_id: Optional[str] = None) -> Optional[str]:
     """Block sensitive browser JS evaluation when the opt-in denylist is on (opt-in because it gates on
     primitive *names*; private-address egress is enforced separately in ``_browser_eval``)."""
-    if not _restrict_browser_evaluate() or _allow_unsafe_browser_evaluate():
+    if not _restrict_browser_evaluate(task_id) or _allow_unsafe_browser_evaluate():
         return None
     reason = _risky_browser_eval_reason(expression)
     if not reason:

@@ -1005,7 +1005,7 @@ def browser_console(clear: bool = False, expression: Optional[str] = None, task_
     """Console messages + uncaught JS errors (optionally ``clear``ing the buffers),
     or — when ``expression`` is given — evaluate JS in the page like the DevTools console."""
     if expression is not None:
-        policy_error = _eval_policy._enforce_browser_eval_policy(expression)
+        policy_error = _eval_policy._enforce_browser_eval_policy(expression, task_id)
         if policy_error:
             refusal = _eval_policy._sensitive_eval_refusal(
                 policy_error, "browser_console", "browser_console_sensitive_eval")
