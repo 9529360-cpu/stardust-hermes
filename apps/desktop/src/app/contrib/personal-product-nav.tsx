@@ -8,7 +8,7 @@ import { revealTreePane } from '@/components/pane-shell/tree/store'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
-import { $sidebarGrouping, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
+import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped, setSidebarOpen } from '@/store/layout'
 import { $newChatProfile, $profileScope, ALL_PROFILES } from '@/store/profile'
 import {
   $activeProjectId,
@@ -172,6 +172,13 @@ export function PersonalProductNav({
   // The agent roster is a page at its own route, like Tools and Plugins.
   const agentSpaceShowing = routePathname(pathname) === BOTS_ROUTE
 
+  // Picking a page or a new chat closes the overlay on a narrow window, so the
+  // choice shows in the main area instead of under the nav.
+  const pick = (item: SidebarNavItem) => {
+    dismissNarrowSidebar()
+    onNavigate(item)
+  }
+
   const newChat = () => {
     setSidebarAgentsGrouped(false)
     setSidebarOpen(true)
@@ -183,7 +190,7 @@ export function PersonalProductNav({
     // in that project's folder nor files under it. A project's own "+" starts chats there.
     exitProjectScope()
     setExpandedProjectId(null)
-    onNavigate({
+    pick({
       action: 'new-session',
       id: 'new-session',
       icon: NULL_ICON,
@@ -192,7 +199,7 @@ export function PersonalProductNav({
   }
 
   const openAgentSpace = () =>
-    onNavigate({
+    pick({
       id: 'bots',
       label: copy.agentSpace,
       icon: NULL_ICON,
@@ -200,7 +207,7 @@ export function PersonalProductNav({
     })
 
   const openTasks = () =>
-    onNavigate({
+    pick({
       id: 'cron',
       label: copy.tasks,
       icon: NULL_ICON,
@@ -208,7 +215,7 @@ export function PersonalProductNav({
     })
 
   const openTools = () =>
-    onNavigate({
+    pick({
       id: 'skills',
       label: copy.tools,
       icon: NULL_ICON,
@@ -216,7 +223,7 @@ export function PersonalProductNav({
     })
 
   const openPlugins = () =>
-    onNavigate({
+    pick({
       id: 'plugins',
       label: copy.plugins,
       icon: NULL_ICON,
