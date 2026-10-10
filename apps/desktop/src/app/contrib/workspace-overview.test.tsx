@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+import type { WorkItem } from '@hermes/shared'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,6 +10,7 @@ import type { CronSuggestion } from '@/types/hermes'
 
 const getCronSuggestions = vi.hoisted(() => vi.fn(async () => [] as CronSuggestion[]))
 const openSession = vi.hoisted(() => vi.fn())
+const requestGateway = vi.hoisted(() => vi.fn(async () => ({ work: [] as WorkItem[] })))
 
 vi.mock('@/hermes', async importOriginal => ({
   ...(await importOriginal<typeof Hermes>()),
@@ -19,14 +21,27 @@ vi.mock('@/app/open-session', () => ({
   openSession: (...args: unknown[]) => openSession(...args)
 }))
 
+vi.mock('@/app/gateway/hooks/use-gateway-request', () => ({
+  useGatewayRequest: () => ({ requestGateway })
+}))
+
 import { I18nProvider } from '@/i18n'
 import { $backgroundStatusBySession } from '@/store/composer-status'
 import { setCronJobs } from '@/store/cron'
+import { $gateway } from '@/store/gateway'
 import { $projectTree } from '@/store/projects'
-import { $currentCwd, $selectedStoredSessionId, $sessions } from '@/store/session'
+import { $activeSessionId, $currentCwd, $selectedStoredSessionId, $sessions } from '@/store/session'
 import { $sessionStates } from '@/store/session-states'
 
-import { WorkspaceOverview } from './workspace-overview'
+import { WorkLedgerSection, WorkspaceOverview } from './workspace-overview'
+
+const englishWorkLabels = {
+  cancel: 'Stop work',
+  empty: 'No work',
+  kinds: { cron: 'Scheduled run', delegation: 'Delegation', process: 'Background process', subagent: 'Subagent' },
+  statuses: { cancelled: 'Cancelled', completed: 'Completed', failed: 'Failed', interrupted: 'Interrupted', running: 'Running' },
+  title: 'Background work'
+} as const
 
 function renderOverview(initialLocale: 'en' | 'zh' = 'zh') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -46,12 +61,16 @@ beforeEach(() => {
   getCronSuggestions.mockReset()
   getCronSuggestions.mockResolvedValue([])
   openSession.mockReset()
+  requestGateway.mockReset()
+  requestGateway.mockResolvedValue({ work: [] })
 })
 
 afterEach(() => {
   cleanup()
   $currentCwd.set('')
   setCronJobs([])
+  $activeSessionId.set(null)
+  $gateway.set(null)
   $selectedStoredSessionId.set(null)
   $sessionStates.set({})
   $sessions.set([])
@@ -92,6 +111,165 @@ describe('WorkspaceOverview (context rail)', () => {
     $projectTree.set([{ id: 'app', label: 'App', path: '/work/app', repos: [], sessionCount: 0, previewSessions: [] } as never])
     renderOverview()
     expect(screen.getByText('/work/app/.worktrees/feature')).toBeTruthy()
+  })
+
+  it('shows owned work ledger items and cancels a running item', async () => {
+    const item: WorkItem = {
+      id: 'subagent:child-1',
+      kind: 'subagent',
+      title: 'Research task',
+      status: 'running',
+      started_at: 100,
+      updated_at: 101,
+      detail: {}
+    }
+
+    requestGateway.mockResolvedValueOnce({ work: [item] }).mockResolvedValueOnce({ work: [] })
+    $activeSessionId.set('runtime-1')
+    $gateway.set({ connectionState: 'open' } as never)
+    renderOverview('en')
+
+    expect(await screen.findByText('Research task')).toBeTruthy()
+    expect(screen.getByText('Subagent · Running')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop work: Research task' }))
+
+    expect(requestGateway).toHaveBeenLastCalledWith('work.cancel', {
+      id: item.id,
+      session_id: 'runtime-1'
+    })
+  })
+
+  it('clears work from the previous session before the new scope resolves', async () => {
+    let resolveDeferred: ((value: { work: WorkItem[] }) => void) | undefined
+
+    const deferred = new Promise<{ work: WorkItem[] }>(resolve => {
+      resolveDeferred = resolve
+    })
+
+    const oldItem: WorkItem = {
+      id: 'subagent:old',
+      kind: 'subagent',
+      title: 'Old session work',
+      status: 'running',
+      started_at: 100,
+      updated_at: 101,
+      detail: {}
+    }
+
+    const newItem: WorkItem = {
+      id: 'subagent:new',
+      kind: 'subagent',
+      title: 'New session work',
+      status: 'running',
+      started_at: 200,
+      updated_at: 201,
+      detail: {}
+    }
+
+    requestGateway.mockResolvedValueOnce({ work: [oldItem] }).mockImplementationOnce(() => deferred)
+    $activeSessionId.set('session-a')
+    $gateway.set({ connectionState: 'open' } as never)
+    renderOverview('en')
+    expect(await screen.findByText('Old session work')).toBeTruthy()
+
+    await act(async () => {
+      $activeSessionId.set('session-b')
+    })
+
+    expect(screen.queryByText('Old session work')).toBeNull()
+    resolveDeferred?.({ work: [newItem] })
+    expect(await screen.findByText('New session work')).toBeTruthy()
+  })
+
+  it('keeps polling so work that starts after the first load appears without a session switch', async () => {
+    const item: WorkItem = {
+      id: 'subagent:late',
+      kind: 'subagent',
+      title: 'Late subagent',
+      status: 'running',
+      started_at: 300,
+      updated_at: 301,
+      detail: {}
+    }
+
+    vi.useFakeTimers()
+
+    try {
+      requestGateway.mockResolvedValueOnce({ work: [] }).mockResolvedValueOnce({ work: [item] })
+      $activeSessionId.set('session-poll')
+      $gateway.set({ connectionState: 'open' } as never)
+      renderOverview('en')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+
+      expect(screen.getByText('Late subagent')).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps work visible when the stop request is refused', async () => {
+    const item: WorkItem = {
+      id: 'subagent:refused',
+      kind: 'subagent',
+      title: 'Research task',
+      status: 'running',
+      started_at: 100,
+      updated_at: 101,
+      detail: {}
+    }
+
+    requestGateway
+      .mockResolvedValueOnce({ work: [item] })
+      .mockResolvedValueOnce({
+        id: item.id,
+        message: 'Work is no longer controllable by this process.',
+        status: 'unavailable'
+      } as never)
+    $activeSessionId.set('runtime-refused')
+    $gateway.set({ connectionState: 'open' } as never)
+    renderOverview('en')
+    expect(await screen.findByText('Research task')).toBeTruthy()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Stop work: Research task' }))
+    })
+
+    expect(requestGateway).toHaveBeenLastCalledWith('work.cancel', { id: item.id, session_id: 'runtime-refused' })
+    expect(screen.getByText('Research task')).toBeTruthy()
+  })
+
+  it('hides stop controls for non-cancellable work kinds', () => {
+    const process: WorkItem = {
+      id: 'process:one',
+      kind: 'process',
+      title: 'Background process',
+      status: 'running',
+      started_at: 100,
+      updated_at: 101,
+      detail: {}
+    }
+
+    const cron: WorkItem = {
+      id: 'cron:exec-1',
+      kind: 'cron',
+      title: 'Inbox digest',
+      status: 'running',
+      started_at: 102,
+      updated_at: 103,
+      detail: {}
+    }
+
+    renderOverview('en')
+
+    render(<WorkLedgerSection items={[process, cron]} labels={englishWorkLabels} onCancel={vi.fn()} />)
+
+    expect(screen.getByText('Background process')).toBeTruthy()
+    expect(screen.getByText('Scheduled run · Running')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Stop work: Background process' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Stop work: Inbox digest' })).toBeNull()
   })
 
   it('shows pending cron suggestions in the Task Center', async () => {
