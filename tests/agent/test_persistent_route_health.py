@@ -103,6 +103,33 @@ def test_expired_open_route_allows_one_half_open_probe(monkeypatch, tmp_path):
     assert status == "half_open_busy"
 
 
+def test_stale_probe_release_does_not_clear_a_newer_lease(monkeypatch, tmp_path):
+    _home(monkeypatch, tmp_path)
+    route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)
+    state = route_health.snapshot()
+    row = next(iter(state["routes"].values()))
+    row["cooldown_until"] = time.time() - 1
+    route_health._write_state(state)
+
+    allowed, _, status, first_probe_id = route_health.allow_route_with_probe_id(
+        "p", "m", "https://x.test",
+    )
+    assert (allowed, status) == (True, "half_open_probe")
+    route_health.release_probe("p", "m", "https://x.test", first_probe_id)
+
+    allowed, _, status, second_probe_id = route_health.allow_route_with_probe_id(
+        "p", "m", "https://x.test",
+    )
+    assert (allowed, status) == (True, "half_open_probe")
+    assert second_probe_id != first_probe_id
+
+    route_health.release_probe("p", "m", "https://x.test", first_probe_id)
+    allowed, retry_after, status = route_health.allow_route("p", "m", "https://x.test")
+    assert allowed is False
+    assert retry_after > 0
+    assert status == "half_open_busy"
+
+
 def test_cross_process_half_open_probe_has_one_lease(monkeypatch, tmp_path):
     _home(monkeypatch, tmp_path)
     route_health.record_failure("p", "m", "https://x.test", FailoverReason.timeout)

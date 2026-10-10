@@ -5,6 +5,7 @@ the new list-based ``fallback_providers`` config format and chain
 advancement through multiple providers.
 """
 
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -111,6 +112,69 @@ class TestFallbackChainAdvancement:
             assert agent._fallback_index == 1
             assert agent.model == "gpt-4o"
             assert agent._fallback_activated is True
+
+    def test_releases_half_open_probe_when_local_activation_fails(self, monkeypatch, tmp_path):
+        url = "https://openrouter.ai/api/v1"
+        model = "openai/gpt-5.6-sol"
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        route_health.reset_for_tests()
+        route_health.record_failure("openrouter", model, url, FailoverReason.timeout)
+        state = route_health.snapshot()
+        row = next(iter(state["routes"].values()))
+        row["cooldown_until"] = time.time() - 1
+        route_health._write_state(state)
+
+        agent = _make_agent(
+            fallback_model={
+                "provider": "openrouter",
+                "model": model,
+                "base_url": url,
+            },
+        )
+        agent.provider = "zai"
+        agent.model = "glm-4.7"
+        agent.base_url = "https://api.z.ai/v1"
+
+        claimed_probe_ids = []
+
+        def _fail_after_probe_claim(*_args, **_kwargs):
+            route_key, _identity = route_health.route_identity("openrouter", model, url)
+            claimed_probe_ids.append(
+                route_health.snapshot()["routes"][route_key].get("probe_id")
+            )
+            raise RuntimeError("local route configuration failed")
+
+        with (
+            patch(
+                "agent.chat_completion_helpers._fallback_entry_unavailable_without_network",
+                return_value=None,
+            ),
+            patch(
+                "agent.auxiliary_client.resolve_provider_client",
+                return_value=(_mock_client(base_url=url), model),
+            ),
+            patch(
+                "hermes_cli.providers.is_actual_route",
+                side_effect=_fail_after_probe_claim,
+            ),
+        ):
+            assert agent._try_activate_fallback() is False
+
+        assert len(claimed_probe_ids) == 1
+        assert claimed_probe_ids[0]
+        route_key, _identity = route_health.route_identity("openrouter", model, url)
+        row = route_health.snapshot()["routes"][route_key]
+        assert row["status"] == "open"
+        assert row["probe_until"] == 0
+        assert row["probe_id"] is None
+
+        # The failed local switch did not contact the route, so another session
+        # can immediately claim a probe instead of waiting for the old lease.
+        assert route_health.allow_route("openrouter", model, url) == (
+            True,
+            0,
+            "half_open_probe",
+        )
 
     def test_explicit_base_url_prechecks_normalized_route_health(self, monkeypatch, tmp_path):
         url = "https://openrouter.ai/api/v1"
