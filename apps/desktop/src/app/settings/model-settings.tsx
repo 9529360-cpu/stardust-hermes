@@ -676,6 +676,10 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     return <ModelSettingsSkeleton />
   }
 
+  // Setup may offer a local model as the new-chat default only when the backend
+  // has confirmed there is none to replace. An unknown default counts as set.
+  const noDefaultModel = mainModel !== null && !mainModel.model
+
   return (
     <div className="grid gap-6">
       <CustomEndpointsSettings
@@ -683,7 +687,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
         onMainModelChanged={onMainModelChanged}
         scopeProfile={scopeProfile}
       />
-      {$localModelsEnabled.get() ? <LocalModelsSettings /> : null}
+      {$localModelsEnabled.get() ? <LocalModelsSettings noDefaultModel={noDefaultModel} /> : null}
 
       {config && mainModel && (reasoningSupported || fastSupported) && (
         <section>

@@ -87,7 +87,9 @@ function fitRank(model: LocalCatalogModel): number {
   return 2
 }
 
-export function LocalModelsSettings() {
+/** `noDefaultModel`: the backend confirmed no main model is set. Setup makes a
+ *  local model the default for new chats, so only then may it lead the pane. */
+export function LocalModelsSettings({ noDefaultModel }: { noDefaultModel: boolean }) {
   const { t } = useI18n()
   const copy = t.settings.localModels
   const installStarting = useStore($localRuntimeInstallStarting)
@@ -294,8 +296,9 @@ export function LocalModelsSettings() {
   // ── Quickstart: the dummy-proof front door ──
   // Until something is servable (runtime + at least one model), the pane
   // leads with a hero that does everything in one click; the full pane
-  // stays one 'Let me choose' click away. A running quickstart pins this
-  // view so its progress has a home even after a remount.
+  // stays one 'Let me choose' click away. The hero only shows when no default
+  // model is set, because quickstart would replace it. A running quickstart
+  // pins this view so its progress has a home even after a remount.
   const qJob = runningQuickstart ?? null
 
   const needsSetup = !status.runtime_installed || status.models.length === 0
@@ -306,7 +309,7 @@ export function LocalModelsSettings() {
 
   const failedInstall = jobs.some(job => job.kind === 'runtime-install' && job.status === 'error')
 
-  if (qJob || (needsSetup && !configure && heroModel && !rJob && !failedInstall)) {
+  if (qJob || (needsSetup && !configure && heroModel && !rJob && !failedInstall && noDefaultModel)) {
     // Stage rail derived from the job phase: engine -> model -> finish.
     const phase = qJob?.phase ?? ''
 

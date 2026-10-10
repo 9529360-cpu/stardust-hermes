@@ -28,9 +28,9 @@ describe('model-status-label', () => {
     expect(modelDisplayParts('anthropic/claude-opus-4.8-fast').tag).toBe('Fast')
   })
 
-  it('maps reasoning effort to compact labels', () => {
+  it('maps reasoning effort to the words Settings uses', () => {
     expect(reasoningEffortLabel('high')).toBe('High')
-    expect(reasoningEffortLabel('xhigh')).toBe('XHigh')
+    expect(reasoningEffortLabel('xhigh')).toBe('Extra High')
     expect(reasoningEffortLabel('max')).toBe('Max')
     expect(reasoningEffortLabel('ultra')).toBe('Ultra')
     expect(reasoningEffortLabel('')).toBe('')

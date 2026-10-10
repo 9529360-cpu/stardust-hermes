@@ -2743,7 +2743,9 @@ export const ar = defineLocale({
       low: 'منخفض',
       medium: 'متوسط',
       high: 'عالٍ',
+      xhigh: 'عالٍ جدًا',
       max: 'أقصى',
+      ultra: 'فائق',
       updateFailed: 'فشل تحديث خيار النموذج',
       fastFailed: 'فشل تحديث الوضع السريع'
     },

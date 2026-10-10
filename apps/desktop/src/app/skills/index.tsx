@@ -29,7 +29,7 @@ import {
   setToolsetEnabled
 } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { isDesktopToolsetVisible } from '@/lib/desktop-toolsets'
+import { isDesktopToolsetRow } from '@/lib/desktop-toolsets'
 import { Loader2 } from '@/lib/icons'
 import { queryClient } from '@/lib/query-client'
 import { invalidateSlashCompletions } from '@/lib/slash-completion-cache'
@@ -228,7 +228,7 @@ function filteredToolsets(
 
   return toolsets
     .filter(toolset => {
-      if (!isDesktopToolsetVisible(toolset.name)) {
+      if (!isDesktopToolsetRow(toolset)) {
         return false
       }
 
@@ -251,7 +251,7 @@ function filteredToolsets(
     )
 }
 
-const visibleToolsetCount = (toolsets: ToolsetInfo[]) => toolsets.filter(ts => isDesktopToolsetVisible(ts.name)).length
+const visibleToolsetCount = (toolsets: ToolsetInfo[]) => toolsets.filter(isDesktopToolsetRow).length
 
 interface SkillsViewProps extends React.ComponentProps<'section'> {
   setStatusbarItemGroup?: SetStatusbarItemGroup
@@ -531,7 +531,7 @@ export function SkillsView({
   // state target the WHOLE tab, never the search-filtered view — a tab-wide
   // control that silently scoped to the current query would be a lie.
   const bulkSkills = skills ?? []
-  const bulkToolsets = useMemo(() => (toolsets ?? []).filter(ts => isDesktopToolsetVisible(ts.name)), [toolsets])
+  const bulkToolsets = useMemo(() => (toolsets ?? []).filter(isDesktopToolsetRow), [toolsets])
 
   // Rotating placeholder nudges from the user's own data — teach that search
   // understands categories and tool names, not just titles.
@@ -552,7 +552,7 @@ export function SkillsView({
 
     if (mode === 'toolsets' && toolsets?.length) {
       return toolsets
-        .filter(ts => isDesktopToolsetVisible(ts.name) && toolNames(ts).length > 0)
+        .filter(isDesktopToolsetRow)
         .slice(0, 5)
         .map(ts => t.common.tryHint(toolNames(ts)[0]))
     }
