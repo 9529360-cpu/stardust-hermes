@@ -139,10 +139,11 @@ _METHOD_PARAM_GUARDS = {
 # screenshots, DOM contents. A list of sensitive methods can never be complete, so the policy is default-deny in a
 # restricted session. Only the methods below return no page data and run no page JavaScript. Page JavaScript
 # (Runtime.evaluate, Runtime.callFunctionOn) keeps the expression policy, so benign expressions still run.
+# Target.getTargets is deliberately absent: it returns every tab's URL and title, so it needs the same approval.
 _CDP_EVAL_METHODS = frozenset({"Runtime.evaluate", "Runtime.callFunctionOn"})
 _CDP_SAFE_METHODS = frozenset({
     "Browser.getVersion",
-    "Target.getTargets", "Target.attachToTarget", "Target.detachFromTarget", "Target.setDiscoverTargets",
+    "Target.attachToTarget", "Target.detachFromTarget", "Target.setDiscoverTargets",
     "Page.enable", "Page.disable",
     "Runtime.enable", "Runtime.disable",
     "DOM.enable", "DOM.disable",

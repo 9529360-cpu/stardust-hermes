@@ -813,6 +813,8 @@ browser_cdp(method="Runtime.evaluate",
 browser_cdp(method="Network.getAllCookies")
 ```
 
+`Target.getTargets` returns every tab's URL and title, so it needs approval in a browser that holds authenticated state (attached over CDP, cloud, extension-controlled, or real-profile), the same as the other sensitive methods. Under `browser.restrict_evaluate: true` it is refused outright.
+
 Browser-level methods (`Target.*`, `Browser.*`, `Storage.*`) omit `target_id`. Page-level methods (`Page.*`, `Runtime.*`, `DOM.*`, `Emulation.*`) require a `target_id` from `Target.getTargets`. Each stateless call is independent — sessions do not persist between calls.
 
 **Cross-origin iframes:** pass `frame_id` (from `browser_snapshot.frame_tree.children[]` where `is_oopif=true`) to route the CDP call through the supervisor's live session for that iframe. This is how `Runtime.evaluate` inside a cross-origin iframe works on Browserbase, where stateless CDP connections would hit signed-URL expiry. Example:

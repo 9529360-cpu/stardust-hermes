@@ -123,6 +123,22 @@ class TestSensitiveCdpPolicy:
         assert "browser.restrict_evaluate" in result["error"]
         assert asked == []
 
+    def test_target_listing_needs_approval_because_it_returns_urls_and_titles(self, monkeypatch, implicit_policy):
+        asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "denied by user"})
+        monkeypatch.setattr(cdp, "_resolve_cdp_endpoint", lambda: pytest.fail("no CDP call without approval"))
+        result = json.loads(cdp.browser_cdp("Target.getTargets"))
+        assert "denied by user" in result["error"]
+        assert asked == ["browser_cdp_sensitive:Target.getTargets"]
+
+    def test_target_listing_is_refused_under_an_explicit_restriction(self, monkeypatch):
+        monkeypatch.setattr("tools.browser_tool_eval_policy._browser_eval_flag", lambda key: key == "restrict_evaluate")
+        asked, _ = _record_approvals(monkeypatch, {"approved": True})
+        monkeypatch.setattr(cdp, "_resolve_cdp_endpoint",
+                            lambda: pytest.fail("no CDP call under an explicit restriction"))
+        result = json.loads(cdp.browser_cdp("Target.getTargets"))
+        assert "browser.restrict_evaluate" in result["error"]
+        assert asked == []
+
     def test_local_sidecars_keep_the_compatibility_behavior(self, monkeypatch):
         monkeypatch.setattr("tools.browser_tool_eval_policy._browser_eval_flag", lambda key: False)
         monkeypatch.setattr("tools.browser_tool_eval_policy._restrict_browser_evaluate", lambda *a, **k: False)
@@ -167,7 +183,7 @@ class TestRegisteredHandlerGate:
     def test_safe_call_routes_without_a_prompt(self, monkeypatch, routes, implicit_policy):
         asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "must not be asked"})
         handler = registry.get_entry("browser_cdp").handler
-        handler({"method": "Target.getTargets", "params": {}}, task_id="t")
+        handler({"method": "Browser.getVersion", "params": {}}, task_id="t")
         assert asked == []
         assert routes == ["browser_cdp"]
 

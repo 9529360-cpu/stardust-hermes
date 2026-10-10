@@ -297,6 +297,79 @@ class TestEvalJudgesTheRecordItRuns:
         assert judged["session_name"] == "h_cloud"
         assert len(ran_on) == 1 and ran_on[0] is judged
 
+    def test_approval_that_outlasts_the_session_runs_on_the_replacement(self, monkeypatch):
+        """The inactivity reaper can tear the judged record down while the approval prompt is open. The command must not
+        run on that dead record: the record is resolved again, and the one that runs is judged and approved."""
+        import tools.browser_tool as bt
+        import tools.browser_tool_cdp as cdp
+        import tools.browser_tool_lifecycle as lifecycle
+        import tools.browser_tool_session as session
+        from tools.browser_tool import browser_console
+
+        key = bt._registry_session_key("test")
+        judged = dict(CLOUD_SESSION, session_name="h_judged")
+        monkeypatch.setitem(bt._active_sessions, key, judged)
+        monkeypatch.setattr(bt, "_last_session_key", lambda task_id: task_id)
+        monkeypatch.setattr(bt, "_is_camofox_mode", lambda: False)
+        monkeypatch.setattr(lifecycle, "_start_browser_cleanup_thread", lambda: None)
+        monkeypatch.setattr(lifecycle, "_update_session_activity", lambda registry_key: None)
+        monkeypatch.setattr(lifecycle, "_session_has_expired", lambda session_info: False)
+        monkeypatch.setattr(session, "_local_backend_process_dead", lambda session_info: False)
+        monkeypatch.setattr(session, "_browser_command_preflight", lambda: {"browser_cmd": "agent-browser"})
+        monkeypatch.setattr(session, "_create_session_for_key",
+                            lambda task_id, force_local: dict(CLOUD_SESSION, session_name="h_replacement"))
+        monkeypatch.setattr(cdp, "_ensure_cdp_supervisor", lambda task_id: None)
+
+        def approve_while_the_reaper_runs(tool, reason, **kw):
+            if bt._active_sessions.get(key) is judged:
+                with bt._cleanup_lock:
+                    bt._active_sessions.pop(key, None)
+            return {"approved": True}
+
+        monkeypatch.setattr("tools.approval.request_tool_approval", approve_while_the_reaper_runs)
+        ran_on = []
+
+        def spawn(task_id, session_info, cmd_parts, command, engine, timeout):
+            ran_on.append(session_info)
+            return {"success": True, "data": {"result": "ok"}}
+
+        monkeypatch.setattr(session, "_spawn_and_collect", spawn)
+
+        result = json.loads(browser_console(expression="document.cookie", task_id="test"))
+
+        stored = bt._active_sessions.get(key)
+        assert result["success"] is True
+        assert stored is not None and stored["session_name"] == "h_replacement"
+        assert ran_on[0] is stored
+
+    def test_real_profile_setting_does_not_hold_a_local_sidecar_to_the_policy(self):
+        """With browser.use_real_profile set, the local sidecar that a private-URL navigation creates is still an ordinary
+        local browser. Its record decides, not the global setting."""
+        from tools.browser_tool import browser_console
+
+        with patch("tools.browser_tool._last_session_key", return_value="test"), \
+             patch("tools.browser_tool._is_camofox_mode", return_value=False), \
+             patch("tools.browser_tool_cloud._use_real_profile", return_value=True), \
+             patch("tools.browser_tool_session.command_session", return_value=(LOCAL_SESSION, None)), \
+             patch("tools.browser_tool_session._run_browser_command", return_value={"success": True, "data": {"result": "ok"}}) as run, \
+             patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
+            result = json.loads(browser_console(expression="document.cookie", task_id="test"))
+        assert result["success"] is True
+        approve.assert_not_called()
+        assert run.call_count == 1
+
+    def test_real_profile_session_stays_under_the_policy(self):
+        from tools.browser_tool import browser_console
+
+        real_profile = {"session_name": "h_real", "features": {"local": True, "real_profile": True}}
+        with patch("tools.browser_tool._last_session_key", return_value="test"), \
+             patch("tools.browser_tool._is_camofox_mode", return_value=False), \
+             patch("tools.browser_tool_session.command_session", return_value=(real_profile, None)), \
+             patch("tools.browser_tool_session._run_browser_command", return_value={"success": True, "data": {"result": "ok"}}), \
+             patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
+            json.loads(browser_console(expression="document.cookie", task_id="test"))
+        assert approve.call_count == 1
+
 
 # ── browser_console schema ───────────────────────────────────────────
 

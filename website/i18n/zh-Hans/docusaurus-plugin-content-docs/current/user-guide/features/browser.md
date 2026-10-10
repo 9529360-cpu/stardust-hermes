@@ -514,6 +514,8 @@ browser_cdp(method="Runtime.evaluate",
 browser_cdp(method="Network.getAllCookies")
 ```
 
+`Target.getTargets` 会返回每个标签页的 URL 和标题，因此在持有已认证状态的浏览器中（CDP 附加、云端、扩展控制或真实配置文件）调用时需要批准，与其他敏感方法相同。开启 `browser.restrict_evaluate: true` 时直接拒绝。
+
 浏览器级方法（`Target.*`、`Browser.*`、`Storage.*`）省略 `target_id`。页面级方法（`Page.*`、`Runtime.*`、`DOM.*`、`Emulation.*`）需要来自 `Target.getTargets` 的 `target_id`。每次无状态调用相互独立 — 调用间不保留会话状态。
 
 **跨域 iframe：** 传入 `frame_id`（来自 `browser_snapshot.frame_tree.children[]` 中 `is_oopif=true` 的条目）可通过监督器的实时会话路由该 iframe 的 CDP 调用。这是在 Browserbase 上对跨域 iframe 执行 `Runtime.evaluate` 的方式，避免无状态 CDP 连接遭遇签名 URL 过期问题。示例：

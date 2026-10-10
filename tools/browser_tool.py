@@ -17,7 +17,7 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Tuple, Union
 from pathlib import Path
 from agent.redact import redact_cdp_url
 from hermes_constants import get_hermes_home, hermes_home_key
@@ -1104,6 +1104,29 @@ def _eval_failure_response(result: Dict[str, Any]) -> str:
     return json.dumps(_lp._copy_fallback_warning(_err(err), result))
 
 
+def _judged_eval_session(expression: str, task_id: Optional[str], effective_task_id: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """The record an eval runs on, cleared by the sensitive-data policy for that record. Returns ``(record, None)``, or
+    ``(None, tool JSON)`` when no record can be made or the call is refused. A dead or suspect record is replaced here,
+    before the verdict. An approval can outlast the inactivity timeout, and the reaper may replace the record while the
+    prompt is open, so the record is resolved again once the human has decided: if it changed, the record that now runs
+    is judged too. The approval always covers the record that runs."""
+    session_info, error = _session.command_session(effective_task_id)
+    if error is not None:
+        return None, _eval_failure_response(error)
+    refusal = _eval_policy._eval_refusal(expression, task_id, session_info, "browser_console", "browser_console_sensitive_eval")
+    if refusal is not None:
+        return None, _dumps(_err(refusal))
+    current, error = _session.command_session(effective_task_id)
+    if error is not None:
+        return None, _eval_failure_response(error)
+    if current is session_info:
+        return session_info, None
+    refusal = _eval_policy._eval_refusal(expression, task_id, current, "browser_console", "browser_console_sensitive_eval")
+    if refusal is not None:
+        return None, _dumps(_err(refusal))
+    return current, None
+
+
 def _browser_eval(expression: str, task_id: Optional[str] = None) -> str:
     """Evaluate JS in the page context. Private-network guard in two halves: the literal
     pre-scan closes direct fetches (they never update ``location.href``); the post-eval
@@ -1128,14 +1151,9 @@ def _browser_eval(expression: str, task_id: Optional[str] = None) -> str:
             return _dumps(_err(refusal))
         return _camofox_eval(expression, task_id)
 
-    # Resolve the record first. A dead or suspect record is replaced here, and the policy judges the record that
-    # results, so the approval and the command both see the same browser.
-    session_info, error = _session.command_session(effective_task_id)
-    if error is not None:
-        return _eval_failure_response(error)
-    refusal = _eval_policy._eval_refusal(expression, task_id, session_info, "browser_console", "browser_console_sensitive_eval")
+    session_info, refusal = _judged_eval_session(expression, task_id, effective_task_id)
     if refusal is not None:
-        return _dumps(_err(refusal))
+        return refusal
 
     fast = _eval_supervisor_fast_path(effective_task_id, expression, session_info)
     if fast is not None:

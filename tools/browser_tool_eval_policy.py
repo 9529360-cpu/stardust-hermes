@@ -108,7 +108,11 @@ def _restrict_browser_evaluate(task_id: Optional[str] = None, session: Optional[
     # under extension control) keeps the policy even when restrict_evaluate is false. The session that runs the
     # call decides, not the terminal.
     try:
-        return not _cloud._browser_is_local_sidecar(task_id, session) or bool(_cloud._use_real_profile())
+        if session is not None:
+            # The record decides on its own. A local sidecar stays an ordinary local browser even when
+            # browser.use_real_profile is set, because the sidecar never uses the real profile.
+            return not _cloud._browser_is_local_sidecar(task_id, session)
+        return not _cloud._browser_is_local_sidecar(task_id) or bool(_cloud._use_real_profile())
     except Exception:
         return True
 
