@@ -4421,7 +4421,7 @@ export interface RpcMethods {
   'connectors.list': { params: ConnectorsListParams; result: ConnectorsListResult }
   /** The current snapshot of one open operation on an owned session. */
   'connectors.operation.status': { params: ConnectionOperationParams; result: ConnectionOperationStatus }
-  /** Read-only recent cron executions for one profile, newest first. Same profile scope as cron.manage list; allowlisted fields only; limit clamped to 1..50. Cron runs cannot be cancelled after dispatch. */
+  /** Read-only recent cron runs of one profile home, newest first. The profile resolves as in cron.manage list (unknown or deleted: 4064); titles are job ids; allowlisted fields only; limit clamped to 1..50; `scoped` is the profile the request ran under. Cron runs cannot be cancelled after dispatch. */
   'cron.executions.list': { params: CronExecutionsListParams; result: CronExecutionsListResult }
   /** List/add/remove/pause/resume cron jobs in the (optionally profile-scoped) cron store. */
   'cron.manage': { params: CronManageParams; result: CronManageResult }

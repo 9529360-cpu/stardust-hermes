@@ -45,8 +45,9 @@ class CronExecutionsListResult(Result):
 
 
 method("cron.executions.list", params=CronExecutionsListParams, result=CronExecutionsListResult,
-       doc="Read-only recent cron executions for one profile, newest first. Same profile scope as cron.manage list; "
-           "allowlisted fields only; limit clamped to 1..50. Cron runs cannot be cancelled after dispatch.")
+       doc="Read-only recent cron runs of one profile home, newest first. The profile resolves as in cron.manage list "
+           "(unknown or deleted: 4064); titles are job ids; allowlisted fields only; limit clamped to 1..50; "
+           "`scoped` is the profile the request ran under. Cron runs cannot be cancelled after dispatch.")
 method("work.list", params=WorkListParams, result=WorkListResult,
        doc="List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable.")
 method("work.cancel", params=WorkCancelParams, result=WorkCancelResult,

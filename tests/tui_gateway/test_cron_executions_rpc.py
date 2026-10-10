@@ -56,6 +56,7 @@ def test_returns_allowlisted_runs_and_never_writes(server, home):
     item = result["work"][0]
     assert item["id"] == f"cron:{record['id']}"
     assert item["kind"] == "cron" and item["status"] == "running"
+    assert item["title"] == "Cron job job-1"
     assert set(item) <= ALLOWED_ITEM_KEYS
     assert set(item["detail"]) <= ALLOWED_DETAIL_KEYS
     assert executions.list_executions(limit=500) == before
@@ -84,3 +85,28 @@ def test_error_text_is_redacted_before_it_leaves_the_ledger(server, home):
 
     assert work[0]["status"] == "failed"
     assert "sk-proj-12345678901234567890" not in work[0]["detail"]["error"]
+
+
+def test_polled_read_runs_on_the_rpc_pool(server):
+    # The desktop polls this every 5 s, so it is kept off the inline RPC reader, like process.list.
+    assert "cron.executions.list" in server._LONG_HANDLERS
+
+
+def test_the_read_binds_the_home_only_and_never_hydrates_secrets(server, home, monkeypatch):
+    # The desktop polls every 5 s. A secret-scoped resolution would re-hydrate external sources each time.
+    from tui_gateway import model_switch
+
+    def hydrate_forbidden(*args, **kwargs):
+        raise AssertionError("cron.executions.list must not bind secret or terminal scope")
+
+    monkeypatch.setattr(model_switch, "_profile_runtime_scope_tokens", hydrate_forbidden)
+    assert _runs(server)["work"] == []
+
+
+def test_a_deleted_profile_is_refused_like_an_unknown_one(server, home, monkeypatch, tmp_path):
+    from tui_gateway import methods_tools
+
+    monkeypatch.setattr(methods_tools, "_profile_home", lambda profile: tmp_path / "profiles" / profile, raising=False)
+    monkeypatch.setattr("hermes_constants.named_profile_is_deleted", lambda path: True)
+    reply = server._methods["cron.executions.list"](1, {"profile": "coder"})
+    assert reply["error"]["code"] == 4064

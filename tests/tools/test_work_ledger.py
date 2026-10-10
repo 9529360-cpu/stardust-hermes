@@ -19,6 +19,10 @@ def isolated(tmp_path, monkeypatch):
     async_work._reset_for_tests()
 
 
+def _no_job_reads(**kwargs):
+    raise AssertionError("the work ledger must not read the jobs store")
+
+
 def persist(rid, status="running"):
     record = {"delegation_id": rid, "goal": "Research", "dispatched_at": 100.0,
               "status": status, "owner_home": hermes_home_key()}
@@ -91,12 +95,13 @@ def test_cron_execution_history_is_normalized(monkeypatch):
         "id": "exec-running", "job_id": "job-1", "source": "scheduler", "status": "claimed",
         "claimed_at": "2026-10-10T08:02:00+00:00",
     }, {"job_id": "job-1", "status": "failed"}])
-    monkeypatch.setattr("cron.jobs.list_jobs", lambda **kwargs: [{"id": "job-1", "name": "Inbox digest"}])
+    monkeypatch.setattr(executions, "executions_db_exists", lambda: True)
+    monkeypatch.setattr("cron.jobs.list_jobs", _no_job_reads)
 
     records = {row["id"]: row for row in ledger.list_work(include_subagents=False)}
     run = records["cron:exec-1"]
     assert run["kind"] == "cron"
-    assert run["title"] == "Inbox digest"
+    assert run["title"] == "Cron job job-1"
     assert run["status"] == "failed"
     assert run["detail"]["job_id"] == "job-1"
     assert set(run["detail"]) <= {"job_id", "source", "delivery_outcome", "error"}
@@ -112,6 +117,7 @@ def test_unreadable_cron_store_is_logged_and_other_work_still_listed(monkeypatch
     def unreadable(**kwargs):
         raise RuntimeError("cron store corrupted")
 
+    monkeypatch.setattr(executions, "executions_db_exists", lambda: True)
     monkeypatch.setattr(executions, "list_executions", unreadable)
     persist("survivor")
     with caplog.at_level(logging.WARNING, logger="tools.work_ledger"):
@@ -151,3 +157,8 @@ def test_cron_items_follow_the_active_profile_home(tmp_path):
         finally:
             reset_hermes_home_override(token)
         assert [item["detail"]["job_id"] for item in items] == [f"job-{name}"]
+
+
+def test_absent_ledger_is_empty_and_is_not_created(tmp_path):
+    assert ledger.cron_work_items() == []
+    assert not (tmp_path / "cron" / "executions.db").exists()

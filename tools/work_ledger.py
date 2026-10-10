@@ -52,8 +52,9 @@ def subagent_work(record: dict) -> dict:
             "detail": {k: record[k] for k in ("model", "delegation_id", "last_tool", "tool_count") if k in record}}
 
 
-def cron_work(record: dict, *, job_title: str | None = None) -> dict | None:
-    """Normalize one durable cron execution for the internal work ledger."""
+def cron_work(record: dict) -> dict | None:
+    """Normalize one durable cron execution for the internal work ledger. The title is the job id:
+    a stored job name falls back to prompt text, so names never leave the server."""
     execution_id = record.get("id")
     if not execution_id:
         return None
@@ -73,7 +74,7 @@ def cron_work(record: dict, *, job_title: str | None = None) -> dict | None:
     return {
         "id": f"cron:{execution_id}",
         "kind": "cron",
-        "title": str(job_title or f"Cron job {record.get('job_id') or 'run'}"),
+        "title": f"Cron job {record.get('job_id') or 'run'}",
         "status": status,
         "started_at": started,
         "updated_at": updated or started,
@@ -82,22 +83,19 @@ def cron_work(record: dict, *, job_title: str | None = None) -> dict | None:
 
 
 def cron_work_items(limit: int = 100) -> list[dict]:
-    """Recent durable cron executions; an unreadable cron store is logged and skipped."""
-    from cron.executions import list_executions
-    from cron.jobs import list_jobs
+    """Recent durable cron runs of the active profile home, newest first. Reads never create the ledger:
+    an absent executions.db is an empty list, and an unreadable one is logged and also empty.
+    Job names are not read at all, so this does not touch the jobs store."""
+    from cron.executions import executions_db_exists, list_executions
 
+    if not executions_db_exists():
+        return []
     try:
         records = list_executions(limit=limit)
     except Exception:
         logger.warning("Work ledger skipped cron execution history", exc_info=True)
         return []
-    try:
-        titles = {str(job.get("id")): job.get("name") for job in list_jobs(include_disabled=True)}
-    except Exception:
-        # Titles are cosmetic: keep the executions and fall back to the job id.
-        logger.warning("Work ledger could not read cron job names", exc_info=True)
-        titles = {}
-    items = (cron_work(record, job_title=titles.get(str(record.get("job_id")))) for record in records)
+    items = (cron_work(record) for record in records)
     return [item for item in items if item is not None]
 
 
