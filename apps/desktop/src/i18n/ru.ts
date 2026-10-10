@@ -4011,6 +4011,16 @@ export const ru = defineLocale({
         runningPrefixedTool: (prefix, action) => `Выполняется: ${prefix.toLowerCase()} ${action.toLowerCase()}`,
         runningTool: action => `Выполняется: ${action.toLowerCase()}`
       },
+      cron: {
+        preview: 'Предпросмотр cron-задачи',
+        previewWithSchedule: schedule => `Предпросмотр cron-задачи · ${schedule}`,
+        previousSchedule: 'Прежнее расписание',
+        nextRuns: 'Следующие запуски',
+        delivery: 'Доставка',
+        deliveryCurrentChat: 'Текущий чат',
+        deliverySaveOnly: 'Только сохранение',
+        notSaved: 'Не сохранено'
+      },
       titles: {
         browser_click: {
           done: 'Нажат элемент страницы',

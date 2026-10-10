@@ -4037,6 +4037,16 @@ export const zhHant = defineLocale({
         runningPrefixedTool: (prefix, action) => `正在執行${prefix}${action}`,
         runningTool: action => `正在執行 ${action}`
       },
+      cron: {
+        preview: '定時任務預覽',
+        previewWithSchedule: schedule => `定時任務預覽 · ${schedule}`,
+        previousSchedule: '原排程',
+        nextRuns: '下次執行',
+        delivery: '傳遞',
+        deliveryCurrentChat: '當前對話',
+        deliverySaveOnly: '僅儲存',
+        notSaved: '未儲存'
+      },
       titles: {
         browser_click: { done: '已點擊頁面元素', pending: '正在點擊頁面元素', pendingAction: '正在點擊' },
         browser_fill: { done: '已填寫表單欄位', pending: '正在填寫表單欄位', pendingAction: '正在填寫' },

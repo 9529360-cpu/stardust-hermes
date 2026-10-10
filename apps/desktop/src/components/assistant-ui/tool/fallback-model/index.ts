@@ -10,6 +10,7 @@ import { extractToolErrorMessage, formatToolResultSummary } from '@/lib/tool-res
 
 import { skillActivityTitle } from '../skill-activity'
 
+import { cronPreview, cronPreviewDetail, cronPreviewHeadline, cronScalar, isCronTool } from './cron'
 import {
   browserExecStepLabel,
   compactPreview,
@@ -41,7 +42,7 @@ export * from './types'
 // The transcript's render budget prices a turn by the same classification, so
 // it lives in `@/lib/tool-render-class` where both sides can reach it without
 // pulling this module's formatting/i18n weight into the cost path.
-export { CONNECTION_CARD_KEY, isCardTool, isFileEditTool, isSilentTool }
+export { CONNECTION_CARD_KEY, isCardTool, isCronTool, isFileEditTool, isSilentTool }
 
 export interface DiffLineStats {
   added: number
@@ -242,13 +243,15 @@ const PREFIX_META: { icon?: string; labelKey: string; prefix: string; tone: Tool
 ]
 
 function toolMeta(name: string): ToolMeta {
-  if (isToolTitleKey(name)) {
-    const meta = TOOL_META[name]
+  const titleKey = isCronTool(name) ? 'cronjob' : name
+
+  if (isToolTitleKey(titleKey)) {
+    const meta = TOOL_META[titleKey]
 
     return {
-      done: translateNow(`assistant.tool.titles.${name}.done`),
-      pending: translateNow(`assistant.tool.titles.${name}.pending`),
-      pendingAction: translateNow(`assistant.tool.titles.${name}.pendingAction`),
+      done: translateNow(`assistant.tool.titles.${titleKey}.done`),
+      pending: translateNow(`assistant.tool.titles.${titleKey}.pending`),
+      pendingAction: translateNow(`assistant.tool.titles.${titleKey}.pendingAction`),
       icon: meta.icon,
       tone: meta.tone
     }
@@ -872,18 +875,6 @@ function fallbackDetailText(args: unknown, result: unknown): string {
   return formatToolResultSummary(args) || minimalValueSummary(args)
 }
 
-function cronScalar(value: unknown): string {
-  if (typeof value === 'string') {
-    return value.trim()
-  }
-
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value)
-  }
-
-  return ''
-}
-
 function formatCronTime(iso: string): string {
   const ts = Date.parse(iso)
 
@@ -900,6 +891,12 @@ function formatCronTime(iso: string): string {
 }
 
 function cronjobSubtitle(argsRecord: Record<string, unknown>, resultRecord: Record<string, unknown>): string {
+  const headline = cronPreviewHeadline(resultRecord)
+
+  if (headline) {
+    return headline
+  }
+
   const jobs = Array.isArray(resultRecord.jobs) ? resultRecord.jobs : null
 
   if (jobs) {
@@ -920,6 +917,17 @@ function cronjobSubtitle(argsRecord: Record<string, unknown>, resultRecord: Reco
 }
 
 function cronjobDetail(argsRecord: Record<string, unknown>, resultRecord: Record<string, unknown>): string {
+  const preview = cronPreview(resultRecord)
+
+  if (preview) {
+    return cronPreviewDetail(preview)
+  }
+
+  // A refused dry run has no preview to show; its error is already the subtitle.
+  if (resultRecord.dry_run === true) {
+    return ''
+  }
+
   const jobs = Array.isArray(resultRecord.jobs) ? resultRecord.jobs : null
 
   if (jobs) {
@@ -1060,7 +1068,7 @@ function toolSubtitle(
     return firstStringField(resultRecord, ['message', 'error'])
   }
 
-  if (toolName === 'cronjob') {
+  if (isCronTool(toolName)) {
     return cronjobSubtitle(argsRecord, resultRecord)
   }
 
@@ -1187,7 +1195,7 @@ function toolDetailText(
       .replace(/\bDuration\s+S\s*:/gi, 'Duration:')
   }
 
-  if (part.toolName === 'cronjob') {
+  if (isCronTool(part.toolName)) {
     return cronjobDetail(argsRecord, resultRecord)
   }
 
@@ -1445,12 +1453,15 @@ export function buildToolView(part: ToolPart, inlineDiff: string): ToolView {
   // Over-budget memory refusals stay amber — don't claim "Saved".
   const memoryMissed = part.toolName === 'memory' && part.result !== undefined && status !== 'success'
 
+  // A dry-run preview names itself in the title: a collapsed row shows only it.
+  const previewHeadline = isCronTool(part.toolName) ? cronPreviewHeadline(resultRecord) : ''
+
   const baseTitle =
     part.result === undefined
       ? meta.pending
       : memoryMissed
         ? translateNow('assistant.tool.memoryWriteNoted')
-        : meta.done
+        : previewHeadline || meta.done
 
   const titleParts = dynamicTitle(
     part,
