@@ -10,6 +10,7 @@ Symbols that tests patch on ``run_agent.*`` (``OpenAI``, ``get_tool_definitions`
 from __future__ import annotations
 
 import logging
+import math
 import os
 import re
 import sys
@@ -559,7 +560,7 @@ _TURN_STATE: Dict[str, Any] = {
     "_last_activity_ts": lambda: time.time(),
     "_last_activity_desc": "initializing",
     "_last_activity_provenance": ActivityProvenance.UNKNOWN,
-    "_session_activity_last_persist_mono": 0.0,  # rate-limits durable SessionDB stamps
+    "_session_activity_last_persist_mono": -math.inf,  # rate-limits durable SessionDB stamps; -inf = due on any clock
     "_current_tool": None,
     "_api_call_count": 0,
     # Opt-out for the between-turns MCP refresh; set on forks that need byte-identical tools[].

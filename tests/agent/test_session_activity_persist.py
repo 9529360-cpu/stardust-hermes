@@ -1,5 +1,6 @@
 """Durable session activity projection from AIAgent._touch_activity (#72016)."""
 
+import math
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -14,7 +15,7 @@ def _agent_with_db(session_id: str = "sess-1"):
         _last_activity_ts=0.0,
         _last_activity_desc="",
         _last_activity_provenance=ActivityProvenance.UNKNOWN,
-        _session_activity_last_persist_mono=0.0,
+        _session_activity_last_persist_mono=-math.inf,
         _current_tool=None,
         _api_call_count=0,
         max_iterations=10,
@@ -63,6 +64,19 @@ def test_touch_activity_persists_session_activity_once_per_minute(monkeypatch):
     )
 
 
+def test_first_stamp_is_due_on_a_young_monotonic_clock(monkeypatch):
+    """A freshly booted host reads time.monotonic() under the 60s persist interval. The first stamp must still
+    persist: "never persisted" means due now, not "due once the clock has run for a minute" (the old 0.0 sentinel)."""
+    agent = _agent_with_db()
+    del agent._session_activity_last_persist_mono  # never persisted: exercise the production default
+    monkeypatch.setattr(run_agent.time, "time", lambda: 1_700_000_000.0)
+    monkeypatch.setattr(run_agent.time, "monotonic", lambda: 5.0)
+    monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
+
+    agent._touch_activity("starting API call #1")
+    agent._session_db.touch_session_activity.assert_called_once()
+
+
 def test_touch_activity_skips_persist_without_session_db(monkeypatch):
     agent = _agent_with_db()
     agent._session_db = None
@@ -94,7 +108,7 @@ def test_touch_activity_accepts_named_provenance(monkeypatch):
     )
 
     agent._session_db.touch_session_activity.reset_mock()
-    agent._session_activity_last_persist_mono = 0.0
+    agent._session_activity_last_persist_mono = -math.inf
     agent._touch_activity("starting API call #1")
     assert agent._last_activity_provenance is ActivityProvenance.UNKNOWN
     agent._session_db.touch_session_activity.assert_called_once_with(
