@@ -26,6 +26,28 @@ afterEach(() => {
   setCurrentModelSource('')
 })
 
+// A narrow row keeps the model's name in a shorter pill; only the floating composer
+// collapses to a bare chevron.
+describe('ModelPill narrow and compact labels', () => {
+  it('keeps the model name visible in a narrow row, in a shorter pill', () => {
+    $activeSessionId.set('live-1')
+
+    render(<ModelPill disabled={false} model={modelState({ model: 'gpt-6' })} narrow />)
+
+    const pill = screen.getByRole('button')
+    expect(pill.textContent).toMatch(/gpt/i)
+    expect(pill.className).toContain('max-w-24')
+  })
+
+  it('collapses to a bare chevron when compact, as the floating composer does', () => {
+    $activeSessionId.set('live-1')
+
+    render(<ModelPill compact disabled={false} model={modelState({ model: 'gpt-6' })} />)
+
+    expect(screen.getByRole('button').textContent).not.toMatch(/gpt/i)
+  })
+})
+
 // #62055: a manual composer pick is sticky and silently overrides the
 // Settings → Model default for every NEW chat. The pill must say so.
 describe('ModelPill pinned-override badge', () => {
