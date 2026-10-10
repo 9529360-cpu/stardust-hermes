@@ -183,6 +183,22 @@ def _is_local_backend() -> bool:
     return terminal_env("TERMINAL_ENV", "local").strip().lower() in ("local", "")
 
 
+def _browser_is_local_sidecar() -> bool:
+    """True when the browser itself is the ordinary local sidecar, whatever the terminal backend is.
+
+    ``_is_local_backend`` also requires a local terminal, because SSRF protection must assume the browser can
+    reach networks the terminal cannot. The sensitive-data policy asks a different question: does this browser
+    hold the operator's authenticated state? Only the browser's own placement counts here. A CDP override and
+    a cloud provider are never local. Keep this in agreement with ``_is_local_backend``.
+    """
+    _bt = _origin()
+    if _cdp._get_cdp_override_raw():
+        return False
+    if _bt._is_camofox_mode():
+        return True
+    return _get_cloud_provider() is None
+
+
 def _get_browser_engine() -> str:
     """Return the browser engine: ``auto`` (no ``--engine`` flag), ``lightpanda`` or ``chrome``.
 

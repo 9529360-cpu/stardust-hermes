@@ -104,10 +104,10 @@ def _restrict_browser_evaluate() -> bool:
     """
     if _browser_eval_flag("restrict_evaluate"):
         return True
-    # Cloud and real-profile pages may contain authenticated data. Local
-    # sidecars retain the compatibility opt-in behavior.
+    # A browser that holds authenticated state (cloud, attached over CDP, or a real profile) keeps the policy
+    # even when restrict_evaluate is false. Only the browser's own placement counts, not the terminal's.
     try:
-        return not _cloud._is_local_backend() or bool(_cloud._use_real_profile())
+        return not _cloud._browser_is_local_sidecar() or bool(_cloud._use_real_profile())
     except Exception:
         return True
 
@@ -151,11 +151,16 @@ def _enforce_browser_eval_policy(expression: str) -> Optional[str]:
     reason = _risky_browser_eval_reason(expression)
     if not reason:
         return None
-    return ("Blocked: browser_console(expression=...) tried to use sensitive browser "
-            f"JavaScript primitive ({reason}) while browser.restrict_evaluate is "
-            "enabled. Use browser_snapshot/browser_get_images/browser_console "
-            "without expression for normal inspection, or set "
-            "browser.restrict_evaluate: false in config.yaml to allow programmatic evaluation.")
+    if _browser_eval_flag("restrict_evaluate"):
+        return ("Blocked: browser_console(expression=...) tried to use sensitive browser "
+                f"JavaScript primitive ({reason}) while browser.restrict_evaluate is "
+                "enabled. Use browser_snapshot/browser_get_images/browser_console "
+                "without expression for normal inspection. To allow programmatic evaluation, "
+                "set browser.allow_unsafe_evaluate: true in config.yaml.")
+    return ("Needs approval: browser_console(expression=...) uses sensitive browser JavaScript primitive "
+            f"({reason}) in a cloud, attached (CDP override), or real-profile browser session, which can hold "
+            "authenticated data. Approve this call if it is intentional. A local browser session does not "
+            "apply this policy.")
 
 
 def _sensitive_eval_refusal(policy_error: str, tool_name: str, rule_key: str) -> Optional[str]:
