@@ -9,6 +9,12 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
+LOCAL_SESSION = {"session_name": "h_local", "features": {"local": True}}
+CLOUD_SESSION = {
+    "session_name": "h_cloud", "bb_session_id": "bb-1",
+    "cdp_url": "wss://cloud.test/devtools/browser/abc", "features": {},
+}
+
 
 # ── browser_console ──────────────────────────────────────────────────
 
@@ -92,6 +98,7 @@ class TestBrowserConsole:
         fake_key = "ghp_" + "BROWSEREVALSECRET1234567890"
         with patch("tools.browser_tool._last_session_key", return_value="test"), \
              patch("tools.browser_tool._is_camofox_mode", return_value=False), \
+             patch("tools.browser_tool_session.command_session", return_value=(LOCAL_SESSION, None)), \
              patch("tools.browser_tool_session._run_browser_command", return_value={"success": True, "data": {"result": fake_key}}):
             result = json.loads(_browser_eval("document.body.innerText", task_id="test"))
 
@@ -112,41 +119,44 @@ class TestBrowserConsole:
         """Local sidecars keep the compatibility behavior: risky expressions run without the approval gate."""
         from tools.browser_tool import browser_console
 
-        with patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=True), \
-             patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
-             patch("tools.browser_tool._browser_eval", return_value=json.dumps({"success": True, "result": "ok"})) as mock_eval, \
+        with patch("tools.browser_tool._last_session_key", return_value="test"), \
+             patch("tools.browser_tool._is_camofox_mode", return_value=False), \
+             patch("tools.browser_tool_session.command_session", return_value=(LOCAL_SESSION, None)), \
+             patch("tools.browser_tool_session._run_browser_command", return_value={"success": True, "data": {"result": "ok"}}) as run, \
              patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
             for expr in self._RISKY_EXPRESSIONS:
                 result = json.loads(browser_console(expression=expr, task_id="test"))
-                assert result == {"success": True, "result": "ok"}, expr
+                assert result["success"] is True and result["result"] == "ok", expr
 
-        assert mock_eval.call_count == len(self._RISKY_EXPRESSIONS)
+        assert run.call_count == len(self._RISKY_EXPRESSIONS)
         approve.assert_not_called()
 
     def test_cloud_sensitive_eval_is_approval_gated(self):
         from tools.browser_tool import browser_console
 
-        with patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=False), \
-             patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
-             patch("tools.browser_tool._browser_eval", return_value=json.dumps({"success": True, "result": "ok"})) as mock_eval, \
+        with patch("tools.browser_tool._last_session_key", return_value="test"), \
+             patch("tools.browser_tool._is_camofox_mode", return_value=False), \
+             patch("tools.browser_tool_session.command_session", return_value=(CLOUD_SESSION, None)), \
+             patch("tools.browser_tool_session._run_browser_command", return_value={"success": True, "data": {"result": "ok"}}) as run, \
              patch("tools.approval.request_tool_approval", return_value={"approved": True}) as approve:
             for expr in self._RISKY_EXPRESSIONS:
                 result = json.loads(browser_console(expression=expr, task_id="test"))
-                assert result == {"success": True, "result": "ok"}, expr
+                assert result["success"] is True and result["result"] == "ok", expr
 
         assert approve.call_count == len(self._RISKY_EXPRESSIONS)
-        assert mock_eval.call_count == len(self._RISKY_EXPRESSIONS)
+        assert run.call_count == len(self._RISKY_EXPRESSIONS)
 
     def test_sensitive_eval_denial_does_not_execute(self):
         from tools.browser_tool import browser_console
-        with patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=False), \
-             patch("tools.browser_tool_cloud._use_real_profile", return_value=False), \
+        with patch("tools.browser_tool._last_session_key", return_value="test"), \
+             patch("tools.browser_tool._is_camofox_mode", return_value=False), \
+             patch("tools.browser_tool_session.command_session", return_value=(CLOUD_SESSION, None)), \
              patch("tools.approval.request_tool_approval", return_value={"approved": False, "message": "denied"}), \
-             patch("tools.browser_tool._browser_eval") as mock_eval:
+             patch("tools.browser_tool_session._run_browser_command") as run:
             result = json.loads(browser_console(expression="document.cookie", task_id="test"))
         assert result["success"] is False
         assert result["error"] == "denied"
-        mock_eval.assert_not_called()
+        run.assert_not_called()
 
     def test_explicit_restrict_evaluate_is_never_approvable(self):
         """An operator's explicit browser.restrict_evaluate is a hard limit, so no approval can override it."""
@@ -209,6 +219,83 @@ class TestBrowserConsole:
              patch("tools.browser_tool_cloud._browser_is_local_sidecar", return_value=True), \
              patch("tools.browser_tool_cloud._use_real_profile", return_value=False):
             assert _restrict_browser_evaluate() is False
+
+
+class TestEvalJudgesTheRecordItRuns:
+    """A dead or suspect record is replaced when the next command runs. The policy judges the record that results and
+    the command runs on that same record, so an approval always covers the browser that executes."""
+
+    @pytest.fixture(params=["dead", "suspect"])
+    def stale_local_fallback(self, monkeypatch, request):
+        """Task ``test`` holds a stale record that fell back from a cloud session to local Chromium: either it died, or a
+        command timed out and marked it suspect. A cloud provider is configured, so the replacement is a cloud session.
+        Only the teardown and the health probes are stubbed; the replacement logic is the real one."""
+        import tools.browser_tool as bt
+        import tools.browser_tool_cdp as cdp
+        import tools.browser_tool_lifecycle as lifecycle
+        import tools.browser_tool_session as session
+
+        monkeypatch.setenv("TERMINAL_ENV", "local")
+        registry_key = bt._registry_session_key("test")
+        monkeypatch.setitem(bt._active_sessions, registry_key,
+                            {"session_name": "h_stale", "features": {"local": True, "fallback_from_cloud": True}})
+        if request.param == "suspect":
+            monkeypatch.setitem(bt._suspect_browser_sessions, registry_key, "command timed out")
+        else:
+            monkeypatch.setattr(lifecycle, "_session_has_expired", lambda session_info: True)
+
+        def teardown(key):
+            with bt._cleanup_lock:
+                bt._active_sessions.pop(key, None)
+
+        monkeypatch.setattr(lifecycle, "_cleanup_single_browser_session", teardown)
+        monkeypatch.setattr(bt, "_last_session_key", lambda task_id: task_id)
+        monkeypatch.setattr(bt, "_is_camofox_mode", lambda: False)
+        monkeypatch.setattr(lifecycle, "_start_browser_cleanup_thread", lambda: None)
+        monkeypatch.setattr(lifecycle, "_update_session_activity", lambda key: None)
+        monkeypatch.setattr(session, "_browser_command_preflight", lambda: {"browser_cmd": "agent-browser"})
+        monkeypatch.setattr(session, "_create_session_for_key",
+                            lambda task_id, force_local: dict(CLOUD_SESSION))
+        monkeypatch.setattr(cdp, "_ensure_cdp_supervisor", lambda task_id: None)
+        return registry_key
+
+    def test_replacement_that_is_cloud_asks_before_anything_runs(self, monkeypatch, stale_local_fallback):
+        import tools.browser_tool_session as session
+        from tools.browser_tool import browser_console
+
+        asked = []
+        monkeypatch.setattr("tools.approval.request_tool_approval",
+                            lambda tool, reason, **kw: asked.append(kw.get("rule_key")) or {"approved": False, "message": "denied by user"})
+        ran = []
+        monkeypatch.setattr(session, "_spawn_and_collect",
+                            lambda *a, **kw: ran.append(a) or {"success": True, "data": {"result": "cookie=secret"}})
+
+        result = json.loads(browser_console(expression="document.cookie", task_id="test"))
+
+        assert result["success"] is False and result["error"] == "denied by user"
+        assert asked == ["browser_console_sensitive_eval"]
+        assert ran == []
+
+    def test_approved_replacement_runs_on_the_record_that_was_judged(self, monkeypatch, stale_local_fallback):
+        import tools.browser_tool as bt
+        import tools.browser_tool_session as session
+        from tools.browser_tool import browser_console
+
+        monkeypatch.setattr("tools.approval.request_tool_approval", lambda tool, reason, **kw: {"approved": True})
+        ran_on = []
+
+        def spawn(task_id, session_info, cmd_parts, command, engine, timeout):
+            ran_on.append(session_info)
+            return {"success": True, "data": {"result": "ok"}}
+
+        monkeypatch.setattr(session, "_spawn_and_collect", spawn)
+
+        result = json.loads(browser_console(expression="document.cookie", task_id="test"))
+
+        judged = bt._active_sessions[stale_local_fallback]
+        assert result["success"] is True
+        assert judged["session_name"] == "h_cloud"
+        assert len(ran_on) == 1 and ran_on[0] is judged
 
 
 # ── browser_console schema ───────────────────────────────────────────

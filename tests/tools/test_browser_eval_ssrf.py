@@ -32,8 +32,10 @@ METADATA_URL = "http://169.254.169.254/latest/meta-data/"
 @pytest.fixture(autouse=True)
 def _no_camofox(monkeypatch):
     monkeypatch.setattr(browser_tool, "_is_camofox_mode", lambda: False)
-    # No supervisor — force the subprocess fallback path by default.
+    # No supervisor — force the subprocess fallback path by default. The task's record is a local sidecar, so the
+    # sensitive-data policy has nothing to judge and these tests exercise only the SSRF guard.
     monkeypatch.setattr(browser_tool, "_last_session_key", lambda key: key)
+    monkeypatch.setattr(bt_session, "command_session", lambda key: ({"session_name": "h_local", "features": {"local": True}}, None))
 
 
 def _eval(expression, task_id="test"):

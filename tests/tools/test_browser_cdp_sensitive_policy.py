@@ -227,3 +227,52 @@ class TestBrowserLocality:
     def test_session_record_cdp_override_is_sensitive(self, monkeypatch, local_browser, session):
         session({"local": True, "cdp_override": True})
         assert cloud._browser_is_local_sidecar("t") is False
+
+
+class TestBrowserControlIsAttached:
+    """With extension browser control on, a call may be served by the user's own browser, with their logins, so the
+    sensitive-data policy applies whatever the legacy session record says."""
+
+    def test_browser_control_makes_a_local_record_sensitive_for_cdp(self, monkeypatch):
+        monkeypatch.setattr("tools.browser_tool_eval_policy._browser_eval_flag", lambda key: False)
+        monkeypatch.setattr(cloud, "_browser_control_enabled", lambda: True)
+        monkeypatch.setattr(cdp, "_resolve_cdp_endpoint", lambda: pytest.fail("no CDP call without approval"))
+        asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "denied by user"})
+        result = json.loads(cdp.browser_cdp("Network.getAllCookies", task_id="t"))
+        assert "denied by user" in result["error"]
+        assert asked == ["browser_cdp_sensitive:Network.getAllCookies"]
+
+
+class TestFrameRouteJudgesTheRecordItReaches:
+    """A ``frame_id`` call reaches the task's own browser through its CDP supervisor. The policy judges that record,
+    and nothing reaches a supervisor without a verdict on the record it serves."""
+
+    CLOUD_RECORD = {"session_name": "h_cloud", "cdp_url": "wss://cloud.test/devtools/browser/abc", "features": {}}
+
+    @pytest.fixture
+    def own_record(self, monkeypatch):
+        monkeypatch.setattr("tools.browser_tool_eval_policy._browser_eval_flag", lambda key: False)
+        monkeypatch.setattr(cloud._cdp, "_get_cdp_override_raw", lambda: "")
+        monkeypatch.setattr(cloud, "_browser_control_enabled", lambda: False)
+        monkeypatch.setattr(cloud._origin(), "_is_camofox_mode", lambda: False)
+
+        def install(record):
+            monkeypatch.setitem(bt._active_sessions, bt._registry_session_key("t"), record)
+        return install
+
+    def test_cloud_frame_call_asks_before_its_supervisor_runs_it(self, monkeypatch, own_record):
+        own_record(dict(self.CLOUD_RECORD))
+        asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "denied by user"})
+        monkeypatch.setattr(cdp, "_browser_cdp_via_supervisor", lambda **kw: pytest.fail("no frame call without approval"))
+        result = json.loads(cdp.browser_cdp("Runtime.evaluate", {"expression": "document.cookie"},
+                                            frame_id="f1", task_id="t"))
+        assert "denied by user" in result["error"]
+        assert asked == ["browser_cdp_sensitive:Runtime.evaluate"]
+
+    def test_local_frame_call_is_not_asked_and_reaches_no_supervisor(self, monkeypatch, own_record):
+        own_record({"session_name": "h_local", "features": {"local": True}})
+        asked, _ = _record_approvals(monkeypatch, {"approved": False, "message": "must not be asked"})
+        result = json.loads(cdp.browser_cdp("Runtime.evaluate", {"expression": "document.cookie"},
+                                            frame_id="f1", task_id="t"))
+        assert asked == []
+        assert "No CDP supervisor" in result["error"]

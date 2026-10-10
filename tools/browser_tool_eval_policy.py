@@ -5,7 +5,7 @@ Facade-owned state is read through ``_bt`` (``tools.browser_tool``, resolved per
 """
 
 import re
-from typing import Optional
+from typing import Any, Dict, Optional
 from utils import is_truthy_value
 from tools.browser_tool_origin import origin_module as _origin
 from tools import browser_tool_cloud as _cloud
@@ -94,7 +94,7 @@ def _allow_unsafe_browser_evaluate() -> bool:
     return _browser_eval_flag("allow_unsafe_evaluate")
 
 
-def _restrict_browser_evaluate(task_id: Optional[str] = None) -> bool:
+def _restrict_browser_evaluate(task_id: Optional[str] = None, session: Optional[Dict[str, Any]] = None) -> bool:
     """Whether the sensitive-primitive eval denylist is enabled (off by default).
 
     It blocks the *names* of common primitives (``fetch``, ``cookie``, ``querySelector(...input...)``),
@@ -104,10 +104,11 @@ def _restrict_browser_evaluate(task_id: Optional[str] = None) -> bool:
     """
     if _browser_eval_flag("restrict_evaluate"):
         return True
-    # A browser that holds authenticated state (cloud, attached over CDP, or a real profile) keeps the policy
-    # even when restrict_evaluate is false. The session that serves this task decides, not the terminal.
+    # A browser that holds authenticated state (cloud, attached over CDP, a real profile, or the user's own browser
+    # under extension control) keeps the policy even when restrict_evaluate is false. The session that runs the
+    # call decides, not the terminal.
     try:
-        return not _cloud._browser_is_local_sidecar(task_id) or bool(_cloud._use_real_profile())
+        return not _cloud._browser_is_local_sidecar(task_id, session) or bool(_cloud._use_real_profile())
     except Exception:
         return True
 
@@ -143,24 +144,48 @@ def _risky_browser_eval_reason(expression: str) -> Optional[str]:
     return hit or _sensitive_browser_eval_token_reason(expression)
 
 
-def _enforce_browser_eval_policy(expression: str, task_id: Optional[str] = None) -> Optional[str]:
-    """Block sensitive browser JS evaluation when the opt-in denylist is on (opt-in because it gates on
-    primitive *names*; private-address egress is enforced separately in ``_browser_eval``)."""
-    if not _restrict_browser_evaluate(task_id) or _allow_unsafe_browser_evaluate():
+def _blocked_eval_message(reason: str) -> str:
+    return ("Blocked: browser_console(expression=...) tried to use sensitive browser "
+            f"JavaScript primitive ({reason}) while browser.restrict_evaluate is "
+            "enabled. Use browser_snapshot/browser_get_images/browser_console "
+            "without expression for normal inspection. To allow programmatic evaluation, "
+            "set browser.allow_unsafe_evaluate: true in config.yaml.")
+
+
+def _explicit_eval_refusal(expression: str) -> Optional[str]:
+    """The operator's hard limit, decided before any session is touched: an explicit ``browser.restrict_evaluate``
+    refuses sensitive primitives outright, whichever browser would run them, and no approval overrides it. The
+    implicit cloud/real-profile policy depends on the session that runs, so it is judged on that session instead
+    (``_eval_refusal``)."""
+    if not _browser_eval_flag("restrict_evaluate") or _allow_unsafe_browser_evaluate():
+        return None
+    reason = _risky_browser_eval_reason(expression)
+    return _blocked_eval_message(reason) if reason else None
+
+
+def _enforce_browser_eval_policy(expression: str, task_id: Optional[str] = None,
+                                 session: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """Block or flag sensitive browser JS evaluation for the browser ``session`` that will run it. The opt-in
+    denylist is gated on primitive *names*; private-address egress is enforced separately in ``_browser_eval``."""
+    if not _restrict_browser_evaluate(task_id, session) or _allow_unsafe_browser_evaluate():
         return None
     reason = _risky_browser_eval_reason(expression)
     if not reason:
         return None
     if _browser_eval_flag("restrict_evaluate"):
-        return ("Blocked: browser_console(expression=...) tried to use sensitive browser "
-                f"JavaScript primitive ({reason}) while browser.restrict_evaluate is "
-                "enabled. Use browser_snapshot/browser_get_images/browser_console "
-                "without expression for normal inspection. To allow programmatic evaluation, "
-                "set browser.allow_unsafe_evaluate: true in config.yaml.")
+        return _blocked_eval_message(reason)
     return ("Needs approval: browser_console(expression=...) uses sensitive browser JavaScript primitive "
-            f"({reason}) in a cloud, attached (CDP override), or real-profile browser session, which can hold "
-            "authenticated data. Approve this call if it is intentional. A local browser session does not "
-            "apply this policy.")
+            f"({reason}) in a cloud, attached (CDP override), extension-controlled, or real-profile browser session, "
+            "which can hold authenticated data. Approve this call if it is intentional. A local browser session does "
+            "not apply this policy.")
+
+
+def _eval_refusal(expression: str, task_id: Optional[str], session: Optional[Dict[str, Any]],
+                  tool_name: str, rule_key: str) -> Optional[str]:
+    """Why a sensitive expression may not run on ``session``, or ``None`` once it may: no policy applies, or a
+    human approved it for this call."""
+    policy_error = _enforce_browser_eval_policy(expression, task_id, session)
+    return _sensitive_eval_refusal(policy_error, tool_name, rule_key) if policy_error else None
 
 
 def _sensitive_eval_refusal(policy_error: str, tool_name: str, rule_key: str) -> Optional[str]:

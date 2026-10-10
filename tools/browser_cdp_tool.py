@@ -163,17 +163,19 @@ def _cdp_method_is_safe(method: str, params: Dict[str, Any]) -> bool:
     return False
 
 
-def _browser_cdp_sensitive_refusal(method: Any, params: Any, task_id: Optional[str] = None) -> Optional[str]:
+def _browser_cdp_sensitive_refusal(method: Any, params: Any, task_id: Optional[str] = None,
+                                   session: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """Refusal text for a raw CDP call that could reach sensitive browser data, or ``None`` when it may run.
-    Applied once per call, before the call is routed (extension controller) or sent (local CDP)."""
+    Applied once per call, before the call is routed (extension controller) or sent (local CDP). ``session`` is the
+    record of the browser the call reaches, when it reaches one through a session (``frame_id`` routing)."""
     if not isinstance(method, str) or not method:
         return None  # the call itself reports the missing method
     params = params if isinstance(params, dict) else {}
     from tools import browser_tool_eval_policy as policy
     if method in _CDP_EVAL_METHODS:
         source = params.get("expression") or params.get("functionDeclaration") or ""
-        policy_error = policy._enforce_browser_eval_policy(str(source), task_id)
-    elif _cdp_method_is_safe(method, params) or not policy._restrict_browser_evaluate(task_id) \
+        policy_error = policy._enforce_browser_eval_policy(str(source), task_id, session)
+    elif _cdp_method_is_safe(method, params) or not policy._restrict_browser_evaluate(task_id, session) \
             or policy._allow_unsafe_browser_evaluate():
         return None
     elif policy._browser_eval_flag("restrict_evaluate"):
@@ -182,7 +184,7 @@ def _browser_cdp_sensitive_refusal(method: Any, params: Any, task_id: Optional[s
                         "To allow it, set browser.allow_unsafe_evaluate: true in config.yaml.")
     else:
         policy_error = (f"Needs approval: browser_cdp({method}) can reach sensitive browser data in a cloud, "
-                        "attached (CDP override), or real-profile browser session. Approve this call if it is "
+                        "attached (CDP override), extension-controlled, or real-profile browser session. Approve this call if it is "
                         "intentional.")
     if not policy_error:
         return None
@@ -259,17 +261,20 @@ async def _cdp_call(ws_url: str, method: str, params: Dict[str, Any], target_id:
         return msg.get("result", {})
 
 
-def _browser_cdp_via_supervisor(task_id: str, frame_id: str, method: str, params: Optional[Dict[str, Any]],
-                                timeout: float) -> str:
-    """Route a CDP call through the live supervisor session for an OOPIF frame."""
-    try:
-        from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
-    except Exception as exc:  # pragma: no cover — defensive
-        return tool_error(f"CDP supervisor is not available: {exc}. frame_id routing requires a running "
-                          "supervisor attached via /browser connect or an active Browserbase session.")
+def _frame_session(task_id: str) -> Optional[Dict[str, Any]]:
+    """The session record a ``frame_id`` call reaches: the task's own record, the one its CDP supervisor serves. Read
+    here and never replaced, so the policy judges the record the call is sent through."""
+    from tools import browser_tool as bt  # type: ignore[import-not-found]
+    with bt._cleanup_lock:
+        return bt._active_sessions.get(bt._registry_session_key(task_id))
 
-    from tools.browser_tool import _registry_session_key
-    supervisor = SUPERVISOR_REGISTRY.get(_registry_session_key(task_id))
+
+def _browser_cdp_via_supervisor(task_id: str, frame_id: str, method: str, params: Optional[Dict[str, Any]],
+                                timeout: float, session: Optional[Dict[str, Any]] = None) -> str:
+    """Route a CDP call through the live supervisor session for an OOPIF frame. Only the supervisor attached to
+    ``session``, the record the policy judged, serves it."""
+    from tools.browser_tool_cdp import _supervisor_for_session
+    supervisor = _supervisor_for_session(task_id, session)
     if supervisor is None:
         return tool_error(f"No CDP supervisor is attached for task={task_id!r}. Call browser_navigate or "
                           "/browser connect first so the supervisor can attach. Once attached, browser_snapshot "
@@ -317,16 +322,19 @@ def browser_cdp(method: str, params: Optional[Dict[str, Any]] = None, target_id:
     WebSocket instead — the only reliable way to evaluate inside an iframe where fresh per-call connections
     hit signed-URL expiry (Browserbase). Both paths share the same private-page/SSRF guard. Returns JSON
     ``{"success": True, "method", "result"}`` or ``{"error": ...}``."""
-    refusal = _browser_cdp_sensitive_refusal(method, params, task_id)
+    session = _frame_session(task_id or "default") if frame_id else None
+    refusal = _browser_cdp_sensitive_refusal(method, params, task_id, session)
     if refusal:
         return tool_error(refusal, method=method)
     return _browser_cdp_call(method=method, params=params, target_id=target_id, frame_id=frame_id,
-                             timeout=timeout, task_id=task_id)
+                             timeout=timeout, task_id=task_id, session=session)
 
 
 def _browser_cdp_call(method: str, params: Optional[Dict[str, Any]] = None, target_id: Optional[str] = None,
-                      frame_id: Optional[str] = None, timeout: float = 30.0, task_id: Optional[str] = None) -> str:
-    """The raw CDP call once the sensitive-data policy has been applied by ``browser_cdp``."""
+                      frame_id: Optional[str] = None, timeout: float = 30.0, task_id: Optional[str] = None,
+                      session: Optional[Dict[str, Any]] = None) -> str:
+    """The raw CDP call once the sensitive-data policy has been applied by ``browser_cdp``. ``session`` is the record
+    that policy judged for a ``frame_id`` call."""
     effective_task_id = task_id or "default"
 
     if frame_id:
@@ -334,7 +342,7 @@ def _browser_cdp_call(method: str, params: Optional[Dict[str, Any]] = None, targ
         if blocked:
             return blocked
         return _browser_cdp_via_supervisor(task_id=effective_task_id, frame_id=frame_id, method=method,
-                                           params=params, timeout=timeout)
+                                           params=params, timeout=timeout, session=session)
 
     if not method or not isinstance(method, str):
         return tool_error("'method' is required (e.g. 'Target.getTargets')", cdp_docs=CDP_DOCS_URL)
@@ -461,16 +469,18 @@ def _browser_cdp_registered_handler(args: Dict[str, Any], **kw: Any) -> Any:
     is covered as well as local CDP. ``browser_cdp`` is the fallback when routing is off."""
     method = args.get("method", "")
     params = args.get("params")
-    refusal = _browser_cdp_sensitive_refusal(method, params, kw.get("task_id"))
+    task_id = kw.get("task_id")
+    session = _frame_session(task_id or "default") if args.get("frame_id") else None
+    refusal = _browser_cdp_sensitive_refusal(method, params, task_id, session)
     if refusal:
         return tool_error(refusal, method=method)
     return routed_browser_handler(
         "browser_cdp", args,
         fallback=lambda: _browser_cdp_call(
             method=method, params=params, target_id=args.get("target_id"),
-            frame_id=args.get("frame_id"), timeout=args.get("timeout", 30.0), task_id=kw.get("task_id"),
+            frame_id=args.get("frame_id"), timeout=args.get("timeout", 30.0), task_id=task_id, session=session,
         ),
-        task_id=kw.get("task_id"), session_id=kw.get("session_id"),
+        task_id=task_id, session_id=kw.get("session_id"),
     )
 
 

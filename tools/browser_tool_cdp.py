@@ -4,7 +4,7 @@ Split out of ``tools/browser_tool.py``. Facade-owned state is read through ``_bt
 
 import contextlib
 import os
-from typing import Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from agent.proxy_bypass import is_loopback_host, loopback_request_kwargs
 from tools.browser_tool_origin import origin_module as _origin
@@ -121,22 +121,42 @@ def _get_dialog_policy_config() -> Tuple[str, float]:
         return DEFAULT_DIALOG_POLICY, DEFAULT_DIALOG_TIMEOUT_S
 
 
+def _supervisor_cdp_url(session_info: Optional[Dict[str, Any]]) -> str:
+    """The CDP URL a session's supervisor attaches to: the CDP override first, then the session's own ``cdp_url``
+    (cloud providers, e.g. Browserbase). ``""`` when the session has no CDP endpoint, such as a local sidecar."""
+    cdp_url = _get_cdp_override()
+    if cdp_url:
+        return cdp_url
+    maybe = str((session_info or {}).get("cdp_url") or "")
+    return _resolve_cdp_override(maybe) if maybe else ""
+
+
+def _supervisor_for_session(task_id: str, session_info: Optional[Dict[str, Any]]) -> Optional[Any]:
+    """The CDP supervisor attached to exactly this session record's browser, or ``None``.
+
+    Supervisors are keyed by task, not by record. One left over from an earlier record can still be attached to a
+    browser that record no longer names (a cloud session since replaced by a local fallback, say), so it never
+    serves calls judged against this record.
+    """
+    cdp_url = _supervisor_cdp_url(session_info)
+    if not cdp_url:
+        return None
+    from tools.browser_supervisor import SUPERVISOR_REGISTRY  # type: ignore[import-not-found]
+    supervisor = SUPERVISOR_REGISTRY.get(_origin()._registry_session_key(task_id))
+    return supervisor if supervisor is not None and supervisor.cdp_url == cdp_url else None
+
+
 def _ensure_cdp_supervisor(task_id: str) -> None:
     """Start a CDP supervisor for ``task_id`` if an endpoint is reachable.
 
     Idempotent (``get_or_start`` skips an existing ``(task_id, cdp_url)`` and restarts on URL change), so safe on
-    every navigate / ``/browser connect``. URL precedence: the CDP override, then the session's own ``cdp_url``
-    (cloud providers, e.g. Browserbase). Swallows all errors — a failed attach must not break the session;
-    snapshots just lack ``pending_dialogs`` / ``frame_tree``.
+    every navigate / ``/browser connect``. URL precedence: see ``_supervisor_cdp_url``. Swallows all errors — a
+    failed attach must not break the session; snapshots just lack ``pending_dialogs`` / ``frame_tree``.
     """
     _bt = _origin()
-    cdp_url = _get_cdp_override()
-    if not cdp_url:
-        with _bt._cleanup_lock:
-            session_info = _bt._active_sessions.get(_bt._registry_session_key(task_id), {})
-        maybe = str(session_info.get("cdp_url") or "")
-        if maybe:
-            cdp_url = _resolve_cdp_override(maybe)
+    with _bt._cleanup_lock:
+        session_info = _bt._active_sessions.get(_bt._registry_session_key(task_id), {})
+    cdp_url = _supervisor_cdp_url(session_info)
     if not cdp_url:
         return
     try:
