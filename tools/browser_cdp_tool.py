@@ -135,28 +135,42 @@ _METHOD_PARAM_GUARDS = {
                          "Blocked: CDP Runtime.evaluate expression targets a private or internal address ({})."),
 }
 
-# Raw CDP reaches the same page data as browser_console, so the same sensitive-data policy applies:
-# page JavaScript evaluation, and cookie or storage reads that need no JavaScript at all.
+# Raw CDP reaches the same page data as browser_console, and much more: response bodies, cache entries,
+# screenshots, DOM contents. A list of sensitive methods can never be complete, so the policy is default-deny in a
+# restricted session. Only the methods below return no page data and run no page JavaScript. Page JavaScript
+# (Runtime.evaluate, Runtime.callFunctionOn) keeps the expression policy, so benign expressions still run.
 _CDP_EVAL_METHODS = frozenset({"Runtime.evaluate", "Runtime.callFunctionOn"})
-_CDP_SENSITIVE_READ_METHODS = frozenset({
-    "Network.getAllCookies", "Network.getCookies", "Storage.getCookies",
-    "DOMStorage.getDOMStorageItems", "IndexedDB.requestData",
+_CDP_SAFE_METHODS = frozenset({
+    "Browser.getVersion",
+    "Target.getTargets", "Target.attachToTarget", "Target.detachFromTarget", "Target.setDiscoverTargets",
+    "Page.enable", "Page.disable", "Page.navigate", "Page.reload",
+    "Runtime.enable", "Runtime.disable",
+    "DOM.enable", "DOM.disable",
+    "Network.enable", "Network.disable",
 })
 
 
-def _browser_cdp_sensitive_refusal(method: str, params: Dict[str, Any]) -> Optional[str]:
-    """Refusal for a raw CDP call that reaches sensitive page data without the browser_console policy."""
+def _browser_cdp_sensitive_refusal(method: Any, params: Any) -> Optional[str]:
+    """Refusal text for a raw CDP call that could reach sensitive browser data, or ``None`` when it may run.
+    Applied once per call, before the call is routed (extension controller) or sent (local CDP)."""
+    if not isinstance(method, str) or not method:
+        return None  # the call itself reports the missing method
+    params = params if isinstance(params, dict) else {}
     from tools import browser_tool_eval_policy as policy
     if method in _CDP_EVAL_METHODS:
         source = params.get("expression") or params.get("functionDeclaration") or ""
         policy_error = policy._enforce_browser_eval_policy(str(source))
-    elif method in _CDP_SENSITIVE_READ_METHODS and policy._restrict_browser_evaluate() \
-            and not policy._allow_unsafe_browser_evaluate():
-        policy_error = (f"Blocked: browser_cdp({method}) reads cookies or storage while the sensitive-data "
-                        "policy is active (browser.restrict_evaluate, or a cloud or real-profile session). "
-                        "Use browser_snapshot for normal inspection.")
-    else:
+    elif method in _CDP_SAFE_METHODS or not policy._restrict_browser_evaluate() \
+            or policy._allow_unsafe_browser_evaluate():
         return None
+    elif policy._browser_eval_flag("restrict_evaluate"):
+        policy_error = (f"Blocked: browser_cdp({method}) can reach sensitive browser data while "
+                        "browser.restrict_evaluate is enabled. Use browser_snapshot for normal inspection. "
+                        "To allow it, set browser.allow_unsafe_evaluate: true in config.yaml.")
+    else:
+        policy_error = (f"Needs approval: browser_cdp({method}) can reach sensitive browser data in a cloud, "
+                        "attached (CDP override), or real-profile browser session. Approve this call if it is "
+                        "intentional.")
     if not policy_error:
         return None
     return policy._sensitive_eval_refusal(policy_error, "browser_cdp", f"browser_cdp_sensitive:{method}")
@@ -290,12 +304,17 @@ def browser_cdp(method: str, params: Optional[Dict[str, Any]] = None, target_id:
     WebSocket instead — the only reliable way to evaluate inside an iframe where fresh per-call connections
     hit signed-URL expiry (Browserbase). Both paths share the same private-page/SSRF guard. Returns JSON
     ``{"success": True, "method", "result"}`` or ``{"error": ...}``."""
-    effective_task_id = task_id or "default"
+    refusal = _browser_cdp_sensitive_refusal(method, params)
+    if refusal:
+        return tool_error(refusal, method=method)
+    return _browser_cdp_call(method=method, params=params, target_id=target_id, frame_id=frame_id,
+                             timeout=timeout, task_id=task_id)
 
-    if isinstance(method, str) and method:
-        refusal = _browser_cdp_sensitive_refusal(method, params if isinstance(params, dict) else {})
-        if refusal:
-            return tool_error(refusal, method=method)
+
+def _browser_cdp_call(method: str, params: Optional[Dict[str, Any]] = None, target_id: Optional[str] = None,
+                      frame_id: Optional[str] = None, timeout: float = 30.0, task_id: Optional[str] = None) -> str:
+    """The raw CDP call once the sensitive-data policy has been applied by ``browser_cdp``."""
+    effective_task_id = task_id or "default"
 
     if frame_id:
         blocked = _browser_cdp_private_guard(task_id=effective_task_id, method=method, params=params or {})
@@ -424,18 +443,29 @@ def _browser_cdp_check() -> bool:
     return bool(check_browser_requirements() and _get_cdp_override_raw())
 
 
+def _browser_cdp_registered_handler(args: Dict[str, Any], **kw: Any) -> Any:
+    """Registry entry point. The sensitive-data policy runs once, before routing, so the extension-controller path
+    is covered as well as local CDP. ``browser_cdp`` is the fallback when routing is off."""
+    method = args.get("method", "")
+    params = args.get("params")
+    refusal = _browser_cdp_sensitive_refusal(method, params)
+    if refusal:
+        return tool_error(refusal, method=method)
+    return routed_browser_handler(
+        "browser_cdp", args,
+        fallback=lambda: _browser_cdp_call(
+            method=method, params=params, target_id=args.get("target_id"),
+            frame_id=args.get("frame_id"), timeout=args.get("timeout", 30.0), task_id=kw.get("task_id"),
+        ),
+        task_id=kw.get("task_id"), session_id=kw.get("session_id"),
+    )
+
+
 registry.register(
     name="browser_cdp",
     toolset="browser-cdp",
     schema=BROWSER_CDP_SCHEMA,
-    handler=lambda args, **kw: routed_browser_handler(
-        "browser_cdp", args,
-        fallback=lambda: browser_cdp(
-            method=args.get("method", ""), params=args.get("params"), target_id=args.get("target_id"),
-            frame_id=args.get("frame_id"), timeout=args.get("timeout", 30.0), task_id=kw.get("task_id"),
-        ),
-        task_id=kw.get("task_id"), session_id=kw.get("session_id"),
-    ),
+    handler=_browser_cdp_registered_handler,
     check_fn=_browser_cdp_check,
     emoji="🧪",
 )
