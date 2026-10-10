@@ -504,6 +504,8 @@ ctx.os.openExternal(url)                   // OS default handler (browser, mail,
 ctx.os.revealPath(path)                    // reveal in Finder / Explorer → Promise<boolean>
 ctx.os.writeClipboard(text)                // system clipboard → Promise<boolean>
 host.navigate('/route')                    // hash-route navigation
+host.fillComposer(text)                    // put text in the active composer WITHOUT sending it
+                                           //   (its own block under any draft; the composer focuses)
 host.openSession(id, { profile?, intent? }) // open a stored session core-style;
                                            //   profile: soft-swap to that profile's backend first
                                            //   intent: 'in-place' (default) | 'stack' | 'tab' | 'window'

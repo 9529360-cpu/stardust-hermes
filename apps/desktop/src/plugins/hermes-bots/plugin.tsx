@@ -76,6 +76,7 @@ import {
   selectedRosterBot,
   sessionOwnsWorkspace
 } from './roster-pane'
+import { RoutinesTabLabel } from './routines-tab'
 import { botRosterMeta, botWorkspaceOwnerKey, setBotsWorkspaceOwner } from './routing'
 import { startHideSweepScheduler } from './session-sweep'
 import { bumpBotOpenGeneration, getBotOpenGeneration, ID, setPluginCtx } from './shared'
@@ -415,7 +416,9 @@ export default {
           // arrives as the right edge's vertical tab and takes no width off the
           // chat until the user opens it.
           defaultCollapsed: true,
-          width: '250px'
+          width: '250px',
+          // The rail is 28px of vertical text; the label is an icon there.
+          tabTitle: () => <RoutinesTabLabel />
         },
         render: () => <RoutinesPane />
       })

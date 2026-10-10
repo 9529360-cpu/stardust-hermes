@@ -143,8 +143,13 @@ type BotsMessages = {
     openChatFailedTitle: (botName: string) => string
     openChatFailedMessage: string
     openGateways: string
-    /** Stands under the bot's name in a chat it has not spoken in yet. */
+    /** Greeting under the bot's name in a chat it has not spoken in yet. */
     chatEmpty: string
+    /** Starter prompts under the greeting. Clicking one fills the composer; it is
+     *  never sent, so the user reads it and decides. */
+    starterIntro: string
+    starterPlan: string
+    starterSteps: string
     /** First line of a brand-new bot's forever-chat — see `kickoffText`. */
     kickoff: string
   }
@@ -416,7 +421,10 @@ const en: BotsMessages = {
     openChatFailedTitle: botName => `Could not open ${botName}’s chat`,
     openChatFailedMessage: 'Try again.',
     openGateways: 'Open Gateways',
-    chatEmpty: 'Say something to get started.',
+    chatEmpty: 'What can I help you with?',
+    starterIntro: 'Introduce yourself and what you are best at',
+    starterPlan: 'Help me plan my day',
+    starterSteps: 'Help me break a task into clear steps',
     kickoff: 'Hey, tell me about yourself!'
   },
   avatar: {
@@ -678,7 +686,10 @@ const ja: BotsMessages = {
     openChatFailedTitle: botName => `${botName} のチャットを開けませんでした`,
     openChatFailedMessage: 'もう一度お試しください。',
     openGateways: 'ゲートウェイを開く',
-    chatEmpty: '何か書いて始めましょう。',
+    chatEmpty: '何をお手伝いしましょうか？',
+    starterIntro: '自己紹介と、得意なことを教えてください',
+    starterPlan: '今日やることの計画を手伝ってください',
+    starterSteps: '一つの作業を分かりやすいステップに分けてください',
     kickoff: 'こんにちは、自己紹介をしてください！'
   },
   avatar: {
@@ -936,7 +947,10 @@ const zh: BotsMessages = {
     openChatFailedTitle: botName => `无法打开 ${botName} 的聊天`,
     openChatFailedMessage: '请重试。',
     openGateways: '打开网关',
-    chatEmpty: '说点什么开始吧。',
+    chatEmpty: '想让我帮你做点什么？',
+    starterIntro: '介绍一下你自己，以及你最擅长什么',
+    starterPlan: '帮我规划一下今天要做的事',
+    starterSteps: '帮我把一件任务拆成清晰的步骤',
     kickoff: '你好，介绍一下你自己吧！'
   },
   avatar: {
@@ -1193,7 +1207,10 @@ const zhHant: BotsMessages = {
     openChatFailedTitle: botName => `無法開啟 ${botName} 的聊天`,
     openChatFailedMessage: '請再試一次。',
     openGateways: '開啟閘道',
-    chatEmpty: '說點什麼開始吧。',
+    chatEmpty: '想讓我幫你做點什麼？',
+    starterIntro: '介紹一下你自己，以及你最擅長什麼',
+    starterPlan: '幫我規劃一下今天要做的事',
+    starterSteps: '幫我把一件任務拆成清楚的步驟',
     kickoff: '你好，介紹一下你自己吧！'
   },
   avatar: {

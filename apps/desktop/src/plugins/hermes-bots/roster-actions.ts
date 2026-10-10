@@ -12,7 +12,14 @@ import { ackStoredSessionId, atom, haptic, host, markSessionUnreadFinished } fro
 
 import { $botOpenPending, $openBotChat, $selectedBot, rosterWatermarks, saveSelectedRosterBot } from './bot-state'
 import { CANONICAL_CHAT_TITLE, notifyBotOpenFailure, openBotCanonicalChat, prepareBotSource } from './canonical-chat'
-import { $botMeta, botActivitySession, botRosterKey, botSelectionKey, newBotChat } from './data'
+import {
+  $botMeta,
+  botActivitySession,
+  botRosterKey,
+  botSelectionKey,
+  newBotChat,
+  recordOpenedCanonicalChat
+} from './data'
 import { $groupChats, $groupChatWorkspace } from './group-chat'
 import { openGroupChat } from './group-chat-view'
 import { liveGroupChatNames } from './group-membership'
@@ -298,6 +305,10 @@ async function openRosterBotChat(bot: RosterRow, generation: number): Promise<bo
     }
 
     if (opened) {
+      // The roster row must learn the registry row this open just resolved, or
+      // the bot reads as chatless everywhere that snapshot is consulted (see
+      // recordOpenedCanonicalChat).
+      recordOpenedCanonicalChat(key, opened)
       // This is not an identity preference: opening already completed through
       // the name registry. Keep only enough ephemeral state to release the
       // claim if another tab later claims the center. Track BOTH identities —

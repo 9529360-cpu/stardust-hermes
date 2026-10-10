@@ -22,6 +22,7 @@ import { atom, computed, type ReadableAtom } from 'nanostores'
 import type { ReactNode } from 'react'
 
 import { capabilityScoped } from '@/api/client'
+import { requestComposerFocus, requestComposerInsert } from '@/app/chat/composer/focus'
 import { PRIMARY_SESSION_VIEW } from '@/app/chat/session-view'
 import { openSession, type OpenSessionIntent } from '@/app/open-session'
 import { $workspaceIsPage } from '@/app/routes'
@@ -669,6 +670,14 @@ export const host = {
   /** Navigate the app router (hash routes, e.g. '/command-center?section=system'). */
   navigate: (path: string) => {
     window.location.hash = path.startsWith('#') ? path : `#${path}`
+  },
+
+  /** Put text into the active composer WITHOUT sending it. It lands as its own
+   *  block under whatever the user already typed, and the composer takes focus,
+   *  so the user reads it and presses send themselves. */
+  fillComposer: (text: string): void => {
+    requestComposerInsert(text, { mode: 'block' })
+    requestComposerFocus()
   },
 
   /** Pre-dial a profile's gateway socket in the background — pool-only, no
