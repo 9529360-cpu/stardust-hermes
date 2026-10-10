@@ -444,7 +444,7 @@ class MemoryStore:
             return _error("old_text cannot be empty.")
         return self._edit(target, old_text.strip(), None)
 
-    def remove_exact(self, target: str, entry: str) -> Dict[str, Any]:
+    def remove_exact(self, target: str, entry: str, *, expected_index: int | None = None) -> Dict[str, Any]:
         """Remove one exact entry while preserving the raw bytes of every other entry."""
         if not entry:
             return _error("entry cannot be empty.")
@@ -468,6 +468,11 @@ class MemoryStore:
                 return _read_failed_error(path)
             normalized_raw = raw.replace("\r\n", "\n").replace("\r", "\n")
             entries = self._parse_entries(normalized_raw)
+            # Check selectors before drift detection (which may create a backup).
+            # Stale selections must cause zero writes, including auxiliary files.
+            matches = [i for i, current in enumerate(entries) if current == entry]
+            if len(matches) != 1 or (expected_index is not None and matches[0] != expected_index):
+                return _error("Selected memory entry is stale or ambiguous; reload the list and retry.")
             if normalized_raw != ENTRY_DELIMITER.join(entries):
                 backup = self._detect_external_drift(target, normalized_raw)
                 return _drift_error(path, backup or "(snapshot unavailable)")
@@ -488,9 +493,6 @@ class MemoryStore:
                 return _drift_error(path, backup or "(snapshot unavailable)")
             if len(entries) != len(set(entries)):
                 return _error("Memory entries are duplicated on disk; resolve duplicates before deleting one.")
-            matches = [index for index, current in enumerate(entries) if current == entry]
-            if len(matches) != 1:
-                return _error("Selected memory entry is stale or ambiguous; reload the list and retry.")
             index = matches[0]
             remaining = entries[:index] + entries[index + 1:]
             remaining_bytes = raw_entry_bytes[:index] + raw_entry_bytes[index + 1:]
@@ -502,6 +504,14 @@ class MemoryStore:
             except OSError as exc:
                 raise RuntimeError(f"Failed to write memory file {path}: {exc}") from exc
             return self._success_response(target, "Entry removed.")
+
+    def remove_index(self, target: str, index: int, expected_text: str) -> Dict[str, Any]:
+        """Validate index AND exact selected text under the byte-preserving delete lock."""
+        if target not in {"memory", "user"}:
+            return _error("target must be memory or user")
+        if type(index) is not int or index < 0:
+            return _error("index must be a non-negative integer")
+        return self.remove_exact(target, expected_text, expected_index=index)
 
     def _edit(self, target: str, old_text: str, new_content: Optional[str]) -> Dict[str, Any]:
         """Locked replace (``new_content`` set) or remove (None) of the entry matching *old_text*."""

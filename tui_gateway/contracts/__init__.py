@@ -9,6 +9,7 @@ from . import (  # noqa: F401
     events,
     groups_bot_relay,
     liveness,
+    memory,
     profiles_vault_complete_foreign_subagents,
     projects_pets,
     prompt_voice,
@@ -16,6 +17,7 @@ from . import (  # noqa: F401
     sessions,
     tools_commands,
     tools_mcp_plugins,
+    work,
 )
 from .base import JsonValue, Params, Payload, Result, WireEnum
 from .registry import EVENTS, METHODS, SERVER_REQUESTS

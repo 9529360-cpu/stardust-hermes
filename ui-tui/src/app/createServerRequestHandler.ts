@@ -73,8 +73,9 @@ export function createServerRequestHandler(ctx: ServerRequestHandlerContext): (r
       case 'approval': {
         patchOverlayState({
           approval: {
-            // Only an explicit false (tirith warning) drops the permanent-allow option.
+            // Scope flags constrain fallback options; explicit choices are also intersected with them.
             allowPermanent: p.allow_permanent !== false,
+            allowSession: p.allow_session !== false,
             choices: strList(p.choices) ?? undefined,
             command: str(p.command),
             description: str(p.description) || 'dangerous command',

@@ -55,7 +55,15 @@ const MODIFIER_CODES = new Set([
 // Modifier names as reported by `event.key` on a bare modifier keydown.
 const MODIFIER_KEYS = new Set(['Alt', 'Control', 'Meta', 'Shift'])
 
-function baseKeyFromCode(code: string): string | null {
+function baseKeyFromCode(code: string | undefined): string | null {
+  // Browser KeyboardEvents normally expose `code`, but synthetic events from
+  // embedded surfaces and older WebViews may omit it. A malformed keydown
+  // must be ignored rather than taking down the renderer while dispatching
+  // global shortcuts.
+  if (!code) {
+    return null
+  }
+
   if (code.startsWith('Key')) {
     return code.slice(3).toLowerCase()
   }

@@ -387,6 +387,8 @@ export interface MockBackendOptions {
  */
 export interface MockBackendOptions {
   mockServer?: MockServerOptions
+  /** Runs before the app launches, so a scenario can seed the sandbox's Hermes home (cron jobs, past runs). */
+  seedSandbox?: (sandbox: Sandbox) => void
 }
 
 export async function setupMockBackend(options: MockBackendOptions = {}): Promise<MockBackendFixture> {
@@ -403,6 +405,7 @@ export async function setupMockBackend(options: MockBackendOptions = {}): Promis
     options.modelContextLength,
   )
   writeEnvFile(sandbox.hermesHome)
+  options.seedSandbox?.(sandbox)
 
   // 3. Build env + launch
   const env = buildAppEnv(sandbox)

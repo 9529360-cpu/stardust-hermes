@@ -185,10 +185,14 @@ export function isTaskCenterNeedsAttention(
     (task.status === 'waiting' && (task.rail === 'approval' || task.rail === 'session'))
 
   const failedTest = task.testResult?.status === 'failed'
-  const failedOrPendingChecks = pullRequestChecks === 'failed' || pullRequestChecks === 'pending'
-  const cronSuggestion = task.action === 'review-cron-suggestion'
 
-  return needsInput || failedTest || failedOrPendingChecks || cronSuggestion
+  const failedOrPendingChecks =
+    pullRequestChecks === 'failed' || pullRequestChecks === 'pending' || pullRequestChecks === 'unavailable'
+
+  const cronSuggestion = task.action === 'review-cron-suggestion'
+  const failedTask = task.status === 'error' || task.status === 'interrupted'
+
+  return needsInput || failedTest || failedOrPendingChecks || cronSuggestion || failedTask
 }
 
 /** Filter the canonical projection without changing task ownership or order. */

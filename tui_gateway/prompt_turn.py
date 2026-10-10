@@ -737,7 +737,8 @@ def _complete_turn_payload(session: dict, st: _TurnRun, status_note: str | None,
         else:
             _clear_inflight_turn(session)
     if status == "error":
-        payload["error"] = str(error_value or raw)
+        from agent.redact import redact_sensitive_text
+        payload["error"] = redact_sensitive_text(str(error_value or raw), force=True)
         payload["recoverable"] = True
         if _error_surface:
             payload["error_surface"] = _error_surface
@@ -746,7 +747,7 @@ def _complete_turn_payload(session: dict, st: _TurnRun, status_note: str | None,
         st.terminal_callback({
             "status": {"interrupted": "cancelled", "error": "failed"}.get(status, "settled"),
             "text": raw if isinstance(raw, str) else str(raw),
-            **({"error": str(error_value or raw)} if status == "error" else {})})
+            **({"error": redact_sensitive_text(str(error_value or raw), force=True)} if status == "error" else {})})
         st.receipt_committed = True
     if st.receipt_committed:
         _retire_turn_marker(session, st.marker_key)
@@ -767,9 +768,10 @@ def _recover_turn_exception(sid: str, session: dict, st: _TurnRun, e: BaseExcept
     # A finalizer exception can leave in-memory history at the turn-start snapshot.
     _restore_agent_history_after_turn_error(session, st.agent)
     if st.terminal_callback is not None and not st.receipt_attempted:
+        from agent.redact import redact_sensitive_text
         st.receipt_attempted = True
         try:
-            st.terminal_callback({"status": "failed", "text": "", "error": str(e)})
+            st.terminal_callback({"status": "failed", "text": "", "error": redact_sensitive_text(str(e), force=True)})
             st.receipt_committed = True
         except Exception:
             logger.exception("hosted room terminal receipt commit failed")
@@ -779,10 +781,11 @@ def _recover_turn_exception(sid: str, session: dict, st: _TurnRun, e: BaseExcept
         st.error_retained = True
         st.error_detail = _turn_failure_detail(e, type(e).__name__, st.prompt_text)
     except Exception as emit_exc:
+        from agent.redact import redact_sensitive_text
         print(
             f"[gateway-turn] terminal error emit failed: {type(emit_exc).__name__}: {emit_exc}",
             file=sys.stderr, flush=True)
-        _emit("error", sid, {"message": str(e)})
+        _emit("error", sid, {"message": redact_sensitive_text(str(e), force=True)})
 
 
 def _finish_turn(sid: str, session: dict, st: _TurnRun) -> None:

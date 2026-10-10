@@ -1,3 +1,4 @@
+import type { WorkItem } from '@hermes/shared'
 import { useState } from 'react'
 
 import { SubagentRow } from '@/app/agents'
@@ -14,12 +15,14 @@ import { SubagentControls } from './subagent-controls'
 import { SubagentTranscript } from './subagent-transcript'
 
 interface SubagentSectionProps {
+  /** Running background cron runs for this profile (read-only); shown below the subagent rows. */
+  cronRuns?: WorkItem[]
   sessionId: string
   defaultCollapsed?: boolean
 }
 
 /** A composer-local roster: never borrow the global Agents panel's scope. */
-export function SubagentSection({ sessionId, defaultCollapsed = true }: SubagentSectionProps) {
+export function SubagentSection({ cronRuns = [], sessionId, defaultCollapsed = true }: SubagentSectionProps) {
   const { t } = useI18n()
   const items = useSessionSlice($subagentsBySession, sessionId)
   const live = items.filter(item => item.status === 'running' || item.status === 'queued')
@@ -27,10 +30,11 @@ export function SubagentSection({ sessionId, defaultCollapsed = true }: Subagent
   const [selected, setSelected] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const hasLive = live.length > 0
+  const hasRuns = cronRuns.length > 0
 
   useViewedInterval(() => setNowMs(Date.now()), 1000, hasLive)
 
-  if (!hasLive) {
+  if (!hasLive && !hasRuns) {
     return null
   }
 
@@ -60,6 +64,17 @@ export function SubagentSection({ sessionId, defaultCollapsed = true }: Subagent
     </button>
   )
 
+  // Read-only: a cron run has no steer or stop control, because cron runs are not cancellable after dispatch.
+  const cronRow = (run: WorkItem) => (
+    <div className="flex w-full min-w-0 items-start gap-2 px-2 py-1" data-slot="composer-cron-run" key={run.id}>
+      <GlyphSpinner ariaLabel={t.agents.running} className="mt-0.5 shrink-0 text-(--ui-purple)" spinner="braille" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs text-(--ui-text-primary)">{run.title}</span>
+        <span className="block truncate text-[0.68rem] text-(--ui-text-tertiary)">{t.statusStack.cronRun}</span>
+      </span>
+    </div>
+  )
+
   const detail = live.find(item => item.id === selected)
 
   return (
@@ -67,16 +82,19 @@ export function SubagentSection({ sessionId, defaultCollapsed = true }: Subagent
       <StatusSection
         collapsedIndicator={
           <GlyphSpinner
-            ariaLabel={live.some(item => item.status === 'running') ? t.agents.running : t.agents.queued}
+            ariaLabel={hasRuns || live.some(item => item.status === 'running') ? t.agents.running : t.agents.queued}
             className="text-(--ui-purple)"
             spinner="braille"
           />
         }
         defaultCollapsed={defaultCollapsed}
         icon={<Codicon className="text-(--ui-purple)" name="agent" size="0.8rem" />}
-        label={t.statusStack.subagents(live.length)}
+        label={hasRuns ? t.statusStack.background(live.length + cronRuns.length) : t.statusStack.subagents(live.length)}
       >
-        <div className="max-h-[25vh] overflow-y-auto overscroll-contain">{live.map(row)}</div>
+        <div className="max-h-[25vh] overflow-y-auto overscroll-contain">
+          {live.map(row)}
+          {cronRuns.map(cronRow)}
+        </div>
         {detail && (
           <div
             className="max-h-[25vh] overflow-y-auto overscroll-contain px-3 py-2"

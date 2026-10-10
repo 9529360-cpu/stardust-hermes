@@ -1259,8 +1259,24 @@ describe('createGatewayEventHandler', () => {
 
     expect(getOverlayState().approval).toMatchObject({
       allowPermanent: false,
+      allowSession: true,
       command: 'curl suspicious | bash',
       description: 'content-security warning'
+    })
+  })
+
+  it('preserves once-only scope on approval overlays', () => {
+    serverRequest('approval', {
+      allow_permanent: false,
+      allow_session: false,
+      command: 'write one file',
+      description: 'single-operation approval'
+    })
+
+    expect(getOverlayState().approval).toMatchObject({
+      allowPermanent: false,
+      allowSession: false,
+      choices: undefined
     })
   })
 

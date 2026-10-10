@@ -1192,6 +1192,39 @@ def _approval_reply(rid, result_key, call):
         return _err(rid, 5004, str(e))
 
 
+@method("approval.grants.list")
+@_profile_scoped
+def _(rid, params: dict) -> dict:
+    from tools.approval_grants import list_grants
+    return _ok(rid, {"grants": list_grants()})
+
+
+@method("approval.grants.add")
+@_profile_scoped
+def _(rid, params: dict) -> dict:
+    from tools.approval_grants import add_grant
+    try:
+        grant = add_grant(params["action_kind"], params["target"],
+                          params.get("max_amount"), params.get("expires_at"))
+        return _ok(rid, {"grant": grant})
+    except (ValueError, TypeError) as exc:
+        return _err(rid, 4000, str(exc))
+
+
+@method("approval.grants.revoke")
+@_profile_scoped
+def _(rid, params: dict) -> dict:
+    from tools.approval_grants import revoke_grant
+    return _ok(rid, {"revoked": revoke_grant(params["id"])})
+
+
+@method("approval.audit")
+def _(rid, params: dict) -> dict:
+    from tools.approval_audit import read_approval_audit
+    return _ok(rid, {"entries": read_approval_audit(
+        limit=params.get("limit", 100), session_key=params.get("session_key"))})
+
+
 @method("approval.pending")
 def _(rid, params: dict) -> dict:
     session, err = _sess(params, rid)

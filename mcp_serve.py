@@ -622,7 +622,8 @@ class _ToolHandlers:
             return json.dumps({"error": "Both target and message are required"})
         try:
             from tools.send_message_tool import send_message_tool
-            return send_message_tool({"action": "send", "target": target, "message": message})
+            return send_message_tool({"action": "send", "target": target, "message": message},
+                                     require_approval=True)
         except ImportError:
             return json.dumps({"error": "Send message tool not available"})
         except Exception as e:

@@ -432,6 +432,8 @@ def _emit_terminal_turn_error(
         turn = session.get("inflight_turn") or {}
         message, partial = str(turn.get("error") or "turn failed"), str(turn.get("assistant") or "")
         cols = int(session.get("cols", 80))
+    from agent.redact import redact_sensitive_text
+    message = redact_sensitive_text(message, force=True)
     text = partial or turn_error_text(message, error_surface)
     rendered = ""
     with contextlib.suppress(Exception):
