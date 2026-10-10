@@ -111,10 +111,10 @@ function isContributedPath(pathname: string): boolean {
   return contributedRoutes().some(route => route.path === pathname)
 }
 
-// ── Contributed sidebar nav — the `sidebar.nav` registry area ────────────────
-// A DATA contribution adds a row to the sidebar's top nav (below Artifacts).
-// Pair with a ROUTES_AREA page: the row navigates to `path` and lights up
-// while the app is there.
+// ── Contributed sidebar nav compatibility area ─────────────────────────────
+// Retained so existing plugins and SDK consumers keep a stable contract. The
+// compact personal sidebar intentionally does not render arbitrary contributed
+// rows; new plugin pages should expose palette/keybind navigation instead.
 
 export const SIDEBAR_NAV_AREA = 'sidebar.nav'
 
@@ -134,7 +134,6 @@ export const OVERLAY_VIEWS: ReadonlySet<AppView> = new Set([
   'session-import',
   'agents',
   'command-center',
-  'cron',
   'profiles',
   'settings',
   'starmap',
@@ -219,7 +218,7 @@ export function appViewForPath(pathname: string): AppView {
 }
 
 /** Does `to` land on a full page rendered INSIDE the workspace pane
- *  (skills/messaging/artifacts/contributed routes)? Overlays don't count —
+ *  (skills/messaging/artifacts/cron/contributed routes)? Overlays don't count —
  *  they float over whatever the workspace is already showing. */
 function isWorkspacePageRoute(to: string): boolean {
   const view = appViewForPath(to)
@@ -228,7 +227,7 @@ function isWorkspacePageRoute(to: string): boolean {
 }
 
 /** True while the workspace pane shows a FULL PAGE (skills/messaging/
- *  artifacts/plugin routes) instead of the chat. Published by the wiring
+ *  artifacts/cron/plugin routes) instead of the chat. Published by the wiring
  *  (which owns the router location); the workspace pane contribution mirrors
  *  it as `headerVeto` so the zone tab bar stands down on pages. Overlays
  *  (settings/…) don't count — the chat stays beneath them. */

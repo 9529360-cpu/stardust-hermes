@@ -1,11 +1,22 @@
-# cron/ (+ kanban) — scheduled jobs and the multi-agent work queue
+# cron/ — scheduled jobs
 
 Applies on top of the root `AGENTS.md`. Long-form: `website/docs/developer-guide/cron-internals.md`;
-user docs `website/docs/user-guide/features/cron.md`, `kanban.md`.
+user docs `website/docs/user-guide/features/cron.md`.
 
 ## Cron
 
-`cron/jobs.py` (job store) + `cron/scheduler.py` (tick loop; `scheduler_*.py` siblings). Agents
+`cron/jobs.py` (job store) + `cron/scheduler.py` (tick loop, in-flight registry, `run_one_job`,
+`python -m cron.scheduler` entry). `jobs.py` keeps the store itself (paths, locks, load/save,
+record normalization, state predicates, run output, telemetry counters) and re-exports its
+`jobs_*` siblings: `schedule` (schedule grammar, next run), `records` (create/edit/pause/resume/
+remove), `runs` (run outcomes, dispatch/heartbeat/fire claims), `due` (repairs, catch-up,
+`get_due_jobs`), `ticker` (liveness markers); they reach it late-bound (`_jobs.<name>`).
+`scheduler.py` keeps the stateful parts and re-exports its
+`scheduler_*` siblings: `job_runtime` (toolsets, model/runtime, pool, agent construction),
+`agent_run` (prompt, watchdog, final response, `run_job`), `run_outcome` (compose/deliver/mark),
+`external_worker`, `failures` (notices, incidents), `delivery`, `prompt`, `preflight`, `script`,
+`provider`. Siblings reach it late-bound (`_sched.<name>`) so `monkeypatch.setattr(cron.scheduler,
+...)` keeps reaching every caller; the `__main__` entry stays below every split-module import. Agents
 schedule via the `cronjob` tool; users via `hermes cron list|add|edit|pause|resume|run|remove` or
 `/cron`. Schedules: duration (`"30m"`, `"2h"`, `"1d"`), "every" phrase (`"every 2h"`, `"every monday
 9am"`), 5-field cron (`"0 9 * * *"`), ISO one-shot (`"2026-06-01T09:00:00Z"`). Per-job fields:
@@ -45,39 +56,6 @@ Hardening invariants — each guards a real failure; don't weaken without answer
 - Background `delegate_task` is process-local; work that must survive restarts is a cron job or a
   `terminal(background=True, notify_on_complete=True)` process.
 
-## Kanban (multi-agent work queue)
-
-Durable SQLite-backed board letting multiple profiles/workers collaborate. Users: `hermes kanban
-<verb>`; dispatcher-spawned workers use a dedicated `kanban_*` toolset so their schema footprint is
-zero outside a kanban task (footprint ladder rung 3).
-
-- **CLI:** `hermes_cli/kanban.py` facade + 14 `kanban_*.py` siblings (`boards`, `db`, `db_connect`,
-  `db_dispatch`, `db_notify`, `db_graph` (task initialization and decomposition), `workspace`, ...). Verbs: `init, create, list (ls), show, assign, link,
-  unlink, comment, attach, attachments, attach-rm, complete, request-review, request-changes,
-  reopen-review, block, unblock, archive, tail`, plus `watch, stats, runs, log, assignees, heartbeat,
-  notify-*, dispatch, daemon, gc`. Argparse alias dispatch must accept both `list` and `ls` (root).
-- **Toolset:** `tools/kanban_tools.py` — `kanban_show, kanban_complete, kanban_request_review,
-  kanban_request_changes, kanban_block, kanban_heartbeat, kanban_comment, kanban_create, kanban_link,
-  kanban_attach, kanban_attach_url, kanban_attachments`; platforms whose saved selection enables
-  `kanban` (`hermes tools enable kanban --platform <p>`; default-off, in `CONFIGURABLE_TOOLSETS`) get
-  the full set plus `kanban_list`/`kanban_unblock` for board routing. The check_fn reads the schema
-  build's own selection (`tools/kanban_toolset_context.py`), never the legacy top-level `toolsets`
-  key alone.
-- **Dispatcher:** long-lived loop (default 60s) that reclaims stale claims, promotes ready tasks,
-  atomically claims, and spawns assigned profiles. Runs **inside the gateway** by default
-  (`kanban.dispatch_in_gateway: true`). Standalone: `plugins/kanban/systemd/hermes-kanban-dispatcher.service`.
-- **Plugin assets:** `plugins/kanban/dashboard/` (web UI) + systemd unit. `kanban_db.connect` is its
-  own connection helper — do not alias it to `projects_db.connect` (a path-proximity generator did).
-
-Isolation: **board** is the hard boundary — workers get `HERMES_KANBAN_BOARD` pinned in their env and
-cannot see other boards; **tenant** is a soft namespace within a board (workspace-path + memory-key
-isolation, one fleet serving several businesses). After `kanban.failure_limit` consecutive
-non-success attempts on a task (default 2) the dispatcher auto-blocks it to stop spin loops.
-Process-identity note: `kanban --preserve-cache` contains "serve" — never classify processes by argv
-substring (root).
-
 ## Tests
 
-`tests/cron/`, `tests/hermes_cli/test_kanban*.py`, `tests/tools/test_kanban*.py`. Schedule parsing
-and catch-up windows are pure functions — test them as data. Never assert on the verb list or
-toolset size (root: no change-detectors). Time-based tests use loose bounds (≥ 2s) and event sync.
+`tests/cron/`. Verify scheduling, ownership, delivery, cancellation, and restart behavior through the canonical test runner.

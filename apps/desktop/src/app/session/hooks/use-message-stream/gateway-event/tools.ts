@@ -145,6 +145,7 @@ export function handleToolEvent(ctx: GatewayEventContext): boolean {
         event.type === 'subagent.spawn_requested' || event.type === 'subagent.start',
         event.type
       )
+
     }
 
     return true

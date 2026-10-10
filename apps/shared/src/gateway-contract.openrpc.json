@@ -25,6 +25,78 @@
       }
     },
     {
+      "name": "approval.audit",
+      "summary": "Read recent redacted approval decisions in the active profile, newest first.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalAuditParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalAuditResult"
+        }
+      }
+    },
+    {
+      "name": "approval.grants.add",
+      "summary": "Store a non-monetary scoped record. Automatic approval is disabled; purchase/payment grants are unsupported.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalGrantsAddParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalGrantsAddResult"
+        }
+      }
+    },
+    {
+      "name": "approval.grants.list",
+      "summary": "List management records in the active profile; not used for automatic approval.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalGrantsListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalGrantsListResult"
+        }
+      }
+    },
+    {
+      "name": "approval.grants.revoke",
+      "summary": "Revoke a standing authorization by id.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/ApprovalGrantsRevokeParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ApprovalGrantsRevokeResult"
+        }
+      }
+    },
+    {
       "name": "approval.pending",
       "summary": "Replay the approvals still waiting on this session (reconnect / polling).",
       "params": [
@@ -237,6 +309,60 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/BotRelayRosterSyncResult"
+        }
+      }
+    },
+    {
+      "name": "browser.controller.bridge_prepare",
+      "summary": "Mint a short-lived, single-use, session-bound Desktop bridge launch grant.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/BrowserControllerBridgePrepareParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/BrowserControllerBridgePrepareResult"
+        }
+      }
+    },
+    {
+      "name": "browser.controller.bridge_revoke",
+      "summary": "Revoke the session-bound Desktop Chrome bridge and outstanding launch grants.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/BrowserControllerBridgeRevokeParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/BrowserControllerBridgeRevokeResult"
+        }
+      }
+    },
+    {
+      "name": "browser.controller.bridge_status",
+      "summary": "Read the session-bound Desktop Chrome bridge status.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/BrowserControllerBridgeStatusParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/BrowserControllerBridgeStatusResult"
         }
       }
     },
@@ -1551,6 +1677,60 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/McpServersTestResult"
+        }
+      }
+    },
+    {
+      "name": "memory.forget",
+      "summary": "Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/MemoryForgetParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/MemoryMutationResult"
+        }
+      }
+    },
+    {
+      "name": "memory.list",
+      "summary": "List enabled curated targets with zero-based indices and explicit target status. Unreadable enabled targets return an error; disabled targets expose no entries.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/MemoryListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/MemoryListResult"
+        }
+      }
+    },
+    {
+      "name": "memory.remember",
+      "summary": "Persist a curated entry using the agent memory content and size guards.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/MemoryRememberParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/MemoryMutationResult"
         }
       }
     },
@@ -3929,6 +4109,42 @@
           "$ref": "#/components/schemas/WakeStopResult"
         }
       }
+    },
+    {
+      "name": "work.cancel",
+      "summary": "Cooperatively interrupt an owned live subagent. Process/delegation IDs fail closed without generation authority.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/WorkCancelParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/WorkCancelResult"
+        }
+      }
+    },
+    {
+      "name": "work.list",
+      "summary": "List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable.",
+      "params": [
+        {
+          "name": "params",
+          "schema": {
+            "$ref": "#/components/schemas/WorkListParams"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/WorkListResult"
+        }
+      }
     }
   ],
   "components": {
@@ -4264,6 +4480,103 @@
         "title": "AgentsListResult",
         "type": "object"
       },
+      "ApprovalAuditEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "ts": {
+            "title": "Ts",
+            "type": "string"
+          },
+          "session_key": {
+            "title": "Session Key",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "pattern_key": {
+            "title": "Pattern Key",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "command_preview": {
+            "title": "Command Preview",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ts",
+          "session_key",
+          "kind",
+          "tool_name",
+          "description",
+          "pattern_key",
+          "outcome",
+          "mode",
+          "command_preview"
+        ],
+        "title": "ApprovalAuditEntry",
+        "type": "object"
+      },
+      "ApprovalAuditParams": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "default": 100,
+            "maximum": 10000,
+            "minimum": 0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "session_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Key"
+          }
+        },
+        "title": "ApprovalAuditParams",
+        "type": "object"
+      },
+      "ApprovalAuditResult": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalAuditEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "ApprovalAuditResult",
+        "type": "object"
+      },
       "ApprovalChoice": {
         "enum": [
           "once",
@@ -4273,6 +4586,201 @@
         ],
         "title": "ApprovalChoice",
         "type": "string"
+      },
+      "ApprovalGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "action_kind": {
+            "title": "Action Kind",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "max_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Max Amount"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action_kind",
+          "target",
+          "created_at"
+        ],
+        "title": "ApprovalGrant",
+        "type": "object"
+      },
+      "ApprovalGrantsAddParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "action_kind": {
+            "enum": [
+              "command_pattern",
+              "send_message"
+            ],
+            "title": "Action Kind",
+            "type": "string"
+          },
+          "target": {
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          },
+          "max_amount": {
+            "default": null,
+            "title": "Max Amount",
+            "type": "null"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expires At"
+          }
+        },
+        "required": [
+          "action_kind",
+          "target"
+        ],
+        "title": "ApprovalGrantsAddParams",
+        "type": "object"
+      },
+      "ApprovalGrantsAddResult": {
+        "additionalProperties": false,
+        "properties": {
+          "grant": {
+            "$ref": "#/components/schemas/ApprovalGrant"
+          }
+        },
+        "required": [
+          "grant"
+        ],
+        "title": "ApprovalGrantsAddResult",
+        "type": "object"
+      },
+      "ApprovalGrantsListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          }
+        },
+        "title": "ApprovalGrantsListParams",
+        "type": "object"
+      },
+      "ApprovalGrantsListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ApprovalGrant"
+            },
+            "title": "Grants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "grants"
+        ],
+        "title": "ApprovalGrantsListResult",
+        "type": "object"
+      },
+      "ApprovalGrantsRevokeParams": {
+        "additionalProperties": false,
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ApprovalGrantsRevokeParams",
+        "type": "object"
+      },
+      "ApprovalGrantsRevokeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "title": "ApprovalGrantsRevokeResult",
+        "type": "object"
       },
       "ApprovalPendingParams": {
         "additionalProperties": false,
@@ -4309,6 +4817,11 @@
             },
             "title": "Approvals",
             "type": "array"
+          },
+          "approval_mode": {
+            "default": "manual",
+            "title": "Approval Mode",
+            "type": "string"
           }
         },
         "required": [
@@ -4426,6 +4939,18 @@
             ],
             "default": null,
             "title": "Smart Denied"
+          },
+          "policy_locked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy Locked"
           },
           "tool_name": {
             "anyOf": [
@@ -6442,6 +6967,250 @@
         ],
         "title": "BrowserAction",
         "type": "string"
+      },
+      "BrowserControllerBridgeLaunchContext": {
+        "additionalProperties": false,
+        "properties": {
+          "grant": {
+            "title": "Grant",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "controller_id": {
+            "title": "Controller Id",
+            "type": "string"
+          },
+          "browser_profile_id": {
+            "title": "Browser Profile Id",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "protocol_version": {
+            "title": "Protocol Version",
+            "type": "integer"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grant",
+          "session_id",
+          "controller_id",
+          "browser_profile_id",
+          "capabilities",
+          "protocol_version",
+          "profile_id"
+        ],
+        "title": "BrowserControllerBridgeLaunchContext",
+        "type": "object"
+      },
+      "BrowserControllerBridgePrepareParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "browser_profile_id": {
+            "title": "Browser Profile Id",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "protocol_version": {
+            "title": "Protocol Version"
+          }
+        },
+        "required": [
+          "session_id",
+          "browser_profile_id",
+          "capabilities",
+          "protocol_version"
+        ],
+        "title": "BrowserControllerBridgePrepareParams",
+        "type": "object"
+      },
+      "BrowserControllerBridgePrepareResult": {
+        "additionalProperties": false,
+        "properties": {
+          "launch_context": {
+            "$ref": "#/components/schemas/BrowserControllerBridgeLaunchContext"
+          },
+          "expires_in_seconds": {
+            "title": "Expires In Seconds",
+            "type": "number"
+          }
+        },
+        "required": [
+          "launch_context",
+          "expires_in_seconds"
+        ],
+        "title": "BrowserControllerBridgePrepareResult",
+        "type": "object"
+      },
+      "BrowserControllerBridgeRevokeParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "controller_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Controller Id"
+          },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Browser Profile Id"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "BrowserControllerBridgeRevokeParams",
+        "type": "object"
+      },
+      "BrowserControllerBridgeRevokeResult": {
+        "additionalProperties": false,
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revoked",
+          "status"
+        ],
+        "title": "BrowserControllerBridgeRevokeResult",
+        "type": "object"
+      },
+      "BrowserControllerBridgeStatusParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Browser Profile Id"
+          }
+        },
+        "required": [
+          "session_id"
+        ],
+        "title": "BrowserControllerBridgeStatusParams",
+        "type": "object"
+      },
+      "BrowserControllerBridgeStatusResult": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Session Id"
+          },
+          "controller_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Controller Id"
+          },
+          "browser_profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Browser Profile Id"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Capabilities"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "BrowserControllerBridgeStatusResult",
+        "type": "object"
       },
       "BrowserControllerCancelPayload": {
         "additionalProperties": false,
@@ -10394,6 +11163,30 @@
             ],
             "default": null,
             "title": "Model"
+          },
+          "fallback_configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fallback Configured"
+          },
+          "provider_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provider Label"
           }
         },
         "required": [
@@ -14750,6 +15543,177 @@
         "title": "McpServersTestResult",
         "type": "object"
       },
+      "MemoryEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "enum": [
+              "memory",
+              "user"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "index",
+          "text"
+        ],
+        "title": "MemoryEntry",
+        "type": "object"
+      },
+      "MemoryForgetParams": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "enum": [
+              "memory",
+              "user"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Index"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Text"
+          },
+          "expected_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Expected Text"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "title": "MemoryForgetParams",
+        "type": "object"
+      },
+      "MemoryListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "default": "both",
+            "enum": [
+              "memory",
+              "user",
+              "both"
+            ],
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "title": "MemoryListParams",
+        "type": "object"
+      },
+      "MemoryListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "targets": {
+            "additionalProperties": {
+              "enum": [
+                "enabled",
+                "disabled"
+              ],
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "memory",
+                "user"
+              ]
+            },
+            "title": "Targets",
+            "type": "object"
+          }
+        },
+        "required": [
+          "entries",
+          "targets"
+        ],
+        "title": "MemoryListResult",
+        "type": "object"
+      },
+      "MemoryMutationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "title": "MemoryMutationResult",
+        "type": "object"
+      },
+      "MemoryRememberParams": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "enum": [
+              "memory",
+              "user"
+            ],
+            "title": "Target",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target",
+          "content"
+        ],
+        "title": "MemoryRememberParams",
+        "type": "object"
+      },
       "MessageCompletePayload": {
         "additionalProperties": false,
         "description": "``prompt_turn._complete_turn_payload`` / ``session_auto_continue._emit_terminal_turn_error`` /\n``agent_callbacks._mirror_subagent_to_child`` (child watch mirror: ``text`` only) /\n``compute_host_bridge`` (``text`` + ``status``).",
@@ -16403,6 +17367,18 @@
             ],
             "default": null,
             "title": "Smart Denied"
+          },
+          "policy_locked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Policy Locked"
           },
           "choices": {
             "anyOf": [
@@ -27410,6 +28386,18 @@
             ],
             "default": null,
             "title": "Provider"
+          },
+          "live": {
+            "default": false,
+            "title": "Live",
+            "type": "boolean"
+          },
+          "timeout_s": {
+            "default": 8,
+            "exclusiveMinimum": 0,
+            "maximum": 30,
+            "title": "Timeout S",
+            "type": "number"
           }
         },
         "title": "SetupRuntimeCheckParams",
@@ -27417,8 +28405,90 @@
       },
       "SetupRuntimeCheckResult": {
         "additionalProperties": false,
-        "description": "``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the\nselected route is the welcome host.",
+        "description": "``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the\nselected route is the welcome host. ``live_ok`` independently reports an opt-in HTTP probe.",
         "properties": {
+          "live_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Live Ok"
+          },
+          "probe_kind": {
+            "anyOf": [
+              {
+                "const": "endpoint_reachability",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Probe Kind"
+          },
+          "inference_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Inference Ok"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Latency Ms"
+          },
+          "error_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auth",
+                  "not_found",
+                  "rate_limit",
+                  "network",
+                  "timeout",
+                  "server",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error Kind"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
           "ok": {
             "title": "Ok",
             "type": "boolean"
@@ -33539,6 +34609,158 @@
           "disabled_persisted"
         ],
         "title": "WakeStopResult",
+        "type": "object"
+      },
+      "WorkCancelParams": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "WorkCancelParams",
+        "type": "object"
+      },
+      "WorkCancelResult": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "not_found",
+              "already_finished",
+              "cancelled",
+              "interrupt_requested",
+              "unavailable",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "message"
+        ],
+        "title": "WorkCancelResult",
+        "type": "object"
+      },
+      "WorkItem": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "delegation",
+              "process",
+              "subagent"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "status",
+          "started_at",
+          "updated_at",
+          "detail"
+        ],
+        "title": "WorkItem",
+        "type": "object"
+      },
+      "WorkListParams": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "title": "WorkListParams",
+        "type": "object"
+      },
+      "WorkListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "work": {
+            "items": {
+              "$ref": "#/components/schemas/WorkItem"
+            },
+            "title": "Work",
+            "type": "array"
+          }
+        },
+        "required": [
+          "work"
+        ],
+        "title": "WorkListResult",
         "type": "object"
       },
       "_SessionScoped": {

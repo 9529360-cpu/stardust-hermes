@@ -51,10 +51,6 @@ def test_is_destructive_command_treats_cp_as_mutating():
     assert _is_destructive_command("cp .env.local .env") is True
 
 
-
-
-
-
 @pytest.fixture()
 def agent():
     """Minimal AIAgent with mocked OpenAI client and tool loading."""
@@ -84,10 +80,6 @@ def test_persist_user_message_override_rewrites_text_turns(agent):
     agent._apply_persist_user_message_override(messages)
 
     assert messages == [{"role": "user", "content": "hello"}]
-
-
-
-
 
 
 def test_flush_persist_override_replaces_api_local_multimodal_note(agent):
@@ -313,7 +305,6 @@ class TestProviderModelNormalization:
         assert agent.model == "glm-5.1"
 
 
-
 # ---------------------------------------------------------------------------
 # Helper to build mock assistant messages (API response objects)
 # ---------------------------------------------------------------------------
@@ -382,10 +373,6 @@ class TestHasContentAfterThinkBlock:
         assert agent._has_content_after_think_block(None) is False
 
 
-
-
-
-
 class TestStripThinkBlocks:
     def test_none_returns_empty(self, agent):
         assert agent._strip_think_blocks(None) == ""
@@ -410,19 +397,10 @@ class TestStripThinkBlocks:
         assert "internal reasoning" not in result
 
 
-
-
-
     def test_single_block_removed(self, agent):
         result = agent._strip_think_blocks("<think>reasoning</think> answer")
         assert "reasoning" not in result
         assert "answer" in result
-
-
-
-
-
-
 
 
     # ─── Unterminated-block coverage (#8878, #9568, #10408) ──────────────
@@ -430,10 +408,6 @@ class TestStripThinkBlocks:
     # closing tag, leaking raw reasoning into assistant content. The open
     # tag appears at a block boundary (start of text or after a newline);
     # everything from that tag to end-of-string is stripped.
-
-
-
-
 
 
     def test_mixed_case_closed_pair_stripped(self, agent):
@@ -452,15 +426,6 @@ class TestStripThinkBlocks:
     # standalone tool-call XML inside assistant content instead of via the
     # structured `tool_calls` field. Left unstripped, raw XML leaks to
     # gateway users (Discord/Telegram/Matrix) and the CLI.
-
-
-
-
-
-
-
-
-
 
 
     @pytest.mark.parametrize(
@@ -488,15 +453,6 @@ class TestExtractReasoning:
         assert agent._extract_reasoning(msg) == "thinking hard"
 
 
-
-
-
-
-
-
-
-
-
 class TestSessionFilenameSafety:
     def test_safe_session_filename_component_contains_traversal(self):
         # The sanitizer is the chokepoint: every session-ID-derived artifact
@@ -520,9 +476,6 @@ class TestGetMessagesUpToLastAssistant:
         result = agent._get_messages_up_to_last_assistant(msgs)
         assert result == msgs
         assert result is not msgs  # should be a copy
-
-
-
 
 
 class TestMaskApiKey:
@@ -740,17 +693,11 @@ class TestInit:
         assert a.max_tokens == 8192
 
 
-
-
-
 class TestInterrupt:
     def test_interrupt_sets_flag(self, agent):
         with patch("run_agent._set_interrupt"), patch("agent.interrupt_control._set_interrupt"):
             agent.interrupt()
             assert agent._interrupt_requested is True
-
-
-
 
 
 class TestHydrateTodoStore:
@@ -962,7 +909,6 @@ class TestBuildSystemPrompt:
         assert "(skill_manage)" not in prompt
 
 
-
     def test_datetime_is_date_only_not_minute_precision(self, agent):
         """Timestamp must be date-only (no HH:MM) so the system prompt
         stays byte-stable for the full day. Minute precision invalidates
@@ -1090,21 +1036,6 @@ class TestToolUseEnforcementConfig:
         agent = self._make_agent(model="openai/gpt-4.1", tool_use_enforcement="auto")
         prompt = agent._build_system_prompt()
         assert TOOL_USE_ENFORCEMENT_GUIDANCE in prompt
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def test_no_tools_never_injects(self):
@@ -1246,8 +1177,6 @@ class TestTaskCompletionGuidance:
         agent = self._make_agent(model="anthropic/claude-opus-4.8")
         prompt = agent._build_system_prompt()
         assert TASK_COMPLETION_GUIDANCE in prompt
-
-
 
 
     def test_no_tools_no_injection(self):
@@ -1430,10 +1359,6 @@ class TestBuildApiKwargs:
         assert "temperature" not in kwargs
 
 
-
-
-
-
     def test_kimi_coding_endpoint_disables_thinking(self, agent):
         """When reasoning_config.enabled=False, thinking should be disabled
         and reasoning_effort should be omitted entirely — mirroring Kimi
@@ -1449,7 +1374,6 @@ class TestBuildApiKwargs:
 
         assert kwargs["extra_body"]["thinking"] == {"type": "disabled"}
         assert "reasoning_effort" not in kwargs
-
 
 
     def test_provider_preferences_injected(self, agent):
@@ -1481,7 +1405,6 @@ class TestBuildApiKwargs:
         assert "reasoning" not in kwargs.get("extra_body", {})
 
 
-
     def test_reasoning_sent_for_copilot_gpt5(self, agent):
         """Copilot/GitHub Models: GPT-5 reasoning goes in extra_body.reasoning."""
         from agent.transports import get_transport
@@ -1510,8 +1433,6 @@ class TestBuildApiKwargs:
         agent.reasoning_config = {"enabled": True, "effort": "xhigh"}
 
         assert agent._github_models_reasoning_extra_body() == {"effort": "xhigh"}
-
-
 
 
     def test_qwen_portal_formats_messages_and_metadata(self, agent):
@@ -1545,11 +1466,6 @@ class TestBuildApiKwargs:
         assert user_content[1] == {"type": "text", "text": "world"}
 
 
-
-
-
-
-
     def test_non_custom_provider_unaffected(self, agent):
         """OpenRouter provider with effort=none should NOT inject think=false."""
         agent.provider = "openrouter"
@@ -1558,7 +1474,6 @@ class TestBuildApiKwargs:
         messages = [{"role": "user", "content": "hi"}]
         kwargs = agent._build_api_kwargs(messages)
         assert kwargs.get("extra_body", {}).get("think") is None
-
 
 
 class TestBuildAssistantMessage:
@@ -1644,13 +1559,6 @@ class TestBuildAssistantMessage:
         note_checkpoint.assert_not_called()
 
 
-
-
-
-
-
-
-
     def test_tool_call_extra_content_preserved(self, agent):
         """Gemini thinking models attach extra_content with thought_signature
         to tool calls. This must be preserved so subsequent API calls include it."""
@@ -1663,11 +1571,6 @@ class TestBuildAssistantMessage:
         assert result["tool_calls"][0]["extra_content"] == {
             "google": {"thought_signature": "abc123"}
         }
-
-
-
-
-
 
 
 class TestFormatToolsForSystemMessage:
@@ -1921,7 +1824,6 @@ class TestExecuteToolCalls:
         assert messages[0]["role"] == "tool"
 
 
-
     def test_vprint_suppressed_in_parseable_quiet_mode(self, agent):
         agent.suppress_status_output = True
 
@@ -2079,15 +1981,6 @@ class TestConcurrentToolExecution:
                 mock_con.assert_not_called()
 
 
-
-
-
-
-
-
-
-
-
     def test_concurrent_executes_all_tools(self, agent):
         """Concurrent path should execute all tools and append results in order."""
         tc1 = _mock_tool_call(name="web_search", arguments='{"q":"alpha"}', call_id="c1")
@@ -2197,10 +2090,6 @@ class TestConcurrentToolExecution:
         assert all("Python interpreter is shutting down" in m["content"] for m in messages)
 
 
-
-
-
-
     def test_invoke_tool_dispatches_to_handle_function_call(self, agent):
         """_invoke_tool should route regular tools through handle_function_call."""
         with patch("model_tools.handle_function_call", return_value="result") as mock_hfc:
@@ -2219,6 +2108,14 @@ class TestConcurrentToolExecution:
                 tool_request_middleware_trace=[],
             )
             assert result == "result"
+
+    def test_invoke_tool_marks_validated_bridge_unwrap(self, agent):
+        """A deferred target stays authorized after the executor unwraps tool_call."""
+        with patch("model_tools.handle_function_call", return_value="result") as mock_hfc:
+            result = agent._invoke_tool("mcp_hidden_tool", {}, "task-1", bridge_unwrapped=True)
+
+        assert result == "result"
+        assert mock_hfc.call_args.kwargs["bridge"] is True
 
     def test_sequential_tool_callbacks_fire_in_order(self, agent):
         tool_call = _mock_tool_call(name="web_search", arguments='{"query":"hello"}', call_id="c1")
@@ -2309,15 +2206,12 @@ class TestConcurrentToolExecution:
         assert secret not in repr(starts + completes + progress)
 
 
-
     def test_invoke_tool_handles_agent_level_tools(self, agent):
         """_invoke_tool should handle todo tool directly."""
         with patch("tools.todo_tool.todo_tool", return_value='{"ok":true}') as mock_todo:
             result = agent._invoke_tool("todo_list", {"todos": []}, "task-1")
             mock_todo.assert_called_once()
         assert "ok" in result
-
-
 
 
     def test_sequential_blocked_tool_skips_checkpoints_and_callbacks(self, agent, monkeypatch):
@@ -2348,8 +2242,6 @@ class TestConcurrentToolExecution:
         assert len(messages) == 1
         assert messages[0]["role"] == "tool"
         assert json.loads(messages[0]["content"]) == {"error": "Blocked by policy"}
-
-
 
 
     @pytest.mark.parametrize("concurrent", [False, True])
@@ -2415,11 +2307,6 @@ class TestConcurrentToolExecution:
 
         assert json.loads(result) == {"error": "Blocked"}
         assert agent._turns_since_memory == 5
-
-
-
-
-
 
 
     def test_managed_tool_pipeline_rejects_second_dispatch(self, agent, monkeypatch):
@@ -2665,12 +2552,6 @@ class TestPathsOverlap:
         assert _paths_overlap(Path("src/a.py"), Path("src/a.py"))
 
 
-
-
-
-
-
-
 class TestParallelScopePathNormalization:
     def test_extract_parallel_scope_path_normalizes_relative_to_cwd(self, tmp_path, monkeypatch):
         from agent.tool_dispatch_helpers import _extract_parallel_scope_path
@@ -2728,8 +2609,6 @@ class TestMcpParallelToolBatch:
                 _parallel_safe_servers.discard("github")
                 _mcp_tool_server_names.pop("mcp__github__list_repos", None)
                 _mcp_tool_server_names.pop("mcp__github__search_code", None)
-
-
 
 
 class TestHandleMaxIterations:
@@ -2978,10 +2857,6 @@ class TestHandleMaxIterations:
         assert messages[2]["tool_name"] == "execute_code"
         assert messages[2]["name"] == "execute_code"
         assert messages[1]["codex_reasoning_items"] == [{"id": "rs_1"}]
-
-
-
-
 
 
     def test_codex_summary_sanitizes_orphan_tool_results(self, agent):
@@ -4427,7 +4302,6 @@ class TestRunConversation:
         assert result["completed"] is True
 
 
-
     def test_glm_prompt_exceeds_max_length_triggers_compression(self, agent):
         """GLM/Z.AI uses 'Prompt exceeds max length' for context overflow."""
         self._setup_agent(agent)
@@ -4458,7 +4332,6 @@ class TestRunConversation:
         mock_compress.assert_called_once()
         assert result["final_response"] == "Recovered after compression"
         assert result["completed"] is True
-
 
 
     def test_length_finish_reason_requests_continuation(self, agent):
@@ -4782,104 +4655,6 @@ class TestRunConversation:
         assert "cut off" in (msgs[-1].get("content") or "").lower()
         assert any(isinstance(m, dict) and m.get("role") == "tool" for m in msgs)
 
-
-    def test_kanban_block_called_on_iteration_exhaustion(self, agent, monkeypatch):
-        """Regression: kanban worker must signal the dispatcher when its
-        iteration budget is exhausted, otherwise the task silently re-runs
-        forever without ever tripping the failure_limit circuit breaker
-        (issue #23216 / #29747 gap 2).
-
-        As of #29747, the exhaustion path routes through
-        ``kanban_db._record_task_failure(outcome="timed_out")`` so the
-        ``consecutive_failures`` counter increments and the dispatcher's
-        ``failure_limit`` breaker eventually trips. The legacy
-        ``kanban_block`` call was replaced because blocked-outcome runs
-        bypass the failure counter.
-        """
-        self._setup_agent(agent)
-        agent.max_iterations = 2
-
-        monkeypatch.setenv("HERMES_KANBAN_TASK", "t_test_task_123")
-
-        # Return a tool call for every iteration to exhaust the budget.
-        tc = _mock_tool_call(name="web_search", arguments="{}", call_id="c1")
-        tool_resp = _mock_response(
-            content="", finish_reason="tool_calls", tool_calls=[tc],
-        )
-        # Final summary response from _handle_max_iterations.
-        summary_resp = _mock_response(
-            content="Could not finish — budget exhausted.", finish_reason="stop",
-        )
-        agent.client.chat.completions.create.side_effect = [
-            tool_resp, tool_resp, summary_resp,
-        ]
-
-        mock_record_failure = MagicMock(return_value=False)
-        mock_connect = MagicMock(return_value=MagicMock())
-
-        with (
-            patch("model_tools.handle_function_call", return_value="ok"),
-            patch("hermes_cli.kanban_db_dispatch._record_task_failure",
-                  mock_record_failure),
-            patch("hermes_cli.kanban_db_connect.connect", mock_connect),
-            patch.object(agent, "_persist_session"),
-            patch.object(agent, "_save_trajectory"),
-            patch.object(agent, "_cleanup_task_resources"),
-        ):
-            result = agent.run_conversation("do the kanban work")
-
-        # The agent should have reported the task as not completed.
-        assert result["completed"] is False
-
-        # _record_task_failure should have been called exactly once for
-        # the exhaustion event, with outcome="timed_out".
-        assert mock_record_failure.call_count == 1, (
-            f"Expected exactly 1 _record_task_failure call, "
-            f"got {mock_record_failure.call_count}. "
-            f"Calls: {mock_record_failure.call_args_list}"
-        )
-        call = mock_record_failure.call_args_list[0]
-        # Positional: (conn, task_id, ...)
-        assert call.args[1] == "t_test_task_123"
-        assert call.kwargs.get("outcome") == "timed_out"
-        assert call.kwargs.get("release_claim") is True
-        assert call.kwargs.get("end_run") is True
-        assert "Iteration budget exhausted" in call.kwargs.get("error", "")
-
-    def test_no_kanban_block_when_not_in_kanban_mode(self, agent, monkeypatch):
-        """The exhaustion bridge must NOT fire when HERMES_KANBAN_TASK
-        is unset (non-kanban runs are unaffected by #29747 gap 2)."""
-        self._setup_agent(agent)
-        agent.max_iterations = 2
-
-        monkeypatch.delenv("HERMES_KANBAN_TASK", raising=False)
-
-        tc = _mock_tool_call(name="web_search", arguments="{}", call_id="c1")
-        tool_resp = _mock_response(
-            content="", finish_reason="tool_calls", tool_calls=[tc],
-        )
-        summary_resp = _mock_response(
-            content="Summary.", finish_reason="stop",
-        )
-        agent.client.chat.completions.create.side_effect = [
-            tool_resp, tool_resp, summary_resp,
-        ]
-
-        mock_record_failure = MagicMock(return_value=False)
-
-        with (
-            patch("model_tools.handle_function_call", return_value="ok"),
-            patch("hermes_cli.kanban_db_dispatch._record_task_failure",
-                  mock_record_failure),
-            patch.object(agent, "_persist_session"),
-            patch.object(agent, "_save_trajectory"),
-            patch.object(agent, "_cleanup_task_resources"),
-        ):
-            agent.run_conversation("do stuff")
-
-        assert mock_record_failure.call_count == 0, (
-            "_record_task_failure should not be called outside kanban mode"
-        )
 
     # ── Output-cap retry: safe_out uses provider available_out + request estimate ──
 
@@ -5207,9 +4982,6 @@ class TestRunConversation:
         assert agent.client.chat.completions.create.call_count <= 6
 
 
-
-
-
 class TestHookPayloadSanitizesSimpleNamespace:
     """Regression: ``_hook_jsonable`` referenced ``SimpleNamespace`` without
     importing it, so sanitizing any hook payload that contained one raised
@@ -5405,6 +5177,41 @@ class TestRetryExhaustion:
         # Crucial regression guard: a deterministic refusal is NOT retried —
         # exactly one API call, no empty-response retry loop.
         assert agent.client.chat.completions.create.call_count == 1
+
+    def test_relay_503_no_channel_for_model_is_not_retried(self, agent):
+        """A new-api relay answers "no channel in your key's group serves this model" with HTTP
+        503 + ``model_not_found``. Read as overload, every backoff retry was spent and the user
+        was told the service was busy; the route cannot serve the model, so the first answer is
+        terminal and the copy says to pick another model."""
+        import httpx
+        from openai import InternalServerError
+
+        self._setup_agent(agent)
+        payload = {"error": {
+            "code": "model_not_found",
+            "message": "No available channel for model test/model under group pro (distributor)",
+            "type": "new_api_error",
+        }}
+        response = httpx.Response(
+            503, json=payload, request=httpx.Request("POST", "https://relay.example/v1/chat/completions"))
+        agent.client.chat.completions.create.side_effect = InternalServerError(
+            f"Error code: 503 - {payload}", response=response, body=payload["error"])
+        from agent import conversation_loop as _conv_loop
+        from agent import retry_utils as _retry_utils
+        with (
+            patch.object(agent, "_persist_session"),
+            patch.object(agent, "_save_trajectory"),
+            patch.object(agent, "_cleanup_task_resources"),
+            patch("run_agent.time", self._make_fast_time_mock()),
+            patch.object(_conv_loop, "time", self._make_fast_time_mock()),
+            patch.object(_retry_utils, "jittered_backoff", lambda *a, **k: 0.0),
+        ):
+            result = agent.run_conversation("hello")
+        assert result.get("failed") is True
+        assert result["failure_reason"] == FailoverReason.model_not_found.value
+        assert result["failure_retryable"] is False
+        assert agent.client.chat.completions.create.call_count == 1
+        assert "isn't available" in result["final_response"]
 
 
     def test_build_api_kwargs_error_no_unbound_local(self, agent):
@@ -5676,11 +5483,6 @@ class TestCredentialPoolRecovery:
         agent._swap_credential.assert_called_once_with(next_entry)
 
 
-
-
-
-
-
     def test_extract_api_error_context_uses_reset_timestamp_and_reason(self, agent):
         response = SimpleNamespace(headers={})
         error = SimpleNamespace(
@@ -5717,8 +5519,6 @@ class TestCredentialPoolRecovery:
         assert context["message"] == "The usage limit has been reached"
 
 
-
-
 class TestMaxTokensParam:
     """Verify _max_tokens_param returns the correct key for each provider."""
 
@@ -5728,18 +5528,7 @@ class TestMaxTokensParam:
         assert result == {"max_completion_tokens": 4096}
 
 
-
-
-
-
-
     # ── Model-name fallback for non-openai.com endpoints serving newer families ──
-
-
-
-
-
-
 
 
 class TestGpt5ApiModeRouting:
@@ -5888,8 +5677,6 @@ class TestSafeWriter:
         assert inner.getvalue() == "hello"
 
 
-
-
     def test_installed_in_run_conversation(self, agent):
         """run_conversation installs _SafeWriter on stdio."""
         import sys
@@ -5915,9 +5702,6 @@ class TestSafeWriter:
     # Honcho integration extracted to plugin (PR #4154).
 
 
-
-
-
 # ===================================================================
 # Anthropic adapter integration fixes
 # ===================================================================
@@ -5941,7 +5725,6 @@ class TestBuildApiKwargsAnthropicMaxTokens:
                     mock_build.call_args[0],
                 ))
             assert kwargs.get("max_tokens") == 4096 or mock_build.call_args[1].get("max_tokens") == 4096
-
 
 
 class TestAnthropicImageFallback:
@@ -6053,7 +5836,6 @@ class TestFallbackAnthropicProvider:
         assert agent._use_prompt_caching is True
 
 
-
 def test_aiagent_uses_copilot_acp_client():
     with (
         patch("model_tools.get_tool_definitions", return_value=_make_tool_defs("web_search")),
@@ -6090,10 +5872,6 @@ def test_quiet_spinner_allowed_with_explicit_print_fn(agent):
         assert agent._should_start_quiet_spinner() is True
 
 
-
-
-
-
 def test_is_openai_client_closed_honors_custom_client_flag():
     assert AIAgent._is_openai_client_closed(SimpleNamespace(is_closed=True)) is True
     assert AIAgent._is_openai_client_closed(SimpleNamespace(is_closed=False)) is False
@@ -6126,8 +5904,6 @@ def test_is_openai_client_closed_handles_method_form():
     assert AIAgent._is_openai_client_closed(closed_client) is True
 
 
-
-
 class TestAnthropicBaseUrlPassthrough:
     """Bug fix: base_url was filtered with 'anthropic in base_url', blocking proxies."""
 
@@ -6149,7 +5925,6 @@ class TestAnthropicBaseUrlPassthrough:
             call_args = mock_build.call_args
             # base_url should be passed through, not filtered out
             assert call_args[0][1] == "https://llm-proxy.company.com/v1"
-
 
 
 class TestAnthropicCredentialRefresh:
@@ -6247,9 +6022,6 @@ class TestAnthropicCredentialRefresh:
         agent._anthropic_client.messages.stream.assert_called_once_with(model="claude-sonnet-4-20250514")
         agent._anthropic_client.messages.create.assert_called_once_with(model="claude-sonnet-4-20250514")
         assert result is response
-
-
-
 
 
 # ===================================================================
@@ -6773,13 +6545,9 @@ class TestStreamingApiCall:
                 agent._interruptible_streaming_api_call({"messages": []})
 
 
-
-
 # ===================================================================
 # Interrupt _vprint force=True verification
 # ===================================================================
-
-
 
 
 # ===================================================================
@@ -6844,7 +6612,6 @@ class TestAnthropicInterruptHandler:
         agent._abort_request_anthropic_client.assert_called_once_with(
             request_client, reason="interrupt_abort"
         )
-
 
 
 # ---------------------------------------------------------------------------
@@ -7068,7 +6835,6 @@ class TestReasoningReplayForStrictProviders:
         assert replayed_assistant["reasoning_content"] == "provider-native scratchpad"
 
 
-
 # ---------------------------------------------------------------------------
 # Bugfix: _vprint force=True on error messages during TTS
 # ---------------------------------------------------------------------------
@@ -7083,8 +6849,6 @@ class TestVprintForceOnErrors:
         with patch("builtins.print", side_effect=lambda *a, **kw: printed.append(a)):
             agent._vprint("error msg", force=True)
         assert len(printed) == 1
-
-
 
 
 class TestNormalizeCodexDictArguments:
@@ -7243,9 +7007,6 @@ class TestMemoryNudgeCounterPersistence:
         assert hasattr(a, "_iters_since_skill")
         assert a._turns_since_memory == 0
         assert a._iters_since_skill == 0
-
-
-
 
 
 class TestSupportsReasoningExtraBody:

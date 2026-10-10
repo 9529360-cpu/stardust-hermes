@@ -36,6 +36,13 @@ interface ParsedHunk {
   oldStart: number
 }
 
+/** A raw unified-diff hunk, kept intact so review surfaces can focus one hunk
+ * without inventing a second diff format or asking the backend for persistence. */
+export interface DiffHunk {
+  diff: string
+  header: string
+}
+
 // Tint + 2px gutter accent per change kind. Text color is included for the
 // plain renderer; the Shiki path omits it so syntax colors win, layering only
 // the background + border.
@@ -132,34 +139,56 @@ export function stripDiffFileHeaders(diff: string): string {
   return lines.slice(start).join('\n')
 }
 
-function parseHunks(diff: string): ParsedHunk[] {
-  const hunks: ParsedHunk[] = []
-  let active: null | ParsedHunk = null
+const DIFF_HUNK_HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/
+
+/** Exported for local review affordances that need hunk boundaries. */
+export function parseDiffHunks(diff: string): DiffHunk[] {
+  const hunks: string[][] = []
+  let active: string[] | null = null
 
   for (const line of stripDiffFileHeaders(diff).split('\n')) {
     if (line.startsWith('@@')) {
-      const match = /@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line)
-
-      if (!match) {
-        active = null
-
-        continue
+      if (active) {
+        hunks.push(active)
       }
 
-      active = { oldStart: Number(match[1]), newStart: Number(match[2]), lines: [] }
-      hunks.push(active)
+      active = DIFF_HUNK_HEADER.test(line) ? [line] : null
 
       continue
     }
 
-    if (!active || line.startsWith('\\')) {
-      continue
+    if (active) {
+      active.push(line)
     }
-
-    active.lines.push({ kind: diffKind(line), text: stripDiffMarker(line) })
   }
 
-  return hunks
+  if (active) {
+    hunks.push(active)
+  }
+
+  return hunks.map(lines => ({ diff: lines.join('\n'), header: lines[0] }))
+}
+
+function parseHunks(diff: string): ParsedHunk[] {
+  return parseDiffHunks(diff).flatMap(hunk => {
+    const match = DIFF_HUNK_HEADER.exec(hunk.header)
+
+    if (!match) {
+      return []
+    }
+
+    return [
+      {
+        oldStart: Number(match[1]),
+        newStart: Number(match[2]),
+        lines: hunk.diff
+          .split('\n')
+          .slice(1)
+          .filter(line => !line.startsWith('\\'))
+          .map(line => ({ kind: diffKind(line), text: stripDiffMarker(line) }))
+      }
+    ]
+  })
 }
 
 // Cleaned diff → renderable lines: file-headers + `@@` hunks dropped (a blank

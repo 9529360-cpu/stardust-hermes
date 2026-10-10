@@ -18,6 +18,8 @@ import {
   type PreviewTarget,
   progressPreviewServerRestart
 } from './preview'
+import { $rightContextOpen, setRightContextOpen } from './right-context'
+import { $selectedStoredSessionId } from './session'
 
 function fileTarget(source: string): PreviewTarget {
   return { kind: 'file', label: source, path: source, previewKind: 'html', source, url: `file://${source}` }
@@ -34,12 +36,14 @@ function artifactTarget(id: string): PreviewTarget {
 describe('preview store', () => {
   beforeEach(() => {
     $previewServerRestart.set(null)
+    $selectedStoredSessionId.set(null)
     closeRightRail()
     window.localStorage.clear()
   })
 
   afterEach(() => {
     $previewServerRestart.set(null)
+    $selectedStoredSessionId.set(null)
     closeRightRail()
     window.localStorage.clear()
   })
@@ -83,6 +87,40 @@ describe('preview store', () => {
     expect(urlTabs).toHaveLength(1)
     expect(urlTabs[0].target.url).toBe('https://www.reddit.com')
     expect($rightRailActiveTabId.get()).toBe(urlTabs[0].id)
+  })
+
+  it('re-fronts an identical browser URL without re-creating its webview target', () => {
+    openPreview(urlTarget('https://example.com'), 'tool-result')
+    const before = $previewTabs.get()
+    const target = before[0].target
+
+    openPreview(urlTarget('https://example.com'), 'tool-result')
+
+    expect($previewTabs.get()).toBe(before)
+    expect($previewTabs.get()[0].target).toBe(target)
+    expect($previewTabs.get()).toHaveLength(1)
+  })
+
+  it('does not auto-reveal a hidden viewer when a running task changes pages', () => {
+    openPreview(urlTarget('https://example.com'), 'tool-result')
+    setRightContextOpen(false)
+
+    openPreview(urlTarget('https://example.org'), 'tool-result', undefined, false)
+
+    expect($rightContextOpen.get()).toBe(false)
+    expect($previewTabs.get()).toHaveLength(1)
+    expect($previewTabs.get()[0].target.url).toBe('https://example.org')
+  })
+
+  it('keeps the current tab id but updates the owner when the next session opens the same URL', () => {
+    openPreview(urlTarget('https://example.com'), 'tool-result', 'session-one')
+    const tabId = $previewTabs.get()[0].id
+
+    openPreview(urlTarget('https://example.com'), 'tool-result', 'session-two')
+
+    expect($previewTabs.get()).toHaveLength(1)
+    expect($previewTabs.get()[0].id).toBe(tabId)
+    expect($previewTabs.get()[0].storedSessionId).toBe('session-two')
   })
 
   it('commits the live page onto a Browser tab without changing its id', () => {
@@ -219,6 +257,42 @@ describe('preview store', () => {
     expect(stored).not.toContain('dashboard')
   })
 
+  it('captures the selected stored session as optional ownership for persistent tabs', () => {
+    $selectedStoredSessionId.set('task-one')
+    openPreview(fileTarget('/work/task-one.html'), 'file-browser')
+
+    expect($previewTabs.get()[0]?.storedSessionId).toBe('task-one')
+    expect(JSON.parse(window.localStorage.getItem('hermes.desktop.previewTabs.v2') ?? '[]')[0].storedSessionId).toBe(
+      'task-one'
+    )
+  })
+
+  it('re-selects the returning task owner and leaves legacy previews global', () => {
+    $selectedStoredSessionId.set('task-one')
+    openPreview(fileTarget('/work/task-one.html'), 'file-browser')
+    const taskOneTab = $previewTabs.get()[0]?.id
+
+    $selectedStoredSessionId.set('task-two')
+    openPreview(fileTarget('/work/task-two.html'), 'file-browser')
+    const taskTwoTab = $previewTabs.get()[1]?.id
+
+    selectRightRailTab(taskOneTab ?? null)
+    $selectedStoredSessionId.set('task-one')
+    $selectedStoredSessionId.set('task-two')
+    expect($rightRailActiveTabId.get()).toBe(taskTwoTab)
+
+    $selectedStoredSessionId.set('task-one')
+    expect($rightRailActiveTabId.get()).toBe(taskOneTab)
+
+    closeRightRail()
+    $selectedStoredSessionId.set(null)
+    openPreview(fileTarget('/work/legacy.html'), 'file-browser')
+    const legacyTab = $previewTabs.get()[0]?.id
+    $selectedStoredSessionId.set('task-without-preview')
+
+    expect($rightRailActiveTabId.get()).toBe(legacyTab)
+  })
+
   it('strips inline image bytes rather than pushing megabytes into storage', () => {
     openPreview({ ...fileTarget('/work/shot.png'), dataUrl: 'data:image/png;base64,AAAA', previewKind: 'image' })
 
@@ -240,8 +314,18 @@ describe('preview store', () => {
   it('does not persist transient remote HTML source fallbacks', () => {
     const target = { ...fileTarget('/remote/report.html'), renderMode: 'source' as const, transient: true }
 
+    $selectedStoredSessionId.set('task-one')
     openPreview(target, 'tool-result')
 
+    expect($previewTabs.get()[0]?.storedSessionId).toBeUndefined()
+    expect(window.localStorage.getItem('hermes.desktop.previewTabs.v2')).toBe('[]')
+  })
+
+  it('does not attach ownership to artifact previews', () => {
+    $selectedStoredSessionId.set('task-one')
+    openPreview(artifactTarget('session-1:dashboard'))
+
+    expect($previewTabs.get()[0]?.storedSessionId).toBeUndefined()
     expect(window.localStorage.getItem('hermes.desktop.previewTabs.v2')).toBe('[]')
   })
 })

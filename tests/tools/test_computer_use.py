@@ -40,6 +40,19 @@ def noop_backend():
 # Schema & registration
 # ---------------------------------------------------------------------------
 
+@pytest.mark.parametrize("requested, actual", [(60.0, 30.0), (-1.0, 0.0), (2.5, 2.5)])
+def test_wait_reports_the_bounded_duration(monkeypatch, requested, actual):
+    from tools.computer_use import backend as computer_use_backend
+    from tools.computer_use.tool import handle_computer_use
+
+    slept = []
+    monkeypatch.setattr(computer_use_backend.time, "sleep", slept.append)
+
+    result = json.loads(handle_computer_use({"action": "wait", "seconds": requested}))
+
+    assert slept == [actual]
+    assert result["message"] == f"waited {actual:.2f}s"
+
 class TestSchema:
 
     def test_schema_lists_all_expected_actions(self):
@@ -92,11 +105,20 @@ class TestRegistration:
 
 class TestDispatch:
 
-    def test_unknown_action_returns_error(self):
-        from tools.computer_use.tool import handle_computer_use
-        out = handle_computer_use({"action": "nope"})
-        parsed = json.loads(out)
-        assert "error" in parsed
+    def test_approval_classification_matches_every_declared_action(self):
+        """Every schema verb maps to one action policy; mutations gate, inspection does not."""
+        from tools.computer_use import tool as cu_tool
+        from tools.computer_use.schema import COMPUTER_USE_SCHEMA
+
+        declared = set(COMPUTER_USE_SCHEMA["parameters"]["properties"]["action"]["enum"])
+        assert declared == set(cu_tool._ACTIONS)
+        assert {name for name, spec in cu_tool._ACTIONS.items() if spec.destructive} == {
+            "click", "double_click", "right_click", "middle_click", "drag", "scroll",
+            "type", "key", "set_value", "focus_app",
+        }
+        assert {name for name, spec in cu_tool._ACTIONS.items() if not spec.destructive} == {
+            "capture", "wait", "list_apps", "list_windows",
+        }
 
 
     def test_type_action_routes_to_type_text_backend(self, noop_backend):
@@ -1424,9 +1446,13 @@ class TestCuaDriverSessionReconnect:
         class FakeProc:
             returncode = 0
             stderr = ""
-            # Daemon returns a path, not inline base64.
-            stdout = ('{"element_count": 7, "tree_markdown": "- [0] AXButton",'
-                      ' "screenshot_file_path": "%s"}' % str(shot))
+            # Daemon returns a path, not inline base64. Encode the payload as
+            # real JSON so Windows backslashes are escaped by the producer.
+            stdout = json.dumps({
+                "element_count": 7,
+                "tree_markdown": "- [0] AXButton",
+                "screenshot_file_path": str(shot),
+            })
 
         import subprocess as _sp
         orig_run = _sp.run
@@ -1743,6 +1769,59 @@ class TestCuaEnvironmentScrubbing:
         assert "PATH" in captured_env or "SAFE_VAR" in captured_env, \
             "At least one safe environment variable should be preserved"
 
+    def test_sanitizer_failure_refuses_to_launch_driver(self, monkeypatch):
+        from tools.computer_use import cua_backend
+
+        monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-forwarded")
+
+        def fail_sanitization(_env):
+            raise ImportError("simulated sanitizer import failure")
+
+        monkeypatch.setattr("tools.environments.local._sanitize_subprocess_env", fail_sanitization)
+        with patch("subprocess.run") as run:
+            with pytest.raises(RuntimeError, match="refusing to launch cua-driver"):
+                cua_backend.sanitized_cua_driver_env()
+        run.assert_not_called()
+
+    def test_status_reports_sanitizer_failure_without_spawning_driver(self, monkeypatch):
+        from tools.computer_use.permissions import computer_use_status
+
+        monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-forwarded")
+
+        def fail_sanitization(_env):
+            raise ImportError("simulated sanitizer import failure")
+
+        monkeypatch.setattr("tools.environments.local._sanitize_subprocess_env", fail_sanitization)
+        with patch("tools.computer_use.cua_backend_driver.resolve_cua_driver_cmd", return_value="cua-driver"), \
+             patch("subprocess.run") as run:
+            result = computer_use_status()
+
+        assert result["installed"] is True
+        assert result["ready"] is None
+        assert "sanitized environment" in result["error"]
+        run.assert_not_called()
+
+    @pytest.mark.macos_only
+    def test_grant_reports_sanitizer_failure_before_claiming_to_request_permission(self, monkeypatch, capsys):
+        from tools.computer_use.permissions import request_permissions_grant
+
+        monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-forwarded")
+
+        def fail_sanitization(_env):
+            raise ImportError("simulated sanitizer import failure")
+
+        monkeypatch.setattr("tools.computer_use.cua_backend_driver.resolve_cua_driver_cmd",
+                            lambda _driver_cmd=None: "cua-driver")
+        monkeypatch.setattr("tools.environments.local._sanitize_subprocess_env", fail_sanitization)
+        with patch("subprocess.run") as run:
+            result = request_permissions_grant()
+
+        output = capsys.readouterr()
+        assert result == 2
+        assert "Could not prepare a sanitized environment" in output.err
+        assert "Requesting Accessibility" not in output.out
+        run.assert_not_called()
+
 
 class TestCuaCliFallbackResolution:
     def test_cli_fallback_uses_resolved_driver_under_thin_path(self):
@@ -1952,6 +2031,15 @@ class TestImageMimeTypePropagation:
     fallback for older cua-driver builds.
     """
 
+    _JPEG_B64 = (
+        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////"
+        "////////////////////////////////////////////////////////2wBDAf//"
+        "////////////////////////////////////////////////////////////////"
+        "////////////////////wAARCAAIAAgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAA"
+        "AAAAAAAAAAP/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAA"
+        "AAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AKAA/9k="
+    )
+
     def test_extract_tool_result_captures_mime_alongside_image(self):
         from unittest.mock import MagicMock
         from tools.computer_use.cua_backend_parse import _extract_tool_result
@@ -1970,25 +2058,25 @@ class TestImageMimeTypePropagation:
         assert out["images"] == ["iVBORw0K..."]
         assert out["image_mime_types"] == ["image/png"]
 
-    def test_capture_response_uses_explicit_mime_when_provided(self):
+    def test_capture_response_uses_explicit_mime_when_provided(self, monkeypatch):
+        from tools.computer_use import tool as cu_tool
         from tools.computer_use.backend import CaptureResult
-        from tools.computer_use.tool import _capture_response
+
+        monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision", lambda: False)
 
         cap = CaptureResult(
             mode="vision",
             width=100, height=100,
-            png_b64="anything-not-a-real-jpeg-prefix-but-mime-says-jpeg",
+            png_b64=self._JPEG_B64,
             image_mime_type="image/jpeg",
             png_bytes_len=10,
         )
-        resp = _capture_response(cap)
-        # _capture_response only returns the _multimodal envelope when the
-        # image is wired into the response.
-        if isinstance(resp, dict) and resp.get("_multimodal"):
-            url = resp["content"][1]["image_url"]["url"]
-            assert url.startswith("data:image/jpeg;base64,"), (
-                f"explicit mime=image/jpeg should win over sniff; got {url[:32]}"
-            )
+        resp = cu_tool._capture_response(cap)
+        assert resp["_multimodal"] is True
+        url = resp["content"][1]["image_url"]["url"]
+        assert url.startswith("data:image/jpeg;base64,"), (
+            f"explicit mime=image/jpeg should win over sniff; got {url[:32]}"
+        )
 
 class TestMcpInvocationResolution:
     """Surface 8 (NousResearch/hermes-agent#47072): instead of hardcoding
@@ -2645,6 +2733,50 @@ class TestCaptureScreenshotPersistence:
         assert "MEDIA:" not in out["text_summary"]
         assert screenshot_path.startswith(str(tmp_path / "cache" / "images"))
         assert Path(screenshot_path).read_bytes() == base64.b64decode(self._PNG_B64)
+
+    def test_invalid_base64_capture_degrades_to_text_without_image_side_effects(self, tmp_path, monkeypatch):
+        from tools.computer_use.backend import UIElement
+        from tools.computer_use import tool as cu_tool
+
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision",
+                            lambda: pytest.fail("invalid image must not route to auxiliary vision"))
+        cap = self._capture()
+        cap.png_b64 = "not-base64%%"
+        cap.elements = [UIElement(index=1, role="Button", label="OK")]
+
+        out = cu_tool._capture_response(cap)
+
+        assert isinstance(out, str)
+        payload = json.loads(out)
+        assert payload["image_invalid"] is True
+        assert "malformed or truncated" in payload["summary"]
+        assert payload["elements"][0]["label"] == "OK"
+        assert not (tmp_path / "cache" / "images").exists()
+
+    def test_truncated_png_capture_degrades_to_text_with_diagnostic(self):
+        from tools.computer_use import tool as cu_tool
+
+        cap = self._capture()
+        raw_png = base64.b64decode(self._PNG_B64)[:-12]
+        cap.png_b64 = base64.b64encode(raw_png).decode("ascii")
+
+        out = cu_tool._capture_response(cap)
+
+        assert isinstance(out, str)
+        payload = json.loads(out)
+        assert payload["image_invalid"] is True
+        assert "malformed or truncated" in payload["summary"]
+
+    def test_valid_png_remains_multimodal(self, monkeypatch):
+        from tools.computer_use import tool as cu_tool
+
+        monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision", lambda: False)
+
+        out = cu_tool._capture_response(self._capture())
+
+        assert out["_multimodal"] is True
+        assert out["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
 
     def test_capture_cache_is_bounded(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))

@@ -143,7 +143,8 @@ export const en: Translations = {
       startingHermesDesktop: 'Starting Hermes Desktop…'
     },
     errors: {
-      backgroundExited: 'The service that runs your chats closed unexpectedly. Restart it to keep going — your chats and settings are safe.',
+      backgroundExited:
+        'The service that runs your chats closed unexpectedly. Restart it to keep going — your chats and settings are safe.',
       backgroundExitedDuringStartup: 'Hermes stopped right after it started.',
       backendStopped: 'Hermes stopped working in the background',
       restartHermes: 'Restart Hermes',
@@ -245,11 +246,13 @@ export const en: Translations = {
       storageFailure: "Hermes couldn't save to its data folder. Open Maintenance to check and repair it.",
       gatewayAuthFailed:
         'This Hermes no longer accepts your saved sign-in. Open Gateways and sign in again (or paste a new access token), then retry.',
-      methodNotAllowed: "Hermes' background service is out of step with the app, probably after an update. Restart it to fix this.",
+      methodNotAllowed:
+        "Hermes' background service is out of step with the app, probably after an update. Restart it to fix this.",
       microphonePermission: 'Microphone permission was denied.',
       openaiRejectedApiKey: "OpenAI didn't accept your API key. Update it in Settings → Keys, then try again.",
       openaiTtsNeedsKey: 'Voice needs an OpenAI key. Add one in Settings → Keys.',
-      codeSkewRestartRequired: 'Hermes was updated but is still running the old version. Restart it to finish the update.',
+      codeSkewRestartRequired:
+        'Hermes was updated but is still running the old version. Restart it to finish the update.',
       restartHermesFailed: "Couldn't restart Hermes"
     },
     actions: {
@@ -584,7 +587,8 @@ export const en: Translations = {
         desktopSuccess: name => `Desktop plugin ${name} installed`,
         agentFailed: 'Agent plugin install failed',
         desktopFailed: 'Desktop plugin install failed',
-        missingEnv: (name, vars) => `${name} is installed but needs a key before it can work: ${vars}. Add it now, or the plugin's tools will fail.`
+        missingEnv: (name, vars) =>
+          `${name} is installed but needs a key before it can work: ${vars}. Add it now, or the plugin's tools will fail.`
       }
     },
     vault: {
@@ -595,7 +599,7 @@ export const en: Translations = {
       loadFailed: 'Could not load vault items',
       empty: 'Nothing saved yet',
       emptyDesc:
-        "Save a login when Stardust first needs it, or add a dedicated low-limit payment card and address here for purchases you ask it to make.",
+        'Save a login when Stardust first needs it, or add a dedicated low-limit payment card and address here for purchases you ask it to make.',
       add: 'Add',
       addTitle: 'Add a login, card or address',
       addDescription: 'Stored encrypted on this machine. Stardust never sees passwords, card numbers or CVCs.',
@@ -799,7 +803,8 @@ export const en: Translations = {
         sidebar: 'Sidebar only'
       },
       backdropTitle: 'Window Background',
-      backdropDesc: 'Show one local image behind the entire Stardust window — sidebar, conversation and tool panes. The image stays on this device.',
+      backdropDesc:
+        'Show one local image behind the entire Stardust window — sidebar, conversation and tool panes. The image stays on this device.',
       userBubbleTitle: 'Message Bubble',
       userBubbleDesc: 'How see-through your own messages are. Solid at 0; only the outline remains at 100.',
       introSplashTitle: 'Intro Splash',
@@ -955,7 +960,8 @@ export const en: Translations = {
       validationReachable: 'Connection works.',
       validationReachableModels: count => `Connection works. Found ${count} model${count === 1 ? '' : 's'}.`,
       validationFailed: 'Connection test failed',
-      activationFailed: 'Could not switch the default service'
+      activationFailed: 'Could not switch the default service',
+      duplicateService: 'A model service with this name already exists. Edit it from the list, or use a different name.'
     },
     computerUse: {
       accessibility: 'Accessibility',
@@ -1142,7 +1148,8 @@ export const en: Translations = {
     gateway: {
       loading: 'Loading gateway settings...',
       unavailableTitle: 'Gateway settings unavailable',
-      unavailableDesc: 'Connection settings can only be changed from the Hermes Desktop app on the computer running it.',
+      unavailableDesc:
+        'Connection settings can only be changed from the Hermes Desktop app on the computer running it.',
       title: 'Gateway Connection',
       envOverride: 'env override',
       intro:
@@ -1195,7 +1202,8 @@ export const en: Translations = {
       remoteUrlTitle: 'Remote URL',
       remoteUrlDesc: 'Base URL for the remote dashboard backend. Path prefixes are supported, for example /hermes.',
       probing: 'Checking how this gateway authenticates…',
-      probeError: "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
+      probeError:
+        "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
       signedIn: 'Signed in',
       signIn: 'Sign in',
       signOut: 'Sign out',
@@ -1401,7 +1409,8 @@ export const en: Translations = {
       apiKeyUpdating: 'Updating…',
       connectProvider: provider => `Connect ${provider}`,
       setupApiKeyHint: provider => `${provider} needs an API key. Connect it to choose a model.`,
-      setupOauthHint: provider => `${provider} signs in through your browser. Stardust continues automatically when sign-in finishes.`,
+      setupOauthHint: provider =>
+        `${provider} signs in through your browser. Stardust continues automatically when sign-in finishes.`,
       currentService: 'Default',
       serviceNotConnected: 'Not connected',
       modelCount: count => `${count} model${count === 1 ? '' : 's'} available`,
@@ -1457,8 +1466,6 @@ export const en: Translations = {
         mcp: { label: 'MCP', hint: 'MCP tool routing' },
         title_generation: { label: 'Title gen', hint: 'Session titles' },
         review: { label: 'Review', hint: '/review reviewer subagent' },
-        triage_specifier: { label: 'Triage specifier', hint: 'Kanban spec fleshing' },
-        kanban_decomposer: { label: 'Kanban decomposer', hint: 'Task decomposition' },
         profile_describer: { label: 'Profile describer', hint: 'Auto profile descriptions' },
         curator: { label: 'Curator', hint: 'Skill-usage review' }
       }
@@ -1681,7 +1688,8 @@ export const en: Translations = {
       postSetupCompleteTitle: 'Setup complete',
       postSetupCompleteMessage: step => `${step} installed.`,
       postSetupErrorTitle: 'Setup finished with errors',
-      postSetupErrorMessage: step => `Setting up ${step} did not finish. Open the logs to see why, then run setup again.`,
+      postSetupErrorMessage: step =>
+        `Setting up ${step} did not finish. Open the logs to see why, then run setup again.`,
       postSetupOpenLogs: 'Open logs',
       postSetupRunAgain: 'Run again',
       postSetupFailed: step => `Failed to run ${step} setup`,
@@ -1723,23 +1731,38 @@ export const en: Translations = {
         switchedToLocal: 'Terminal commands now run locally. Applies to new sessions.'
       },
       browserRealProfile: {
-        label: 'Use My Real Browser Profile',
+        label: 'Use a Copy of My Browser Profile',
         description:
           "Copies your default browser's logins and cookies into a managed snapshot the agent browses with. Your live profile is never opened directly. Applies to new sessions.",
         enabledTitle: 'Real-profile browsing on',
         enabledMessage: 'New sessions will browse with a snapshot of your default browser profile.',
         disabledTitle: 'Real-profile browsing off',
         disabledMessage: 'The profile snapshot will be deleted; new sessions use a clean browser.',
-        failedSave: 'Could not save the real-profile setting',
-        prompt: {
-          title: 'Stay signed in to your sites',
-          body: 'Let Hermes browse with a snapshot of your default browser profile, so sites open already signed in.',
-          bulletSnapshot: 'Cookies and logins are copied into a managed snapshot.',
-          bulletLiveProfile: 'Your live browser profile is never opened directly.',
-          bulletLocal: 'Nothing leaves this computer.',
-          dontShowAgain: "Don't show again",
-          notNow: 'Not now',
-          enable: 'Use my profile'
+        failedSave: 'Could not save the real-profile setting'
+      },
+      browserHostControl: {
+        label: 'Connect to an Open Chrome Profile',
+        description:
+          'Explicitly pair this session with one already-open Chrome profile through the approved browser extension. Stardust never copies your Chrome cookies.',
+        statusLabel: 'Status',
+        profileLabel: 'Chrome profile directory',
+        connect: 'Connect Chrome',
+        disconnect: 'Disconnect',
+        working: 'Working…',
+        connectedTitle: 'Chrome connected',
+        connectedMessage: 'This session can now use the paired Chrome profile after each action is approved.',
+        connectFailed: 'Could not connect to Chrome',
+        disconnectFailed: 'Could not disconnect from Chrome',
+        noSession: 'Open or select a Desktop session first.',
+        invalidProfile: 'Use only the Chrome profile directory name, such as Default or Profile 1.',
+        warning:
+          'Install and enable the official Playwright MCP Browser Extension in Chrome, then approve the intended tab when prompted. The connection is session-scoped and stops when you disconnect.',
+        status: {
+          inactive: 'Not connected',
+          starting: 'Connecting…',
+          connected: 'Connected',
+          stopping: 'Disconnecting…',
+          error: 'Error'
         }
       }
     }
@@ -1820,14 +1843,10 @@ export const en: Translations = {
         'Extend the agent for the selected profile — tools, hooks, providers. Take effect after a gateway restart.',
       pageBlurb: 'One row per plugin. A plugin can extend this app, the agent, or both — each half has its own switch.',
       bundledNames: {
-        'hermes-bots': 'Agents',
-        kanban: 'Task Board',
-        radio: 'Radio'
+        'hermes-bots': 'Agents'
       },
       bundledDescriptions: {
-        'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.',
-        kanban: 'Multi-agent task board with a board view, sidebar entry, and live task activity in the status bar.',
-        radio: 'Live radio with pinned stations, search, and an audio-reactive waveform.'
+        'hermes-bots': 'Agent roster with dedicated chats, routines, group conversations, and agent-to-agent messaging.'
       },
       halfDesktop: 'Desktop',
       halfDesktopHint: 'this app, same for every profile',
@@ -2175,11 +2194,19 @@ export const en: Translations = {
       resume: 'Resume',
       runNow: 'Run now',
       memoryData: 'Memory data',
-      memoryDataDesc: 'Built-in memory files injected into every session',
+      memoryDataDesc: 'Review built-in entries. Existing chats keep their cached prompt until a fresh session.',
       memoryProvider: name => `Active provider: ${name}`,
       builtinMemory: 'built-in',
       memoryFile: 'Agent memory (MEMORY.md)',
       userFile: 'User profile (USER.md)',
+      viewEntries: 'View entries',
+      hideEntries: 'Hide entries',
+      noEntries: 'No entries',
+      entriesUnavailable: 'Built-in memory is unavailable for this profile.',
+      removeEntry: 'Remove entry',
+      removeEntryConfirm: 'Remove this memory entry?',
+      entryRemoved: 'Memory entry removed',
+      removeEntryFailed: 'Could not remove memory entry',
       bytes: size => size,
       empty: 'empty',
       resetMemory: 'Reset memory',
@@ -2563,9 +2590,11 @@ export const en: Translations = {
     nameLabel: 'Name',
     cloneFrom: 'Clone from',
     cloneFromNone: 'None (blank)',
-    cloneFromDesc: 'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from the selected profile. Sessions and scheduled jobs stay separate.',
+    cloneFromDesc:
+      'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from the selected profile. Sessions and scheduled jobs stay separate.',
     cloneFromDefault: 'Clone from default',
-    cloneFromDefaultDesc: 'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from your default profile. Sessions and scheduled jobs stay separate.',
+    cloneFromDefaultDesc:
+      'Copies config, .env secrets, skills, SOUL.md, and curated memory (MEMORY.md and USER.md) from your default profile. Sessions and scheduled jobs stay separate.',
     invalidName: hint => `Invalid name. ${hint}`,
     nameRequired: 'Name is required.',
     creating: 'Creating...',
@@ -2756,7 +2785,7 @@ export const en: Translations = {
       dismissed: 'Suggestion dismissed',
       actionFailed: 'Could not update automation suggestion',
       needsConversation: 'Open a saved conversation first so scheduled results have a chat to return to.'
-    },
+    }
   },
 
   artifacts: {
@@ -2816,6 +2845,7 @@ export const en: Translations = {
 
   sidebar: {
     recent: 'Recent',
+    filters: 'Filters',
     gatewayGroups: {
       grouping: 'Gateway & profile',
       rename: 'Rename group',
@@ -2840,7 +2870,7 @@ export const en: Translations = {
     clearSearch: 'Clear search',
     noMatch: query => `No sessions match “${query}”.`,
     results: 'Results',
-    pinned: 'Pinned',
+    pinned: 'Pinned chats',
     sessions: 'Chats',
     cronJobs: 'Cron jobs',
     groupAriaGrouped: 'Show sessions as a single list',
@@ -2999,6 +3029,7 @@ export const en: Translations = {
 
   composer: {
     message: 'Message',
+    addContext: 'Add context',
     wakingProfile: profile => `Waking up ${profile}…`,
     placeholderStarting: 'Starting your assistant...',
     placeholderReconnecting: 'Reconnecting…',
@@ -3307,9 +3338,15 @@ export const en: Translations = {
       revertConfirm: 'Discard changes to this file and restore it to the committed state? This cannot be undone.',
       revertAllConfirm: 'Discard every change and restore files to the committed state? This cannot be undone.',
       staged: 'Staged',
+      unstaged: 'Unstaged',
+      untracked: 'Untracked',
       noChanges: 'No changes',
       notRepo: 'Not a git repository',
       noDiff: 'No diff to show',
+      hunk: (current, total) => `Hunk ${current} of ${total}`,
+      previousHunk: 'Previous hunk',
+      nextHunk: 'Next hunk',
+      allHunks: 'All hunks',
       scopeUncommitted: 'Uncommitted',
       scopeBranch: 'Branch',
       scopeLastTurn: 'Last turn',
@@ -3329,6 +3366,13 @@ export const en: Translations = {
       branchOffFrom: base => `New branch from ${base}`,
       switchTo: branch => `Switch to ${branch}`,
       switchFailed: branch => `Could not switch to ${branch}`,
+      checks: {
+        loading: 'Checks loading',
+        unavailable: 'Checks unavailable',
+        pending: 'Checks pending',
+        passed: 'Checks passed',
+        failed: 'Checks failed'
+      },
       worktrees: 'Worktrees'
     }
   },
@@ -3462,7 +3506,8 @@ export const en: Translations = {
     remoteUrlDesc: 'Use the base URL of the Hermes gateway, including https:// when remote.',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: 'Detecting gateway authentication...',
-    probeError: "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
+    probeError:
+      "Hermes can't reach that address. Check the URL and that the other computer is running Hermes — sign-in options appear once it answers.",
     probeErrorDetails: 'Details',
     identityProvider: 'your identity provider',
     authTitle: 'Authentication',
@@ -3508,17 +3553,17 @@ export const en: Translations = {
 
   onboarding: {
     headerTitle: "Let's get you setup with Stardust Agent",
-    setupRelay: 'Set up a custom model endpoint',
-    setupRelayHint: 'Open model settings to enter your endpoint URL, key, and model.',
+    setupRelay: 'Add model API',
+    setupRelayHint: 'Enter the API base URL, API key, and model.',
     advancedProviders: 'Advanced: provider accounts and other services',
-    headerDesc: 'Connect your own model endpoint first, or finish setup later in Settings.',
+    headerDesc: 'Connect your own model API directly, or add one later in Settings.',
     preparingInstall: 'Stardust is finishing install. This usually takes under a minute on first run.',
     starting: 'Starting Stardust…',
     lookingUpProviders: 'Looking up providers...',
     collapse: 'Collapse',
     otherProviders: 'Other providers',
     haveApiKey: 'I have an API key',
-    chooseLater: "I'll choose a provider later",
+    chooseLater: "I'll set this up later",
     recommended: 'Recommended',
     connected: 'Connected',
     featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Stardust',
@@ -3540,7 +3585,8 @@ export const en: Translations = {
       xai: { short: 'Grok models', description: 'Direct access to xAI Grok models.' },
       local: {
         short: 'self-hosted',
-        description: 'Point Stardust at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
+        description:
+          'Point Stardust at a local or self-hosted OpenAI-compatible endpoint (vLLM, llama.cpp, Ollama, etc).'
       }
     },
     backToSignIn: 'Back to sign in',
@@ -3804,7 +3850,17 @@ export const en: Translations = {
         loading: 'Loading breakdown…',
         percentFull: percent => `${percent}% Full`,
         title: 'Context Usage',
-        tokenSummary: (used, max) => `${used} / ${max} Tokens`
+        tokenSummary: (used, max) => `${used} / ${max} Tokens`,
+        sessionTokens: 'Session token usage',
+        sessionTokensNote:
+          'Cumulative model calls; separate from current context occupancy. Cache tokens are part of the prompt, not added to the total.',
+        inputTokens: 'Uncached input',
+        cacheReadTokens: 'Cache read',
+        cacheWriteTokens: 'Cache write',
+        outputTokens: 'Output',
+        totalTokens: 'Total (prompt + output)',
+        noSessionTokens: 'No model usage yet',
+        unavailable: 'Not reported'
       },
       session: 'Session',
       yoloOn: 'YOLO on — auto-approving dangerous commands. Shift+click toggles globally.',
@@ -3968,6 +4024,7 @@ export const en: Translations = {
   },
 
   zones: {
+    paneTitles: { overview: 'Context', files: 'Files', review: 'Review', terminal: 'Terminal' },
     showTabStrip: 'Show tabs',
     hideTabStrip: 'Hide tabs',
     showStripTab: title => `Show ${title}`,
@@ -4051,6 +4108,7 @@ export const en: Translations = {
     thread: {
       loadingSession: 'Loading session',
       showEarlier: 'Show earlier messages',
+      workProgress: count => (count === 1 ? 'Work update' : `${count} work updates`),
       loadingResponse: 'Stardust is loading a response',
       loadingLocalModel: model => `Loading ${model} into memory`,
       processingPrompt: 'Processing prompt',
@@ -4086,17 +4144,21 @@ export const en: Translations = {
         auth: 'The AI service rejected your sign-in. Check the credentials for this provider, then send your message again.',
         billing: 'Your account has no credits left for this provider. Top up or switch provider, then send again.',
         disk: 'Your disk is full, so Hermes could not save this conversation. Free some space, then retry.',
-        endpoint: "Hermes can't reach your custom model server. Check that it is running, then send your message again.",
-        gateway: 'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
+        endpoint:
+          "Hermes can't reach your custom model server. Check that it is running, then send your message again.",
+        gateway:
+          'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
         generic: 'Something went wrong while Hermes was replying. Retry, or copy the details if it keeps happening.',
         provider: 'The AI service could not complete this request. Retry in a moment or switch provider.',
-        runtime: 'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
+        runtime:
+          'Hermes hit an internal problem starting this reply. Send your message again; if it keeps happening, send diagnostics.',
         streaming: 'The connection dropped before the reply finished. Retry to send it again.'
       },
       errorCodes: {
         auth: {
           title: provider => `${provider} rejected your sign-in`,
-          body: provider => `The credentials saved for ${provider} were not accepted. Fix them in Settings or switch provider, then send your message again.`
+          body: provider =>
+            `The credentials saved for ${provider} were not accepted. Fix them in Settings or switch provider, then send your message again.`
         },
         auth_permanent: {
           title: provider => `${provider} rejected your sign-in`,
@@ -4146,7 +4208,8 @@ export const en: Translations = {
         },
         model_not_found: {
           title: 'This model is not available',
-          body: provider => `${provider} does not offer this model on your account. Choose another model, then send your message again.`
+          body: provider =>
+            `${provider} does not offer this model on your account. Choose another model, then send your message again.`
         },
         provider_policy_blocked: {
           title: 'This model is blocked by your account settings',
@@ -4202,6 +4265,7 @@ export const en: Translations = {
       errorRetry: 'Retry',
       errorStartNewSession: 'Start new session',
       errorSwitchProvider: 'Switch provider',
+      errorSetUpFallback: 'Set up a fallback model',
       errorChooseModel: 'Choose a model',
       errorCompressConversation: 'Compress conversation',
       errorCompressFailed: 'Could not compress the conversation',
@@ -4210,7 +4274,7 @@ export const en: Translations = {
       errorUpdateApiKey: 'Update API key',
       errorSignInAgain: provider => `Sign in to ${provider} again`,
       errorOauthExpired: provider =>
-        `Your ${provider} sign-in has expired or was revoked. Sign in again to keep chatting.`,
+        `Your ${provider} sign-in has expired or was revoked. Run hermes model in a terminal and choose ${provider} to sign in again, or switch to a model API in Settings → Model services.`,
       errorOpenLogs: 'Open logs',
       errorOpenLogsFailed: 'Could not open the logs folder',
       errorOpenDesktopLogs: 'Open Desktop logs',
@@ -4401,8 +4465,10 @@ export const en: Translations = {
     sudoSendFailed: 'Could not send sudo password',
     secretSendFailed: 'Could not send secret',
     sudoTitle: 'Administrator password',
-    sudoDesc: 'Review the command before entering your sudo password. Your password is sent to the agent running it and cached for this session.',
-    sudoCommandUnavailable: 'This agent did not provide the command. Cancel if you cannot verify it in the conversation.',
+    sudoDesc:
+      'Review the command before entering your sudo password. Your password is sent to the agent running it and cached for this session.',
+    sudoCommandUnavailable:
+      'This agent did not provide the command. Cancel if you cannot verify it in the conversation.',
     sudoPlaceholder: 'sudo password',
     secretTitle: 'Secret required',
     secretDesc: 'Hermes needs a credential to continue.',
@@ -4514,7 +4580,8 @@ export const en: Translations = {
       success: platform => `Handed off to ${platform}. Resume here anytime.`,
       systemNote: platform => `↻ Handed off to ${platform} — resume here anytime.`,
       failed: error => `Handoff failed: ${error}`,
-      timedOut: "Hermes couldn't reach your messaging connection. Start it from Settings → Messaging, then try the handoff again.",
+      timedOut:
+        "Hermes couldn't reach your messaging connection. Start it from Settings → Messaging, then try the handoff again.",
       startMessaging: 'Start messaging'
     }
   },

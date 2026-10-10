@@ -19,16 +19,10 @@ import { formatTimelineRange, formatTimelineTimestamp } from './timestamp'
 import { Thread } from '.'
 
 const requestFreshSession = vi.hoisted(() => vi.fn())
-const startManualProviderOAuth = vi.hoisted(() => vi.fn())
 
 vi.mock('@/store/profile', async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
   requestFreshSession: () => requestFreshSession()
-}))
-
-vi.mock('@/store/onboarding', async importOriginal => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  startManualProviderOAuth: (...args: unknown[]) => startManualProviderOAuth(...args)
 }))
 
 // Timeline timestamps render only when `display.timestamps` is enabled.
@@ -41,7 +35,6 @@ stubThreadEnvironment()
 afterEach(() => {
   cleanup()
   requestFreshSession.mockClear()
-  startManualProviderOAuth.mockClear()
 })
 
 function userMessage(): ThreadMessage {
@@ -299,7 +292,7 @@ describe('code-keyed error card copy and actions', () => {
 })
 
 describe('rejected API key recovery', () => {
-  it('names the key as the problem and deep-links Settings → Keys to that env var', async () => {
+  it('names the key as the problem and routes recovery to model API services', async () => {
     render(
       <MemoryRouter>
         <LocationProbe />
@@ -325,20 +318,81 @@ describe('rejected API key recovery', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
 
     screen.getByRole('button', { name: 'Update API key' }).click()
-    await waitFor(() => expect(screen.getByTestId('location').textContent).toMatch(/\?tab=keys&key=OPENAI_API_KEY$/))
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toMatch(/\?tab=config:model$/))
+  })
+})
+
+describe('fallback model offer', () => {
+  it('routes a busy provider with no fallback straight to the fallback field', async () => {
+    render(
+      <MemoryRouter>
+        <LocationProbe />
+        <Harness
+          assistant={failedMessage(
+            {
+              code: 'overloaded',
+              fallbackConfigured: false,
+              layer: 'provider',
+              provider: 'custom:relay',
+              retryable: true
+            },
+            'HTTP 503: No available channel for model gemini-3.8-flash'
+          )}
+        />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeTruthy()
+    // One way to the same settings page, and it lands on the field that fixes this.
+    expect(screen.queryByRole('button', { name: 'Switch provider' })).toBeNull()
+
+    screen.getByRole('button', { name: 'Set up a fallback model' }).click()
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toMatch(/\?tab=config:model&field=fallback_providers$/)
+    )
+  })
+
+  it('keeps Switch provider and no fallback offer when one was configured', async () => {
+    render(
+      <MemoryRouter>
+        <Harness
+          assistant={failedMessage({
+            code: 'overloaded',
+            fallbackConfigured: true,
+            layer: 'provider',
+            retryable: true
+          })}
+        />
+      </MemoryRouter>
+    )
+
+    expect(await screen.findByRole('button', { name: 'Switch provider' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Set up a fallback model' })).toBeNull()
   })
 })
 
 describe('expired OAuth grant recovery', () => {
-  it('explains the expiry and re-runs that provider sign-in in one click', async () => {
-    render(<Harness assistant={oauthExpiredMessage()} />)
+  it('keeps the legacy credential readable but routes recovery to model API services', async () => {
+    render(
+      <MemoryRouter>
+        <LocationProbe />
+        <Harness assistant={oauthExpiredMessage()} />
+      </MemoryRouter>
+    )
 
-    expect(await screen.findByText(/Nous Portal sign-in has expired/)).toBeTruthy()
-    // Signing in changes the outcome, so Retry stays as the follow-up click.
+    expect(await screen.findByText('Your Nous Portal sign-in expired')).toBeTruthy()
+    // Desktop has no in-app provider sign-in any more: the copy must name the
+    // real way back instead of promising a sign-in the card cannot start.
+    expect(
+      screen.getByText(
+        'Your Nous Portal sign-in has expired or was revoked. Run hermes model in a terminal and choose Nous Portal to sign in again, or switch to a model API in Settings → Model services.'
+      )
+    ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Sign in to Nous Portal again' })).toBeNull()
 
-    screen.getByRole('button', { name: 'Sign in to Nous Portal again' }).click()
-    expect(startManualProviderOAuth).toHaveBeenCalledWith('nous', undefined)
+    screen.getByRole('button', { name: 'Switch provider' }).click()
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toMatch(/\?tab=config:model$/))
   })
 })
 

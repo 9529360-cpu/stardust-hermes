@@ -13,14 +13,13 @@ import {
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { Check, Globe, Loader2, Plus, Save, Trash2, Zap } from '@/lib/icons'
-import { cn } from '@/lib/utils'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
-import type { CustomEndpoint, CustomEndpointUpdate } from '@/types/hermes'
+import type { CustomEndpoint, CustomEndpointsResponse, CustomEndpointUpdate } from '@/types/hermes'
 
 import { useOnProfileSwitch } from '../hooks/use-on-profile-switch'
 
-import { EmptyState, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from './primitives'
+import { EmptyState, ListRow, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from './primitives'
 
 interface CustomEndpointsSettingsProps {
   onConfigSaved?: () => void
@@ -60,9 +59,14 @@ const EMPTY_FORM: EndpointForm = {
   contextLength: '',
   discoverModels: true,
   id: '',
-  makeDefault: true,
+  makeDefault: false,
   model: '',
   name: ''
+}
+
+// The Electron REST bridge reports HTTP failures as `Error("<status>: <body>")`.
+function isConflictError(error: unknown): boolean {
+  return /(^|\s)409:/.test(error instanceof Error ? error.message : String(error))
 }
 
 function formFromEndpoint(endpoint: CustomEndpoint): EndpointForm {
@@ -107,6 +111,11 @@ export function CustomEndpointsSettings({
   const [activating, setActivating] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [endpoints, setEndpoints] = useState<CustomEndpoint[]>([])
+  // Whether this profile already has a main model. Adding a service never
+  // replaces a working default implicitly, but on a profile with none (first
+  // run) the first service must become the default or chat still has no model.
+  const [hasMainModel, setHasMainModel] = useState(true)
+  const [editorMode, setEditorMode] = useState<'add' | 'edit' | null>(null)
   const [form, setForm] = useState<EndpointForm>(EMPTY_FORM)
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -116,6 +125,9 @@ export function CustomEndpointsSettings({
 
   function updateForm(update: (current: EndpointForm) => EndpointForm) {
     probeRevision.current++
+    // An edit invalidates the in-flight probe; its stale finally must not leave
+    // the Test control disabled until the panel is reopened.
+    setTesting(false)
     setProbeMessage(null)
     setForm(current => {
       const next = update(current)
@@ -128,6 +140,11 @@ export function CustomEndpointsSettings({
     })
   }
 
+  const applyEndpoints = useCallback((data: CustomEndpointsResponse) => {
+    setEndpoints(data.endpoints)
+    setHasMainModel(Boolean(data.current?.model?.trim()) || data.endpoints.some(endpoint => endpoint.is_current))
+  }, [])
+
   const loadProfile = useCallback(
     async (epoch: number) => {
       try {
@@ -137,16 +154,7 @@ export function CustomEndpointsSettings({
           return
         }
 
-        setEndpoints(data.endpoints)
-        const current = data.endpoints.find(endpoint => endpoint.is_current) ?? data.endpoints[0]
-
-        if (current) {
-          setForm(formFromEndpoint(current))
-          setDiscoveredModels(current.models)
-        } else {
-          setForm(EMPTY_FORM)
-          setDiscoveredModels([])
-        }
+        applyEndpoints(data)
       } catch (err) {
         if (profileEpoch.current === epoch) {
           notifyError(err, c.loadFailed)
@@ -157,7 +165,7 @@ export function CustomEndpointsSettings({
         }
       }
     },
-    [c.loadFailed, scopeProfile]
+    [applyEndpoints, c.loadFailed, scopeProfile]
   )
 
   const beginProfileReload = useCallback(() => {
@@ -169,6 +177,7 @@ export function CustomEndpointsSettings({
     setActivating(null)
     setDeleting(null)
     setEndpoints([])
+    setEditorMode(null)
     setForm(EMPTY_FORM)
     setDiscoveredModels([])
     setAdvancedOpen(false)
@@ -181,8 +190,35 @@ export function CustomEndpointsSettings({
     const data = await getCustomEndpoints(scopeProfile)
 
     if (profileEpoch.current === epoch) {
-      setEndpoints(data.endpoints)
+      applyEndpoints(data)
     }
+  }
+
+  function closeEditor() {
+    probeRevision.current++
+    setEditorMode(null)
+    setForm(EMPTY_FORM)
+    setDiscoveredModels([])
+    setAdvancedOpen(false)
+    setProbeMessage(null)
+  }
+
+  function beginAdd() {
+    probeRevision.current++
+    setEditorMode('add')
+    setForm({ ...EMPTY_FORM, makeDefault: !hasMainModel })
+    setDiscoveredModels([])
+    setAdvancedOpen(false)
+    setProbeMessage(null)
+  }
+
+  function beginEdit(endpoint: CustomEndpoint) {
+    probeRevision.current++
+    setEditorMode('edit')
+    setForm(formFromEndpoint(endpoint))
+    setDiscoveredModels(endpoint.models)
+    setAdvancedOpen(false)
+    setProbeMessage(null)
   }
 
   useEffect(() => {
@@ -204,6 +240,10 @@ export function CustomEndpointsSettings({
   })
 
   async function handleSave() {
+    if (!editorMode) {
+      return
+    }
+
     if (!isEndpointUrl(form.baseUrl)) {
       setProbeMessage(c.validationFailed)
 
@@ -214,30 +254,36 @@ export function CustomEndpointsSettings({
 
     try {
       setSaving(true)
-      const response = await saveCustomEndpoint(toPayload(form, discoveredModels), scopeProfile)
+
+      const response = await saveCustomEndpoint(
+        { ...toPayload(form, discoveredModels), create_only: editorMode === 'add' },
+        scopeProfile
+      )
 
       if (profileEpoch.current !== epoch) {
         return
       }
 
-      setEndpoints(response.endpoints)
+      applyEndpoints(response)
       const saved = response.endpoints.find(endpoint => endpoint.id === response.id)
-
-      if (saved) {
-        setForm(formFromEndpoint(saved))
-        setDiscoveredModels(saved.models)
-      }
 
       if (saved && saved.is_current && scopeProfile === undefined) {
         onMainModelChanged?.(saved.id, saved.model)
       }
 
+      closeEditor()
       triggerHaptic('success')
       onConfigSaved?.()
       notify({ kind: 'success', message: c.saved })
     } catch (err) {
       if (profileEpoch.current === epoch) {
-        notifyError(err, c.saveFailed)
+        if (editorMode === 'add' && isConflictError(err)) {
+          // Add is create-only: the backend refused to overwrite a saved
+          // service with the same name. Say so where the user is typing.
+          setProbeMessage(c.duplicateService)
+        } else {
+          notifyError(err, c.saveFailed)
+        }
       }
     } finally {
       if (profileEpoch.current === epoch) {
@@ -330,12 +376,7 @@ export function CustomEndpointsSettings({
         return
       }
 
-      setEndpoints(response.endpoints)
-
-      if (form.id === endpoint.id) {
-        setForm(EMPTY_FORM)
-        setDiscoveredModels([])
-      }
+      applyEndpoints(response)
 
       onConfigSaved?.()
       triggerHaptic('success')
@@ -357,78 +398,21 @@ export function CustomEndpointsSettings({
   const allModelOptions = Array.from(new Set([...discoveredModels, form.model].filter(Boolean)))
   const canSave = form.name.trim() && isEndpointUrl(form.baseUrl) && form.model.trim()
 
-  return (
-    <SettingsContent>
-      <div className="space-y-6">
+  if (editorMode) {
+    return (
+      <SettingsContent>
         <section>
-          <SectionHeading icon={Globe} meta={`${endpoints.length}`} title={c.title} />
-          <div className="divide-y divide-border/40 rounded-md border border-border/50">
-            {endpoints.length ? (
-              endpoints.map(endpoint => (
-                <div className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" key={endpoint.id}>
-                  <button
-                    className="min-w-0 text-left"
-                    onClick={() => {
-                      probeRevision.current++
-                      setProbeMessage(null)
-                      setForm(formFromEndpoint(endpoint))
-                      setDiscoveredModels(endpoint.models)
-                      setAdvancedOpen(false)
-                    }}
-                    type="button"
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-medium">{endpoint.name}</span>
-                      {endpoint.is_current && (
-                        <Pill tone="primary">
-                          <Check className="size-3" />
-                          {c.active}
-                        </Pill>
-                      )}
-                      {endpoint.source === 'direct-config' && <Pill>config.yaml</Pill>}
-                    </div>
-                    <div className="mt-1 truncate font-mono text-[0.7rem] text-muted-foreground">
-                      {endpoint.base_url}
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <span>{endpoint.model}</span>
-                      {endpoint.has_api_key && <span>{endpoint.api_key_preview ?? c.apiKeySet}</span>}
-                    </div>
-                  </button>
-                  <div className="flex items-center gap-2 sm:justify-end">
-                    <Button
-                      disabled={endpoint.is_current || activating === endpoint.id}
-                      onClick={() => void handleActivate(endpoint)}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {activating === endpoint.id ? <Loader2 className="animate-spin" /> : <Zap />}
-                      {activating === endpoint.id ? c.using : c.use}
-                    </Button>
-                    {endpoint.source !== 'direct-config' && (
-                      <Button
-                        className="hover:text-destructive"
-                        disabled={deleting === endpoint.id}
-                        onClick={() => void handleDelete(endpoint)}
-                        size="icon-sm"
-                        title={c.deleteEndpoint}
-                        variant="ghost"
-                      >
-                        {deleting === endpoint.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <EmptyState description={c.emptyDescription} title={c.emptyTitle} />
-            )}
-          </div>
-        </section>
+          <SectionHeading
+            aside={
+              <Button disabled={saving} onClick={closeEditor} size="inline" type="button" variant="text">
+                {t.common.cancel}
+              </Button>
+            }
+            icon={editorMode === 'add' ? Plus : Globe}
+            title={editorMode === 'add' ? c.addTitle : c.editTitle}
+          />
 
-        <section>
-          <SectionHeading icon={Plus} title={form.id ? c.editTitle : c.addTitle} />
-          <div className="grid gap-3 rounded-md border border-border/50 p-3">
+          <div className="grid gap-3">
             <label className="grid gap-1.5 text-xs text-muted-foreground">
               {c.nameLabel}
               <Input
@@ -480,7 +464,7 @@ export function CustomEndpointsSettings({
               {c.apiKeyLabel}
               <Input
                 onChange={event => updateForm(current => ({ ...current, apiKey: event.target.value }))}
-                placeholder={form.id ? c.apiKeyKeepExisting : c.apiKeyOptional}
+                placeholder={editorMode === 'edit' ? c.apiKeyKeepExisting : c.apiKeyOptional}
                 type="password"
                 value={form.apiKey}
               />
@@ -500,15 +484,22 @@ export function CustomEndpointsSettings({
             </div>
 
             {advancedOpen && (
-              <div className="grid gap-3 rounded-md border border-border/40 bg-muted/20 p-3">
+              <div className="grid gap-3 pt-1">
                 <label className="grid gap-1.5 text-xs text-muted-foreground">
                   {c.providerIdLabel}
                   <Input
-                    onChange={event => updateForm(current => ({ ...current, id: event.target.value }))}
+                    disabled={editorMode === 'edit'}
+                    onChange={
+                      editorMode === 'add'
+                        ? event => updateForm(current => ({ ...current, id: event.target.value }))
+                        : undefined
+                    }
                     placeholder={c.providerIdPlaceholder}
                     value={form.id}
                   />
-                  <span className="text-[0.7rem] text-muted-foreground">{c.providerIdHint}</span>
+                  {editorMode === 'add' && (
+                    <span className="text-[0.7rem] text-muted-foreground">{c.providerIdHint}</span>
+                  )}
                 </label>
                 <label className="grid gap-1.5 text-xs text-muted-foreground">
                   {c.contextLabel}
@@ -547,22 +538,86 @@ export function CustomEndpointsSettings({
                 {saving ? <Loader2 className="animate-spin" /> : <Save />}
                 {saving ? c.saving : c.save}
               </Button>
-              <Button
-                className={cn(!form.id && 'hidden')}
-                onClick={() => {
-                  setForm(EMPTY_FORM)
-                  setDiscoveredModels([])
-                  setAdvancedOpen(false)
-                }}
-                type="button"
-                variant="ghost"
-              >
-                {c.newEndpoint}
-              </Button>
             </div>
           </div>
         </section>
-      </div>
+      </SettingsContent>
+    )
+  }
+
+  return (
+    <SettingsContent>
+      <section>
+        <SectionHeading
+          aside={
+            <Button onClick={beginAdd} size="sm" type="button" variant="secondary">
+              <Plus />
+              {c.addTitle}
+            </Button>
+          }
+          icon={Globe}
+          meta={`${endpoints.length}`}
+          title={c.title}
+        />
+        {endpoints.length ? (
+          <div>
+            {endpoints.map(endpoint => (
+              <ListRow
+                action={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      disabled={endpoint.is_current || activating === endpoint.id}
+                      onClick={() => void handleActivate(endpoint)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      {activating === endpoint.id ? <Loader2 className="animate-spin" /> : <Zap />}
+                      {activating === endpoint.id ? c.using : c.use}
+                    </Button>
+                    <Button onClick={() => beginEdit(endpoint)} size="inline" type="button" variant="textStrong">
+                      {c.editTitle}
+                    </Button>
+                    {endpoint.source !== 'direct-config' && (
+                      <Button
+                        aria-label={c.deleteEndpoint}
+                        className="hover:text-destructive"
+                        disabled={deleting === endpoint.id}
+                        onClick={() => void handleDelete(endpoint)}
+                        size="icon-sm"
+                        variant="ghost"
+                      >
+                        {deleting === endpoint.id ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                      </Button>
+                    )}
+                  </div>
+                }
+                description={
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>{endpoint.model}</span>
+                    {endpoint.has_api_key && <span>{endpoint.api_key_preview ?? c.apiKeySet}</span>}
+                  </span>
+                }
+                hint={endpoint.base_url}
+                key={endpoint.id}
+                title={
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{endpoint.name}</span>
+                    {endpoint.is_current && (
+                      <Pill tone="primary">
+                        <Check className="size-3" />
+                        {c.active}
+                      </Pill>
+                    )}
+                    {endpoint.source === 'direct-config' && <Pill>config.yaml</Pill>}
+                  </span>
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState description={c.emptyDescription} title={c.emptyTitle} />
+        )}
+      </section>
     </SettingsContent>
   )
 }

@@ -237,6 +237,7 @@ export interface CustomEndpointUpdate {
   api_key?: string
   base_url: string
   context_length?: number
+  create_only?: boolean
   discover_models?: boolean
   id?: string
   make_default?: boolean
@@ -677,6 +678,7 @@ export interface SessionResumeResult {
     description?: string
     request_id?: string
     smart_denied?: boolean
+    policy_locked?: boolean
   }
   // Server→client requests still unanswered for this session (clarify, sudo,
   // vault prompts, …). The shared channel re-delivers them to the request
@@ -732,6 +734,12 @@ export interface UsageStats {
   avg_tps?: number
   /** Session prompt-cache hit rate, 0–100. Omitted (not 0) when the provider reports no cache reads. */
   cache_hit_pct?: number
+  /** Session cumulative prompt-cache reads; absent on older gateways. */
+  cache_read?: number
+  /** Session cumulative prompt-cache writes; absent on older gateways. */
+  cache_write?: number
+  /** All prompt tokens, including uncached input and cache reads/writes. */
+  prompt?: number
   calls: number
   context_max?: number
   context_percent?: number
@@ -1656,6 +1664,12 @@ export interface MemoryStatusResponse {
   active: string
   providers: { name: string; description: string; configured: boolean }[]
   builtin_files: { memory: number; user: number }
+}
+
+export interface MemoryEntriesResponse {
+  target: 'memory' | 'user'
+  available: boolean
+  entries: string[]
 }
 
 /** `GET /api/curator` — background skill-curator status. */

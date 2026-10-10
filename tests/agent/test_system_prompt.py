@@ -153,6 +153,64 @@ def _prompt_parts(agent):
         return build_system_prompt_parts(agent)
 
 
+def test_desktop_browser_modes_route_to_one_authoritative_surface():
+    agent = _make_agent(
+        platform="desktop",
+        valid_tool_names=["desktop_preview", "drive_preview", "computer_use", "browser_exec"],
+    )
+    prompt = _stable_prompt(agent)
+
+    assert "use the in-app Browser by default" in prompt
+    assert "that SAME live page using drive_preview" in prompt
+    assert "For the user's existing host browser, use computer_use" in prompt
+    assert "only copies logins into another profile" in prompt
+    assert "when the GUI is connected to a remote gateway" in prompt
+    assert "Never silently switch between these surfaces" in prompt
+
+
+def test_desktop_browser_modes_fail_closed_when_host_controller_unavailable():
+    agent = _make_agent(platform="desktop", valid_tool_names=["desktop_preview", "drive_preview", "browser_exec"])
+    prompt = _stable_prompt(agent)
+
+    assert "No host-window controller is available" in prompt
+    assert "do not substitute a copied profile or a new browser session" in prompt
+    assert "For the user's existing host browser, use computer_use" not in prompt
+
+
+def test_browser_mode_guidance_requires_desktop_and_live_in_app_tools():
+    for platform, tools in (
+        ("tui", ["desktop_preview", "drive_preview", "computer_use"]),
+        ("desktop", ["computer_use", "browser_exec"]),
+    ):
+        agent = _make_agent(platform=platform, valid_tool_names=tools)
+        assert "Desktop browser targets:" not in _stable_prompt(agent)
+
+
+def test_unified_desktop_browser_prompt_chooses_one_tool_and_never_crosses_sessions():
+    agent = _make_agent(
+        platform="desktop",
+        valid_tool_names=["browser", "desktop_preview", "drive_preview", "computer_use", "browser_navigate"],
+    )
+    prompt = _stable_prompt(agent)
+
+    assert "ONE browser control tool: browser" in prompt
+    assert "browser target=in_app" in prompt
+    assert "browser target=host" in prompt
+    assert "Never mix tabs, login state" in prompt
+    assert "No host-window controller is available" not in prompt
+    assert "For the user's existing host browser, use computer_use" not in prompt
+    assert "Use the in-app Browser" not in prompt
+
+
+def test_unified_browser_guide_requires_desktop_and_exposed_tool():
+    assert "ONE browser control tool" not in _stable_prompt(
+        _make_agent(platform="tui", valid_tool_names=["browser"])
+    )
+    assert "ONE browser control tool" not in _stable_prompt(
+        _make_agent(platform="desktop", valid_tool_names=["browser_navigate"])
+    )
+
+
 def _init_code_repo(path):
     """A git repo that actually holds code — the coding posture requires a source
     file (or manifest), not a bare ``.git`` (a prose/notes repo stays general)."""

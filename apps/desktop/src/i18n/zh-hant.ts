@@ -254,8 +254,7 @@ export const zhHant = defineLocale({
     doneTitle: '診斷資訊已儲存',
     doneDescription: '已將遮罩後的診斷套件儲存到您的電腦。如需支援，可將此檔案附加到星塵的 GitHub Issue。',
     failedTitle: '無法儲存診斷資訊',
-    failedHint:
-      '請更新星塵與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
+    failedHint: '請更新星塵與後端後重試。此流程不會退回到把日誌上傳到支援服務的舊路徑。',
     handoffLead: '需要協助？',
     links: {
       github: '星塵 GitHub Issues'
@@ -923,7 +922,8 @@ export const zhHant = defineLocale({
       validationReachable: '連線正常。',
       validationReachableModels: count => `連線正常，找到 ${count} 個模型。`,
       validationFailed: '連線測試失敗',
-      activationFailed: '切換預設服務失敗'
+      activationFailed: '切換預設服務失敗',
+      duplicateService: '已經有同名的模型服務。請在列表中編輯它，或換一個名稱。'
     },
     computerUse: {
       accessibility: '輔助使用',
@@ -1260,8 +1260,6 @@ export const zhHant = defineLocale({
         mcp: { label: 'MCP', hint: 'MCP 工具路由' },
         title_generation: { label: '標題生成', hint: '工作階段標題' },
         review: { label: '評審', hint: '/review 評審子代理' },
-        triage_specifier: { label: '分類指定', hint: '看板任務規格補全' },
-        kanban_decomposer: { label: '看板分解', hint: '任務拆解' },
         profile_describer: { label: '設定檔描述', hint: '自動生成設定檔描述' },
         curator: { label: '策展器', hint: '技能使用審查' }
       }
@@ -1369,8 +1367,7 @@ export const zhHant = defineLocale({
     providers: {
       connectAccount: '登入模型提供方',
       haveApiKey: '改用 API 金鑰？',
-      intro:
-        '可以使用提供方訂閱或網頁登入，無需複製 API 金鑰。Stardust 會在應用程式中完成提供方登入流程。',
+      intro: '可以使用提供方訂閱或網頁登入，無需複製 API 金鑰。Stardust 會在應用程式中完成提供方登入流程。',
       connected: '已連線',
       collapse: '收合',
       connectAnother: '連結其他提供方',
@@ -1481,7 +1478,7 @@ export const zhHant = defineLocale({
         needsSetupHint: '現在即可選擇此後端——但在完成設定前命令將會失敗。'
       },
       browserRealProfile: {
-        label: '使用我的真實瀏覽器設定檔',
+        label: '使用瀏覽器設定檔副本',
         description:
           '將預設瀏覽器的登入資訊與 Cookie 複製到受管理的快照中，代理使用該快照進行瀏覽。絕不會直接開啟你的真實設定檔。將套用於新工作階段。',
         enabledTitle: '真實設定檔瀏覽：已開啟',
@@ -1489,15 +1486,28 @@ export const zhHant = defineLocale({
         disabledTitle: '真實設定檔瀏覽：已關閉',
         disabledMessage: '設定檔快照將被刪除；新工作階段使用乾淨的瀏覽器。',
         failedSave: '無法儲存真實設定檔設定',
-        prompt: {
-          title: '讓網站保持登入狀態',
-          body: '讓 Hermes 使用預設瀏覽器設定檔的快照進行瀏覽，網站開啟時即已登入。',
-          bulletSnapshot: 'Cookie 與登入資訊會複製到受管理的快照中。',
-          bulletLiveProfile: '絕不會直接開啟你的真實瀏覽器設定檔。',
-          bulletLocal: '所有資料都不會離開這台電腦。',
-          dontShowAgain: '不再顯示',
-          notNow: '暫不',
-          enable: '使用我的設定檔'
+      },
+      browserHostControl: {
+        label: '連接至已開啟的 Chrome 設定檔',
+        description: '透過核准的瀏覽器擴充功能，明確將此工作階段配對至已開啟的 Chrome 設定檔。Stardust 不會複製 Chrome Cookie。',
+        statusLabel: '狀態',
+        profileLabel: 'Chrome 設定檔目錄',
+        connect: '連接 Chrome',
+        disconnect: '中斷連接',
+        working: '處理中…',
+        connectedTitle: 'Chrome 已連接',
+        connectedMessage: '每個操作獲得核准後，此工作階段即可使用已配對的 Chrome 設定檔。',
+        connectFailed: '無法連接 Chrome',
+        disconnectFailed: '無法中斷 Chrome 連接',
+        noSession: '請先開啟或選取 Desktop 工作階段。',
+        invalidProfile: '只輸入 Chrome 設定檔目錄名稱，例如 Default 或 Profile 1。',
+        warning: '請先在 Chrome 中安裝並啟用官方 Playwright MCP Browser Extension，並在擴充功能提示中核准要控制的分頁。連接僅限此工作階段，中斷連接後即會停止。',
+        status: {
+          inactive: '未連接',
+          starting: '連接中…',
+          connected: '已連接',
+          stopping: '中斷連接中…',
+          error: '錯誤'
         }
       }
     }
@@ -1600,24 +1610,65 @@ export const zhHant = defineLocale({
     },
     toolsetLabels: {
       a2a: 'A2A 智能體協作',
-      web: '聯網搜尋與網頁擷取', browser: '瀏覽器自動化', terminal: '終端與程序', file: '檔案操作',
-      code_execution: '程式碼執行', vision: '圖片分析', video: '影片分析', image_gen: '圖片生成', video_gen: '影片生成',
-      x_search: 'X 搜尋', tts: '文字轉語音', stt: '語音轉文字', skills: '技能', todo: '任務規劃', kanban: '看板',
-      memory: '記憶', context_engine: '上下文引擎', session_search: '對話搜尋', connections: '連接器', clarify: '釐清問題',
-      delegation: '任務委派', cronjob: '定時任務', homeassistant: 'Home Assistant', spotify: 'Spotify', discord: 'Discord',
-      discord_admin: 'Discord 管理', yuanbao: '元寶', computer_use: '電腦控制'
+      web: '聯網搜尋與網頁擷取',
+      browser: '瀏覽器自動化',
+      terminal: '終端與程序',
+      file: '檔案操作',
+      code_execution: '程式碼執行',
+      vision: '圖片分析',
+      video: '影片分析',
+      image_gen: '圖片生成',
+      video_gen: '影片生成',
+      x_search: 'X 搜尋',
+      tts: '文字轉語音',
+      stt: '語音轉文字',
+      skills: '技能',
+      todo: '任務規劃',
+      kanban: '看板',
+      memory: '記憶',
+      context_engine: '上下文引擎',
+      session_search: '對話搜尋',
+      connections: '連接器',
+      clarify: '釐清問題',
+      delegation: '任務委派',
+      cronjob: '定時任務',
+      homeassistant: 'Home Assistant',
+      spotify: 'Spotify',
+      discord: 'Discord',
+      discord_admin: 'Discord 管理',
+      yuanbao: '元寶',
+      computer_use: '電腦控制'
     },
     toolsetDescriptions: {
       a2a: '透過 A2A 協定探索、呼叫並協調其他智能體。',
-      web: '聯網搜尋並擷取網頁內容。', browser: '開啟網頁並完成點擊、輸入、捲動等互動。', terminal: '執行終端指令並管理背景程序。',
-      file: '讀取、寫入、修改並搜尋本機檔案。', code_execution: '執行可程式化的程式碼任務，減少多輪工具呼叫。', vision: '分析圖片與其他視覺內容。',
-      video: '理解和分析影片內容。', image_gen: '根據描述生成圖片。', video_gen: '根據文字、圖片或參考素材生成影片。',
-      x_search: '搜尋 X 上的公開貼文與討論。', tts: '將文字轉換為語音。', stt: '將語音內容轉換為文字。', skills: '使用和管理專業技能與知識。',
-      todo: '規劃並追蹤多步驟任務。', kanban: '透過任務看板協調多智能體工作。', memory: '跨對話保存長期記憶與個人偏好。',
-      context_engine: '使用目前上下文引擎提供的執行階段工具。', session_search: '搜尋並回顧過去的對話。', connections: '使用連接器、外部服務與帳戶授權。',
-      clarify: '在需要時向你提出釐清問題。', delegation: '將複雜子任務委派給獨立智能體。', cronjob: '建立、暫停、更新並執行定時任務。',
-      homeassistant: '控制和監控 Home Assistant 智慧家庭裝置。', spotify: '搜尋音樂並控制 Spotify 播放。', discord: '讀取並參與 Discord 對話。',
-      discord_admin: '管理 Discord 頻道、角色與置頂內容。', yuanbao: '使用元寶平台的群聊、成員與私聊能力。', computer_use: '在背景控制 macOS、Windows 或 Linux 桌面。'
+      web: '聯網搜尋並擷取網頁內容。',
+      browser: '開啟網頁並完成點擊、輸入、捲動等互動。',
+      terminal: '執行終端指令並管理背景程序。',
+      file: '讀取、寫入、修改並搜尋本機檔案。',
+      code_execution: '執行可程式化的程式碼任務，減少多輪工具呼叫。',
+      vision: '分析圖片與其他視覺內容。',
+      video: '理解和分析影片內容。',
+      image_gen: '根據描述生成圖片。',
+      video_gen: '根據文字、圖片或參考素材生成影片。',
+      x_search: '搜尋 X 上的公開貼文與討論。',
+      tts: '將文字轉換為語音。',
+      stt: '將語音內容轉換為文字。',
+      skills: '使用和管理專業技能與知識。',
+      todo: '規劃並追蹤多步驟任務。',
+      kanban: '透過任務看板協調多智能體工作。',
+      memory: '跨對話保存長期記憶與個人偏好。',
+      context_engine: '使用目前上下文引擎提供的執行階段工具。',
+      session_search: '搜尋並回顧過去的對話。',
+      connections: '使用連接器、外部服務與帳戶授權。',
+      clarify: '在需要時向你提出釐清問題。',
+      delegation: '將複雜子任務委派給獨立智能體。',
+      cronjob: '建立、暫停、更新並執行定時任務。',
+      homeassistant: '控制和監控 Home Assistant 智慧家庭裝置。',
+      spotify: '搜尋音樂並控制 Spotify 播放。',
+      discord: '讀取並參與 Discord 對話。',
+      discord_admin: '管理 Discord 頻道、角色與置頂內容。',
+      yuanbao: '使用元寶平台的群聊、成員與私聊能力。',
+      computer_use: '在背景控制 macOS、Windows 或 Linux 桌面。'
     },
     skillUpdated: '技能已更新',
     edit: '編輯',
@@ -1630,14 +1681,10 @@ export const zhHant = defineLocale({
       agentBlurb: '為所選設定擴充智能體 — 工具、掛鉤與模型提供方。重新啟動閘道後生效。',
       pageBlurb: '每個外掛一列。外掛可以擴充本應用、智能體或兩者 — 每個部分都有自己的開關。',
       bundledNames: {
-        'hermes-bots': '智能體',
-        kanban: '任務看板',
-        radio: '電台'
+        'hermes-bots': '智能體'
       },
       bundledDescriptions: {
-        'hermes-bots': '智能體名冊，為每個智能體提供獨立對話、定時任務、群聊與智能體間訊息。',
-        kanban: '多智能體任務看板，包含看板頁面、側欄入口與狀態列中的即時任務動態。',
-        radio: '線上電台，支援固定常用電台、搜尋與隨音訊變化的波形顯示。'
+        'hermes-bots': '智能體名冊，為每個智能體提供獨立對話、定時任務、群聊與智能體間訊息。'
       },
       halfDesktop: '桌面',
       halfDesktopHint: '本應用，所有設定相同',
@@ -1664,7 +1711,8 @@ export const zhHant = defineLocale({
       catalogTitle: '外掛目錄',
       catalogBrowse: '瀏覽',
       catalogHide: '隱藏目錄瀏覽器',
-      catalogHint: '在目錄中選擇外掛後，經過審核的條目會以固定提交安裝到所選設定。包含智能體與桌面兩部分的外掛可一次完成安裝。',
+      catalogHint:
+        '在目錄中選擇外掛後，經過審核的條目會以固定提交安裝到所選設定。包含智能體與桌面兩部分的外掛可一次完成安裝。',
       alreadyInstalled: (name: string) => `${name} 已安裝在此設定中。`,
       catalogProvenance: (sha: string) => `從外掛目錄安裝${sha ? `，固定提交 ${sha}` : ''}。`,
       pinnedProvenance: (sha: string) => `已固定到提交 ${sha}。重新固定前將拒絕更新。`,
@@ -2057,15 +2105,13 @@ export const zhHant = defineLocale({
     platformIntro: {
       telegram:
         '在 Telegram 中與 @BotFather 對話，執行 /newbot，複製它提供的權杖，再從 @userinfobot 取得你的數字使用者 ID。',
-      discord:
-        '開啟 Discord Developer Portal，建立應用程式、加入 Bot，複製其權杖，再以正確權限把機器人邀請到伺服器。',
+      discord: '開啟 Discord Developer Portal，建立應用程式、加入 Bot，複製其權杖，再以正確權限把機器人邀請到伺服器。',
       slack: '建立 Slack 應用程式、啟用 Socket Mode、安裝到工作區，然後複製 bot 權杖和 app 層級權杖。',
       mattermost: '在 Mattermost 伺服器建立機器人帳號或個人存取權杖，然後在此貼上伺服器 URL 和權杖。',
       matrix: '使用機器人帳號登入 homeserver，然後複製存取權杖、使用者 ID 和 homeserver URL。',
       signal: '在可連線的位置執行 signal-cli REST 橋接，然後在這裡填入該 URL 和已註冊的電話號碼。',
       whatsapp: '啟動隨本應用程式提供的 WhatsApp 橋接，首次執行時掃描 QR 碼，然後啟用此平台。',
-      bluebubbles:
-        '在有 iMessage 的 Mac 上執行 BlueBubbles Server 並公開 API，然後在這裡填入該 URL 和伺服器密碼。',
+      bluebubbles: '在有 iMessage 的 Mac 上執行 BlueBubbles Server 並公開 API，然後在這裡填入該 URL 和伺服器密碼。',
       homeassistant: '在 Home Assistant 開啟個人資料並建立長期存取權杖，再把它和 HA URL 一起貼到這裡。',
       email: '使用專用信箱。Gmail / Workspace 可建立應用程式密碼，並使用 imap.gmail.com / smtp.gmail.com。',
       sms: '從 Twilio 控制台取得 Account SID、Auth Token，以及可傳送簡訊的電話號碼。',
@@ -2172,9 +2218,11 @@ export const zhHant = defineLocale({
     nameLabel: '名稱',
     cloneFrom: '複製來源',
     cloneFromNone: '無（空白）',
-    cloneFromDesc: '從選取的來源設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
+    cloneFromDesc:
+      '從選取的來源設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
     cloneFromDefault: '從預設設定檔複製設定',
-    cloneFromDefaultDesc: '從預設設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
+    cloneFromDefaultDesc:
+      '從預設設定檔複製設定、.env 中的密鑰、技能、SOUL.md，以及精選記憶（MEMORY.md 和 USER.md）。工作階段與排程任務不會複製。',
     invalidName: hint => `設定檔名稱無效。${hint}`,
     nameRequired: '名稱為必填',
     creating: '建立中…',
@@ -2353,7 +2401,7 @@ export const zhHant = defineLocale({
       dismissed: '已略過建議',
       actionFailed: '無法更新自動化建議',
       needsConversation: '請先開啟一個已儲存的對話，讓排程結果有可返回的對話。'
-    },
+    }
   },
 
   artifacts: {
@@ -2413,6 +2461,7 @@ export const zhHant = defineLocale({
 
   sidebar: {
     recent: '最近',
+    filters: '篩選',
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -2437,7 +2486,7 @@ export const zhHant = defineLocale({
     clearSearch: '清除搜尋',
     noMatch: query => `沒有工作階段符合「${query}」。`,
     results: '結果',
-    pinned: '已釘選',
+    pinned: '置頂會話',
     sessions: '對話',
     cronJobs: '排程任務',
     groupAriaGrouped: '以單一清單顯示工作階段',
@@ -2562,8 +2611,8 @@ export const zhHant = defineLocale({
       untitledChat: id => `工作階段 ${id}`,
       ageNow: '剛才',
       ageDay: '天',
-      ageHour: '時',
-      ageMin: '分'
+      ageHour: '小時',
+      ageMin: '分鐘'
     },
     dateDivider: {
       today: '今天稍早',
@@ -2580,6 +2629,7 @@ export const zhHant = defineLocale({
 
   composer: {
     message: '訊息',
+    addContext: '新增上下文',
     wakingProfile: profile => `正在喚醒 ${profile}…`,
     placeholderStarting: '正在啟動助理...',
     placeholderReconnecting: '正在重新連線…',
@@ -2842,9 +2892,15 @@ export const zhHant = defineLocale({
       revertConfirm: '捨棄對此檔案的變更並將其還原至已提交狀態？此操作無法復原。',
       revertAllConfirm: '捨棄所有變更並將檔案還原至已提交狀態？此操作無法復原。',
       staged: '已暫存',
+      unstaged: '未暫存',
+      untracked: '未追蹤',
       noChanges: '沒有變更',
       notRepo: '不是 Git 儲存庫',
       noDiff: '沒有可顯示的差異',
+      hunk: (current, total) => `第 ${current} 個變更區塊，共 ${total} 個`,
+      previousHunk: '上一個變更區塊',
+      nextHunk: '下一個變更區塊',
+      allHunks: '全部變更區塊',
       scopeUncommitted: '未提交',
       scopeBranch: '分支',
       scopeLastTurn: '上一輪',
@@ -2863,6 +2919,13 @@ export const zhHant = defineLocale({
       branchOffFrom: base => `從 ${base} 建立新分支`,
       switchTo: branch => `切換到 ${branch}`,
       switchFailed: branch => `無法切換到 ${branch}`,
+      checks: {
+        loading: '檢查載入中',
+        unavailable: '檢查無法使用',
+        pending: '檢查等待中',
+        passed: '檢查已通過',
+        failed: '檢查失敗'
+      },
       worktrees: '工作樹'
     }
   },
@@ -3021,14 +3084,16 @@ export const zhHant = defineLocale({
 
   onboarding: {
     headerTitle: '開始設定 Stardust Agent',
-    headerDesc: '連線模型提供方即可開始聊天。大多數選項只需一次點擊。',
+    headerDesc: '直接連線你自己的模型 API；也可以稍後在設定中新增。',
+    setupRelay: '新增模型 API',
+    setupRelayHint: '填寫 API 位址、API Key 與模型即可。',
     preparingInstall: 'Stardust 正在完成安裝。首次執行通常不到一分鐘。',
     starting: '正在啟動 Stardust…',
     lookingUpProviders: '正在查詢提供方...',
     collapse: '收合',
     otherProviders: '其他提供方',
     haveApiKey: '我有 API 金鑰',
-    chooseLater: '稍後再選擇提供方',
+    chooseLater: '稍後再設定',
     recommended: '建議',
     connected: '已連線',
     featuredPitch: '一個訂閱，300+ 前沿模型 — 執行 Stardust 的建議方式',
@@ -3237,7 +3302,16 @@ export const zhHant = defineLocale({
         loading: '正在載入明細…',
         percentFull: percent => `已用 ${percent}%`,
         title: '上下文使用量',
-        tokenSummary: (used, max) => `${used} / ${max} Tokens`
+        tokenSummary: (used, max) => `${used} / ${max} Tokens`,
+        sessionTokens: '工作階段 Token 用量',
+        sessionTokensNote: '模型呼叫累計值，與目前上下文佔用不同；快取 Token 已計入提示總量，請勿另加至總計。',
+        inputTokens: '未快取輸入',
+        cacheReadTokens: '快取讀取',
+        cacheWriteTokens: '快取寫入',
+        outputTokens: '輸出',
+        totalTokens: '總計（提示 + 輸出）',
+        noSessionTokens: '尚無模型用量',
+        unavailable: '未回報'
       },
       session: '工作階段',
       yoloOn: 'YOLO 已開啟 — 自動核准危險指令。Shift+點擊可全域切換。',
@@ -3389,6 +3463,7 @@ export const zhHant = defineLocale({
   },
 
   zones: {
+    paneTitles: { overview: '上下文', files: '檔案', review: '審查', terminal: '終端機' },
     showTabStrip: '顯示分頁',
     hideTabStrip: '隱藏分頁',
     showStripTab: title => `顯示 ${title}`,
@@ -3458,10 +3533,17 @@ export const zhHant = defineLocale({
   },
 
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: '今天想做什麼？', body: '直接問我，或者把一件事交給我。需要專案、檔案或預覽時，相關上下文會出現在對話右側。', start: '從一則訊息開始', actions: '瀏覽命令' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: '今天想做什麼？',
+      body: '直接問我，或者把一件事交給我。需要專案、檔案或預覽時，相關上下文會出現在對話右側。',
+      start: '從一則訊息開始',
+      actions: '瀏覽命令'
+    },
     thread: {
       loadingSession: '正在載入工作階段',
       showEarlier: '顯示較早的訊息',
+      workProgress: count => `${count} 則工作進度`,
       loadingResponse: 'Stardust 正在載入回覆',
       resumeWhenBackgroundDone: count =>
         count === 1 ? '背景工作完成後將自動繼續' : `${count} 個背景工作完成後將自動繼續`,
@@ -3479,21 +3561,142 @@ export const zhHant = defineLocale({
       react: '回應',
       dismissError: '关闭错误',
       errorLayers: {
-        auth: '認證錯誤',
-        billing: '額度不足',
+        auth: '登入或金鑰有問題',
+        billing: '額度用完了',
         disk: '磁碟已滿',
-        endpoint: '自訂端點錯誤',
-        gateway: '閘道錯誤',
-        generic: '本輪失敗',
-        provider: '模型服務商錯誤',
-        runtime: '本機執行環境錯誤',
-        streaming: '串流連線錯誤'
+        endpoint: '連不上你的模型伺服器',
+        gateway: '星塵遇到了問題',
+        generic: '星塵沒能完成這次回覆',
+        provider: '模型服務回傳了錯誤',
+        runtime: '星塵遇到了問題',
+        streaming: '回覆中途斷開了'
       },
+      errorLayerBodies: {
+        auth: '模型服務沒有接受你的登入憑證。檢查這個服務的金鑰或登入，然後重新傳送。',
+        billing: '這個服務的帳戶額度已用完。儲值或切換服務商，然後重新傳送。',
+        disk: '磁碟已滿，星塵無法儲存這段對話。清出一些空間後重試。',
+        endpoint: '星塵連不上你的自訂模型伺服器。確認它正在執行，然後重新傳送。',
+        gateway: '星塵開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
+        generic: '星塵回覆時出了問題。可以重試；如果反覆出現，請複製錯誤詳細資訊。',
+        provider: '模型服務沒能完成這次請求。稍後重試，或切換服務商。',
+        runtime: '星塵開始回覆時遇到內部問題。重新傳送一次；如果反覆出現，請傳送診斷資訊。',
+        streaming: '回覆還沒寫完連線就斷了。點「重試」重新傳送。'
+      },
+      errorCodes: {
+        auth: {
+          title: provider => `${provider} 沒有接受你的登入`,
+          body: provider => `${provider} 不接受已儲存的憑證。在設定中修正或切換服務商，然後重新傳送。`
+        },
+        auth_permanent: {
+          title: provider => `${provider} 沒有接受你的登入`,
+          body: provider => `${provider} 的憑證無效或已被撤銷。更新憑證或切換服務商，然後重新傳送。`
+        },
+        billing: {
+          title: '額度用完了',
+          body: provider => `你的 ${provider} 帳戶額度已用完。儲值或切換服務商，然後重新傳送。`
+        },
+        rate_limit: {
+          title: '模型服務正忙',
+          body: provider => `${provider} 正在限制請求次數。等一分鐘再重試。`
+        },
+        upstream_rate_limit: {
+          title: '模型服務正忙',
+          body: provider => `${provider} 正在限制請求次數。等一分鐘再重試。`
+        },
+        overloaded: {
+          title: '模型服務負載過高',
+          body: provider => `${provider} 現在出了狀況。稍後重試，或切換服務商。`
+        },
+        server_error: {
+          title: '模型服務出了問題',
+          body: provider => `${provider} 回傳了伺服器錯誤。稍後重試，或切換服務商。`
+        },
+        timeout: {
+          title: '回覆逾時了',
+          body: provider => `${provider} 沒有及時回應。點「重試」重新傳送。`
+        },
+        stream_drop: {
+          title: '回覆中途斷開了',
+          body: '回覆還沒寫完連線就斷了。點「重試」重新傳送。'
+        },
+        ssl_cert_verification: {
+          title: '安全連線失敗',
+          body: provider => `星塵無法驗證與 ${provider} 的安全連線。檢查網路或 Proxy 設定，或切換服務商，然後重新傳送。`
+        },
+        context_overflow: {
+          title: '這段對話太長了',
+          body: '這段對話已超出模型能處理的長度。壓縮對話或開始新對話，然後重新傳送。'
+        },
+        payload_too_large: {
+          title: '這則訊息太大了',
+          body: '這次請求對模型來說太大了。壓縮對話或開始新對話，然後重新傳送。'
+        },
+        model_not_found: {
+          title: '這個模型無法使用',
+          body: provider => `${provider} 在你的帳戶下不提供這個模型。換一個模型，然後重新傳送。`
+        },
+        provider_policy_blocked: {
+          title: '你的帳戶設定封鎖了這個模型',
+          body: provider => `依你帳戶的資料或隱私設定，${provider} 不會轉送這次請求。換一個模型或切換服務商。`
+        },
+        content_policy_blocked: {
+          title: '模型服務拒絕了這次請求',
+          body: provider => `${provider} 不願意回答這則訊息。修改後再傳送。`
+        },
+        format_error: {
+          title: '模型服務不接受這次請求',
+          body: provider => `${provider} 不接受這次請求的格式。切換服務商，或傳送診斷資訊方便我們排查。`
+        },
+        truncated: {
+          title: '回覆被截斷了',
+          body: '模型還沒寫完就停了。點「重試」取得完整回覆。'
+        },
+        invalid_response: {
+          title: '模型服務回傳了無法讀取的內容',
+          body: provider => `${provider} 回傳的內容星塵讀不懂。稍後重試。`
+        },
+        empty_response: {
+          title: '模型服務回傳了空白回覆',
+          body: provider => `${provider} 對這則訊息什麼也沒回傳。稍後重試。`
+        },
+        loop_error: {
+          title: '星塵陷入了迴圈',
+          body: '回覆一直重複同樣的步驟，星塵把它停了下來。可以重試；如果再次出現，開始新對話。'
+        },
+        SESSION_NOT_OWNED: {
+          title: '這段對話正在別處開啟',
+          body: '這段對話正在另一個星塵視窗或終端機中開啟。在那邊關閉後重新傳送，或在這裡開始新對話。'
+        },
+        disk_full: {
+          title: '磁碟已滿',
+          body: '磁碟已滿，星塵無法儲存這段對話。清出一些空間後重試。'
+        }
+      },
+      errorAuthKinds: {
+        api_key: {
+          title: provider => `${provider} 沒有接受你的 API 金鑰`,
+          body: provider => `為 ${provider} 儲存的金鑰無效或已被撤銷。更新後重試。`
+        },
+        oauth: {
+          title: provider => `你的 ${provider} 登入已過期`
+        }
+      },
+      errorDetails: '詳細資訊',
+      errorGenericProvider: '模型服務',
+      errorToastTitle: '星塵沒能完成這次回覆',
       errorRetry: '重試',
       errorStartNewSession: '開始新工作階段',
       errorSwitchProvider: '切換服務商',
+      errorSetUpFallback: '設定備用模型',
       errorSignInAgain: provider => `重新登入 ${provider}`,
-      errorOauthExpired: provider => `您的 ${provider} 登入已過期或被撤銷。請重新登入以繼續對話。`,
+      errorOauthExpired: provider =>
+        `您的 ${provider} 登入已過期或被撤銷。請在終端機執行 hermes model，選擇 ${provider} 重新登入；或在「設定 → 模型服務」中改用模型 API。`,
+      errorChooseModel: '選擇模型',
+      errorCompressConversation: '壓縮對話',
+      errorCompressFailed: '無法壓縮對話',
+      errorOpenHermesFolder: '開啟星塵資料夾',
+      errorOpenHermesFolderFailed: '無法開啟星塵資料夾',
+      errorUpdateApiKey: '更新 API 金鑰',
       errorOpenLogs: '開啟日誌',
       errorOpenLogsFailed: '無法開啟日誌資料夾',
       errorOpenDesktopLogs: '開啟桌面端日誌',

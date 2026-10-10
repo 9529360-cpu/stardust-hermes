@@ -439,11 +439,12 @@ class TestKernelOwnershipAndLifecycle(unittest.TestCase):
                 t.join()
         self.assertEqual([r["status"] for r in results], ["success"] * 6)
         self.assertEqual(len(_KERNELS), 1)
-        live = subprocess.run(
-            ["pgrep", "-fc", "-P", str(os.getpid()), "hermes_kernel_runner"],
-            capture_output=True, text=True,
-        ).stdout.strip()
-        self.assertEqual(live, "1")
+        if shutil.which("pgrep"):
+            live = subprocess.run(
+                ["pgrep", "-fc", "-P", str(os.getpid()), "hermes_kernel_runner"],
+                capture_output=True, text=True,
+            ).stdout.strip()
+            self.assertEqual(live, "1")
 
 
 class TestPerCellRpcAuthority(unittest.TestCase):
@@ -492,6 +493,47 @@ class TestPerCellRpcAuthority(unittest.TestCase):
         self.assertIs(seen[0]["approval_cb"], cb_one)
         self.assertIs(seen[1]["approval_cb"], cb_two)
         self.assertEqual(seen[0]["task_id"], "kernel-test")
+
+    def test_persistent_kernel_dispatch_passes_frozen_session_grant(self):
+        from model_tools import tool_capability_context
+        from tools.code_kernel import CellAuthority
+
+        seen = []
+
+        def record(tool_name, tool_args, **kwargs):
+            seen.append((tool_name, tool_args, kwargs))
+            return json.dumps({"ok": True})
+
+        frozen_tools = ["read_file", "terminal"]
+        grant = {"allowed_tools": frozen_tools, "session_id": "session-frozen"}
+        with tool_capability_context(allowed_tools=frozen_tools, session_id="session-frozen"):
+            authority = CellAuthority(
+                "task-frozen", session_id="session-frozen",
+                enabled_tools=frozen_tools, capability_grant=grant,
+            )
+        with patch("model_tools.handle_function_call", side_effect=record):
+            authority.dispatch("read_file", {"path": "x"})
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(seen[0][2]["task_id"], "task-frozen")
+        self.assertEqual(seen[0][2]["session_id"], "session-frozen")
+        self.assertEqual(set(seen[0][2]["enabled_tools"]), set(frozen_tools))
+        self.assertEqual(seen[0][2]["capability_grant"]["session_id"], "session-frozen")
+
+    def test_rpc_default_dispatch_passes_frozen_session_grant(self):
+        from tools.code_execution_rpc import _default_dispatch
+
+        seen = []
+        with patch("model_tools.handle_function_call", side_effect=lambda *args, **kwargs: seen.append(
+                (args, kwargs)) or "ok"):
+            dispatch = _default_dispatch(
+                "task-rpc", session_id="session-rpc", enabled_tools=["read_file"],
+                capability_grant={"allowed_tools": ["read_file"], "session_id": "session-rpc"},
+            )
+            dispatch("read_file", {"path": "x"})
+        self.assertEqual(seen[0][1]["task_id"], "task-rpc")
+        self.assertEqual(seen[0][1]["session_id"], "session-rpc")
+        self.assertEqual(seen[0][1]["enabled_tools"], ["read_file"])
+        self.assertEqual(seen[0][1]["capability_grant"]["session_id"], "session-rpc")
 
     def test_cross_cell_alias_dispatches_under_the_current_cell(self):
         # Adversarial cross-cell dataflow: a callable captured in cell 1 and

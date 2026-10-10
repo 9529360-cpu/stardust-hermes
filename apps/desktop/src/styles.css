@@ -2034,6 +2034,11 @@ body.guest-pointer-lock :is(webview, iframe) {
   border-bottom-color: var(--ui-stroke-tertiary) !important;
 }
 
+[data-slot='aui_assistant-message-content'][data-activity-collapsed] [data-slot='aui_thinking-disclosure'],
+[data-slot='aui_assistant-message-content'][data-activity-collapsed] [data-tool-summary] {
+  display: none;
+}
+
 /* Tool / thinking blocks are scaffolding around the model's reply, so we
    keep them transparent and fade them slightly. The reading column (prose)
    stays at full strength; scaffolding lifts back to full opacity on

@@ -310,13 +310,7 @@ _CLI_FAMILIES: dict[str, tuple[_CliSurface, str]] = {
     "project": (
         _CliSurface("builder", "hermes_cli.projects_cmd", "build_parser", "cmd_project"),
         "list, show, *create, *add-folder, *remove-folder, *rename, *set-primary, *use, "
-        "*archive, *restore, *bind-board, facts list, *facts add, *facts verify, *facts supersede"),
-    "kanban": (
-        _CliSurface("builder", "hermes_cli.kanban", "build_parser", "cmd_kanban"),
-        "*init, boards list, *boards create, *boards rm, *boards switch, boards current, "
-        "*boards rename, *boards set-workdir, *create, list, show, *assign, *reclaim, *reassign, "
-        "diagnose, *link, *unlink, *claim, *comment, *complete, *edit, *block, *schedule, "
-        "*unblock, *promote, *archive, stats, runs, heartbeat, assignments, context"),
+        "*archive, *restore, facts list, *facts add, *facts verify, *facts supersede"),
     "bundles": (_reg("bundles", "bundles_command"), "list, show, *create, *delete, *reload"),
     "checkpoints": (_reg("checkpoints"), "status, list, *prune, *clear, *clear-legacy"),
     "curator": (
@@ -359,14 +353,6 @@ _BLOCKED_PAIRS = {
     ("profile", "alias"): "`profile alias` creates shell wrappers and is not available in Hermes Console.",
     ("skills", "config"): "`skills config` is interactive and is not available in Hermes Console.",
     ("skills", "publish"): "`skills publish` is not available in Hermes Console.",
-    ("kanban", "tail"): "`kanban tail` streams output and is not available in Hermes Console.",
-    ("kanban", "watch"): "`kanban watch` streams output and is not available in Hermes Console.",
-    ("kanban", "daemon"): "`kanban daemon` starts a service and is not available in Hermes Console.",
-    ("kanban", "dispatcher"): "`kanban dispatcher` starts a worker and is not available in Hermes Console.",
-    ("kanban", "swarm"): "`kanban swarm` starts agent work and is not available in Hermes Console.",
-    ("kanban", "decompose"): "`kanban decompose` starts agent work and is not available in Hermes Console.",
-    ("kanban", "specify"): "`kanban specify` starts agent work and is not available in Hermes Console.",
-    ("kanban", "gc"): "`kanban gc` is not available in Hermes Console.",
     ("sessions", "delete"): "`sessions delete` and `sessions prune` are not available in Hermes Console.",
     ("sessions", "prune"): "`sessions delete` and `sessions prune` are not available in Hermes Console.",
 }

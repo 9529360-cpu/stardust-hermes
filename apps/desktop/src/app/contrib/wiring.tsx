@@ -47,7 +47,7 @@ import { $billingSettingsRequest } from '@/store/billing-block'
 import { $desktopBoot } from '@/store/boot'
 import { requestVoiceConversationStart } from '@/store/composer'
 import { $activeConnectionId } from '@/store/connections'
-import { $cronReviewRequest, setCronFocusJobId } from '@/store/cron'
+import { $cronReviewRequest } from '@/store/cron'
 import { requestGatewayForProfile } from '@/store/gateway'
 import { reconnectGateway } from '@/store/gateway-reconnect'
 import { $pinnedSessionIds, pinSession, restoreWorktree, unpinSession } from '@/store/layout'
@@ -58,7 +58,6 @@ import {
   $activeGatewayProfile,
   $freshSessionRequest,
   $profileScope,
-  ALL_PROFILES,
   ensureGatewayProfile,
   newSessionInProfile,
   normalizeProfileKey,
@@ -98,7 +97,6 @@ import { closeWorkspaceTab } from '../chat/close-tab'
 import { requestComposerInsert } from '../chat/composer/focus'
 import { useComposerActions } from '../chat/hooks/use-composer-actions'
 import { CommandPalette } from '../command-palette'
-import { triggerAndRefreshCronJobs } from '../cron/cron-actions'
 import { useGatewayBoot } from '../gateway/hooks/use-gateway-boot'
 import { useGatewayRequest } from '../gateway/hooks/use-gateway-request'
 import { useHermesConfigRecord } from '../hooks/use-config-record'
@@ -169,11 +167,10 @@ import type { WiringActions, WiringApi } from './types'
 import { POOL_LIMITS_SETTINGS_ROUTE } from './wiring-routing'
 
 // Overlay views the controller mounts over the shell — lazy, load on demand.
-// The workspace-route full-page views (skills/messaging/artifacts) are the
+// The workspace-route full-page views (skills/messaging/artifacts/cron) are the
 // ChatRoutesSurface's and live in ./surfaces.
 const AgentsView = lazy(async () => ({ default: (await import('../agents')).AgentsView }))
 const CommandCenterView = lazy(async () => ({ default: (await import('../command-center')).CommandCenterView }))
-const CronView = lazy(async () => ({ default: (await import('../cron')).CronView }))
 const WebhooksView = lazy(async () => ({ default: (await import('../webhooks')).WebhooksView }))
 const ProfilesView = lazy(async () => ({ default: (await import('../profiles')).ProfilesView }))
 const SettingsView = lazy(async () => ({ default: (await import('../settings')).SettingsView }))
@@ -262,7 +259,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     billingSettingsSeenRef.current = billingSettingsRequest
 
     if (billingSettingsRequest > 0) {
-      navigate(`${SETTINGS_ROUTE}?tab=providers&pview=keys`)
+      navigate(`${SETTINGS_ROUTE}?tab=config:model`)
     }
   }, [billingSettingsRequest, navigate])
 
@@ -291,7 +288,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     cronReviewSeenRef.current = cronReviewRequest
 
     if (cronReviewRequest > 0) {
-      navigate(CRON_ROUTE)
+      navigateToWorkspacePage(navigate, CRON_ROUTE)
     }
   }, [cronReviewRequest, navigate])
   const freshDraftReady = useStore($freshDraftReady)
@@ -335,7 +332,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     closeOverlayToPreviousRoute,
     commandCenterInitialSection,
     commandCenterOpen,
-    cronOpen,
     currentView,
     openAgents,
     openCommandCenterSection,
@@ -407,8 +403,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     [dispatchSessionRpc]
   )
 
-  const { loadMoreMessagingForPlatform, loadMoreSessions, refreshCronJobs, refreshMessagingSessions, refreshSessions } =
-    useSessionListActions({ profileScope })
+  const { loadMoreSessions, refreshCronJobs, refreshMessagingSessions, refreshSessions } = useSessionListActions({
+    profileScope
+  })
 
   const updateActiveSessionRuntimeInfo = useCallback(
     (info: { branch?: string; cwd?: string }) => {
@@ -442,7 +439,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     requestGateway
   })
 
-  const openProviderSettings = useCallback(() => navigate(`${SETTINGS_ROUTE}?tab=providers`), [navigate])
+  const openModelServices = useCallback(() => navigate(`${SETTINGS_ROUTE}?tab=config:model`), [navigate])
 
   // Palette "Keyboard shortcuts" entry dispatches a custom event (contributions
   // don't have router access); listen and navigate to the settings keybinds tab.
@@ -1132,12 +1129,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onDeleteSession: sessionId => void removeSession(sessionId),
     onDismissError: dismissError,
     onEdit: editMessage,
-    onLoadMoreMessaging: loadMoreMessagingForPlatform,
     onLoadMoreSessions: loadMoreSessions,
-    onManageCronJob: (jobId, owner?: string) => {
-      setCronFocusJobId(owner ? { id: jobId, profile: owner } : jobId)
-      navigate(CRON_ROUTE)
-    },
     onNavigate: selectSidebarItem,
     onNewSessionInWorkspace: path => startSessionInWorkspace(path, { openTab: true }),
     onNewSessionSplit: (dir, opts) =>
@@ -1186,17 +1178,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     onThreadMessagesChange: handleThreadMessagesChange,
     onToggleSelectedPin: toggleSelectedPin,
     onTranscribeAudio: transcribeVoiceAudio,
-    onTriggerCronJob: (jobId, owner?: string) => {
-      const viewProfile = profileScope === ALL_PROFILES ? 'all' : profileScope
-
-      if (!owner && viewProfile === 'all') {
-        return Promise.resolve()
-      }
-
-      return triggerAndRefreshCronJobs(jobId, viewProfile, owner || viewProfile)
-        .then(() => undefined)
-        .catch(() => undefined)
-    },
     getGateway: () => gatewayRef.current,
     openAgents,
     openCommandCenterSection,
@@ -1347,7 +1328,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       <SessionPickerOverlay onResume={sessionId => openSession(sessionId, navigate)} />
       <ModelVisibilityOverlay
         gateway={gateway || undefined}
-        onOpenProviders={openProviderSettings}
+        onAddModelApi={openModelServices}
         ownerConnectionId={activeConnectionId || undefined}
         profile={activeGatewayProfile}
       />
@@ -1409,12 +1390,6 @@ export function ContribWiring({ children }: { children: ReactNode }) {
       {agentsOpen && (
         <Suspense fallback={null}>
           <AgentsView onClose={closeOverlayToPreviousRoute} />
-        </Suspense>
-      )}
-
-      {cronOpen && (
-        <Suspense fallback={null}>
-          <CronView onClose={closeOverlayToPreviousRoute} onOpenSession={actions.onResumeSession} />
         </Suspense>
       )}
 

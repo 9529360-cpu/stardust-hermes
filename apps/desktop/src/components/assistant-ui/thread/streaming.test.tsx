@@ -531,7 +531,8 @@ describe('assistant-ui streaming renderer', () => {
       />
     )
 
-    // Interim commentary stays visible…
+    // A pure text turn keeps its interims visible; only turns with tool
+    // activity treat stage narration as an expandable work record.
     expect(container.textContent).toContain('Let me check the files.')
     expect(container.textContent).toContain('Now applying the patch.')
     expect(container.textContent).toContain('All done — patch applied.')
@@ -545,6 +546,32 @@ describe('assistant-ui streaming renderer', () => {
     )
 
     expect(finalRoot?.querySelector('[data-slot="aui_msg-actions"]')).toBeTruthy()
+  })
+
+  it('folds sealed text updates in a tool turn without hiding tools, failures, or the answer', async () => {
+    const first = assistantInterimMessage('Let me check the files.')
+    const second = assistantInterimMessage('Now applying the patch.', 'assistant-interim-2')
+    const tool = { ...assistantTerminalMessage(), metadata: { ...assistantTerminalMessage().metadata, custom: { interim: true } } } as ThreadMessage
+
+    const { container } = render(
+      <TranscriptHarness
+        messages={[userMessage(), first, second, tool, assistantErrorMessage('Needs attention'), assistantMessage('Result ready.', false)]}
+      />
+    )
+
+    const progress = await screen.findByText('2 work updates')
+    const disclosure = progress.closest('details')
+
+    expect(disclosure).toBeTruthy()
+    expect(disclosure?.open).toBe(false)
+    expect(container.textContent).toContain('Result ready.')
+    expect(container.textContent).toContain('Needs attention')
+    expect(container.querySelector('[data-slot="aui_work-progress"] [data-tool-group]')).toBeNull()
+    expect(container.querySelector('[data-tool-summary]')).not.toBeNull()
+    fireEvent.click(progress)
+    expect(disclosure?.open).toBe(true)
+    expect(disclosure?.textContent).toContain('Let me check the files.')
+    expect(disclosure?.textContent).toContain('Now applying the patch.')
   })
 
   it('puts the turn duration on the action bar row instead of a line of its own', () => {
@@ -791,6 +818,7 @@ describe('assistant-ui streaming renderer', () => {
   it('shows the command prompt and exit code for terminal calls', async () => {
     const { container } = render(<MessageHarness message={assistantTerminalMessage()} />)
 
+    fireEvent.click(container.querySelector('[data-tool-summary] button')!)
     fireEvent.click(container.querySelector('[data-tool-row] button')!)
 
     await waitFor(() => {

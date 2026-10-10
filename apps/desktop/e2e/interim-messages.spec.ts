@@ -10,10 +10,10 @@
  * The mock server walks through a multi-turn script when it sees the
  * trigger keyword:
  *
- *   Turn 1: "Let me start by planning the approach." + todo tool_call
- *   Turn 2: "Now checking the details before answering." + todo tool_call
- *   Turn 3: (no text) + todo tool_call          → NO interim (no visible text)
- *   Turn 4: "Found something interesting worth noting." + todo tool_call
+ *   Turn 1: "Let me start by planning the approach." + terminal tool_call
+ *   Turn 2: "Now checking the details before answering." + terminal tool_call
+ *   Turn 3: (no text) + terminal tool_call      → NO interim (no visible text)
+ *   Turn 4: "Found something interesting worth noting." + terminal tool_call
  *   Turn 5: "All done! Here is the complete summary..." (final, stop)
  *
  * Two describe blocks exercise the config flag both ways:
@@ -37,14 +37,16 @@
  * Prerequisite: `npm run build` must have been run so dist/ exists.
  */
 
-import { expect, type Page, test } from '@playwright/test'
+import { type Page } from '@playwright/test'
+
+import { INTERIM_TEXTS, restartMockServer, WORK_PROGRESS_FINAL, WORK_PROGRESS_TRIGGER, WORK_PROGRESS_UPDATE } from '../../../tests-js/scripts/mock-server'
 
 import {
   type MockBackendFixture,
   setupMockBackend,
   waitForAppReady,
 } from './fixtures'
-import { INTERIM_TEXTS, restartMockServer } from '../../../tests-js/scripts/mock-server'
+import { expect, test } from './test'
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -182,6 +184,7 @@ test.describe('interim assistant messages — flag ON (default)', () => {
 
   test('all interim texts survive alongside the final response', async () => {
     const page = fixture.page
+    const testInfo = test.info()
     await sendInterimMessage(page)
 
     // Every interim text (turns with visible text + tool calls) must be
@@ -212,6 +215,55 @@ test.describe('interim assistant messages — flag ON (default)', () => {
       const count = await countTranscriptMessagesContaining(page, text)
       expect(count, `"${text}" must not be duplicated after reconcile`).toBe(1)
     }
+
+    // These real interim bubbles include tools, so they must not be hidden as
+    // text-only work updates. The focused renderer test covers that separate case.
+    await expect(page.locator('[data-slot="aui_work-progress"]')).toHaveCount(0)
+    // Exercise the actual Electron renderer, not just the retained transcript:
+    // an activity call is summarized, while its output remains reachable.
+    const summary = page.locator('[data-tool-summary]').first()
+    await expect(summary).toBeVisible()
+    const toggle = summary.locator('button[aria-expanded]')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await page.screenshot({ path: testInfo.outputPath('interim-collapsed.png') })
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await page.screenshot({ path: testInfo.outputPath('interim-expanded.png') })
+  })
+})
+
+test.describe('text-only work progress in a tool-bearing turn', () => {
+  let fixture: MockBackendFixture
+
+  test.beforeAll(async () => {
+    restartMockServer()
+    fixture = await setupMockBackend({ extraConfig: DISABLE_AUTO_TITLE })
+    await waitForAppReady(fixture, 120_000)
+  })
+
+  test.afterAll(async () => {
+    await fixture?.cleanup()
+  })
+
+  test('folds a sealed text update but keeps its tool and final answer available', async () => {
+    const page = fixture.page
+    const composer = page.locator('[contenteditable="true"]').first()
+    await composer.waitFor({ state: 'visible', timeout: 10_000 })
+    await composer.fill(WORK_PROGRESS_TRIGGER)
+    await composer.press('Enter')
+
+    const viewport = page.locator('[data-slot="aui_thread-viewport"]')
+    await expect(viewport.getByText(WORK_PROGRESS_FINAL)).toBeVisible({ timeout: 90_000 })
+    const progress = viewport.locator('[data-slot="aui_work-progress"]')
+    await expect(progress).toHaveCount(1, { timeout: 15_000 })
+    await expect(progress).not.toHaveAttribute('open')
+    await expect(progress).toContainText(WORK_PROGRESS_UPDATE)
+    await expect(viewport.locator('[data-tool-summary]')).toBeVisible()
+    await progress.locator('summary').click()
+    await expect(progress).toHaveAttribute('open', '')
+    await expect(progress.getByText(WORK_PROGRESS_UPDATE)).toBeVisible()
+    await expect(viewport.getByText(WORK_PROGRESS_FINAL)).toBeVisible()
+    await expect(viewport.getByText('[System: Continue now. Execute the required tool calls and only send your final answer after completing the task.]')).toHaveCount(0)
   })
 })
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { HermesReviewFile } from '@/global'
 
-import { buildReviewTree, countAllNodes, flattenReviewRows } from './tree-data'
+import { buildReviewTree, countAllNodes, flattenReviewRows, groupReviewFiles } from './tree-data'
 
 const file = (path: string, added = 1, removed = 0): HermesReviewFile => ({
   path,
@@ -41,6 +41,36 @@ describe('buildReviewTree', () => {
 
     expect(tree[0].name).toBe('a')
     expect(tree[0].children?.map(n => n.name).sort()).toEqual(['b', 'other.ts'])
+  })
+})
+
+describe('groupReviewFiles', () => {
+  it('keeps staged, unstaged, and untracked files in distinct stable sections', () => {
+    const staged = { ...file('staged.ts', 4, 1), staged: true }
+    const unstaged = file('changed.ts', 2, 3)
+    const untracked = { ...file('new.ts', 6), status: '?' }
+
+    const groups = groupReviewFiles([untracked, unstaged, staged])
+
+    expect(groups.map(group => group.kind)).toEqual(['staged', 'unstaged', 'untracked'])
+    expect(groups.map(group => group.files.map(entry => entry.path))).toEqual([
+      ['staged.ts'],
+      ['changed.ts'],
+      ['new.ts']
+    ])
+    expect(groups.map(group => [group.added, group.removed])).toEqual([
+      [4, 1],
+      [2, 3],
+      [6, 0]
+    ])
+  })
+
+  it('omits empty sections without changing file objects', () => {
+    const only = file('only.ts')
+    const groups = groupReviewFiles([only])
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.files[0]).toBe(only)
   })
 })
 

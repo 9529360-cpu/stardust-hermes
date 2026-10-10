@@ -2897,7 +2897,7 @@ def generate_systemd_unit(system: bool = False, run_as_user: str | None = None) 
         path_entries = [e for e in _target_node_entries if e not in path_entries] + path_entries
         user_home = Path(home_dir)
         identity_lines = f"User={username}\nGroup={group_name}\n"
-        # Restart-safe cron/Kanban workers cross `systemd-run --user`, which needs this user's manager;
+        # Restart-safe cron workers cross `systemd-run --user`, which needs this user's manager;
         # without the ordering the gateway and user@<uid>.service race at boot and the one-shot bus
         # adoption in run_gateway() can miss (#104893).
         ordering_lines = f"After=user@{uid}.service\nWants=user@{uid}.service\n"
@@ -3066,7 +3066,7 @@ def refresh_systemd_unit_if_needed(system: bool = False) -> bool:
 def _print_linger_enable_warning(username: str, detail: str | None = None, *, system: bool = False) -> None:
     print()
     if system:
-        print(f"⚠ Linger not enabled for {username} — cron and Kanban workers cannot start (no user D-Bus).")
+        print(f"⚠ Linger not enabled for {username} — cron workers cannot start (no user D-Bus).")
     else:
         print("⚠ Linger not enabled — gateway may stop when you close this terminal.")
     if detail:
@@ -3086,7 +3086,7 @@ def _ensure_linger_enabled(username: str | None = None, *, system: bool = False)
 
     A user unit needs linger so the gateway survives logout. A system unit (``system=True``) needs
     it for its ``User=`` so ``user@<uid>.service`` provides the D-Bus that ``systemd-run --user
-    --scope`` — every restart-safe cron/Kanban worker — connects to (#104893). Returns True only
+    --scope`` — every restart-safe cron worker — connects to (#104893). Returns True only
     when linger was enabled by this call.
     """
     if is_termux() or not is_linux():
@@ -3113,7 +3113,7 @@ def _ensure_linger_enabled(username: str | None = None, *, system: bool = False)
         return False
 
     if system:
-        print(f"Enabling linger for {username} so cron and Kanban workers can reach systemd-run --user...")
+        print(f"Enabling linger for {username} so cron workers can reach systemd-run --user...")
     else:
         print("Enabling linger so the gateway survives SSH logout...")
     try:
@@ -3142,7 +3142,7 @@ def _ensure_system_service_linger(username: str) -> None:
     import pwd
     uid = pwd.getpwnam(username).pw_uid  # windows-footgun: ok — POSIX systemd helper, never invoked on Windows
     if _wait_for_target_user_bus(uid):
-        print(f"✓ /run/user/{uid}/bus is up — cron and Kanban workers can use systemd-run --user")
+        print(f"✓ /run/user/{uid}/bus is up — cron workers can use systemd-run --user")
     else:
         print(f"⚠ /run/user/{uid}/bus did not appear within 5s.")
         print(f"  Start the user manager: sudo systemctl start user@{uid}.service")

@@ -44,12 +44,6 @@ EXPOSED_TOOLS: tuple[str, ...] = (
     "browser_scroll",
     "browser_back", "browser_get_images", "browser_console", "browser_vision",
     "vision_analyze", "image_generate", "skill_view", "skills_list", "text_to_speech",
-    # Kanban handoff tools: stateless (read HERMES_KANBAN_TASK, write kanban.db).
-    # Without them a codex-runtime worker can't report completion and hangs.
-    "kanban_complete", "kanban_block", "kanban_request_review", "kanban_request_changes", "kanban_comment",
-    "kanban_heartbeat", "kanban_show", "kanban_list",
-    # Orchestrator-only (the kanban tool gates them on HERMES_KANBAN_TASK unset).
-    "kanban_create", "kanban_unblock", "kanban_link",
 )
 
 
@@ -88,7 +82,11 @@ def _build_server() -> Any:
         def _dispatch(**kwargs: Any) -> str:
             try:
                 # Drop None so unset optionals aren't forwarded to the handler.
-                return handle_function_call(tool_name, {k: v for k, v in kwargs.items() if v is not None})
+                return handle_function_call(
+                    tool_name,
+                    {k: v for k, v in kwargs.items() if v is not None},
+                    enabled_tools=list(EXPOSED_TOOLS),
+                )
             except Exception as exc:
                 logger.exception("tool %s raised", tool_name)
                 return json.dumps({"error": str(exc), "tool": tool_name})

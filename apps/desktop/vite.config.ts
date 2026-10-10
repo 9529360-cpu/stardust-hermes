@@ -240,6 +240,9 @@ export default defineConfig(({ command }) => ({
     host: '127.0.0.1',
     port: 5174,
     strictPort: true,
+    // Electron's temporary userData can contain locked Chromium files on
+    // Windows; they are not source files and must never enter Vite's watcher.
+    watch: { ignored: ['**/.artifacts/**'] },
     warmup: {
       clientFiles: ['./src/components/intro-reveal/intro-root.tsx']
     },

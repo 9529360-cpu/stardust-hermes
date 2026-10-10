@@ -396,7 +396,6 @@ def test_cli_docs_urls_point_to_stardust_repository() -> None:
         "hermes_cli/auth_constants.py",
         "hermes_cli/dashboard_auth/login_page.py",
         "hermes_cli/fallback_cmd.py",
-        "hermes_cli/kanban_parser.py",
         "hermes_cli/main_dashboard.py",
         "hermes_cli/portal_cli.py",
         "hermes_cli/setup.py",
@@ -409,8 +408,6 @@ def test_cli_docs_urls_point_to_stardust_repository() -> None:
         "hermes_cli/tools_config.py",
         "hermes_cli/update_cmd_maint.py",
         "hermes_cli/web_server_oauth.py",
-        "plugins/kanban/dashboard/dist/index.js",
-        "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
         "plugins/platforms/discord/adapter.py",
         "plugins/platforms/slack/adapter.py",
         "setup.py",
@@ -431,12 +428,6 @@ def test_cli_docs_urls_point_to_stardust_repository() -> None:
         "user-guide/features/fallback-providers.md": (
             "hermes_cli/fallback_cmd.py", "hermes_cli/subcommands/fallback.py",
         ),
-        "user-guide/features/kanban.md": (
-            "hermes_cli/kanban_parser.py",
-            "plugins/kanban/dashboard/dist/index.js",
-            "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
-        ),
-        "user-guide/features/kanban-tutorial.md": ("plugins/kanban/dashboard/dist/index.js",),
         "user-guide/features/tool-gateway.md": ("hermes_cli/portal_cli.py",),
         "user-guide/configuration.md": ("hermes_cli/setup.py",),
         "user-guide/messaging/webhooks.md": (
@@ -522,7 +513,7 @@ def test_openrouter_referer_headers_are_attribution_not_doc_links() -> None:
     attribution, not a "learn more" doc link -- out of scope for the docs-link migration."""
     for path in (
         "agent/anthropic_adapter.py",
-        "agent/auxiliary_client.py",
+        "agent/auxiliary_catalog.py",
         "hermes_cli/models.py",
         "plugins/model-providers/ai-gateway/__init__.py",
         "plugins/model-providers/fireworks/__init__.py",

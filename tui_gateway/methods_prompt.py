@@ -701,13 +701,9 @@ def _(rid, params: dict) -> dict:
         target=lambda: _run_after_agent_ready(
             rid, sid, session, text, display_kind, hosted_terminal_callback, turn_author),
         daemon=True)
-    # Start before publishing: a reader (e.g. compute_host._run_real_turn) that observes this
-    # thread via `_run_thread` must never see one that has not actually begun yet — `is_alive()`
-    # is False both before `start()` and after the thread finishes, so publishing the handle
-    # first would let a reader mistake "not started" for "already done" and end the turn early.
-    run_thread.start()
     # Handle lets session.interrupt tell a live turn from a stuck `running` flag.
-    session["_run_thread"] = run_thread
+    from tui_gateway.run_thread_handle import start_turn_thread
+    start_turn_thread(session, run_thread)
     return _ok(rid, {"status": "streaming", **survivor_fields})
 
 
@@ -1196,6 +1192,39 @@ def _approval_reply(rid, result_key, call):
         return _err(rid, 5004, str(e))
 
 
+@method("approval.grants.list")
+@_profile_scoped
+def _(rid, params: dict) -> dict:
+    from tools.approval_grants import list_grants
+    return _ok(rid, {"grants": list_grants()})
+
+
+@method("approval.grants.add")
+@_profile_scoped
+def _(rid, params: dict) -> dict:
+    from tools.approval_grants import add_grant
+    try:
+        grant = add_grant(params["action_kind"], params["target"],
+                          params.get("max_amount"), params.get("expires_at"))
+        return _ok(rid, {"grant": grant})
+    except (ValueError, TypeError) as exc:
+        return _err(rid, 4000, str(exc))
+
+
+@method("approval.grants.revoke")
+@_profile_scoped
+def _(rid, params: dict) -> dict:
+    from tools.approval_grants import revoke_grant
+    return _ok(rid, {"revoked": revoke_grant(params["id"])})
+
+
+@method("approval.audit")
+def _(rid, params: dict) -> dict:
+    from tools.approval_audit import read_approval_audit
+    return _ok(rid, {"entries": read_approval_audit(
+        limit=params.get("limit", 100), session_key=params.get("session_key"))})
+
+
 @method("approval.pending")
 def _(rid, params: dict) -> dict:
     session, err = _sess(params, rid)
@@ -1204,8 +1233,14 @@ def _(rid, params: dict) -> dict:
     if params.get("profile") is not None and not _live_profile_matches(session, _profile_home(params["profile"])):
         return _err(rid, 4001, "session not found")
     with _session_profile_runtime_scope(session):
-        return _approval_reply(
-            rid, "approvals", lambda a: a.list_gateway_approvals(session["session_key"]))
+        mode = _load_approval_mode()
+        from tools import approval
+        pending = approval.list_gateway_approvals(
+            session["session_key"], policy_locked_only=mode == "off")
+        return _ok(rid, {
+            "approvals": pending,
+            "approval_mode": mode,
+        })
 
 
 @method("approval.received")

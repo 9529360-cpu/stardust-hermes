@@ -308,7 +308,9 @@ def _fail_inflight_turn(session: dict, error: Any, error_surface: Optional[dict]
     """Mark the in-flight turn terminal-error but keep it replayable: a failure's terminal frame can be lost on
     WS disconnect and the turn may never have been committed, so the snapshot lets ``session.resume`` replay
     prompt, partial text and error. Lives until the next turn starts or the session closes. Caller holds history_lock."""
-    message = str(error) if not isinstance(error, BaseException) else (str(error) or type(error).__name__)
+    raw = str(error) if not isinstance(error, BaseException) else (str(error) or type(error).__name__)
+    from agent.redact import redact_sensitive_text
+    message = redact_sensitive_text(raw, force=True)
     now = time.time()
     turn = session.get("inflight_turn")
     if not isinstance(turn, dict):

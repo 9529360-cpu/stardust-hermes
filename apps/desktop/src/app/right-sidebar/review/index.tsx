@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { FileDiffPanel } from '@/components/chat/diff-lines'
+import { FileDiffPanel, parseDiffHunks } from '@/components/chat/diff-lines'
 import { DiffSkeleton, TreeSkeleton } from '@/components/chat/skeletons'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -37,6 +38,7 @@ import { SidebarPanelLabel } from '../../shell/sidebar-label'
 import { PaneEmptyState, RightSidebarSectionHeader } from '../index'
 
 import { ReviewFileTree } from './file-tree'
+import { diffForSelectedHunk, ReviewHunkNavigator } from './hunk-navigation'
 import { ReviewShipBar } from './ship-bar'
 
 // Compact header/diff action buttons — micro hit targets packed tight, matching
@@ -55,6 +57,12 @@ export function ReviewPane() {
   const diffLoading = useStore($reviewDiffLoading)
   const revertTarget = useStore($reviewRevertTarget)
   const treeMode = useStore($reviewTreeMode)
+  const reviewHunks = useMemo(() => (diff ? parseDiffHunks(diff) : []), [diff])
+  const [selectedHunkIndex, setSelectedHunkIndex] = useState<number | null>(null)
+
+  useEffect(() => {
+    setSelectedHunkIndex(null)
+  }, [diff, selectedPath])
 
   const selectedFile = files.find(file => file.path === selectedPath)
   const hasFiles = files.length > 0
@@ -161,6 +169,15 @@ export function ReviewPane() {
               {displayPath(selectedFile.path)}
             </span>
             <DiffCount added={selectedFile.added} className="text-[0.64rem] leading-4" removed={selectedFile.removed} />
+            <ReviewHunkNavigator
+              allHunks={c.allHunks}
+              count={reviewHunks.length}
+              hunkLabel={c.hunk}
+              nextHunk={c.nextHunk}
+              onSelect={setSelectedHunkIndex}
+              previousHunk={c.previousHunk}
+              selectedIndex={selectedHunkIndex}
+            />
             <Tip label={selectedFile.staged ? c.unstage : c.stage}>
               <Button
                 aria-label={selectedFile.staged ? c.unstage : c.stage}
@@ -192,7 +209,12 @@ export function ReviewPane() {
                 <DiffSkeleton />
               ) : null
             ) : diff ? (
-              <FileDiffPanel className="mx-0 mb-0 h-full max-h-none" diff={diff} path={selectedFile.path} virtualized />
+              <FileDiffPanel
+                className="mx-0 mb-0 h-full max-h-none"
+                diff={diffForSelectedHunk(diff, reviewHunks, selectedHunkIndex)}
+                path={selectedFile.path}
+                virtualized
+              />
             ) : (
               <div className="py-6 text-center text-[0.66rem] text-muted-foreground/60">{c.noDiff}</div>
             )}

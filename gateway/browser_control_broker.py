@@ -8,6 +8,7 @@ changes happen under one RLock; the send callback runs *outside* it so a control
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import secrets
 import threading
@@ -20,12 +21,32 @@ _OWNER_UNSET = object()
 
 #: Default lifetime of a minted registration ticket, in clock seconds.
 DEFAULT_TICKET_TTL = 30.0
+#: Default lifetime of a Desktop supervisor launch grant, in clock seconds. Grants are
+#: deliberately separate from registration tickets: the supervisor may exchange one grant
+#: for exactly one API registration ticket, but a registration ticket can never mint another
+#: launch grant.
+DEFAULT_LAUNCH_GRANT_TTL = 30.0
 #: Default wall time a dispatch waits for the controller to complete.
 DEFAULT_COMMAND_TIMEOUT = 30.0
 #: Maximum cancel frames retained while a same-identity controller is offline.
 MAX_DEFERRED_CANCELS = 512
 #: Current wire protocol version; registration requires this exact int (bools rejected).
 BROWSER_CONTROL_PROTOCOL_VERSION = 1
+
+#: Family shared by the loopback API and the local Desktop supervisor. The principal, not
+#: this family alone, separates one Desktop session from another local API identity.
+LOCAL_DESKTOP_TRANSPORT_FAMILY = "local-api"
+
+
+def local_desktop_principal(profile_id: str, session_id: str) -> str:
+    """Derive the local Desktop principal from server-owned profile/session values.
+
+    Neither value is accepted from the controller as an identity. The delimiter keeps
+    component boundaries unambiguous (``a:b`` + ``c`` must not collide with ``a`` + ``b:c``),
+    and the digest keeps the raw session/profile values out of broker diagnostics and frames.
+    """
+    raw = f"{str(profile_id or '').strip()}\x00{str(session_id or '').strip()}"
+    return f"principal:desktop:{hashlib.sha256(raw.encode('utf-8')).hexdigest()[:32]}"
 
 #: Exact controller capability allowlist shared by every transport (raw CDP/eval/console stay out).
 BROWSER_CONTROL_CAPABILITIES = frozenset({
@@ -89,6 +110,10 @@ class ControllerTicketInvalid(BrowserControlError):
     """A registration ticket is unknown, already consumed, or expired."""
 
 
+class LaunchGrantInvalid(BrowserControlError):
+    """A Desktop bridge launch grant is unknown, already consumed, or expired."""
+
+
 class ControllerUnavailable(BrowserControlError):
     """No attached controller exactly matches the requested scope/capability."""
 
@@ -132,8 +157,22 @@ class Ticket:
     expires_at: float
 
 
+@dataclass(frozen=True)
+class LaunchGrant:
+    """Opaque, single-use credential for one Desktop supervisor launch."""
+    value: str
+    expires_at: float
+
+
 @dataclass
 class _TicketRecord:
+    scope: ControllerScope
+    expires_at: float
+    consumed: bool = False
+
+
+@dataclass
+class _LaunchGrantRecord:
     scope: ControllerScope
     expires_at: float
     consumed: bool = False
@@ -168,13 +207,20 @@ def _cancel_frame(pending: _PendingCommand) -> dict:
 
 class BrowserControlBroker:
     """Thread-safe broker core; ``clock`` is injectable (default ``time.monotonic``)."""
-    def __init__(self, *, ticket_ttl: float = DEFAULT_TICKET_TTL, command_timeout: float = DEFAULT_COMMAND_TIMEOUT,
-                 clock: Optional[Callable[[], float]] = None, developer_mode: Optional[bool] = None) -> None:
+    def __init__(
+        self, *, ticket_ttl: float = DEFAULT_TICKET_TTL,
+        launch_grant_ttl: float = DEFAULT_LAUNCH_GRANT_TTL,
+        bridge_grant_ttl: Optional[float] = None,
+        command_timeout: float = DEFAULT_COMMAND_TIMEOUT,
+        clock: Optional[Callable[[], float]] = None, developer_mode: Optional[bool] = None,
+    ) -> None:
         self._ticket_ttl = ticket_ttl
+        self._launch_grant_ttl = launch_grant_ttl if bridge_grant_ttl is None else bridge_grant_ttl
         self._command_timeout = command_timeout
         self._clock = clock if clock is not None else time.monotonic
         self._lock = threading.RLock()
         self._tickets: Dict[str, _TicketRecord] = {}
+        self._launch_grants: Dict[str, _LaunchGrantRecord] = {}
         self._controllers: Dict[ControllerScope, _Controller] = {}
         self._pending: Dict[str, _PendingCommand] = {}
         # None defers to live config on every selection (so flipping developer_mode off REVOKES
@@ -228,6 +274,106 @@ class BrowserControlBroker:
             record.consumed = True
             return record.scope
 
+    def mint_launch_grant(self, scope: ControllerScope) -> LaunchGrant:
+        """Mint an opaque, short-lived, single-use Desktop launch grant bound to ``scope``."""
+        now = self._clock()
+        with self._lock:
+            self._launch_grants = {
+                value: record for value, record in self._launch_grants.items()
+                if record.expires_at + self._ticket_ttl > now
+            }
+            value = secrets.token_urlsafe(32)
+            self._launch_grants[value] = record = _LaunchGrantRecord(
+                scope=scope, expires_at=now + self._launch_grant_ttl)
+        return LaunchGrant(value=value, expires_at=record.expires_at)
+
+    def consume_launch_grant(
+        self, value: str, *, scope: Optional[ControllerScope] = None,
+    ) -> ControllerScope:
+        """Exchange a launch grant exactly once.
+
+        ``scope`` is an optional caller-side assertion used by tests and trusted adapters;
+        a mismatch fails closed without revealing the stored scope or consuming the grant.
+        Unknown, consumed, malformed, and expired values all use the same exception type.
+        """
+        if not isinstance(value, str) or not value:
+            raise LaunchGrantInvalid("unknown launch grant")
+        now = self._clock()
+        with self._lock:
+            record = self._launch_grants.get(value)
+            if record is None:
+                raise LaunchGrantInvalid("unknown launch grant")
+            if record.consumed:
+                raise LaunchGrantInvalid("launch grant already consumed")
+            if now > record.expires_at:
+                self._launch_grants.pop(value, None)
+                raise LaunchGrantInvalid("launch grant expired")
+            if scope is not None and record.scope != scope:
+                raise LaunchGrantInvalid("launch grant scope mismatch")
+            record.consumed = True
+            return record.scope
+
+    # The bridge-specific spelling keeps the API self-documenting while the shorter launch
+    # spelling mirrors mint_ticket/consume_ticket for broker callers.
+    def mint_bridge_grant(self, scope: ControllerScope) -> LaunchGrant:
+        return self.mint_launch_grant(scope)
+
+    def consume_bridge_grant(
+        self, value: str, *, scope: Optional[ControllerScope] = None,
+    ) -> ControllerScope:
+        return self.consume_launch_grant(value, scope=scope)
+
+    def revoke_launch_grants(self, scope: ControllerScope) -> int:
+        """Invalidate outstanding launch grants for an exact stable identity."""
+        with self._lock:
+            values = [
+                value for value, record in self._launch_grants.items()
+                if _same_scope_identity(record.scope, scope)
+            ]
+            for value in values:
+                self._launch_grants.pop(value, None)
+        return len(values)
+
+    def revoke_bridge_grants(self, scope: ControllerScope) -> int:
+        return self.revoke_launch_grants(scope)
+
+    def revoke_bridge_session(self, *, principal_id: str, profile_id: str,
+                              session_id: str, controller_id: str = "") -> int:
+        """Revoke pending/consumed Desktop credentials and detach this session's controllers.
+
+        Retaining spent launch records through the ticket lifetime lets attach reject a
+        ticket consumed just before revocation, without introducing another authority store.
+        """
+        def matches(scope):
+            return (scope.principal_id, scope.profile_id, scope.session_id, scope.transport_family) == (
+                principal_id, profile_id, session_id, LOCAL_DESKTOP_TRANSPORT_FAMILY
+            ) and (not controller_id or scope.controller_id == controller_id)
+
+        with self._lock:
+            scopes = {scope for scope in self._controllers if matches(scope)}
+            revoked = 0
+            for records in (self._launch_grants, self._tickets):
+                for value, record in list(records.items()):
+                    if matches(record.scope):
+                        scopes.add(record.scope)
+                        del records[value]
+                        revoked += 1
+        # detach may take the send lock and emit/fail pending work; never do that
+        # while holding the broker state lock. New Desktop pairing uses a new id.
+        for scope in scopes:
+            self.detach(scope, notify_controller=False)
+        return revoked
+
+    def _validate_bridge_attach_locked(self, scope: ControllerScope) -> None:
+        if (scope.transport_family != LOCAL_DESKTOP_TRANSPORT_FAMILY
+                or scope.principal_id != local_desktop_principal(scope.profile_id, scope.session_id)):
+            return
+        now = self._clock()
+        if not any(record.scope == scope and record.consumed
+                   and record.expires_at + self._ticket_ttl > now
+                   for record in self._launch_grants.values()):
+            raise ControllerRejected("Desktop bridge authorization expired or revoked")
+
     def _controller_for_identity_locked(self, scope: ControllerScope) -> Optional[_Controller]:
         """Attached controller sharing ``scope``'s stable identity (any capabilities)."""
         return next((c for c in self._controllers.values() if _same_scope_identity(c.scope, scope)), None)
@@ -243,6 +389,7 @@ class BrowserControlBroker:
         authenticated session lane hard-replaces it."""
         while True:
             with self._lock:
+                self._validate_bridge_attach_locked(scope)
                 existing = self._controller_for_identity_locked(scope)
                 lane_scopes = [
                     c for c in self._controllers if not _same_scope_identity(c, scope)
@@ -264,6 +411,7 @@ class BrowserControlBroker:
                 with self._lock:
                     if self._controllers.get(existing.scope) is not existing:
                         continue
+                    self._validate_bridge_attach_locked(scope)
                     self._controllers.pop(existing.scope, None)
                     existing.scope, existing.send, existing.owner, existing.connected = scope, send, owner, False
                     for pending in self._pending_for_scope_locked(scope):
@@ -283,6 +431,7 @@ class BrowserControlBroker:
                     raise ConnectionError("browser controller reconnect could not flush deferred cancels")
                 with self._lock:
                     if self._controllers.get(scope) is existing:
+                        self._validate_bridge_attach_locked(scope)
                         existing.connected = True
                 return
 
@@ -488,6 +637,7 @@ class BrowserControlBroker:
             self.detach(scope)
         with self._lock:
             self._tickets.clear()
+            self._launch_grants.clear()
             # Pending entries whose controller a concurrent teardown removed.
             for pending in list(self._pending.values()):
                 self._resolve_pending(pending, cancelled=True)
@@ -496,6 +646,11 @@ class BrowserControlBroker:
     def ticket_ttl_seconds(self) -> float:
         """Configured lifetime for newly minted one-shot tickets."""
         return self._ticket_ttl
+
+    @property
+    def launch_grant_ttl_seconds(self) -> float:
+        """Configured lifetime for newly minted one-shot Desktop launch grants."""
+        return self._launch_grant_ttl
 
     @property
     def pending_count(self) -> int:

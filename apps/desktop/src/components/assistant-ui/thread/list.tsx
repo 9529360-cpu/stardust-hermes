@@ -43,6 +43,7 @@ import { MessageRenderBoundary } from '../message-render-boundary'
 import { resolveShowEarlierAction, shouldAutoShowEarlier, useTranscriptWindow } from './transcript-window'
 import { useMessagesBelow } from './use-messages-below'
 import { useStickyPromptClip } from './use-sticky-prompt-clip'
+import { WorkProgressMessages } from './work-progress'
 
 type ThreadMessageComponents = ComponentProps<typeof ThreadPrimitive.MessageByIndex>['components']
 
@@ -225,9 +226,9 @@ export function buildGroups(signature: string): MessageGroup[] {
   }
 
   const messages = signature.split('\n').map(row => {
-    const [index, id, role, weight] = row.split(':')
+    const [index, id, role, weight, autoContinue] = row.split(':')
 
-    return { id, index: Number(index), role, weight: Number(weight) || 1 }
+    return { id, index: Number(index), role, weight: Number(weight) || 1, autoContinue: autoContinue === '1' }
   })
 
   const groups: MessageGroup[] = []
@@ -244,7 +245,9 @@ export function buildGroups(signature: string): MessageGroup[] {
     const indices = [message.index]
     let weight = message.weight
 
-    while (i + 1 < messages.length && messages[i + 1].role !== 'user') {
+    // A backend-authored continuation notice extends this work, not a fresh
+    // human turn; leave the real next user message as a group boundary.
+    while (i + 1 < messages.length && (messages[i + 1].role !== 'user' || messages[i + 1].autoContinue)) {
       weight += messages[++i].weight
       indices.push(messages[i].index)
     }
@@ -386,9 +389,7 @@ const TurnRow = memo(function TurnRow({ components, group, resetKey, virtualized
             className="composer-human-ai-pair-container relative flex min-w-0 flex-col gap-(--conversation-turn-gap)"
             data-slot="aui_turn-pair"
           >
-            {group.indices.map(index => (
-              <ThreadPrimitive.MessageByIndex components={components} index={index} key={index} />
-            ))}
+            <WorkProgressMessages components={components} indices={group.indices} />
           </div>
         ) : (
           <ThreadPrimitive.MessageByIndex components={components} index={group.index} />
@@ -415,7 +416,11 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   // every tick (measured: 540 wasted Block renders per explain() sample with
   // two threads streaming).
   const structuralSignature = useAuiState(s =>
-    s.thread.messages.map((message, index) => `${index}:${message.id}:${message.role}`).join('\n')
+    s.thread.messages
+      .map((message, index) =>
+        `${index}:${message.id}:${message.role}:1:${message.metadata?.custom?.autoContinue === true ? '1' : '0'}`
+      )
+      .join('\n')
   )
 
   const weightSignature = useAuiState(s =>

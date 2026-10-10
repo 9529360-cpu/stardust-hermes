@@ -8,7 +8,11 @@ import {
   findLiveTaskRuntimeIdByStoredId,
   findLiveTaskSession,
   findLiveTaskStoredId,
-  resolveTaskWorkspaceCwd
+  resolveTaskPreviewId,
+  resolveTaskTerminalId,
+  resolveTaskWorkspaceCwd,
+  type TaskPreviewEntry,
+  type TaskTerminalEntry
 } from './task-session'
 
 function session(id: string, over: Partial<SessionInfo> = {}): SessionInfo {
@@ -88,7 +92,9 @@ describe('findLiveTaskRuntimeId', () => {
       _lineage_ids: ['root', 'tip'],
       _lineage_root_id: 'root'
     })
+
     const busy = { ...createClientSessionState(null), busy: true, storedSessionId: 'root' }
+
     const attention = {
       ...createClientSessionState(null),
       busy: true,
@@ -121,6 +127,7 @@ describe('findLiveTaskRuntimeIdByStoredId', () => {
 
   it('prefers needs-input over another matching running runtime', () => {
     const running = { ...createClientSessionState(null), busy: true, storedSessionId: 'stored-task' }
+
     const attention = {
       ...createClientSessionState(null),
       busy: true,
@@ -129,10 +136,7 @@ describe('findLiveTaskRuntimeIdByStoredId', () => {
     }
 
     expect(
-      findLiveTaskRuntimeIdByStoredId(
-        { 'runtime-running': running, 'runtime-attention': attention },
-        'stored-task'
-      )
+      findLiveTaskRuntimeIdByStoredId({ 'runtime-running': running, 'runtime-attention': attention }, 'stored-task')
     ).toBe('runtime-attention')
   })
 })
@@ -179,5 +183,131 @@ describe('resolveTaskWorkspaceCwd', () => {
 
   it('falls back to the explicit project scope when no conversation owns a cwd', () => {
     expect(resolveTaskWorkspaceCwd('', undefined, undefined, 'D:/scope')).toBe('D:/scope')
+  })
+})
+
+function terminal(id: string, over: Partial<TaskTerminalEntry> = {}): TaskTerminalEntry {
+  return {
+    cwd: '/repo',
+    id,
+    kind: 'user',
+    ...over
+  }
+}
+
+function preview(id: string, storedSessionId?: string): TaskPreviewEntry {
+  return { id, ...(storedSessionId ? { storedSessionId } : {}) }
+}
+
+describe('resolveTaskPreviewId', () => {
+  it('prefers the selected task owner over legacy previews and another task', () => {
+    expect(
+      resolveTaskPreviewId(
+        [preview('legacy'), preview('task-one-preview', 'task-one'), preview('task-two-preview', 'task-two')],
+        'legacy',
+        'task-two',
+        []
+      )
+    ).toBe('task-two-preview')
+  })
+
+  it('keeps the active preview when several previews share the selected owner', () => {
+    expect(
+      resolveTaskPreviewId(
+        [preview('task-preview-old', 'task-one'), preview('task-preview-current', 'task-one')],
+        'task-preview-current',
+        'task-one',
+        []
+      )
+    ).toBe('task-preview-current')
+  })
+
+  it('matches a compressed task owner through the loaded lineage row', () => {
+    const compressed = session('task-tip', { _lineage_ids: ['task-root', 'task-tip'], _lineage_root_id: 'task-root' })
+
+    expect(resolveTaskPreviewId([preview('task-preview', 'task-root')], null, 'task-tip', [compressed])).toBe(
+      'task-preview'
+    )
+  })
+
+  it('returns undefined without a selected owner or a matching owned preview', () => {
+    expect(resolveTaskPreviewId([preview('task-preview', 'task-one')], 'task-preview', null, [])).toBeUndefined()
+    expect(resolveTaskPreviewId([preview('task-preview', 'task-one')], 'task-preview', 'task-two', [])).toBeUndefined()
+  })
+})
+
+describe('resolveTaskTerminalId', () => {
+  it('prefers the selected task owner when tasks share a cwd', () => {
+    expect(
+      resolveTaskTerminalId(
+        [
+          terminal('task-one-terminal', { storedSessionId: 'task-one' }),
+          terminal('task-two-terminal', { storedSessionId: 'task-two' })
+        ],
+        'task-one-terminal',
+        'task-two',
+        [],
+        '/repo'
+      )
+    ).toBe('task-two-terminal')
+  })
+
+  it('uses the owned tab matching the task cwd when several tabs share an owner', () => {
+    expect(
+      resolveTaskTerminalId(
+        [
+          terminal('task-terminal-old', { cwd: '/other', storedSessionId: 'task-one' }),
+          terminal('task-terminal-current', { storedSessionId: 'task-one' })
+        ],
+        'task-terminal-old',
+        'task-one',
+        [],
+        '/repo'
+      )
+    ).toBe('task-terminal-current')
+  })
+
+  it('does not cross-select another task owner when the selected task has no terminal', () => {
+    expect(
+      resolveTaskTerminalId(
+        [terminal('task-one-terminal', { storedSessionId: 'task-one' })],
+        'task-one-terminal',
+        'task-two',
+        [],
+        '/repo'
+      )
+    ).toBeUndefined()
+  })
+
+  it('preserves the legacy cwd pool for unowned tabs', () => {
+    expect(
+      resolveTaskTerminalId(
+        [terminal('legacy'), terminal('other-task', { storedSessionId: 'task-one' })],
+        'other-task',
+        'task-two',
+        [],
+        '/repo'
+      )
+    ).toBe('legacy')
+  })
+
+  it('can select an owned tab before cwd hydration completes', () => {
+    expect(
+      resolveTaskTerminalId([terminal('task-one-terminal', { storedSessionId: 'task-one' })], null, 'task-one', [], '')
+    ).toBe('task-one-terminal')
+  })
+
+  it('matches a compressed task owner through the loaded lineage row', () => {
+    const compressed = session('task-tip', { _lineage_ids: ['task-root', 'task-tip'], _lineage_root_id: 'task-root' })
+
+    expect(
+      resolveTaskTerminalId(
+        [terminal('task-terminal', { storedSessionId: 'task-root' })],
+        null,
+        'task-tip',
+        [compressed],
+        ''
+      )
+    ).toBe('task-terminal')
   })
 })

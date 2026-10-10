@@ -7,6 +7,8 @@ and voice / wake-word control (``methods_voice.py``).
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from .base import JsonValue, Params, Result, WireEnum
@@ -284,12 +286,82 @@ method("request.answer", params=RequestAnswerParams, result=RequestAnswerResult,
 # ── approvals ─────────────────────────────────────────────────────────────────────────────────
 
 
+class ApprovalGrant(Result):
+    id: str
+    action_kind: str
+    target: str
+    max_amount: float | None = None  # legacy metadata only; not payment authority
+    expires_at: str | None = None
+    created_at: str
+
+
+class ApprovalGrantsListParams(Params):
+    profile: str | None = None
+
+
+class ApprovalGrantsListResult(Result):
+    grants: list[ApprovalGrant]
+
+
+class ApprovalGrantsAddParams(ApprovalGrantsListParams):
+    action_kind: Literal["command_pattern", "send_message"]
+    target: str = Field(min_length=1)
+    max_amount: None = None
+    expires_at: str | None = None
+
+
+class ApprovalGrantsAddResult(Result):
+    grant: ApprovalGrant
+
+
+class ApprovalGrantsRevokeParams(ApprovalGrantsListParams):
+    id: str
+
+
+class ApprovalGrantsRevokeResult(Result):
+    revoked: bool
+
+
+method("approval.grants.list", params=ApprovalGrantsListParams, result=ApprovalGrantsListResult,
+       doc="List management records in the active profile; not used for automatic approval.")
+method("approval.grants.add", params=ApprovalGrantsAddParams, result=ApprovalGrantsAddResult,
+       doc="Store a non-monetary scoped record. Automatic approval is disabled; purchase/payment grants are unsupported.")
+method("approval.grants.revoke", params=ApprovalGrantsRevokeParams, result=ApprovalGrantsRevokeResult,
+       doc="Revoke a standing authorization by id.")
+
+
+class ApprovalAuditParams(Params):
+    limit: int = Field(default=100, ge=0, le=10000)
+    session_key: str | None = None
+
+
+class ApprovalAuditEntry(Result):
+    ts: str
+    session_key: str
+    kind: str
+    tool_name: str
+    description: str
+    pattern_key: str
+    outcome: str
+    mode: str
+    command_preview: str
+
+
+class ApprovalAuditResult(Result):
+    entries: list[ApprovalAuditEntry]
+
+
+method("approval.audit", params=ApprovalAuditParams, result=ApprovalAuditResult,
+       doc="Read recent redacted approval decisions in the active profile, newest first.")
+
+
 class ApprovalPendingParams(SessionParams):
     pass
 
 
 class ApprovalPendingResult(Result):
     approvals: list[PendingApproval]
+    approval_mode: str = "manual"
 
 
 method("approval.pending", params=ApprovalPendingParams, result=ApprovalPendingResult,

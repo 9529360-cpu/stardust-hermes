@@ -16,6 +16,7 @@ import { DiffCount } from '@/components/ui/diff-count'
 import { Tip } from '@/components/ui/tooltip'
 import type { HermesReviewFile } from '@/global'
 import { useI18n } from '@/i18n'
+import type { Translations } from '@/i18n/types'
 import { isDesktopFsRemoteMode } from '@/lib/desktop-fs'
 import { displayPath } from '@/lib/display-path'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
@@ -53,6 +54,8 @@ import {
   buildReviewTree,
   countAllNodes,
   flattenReviewRows,
+  groupReviewFiles,
+  type ReviewFileGroup,
   type ReviewFlatRow,
   type ReviewTreeNode
 } from './tree-data'
@@ -113,25 +116,43 @@ export function ReviewFileTree() {
   const loading = useStore($reviewLoading)
   const mode = useStore($reviewTreeMode)
 
-  const tree = useMemo(() => (mode === 'tree' ? buildReviewTree(files) : buildReviewFlatList(files)), [files, mode])
+  const groups = useMemo(() => groupReviewFiles(files), [files])
+
+  const groupTrees = useMemo(
+    () =>
+      groups.map(group => ({
+        group,
+        tree: mode === 'tree' ? buildReviewTree(group.files) : buildReviewFlatList(group.files)
+      })),
+    [groups, mode]
+  )
 
   // Heavy is decided by the TOTAL node count, not the top-level row count: the
   // classic blow-up is ONE folder holding tens of thousands of untracked files,
   // which is a single top-level node but must still take the virtualized path.
-  const heavy = useMemo(() => countAllNodes(tree) > HEAVY_LIST_CAP, [tree])
+  const heavy = useMemo(
+    () => groupTrees.reduce((total, group) => total + countAllNodes(group.tree), groupTrees.length) > HEAVY_LIST_CAP,
+    [groupTrees]
+  )
 
   // Visible rows for the virtualized path. Heavy trees start fully collapsed
   // (folders default closed) so even the first mount is a handful of rows; the
   // user expands a folder to reveal its children, still virtualized.
   const nodeOpen = useStore($sidebarWorkspaceNodeOpen)
 
-  const rows = useMemo(() => {
+  const rows = useMemo<ReviewVirtualRow[]>(() => {
     if (!heavy) {
       return []
     }
 
-    return flattenReviewRows(tree, id => nodeOpen[`review:${id}`] ?? false)
-  }, [heavy, nodeOpen, tree])
+    return groupTrees.flatMap(({ group, tree }) => [
+      { group, key: `section:${group.kind}`, kind: 'section' as const },
+      ...flattenReviewRows(tree, id => nodeOpen[`review:${id}`] ?? false).map(row => ({
+        kind: 'node' as const,
+        row
+      }))
+    ])
+  }, [groupTrees, heavy, nodeOpen])
 
   const scrollerRef = useRef<HTMLDivElement | null>(null)
 
@@ -170,8 +191,56 @@ export function ReviewFileTree() {
       {heavy ? (
         <VirtualizedReviewList rows={rows} scrollRef={scrollerRef} />
       ) : (
-        <ReviewNodeList animate={animate} depth={0} nodes={tree} />
+        groupTrees.map(({ group, tree }) => (
+          <ReviewFileSection group={group} key={group.kind}>
+            <ReviewNodeList animate={animate} depth={0} nodes={tree} />
+          </ReviewFileSection>
+        ))
       )}
+    </div>
+  )
+}
+
+type ReviewVirtualRow = { group: ReviewFileGroup; key: string; kind: 'section' } | { kind: 'node'; row: ReviewFlatRow }
+
+function reviewGroupLabel(c: Translations['statusStack']['coding'], kind: ReviewFileGroup['kind']): string {
+  if (kind === 'staged') {
+    return c.staged
+  }
+
+  if (kind === 'untracked') {
+    return c.untracked
+  }
+
+  return c.unstaged
+}
+
+function ReviewSectionHeader({ group }: { group: ReviewFileGroup }) {
+  const { t } = useI18n()
+  const c = t.statusStack.coding
+  const label = reviewGroupLabel(c, group.kind)
+
+  return (
+    <div
+      className="flex h-6 items-center gap-1.5 pr-1.5 text-[0.64rem] font-medium uppercase tracking-[0.04em] text-(--ui-text-tertiary)"
+      data-review-section-header={group.kind}
+      style={rowStyle(0)}
+    >
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="shrink-0 tabular-nums">{group.files.length}</span>
+      <DiffCount added={group.added} className="text-[0.6rem] leading-4" removed={group.removed} />
+    </div>
+  )
+}
+
+function ReviewFileSection({ children, group }: { children: ReactNode; group: ReviewFileGroup }) {
+  const { t } = useI18n()
+  const label = reviewGroupLabel(t.statusStack.coding, group.kind)
+
+  return (
+    <div aria-label={label} data-review-section={group.kind} role="group">
+      <ReviewSectionHeader group={group} />
+      {children}
     </div>
   )
 }
@@ -209,13 +278,17 @@ function VirtualizedReviewList({
   rows,
   scrollRef
 }: {
-  rows: ReviewFlatRow[]
+  rows: ReviewVirtualRow[]
   scrollRef: RefObject<HTMLDivElement | null>
 }) {
   const virtualizer = useVirtualizer({
     count: rows.length,
     estimateSize: () => ROW_HEIGHT,
-    getItemKey: index => rows[index]?.node.id ?? index,
+    getItemKey: index => {
+      const row = rows[index]
+
+      return row?.kind === 'section' ? row.key : (row?.row.node.id ?? index)
+    },
     getScrollElement: () => scrollRef.current,
     // jsdom-friendly default; the real rect takes over on first observe.
     initialRect: { height: 600, width: 240 },
@@ -237,7 +310,7 @@ function VirtualizedReviewList({
         return (
           <div
             data-index={virtualItem.index}
-            key={row.node.id}
+            key={row.kind === 'section' ? row.key : row.row.node.id}
             ref={virtualizer.measureElement}
             style={{
               left: 0,
@@ -247,10 +320,12 @@ function VirtualizedReviewList({
               width: '100%'
             }}
           >
-            {row.node.isDir ? (
-              <ReviewDirRow animate={false} defaultOpen={false} depth={row.depth} leaf node={row.node} />
+            {row.kind === 'section' ? (
+              <ReviewSectionHeader group={row.group} />
+            ) : row.row.node.isDir ? (
+              <ReviewDirRow animate={false} defaultOpen={false} depth={row.row.depth} leaf node={row.row.node} />
             ) : (
-              <ReviewFileRow depth={row.depth} node={row.node} />
+              <ReviewFileRow depth={row.row.depth} node={row.row.node} />
             )}
           </div>
         )
@@ -259,9 +334,9 @@ function VirtualizedReviewList({
   )
 }
 
-// Depth-0 rows align their icon to the panel header's dither glyph: the tree
-// body has px-1 (4px) and the header glyph sits at px-2.5 (10px) + the label's
-// pl-2 (8px) = 18px, so the base inset is 18 − 4 = 14px.
+// Depth-0 rows align their icon to the panel header's label: the tree body has
+// px-1 (4px) and the label text starts at px-2.5 (10px) + its pl-2 (8px) = 18px,
+// so the base inset is 18 − 4 = 14px.
 const ROW_BASE_INSET = 14
 
 function rowStyle(depth: number): CSSProperties {

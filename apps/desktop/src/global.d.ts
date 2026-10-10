@@ -195,6 +195,12 @@ declare global {
         // its draft and re-focus the input on every open.
         onShown: (callback: () => void) => () => void
       }
+      browserControl: {
+        start: (payload: { profile?: string | null; launchContext: object; chromeProfileDir: string; packageSpec: string }) => Promise<BrowserBridgeStatus>
+        stop: () => Promise<BrowserBridgeStatus>
+        status: () => Promise<BrowserBridgeStatus>
+        onStatus: (callback: (status: BrowserBridgeStatus) => void) => () => void
+      }
       getBootProgress: () => Promise<DesktopBootProgress>
       getConnectionConfig: (profile?: null | string) => Promise<DesktopConnectionConfig>
       saveConnectionConfig: (payload: DesktopConnectionConfigInput) => Promise<DesktopConnectionConfig>
@@ -462,6 +468,7 @@ declare global {
           commitContext: (repoPath: string) => Promise<{ diff: string; recent: string }>
           push: (repoPath: string) => Promise<{ ok: boolean }>
           shipInfo: (repoPath: string) => Promise<HermesReviewShipInfo>
+          checks: (repoPath: string, prNumber?: number, headSha?: string) => Promise<HermesReviewChecks>
           // The PR on each of the given branches — plus any known only by
           // number — for badging a list of sessions in one request instead of
           // one `pr view` per checkout.
@@ -793,6 +800,15 @@ export interface DesktopPluginProfileRoute {
   mode: 'local' | 'remote'
   profile: string
   targetProfile: string
+}
+
+export type BrowserBridgeStatus = {
+  status: 'inactive' | 'starting' | 'connected' | 'stopping' | 'error'
+  error?: string
+  session_id?: string
+  controller_id?: string
+  browser_profile_id?: string
+  capabilities?: string[]
 }
 
 export interface HermesConnection {
@@ -1407,6 +1423,13 @@ export interface HermesPrComment {
 export interface HermesReviewShipInfo {
   ghReady: boolean
   pr: HermesReviewPr | null
+}
+
+export interface HermesReviewChecks {
+  status: 'completed' | 'pending' | 'unavailable'
+  conclusion: null | string
+  checks: Array<{ name: string; status: string; conclusion: null | string; url: string }>
+  workflowRuns: Array<{ name: string; status: string; conclusion: null | string; url: string }>
 }
 
 export interface HermesReadDirEntry {

@@ -57,10 +57,25 @@ one-off at the call site.
   and casual chat do not force it open. Explicit project, Browser/Preview,
   Files, Review, Terminal, or development actions may reveal it; passive
   background updates may refresh hidden state but must not steal attention.
-- **Pages are secondary destinations.** Tasks, projects, knowledge, tools, and
-  settings may be reached from the left navigation or overlays. Returning to
-  Conversation restores the assistant transcript, never a separate Workspace
-  landing page.
+- **One Browser tool, two explicit real targets.** Frontground desktop web
+  automation enters through the session-scoped `browser` tool. Target
+  `in_app` drives the actual right-rail WebView using the existing preview
+  controller. Target `host` requires an authenticated and approved extension
+  bound to the session's own `browser_control_broker` scope; an absent
+  controller is a refusal, not a silent new Chromium/OS fallback. A turn pins
+  its target. Do not mirror a URL into a second WebView, share cookies
+  implicitly, or switch targets silently. The host Chrome extension itself
+  is not bundled yet; a copied Chrome profile is NOT live host control.
+- **Browser use is observable without demanding attention.** A foreground
+  in-app browser action reveals its own live tab; the user may hide it without
+  cancelling that task. Later browser actions in the turn do not reopen it,
+  but a fresh turn may. Real host-browser actions use the actual OS window,
+  not the in-app rail. Off-screen sessions never steal focus. Independent
+  cloud/CDP/headless sessions are not passed off as live in-app tabs.
+- **Pages are secondary destinations.** Tasks, projects, knowledge, and tools
+  render in the workspace when opened from the left navigation; settings and
+  focused utilities may still use overlays. Returning to Conversation restores
+  the assistant transcript, never a separate Workspace landing page.
 - **Panes are working context.** Browser/preview, agent activity, files, review,
   terminal, tests, and diff belong to the right stage and remain attached to
   the current task. Their state survives temporary hiding where the underlying
@@ -211,9 +226,19 @@ blurred backdrop.
 - **Gutters:** `PAGE_INSET_X` (`src/app/layout-constants.ts`) for page side
   padding; `PAGE_INSET_NEG_X` to bleed a child to the edge. Don't hardcode
   `px-6`/`px-8` on pages.
+- **Side rails:** section labels use `SidebarPanelLabel` (11px, sentence case,
+  tertiary text — no accent color, tracked caps or glyph). A rail hosting
+  several panes (conversations/agents, context/files/review) shows its tabs as
+  one segmented control, and core panes give the tab a localized `tabTitle`
+  (`CorePaneTitle`) instead of their raw id.
+- **Conversation measure:** `--conversation-column-width`
+  (`src/reference-shell.css`, at most 46rem) is the one width the transcript,
+  empty state, sync banner and composer share. Change the token, never one
+  surface's width.
 - **Master/detail overlays:** `OverlaySplitLayout` + `OverlaySidebar` /
-  `OverlayMain`. Cron, profiles, etc. ride this — don't rebuild a titlebar
-  shell.
+  `OverlayMain`. Profiles and other true overlays ride this — don't rebuild a
+  titlebar shell. Tasks/Cron is a workspace page and reuses the shared
+  list/detail primitives without the `OverlayView` wrapper.
 - **Rows:** `ListRow` (settings `primitives.tsx`) for label/description/action
   rows. Flat, flush-left; no per-row indentation that fights flush headers.
 - **No dividers between rows** unless the list genuinely needs them; prefer
@@ -286,12 +311,18 @@ so glass and message-bubble transparency do not reveal scrolling text.
 - Interactive directive chips in the composer expose their action on hover.
   The action stays visible for a 500ms grace period while the pointer crosses
   from the chip to the floating pill; leaving both dismisses it.
-- A tool result may expose an inline action that opens a preview. It must not
-  open the rail automatically.
+- A passive tool result may expose an inline action that opens a preview;
+  it must not open the rail automatically. A foreground action that actually
+  uses the in-app browser is the exception defined above: it reveals the live
+  browser once, while respecting a user's subsequent dismissal.
 - Tool rows reserve destructive red for explicit failures. Missing read paths and
   ambiguous exit-1 results use neutral notices, with details still available.
   Errors described inside returned data are not tool failures. Expanded failures
   show the actual explanation; supporting output keeps its normal text color.
+- Thinking starts collapsed: while the model thinks the row shows a live
+  timer, and the reasoning body opens only when the user opens it. The
+  Appearance preference restores live previews; it is stored only when the
+  user changes it, so a later default change still reaches everyone else.
 - Composer status groups start collapsed except todos. Progress updates and queue
   pause/resume preserve the user's disclosure choice. Error banners meet the
   stack's top edge without a blank padding strip. File and preview links remain

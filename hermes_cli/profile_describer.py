@@ -1,12 +1,13 @@
 """Profile describer — auto-generate ``description`` for a profile.
 
-Mirrors ``hermes_cli/kanban_specify.py``: lazy aux client import, lenient response parse,
-never raises on expected failure modes. Reads at most ``MAX_SKILLS_FOR_PROMPT`` skill
-names to keep the prompt bounded.
+Uses a lazy auxiliary client and lenient response parsing; expected failures are returned
+as a structured outcome. Reads at most ``MAX_SKILLS_FOR_PROMPT`` skill names to keep the
+prompt bounded.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -22,12 +23,11 @@ logger = logging.getLogger(__name__)
 MAX_SKILLS_FOR_PROMPT = 60
 
 
-_SYSTEM_PROMPT = """You are a profile-describer for the Hermes Agent kanban board.
+_SYSTEM_PROMPT = """You are a profile-describer for an AI assistant.
 
-A user runs multiple "profiles" — distinct agent identities, each with their
-own skills, model, and configuration. The kanban board's orchestrator routes
-work to whichever profile best fits each task. To do that well, every
-profile needs a short, concrete description of what it's good at.
+A user runs multiple profiles — distinct agent identities, each with their own skills,
+model, and configuration. Produce a short, concrete description of what this profile is
+good at so the user can choose the right profile for a task.
 
 You are given a profile's:
   - Name
@@ -41,8 +41,8 @@ Produce a single JSON object with exactly one key:
   }
 
 Rules:
-  - The description is what an orchestrator will read to decide whether to
-    route a task here. Lead with the profile's strongest capability.
+  - The description should help a user choose this profile for a task. Lead with
+    the profile's strongest capability.
   - Stay concrete. Bad: "an AI agent that helps users."
                   Good: "Reads and modifies Python codebases — runs tests,
                          refactors functions, opens GitHub PRs."
@@ -105,8 +105,20 @@ def _sample_skills(names: list[str]) -> list[str]:
 
 
 def _extract_json_blob(raw: str) -> Optional[dict]:
-    from hermes_cli.kanban_specify import _extract_json_blob as _extract
-    return _extract(raw, _FENCE_RE)
+    """Parse a JSON object from a model response, tolerating Markdown fences."""
+    text = _FENCE_RE.sub("", str(raw or "").strip()).strip()
+    candidates = [text]
+    start, end = text.find("{"), text.rfind("}")
+    if start >= 0 and end > start:
+        candidates.append(text[start:end + 1])
+    for candidate in candidates:
+        try:
+            value = json.loads(candidate)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if isinstance(value, dict):
+            return value
+    return None
 
 
 def describe_profile(profile_name: str, *, overwrite: bool = False, timeout: Optional[int] = None) -> DescribeOutcome:

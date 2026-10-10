@@ -933,6 +933,20 @@ class TestSkillTextDescription:
         assert overrides["description"].startswith(bu_cli._HEADER_BASE)
         assert overrides["description"].endswith(bu_cli._HELPERS_DIGEST)
 
+    def test_browser_description_teaches_tab_reuse_and_desktop_surface(self):
+        assert "goto_url(url)" in bu_cli._HEADER_BASE
+        assert "new_tab(url) is only for a genuinely NEW tab" in bu_cli._HEADER_BASE
+        assert "desktop_preview and drive_preview" in bu_cli._HEADER_BASE
+
+    def test_real_profile_copy_is_not_described_as_host_browser(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_real_profile_consented", lambda: True)
+        properties = bu_cli._dynamic_schema_overrides()["parameters"]["properties"]
+        description = properties["local"]["description"]
+        assert "separate, Hermes-managed local Chromium" in description
+        assert "COPY of the" in description
+        assert "does NOT control any existing Chrome" in description
+        assert "computer_use" in description
+
     def test_digest_names_core_helpers(self):
         for helper in ("new_tab(", "page_info()", "js(", "fill_input(",
                        "click_at_xy(", "capture_screenshot()", "cdp("):
@@ -948,6 +962,8 @@ class TestBrowserExec:
     def test_missing_cli_returns_install_hint(self, monkeypatch):
         monkeypatch.setattr(bu_cli, "_find_cli", lambda: None)
         result = json.loads(bu_cli.browser_exec("print(page_info())"))
+        assert result["success"] is False
+        assert result["error_type"] == "cli_unavailable"
         assert "uv tool install browser-use" in result["error"]
 
     def test_empty_code_rejected(self):
@@ -974,6 +990,8 @@ class TestBrowserExec:
         cli = _fake_cli(tmp_path, "cat > /dev/null\n")
         monkeypatch.setattr(bu_cli, "_find_cli", lambda: [cli])
         result = json.loads(bu_cli.browser_exec("print(1)", session="bad name!"))
+        assert result["success"] is False
+        assert result["error_type"] == "invalid_session"
         assert "error" in result
         assert "session" in result["error"].lower()
 
@@ -982,6 +1000,8 @@ class TestBrowserExec:
         monkeypatch.setattr(bu_cli, "_find_cli", lambda: [cli])
         result = json.loads(bu_cli.browser_exec("print(1)"))
         assert result["success"] is False
+        assert result["error_type"] == "process_failed"
+        assert result["error"] == "browser-use CLI exited with code 3"
         assert result["exit_code"] == 3
         assert "boom" in result["stderr"]
 
@@ -990,7 +1010,97 @@ class TestBrowserExec:
         monkeypatch.setattr(bu_cli, "_find_cli", lambda: [cli])
         monkeypatch.setattr(bu_cli, "_MIN_TIMEOUT_S", 1)
         result = json.loads(bu_cli.browser_exec("print(1)", timeout_s=1))
+        assert result["success"] is False
+        assert result["error_type"] == "timeout"
         assert "timed out" in result["error"]
+
+
+class TestBrowserExecErrorContract:
+    """Every browser_exec failure path has one machine-readable envelope.
+
+    These tests stub the process boundary so the contract is deterministic on
+    Windows too; the legacy shell-script fixtures above exercise subprocess
+    plumbing on POSIX hosts.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _stub_process_boundary(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_base_subprocess_env", lambda: {})
+        monkeypatch.setattr(bu_cli, "_attach_vault_supervisor", lambda *args: None)
+        monkeypatch.setattr(bu_cli, "_workspace_dir", lambda task_id: None)
+
+    @staticmethod
+    def _error(raw):
+        result = json.loads(raw)
+        assert result["success"] is False
+        assert set(("error", "error_type")) <= result.keys()
+        return result
+
+    def test_validation_errors_are_typed(self):
+        result = self._error(bu_cli.browser_exec(""))
+        assert result["error_type"] == "invalid_request"
+
+    def test_unsafe_url_error_is_typed(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_blocked_url_in_code", lambda code: "blocked")
+        result = self._error(bu_cli.browser_exec("new_tab('http://127.0.0.1')"))
+        assert result["error_type"] == "unsafe_url"
+
+    def test_cli_and_session_errors_are_typed(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: None)
+        assert self._error(bu_cli.browser_exec("print(1)"))["error_type"] == "cli_unavailable"
+
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: ["browser-use"])
+        result = self._error(bu_cli.browser_exec("print(1)", session="bad name!"))
+        assert result["error_type"] == "invalid_session"
+
+    def test_backend_launch_and_timeout_errors_are_typed(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: ["browser-use"])
+        monkeypatch.setattr(bu_cli, "_route_backend", lambda *args: "backend down")
+        assert self._error(bu_cli.browser_exec("print(1)"))["error_type"] == "backend_unavailable"
+
+        monkeypatch.setattr(bu_cli, "_route_backend", lambda *args: None)
+        monkeypatch.setattr(bu_cli, "_run_cli_killing_process_group",
+                            lambda *args: (_ for _ in ()).throw(OSError("cannot launch")))
+        assert self._error(bu_cli.browser_exec("print(1)"))["error_type"] == "launch_failed"
+
+        monkeypatch.setattr(bu_cli, "_run_cli_killing_process_group",
+                            lambda *args: (_ for _ in ()).throw(subprocess.TimeoutExpired("browser-use", 5)))
+        assert self._error(bu_cli.browser_exec("print(1)"))["error_type"] == "timeout"
+
+    def test_process_failure_is_typed_without_changing_success_shape(self, monkeypatch):
+        monkeypatch.setattr(bu_cli, "_find_cli", lambda: ["browser-use"])
+        monkeypatch.setattr(bu_cli, "_route_backend", lambda *args: None)
+        monkeypatch.setattr(bu_cli, "_find_screenshot", lambda *args: "C:/tmp/partial.png")
+        monkeypatch.setattr(
+            bu_cli,
+            "_native_screenshot_result",
+            lambda *args: pytest.fail("failed exec must not become a multimodal success"),
+        )
+        monkeypatch.setattr(
+            bu_cli,
+            "_run_cli_killing_process_group",
+            lambda *args: subprocess.CompletedProcess(["browser-use"], 3, "out", "err"),
+        )
+        failed = json.loads(bu_cli.browser_exec("print(1)"))
+        assert failed == {
+            "success": False,
+            "exit_code": 3,
+            "output": "out",
+            "stderr": "err",
+            "error": "browser-use CLI exited with code 3",
+            "error_type": "process_failed",
+            "screenshot_path": "C:/tmp/partial.png",
+        }
+
+        monkeypatch.setattr(bu_cli, "_find_screenshot", lambda *args: None)
+        monkeypatch.setattr(
+            bu_cli,
+            "_run_cli_killing_process_group",
+            lambda *args: subprocess.CompletedProcess(["browser-use"], 0, "ok", ""),
+        )
+        succeeded = json.loads(bu_cli.browser_exec("print(1)"))
+        assert succeeded == {"success": True, "exit_code": 0, "output": "ok"}
+        assert "error_type" not in succeeded
 
 
 class TestFindCliManagedBin:

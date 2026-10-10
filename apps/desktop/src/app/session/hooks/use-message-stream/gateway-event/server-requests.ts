@@ -205,7 +205,8 @@ const approval: Handler = ctx => {
     requestId: str(p.request_id) || undefined,
     serverRequestId: request.id,
     sessionId: sessionId || null,
-    smartDenied: p.smart_denied === true
+    smartDenied: p.smart_denied === true,
+    policyLocked: p.policy_locked === true
   }).catch(() => undefined)
   markNeedsInput(ctx)
 

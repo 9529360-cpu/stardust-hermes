@@ -313,7 +313,7 @@ export const ja = defineLocale({
     exportFailed: '書き出しに失敗しました',
     resetFailed: 'リセットに失敗しました',
     nav: {
-      providers: 'プロバイダー',
+      providers: 'モデルサービス',
       providerAccounts: 'アカウント',
       providerApiKeys: 'API キー',
       providerCustomEndpoints: 'カスタムエンドポイント',
@@ -366,9 +366,11 @@ export const ja = defineLocale({
       expYearField: '有効期限（年）',
       cvcField: 'CVC',
       delegatedPaymentLabel: 'Stardust 支払いカード',
-      delegatedPaymentDescription: 'Stardust に購入や支払いを明示的に依頼した場合、このカードを追加確認なしで使用できます。',
+      delegatedPaymentDescription:
+        'Stardust に購入や支払いを明示的に依頼した場合、このカードを追加確認なしで使用できます。',
       allowAnyOriginLabel: '任意のチェックアウトサイトで使用',
-      allowAnyOriginDescription: '専用の低限度額・プリペイド・バーチャルカード向けです。残高や発行会社の限度額が実際の上限になります。',
+      allowAnyOriginDescription:
+        '専用の低限度額・プリペイド・バーチャルカード向けです。残高や発行会社の限度額が実際の上限になります。',
       delegatedPaymentBadge: '委任支払い',
       anySiteBadge: '任意サイト',
       postalField: '郵便番号',
@@ -543,7 +545,8 @@ export const ja = defineLocale({
         sidebar: 'サイドバーのみ'
       },
       backdropTitle: 'ウィンドウ背景',
-      backdropDesc: 'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
+      backdropDesc:
+        'サイドバー、会話、ツールペインを含む Stardust ウィンドウ全体の背後にローカル画像を表示します。画像はこの端末内にのみ保持されます。',
       userBubbleTitle: 'メッセージの吹き出し',
       userBubbleDesc: '自分のメッセージの透け具合。0 で不透明、100 で枠線だけが残ります。',
       introSplashTitle: 'イントロ表示',
@@ -1169,8 +1172,6 @@ export const ja = defineLocale({
         mcp: { label: 'MCP', hint: 'MCP ツールルーティング' },
         title_generation: { label: 'タイトル生成', hint: 'セッションタイトル' },
         review: { label: 'レビュー', hint: '/review レビューサブエージェント' },
-        triage_specifier: { label: 'トリアージ指定', hint: 'カンバン仕様の具体化' },
-        kanban_decomposer: { label: 'カンバン分解', hint: 'タスク分解' },
         profile_describer: { label: 'プロファイル記述', hint: 'プロファイル概要の自動生成' },
         curator: { label: 'キュレーター', hint: 'スキル使用レビュー' }
       }
@@ -1400,7 +1401,7 @@ export const ja = defineLocale({
         needsSetupHint: 'このバックエンドは今すぐ選択できますが、セットアップが完了するまでコマンドは失敗します。'
       },
       browserRealProfile: {
-        label: '実際のブラウザプロファイルを使用',
+        label: 'ブラウザープロファイルのコピーを使用',
         description:
           '既定ブラウザのログイン情報と Cookie を管理されたスナップショットにコピーし、エージェントはそれを使ってブラウジングします。実際のプロファイルが直接開かれることはありません。新しいセッションに適用されます。',
         enabledTitle: '実プロファイルブラウジング：オン',
@@ -1408,15 +1409,28 @@ export const ja = defineLocale({
         disabledTitle: '実プロファイルブラウジング：オフ',
         disabledMessage: 'プロファイルのスナップショットは削除され、新しいセッションはクリーンなブラウザを使用します。',
         failedSave: '実プロファイル設定を保存できませんでした',
-        prompt: {
-          title: 'サイトにログインしたまま利用',
-          body: 'Hermes が既定ブラウザプロファイルのスナップショットでブラウジングできるようにすると、サイトはログイン済みの状態で開きます。',
-          bulletSnapshot: 'Cookie とログイン情報は管理されたスナップショットにコピーされます。',
-          bulletLiveProfile: '実際のブラウザプロファイルが直接開かれることはありません。',
-          bulletLocal: 'データがこのコンピュータの外に出ることはありません。',
-          dontShowAgain: '今後表示しない',
-          notNow: '今はしない',
-          enable: 'プロファイルを使用'
+      },
+      browserHostControl: {
+        label: '開いている Chrome プロファイルに接続',
+        description: '承認済みブラウザー拡張機能を通して、このセッションを開いている Chrome プロファイルに明示的にペアリングします。Chrome の Cookie はコピーしません。',
+        statusLabel: '状態',
+        profileLabel: 'Chrome プロファイルのディレクトリ',
+        connect: 'Chrome に接続',
+        disconnect: '切断',
+        working: '処理中…',
+        connectedTitle: 'Chrome に接続しました',
+        connectedMessage: '各操作の承認後、このセッションでペアリングした Chrome プロファイルを使用できます。',
+        connectFailed: 'Chrome に接続できませんでした',
+        disconnectFailed: 'Chrome を切断できませんでした',
+        noSession: '先に Desktop セッションを開くか選択してください。',
+        invalidProfile: 'Default や Profile 1 のような Chrome プロファイル名だけを入力してください。',
+        warning: '先に Chrome に Stardust ブラウザー拡張機能をインストールして有効にしてください。接続はセッション単位で、切断すると停止します。',
+        status: {
+          inactive: '未接続',
+          starting: '接続中…',
+          connected: '接続済み',
+          stopping: '切断中…',
+          error: 'エラー'
         }
       }
     }
@@ -1956,9 +1970,11 @@ export const ja = defineLocale({
     nameLabel: '名前',
     cloneFrom: '複製元',
     cloneFromNone: 'なし（空）',
-    cloneFromDesc: '選択したプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
+    cloneFromDesc:
+      '選択したプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     cloneFromDefault: 'デフォルトプロファイルから設定を複製',
-    cloneFromDefaultDesc: 'デフォルトプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
+    cloneFromDefaultDesc:
+      'デフォルトプロファイルから設定、.env のシークレット、スキル、SOUL.md、厳選された記憶（MEMORY.md と USER.md）をコピーします。セッションとスケジュール済みジョブはコピーしません。',
     invalidName: hint => `無効なプロファイル名。${hint}`,
     nameRequired: '名前は必須です',
     creating: '作成中...',
@@ -2140,7 +2156,7 @@ export const ja = defineLocale({
       dismissed: '提案を却下しました',
       actionFailed: '自動化の提案を更新できませんでした',
       needsConversation: 'スケジュール結果の返却先を確保するため、先に保存済みの会話を開いてください。'
-    },
+    }
   },
 
   artifacts: {
@@ -2200,6 +2216,7 @@ export const ja = defineLocale({
 
   sidebar: {
     recent: '最近',
+    filters: 'フィルター',
     gatewayGroups: {
       grouping: 'ゲートウェイとプロファイル',
       rename: 'グループ名を変更',
@@ -2224,7 +2241,7 @@ export const ja = defineLocale({
     clearSearch: '検索をクリア',
     noMatch: query => `"${query}" に一致するセッションがありません。`,
     results: '結果',
-    pinned: 'ピン留め',
+    pinned: 'ピン留めした会話',
     sessions: 'チャット',
     cronJobs: 'Cronジョブ',
     groupAriaGrouped: 'セッションを単一リストとして表示',
@@ -2371,6 +2388,7 @@ export const ja = defineLocale({
 
   composer: {
     message: 'メッセージ',
+    addContext: 'コンテキストを追加',
     wakingProfile: profile => `${profile} を起動中…`,
     placeholderStarting: 'アシスタントを起動中...',
     placeholderReconnecting: '再接続中…',
@@ -2634,9 +2652,15 @@ export const ja = defineLocale({
       revertConfirm: 'このファイルの変更を破棄してコミット済みの状態に戻しますか？この操作は元に戻せません。',
       revertAllConfirm: 'すべての変更を破棄してコミット済みの状態に戻しますか？この操作は元に戻せません。',
       staged: 'ステージ済み',
+      unstaged: '未ステージ',
+      untracked: '未追跡',
       noChanges: '変更なし',
       notRepo: 'Git リポジトリではありません',
       noDiff: '表示する差分がありません',
+      hunk: (current, total) => `ハンク ${current}/${total}`,
+      previousHunk: '前のハンク',
+      nextHunk: '次のハンク',
+      allHunks: 'すべてのハンク',
       scopeUncommitted: '未コミット',
       scopeBranch: 'ブランチ',
       scopeLastTurn: '前のターン',
@@ -2656,6 +2680,13 @@ export const ja = defineLocale({
       branchOffFrom: base => `${base} から新しいブランチ`,
       switchTo: branch => `${branch} に切り替え`,
       switchFailed: branch => `${branch} に切り替えできませんでした`,
+      checks: {
+        loading: 'チェックを読み込み中',
+        unavailable: 'チェックを利用できません',
+        pending: 'チェック待機中',
+        passed: 'チェックに合格',
+        failed: 'チェックに失敗'
+      },
       worktrees: 'ワークツリー'
     }
   },
@@ -2825,14 +2856,16 @@ export const ja = defineLocale({
 
   onboarding: {
     headerTitle: 'Stardust Agent のセットアップをしましょう',
-    headerDesc: 'チャットを始めるにはモデルプロバイダーを接続してください。ほとんどのオプションはワンクリックです。',
+    headerDesc: 'モデル API を直接接続するか、あとで設定から追加できます。',
+    setupRelay: 'モデル API を追加',
+    setupRelayHint: 'API のベース URL、API キー、モデルを入力します。',
     preparingInstall: 'Stardust はインストールを完了中です。初回実行では通常 1 分以内に完了します。',
     starting: 'Stardust を起動中…',
     lookingUpProviders: 'プロバイダーを検索中...',
     collapse: '折りたたむ',
     otherProviders: 'その他のプロバイダー',
     haveApiKey: 'API キーをお持ちです',
-    chooseLater: '後でプロバイダーを選択します',
+    chooseLater: 'あとで設定します',
     recommended: '推奨',
     connected: '接続済み',
     featuredPitch: '1 つのサブスクリプションで 300 以上の最先端モデル — Stardust を実行するための推奨方法',
@@ -3050,7 +3083,17 @@ export const ja = defineLocale({
         loading: '内訳を読み込み中…',
         percentFull: percent => `${percent}% 使用中`,
         title: 'コンテキスト使用状況',
-        tokenSummary: (used, max) => `${used} / ${max} Tokens`
+        tokenSummary: (used, max) => `${used} / ${max} Tokens`,
+        sessionTokens: 'セッションのトークン使用量',
+        sessionTokensNote:
+          'モデル呼び出しの累計値。現在のコンテキスト使用量とは異なります。キャッシュ分は総計に含まれ、重複加算しません。',
+        inputTokens: '非キャッシュ入力',
+        cacheReadTokens: 'キャッシュ読み込み',
+        cacheWriteTokens: 'キャッシュ書き込み',
+        outputTokens: '出力',
+        totalTokens: '合計（プロンプト + 出力）',
+        noSessionTokens: 'モデル使用量はまだありません',
+        unavailable: '報告なし'
       },
       session: 'セッション',
       yoloOn: 'YOLO オン — 危険なコマンドを自動承認中。Shift+クリックで全体に切り替え。',
@@ -3205,6 +3248,7 @@ export const ja = defineLocale({
   },
 
   zones: {
+    paneTitles: { overview: 'コンテキスト', files: 'ファイル', review: 'レビュー', terminal: 'ターミナル' },
     showTabStrip: 'タブを表示',
     hideTabStrip: 'タブを隠す',
     showStripTab: title => `${title} を表示`,
@@ -3275,10 +3319,17 @@ export const ja = defineLocale({
   },
 
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: '今日は何を進めますか？', body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。', start: 'メッセージを始める', actions: 'コマンドを見る' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: '今日は何を進めますか？',
+      body: 'そのまま質問するか、仕事を任せてください。必要なときだけ、プロジェクト・ファイル・プレビューの文脈を会話の横に表示します。',
+      start: 'メッセージを始める',
+      actions: 'コマンドを見る'
+    },
     thread: {
       loadingSession: 'セッションを読み込み中',
       showEarlier: '以前のメッセージを表示',
+      workProgress: count => `作業の進捗 ${count} 件`,
       loadingResponse: 'Stardust が応答を読み込み中',
       resumeWhenBackgroundDone: count =>
         count === 1
@@ -3298,22 +3349,156 @@ export const ja = defineLocale({
       react: 'リアクション',
       dismissError: 'エラーを閉じる',
       errorLayers: {
-        auth: '認証エラー',
-        billing: 'クレジット不足',
-        disk: 'ディスク容量不足',
-        endpoint: 'カスタムエンドポイントのエラー',
-        gateway: 'ゲートウェイのエラー',
-        generic: 'ターンが失敗しました',
-        provider: 'プロバイダーのエラー',
-        runtime: 'ローカルランタイムのエラー',
-        streaming: 'ストリーミング接続のエラー'
+        auth: 'サインインまたはキーの問題',
+        billing: 'クレジットが残っていません',
+        disk: 'ディスクがいっぱいです',
+        endpoint: 'モデルサーバーに接続できません',
+        gateway: 'Stardust で問題が起きました',
+        generic: 'Stardust はこの返信を完了できませんでした',
+        provider: 'AI サービスがエラーを返しました',
+        runtime: 'Stardust で問題が起きました',
+        streaming: '返信が途中で切れました'
       },
+      errorLayerBodies: {
+        auth: 'AI サービスがサインイン情報を受け付けませんでした。このサービスのキーやサインインを確認してから、もう一度送信してください。',
+        billing:
+          'このサービスのアカウントにクレジットが残っていません。チャージするかプロバイダーを切り替えてから、もう一度送信してください。',
+        disk: 'ディスクがいっぱいのため、Stardust はこの会話を保存できませんでした。空き容量を作ってから再試行してください。',
+        endpoint:
+          'Stardust はカスタムモデルサーバーに接続できません。起動していることを確認してから、もう一度送信してください。',
+        gateway:
+          'Stardust が返信を始める際に内部で問題が起きました。もう一度送信してください。繰り返す場合は診断情報を送信してください。',
+        generic: 'Stardust の返信中に問題が起きました。再試行するか、繰り返す場合は詳細をコピーしてください。',
+        provider:
+          'AI サービスがこのリクエストを完了できませんでした。少し待って再試行するか、プロバイダーを切り替えてください。',
+        runtime:
+          'Stardust が返信を始める際に内部で問題が起きました。もう一度送信してください。繰り返す場合は診断情報を送信してください。',
+        streaming: '返信が終わる前に接続が切れました。再試行するともう一度送信します。'
+      },
+      errorCodes: {
+        auth: {
+          title: provider => `${provider} がサインインを受け付けませんでした`,
+          body: provider =>
+            `${provider} 用に保存された認証情報が受け付けられませんでした。設定で修正するかプロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        auth_permanent: {
+          title: provider => `${provider} がサインインを受け付けませんでした`,
+          body: provider =>
+            `${provider} の認証情報が無効か取り消されています。更新するかプロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        billing: {
+          title: 'クレジットが残っていません',
+          body: provider =>
+            `${provider} のアカウントにクレジットが残っていません。チャージするかプロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        rate_limit: {
+          title: 'AI サービスが混み合っています',
+          body: provider => `${provider} がリクエストを制限しています。1 分ほど待ってから再試行してください。`
+        },
+        upstream_rate_limit: {
+          title: 'AI サービスが混み合っています',
+          body: provider => `${provider} がリクエストを制限しています。1 分ほど待ってから再試行してください。`
+        },
+        overloaded: {
+          title: 'AI サービスが過負荷です',
+          body: provider =>
+            `${provider} で問題が起きています。少し待って再試行するか、プロバイダーを切り替えてください。`
+        },
+        server_error: {
+          title: 'AI サービスで問題が起きました',
+          body: provider =>
+            `${provider} がサーバーエラーを返しました。少し待って再試行するか、プロバイダーを切り替えてください。`
+        },
+        timeout: {
+          title: '返信がタイムアウトしました',
+          body: provider => `${provider} が時間内に応答しませんでした。再試行するともう一度送信します。`
+        },
+        stream_drop: {
+          title: '返信が途中で切れました',
+          body: '返信が終わる前に接続が切れました。再試行するともう一度送信します。'
+        },
+        ssl_cert_verification: {
+          title: '安全な接続に失敗しました',
+          body: provider =>
+            `Stardust は ${provider} との安全な接続を確認できませんでした。ネットワークやプロキシの設定を確認するか、プロバイダーを切り替えてから、もう一度送信してください。`
+        },
+        context_overflow: {
+          title: 'この会話が長すぎます',
+          body: '会話がモデルで扱える長さを超えました。会話を圧縮するか新しいチャットを始めてから、もう一度送信してください。'
+        },
+        payload_too_large: {
+          title: 'このメッセージが大きすぎます',
+          body: 'リクエストがモデルには大きすぎました。会話を圧縮するか新しいチャットを始めてから、もう一度送信してください。'
+        },
+        model_not_found: {
+          title: 'このモデルは利用できません',
+          body: provider =>
+            `${provider} はあなたのアカウントでこのモデルを提供していません。別のモデルを選んでから、もう一度送信してください。`
+        },
+        provider_policy_blocked: {
+          title: 'アカウント設定でこのモデルがブロックされています',
+          body: provider =>
+            `アカウントのデータやプライバシーの設定により、${provider} はこのリクエストを転送しません。別のモデルを選ぶか、プロバイダーを切り替えてください。`
+        },
+        content_policy_blocked: {
+          title: 'AI サービスがこのリクエストを断りました',
+          body: provider => `${provider} はこのメッセージに回答しませんでした。内容を編集してから送り直してください。`
+        },
+        format_error: {
+          title: 'AI サービスがリクエストを受け付けませんでした',
+          body: provider =>
+            `${provider} はこのリクエストの形式を受け付けませんでした。プロバイダーを切り替えるか、調査のために診断情報を送信してください。`
+        },
+        truncated: {
+          title: '返信が途中で止まりました',
+          body: 'モデルが最後まで書き終える前に止まりました。再試行すると完全な返信を取得します。'
+        },
+        invalid_response: {
+          title: 'AI サービスが読み取れない返信を返しました',
+          body: provider => `${provider} が Stardust の読み取れない内容を返しました。少し待って再試行してください。`
+        },
+        empty_response: {
+          title: 'AI サービスが空の返信を返しました',
+          body: provider => `${provider} はこのメッセージに何も返しませんでした。少し待って再試行してください。`
+        },
+        loop_error: {
+          title: 'Stardust がループに入りました',
+          body: '返信が同じ手順を繰り返したため、Stardust が停止しました。再試行するか、再発する場合は新しいチャットを始めてください。'
+        },
+        SESSION_NOT_OWNED: {
+          title: 'このチャットは別の場所で開かれています',
+          body: 'このチャットは別の Stardust ウィンドウかターミナルで開かれています。そちらで閉じてからもう一度送信するか、ここで新しいチャットを始めてください。'
+        },
+        disk_full: {
+          title: 'ディスクがいっぱいです',
+          body: 'ディスクがいっぱいのため、Stardust はこの会話を保存できませんでした。空き容量を作ってから再試行してください。'
+        }
+      },
+      errorAuthKinds: {
+        api_key: {
+          title: provider => `${provider} が API キーを受け付けませんでした`,
+          body: provider => `${provider} 用に保存されたキーが無効か取り消されています。更新してから再試行してください。`
+        },
+        oauth: {
+          title: provider => `${provider} のサインインが期限切れです`
+        }
+      },
+      errorDetails: '詳細',
+      errorGenericProvider: 'AI サービス',
+      errorToastTitle: 'Stardust は返信を完了できませんでした',
       errorRetry: '再試行',
       errorStartNewSession: '新しいセッションを開始',
       errorSwitchProvider: 'プロバイダーを切り替え',
+      errorSetUpFallback: 'フォールバックモデルを設定',
       errorSignInAgain: provider => `${provider} に再度サインイン`,
       errorOauthExpired: provider =>
-        `${provider} のサインインが期限切れか取り消されました。続けるには再度サインインしてください。`,
+        `${provider} のサインインが期限切れか取り消されました。ターミナルで hermes model を実行して ${provider} を選び、再度サインインするか、「設定 → モデルサービス」でモデル API に切り替えてください。`,
+      errorChooseModel: 'モデルを選ぶ',
+      errorCompressConversation: '会話を圧縮',
+      errorCompressFailed: '会話を圧縮できませんでした',
+      errorOpenHermesFolder: 'Stardust のデータフォルダを開く',
+      errorOpenHermesFolderFailed: 'Stardust のデータフォルダを開けませんでした',
+      errorUpdateApiKey: 'API キーを更新',
       errorOpenLogs: 'ログを開く',
       errorOpenLogsFailed: 'ログフォルダを開けませんでした',
       errorOpenDesktopLogs: 'デスクトップのログを開く',
@@ -3499,7 +3684,8 @@ export const ja = defineLocale({
     sudoTitle: '管理者パスワード',
     sudoDesc:
       'sudo パスワードを入力する前にコマンドを確認してください。パスワードは実行するエージェントに送信され、このセッション中キャッシュされます。',
-    sudoCommandUnavailable: 'エージェントからコマンドが提供されていません。会話で確認できない場合はキャンセルしてください。',
+    sudoCommandUnavailable:
+      'エージェントからコマンドが提供されていません。会話で確認できない場合はキャンセルしてください。',
     sudoPlaceholder: 'sudo パスワード',
     secretTitle: 'シークレットが必要です',
     secretDesc: 'Hermes は続行するための認証情報が必要です。',

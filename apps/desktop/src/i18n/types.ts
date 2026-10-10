@@ -828,6 +828,7 @@ export interface Translations {
       validationReachableModels: (count: number) => string
       validationFailed: string
       activationFailed: string
+      duplicateService: string
     }
     computerUse: {
       accessibility: string
@@ -1535,15 +1536,28 @@ export interface Translations {
         disabledTitle: string
         disabledMessage: string
         failedSave: string
-        prompt: {
-          title: string
-          body: string
-          bulletSnapshot: string
-          bulletLiveProfile: string
-          bulletLocal: string
-          dontShowAgain: string
-          notNow: string
-          enable: string
+      }
+      browserHostControl: {
+        label: string
+        description: string
+        statusLabel: string
+        profileLabel: string
+        connect: string
+        disconnect: string
+        working: string
+        connectedTitle: string
+        connectedMessage: string
+        connectFailed: string
+        disconnectFailed: string
+        noSession: string
+        invalidProfile: string
+        warning: string
+        status: {
+          inactive: string
+          starting: string
+          connected: string
+          stopping: string
+          error: string
         }
       }
     }
@@ -1617,8 +1631,8 @@ export interface Translations {
       agentTitle: string
       agentBlurb: string
       pageBlurb: string
-      bundledNames: Record<'hermes-bots' | 'kanban' | 'radio', string>
-      bundledDescriptions: Record<'hermes-bots' | 'kanban' | 'radio', string>
+      bundledNames: Record<'hermes-bots', string>
+      bundledDescriptions: Record<'hermes-bots', string>
       halfDesktop: string
       halfDesktopHint: string
       halfAgent: string
@@ -1941,6 +1955,14 @@ export interface Translations {
       builtinMemory: string
       memoryFile: string
       userFile: string
+      viewEntries: string
+      hideEntries: string
+      noEntries: string
+      entriesUnavailable: string
+      removeEntry: string
+      removeEntryConfirm: string
+      entryRemoved: string
+      removeEntryFailed: string
       bytes: (size: string) => string
       empty: string
       resetMemory: string
@@ -2439,6 +2461,7 @@ export interface Translations {
 
   sidebar: {
     recent: string
+    filters: string
     gatewayGroups: {
       grouping: string
       rename: string
@@ -2611,6 +2634,7 @@ export interface Translations {
 
   composer: {
     message: string
+    addContext: string
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string
@@ -2871,9 +2895,15 @@ export interface Translations {
       revertConfirm: string
       revertAllConfirm: string
       staged: string
+      unstaged: string
+      untracked: string
       noChanges: string
       notRepo: string
       noDiff: string
+      hunk: (current: number, total: number) => string
+      previousHunk: string
+      nextHunk: string
+      allHunks: string
       scopeUncommitted: string
       scopeBranch: string
       scopeLastTurn: string
@@ -2892,6 +2922,13 @@ export interface Translations {
       branchOffFrom: (base: string) => string
       switchTo: (branch: string) => string
       switchFailed: (branch: string) => string
+      checks: {
+        loading: string
+        unavailable: string
+        pending: string
+        passed: string
+        failed: string
+      }
       worktrees: string
     }
   }
@@ -3326,6 +3363,15 @@ export interface Translations {
         percentFull: (percent: number) => string
         title: string
         tokenSummary: (used: string, max: string) => string
+        sessionTokens: string
+        sessionTokensNote: string
+        inputTokens: string
+        cacheReadTokens: string
+        cacheWriteTokens: string
+        outputTokens: string
+        totalTokens: string
+        noSessionTokens: string
+        unavailable: string
       }
       session: string
       yoloOn: string
@@ -3485,6 +3531,7 @@ export interface Translations {
   }
 
   zones: {
+    paneTitles: { overview: string; files: string; review: string; terminal: string }
     showTabStrip: string
     hideTabStrip: string
     showStripTab: (title: string) => string
@@ -3567,6 +3614,7 @@ export interface Translations {
     thread: {
       loadingSession: string
       showEarlier: string
+      workProgress: (count: number) => string
       loadingResponse: string
       loadingLocalModel: (model: string) => string
       processingPrompt: string
@@ -3627,6 +3675,7 @@ export interface Translations {
       /** Escape hatch when Retry would only reproduce SESSION_NOT_OWNED (#106217). */
       errorStartNewSession: string
       errorSwitchProvider: string
+      errorSetUpFallback: string
       errorChooseModel: string
       errorCompressConversation: string
       errorCompressFailed: string

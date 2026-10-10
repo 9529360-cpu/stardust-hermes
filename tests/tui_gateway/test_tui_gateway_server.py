@@ -2619,18 +2619,12 @@ def test_load_enabled_toolsets_rejects_disabled_mcp_env(monkeypatch, capsys):
         config_mod, "load_config", lambda: {"platform_toolsets": {"cli": ["memory"]}}
     )
 
-    # Sorted: ["memory", "project"]. `kanban` is a configurable opt-in and is
-    # never recovered onto a saved list; `project` is GUI-only, folded in by
-    # _load_enabled_toolsets. Toolsets inside their first release
-    # (_RECENTLY_SHIPPED_TOOLSETS) are back-filled onto saved lists that never
-    # offered them — allow those too.
-    from hermes_cli.tools_config import _RECENTLY_SHIPPED_TOOLSETS
-
+    # Saved selections retain memory and the session-scoped project capability.
     result = server._load_enabled_toolsets()
     assert result is not None
     assert {"memory", "project"} <= set(result)
     assert "kanban" not in result
-    assert set(result) - {"memory", "project"} <= _RECENTLY_SHIPPED_TOOLSETS
+    assert set(result) == {"memory", "project"}
     err = capsys.readouterr().err
     assert "ignoring disabled MCP servers" in err
     assert "mcp-off" in err
@@ -2651,13 +2645,12 @@ def test_load_enabled_toolsets_falls_back_when_tui_env_invalid(monkeypatch, caps
         config_mod, "load_config", lambda: {"platform_toolsets": {"cli": ["memory"]}}
     )
 
-    from hermes_cli.tools_config import _RECENTLY_SHIPPED_TOOLSETS
 
     result = server._load_enabled_toolsets()
     assert result is not None
     assert {"memory", "project"} <= set(result)
     assert "kanban" not in result
-    assert set(result) - {"memory", "project"} <= _RECENTLY_SHIPPED_TOOLSETS
+    assert set(result) == {"memory", "project"}
     assert "using configured CLI toolsets" in capsys.readouterr().err
 
 
@@ -8675,19 +8668,62 @@ def test_config_get_approval_mode_normalizes_yaml_off(tmp_path, monkeypatch):
     assert response["result"]["value"] == "off"
 
 
+def test_approval_pending_off_hides_unlocked_entries_but_preserves_room_policy_requests(tmp_path, monkeypatch):
+    import yaml
+
+    from tools import approval
+    from tools.approval_gateway_wait import _ApprovalEntry
+
+    monkeypatch.setattr(server, "_hermes_home", tmp_path)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setattr(server, "_start_agent_build", lambda *args, **kwargs: None)
+    (tmp_path / "config.yaml").write_text(yaml.safe_dump({"approvals": {"mode": "off"}}))
+    sid, session_key = "approval-off-sid", "approval-off-session"
+    agent_ready = threading.Event()
+    agent_ready.set()
+    server._sessions[sid] = {
+        "session_key": session_key,
+        "agent": object(),
+        "agent_ready": agent_ready,
+        "profile_home": None,
+    }
+    entry = _ApprovalEntry({"request_id": "stale", "command": "old", "pattern_keys": ["dangerous"]})
+    locked = _ApprovalEntry({"request_id": "room", "command": "room command", "policy_locked": True})
+    approval._gateway_queues[approval._state_key(session_key)] = [entry, locked]
+
+    try:
+        response = server.handle_request({
+            "id": "approval-pending-off",
+            "method": "approval.pending",
+            "params": {"session_id": sid},
+        })
+        assert response["result"]["approval_mode"] == "off"
+        assert response["result"]["approvals"] == [locked.data]
+        assert not entry.event.is_set() and entry.result is None
+        assert not locked.event.is_set() and locked.result is None
+    finally:
+        server._sessions.pop(sid, None)
+        approval._gateway_queues.pop(approval._state_key(session_key), None)
+
+
 def test_config_set_approval_mode_persists_three_way_value_and_emits_live_status(
     tmp_path, monkeypatch
 ):
     import yaml
+    from tools import approval
+    from tools.approval_gateway_wait import _ApprovalEntry
 
     monkeypatch.setattr(server, "_hermes_home", tmp_path)
     # config.set writes via server._hermes_home, but the post-write
     # session.info emit resolves the effective mode through the canonical
     # tools.approval resolver (load_config → env HERMES_HOME).
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setattr(server, "_start_agent_build", lambda *args, **kwargs: None)
     emitted = []
     monkeypatch.setattr(server, "_emit", lambda *args: emitted.append(args))
     server._sessions["sid"] = {"agent": object(), "session_key": "profile-session"}
+    entry = _ApprovalEntry({"request_id": "pending-before-off", "command": "old"})
+    approval._gateway_queues[approval._state_key("profile-session")] = [entry]
 
     try:
         resp = server.handle_request(
@@ -8697,13 +8733,23 @@ def test_config_set_approval_mode_persists_three_way_value_and_emits_live_status
                 "params": {"key": "approvals.mode", "value": "manual"},
             }
         )
+        off_resp = server.handle_request(
+            {
+                "id": "2",
+                "method": "config.set",
+                "params": {"key": "approvals.mode", "value": "off"},
+            }
+        )
     finally:
         server._sessions.clear()
+        approval._gateway_queues.pop(approval._state_key("profile-session"), None)
 
     assert resp["result"] == {"key": "approvals.mode", "value": "manual"}
-    assert yaml.safe_load((tmp_path / "config.yaml").read_text())["approvals"]["mode"] == "manual"
+    assert yaml.safe_load((tmp_path / "config.yaml").read_text())["approvals"]["mode"] == "off"
     assert emitted and emitted[0][0:2] == ("session.info", "sid")
     assert emitted[0][2]["approval_mode"] == "manual"
+    assert off_resp["result"] == {"key": "approvals.mode", "value": "off"}
+    assert emitted[-1][2]["approval_mode"] == "off"
 
 
 def test_pet_gallery_quoted_false_enabled_reports_disabled(tmp_path, monkeypatch):
@@ -20312,11 +20358,14 @@ def test_get_usage_perf_readouts_present():
         model = "x"
         session_prompt_tokens = 27_873
         session_cache_read_tokens = 24_369
+        session_cache_write_tokens = 312
         _api_latency_history = deque([2.1, 4.3], maxlen=10)
         _api_output_history = deque([130, 190], maxlen=10)
 
     usage = server._get_usage(_PerfAgent())
     assert usage["cache_hit_pct"] == 87
+    assert usage["cache_read"] == 24_369
+    assert usage["cache_write"] == 312
     assert usage["avg_latency_s"] == 3.2
     assert usage["avg_tps"] == 50.0  # true throughput sum(out)/sum(lat), not mean of ratios
 
@@ -20331,6 +20380,8 @@ def test_get_usage_perf_readouts_omitted_without_data():
 
     usage = server._get_usage(_ColdAgent())
     assert "cache_hit_pct" not in usage
+    assert usage["cache_read"] == 0
+    assert usage["cache_write"] == 0
     assert "avg_latency_s" not in usage
     assert "avg_tps" not in usage
 

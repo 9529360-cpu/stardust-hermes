@@ -1,19 +1,18 @@
 import { Codecs, persistentAtom } from '@/lib/persisted'
 import { readKey } from '@/lib/storage'
 
-// v1 (`hermes.desktop.statusbarHidden`) was seeded with the approval pill
-// hidden, so every existing store carries an `approval-mode` the user never
-// chose. v2 seeds from v1 minus that id: other customizations survive, the
-// pill appears once on update, and hiding it again persists here.
-const STATUSBAR_HIDDEN_STORAGE_KEY = 'hermes.desktop.statusbarHidden.v2'
+// v1 (`hermes.desktop.statusbarHidden`) hid the approval pill by default;
+// v2 corrected that. v3 exposes the bottom usage entry while retaining other
+// v2 customizations; an explicit v3 hide remains persistent.
+const STATUSBAR_HIDDEN_STORAGE_KEY = 'hermes.desktop.statusbarHidden.v3'
+const PREVIOUS_HIDDEN_STORAGE_KEY = 'hermes.desktop.statusbarHidden.v2'
 const LEGACY_HIDDEN_STORAGE_KEY = 'hermes.desktop.statusbarHidden'
 // Keep the existing key so an explicit user choice survives this product skin.
 const STATUSBAR_VISIBLE_STORAGE_KEY = 'hermes.desktop.statusbarVisible.v2'
 
-// Private-product default: keep the first view clean and conversation-first.
-// The status bar is still fully available from the `view.toggleStatusbar`
-// keybind / command palette and any persisted explicit preference wins.
-export const $statusbarVisible = persistentAtom(STATUSBAR_VISIBLE_STORAGE_KEY, false, Codecs.bool)
+// Surface the bottom usage entry on new installs while preserving an existing
+// explicit choice to hide the whole bar.
+export const $statusbarVisible = persistentAtom(STATUSBAR_VISIBLE_STORAGE_KEY, true, Codecs.bool)
 
 export function toggleStatusbarVisible() {
   $statusbarVisible.set(!$statusbarVisible.get())
@@ -25,13 +24,11 @@ export function toggleStatusbarVisible() {
 // navigation, not status, so they start out of the way. The approval pill
 // (the yolo zap) stays: whether dangerous commands run unasked is state the
 // user should see at a glance. The per-turn
-// session readouts (running/session timers, context meter, cache hit rate,
-// tokens/sec) are diagnostics most users don't watch, so they start hidden too
-// and the bar stays quiet mid-turn.
+// live diagnostics (running/session timers, cache hit rate, tokens/sec) stay
+// optional; the context/usage menu is now the default bottom entry.
 export const STATUSBAR_HIDDEN_BY_DEFAULT: readonly string[] = [
   'agents',
   'cache-hit-rate',
-  'context-usage',
   'cron',
   'running-timer',
   'session-timer',
@@ -49,15 +46,20 @@ export const STATUSBAR_HIDDEN_BY_DEFAULT: readonly string[] = [
 const sanitizeHiddenIds = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string' && id.length > 0) : []
 
-function legacyHiddenSeed(): string[] {
-  const raw = readKey(LEGACY_HIDDEN_STORAGE_KEY)
+function hiddenSeed(): string[] {
+  const previous = readKey(PREVIOUS_HIDDEN_STORAGE_KEY)
+  const raw = previous ?? readKey(LEGACY_HIDDEN_STORAGE_KEY)
 
   if (raw === null) {
     return [...STATUSBAR_HIDDEN_BY_DEFAULT]
   }
 
   try {
-    return sanitizeHiddenIds(JSON.parse(raw)).filter(id => id !== 'approval-mode')
+    const hidden = sanitizeHiddenIds(JSON.parse(raw)).filter(id => id !== 'approval-mode')
+    // v2 shipped the context meter hidden by default. Unhide it for the new
+    // bottom token/cache entry while retaining every other prior preference.
+
+    return hidden.filter(id => id !== 'context-usage')
   } catch {
     return [...STATUSBAR_HIDDEN_BY_DEFAULT]
   }
@@ -65,7 +67,7 @@ function legacyHiddenSeed(): string[] {
 
 export const $statusbarHiddenIds = persistentAtom<string[]>(
   STATUSBAR_HIDDEN_STORAGE_KEY,
-  legacyHiddenSeed(),
+  hiddenSeed(),
   Codecs.json<string[]>(sanitizeHiddenIds)
 )
 

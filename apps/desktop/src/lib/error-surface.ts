@@ -66,12 +66,16 @@ export interface ErrorSurface {
    *  the fix is signing in again (expired/revoked grant); `api_key` means a
    *  key needs replacing. Absent from older backends. */
   authKind?: 'api_key' | 'oauth'
-  /** Auth layer only: display name of the failing provider ("Nous Portal"). */
+  /** Display name of the failing provider ("Nous Portal", or a custom
+   *  service's configured name rather than its `custom` id). */
   providerLabel?: string
   /** Auth layer, api_key only: the env var holding the rejected key
    *  (OPENAI_API_KEY). Deep-links Settings → Keys to that row. Absent from
    *  older backends. */
   apiKeyEnv?: string
+  /** Whether the failing session had a fallback model to switch to. Absent
+   *  when the backend did not say (older backends). */
+  fallbackConfigured?: boolean
 }
 
 /** Validate a wire payload into an ErrorSurface, or null when absent/garbled. */
@@ -84,6 +88,7 @@ export function parseErrorSurface(value: unknown): ErrorSurface | null {
     api_key_env?: unknown
     auth_kind?: unknown
     code?: unknown
+    fallback_configured?: unknown
     layer?: unknown
     model?: unknown
     provider?: unknown
@@ -105,12 +110,13 @@ export function parseErrorSurface(value: unknown): ErrorSurface | null {
     ...(typeof raw.model === 'string' && raw.model ? { model: raw.model } : {}),
     ...(raw.auth_kind === 'oauth' || raw.auth_kind === 'api_key' ? { authKind: raw.auth_kind } : {}),
     ...(typeof raw.provider_label === 'string' && raw.provider_label ? { providerLabel: raw.provider_label } : {}),
-    ...(typeof raw.api_key_env === 'string' && raw.api_key_env ? { apiKeyEnv: raw.api_key_env } : {})
+    ...(typeof raw.api_key_env === 'string' && raw.api_key_env ? { apiKeyEnv: raw.api_key_env } : {}),
+    ...(typeof raw.fallback_configured === 'boolean' ? { fallbackConfigured: raw.fallback_configured } : {})
   }
 }
 
-/** True when the failed turn's provider rejected an OAuth grant — the
- *  one-click recovery is re-running that provider's sign-in, not editing keys. */
+/** True when the failed turn's provider rejected an OAuth grant. Signing in
+ *  again (from a terminal) changes the outcome, so Retry stays offered. */
 export function isOAuthReauthSurface(surface: ErrorSurface | null | undefined): surface is ErrorSurface & {
   authKind: 'oauth'
   provider: string
@@ -119,7 +125,7 @@ export function isOAuthReauthSurface(surface: ErrorSurface | null | undefined): 
 }
 
 /** True when the failed turn's provider rejected a saved API key — the fix is
- *  replacing the key in Settings → Keys, then retrying. */
+ *  replacing the key in Settings → Models, then retrying. */
 export function isApiKeyRejectedSurface(surface: ErrorSurface | null | undefined): surface is ErrorSurface & {
   authKind: 'api_key'
 } {
@@ -157,13 +163,26 @@ export interface ErrorRecoveryPlan {
   editMessage: boolean
   /** Reveal the Hermes data folder so the user can free space (disk_full). */
   openHermesFolder: boolean
-  /** Settings → Keys deep link (auth, api_key). */
+  /** Settings → Models deep link to replace a rejected key (auth, api_key). */
   updateApiKey: boolean
-  /** Re-run the provider's OAuth sign-in (auth, oauth). */
-  signInAgain: boolean
   /** Settings → Models deep link. */
   switchProvider: boolean
+  /** Settings → Models → fallback models deep link: a failure another model
+   *  would get past ended the turn because none was configured. */
+  setUpFallback: boolean
 }
+
+// Failures about the CURRENT model/provider that a fallback model gets past
+// automatically — the agent switches only when one is configured.
+const FALLBACK_RESCUES: ReadonlySet<string> = new Set([
+  'overloaded',
+  'server_error',
+  'rate_limit',
+  'upstream_rate_limit',
+  'timeout',
+  'model_not_found',
+  'provider_policy_blocked'
+])
 
 // Layers where the fix is provider/endpoint/auth config, not a retry.
 const SWITCH_PROVIDER_LAYERS: readonly ErrorSurfaceLayer[] = ['auth', 'billing', 'endpoint', 'provider']
@@ -196,7 +215,7 @@ export function errorRecoveryPlan(surface: ErrorSurface | null | undefined): Err
     // where fixing the credential changes the outcome and Retry is the
     // natural second click.
     retry: !surface || surface.retryable || oauthReauth || apiKeyRejected,
-    signInAgain: oauthReauth,
+    setUpFallback: surface?.fallbackConfigured === false && FALLBACK_RESCUES.has(surface.code),
     startNewSession: false,
     switchProvider: surface != null && SWITCH_PROVIDER_LAYERS.includes(surface.layer),
     updateApiKey: apiKeyRejected

@@ -2352,12 +2352,20 @@ def _seed_nous_singleton(seed: _Seeder, auth_store: Dict[str, Any]) -> None:
     })
 
 
+# Token fingerprints whose degraded Copilot exchange was already reported by this process. The
+# warning describes a lasting state, and every pool load (each provider listing, each new
+# session) re-seeds Copilot: repeating it there made it most of errors.log for anyone signed in
+# to the GitHub CLI, burying the errors that matter.
+_copilot_degraded_reported: Set[str] = set()
+
+
 def _seed_copilot_singleton(seed: _Seeder) -> None:
     # Copilot tokens are resolved dynamically via `gh auth token` or env vars
     # (COPILOT_GITHUB_TOKEN / GH_TOKEN); they don't live in the auth store.
     try:
         from hermes_cli.copilot_auth import (
             COPILOT_ENV_VARS,
+            _token_fingerprint,
             resolve_copilot_token,
             get_copilot_api_token,
         )
@@ -2381,13 +2389,19 @@ def _seed_copilot_singleton(seed: _Seeder) -> None:
         # get_copilot_api_token falls back to the RAW token when the exchange
         # fails; the Copilot API then routes it to the fallback
         # "copilot-language-server" integrator whose allowlist omits
-        # enterprise-only models -> HTTP 400 on every turn. Surface it.
+        # enterprise-only models -> HTTP 400 on every turn. Surface it once
+        # per token while it lasts; a recovery re-arms the warning.
+        fingerprint = _token_fingerprint(token)
         if api_token == token and not enterprise_base_url:
-            logger.warning(
-                "Copilot token exchange degraded to RAW token (exchange "
-                "unavailable); enterprise-only models may 400 with "
-                "model_not_available_for_integrator until exchange recovers."
-            )
+            if fingerprint not in _copilot_degraded_reported:
+                _copilot_degraded_reported.add(fingerprint)
+                logger.warning(
+                    "Copilot token exchange degraded to RAW token (exchange "
+                    "unavailable); enterprise-only models may 400 with "
+                    "model_not_available_for_integrator until exchange recovers."
+                )
+        else:
+            _copilot_degraded_reported.discard(fingerprint)
         pconfig = PROVIDER_REGISTRY.get(seed.provider)
         seed.upsert(source_name, {
             "auth_type": AUTH_TYPE_API_KEY,

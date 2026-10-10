@@ -808,7 +808,6 @@ $ hermes model
 [ ] compression          currently: auto / main model
 [ ] approval             currently: auto / main model
 [ ] triage_specifier     currently: auto / main model
-[ ] kanban_decomposer    currently: auto / main model
 [ ] profile_describer    currently: auto / main model
 ```
 

@@ -1,7 +1,7 @@
 """Intent, execution, and read-only task projection contracts for Stardust.
 
 The module is deliberately policy/read-model only. It does not run tools or own mutable
-task state: current-session execution, background processes, delegation, cron, and Kanban
+task state: current-session execution, background processes, delegation, and cron
 remain authoritative in their existing runtimes.
 """
 
@@ -33,7 +33,6 @@ class AssistantExecutionRail(str, Enum):
     PROCESS = "process"
     DELEGATION = "delegation"
     CRON = "cron"
-    KANBAN = "kanban"
 
 
 class AssistantTaskState(str, Enum):
@@ -68,13 +67,12 @@ ATTENTION_TASK_STATES = frozenset(
     }
 )
 
-_DURABLE_RAILS = frozenset({AssistantExecutionRail.CRON, AssistantExecutionRail.KANBAN})
+_DURABLE_RAILS = frozenset({AssistantExecutionRail.CRON})
 _RAIL_DURABILITY: dict[AssistantExecutionRail, Durability] = {
     AssistantExecutionRail.CURRENT_SESSION: "turn",
     AssistantExecutionRail.PROCESS: "process_local",
     AssistantExecutionRail.DELEGATION: "process_local",
     AssistantExecutionRail.CRON: "restart_durable",
-    AssistantExecutionRail.KANBAN: "restart_durable",
 }
 _RAILS_BY_MODE = {
     AssistantExecutionMode.RESPOND: frozenset({AssistantExecutionRail.NONE}),
@@ -103,9 +101,6 @@ _PROCESS_EXIT_STATES = frozenset({"exited", "already_exited", "completed"})
 _CRON_QUEUED_STATES = frozenset({"scheduled", "queued"})
 _CRON_FAILED_STATES = frozenset({"error", "failed"})
 
-_KANBAN_QUEUED_STATES = frozenset({"triage", "todo", "scheduled", "ready"})
-_KANBAN_RUNNING_STATES = frozenset({"running", "review"})
-_KANBAN_COMPLETED_STATES = frozenset({"done", "archived"})
 
 
 @dataclass(frozen=True)
@@ -145,7 +140,7 @@ EXECUTION_CONTRACTS = (
         AssistantExecutionMode.SCHEDULE_OR_WATCH,
         "restart_durable",
         True,
-        "Use cron, kanban, or another durable owner for future, recurring, monitored, or restart-surviving work.",
+        "Use cron or another durable owner for future, recurring, monitored, or restart-surviving work.",
     ),
     AssistantExecutionContract(
         AssistantExecutionMode.CLARIFY,
@@ -217,7 +212,6 @@ class AssistantTaskProjection:
         if self.rail in {
             AssistantExecutionRail.PROCESS,
             AssistantExecutionRail.CRON,
-            AssistantExecutionRail.KANBAN,
         } and not self.background:
             raise ValueError(f"{self.rail.value} task projections are background work")
 
@@ -394,19 +388,6 @@ def cron_job_lifecycle_state(
     raise ValueError(f"unknown cron state: {state}")
 
 
-def kanban_lifecycle_state(owner_state: Any) -> AssistantTaskState:
-    state = _owner_state(owner_state, "kanban")
-    if state in _KANBAN_QUEUED_STATES:
-        return AssistantTaskState.QUEUED
-    if state in _KANBAN_RUNNING_STATES:
-        return AssistantTaskState.RUNNING
-    if state == "blocked":
-        return AssistantTaskState.BLOCKED
-    if state in _KANBAN_COMPLETED_STATES:
-        return AssistantTaskState.COMPLETED
-    raise ValueError(f"unknown kanban state: {state}")
-
-
 def project_delegation(record: Mapping[str, Any]) -> AssistantTaskProjection:
     """Project live, completion-event, or durable-ledger delegation data."""
 
@@ -541,84 +522,15 @@ def project_cron_job(
     )
 
 
-def project_kanban_task(
-    task: Mapping[str, Any], *, run: Mapping[str, Any] | None = None
-) -> AssistantTaskProjection:
-    """Project a durable Kanban task plus its optional current/latest run handoff."""
-
-    run_record = _mapping(run)
-    metadata = _mapping(run_record.get("metadata"))
-    records = (task, run_record, metadata)
-    owner_id = _text(task.get("task_id") or task.get("id"))
-    state = kanban_lifecycle_state(task.get("status"))
-    final_report = (
-        _first_text((run_record, task), "final_report", "summary", "result") or None
-    )
-    requires_approval = bool(
-        task.get("requires_approval")
-        or run_record.get("requires_approval")
-        or metadata.get("requires_approval")
-    )
-    if state is AssistantTaskState.BLOCKED and (
-        _text(task.get("block_kind")).lower() == "needs_input" or requires_approval
-    ):
-        state = AssistantTaskState.WAITING_FOR_USER
-
-    return AssistantTaskProjection(
-        task_id=assistant_task_id(AssistantExecutionRail.KANBAN, owner_id),
-        title=_text(task.get("title")) or "Task",
-        state=state,
-        rail=AssistantExecutionRail.KANBAN,
-        durability="restart_durable",
-        background=True,
-        owner_id=owner_id,
-        parent_session_id=_text(task.get("parent_session_id") or task.get("session_id")) or None,
-        child_ids=_refs_from(records, "child_ids", "children", "created_cards"),
-        project_ref=_text(task.get("project_id") or task.get("project_ref")) or None,
-        workspace=_text(task.get("workspace_path") or task.get("workdir")) or None,
-        requires_approval=requires_approval,
-        approval_refs=_refs_from(records, "approval_id", "approval_ids", "approval_refs"),
-        artifact_refs=_refs_from(records, "artifacts", "artifact_refs"),
-        final_report=final_report,
-        detail=_first_text(
-            (run_record, task),
-            "blocked_reason",
-            "error",
-            "last_failure_error",
-        ),
-        recoverable=False,
-        recovery_action=(
-            "unblock"
-            if state in {AssistantTaskState.BLOCKED, AssistantTaskState.WAITING_FOR_USER}
-            else None
-        ),
-    )
-
-
-DURABLE_TASK_GUIDANCE = (
-    "For non-time-based work that should outlive the current chat or survive restart, use `assistant_tasks`; "
-    "split independent outcomes into separate durable tasks. Later chats recover that work through `assistant_tasks`; "
-    "the originating session is provenance, not ownership. Inspect durable task history before explaining why work is "
-    "blocked/failed or what it already tried; Kanban events and runs outrank chat memory. Cancel durable work only from "
-    "the CURRENT user's explicit request. Permanently delete durable work only from the CURRENT user's explicit deletion request; "
-    "deletion stops active work and removes its durable record, while cancellation preserves history. "
-    "Resume a blocked durable task only from the CURRENT user turn's explicit input or authorization, "
-    "never from memory, prior assistant text, or an old chat. "
-    "Keep short work in the foreground and use cron for time-based or recurring work. Existing user authorization "
-    "continues only within its stated scope; block when material facts, scope, or risk change. "
-)
-
-
 ASSISTANT_EXECUTION_GUIDANCE = (
     "Choose the smallest execution mode that satisfies the user's intent: `respond` for conversation, "
     "explanation, brainstorming, review, and advice; `execute_foreground` for bounded authorized work on the "
     "current tool surface; `delegate` for scoped coding, research, or multi-step child work while the parent "
     "remains the orchestrator; `delegate_background` for process-local work that can run without holding the "
     "foreground, never as a promise of restart durability; `schedule_or_watch` for future, recurring, monitored, "
-    "or restart-surviving work through cron, kanban, or another durable owner; and `clarify` only when a material "
+    "or restart-surviving work through cron or another durable owner; and `clarify` only when a material "
     "user decision, authorization, recipient, or safety-critical fact is genuinely missing. Missing passwords, "
     "payment details, OTP seeds, or API secrets should use secure local credential capture or Vault resolution "
     "before chat clarification whenever that path exists. "
-    + DURABLE_TASK_GUIDANCE
     + "Background work must remain observable and must not steal focus."
 )

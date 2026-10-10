@@ -12,7 +12,6 @@ from hermes_cli.nous_account import NousPortalAccountInfo, NousToolAccessInfo
 from hermes_cli.nous_subscription import NousSubscriptionFeatures
 from hermes_cli.tools_config import (
     _DEFAULT_OFF_TOOLSETS,
-    _RECENTLY_SHIPPED_TOOLSETS,
     _apply_toolset_change,
     _checklist_toolset_keys,
     _configure_provider,
@@ -813,17 +812,16 @@ def test_get_effective_configurable_toolsets_dedupes_bundled_plugins():
 
 
 
-# Kanban now participates in the checklist: an explicit deselection must be
-# both visible in the diff and durable in the platform selection.
-def test_kanban_checklist_reports_and_persists_explicit_removal():
-    config = {"platform_toolsets": {"telegram": ["kanban", "web", "terminal"]}}
+# An explicit deselection is visible in the diff and persists in platform selections.
+def test_memory_checklist_reports_and_persists_explicit_removal():
+    config = {"platform_toolsets": {"telegram": ["memory", "web", "terminal"]}}
     current = _get_platform_tools(config, "telegram", include_default_mcp_servers=False)
     universe = _checklist_toolset_keys("telegram")
-    new_enabled = current - {"kanban"}
-    assert ((current - new_enabled) & universe) == {"kanban"}
+    new_enabled = current - {"memory"}
+    assert ((current - new_enabled) & universe) == {"memory"}
     with patch("hermes_cli.tools_config.save_config"):
         _save_platform_tools(config, "telegram", new_enabled)
-    assert "kanban" not in _get_platform_tools(config, "telegram", include_default_mcp_servers=False)
+    assert "memory" not in _get_platform_tools(config, "telegram", include_default_mcp_servers=False)
     assert {"web", "terminal"} <= set(config["platform_toolsets"]["telegram"])
 
 
@@ -918,114 +916,55 @@ def test_visible_video_providers_hide_all_nous_managed_rows():
 # ("browserbase") only the CLI, and camofox its npm package.
 
 
-# ── Toolsets that shipped after a platform's last `hermes tools` save ────────
-#
-# Saving the picker (or one toggle in the desktop Toolsets UI) replaces a
-# platform's composite (``[hermes-cli]``) with a frozen explicit list, and
-# nothing ever adds to that list — so a toolset shipped later stays off
-# forever, while everyone still on the composite inherits it on upgrade.
-# ``_RECENTLY_SHIPPED_TOOLSETS`` closes that gap for toolsets new enough that
-# absence from a saved list cannot mean the user declined them.
-#
-# Every assertion here is a subset test against that set, which passes
-# vacuously once it empties out — and empty is the steady state between
-# releases. Skip loudly rather than going quietly green.
-_requires_recently_shipped = pytest.mark.skipif(
-    not _RECENTLY_SHIPPED_TOOLSETS,
-    reason="no toolset is currently inside its first release",
-)
 
-
-def _saved_list_from_before(platform="cli"):
-    """A saved explicit list as it looked before the new toolsets existed."""
-    from hermes_cli.tools_config import (
-        _CONFIG_ONLY_TOOLSETS,
-        _toolset_allowed_for_platform,
-    )
-
-    return {
-        "platform_toolsets": {
-            platform: sorted(
-                ts_key
-                for ts_key, _, _ in CONFIGURABLE_TOOLSETS
-                if ts_key not in _RECENTLY_SHIPPED_TOOLSETS
-                and ts_key not in _DEFAULT_OFF_TOOLSETS
-                and ts_key not in _CONFIG_ONLY_TOOLSETS
-                and _toolset_allowed_for_platform(ts_key, platform)
-            )
-        }
-    }
-
-
-@_requires_recently_shipped
-def test_saved_list_gains_toolsets_that_shipped_after_it_was_written():
-    """The bug: a frozen list never gained a newly shipped toolset, so
-    composite users got it on upgrade and picker users silently did not."""
-    on_composite = _get_platform_tools(
-        {"platform_toolsets": {"cli": ["hermes-cli"]}},
-        "cli",
-        include_default_mcp_servers=False,
-    )
-    on_saved_list = _get_platform_tools(
-        _saved_list_from_before(), "cli", include_default_mcp_servers=False
-    )
-
-    assert _RECENTLY_SHIPPED_TOOLSETS <= (on_composite & on_saved_list)
-
-
-@_requires_recently_shipped
-def test_unchecking_the_new_toolset_sticks():
-    """Saving records it as offered, so the next read reads absence as a
-    decline instead of turning it back on."""
+def test_unchecking_saved_toolset_sticks():
+    """An unchecked saved toolset remains absent on the next read."""
     config = {"platform_toolsets": {"cli": ["hermes-cli"]}}
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
     with patch("hermes_cli.tools_config.save_config"):
-        _save_platform_tools(config, "cli", enabled - _RECENTLY_SHIPPED_TOOLSETS)
+        _save_platform_tools(config, "cli", enabled - {"memory"})
 
     reread = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
 
-    assert not (_RECENTLY_SHIPPED_TOOLSETS & reread)
+    assert "memory" not in reread
 
 
-@_requires_recently_shipped
 def test_agent_disabled_toolsets_still_wins():
     """The other way to say no — a global suppression list applied last."""
-    config = _saved_list_from_before()
-    config["agent"] = {"disabled_toolsets": sorted(_RECENTLY_SHIPPED_TOOLSETS)}
+    config = {"platform_toolsets": {"cli": ["memory"]}}
+    config["agent"] = {"disabled_toolsets": ["memory"]}
 
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
 
-    assert not (_RECENTLY_SHIPPED_TOOLSETS & enabled)
+    assert "memory" not in enabled
 
 
-@_requires_recently_shipped
 def test_agent_disabled_toolsets_json_array_string_form_still_wins():
     """#86661: the suppression list may arrive as a JSON-array string (e.g.
     `hermes config set agent.disabled_toolsets '["memory"]'`). It must be
     parsed, not treated as one dead toolset name that filters nothing."""
-    config = _saved_list_from_before()
+    config = {"platform_toolsets": {"cli": ["memory"]}}
     import json as _json
 
     config["agent"] = {
-        "disabled_toolsets": _json.dumps(sorted(_RECENTLY_SHIPPED_TOOLSETS))
+        "disabled_toolsets": _json.dumps(["memory"])
     }
 
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
 
-    assert not (_RECENTLY_SHIPPED_TOOLSETS & enabled)
+    assert "memory" not in enabled
 
 
-@_requires_recently_shipped
 def test_agent_disabled_toolsets_python_literal_string_form_still_wins():
     """Single-quoted Python-literal form (as written by some config editors)
     must resolve the same way as the JSON form."""
-    config = _saved_list_from_before()
-    quoted = ", ".join(repr(ts) for ts in sorted(_RECENTLY_SHIPPED_TOOLSETS))
+    config = {"platform_toolsets": {"cli": ["memory"]}}
+    quoted = ", ".join(repr(ts) for ts in ["memory"])
     config["agent"] = {"disabled_toolsets": f"[{quoted}]"}
 
     enabled = _get_platform_tools(config, "cli", include_default_mcp_servers=False)
 
-    assert not (_RECENTLY_SHIPPED_TOOLSETS & enabled)
+    assert "memory" not in enabled
 
 
 def test_disabled_composite_debugging_prunes_constituent_platform_toolsets():
@@ -1059,31 +998,6 @@ def test_disabled_composite_display_matches_runtime_tool_selection():
         assert (name in enabled) == bool(set(resolve_toolset(name)) & runtime), name
 
 
-@_requires_recently_shipped
-def test_platforms_whose_composite_excludes_it_are_left_narrow():
-    """Parity is the justification, so don't widen a deliberately small
-    composite (hermes-acp, hermes-webhook) that never carried the toolset."""
-    from toolsets import TOOLSETS, resolve_toolset
-
-    narrow = [
-        platform
-        for platform in ("acp", "webhook")
-        if f"hermes-{platform}" in TOOLSETS
-        and not any(
-            set(resolve_toolset(ts, include_registry=False))
-            <= set(resolve_toolset(f"hermes-{platform}"))
-            for ts in _RECENTLY_SHIPPED_TOOLSETS
-        )
-    ]
-    assert narrow, "expected a composite that excludes the new toolset"
-
-    for platform in narrow:
-        enabled = _get_platform_tools(
-            _saved_list_from_before(platform),
-            platform,
-            include_default_mcp_servers=False,
-        )
-        assert not (_RECENTLY_SHIPPED_TOOLSETS & enabled), platform
 
 
 # Regression for issue #81163 (Layer 2): an explicitly-listed plugin toolset

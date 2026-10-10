@@ -657,9 +657,17 @@ export interface SetupStatusResult {
 export interface SetupRuntimeCheckParams {
   profile?: string | null
   provider?: string | null
+  live?: boolean
+  timeout_s?: number
 }
-/** ``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the selected route is the welcome host. */
+/** ``ok=False`` + ``error`` when the resolved model can't be served; ``free_tier`` says the selected route is the welcome host. ``live_ok`` independently reports an opt-in HTTP probe. */
 export interface SetupRuntimeCheckResult {
+  live_ok?: boolean | null
+  probe_kind?: 'endpoint_reachability' | null
+  inference_ok?: boolean | null
+  latency_ms?: number | null
+  error_kind?: 'auth' | 'not_found' | 'rate_limit' | 'network' | 'timeout' | 'server' | 'unknown' | null
+  reason?: string | null
   ok: boolean
   provider?: string | null
   model?: string | null
@@ -1362,6 +1370,45 @@ export interface ControllerScope {
   transport_family: string
   capabilities: string[]
 }
+export interface BrowserControllerBridgePrepareParams {
+  session_id: string
+  browser_profile_id: string
+  capabilities: string[]
+  protocol_version: unknown
+}
+export interface BrowserControllerBridgePrepareResult {
+  launch_context: BrowserControllerBridgeLaunchContext
+  expires_in_seconds: number
+}
+export interface BrowserControllerBridgeLaunchContext {
+  grant: string
+  session_id: string
+  controller_id: string
+  browser_profile_id: string
+  capabilities: string[]
+  protocol_version: number
+  profile_id: string
+}
+export interface BrowserControllerBridgeStatusParams {
+  session_id: string
+  browser_profile_id?: string | null
+}
+export interface BrowserControllerBridgeStatusResult {
+  status: string
+  session_id?: string | null
+  controller_id?: string | null
+  browser_profile_id?: string | null
+  capabilities?: string[] | null
+}
+export interface BrowserControllerBridgeRevokeParams {
+  session_id: string
+  controller_id?: string | null
+  browser_profile_id?: string | null
+}
+export interface BrowserControllerBridgeRevokeResult {
+  revoked: number
+  status: string
+}
 export interface BrowserControllerResultParams {
   session_id: string
   command_id: string
@@ -1385,6 +1432,31 @@ export interface PingResult {
 }
 export interface GatewayCapabilitiesResult {
   per_session_exclusive_submit: boolean
+}
+export interface MemoryListParams {
+  target?: 'memory' | 'user' | 'both'
+}
+export interface MemoryListResult {
+  entries: MemoryEntry[]
+  targets: Record<string, 'enabled' | 'disabled'>
+}
+export interface MemoryEntry {
+  target: 'memory' | 'user'
+  index: number
+  text: string
+}
+export interface MemoryRememberParams {
+  target: 'memory' | 'user'
+  content: string
+}
+export interface MemoryMutationResult {
+  success: boolean
+}
+export interface MemoryForgetParams {
+  target: 'memory' | 'user'
+  index?: number | null
+  text?: string | null
+  expected_text?: string | null
 }
 /** ``word`` is the token under the cursor (``@`` prefix = context reference); ``cwd`` / ``session_id`` pick the directory the listing resolves against. */
 export interface CompletePathParams {
@@ -2290,12 +2362,62 @@ export interface RequestAnswerParams {
 export interface RequestAnswerResult {
   status: ClarifyLockStatus
 }
+export interface ApprovalGrantsListParams {
+  profile?: string | null
+}
+export interface ApprovalGrantsListResult {
+  grants: ApprovalGrant[]
+}
+export interface ApprovalGrant {
+  id: string
+  action_kind: string
+  target: string
+  max_amount?: number | null
+  expires_at?: string | null
+  created_at: string
+}
+export interface ApprovalGrantsAddParams {
+  profile?: string | null
+  action_kind: 'command_pattern' | 'send_message'
+  target: string
+  max_amount?: null
+  expires_at?: string | null
+}
+export interface ApprovalGrantsAddResult {
+  grant: ApprovalGrant
+}
+export interface ApprovalGrantsRevokeParams {
+  profile?: string | null
+  id: string
+}
+export interface ApprovalGrantsRevokeResult {
+  revoked: boolean
+}
+export interface ApprovalAuditParams {
+  limit?: number
+  session_key?: string | null
+}
+export interface ApprovalAuditResult {
+  entries: ApprovalAuditEntry[]
+}
+export interface ApprovalAuditEntry {
+  ts: string
+  session_key: string
+  kind: string
+  tool_name: string
+  description: string
+  pattern_key: string
+  outcome: string
+  mode: string
+  command_preview: string
+}
 export interface ApprovalPendingParams {
   session_id: string
   profile?: string | null
 }
 export interface ApprovalPendingResult {
   approvals: PendingApproval[]
+  approval_mode?: string
 }
 /** One unresolved ``tools/approval.py`` gateway queue entry as ``server._approval_request_payload`` renders it (command redacted; ``choices`` precomputed). The key set is owned by the approval tool. */
 export interface PendingApproval {
@@ -2307,6 +2429,7 @@ export interface PendingApproval {
   allow_permanent?: boolean | null
   allow_session?: boolean | null
   smart_denied?: boolean | null
+  policy_locked?: boolean | null
   choices?: string[] | null
   tool_name?: string | null
   [key: string]: unknown
@@ -3697,6 +3820,30 @@ export interface AgentPluginRow {
   update_available?: boolean | null
   pinned_sha?: string | null
 }
+export interface WorkListParams {
+  session_id?: string
+}
+export interface WorkListResult {
+  work: WorkItem[]
+}
+export interface WorkItem {
+  id: string
+  kind: 'delegation' | 'process' | 'subagent'
+  title: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
+  started_at: number | null
+  updated_at: number | null
+  detail: Record<string, unknown>
+}
+export interface WorkCancelParams {
+  id: string
+  session_id?: string
+}
+export interface WorkCancelResult {
+  id: string
+  status: 'not_found' | 'already_finished' | 'cancelled' | 'interrupt_requested' | 'unavailable' | 'error'
+  message: string
+}
 /** Single question: ``question`` / ``choices`` (/ ``multi_select``); batch: ``questions``. ``answers`` rides only on a reconnect replay (locks the server already accepted). */
 export interface ClarifyRequestParams {
   session_id: string
@@ -3727,6 +3874,7 @@ export interface ApprovalRequestParams {
   allow_permanent?: boolean | null
   allow_session?: boolean | null
   smart_denied?: boolean | null
+  policy_locked?: boolean | null
   tool_name?: string | null
   gateway_session_id?: string | null
   [key: string]: unknown
@@ -3908,6 +4056,8 @@ export interface ErrorSurface {
   retryable: boolean
   provider?: string | null
   model?: string | null
+  fallback_configured?: boolean | null
+  provider_label?: string | null
   [key: string]: unknown
 }
 /** ``server._status_update`` and the direct emitters (goal / loop / heartbeat / process). */
@@ -4185,6 +4335,14 @@ export interface RequestCancelPayload {
 export interface RpcMethods {
   /** Selected profile's background process summary for ``/agents``. */
   'agents.list': { params: AgentsListParams; result: AgentsListResult }
+  /** Read recent redacted approval decisions in the active profile, newest first. */
+  'approval.audit': { params: ApprovalAuditParams; result: ApprovalAuditResult }
+  /** Store a non-monetary scoped record. Automatic approval is disabled; purchase/payment grants are unsupported. */
+  'approval.grants.add': { params: ApprovalGrantsAddParams; result: ApprovalGrantsAddResult }
+  /** List management records in the active profile; not used for automatic approval. */
+  'approval.grants.list': { params: ApprovalGrantsListParams; result: ApprovalGrantsListResult }
+  /** Revoke a standing authorization by id. */
+  'approval.grants.revoke': { params: ApprovalGrantsRevokeParams; result: ApprovalGrantsRevokeResult }
   /** Replay the approvals still waiting on this session (reconnect / polling). */
   'approval.pending': { params: ApprovalPendingParams; result: ApprovalPendingResult }
   /** Tell the backend the card is on screen, so its timeout clock starts. */
@@ -4209,6 +4367,12 @@ export interface RpcMethods {
   'bot_relay.reply': { params: BotRelayReplyParams; result: OkResult }
   /** Replace this gateway's view of agents on other connections; answers the accepted row count. */
   'bot_relay.roster.sync': { params: BotRelayRosterSyncParams; result: BotRelayRosterSyncResult }
+  /** Mint a short-lived, single-use, session-bound Desktop bridge launch grant. */
+  'browser.controller.bridge_prepare': { params: BrowserControllerBridgePrepareParams; result: BrowserControllerBridgePrepareResult }
+  /** Revoke the session-bound Desktop Chrome bridge and outstanding launch grants. */
+  'browser.controller.bridge_revoke': { params: BrowserControllerBridgeRevokeParams; result: BrowserControllerBridgeRevokeResult }
+  /** Read the session-bound Desktop Chrome bridge status. */
+  'browser.controller.bridge_status': { params: BrowserControllerBridgeStatusParams; result: BrowserControllerBridgeStatusResult }
   /** Hard-detach only the controller owned by this authenticated transport. */
   'browser.controller.detach': { params: BrowserControllerParams; result: BrowserControllerDetachResult }
   /** Acknowledge a heartbeat only for this transport's own attached controller. */
@@ -4355,6 +4519,12 @@ export interface RpcMethods {
   'mcp.servers.status': { params: ProfileParams; result: McpServersStatusResult }
   /** Connect, list tools, disconnect — an OAuth server with no token on disk is reported as not ok. */
   'mcp.servers.test': { params: McpServerNameParams; result: McpServersTestResult }
+  /** Remove by exact unique text, or index plus expected_text from memory.list. Stale selections do not write. */
+  'memory.forget': { params: MemoryForgetParams; result: MemoryMutationResult }
+  /** List enabled curated targets with zero-based indices and explicit target status. Unreadable enabled targets return an error; disabled targets expose no entries. */
+  'memory.list': { params: MemoryListParams; result: MemoryListResult }
+  /** Persist a curated entry using the agent memory content and size guards. */
+  'memory.remember': { params: MemoryRememberParams; result: MemoryMutationResult }
   /** Set/clear one author's emoji reaction on a message; returns the row's full reaction list. */
   'message.react': { params: MessageReactParams; result: MessageReactResult }
   /** Remove every credential (env keys and OAuth state) for a provider. */
@@ -4619,10 +4789,18 @@ export interface RpcMethods {
   'wake.status': { params: WakeStatusParams; result: WakeStatusResult }
   /** Stop this surface's listener; persist also writes wake_word.enabled: false. */
   'wake.stop': { params: WakeStopParams; result: WakeStopResult }
+  /** Cooperatively interrupt an owned live subagent. Process/delegation IDs fail closed without generation authority. */
+  'work.cancel': { params: WorkCancelParams; result: WorkCancelResult }
+  /** List only live children proven owned by the exact session/transport generation. Requires session_id; profile-wide process/delegation records are unavailable. */
+  'work.list': { params: WorkListParams; result: WorkListResult }
 }
 export type RpcMethod = keyof RpcMethods
 export const RPC_METHODS = [
   'agents.list',
+  'approval.audit',
+  'approval.grants.add',
+  'approval.grants.list',
+  'approval.grants.revoke',
   'approval.pending',
   'approval.received',
   'approval.respond',
@@ -4635,6 +4813,9 @@ export const RPC_METHODS = [
   'bot_relay.outbox.drain',
   'bot_relay.reply',
   'bot_relay.roster.sync',
+  'browser.controller.bridge_prepare',
+  'browser.controller.bridge_revoke',
+  'browser.controller.bridge_status',
   'browser.controller.detach',
   'browser.controller.heartbeat',
   'browser.controller.register',
@@ -4708,6 +4889,9 @@ export const RPC_METHODS = [
   'mcp.servers.set_api_key',
   'mcp.servers.status',
   'mcp.servers.test',
+  'memory.forget',
+  'memory.list',
+  'memory.remember',
   'message.react',
   'model.disconnect',
   'model.options',
@@ -4839,7 +5023,9 @@ export const RPC_METHODS = [
   'wake.resume',
   'wake.start',
   'wake.status',
-  'wake.stop'
+  'wake.stop',
+  'work.cancel',
+  'work.list'
 ] as const satisfies readonly RpcMethod[]
 
 // ── Server→client requests ──

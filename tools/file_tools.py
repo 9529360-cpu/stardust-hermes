@@ -577,8 +577,6 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
     → negative-result cache → dedup stub → real read.
     """
     try:
-        offset, limit = normalize_read_pagination(offset, limit)
-
         # On the RAW model-supplied string, before any expanduser()/resolve():
         # on Windows resolving \??\UNC\host\share already sends SMB auth (NTLM
         # leak); on POSIX the task-base join would anchor the prefix as a
@@ -586,6 +584,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = DEFAULT_READ_LIMIT, 
         nt_err = get_nt_namespace_error(path, verb="Read")
         if nt_err:
             return tool_error(nt_err)
+        offset, limit = normalize_read_pagination(offset, limit)
 
         device_base = None if Path(path).expanduser().is_absolute() else _resolve_base_dir(task_id)
         if _is_blocked_device(path, base_dir=device_base):
@@ -994,6 +993,11 @@ def search_tool(pattern: str, target: str = "content", path: str = ".",
                 task_id: str = "default") -> str:
     """Search for content or files."""
     try:
+        # Reject namespace paths before configuration-backed pagination can
+        # resolve the profile home, and before repeated-search bookkeeping.
+        nt_err = get_nt_namespace_error(path, verb="Search")
+        if nt_err:
+            return tool_error(nt_err)
         offset, limit = normalize_search_pagination(offset, limit)
 
         # Pagination args (and order) are part of the key so paging through truncated
@@ -1012,11 +1016,6 @@ def search_tool(pattern: str, target: str = "content", path: str = ".",
                 pattern=pattern,
                 already_searched=count)
 
-        # Raw string before _resolve_path_for_task: resolving is the NTLM-leak
-        # trigger and the task-base join would hide the prefix (see read_file_tool).
-        nt_err = get_nt_namespace_error(path, verb="Search")
-        if nt_err:
-            return tool_error(nt_err)
         try:
             resolved_search_path = str(_resolve_path_for_task(path, task_id))
         except (OSError, ValueError, RuntimeError) as exc:

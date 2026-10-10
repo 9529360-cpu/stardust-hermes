@@ -762,32 +762,63 @@ def _bind_interrupt_scope(agent: Any, ra) -> None:
 def _memory_turn_start_and_prefetch(
     agent: Any, original_user_message: Any, turn_author: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Notify memory providers of the new turn, then prefetch external memory once
-    before the tool loop (skipped on trivial prompts with no semantic signal).
-    Returns the prefetch text (``""`` when nothing was injected)."""
-    if not agent._memory_manager:
-        return ""
+    """Recall bounded local topic summaries plus any external-provider memory.
+
+    Topic summaries are selected locally (no model/network call) and ride the existing
+    per-turn user-message sidecar, preserving the byte-stable system prompt. An unchanged
+    topic version is injected only once per session; its earlier sidecar remains in history.
+    """
     _query = original_user_message if isinstance(original_user_message, str) else ""
-    # The author rides along so a provider can attribute THIS turn, not whoever opened the session.
-    _author = turn_author if isinstance(turn_author, dict) else {}
-    with suppress(Exception):
-        agent._memory_manager.on_turn_start(
-            agent._user_turn_count, _query,
-            author_id=_author.get("id") or None, author_name=_author.get("name") or None,
-            author_is_bot=bool(_author.get("is_bot")),
-        )
-    ext_prefetch_cache = ""
-    with suppress(Exception):
-        if not is_trivial_prompt(_query):
-            ext_prefetch_cache = agent._memory_manager.prefetch_all(_query, session_id=agent.session_id) or ""
-    # Deterministic recall indicator via _emit_status so the model can't silently
-    # drop injected memory.
-    if ext_prefetch_cache:
+    if is_trivial_prompt(_query):
+        return ""
+
+    parts: list[str] = []
+    if getattr(agent, "_topic_summaries_enabled", False):
         with suppress(Exception):
-            _recall_indicator = agent._memory_manager.describe_recall()
-            if _recall_indicator:
-                agent._emit_status(_recall_indicator)
-    return ext_prefetch_cache
+            from tools.memory_tool import memory_persistence_enabled
+            from tools.topic_memory_store import format_topic_recall, recall_topic_summaries
+
+            if memory_persistence_enabled(fail_closed=True):
+                session_id = getattr(agent, "session_id", "") or ""
+                if getattr(agent, "_topic_recall_session_id", "") != session_id:
+                    agent._topic_recall_session_id = session_id
+                    agent._topic_recall_versions = {}
+                seen = getattr(agent, "_topic_recall_versions", {})
+                selected = recall_topic_summaries(
+                    _query,
+                    limit=getattr(agent, "_topic_recall_limit", 2),
+                    char_budget=getattr(agent, "_topic_recall_char_budget", 1800),
+                )
+                fresh = [row for row in selected if seen.get(str(row.get("key") or "")) != row.get("version")]
+                if fresh:
+                    topic_context = format_topic_recall(fresh)
+                    if topic_context:
+                        parts.append(topic_context)
+                        for row in fresh:
+                            seen[str(row.get("key") or "")] = row.get("version")
+                        agent._topic_recall_versions = seen
+                        with suppress(Exception):
+                            agent._emit_status(f"🧠 Recalled {len(fresh)} topic summar{'y' if len(fresh) == 1 else 'ies'}")
+
+    if agent._memory_manager:
+        # The author rides along so a provider can attribute THIS turn, not whoever opened the session.
+        _author = turn_author if isinstance(turn_author, dict) else {}
+        with suppress(Exception):
+            agent._memory_manager.on_turn_start(
+                agent._user_turn_count, _query,
+                author_id=_author.get("id") or None, author_name=_author.get("name") or None,
+                author_is_bot=bool(_author.get("is_bot")),
+            )
+        external = ""
+        with suppress(Exception):
+            external = agent._memory_manager.prefetch_all(_query, session_id=agent.session_id) or ""
+        if external:
+            parts.append(external)
+            with suppress(Exception):
+                _recall_indicator = agent._memory_manager.describe_recall()
+                if _recall_indicator:
+                    agent._emit_status(_recall_indicator)
+    return "\n\n".join(parts)
 
 
 def _stamp_api_content_sidecar(

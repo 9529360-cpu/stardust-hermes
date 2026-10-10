@@ -14,7 +14,6 @@ _HERMES_FOUNDATION_TOOLS = [
     "skills_list", "skill_view", "skill_manage",
     "todo_list", "memory",
     "session_search",
-    "assistant_tasks",
     "clarify",
     "execute_code", "delegate_task",
 ]
@@ -34,13 +33,6 @@ _HERMES_DEFAULT_EDGE_TOOLS = [
     "text_to_speech",
     "cronjob_manage",
     "ha_list_entities", "ha_get_state", "ha_list_services", "ha_call_service",
-    "kanban_show", "kanban_list",
-    "kanban_complete", "kanban_block", "kanban_request_review",
-    "kanban_request_changes",
-    "kanban_heartbeat",
-    "kanban_comment", "kanban_create", "kanban_link",
-    "kanban_unblock",
-    "kanban_attach", "kanban_attach_url", "kanban_attachments",
     "computer_use",
     # Service-gated connector account status and authorization links.
     "manage_connections",
@@ -77,14 +69,14 @@ def _bundle(description, extras=()):
     return _ts(description, _HERMES_DEFAULT_TOOLS + list(extras))
 
 
-def _default_without(*excluded, kanban=True):
-    """_HERMES_DEFAULT_TOOLS minus exclusions (and optionally kanban_*); order preserved."""
-    return [t for t in _HERMES_DEFAULT_TOOLS if t not in excluded and (kanban or not t.startswith("kanban_"))]
+def _default_without(*excluded):
+    """_HERMES_DEFAULT_TOOLS minus exclusions; order preserved."""
+    return [t for t in _HERMES_DEFAULT_TOOLS if t not in excluded]
 
 
 # Coding posture: everything you reach for while pairing on code; drops messaging,
-# tts, image_gen, home-assistant, cron, kanban and computer-use.
-_CODING_TOOLS = _default_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", *_HA_TOOLS, kanban=False)
+# tts, image_gen, home-assistant, cron and computer-use.
+_CODING_TOOLS = _default_without("image_generate", "text_to_speech", "cronjob_manage", "computer_use", *_HA_TOOLS)
 
 # Core toolset definitions: individual tools or references to other toolsets.
 TOOLSETS = {
@@ -142,10 +134,6 @@ TOOLSETS = {
     ),
     "tts": _ts("Text-to-speech: convert text to audio with Edge TTS (free), ElevenLabs, OpenAI, or xAI", ["text_to_speech"]),
     "todo": _ts("Task planning and tracking for multi-step work", ["todo_list"]),
-    "assistant_tasks": _ts(
-        "Durable personal-assistant task intake and status over the existing Kanban execution authority",
-        ["assistant_tasks"],
-    ),
     "memory": _ts("Persistent memory across sessions (personal notes + user profile)", ["memory"]),
     "context_engine": _ts("Runtime tools exposed by the active context engine"),
     "session_search": _ts("Search and recall past conversations with summarization", ["session_search"]),
@@ -163,7 +151,7 @@ TOOLSETS = {
     "desktop_ui": _ts(
         "Desktop GUI affordances — in-app terminal/browser panes, pane focus, "
         "reactions (GUI sessions only)",
-        ["read_terminal", "close_terminal", "desktop_preview", "drive_preview",
+        ["read_terminal", "close_terminal", "browser", "desktop_preview", "drive_preview",
          "annotate_preview", "read_window_below", "focus_pane", "react_to_message",
          "gui_tour", "show_tip"],
     ),
@@ -171,16 +159,6 @@ TOOLSETS = {
     "code_execution": _ts("Run Python scripts that call tools programmatically (reduces LLM round trips)", ["execute_code"]),
     "delegation": _ts("Spawn subagents with isolated context for complex subtasks", ["delegate_task"]),
     "homeassistant": _ts("Home Assistant smart home control and monitoring", _HA_TOOLS),
-    "kanban": _ts(
-        "Kanban multi-agent coordination — only active when the agent is spawned by "
-        "the kanban dispatcher (HERMES_KANBAN_TASK env set). The dispatcher runs "
-        "inside the gateway by default; see `kanban.dispatch_in_gateway` in "
-        "config.yaml. Lets workers mark tasks done with structured handoffs, enter "
-        "first-class review (request_review — not a block), return review changes, "
-        "block for human input, heartbeat during long ops, comment on threads, attach "
-        "files, and (for orchestrators) list, unblock, and fan out tasks.",
-        [t for t in _HERMES_DEFAULT_TOOLS if t.startswith("kanban_")],
-    ),
     "discord": _ts("Discord read and participate tools (fetch messages, search members, create threads)", ["discord"]),
     "discord_admin": _ts("Discord server management (list channels/roles, pin messages, assign roles)", ["discord_admin"]),
     "yuanbao": _ts("Yuanbao platform tools - group info, member queries, DM, stickers", _YUANBAO_TOOLS),
@@ -218,7 +196,7 @@ TOOLSETS = {
     "hermes-api-server": _ts(
         "OpenAI-compatible API server — full agent tools accessible via HTTP (no "
         "interactive UI tools like clarify or send_message)",
-        _default_without("text_to_speech", "clarify", "computer_use", kanban=False),
+        _default_without("text_to_speech", "clarify", "computer_use"),
     ),
     "hermes-cli": _bundle("Full interactive CLI toolset - all default tools plus cronjob management"),
 

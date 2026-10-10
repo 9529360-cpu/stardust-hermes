@@ -93,6 +93,8 @@
     "@dnd-kit/sortable": "10.0.0",
     "@dnd-kit/utilities": "3.2.2",
     "@hermes/shared": "file:../shared",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@playwright/mcp": "0.0.83",
     "@icons-pack/react-simple-icons": "13.11.1",
     "@lezer/highlight": "1.2.3",
     "@nanostores/react": "1.1.0",
@@ -209,7 +211,12 @@
       "dist/**",
       "assets/**",
       "public/**",
-      "package.json"
+      "package.json",
+      {
+        "from": "../../experiments/playwright-mcp-host-bridge/src",
+        "to": "experiments/playwright-mcp-host-bridge/src",
+        "filter": ["**/*.mjs"]
+      }
     ],
     "beforeBuild": "scripts/before-build.mjs",
     "beforePack": "scripts/before-pack.mjs",

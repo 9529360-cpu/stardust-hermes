@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -57,8 +58,8 @@ def append_output_contract(context: Optional[str], schema: Dict[str, Any]) -> st
     return f"{base}\n\n{block}" if base else block
 
 
-def extract_json_candidate(text: str) -> str:
-    """Strip markdown fences and prose around the outermost ``{...}``/``[...]``."""
+def _candidate_source(text: str) -> str:
+    """Strip a surrounding markdown JSON fence while retaining prose for candidate scanning."""
     raw = (text or "").strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1]
@@ -67,9 +68,110 @@ def extract_json_candidate(text: str) -> str:
         raw = raw.strip()
         if raw.lower().startswith("json\n"):
             raw = raw.split("\n", 1)[1]
-    # Try each bracket kind's outermost span, earliest opener first, and keep the first that parses:
-    # checking "{" before "[" unconditionally sliced a fenced array down to its first..last object and
-    # rejected every valid array answer.
+    return raw
+
+
+def _json_candidate_end(raw: str, start: int) -> Optional[int]:
+    """Return the end of a balanced object/array span, or ``None`` if unbalanced."""
+    pairs = {"}": "{", "]": "["}
+    stack = [raw[start]]
+    in_string = False
+    escaped = False
+
+    for index in range(start + 1, len(raw)):
+        char = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char in "}]":
+            if not stack or stack[-1] != pairs[char]:
+                return None
+            stack.pop()
+            if not stack:
+                return index + 1
+    return None
+
+
+def _json_candidates(raw: str) -> List[Tuple[str, Optional[Any], Optional[str]]]:
+    """Return outer JSON candidates in text order, preserving malformed candidates too."""
+    decoder = json.JSONDecoder()
+    candidates: List[Tuple[str, Optional[Any], Optional[str]]] = []
+    cursor = 0
+    while cursor < len(raw):
+        object_start = raw.find("{", cursor)
+        array_start = raw.find("[", cursor)
+        starts = [start for start in (object_start, array_start) if start >= 0]
+        if not starts:
+            break
+        start = min(starts)
+        try:
+            parsed, end = decoder.raw_decode(raw, start)
+        except json.JSONDecodeError as exc:
+            # Do not promote a valid-looking nested value from inside a malformed
+            # outer object/array. It is not an independent final JSON candidate.
+            end = _json_candidate_end(raw, start)
+            if end is None:
+                candidates.append((raw[start:].strip(), None, f"Response is not valid JSON: {exc}"))
+                break
+            candidates.append((raw[start:end], None, f"Response is not valid JSON: {exc}"))
+            cursor = end
+            continue
+        candidates.append((raw[start:end], parsed, None))
+        cursor = end
+    return candidates
+
+
+def _last_final_label_end(raw: str) -> Optional[int]:
+    """Find the last prose-level ``Final:`` marker outside JSON containers/strings."""
+    pairs = {"}": "{", "]": "["}
+    stack: List[str] = []
+    in_string = False
+    escaped = False
+    final_end: Optional[int] = None
+    index = 0
+    while index < len(raw):
+        if not stack and not in_string:
+            match = re.match(r"(?i)\bfinal\s*:", raw[index:])
+            if match:
+                final_end = index + match.end()
+                index = final_end
+                continue
+        char = raw[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        elif char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char in "}]":
+            if stack and stack[-1] == pairs[char]:
+                stack.pop()
+        index += 1
+    return final_end
+
+
+def extract_json_candidate(text: str) -> str:
+    """Strip prose/fences and return the last complete object or array candidate."""
+    raw = _candidate_source(text)
+    candidates = _json_candidates(raw)
+    if candidates:
+        return candidates[-1][0]
+
+    # Preserve a useful malformed span for the caller's JSON parse diagnostic.
     spans = []
     for opener, closer in (("{", "}"), ("[", "]")):
         start, end = raw.find(opener), raw.rfind(closer)
@@ -86,19 +188,37 @@ def extract_json_candidate(text: str) -> str:
 
 def validate_output(text: str, schema: Dict[str, Any]) -> Tuple[bool, List[str]]:
     """``(True, [])`` or ``(False, errors)`` with strings suitable for the retry turn."""
-    candidate = extract_json_candidate(text or "")
-    if not candidate.strip():
-        return False, ["Response was empty — expected a JSON object matching the schema."]
-    try:
-        parsed = json.loads(candidate)
-    except (ValueError, TypeError) as exc:
-        return False, [f"Response is not valid JSON: {exc}"]
+    raw = _candidate_source(text or "")
+    # An explicit final marker establishes the answer boundary even when the
+    # final answer contains no object/array candidate. Earlier examples must
+    # never become the result merely because final text is prose, empty, or a
+    # scalar. Keep scanning within that final segment so prose/fence wrappers
+    # around a valid JSON value remain supported.
+    final_end = _last_final_label_end(raw)
+    if final_end is not None:
+        raw = raw[final_end:]
+    candidates = _json_candidates(raw)
+    if not candidates:
+        candidate = extract_json_candidate(raw)
+        if not candidate.strip():
+            return False, ["Response was empty — expected a JSON value matching the schema."]
+        try:
+            json.loads(candidate)
+        except (ValueError, TypeError) as exc:
+            return False, [f"Response is not valid JSON: {exc}"]
+        candidates = [(candidate, json.loads(candidate), None)]
+    _candidate, parsed, parse_error = candidates[-1]
+    if parse_error:
+        return False, [parse_error]
     try:
         from jsonschema.validators import validator_for  # type: ignore[import-untyped]
     except ImportError:
         logger.debug("jsonschema unavailable; accepting parsed JSON without validation")
         return True, []
+
     validator = validator_for(schema)(schema)
+    # The last complete JSON value is the child's final candidate. Earlier values
+    # may be examples, so they must not override a malformed final answer.
     errors = sorted(validator.iter_errors(parsed), key=lambda e: list(e.absolute_path))
     rendered = [  # bound error volume for the retry prompt
         "$" + "".join(f"[{p}]" if isinstance(p, int) else f".{p}" for p in err.absolute_path) + f": {err.message}"

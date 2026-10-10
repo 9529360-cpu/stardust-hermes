@@ -38,13 +38,17 @@ export function registerFsIpc({
 
   ipcMain.handle('hermes:fs:gitRoot', async (_event, startPath) => gitRootForIpc(startPath))
 
+  // Keep the same IPC path syntax checks as writes/reads. This rejects device
+  // paths and malformed file URLs; it is NOT an authorization root allowlist.
+  const requestedPath = (value: unknown, purpose: string) =>
+    resolveRequestedPathForIpc(expandUserPath(String(value || '').trim()), { purpose })
+
   // Reveal a path in the OS file manager (Finder / Explorer / Files).
   ipcMain.handle('hermes:fs:reveal', async (_event, targetPath) => {
-    const target = String(targetPath || '').trim()
-
-    if (!target) {
+    if (!String(targetPath || '').trim()) {
       return false
     }
+    const target = requestedPath(targetPath, 'Reveal path')
 
     try {
       shell.showItemInFolder(target)
@@ -61,11 +65,10 @@ export function registerFsIpc({
   // which often doesn't exist on first use. `shell.openPath` returns '' on
   // success or an error string; both mkdir + openPath failures are surfaced.
   ipcMain.handle('hermes:fs:openDir', async (_event, dirPath) => {
-    const dir = String(dirPath || '').trim()
-
-    if (!dir) {
+    if (!String(dirPath || '').trim()) {
       return { ok: false, error: 'no path' }
     }
+    const dir = requestedPath(dirPath, 'Open directory')
 
     try {
       await fs.promises.mkdir(dir, { recursive: true })
@@ -153,12 +156,12 @@ export function registerFsIpc({
   // base name; the destination is resolved in the SAME parent dir so a rename can
   // never move the item elsewhere or traverse out. Rejects on a name collision.
   ipcMain.handle('hermes:fs:rename', async (_event, targetPath, newName) => {
-    const src = String(targetPath || '').trim()
     const name = String(newName || '').trim()
 
-    if (!src || !name || name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
+    if (!String(targetPath || '').trim() || !name || name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
       throw new Error('Invalid rename')
     }
+    const src = requestedPath(targetPath, 'Rename path')
 
     const dst = path.join(path.dirname(src), name)
 
@@ -206,11 +209,10 @@ export function registerFsIpc({
   // Move a file/folder to the OS trash (recoverable) — the VS Code "Delete"
   // default. `shell.trashItem` routes to Finder/Explorer/Files trash per platform.
   ipcMain.handle('hermes:fs:trash', async (_event, targetPath) => {
-    const target = String(targetPath || '').trim()
-
-    if (!target) {
+    if (!String(targetPath || '').trim()) {
       throw new Error('Invalid delete')
     }
+    const target = requestedPath(targetPath, 'Trash path')
 
     await shell.trashItem(target)
 

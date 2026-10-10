@@ -19,17 +19,14 @@ REQUIRED_SECTIONS = [
     "## Prerequisites",
     "## How to Run",
     "## Quick Reference",
-    "## Review Lenses",
     "## Procedure",
     "## Pitfalls",
     "## Verification",
 ]
 REVIEW_ACTIONS = {
-    "kanban_show",
-    "kanban_comment",
-    "kanban_complete",
-    "kanban_request_changes",
-    "kanban_block",
+    "read_file",
+    "search_files",
+    "terminal",
 }
 
 
@@ -71,25 +68,16 @@ def test_skill_documents_native_review_actions(
     assert f"`{tool_name}`" in skill_text
 
 
-def test_verdicts_route_through_distinct_terminal_actions(skill_text: str) -> None:
+def test_verdicts_distinguish_defects_from_missing_input(skill_text: str) -> None:
     quick_reference = skill_text.split("## Quick Reference", 1)[1].split(
-        "## Review Lenses", 1
+        "## Procedure", 1
     )[0]
-    assert "Approve" in quick_reference and "`kanban_complete`" in quick_reference
-    assert "Request changes" in quick_reference
-    assert "`kanban_request_changes`" in quick_reference
-    assert "Escalate" in quick_reference and "`kanban_block`" in quick_reference
+    assert "Ready" in quick_reference
+    assert "Changes required" in quick_reference
+    assert "Needs input" in quick_reference
 
 
-def test_review_lenses_vary_per_round(skill_text: str) -> None:
-    lenses = skill_text.split("## Review Lenses", 1)[1].split("## Procedure", 1)[0]
-    # Round derivation must key off history the reviewer actually sees.
-    assert "`changes_requested`" in lenses
-    assert "Prior attempts on this task" in lenses
-    # One distinct lens per round.
-    for lens in ("Artifact", "Execution", "Contract"):
-        assert lens in lenses
-    # Execution lens must direct empirical verification via the terminal.
-    assert "`terminal`" in lenses
-    # Fan-out note: parallel reviewers get different briefs.
-    assert "`delegate_task`" in lenses
+def test_review_requires_candidate_evidence_and_preserves_authorization(skill_text: str) -> None:
+    assert "exact candidate" in skill_text
+    assert "does not itself authorize publishing, deployment, or merging" in skill_text
+    assert "kanban_" not in skill_text

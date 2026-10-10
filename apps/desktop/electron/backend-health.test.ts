@@ -39,6 +39,23 @@ test('uses lightweight /api/health for current backends', async () => {
   assert.deepEqual(calls, [['public', 'http://127.0.0.1:9000/api/health']])
 })
 
+test('fails immediately when an already-bound local backend refuses the probe', async () => {
+  const refused = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:53150'), { code: 'ECONNREFUSED' })
+  let sleeps = 0
+
+  await assert.rejects(
+    waitForHermesReady('http://127.0.0.1:53150', {
+      fetchPublicJson: async () => { throw refused },
+      fetchJson: async () => { throw refused },
+      alreadyBound: true,
+      timeoutMs: 60_000,
+      sleep: async () => { sleeps += 1 }
+    }),
+    /ECONNREFUSED/
+  )
+  assert.equal(sleeps, 0)
+})
+
 test('falls back to /api/status only for old backends without /api/health', async () => {
   const calls: string[][] = []
 

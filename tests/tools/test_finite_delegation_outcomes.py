@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -193,6 +194,29 @@ def test_finite_batch_returns_parent_interruption(harness):
         stopper.join(5)
         assert not stopper.is_alive()
         assert not stop_errors
+
+
+def test_parent_stop_during_a_finished_childs_teardown_keeps_its_result(harness):
+    """The parent stops while a sibling that already finished is still tearing down (closing
+    sandboxes, kernels, clients). The batch waits for that child anyway; reporting it
+    ``interrupted`` threw its finished work away (main CI, 2026-10-04: ['interrupted', 'interrupted'])."""
+    parent, children, dispatch = harness
+    finisher, slow = _Child(), _Child("slow")
+    children.extend([finisher, slow])
+    close_finisher = finisher.close
+
+    def close_while_parent_stops():
+        assert slow.started.wait(3)
+        parent.hard_interrupt("test parent stop")
+        slow.allow_finish.set()
+        time.sleep(1.0)  # outlast the dispatcher's 0.5 s interrupt poll before this child returns
+        close_finisher()
+
+    finisher.close = close_while_parent_stops
+    result = dispatch()
+
+    _joined(result, ["completed", "interrupted"])
+    assert slow.interrupted.is_set()
 
 
 def test_finite_marker_overrides_api_history_continuation(harness):

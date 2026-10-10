@@ -49,7 +49,7 @@ _HOMEBREW_CI_POLLER_HINT = (
 _ASYNC_UNSUPPORTED_NOTE = (
     'notify_on_complete / watch_patterns are not available in this session — it cannot receive '
     'an async completion after the turn ends (a one-shot runner such as `hermes -z`, a cron '
-    'job, a Kanban worker, or a stateless HTTP endpoint). The process is running in the '
+    'job, a one-shot worker, or a stateless HTTP endpoint). The process is running in the '
     "background; retrieve its result with process(action='poll') or process(action='wait')."
 )
 
@@ -206,7 +206,7 @@ _SUBAGENT_NOTIFY_NOTE = (
 )
 
 _FINITE_SESSION_PROCESS_NOTE = (
-    "This is a one-shot run (e.g. a Kanban worker): it ends after your final answer and stops the background "
+    "This is a one-shot run (e.g. a one-shot worker): it ends after your final answer and stops the background "
     "processes it started. Use this one for checks within the run; never tell the user a server or watcher was "
     "left running — tell them how to start it themselves if they need it afterwards."
 )

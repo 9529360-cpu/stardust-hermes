@@ -431,6 +431,14 @@ export function liveSessionProjectId(session: SessionInfo, explicitProjects: Pro
   return repoRoot
 }
 
+/** True when a session belongs to a project the user created — not an auto-detected repo, whose
+ *  id is its root path rather than an explicit project's id. */
+export function sessionInExplicitProject(session: SessionInfo, explicitProjects: ProjectInfo[]): boolean {
+  const projectId = liveSessionProjectId(session, explicitProjects)
+
+  return projectId !== null && explicitProjects.some(project => project.id === projectId)
+}
+
 /** The lane a row files under: its live project, or Home for detached (cwd-less) rows. */
 export function sessionBucketId(session: SessionInfo, explicitProjects: ProjectInfo[]): null | string {
   return liveSessionProjectId(session, explicitProjects) ?? (isDetachedSession(session) ? NO_PROJECT_ID : null)
@@ -509,11 +517,9 @@ function liveLaneForRepo(repoRoot: string, session: SessionInfo): null | Sidebar
   const wt = sessionPath.match(/^(.*[/\\]\.worktrees)[/\\]([^/\\]+)/)
 
   if (wt) {
-    const [worktreeRoot, worktreesDir, slug] = [wt[0], wt[1], wt[2]]
+    const [worktreeRoot, slug] = [wt[0], wt[2]]
 
-    return /^t_[0-9a-f]+$/.test(slug)
-      ? { id: `${repoRoot}::kanban`, isKanban: true, isMain: false, label: 'kanban', path: worktreesDir, sessions: [] }
-      : { id: worktreeRoot, isMain: false, label: slug, path: worktreeRoot, sessions: [] }
+    return { id: worktreeRoot, isMain: false, label: slug, path: worktreeRoot, sessions: [] }
   }
 
   const branch = (session.git_branch || '').trim() || DEFAULT_BRANCH_LABEL

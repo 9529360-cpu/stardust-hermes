@@ -7,13 +7,6 @@ import { $connection, $selectedStoredSessionId } from '@/store/session'
 import { forgetPreviewConsole, previewConsoleState } from './preview-console-store'
 import { PreviewPane } from './preview-pane'
 
-// The consent dialog has its own test file and needs a QueryClientProvider;
-// these tests exercise the pane's console/watch/webview wiring, not the
-// prompt, so isolate it the way the pane's other collaborators are.
-vi.mock('./real-profile-consent-dialog', () => ({
-  RealProfileConsentDialog: () => null
-}))
-
 function stubPdfObjectUrls() {
   const NativeUrl = URL
   let objectUrlIndex = 0
@@ -132,6 +125,9 @@ describe('PreviewPane console state', () => {
     })
 
     expect(rendered.queryByRole('textbox', { name: 'Address' })).not.toBeNull()
+    // The in-app WebView must NOT prompt to copy the user's Chrome cookies
+    // for a separate backend browser: these are different session owners.
+    expect(rendered.queryByRole('dialog')).toBeNull()
 
     await act(async () => {
       rendered.rerender(

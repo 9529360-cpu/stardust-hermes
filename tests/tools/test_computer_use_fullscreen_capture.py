@@ -35,11 +35,21 @@ class _FakeSession:
         windows: Optional[List[Dict[str, Any]]] = None,
         desktop_image: Optional[str] = _PNG_B64,
         capture_scope: str = "window",
+        config_error: bool = False,
+        config_scope: Optional[str] = None,
+        config_has_scope: bool = True,
+        desktop_state_error: bool = False,
+        set_config_errors: Optional[set[str]] = None,
     ):
         self.calls: List[tuple] = []
         self._windows = windows or []
         self._desktop_image = desktop_image
         self._scope = capture_scope
+        self._config_error = config_error
+        self._config_scope = config_scope if config_scope is not None else capture_scope
+        self._config_has_scope = config_has_scope
+        self._desktop_state_error = desktop_state_error
+        self._set_config_errors = set_config_errors or set()
         self.capabilities_discovered = True
 
     def _has_tool(self, name: str) -> bool:
@@ -48,17 +58,24 @@ class _FakeSession:
     def call_tool(self, name: str, args: Dict[str, Any], timeout: float = 30.0):
         self.calls.append((name, dict(args or {})))
         if name == "get_config":
+            if self._config_error:
+                raise RuntimeError("config unavailable")
             return {
                 "data": "",
                 "images": [],
-                "structuredContent": {"capture_scope": self._scope},
+                "structuredContent": {"capture_scope": self._config_scope} if self._config_has_scope else {},
                 "isError": False,
             }
         if name == "set_config":
+            if args["value"] in self._set_config_errors:
+                return {"data": "config write failed", "images": [], "structuredContent": None,
+                        "isError": True}
             self._scope = args["value"]
             return {"data": "ok", "images": [], "structuredContent": None,
                     "isError": False}
         if name == "get_desktop_state":
+            if self._desktop_state_error:
+                raise RuntimeError("desktop capture failed")
             images = [self._desktop_image] if self._desktop_image else []
             return {
                 "data": "desktop state",
@@ -127,8 +144,9 @@ class TestFullScreenLane:
         assert "capture(app='desktop')" in cap.note
         assert "capture(app='<AppName>')" in cap.note
 
-    def test_capture_scope_switched_and_restored(self):
-        session = _FakeSession(capture_scope="window")
+    @pytest.mark.parametrize("scope", ["window", "auto"])
+    def test_capture_scope_switched_and_restored(self, scope):
+        session = _FakeSession(capture_scope=scope)
         backend = _make_backend(session)
 
         backend.capture(mode="vision", app="screen")
@@ -136,9 +154,9 @@ class TestFullScreenLane:
         set_calls = session.called("set_config")
         assert {"key": "capture_scope", "value": "desktop",
                 "session": "test-session"} in set_calls
-        assert {"key": "capture_scope", "value": "window",
+        assert {"key": "capture_scope", "value": scope,
                 "session": "test-session"} in set_calls
-        assert session._scope == "window", "prior scope must be restored"
+        assert session._scope == scope, "prior scope must be restored"
 
     def test_scope_untouched_when_already_desktop(self):
         session = _FakeSession(capture_scope="desktop")
@@ -147,6 +165,85 @@ class TestFullScreenLane:
         backend.capture(mode="vision", app="screen")
 
         assert not session.called("set_config")
+
+    def test_scope_restored_when_desktop_capture_raises(self):
+        session = _FakeSession(capture_scope="window", desktop_state_error=True)
+        backend = _make_backend(session)
+
+        with pytest.raises(RuntimeError, match="desktop capture failed"):
+            backend.capture(mode="vision", app="screen")
+
+        assert session._scope == "window"
+        assert session.called("set_config") == [
+            {"key": "capture_scope", "value": "desktop", "session": "test-session"},
+            {"key": "capture_scope", "value": "window", "session": "test-session"},
+        ]
+
+    def test_failed_switch_skips_capture_and_attempts_restore(self):
+        session = _FakeSession(capture_scope="window", set_config_errors={"desktop"})
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "could not switch capture_scope to desktop" in cap.window_title
+        assert session._scope == "window"
+        assert not session.called("get_desktop_state")
+        assert session.called("set_config") == [
+            {"key": "capture_scope", "value": "desktop", "session": "test-session"},
+            {"key": "capture_scope", "value": "window", "session": "test-session"},
+        ]
+
+    def test_failed_restore_is_reported_instead_of_returning_capture(self):
+        session = _FakeSession(capture_scope="window", set_config_errors={"window"})
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "could not restore the previous capture_scope" in cap.window_title
+        assert session._scope == "desktop"
+
+    def test_capture_and_restore_failures_are_both_reported(self):
+        session = _FakeSession(capture_scope="window", desktop_state_error=True,
+                               set_config_errors={"window"})
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "desktop capture failed" in cap.window_title
+        assert "could not restore the previous capture_scope" in cap.window_title
+        assert session._scope == "desktop"
+
+    @pytest.mark.parametrize("session", [
+        _FakeSession(config_error=True),
+        _FakeSession(config_has_scope=False),
+        _FakeSession(config_scope=""),
+    ])
+    def test_unknown_prior_scope_skips_capture_without_mutating_session(self, session):
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "could not read the current capture_scope" in cap.window_title
+        assert not session.called("set_config")
+        assert not session.called("get_desktop_state")
+        assert session._scope == "window"
+
+    @pytest.mark.parametrize("scope", ["bogus", " window ", "AUTO"])
+    def test_unsupported_prior_scope_is_not_rewritten(self, scope):
+        session = _FakeSession(capture_scope=scope)
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen")
+
+        assert cap.png_b64 is None
+        assert "not a supported value" in cap.window_title
+        assert not session.called("set_config")
+        assert not session.called("get_desktop_state")
+        assert session._scope == scope
 
     def test_imageless_desktop_state_fails_closed_with_guidance(self):
         session = _FakeSession(desktop_image=None)
@@ -176,6 +273,27 @@ class TestFullScreenLane:
         assert not session.called("get_desktop_state"), (
             "an exact pid/window target must win over the app sentinel"
         )
+
+    def test_placeholder_ids_keep_full_screen_lane(self):
+        """Schema-filled zero IDs are ignored, so they cannot redirect a screen grab to window discovery."""
+        session = _FakeSession()
+        backend = _make_backend(session)
+
+        backend.capture(mode="vision", app="screen", pid=0, window_id=0)
+
+        assert session.called("get_desktop_state")
+        assert not session.called("list_windows")
+
+    def test_incomplete_exact_target_fails_before_any_screen_capture(self):
+        """A lone real ID is rejected rather than falling through to a broader screen grab."""
+        session = _FakeSession()
+        backend = _make_backend(session)
+
+        cap = backend.capture(mode="vision", app="screen", pid=123, window_id=0)
+
+        assert "requires both pid and window_id" in cap.window_title
+        assert not session.called("get_desktop_state")
+        assert not session.called("screenshot")
 
 
 class TestDesktopShellLane:

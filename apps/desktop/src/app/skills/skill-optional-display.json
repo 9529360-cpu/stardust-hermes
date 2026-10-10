@@ -1,0 +1,606 @@
+{
+  "agent-merge-conflict-arbiter": {
+    "name": "代理合并冲突仲裁",
+    "description": "中立仲裁两个代理的合并冲突"
+  },
+  "antigravity-cli": {
+    "name": "Antigravity CLI",
+    "description": "管理 agy 插件、认证与沙箱"
+  },
+  "blackbox": {
+    "name": "Blackbox AI",
+    "description": "通过多模型 CLI 委派编程任务"
+  },
+  "cli-anything": {
+    "name": "CLI-Anything",
+    "description": "安装运行 CLI-Hub 的代理原生软件 CLI"
+  },
+  "cli-anything-harness-builder": {
+    "name": "CLI 适配构建器",
+    "description": "为图形软件构建代理可用的 CLI 适配层"
+  },
+  "dynamic-workflow": {
+    "name": "动态工作流",
+    "description": "规划并行分派、对抗验证与分批执行"
+  },
+  "grok": {
+    "name": "Grok 编码代理",
+    "description": "通过 xAI Grok Build CLI 委派开发与 PR"
+  },
+  "honcho": {
+    "name": "Honcho 记忆",
+    "description": "配置排查 Hermes 的 Honcho 记忆"
+  },
+  "openhands": {
+    "name": "OpenHands 编码代理",
+    "description": "通过 OpenHands CLI 与 LiteLLM 委派编程"
+  },
+  "evm": {
+    "name": "EVM 链查询",
+    "description": "只读查询八条 EVM 链的钱包、代币与 Gas"
+  },
+  "hyperliquid": {
+    "name": "Hyperliquid 数据",
+    "description": "查询市场、账户历史与交易复盘"
+  },
+  "solana": {
+    "name": "Solana 链查询",
+    "description": "查询钱包、代币、交易与 NFT 的美元价值"
+  },
+  "one-three-one-rule": {
+    "name": "1-3-1 决策简报",
+    "description": "以一个问题、三个选项和一个建议撰写简报"
+  },
+  "ai-presenter-video": {
+    "name": "AI 主播视频",
+    "description": "由脚本与图片制作并验证 AI 主播视频"
+  },
+  "archify": {
+    "name": "Archify 交互图",
+    "description": "制作经验证的交互式 HTML 图表"
+  },
+  "ascii-art": {
+    "name": "ASCII 艺术",
+    "description": "制作字符画、文本框与图片转字符画"
+  },
+  "audiocraft-audio-generation": {
+    "name": "AudioCraft 音频生成",
+    "description": "用 MusicGen 生成音乐、AudioGen 生成音效"
+  },
+  "auteur": {
+    "name": "电影感网页设计",
+    "description": "设计并构建电影感网页"
+  },
+  "baoyu-article-illustrator": {
+    "name": "宝玉文章配图",
+    "description": "按类型、风格与配色一致性制作文章插图"
+  },
+  "baoyu-comic": {
+    "name": "宝玉知识漫画",
+    "description": "创作教育、传记与教程类知识漫画"
+  },
+  "comfyui": {
+    "name": "ComfyUI 生成工作流",
+    "description": "通过扩散工作流生成图像、视频和音频"
+  },
+  "concept-diagrams": {
+    "name": "概念图解",
+    "description": "生成 HTML 呈现的简约教育 SVG 图解"
+  },
+  "creative-ideation": {
+    "name": "创意构思",
+    "description": "运用具名创意方法生成想法"
+  },
+  "draw-your-font": {
+    "name": "手写字体制作",
+    "description": "将手写照片转换为可安装的 TTF 字体"
+  },
+  "dream-loop": {
+    "name": "3D 概念图迭代",
+    "description": "对照概念图迭代构建高保真 3D 场景"
+  },
+  "excalidraw": {
+    "name": "Excalidraw 手绘图",
+    "description": "制作架构、流程和时序图的 Excalidraw JSON"
+  },
+  "heartmula": {
+    "name": "HeartMuLa 歌曲生成",
+    "description": "根据歌词和标签生成 Suno 风格歌曲"
+  },
+  "hyperframes": {
+    "name": "Hyperframes 视频渲染",
+    "description": "将 HTML 作品渲染为 MP4 或 WebM"
+  },
+  "impeccable": {
+    "name": "Impeccable 前端设计",
+    "description": "提供上游维护的前端设计指导"
+  },
+  "ip-as-logo": {
+    "name": "IP 吉祥物标志",
+    "description": "设计 32px 下清晰可辨的简约可爱标志"
+  },
+  "meme-generation": {
+    "name": "表情包生成",
+    "description": "用 Pillow 在模板叠字生成 PNG 表情包"
+  },
+  "mono-color": {
+    "name": "单色印刷海报",
+    "description": "生成单色或双色油墨风格海报"
+  },
+  "pixel-art": {
+    "name": "像素艺术",
+    "description": "使用 NES、Game Boy、PICO-8 等配色创作"
+  },
+  "pretext": {
+    "name": "Pretext 创意排版",
+    "description": "用无 DOM 文本布局制作浏览器演示"
+  },
+  "simple-english": {
+    "name": "简明技术英语",
+    "description": "改写文本为 ASD-STE100 简明技术英语"
+  },
+  "sketch": {
+    "name": "HTML 设计草图",
+    "description": "快速比较两到三种 HTML 设计方案"
+  },
+  "social-media-content-calendar": {
+    "name": "社媒内容日历",
+    "description": "从简报到发布规划跨平台社媒活动"
+  },
+  "system-atlas": {
+    "name": "系统架构图册",
+    "description": "制作可探索的等距视角 HTML 架构图册"
+  },
+  "tldraw-offline": {
+    "name": "tldraw 离线画布",
+    "description": "由代理操控和编写离线画布脚本"
+  },
+  "unreal-mcp": {
+    "name": "Unreal Engine MCP",
+    "description": "自动操作编辑器场景、Actor 与渲染"
+  },
+  "jupyter-notebook": {
+    "name": "Jupyter 交互笔记本",
+    "description": "通过实时 Jupyter 内核迭代运行 Python"
+  },
+  "actual-setup": {
+    "name": "Actual Computer 配置",
+    "description": "在 Hermes 中配置 actual.inc 推理"
+  },
+  "docker-management": {
+    "name": "Docker 管理",
+    "description": "管理容器、镜像、卷与 Compose"
+  },
+  "hermes-s6-container-supervision": {
+    "name": "Hermes s6 服务管理",
+    "description": "修改排查 Hermes Docker 镜像中的 s6 服务"
+  },
+  "inference-sh-cli": {
+    "name": "inference.sh CLI",
+    "description": "运行 150 多种图像、视频与 LLM 应用"
+  },
+  "pinggy-tunnel": {
+    "name": "Pinggy SSH 隧道",
+    "description": "通过 SSH 零安装开放本地服务"
+  },
+  "setup-wizard-generator": {
+    "name": "配置向导生成器",
+    "description": "生成引导人工配置的 Bash 向导"
+  },
+  "watchers": {
+    "name": "来源轮询监控",
+    "description": "轮询 RSS、JSON API 和 GitHub 并按水位去重"
+  },
+  "adversarial-ux-test": {
+    "name": "对抗式 UX 测试",
+    "description": "扮演苛刻用户发现并分级体验痛点"
+  },
+  "agentmail": {
+    "name": "AgentMail 邮箱",
+    "description": "通过 AgentMail CLI 使用代理邮箱"
+  },
+  "3-statement-model": {
+    "name": "三表财务模型",
+    "description": "在 Excel 构建利润表、资产负债表与现金流量表联动模型"
+  },
+  "comps-analysis": {
+    "name": "可比公司估值",
+    "description": "构建 Excel 可比公司估值工作簿"
+  },
+  "dcf-model": {
+    "name": "DCF 估值模型",
+    "description": "构建 Excel 现金流折现估值工作簿"
+  },
+  "excel-author": {
+    "name": "Excel 财务建模",
+    "description": "用 openpyxl 无界面构建可审计财务工作簿"
+  },
+  "lbo-model": {
+    "name": "杠杆收购模型",
+    "description": "构建含 IRR 与 MOIC 的 Excel 杠杆收购模型"
+  },
+  "merger-model": {
+    "name": "并购增厚稀释模型",
+    "description": "构建 Excel 并购增厚／稀释模型"
+  },
+  "polymarket": {
+    "name": "Polymarket 市场查询",
+    "description": "查询市场、价格、订单簿与历史数据"
+  },
+  "pptx-author": {
+    "name": "PowerPoint 演示文稿制作",
+    "description": "用 python-pptx 无界面制作演示文稿"
+  },
+  "stocks": {
+    "name": "股票行情",
+    "description": "通过 Yahoo 查询股票报价、历史、比较及加密货币"
+  },
+  "minecraft-modpack-server": {
+    "name": "Minecraft 模组服务器",
+    "description": "托管 CurseForge 或 Modrinth 模组服务器"
+  },
+  "pokemon-player": {
+    "name": "宝可梦模拟器玩家",
+    "description": "通过无界面模拟器及内存读取游玩宝可梦"
+  },
+  "fitness-nutrition": {
+    "name": "健身与营养",
+    "description": "利用 wger 和 USDA 数据规划训练与营养指标"
+  },
+  "neuroskill-bci": {
+    "name": "NeuroSkill 脑机接口",
+    "description": "使用实时脑机接口认知与情绪状态"
+  },
+  "fastmcp": {
+    "name": "FastMCP 服务开发",
+    "description": "构建、测试和部署 Python MCP 服务器"
+  },
+  "mcp-oauth-remote-gateway": {
+    "name": "远程 MCP OAuth 配置",
+    "description": "在无界面网关手动授权远程 MCP 服务器"
+  },
+  "mcporter": {
+    "name": "MCPorter 命令行工具",
+    "description": "在终端列出、认证和调用 MCP 工具"
+  },
+  "openclaw-migration": {
+    "name": "OpenClaw 迁移",
+    "description": "将 OpenClaw 记忆与技能导入 Hermes"
+  },
+  "accelerate": {
+    "name": "Accelerate 分布式训练",
+    "description": "以较少改动跨 GPU 运行 PyTorch 训练"
+  },
+  "chroma": {
+    "name": "Chroma 向量数据库",
+    "description": "以嵌入数据库支持 RAG 与语义搜索"
+  },
+  "clip": {
+    "name": "CLIP 图文检索",
+    "description": "进行零样本图像分类及图文搜索"
+  },
+  "evaluating-llms-harness": {
+    "name": "LLM 基准评测",
+    "description": "用 lm-eval-harness 评测 MMLU、GSM8K 等基准"
+  },
+  "weights-and-biases": {
+    "name": "Weights & Biases 实验管理",
+    "description": "记录实验、参数扫描、模型注册与仪表板"
+  },
+  "faiss": {
+    "name": "FAISS 向量检索",
+    "description": "快速搜索十亿级向量的相似项"
+  },
+  "flash-attention": {
+    "name": "FlashAttention 加速",
+    "description": "加速长序列 Transformer 训练与推理"
+  },
+  "guidance": {
+    "name": "Guidance 约束生成",
+    "description": "以语法约束 LLM 输出确保 JSON 有效"
+  },
+  "huggingface-tokenizers": {
+    "name": "Hugging Face Tokenizers",
+    "description": "快速 BPE／WordPiece 分词与自定义词表训练"
+  },
+  "llama-cpp": {
+    "name": "llama.cpp 本地推理",
+    "description": "运行本地 GGUF 推理并发现 HF Hub 模型"
+  },
+  "outlines": {
+    "name": "Outlines 结构化生成",
+    "description": "按 JSON、正则或 Pydantic 约束生成"
+  },
+  "serving-llms-vllm": {
+    "name": "vLLM 模型服务",
+    "description": "提供高吞吐 LLM 服务、OpenAI API 与量化"
+  },
+  "instructor": {
+    "name": "Instructor 结构化输出",
+    "description": "使用 Pydantic 验证 LLM 结构化输出"
+  },
+  "lambda-labs": {
+    "name": "Lambda Labs GPU 云",
+    "description": "按需使用 GPU 云实例训练模型"
+  },
+  "llava": {
+    "name": "LLaVA 视觉语言对话",
+    "description": "支持视觉问答、图像描述与对话"
+  },
+  "modal": {
+    "name": "Modal 无服务器 GPU",
+    "description": "为机器学习任务及模型 API 提供 GPU 云服务"
+  },
+  "huggingface-hub": {
+    "name": "Hugging Face Hub",
+    "description": "用 hf CLI 搜索、下载、上传模型及数据集"
+  },
+  "segment-anything-model": {
+    "name": "SAM 图像分割",
+    "description": "按点、框和掩码进行零样本图像分割"
+  },
+  "nemo-curator": {
+    "name": "NeMo Curator 数据整理",
+    "description": "训练数据去重、筛选及个人信息脱敏"
+  },
+  "obliteratus": {
+    "name": "OBLITERATUS 拒答消除",
+    "description": "用均值差等方法消除 LLM 拒答"
+  },
+  "peft": {
+    "name": "PEFT 高效微调",
+    "description": "在有限 GPU 显存下用 LoRA 微调 LLM"
+  },
+  "pinecone": {
+    "name": "Pinecone 向量数据库",
+    "description": "为生产环境 RAG 与搜索提供托管服务"
+  },
+  "pytorch-fsdp": {
+    "name": "PyTorch FSDP 分布式训练",
+    "description": "以全分片数据并行训练大型模型"
+  },
+  "pytorch-lightning": {
+    "name": "PyTorch Lightning 训练",
+    "description": "以分布式支持简化训练循环"
+  },
+  "qdrant": {
+    "name": "Qdrant 向量搜索",
+    "description": "为生产环境 RAG 提供向量搜索引擎"
+  },
+  "dspy": {
+    "name": "DSPy 语言模型编程",
+    "description": "声明式构建模型程序并优化提示与 RAG"
+  },
+  "saelens": {
+    "name": "SAE Lens 可解释性分析",
+    "description": "训练稀疏自编码器解释模型特征"
+  },
+  "simpo": {
+    "name": "SimPO 偏好对齐",
+    "description": "以无需参考模型的方法进行偏好对齐"
+  },
+  "slime": {
+    "name": "Slime 强化学习后训练",
+    "description": "结合 Megatron 与 SGLang 训练 LLM"
+  },
+  "stable-diffusion": {
+    "name": "Stable Diffusion 图像生成",
+    "description": "执行文生图、局部重绘与图生图"
+  },
+  "tensorrt-llm": {
+    "name": "TensorRT-LLM 推理",
+    "description": "在 NVIDIA GPU 上实现高吞吐 LLM 推理"
+  },
+  "torchtitan": {
+    "name": "TorchTitan 大规模预训练",
+    "description": "通过 PyTorch 四维并行预训练 LLM"
+  },
+  "axolotl": {
+    "name": "Axolotl 模型微调",
+    "description": "通过 YAML 配置 LoRA、DPO、GRPO 等微调"
+  },
+  "trl-fine-tuning": {
+    "name": "TRL 模型后训练",
+    "description": "执行 SFT、DPO、GRPO、RLOO 与奖励建模"
+  },
+  "unsloth": {
+    "name": "Unsloth 高效微调",
+    "description": "以更低显存将 LoRA／QLoRA 微调提速 2–5 倍"
+  },
+  "whisper": {
+    "name": "Whisper 语音转写",
+    "description": "转写及翻译 99 种语言的语音"
+  },
+  "mpp-agent": {
+    "name": "MPP 代理支付",
+    "description": "通过 Machine Payments Protocol 支付 HTTP 402 API"
+  },
+  "stripe-link-cli": {
+    "name": "Stripe Link 代理支付",
+    "description": "用银行卡、SPT 和审批流程完成代理支付"
+  },
+  "stripe-projects": {
+    "name": "Stripe Projects 服务开通",
+    "description": "开通 SaaS 服务并同步凭据"
+  },
+  "canvas": {
+    "name": "Canvas LMS 查询",
+    "description": "以 API 令牌获取课程与作业"
+  },
+  "decision-questionnaire": {
+    "name": "决策问卷",
+    "description": "将暂时无法回答的决策整理为问卷文档"
+  },
+  "here-now": {
+    "name": "here.now 网站发布",
+    "description": "发布至 {slug}.here.now 并在 Drives 存储文件"
+  },
+  "live-dashboard": {
+    "name": "实时仪表板",
+    "description": "基于实时来源构建自动更新的仪表板"
+  },
+  "memento-flashcards": {
+    "name": "Memento 间隔复习卡片",
+    "description": "创建、复习、测验和导出闪卡"
+  },
+  "property-listings": {
+    "name": "房源卡片",
+    "description": "以桌面卡片展示房产与租赁房源"
+  },
+  "shop": {
+    "name": "Shop 购物",
+    "description": "搜索商品、结账、追踪订单和退货"
+  },
+  "shopify": {
+    "name": "Shopify API 查询",
+    "description": "通过 curl 查询 Admin／Storefront GraphQL API"
+  },
+  "siyuan": {
+    "name": "思源知识库",
+    "description": "通过 API 查询和编辑思源知识库"
+  },
+  "telephony": {
+    "name": "电话与短信服务",
+    "description": "开通 Twilio 号码、发送 SMS／MMS 及 AI 外呼"
+  },
+  "bioinformatics": {
+    "name": "生物信息学技能入口",
+    "description": "访问 400 多项基因组学和计算生物学技能"
+  },
+  "blogwatcher": {
+    "name": "博客订阅监控",
+    "description": "通过 blogwatcher-cli 监控博客及 RSS／Atom"
+  },
+  "darwinian-evolver": {
+    "name": "达尔文式迭代优化",
+    "description": "通过 Imbue 进化循环优化提示、正则、SQL 和代码"
+  },
+  "domain-intel": {
+    "name": "域名情报",
+    "description": "被动侦察子域名、SSL 证书、WHOIS 与 DNS"
+  },
+  "drug-discovery": {
+    "name": "药物发现研究",
+    "description": "搜索 ChEMBL 并分析类药性与相互作用"
+  },
+  "duckduckgo-search": {
+    "name": "DuckDuckGo 搜索",
+    "description": "通过 ddgs 免费免密钥搜索网页、新闻和图片"
+  },
+  "gitnexus-explorer": {
+    "name": "GitNexus 代码图谱",
+    "description": "提供交互式代码库知识图谱网页界面"
+  },
+  "osint-investigation": {
+    "name": "开源情报调查",
+    "description": "用公开记录与制裁数据追踪资金线索"
+  },
+  "parallel-cli": {
+    "name": "Parallel CLI 研究工具",
+    "description": "进行网页搜索、深度研究及信息补全"
+  },
+  "pinecone-research": {
+    "name": "Pinecone 研究记忆",
+    "description": "以 Pinecone 实现代理 RAG 和长期记忆"
+  },
+  "qmd": {
+    "name": "QMD 本地混合搜索",
+    "description": "混合检索笔记、文档与转录文本"
+  },
+  "research-paper-writing": {
+    "name": "机器学习论文写作",
+    "description": "从设计到投稿撰写 NeurIPS、ICML、ICLR 论文"
+  },
+  "rss-feeds": {
+    "name": "RSS 订阅读取",
+    "description": "读取 RSS、Atom、JSON 并发现网页订阅链接"
+  },
+  "scrapling": {
+    "name": "Scrapling 网页抓取",
+    "description": "用隐蔽浏览及 Cloudflare 绕过技术抓取网站"
+  },
+  "searxng-search": {
+    "name": "SearXNG 元搜索",
+    "description": "免费免密钥聚合 70 多个搜索引擎"
+  },
+  "1password": {
+    "name": "1Password 密钥管理",
+    "description": "配置 op CLI、登录、读取或注入密钥"
+  },
+  "godmode": {
+    "name": "LLM 越狱方法",
+    "description": "使用 Parseltongue、GODMODE 等方法测试越狱"
+  },
+  "oss-forensics": {
+    "name": "开源供应链取证",
+    "description": "调查 GitHub 供应链事件、恢复证据并报告 IOC"
+  },
+  "sherlock": {
+    "name": "Sherlock 用户名搜索",
+    "description": "跨 400 多个平台查找用户名账户"
+  },
+  "unbroker": {
+    "name": "个人信息移除",
+    "description": "自动向数据经纪商申请移除个人信息"
+  },
+  "web-pentest": {
+    "name": "授权网站渗透测试",
+    "description": "授权范围内侦察、验证漏洞并出具报告"
+  },
+  "openhue": {
+    "name": "OpenHue 灯光控制",
+    "description": "通过 CLI 控制 Philips Hue 灯具、场景和房间"
+  },
+  "reddit-reading": {
+    "name": "Reddit 阅读",
+    "description": "无需浏览器阅读社区、帖子和用户资料"
+  },
+  "ast-grep": {
+    "name": "ast-grep 结构化代码搜索",
+    "description": "基于 AST 搜索和重写代码结构"
+  },
+  "code-wiki": {
+    "name": "代码库 Wiki 生成",
+    "description": "生成代码库 Wiki 文档及 Mermaid 图表"
+  },
+  "grill-me": {
+    "name": "对抗式方案访谈",
+    "description": "实现前通过对抗式访谈审视方案"
+  },
+  "pr-lens": {
+    "name": "PR 变更可视化",
+    "description": "将代码变更绘制为动态架构及数据流 SVG"
+  },
+  "rest-graphql-debug": {
+    "name": "REST／GraphQL 调试",
+    "description": "排查状态码、认证、Schema 并构建复现"
+  },
+  "subagent-driven-development": {
+    "name": "子代理驱动开发",
+    "description": "以 delegate_task 执行计划并进行两阶段审查"
+  },
+  "cloudflare-temporary-deploy": {
+    "name": "Cloudflare 临时部署",
+    "description": "无需账户以 wrangler --temporary 部署 Worker"
+  },
+  "har-derived-api-client": {
+    "name": "HAR 派生 API 客户端",
+    "description": "录制网站 XHR 至 HAR 并构建 HTTP 客户端"
+  },
+  "page-agent": {
+    "name": "网页内嵌代理",
+    "description": "在 Web 应用中嵌入自然语言 GUI 助手"
+  },
+  "publish-site": {
+    "name": "网站版本化发布",
+    "description": "版本化部署到 GitHub、Cloudflare 或 Netlify Pages"
+  },
+  "scrollcraft": {
+    "name": "滚动叙事页面",
+    "description": "制作以滚动位置驱动时间轴的落地页"
+  },
+  "yuanbao": {
+    "name": "元宝群组操作",
+    "description": "在元宝群组 @ 用户并查询信息及成员"
+  }
+}

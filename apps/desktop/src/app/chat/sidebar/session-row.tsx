@@ -27,7 +27,12 @@ import { cn } from '@/lib/utils'
 import { $sidebarRowMeta } from '@/store/layout'
 import { normalizeProfileKey } from '@/store/profile'
 import { $projects } from '@/store/projects'
-import { $pullRequestsByBranch, sessionPrKey } from '@/store/pull-requests'
+import {
+  $pullRequestChecksByPr,
+  $pullRequestsByBranch,
+  pullRequestChecksKey,
+  sessionPrKey
+} from '@/store/pull-requests'
 import { $sessionDotStateById, hasLiveTurn, showsRunningArc } from '@/store/session-dot-state'
 import { $sessionListDensity } from '@/store/session-list-density'
 import { $openStoredSessionIds } from '@/store/session-states'
@@ -175,6 +180,13 @@ function SidebarSessionRowImpl({
   // those branches should repaint.
   const prKey = sessionPrKey(session)
   const pr = useStoreSelector($pullRequestsByBranch, prs => (rowMeta.includes('pr') && prKey ? prs[prKey] : undefined))
+
+  const prChecksState = useStoreSelector($pullRequestChecksByPr, checks => {
+    const checksKey = pr && prKey ? pullRequestChecksKey(prKey, pr.number) : null
+
+    return checksKey ? (checks[checksKey] ?? 'loading') : undefined
+  })
+
   // Open in a pane, but not the focused one. A selector rather than a prop:
   // it reaches all four row render paths at once, the set only changes when a
   // tile opens or closes, and the boolean bails every unaffected row out.
@@ -205,7 +217,7 @@ function SidebarSessionRowImpl({
   }
 
   if (pr) {
-    trailing.push({ key: 'pr', node: <PrTag pr={pr} /> })
+    trailing.push({ key: 'pr', node: <PrTag checksState={prChecksState} pr={pr} /> })
   }
 
   const showAge = pinnedAge || card

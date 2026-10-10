@@ -104,7 +104,7 @@ export function freeTierStripPending(status: FreeTierStatus | null, route: boole
 
 // Several composers can be mounted at once (split zones, a popout mid-dock).
 // The FIRST mounted strip claims the notice; the rest render nothing, so one
-// pending notice never paints N times. Mirrors the real-profile-consent claim.
+// pending notice never paints N times. This claim is local to free-tier notices.
 const $noticeClaim = atom<null | string>(null)
 
 export function claimFreeTierNotice(id: string) {

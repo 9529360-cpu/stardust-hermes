@@ -9,8 +9,6 @@ from gateway.platforms.event import MessageEvent, MessageType
 from gateway.run import GatewayRunner
 from gateway.session import SessionSource
 from gateway.wake import deliver_wake
-from hermes_cli import kanban_db as kb
-from hermes_cli import kanban_db_connect as kbc
 
 
 class WakeAdapter(BasePlatformAdapter):
@@ -43,14 +41,7 @@ async def unused_handler(event):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("human_pending", [False, True])
 async def test_completed_board_wake_is_admitted_without_changing_human_input(tmp_path, monkeypatch, human_pending):
-    monkeypatch.setenv("HERMES_KANBAN_DB", str(tmp_path / "board.db"))
-    kb.init_db()
-    with kbc.connect() as conn:
-        tid = kb.create_task(conn, title="wake receipt", assignee="worker")
-        kb.complete_task(conn, tid, summary="completed result")
-        task = kb.get_task(conn, tid)
-    assert task is not None and task.status == "done"
-    text = f"[Kanban task completed] {task.result}"
+    text = "[Background work completed] completed result"
     adapter, runner, source, key = busy_gateway()
     human = MessageEvent(text="human follow-up", message_type=MessageType.TEXT, source=source)
     if human_pending:

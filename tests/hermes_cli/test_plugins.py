@@ -874,12 +874,12 @@ class TestDeliveryParity:
         fired = []
         mgr = self._fresh_manager(
             monkeypatch,
-            lambda m: m._hooks.setdefault("kanban_task_claimed", []).append(
+            lambda m: m._hooks.setdefault("on_session_start", []).append(
                 lambda **kw: fired.append(kw) or "ok"
             ),
         )
 
-        results = plugins_mod.invoke_hook("kanban_task_claimed", task_id="t1")
+        results = plugins_mod.invoke_hook("on_session_start", task_id="t1")
 
         assert mgr._discovered is True
         # invoke_hook may enrich kwargs (e.g. telemetry_schema_version);
@@ -1431,6 +1431,7 @@ class TestForceReloadSymmetry:
                 {"query": "test"},
                 task_id="t1",
                 session_id="s1",
+                enabled_tools=["web_search"],
             )
 
         assert dispatch_calls == []

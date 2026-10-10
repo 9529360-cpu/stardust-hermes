@@ -5,24 +5,23 @@ import type { ChatSidebar } from '../chat/sidebar'
 import type { CommandCenterSection } from '../command-center'
 import type { useGatewayRequest } from '../gateway/hooks/use-gateway-request'
 import type { ModelMenuPanel } from '../shell/model-menu-panel'
+import type { SidebarNavItem } from '../types'
 
 export type GatewayRequester = ReturnType<typeof useGatewayRequest>['requestGateway']
 
-/** The ChatSidebar handlers the controller owns — forwarded verbatim. */
+/** The handlers owned by the controller for the compact sidebar surface. */
 export type SidebarActions = Pick<
   ComponentProps<typeof ChatSidebar>,
   | 'onArchiveSession'
   | 'onBranchSession'
   | 'onDeleteSession'
-  | 'onLoadMoreMessaging'
   | 'onLoadMoreSessions'
-  | 'onManageCronJob'
-  | 'onNavigate'
   | 'onNewSessionInWorkspace'
   | 'onNewSessionSplit'
   | 'onResumeSession'
-  | 'onTriggerCronJob'
->
+> & {
+  onNavigate: (item: SidebarNavItem) => void
+}
 
 /** The ChatView handlers the controller owns — forwarded verbatim. */
 export type ChatActions = Pick<

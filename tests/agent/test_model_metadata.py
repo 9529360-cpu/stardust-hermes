@@ -1939,6 +1939,32 @@ class TestFallbackWarning:
         assert any("totally-unknown-model-xyz" in r.getMessage() for r in warning_msgs)
         assert any("model.context_length" in r.getMessage() for r in warning_msgs)
 
+    def test_custom_endpoint_catalog_hit_logs_the_value_it_uses_once(self, caplog):
+        """A custom endpoint whose probes miss but whose model name matches the catalog uses the
+        catalog value. The log used to claim "defaulting to 256,000 tokens" right before "using
+        hardcoded 1,048,576" — on every resolution, several per agent build. Say the value that
+        is actually used, once per model+endpoint."""
+        import logging
+        from agent import model_metadata as mm
+
+        mm._CATALOG_HIT_NOTED.clear()
+        try:
+            with self._patch_all_lookups(), \
+                 patch("agent.model_metadata._query_local_context_length", return_value=None):
+                with caplog.at_level(logging.INFO, logger="agent.model_metadata"):
+                    results = [
+                        get_model_context_length("gemini-3.8-flash", base_url="https://relay.example/v1",
+                                                 provider="custom")
+                        for _ in range(3)
+                    ]
+        finally:
+            mm._CATALOG_HIT_NOTED.clear()
+
+        assert results == [DEFAULT_CONTEXT_LENGTHS["gemini"]] * 3
+        messages = [r.getMessage() for r in caplog.records]
+        assert not any("defaulting to" in m or "falling back" in m for m in messages)
+        assert len([m for m in messages if "Using hardcoded context length" in m]) == 1
+
     def test_no_warning_when_cached(self, caplog):
         """No fallback warning when the context length is found in the cache."""
         import logging

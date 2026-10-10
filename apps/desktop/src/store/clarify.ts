@@ -121,6 +121,7 @@ export function normalizeQuestions(questions: unknown): ClarifyQuestion[] {
 // resolve it once they switch over — without a second concurrent clarify
 // clobbering the first. A request with no session id lands under the empty key.
 const keyFor = (sessionId: string | null | undefined): string => sessionId ?? ''
+
 const batchDraftKey = (requestId: string, sessionId: string | null | undefined): string =>
   `${keyFor(sessionId)}\u0000${requestId}`
 
@@ -263,6 +264,22 @@ export const hasClarifyRequest = (sessionId: string | null | undefined): boolean
  * An empty answer is the same thing the card's own Skip button sends; answering
  * a request that already expired is a no-op, so racing the timeout is harmless.
  */
+
+/** Answer a parked clarify through the same server-request path as the transcript card. */
+export function answerClarifyRequest(request: ClarifyRequest, answer: string): boolean {
+  if (
+    !$clarifyRequests.get()[keyFor(request.sessionId)] ||
+    $clarifyRequests.get()[keyFor(request.sessionId)]?.requestId !== request.requestId
+  ) {
+    return false
+  }
+
+  respondToServerRequest(request.requestId, { answer })
+  clearClarifyRequest(request.requestId, request.sessionId)
+
+  return true
+}
+
 export async function skipClarifyRequest(sessionId: string | null | undefined): Promise<boolean> {
   const request = $clarifyRequests.get()[keyFor(sessionId)]
 

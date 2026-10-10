@@ -190,10 +190,12 @@ def resolve_gateway_approval(session_key: str, choice: str,
     return len(targets)
 
 
-def list_gateway_approvals(session_key: str) -> list[dict]:
+def list_gateway_approvals(session_key: str, *, policy_locked_only: bool = False) -> list[dict]:
     """Return replay-safe snapshots of unresolved approvals for one session."""
     with _lock:
-        return [dict(entry.data) for entry in _gateway_queues.get(_state_key(session_key), [])]
+        entries = _gateway_queues.get(_state_key(session_key), [])
+        return [dict(entry.data) for entry in entries
+                if not policy_locked_only or entry.data.get("policy_locked") is True]
 
 
 def register_gateway_settle(session_key: str, request_id: str, settle) -> bool:
@@ -539,11 +541,12 @@ def _gateway_notify_cb(session_key: str):
 
 def _pending_result(spec, session_key: str, *, command: str, description: str,
                     pattern_key: str, pattern_keys: list[str], body: str | None,
-                    smart_denied: bool) -> dict:
+                    smart_denied: bool, allow_session: bool = True, allow_permanent: bool = True) -> dict:
     """Queue an approval nobody can answer right now (no gateway notifier, no CLI panel) for
     ``/approve`` / ``/deny`` review. Command/code gates return the backward-compatible
     ``pending_approval`` shape (``pattern_keys`` + STOP text); the action gate ``approval_required``."""
-    pending = {"command": command, "pattern_key": pattern_key}
+    pending = {"command": command, "pattern_key": pattern_key,
+               "allow_session": allow_session, "allow_permanent": allow_permanent}
     if spec.pending_keys:
         pending["pattern_keys"] = pattern_keys
     pending["description"] = description
@@ -752,6 +755,21 @@ _ACTION_GATE = _GateSpec(
 )
 
 
+def _audit_decision(result, *, command, description="", pattern_key="", outcome=None,
+                    mode=None, kind="command", tool_name="terminal"):
+    try:
+        from tools.approval_audit import enqueue_approval_audit
+        enqueue_approval_audit(
+            session_key=get_current_session_key(), kind=kind, tool_name=tool_name,
+            description=description, pattern_key=pattern_key,
+            outcome=outcome or ("approved_once" if result.get("approved") else "denied"),
+            mode=mode or approval_context._get_approval_mode(), command_preview=command,
+        )
+    except Exception:
+        logger.warning("Unable to record approval audit decision")
+    return result
+
+
 def _smart_gate(spec: _GateSpec, command: str, description: str, pattern_key: str,
                 pattern_keys: list[str], session_key: str, *,
                 human_present: bool) -> tuple[dict | None, bool]:
@@ -784,11 +802,27 @@ def _smart_gate(spec: _GateSpec, command: str, description: str, pattern_key: st
     }, True
 
 
-def _human_decision(spec: _GateSpec, *, command: str, description: str,
+def _human_decision(spec, **kwargs):
+    decision = {}
+    result = _human_decision_impl(spec, audit_choice=decision, **kwargs)
+    outcome = decision.get("outcome")
+    mode = None
+    if result.get("smart_approved") or result.get("smart_denied"):
+        mode = "smart"
+        outcome = "auto_approved" if result.get("approved") else "denied"
+    return _audit_decision(result, command=kwargs["command"], description=kwargs["description"],
+                           pattern_key=kwargs["pattern_key"], outcome=outcome, mode=mode,
+                           kind=kwargs.get("audit_kind", "command"),
+                           tool_name=kwargs.get("audit_tool_name", "terminal"))
+
+
+def _human_decision_impl(spec: _GateSpec, *, command: str, description: str,
                     pattern_key: str, pattern_keys: list[str], warnings: list[tuple],
                     session_key: str, approval_callback, is_cli: bool, is_gateway: bool,
                     is_ask: bool, smart: bool = False,
-                    permanent_capable: bool = True, pending_body=None) -> dict:
+                    permanent_capable: bool = True, pending_body=None,
+                    audit_kind="command", audit_tool_name="terminal", audit_choice=None,
+                    once_only=False) -> dict:
     """Ask a human (after the optional guardian-LLM step) and turn the answer into the gate result.
 
     ``warnings`` are the ``(key, _, is_tirith)`` tuples :func:`_persist_choice` stores on
@@ -806,7 +840,8 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
         if result is not None:
             return result
     pending_body = pending_body() if pending_body else None
-    allow_permanent = permanent_capable and not smart_denied
+    allow_session = not (smart_denied or once_only)
+    allow_permanent = permanent_capable and allow_session
 
     def deny(template: str, outcome: str, **fmt) -> dict:
         breaker = ""
@@ -819,8 +854,13 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
                        outcome=outcome, noun=spec.noun, **extra)
 
     def grant(choice: str) -> dict:
-        # A smart-DENY owner override is always one operation, even if an older client returns "session" or "always".
-        if not smart_denied:
+        scope = "once" if smart_denied or once_only else choice
+        if scope == "always":
+            scope = "permanent" if permanent_capable else "session"
+        audit_choice["outcome"] = "approved_" + scope
+        # Smart-DENY and once-only gates keep legacy callback compatibility: an older
+        # client's session/always answer authorizes this operation only, never a stored grant.
+        if not smart_denied and not once_only:
             _persist_choice(session_key, choice, warnings)
         if spec.user_approved:
             return _user_approved(session_key, description)
@@ -830,7 +870,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
         attempt = _present_with_selected_transport(
             command=command, description=description, pattern_key=pattern_key, pattern_keys=pattern_keys,
             session_key=session_key, surface="gateway" if (is_gateway or is_ask) else "cli",
-            allow_session=not smart_denied, allow_permanent=allow_permanent,
+            allow_session=allow_session, allow_permanent=allow_permanent,
         )
         choice, denied = _transport_choice(attempt, pattern_key=pattern_key, description=description)
         if denied is not None:
@@ -856,8 +896,8 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
             data = {
                 "command": display_command, "pattern_key": pattern_key,
                 "pattern_keys": pattern_keys, "description": display_description,
-                "allow_permanent": permanent_capable and not smart_denied,
-                "allow_session": not smart_denied,
+                "allow_permanent": allow_permanent,
+                "allow_session": allow_session,
             }
             if smart_denied:
                 data["smart_denied"] = True
@@ -890,6 +930,7 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
             return _pending_result(
                 spec, session_key, command=display_command, description=display_description, pattern_key=pattern_key,
                 pattern_keys=pattern_keys, body=pending_body, smart_denied=smart_denied,
+                allow_session=allow_session, allow_permanent=allow_permanent,
             )
 
     # CLI interactive: single combined prompt, wrapped in the pre/post plugin hooks.
@@ -901,7 +942,8 @@ def _human_decision(spec: _GateSpec, *, command: str, description: str,
                        pattern_keys=list(pattern_keys), session_key=session_key, surface="cli")
     approval_context._fire_approval_hook("pre_approval_request", **hook_kwargs)
     choice = prompt_dangerous_approval(prompt_command, prompt_description, allow_permanent=allow_permanent,
-                                       smart_denied=smart_denied, approval_callback=approval_callback)
+                                       allow_session=allow_session, smart_denied=smart_denied,
+                                       approval_callback=approval_callback)
     approval_context._fire_approval_hook("post_approval_response", **hook_kwargs, choice=choice)
     if choice == "timeout":
         return deny(spec.cli_timeout, "timeout")
@@ -935,7 +977,8 @@ def _run_approval_gate(
     advice: str = "Find an alternative approach that avoids this action.",
     cron_deny_message: str = "", single_query_deny_message: str = "", unattended_deny_message: str = "",
     autoapprove_log_prefix: str, fail_closed_when_no_human: bool = False, no_human_block_message: str = "",
-    respect_smart_mode: bool = False,
+    respect_smart_mode: bool = False, audit_kind: str = "command", audit_tool_name: str = "terminal",
+    once_only: bool = False,
 ) -> dict:
     """Shared human-approval gate for a flagged action (tool call or write): decision core for
     :func:`request_tool_approval` and the file-tool write gates.
@@ -949,15 +992,20 @@ def _run_approval_gate(
     Unattended deny text is ``ctx.block_message(subject, noun, advice)`` unless the caller passes
     an explicit ``*_deny_message`` (the file-tool write gates word their own).
     """
+    def audited(result, outcome, mode=None):
+        return _audit_decision(result, command=display_target, description=description,
+                               pattern_key=pattern_key, outcome=outcome, mode=mode,
+                               kind=audit_kind, tool_name=audit_tool_name)
+
     # Hardline blocks are the caller's job BEFORE this gate, so yolo here only skips the recoverable approval layer.
     # ``approvals.mode: off`` is the third bypass source (the Desktop "Approvals: off" toggle writes it); the shell
     # guards honour it, so every action routed through this gate (computer_use, plugin rules, SSH-config writes,
     # dangerous-pattern prompts) must too, or "off" still prompts on those surfaces.
     if _yolo_active() or approval_context._get_approval_mode() == "off":
-        return _approved()
+        return audited(_approved(), "auto_approved", "yolo" if _yolo_active() else "off")
     session_key = get_current_session_key()
-    if is_approved(session_key, pattern_key):
-        return _approved()
+    if not once_only and is_approved(session_key, pattern_key):
+        return audited(_approved(), "approved_permanent" if _is_permanently_approved(pattern_key) else "approved_session")
 
     approval_callback, is_cli, is_gateway, is_ask = _presence(approval_callback)
     if not is_cli and not is_gateway:
@@ -976,32 +1024,33 @@ def _run_approval_gate(
                                                 advice="Find an alternative approach that avoids this action.")
                 elif not message:
                     message = ctx.block_message(subject, noun=noun, advice=advice)
-                return _blocked(message, pattern_key=pattern_key, description=description)
+                return audited(_blocked(message, pattern_key=pattern_key, description=description), "blocked", "unattended")
             if ctx.name == "single_query":
                 # Return here rather than fall through: the fail-closed branch would
                 # otherwise block what single_query_mode: approve just authorized.
                 logger.warning("%s (pattern: %s): %s — single-query auto-approve "
                                "(approvals.single_query_mode: approve).", *log_args)
-                return _approved()
+                return audited(_approved(), "auto_approved", "unattended")
             break  # cron/unattended approve-mode: auto-approve below
         else:
             if fail_closed_when_no_human:
                 logger.warning("%s (pattern: %s): %s — no interactive user/gateway present; "
                                "BLOCKED (fail-closed). Set HERMES_INTERACTIVE or "
                                "HERMES_GATEWAY_SESSION to answer the prompt.", *log_args)
-                return _blocked(no_human_block_message or (
+                return audited(_blocked(no_human_block_message or (
                     f"BLOCKED: approval required ({description}) but no "
                     "interactive user or gateway is present to approve it."),
-                    pattern_key=pattern_key, description=description)
+                    pattern_key=pattern_key, description=description), "blocked", "unattended")
         logger.warning("%s (pattern: %s): %s — set HERMES_INTERACTIVE or "
                        "HERMES_GATEWAY_SESSION to require approval.", *log_args)
-        return _approved()
+        return audited(_approved(), "auto_approved", "unattended")
 
     return _human_decision(
         _ACTION_GATE, command=display_target, description=description, pattern_key=pattern_key,
         pattern_keys=[pattern_key], warnings=[(pattern_key, None, False)], session_key=session_key,
         approval_callback=approval_callback, is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask,
         smart=respect_smart_mode and approval_context._get_approval_mode() == "smart",
+        audit_kind=audit_kind, audit_tool_name=audit_tool_name, once_only=once_only,
     )
 
 
@@ -1021,7 +1070,8 @@ def _user_deny_block(command: str) -> dict | None:
     if deny_pattern is None:
         return None
     logger.warning("User deny rule %r blocked command: %s", deny_pattern, command[:200])
-    return _user_deny_block_result(deny_pattern)
+    return _audit_decision(_user_deny_block_result(deny_pattern), command=command,
+                           description="User deny rule", pattern_key=deny_pattern, outcome="blocked", mode="deny_rule")
 
 
 def _floor_block(command: str, *, sudo_guard: bool = False) -> dict | None:
@@ -1032,12 +1082,14 @@ def _floor_block(command: str, *, sudo_guard: bool = False) -> dict | None:
     is_hardline, hardline_desc = detect_hardline_command(command)
     if is_hardline:
         logger.warning("Hardline block: %s (command: %s)", hardline_desc, command[:200])
-        return _hardline_block_result(hardline_desc, command)
+        return _audit_decision(_hardline_block_result(hardline_desc, command), command=command,
+                               description=hardline_desc, outcome="blocked", mode="floor")
     if sudo_guard:
         is_sudo_guess, sudo_guess_desc = _check_sudo_stdin_guard(command)
         if is_sudo_guess:
             logger.warning("Sudo stdin guard block: %s (command: %s)", sudo_guess_desc, command[:200])
-            return _sudo_stdin_block_result(sudo_guess_desc)
+            return _audit_decision(_sudo_stdin_block_result(sudo_guess_desc), command=command,
+                                   description=sudo_guess_desc, outcome="blocked", mode="floor")
     return _user_deny_block(command)
 
 
@@ -1053,9 +1105,9 @@ def check_dangerous_command(command: str, env_type: str,
     if blocked is not None:
         return blocked
     if _yolo_active():
-        return _approved()
+        return _audit_decision(_approved(), command=command, outcome="auto_approved", mode="yolo")
     if _command_matches_permanent_allowlist(command):
-        return _approved()
+        return _audit_decision(_approved(), command=command, outcome="approved_permanent")
     is_dangerous, pattern_key, description = detect_dangerous_command(command)
     if not is_dangerous:
         return _approved()
@@ -1067,7 +1119,8 @@ def check_dangerous_command(command: str, env_type: str,
     )
 
 
-def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", approval_callback=None) -> dict:
+def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", approval_callback=None,
+                          action_kind=None, target=None, amount=None, once_only=False) -> dict:
     """Escalate an arbitrary tool call to the human-approval gate.
 
     Entry point for a plugin ``pre_tool_call`` hook returning ``{"action": "approve", ...}``:
@@ -1076,16 +1129,25 @@ def request_tool_approval(tool_name: str, reason: str, *, rule_key: str = "", ap
     the LLM cannot skip it. Cron honors ``approvals.cron_mode``; any OTHER non-interactive
     non-gateway context fails CLOSED. ``rule_key`` controls the ``[a]lways`` allowlist grain;
     when empty it is ``tool_name`` + a hash of ``reason`` so DISTINCT reasons on the same tool
-    persist independently. Returns the ``check_dangerous_command`` result shape.
+    persist independently. Structured scope fields partition prompt decisions only;
+    stored standing grants are not consulted for automatic approval.
+    Returns the ``check_dangerous_command`` result shape.
     """
     description = reason or f"Plugin requires approval for {tool_name}"
     if not rule_key:
         rule_key = f"{tool_name}:{hashlib.sha256(description.encode('utf-8')).hexdigest()[:12]}"
+    if target is not None:
+        # A session/always choice on one concrete action cannot authorize a
+        # different recipient or amount merely because its reason is identical.
+        import json
+        scope = json.dumps([action_kind or tool_name, target, str(amount)], ensure_ascii=False)
+        rule_key += ":scope:" + hashlib.sha256(scope.encode("utf-8")).hexdigest()[:16]
     subject = f"Tool '{tool_name}' requires approval ({description})"
     return _run_approval_gate(
         # Namespaced so plugin-rule approvals share the allowlist machinery without ever colliding with a real
         # command pattern key; the display target is a synthetic label for the display/allowlist layer.
         pattern_key=f"plugin_rule:{rule_key}", description=description,
+        audit_kind="tool", audit_tool_name=tool_name, once_only=once_only,
         display_target=f"<{tool_name}> (plugin approval rule)", approval_callback=approval_callback,
         subject=subject, advice="Find an alternative approach.",
         autoapprove_log_prefix=f"plugin-escalated tool call '{tool_name}' in non-interactive non-gateway context",
@@ -1147,9 +1209,10 @@ def check_all_command_guards(command: str, env_type: str,
 
     approval_mode = approval_context._get_approval_mode()
     if _yolo_active() or approval_mode == "off":
-        return _approved()
+        return _audit_decision(_approved(), command=command, outcome="auto_approved",
+                               mode="yolo" if _yolo_active() else "off")
     if _command_matches_permanent_allowlist(command):
-        return _approved()
+        return _audit_decision(_approved(), command=command, outcome="approved_permanent")
 
     approval_callback, is_cli, is_gateway, is_ask = _presence(approval_callback)
     # Outside CLI/gateway/ask flows we never block on approvals: each
@@ -1158,8 +1221,8 @@ def check_all_command_guards(command: str, env_type: str,
         for ctx in _unattended_contexts():
             result = _unattended_deny(command, ctx)
             if result is not None:
-                return result
-        return _approved()
+                return _audit_decision(result, command=command, outcome="blocked", mode="unattended")
+        return _audit_decision(_approved(), command=command, outcome="auto_approved", mode="unattended")
 
     # Gather findings: warnings = [(pattern_key, description, is_tirith)]. Tirith block AND warn both go through the
     # approval flow (block used to be a hard stop) so users can inspect the findings and approve.
@@ -1176,6 +1239,10 @@ def check_all_command_guards(command: str, env_type: str,
     if is_dangerous and not is_approved(session_key, pattern_key):
         warnings.append((pattern_key, description, False))
     if not warnings:
+        if is_dangerous:
+            return _audit_decision(_approved(), command=command, description=description,
+                                   pattern_key=pattern_key, outcome="approved_permanent"
+                                   if _is_permanently_approved(pattern_key) else "approved_session")
         return _approved()
 
     combined_desc = "; ".join(desc for _, desc, _ in warnings)
@@ -1215,6 +1282,7 @@ def check_execute_code_guard(code: str, env_type: str, has_host_access: bool = F
     arbitrary code headlessly without any approval surface is trusted-by-config (set a gateway/ask surface
     or ``approvals.cron_mode`` to require approval). See #30882.
     """
+    command = f"execute_code <<'PY'\n{code}\nPY"
     pattern_key = "execute_code"
     description = _EXECUTE_CODE_DESCRIPTION
 
@@ -1225,7 +1293,9 @@ def check_execute_code_guard(code: str, env_type: str, has_host_access: bool = F
         return _approved()
     approval_mode = approval_context._get_approval_mode()
     if _yolo_active() or approval_mode == "off":
-        return _approved()
+        return _audit_decision(_approved(), command=command, pattern_key=pattern_key,
+                               description=description, outcome="auto_approved",
+                               mode="yolo" if _yolo_active() else "off", tool_name="execute_code")
 
     # (-q clears the presence flags, but its unattended context resolves first anyway.)
     approval_callback, is_cli, is_gateway, is_ask = _presence()
@@ -1233,12 +1303,15 @@ def check_execute_code_guard(code: str, env_type: str, has_host_access: bool = F
     # sessions: the first active context resolves instantly from its mode.
     for ctx in _unattended_contexts():
         if ctx.mode() == "deny":
-            return _denied(
+            return _audit_decision(_denied(
                 "BLOCKED: execute_code runs arbitrary local Python (including "
                 "subprocess calls that bypass shell-string approval checks). " + ctx.exec_tail,
                 pattern_key=pattern_key, description=description, outcome="blocked", noun="code",
-            )
-        return _approved()
+            ), command=command, pattern_key=pattern_key, description=description,
+                outcome="blocked", mode="unattended", tool_name="execute_code")
+        return _audit_decision(_approved(), command=command, pattern_key=pattern_key,
+                               description=description, outcome="auto_approved",
+                               mode="unattended", tool_name="execute_code")
 
     # Only gateway/ask contexts get the one-shot whole-script approval. In an interactive CLI the script's terminal()
     # calls are guarded per-call (context propagates into the RPC thread, #33057), so a whole-script prompt would fire
@@ -1249,20 +1322,21 @@ def check_execute_code_guard(code: str, env_type: str, has_host_access: bool = F
         return _approved()
 
     session_key = get_current_session_key()
-    # Built only past the early-return gates so common paths don't copy a potentially-large script into this string.
-    command = f"execute_code <<'PY'\n{code}\nPY"
 
     # Without this, "Approve session" / "Always" choices are stored but never
     # consulted, so every execute_code call re-prompts (#39275).
     if is_approved(session_key, pattern_key):
-        return _approved()
+        return _audit_decision(_approved(), command=command, pattern_key=pattern_key,
+                               description=description, outcome="approved_permanent"
+                               if _is_permanently_approved(pattern_key) else "approved_session",
+                               tool_name="execute_code")
 
     # Smart mode: an APPROVE only suppresses the redundant whole-script prompt; the per-call terminal() guards still
     # run independently. The gateway renders the pending payload to Discord/Slack, so the script body is redacted for
     # display; the raw code is what gets assessed and run.
     from agent.redact import redact_sensitive_text
     return _human_decision(
-        _EXECUTE_CODE_GATE, command=command, description=description, pattern_key=pattern_key,
+        _EXECUTE_CODE_GATE, audit_tool_name="execute_code", command=command, description=description, pattern_key=pattern_key,
         pattern_keys=[pattern_key], warnings=[(pattern_key, None, False)], session_key=session_key,
         approval_callback=approval_callback, is_cli=is_cli, is_gateway=is_gateway, is_ask=is_ask,
         smart=approval_mode == "smart",

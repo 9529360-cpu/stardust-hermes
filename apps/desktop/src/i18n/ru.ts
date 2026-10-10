@@ -411,7 +411,7 @@ export const ru = defineLocale({
     exportFailed: 'Не удалось экспортировать',
     resetFailed: 'Не удалось сбросить',
     nav: {
-      providers: 'Провайдеры',
+      providers: 'Сервисы моделей',
       providerAccounts: 'Аккаунты',
       providerApiKeys: 'API-ключи',
       providerCustomEndpoints: 'Свои эндпоинты',
@@ -610,7 +610,8 @@ export const ru = defineLocale({
         sidebar: 'Только боковая панель'
       },
       backdropTitle: 'Фон окна',
-      backdropDesc: 'Показывать локальное изображение за всем окном Stardust — боковой панелью, чатом и панелями инструментов. Изображение остаётся только на этом устройстве.',
+      backdropDesc:
+        'Показывать локальное изображение за всем окном Stardust — боковой панелью, чатом и панелями инструментов. Изображение остаётся только на этом устройстве.',
       userBubbleTitle: 'Пузырь сообщения',
       userBubbleDesc: 'Насколько прозрачны ваши сообщения. 0 — сплошная заливка, 100 — остаётся только контур.',
       introSplashTitle: 'Экран приветствия',
@@ -2228,9 +2229,11 @@ export const ru = defineLocale({
     nameLabel: 'Имя',
     cloneFrom: 'Клонировать из',
     cloneFromNone: 'Нет (пустой)',
-    cloneFromDesc: 'Копирует конфигурацию, секреты из .env, навыки, SOUL.md и отобранную память (MEMORY.md и USER.md) из выбранного профиля. Сеансы и запланированные задания не копируются.',
+    cloneFromDesc:
+      'Копирует конфигурацию, секреты из .env, навыки, SOUL.md и отобранную память (MEMORY.md и USER.md) из выбранного профиля. Сеансы и запланированные задания не копируются.',
     cloneFromDefault: 'Клонировать из профиля по умолчанию',
-    cloneFromDefaultDesc: 'Копирует конфигурацию, секреты из .env, навыки, SOUL.md и отобранную память (MEMORY.md и USER.md) из профиля по умолчанию. Сеансы и запланированные задания не копируются.',
+    cloneFromDefaultDesc:
+      'Копирует конфигурацию, секреты из .env, навыки, SOUL.md и отобранную память (MEMORY.md и USER.md) из профиля по умолчанию. Сеансы и запланированные задания не копируются.',
     invalidName: hint => `Некорректное имя. ${hint}`,
     nameRequired: 'Имя обязательно.',
     creating: 'Создание...',
@@ -2410,7 +2413,7 @@ export const ru = defineLocale({
       dismissed: 'Предложение отклонено',
       actionFailed: 'Не удалось обновить предложение автоматизации',
       needsConversation: 'Сначала откройте сохранённый чат, чтобы запланированные результаты могли вернуться в него.'
-    },
+    }
   },
   artifacts: {
     search: 'Поиск артефактов...',
@@ -2492,7 +2495,7 @@ export const ru = defineLocale({
     clearSearch: 'Очистить поиск',
     noMatch: query => `Нет сеансов по запросу «${query}».`,
     results: 'Результаты',
-    pinned: 'Закреплённые',
+    pinned: 'Закреплённые чаты',
     sessions: 'Чаты',
     cronJobs: 'Cron-задачи',
     groupAriaGrouped: 'Показать сеансы одним списком',
@@ -2951,9 +2954,15 @@ export const ru = defineLocale({
         'Сбросить изменения в этом файле и вернуть его в закоммиченное состояние? Это действие необратимо.',
       revertAllConfirm: 'Сбросить все изменения и вернуть файлы в закоммиченное состояние? Это действие необратимо.',
       staged: 'В индексе',
+      unstaged: 'Не в индексе',
+      untracked: 'Неотслеживаемые',
       noChanges: 'Изменений нет',
       notRepo: 'Не git-репозиторий',
       noDiff: 'Нет diff для показа',
+      hunk: (current, total) => `Фрагмент ${current} из ${total}`,
+      previousHunk: 'Предыдущий фрагмент',
+      nextHunk: 'Следующий фрагмент',
+      allHunks: 'Все фрагменты',
       scopeUncommitted: 'Незакоммиченные',
       scopeBranch: 'Ветка',
       scopeLastTurn: 'Последний ход',
@@ -2973,6 +2982,13 @@ export const ru = defineLocale({
       branchOffFrom: base => `Новая ветка от ${base}`,
       switchTo: branch => `Переключиться на ${branch}`,
       switchFailed: branch => `Не удалось переключиться на ${branch}`,
+      checks: {
+        loading: 'Проверки загружаются',
+        unavailable: 'Проверки недоступны',
+        pending: 'Проверки ожидают',
+        passed: 'Проверки пройдены',
+        failed: 'Проверки не пройдены'
+      },
       worktrees: 'Worktrees'
     }
   },
@@ -3136,14 +3152,16 @@ export const ru = defineLocale({
   },
   onboarding: {
     headerTitle: 'Настроим для вас Stardust Agent',
-    headerDesc: 'Подключите провайдера модели, чтобы начать общение. Большинство вариантов — в один клик.',
+    headerDesc: 'Подключите API модели напрямую или добавьте его позже в настройках.',
+    setupRelay: 'Добавить API модели',
+    setupRelayHint: 'Укажите базовый URL API, ключ API и модель.',
     preparingInstall: 'Stardust завершает установку. Обычно это занимает меньше минуты при первом запуске.',
     starting: 'Запускаем Stardust…',
     lookingUpProviders: 'Ищем провайдеров...',
     collapse: 'Свернуть',
     otherProviders: 'Другие провайдеры',
     haveApiKey: 'У меня есть API-ключ',
-    chooseLater: 'Выберу провайдера позже',
+    chooseLater: 'Настрою позже',
     recommended: 'Рекомендуется',
     connected: 'Подключено',
     featuredPitch: 'Одна подписка, 300+ передовых моделей — рекомендуемый способ запускать Stardust',
@@ -3362,7 +3380,17 @@ export const ru = defineLocale({
         loading: 'Загрузка разбивки…',
         percentFull: percent => `${percent}% занято`,
         title: 'Использование контекста',
-        tokenSummary: (used, max) => `${used} / ${max} токенов`
+        tokenSummary: (used, max) => `${used} / ${max} токенов`,
+        sessionTokens: 'Токены за сеанс',
+        sessionTokensNote:
+          'Сумма вызовов модели, не текущий объём контекста. Токены кэша уже входят в промпт и не прибавляются к итогу повторно.',
+        inputTokens: 'Ввод без кэша',
+        cacheReadTokens: 'Чтение кэша',
+        cacheWriteTokens: 'Запись кэша',
+        outputTokens: 'Вывод',
+        totalTokens: 'Всего (промпт + вывод)',
+        noSessionTokens: 'Вызовов модели пока нет',
+        unavailable: 'Нет данных'
       },
       session: 'Сеанс',
       yoloOn: 'YOLO включён — автоматическое подтверждение опасных команд. Shift-клик переключает глобально.',
@@ -3489,7 +3517,8 @@ export const ru = defineLocale({
       address: 'Адрес',
       addressPlaceholder: 'Введите адрес',
       blankPageBody: 'Введите адрес выше, чтобы просматривать, или попросите Stardust открыть страницу.',
-      finishedRestarting: message => `Stardust завершил перезапуск сервера предпросмотра${message ? `: ${message}` : ''}`,
+      finishedRestarting: message =>
+        `Stardust завершил перезапуск сервера предпросмотра${message ? `: ${message}` : ''}`,
       failedRestarting: message => `Перезапуск сервера не удался: ${message}`,
       unknownError: 'неизвестная ошибка',
       restartedTitle: 'Сервер предпросмотра перезапущен',
@@ -3584,10 +3613,17 @@ export const ru = defineLocale({
     }
   },
   assistant: {
-    intro: { eyebrow: 'Stardust', headline: 'С чего начнём?', body: 'Задайте вопрос или поручите задачу. Контекст проекта, файлов или предпросмотра появится рядом с диалогом только при необходимости.', start: 'Начать с сообщения', actions: 'Открыть команды' },
+    intro: {
+      eyebrow: 'Stardust',
+      headline: 'С чего начнём?',
+      body: 'Задайте вопрос или поручите задачу. Контекст проекта, файлов или предпросмотра появится рядом с диалогом только при необходимости.',
+      start: 'Начать с сообщения',
+      actions: 'Открыть команды'
+    },
     thread: {
       loadingSession: 'Загрузка сеанса',
       showEarlier: 'Показать ранние сообщения',
+      workProgress: count => `Ход работы: ${count}`,
       loadingResponse: 'Stardust загружает ответ',
       resumeWhenBackgroundDone: count =>
         count === 1

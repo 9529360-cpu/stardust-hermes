@@ -22,6 +22,10 @@ def memory_env(tmp_path, monkeypatch):
         "§\nUser is Teknium\n§\nTimezone: US Pacific",
         encoding="utf-8",
     )
+    (memories / "TOPICS.json").write_text(
+        '{"version":1,"topics":[{"key":"project","title":"Project","summary":"Current state","keywords":[]}]}',
+        encoding="utf-8",
+    )
     return hermes_home, memories
 
 
@@ -37,6 +41,7 @@ class TestMemoryReset:
 
         assert not (memories / "MEMORY.md").exists()
         assert not (memories / "USER.md").exists()
+        assert not (memories / "TOPICS.json").exists()
         assert (memories / "MEMORY.md.reset-generation").read_text(encoding="utf-8").strip()
         assert (memories / "USER.md.reset-generation").read_text(encoding="utf-8").strip()
 
@@ -70,6 +75,7 @@ class TestMemoryReset:
         _reset("memory", yes=False)
 
         assert (memories / "MEMORY.md").exists()
+        assert (memories / "TOPICS.json").exists()
         assert not (memories / "MEMORY.md.reset-generation").exists()
 
     def test_cli_reset_fences_already_loaded_store(self, memory_env):

@@ -588,7 +588,7 @@ def _sandbox_tools_for(enabled_tools: Optional[List[str]]) -> frozenset:
 
 def _run_remote_per_call(env, env_type: str, code: str, effective_task_id: str,
                          sandbox_tools: frozenset, *, timeout: int, max_tool_calls: int,
-                         exec_start: float) -> str:
+                         exec_start: float, capability_context=None) -> str:
     """Per-call script ship: stage hermes_tools.py + script.py in a fresh remote sandbox dir,
     serve file-RPC from a polling thread, run, clean up."""
     sandbox_dir = f"{_env_temp_dir(env)}/hermes_exec_{uuid.uuid4().hex[:12]}"
@@ -604,10 +604,16 @@ def _run_remote_per_call(env, env_type: str, code: str, effective_task_id: str,
         # Wrapped so the thread inherits the turn's approval context + callbacks
         # (tools.thread_context) — else sandbox RPC tool calls lose approval routing.
         # See #30882.
+        if capability_context is None:
+            from model_tools import current_tool_capability_context
+            capability_context = current_tool_capability_context()
         rpc_thread = threading.Thread(
             target=propagate_context_to_thread(_rpc_poll_loop), daemon=True,
             args=(env, f"{sandbox_dir}/rpc", effective_task_id, [], tool_call_counter,
-                  max_tool_calls, sandbox_tools, stop_event, rpc_token))
+                  max_tool_calls, sandbox_tools, stop_event, rpc_token),
+            kwargs={"session_id": getattr(capability_context, "session_id", None),
+                    "enabled_tools": list(getattr(capability_context, "allowed_tools", ()) or sandbox_tools),
+                    "capability_grant": capability_context})
         rpc_thread.start()
         env_prefix = (f"HERMES_RPC_DIR={quoted_rpc_dir} HERMES_RPC_TOKEN={shlex.quote(rpc_token)} "
                       "PYTHONDONTWRITEBYTECODE=1")
@@ -646,7 +652,7 @@ def _run_remote_per_call(env, env_type: str, code: str, effective_task_id: str,
 
 
 def _execute_remote(code: str, task_id: Optional[str], enabled_tools: Optional[List[str]],
-                    reset: bool = False) -> str:
+                    reset: bool = False, capability_context=None) -> str:
     """Run code on the remote terminal backend: the owner's persistent remote session kernel
     (tools/code_kernel_remote.py) first, else the per-call script ship — the fail-open route when
     a kernel cannot be spawned and the only route for hosts that cannot sustain a background process."""
@@ -682,8 +688,11 @@ def _execute_remote(code: str, task_id: Optional[str], enabled_tools: Optional[L
         logger.info("remote session kernel unavailable on %s; using per-call path", env_type)
     except Exception as exc:
         return _remote_failure(exc, exec_start, 0)
-    return _run_remote_per_call(env, env_type, code, effective_task_id, sandbox_tools,
-                                timeout=timeout, max_tool_calls=max_tool_calls, exec_start=exec_start)
+    return _run_remote_per_call(
+        env, env_type, code, effective_task_id, sandbox_tools,
+        timeout=timeout, max_tool_calls=max_tool_calls, exec_start=exec_start,
+        capability_context=capability_context,
+    )
 
 
 # ---- Main entry point ----
@@ -733,6 +742,8 @@ def execute_code(
                 "Run the lifecycle command from a shell outside the gateway."
             )
     from tools.terminal_tool import _get_env_config, _docker_has_host_access
+    from model_tools import current_tool_capability_context
+    _capability_context = current_tool_capability_context()
     _env_config = _get_env_config()
     env_type = _env_config["env_type"]
     # Arbitrary Python never passes through terminal()/DANGEROUS_PATTERNS, so guard the whole
@@ -750,7 +761,10 @@ def execute_code(
         from tools.interrupt import clear_current_thread_interrupt
         clear_current_thread_interrupt()
     if env_type != "local":
-        return _execute_remote(code, task_id, enabled_tools, reset=bool(reset))
+        return _execute_remote(
+            code, task_id, enabled_tools, reset=bool(reset),
+            capability_context=_capability_context,
+        )
     from tools.interrupt import is_interrupted as _is_interrupted
     # Session kernels are always on locally (one interpreter per conversation); the guards above
     # already ran for this cell, and the kernel path shares env builder, RPC server and redaction.

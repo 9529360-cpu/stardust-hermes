@@ -34,9 +34,9 @@ That uses your current config, keys, sessions, and skills.
 
 ## What's in the app
 
-The desktop app is organized as a chat-first window with a left sidebar for navigation. It's built to allow managing multiple simultaneous agent conversations, configuring messaging providers, creating artifacts, browsing projects' folder structures, and working on multiple projects at once.
+The desktop app is organized as a chat-first window with a compact left sidebar. Its permanent product navigation is **New chat**, **Tasks**, **Tools**, **Plugins**, and **Project**, followed by pinned conversations and the unified conversation list (local chats and messaging-platform threads together). Secondary destinations stay available through their owning views, the command palette, and keybinds instead of accumulating permanent sidebar rows.
 
-Sidebar selection follows the focused chat pane. Opening or focusing a session tab clears a page's highlight, including contributed pages such as Kanban, even when the workspace retains that page's route.
+Sidebar selection follows the focused chat pane. Focusing a session tab clears the navigation highlight of the page the workspace is showing, even while the workspace keeps that page’s route.
 
 ### Chat
 
@@ -110,7 +110,7 @@ Explore and preview the working directory without leaving the app — useful for
 
 When connected to a remote gateway, opening a file artifact downloads it through that gateway, using the artifact’s originating profile and session. Relative paths resolve against the session’s saved working directory; home-relative paths use the gateway’s home, never the Desktop machine’s home. Windows-style relative paths are recognized alongside forward-slash paths, and file URIs retain drive and network-share information for the gateway to interpret. Missing sessions or working directories produce an error rather than selecting a different local file.
 
-The **Artifacts** view collects what your sessions generate — **images, files, and links** — into one searchable, browsable gallery. Open it from the sidebar, the command palette (**Artifacts — Browse generated outputs**), or a `nav.artifacts` shortcut you bind yourself. It indexes recent session outputs automatically; every artifact shows which session produced it with a jump back to that chat, and images and files open in a preview with download / open-in-browser / copy actions.
+The **Artifacts** view collects what your sessions generate — **images, files, and links** — into one searchable, browsable gallery. Open it from the command palette (**Artifacts — Browse generated outputs**) or a `nav.artifacts` shortcut you bind yourself. It indexes recent session outputs automatically; every artifact shows which session produced it with a jump back to that chat, and images and files open in a preview with download / open-in-browser / copy actions.
 
 ### Windows, tabs & panes
 
@@ -195,7 +195,7 @@ Manage providers, models, tools, and credentials from a real UI instead of editi
 - **VS Code Marketplace themes** — beyond the built-in theme presets, the appearance settings include a live VS Code Marketplace search: pick any color theme and the app downloads, converts, and installs it as a desktop theme. The same importer is available from the command palette (*Install theme*), and imported themes can be removed again from the appearance settings.
 - **Keep computer awake** — **Settings → Advanced → Keep computer awake** stops the machine from sleeping so long or overnight agent runs keep going (the display can still dim). This is a per-computer setting.
 
-First-run onboarding has been redesigned on a unified overlay design system, and you can pick **Choose provider later** to skip provider setup and get into the app first.
+First-run onboarding has been redesigned on a unified overlay design system, and you can pick **I'll set this up later** to skip model setup and get into the app first.
 
 #### Per-profile settings: the "Applies to" scope
 
@@ -285,7 +285,7 @@ chats decide who replies: [Bot Mode: A Roster of Agents](./bot-mode.md).
 ### Sessions & profiles
 
 - **Session-list overhaul** — a reworked session list with archiving and general session hygiene to keep the list manageable as it grows.
-- **Search sessions by id** — find a specific session directly by its id.
+- **Search sessions** — **Cmd/Ctrl+Shift+F** opens **Command Center → Sessions**. Typing matches loaded sessions instantly (title, preview, id, workspace, branch, platform) and also searches the full message history, so older conversations and messaging threads outside the loaded list are found too.
 - **Concurrent multi-profile sessions** — run sessions across multiple [profiles](./profiles.md) at the same time, and reference a session in another profile with cross-profile `@session` links.
 - **Export / import a profile** — share a whole setup as a single file. **⌘K → Export profile…** (or right-click a profile square in the rail) writes a `.tar.gz` with skills, memory, persona, crons, plugins, and settings; API keys are stripped. Exporting from the desktop also bundles your appearance and interface — skin, light/dark mode, custom themes, the profile's rail color, and your window layout — so an imported profile arrives looking the way the sender had it. Import via **⌘K → Import profile…** or the button beside the rail's **+**; it applies the overlay and drops you into the new profile. The same archive works with `/export` / `/import` in chat and `hermes profile export` / `import` from a shell. See [Export and import a profile file](./profile-distributions.md#export-and-import-a-profile-file).
 

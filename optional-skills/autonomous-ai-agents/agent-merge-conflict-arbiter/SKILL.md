@@ -22,8 +22,8 @@ produces a merged result, like a merge-queue arbiter.
 
 ## When to Use
 
-- Two agent branches/worktrees collide during a parallel campaign (kanban
-  engineering pipeline, parallel-PR wave, multi-worktree refactor).
+- Two agent branches/worktrees collide during a parallel campaign
+  (parallel-PR wave, multi-worktree refactor).
 - `git merge` or `git rebase` halts on conflicts between two agents' work and
   neither original agent should self-adjudicate.
 - Do NOT use for conflicts within a single agent's own work, or for trivial
@@ -33,8 +33,7 @@ produces a merged result, like a merge-queue arbiter.
 
 - A repo checkout containing the halted merge, or the two branch names plus
   permission to run the merge yourself.
-- Both sides' intent sources: kanban completion summaries (`terminal` running
-  `hermes kanban show <task-id>`), PR bodies, or at minimum each branch's
+- Both sides' intent sources: implementation summaries, PR bodies, or at minimum each branch's
   commit messages.
 - The project's build/test command, if one exists.
 
@@ -48,12 +47,6 @@ repo: load the skill, then follow the Procedure top to bottom.
 - `delegate_task`: spawn a subagent whose task message contains the repo path,
   both branch names, and both sides' intent summaries verbatim, plus an
   instruction to follow this skill.
-- Kanban-native: create a reconciliation card assigned to a **third profile**
-  (not either worker's profile) with BOTH conflicted cards linked as parents —
-  `kanban_create(title="reconcile branch-a x branch-b", assignee="reconciler",
-  parents=["t_a", "t_b"])`. The parent links carry both sides' completion
-  summaries into the reconciler's context automatically; the card body should
-  name the repo path and the two branches.
 
 ## Quick Reference
 
@@ -76,7 +69,7 @@ explicitly in the hand-back summary.
   `git log --oneline <base>..<side>` and `git diff <base>..<side> -- <file>`
   for every conflicted file. In a halted merge, `HEAD` is one side and
   `MERGE_HEAD` is the other.
-- Collect each side's intent: `hermes kanban show <task-id>` for completion
+- Collect each side's intent: the implementation handoff for completion
   summaries/metadata, or the PR body, or the commit messages from the log
   above. Write down one sentence of intent per side before touching any file.
 - Done when: you can state both intents in your own words and have both diffs
@@ -105,7 +98,7 @@ explicitly in the hand-back summary.
     into a hybrid neither side asked for.
   - superseded → keep the surviving side; delete the dead premise.
 - Never favor the side that spawned you. If intents genuinely tie, escalate
-  (block the kanban card / report back) rather than guess.
+  (report the blocker to the parent) rather than guess.
 - Change nothing outside conflict markers — no formatting, renames, or
   opportunistic fixes.
 - `git add` each resolved file via `terminal`.
@@ -127,7 +120,7 @@ explicitly in the hand-back summary.
   `file:lines — class — which side(s) kept — rationale`. For every
   same-question-different-answer hunk, state the design question and the
   answer you picked so a human can veto it — never bury a design call.
-- Kanban: `kanban_complete(summary=...)`. Standalone: print the summary.
+- Return the summary to the parent agent or user.
 - Done when: the summary is delivered and lists all hunks.
 
 ## Pitfalls
@@ -141,12 +134,12 @@ explicitly in the hand-back summary.
   whole file as one class silently drops a disjoint change.
 - **Drive-by edits** make the merge unreviewable and steal decisions from the
   original agents.
-- **Missing intents**: commit messages alone can be thin; prefer kanban
+- **Missing intents**: commit messages alone can be thin; prefer implementation
   completion summaries or PR bodies. If neither side's intent is recoverable,
   escalate instead of guessing.
 - **Repeat offenders**: repeated conflicts on the SAME file across rounds are
   a hotspot signal, not routine reconciliation work — flag it (e.g. a
-  `hotspot: <path> — <reason>` kanban comment) so the orchestrator decomposes
+  `hotspot: <path> — <reason>` in the report) so the orchestrator decomposes
   that file, rather than serially reconciling every new collision on it.
 
 ## Verification

@@ -483,6 +483,24 @@ def review_pr_list(cwd: str, branches: list[str], numbers: list[int] = None) -> 
                 prs.append(_pr_payload(pr))
     return {"ghReady": True, "prs": prs}
 
+def review_checks(cwd: str, pr_number: int | None = None, head_sha: str | None = None) -> dict:
+    unavailable = {"status": "unavailable", "conclusion": None, "checks": [], "workflowRuns": []}
+    if not _is_dir(cwd) or not (pr_number or head_sha): return unavailable
+    ok, repo = _gh(cwd, ["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
+    owner, _, name = repo.strip().partition("/")
+    if not ok or not owner or not name: return unavailable
+    target = f"pullRequest(number: {int(pr_number)})" if pr_number else f"object(expression: {json.dumps(str(head_sha))})"
+    query = f"query {{ repository(owner: {json.dumps(owner)}, name: {json.dumps(name)}) {{ {target} {{ ... on PullRequest {{ statusCheckRollup {{ state conclusion }} checkSuites(first: 50) {{ nodes {{ status conclusion workflowRun {{ workflowName url }} checkRuns(first: 50) {{ nodes {{ name status conclusion detailsUrl htmlUrl }} }} }} }} }} }} }} }}"
+    data = _gh_json(cwd, ["api", "graphql", "-f", f"query={query}"])
+    pr = ((data or {}).get("data") or {}).get("repository", {}).get("pullRequest" if pr_number else "object")
+    if not pr: return unavailable
+    checks, runs = [], []
+    for suite in pr.get("checkSuites", {}).get("nodes") or []:
+        for run in suite.get("checkRuns", {}).get("nodes") or []: checks.append({"name": str(run.get("name") or ""), "status": str(run.get("status") or "").lower(), "conclusion": str(run.get("conclusion")).lower() if run.get("conclusion") else None, "url": str(run.get("detailsUrl") or run.get("htmlUrl") or "")})
+        if suite.get("workflowRun"): runs.append({"name": str(suite["workflowRun"].get("workflowName") or ""), "url": str(suite["workflowRun"].get("url") or ""), "status": str(suite.get("status") or "").lower(), "conclusion": str(suite.get("conclusion")).lower() if suite.get("conclusion") else None})
+    rollup = pr.get("statusCheckRollup") or {}; conclusion = str(rollup.get("conclusion")).lower() if rollup.get("conclusion") else None
+    return {"status": str(rollup.get("state") or ("completed" if conclusion else "pending")).lower(), "conclusion": conclusion, "checks": checks, "workflowRuns": runs}
+
 
 def review_create_pr(cwd: str) -> dict:
     """Create a PR for the current branch (push first), letting gh fill title/body."""

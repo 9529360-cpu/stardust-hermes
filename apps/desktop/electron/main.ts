@@ -83,6 +83,7 @@ import {
 } from './bootstrap-platform'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
+import { BrowserControlBridgeSupervisor } from './browser-control-bridge-supervisor'
 import {
   BROWSER_WINDOW_HEIGHT,
   BROWSER_WINDOW_MIN_HEIGHT,
@@ -175,6 +176,7 @@ import { installEmbedReferer } from './embed-referer'
 import { createAmbientClaimArbiter } from './event-dedupe'
 import {
   buildTerminalScript,
+  launchExternalTerminal,
   resolveTerminalLaunch,
   terminalScriptEnv,
   terminalScriptExtension,
@@ -657,11 +659,7 @@ if (IS_WINDOWS) {
     windowsSandboxFallbackSticky = true
     windowsSandboxFallbackReason = 'gpu-breakpoint'
 
-    try {
-      writeSandboxMarker(app.getPath('userData'), fallbackMarker('gpu-breakpoint', app.getVersion()))
-    } catch {
-      void 0
-    }
+    writeSandboxMarker(app.getPath('userData'), fallbackMarker('gpu-breakpoint', app.getVersion()))
 
     console.warn(
       `[hermes] Windows GPU sandbox crashed (exit=${details?.exitCode}); relaunching once with --no-sandbox (#38216)`
@@ -6550,7 +6548,7 @@ async function buildReadinessHealthProbe(baseUrl, authMode, token) {
   return { probeHealth: fetchPublicJson, probeIsCredentialed: false }
 }
 
-async function waitForHermes(baseUrl, token, signal?, authMode?, headers = {}) {
+async function waitForHermes(baseUrl, token, signal?, authMode?, headers = {}, alreadyBound = false) {
   const { probeHealth, probeIsCredentialed } = await buildReadinessHealthProbe(baseUrl, authMode, token)
 
   return waitForHermesReady(baseUrl, {
@@ -6561,7 +6559,8 @@ async function waitForHermes(baseUrl, token, signal?, authMode?, headers = {}) {
       ? (url, _token, options = {}) => probeHealth(url, requestOptionsWithHeaders(options, headers))
       : fetchJson,
     probeHealth: (url, options = {}) => probeHealth(url, requestOptionsWithHeaders(options, headers)),
-    probeIsCredentialed
+    probeIsCredentialed,
+    alreadyBound
   })
 }
 
@@ -12555,7 +12554,7 @@ async function runHermesStart() {
     const baseUrl = `http://127.0.0.1:${port}`
     await advanceBootProgress('backend.wait', 'Waiting for Hermes backend to become ready', 90)
     backendConnectionState.assertCurrentAttempt(connectionAttempt)
-    await Promise.race([waitForHermes(baseUrl, token), backendStartFailed])
+    await Promise.race([waitForHermes(baseUrl, token, undefined, undefined, {}, true), backendStartFailed])
     backendConnectionState.assertCurrentAttempt(connectionAttempt)
     backendReady = true
     backendStartFailure = null
@@ -14043,18 +14042,15 @@ function createWindow() {
       // Start Menu click does not re-enter the GPU FATAL crash loop. The marker
       // records the app version so the next update re-probes the sandbox.
       if (IS_WINDOWS) {
-        try {
-          writeSandboxMarker(
-            app.getPath('userData'),
-            markerAfterSuccessfulBoot({
-              fallbackActive: windowsSandboxFallbackSticky,
-              reason: windowsSandboxFallbackReason,
-              appVersion: app.getVersion()
-            })
-          )
-        } catch (error) {
-          rememberLog(`[sandbox] marker update after main-window reveal failed: ${error?.message || error}`)
-        }
+        writeSandboxMarker(
+          app.getPath('userData'),
+          markerAfterSuccessfulBoot({
+            fallbackActive: windowsSandboxFallbackSticky,
+            reason: windowsSandboxFallbackReason,
+            appVersion: app.getVersion()
+          }),
+          { warn: rememberLog }
+        )
       }
     }
   })
@@ -14132,11 +14128,7 @@ function createWindow() {
         windowsSandboxFallbackSticky = true
         windowsSandboxFallbackReason = 'renderer-crash-loop'
 
-        try {
-          writeSandboxMarker(app.getPath('userData'), fallbackMarker('renderer-crash-loop', app.getVersion()))
-        } catch {
-          void 0
-        }
+        writeSandboxMarker(app.getPath('userData'), fallbackMarker('renderer-crash-loop', app.getVersion()))
 
         rememberLog('[renderer] Windows sandbox crash loop detected; relaunching once with --no-sandbox (#38216)')
 
@@ -14224,6 +14216,29 @@ function createWindow() {
     sendWindowStateChanged()
   })
 }
+
+const browserControlBridgeSupervisor = new BrowserControlBridgeSupervisor({
+  resourcesPath: app.getAppPath(),
+  packagedBridgeEntry: app.isPackaged ? appPath => path.join(appPath, 'experiments', 'playwright-mcp-host-bridge', 'src', 'main.mjs') : undefined
+})
+
+ipcMain.handle('hermes:browser-control:bridge:start', async (event, payload) => {
+  const connection = await ensureBackend(payload?.profile)
+  const backendUrl = new URL(connection.baseUrl)
+  const isLoopback = backendUrl.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(backendUrl.hostname) && !backendUrl.username && !backendUrl.password && !backendUrl.search && !backendUrl.hash
+  if (connection.mode === 'remote' || !isLoopback) {
+    throw new Error('Browser control requires a local loopback backend')
+  }
+  const launchContext = payload?.launchContext
+  if (!launchContext || typeof launchContext !== 'object') {
+    throw new Error('Server-issued browser launch context is required')
+  }
+  const status = await browserControlBridgeSupervisor.start({ gatewayUrl: connection.baseUrl, launchContext, chromeProfileDir: payload.chromeProfileDir, packageSpec: payload.packageSpec })
+  event.sender.send('hermes:browser-control:bridge:status', status)
+  return status
+})
+ipcMain.handle('hermes:browser-control:bridge:stop', async event => { const status = await browserControlBridgeSupervisor.stop(); event.sender.send('hermes:browser-control:bridge:status', status); return status })
+ipcMain.handle('hermes:browser-control:bridge:status', () => browserControlBridgeSupervisor.status())
 
 ipcMain.handle('hermes:connection', async (_event, profile, extra) => {
   // Coalesce concurrent renderer dials for one profile scope (#90812): the
@@ -14508,10 +14523,11 @@ ipcMain.handle('hermes:window:openInTerminal', async (_event, sessionId, opts) =
 
     rememberLog(`[terminal] opening session ${sessionId} via ${launch.command}`)
 
-    // Detached + unref'd: the terminal window outlives the desktop app, and
-    // never inherits our stdio (a closed pipe would kill the TUI).
-    const child = spawn(launch.command, launch.args, { detached: true, stdio: 'ignore' })
-    child.unref()
+    // A failed spawn emits an asynchronous error; wait for 'spawn' before
+    // reporting success, and keep observing the detached process afterwards.
+    await launchExternalTerminal(launch, spawn, error => {
+      rememberLog(`[terminal] process failed: ${error.message}`)
+    })
 
     return { ok: true }
   } catch (error) {
@@ -16529,6 +16545,7 @@ app.on('before-quit', () => {
 // Close the pooled keep-alive sockets on quit so lingering connections can't
 // hold the event loop open or leak FDs past app teardown.
 app.on('will-quit', () => {
+  browserControlBridgeSupervisor.stop()
   sshIsolatedKeepalives.stopAll()
   destroyKeepaliveAgents()
 })
@@ -17687,11 +17704,7 @@ app.on('before-quit', event => {
   // Keyed on sticky (not active): a manual --no-sandbox run still records a
   // clean quit, while an engaged fallback keeps its sticky marker.
   if (IS_WINDOWS && !windowsSandboxFallbackSticky) {
-    try {
-      writeSandboxMarker(app.getPath('userData'), markerAfterSuccessfulBoot({ fallbackActive: false }))
-    } catch {
-      void 0
-    }
+    writeSandboxMarker(app.getPath('userData'), markerAfterSuccessfulBoot({ fallbackActive: false }))
   }
 
   // The always-on-top overlay isn't a "real" app window; close it so a stray

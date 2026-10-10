@@ -12,7 +12,7 @@
 
 import { useStore } from '@nanostores/react'
 
-import { allPaneIds, findGroup } from '@/components/pane-shell/tree/model'
+import { findGroup } from '@/components/pane-shell/tree/model'
 import { $activeTreeGroup, $layoutTree, revealTreePane, treePanesWithPrefix } from '@/components/pane-shell/tree/store'
 import { type MenuKit, renderActionItem } from '@/components/ui/actions-menu'
 import { FileTypeIcon } from '@/components/ui/file-type-icon'
@@ -33,6 +33,7 @@ import {
   popOutBrowserTab,
   type PreviewTarget
 } from '@/store/preview'
+import { $rightContextOpen } from '@/store/right-context'
 import { canOpenBrowserWindow } from '@/store/windows'
 
 import { paneMirror } from './pane-mirror'
@@ -191,9 +192,7 @@ function existingPreviewAnchor(tabId: string): string | undefined {
     return previewPaneId(other.id)
   }
 
-  const tree = $layoutTree.get()
-
-  return tree && allPaneIds(tree).includes('workspace-overview') ? 'workspace-overview' : undefined
+  return undefined
 }
 
 /** Keep pane contributions mirroring `$previewTabs`, keep the store's selection
@@ -215,13 +214,21 @@ export function watchPreviewTiles(): void {
   const reveal = () => {
     const tabId = $rightRailActiveTabId.get()
 
-    if (tabId && targetFor(tabId)) {
+    // A hidden viewer stays hidden while the agent navigates its browser.
+    // revealTreePane itself expands a collapsed side even when openPreview
+    // requested reveal=false, so this mirror must respect the user's choice.
+    if ($rightContextOpen.get() && tabId && targetFor(tabId)) {
       revealTreePane(`${PREVIEW_TILE_PREFIX}:${tabId}`)
     }
   }
 
   $rightRailActiveTabId.listen(reveal)
   $previewTabs.listen(reveal)
+  $rightContextOpen.listen(open => {
+    if (open) {
+      reveal()
+    }
+  })
 
   // And the reverse: clicking a preview TAB activates its pane in the TREE
   // only, so the store's selection must follow or `$previewTarget` (⌘L quote

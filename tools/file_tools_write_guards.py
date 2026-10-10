@@ -252,8 +252,13 @@ def _request_protected_instruction_approval(reasons: list[str], task_id: str = "
 
     Deliberately NOT routed through ``_run_approval_gate`` (honors --yolo and
     allowlists): this gate is one-operation approval EVERY time, no persisted
-    scope, fail-closed without a human channel.
+    scope, fail-closed without a human channel. ``approvals.mode: off`` is the
+    explicit global bypass and therefore applies here too.
     """
+    from tools.approval_context import _get_approval_mode
+    if _get_approval_mode() == "off":
+        return None
+
     targets = ", ".join(dict.fromkeys(reasons))
     description = (
         f"Write to protected agent-instruction file(s): {targets}. "

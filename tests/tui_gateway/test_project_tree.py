@@ -161,7 +161,7 @@ def test_overview_orders_lanes_by_recency_not_alphabetically():
     assert _non_trunk_labels(hydrate=True) == ["wt-zzz", "wt-aaa"]
 
 
-def test_kanban_task_worktrees_collapse_into_one_bucket():
+def test_legacy_task_worktrees_remain_independent_and_keep_sessions():
     resolve = _resolver(
         {
             "/repo": ("/repo", "/repo"),
@@ -177,14 +177,12 @@ def test_kanban_task_worktrees_collapse_into_one_bucket():
 
     tree = pt.build_tree([], sessions, [], resolve, hydrate=True)
     project = tree["projects"][0]
-    kanban = [g for repo in project["repos"] for g in repo["groups"] if g.get("isKanban")]
-
-    assert len(kanban) == 1
-    assert kanban[0]["id"] == "/repo::kanban"
-    assert kanban[0]["path"] == "/repo/.worktrees"
-    assert len(kanban[0]["sessions"]) == 2
-    # The bucket sorts below the real main branch.
-    assert _lane_ids(project)[-1] == "/repo::kanban"
+    groups = [g for repo in project["repos"] for g in repo["groups"]]
+    assert not any(g.get("isKanban") for g in groups)
+    assert {g["id"] for g in groups} == {
+        "/repo::branch::main", "/repo/.worktrees/t_aaaaaaaa", "/repo/.worktrees/t_bbbbbbbb"
+    }
+    assert sum(len(g["sessions"]) for g in groups) == 3
 
 
 def test_user_worktree_under_dotworktrees_is_its_own_lane_not_kanban():
@@ -641,8 +639,8 @@ def test_heuristic_lane_ids_for_kanban_and_wt_suffix_are_unchanged():
     """
     kanban = pt._place_by_heuristic("/www/app/.worktrees/t_1a2b3c")
     assert kanban is not None
-    assert kanban["lane_key"] == pt._kanban_lane_id("/www/app")
-    assert kanban["is_kanban"] is True
+    assert kanban["lane_key"] == "/www/app/.worktrees/t_1a2b3c::branch::main"
+    assert kanban["is_kanban"] is False
 
     wt = pt._place_by_heuristic("/www/app-wt-feature")
     assert wt is not None

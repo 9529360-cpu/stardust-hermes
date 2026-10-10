@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import atexit
 import base64
+import binascii
 import contextlib
 import hashlib
 import json
@@ -22,6 +23,8 @@ from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from tools.computer_use.backend import ActionResult, CaptureResult, ComputerUseBackend, UIElement, image_dimensions_from_bytes
+from tools.computer_use.cua_backend_parse import _is_placeholder_id
+from tools.browser_preview_approval import classify_browser_preview_action
 
 logger = logging.getLogger(__name__)
 
@@ -297,6 +300,21 @@ def handle_computer_use(args: Dict[str, Any], **kwargs) -> Any:
         return err
     scopes = ([action] if action in _ACTIONS and _ACTIONS[action].destructive else []) + (
         ["bring_to_front"] if args.get("bring_to_front") or (action == "focus_app" and args.get("raise_window")) else [])
+    # Match the backend's whole-screen sentinels, while retaining the explicit
+    # desktop-shell approval boundary. These captures can disclose information
+    # beyond the selected app. Ignore schema-filled placeholder IDs exactly as
+    # the backend does, or `pid=0, window_id=0` could bypass this gate.
+    app_target = str(args.get("app") or "").strip().lower()
+    has_effective_target_id = any(
+        value is not None and not _is_placeholder_id(value)
+        for value in (args.get("pid"), args.get("window_id"))
+    )
+    full_screen_capture = (
+        app_target in {"screen", "fullscreen", "full screen", "all"} and not has_effective_target_id
+    )
+    desktop_shell_capture = app_target == "desktop"
+    if action == "capture" and (full_screen_capture or desktop_shell_capture):
+        scopes.append("capture_fullscreen")
     for scope in scopes:
         if (err := _request_approval(scope, args)) is not None:
             return err
@@ -557,21 +575,30 @@ _bounds_space_note = lambda elements, image_width, image_height: _bounds_hints(e
 
 def _capture_view(cap: CaptureResult, max_elements: int) -> SimpleNamespace:
     """One capture's derived facts, computed once for every response branch: ``visible`` is the capped element list,
-    ``dims_omitted`` an image below the provider minimum."""
-    visible, dims = cap.elements[:max_elements], None
-    with contextlib.suppress(Exception):  # (width, height) of the inline PNG/JPEG screenshot, else the backend's
-        dims = image_dimensions_from_bytes(base64.b64decode(cap.png_b64, validate=False)) if cap.png_b64 else None
+    ``dims_omitted`` an image below the provider minimum, ``image_invalid`` an unusable screenshot payload."""
+    visible, dims, image_invalid = cap.elements[:max_elements], None, False
+    if cap.png_b64:
+        try:
+            image_bytes = base64.b64decode(cap.png_b64, validate=True)
+            dims = image_dimensions_from_bytes(image_bytes)
+            png_complete = image_bytes.startswith(b"\x89PNG\r\n\x1a\n") and image_bytes.endswith(
+                b"\x00\x00\x00\x00IEND\xaeB`\x82")
+            jpeg_complete = image_bytes.startswith(b"\xff\xd8") and image_bytes.endswith(b"\xff\xd9")
+            if not dims or min(dims) <= 0 or not (png_complete or jpeg_complete):
+                dims, image_invalid = None, True
+        except (binascii.Error, TypeError, ValueError):
+            image_invalid = True
     width, height = dims or (cap.width, cap.height)
     scale, note = _bounds_hints(visible, width, height)
     # Capped labels / capped element array: spill the complete tree for on-demand reads.
     lost_detail = len(cap.elements) > len(visible) or any(len(e.label) > _MAX_ELEMENT_LABEL_CHARS for e in visible)
     too_small = bool(dims) and min(dims) < _MIN_PROVIDER_IMAGE_DIMENSION
-    has_image = bool(cap.png_b64) and cap.mode != "ax" and not too_small
+    has_image = bool(cap.png_b64) and not image_invalid and cap.mode != "ax" and not too_small
     return SimpleNamespace(cap=cap, visible=visible, total=len(cap.elements), width=width, height=height,
                            truncated=len(cap.elements) - len(visible), bounds_scale=scale, bounds_note=note,
                            elements_file=_spill_elements_to_file(cap) if lost_detail else None,
                            screenshot_path=_persist_capture_image(cap) if has_image else None,
-                           dims_omitted=dims if too_small else None, has_image=has_image)
+                           dims_omitted=dims if too_small else None, image_invalid=image_invalid, has_image=has_image)
 
 def _capture_summary_lines(v: SimpleNamespace) -> List[str]:
     """Human-readable capture summary; line ORDER is contract. Lists only what `elements` surfaces, otherwise the
@@ -592,6 +619,8 @@ def _capture_summary_lines(v: SimpleNamespace) -> List[str]:
         *_format_elements(v.visible),
         *([f"  (screenshot omitted: {v.dims_omitted[0]}x{v.dims_omitted[1]} is below the "
            f"{_MIN_PROVIDER_IMAGE_DIMENSION}x{_MIN_PROVIDER_IMAGE_DIMENSION} provider minimum)"] if v.dims_omitted else []),
+        *(["  (screenshot omitted: captured image data is malformed or truncated; retry the capture)"]
+          if v.image_invalid else []),
     ]
 
 def _text_capture_payload(v: SimpleNamespace, summary: str, extra: Optional[Dict[str, Any]] = None) -> str:
@@ -613,7 +642,8 @@ def _capture_response(cap: CaptureResult, max_elements: int = _DEFAULT_MAX_ELEME
                       session_id: Optional[str] = None) -> Any:
     v = _capture_view(cap, max_elements)
     lines = _capture_summary_lines(v)
-    summary, extra = "\n".join(lines), None  # multimodal/aux paths use this; text paths append notes and rebuild
+    summary, extra = "\n".join(lines), {"image_invalid": True} if v.image_invalid else None
+    # Multimodal/aux paths use the initial summary; text paths append notes and rebuild.
     if v.has_image and session_id and _screenshot_dedup_check(
             _scoped_sid(session_id), _capture_digest(cap), (str(cap.app or ""), str(cap.window_title or ""))):
         # Unchanged frame: same pixels for the same target in this session — no image (and no aux-vision call);

@@ -29,7 +29,8 @@ from hermes_cli.web_models import (
     BackupRequest, CredentialPoolAdd, HookCreate, HookDelete, ImportRequest, MemoryProviderSelect,
     MemoryReset, PairingApprove, PairingRevoke, WebhookCreate, WebhookEnabledToggle,
 )
-from hermes_cli.web_routers._common import _CONFIG_MUTATION_LOCK, http_failure, spawn_profile_action
+from hermes_cli.web_routers._common import (
+    _CONFIG_MUTATION_LOCK, http_failure, scoped_to_thread, spawn_profile_action)
 from hermes_cli.web_routers.files import stream_upload_to_path
 
 _log = logging.getLogger("hermes_cli.web_server")
@@ -444,7 +445,7 @@ _MEMORY_FILES = (("MEMORY.md", "memory"), ("USER.md", "user"))
 
 
 @router.get("/api/memory")
-async def get_memory_status():
+async def get_memory_status(profile: Optional[str] = None):
     def _run():  # load_config(), stats and discovery are disk reads — off-loop
         cfg = load_config()
         mem = cfg.get("memory")
@@ -454,9 +455,59 @@ async def get_memory_status():
         for fname, key in _MEMORY_FILES:
             path = mem_dir / fname
             files[key] = path.stat().st_size if path.exists() else 0
+        topic_path = mem_dir / "TOPICS.json"
+        files["topic"] = topic_path.stat().st_size if topic_path.exists() else 0
         return {"active": active, "providers": _discover_memory_provider_statuses(), "builtin_files": files}
 
-    return await asyncio.to_thread(_run)
+    return await scoped_to_thread(profile, _run)
+
+
+@router.get("/api/memory/entries")
+async def get_memory_entries(target: str, profile: Optional[str] = None):
+    """Read entries only from Stardust's built-in memory files, never an external provider."""
+    if target not in {"memory", "user"}:
+        raise HTTPException(status_code=400, detail="target must be memory or user")
+
+    def _read():
+        from tools.memory_tool import load_on_disk_store, memory_persistence_enabled
+
+        if not memory_persistence_enabled(fail_closed=True):
+            return {"target": target, "available": False, "entries": []}
+
+        store = load_on_disk_store()
+        if not store.target_enabled(target):
+            return {"target": target, "available": False, "entries": []}
+        if store.load_failed(target):
+            raise HTTPException(status_code=503, detail="Built-in memory could not be read; retry later")
+        return {"target": target, "available": True, "entries": list(store._entries_for(target))}
+
+    return await scoped_to_thread(profile, _read)
+
+
+@router.delete("/api/memory/entries")
+async def delete_memory_entry(target: str, body: Dict[str, str], profile: Optional[str] = None):
+    """Remove one exact entry through MemoryStore's lock, drift, and generation guards."""
+    if target not in {"memory", "user"}:
+        raise HTTPException(status_code=400, detail="target must be memory or user")
+    entry = body.get("entry", "")
+    if not entry.strip():
+        raise HTTPException(status_code=400, detail="entry is required")
+
+    def _remove():
+        from tools.memory_tool import load_on_disk_store, memory_persistence_enabled
+
+        if not memory_persistence_enabled(fail_closed=True):
+            raise HTTPException(status_code=409, detail="Built-in memory persistence is disabled")
+
+        store = load_on_disk_store()
+        if not store.target_enabled(target):
+            raise HTTPException(status_code=409, detail="Built-in memory is disabled for this target")
+        result = store.remove_exact(target, entry)
+        if not result.get("success"):
+            raise HTTPException(status_code=409, detail="Memory entry changed; reload the list and retry")
+        return {"ok": True, "active_session_behavior": "refresh_on_next_turn"}
+
+    return await scoped_to_thread(profile, _remove)
 
 
 @router.put("/api/memory/provider")
@@ -483,6 +534,7 @@ async def reset_memory(body: MemoryReset):
         raise HTTPException(status_code=400, detail="target must be all, memory, or user")
 
     from tools.memory_tool import MemoryStore
+    from tools.topic_memory_store import reset_topic_summaries
 
     deleted = []
     reset_targets = []
@@ -500,6 +552,15 @@ async def reset_memory(body: MemoryReset):
         reset_targets.append(fname)
         if existed:
             deleted.append(fname)
+    if target == "all":
+        try:
+            existed = reset_topic_summaries()
+        except (OSError, RuntimeError) as exc:
+            completed = f" Earlier targets already reset: {', '.join(reset_targets)}." if reset_targets else ""
+            raise HTTPException(status_code=500, detail=f"Could not reset TOPICS.json: {exc}.{completed}") from exc
+        reset_targets.append("TOPICS.json")
+        if existed:
+            deleted.append("TOPICS.json")
     return {
         "ok": True,
         "deleted": deleted,

@@ -118,6 +118,57 @@ describe('JsonRpcRequestChannel', () => {
     }
   })
 
+  // A hidden Chromium window runs the 15 s heartbeat interval about once a
+  // minute. Measuring the deadline from the last inbound frame turned every
+  // throttled tick into a "timeout" and redialed a healthy socket around the
+  // clock; only a ping that actually went unanswered may fail it.
+  it('a throttled heartbeat keeps a healthy socket and still drops a dead one', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const failures: string[] = []
+
+      const channel = new JsonRpcRequestChannel({
+        heartbeatDeadlineMs: 45_000,
+        heartbeatIntervalMs: 15_000,
+        heartbeatLiveness: 'any-inbound',
+        onHeartbeatFailure: e => void failures.push(e.message)
+      })
+
+      const { sent, transport } = spyTransport()
+
+      channel.attach(transport)
+      channel.startHeartbeat()
+
+      // One wake-up per minute: the clock moves 45 s with the interval asleep,
+      // then it fires once.
+      const throttledWakeUp = async () => {
+        vi.setSystemTime(Date.now() + 45_000)
+        await vi.advanceTimersByTimeAsync(15_000)
+      }
+
+      const lastPing = () => JSON.parse(sent.at(-1)!) as { id: string; method: string }
+
+      for (let minute = 0; minute < 10; minute++) {
+        await throttledWakeUp()
+        expect(lastPing().method).toBe('gateway.ping')
+        channel.handleFrame(JSON.stringify({ id: lastPing().id, jsonrpc: '2.0', result: { ok: true } }))
+      }
+
+      expect(failures).toEqual([])
+
+      // The backend goes silent: this wake-up's ping gets no answer…
+      await throttledWakeUp()
+      expect(failures).toEqual([])
+
+      // …and the next wake-up finds it unanswered past the deadline.
+      await throttledWakeUp()
+      expect(failures).toEqual(['WebSocket heartbeat acknowledgement timed out'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // TUI contract: a backend whose request loop is wedged may still stream
   // deltas; only a pong (or a response to our own request) proves it can
   // answer, so notifications alone must NOT keep the transport alive.

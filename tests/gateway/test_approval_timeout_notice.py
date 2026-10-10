@@ -42,6 +42,18 @@ def test_non_timeout_reasons_never_post(monkeypatch):
     assert runner.scheduled == []
 
 
+def test_mode_off_bypass_posts_a_notice_and_retires_the_approval_card(monkeypatch):
+    hooks = _capture_settle(monkeypatch)
+    runner = _Runner(current=True)
+    settle_mod.register_timeout_notice(
+        runner, {"request_id": "r3"}, command="write AGENTS.md", card_message_id="card-3"
+    )
+
+    hooks["r3"]("bypassed")
+
+    assert runner.scheduled == ["Approval bypass notice scheduling error"]
+
+
 @pytest.mark.asyncio
 async def test_text_prompt_is_never_edited_in_place():
     """card_message_id=None (the text-fallback path) must send a new message, not rewrite the prompt."""
@@ -61,3 +73,26 @@ async def test_text_prompt_is_never_edited_in_place():
     assert [kind for kind, _ in calls] == ["send"]
     await settle_mod._post_timeout_notice(ctx, "ls", "card-9", 300)
     assert ("edit", "card-9") in calls
+
+
+@pytest.mark.asyncio
+async def test_auto_approved_notice_edits_buttons_or_sends_followup_for_text():
+    calls = []
+
+    class _Adapter:
+        async def edit_message(self, chat_id, message_id, content):
+            calls.append(("edit", message_id, content))
+            return SimpleNamespace(success=True)
+
+        async def send(self, chat_id, content, metadata=None):
+            calls.append(("send", content, metadata))
+            return SimpleNamespace(success=True)
+
+    ctx = SimpleNamespace(_status_adapter=_Adapter(), _status_chat_id="c", _status_thread_metadata=None)
+    await settle_mod._post_auto_approved_notice(ctx, "write AGENTS.md", "card-3")
+    await settle_mod._post_auto_approved_notice(ctx, "write AGENTS.md", None)
+
+    assert calls[0][0:2] == ("edit", "card-3")
+    assert "was allowed" in calls[0][2]
+    assert calls[1][0] == "send"
+    assert "was allowed" in calls[1][1]

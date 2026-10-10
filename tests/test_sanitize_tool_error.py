@@ -98,7 +98,7 @@ class TestHandleFunctionCallIntegration:
         original = _registry._tools[target].handler
         _registry._tools[target].handler = boom
         try:
-            result_str = handle_function_call(target, {})
+            result_str = handle_function_call(target, {}, internal=True)
         finally:
             _registry._tools[target].handler = original
 

@@ -778,19 +778,13 @@ export const $cronSessions = atom<SessionInfo[]>([])
 // share one source of truth without a circular import.
 export const CRON_SECTION_LIMIT = 50
 // Messaging-platform sessions (telegram/discord/...) are fetched as their own
-// slice — separate from local recents — so each platform renders a
-// self-managed sidebar section and never interleaves with (or buries) local
-// chats in the recents page. One combined fetch seeds every platform; a
-// platform that exceeds this cap gets its own per-platform "load more".
+// slice — separate from local recents — so paging local chats never pulls in
+// (or buries them under) gateway threads. One combined fetch loads the most
+// recent threads across every platform; the sidebar folds them into its
+// unified conversation list, and the Command Center's full-text search reaches
+// older ones.
 export const $messagingSessions = atom<SessionInfo[]>([])
 export const MESSAGING_SECTION_LIMIT = 100
-// Exact per-platform conversation totals, keyed by source id. Empty until a
-// per-platform "load more" fetch resolves it (the combined seed fetch only
-// knows the aggregate), so sections fall back to their loaded count.
-export const $messagingPlatformTotals = atom<Record<string, number>>({})
-// True when the combined seed fetch hit MESSAGING_SECTION_LIMIT, so at least
-// one platform may have more rows on disk than were loaded.
-export const $messagingTruncated = atom<boolean>(false)
 
 /**
  * Ownership stubs for UNLISTED draft tiles (the tab-strip "+" / project
@@ -1235,9 +1229,6 @@ export const setSessions = (next: Updater<SessionInfo[]>) => updateAtom($session
 export const setUnlistedSessionOwnerRows = (next: Updater<SessionInfo[]>) => updateAtom($unlistedSessionOwnerRows, next)
 export const setCronSessions = (next: Updater<SessionInfo[]>) => updateAtom($cronSessions, next)
 export const setMessagingSessions = (next: Updater<SessionInfo[]>) => updateAtom($messagingSessions, next)
-export const setMessagingPlatformTotals = (next: Updater<Record<string, number>>) =>
-  updateAtom($messagingPlatformTotals, next)
-export const setMessagingTruncated = (next: Updater<boolean>) => updateAtom($messagingTruncated, next)
 export const setSessionProfilesTruncated = (next: Updater<Record<string, boolean>>) =>
   updateAtom($sessionProfilesTruncated, next)
 export const setSessionProfilesUsage = (next: Updater<Record<string, ProfileUsage>>) =>

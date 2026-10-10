@@ -151,7 +151,7 @@ class TestBrowserPassthroughPattern:
 
 
 class TestDelegatedChildMarker:
-    def test_delegated_child_context_scrubs_parent_kanban_keys_and_sets_marker(self):
+    def test_delegated_child_context_propagates_marker_and_retains_safe_env(self):
         from agent.delegation_context import delegated_child_context
 
         with patch.dict(
@@ -171,8 +171,6 @@ class TestDelegatedChildMarker:
         assert env["HERMES_DELEGATED_CHILD_CONTEXT"]  # fenced board root (path), not a bare flag
         # Worker identity is scrubbed; board location and workspace routing survive so the
         # fenced descendant can still read the board it belongs to.
-        assert "HERMES_KANBAN_TASK" not in env
-        assert "HERMES_KANBAN_RUN_ID" not in env
         assert env["HERMES_KANBAN_DB"] == "/tmp/parent-kanban.db"
         assert env["HERMES_KANBAN_WORKSPACE"] == "/tmp/parent-workspace"
         assert env["MY_APP_VAR"] == "keep-me"

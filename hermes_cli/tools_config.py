@@ -64,9 +64,7 @@ CONFIGURABLE_TOOLSETS = [
     ("stt",             "🎙️ Speech-to-Text",           "voice transcription (gateway voice messages + voice mode)"),
     ("skills",          "📚 Skills",                    "list, view, manage"),
     ("todo",            "📋 Task Planning",             "todo_list"),
-    ("kanban",          "📌 Kanban",                    "opt-in task board tools for this platform"),
-    ("assistant_tasks", "🧭 Durable Assistant Tasks",        "cross-conversation task intake, status, cancel, and resume"),
-    ("memory",          "💾 Memory",                    "persistent memory across sessions"),
+    ("memory",           "💾 Memory",                    "persistent memory across sessions"),
     ("context_engine",  "🧩 Context Engine",            "runtime tools from the active context engine"),
     ("session_search",  "🔎 Session Search",            "search past conversations"),
     ("connections",     "🔌 Connections",               "remote connector tools and account authorization"),
@@ -94,7 +92,7 @@ def gui_toolset_label(label: str) -> str:
 
 # OFF by default for new installs (still in _HERMES_CORE_TOOLS; the checklist won't pre-select them). x_search
 # auto-enables when xAI creds exist (mirrors HASS_TOKEN → homeassistant); its check_fn still gates the schema.
-_DEFAULT_OFF_TOOLSETS = {"homeassistant", "spotify", "discord", "discord_admin", "video", "video_gen", "x_search", "a2a", "kanban"}
+_DEFAULT_OFF_TOOLSETS = {"homeassistant", "spotify", "discord", "discord_admin", "video", "video_gen", "x_search", "a2a"}
 
 # Config-only capabilities: provider setup in `hermes tools` (TOOL_CATEGORIES) but not model toolsets — zero
 # schemas, own switch (``stt.enabled``), never in ``platform_toolsets`` or the per-platform checklist.
@@ -426,37 +424,6 @@ def enabled_mcp_server_names(config: dict) -> Set[str]:
     return names
 
 
-#: Toolsets young enough that absence from a saved ``platform_toolsets`` list means "never offered", not
-#: "declined": saving ``hermes tools`` freezes a platform's composite into an explicit list nothing adds to, so
-#: a later toolset stays off forever for picker users while ``[hermes-cli]`` users inherit it.
-#: MUST ship in the same release as the toolset and be emptied in the next: once a released build has put the
-#: toolset on a checklist, an unchecking user's config is byte-identical to one saved before it existed and this
-#: rule would turn the opt-out back on (stuck checkbox). ``check_fn``-gated toolsets cost nothing here; never
-#: probe a remote service from this path — it runs on every CLI start, gateway session and cron tick.
-_RECENTLY_SHIPPED_TOOLSETS: frozenset = frozenset({"assistant_tasks"})
-
-
-def _enable_recently_shipped_toolsets(enabled_toolsets: Set[str], config: dict, platform: str) -> None:
-    """Turn on toolsets that shipped after this platform's saved list (mutates ``enabled_toolsets``). Both "no"s
-    outlive this: unchecking records ``known_builtin_toolsets`` (declined), and ``agent.disabled_toolsets`` is
-    subtracted last in :func:`_get_platform_tools`."""
-    from toolsets import resolve_toolset
-
-    offered = (config.get("known_builtin_toolsets") or {}).get(platform)
-    declined = {str(ts) for ts in offered} if isinstance(offered, list) else set()
-    default_ts = _platform_default_toolset(platform)
-    composite_tools = None
-    for ts_key in sorted(_RECENTLY_SHIPPED_TOOLSETS):
-        if ts_key in enabled_toolsets or ts_key in declined or not _toolset_allowed_for_platform(ts_key, platform):
-            continue
-        # Only enable where staying on the composite would have enabled it anyway; deliberately narrow
-        # composites (hermes-acp, hermes-webhook) stay narrow.
-        ts_tools = set(resolve_toolset(ts_key, include_registry=False))
-        if composite_tools is None:
-            composite_tools = set(resolve_toolset(default_ts))
-        if not ts_tools or not ts_tools.issubset(composite_tools):
-            continue
-        enabled_toolsets.add(ts_key)
 
 
 def _configurable_subset_of(tool_names: Set[str], platform: str) -> Set[str]:
@@ -512,7 +479,6 @@ def _explicit_toolsets(
         for t in resolve_toolset(ts_name)}
     if composite_tools:
         enabled |= _configurable_subset_of(composite_tools, platform) - _default_off_toolsets(platform, explicitly_configured)
-    _enable_recently_shipped_toolsets(enabled, config, platform)
     return enabled
 
 
@@ -586,11 +552,6 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
     # Explicit non-configurable entries (custom toolsets, MCP server names) pass through.
     explicit_passthrough = {ts for ts in toolset_names if ts not in explicit_known_keys and ts not in platform_default_keys}
     enabled_toolsets |= _merge_mcp_servers(config, toolset_names, explicit_passthrough, include_default_mcp_servers)
-
-    # Legacy profile opt-in is a fallback only. A saved platform list (even
-    # empty) is authoritative, so a later disable cannot silently re-enable it.
-    if not explicitly_configured and "kanban" in (config.get("toolsets") or []):
-        enabled_toolsets.add("kanban")
 
     # agent.disabled_toolsets is a global suppression list (#86661) and runs LAST so it overrides everything
     # above. It may arrive as a JSON-array string ("['memory']") from `hermes config set` or a JSON-mode editor.

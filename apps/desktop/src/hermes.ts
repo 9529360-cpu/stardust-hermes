@@ -74,6 +74,7 @@ export type {
   McpCatalogResponse,
   McpServerSummary,
   McpServerTestResponse,
+  MemoryEntriesResponse,
   MemoryProviderConfig,
   MemoryProviderOAuthStatus,
   MemoryStatusResponse,

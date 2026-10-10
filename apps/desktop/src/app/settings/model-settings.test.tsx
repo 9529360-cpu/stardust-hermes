@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { atom } from 'nanostores'
 import { useEffect } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -26,10 +25,6 @@ const saveMoaModels = vi.fn()
 const setEnvVar = vi.fn()
 const getHermesConfigRecord = vi.fn()
 const saveHermesConfig = vi.fn()
-const startManualLocalEndpoint = vi.fn()
-const startManualOnboarding = vi.fn()
-const startManualProviderOAuth = vi.fn()
-const desktopOnboarding = atom({ manual: false })
 const profileSwitchHandlers = new Set<() => void>()
 
 vi.mock('@/hermes', () => ({
@@ -47,13 +42,6 @@ vi.mock('@/hermes', () => ({
   getHermesConfigRecord: () => getHermesConfigRecord(),
   saveHermesConfig: (config: unknown) => saveHermesConfig(config),
   setApiRequestProfile: () => {}
-}))
-
-vi.mock('@/store/onboarding', () => ({
-  $desktopOnboarding: desktopOnboarding,
-  startManualLocalEndpoint: (reason?: null | string, profile?: string) => startManualLocalEndpoint(reason, profile),
-  startManualOnboarding: (reason?: null | string, profile?: string) => startManualOnboarding(reason, profile),
-  startManualProviderOAuth: (slug: string, profile?: string) => startManualProviderOAuth(slug, profile)
 }))
 
 vi.mock('../hooks/use-on-profile-switch', () => ({
@@ -96,15 +84,10 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
-  desktopOnboarding.set({ manual: false })
   profileSwitchHandlers.clear()
 })
 
-async function renderModelSettings(
-  scopeProfile?: string,
-  initialEntries: string[] = ['/'],
-  expandOtherServices = true
-) {
+async function renderModelSettings(scopeProfile?: string, initialEntries: string[] = ['/']) {
   const { ModelSettings } = await import('./model-settings')
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 
@@ -117,10 +100,6 @@ async function renderModelSettings(
       </QueryClientProvider>
     </MemoryRouter>
   )
-
-  if (expandOtherServices) {
-    fireEvent.click(await screen.findByRole('button', { name: 'Choose another service' }))
-  }
 
   return result
 }
@@ -142,8 +121,6 @@ async function renderChineseModelSettings() {
       </MemoryRouter>
     </I18nProvider>
   )
-
-  fireEvent.click(await screen.findByRole('button', { name: '选择其他服务' }))
 
   return result
 }
@@ -173,102 +150,19 @@ describe('ModelSettings profile scope', () => {
 })
 
 describe('ModelSettings', () => {
-  it('shows configured model services as rows instead of a provider dropdown', async () => {
-    await renderModelSettings(undefined, ['/'], false)
+  it('uses the direct model-service editor without provider account controls', async () => {
+    await renderModelSettings()
 
     await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalled())
     expect(await screen.findByText('Add model service')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Nous/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Choose another service' }))
-    expect(await screen.findByRole('button', { name: /Nous/ })).toBeTruthy()
-    expect(screen.queryByText(/DeepSeek/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Choose another service' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Advanced connection settings' })).toBeNull()
+    expect(screen.queryByText(/provider accounts/i)).toBeNull()
   })
 
-  it.each(['custom', 'local', 'custom:lab'])(
-    'opens local endpoint setup when %s has no inventory row',
-    async provider => {
-      getGlobalModelInfo.mockResolvedValueOnce({ provider, model: '' })
-      getGlobalModelOptions.mockResolvedValueOnce({ providers: [] })
-
-      await renderModelSettings()
-
-      expect(await screen.findByText(provider)).toBeTruthy()
-      expect(screen.queryByText(/undefined/)).toBeNull()
-      expect(screen.queryByText(/signs in through your browser/)).toBeNull()
-
-      fireEvent.click(await screen.findByRole('button', { name: 'Connect AI service' }))
-
-      expect(startManualLocalEndpoint).toHaveBeenCalledOnce()
-      expect(startManualOnboarding).not.toHaveBeenCalled()
-      expect(startManualProviderOAuth).not.toHaveBeenCalled()
-    }
-  )
-
-  it('opens the generic provider picker for an unknown provider with no inventory row', async () => {
-    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'retired-provider', model: '' })
-    getGlobalModelOptions.mockResolvedValueOnce({ providers: [] })
-
+  it('reloads authoritative model state when the active profile changes', async () => {
     await renderModelSettings()
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Connect AI service' }))
-
-    expect(startManualOnboarding).toHaveBeenCalledOnce()
-    expect(startManualLocalEndpoint).not.toHaveBeenCalled()
-    expect(startManualProviderOAuth).not.toHaveBeenCalled()
-  })
-
-  it('deep-links a known OAuth provider row into its setup flow', async () => {
-    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'anthropic', model: '' })
-    getGlobalModelOptions.mockResolvedValueOnce({
-      providers: [
-        {
-          name: 'Anthropic',
-          slug: 'anthropic',
-          models: [],
-          authenticated: false,
-          auth_type: 'oauth'
-        }
-      ]
-    })
-
-    await renderModelSettings()
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Connect Anthropic' }))
-
-    expect(startManualProviderOAuth).toHaveBeenCalledWith('anthropic', undefined)
-    expect(startManualLocalEndpoint).not.toHaveBeenCalled()
-    expect(startManualOnboarding).not.toHaveBeenCalled()
-  })
-
-  it('replaces the selected provider and model when the active profile changes', async () => {
-    getGlobalModelInfo
-      .mockResolvedValueOnce({ provider: 'custom', model: 'local-a' })
-      .mockResolvedValueOnce({ provider: 'nous', model: 'hermes-4' })
-    getGlobalModelOptions
-      .mockResolvedValueOnce({
-        providers: [
-          {
-            name: 'Custom A',
-            slug: 'custom',
-            models: ['local-a'],
-            authenticated: true
-          }
-        ]
-      })
-      .mockResolvedValueOnce({
-        providers: [
-          {
-            name: 'Nous',
-            slug: 'nous',
-            models: ['hermes-4'],
-            authenticated: true,
-            capabilities: { 'hermes-4': { reasoning: true, fast: true } }
-          }
-        ]
-      })
-
-    await renderModelSettings()
-    expect(await screen.findByRole('button', { name: /Custom A/ })).toBeTruthy()
+    await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(1))
 
     await act(async () => {
       for (const handler of [...profileSwitchHandlers]) {
@@ -277,142 +171,6 @@ describe('ModelSettings', () => {
     })
 
     await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(screen.getByRole('button', { name: /Nous/ })).toBeTruthy())
-    expect(screen.queryByRole('button', { name: 'Connect AI service' })).toBeNull()
-  })
-
-  it('preserves a user-defined provider endpoint when applying the main model', async () => {
-    getGlobalModelOptions.mockResolvedValueOnce({
-      providers: [
-        {
-          name: 'Nous',
-          slug: 'nous',
-          models: ['hermes-4'],
-          authenticated: true
-        },
-        {
-          name: 'Ollama',
-          slug: 'local-ollama',
-          models: ['qwen3:latest'],
-          authenticated: true,
-          is_user_defined: true,
-          api_url: 'http://localhost:11434/v1'
-        }
-      ]
-    })
-    setModelAssignment.mockResolvedValueOnce({
-      ok: true,
-      provider: 'local-ollama',
-      model: 'qwen3:latest',
-      gateway_tools: []
-    })
-
-    await renderModelSettings()
-
-    fireEvent.click(await screen.findByRole('button', { name: /Ollama/ }))
-    expect(await screen.findByText('qwen3:latest')).toBeTruthy()
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
-
-    await waitFor(() =>
-      expect(setModelAssignment).toHaveBeenCalledWith({
-        model: 'qwen3:latest',
-        provider: 'local-ollama',
-        scope: 'main',
-        base_url: 'http://localhost:11434/v1'
-      })
-    )
-  })
-
-  it('rotates a saved API key from the provider editor before applying its model', async () => {
-    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'openai', model: 'gpt-5.4' })
-    getGlobalModelOptions.mockResolvedValueOnce({
-      providers: [
-        {
-          name: 'OpenAI',
-          slug: 'openai',
-          models: ['gpt-5.4'],
-          authenticated: true,
-          auth_type: 'api_key',
-          key_env: 'OPENAI_API_KEY'
-        }
-      ]
-    })
-    setModelAssignment.mockResolvedValueOnce({
-      ok: true,
-      provider: 'openai',
-      model: 'gpt-5.4',
-      gateway_tools: []
-    })
-
-    await renderModelSettings()
-
-    const key = await screen.findByPlaceholderText('Leave blank to keep the saved key')
-    fireEvent.change(key, { target: { value: 'sk-replacement' } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Apply' }))
-
-    await waitFor(() => expect(setEnvVar).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-replacement'))
-    await waitFor(() =>
-      expect(setModelAssignment).toHaveBeenCalledWith({
-        model: 'gpt-5.4',
-        provider: 'openai',
-        scope: 'main'
-      })
-    )
-    expect(setEnvVar.mock.invocationCallOrder[0]).toBeLessThan(setModelAssignment.mock.invocationCallOrder[0])
-  })
-
-  it('updates a saved API key without changing the selected model', async () => {
-    getGlobalModelInfo.mockResolvedValueOnce({ provider: 'openai', model: 'gpt-5.4' })
-    getGlobalModelOptions.mockResolvedValue({
-      providers: [
-        {
-          name: 'OpenAI',
-          slug: 'openai',
-          models: ['gpt-5.4', 'gpt-5.4-mini'],
-          authenticated: true,
-          auth_type: 'api_key',
-          key_env: 'OPENAI_API_KEY'
-        }
-      ]
-    })
-
-    await renderModelSettings()
-
-    const key = await screen.findByPlaceholderText('Leave blank to keep the saved key')
-    fireEvent.change(key, { target: { value: 'sk-rotated' } })
-    fireEvent.click(await screen.findByRole('button', { name: 'Update key' }))
-
-    await waitFor(() => expect(setEnvVar).toHaveBeenCalledWith('OPENAI_API_KEY', 'sk-rotated'))
-    await waitFor(() => expect((key as HTMLInputElement).value).toBe(''))
-    expect(getRecommendedDefaultModel).not.toHaveBeenCalled()
-    expect(setModelAssignment).not.toHaveBeenCalled()
-    expect(screen.getByText('Model: gpt-5.4')).toBeTruthy()
-  })
-
-  it('opens the shared provider and custom-service flows from the model page', async () => {
-    await renderModelSettings('research')
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Advanced connection settings' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Add model service' }))
-    expect(startManualOnboarding).toHaveBeenCalledWith(null, 'research')
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Add custom service' }))
-    expect(startManualLocalEndpoint).not.toHaveBeenCalled()
-  })
-
-  it('refreshes the model-service list after the shared setup flow closes', async () => {
-    await renderModelSettings()
-    await waitFor(() => expect(getGlobalModelOptions).toHaveBeenCalledTimes(1))
-
-    await act(async () => {
-      desktopOnboarding.set({ manual: true })
-    })
-    await act(async () => {
-      desktopOnboarding.set({ manual: false })
-    })
-
-    await waitFor(() => expect(getGlobalModelOptions.mock.calls.length).toBeGreaterThan(1))
   })
 
   it('writes the profile default speed (service_tier) as a sparse patch, never the cached snapshot', async () => {
@@ -473,9 +231,9 @@ describe('ModelSettings', () => {
     await openAdvancedModelSettings()
 
     expect(await screen.findByText('Vision')).toBeTruthy()
-    // #97297 — the three canonical slots the backend serves must have rows too.
-    expect(screen.getByText('Triage specifier')).toBeTruthy()
-    expect(screen.getByText('Kanban decomposer')).toBeTruthy()
+    // Retired board slots are absent; profile descriptions remain configurable.
+    expect(screen.queryByText('Triage specifier')).toBeNull()
+    expect(screen.queryByText('Kanban decomposer')).toBeNull()
     expect(screen.getByText('Profile describer')).toBeTruthy()
     expect(screen.getAllByText('auto · use main model').length).toBeGreaterThan(0)
   })
@@ -567,26 +325,6 @@ describe('ModelSettings', () => {
         base_url: 'http://localhost:11434/v1'
       })
     )
-  })
-
-  it('warns when a main switch leaves auxiliary tasks pinned to another provider', async () => {
-    setModelAssignment.mockResolvedValueOnce({
-      ok: true,
-      provider: 'openrouter',
-      model: 'anthropic/claude-opus-4.7',
-      gateway_tools: [],
-      stale_aux: [{ task: 'compression', provider: 'nous', model: 'hermes-4' }]
-    })
-
-    await renderModelSettings()
-    await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalled())
-
-    const applyButton = await screen.findByRole('button', { name: 'Apply' })
-    fireEvent.click(applyButton)
-
-    // The switch-time notice names the pinned provider and offers a reset.
-    expect(await screen.findByText(/still run on/)).toBeTruthy()
-    expect(screen.getByText('nous')).toBeTruthy()
   })
 
   it('shows a persistent banner when a loaded aux slot mismatches the main provider', async () => {
@@ -716,8 +454,8 @@ describe('ModelSettings MoA preset editor', () => {
   it('renders the model-service and MoA chrome in the active Chinese locale', async () => {
     await renderChineseModelSettings()
 
-    expect(await screen.findByText('模型服务')).toBeTruthy()
-    expect(screen.getByText(/选一个服务，需要时填 API Key 或登录/)).toBeTruthy()
+    expect(await screen.findByText('添加模型服务')).toBeTruthy()
+    expect(screen.queryByText(/API Key 或登录/)).toBeNull()
     expect(screen.getByRole('button', { name: '高级模型设置' })).toBeTruthy()
     await openAdvancedModelSettings('高级模型设置')
     expect(await screen.findByText('参考模型 1')).toBeTruthy()
@@ -820,6 +558,43 @@ describe('ModelSettings MoA preset editor', () => {
           })
         })
       )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not send the previous profile’s debounced MoA edit after a live switch', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    try {
+      await openReferenceEditor()
+      fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
+      await act(async () => {
+        for (const handler of [...profileSwitchHandlers]) { handler() }
+      })
+      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      expect(saveMoaModels).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not repaint a previous profile’s in-flight MoA save after a live switch', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    try {
+      let resolveSave!: (value: ReturnType<typeof moaConfig>) => void
+      saveMoaModels.mockImplementationOnce(() => new Promise(resolve => {resolveSave = resolve}))
+      await openReferenceEditor()
+      fireEvent.click(screen.getByRole('switch', { name: 'Enabled' }))
+      await act(async () => { await vi.advanceTimersByTimeAsync(700) })
+      expect(saveMoaModels).toHaveBeenCalledTimes(1)
+      await act(async () => {
+        for (const handler of [...profileSwitchHandlers]) { handler() }
+      })
+      await waitFor(() => expect(getMoaModels).toHaveBeenCalledTimes(2))
+      await act(async () => { resolveSave({ ...moaConfig(), presets: { default: { ...moaConfig().presets.default, enabled: false } } }) })
+      expect(screen.getByRole('switch', { name: 'Enabled' }).getAttribute('aria-checked')).toBe('true')
     } finally {
       vi.useRealTimers()
     }

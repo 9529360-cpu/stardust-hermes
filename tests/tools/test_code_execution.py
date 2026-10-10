@@ -177,6 +177,48 @@ class TestHermesToolsGeneration(unittest.TestCase):
 
 
 class TestExecuteCodeRemoteTempDir(unittest.TestCase):
+    def test_remote_rpc_thread_receives_frozen_session_grant(self):
+        from model_tools import tool_capability_context
+
+        env = MagicMock()
+        env.get_temp_dir.return_value = "/tmp"
+        env.execute.side_effect = lambda command, **kwargs: (
+            {"output": "OK\n", "returncode": 0}
+            if "command -v python3" in command else
+            {"output": "remote ok\n", "returncode": 0}
+        )
+        seen = []
+
+        class CapturingThread:
+            def __init__(self, *args, **kwargs):
+                self.args = args
+                self.kwargs = kwargs
+
+            def start(self):
+                seen.append(self.kwargs)
+
+            def join(self, timeout=None):
+                return None
+
+        frozen_tools = ["read_file"]
+        with tool_capability_context(allowed_tools=frozen_tools, session_id="remote-session") as bound_grant:
+            with patch("tools.code_execution_tool._load_config",
+                       return_value={"timeout": 30, "max_tool_calls": 5}), \
+                 patch("tools.code_execution_tool._get_or_create_env", return_value=(env, "ssh")), \
+                 patch("tools.code_execution_tool._ship_file_to_remote"), \
+                 patch("tools.code_execution_tool.threading.Thread", CapturingThread):
+                result = json.loads(_execute_remote(
+                    "print('remote')", "remote-task", frozen_tools,
+                    capability_context=bound_grant,
+                ))
+
+        self.assertEqual(result["status"], "success", result)
+        self.assertEqual(len(seen), 1)
+        kwargs = seen[0]["kwargs"]
+        self.assertEqual(kwargs["session_id"], "remote-session")
+        self.assertEqual(kwargs["enabled_tools"], frozen_tools)
+        self.assertIs(kwargs["capability_grant"], bound_grant)
+
     def test_execute_remote_uses_backend_temp_dir_for_sandbox(self):
         class FakeEnv:
             def __init__(self):

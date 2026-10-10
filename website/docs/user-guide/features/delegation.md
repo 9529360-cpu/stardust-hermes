@@ -6,7 +6,7 @@ description: "Spawn isolated child agents for parallel workstreams with delegate
 
 # Subagent Delegation
 
-The `delegate_task` tool spawns child AIAgent instances with isolated context, inherited tool access, and their own terminal sessions. Each child gets a fresh conversation and works independently — only its final summary enters the parent's context.
+The `delegate_task` tool spawns child AIAgent instances with isolated context, inherited tool access, and their own terminal sessions. Each child gets a fresh conversation and works independently. Its final summary enters the parent's context automatically; the parent can explicitly inspect bounded recent activity while it runs.
 
 Top-level model calls run in the background automatically. Hermes returns a handle immediately so the conversation can continue, then posts the result back as a new message. An orchestrator subagent waits for its own workers so it can synthesize their results before returning.
 
@@ -51,6 +51,34 @@ delegate_task(tasks=[
     {"goal": "Fix the build", "context": "Project root: /home/user/project"}
 ])
 ```
+
+## Observe and direct ongoing work
+
+The parent can call `delegate_task(action="list")` for its own live members,
+including their last started tool and tool count. To answer a progress question
+or investigate a member before changing its direction, call
+`delegate_task(action="inspect", subagent_id="...")`. This reads a bounded,
+credential-redacted operational transcript through the backend; the parent does
+not need access to the backend's filesystem. It is partial activity evidence,
+not proof of a completed deliverable. Do not poll it while waiting for a result.
+Use `steer` to pass a course correction and `stop` to request cancellation.
+
+Each task may specify `model` and `provider` independently. The provider names
+an already configured service, including a named custom provider; credentials
+come from that service's configuration. Do not put API keys in task context.
+When changing provider, the member does not reuse the default provider's key,
+endpoint, or request headers. An invalid route refuses the batch before member
+construction.
+
+In Stardust Desktop, starting the first members in the active conversation
+opens the right sidebar and shows their progress and controls. Updates from
+other conversations do not open it. Closing the sidebar leaves the existing
+composer controls available.
+
+These are still session-owned subagents, not persistent project appointments.
+Process exit interrupts execution; durable completion receipts do not restart
+unfinished members. Long-lived teams require a separate persistent identity and
+recovery contract before they can promise restart durability.
 
 ## Structured Output (`output_schema`)
 
@@ -294,7 +322,7 @@ delegation:
 
 Resolution order: `delegation.base_url` (direct endpoint) takes precedence, then `delegation.provider` (full credential bundle resolved via the runtime provider system), and when neither is set children inherit the parent's provider and credentials; `delegation.model` applies in all cases, and when it is empty children inherit the parent's model. Setting `delegation.provider` alongside `delegation.base_url` keeps the explicit endpoint but carries that provider's request overrides and max output tokens into the child. An explicit `delegation.request_overrides` dict is honored on every branch and merges over those runtime-derived values (see [Configuration](#configuration) below).
 
-Note that the pin is global: `delegate_task` has no per-task model parameter, so every child in a batch runs on the configured delegation model. For quality-sensitive subtasks that need a stronger model, either leave `delegation.model` unset for that session or hand the task to the [kanban board](kanban.md#per-task-model-override), which does support a per-task model override.
+Note that the pin is global: `delegate_task` has no per-task model parameter, so every child in a batch runs on the configured delegation model. For quality-sensitive subtasks that need a stronger model, either leave `delegation.model` unset for that session.
 
 ## The `/review` Command
 
