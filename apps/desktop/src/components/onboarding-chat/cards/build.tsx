@@ -26,6 +26,7 @@ import {
   SETUP_PROFILE
 } from '@/components/onboarding-chat/setup-profile'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/i18n'
 import { answeredAfter } from '@/lib/chat-messages/parts'
 import { segmentTranscriptDirectives } from '@/lib/transcript-directives'
 import { cn } from '@/lib/utils'
@@ -115,6 +116,7 @@ export function FirstBuildCard({ attrs, locked }: CardProps) {
  * and a locked (replayed) transcript never starts one.
  */
 export function HandoffCard({ attrs, locked }: CardProps) {
+  const { t } = useI18n()
   const view = useSessionView()
   const storedId = useStore(view.$storedId)
   const runtimeId = useStore(view.$runtimeId)
@@ -211,14 +213,14 @@ export function HandoffCard({ attrs, locked }: CardProps) {
       <StatusDot live={!settled && !failed} />
       <span className="text-(--ui-text-secondary)">
         {failed
-          ? (error ?? 'The first build could not be started. Retry to check its session.')
+          ? (error ?? t.onboarding.firstBuildFailed)
           : settled
-            ? `${title} was started — find it in your sessions`
-            : `Opening ${title}\u2026`}
+            ? t.onboarding.buildStarted(title)
+            : t.onboarding.buildOpening(title)}
       </span>
       {state?.phase === 'error' && (
         <Button disabled={locked} onClick={() => void retry()} size="sm" variant="text">
-          Retry first build
+          {t.onboarding.retryFirstBuild}
         </Button>
       )}
     </div>
@@ -227,10 +229,11 @@ export function HandoffCard({ attrs, locked }: CardProps) {
 
 /** The earlier steps are derived from this transcript on every render, so a re-mount cannot lose or repeat them. */
 export function ProgressCard({ attrs, locked }: CardProps) {
+  const { t } = useI18n()
   const view = useSessionView()
   const messages = useStore(view.$messages)
   const messageId = useAuiState(state => state.message.id)
-  const title = (attrs.title ?? '').trim() || 'Working on it'
+  const title = (attrs.title ?? '').trim() || t.onboarding.workingOnIt
 
   const index = messages.findIndex(message => message.id === messageId)
   const previous = index < 0 ? [] : messages.slice(0, index)
@@ -250,7 +253,7 @@ export function ProgressCard({ attrs, locked }: CardProps) {
       .at(-1)
 
     return progress?.kind === 'directive'
-      ? [{ id: message.id, title: progress.directive.attrs.title?.trim() || 'Working on it' }]
+      ? [{ id: message.id, title: progress.directive.attrs.title?.trim() || t.onboarding.workingOnIt }]
       : []
   })
 

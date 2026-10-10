@@ -33,7 +33,13 @@ export const en: Translations = {
     search: 'Find an app',
     empty: 'No matching apps',
     disclaimer: 'Connecting is optional. Only authorize the apps you want Hermes to use.',
-    execution: 'Connector tools'
+    execution: 'Connector tools',
+    skipThis: 'Skip this',
+    setupUnavailable: 'Connections aren’t available right now — this can be set up later.',
+    nothingYet: 'Nothing connects yet.',
+    nothingYetBody: 'Hermes will offer to link these when a task needs them, and asks before reading anything.',
+    noneOfThese: 'None of these',
+    continueWithCount: (count: number) => `Continue with ${count}`
   },
 
   sessionImport: {
@@ -930,7 +936,10 @@ export const en: Translations = {
         noneAvailable: 'No pets available to turn on right now.',
         turnOnFailed: 'Could not turn the pet on.',
         turnOffFailed: 'Could not turn the pet off.'
-      }
+      },
+      vscodeMarketplace: 'From the VS Code Marketplace',
+      noThemeMatch: (query: string) => `No installed themes match "${query}".`,
+      imageFilterName: 'Images'
     },
     fieldLabels: FIELD_LABELS,
     fieldDescriptions: FIELD_DESCRIPTIONS,
@@ -959,7 +968,11 @@ export const en: Translations = {
       warmBotBackendsAria: 'Warm bot backends',
       warmBotBackendsTitle: 'Warm Bot Backends',
       backendIdleTimeoutAria: 'Backend idle timeout in milliseconds',
-      backendIdleTimeoutTitle: 'Backend Idle Timeout'
+      backendIdleTimeoutTitle: 'Backend Idle Timeout',
+      warmBotBackendsDesc:
+        'How many bot backends stay running for instant switching. Higher = faster switches, more memory (~60MB per backend). Applies immediately.',
+      backendIdleTimeoutDesc:
+        'How long an unused bot backend stays warm before it is shut down. Raise this so bots you revisit every few minutes never pay a cold start.'
     },
     customEndpoints: {
       title: 'Custom service',
@@ -1007,7 +1020,31 @@ export const en: Translations = {
     computerUse: {
       accessibility: 'Accessibility',
       screenRecording: 'Screen Recording',
-      driverHealth: 'Driver health'
+      driverHealth: 'Driver health',
+      checking: 'Checking Computer Use status…',
+      notSupported: (platform: string) => `Computer Use isn't supported on this platform (${platform}).`,
+      installBackend: 'Install the cua-driver backend below to drive this machine.',
+      grantHint: ' Then grant Accessibility and Screen Recording here.',
+      grantIdentity:
+        'Grants attach to CuaDriver\'s own identity (com.trycua.driver), not Hermes — so the dialog is attributed to the process that drives your Mac.',
+      recheck: 'Recheck',
+      ready: 'Computer Use is ready. Ask the agent to capture an app and click around.',
+      platformNoteLinux: 'Drives your desktop via the X11/XWayland accessibility stack — no permission prompt.',
+      platformNoteWin32:
+        'First run may trigger a Windows SmartScreen prompt for the cua-driver UIAccess worker — allow it.',
+      granted: 'Granted',
+      notGranted: 'Not granted',
+      unknownState: 'Unknown',
+      pillReady: 'Ready',
+      pillNotReady: 'Not ready',
+      approveTitle: 'Approve in System Settings',
+      approveMessage: 'macOS will show a permission dialog attributed to CuaDriver. Approve it, then return here.',
+      waitingApproval: 'Waiting for approval…',
+      grantPermissions: 'Grant permissions',
+      hintAccessibility: 'Lets cua-driver post clicks, keystrokes, and read the accessibility tree.',
+      hintScreenRecording: 'Lets cua-driver capture screenshots of app windows.',
+      requestFailed: 'Could not request permissions',
+      readFailed: 'Could not read Computer Use status'
     },
     about: {
       heading: 'Hermes Desktop',
@@ -1083,7 +1120,13 @@ export const en: Translations = {
       shortcutDesc: 'Needs at least one modifier, e.g. CommandOrControl+Shift+Space.',
       active: 'Shortcut is active.',
       takenBy: 'Another app already uses this shortcut — pick a different one.',
-      invalidShortcut: 'Not a valid shortcut. Include at least one modifier key.'
+      invalidShortcut: 'Not a valid shortcut. Include at least one modifier key.',
+      askPlaceholder: 'Ask Hermes…',
+      disconnectedPlaceholder: 'Not connected — open Hermes to reconnect',
+      sendTo: 'Send to',
+      targetLabel: 'Target session',
+      currentChat: 'Current chat',
+      newSession: 'New session'
     },
     credentials: {
       pasteKey: 'Paste key',
@@ -1436,7 +1479,8 @@ export const en: Translations = {
       importPlaceholder: 'Paste an mcp.json snippet, npx/docker command, claude mcp add line, URL, or Cursor link…',
       importNoMatch: 'No server config recognized in the pasted text.',
       importConfirm: 'Add to mcp.json',
-      importConfirmMany: count => `Add ${count} servers to mcp.json`
+      importConfirmMany: count => `Add ${count} servers to mcp.json`,
+      apiKeyTag: 'API key'
     },
     model: {
       loading: 'Loading model services...',
@@ -1511,7 +1555,13 @@ export const en: Translations = {
         review: { label: 'Review', hint: '/review reviewer subagent' },
         profile_describer: { label: 'Profile describer', hint: 'Auto profile descriptions' },
         curator: { label: 'Curator', hint: 'Skill-usage review' }
-      }
+      },
+      auxiliaryRunOn:
+        (count: number, names: string) => ({ before: `${count} auxiliary task${count === 1 ? '' : 's'} (${names}) still run on `, after: ', not your main model.' }),
+      otherProviders: 'other providers',
+      slotProviderAria: (label: string) => `${label} provider`,
+      slotModelAria: (label: string) => `${label} model`,
+      slotReasoningAria: (label: string) => `${label} reasoning effort`
     },
     localModels: {
       title: 'Local Models',
@@ -1808,6 +1858,33 @@ export const en: Translations = {
           error: 'Error'
         }
       }
+    },
+    memoryProvider: {
+      waitingForConsent: 'Waiting for browser consent…',
+      loadFailed: (error: string) => `Memory provider settings failed to load: ${error}`,
+      loadingLabel: 'Loading memory provider settings...',
+      settingsTitle: (label: string) => `${label} settings`,
+      setLabel: (label: string) => `${label} set`,
+      notSetLabel: (label: string) => `${label} not set`,
+      fullConfig: 'Full config…',
+      modalTitle: (label: string) => `${label} — full configuration`,
+      modalDescription:
+        (label: string) => ({ before: `Every ${label} option for the `, after: ' profile. Blank fields fall back to the resolved host or built-in default.' }),
+      docsLink: (label: string) => `${label} configuration reference`,
+      saveChanges: 'Save changes',
+      keepCurrentValue: 'Leave blank to keep current value',
+      apiKeySet: 'api key set',
+      oauthSet: 'oauth set',
+      saved: 'Memory provider configuration updated.',
+      savedTitle: (label: string) => `${label} saved`,
+      aboutField: (label: string) => `About ${label}`,
+      startFailedDetail: 'Could not start the connection.',
+      startFailedToast: 'Failed to start connection',
+      timedOut: 'Timed out — try again.',
+      connectionFailed: 'Connection failed.',
+      connectViaOauth: 'Connect via OAuth',
+      reconnect: 'Reconnect',
+      loadFailedPlain: 'Memory provider settings failed to load'
     }
   },
 
@@ -2018,7 +2095,24 @@ export const en: Translations = {
     importEmpty: 'Paste a map code to load it.',
     importSuccess: nodes => `Loaded a map with ${nodes} ${nodes === 1 ? 'node' : 'nodes'}.`,
     importedBadge: 'imported map',
-    resetToMine: 'Back to my map'
+    resetToMine: 'Back to my map',
+    legendCoreOuter: 'core = oldest · outer = newer',
+    legendMemory: 'memory',
+    nodeMenu: {
+      editMemory: 'Edit memory…',
+      editSkill: 'Edit skill…',
+      editTitle: (label: string) => `Edit ${label}`,
+      archiveSkill: 'Archive skill',
+      deleteMemory: 'Delete memory',
+      removedForever: 'This memory is removed permanently.',
+      deleteTitle: (label: string) => `Delete ${label}?`
+    },
+    timeline: {
+      pause: 'Pause',
+      playTimeline: 'Play timeline',
+      scrubber: 'Timeline scrubber'
+    },
+    badShareCode: 'Could not read that map code.'
   },
   agents: {
     extendedTranscript: 'Extended transcript',
@@ -2125,7 +2219,14 @@ export const en: Translations = {
       referenceImageTooLarge: 'Reference image is too large. Use one under 16 MB.',
       referenceImageInvalid: 'Could not read that reference image. Try a PNG, JPG, WebP, or GIF.',
       adopt: 'Adopt',
-      startOver: 'Start over'
+      startOver: 'Start over',
+      unavailableTitle: 'Add an image backend to generate',
+      unavailableBody: 'Hatching a custom pet needs a provider that can ground on a reference image.',
+      setupImageGeneration: 'Set up image generation',
+      grabKeyFrom: 'Grab a key from',
+      addReference: 'Add a reference',
+      removeReference: 'Remove reference',
+      referenceFallback: 'Reference'
     },
     installTheme: {
       title: 'Install theme…',
@@ -2377,7 +2478,8 @@ export const en: Translations = {
       pairingExpired: 'Telegram pairing expired. Start a new QR setup to try again.',
       stillWaiting: detail => `Still waiting for Telegram. Retrying after: ${detail}`,
       savedRestarting: 'Telegram saved; gateway restarting…',
-      savedRestartFailed: detail => `Telegram saved; gateway restart failed${detail}`
+      savedRestartFailed: detail => `Telegram saved; gateway restart failed${detail}`,
+      qrAlt: 'Telegram setup QR code'
     },
     fieldCopy: {
       TELEGRAM_BOT_TOKEN: {
@@ -3090,7 +3192,36 @@ export const en: Translations = {
       working: 'Working',
       done: 'Done'
     },
-    markAllRead: 'Mark all as read'
+    markAllRead: 'Mark all as read',
+    filterMenu: {
+      grouping: 'Grouping',
+      ordering: 'Ordering',
+      show: 'Show',
+      status: 'Status',
+      pullRequest: 'Pull request',
+      profile: 'Profile',
+      project: 'Project',
+      resetDefaults: 'Reset to defaults',
+      updated: 'Updated',
+      created: 'Created',
+      tokens: 'Tokens',
+      cost: 'Cost',
+      manual: 'Manual',
+      preview: 'Preview',
+      prOpen: 'Open',
+      draft: 'Draft',
+      merged: 'Merged',
+      closed: 'Closed',
+      noPr: 'No PR',
+      needsInput: 'Needs input',
+      working: 'Working',
+      unread: 'Unread',
+      idle: 'Idle',
+      inboxStyle: 'Inbox style',
+      archived: 'Archived',
+      expandAll: 'Expand all',
+      collapseAll: 'Collapse all'
+    }
   },
 
   composer: {
@@ -3705,7 +3836,13 @@ export const en: Translations = {
     price: (input, output) => `${input} in / ${output} out per Mtok`,
     change: 'Change',
     startChatting: 'Begin',
-    docs: provider => `${provider} docs`
+    docs: provider => `${provider} docs`,
+    skipSetup: 'Skip setup',
+    retryFirstBuild: 'Retry first build',
+    firstBuildFailed: 'The first build could not be started. Retry to check its session.',
+    buildStarted: (title: string) => `${title} was started — find it in your sessions`,
+    buildOpening: (title: string) => `Opening ${title}…`,
+    workingOnIt: 'Working on it'
   },
 
   freeTier: {
@@ -3787,7 +3924,9 @@ export const en: Translations = {
       noModels: 'No models found',
       editModels: 'Edit models…',
       refreshModels: 'Refresh models',
-      fast: 'Fast'
+      fast: 'Fast',
+      moaPresets: 'MoA presets',
+      moaPrefix: 'MoA:'
     },
     modelOptions: {
       noOptions: 'No options for this model',
@@ -3939,6 +4078,12 @@ export const en: Translations = {
       modelPinned: 'pinned by you; new chats use this instead of the Settings default',
       modelTitle: (provider, model) => `Model · ${provider}: ${model}`,
       providerModelTitle: (provider, model) => `${provider} · ${model}`
+    },
+    tiles: {
+      sessionOpenFailed: 'Couldn\'t open this session',
+      noPageAt: (path: string) => `no page at ${path}`,
+      resumeStillAvailable: 'Session is still available — retry resuming it.',
+      resumeUnavailable: 'Session unavailable — you can retry resuming it.'
     }
   },
 
@@ -4370,7 +4515,25 @@ export const en: Translations = {
       restoreNext: 'Restore next checkpoint',
       goForward: 'Go forward',
       sendEdited: 'Send edited message',
-      attachingFile: 'Attaching…'
+      attachingFile: 'Attaching…',
+      messageFrom: (sender: string) => `Message from ${sender}`,
+      showMessage: 'show message',
+      repliedTo: (sender: string) => `Replied to ${sender}`,
+      showReply: 'show reply',
+      conversationTimeline: 'Conversation timeline',
+      hermesWorking: 'Hermes is working',
+      toolPayload: 'Tool payload',
+      toolSearch: 'Search',
+      emojiSearch: 'Search…',
+      loadingEmoji: 'Loading emoji…',
+      noEmoji: 'No emoji found.',
+      moreEmoji: 'More emoji',
+      reactedByHermes: 'Reacted by Hermes',
+      deliveryPending: 'Messaging',
+      deliveryDone: 'Messaged',
+      removeReaction: (emoji: string) => `Remove ${emoji} reaction`,
+      summarizingThread: 'Summarizing thread',
+      searchResults: 'Search results'
     },
     approval: {
       gatewayDisconnected:
@@ -4526,6 +4689,22 @@ export const en: Translations = {
         web_search: { done: 'Searched web', pending: 'Searching web', pendingAction: 'Searching' },
         write_file: { done: 'Edited file', pending: 'Editing file', pendingAction: 'Editing' }
       }
+    },
+    media: {
+      fetchFailed: (name: string) => `Couldn't fetch ${name} from the gateway (missing, unreadable, or too large).`,
+      openMediaFile: (kind: 'audio' | 'video') => `Open ${kind} file`,
+      couldntLoad: (name: string) => `Couldn't load ${name}.`,
+      openImage: 'Open image',
+      loadingName: (name: string) => `Loading ${name}...`,
+      generatedImage: 'Generated image',
+      openNamed: (name: string) => `Open ${name}`
+    },
+    embeds: {
+      failed: (label: string) => `Failed to load ${label} embed`,
+      openDiagram: 'Open diagram',
+      holdToZoom: 'Hold ⌘ to zoom',
+      spotifyTitle: 'Spotify embed',
+      youtubeTitle: 'YouTube embed'
     }
   },
 
@@ -4733,6 +4912,13 @@ export const en: Translations = {
       title: 'Sidebar',
       description: 'Displays the mobile sidebar.',
       toggle: open => `${open ? 'Show' : 'Hide'} sidebar`
-    }
+    },
+    zoomable: {
+      zoomOut: 'Zoom out',
+      zoomIn: 'Zoom in',
+      reset: 'Reset'
+    },
+    moreActions: 'More actions',
+    hatchingProgress: 'Hatching progress'
   }
 }

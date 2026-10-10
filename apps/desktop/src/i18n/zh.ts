@@ -28,7 +28,13 @@ export const zh = defineLocale({
     search: '查找应用',
     empty: '没有匹配的应用',
     disclaimer: '连接为可选操作。请仅授权你希望 Hermes 使用的应用。',
-    execution: '连接器工具'
+    execution: '连接器工具',
+    skipThis: '跳过此步',
+    setupUnavailable: '暂时无法使用连接功能，之后可以再设置。',
+    nothingYet: '还没有连接任何应用。',
+    nothingYetBody: 'Stardust 会在任务需要时提出连接，并在读取任何内容前先询问你。',
+    noneOfThese: '都不要',
+    continueWithCount: (count: number) => `继续（${count}）`
   },
 
   sessionImport: {
@@ -850,7 +856,10 @@ export const zh = defineLocale({
         noneAvailable: '当前没有可开启的宠物。',
         turnOnFailed: '无法开启宠物。',
         turnOffFailed: '无法关闭宠物。'
-      }
+      },
+      vscodeMarketplace: '来自 VS Code 应用市场',
+      noThemeMatch: (query: string) => `没有匹配“${query}”的已安装主题。`,
+      imageFilterName: '图片'
     },
     fieldLabels: defineFieldCopy({
       model: '默认模型',
@@ -1142,7 +1151,9 @@ export const zh = defineLocale({
       warmBotBackendsAria: '预热机器人后端',
       warmBotBackendsTitle: '预热机器人后端',
       backendIdleTimeoutAria: '后端空闲超时（毫秒）',
-      backendIdleTimeoutTitle: '后端空闲超时（毫秒）'
+      backendIdleTimeoutTitle: '后端空闲超时（毫秒）',
+      warmBotBackendsDesc: '保持运行的机器人后端数量，用于即时切换。数值越大切换越快，但占用的内存越多（每个后端约 60MB）。立即生效。',
+      backendIdleTimeoutDesc: '未使用的机器人后端在关闭前保持预热的时长。调高这个值，你每隔几分钟就会再访问的机器人就不必每次冷启动。'
     },
     customEndpoints: {
       title: '自定义服务',
@@ -1190,7 +1201,29 @@ export const zh = defineLocale({
     computerUse: {
       accessibility: '辅助功能',
       screenRecording: '屏幕录制',
-      driverHealth: '驱动健康状态'
+      driverHealth: '驱动健康状态',
+      checking: '正在检查 Computer Use 状态…',
+      notSupported: (platform: string) => `此平台不支持 Computer Use（${platform}）。`,
+      installBackend: '请在下方安装 cua-driver 后端，才能操作这台电脑。',
+      grantHint: ' 然后在这里授予“辅助功能”和“屏幕录制”权限。',
+      grantIdentity: '授权绑定在 CuaDriver 自身的身份（com.trycua.driver）上，而不是 Stardust，因此弹窗会显示为驱动这台 Mac 的进程。',
+      recheck: '重新检查',
+      ready: 'Computer Use 已就绪。可以让助手截取某个应用并进行点击操作。',
+      platformNoteLinux: '通过 X11/XWayland 辅助功能组件操作桌面，无需权限提示。',
+      platformNoteWin32: '首次运行时，Windows SmartScreen 可能会为 cua-driver UIAccess 工作进程弹出提示，请允许。',
+      granted: '已授权',
+      notGranted: '未授权',
+      unknownState: '未知',
+      pillReady: '就绪',
+      pillNotReady: '未就绪',
+      approveTitle: '请在系统设置中批准',
+      approveMessage: 'macOS 会弹出归属于 CuaDriver 的权限对话框。请批准后回到这里。',
+      waitingApproval: '等待批准…',
+      grantPermissions: '授予权限',
+      hintAccessibility: '允许 cua-driver 发送点击和按键，并读取无障碍树。',
+      hintScreenRecording: '允许 cua-driver 截取应用窗口的截图。',
+      requestFailed: '无法请求权限',
+      readFailed: '无法读取 Computer Use 状态'
     },
     about: {
       heading: 'Hermes Desktop',
@@ -1263,7 +1296,13 @@ export const zh = defineLocale({
       shortcutDesc: '至少需要一个修饰键，例如 CommandOrControl+Shift+Space。',
       active: '快捷键已生效。',
       takenBy: '此快捷键已被其他应用占用，请换一个。',
-      invalidShortcut: '不是有效的快捷键。请至少包含一个修饰键。'
+      invalidShortcut: '不是有效的快捷键。请至少包含一个修饰键。',
+      askPlaceholder: '问问 Stardust…',
+      disconnectedPlaceholder: '未连接，请打开 Stardust 重新连接',
+      sendTo: '发送到',
+      targetLabel: '目标会话',
+      currentChat: '当前对话',
+      newSession: '新会话'
     },
     credentials: {
       pasteKey: '粘贴密钥',
@@ -1606,7 +1645,8 @@ export const zh = defineLocale({
       importPlaceholder: '粘贴 mcp.json 片段、npx/docker 命令、claude mcp add 命令、URL 或 Cursor 链接…',
       importNoMatch: '粘贴的文本中未识别到服务器配置。',
       importConfirm: '添加到 mcp.json',
-      importConfirmMany: count => `添加 ${count} 个服务器到 mcp.json`
+      importConfirmMany: count => `添加 ${count} 个服务器到 mcp.json`,
+      apiKeyTag: 'API 密钥'
     },
     model: {
       loading: '正在加载模型服务...',
@@ -1679,7 +1719,13 @@ export const zh = defineLocale({
         review: { label: '评审', hint: '/review 评审子智能体' },
         profile_describer: { label: '配置描述', hint: '自动生成配置描述' },
         curator: { label: '维护器', hint: '技能使用审查' }
-      }
+      },
+      auxiliaryRunOn:
+        (count: number, names: string) => ({ before: `共 ${count} 项辅助任务（${names}）仍在`, after: '上运行，而不是你的主模型。' }),
+      otherProviders: '其他提供方',
+      slotProviderAria: (label: string) => `${label} 提供方`,
+      slotModelAria: (label: string) => `${label} 模型`,
+      slotReasoningAria: (label: string) => `${label} 推理强度`
     },
     localModels: {
       title: '本地模型',
@@ -1951,6 +1997,32 @@ export const zh = defineLocale({
           error: '错误'
         }
       }
+    },
+    memoryProvider: {
+      waitingForConsent: '正在等待浏览器授权…',
+      loadFailed: (error: string) => `记忆提供方设置加载失败：${error}`,
+      loadingLabel: '正在加载记忆提供方设置…',
+      settingsTitle: (label: string) => `${label} 设置`,
+      setLabel: (label: string) => `${label} 已设置`,
+      notSetLabel: (label: string) => `${label} 未设置`,
+      fullConfig: '完整配置…',
+      modalTitle: (label: string) => `${label} — 完整配置`,
+      modalDescription: (label: string) => ({ before: `${label} 的全部选项适用于配置档案“`, after: '”。留空的字段会回退到解析出的主机或内置默认值。' }),
+      docsLink: (label: string) => `${label} 配置参考`,
+      saveChanges: '保存更改',
+      keepCurrentValue: '留空则保留当前值',
+      apiKeySet: 'API 密钥已设置',
+      oauthSet: 'OAuth 已设置',
+      saved: '记忆提供方配置已更新。',
+      savedTitle: (label: string) => `${label} 已保存`,
+      aboutField: (label: string) => `关于 ${label}`,
+      startFailedDetail: '无法开始连接。',
+      startFailedToast: '无法开始连接',
+      timedOut: '等待超时，请重试。',
+      connectionFailed: '连接失败。',
+      connectViaOauth: '通过 OAuth 连接',
+      reconnect: '重新连接',
+      loadFailedPlain: '记忆提供方设置加载失败'
     }
   },
 
@@ -2246,7 +2318,24 @@ export const zh = defineLocale({
     importEmpty: '粘贴图谱代码以加载。',
     importSuccess: nodes => `已加载包含 ${nodes} 个节点的图谱。`,
     importedBadge: '导入的图谱',
-    resetToMine: '返回我的图谱'
+    resetToMine: '返回我的图谱',
+    legendCoreOuter: '中心 = 最早 · 外圈 = 较新',
+    legendMemory: '记忆',
+    nodeMenu: {
+      editMemory: '编辑记忆…',
+      editSkill: '编辑技能…',
+      editTitle: (label: string) => `编辑 ${label}`,
+      archiveSkill: '归档技能',
+      deleteMemory: '删除记忆',
+      removedForever: '此记忆将被永久删除。',
+      deleteTitle: (label: string) => `删除 ${label}？`
+    },
+    timeline: {
+      pause: '暂停',
+      playTimeline: '播放时间线',
+      scrubber: '时间线进度'
+    },
+    badShareCode: '无法读取这个地图代码。'
   },
   agents: {
     extendedTranscript: '扩展记录',
@@ -2352,7 +2441,14 @@ export const zh = defineLocale({
       referenceImageTooLarge: '参考图过大。请使用小于 16 MB 的图片。',
       referenceImageInvalid: '无法读取该参考图。请尝试 PNG、JPG、WebP 或 GIF。',
       adopt: '领养',
-      startOver: '重新开始'
+      startOver: '重新开始',
+      unavailableTitle: '请先添加图像生成后端',
+      unavailableBody: '孵化自定义宠物需要支持参考图像的提供方。',
+      setupImageGeneration: '设置图像生成',
+      grabKeyFrom: '获取密钥可前往',
+      addReference: '添加参考图',
+      removeReference: '移除参考图',
+      referenceFallback: '参考图'
     },
     installTheme: {
       title: '安装主题…',
@@ -2597,7 +2693,8 @@ export const zh = defineLocale({
       pairingExpired: 'Telegram 配对已过期。请重新开始二维码设置。',
       stillWaiting: detail => `仍在等待 Telegram。出错后重试：${detail}`,
       savedRestarting: 'Telegram 已保存；网关正在重启…',
-      savedRestartFailed: detail => `Telegram 已保存；网关重启失败${detail}`
+      savedRestartFailed: detail => `Telegram 已保存；网关重启失败${detail}`,
+      qrAlt: 'Telegram 设置二维码'
     },
     fieldCopy: {
       TELEGRAM_BOT_TOKEN: {
@@ -3408,7 +3505,36 @@ export const zh = defineLocale({
       working: '进行中',
       done: '已完成'
     },
-    markAllRead: '全部标记为已读'
+    markAllRead: '全部标记为已读',
+    filterMenu: {
+      grouping: '分组方式',
+      ordering: '排序方式',
+      show: '显示',
+      status: '状态',
+      pullRequest: '拉取请求',
+      profile: '配置档案',
+      project: '项目',
+      resetDefaults: '恢复默认设置',
+      updated: '更新时间',
+      created: '创建时间',
+      tokens: '令牌用量',
+      cost: '费用',
+      manual: '手动',
+      preview: '预览',
+      prOpen: '打开',
+      draft: '草稿',
+      merged: '已合并',
+      closed: '已关闭',
+      noPr: '无 PR',
+      needsInput: '需要输入',
+      working: '运行中',
+      unread: '未读',
+      idle: '空闲',
+      inboxStyle: '收件箱样式',
+      archived: '已归档',
+      expandAll: '全部展开',
+      collapseAll: '全部收起'
+    }
   },
 
   composer: {
@@ -3984,7 +4110,13 @@ export const zh = defineLocale({
     price: (input, output) => `${input} 输入 / ${output} 输出每 Mtok`,
     change: '更改',
     startChatting: '开始',
-    docs: provider => `${provider} 文档`
+    docs: provider => `${provider} 文档`,
+    skipSetup: '跳过设置',
+    retryFirstBuild: '重试首次构建',
+    firstBuildFailed: '无法开始首次构建。请重试以查看其会话。',
+    buildStarted: (title: string) => `${title} 已开始 — 可在你的会话中找到它`,
+    buildOpening: (title: string) => `正在打开 ${title}…`,
+    workingOnIt: '正在处理'
   },
 
   // Not yet translated — English fallbacks so the free-tier surfaces stay
@@ -4068,7 +4200,9 @@ export const zh = defineLocale({
       noModels: '未找到模型',
       editModels: '编辑模型…',
       refreshModels: '刷新模型',
-      fast: '快速'
+      fast: '快速',
+      moaPresets: 'MoA 预设',
+      moaPrefix: 'MoA：'
     },
     modelOptions: {
       noOptions: '此模型没有可用选项',
@@ -4219,6 +4353,12 @@ export const zh = defineLocale({
       modelPinned: '已由你固定；新对话将使用此模型而非“设置”中的默认模型',
       modelTitle: (provider, model) => `模型 · ${provider}: ${model}`,
       providerModelTitle: (provider, model) => `${provider} · ${model}`
+    },
+    tiles: {
+      sessionOpenFailed: '无法打开此会话',
+      noPageAt: (path: string) => `没有页面：${path}`,
+      resumeStillAvailable: '会话仍然可用，请重试恢复。',
+      resumeUnavailable: '会话不可用，你可以重试恢复。'
     }
   },
 
@@ -4635,7 +4775,25 @@ export const zh = defineLocale({
       restoreNext: '恢复下一个检查点',
       goForward: '前进',
       sendEdited: '发送编辑后的消息',
-      attachingFile: '正在附加…'
+      attachingFile: '正在附加…',
+      messageFrom: (sender: string) => `来自 ${sender} 的消息`,
+      showMessage: '查看消息',
+      repliedTo: (sender: string) => `已回复 ${sender}`,
+      showReply: '查看回复',
+      conversationTimeline: '对话时间线',
+      hermesWorking: 'Stardust 正在工作',
+      toolPayload: '工具数据',
+      toolSearch: '搜索',
+      emojiSearch: '搜索…',
+      loadingEmoji: '正在加载表情…',
+      noEmoji: '没有找到表情。',
+      moreEmoji: '更多表情',
+      reactedByHermes: '由 Stardust 回应',
+      deliveryPending: '正在发送给',
+      deliveryDone: '已发送给',
+      removeReaction: (emoji: string) => `移除 ${emoji} 回应`,
+      summarizingThread: '正在总结对话',
+      searchResults: '搜索结果'
     },
     approval: {
       gatewayDisconnected: 'Hermes 网关未连接',
@@ -4774,6 +4932,22 @@ export const zh = defineLocale({
         web_search: { done: '已搜索网页', pending: '正在搜索网页', pendingAction: '正在搜索' },
         write_file: { done: '已编辑文件', pending: '正在编辑文件', pendingAction: '正在编辑' }
       }
+    },
+    media: {
+      fetchFailed: (name: string) => `无法从网关获取 ${name}（文件缺失、无法读取或过大）。`,
+      openMediaFile: (kind: 'audio' | 'video') => (kind === 'audio' ? '打开音频文件' : '打开视频文件'),
+      couldntLoad: (name: string) => `无法加载 ${name}。`,
+      openImage: '打开图片',
+      loadingName: (name: string) => `正在加载 ${name}…`,
+      generatedImage: '生成的图片',
+      openNamed: (name: string) => `打开 ${name}`
+    },
+    embeds: {
+      failed: (label: string) => `无法加载 ${label} 嵌入内容`,
+      openDiagram: '打开图表',
+      holdToZoom: '按住 ⌘ 缩放',
+      spotifyTitle: 'Spotify 嵌入内容',
+      youtubeTitle: 'YouTube 嵌入内容'
     }
   },
 
@@ -4971,6 +5145,13 @@ export const zh = defineLocale({
       title: '侧边栏',
       description: '显示移动端侧边栏。',
       toggle: open => `${open ? '显示' : '隐藏'}侧边栏`
-    }
+    },
+    zoomable: {
+      zoomOut: '缩小',
+      zoomIn: '放大',
+      reset: '重置'
+    },
+    moreActions: '更多操作',
+    hatchingProgress: '孵化进度'
   }
 })

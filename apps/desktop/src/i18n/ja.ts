@@ -673,7 +673,10 @@ export const ja = defineLocale({
         noneAvailable: 'オンにできるペットがありません。',
         turnOnFailed: 'ペットをオンにできませんでした。',
         turnOffFailed: 'ペットをオフにできませんでした。'
-      }
+      },
+      vscodeMarketplace: 'VS Code マーケットプレイスから',
+      noThemeMatch: (query: string) => `「${query}」に一致するインストール済みのテーマはありません。`,
+      imageFilterName: '画像'
     },
     fieldLabels: defineFieldCopy({
       model: 'デフォルトモデル',
@@ -964,7 +967,13 @@ export const ja = defineLocale({
       shortcutDesc: '修飾キーが 1 つ以上必要です（例: CommandOrControl+Shift+Space）。',
       active: 'ショートカットは有効です。',
       takenBy: 'このショートカットは他のアプリが使用しています。別のものを選んでください。',
-      invalidShortcut: '有効なショートカットではありません。修飾キーを 1 つ以上含めてください。'
+      invalidShortcut: '有効なショートカットではありません。修飾キーを 1 つ以上含めてください。',
+      askPlaceholder: 'Stardust に質問…',
+      disconnectedPlaceholder: '未接続です。Stardust を開いて再接続してください',
+      sendTo: '送信先',
+      targetLabel: '送信先のセッション',
+      currentChat: '現在のチャット',
+      newSession: '新しいセッション'
     },
     credentials: {
       pasteKey: 'キーを貼り付け',
@@ -1181,7 +1190,8 @@ export const ja = defineLocale({
       importPlaceholder: 'mcp.json スニペット、npx/docker コマンド、claude mcp add 行、URL、Cursor リンクを貼り付け…',
       importNoMatch: '貼り付けたテキストからサーバー設定を認識できませんでした。',
       importConfirm: 'mcp.json に追加',
-      importConfirmMany: count => `${count} 件のサーバーを mcp.json に追加`
+      importConfirmMany: count => `${count} 件のサーバーを mcp.json に追加`,
+      apiKeyTag: 'APIキー'
     },
     model: {
       loading: 'モデル設定を読み込み中...',
@@ -1215,7 +1225,13 @@ export const ja = defineLocale({
         review: { label: 'レビュー', hint: '/review レビューサブエージェント' },
         profile_describer: { label: 'プロファイル記述', hint: 'プロファイル概要の自動生成' },
         curator: { label: 'キュレーター', hint: 'スキル使用レビュー' }
-      }
+      },
+      auxiliaryRunOn:
+        (count: number, names: string) => ({ before: `${count} 件の補助タスク（${names}）は `, after: ' で実行されたままです（メインのモデルではありません）。' }),
+      otherProviders: 'ほかのプロバイダー',
+      slotProviderAria: (label: string) => `${label} プロバイダー`,
+      slotModelAria: (label: string) => `${label} モデル`,
+      slotReasoningAria: (label: string) => `${label} の推論の強度`
     },
     localModels: {
       title: 'ローカルモデル',
@@ -1474,6 +1490,62 @@ export const ja = defineLocale({
           error: 'エラー'
         }
       }
+    },
+    computerUse: {
+      checking: 'Computer Use の状態を確認中…',
+      notSupported: (platform: string) => `このプラットフォームでは Computer Use を利用できません（${platform}）。`,
+      installBackend: 'このマシンを操作するには、下の cua-driver バックエンドをインストールしてください。',
+      grantHint: ' 続けて、ここで「アクセシビリティ」と「画面収録」を許可してください。',
+      grantIdentity: '権限は Stardust ではなく CuaDriver 自身の識別子（com.trycua.driver）に付与されるため、ダイアログには Mac を操作しているプロセスとして表示されます。',
+      recheck: '再確認',
+      ready: 'Computer Use の準備ができました。エージェントにアプリを撮影させ、操作させてください。',
+      platformNoteLinux: 'X11/XWayland のアクセシビリティ機能でデスクトップを操作します。権限の確認は不要です。',
+      platformNoteWin32: '初回実行時に、cua-driver UIAccess ワーカーについて Windows SmartScreen の確認が表示されることがあります。許可してください。',
+      granted: '許可済み',
+      notGranted: '未許可',
+      unknownState: '不明',
+      pillReady: '準備完了',
+      pillNotReady: '準備できていません',
+      approveTitle: 'システム設定で承認してください',
+      approveMessage: 'macOS が CuaDriver 名義の許可ダイアログを表示します。承認してから、ここに戻ってください。',
+      waitingApproval: '承認を待っています…',
+      grantPermissions: '権限を許可',
+      hintAccessibility: 'cua-driver がクリックやキー入力を送信し、アクセシビリティツリーを読み取れるようにします。',
+      hintScreenRecording: 'cua-driver がアプリのウィンドウのスクリーンショットを撮影できるようにします。',
+      requestFailed: '権限をリクエストできませんでした',
+      readFailed: 'Computer Use の状態を読み取れませんでした'
+    },
+    memoryProvider: {
+      waitingForConsent: 'ブラウザでの許可を待っています…',
+      loadFailed: (error: string) => `メモリプロバイダーの設定を読み込めませんでした: ${error}`,
+      loadingLabel: 'メモリプロバイダーの設定を読み込み中…',
+      settingsTitle: (label: string) => `${label} の設定`,
+      setLabel: (label: string) => `${label} 設定済み`,
+      notSetLabel: (label: string) => `${label} 未設定`,
+      fullConfig: '詳細設定…',
+      modalTitle: (label: string) => `${label} — 詳細設定`,
+      modalDescription:
+        (label: string) => ({ before: `${label} のすべての設定は「`, after: '」プロファイル用です。空欄の項目は、解決されたホストまたは組み込みの既定値を使います。' }),
+      docsLink: (label: string) => `${label} の設定リファレンス`,
+      saveChanges: '変更を保存',
+      keepCurrentValue: '空欄のままだと現在の値を保持します',
+      apiKeySet: 'APIキー設定済み',
+      oauthSet: 'OAuth 設定済み',
+      saved: 'メモリプロバイダーの設定を更新しました。',
+      savedTitle: (label: string) => `${label} を保存しました`,
+      aboutField: (label: string) => `${label} について`,
+      startFailedDetail: '接続を開始できませんでした。',
+      startFailedToast: '接続を開始できませんでした',
+      timedOut: 'タイムアウトしました。もう一度お試しください。',
+      connectionFailed: '接続に失敗しました。',
+      connectViaOauth: 'OAuth で接続',
+      reconnect: '再接続',
+      loadFailedPlain: 'メモリプロバイダーの設定を読み込めませんでした'
+    },
+    poolLimits: {
+      warmBotBackendsDesc:
+        'すぐに切り替えられるよう起動したままにしておくボットバックエンドの数です。多いほど切り替えが速くなりますが、メモリを多く使います（バックエンド 1 つあたり約 60MB）。すぐに適用されます。',
+      backendIdleTimeoutDesc: '使われていないボットバックエンドを停止するまで待機させておく時間です。数分おきに使うボットで毎回コールドスタートにならないよう、この値を大きくしてください。'
     }
   },
 
@@ -1553,7 +1625,24 @@ export const ja = defineLocale({
     loadFailed: 'メモリグラフを読み込めませんでした',
     loading: '読み込み中…',
     emptyTitle: 'まだ学習はありません',
-    emptyDesc: 'Hermes がスキルやメモリを蓄積すると、ここに表示されます。'
+    emptyDesc: 'Hermes がスキルやメモリを蓄積すると、ここに表示されます。',
+    legendCoreOuter: '中心 = 最も古い · 外側 = より新しい',
+    legendMemory: 'メモリ',
+    nodeMenu: {
+      editMemory: 'メモリを編集…',
+      editSkill: 'スキルを編集…',
+      editTitle: (label: string) => `${label} を編集`,
+      archiveSkill: 'スキルをアーカイブ',
+      deleteMemory: 'メモリを削除',
+      removedForever: 'このメモリは完全に削除されます。',
+      deleteTitle: (label: string) => `${label} を削除しますか？`
+    },
+    timeline: {
+      pause: '一時停止',
+      playTimeline: 'タイムラインを再生',
+      scrubber: 'タイムラインのシーク'
+    },
+    badShareCode: 'このマップコードを読み取れませんでした。'
   },
   agents: {
     extendedTranscript: '詳細な実行ログ',
@@ -1654,7 +1743,14 @@ export const ja = defineLocale({
       referenceImageTooLarge: '参照画像が大きすぎます。16 MB 未満の画像を使ってください。',
       referenceImageInvalid: '参照画像を読み込めませんでした。PNG/JPG/WebP/GIF を試してください。',
       adopt: '迎え入れる',
-      startOver: 'やり直す'
+      startOver: 'やり直す',
+      unavailableTitle: '画像生成のバックエンドを追加してください',
+      unavailableBody: 'カスタムペットの孵化には、参照画像を扱える提供元が必要です。',
+      setupImageGeneration: '画像生成を設定',
+      grabKeyFrom: 'キーの取得先',
+      addReference: '参照画像を追加',
+      removeReference: '参照画像を削除',
+      referenceFallback: '参照画像'
     },
     installTheme: {
       title: 'テーマをインストール…',
@@ -1789,7 +1885,8 @@ export const ja = defineLocale({
       pairingExpired: 'Telegram のペアリングが期限切れです。新しい QR セットアップを開始してください。',
       stillWaiting: detail => `Telegram を待機中。エラー後に再試行: ${detail}`,
       savedRestarting: 'Telegram を保存しました。ゲートウェイを再起動中…',
-      savedRestartFailed: detail => `Telegram を保存しましたが、ゲートウェイの再起動に失敗しました${detail}`
+      savedRestartFailed: detail => `Telegram を保存しましたが、ゲートウェイの再起動に失敗しました${detail}`,
+      qrAlt: 'Telegram 設定用の QR コード'
     },
     credentialsSet: '認証情報を設定しました',
     needsSetup: '設定が必要',
@@ -2279,6 +2376,7 @@ export const ja = defineLocale({
   sidebar: {
     recent: '最近',
     filters: 'フィルター',
+    markAllRead: 'すべて既読にする',
     gatewayGroups: {
       grouping: 'ゲートウェイとプロファイル',
       rename: 'グループ名を変更',
@@ -2445,6 +2543,35 @@ export const ja = defineLocale({
     statusDivider: {
       working: '実行中',
       done: '完了'
+    },
+    filterMenu: {
+      grouping: 'グループ化',
+      ordering: '並び順',
+      show: '表示',
+      status: '状態',
+      pullRequest: 'プルリクエスト',
+      profile: 'プロファイル',
+      project: 'プロジェクト',
+      resetDefaults: '初期設定に戻す',
+      updated: '更新日時',
+      created: '作成日時',
+      tokens: 'トークン数',
+      cost: 'コスト',
+      manual: '手動',
+      preview: 'プレビュー',
+      prOpen: '開いている',
+      draft: '下書き',
+      merged: 'マージ済み',
+      closed: 'クローズ',
+      noPr: 'PRなし',
+      needsInput: '入力待ち',
+      working: '実行中',
+      unread: '未読',
+      idle: '待機中',
+      inboxStyle: 'インボックス形式',
+      archived: 'アーカイブ済み',
+      expandAll: 'すべて展開',
+      collapseAll: 'すべて折りたたむ'
     }
   },
 
@@ -2997,7 +3124,13 @@ export const ja = defineLocale({
     price: (input, output) => `${input} 入力 / ${output} 出力 per Mtok`,
     change: '変更',
     startChatting: '始める',
-    docs: provider => `${provider} ドキュメント`
+    docs: provider => `${provider} ドキュメント`,
+    skipSetup: 'セットアップをスキップ',
+    retryFirstBuild: '最初のビルドを再試行',
+    firstBuildFailed: '最初のビルドを開始できませんでした。再試行してセッションを確認してください。',
+    buildStarted: (title: string) => `${title} を開始しました — セッションから確認できます`,
+    buildOpening: (title: string) => `${title} を開いています…`,
+    workingOnIt: '作業中'
   },
 
   modelPicker: {
@@ -3035,7 +3168,9 @@ export const ja = defineLocale({
       noModels: 'モデルが見つかりません',
       editModels: 'モデルを編集…',
       refreshModels: 'モデルを更新',
-      fast: '高速'
+      fast: '高速',
+      moaPresets: 'MoA プリセット',
+      moaPrefix: 'MoA：'
     },
     modelOptions: {
       noOptions: 'このモデルにはオプションがありません',
@@ -3169,6 +3304,12 @@ export const ja = defineLocale({
       modelPinned: '手動で固定中 — 新しいチャットは設定のデフォルトではなくこのモデルを使用します',
       modelTitle: (provider, model) => `モデル · ${provider}: ${model}`,
       providerModelTitle: (provider, model) => `${provider} · ${model}`
+    },
+    tiles: {
+      sessionOpenFailed: 'このセッションを開けませんでした',
+      noPageAt: (path: string) => `ページがありません: ${path}`,
+      resumeStillAvailable: 'セッションはまだ利用できます。再開を再試行してください。',
+      resumeUnavailable: 'セッションを利用できません。再開を再試行できます。'
     }
   },
 
@@ -3588,7 +3729,25 @@ export const ja = defineLocale({
       restoreNext: '次のチェックポイントに戻す',
       goForward: '進む',
       sendEdited: '編集済みメッセージを送信',
-      attachingFile: '添付中…'
+      attachingFile: '添付中…',
+      messageFrom: (sender: string) => `${sender} からのメッセージ`,
+      showMessage: 'メッセージを表示',
+      repliedTo: (sender: string) => `${sender} に返信しました`,
+      showReply: '返信を表示',
+      conversationTimeline: '会話のタイムライン',
+      hermesWorking: 'Stardust が作業中です',
+      toolPayload: 'ツールのペイロード',
+      toolSearch: '検索',
+      emojiSearch: '検索…',
+      loadingEmoji: '絵文字を読み込み中…',
+      noEmoji: '絵文字が見つかりません。',
+      moreEmoji: '絵文字をもっと見る',
+      reactedByHermes: 'Stardust がリアクション',
+      deliveryPending: '送信中:',
+      deliveryDone: '送信済み:',
+      removeReaction: (emoji: string) => `${emoji} のリアクションを削除`,
+      summarizingThread: '会話を要約中',
+      searchResults: '検索結果'
     },
     approval: {
       gatewayDisconnected: 'Hermes ゲートウェイが接続されていません',
@@ -3741,6 +3900,22 @@ export const ja = defineLocale({
         web_search: { done: 'Web を検索しました', pending: 'Web を検索中', pendingAction: '検索中' },
         write_file: { done: 'ファイルを編集しました', pending: 'ファイルを編集中', pendingAction: '編集中' }
       }
+    },
+    media: {
+      fetchFailed: (name: string) => `ゲートウェイから ${name} を取得できませんでした（見つからない、読み取れない、またはサイズが大きすぎます）。`,
+      openMediaFile: (kind: 'audio' | 'video') => (kind === 'audio' ? '音声ファイルを開く' : '動画ファイルを開く'),
+      couldntLoad: (name: string) => `${name} を読み込めませんでした。`,
+      openImage: '画像を開く',
+      loadingName: (name: string) => `${name} を読み込み中…`,
+      generatedImage: '生成された画像',
+      openNamed: (name: string) => `${name} を開く`
+    },
+    embeds: {
+      failed: (label: string) => `${label} の埋め込みを読み込めませんでした`,
+      openDiagram: '図を開く',
+      holdToZoom: '⌘ を押しながらズーム',
+      spotifyTitle: 'Spotify の埋め込み',
+      youtubeTitle: 'YouTube の埋め込み'
     }
   },
 
@@ -3944,6 +4119,22 @@ export const ja = defineLocale({
       title: 'サイドバー',
       description: 'モバイルサイドバーを表示します。',
       toggle: open => `サイドバーを${open ? '表示' : '非表示'}`
-    }
+    },
+    zoomable: {
+      zoomOut: '縮小',
+      zoomIn: '拡大',
+      reset: 'リセット'
+    },
+    moreActions: 'その他の操作',
+    hatchingProgress: '孵化の進行状況'
+  },
+  connectors: {
+    skipThis: 'このステップをスキップ',
+    search: 'アプリを検索',
+    setupUnavailable: '現在、接続機能は利用できません。後から設定できます。',
+    nothingYet: 'まだ何も接続されていません。',
+    nothingYetBody: 'タスクで必要になったときに Stardust が接続を提案します。内容を読み取る前には必ず確認します。',
+    noneOfThese: 'どれも選ばない',
+    continueWithCount: (count: number) => `${count} 件で続ける`
   }
 })

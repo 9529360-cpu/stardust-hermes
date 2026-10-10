@@ -645,7 +645,10 @@ export const zhHant = defineLocale({
         noneAvailable: '目前沒有可開啟的寵物。',
         turnOnFailed: '無法開啟寵物。',
         turnOffFailed: '無法關閉寵物。'
-      }
+      },
+      vscodeMarketplace: '來自 VS Code 應用程式市集',
+      noThemeMatch: (query: string) => `沒有符合「${query}」的已安裝主題。`,
+      imageFilterName: '圖片'
     },
     fieldLabels: defineFieldCopy({
       model: '預設模型',
@@ -921,7 +924,9 @@ export const zhHant = defineLocale({
       warmBotBackendsAria: '預熱機器人後端',
       warmBotBackendsTitle: '預熱機器人後端',
       backendIdleTimeoutAria: '後端閒置逾時（毫秒）',
-      backendIdleTimeoutTitle: '後端閒置逾時（毫秒）'
+      backendIdleTimeoutTitle: '後端閒置逾時（毫秒）',
+      warmBotBackendsDesc: '保持執行的機器人後端數量，用於即時切換。數值越大切換越快，但占用的記憶體越多（每個後端約 60MB）。立即生效。',
+      backendIdleTimeoutDesc: '未使用的機器人後端在關閉前保持預熱的時間。調高此值，你每隔幾分鐘就會再訪的機器人就不必每次冷啟動。'
     },
     customEndpoints: {
       title: '自訂服務',
@@ -969,7 +974,29 @@ export const zhHant = defineLocale({
     computerUse: {
       accessibility: '輔助使用',
       screenRecording: '螢幕錄製',
-      driverHealth: '驅動程式健康狀態'
+      driverHealth: '驅動程式健康狀態',
+      checking: '正在檢查 Computer Use 狀態…',
+      notSupported: (platform: string) => `此平台不支援 Computer Use（${platform}）。`,
+      installBackend: '請在下方安裝 cua-driver 後端，才能操作這台電腦。',
+      grantHint: ' 接著在這裡授予「輔助使用」和「螢幕錄製」權限。',
+      grantIdentity: '授權綁定在 CuaDriver 本身的身分（com.trycua.driver）上，而不是 Stardust，因此對話框會顯示為驅動這台 Mac 的程序。',
+      recheck: '重新檢查',
+      ready: 'Computer Use 已就緒。可以讓助理截取某個應用程式並進行點按操作。',
+      platformNoteLinux: '透過 X11/XWayland 協助工具堆疊操作桌面，無需權限提示。',
+      platformNoteWin32: '首次執行時，Windows SmartScreen 可能會為 cua-driver UIAccess 工作程序跳出提示，請允許。',
+      granted: '已授權',
+      notGranted: '未授權',
+      unknownState: '未知',
+      pillReady: '就緒',
+      pillNotReady: '未就緒',
+      approveTitle: '請在系統設定中核准',
+      approveMessage: 'macOS 會跳出歸屬於 CuaDriver 的權限對話框。請核准後回到這裡。',
+      waitingApproval: '等待核准…',
+      grantPermissions: '授予權限',
+      hintAccessibility: '允許 cua-driver 傳送點按與按鍵，並讀取無障礙樹。',
+      hintScreenRecording: '允許 cua-driver 擷取應用程式視窗的截圖。',
+      requestFailed: '無法請求權限',
+      readFailed: '無法讀取 Computer Use 狀態'
     },
     about: {
       heading: 'Hermes Desktop',
@@ -1034,7 +1061,13 @@ export const zhHant = defineLocale({
       shortcutDesc: '至少需要一個修飾鍵，例如 CommandOrControl+Shift+Space。',
       active: '快速鍵已生效。',
       takenBy: '此快速鍵已被其他應用程式占用，請換一個。',
-      invalidShortcut: '不是有效的快速鍵。請至少包含一個修飾鍵。'
+      invalidShortcut: '不是有效的快速鍵。請至少包含一個修飾鍵。',
+      askPlaceholder: '問問 Stardust…',
+      disconnectedPlaceholder: '未連線，請開啟 Stardust 重新連線',
+      sendTo: '傳送到',
+      targetLabel: '目標工作階段',
+      currentChat: '目前對話',
+      newSession: '新工作階段'
     },
     credentials: {
       pasteKey: '貼上金鑰',
@@ -1236,7 +1269,8 @@ export const zhHant = defineLocale({
       importPlaceholder: '貼上 mcp.json 片段、npx/docker 指令、claude mcp add 指令、URL 或 Cursor 連結…',
       importNoMatch: '貼上的文字中未識別到伺服器設定。',
       importConfirm: '加入 mcp.json',
-      importConfirmMany: count => `將 ${count} 個伺服器加入 mcp.json`
+      importConfirmMany: count => `將 ${count} 個伺服器加入 mcp.json`,
+      apiKeyTag: 'API 金鑰'
     },
     model: {
       loading: '正在載入模型服務...',
@@ -1303,7 +1337,13 @@ export const zhHant = defineLocale({
         review: { label: '評審', hint: '/review 評審子代理' },
         profile_describer: { label: '設定檔描述', hint: '自動生成設定檔描述' },
         curator: { label: '策展器', hint: '技能使用審查' }
-      }
+      },
+      auxiliaryRunOn:
+        (count: number, names: string) => ({ before: `共 ${count} 項輔助任務（${names}）仍在`, after: '上執行，而不是你的主要模型。' }),
+      otherProviders: '其他提供者',
+      slotProviderAria: (label: string) => `${label} 提供者`,
+      slotModelAria: (label: string) => `${label} 模型`,
+      slotReasoningAria: (label: string) => `${label} 推理強度`
     },
     localModels: {
       title: '本地模型',
@@ -1551,6 +1591,32 @@ export const zhHant = defineLocale({
           error: '錯誤'
         }
       }
+    },
+    memoryProvider: {
+      waitingForConsent: '正在等待瀏覽器授權…',
+      loadFailed: (error: string) => `記憶提供者設定載入失敗：${error}`,
+      loadingLabel: '正在載入記憶提供者設定…',
+      settingsTitle: (label: string) => `${label} 設定`,
+      setLabel: (label: string) => `${label} 已設定`,
+      notSetLabel: (label: string) => `${label} 未設定`,
+      fullConfig: '完整設定…',
+      modalTitle: (label: string) => `${label} — 完整設定`,
+      modalDescription: (label: string) => ({ before: `${label} 的全部選項適用於設定檔「`, after: '」。留空的欄位會回退到解析後的主機或內建預設值。' }),
+      docsLink: (label: string) => `${label} 設定參考`,
+      saveChanges: '儲存變更',
+      keepCurrentValue: '留空則保留目前的值',
+      apiKeySet: 'API 金鑰已設定',
+      oauthSet: 'OAuth 已設定',
+      saved: '記憶提供者設定已更新。',
+      savedTitle: (label: string) => `${label} 已儲存`,
+      aboutField: (label: string) => `關於 ${label}`,
+      startFailedDetail: '無法開始連線。',
+      startFailedToast: '無法開始連線',
+      timedOut: '等待逾時，請再試一次。',
+      connectionFailed: '連線失敗。',
+      connectViaOauth: '透過 OAuth 連線',
+      reconnect: '重新連線',
+      loadFailedPlain: '記憶提供者設定載入失敗'
     }
   },
 
@@ -1781,7 +1847,24 @@ export const zhHant = defineLocale({
     loadFailed: '無法載入記憶圖譜',
     loading: '載入中…',
     emptyTitle: '尚無學習內容',
-    emptyDesc: '當 Hermes 為你的工作建立技能與記憶時，會顯示在這裡。'
+    emptyDesc: '當 Hermes 為你的工作建立技能與記憶時，會顯示在這裡。',
+    legendCoreOuter: '中心 = 最早 · 外圈 = 較新',
+    legendMemory: '記憶',
+    nodeMenu: {
+      editMemory: '編輯記憶…',
+      editSkill: '編輯技能…',
+      editTitle: (label: string) => `編輯 ${label}`,
+      archiveSkill: '封存技能',
+      deleteMemory: '刪除記憶',
+      removedForever: '此記憶將被永久刪除。',
+      deleteTitle: (label: string) => `刪除 ${label}？`
+    },
+    timeline: {
+      pause: '暫停',
+      playTimeline: '播放時間軸',
+      scrubber: '時間軸進度'
+    },
+    badShareCode: '無法讀取這個地圖代碼。'
   },
   agents: {
     extendedTranscript: '完整記錄尾端',
@@ -1882,7 +1965,14 @@ export const zhHant = defineLocale({
       referenceImageTooLarge: '參考圖片過大。請使用小於 16 MB 的圖片。',
       referenceImageInvalid: '無法讀取該參考圖片。請嘗試 PNG、JPG、WebP 或 GIF。',
       adopt: '領養',
-      startOver: '重新開始'
+      startOver: '重新開始',
+      unavailableTitle: '請先新增圖像生成後端',
+      unavailableBody: '孵化自訂寵物需要支援參考圖像的提供者。',
+      setupImageGeneration: '設定圖像生成',
+      grabKeyFrom: '取得金鑰可前往',
+      addReference: '新增參考圖',
+      removeReference: '移除參考圖',
+      referenceFallback: '參考圖'
     },
     installTheme: {
       title: '安裝主題…',
@@ -2015,7 +2105,8 @@ export const zhHant = defineLocale({
       pairingExpired: 'Telegram 配對已到期。請重新開始 QR 設定。',
       stillWaiting: detail => `仍在等待 Telegram。出錯後重試：${detail}`,
       savedRestarting: 'Telegram 已儲存；閘道正在重新啟動…',
-      savedRestartFailed: detail => `Telegram 已儲存；閘道重新啟動失敗${detail}`
+      savedRestartFailed: detail => `Telegram 已儲存；閘道重新啟動失敗${detail}`,
+      qrAlt: 'Telegram 設定 QR 碼'
     },
     credentialsSet: '憑證已設定',
     needsSetup: '需要設定',
@@ -2524,6 +2615,7 @@ export const zhHant = defineLocale({
   sidebar: {
     recent: '最近',
     filters: '篩選',
+    markAllRead: '全部標記為已讀',
     gatewayGroups: {
       grouping: '閘道與設定檔',
       rename: '重新命名群組',
@@ -2686,6 +2778,35 @@ export const zhHant = defineLocale({
     statusDivider: {
       working: '進行中',
       done: '已完成'
+    },
+    filterMenu: {
+      grouping: '分組方式',
+      ordering: '排序方式',
+      show: '顯示',
+      status: '狀態',
+      pullRequest: '拉取請求',
+      profile: '設定檔',
+      project: '專案',
+      resetDefaults: '恢復預設值',
+      updated: '更新時間',
+      created: '建立時間',
+      tokens: '權杖用量',
+      cost: '費用',
+      manual: '手動',
+      preview: '預覽',
+      prOpen: '開啟',
+      draft: '草稿',
+      merged: '已合併',
+      closed: '已關閉',
+      noPr: '無 PR',
+      needsInput: '需要輸入',
+      working: '執行中',
+      unread: '未讀',
+      idle: '閒置',
+      inboxStyle: '收件匣樣式',
+      archived: '已封存',
+      expandAll: '全部展開',
+      collapseAll: '全部收合'
     }
   },
 
@@ -3216,7 +3337,13 @@ export const zhHant = defineLocale({
     price: (input, output) => `${input} 輸入 / ${output} 輸出 每 Mtok`,
     change: '變更',
     startChatting: '開始',
-    docs: provider => `${provider} 文件`
+    docs: provider => `${provider} 文件`,
+    skipSetup: '跳過設定',
+    retryFirstBuild: '重試首次建置',
+    firstBuildFailed: '無法開始首次建置。請重試以查看其工作階段。',
+    buildStarted: (title: string) => `${title} 已開始 — 可在你的工作階段中找到它`,
+    buildOpening: (title: string) => `正在開啟 ${title}…`,
+    workingOnIt: '正在處理'
   },
 
   modelPicker: {
@@ -3254,7 +3381,9 @@ export const zhHant = defineLocale({
       noModels: '找不到模型',
       editModels: '編輯模型…',
       refreshModels: '重新整理模型',
-      fast: '快速'
+      fast: '快速',
+      moaPresets: 'MoA 預設',
+      moaPrefix: 'MoA：'
     },
     modelOptions: {
       noOptions: '此模型沒有可用選項',
@@ -3387,6 +3516,12 @@ export const zhHant = defineLocale({
       modelPinned: '已由你固定；新對話將使用此模型而非「設定」中的預設模型',
       modelTitle: (provider, model) => `模型 · ${provider}：${model}`,
       providerModelTitle: (provider, model) => `${provider} · ${model}`
+    },
+    tiles: {
+      sessionOpenFailed: '無法開啟此工作階段',
+      noPageAt: (path: string) => `沒有頁面：${path}`,
+      resumeStillAvailable: '工作階段仍可使用，請重試恢復。',
+      resumeUnavailable: '工作階段無法使用，你可以重試恢復。'
     }
   },
 
@@ -3786,7 +3921,25 @@ export const zhHant = defineLocale({
       restoreNext: '還原至下一個檢查點',
       goForward: '前進',
       sendEdited: '傳送編輯後的訊息',
-      attachingFile: '正在附加…'
+      attachingFile: '正在附加…',
+      messageFrom: (sender: string) => `來自 ${sender} 的訊息`,
+      showMessage: '查看訊息',
+      repliedTo: (sender: string) => `已回覆 ${sender}`,
+      showReply: '查看回覆',
+      conversationTimeline: '對話時間軸',
+      hermesWorking: 'Stardust 正在工作',
+      toolPayload: '工具資料',
+      toolSearch: '搜尋',
+      emojiSearch: '搜尋…',
+      loadingEmoji: '正在載入表情…',
+      noEmoji: '找不到表情。',
+      moreEmoji: '更多表情',
+      reactedByHermes: '由 Stardust 回應',
+      deliveryPending: '正在傳送給',
+      deliveryDone: '已傳送給',
+      removeReaction: (emoji: string) => `移除 ${emoji} 回應`,
+      summarizingThread: '正在摘要對話',
+      searchResults: '搜尋結果'
     },
     approval: {
       gatewayDisconnected: 'Hermes 閘道未連線',
@@ -3911,6 +4064,22 @@ export const zhHant = defineLocale({
         web_search: { done: '已搜尋網頁', pending: '正在搜尋網頁', pendingAction: '正在搜尋' },
         write_file: { done: '已編輯檔案', pending: '正在編輯檔案', pendingAction: '正在編輯' }
       }
+    },
+    media: {
+      fetchFailed: (name: string) => `無法從閘道取得 ${name}（檔案遺失、無法讀取或過大）。`,
+      openMediaFile: (kind: 'audio' | 'video') => (kind === 'audio' ? '開啟音訊檔案' : '開啟影片檔案'),
+      couldntLoad: (name: string) => `無法載入 ${name}。`,
+      openImage: '開啟圖片',
+      loadingName: (name: string) => `正在載入 ${name}…`,
+      generatedImage: '生成的圖片',
+      openNamed: (name: string) => `開啟 ${name}`
+    },
+    embeds: {
+      failed: (label: string) => `無法載入 ${label} 嵌入內容`,
+      openDiagram: '開啟圖表',
+      holdToZoom: '按住 ⌘ 縮放',
+      spotifyTitle: 'Spotify 嵌入內容',
+      youtubeTitle: 'YouTube 嵌入內容'
     }
   },
 
@@ -4108,6 +4277,22 @@ export const zhHant = defineLocale({
       title: '側邊欄',
       description: '顯示行動裝置側邊欄。',
       toggle: open => `${open ? '顯示' : '隱藏'}側邊欄`
-    }
+    },
+    zoomable: {
+      zoomOut: '縮小',
+      zoomIn: '放大',
+      reset: '重設'
+    },
+    moreActions: '更多操作',
+    hatchingProgress: '孵化進度'
+  },
+  connectors: {
+    skipThis: '略過此步',
+    search: '尋找應用程式',
+    setupUnavailable: '目前無法使用連線功能，之後可以再設定。',
+    nothingYet: '尚未連接任何應用程式。',
+    nothingYetBody: 'Stardust 會在任務需要時提議連結，並在讀取任何內容前先詢問你。',
+    noneOfThese: '都不要',
+    continueWithCount: (count: number) => `繼續（${count}）`
   }
 })

@@ -16,6 +16,7 @@ import { chunkByLines, SyntaxHighlighter } from '@/components/chat/shiki-highlig
 import { TranscriptVideo } from '@/components/chat/transcript-video'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { useI18n } from '@/i18n'
 import { detectArtifact } from '@/lib/artifact-detect'
 import { normalizeExternalUrl, openExternalLink, PrettyLink } from '@/lib/external-link'
 import { createMemoizedMathPlugin } from '@/lib/katex-memo'
@@ -124,14 +125,13 @@ function useOpenMediaFile(path: string) {
 }
 
 function OpenMediaFailedNote({ name }: { name: string }) {
-  return (
-    <span className="mt-1 block text-xs text-muted-foreground">
-      Couldn&apos;t fetch {name} from the gateway (missing, unreadable, or too large).
-    </span>
-  )
+  const { t } = useI18n()
+
+  return <span className="mt-1 block text-xs text-muted-foreground">{t.assistant.media.fetchFailed(name)}</span>
 }
 
 function OpenMediaButton({ kind, path }: { kind: 'audio' | 'video'; path: string }) {
+  const { t } = useI18n()
   const { open, openFailed } = useOpenMediaFile(path)
 
   return (
@@ -141,7 +141,7 @@ function OpenMediaButton({ kind, path }: { kind: 'audio' | 'video'; path: string
         onClick={open}
         type="button"
       >
-        Open {kind} file
+        {t.assistant.media.openMediaFile(kind)}
       </button>
       {openFailed && <OpenMediaFailedNote name={mediaName(path)} />}
     </span>
@@ -149,6 +149,7 @@ function OpenMediaButton({ kind, path }: { kind: 'audio' | 'video'; path: string
 }
 
 function MediaAttachment({ path }: { path: string }) {
+  const { t } = useI18n()
   const [src, setSrc] = useState('')
   const [failed, setFailed] = useState(false)
   const { open, openFailed } = useOpenMediaFile(path)
@@ -240,7 +241,7 @@ function MediaAttachment({ path }: { path: string }) {
           open()
         }}
       >
-        {failed ? `Open ${name}` : `Loading ${name}...`}
+        {failed ? t.assistant.media.openNamed(name) : t.assistant.media.loadingName(name)}
       </a>
       {openFailed && <OpenMediaFailedNote name={name} />}
     </span>
@@ -373,6 +374,7 @@ export function MarkdownImage(props: ComponentProps<'img'>) {
 }
 
 function MarkdownImageContent({ className, src, alt, ...props }: ComponentProps<'img'>) {
+  const { t } = useI18n()
   const rawSrc = typeof src === 'string' ? src : ''
   const [resolvedSrc, setResolvedSrc] = useState(() => (rawSrc && isInlineMediaSrc(rawSrc) ? rawSrc : ''))
   const [failed, setFailed] = useState(false)
@@ -415,9 +417,9 @@ function MarkdownImageContent({ className, src, alt, ...props }: ComponentProps<
   if (failed) {
     return (
       <span className="my-2 block text-sm text-muted-foreground">
-        Couldn&apos;t load {name}.{' '}
+        {t.assistant.media.couldntLoad(name)}{' '}
         <button className="ref font-medium text-foreground" onClick={open} type="button">
-          Open image
+          {t.assistant.media.openImage}
         </button>
         {openFailed && <OpenMediaFailedNote name={name} />}
       </span>
@@ -425,7 +427,7 @@ function MarkdownImageContent({ className, src, alt, ...props }: ComponentProps<
   }
 
   if (!resolvedSrc) {
-    return <span className="my-2 block text-sm text-muted-foreground">Loading {name}...</span>
+    return <span className="my-2 block text-sm text-muted-foreground">{t.assistant.media.loadingName(name)}</span>
   }
 
   // The width cap belongs on the container, not the <img>: a percentage

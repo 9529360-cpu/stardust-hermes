@@ -1628,7 +1628,7 @@ function McpCatalog({
                   </span>
                   <CatalogTag>{entry.transport}</CatalogTag>
                   {entry.auth_type === 'oauth' && <CatalogTag>OAuth</CatalogTag>}
-                  {entry.auth_type === 'api_key' && <CatalogTag>API key</CatalogTag>}
+                  {entry.auth_type === 'api_key' && <CatalogTag>{t.settings.mcp.apiKeyTag}</CatalogTag>}
                   {entry.needs_install && !entry.installed && <CatalogTag>{m.catalogNeedsInstall}</CatalogTag>}
                   {entry.installed && (
                     <span className="text-[0.6rem] text-emerald-400">

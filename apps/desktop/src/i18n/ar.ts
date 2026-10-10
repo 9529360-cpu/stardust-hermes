@@ -701,7 +701,10 @@ export const ar = defineLocale({
         noneAvailable: 'لا توجد حيوانات أليفة متاحة للتشغيل الآن.',
         turnOnFailed: 'تعذّر تشغيل الحيوان الأليف.',
         turnOffFailed: 'تعذّر إيقاف الحيوان الأليف.'
-      }
+      },
+      vscodeMarketplace: 'من سوق VS Code',
+      noThemeMatch: (query: string) => `لا توجد سمات مثبتة تطابق "${query}".`,
+      imageFilterName: 'الصور'
     },
     fieldLabels: {
       model: 'النموذج الافتراضي',
@@ -887,7 +890,13 @@ export const ar = defineLocale({
       shortcutDesc: 'يحتاج إلى مفتاح تعديل واحد على الأقل، مثل CommandOrControl+Shift+Space.',
       active: 'الاختصار مفعّل.',
       takenBy: 'يستخدم تطبيق آخر هذا الاختصار — اختر اختصارا مختلفا.',
-      invalidShortcut: 'ليس اختصارا صالحا. أضف مفتاح تعديل واحدا على الأقل.'
+      invalidShortcut: 'ليس اختصارا صالحا. أضف مفتاح تعديل واحدا على الأقل.',
+      askPlaceholder: 'اسأل Stardust…',
+      disconnectedPlaceholder: 'غير متصل — افتح Stardust لإعادة الاتصال',
+      sendTo: 'إرسال إلى',
+      targetLabel: 'الجلسة المستهدفة',
+      currentChat: 'المحادثة الحالية',
+      newSession: 'جلسة جديدة'
     },
     credentials: {
       pasteKey: 'لصق المفتاح',
@@ -1021,7 +1030,8 @@ export const ar = defineLocale({
       deepLinkErrorConfig: 'إعدادات الرابط ليست JSON صالحا مرمّزا بـ base64.',
       deepLinkErrorShape: 'يجب أن تكون الإعدادات كائن JSON يحتوي على حقل `url` أو `command` نصي.',
       deepLinkErrorUrl: 'يسمح فقط بعناوين http:// و https:// للخادم.',
-      deepLinkErrorTooLarge: 'حجم الإعدادات يتجاوز الحد الأقصى 32KB.'
+      deepLinkErrorTooLarge: 'حجم الإعدادات يتجاوز الحد الأقصى 32KB.',
+      apiKeyTag: 'مفتاح API'
     },
     model: {
       loading: 'جار تحميل إعدادات النموذج...',
@@ -1083,7 +1093,13 @@ export const ar = defineLocale({
           label: 'المنسّق',
           hint: 'مراجعة استخدام المهارات'
         }
-      }
+      },
+      auxiliaryRunOn:
+        (count: number, names: string) => ({ before: `ما زالت ${count} من المهام المساعدة (${names}) تعمل على `, after: '، وليس على نموذجك الرئيسي.' }),
+      otherProviders: 'مزوّدون آخرون',
+      slotProviderAria: (label: string) => `${label} المزوّد`,
+      slotModelAria: (label: string) => `${label} النموذج`,
+      slotReasoningAria: (label: string) => `${label} مستوى التفكير`
     },
     providers: {
       connectAccount: 'ربط حساب',
@@ -1169,6 +1185,64 @@ export const ar = defineLocale({
       postSetupErrorTitle: 'انتهى الإعداد بأخطاء',
       postSetupErrorMessage: step => `تحقق من سجل ${step}.`,
       postSetupFailed: step => `فشل تشغيل إعداد ${step}`
+    },
+    computerUse: {
+      checking: 'جارٍ التحقق من حالة Computer Use…',
+      notSupported: (platform: string) => `Computer Use غير مدعوم على هذه المنصة (${platform}).`,
+      installBackend: 'ثبّت خلفية cua-driver أدناه للتحكم في هذا الجهاز.',
+      grantHint: ' ثم امنح صلاحيتي «إمكانية الوصول» و«تسجيل الشاشة» من هنا.',
+      grantIdentity:
+        'تُمنح الأذونات لهوية CuaDriver نفسها (com.trycua.driver) لا لـ Stardust، لذلك تُنسب النافذة إلى العملية التي تتحكم في جهاز Mac الخاص بك.',
+      recheck: 'إعادة الفحص',
+      ready: 'Computer Use جاهز. اطلب من الوكيل التقاط تطبيق والتفاعل معه.',
+      platformNoteLinux: 'يتحكم في سطح المكتب عبر مكدس إمكانية الوصول X11/XWayland — دون طلب إذن.',
+      platformNoteWin32: 'قد تظهر في أول تشغيل مطالبة Windows SmartScreen لعملية cua-driver UIAccess — اسمح بها.',
+      granted: 'ممنوح',
+      notGranted: 'غير ممنوح',
+      unknownState: 'غير معروف',
+      pillReady: 'جاهز',
+      pillNotReady: 'غير جاهز',
+      approveTitle: 'وافق في إعدادات النظام',
+      approveMessage: 'سيعرض macOS نافذة إذن تُنسب إلى CuaDriver. وافق عليها ثم عد إلى هنا.',
+      waitingApproval: 'في انتظار الموافقة…',
+      grantPermissions: 'منح الأذونات',
+      hintAccessibility: 'يتيح لـ cua-driver إرسال النقرات ولوحة المفاتيح وقراءة شجرة إمكانية الوصول.',
+      hintScreenRecording: 'يتيح لـ cua-driver التقاط لقطات شاشة لنوافذ التطبيقات.',
+      requestFailed: 'تعذّر طلب الأذونات',
+      readFailed: 'تعذّر قراءة حالة Computer Use'
+    },
+    memoryProvider: {
+      waitingForConsent: 'في انتظار الموافقة في المتصفح…',
+      loadFailed: (error: string) => `تعذّر تحميل إعدادات مزوّد الذاكرة: ${error}`,
+      loadingLabel: 'جارٍ تحميل إعدادات مزوّد الذاكرة…',
+      settingsTitle: (label: string) => `إعدادات ${label}`,
+      setLabel: (label: string) => `${label} مُعيَّن`,
+      notSetLabel: (label: string) => `${label} غير مُعيَّن`,
+      fullConfig: 'الإعدادات الكاملة…',
+      modalTitle: (label: string) => `${label} — الإعدادات الكاملة`,
+      modalDescription:
+        (label: string) => ({ before: `جميع خيارات ${label} لملف التعريف «`, after: '». الحقول الفارغة تعود إلى المضيف المحلول أو القيمة المدمجة.' }),
+      docsLink: (label: string) => `مرجع إعدادات ${label}`,
+      saveChanges: 'حفظ التغييرات',
+      keepCurrentValue: 'اتركه فارغًا للإبقاء على القيمة الحالية',
+      apiKeySet: 'مفتاح API مُعيَّن',
+      oauthSet: 'OAuth مُعيَّن',
+      saved: 'تم تحديث إعدادات مزوّد الذاكرة.',
+      savedTitle: (label: string) => `تم حفظ ${label}`,
+      aboutField: (label: string) => `حول ${label}`,
+      startFailedDetail: 'تعذّر بدء الاتصال.',
+      startFailedToast: 'تعذّر بدء الاتصال',
+      timedOut: 'انتهت المهلة — حاول مرة أخرى.',
+      connectionFailed: 'فشل الاتصال.',
+      connectViaOauth: 'الاتصال عبر OAuth',
+      reconnect: 'إعادة الاتصال',
+      loadFailedPlain: 'تعذّر تحميل إعدادات مزوّد الذاكرة'
+    },
+    poolLimits: {
+      warmBotBackendsDesc:
+        'عدد خلفيات الروبوتات التي تبقى قيد التشغيل للتبديل الفوري. كلما زاد العدد أصبح التبديل أسرع، لكن الذاكرة المستخدمة تزداد (نحو 60 ميغابايت لكل خلفية). يُطبَّق فورًا.',
+      backendIdleTimeoutDesc:
+        'المدة التي تبقى فيها خلفية روبوت غير مستخدمة جاهزة قبل إيقافها. ارفعها حتى لا تتطلب الروبوتات التي تعود إليها كل بضع دقائق بدءًا باردًا.'
     }
   },
   skills: {
@@ -1296,7 +1370,14 @@ export const ar = defineLocale({
       referenceImageTooLarge: 'صورة المرجع كبيرة جدا. استخدم واحدة أقل من 16 MB.',
       referenceImageInvalid: 'تعذّرت قراءة صورة المرجع تلك. جرّب PNG أو JPG أو WebP أو GIF.',
       adopt: 'تبنّي',
-      startOver: 'البدء من جديد'
+      startOver: 'البدء من جديد',
+      unavailableTitle: 'أضف خلفية لتوليد الصور',
+      unavailableBody: 'يحتاج فقس حيوان أليف مخصص إلى مزوّد يستند إلى صورة مرجعية.',
+      setupImageGeneration: 'إعداد توليد الصور',
+      grabKeyFrom: 'احصل على مفتاح من',
+      addReference: 'إضافة مرجع',
+      removeReference: 'إزالة المرجع',
+      referenceFallback: 'مرجع'
     },
     installTheme: {
       title: 'تثبيت سمة...',
@@ -1456,7 +1537,8 @@ export const ar = defineLocale({
       pairingExpired: 'انتهت صلاحية اقتران Telegram. ابدأ إعداد QR جديدًا.',
       stillWaiting: detail => `ما زلنا ننتظر Telegram. إعادة المحاولة بعد: ${detail}`,
       savedRestarting: 'تم حفظ Telegram؛ تجري إعادة تشغيل البوابة…',
-      savedRestartFailed: detail => `تم حفظ Telegram؛ فشلت إعادة تشغيل البوابة${detail}`
+      savedRestartFailed: detail => `تم حفظ Telegram؛ فشلت إعادة تشغيل البوابة${detail}`,
+      qrAlt: 'رمز QR لإعداد Telegram'
     },
     credentialsSet: 'بيانات الاعتماد مضبوطة',
     needsSetup: 'يحتاج إعدادا',
@@ -1943,6 +2025,8 @@ export const ar = defineLocale({
   },
   sidebar: {
     recent: 'الأخيرة',
+    filters: 'التصفية',
+    markAllRead: 'تحديد الكل كمقروء',
     gatewayGroups: {
       grouping: 'البوابة والملف الشخصي',
       rename: 'إعادة تسمية المجموعة',
@@ -2099,6 +2183,35 @@ export const ar = defineLocale({
       ageDay: 'يوم',
       ageHour: 'ساعة',
       ageMin: 'دقيقة'
+    },
+    filterMenu: {
+      grouping: 'التجميع',
+      ordering: 'الترتيب',
+      show: 'عرض',
+      status: 'الحالة',
+      pullRequest: 'طلب السحب',
+      profile: 'الملف الشخصي',
+      project: 'المشروع',
+      resetDefaults: 'استعادة الإعدادات الافتراضية',
+      updated: 'آخر تحديث',
+      created: 'تاريخ الإنشاء',
+      tokens: 'الرموز',
+      cost: 'التكلفة',
+      manual: 'يدوي',
+      preview: 'معاينة',
+      prOpen: 'مفتوح',
+      draft: 'مسودة',
+      merged: 'مدمج',
+      closed: 'مغلق',
+      noPr: 'بدون PR',
+      needsInput: 'بانتظار الإدخال',
+      working: 'قيد التشغيل',
+      unread: 'غير مقروء',
+      idle: 'خامل',
+      inboxStyle: 'نمط صندوق الوارد',
+      archived: 'مؤرشفة',
+      expandAll: 'توسيع الكل',
+      collapseAll: 'طيّ الكل'
     }
   },
   composer: {
@@ -2577,7 +2690,13 @@ export const ar = defineLocale({
     price: (input, output) => `${input} إدخال / ${output} إخراج لكل مليون رمز`,
     change: 'تغيير',
     startChatting: 'ابدأ',
-    docs: provider => `وثائق ${provider}`
+    docs: provider => `وثائق ${provider}`,
+    skipSetup: 'تخطي الإعداد',
+    retryFirstBuild: 'إعادة محاولة البناء الأول',
+    firstBuildFailed: 'تعذّر بدء البناء الأول. أعد المحاولة للتحقق من جلسته.',
+    buildStarted: (title: string) => `تم بدء ${title} — ابحث عنه في جلساتك`,
+    buildOpening: (title: string) => `جارٍ فتح ${title}…`,
+    workingOnIt: 'جارٍ العمل على ذلك'
   },
   modelPicker: {
     title: 'اختيار النموذج',
@@ -2609,7 +2728,9 @@ export const ar = defineLocale({
       noModels: 'لا توجد نماذج',
       editModels: 'تحرير النماذج',
       refreshModels: 'تحديث النماذج',
-      fast: 'سريع'
+      fast: 'سريع',
+      moaPresets: 'إعدادات MoA المسبقة',
+      moaPrefix: 'MoA:'
     },
     modelOptions: {
       noOptions: 'لا توجد خيارات لهذا النموذج',
@@ -2686,6 +2807,12 @@ export const ar = defineLocale({
       modelPinned: 'النموذج مثبت',
       modelTitle: (provider, model) => `${provider}: ${model}`,
       providerModelTitle: (provider, model) => `${provider}: ${model}`
+    },
+    tiles: {
+      sessionOpenFailed: 'تعذّر فتح هذه الجلسة',
+      noPageAt: (path: string) => `لا توجد صفحة في ${path}`,
+      resumeStillAvailable: 'الجلسة ما زالت متاحة — أعد محاولة استئنافها.',
+      resumeUnavailable: 'الجلسة غير متاحة — يمكنك إعادة محاولة استئنافها.'
     }
   },
   rightSidebar: {
@@ -2961,7 +3088,25 @@ export const ar = defineLocale({
       restoreNext: 'استعادة التالي',
       goForward: 'تقدم',
       sendEdited: 'إرسال التعديل',
-      attachingFile: 'جار إرفاق الملف'
+      attachingFile: 'جار إرفاق الملف',
+      messageFrom: (sender: string) => `رسالة من ${sender}`,
+      showMessage: 'عرض الرسالة',
+      repliedTo: (sender: string) => `ردّ على ${sender}`,
+      showReply: 'عرض الرد',
+      conversationTimeline: 'الخط الزمني للمحادثة',
+      hermesWorking: 'Stardust يعمل',
+      toolPayload: 'بيانات الأداة',
+      toolSearch: 'بحث',
+      emojiSearch: 'بحث…',
+      loadingEmoji: 'جارٍ تحميل الرموز التعبيرية…',
+      noEmoji: 'لم يُعثر على رموز تعبيرية.',
+      moreEmoji: 'المزيد من الرموز التعبيرية',
+      reactedByHermes: 'تفاعل من Stardust',
+      deliveryPending: 'جارٍ الإرسال إلى',
+      deliveryDone: 'أُرسلت إلى',
+      removeReaction: (emoji: string) => `إزالة التفاعل ${emoji}`,
+      summarizingThread: 'جارٍ تلخيص المحادثة',
+      searchResults: 'نتائج البحث'
     },
     approval: {
       gatewayDisconnected: 'البوابة غير متصلة',
@@ -3168,6 +3313,22 @@ export const ar = defineLocale({
           pendingAction: 'جار التحرير'
         }
       }
+    },
+    media: {
+      fetchFailed: (name: string) => `تعذّر جلب ${name} من البوابة (ملف مفقود أو غير قابل للقراءة أو كبير جدًا).`,
+      openMediaFile: (kind: 'audio' | 'video') => (kind === 'audio' ? 'فتح ملف صوتي' : 'فتح ملف فيديو'),
+      couldntLoad: (name: string) => `تعذّر تحميل ${name}.`,
+      openImage: 'فتح الصورة',
+      loadingName: (name: string) => `جارٍ تحميل ${name}…`,
+      generatedImage: 'صورة مُنشأة',
+      openNamed: (name: string) => `فتح ${name}`
+    },
+    embeds: {
+      failed: (label: string) => `تعذّر تحميل تضمين ${label}`,
+      openDiagram: 'فتح المخطط',
+      holdToZoom: 'اضغط ⌘ للتكبير',
+      spotifyTitle: 'تضمين Spotify',
+      youtubeTitle: 'تضمين YouTube'
     }
   },
   prompts: {
@@ -3363,6 +3524,41 @@ export const ar = defineLocale({
       title: 'الشريط الجانبي',
       description: 'تنقل التطبيق',
       toggle: open => `${open ? 'إظهار' : 'إخفاء'} الشريط الجانبي`
-    }
+    },
+    zoomable: {
+      zoomOut: 'تصغير',
+      zoomIn: 'تكبير',
+      reset: 'إعادة الضبط'
+    },
+    moreActions: 'إجراءات أخرى',
+    hatchingProgress: 'تقدّم الفقس'
+  },
+  connectors: {
+    skipThis: 'تخطي هذه الخطوة',
+    search: 'ابحث عن تطبيق',
+    setupUnavailable: 'الاتصالات غير متاحة الآن — يمكن إعدادها لاحقًا.',
+    nothingYet: 'لا يوجد اتصال بعد.',
+    nothingYetBody: 'سيقترح Stardust ربطها عندما تحتاج إليها مهمة، وسيسألك قبل قراءة أي شيء.',
+    noneOfThese: 'لا شيء من هذه',
+    continueWithCount: (count: number) => `متابعة (${count})`
+  },
+  starmap: {
+    legendCoreOuter: 'المركز = الأقدم · الخارج = الأحدث',
+    legendMemory: 'الذاكرة',
+    nodeMenu: {
+      editMemory: 'تعديل الذاكرة…',
+      editSkill: 'تعديل المهارة…',
+      editTitle: (label: string) => `تعديل ${label}`,
+      archiveSkill: 'أرشفة المهارة',
+      deleteMemory: 'حذف الذاكرة',
+      removedForever: 'ستُحذف هذه الذاكرة نهائيًا.',
+      deleteTitle: (label: string) => `حذف ${label}؟`
+    },
+    timeline: {
+      pause: 'إيقاف مؤقت',
+      playTimeline: 'تشغيل الخط الزمني',
+      scrubber: 'شريط تمرير الخط الزمني'
+    },
+    badShareCode: 'تعذّر قراءة رمز الخريطة هذا.'
   }
 })

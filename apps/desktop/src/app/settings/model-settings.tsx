@@ -179,6 +179,8 @@ interface StaleAuxWarningProps {
 // $0-balance provider after switching main away from it) and offers the
 // existing one-click reset rather than auto-clearing legitimate pins.
 function StaleAuxWarning({ applying, onReset, slots, taskLabel }: StaleAuxWarningProps) {
+  const { t } = useI18n()
+
   if (!slots.length) {
     return null
   }
@@ -186,16 +188,18 @@ function StaleAuxWarning({ applying, onReset, slots, taskLabel }: StaleAuxWarnin
   const provider = slots[0].provider
   const allSameProvider = slots.every(slot => slot.provider === provider)
   const names = slots.map(slot => taskLabel(slot.task)).join(', ')
+  const aux = t.settings.model.auxiliaryRunOn(slots.length, names)
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
       <AlertTriangle className="size-3.5 shrink-0" />
       <span className="grow">
-        {slots.length} auxiliary task{slots.length === 1 ? '' : 's'} ({names}) still run on{' '}
-        <span className="font-mono">{allSameProvider ? provider : 'other providers'}</span>, not your main model.
+        {aux.before}
+        <span className="font-mono">{allSameProvider ? provider : t.settings.model.otherProviders}</span>
+        {aux.after}
       </span>
       <Button disabled={applying} onClick={onReset} size="sm" variant="textStrong">
-        Reset all to main
+        {t.settings.model.resetAllToMain}
       </Button>
     </div>
   )
@@ -811,7 +815,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                             value={auxDraft.provider}
                           >
                             <SelectTrigger
-                              aria-label={`${copy.label} provider`}
+                              aria-label={t.settings.model.slotProviderAria(copy.label)}
                               className={cn('min-w-32', CONTROL_TEXT)}
                             >
                               <SelectValue placeholder={m.provider} />
@@ -828,7 +832,10 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                             onValueChange={value => setAuxDraft(prev => ({ ...prev, model: value }))}
                             value={auxDraft.model}
                           >
-                            <SelectTrigger aria-label={`${copy.label} model`} className={cn('min-w-48', CONTROL_TEXT)}>
+                            <SelectTrigger
+                              aria-label={t.settings.model.slotModelAria(copy.label)}
+                              className={cn('min-w-48', CONTROL_TEXT)}
+                            >
                               <SelectValue placeholder={m.model} />
                             </SelectTrigger>
                             <SelectContent>
@@ -847,7 +854,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
                             value={auxDraft.reasoningEffort}
                           >
                             <SelectTrigger
-                              aria-label={`${copy.label} reasoning effort`}
+                              aria-label={t.settings.model.slotReasoningAria(copy.label)}
                               className={cn('min-w-32', CONTROL_TEXT)}
                             >
                               <SelectValue />
