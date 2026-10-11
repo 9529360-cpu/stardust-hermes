@@ -1690,6 +1690,20 @@ function CronEditorDialog({
       return
     }
 
+    // Check the folder here, so an empty or relative folder gets this field's own wording instead of
+    // the backend's English slot message. The backend still checks it again when the job is created.
+    const folderField = blueprint.fields.find(field => field.type === 'folder')
+
+    const folderError = folderField
+      ? validateCronTriggerForm({ when: 'folder', watchDir: slotValues[folderField.name] ?? '', pattern: '*' })
+      : null
+
+    if (folderError) {
+      setError(c.trigger[folderError])
+
+      return
+    }
+
     setSaving(true)
     setError(null)
 

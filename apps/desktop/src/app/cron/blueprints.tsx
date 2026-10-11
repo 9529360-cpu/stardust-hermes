@@ -76,10 +76,30 @@ export function initialBlueprintValues(blueprint: AutomationBlueprint): Record<s
   return out
 }
 
-// A slot-level validation error from the backend arrives as "422: <message>"
-// (or "<code>: <message>"); strip the leading numeric code for inline display.
+// A slot-level validation error reaches the form as "422: {\"detail\": \"...\"}". Through Electron's
+// IPC bridge it is also wrapped in "Error invoking remote method '<channel>': Error: ...". Keep only
+// the message the owner needs, for inline display.
 export function cleanBlueprintFieldError(message: string): string {
-  return message.replace(/^\d+:\s*/, '')
+  const unwrapped = message
+    .replace(/^Error invoking remote method '[^']*': (?:Error: )?/, '')
+    .replace(/^\d+:\s*/, '')
+    .trim()
+
+  return blueprintErrorDetail(unwrapped) ?? unwrapped
+}
+
+function blueprintErrorDetail(text: string): null | string {
+  if (!text.startsWith('{')) {
+    return null
+  }
+
+  try {
+    const body = JSON.parse(text) as { detail?: unknown }
+
+    return typeof body.detail === 'string' && body.detail.trim() ? body.detail.trim() : null
+  } catch {
+    return null
+  }
 }
 
 // Help text to show under a slot control. The backend deliver help is
