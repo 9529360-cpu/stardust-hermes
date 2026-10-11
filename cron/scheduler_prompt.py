@@ -13,6 +13,8 @@ import logging
 from hermes_time import now as _hermes_now
 from typing import Optional
 
+from cron.triggers import trigger_context_block
+
 # Log-record parity with the origin module.
 logger = logging.getLogger("cron.scheduler")
 
@@ -277,6 +279,12 @@ def _build_job_prompt(
             else ("Script Error", "The data-collection script failed. Report this to the user.")
         )
         prompt = _prepend_context_block(prompt, heading, intro, script_output)
+        has_injected_data = True
+
+    # Event runs (startup, folder) carry metadata only, as injected data rather than user instruction.
+    trigger_block = trigger_context_block(job)
+    if trigger_block:
+        prompt = f"{trigger_block}{prompt}"
         has_injected_data = True
 
     prompt, _handoff_injected = _inject_session_handoff(job, prompt)
