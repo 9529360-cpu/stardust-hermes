@@ -594,8 +594,8 @@ CATALOG: List[AutomationBlueprint] = [
             "A new PDF appeared in a folder you asked me to watch. The trigger block below gives its "
             "name, size, modified time and path. Do not open or read the PDF. From the file name and "
             "these details only, write a short summary of what its first page probably covers, and say "
-            "that it is based on the name and details, not the contents. Then open the summary in the "
-            "preview pane."
+            "that it is based on the name and details, not the contents. Then save the summary as a "
+            "Markdown file in your workspace's reports folder and reply with the file's path."
         ),
         slots=[
             BlueprintSlot(
