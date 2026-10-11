@@ -3,7 +3,7 @@
 
 ; Drive the REAL Hermes-Setup.exe (Tauri bootstrap installer) window:
 ; click Install, wait for the install to finish, click Launch, and wait for
-; the real Hermes.exe (Electron desktop) window to appear.
+; the real Stardust.exe (Electron desktop) window to appear.
 ;
 ; Adapted from @ethernet8023's e2e/windows/install-hermes-desktop.ahk
 ; (PR #68183) -- same ImageSearch approach; the install-button template was
@@ -112,7 +112,7 @@ BootstrapLogContains(needle) {
 }
 
 installerWin := "ahk_exe " setupExe
-appWin := "ahk_exe Hermes.exe"
+appWin := "ahk_exe Stardust.exe"
 
 ; Button center as a fraction of the window rect (installer is ~full-screen
 ; on the runner). Measured from a live CI frame where the template match
@@ -206,7 +206,7 @@ Log("Launch clicked; waiting for the Hermes desktop app window")
 try {
     appRect := WaitForRealWindow(appWin, 300000)
 } catch {
-    throw Error("Hermes.exe real-sized window did not appear within 300s of clicking Launch")
+    throw Error("Stardust.exe real-sized window did not appear within 300s of clicking Launch")
 }
 Log(Format("App window appeared at x={1} y={2} w={3} h={4}", appRect.x, appRect.y, appRect.w, appRect.h))
 

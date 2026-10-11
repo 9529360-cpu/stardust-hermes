@@ -97,7 +97,7 @@ export const SPEC = {
     install: [
       // irm https://hermes.nousresearch.com/install.ps1 | iex
       { method: 'installer-script' },
-      // The same one-liner with -IncludeDesktop: builds Hermes.exe AND
+      // The same one-liner with -IncludeDesktop: builds Stardust.exe AND
       // registers Start Menu / Desktop shortcuts, so it is a second real
       // path to a hand-launchable app.
       { method: 'installer-script+desktop' },

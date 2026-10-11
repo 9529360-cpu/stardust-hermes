@@ -196,9 +196,9 @@ find_installed_app() {
   # (the checkout's release dir), plus /Applications for a copied bundle.
   local cand
   for cand in \
-    "$INSTALL_DIR/apps/desktop/release/mac-arm64/Hermes.app" \
-    "$INSTALL_DIR/apps/desktop/release/mac/Hermes.app" \
-    "/Applications/Hermes.app"; do
+    "$INSTALL_DIR/apps/desktop/release/mac-arm64/Stardust.app" \
+    "$INSTALL_DIR/apps/desktop/release/mac/Stardust.app" \
+    "/Applications/Stardust.app"; do
     [ -d "$cand" ] && { printf '%s' "$cand"; return 0; }
   done
   return 1
@@ -252,7 +252,7 @@ phase_install() {
   [ -x "$hermes" ] || fail "no hermes console script at $hermes"
   "$hermes" --version 2>&1 | ts_prefix > "$LOG_DIR/version-old.log" || fail "hermes --version failed after install"
   ok "hermes --version works: $(head -c 120 "$LOG_DIR/version-old.log" | tr -d '\n')"
-  find_installed_app >/dev/null || fail "no installed Hermes.app after the dmg bootstrap"
+  find_installed_app >/dev/null || fail "no installed Stardust.app after the dmg bootstrap"
   ok "installed app: $(find_installed_app)"
 }
 
@@ -357,11 +357,11 @@ phase_update() {
       # The desktop stage is this leg's claim: the rebuilt app must exist.
       head_app=""
       for cand in \
-        "$INSTALL_DIR/apps/desktop/release/mac-arm64/Hermes.app" \
-        "$INSTALL_DIR/apps/desktop/release/mac/Hermes.app"; do
+        "$INSTALL_DIR/apps/desktop/release/mac-arm64/Stardust.app" \
+        "$INSTALL_DIR/apps/desktop/release/mac/Stardust.app"; do
         [ -d "$cand" ] && { head_app="$cand"; break; }
       done
-      [ -n "$head_app" ] || fail "no built Hermes.app under the checkout after the +desktop update"
+      [ -n "$head_app" ] || fail "no built Stardust.app under the checkout after the +desktop update"
       ok "rebuilt app present: $head_app"
       ;;
     open-app-update)

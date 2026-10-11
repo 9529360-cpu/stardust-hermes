@@ -99,9 +99,9 @@ HERMES_BIN="$INSTALL_DIR/venv/bin/hermes"
 installed_app() {
   local cand
   for cand in \
-    "$INSTALL_DIR/apps/desktop/release/mac-arm64/Hermes.app" \
-    "$INSTALL_DIR/apps/desktop/release/mac/Hermes.app" \
-    "/Applications/Hermes.app"; do
+    "$INSTALL_DIR/apps/desktop/release/mac-arm64/Stardust.app" \
+    "$INSTALL_DIR/apps/desktop/release/mac/Stardust.app" \
+    "/Applications/Stardust.app"; do
     [ -d "$cand" ] && return 0
   done
   return 1
@@ -134,7 +134,7 @@ FIRST_SHOT=0
 CLICKS=0
 while :; do
   if install_complete; then
-    log "install landed: checkout + venv console script + Hermes.app present"
+    log "install landed: checkout + venv console script + Stardust.app present"
     shot "02-install-landed"
     break
   fi

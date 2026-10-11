@@ -60,7 +60,7 @@ echo "--- treatment 2: packaged shape captured, not spawned"
 rm -f "$WORK"/spec.json*
 run_py yes -c '
 import subprocess
-exe = "/x/apps/desktop/release/linux-unpacked/Hermes"
+exe = "/x/apps/desktop/release/linux-unpacked/Stardust"
 r = subprocess.run([exe, "--no-sandbox"], cwd="/tmp", env={"PATH": "/usr/bin"})
 assert r.returncode == 0, r   # a real spawn of this path would ENOENT
 '
@@ -71,7 +71,7 @@ echo "--- treatment 3: windows-style packaged argv matches too"
 rm -f "$WORK"/spec.json*
 run_py yes -c '
 import subprocess
-r = subprocess.run(["C:\\x\\apps\\desktop\\release\\win-unpacked\\Hermes.exe"], env={})
+r = subprocess.run(["C:\\x\\apps\\desktop\\release\\win-unpacked\\Stardust.exe"], env={})
 assert r.returncode == 0
 '
 [ "$(cat "$WORK/spec.json.captured")" = "packaged" ] || fail "treatment 3: wrong shape"
