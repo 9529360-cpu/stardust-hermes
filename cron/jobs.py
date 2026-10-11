@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 from hermes_time import now as _hermes_now
 from hermes_time import get_timezone
 from utils import atomic_replace, atomic_write_text
+from cron.triggers import is_event_triggered, trigger_status
 
 # croniter is imported lazily (slow import, only needed for cron exprs). HAS_CRONITER stays a
 # module attribute: a monkeypatched value wins because _ensure_croniter only probes while None.
@@ -425,9 +426,10 @@ def fire_claim_fence(job_id: str, *, expected_owner: str):
         yield owns_claim
 
 
-# Fields that must never change after creation: ``id`` is a path component under OUTPUT_DIR, so an
-# update could leak ``../escape``/absolute/nested values into output writes/deletes.
-_IMMUTABLE_JOB_FIELDS = frozenset({"id"})
+# Fields that callers may never set through update_job. ``id`` is a path component under OUTPUT_DIR, so
+# an update could leak ``../escape``/absolute/nested values into output writes/deletes. ``trigger_state``
+# is runtime bookkeeping (queue, folder memory, run budget) owned by cron.jobs_triggers.
+_IMMUTABLE_JOB_FIELDS = frozenset({"id", "trigger_state"})
 
 
 def _job_output_dir(job_id: str) -> Path:
@@ -532,6 +534,10 @@ def _normalize_job_record(job: Dict[str, Any]) -> Dict[str, Any]:
     # Derived from the scheduler-honoured ``enabled`` flag so a half-paused record cannot render
     # "paused" while still firing. See effective_job_state().
     normalized["state"] = effective_job_state(normalized)
+    if is_event_triggered(normalized):
+        # Readers get a summary; the queue, folder memory and skip history stay in the store.
+        normalized["trigger_status"] = trigger_status(normalized)
+    normalized.pop("trigger_state", None)
     return normalized
 
 
@@ -1256,6 +1262,12 @@ from cron.jobs_runs import (  # noqa: E402
     _machine_id,
     claim_job_for_fire,
     heartbeat_fire_claim,
+)
+from cron.jobs_triggers import (  # noqa: E402
+    mark_ticker_started,
+    collect_trigger_dispatches,
+    return_trigger_dispatch,
+    record_trigger_outcome,
 )
 from cron.jobs_due import (  # noqa: E402
     COMPLETED_ONESHOT_RETENTION_DAYS,

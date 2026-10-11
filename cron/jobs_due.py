@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from cron import triggers as _triggers
+
 logger = logging.getLogger("cron.jobs")  # log-record parity with the origin module
 
 
@@ -490,6 +492,12 @@ def _evaluate_due_job(job: Dict[str, Any], scan: _DueScan, run_claim_ttl: float)
     return True
 
 
+def _manual_run_pending(job: Dict[str, Any]) -> bool:
+    """A run-now stamp: ``manual_run_at`` equals ``next_run_at``, the same test the scan applies below."""
+    manual = job.get("manual_run_at")
+    return bool(manual) and manual == job.get("next_run_at")
+
+
 def _get_due_jobs_locked() -> List[Dict[str, Any]]:
     """Inner implementation of get_due_jobs(); must be called with _jobs_lock held."""
     raw_jobs = _jobs.load_jobs()
@@ -516,6 +524,9 @@ def _get_due_jobs_locked() -> List[Dict[str, Any]]:
                 continue
             if _jobs._has_pause_marker(job):
                 _self_disable_half_paused(job, scan)
+                continue
+            # Startup and folder jobs never become due by the clock. Only a run-now stamp makes one due.
+            if _triggers.is_event_triggered(job) and not _manual_run_pending(job):
                 continue
             if _evaluate_due_job(job, scan, run_claim_ttl):
                 due.append(job)

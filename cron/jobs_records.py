@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from cron import triggers as _triggers  # pure model; no store access
+
 logger = logging.getLogger("cron.jobs")  # log-record parity with the origin module
 
 
@@ -280,7 +282,7 @@ def _next_run_or_reject_past_oneshot(
 
 def create_job(
     prompt: Optional[str],
-    schedule: str,
+    schedule: Optional[str] = None,
     name: Optional[str] = None,
     repeat: Optional[int] = None,
     deliver: Optional[str] = None,
@@ -308,11 +310,14 @@ def create_job(
     paused_reason: Optional[str] = None,
     approval_mode: Optional[str] = None,
     dry_run: bool = False,
+    trigger: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Create a new cron job and return the stored record.
 
     dry_run runs every check below and returns the record that would be stored, without saving it
     (the caller registers nothing either). Its ``id`` is a placeholder and must not be used.
+    trigger: ``{"type": "startup"}`` or ``{"type": "folder", "watch_dir", "pattern", "poll_seconds"}``
+    makes an event job, which takes no ``schedule``. Omitted, the job runs on ``schedule`` as before.
 
     deliver defaults to "origin" when ``origin`` is given, else "local"; repeat None = forever.
     script: stdout is injected as prompt context, or with ``no_agent=True`` IS the job (stdout
@@ -328,7 +333,16 @@ def create_job(
         raise ValueError("paused_reason must be a string.")
     if paused_reason is not None and not paused:
         raise ValueError("paused_reason requires paused=True.")
-    parsed_schedule = _jobs.parse_schedule(schedule)
+    trigger_spec = _triggers.normalize_trigger(trigger)
+    if trigger_spec is None:
+        if schedule is None:
+            raise ValueError("A scheduled job needs a schedule, for example 'every 2h'.")
+        parsed_schedule = _jobs.parse_schedule(schedule)
+    else:
+        if schedule is not None and str(schedule).strip():
+            raise ValueError(
+                f"A {trigger_spec['type']} job runs on its trigger and cannot also take a schedule.")
+        parsed_schedule = _triggers.trigger_schedule(trigger_spec)
     # Normalize repeat: treat 0 or negative values as None (infinite). String forms
     # ('forever'/'once'/numeric) coerce via normalize_repeat_value — the shared chokepoint with update paths
     # (#66824/#64520/#7142/#71987/#95706).
@@ -365,7 +379,8 @@ def create_job(
     name = name or label_source[:50].strip()
     provider_snapshot, model_snapshot = _compute_provider_model_snapshots(
         provider=f["provider"], model=f["model"], base_url=f["base_url"], no_agent=f["no_agent"])
-    next_run_at = _next_run_or_reject_past_oneshot(parsed_schedule, name, schedule, "")
+    next_run_at = None if trigger_spec is not None else _next_run_or_reject_past_oneshot(
+        parsed_schedule, name, schedule, "")
 
     job = {
         "id": job_id,
@@ -417,6 +432,9 @@ def create_job(
     ):
         if value is not None:
             job[key] = value
+    if trigger_spec is not None:
+        job["trigger"] = trigger_spec
+        job["trigger_state"] = _triggers.initial_trigger_state(trigger_spec, _triggers.now_epoch())
 
     if dry_run:
         return job
@@ -574,6 +592,31 @@ def _fill_missing_next_run(updated: Dict[str, Any]) -> None:
     updated["next_run_at"] = next_run
 
 
+def _apply_trigger_update(job: Dict[str, Any], updates: Dict[str, Any]) -> None:
+    """Trigger half of update_job, run under the jobs lock before the generic merge. A job's trigger
+    type is fixed at creation (create a new job to change it), and a startup or folder job takes no
+    schedule. Folder settings can change. A new watch_dir or pattern starts a fresh baseline, so files
+    already in the new folder do not trigger a run."""
+    current = _triggers.trigger_type(job)
+    if current in _triggers.EVENT_TYPES and "schedule" in updates:
+        raise ValueError("A startup or folder job runs on its trigger and cannot take a schedule.")
+    if "trigger" not in updates:
+        return
+    spec = _triggers.normalize_trigger(updates["trigger"])
+    new_type = spec["type"] if spec is not None else "schedule"
+    if new_type != current:
+        raise ValueError(
+            f"Cannot change a {current} job to {new_type}; create a new job for that trigger.")
+    if spec is None:
+        updates.pop("trigger")
+        return
+    previous = job.get("trigger") or {}
+    updates["trigger"] = spec
+    updates["schedule"] = _triggers.trigger_schedule(spec)
+    if (previous.get("watch_dir"), previous.get("pattern")) != (spec.get("watch_dir"), spec.get("pattern")):
+        updates["trigger_state"] = _triggers.initial_trigger_state(spec, _triggers.now_epoch())
+
+
 def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Update a job by ID, refreshing derived schedule fields when needed."""
     # ``id`` is a path component under OUTPUT_DIR — changing it would leak path-escape values.
@@ -587,6 +630,7 @@ def update_job(job_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]
         # generic update path so REST/CLI/dashboard edits cannot leave a hidden second target.
         if "deliver" in updates and str(updates.get("deliver") or "").strip().lower() != "origin":
             updates["local_session_origin"] = None
+        _apply_trigger_update(job, updates)
         _rederive_repeat_for_schedule_change(job, updates)
         _normalize_job_updates(job, updates)
         previous_inference_axes = _normalized_inference_axes(job)
