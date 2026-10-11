@@ -33,6 +33,7 @@ from agent.replay_cleanup import canonicalize_replay_history
 from agent.compaction_display import project_compaction_message_for_display  # noqa: F401
 from agent.skill_commands import describe_skill_invocation  # noqa: F401
 from agent.conversation_loop import INTERRUPT_WAITING_FOR_MODEL_PREFIX  # noqa: F401
+from agent.reasoning_timing import current_event_stamp
 from tui_gateway import git_probe
 from tui_gateway._env import env_float, env_int
 from tui_gateway.turn_marker import clear_turn_marker, read_turn_marker, record_turn_start  # noqa: F401
@@ -618,7 +619,18 @@ def write_json(obj: dict) -> bool:
     return (current_transport() or _stdio_transport).write(obj)
 
 
+# Stream events the desktop times its segments from. Each one carries the backend clock, so a live block's
+# span and the span stored on its row are the same numbers (agent/reasoning_timing.py).
+_TIMED_STREAM_EVENTS = frozenset({
+    "message.complete", "message.delta", "message.interim", "reasoning.available", "reasoning.delta",
+    "tool.complete", "tool.start",
+})
+
+
 def _event_frame(event: str, sid: str, payload: dict | None = None) -> dict:
+    if event in _TIMED_STREAM_EVENTS:
+        stamp = current_event_stamp()
+        payload = {"timestamp": time.time() if stamp is None else stamp, **(payload or {})}
     _contracts.check_payload(event, payload)
     params: dict = {"type": event, "session_id": sid, **({"payload": payload} if payload is not None else {})}
     return {"jsonrpc": "2.0", "method": "event", "params": params}
