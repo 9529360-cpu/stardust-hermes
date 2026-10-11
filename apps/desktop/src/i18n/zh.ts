@@ -27,7 +27,7 @@ export const zh = defineLocale({
     ownerMissing: '请重新打开此对话以管理连接。',
     search: '查找应用',
     empty: '没有匹配的应用',
-    disclaimer: '连接为可选操作。请仅授权你希望 Hermes 使用的应用。',
+    disclaimer: '连接为可选操作。请仅授权你希望 Stardust 使用的应用。',
     execution: '连接器工具',
     skipThis: '跳过此步',
     setupUnavailable: '暂时无法使用连接功能，之后可以再设置。',
@@ -39,7 +39,7 @@ export const zh = defineLocale({
 
   sessionImport: {
     title: '从其他应用继续',
-    subtitle: '将对话导入 Hermes，接着上次的进度继续。',
+    subtitle: '将对话导入 Stardust，接着上次的进度继续。',
     action: '导入对话',
     readingFrom: '读取自',
     connectedComputer: '已连接的计算机',
@@ -57,17 +57,17 @@ export const zh = defineLocale({
     more: '加载更多对话',
     messages: '条消息',
     choose: '继续一段对话',
-    chooseHelp: '选择对话，在导入 Hermes 前查看历史记录。',
+    chooseHelp: '选择对话，在导入 Stardust 前查看历史记录。',
     previewLoading: '正在打开预览',
     previewError: '预览不可用',
     previewHelp: '源文件可能已移动或更改。请刷新列表后重试。',
     previewLimit: '预览已缩短，便于阅读。导入时会复制完整对话。',
     you: '你',
-    snapshot: '此对话已导入 Hermes。打开现有副本即可继续。',
+    snapshot: '此对话已导入 Stardust。打开现有副本即可继续。',
     copyNotice: '复制对话文本，不更改源文件。不包含工具输出和推理内容。',
     importing: '正在导入…',
-    open: '在 Hermes 中打开',
-    continue: '在 Hermes 中继续',
+    open: '在 Stardust 中打开',
+    continue: '在 Stardust 中继续',
     importError: '无法导入此对话。'
   },
   common: {
@@ -132,19 +132,19 @@ export const zh = defineLocale({
   },
 
   boot: {
-    ready: 'Hermes 桌面版已就绪',
+    ready: 'Stardust 桌面版已就绪',
     desktopBootFailedWithMessage: message => `桌面启动失败：${message}`,
     steps: {
       connectingGateway: '正在连接桌面网关',
-      loadingSettings: '正在加载 Hermes 设置',
+      loadingSettings: '正在加载 Stardust 设置',
       loadingSessions: '正在加载最近对话',
-      retryingRemoteBackend: '正在重新连接远程 Hermes 后端…',
+      retryingRemoteBackend: '正在重新连接远程 Stardust 后端…',
       startingDesktopConnection: '正在启动桌面连接',
-      startingHermesDesktop: '正在启动 Hermes 桌面版…'
+      startingHermesDesktop: '正在启动 Stardust 桌面版…'
     },
     errors: {
-      backgroundExited: 'Hermes 后台进程已退出。',
-      backgroundExitedDuringStartup: 'Hermes 后台进程在启动期间退出。',
+      backgroundExited: 'Stardust 后台进程已退出。',
+      backgroundExitedDuringStartup: 'Stardust 后台进程在启动期间退出。',
       backendStopped: '后端已停止',
       desktopBootFailed: '桌面启动失败',
       gatewayConnectionLost: '与网关的连接已断开',
@@ -154,7 +154,7 @@ export const zh = defineLocale({
       ipcBridgeUnavailable: '桌面 IPC 桥不可用。'
     },
     failure: {
-      title: 'Hermes 无法启动',
+      title: 'Stardust 无法启动',
       description: '后台网关没有启动。请尝试下面的恢复步骤；这里不会删除你的对话或设置。',
       remoteTitle: '需要重新登录远程网关',
       remoteDescription: '你的远程网关会话已过期。请重新登录以恢复连接。这些操作不会删除你的对话或设置。',
@@ -199,9 +199,9 @@ export const zh = defineLocale({
     copyDetail: '复制详情',
     copyDetailFailed: '无法复制通知详情',
     backendOutOfDateTitle: '后端版本过旧',
-    backendOutOfDateMessage: '你的 Hermes 后端早于当前桌面构建，可能无法正常工作。请更新以保持一致。',
+    backendOutOfDateMessage: '你的 Stardust 后端早于当前桌面构建，可能无法正常工作。请更新以保持一致。',
     installMethodUnsupportedTitle: '不受支持的安装方式',
-    updateHermes: '更新 Hermes',
+    updateHermes: '更新 Stardust',
     updateReadyTitle: '有可用更新',
     updateReadyMessage: count => `有 ${count} 项新更改可用。`,
     updateReadyMessageUnknown: '有新更新可用。',
@@ -222,7 +222,7 @@ export const zh = defineLocale({
       elevenLabsRejectedKey: 'ElevenLabs 拒绝了该 API key (401)。',
       diskFull: '磁盘已满 — 请腾出一些空间后再试。',
       gatewayAuthFailed: '网关认证失败 — 请检查你的 API_SERVER_KEY。',
-      methodNotAllowed: '桌面后端拒绝了该请求 (405 Method Not Allowed)。请尝试重启 Hermes Desktop。',
+      methodNotAllowed: '桌面后端拒绝了该请求 (405 Method Not Allowed)。请尝试重启 Stardust Desktop。',
       microphonePermission: '麦克风权限已被拒绝。',
       openaiRejectedApiKey: 'OpenAI 拒绝了该 API key。',
       openaiTtsNeedsKey: 'OpenAI TTS 需要 VOICE_TOOLS_OPENAI_KEY 或 OPENAI_API_KEY。',
@@ -283,19 +283,19 @@ export const zh = defineLocale({
   sendDiagnostics: {
     title: '保存诊断信息',
     privacyNotice:
-      '星尘会在后端生成一个强制脱敏的本地诊断 ZIP。内容包括系统信息（操作系统、版本、服务商、已配置的 API 密钥种类——绝不包含密钥本身）以及近期的 agent、gateway 和桌面端日志，其中可能包含对话内容、工具输出和文件路径。默认流程不会把这些内容上传到任何支持服务。保存尝试结束后，星尘会要求后端删除临时副本；异常退出遗留的临时包也会自动清理。',
+      'Stardust 会在后端生成一个强制脱敏的本地诊断 ZIP。内容包括系统信息（操作系统、版本、服务商、已配置的 API 密钥种类——绝不包含密钥本身）以及近期的 agent、gateway 和桌面端日志，其中可能包含对话内容、工具输出和文件路径。默认流程不会把这些内容上传到任何支持服务。保存尝试结束后，Stardust 会要求后端删除临时副本；异常退出遗留的临时包也会自动清理。',
     save: '生成并保存',
     preparing: '正在准备…',
     cancel: '取消',
     close: '关闭',
     copyPath: '复制路径',
     doneTitle: '诊断信息已保存',
-    doneDescription: '脱敏诊断包已保存到您的电脑。如需支持，可将该文件附加到星尘的 GitHub Issue。',
+    doneDescription: '脱敏诊断包已保存到您的电脑。如需支持，可将该文件附加到 Stardust 的 GitHub Issue。',
     failedTitle: '无法保存诊断信息',
-    failedHint: '请更新星尘及后端后重试。此流程不会退回到把日志上传到支持服务的旧路径。',
+    failedHint: '请更新 Stardust 及后端后重试。此流程不会退回到把日志上传到支持服务的旧路径。',
     handoffLead: '需要帮助？',
     links: {
-      github: '星尘 GitHub Issues'
+      github: 'Stardust GitHub Issues'
     }
   },
 
@@ -484,7 +484,7 @@ export const zh = defineLocale({
     exportConfig: '导出配置',
     importConfig: '导入配置',
     resetToDefaults: '恢复默认',
-    resetConfirm: '将所有设置恢复为 Hermes 默认值？',
+    resetConfirm: '将所有设置恢复为 Stardust 默认值？',
     exportFailed: '导出失败',
     resetFailed: '重置失败',
     nav: {
@@ -557,7 +557,7 @@ export const zh = defineLocale({
       deleteAction: '移除已保存项',
       otpField: '验证器密钥',
       otpPlaceholder: 'Base32 密钥或 otpauth:// 链接',
-      otpHint: '启用两步验证时网站显示的“设置密钥”。保存后 Hermes 会自动生成验证码。',
+      otpHint: '启用两步验证时网站显示的“设置密钥”。保存后 Stardust 会自动生成验证码。',
       twoFactorBadge: '自动 2FA',
       deleteTitle: '删除此项？',
       deleteDescription: label => `“${label}”将从加密保险库中移除。此操作无法撤销。`,
@@ -567,10 +567,10 @@ export const zh = defineLocale({
         blurb:
           '已安装的密码管理器会被自动识别。智能体第一次需要其中的登录信息时会请你解锁（每个会话一次）；内存中只保留会话令牌，智能体永远看不到你的主密码或任何登录信息。',
         toggleFailed: '无法更新密码管理器',
-        notInstalled: name => `未检测到。安装 ${name} 命令行工具并登录后，Hermes 会自动识别。`,
-        disabledDesc: '已检测到，但已为 Hermes 关闭。',
+        notInstalled: name => `未检测到。安装 ${name} 命令行工具并登录后，Stardust 会自动识别。`,
+        disabledDesc: '已检测到，但已为 Stardust 关闭。',
         lockedDesc: '已检测到。智能体需要登录信息时会请你解锁，也可立即解锁。',
-        unlockedDesc: '本会话已解锁。闲置 30 分钟或关闭 Hermes 后会自动锁定。',
+        unlockedDesc: '本会话已解锁。闲置 30 分钟或关闭 Stardust 后会自动锁定。',
         statusLocked: '已锁定',
         statusNotDetected: '未检测到',
         statusOff: '已关闭',
@@ -587,7 +587,7 @@ export const zh = defineLocale({
     plugins: {
       title: '桌面插件',
       blurb:
-        '加载到此应用中的界面扩展——随构建捆绑，或放入 desktop-plugins 文件夹（包括 Hermes 编写的插件）。禁用会即时卸载插件并在重启后保持。',
+        '加载到此应用中的界面扩展——随构建捆绑，或放入 desktop-plugins 文件夹（包括 Stardust 编写的插件）。禁用会即时卸载插件并在重启后保持。',
       count: n => `已安装 ${n} 个`,
       openFolder: '打开插件文件夹',
       rescan: '重新扫描',
@@ -613,7 +613,7 @@ export const zh = defineLocale({
         agentTargetLocal: (profile, dir) => `安装到 ${profile} 后端（${dir}）`,
         agentTargetRemote: profile => `安装到已连接的 ${profile} 后端`,
         catalogPinned: (name, sha) =>
-          `Hermes 目录条目「${name}」— agent 部分将安装在经过审核的固定提交${sha ? ` ${sha}` : ''}，而不是分支最新代码。`,
+          `Stardust 目录条目「${name}」— agent 部分将安装在经过审核的固定提交${sha ? ` ${sha}` : ''}，而不是分支最新代码。`,
         reviewedHeading: '经过审核的目录条目',
         reviewedIntro: '此条目已在其固定提交处经过人工审核。你仍可在下方检查确切代码。',
         restartToApply: '重启网关后插件才会生效。',
@@ -655,7 +655,7 @@ export const zh = defineLocale({
       intro: '原生桌面通知，区别于应用内提示。设置按设备保存，每台电脑各自独立。',
       enableAll: '启用通知',
       enableAllDesc: '关闭后静音下方所有通知。',
-      focusedHint: '完成提醒仅在 Hermes 处于后台时触发。',
+      focusedHint: '完成提醒仅在 Stardust 处于后台时触发。',
       kinds: {
         approval: {
           label: '需要批准',
@@ -663,11 +663,11 @@ export const zh = defineLocale({
         },
         input: {
           label: '需要输入',
-          description: 'Hermes 提出了问题，或需要密码或密钥。'
+          description: 'Stardust 提出了问题，或需要密码或密钥。'
         },
         turnDone: {
           label: '回复就绪',
-          description: 'Hermes 在后台时完成了一轮对话。'
+          description: 'Stardust 在后台时完成了一轮对话。'
         },
         turnError: {
           label: '本轮失败',
@@ -683,11 +683,11 @@ export const zh = defineLocale({
         },
         plugin: {
           label: '插件通知',
-          description: 'Hermes 在后台时，桌面插件发送了通知。'
+          description: 'Stardust 在后台时，桌面插件发送了通知。'
         }
       },
       test: '发送测试通知',
-      testTitle: 'Hermes',
+      testTitle: 'Stardust',
       testBody: '通知工作正常。',
       testSent: '测试已发送。如果没有出现，请检查系统通知权限和专注模式／勿扰模式。',
       testUnsupported: '此系统不支持原生通知。',
@@ -707,7 +707,7 @@ export const zh = defineLocale({
       advanced: '高级'
     },
     searchPlaceholder: {
-      about: '关于 Hermes Desktop',
+      about: '关于 Stardust Desktop',
       config: '搜索设置…',
       gateway: '网关连接…',
       keys: '搜索 API 密钥…',
@@ -723,7 +723,7 @@ export const zh = defineLocale({
       title: '外观',
       intro: '这些是仅桌面端的显示偏好。模式控制明暗；主题控制强调色与对话界面样式。',
       colorMode: '颜色模式',
-      colorModeDesc: '选择固定模式，或让 Hermes 跟随系统设置。',
+      colorModeDesc: '选择固定模式，或让 Stardust 跟随系统设置。',
       toolViewTitle: '工具调用显示',
       toolViewDesc: '产品模式隐藏原始工具数据；技术模式显示完整输入/输出。',
       reasoningCollapsedTitle: '默认折叠推理过程',
@@ -783,12 +783,12 @@ export const zh = defineLocale({
       introSplashTitle: '开场标识',
       introSplashDesc: '空白对话中显示的字标和提示语。',
       reactionsTitle: '消息回应',
-      reactionsDesc: 'iMessage 风格的表情回应 — 你可以给消息添加回应，Hermes 也能回应你的消息。',
+      reactionsDesc: 'iMessage 风格的表情回应 — 你可以给消息添加回应，Stardust 也能回应你的消息。',
       tipsTitle: '应用内提示',
-      tipsDesc: '偶尔显示来自应用和 Hermes 的提示，每条提示只出现一次。开始使用满30天后自动关闭，你可以重新开启。',
+      tipsDesc: '偶尔显示来自应用和 Stardust 的提示，每条提示只出现一次。开始使用满30天后自动关闭，你可以重新开启。',
       tipsReset: (count: number) => `再次显示 ${count} 条提示`,
       toursTitle: '引导导览',
-      toursDesc: '让 Hermes 逐步高亮每个位置，带你熟悉应用。开始使用满30天后自动关闭，你可以重新开启。',
+      toursDesc: '让 Stardust 逐步高亮每个位置，带你熟悉应用。开始使用满30天后自动关闭，你可以重新开启。',
       composerPopoutTitle: '悬浮输入框',
       composerPopoutDesc: '允许将输入框拖出底部停靠区。关闭后，输入框会锁定在底部。',
       vibeHeartsTitle: '心情爱心',
@@ -822,8 +822,8 @@ export const zh = defineLocale({
       pet: {
         title: '宠物',
         intro:
-          '领养一只悬浮在应用上的 petdex 动画宠物，它会根据 Hermes 的状态做出反应——工具执行时奔跑、成功时欢呼、出错时沮丧。',
-        restartHint: '宠物功能需要重启——当前运行的应用在此功能加入前启动。请退出并重新打开 Hermes，然后回到此处。',
+          '领养一只悬浮在应用上的 petdex 动画宠物，它会根据 Stardust 的状态做出反应——工具执行时奔跑、成功时欢呼、出错时沮丧。',
+        restartHint: '宠物功能需要重启——当前运行的应用在此功能加入前启动。请退出并重新打开 Stardust，然后回到此处。',
         scaleTitle: '大小',
         scaleDesc: '调整悬浮宠物的大小，所有界面即时生效。',
         roamTitle: '漫游',
@@ -1048,10 +1048,10 @@ export const zh = defineLocale({
         repoScanRoots: '要扫描的文件夹。留空时扫描主目录。',
         repoScanExcludePaths: '发现代码仓库时跳过这些文件夹及其子目录。'
       },
-      timezone: '当 Hermes 需要本地时间上下文时使用。留空则使用系统时区。',
+      timezone: '当 Stardust 需要本地时间上下文时使用。留空则使用系统时区。',
       agent: {
         imageInputMode: '控制图片附件如何发送给模型。',
-        maxTurns: 'Hermes 停止一次运行前工具调用轮次的上限。'
+        maxTurns: 'Stardust 停止一次运行前工具调用轮次的上限。'
       },
       terminal: {
         cwd: '工具与终端操作的默认项目目录。',
@@ -1065,9 +1065,9 @@ export const zh = defineLocale({
       codeExecution: {
         mode: '代码执行被限定到当前项目的严格程度。'
       },
-      fileReadMaxChars: 'Hermes 单次文件读取可读取的最大字符数。',
+      fileReadMaxChars: 'Stardust 单次文件读取可读取的最大字符数。',
       approvals: {
-        mode: 'Hermes 如何处理需要显式审批的命令。',
+        mode: 'Stardust 如何处理需要显式审批的命令。',
         timeout: '审批提示在超时前等待的时长。'
       },
       security: {
@@ -1089,15 +1089,15 @@ export const zh = defineLocale({
       },
       browser: {
         useRealProfile:
-          '本地浏览使用你的真实登录状态。Hermes 会把你默认浏览器的配置（Cookie、登录、偏好）复制为受管快照，并用自带的 Chromium 驱动它——不会直接打开你的实时配置，且每次运行都会从实时配置刷新副本。还允许智能体在配置了云端浏览器后端时，按需打开本地真实配置会话。仅支持 Chromium 系浏览器（Chrome、Edge、Brave、Brave Origin、Chromium）；默认浏览器不是 Chromium 系时会给出明确报错。默认关闭。'
+          '本地浏览使用你的真实登录状态。Stardust 会把你默认浏览器的配置（Cookie、登录、偏好）复制为受管快照，并用自带的 Chromium 驱动它——不会直接打开你的实时配置，且每次运行都会从实时配置刷新副本。还允许智能体在配置了云端浏览器后端时，按需打开本地真实配置会话。仅支持 Chromium 系浏览器（Chrome、Edge、Brave、Brave Origin、Chromium）；默认浏览器不是 Chromium 系时会给出明确报错。默认关闭。'
       },
       voice: {
         autoTts: '自动朗读助手回复。',
         voiceChatMode:
-          'chained：语音转文字 → Hermes → 文字转语音，使用下方的提供商。gpt-live：一个全双工的 OpenAI 语音模型（gpt-live-1）负责听和说，并把每个实际请求交给 Hermes——由你选择的任意模型带着完整工具集作答。需要 OpenAI API 密钥；语音层按每分钟 $0.05 计费。',
+          'chained：语音转文字 → Stardust → 文字转语音，使用下方的提供商。gpt-live：一个全双工的 OpenAI 语音模型（gpt-live-1）负责听和说，并把每个实际请求交给 Stardust——由你选择的任意模型带着完整工具集作答。需要 OpenAI API 密钥；语音层按每分钟 $0.05 计费。',
         gptLive: {
           voice: 'GPT-Live 模式使用的音色，可填写自定义音色 ID。',
-          instructions: '附加到实时语音人设的句子（语气、语速、语言）。Hermes 保留自己的系统提示词。'
+          instructions: '附加到实时语音人设的句子（语气、语速、语言）。Stardust 保留自己的系统提示词。'
         }
       },
       stt: {
@@ -1123,13 +1123,13 @@ export const zh = defineLocale({
       },
       updates: {
         nonInteractiveLocalChanges:
-          'Hermes 从应用内更新时（无终端提示），保留本地源码修改（暂存）或丢弃（放弃）。通过终端更新时始终会询问。'
+          'Stardust 从应用内更新时（无终端提示），保留本地源码修改（暂存）或丢弃（放弃）。通过终端更新时始终会询问。'
       }
     }),
     uninstallSection: {
       dangerZone: '危险操作',
       confirmUninstall: '确认卸载',
-      uninstallHermes: '卸载 Hermes',
+      uninstallHermes: '卸载 Stardust',
       checkingInstalled: '正在检查已安装内容…',
       guiOnlyTitle: '仅卸载桌面应用',
       guiOnlyDescription: '移除桌面应用；本地智能体、配置和聊天记录都会保留。',
@@ -1226,16 +1226,16 @@ export const zh = defineLocale({
       readFailed: '无法读取 Computer Use 状态'
     },
     about: {
-      heading: 'Hermes Desktop',
+      heading: 'Stardust Desktop',
       version: value => `版本 ${value}`,
       versionUnavailable: '版本不可用',
       bundleOutOfSync: '应用构建版本过旧',
       bundleOutOfSyncDesc:
-        'Hermes 运行时已更新,但桌面应用本身仍是旧构建——在应用更新之前,新的界面功能(如 Bot Mode)不会显示。请运行下方的更新以重新构建应用。如果此警告仍未消除,请从最新的桌面安装程序重新安装。',
+        'Stardust 运行时已更新,但桌面应用本身仍是旧构建——在应用更新之前,新的界面功能(如 Bot Mode)不会显示。请运行下方的更新以重新构建应用。如果此警告仍未消除,请从最新的桌面安装程序重新安装。',
       bundleOutOfSyncAction: '获取安装程序',
       bundleSwapPending: '重启以完成更新',
-      bundleSwapPendingDesc: '更新后的应用已安装完成，只需重启 Hermes 即可加载新版本。聊天记录和设置不会受到影响。',
-      bundleSwapPendingAction: '重启 Hermes',
+      bundleSwapPendingDesc: '更新后的应用已安装完成，只需重启 Stardust 即可加载新版本。聊天记录和设置不会受到影响。',
+      bundleSwapPendingAction: '重启 Stardust',
       updates: '更新',
       checkNow: '立即检查',
       checking: '检查中…',
@@ -1252,7 +1252,7 @@ export const zh = defineLocale({
       lastChecked: age => `上次检查:${age}`,
       justNowSuffix: ' · 刚刚',
       automaticUpdates: '自动更新',
-      automaticUpdatesDesc: 'Hermes 会在后台自动检查更新，并在有可用更新时通知你。',
+      automaticUpdatesDesc: 'Stardust 会在后台自动检查更新，并在有可用更新时通知你。',
       branchCommit: (branch, commit) => `分支 ${branch} · 提交 ${commit}`,
       never: '从未',
       justNow: '刚刚',
@@ -1269,7 +1269,7 @@ export const zh = defineLocale({
       searchPlaceholder: '搜索…',
       noResults: '未找到结果',
       systemDefault: '系统默认',
-      loading: '正在加载 Hermes 配置...',
+      loading: '正在加载 Stardust 配置...',
       emptyTitle: '无可配置项',
       emptyDesc: '此分区没有可调整的设置。',
       failedLoad: '设置加载失败',
@@ -1291,7 +1291,7 @@ export const zh = defineLocale({
     },
     quickEntry: {
       enabledTitle: '快速输入',
-      enabledDesc: '用全局快捷键在任何地方唤出一个小输入框，无需打开 Hermes 即可发送提示。',
+      enabledDesc: '用全局快捷键在任何地方唤出一个小输入框，无需打开 Stardust 即可发送提示。',
       shortcutTitle: '快速输入快捷键',
       shortcutDesc: '至少需要一个修饰键，例如 CommandOrControl+Shift+Space。',
       active: '快捷键已生效。',
@@ -1327,7 +1327,7 @@ export const zh = defineLocale({
     // v2 多连接注册表：设置 → 网关。
     connections: {
       title: '已注册网关',
-      intro: '管理本机以及通过远程、SSH 或 Hermes Cloud 连接可访问的每个 Hermes 网关。',
+      intro: '管理本机以及通过远程、SSH 或 Hermes Cloud 连接可访问的每个 Stardust 网关。',
       stagedNote:
         '可在“对话”侧边栏切换网关。配置档案、聊天、消息和定时任务归属于各自网关；其他网关上的工作会继续运行。',
       launchModeTitle: '启动时返回上次使用网关的对话视图',
@@ -1360,10 +1360,10 @@ export const zh = defineLocale({
       kindRemote: '远程网关',
       kindCloud: 'Hermes Cloud',
       kindSsh: 'SSH',
-      kindLocalDesc: '由本应用管理的 Hermes 运行时。',
-      kindRemoteDesc: '可通过 HTTP(S) 访问的 Hermes 网关——局域网、Tailscale 或互联网。',
+      kindLocalDesc: '由本应用管理的 Stardust 运行时。',
+      kindRemoteDesc: '可通过 HTTP(S) 访问的 Stardust 网关——局域网、Tailscale 或互联网。',
       kindCloudDesc: '通过你的 Hermes Cloud 账户发现的托管实例。',
-      kindSshDesc: '通过 SSH 访问的 Hermes 安装。',
+      kindSshDesc: '通过 SSH 访问的 Stardust 安装。',
       labelTitle: '名称',
       labelDesc: '必填。此实例出现的所有位置都会显示该名称；必须唯一（例如“家庭服务器”、“工作笔记本”）。',
       labelPlaceholder: '家庭服务器',
@@ -1371,7 +1371,7 @@ export const zh = defineLocale({
       sshHostTitle: 'SSH 主机',
       headersTitle: '额外网关请求头',
       headersDesc:
-        '随发往此网关的每个 HTTP 和 WebSocket 请求一起发送——用于 Cloudflare Access 等访问代理（CF-Access-Client-Id / CF-Access-Client-Secret）。值加密存储。由 Hermes 管理的请求头（Authorization、Cookie、Host 等）会被忽略。',
+        '随发往此网关的每个 HTTP 和 WebSocket 请求一起发送——用于 Cloudflare Access 等访问代理（CF-Access-Client-Id / CF-Access-Client-Secret）。值加密存储。由 Stardust 管理的请求头（Authorization、Cookie、Host 等）会被忽略。',
       headerValuePlaceholder: '值',
       headerValueSaved: '已保存——留空以保留',
       headerAdd: '添加请求头',
@@ -1412,14 +1412,14 @@ export const zh = defineLocale({
       title: '网关连接',
       envOverride: '环境变量覆盖',
       intro:
-        'Hermes Desktop 默认会启动自己的本地网关。当你希望此应用控制另一台机器上或可信代理后的现有 Hermes 后端时，可以使用远程网关。网关连接属于本机级设置；profile 是从所连接的网关中发现的。',
+        'Stardust Desktop 默认会启动自己的本地网关。当你希望此应用控制另一台机器上或可信代理后的现有 Stardust 后端时，可以使用远程网关。网关连接属于本机级设置；profile 是从所连接的网关中发现的。',
       envOverrideTitle: '环境变量正在控制此桌面会话。',
       envOverrideDesc: '取消设置 HERMES_DESKTOP_REMOTE_URL 和 HERMES_DESKTOP_REMOTE_TOKEN 后才会使用下面保存的设置。',
       modeTitle: '连接模式',
       localTitle: '本地网关',
-      localDesc: '在 localhost 启动私有 Hermes 后端。这是默认方式，并且可离线工作。',
+      localDesc: '在 localhost 启动私有 Stardust 后端。这是默认方式，并且可离线工作。',
       remoteTitle: '远程网关',
-      remoteDesc: '将此桌面外壳连接到远程 Hermes 后端。',
+      remoteDesc: '将此桌面外壳连接到远程 Stardust 后端。',
       remoteAuthHint: '托管网关使用 OAuth 或用户名密码；自托管网关也可能使用会话 token。',
       cloudTitle: 'Hermes Cloud',
       cloudDesc: '只需登录 Hermes Cloud 一次，即可从你账户下的智能体中选择——无需粘贴 URL。',
@@ -1501,7 +1501,7 @@ export const zh = defineLocale({
       savedTitle: '网关设置已保存',
       restartingMessage: 'Stardust Desktop 将使用已保存设置重新连接（界面保持打开）。',
       savedMessage: '已保存，下一次重启生效。',
-      connectedTo: (baseUrl, version) => `已连接到 ${baseUrl}${version ? ` · Hermes ${version}` : ''}`,
+      connectedTo: (baseUrl, version) => `已连接到 ${baseUrl}${version ? ` · Stardust ${version}` : ''}`,
       reachableTitle: '远程网关可访问',
       signedOutTitle: '已退出登录',
       signedOutMessage: '已清除远程网关会话。',
@@ -1513,7 +1513,7 @@ export const zh = defineLocale({
       saveFailed: '无法保存网关设置',
       sshTitle: '通过 SSH 连接',
       sshDesc:
-        'Hermes 会通过 SSH 在远程启动并以隧道连接到本应用——无需自行启动或暴露任何服务。前提：已具备到该主机的密钥 SSH 访问。',
+        'Stardust 会通过 SSH 在远程启动并以隧道连接到本应用——无需自行启动或暴露任何服务。前提：已具备到该主机的密钥 SSH 访问。',
       sshTrustHint: '首次提供的主机密钥会被信任并固定；后续变更将被拒绝。',
       sshHostTitle: '主机',
       sshHostDesc: 'user@host，或 ~/.ssh/config 中的 Host 别名。',
@@ -1534,17 +1534,17 @@ export const zh = defineLocale({
       sshTestConnection: '测试 SSH',
       sshConnect: '连接',
       sshButtonsHint: '“保存”将在下次启动时生效，“连接”则立即重新连接。',
-      sshReachable: (host, platform) => `可连接：${host}（${platform}）——已找到 Hermes`,
+      sshReachable: (host, platform) => `可连接：${host}（${platform}）——已找到 Stardust`,
       sshIncompleteHost: '连接前请输入 SSH 主机。',
       sshErrUnreachable: '无法通过 SSH 连接到该主机。请检查主机、端口和网络。',
       sshErrAuth:
-        'SSH 认证失败。请将密钥加载到 ssh-agent（ssh-add），或在 ~/.ssh/config 中设置 IdentityFile——Hermes 以非交互方式运行 ssh。',
+        'SSH 认证失败。请将密钥加载到 ssh-agent（ssh-add），或在 ~/.ssh/config 中设置 IdentityFile——Stardust 以非交互方式运行 ssh。',
       sshErrHostKey: '自上次连接以来主机密钥已更改。请确认这是预期的，然后运行 ssh-keygen -R <host> 并重新连接。',
       sshErrNotInstalled:
-        '远程主机上未安装 Hermes。请在远程安装（curl -fsSL https://hermes-agent.nousresearch.com/install.sh | sh）或设置 Hermes 路径。',
-      sshErrPlatform: '不支持的远程平台。Hermes Desktop 的 SSH 模式支持 Linux、macOS 和 Windows 远程主机。',
+        '远程主机上未安装 Stardust。请在远程安装（curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash）或设置 Hermes 路径。',
+      sshErrPlatform: '不支持的远程平台。Stardust Desktop 的 SSH 模式支持 Linux、macOS 和 Windows 远程主机。',
       sshErrTimeout: 'SSH 连接超时。主机可能无法访问或处于休眠状态。',
-      sshErrUpdateRequired: '使用 Desktop SSH 连接前，请更新远程主机上的 Hermes。',
+      sshErrUpdateRequired: '使用 Desktop SSH 连接前，请更新远程主机上的 Stardust。',
       sshErrUnknown: 'SSH 连接失败。'
     },
     keys: {
@@ -1630,7 +1630,7 @@ export const zh = defineLocale({
       noOutput: '暂无输出。',
       deepLinkTitle: '添加 MCP 服务器？',
       deepLinkDescription:
-        '一个链接请求将此 MCP 服务器添加到 Hermes。请检查下方的完整配置——它来自该链接，而非 Hermes。',
+        '一个链接请求将此 MCP 服务器添加到 Stardust。请检查下方的完整配置——它来自该链接，而非 Stardust。',
       deepLinkStdioWarning: '此服务器会使用下方所示命令在你的电脑上运行本地进程。仅在信任其来源时继续。',
       deepLinkConfirm: '添加服务器',
       deepLinkNameInvalid: '名称须为 1-64 个字母、数字、点、连字符或下划线。',
@@ -1733,7 +1733,7 @@ export const zh = defineLocale({
       runtimeReady: backend => `就绪 · ${backend}`,
       serverRunning: '运行中',
       runtimeInstalled: '已安装 llama.cpp 运行时',
-      runtimeInstalledDetail: (tag, backend) => `构建 ${tag}，${backend} 后端。Hermes 会为您启动并管理服务器。`,
+      runtimeInstalledDetail: (tag, backend) => `构建 ${tag}，${backend} 后端。Stardust 会为您启动并管理服务器。`,
       installTitle: '安装本地运行时',
       installDetail: '下载 llama.cpp 推理引擎（几百 MB）。下载的模型完全在本机运行——无需账号，数据不会离开您的电脑。',
       installAction: '安装运行时',
@@ -1858,7 +1858,7 @@ export const zh = defineLocale({
       noKeysMatch: '没有匹配的提供方。',
       localEndpoint: {
         title: '本地 / 自定义端点',
-        description: '将 Hermes 指向任意 OpenAI 兼容端点（Zyphra、vLLM、llama.cpp、Ollama 等）。'
+        description: '将 Stardust 指向任意 OpenAI 兼容端点（Zyphra、vLLM、llama.cpp、Ollama 等）。'
       },
       loading: '正在加载提供方...'
     },
@@ -2221,7 +2221,7 @@ export const zh = defineLocale({
       emptyHint: '在下方目录中浏览，一键安装经过审核的插件。',
       loadFailed: '无法加载智能体插件',
       toggleFailed: (name: string) => `无法切换 ${name}`,
-      legacyBackend: '此后端版本较旧，不支持按键名切换插件 — 请更新 Hermes 后再在此管理。',
+      legacyBackend: '此后端版本较旧，不支持按键名切换插件 — 请更新 Stardust 后再在此管理。',
       portableBadge: '便携',
       catalogTitle: '插件目录',
       catalogBrowse: '浏览',
@@ -2307,7 +2307,7 @@ export const zh = defineLocale({
     loadFailed: '无法加载记忆图谱',
     loading: '加载中…',
     emptyTitle: '尚无学习内容',
-    emptyDesc: '当 Hermes 为你的工作构建技能和记忆时，会显示在这里。',
+    emptyDesc: '当 Stardust 为你的工作构建技能和记忆时，会显示在这里。',
     share: '分享图谱',
     shareHint: '复制代码以分享此图谱，或粘贴代码以载入。仅包含布局，不含你的记忆或技能内容。',
     shareTitle: '导入 / 导出图谱',
@@ -2405,7 +2405,7 @@ export const zh = defineLocale({
       placeholder: '搜索宠物…',
       loading: '正在加载 petdex 画廊…',
       error: '无法连接到 petdex 画廊。',
-      staleBackend: '请重启 Hermes 以使用宠物功能——当前后端版本过旧。',
+      staleBackend: '请重启 Stardust 以使用宠物功能——当前后端版本过旧。',
       empty: '没有匹配的宠物。',
       turnOff: '关闭',
       turnOn: '开启',
@@ -2432,8 +2432,8 @@ export const zh = defineLocale({
       hatchComposing: '正在拼合……',
       hatchSaving: '马上就好……',
       namePlaceholder: '给宠物起个名字',
-      staleBackend: '请更新 Hermes 以生成宠物。',
-      backgroundHint: '你可以关闭此窗口——完成后 Hermes 会通知你。',
+      staleBackend: '请更新 Stardust 以生成宠物。',
+      backgroundHint: '你可以关闭此窗口——完成后 Stardust 会通知你。',
       slowProviderHint: '这可能需要几分钟',
       remix: '混合生成',
       remixConfirmTitle: '以此造型混合生成？',
@@ -2475,7 +2475,7 @@ export const zh = defineLocale({
     },
     nav: {
       newChat: { title: '新建对话', detail: '开始一个新对话' },
-      settings: { title: '设置', detail: '配置 Hermes 桌面端' },
+      settings: { title: '设置', detail: '配置 Stardust 桌面端' },
       skills: { title: '技能与工具', detail: '启用技能、工具集与提供方' },
       messaging: { title: '消息平台', detail: '配置 Telegram、Slack、Discord 等' },
       artifacts: { title: '产物', detail: '浏览生成的输出' }
@@ -2497,7 +2497,7 @@ export const zh = defineLocale({
     noSessions: '暂无对话。',
     gatewayRunning: '消息网关运行中',
     gatewayStopped: '消息网关已停止',
-    hermesActiveSessions: (version, count) => `Hermes ${version} · 活跃对话 ${count}`,
+    hermesActiveSessions: (version, count) => `Stardust ${version} · 活跃对话 ${count}`,
     restartGateway: '重启网关',
     openBrowser: '打开浏览器',
     gatewayRestartFailed: '网关重启失败。',
@@ -2505,7 +2505,7 @@ export const zh = defineLocale({
     sharedGatewayRestartDescription: bots => `此设备上的所有机器人都会重新连接：${bots}`,
     sharedGatewayRestartConfirm: '全部重启',
     sharedGatewayRestarted: count => `共享网关已重启（${count} 个机器人）`,
-    updateHermes: '更新 Hermes',
+    updateHermes: '更新 Stardust',
     reloadWindow: '重新载入窗口',
     actionRunning: '运行中',
     actionDone: '完成',
@@ -2900,7 +2900,7 @@ export const zh = defineLocale({
       menuItem: '连接到远程主机…',
       badge: (host: string) => `运行于 ${host}`,
       title: (profile: string) => `将 ${profile} 连接到远程主机`,
-      description: '此配置档案中的对话将在你指定的远程 Hermes 上运行，而不是这台电脑。',
+      description: '此配置档案中的对话将在你指定的远程 Stardust 上运行，而不是这台电脑。',
       urlLabel: '远程地址',
       urlPlaceholder: 'https://hermes.example.com',
       urlInvalid: '请输入以 http:// 或 https:// 开头的完整地址',
@@ -2963,7 +2963,7 @@ export const zh = defineLocale({
     deleteDescMid: ' 并移除其 ',
     deleteDescSuffix: ' 目录。此操作无法撤销。',
     deleting: '删除中…',
-    createDesc: '配置档案是相互独立的 Hermes 环境：各自拥有独立的配置、技能和 SOUL.md。',
+    createDesc: '配置档案是相互独立的 Stardust 环境：各自拥有独立的配置、技能和 SOUL.md。',
     nameLabel: '名称',
     cloneFrom: '克隆来源',
     cloneFromNone: '无（空白）',
@@ -3028,7 +3028,7 @@ export const zh = defineLocale({
       message: count => `${count} 个未固定的定时任务将继续使用创建时的模型运行。固定它们或设置 cron.model 以迁移。`,
       detailMore: (names, remaining) => `${names}，以及另外 ${remaining} 个`,
       review: '检查定时任务',
-      saveFailed: 'Hermes 未保存该模型更改。',
+      saveFailed: 'Stardust 未保存该模型更改。',
       confirmTitle: '模型选择警告',
       confirmDetail: '仅在你接受此权衡时确认。',
       confirmAction: '确认',
@@ -3409,8 +3409,8 @@ export const zh = defineLocale({
       copyPath: '复制路径',
       removeFromSidebar: '从侧边栏移除',
       createFailed: '无法创建项目',
-      staleBackend: '请更新 Hermes 后端以创建项目——当前后端比桌面应用旧（设置 → 更新 → 后端）。',
-      deleteConfirm: '这会从 Hermes 中移除已保存的项目。文件、git 仓库和工作树保持不变。',
+      staleBackend: '请更新 Stardust 后端以创建项目——当前后端比桌面应用旧（设置 → 更新 → 后端）。',
+      deleteConfirm: '这会从 Stardust 中移除已保存的项目。文件、git 仓库和工作树保持不变。',
       startWork: '新建工作树',
       newWorktreeTitle: '新建工作树',
       newWorktreeDesc: '为这个工作树命名分支。',
@@ -3419,7 +3419,7 @@ export const zh = defineLocale({
       baseBranchPlaceholder: '搜索分支…',
       baseBranchNone: '未找到分支',
       startWorkFailed: '无法创建工作树',
-      worktreeStaleBackend: '请更新 Hermes 后端以在此远程连接上创建工作树 —— 该后端早于 git 工作树 API。',
+      worktreeStaleBackend: '请更新 Stardust 后端以在此远程连接上创建工作树 —— 该后端早于 git 工作树 API。',
       worktreeProjectLabel: '项目',
       worktreeProjectPlaceholder: '搜索项目…',
       worktreeProjectNone: '没有包含文件夹的项目',
@@ -3585,8 +3585,8 @@ export const zh = defineLocale({
     transcribingDictation: '正在转写听写',
     voiceControls: '语音',
     voiceEngine: '语音聊天引擎',
-    voiceEngineChained: '语音转文字 + Hermes 语音',
-    voiceEngineLive: 'GPT-Live（全双工，委托给 Hermes）',
+    voiceEngineChained: '语音转文字 + Stardust 语音',
+    voiceEngineLive: 'GPT-Live（全双工，委托给 Stardust）',
     voiceEngineLiveNeedsKey: '需要 OpenAI API 密钥',
     voiceEngineChangeFailed: '无法更改语音聊天引擎',
     voiceEngineChainedShort: '语音转文字',
@@ -3623,7 +3623,7 @@ export const zh = defineLocale({
       'composer.history': '循环弹窗 / 历史'
     },
     attachUrlTitle: '附加 URL',
-    attachUrlDesc: 'Hermes 将抓取该页面并作为本回合的上下文。',
+    attachUrlDesc: 'Stardust 将抓取该页面并作为本回合的上下文。',
     urlPlaceholder: 'https://example.com/post',
     urlHintPre: '请包含完整 URL，例如 ',
     attach: '附加',
@@ -3895,9 +3895,9 @@ export const zh = defineLocale({
       fetch: '下载中…',
       pull: '马上完成…',
       pydeps: '收尾中…',
-      update: '正在更新 Hermes…',
+      update: '正在更新 Stardust…',
       rebuild: '正在重新构建桌面应用…',
-      restart: '正在重启 Hermes…',
+      restart: '正在重启 Stardust…',
       done: '更新完成',
       manual: '从终端更新',
       guiSkew: '请更新桌面应用',
@@ -3907,39 +3907,39 @@ export const zh = defineLocale({
     checkFailedTitle: '无法检查更新',
     tryAgain: '重试',
     notAvailableTitle: '更新不可用',
-    unsupportedMessage: '此版本的 Hermes 无法在应用内自行更新。',
+    unsupportedMessage: '此版本的 Stardust 无法在应用内自行更新。',
     connectionRetry: '请检查网络连接后重试。',
     latestBody: '你正在运行最新版本。',
     latestBodyBackend: '后端正在运行最新版本。',
     allSetTitle: '已是最新',
     availableTitle: '有可用更新',
-    availableBody: '新版 Hermes 已可安装。',
+    availableBody: '新版 Stardust 已可安装。',
     availableTitleBackend: '后端有可用更新',
-    availableBodyBackend: '已连接的 Hermes 后端有新版本可安装。',
+    availableBodyBackend: '已连接的 Stardust 后端有新版本可安装。',
     availableBodyNoChangelog: '已有新版本可用。此安装方式无法显示更新日志。',
     updateNow: '立即更新',
     maybeLater: '稍后再说',
     moreChanges: count => `另有 ${count} 项更改。`,
     manualTitle: '从终端更新',
-    manualBody: '你是从命令行安装的 Hermes，因此更新也需要在那里运行。请将此命令粘贴到终端：',
-    manualPickedUp: '下次启动 Hermes 时会使用新版本。',
+    manualBody: '你是从命令行安装的 Stardust，因此更新也需要在那里运行。请将此命令粘贴到终端：',
+    manualPickedUp: '下次启动 Stardust 时会使用新版本。',
     guiSkewTitle: '请更新桌面应用',
     guiSkewBody:
-      '后端已更新，但此桌面应用包未更改。请更新或重新安装 Hermes 桌面应用（你的 AppImage / .deb / .rpm）以保持一致。',
+      '后端已更新，但此桌面应用包未更改。请更新或重新安装 Stardust 桌面应用（你的 AppImage / .deb / .rpm）以保持一致。',
     copy: '复制',
     copied: '已复制',
     done: '完成',
     applyingBody:
-      'Hermes 更新器会在自己的窗口中接管，并在完成后自动重新打开 Hermes。更新期间请不要自行重新打开 Hermes。',
-    applyingBodyBackend: '远程后端正在应用更新并将重启。恢复后 Hermes 会自动重新连接。',
-    applyingClose: '此窗口会在更新期间关闭，随后 Hermes 会自动重新打开。',
+      'Stardust 更新器会在自己的窗口中接管，并在完成后自动重新打开 Stardust。更新期间请不要自行重新打开 Stardust。',
+    applyingBodyBackend: '远程后端正在应用更新并将重启。恢复后 Stardust 会自动重新连接。',
+    applyingClose: '此窗口会在更新期间关闭，随后 Stardust 会自动重新打开。',
     errorTitle: '更新未完成',
     errorBody: '没有数据丢失。你可以现在重试。',
-    blockerTitle: '关闭本地预览以更新 Hermes？',
-    blockerBody: 'Hermes 需要在更新前停止这些本地预览。这不会修改或删除你的文件。',
-    foreignBlockerTitle: '关闭其他进程以更新 Hermes',
-    foreignBlockerBody: 'Hermes 无法安全地自动关闭这些进程。请关闭拥有这些进程的应用、终端或服务，然后重试更新。',
-    mixedBlockerBody: 'Hermes 可以关闭下方列出的本地预览。其他进程必须手动关闭，更新才能继续。',
+    blockerTitle: '关闭本地预览以更新 Stardust？',
+    blockerBody: 'Stardust 需要在更新前停止这些本地预览。这不会修改或删除你的文件。',
+    foreignBlockerTitle: '关闭其他进程以更新 Stardust',
+    foreignBlockerBody: 'Stardust 无法安全地自动关闭这些进程。请关闭拥有这些进程的应用、终端或服务，然后重试更新。',
+    mixedBlockerBody: 'Stardust 可以关闭下方列出的本地预览。其他进程必须手动关闭，更新才能继续。',
     closePreviewsAndUpdate: '关闭预览并更新',
     closePreviewsAndCheckAgain: '关闭预览并重新检查',
     localPreview: '本地预览',
@@ -3985,20 +3985,20 @@ export const zh = defineLocale({
     installTo: '将安装到',
     retryAfterRun: '我已运行 -- 重试',
     setupChoiceTitle: '设置 Stardust Desktop',
-    setupChoiceDesc: '将此应用连接到你已运行的 Hermes 网关，或在这台电脑上本地安装 Hermes。',
-    connectExistingTitle: '连接到现有 Hermes',
+    setupChoiceDesc: '将此应用连接到你已运行的 Stardust 网关，或在这台电脑上本地安装 Stardust。',
+    connectExistingTitle: '连接到现有 Stardust',
     connectExistingShort: '连接现有环境',
     connectExistingDesc: '使用会话令牌或浏览器登录连接远程后端。不会启动本地安装。',
-    installLocalTitle: '本地安装 Hermes',
-    installLocalDesc: '下载 Hermes，创建 Python 环境，并在这台电脑上运行后端。',
+    installLocalTitle: '本地安装 Stardust',
+    installLocalDesc: '下载 Stardust，创建 Python 环境，并在这台电脑上运行后端。',
     localStartUnavailable: '无法启动本地安装。请重启 Stardust Desktop 后重试。',
-    remoteSetupTitle: '连接到现有 Hermes',
-    remoteSetupDesc: '输入网关 URL。Hermes Desktop 会检测需要令牌还是浏览器登录。',
+    remoteSetupTitle: '连接到现有 Stardust',
+    remoteSetupDesc: '输入网关 URL。Stardust Desktop 会检测需要令牌还是浏览器登录。',
     remoteUrlTitle: '网关 URL',
-    remoteUrlDesc: '使用 Hermes 网关的基础 URL；远程地址请包含 https://。',
+    remoteUrlDesc: '使用 Stardust 网关的基础 URL；远程地址请包含 https://。',
     remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
     probing: '正在检测网关认证方式...',
-    probeError: '无法连接到该 Hermes 网关。',
+    probeError: '无法连接到该 Stardust 网关。',
     identityProvider: '你的身份提供方',
     authTitle: '认证',
     authNeedsOauth: provider => `测试此网关前请先使用 ${provider} 登录。`,
@@ -4021,8 +4021,8 @@ export const zh = defineLocale({
     settingUpTitle: '正在设置 Stardust',
     finishingTitle: '正在收尾',
     failedDesc:
-      '某个安装步骤失败。在 Windows 上，如果另一个 Hermes CLI 或桌面实例正在运行，可能会出现这种情况。请停止正在运行的 Hermes 实例后重试。可查看下面的详情或 desktop 日志中的完整记录。',
-    activeDesc: '这是一次性设置。Hermes 安装器正在下载依赖并配置你的机器。之后启动会跳过此步骤。',
+      '某个安装步骤失败。在 Windows 上，如果另一个 Stardust CLI 或桌面实例正在运行，可能会出现这种情况。请停止正在运行的 Stardust 实例后重试。可查看下面的详情或 desktop 日志中的完整记录。',
+    activeDesc: '这是一次性设置。Stardust 安装器正在下载依赖并配置你的机器。之后启动会跳过此步骤。',
     progress: (completed, total) => `${completed}/${total} 个步骤已完成`,
     currentStage: stage => ` -- 当前：${stage}`,
     fetchingManifest: '正在获取安装器 manifest...',
@@ -4256,7 +4256,7 @@ export const zh = defineLocale({
       update: '更新',
       updateInProgress: '正在更新',
       commitsBehind: (count, branch) => `落后 ${branch} ${count} 个提交`,
-      desktopVersion: version => `Hermes Desktop v${version}`,
+      desktopVersion: version => `Stardust Desktop v${version}`,
       backendVersion: version => `后端 v${version}`,
       clientLabel: version => `客户端 v${version}`,
       connectionSsh: host => `SSH: ${host}`,
@@ -4424,7 +4424,7 @@ export const zh = defineLocale({
     binaryTitle: '这看起来像二进制文件',
     binaryBody: label => `预览 ${label} 可能会显示不可读文本。`,
     largeTitle: '此文件较大',
-    largeBody: (label, size) => `${label} 大小为 ${size}。Hermes 只会显示前 512 KB。`,
+    largeBody: (label, size) => `${label} 大小为 ${size}。Stardust 只会显示前 512 KB。`,
     previewAnyway: '仍然预览',
     truncated: '显示前 512 KB。',
     noInlineTitle: '没有内联预览',
@@ -4623,21 +4623,21 @@ export const zh = defineLocale({
         billing: '额度用完了',
         disk: '磁盘已满',
         endpoint: '连不上你的模型服务器',
-        gateway: '星尘遇到了问题',
-        generic: '星尘没能完成这次回复',
+        gateway: 'Stardust 遇到了问题',
+        generic: 'Stardust 没能完成这次回复',
         provider: '模型服务返回了错误',
-        runtime: '星尘遇到了问题',
+        runtime: 'Stardust 遇到了问题',
         streaming: '回复中途断开了'
       },
       errorLayerBodies: {
         auth: '模型服务没有接受你的登录凭据。检查这个服务的密钥或登录，然后重新发送。',
         billing: '这个服务的账户额度已用完。充值或切换服务商，然后重新发送。',
-        disk: '磁盘已满，星尘没法保存这段对话。清理一些空间后重试。',
-        endpoint: '星尘连不上你的自定义模型服务器。确认它正在运行，然后重新发送。',
-        gateway: '星尘开始回复时遇到内部问题。重新发送一次；如果反复出现，请发送诊断信息。',
-        generic: '星尘回复时出了问题。可以重试；如果反复出现，请复制错误详情。',
+        disk: '磁盘已满，Stardust 没法保存这段对话。清理一些空间后重试。',
+        endpoint: 'Stardust 连不上你的自定义模型服务器。确认它正在运行，然后重新发送。',
+        gateway: 'Stardust 开始回复时遇到内部问题。重新发送一次；如果反复出现，请发送诊断信息。',
+        generic: 'Stardust 回复时出了问题。可以重试；如果反复出现，请复制错误详情。',
         provider: '模型服务没能完成这次请求。稍后重试，或切换服务商。',
-        runtime: '星尘开始回复时遇到内部问题。重新发送一次；如果反复出现，请发送诊断信息。',
+        runtime: 'Stardust 开始回复时遇到内部问题。重新发送一次；如果反复出现，请发送诊断信息。',
         streaming: '回复还没写完连接就断了。点“重试”重新发送。'
       },
       errorCodes: {
@@ -4679,7 +4679,7 @@ export const zh = defineLocale({
         },
         ssl_cert_verification: {
           title: '安全连接失败',
-          body: provider => `星尘无法验证与 ${provider} 的安全连接。检查网络或代理设置，或切换服务商，然后重新发送。`
+          body: provider => `Stardust 无法验证与 ${provider} 的安全连接。检查网络或代理设置，或切换服务商，然后重新发送。`
         },
         context_overflow: {
           title: '这段对话太长了',
@@ -4711,23 +4711,23 @@ export const zh = defineLocale({
         },
         invalid_response: {
           title: '模型服务返回了看不懂的内容',
-          body: provider => `${provider} 返回的内容星尘读不懂。稍后重试。`
+          body: provider => `${provider} 返回的内容 Stardust 读不懂。稍后重试。`
         },
         empty_response: {
           title: '模型服务返回了空回复',
           body: provider => `${provider} 对这条消息什么也没返回。稍后重试。`
         },
         loop_error: {
-          title: '星尘陷入了循环',
-          body: '回复一直在重复同样的步骤，星尘把它停了下来。可以重试；如果再次出现，开始新对话。'
+          title: 'Stardust 陷入了循环',
+          body: '回复一直在重复同样的步骤，Stardust 把它停了下来。可以重试；如果再次出现，开始新对话。'
         },
         SESSION_NOT_OWNED: {
           title: '这个对话正在别处打开',
-          body: '这个对话正在另一个星尘窗口或终端里打开。在那边关闭后重新发送，或在这里开始新对话。'
+          body: '这个对话正在另一个 Stardust 窗口或终端里打开。在那边关闭后重新发送，或在这里开始新对话。'
         },
         disk_full: {
           title: '磁盘已满',
-          body: '磁盘已满，星尘没法保存这段对话。清理一些空间后重试。'
+          body: '磁盘已满，Stardust 没法保存这段对话。清理一些空间后重试。'
         }
       },
       errorAuthKinds: {
@@ -4741,7 +4741,7 @@ export const zh = defineLocale({
       },
       errorDetails: '详情',
       errorGenericProvider: '模型服务',
-      errorToastTitle: '星尘没能完成这次回复',
+      errorToastTitle: 'Stardust 没能完成这次回复',
       errorRetry: '重试',
       errorStartNewSession: '开始新对话',
       errorSwitchProvider: '切换服务商',
@@ -4752,8 +4752,8 @@ export const zh = defineLocale({
       errorChooseModel: '选择模型',
       errorCompressConversation: '压缩对话',
       errorCompressFailed: '无法压缩对话',
-      errorOpenHermesFolder: '打开星尘数据文件夹',
-      errorOpenHermesFolderFailed: '无法打开星尘数据文件夹',
+      errorOpenHermesFolder: '打开 Stardust 数据文件夹',
+      errorOpenHermesFolderFailed: '无法打开 Stardust 数据文件夹',
       errorUpdateApiKey: '更新 API 密钥',
       errorOpenLogs: '打开日志',
       errorOpenLogsFailed: '无法打开日志文件夹',
@@ -4800,7 +4800,7 @@ export const zh = defineLocale({
       searchResults: '搜索结果'
     },
     approval: {
-      gatewayDisconnected: 'Hermes 网关未连接',
+      gatewayDisconnected: 'Stardust 网关未连接',
       sendFailed: '无法发送审批响应',
       run: '运行',
       command: '命令',
@@ -4811,12 +4811,12 @@ export const zh = defineLocale({
       reject: '拒绝',
       alwaysTitle: '始终允许此命令？',
       alwaysDescription: pattern =>
-        `这会将“${pattern}”模式加入永久允许列表 (~/.hermes/config.yaml)。Hermes 对类似命令将不再询问，包括当前对话和未来对话。`,
+        `这会将“${pattern}”模式加入永久允许列表 (~/.hermes/config.yaml)。Stardust 对类似命令将不再询问，包括当前对话和未来对话。`,
       alwaysAllow: '始终允许'
     },
     clarify: {
       notReady: '澄清请求尚未就绪',
-      gatewayDisconnected: 'Hermes 网关未连接',
+      gatewayDisconnected: 'Stardust 网关未连接',
       sendFailed: '无法发送澄清响应',
       loadingQuestion: '正在加载问题…',
       other: '其他 (输入你的答案)',
@@ -4847,7 +4847,7 @@ export const zh = defineLocale({
       envRequired: '请先填写所需凭据',
       sendFailed: '无法发送 MCP 设置响应',
       reloadFailed: '服务器已保存，但重新加载 MCP 工具失败 — 将在下个对话加载',
-      gatewayDisconnected: 'Hermes 网关未连接'
+      gatewayDisconnected: 'Stardust 网关未连接'
     },
     tool: {
       copyCode: '复制代码',
@@ -5017,7 +5017,7 @@ export const zh = defineLocale({
   },
 
   prompts: {
-    gatewayDisconnected: 'Hermes 网关未连接',
+    gatewayDisconnected: 'Stardust 网关未连接',
     sudoSendFailed: '无法发送 sudo 密码',
     secretSendFailed: '无法发送密钥',
     sudoTitle: '管理员密码',
@@ -5025,7 +5025,7 @@ export const zh = defineLocale({
     sudoCommandUnavailable: '此 agent 未提供命令。如果无法在对话中确认，请取消。',
     sudoPlaceholder: 'sudo 密码',
     secretTitle: '需要密钥',
-    secretDesc: 'Hermes 需要一个凭据才能继续。',
+    secretDesc: 'Stardust 需要一个凭据才能继续。',
     secretPlaceholder: '密钥值',
     vaultUnlockSendFailed: '无法发送主密码',
     vaultUnlockTitle: name => `解锁 ${name}`,
@@ -5037,7 +5037,7 @@ export const zh = defineLocale({
     vaultSaveSendFailed: '无法保存登录信息',
     vaultSaveTitle: site => `保存 ${site} 的登录信息？`,
     vaultSaveDesc: origin =>
-      `Hermes 到达了 ${origin} 的登录页，但没有为它保存的登录信息。在此输入一次；它将在本机加密保存并直接填入页面，模型永远看不到密码。`,
+      `Stardust 到达了 ${origin} 的登录页，但没有为它保存的登录信息。在此输入一次；它将在本机加密保存并直接填入页面，模型永远看不到密码。`,
     vaultSaveIdentifierLabel: '邮箱或用户名',
     vaultSaveIdentifierPlaceholder: 'you@example.com',
     vaultSavePasswordPlaceholder: '密码',
@@ -5047,9 +5047,9 @@ export const zh = defineLocale({
     vaultCodeSendFailed: '无法发送验证码',
     vaultCodeTitle: site => `${site} 的验证码`,
     vaultCodeDesc: site =>
-      `${site} 要求输入一次性验证码（短信、邮件或验证器应用）。在此输入，Hermes 会将其填入页面；模型永远看不到它。`,
+      `${site} 要求输入一次性验证码（短信、邮件或验证器应用）。在此输入，Stardust 会将其填入页面；模型永远看不到它。`,
     vaultCodeLabel: '验证码',
-    vaultCodeFootnote: '提示：在“设置 → 密码与登录”中为该登录保存验证器密钥后，Hermes 会自动填写验证码。',
+    vaultCodeFootnote: '提示：在“设置 → 密码与登录”中为该登录保存验证器密钥后，Stardust 会自动填写验证码。',
     vaultCodeSkip: '跳过',
     vaultCodeConfirm: '输入验证码'
   },
@@ -5109,8 +5109,8 @@ export const zh = defineLocale({
     sessionExportFailed: '无法导出对话',
     imageSaved: '图片已保存',
     downloadStarted: '下载已开始',
-    restartToUseSaveImage: '重启 Hermes 桌面版后可使用保存图片。',
-    restartToSaveImages: '重启 Hermes 桌面版以保存图片',
+    restartToUseSaveImage: '重启 Stardust 桌面版后可使用保存图片。',
+    restartToSaveImages: '重启 Stardust 桌面版以保存图片',
     imageDownloadFailed: '图片下载失败',
     openImage: '打开图片',
     downloadImage: '下载图片',
@@ -5144,14 +5144,14 @@ export const zh = defineLocale({
       },
       skills: {
         title: '教一次就够',
-        text: '技能是一组说明文件，Hermes 会在需要时自行加载。'
+        text: '技能是一组说明文件，Stardust 会在需要时自行加载。'
       },
       messaging: {
         title: '离开电脑也能用',
         text: '接入 Telegram、Discord、Slack 等 — 同一个智能体，同一份记忆。'
       },
       artifacts: {
-        title: 'Hermes 做过的一切',
+        title: 'Stardust 做过的一切',
         text: '所有对话里的图片、文件和链接，都汇总在这里。'
       },
       cron: {
@@ -5164,7 +5164,7 @@ export const zh = defineLocale({
       },
       profiles: {
         title: '配置文件彼此独立',
-        text: '每个都是独立的 Hermes — 自己的密钥、记忆和对话。'
+        text: '每个都是独立的 Stardust — 自己的密钥、记忆和对话。'
       },
       'composer-mentions': {
         title: '附件与命令',

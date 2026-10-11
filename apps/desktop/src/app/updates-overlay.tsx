@@ -21,6 +21,7 @@ import { openExternalLink } from '@/lib/external-link'
 import { AlertCircle, Check, Copy, Terminal } from '@/lib/icons'
 import { resolveUpdateCopy, type UpdateTarget } from '@/lib/update-copy'
 import { cn } from '@/lib/utils'
+import { PRODUCT_RELEASES_URL } from '@/product-brand'
 import { requestRoute } from '@/store/recovery-requests'
 import {
   $backendUpdateApply,
@@ -42,8 +43,8 @@ import {
 
 import { SETTINGS_ROUTE } from './routes'
 
-/** Same installer page Settings → About links to. */
-const INSTALLER_URL = 'https://hermes-agent.nousresearch.com/'
+/** Same releases page Settings → About links to. */
+const INSTALLER_URL = PRODUCT_RELEASES_URL
 
 /** Main puts the raw cause after "Details:" — show it as the dimmed line. */
 function splitDetails(text: string): [string, string | null] {

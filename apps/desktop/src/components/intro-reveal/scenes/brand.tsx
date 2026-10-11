@@ -1,5 +1,7 @@
 import type { ComponentProps } from 'react'
 
+import { PRODUCT_NAME } from '@/product-brand'
+
 const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
 
 interface BrandCloseProps extends ComponentProps<'div'> {}
@@ -22,7 +24,7 @@ export function BrandClose({ ref }: BrandCloseProps) {
             textShadow: '0 2px 24px rgba(0,0,0,0.45)'
           }}
         >
-          Hermes Agent
+          {PRODUCT_NAME}
         </h1>
         <p
           className="text-[2vmin] uppercase tracking-[0.42em] text-white/50"

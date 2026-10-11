@@ -16,110 +16,6 @@ import type { Locale, Translations } from './types'
 
 export { LOCALE_META } from './languages'
 
-const UPSTREAM_INSTALL_COMMAND = /curl -fsSL https:\/\/hermes-agent\.nousresearch\.com\/install\.sh \| (?:ba)?sh/g
-const STARDUST_INSTALL_COMMAND =
-  'curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash'
-
-function stardustProductName(value: string): string {
-  return value.replaceAll('Hermes Desktop', 'Stardust Desktop').replaceAll('Hermes', 'Stardust')
-}
-
-/** Replace only static copy. Functions and other runtime values stay intact so
- * technical commands/config values returned by callbacks are never rewritten
- * accidentally. Apply this helper only to explicitly product-facing subtrees. */
-function normalizeStaticProductCopy<T>(value: T): T {
-  if (typeof value === 'string') {
-    return stardustProductName(value) as T
-  }
-
-  if (Array.isArray(value)) {
-    return value.map(item => normalizeStaticProductCopy(item)) as T
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, normalizeStaticProductCopy(entry)])
-    ) as T
-  }
-
-  return value
-}
-
-/**
- * The inherited locale catalogs still carry a handful of Hermes-era SSH
- * recovery strings. Keep those catalogs intact until they are naturally
- * translated again, but never let a live Stardust UI send a user to the
- * upstream installer. The second "Hermes" in the not-installed copy usually
- * names the compatibility path/CLI, so only the first product-name occurrence
- * is rewritten.
- */
-export function normalizeStardustProductCopy(translations: Translations): Translations {
-  const gateway = translations.settings.gateway
-  const settings = translations.settings
-
-  return {
-    ...translations,
-    connectors: {
-      ...translations.connectors,
-      disclaimer: stardustProductName(translations.connectors.disclaimer)
-    },
-    sessionImport: normalizeStaticProductCopy(translations.sessionImport),
-    boot: {
-      ...translations.boot,
-      ready: stardustProductName(translations.boot.ready),
-      steps: normalizeStaticProductCopy(translations.boot.steps),
-      errors: normalizeStaticProductCopy(translations.boot.errors),
-      failure: normalizeStaticProductCopy(translations.boot.failure)
-    },
-    notifications: normalizeStaticProductCopy(translations.notifications),
-    cron: normalizeStaticProductCopy(translations.cron),
-    tips: normalizeStaticProductCopy(translations.tips),
-    settings: {
-      ...settings,
-      resetConfirm: stardustProductName(settings.resetConfirm),
-      vault: normalizeStaticProductCopy(settings.vault),
-      notifications: normalizeStaticProductCopy(settings.notifications),
-      appearance: normalizeStaticProductCopy(settings.appearance),
-      about: normalizeStaticProductCopy(settings.about),
-      plugins: {
-        ...normalizeStaticProductCopy(settings.plugins),
-        installModal: {
-          ...normalizeStaticProductCopy(settings.plugins.installModal),
-          catalogPinned: (name, sha) => stardustProductName(settings.plugins.installModal.catalogPinned(name, sha))
-        }
-      },
-      searchPlaceholder: {
-        ...settings.searchPlaceholder,
-        about: settings.searchPlaceholder.about.replace('Hermes Desktop', 'Stardust Desktop')
-      },
-      uninstallSection: {
-        ...settings.uninstallSection,
-        uninstallHermes: settings.uninstallSection.uninstallHermes.replace('Hermes', 'Stardust')
-      },
-      config: {
-        ...settings.config,
-        loading: settings.config.loading.replace('Hermes', 'Stardust')
-      },
-      providers: {
-        ...settings.providers,
-        intro: settings.providers.intro.replace('Hermes', 'Stardust'),
-        localEndpoint: {
-          ...settings.providers.localEndpoint,
-          description: settings.providers.localEndpoint.description.replace('Hermes', 'Stardust')
-        }
-      },
-      gateway: {
-        ...gateway,
-        sshErrAuth: gateway.sshErrAuth.replace('Hermes', 'Stardust'),
-        sshErrNotInstalled: gateway.sshErrNotInstalled
-          .replace('Hermes', 'Stardust')
-          .replace(UPSTREAM_INSTALL_COMMAND, STARDUST_INSTALL_COMMAND),
-        sshErrPlatform: gateway.sshErrPlatform.replace('Hermes Desktop', 'Stardust Desktop')
-      }
-    }
-  }
-}
-
 export interface I18nConfigClient {
   getConfig: () => Promise<HermesConfigRecord>
   saveConfig: (config: HermesConfigRecord) => Promise<{ ok: boolean }>
@@ -181,7 +77,7 @@ const I18nContext = createContext<I18nContextValue>({
   locale: DEFAULT_LOCALE,
   saveError: null,
   setLocale: async () => {},
-  t: normalizeStardustProductCopy(TRANSLATIONS[DEFAULT_LOCALE])
+  t: TRANSLATIONS[DEFAULT_LOCALE]
 })
 
 export interface I18nProviderProps {
@@ -330,7 +226,7 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
       locale,
       saveError,
       setLocale,
-      t: normalizeStardustProductCopy(TRANSLATIONS[locale])
+      t: TRANSLATIONS[locale]
     }),
     [configLoadError, isLoadingConfig, isSavingLocale, locale, saveError, setLocale]
   )
