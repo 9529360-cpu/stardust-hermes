@@ -15,6 +15,7 @@ import {
   $projectScope,
   $projectsRpcAvailable,
   $projectTree,
+  $projectTreeLoading,
   enterProject,
   exitProjectScope,
   fetchProjectSessions,
@@ -121,6 +122,7 @@ export function PersonalProductNav({
   const [projectLoadFailed, setProjectLoadFailed] = useState(false)
   const projects = useStore($projectTree)
   const projectsRead = useStore($projectsRpcAvailable) === true
+  const projectsLoading = useStore($projectTreeLoading)
   const profileScope = useStore($profileScope)
   const projectScope = useStore($projectScope)
   const activeProjectId = useStore($activeProjectId)
@@ -403,8 +405,9 @@ export function PersonalProductNav({
                 </div>
               )
             })}
-            {/* Only once the tree has been read: before that an empty list says nothing yet. */}
-            {projectsRead && projects.length === 0 && (
+            {/* Only once the tree is read and not loading, and only when no real project exists. */}
+            {/* Home is folder-less chats, not a project, so a Home-only tree still shows the line. */}
+            {projectsRead && !projectsLoading && projects.every(project => project.isNoProject) && (
               <div className="px-2 py-1 text-xs text-(--ui-text-tertiary)">{t.sidebar.projects.emptyTitle}</div>
             )}
             <button

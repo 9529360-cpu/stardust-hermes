@@ -1,6 +1,8 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
+import { startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
@@ -10,11 +12,12 @@ import {
   writeMockProviderConfig
 } from './fixtures'
 import { expect, test } from './test'
-import { startMockServer } from '../../../tests-js/scripts/mock-server'
 
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
 test('reviews and removes one built-in memory entry in an isolated profile', async ({}, testInfo) => {
   const taskTemp = process.env.STARDUST_TASK_TEMP
-  if (!taskTemp) throw new Error('STARDUST_TASK_TEMP must point to the D-drive task temp directory')
+
+  if (!taskTemp) {throw new Error('STARDUST_TASK_TEMP must point to the D-drive task temp directory')}
   process.env.TEMP = taskTemp
   process.env.TMP = taskTemp
   process.env.TMPDIR = taskTemp
@@ -60,7 +63,7 @@ test('reviews and removes one built-in memory entry in an isolated profile', asy
     await expect(page.getByText('Lives in Berlin', { exact: true })).toBeVisible()
 
     const freshDialog = page.getByRole('dialog')
-    await expect(freshDialog).toContainText(/fresh session|新会话/)
+    await expect(freshDialog).toContainText(/fresh chat|新对话/)
     await freshDialog.getByRole('button', { name: /Keep current chat|继续当前聊天|继续/ }).click()
     await app.close()
     app = null

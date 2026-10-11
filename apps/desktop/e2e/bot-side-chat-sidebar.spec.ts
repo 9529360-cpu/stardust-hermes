@@ -127,7 +127,7 @@ test('a bot side-chat stays listed after a reload, and the Bot Chat stays hidden
   // The Bot Chat has a composer on screen too, so the text goes to whichever
   // composer holds the keyboard after the draft opens. Click none of them.
   await page.keyboard.press('Control+t')
-  await expect(page.getByRole('tab', { name: /New session|尚未发送/, selected: true }).first()).toBeVisible({
+  await expect(page.getByRole('tab', { name: /New chat|New session|新建对话|新建会话|尚未发送/, selected: true }).first()).toBeVisible({
     timeout: 15_000
   })
 

@@ -4,6 +4,9 @@ import { SearchField } from '@/components/ui/search-field'
 import { ResponsiveTabs } from '@/components/ui/tab-dropdown'
 import { cn } from '@/lib/utils'
 
+import { PAGE_INSET_X } from './layout-constants'
+import { PanelHeader } from './overlays/panel'
+
 // Tabs are data, not nodes: the shell owns their presentation so every page
 // gets the same behavior — a centered TextTab row on wide viewports that
 // collapses into a dropdown when the header can't fit both search and tabs.
@@ -16,6 +19,8 @@ export interface PageShellTab {
 
 interface PageSearchShellProps extends React.ComponentProps<'section'> {
   children: ReactNode
+  /** Page title row above the search and tabs: the same PanelHeader the Tasks page uses. */
+  title?: string
   tabs?: PageShellTab[]
   activeTab?: string
   onTabChange?: (id: string) => void
@@ -55,6 +60,7 @@ function ShellTabs({
 export function PageSearchShell({
   children,
   className,
+  title,
   tabs,
   activeTab,
   onTabChange,
@@ -89,9 +95,20 @@ export function PageSearchShell({
         draggable titlebar strip that is `calc()`'d around the icon clusters
         (see app-shell.tsx), so window dragging still works here.
       */}
+      {title ? (
+        <div className={cn('shrink-0 pt-[calc(var(--titlebar-height)+0.5rem)]', PAGE_INSET_X)}>
+          <PanelHeader title={title} />
+        </div>
+      ) : null}
       <div className="shrink-0">
         {(hasTabs || !searchHidden) && (
-          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-3 pb-2 pt-[calc(var(--titlebar-height)+0.5rem)]">
+          <div
+            className={cn(
+              'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 pb-2',
+              // With a title row, the search and tabs share the title's inset, and the title already clears the titlebar.
+              title ? PAGE_INSET_X : 'px-3 pt-[calc(var(--titlebar-height)+0.5rem)]'
+            )}
+          >
             <div className="flex min-w-0 items-center justify-start">
               {!searchHidden && (
                 <SearchField

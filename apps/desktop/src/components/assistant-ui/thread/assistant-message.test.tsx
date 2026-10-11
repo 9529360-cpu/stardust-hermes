@@ -194,13 +194,13 @@ describe('AssistantMessage branch button visibility (bug #2 fix)', () => {
 })
 
 describe('ownership refusal recovery (#106217)', () => {
-  it('offers Start new session and suppresses Retry for live-owner refusals', async () => {
+  it('offers Start new chat and suppresses Retry for live-owner refusals', async () => {
     render(<Harness assistant={ownershipRefusalMessage()} />)
 
-    expect(await screen.findByRole('button', { name: 'Start new session' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: 'Start new chat' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
 
-    screen.getByRole('button', { name: 'Start new session' }).click()
+    screen.getByRole('button', { name: 'Start new chat' }).click()
     expect(requestFreshSession).toHaveBeenCalledTimes(1)
   })
 
@@ -254,12 +254,12 @@ describe('code-keyed error card copy and actions', () => {
     expect(screen.getByText(/HTTP 400/).closest('details')).not.toBeNull()
   })
 
-  it('offers Compress conversation and Start new session for a context overflow', async () => {
+  it('offers Compress conversation and Start new chat for a context overflow', async () => {
     render(<Harness assistant={failedMessage({ code: 'context_overflow', layer: 'provider', retryable: true })} />)
 
     expect(await screen.findByText('This conversation is too long')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Compress conversation' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Start new session' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Start new chat' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
   })
 

@@ -188,8 +188,8 @@ describe('Command Center memory reset forget boundary', () => {
     )
     expect(vi.mocked(confirm).mock.calls[1]?.[0]).toEqual(
       expect.objectContaining({
-        confirmLabel: 'Start new session',
-        description: expect.stringContaining('fresh session')
+        confirmLabel: 'Start new chat',
+        description: expect.stringContaining('fresh chat')
       })
     )
     expect(requestFreshSession).toHaveBeenCalledTimes(1)

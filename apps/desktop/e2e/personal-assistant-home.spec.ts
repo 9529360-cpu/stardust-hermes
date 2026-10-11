@@ -1,6 +1,5 @@
-import { expect, test } from './test'
-
 import { type MockBackendFixture, setupMockBackend, waitForAppReady } from './fixtures'
+import { expect, test } from './test'
 
 let fixture: MockBackendFixture | null = null
 
@@ -14,13 +13,16 @@ test.afterAll(async () => {
   fixture = null
 })
 
+// eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
 test('personal assistant workspace keeps conversation primary and navigation unclipped', async ({}, testInfo) => {
   const page = fixture!.page
   const consoleErrors: string[] = []
   const pageErrors: string[] = []
+
   const noteConsole = (message: { text: () => string; type: () => string }) => {
-    if (message.type() === 'error') consoleErrors.push(message.text())
+    if (message.type() === 'error') {consoleErrors.push(message.text())}
   }
+
   const notePageError = (error: Error) => pageErrors.push(error.stack ?? error.message)
   page.on('console', noteConsole)
   page.on('pageerror', notePageError)
@@ -36,7 +38,7 @@ test('personal assistant workspace keeps conversation primary and navigation unc
   await expect(intro).toBeVisible()
   await expect(page.getByTestId('assistant-quick-actions')).toHaveCount(0)
   await expect(productNav).toBeVisible()
-  await expect(page.getByRole('tab', { name: '会话' })).toHaveCount(0)
+  await expect(page.getByRole('tab', { name: '对话' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: '智能体' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: 'SESSIONS' })).toHaveCount(0)
   await expect(page.getByRole('tab', { name: 'BOTS' })).toHaveCount(0)

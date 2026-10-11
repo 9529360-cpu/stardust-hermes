@@ -14,6 +14,8 @@
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 
+import { type MockServer, startMockServer } from '../../../tests-js/scripts/mock-server'
+
 import {
   buildAppEnv,
   createSandbox,
@@ -23,7 +25,6 @@ import {
   writeEnvFile,
   writeMockProviderConfig,
 } from './fixtures'
-import { type MockServer, startMockServer } from '../../../tests-js/scripts/mock-server'
 import { RealSessionBuilder } from './real-session-builder'
 import { type ElectronApplication, expect, type Page, test } from './test'
 
@@ -125,7 +126,7 @@ async function openSeededSession(page: Page): Promise<void> {
  * surface is empty rather than waiting for the old caption to leave the page.
  */
 async function openNewSession(page: Page): Promise<void> {
-  await page.locator('[data-slot="sidebar"] button[aria-label="New session"]').first().click()
+  await page.locator('[data-slot="sidebar"] button[aria-label="New chat"], [data-slot="sidebar"] button[aria-label="新建对话"]').first().click()
   await page.waitForFunction(
     ([expected, surfaceSelector]: [string, string]) => {
       const surfaces = document.querySelectorAll(surfaceSelector)
@@ -164,6 +165,7 @@ test.describe('attached image resume', () => {
     fixture = null
   })
 
+  // eslint-disable-next-line no-empty-pattern -- Playwright needs the object pattern here
   test('renders a persisted attachment as a thumbnail on first open and after a cold reload', async ({}, testInfo) => {
     // Seeding through the real gateway plus two full app boots does not fit the
     // default per-test budget on a cold runner.

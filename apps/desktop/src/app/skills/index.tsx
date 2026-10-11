@@ -941,6 +941,8 @@ export function SkillsView({
         { id: 'mcp', label: t.skills.tabMcp },
         { id: 'plugins', label: t.skills.tabPlugins }
       ]}
+      // The routed page titles itself like Tasks; the embedded copy (Bot Mode dialogs) sits under the dialog's label.
+      title={embedded ? undefined : t.skills.pageTitles[mode]}
     >
       {/* One shared column: the scope selector sits above whichever tab is
           active, so Skills / Tools / MCP all read and write the SAME selected

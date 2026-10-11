@@ -12,6 +12,7 @@ import {
   $projectScope,
   $projectsRpcAvailable,
   $projectTree,
+  $projectTreeLoading,
   ALL_PROJECTS,
   deleteProject,
   fetchProjectSessions
@@ -55,6 +56,7 @@ afterEach(() => {
   $newChatProfile.set(null)
   $projectTree.set([])
   $projectsRpcAvailable.set(null)
+  $projectTreeLoading.set(false)
   $projectScope.set(ALL_PROJECTS)
   $currentCwd.set('')
   setSidebarAgentsGrouped(false)
@@ -230,6 +232,40 @@ describe('PersonalProductNav', () => {
     fireEvent.click(projectButton)
     expect(projectButton.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('button', { name: 'Example' })).toBeNull()
+  })
+
+  it('says there are no projects yet once the tree has loaded with no real project in it', () => {
+    $projectsRpcAvailable.set(true)
+    $projectTreeLoading.set(true)
+    renderNav('chat')
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+    // Still loading: an empty list is not yet a fact, so no "none yet" line.
+    expect(screen.queryByText('暂无项目')).toBeNull()
+
+    act(() => $projectTreeLoading.set(false))
+    expect(screen.getByText('暂无项目')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '新建项目' })).toBeTruthy()
+  })
+
+  it('treats the folder-less Home bucket as no project', () => {
+    $projectsRpcAvailable.set(true)
+    $projectTree.set([{ id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 1 }])
+    renderNav('chat')
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+
+    expect(screen.getByText('暂无项目')).toBeTruthy()
+  })
+
+  it('hides the empty line as soon as a real project exists', () => {
+    $projectsRpcAvailable.set(true)
+    $projectTree.set([
+      { id: 'no-project', isNoProject: true, label: 'Home', path: null, repos: [], sessionCount: 1 },
+      { id: 'p_example', label: 'Example', path: 'D:/Example', repos: [], sessionCount: 1 }
+    ])
+    renderNav('chat')
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+
+    expect(screen.queryByText('暂无项目')).toBeNull()
   })
 
   it('opens a project conversation from its nested list without removing recents', async () => {

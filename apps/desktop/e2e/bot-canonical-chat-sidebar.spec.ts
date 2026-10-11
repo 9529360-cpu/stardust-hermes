@@ -25,9 +25,9 @@ async function capture(page: MockBackendFixture['page'], label: string): Promise
 }
 
 // The untitled fallback a row shows when it has no name and no first message.
-const UNTITLED = /^(无标题会话|Untitled session)$/
+const UNTITLED = /^(无标题会话|无标题对话|Untitled session|Untitled chat)$/
 // The conversation list when it holds no rows.
-const EMPTY_LIST = /^(暂无会话|No sessions yet)$/
+const EMPTY_LIST = /^(暂无会话|暂无对话|No sessions yet|No chats yet)$/
 
 let fixture: MockBackendFixture | null = null
 

@@ -183,11 +183,11 @@ describe('ConnectionsRegistrySection', () => {
   it('lets users opt into restoring the last-used source', async () => {
     render(<ConnectionsRegistrySection />)
 
-    const launchSetting = await screen.findByText('At startup, return to Sessions on the last-used gateway')
+    const launchSetting = await screen.findByText('At startup, return to Chats on the last-used gateway')
     const addConnection = screen.getByText('Add connection')
 
     expect(addConnection.compareDocumentPosition(launchSetting) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    fireEvent.click(screen.getByRole('switch', { name: 'At startup, return to Sessions on the last-used gateway' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'At startup, return to Chats on the last-used gateway' }))
 
     await waitFor(() => expect(setLaunchMode).toHaveBeenCalledWith('last-used'))
   })
@@ -201,7 +201,7 @@ describe('ConnectionsRegistrySection', () => {
     render(<ConnectionsRegistrySection />)
 
     await waitFor(() => expect(list).toHaveBeenCalledTimes(1))
-    expect(screen.getByText('At startup, return to Sessions on the last-used gateway')).toBeTruthy()
+    expect(screen.getByText('At startup, return to Chats on the last-used gateway')).toBeTruthy()
   })
 
   it('keeps search out of the way for a small registry', async () => {
