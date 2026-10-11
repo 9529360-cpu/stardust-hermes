@@ -209,28 +209,6 @@ test('profile route omits identity when two registry entries match exactly', () 
   assert.equal(route?.connectionId, undefined)
 })
 
-test('kind, auth material, headers, and Cloud org stay part of route identity', () => {
-  const cloud = {
-    mode: 'cloud',
-    url: 'https://cloud.test',
-    authMode: 'oauth',
-    headers: { 'CF-Access': { encoding: 'plain', value: 'a' } },
-    org: 'org-a'
-  }
-
-  const route = resolveDesktopRemoteRoute({
-    config: { mode: 'cloud', remote: cloud },
-    registry: registry('cloud', [
-      { id: 'cloud', kind: 'cloud', label: 'Cloud', ...cloud },
-      { id: 'remote', kind: 'remote', label: 'Remote', ...cloud },
-      { id: 'other-org', kind: 'cloud', label: 'Other org', ...cloud, org: 'org-b' }
-    ])
-  })
-
-  assert.equal(route?.kind, 'cloud')
-  assert.equal(route?.connectionId, 'cloud')
-})
-
 test('URL route fails closed for different token, headers, kind, or Cloud org', () => {
   const cases = [
     {
@@ -252,14 +230,6 @@ test('URL route fails closed for different token, headers, kind, or Cloud org', 
         token: tokenA,
         headers: { 'CF-Access': { encoding: 'plain', value: 'b' } }
       }
-    },
-    {
-      config: { mode: 'remote', remote: { url: 'https://gateway.test', token: tokenA } },
-      primary: { kind: 'cloud', url: 'https://gateway.test', token: tokenA }
-    },
-    {
-      config: { mode: 'cloud', remote: { url: 'https://gateway.test', authMode: 'oauth', org: 'a' } },
-      primary: { kind: 'cloud', url: 'https://gateway.test', authMode: 'oauth', org: 'b' }
     }
   ]
 
@@ -368,28 +338,6 @@ test('falls back to a REMOTE registry primary when the v1 mode is local (#91564/
   assert.equal(route?.connectionId, 'gw-b')
   assert.equal((route as any)?.url, 'https://gw-b.test')
   assert.deepEqual((route as any)?.token, tokenB)
-})
-
-test('falls back to a CLOUD registry primary when the v1 mode is local', () => {
-  const route = resolveDesktopRemoteRoute({
-    config: { mode: 'local' },
-    profile: null,
-    registry: registry('cloud-1', [
-      {
-        id: 'cloud-1',
-        kind: 'cloud',
-        label: 'Hermes Cloud',
-        url: 'https://agent.hermes.cloud',
-        authMode: 'oauth',
-        org: 'nous'
-      }
-    ])
-  })
-
-  assert.equal(route?.kind, 'cloud')
-  assert.equal(route?.source, 'registry')
-  assert.equal((route as any)?.authMode, 'oauth')
-  assert.equal((route as any)?.org, 'nous')
 })
 
 test('falls back to an SSH registry primary when the v1 mode is local', () => {

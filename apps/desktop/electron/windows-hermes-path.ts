@@ -270,7 +270,7 @@ export async function resolveVenvHermesCommand(
     }))
   ) {
     rememberLog?.(
-      `Ignoring venv Hermes at ${python}: runtime import probe failed (broken/partial venv); falling through to bootstrap.`
+      `Ignoring venv Stardust at ${python}: runtime import probe failed (broken/partial venv); falling through to bootstrap.`
     )
 
     return null

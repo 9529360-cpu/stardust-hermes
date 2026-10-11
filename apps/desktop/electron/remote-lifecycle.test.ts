@@ -300,6 +300,26 @@ test('locateHermes falls back to the login-shell command -v probe', async () => 
   assert.equal(await locateHermes(ssh, ''), '/home/u/.local/bin/hermes')
 })
 
+test('locateHermes names the Stardust installer when no hermes is installed on the remote', async () => {
+  const ssh = fakeSsh([])
+
+  await assert.rejects(
+    () => locateHermes(ssh, ''),
+    (err: any) => {
+      assert.equal(err.kind, 'hermes-not-found')
+      assert.ok(
+        err.message.includes(
+          'curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash'
+        ),
+        err.message
+      )
+      assert.ok(!err.message.includes('hermes-agent.nousresearch.com'), err.message)
+
+      return true
+    }
+  )
+})
+
 test('locateHermes preserves an installer wrapper instead of resolving its interpreter', async () => {
   // install.sh venv mode writes: exec "$HERMES_BIN" "$HERMES_ENTRYPOINT" "$@",
   // where $HERMES_BIN is the venv python. The old canonicalization returned
@@ -1845,7 +1865,10 @@ test('probes run under the remote watchdog so a hung CLI cannot orphan (#110478)
 
   assert.equal(await remoteSupportsSshOwnership(helpSsh, '/x/hermes'), true)
   assert.ok(helpProbe.includes('kill -9'), 'ownership probe wrapped in the remote watchdog')
-  assert.ok(/\$\(.*\(.*serve --help.*\) <\/dev\/null &/.test(helpProbe), 'watchdog nested around the inner serve --help')
+  assert.ok(
+    /\$\(.*\(.*serve --help.*\) <\/dev\/null &/.test(helpProbe),
+    'watchdog nested around the inner serve --help'
+  )
 })
 
 test('cleanupStale escalates to SIGKILL when the backend survives the graceful wait (#91668 quit-during-active-turn)', async () => {

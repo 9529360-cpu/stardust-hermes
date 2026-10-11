@@ -153,7 +153,6 @@ import {
   setPrimaryConnection,
   shouldDeferLocalEnumeration,
   shouldRetrySshInventory,
-  updateEligibility,
   upsertConnection
 } from './connection-registry'
 import type { RosterProfileMetadata } from './connection-registry'
@@ -1579,7 +1578,7 @@ function logPoolSpawnFailure(label: string, error: unknown): void {
     rememberLog(`Profile backend ${label} slot wait timed out (background); will retry on the next hydration`)
   } else {
     rememberLog(
-      `Hermes backend for profile ${label} failed to start: ${error instanceof Error ? error.message : String(error)}`
+      `Stardust backend for profile ${label} failed to start: ${error instanceof Error ? error.message : String(error)}`
     )
   }
 }
@@ -1711,8 +1710,7 @@ let nativeThemeListenerInstalled = false
 let bootProgressState = {
   error: null,
   fakeMode: BOOT_FAKE_MODE,
-  isCloudBackendDown: false,
-  message: 'Waiting to start Hermes backend',
+  message: 'Waiting to start Stardust backend',
   phase: 'idle',
   progress: 0,
   retryable: false,
@@ -2445,7 +2443,7 @@ async function waitForUpdateToFinish() {
 
       await advanceBootProgress(
         'backend.update-wait',
-        'An update is finishing — Hermes will start automatically when it completes…',
+        'An update is finishing — Stardust will start automatically when it completes…',
         12
       )
     },
@@ -2518,7 +2516,7 @@ async function waitForUpdateToFinish() {
   if (outcome === 'timeout') {
     rememberLog('[updates] update still in progress after wait timeout; starting backend anyway')
   } else if (relaunchIntoSwappedBundle()) {
-    await advanceBootProgress('backend.update-restart', 'Restarting Hermes to load the updated app…', 14)
+    await advanceBootProgress('backend.update-restart', 'Restarting Stardust to load the updated app…', 14)
     // Park while the scheduled exit lands so this stale build never starts a
     // backend; the failsafe below only runs if the exit somehow does not.
     await new Promise(resolve => setTimeout(resolve, BUNDLE_SWAP_RELAUNCH_FAILSAFE_MS))
@@ -3161,8 +3159,8 @@ async function checkUpdates({ force = false }: { force?: boolean } = {}) {
       supported: false,
       reason: 'not-a-git-checkout',
       message:
-        "This copy of Hermes can't update itself from inside the app. Download the latest version from the Hermes website, " +
-        `or reinstall Hermes to enable in-app updates. Details: ${updateRoot} has no version-control metadata.`,
+        "This copy of Stardust can't update itself from inside the app. Download the latest version from the Stardust website, " +
+        `or reinstall Stardust to enable in-app updates. Details: ${updateRoot} has no version-control metadata.`,
       hermesRoot: updateRoot,
       branch
     }
@@ -3746,7 +3744,7 @@ async function claimBackendChild(child, command, profile, nonce, outputTail: Bac
     stopBackendChild(child)
     await waitForBackendExit(child)
     throw new Error(
-      `Hermes backend (PID ${child.pid}) died before its identity could be recorded: ${decision.reason}${outputTail?.describe() ?? ''}`
+      `Stardust backend (PID ${child.pid}) died before its identity could be recorded: ${decision.reason}${outputTail?.describe() ?? ''}`
     )
   }
 
@@ -3755,7 +3753,7 @@ async function claimBackendChild(child, command, profile, nonce, outputTail: Bac
   if (decision.action === 'degrade') {
     startMarker = pidOnlyStartMarker(child.pid)
     rememberLog(
-      `WARNING: process start marker probe failed for live Hermes backend PID ${child.pid}; ` +
+      `WARNING: process start marker probe failed for live Stardust backend PID ${child.pid}; ` +
         `claiming with PID-only identity instead of stopping it: ${decision.reason}`
     )
   } else {
@@ -3783,7 +3781,7 @@ async function claimBackendChild(child, command, profile, nonce, outputTail: Bac
     stopBackendChild(child)
     await waitForBackendExit(child)
     throw new Error(
-      `Could not persist ownership for the Hermes backend: ${error.message}${outputTail?.describe() ?? ''}`
+      `Could not persist ownership for the Stardust backend: ${error.message}${outputTail?.describe() ?? ''}`
     )
   }
 }
@@ -4044,7 +4042,7 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
     emitUpdateProgress({
       stage: 'restart',
       message:
-        'Updating Hermes — this window will close and the updater will open. Don’t reopen Hermes yourself; it restarts automatically when the update finishes.',
+        'Updating Stardust — this window will close and the updater will open. Don’t reopen Stardust yourself; it restarts automatically when the update finishes.',
       percent: 100
     })
     repairMacUpdaterHelper(updater)
@@ -4089,8 +4087,8 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       // user close the holder and retry. Restart our own backend so the app
       // keeps working after the failed attempt.
       const message =
-        'Update aborted: another process is holding the Hermes install open ' +
-        '(a second Hermes window or a terminal running hermes?). Close it and retry.'
+        'Update aborted: another process is holding the Stardust install open ' +
+        '(a second Stardust window or a terminal running hermes?). Close it and retry.'
 
       emitUpdateProgress({ stage: 'error', message, percent: null })
       startHermes().catch(() => {})
@@ -4627,7 +4625,7 @@ async function applyUpdatesPosixHandoff(opts: any) {
   emitUpdateProgress({
     stage: 'restart',
     message:
-      'Updating Hermes — this window will close. Don’t reopen Hermes yourself; it restarts automatically when the update finishes.',
+      'Updating Stardust — this window will close. Don’t reopen Stardust yourself; it restarts automatically when the update finishes.',
     percent: 100
   })
 
@@ -4981,7 +4979,7 @@ async function createActiveBackend(backendArgs) {
 
   return {
     kind: 'python',
-    label: `Hermes at ${ACTIVE_HERMES_ROOT}`,
+    label: `Stardust at ${ACTIVE_HERMES_ROOT}`,
     command,
     args: ['-m', 'hermes_cli.main', ...backendArgs],
     env: buildDesktopBackendEnv({
@@ -5001,7 +4999,7 @@ async function resolveHermesBackend(backendArgs) {
   const overrideRoot = process.env.HERMES_DESKTOP_HERMES_ROOT && path.resolve(process.env.HERMES_DESKTOP_HERMES_ROOT)
 
   if (overrideRoot && isHermesSourceRoot(overrideRoot)) {
-    const backend = await createPythonBackend(overrideRoot, `Hermes source at ${overrideRoot}`, backendArgs)
+    const backend = await createPythonBackend(overrideRoot, `Stardust source at ${overrideRoot}`, backendArgs)
 
     if (backend) {
       return backend
@@ -5013,7 +5011,7 @@ async function resolveHermesBackend(backendArgs) {
   //    installed `hermes` on PATH so local Python edits are actually exercised.
   //    (In dev with no checkout, SOURCE_REPO_ROOT won't pass isHermesSourceRoot.)
   if (!IS_PACKAGED && isHermesSourceRoot(SOURCE_REPO_ROOT)) {
-    const backend = await createPythonBackend(SOURCE_REPO_ROOT, `Hermes source at ${SOURCE_REPO_ROOT}`, backendArgs)
+    const backend = await createPythonBackend(SOURCE_REPO_ROOT, `Stardust source at ${SOURCE_REPO_ROOT}`, backendArgs)
 
     if (backend) {
       return backend
@@ -5033,7 +5031,7 @@ async function resolveHermesBackend(backendArgs) {
   if (activeRuntime.shouldUseActiveRuntime && !bootstrapRepairRequested) {
     if (!activeRuntime.hasValidMarker) {
       rememberLog(
-        `[bootstrap] Active Hermes runtime at ${ACTIVE_HERMES_ROOT} is usable but the bootstrap marker is missing or stale; skipping first-run bootstrap.`
+        `[bootstrap] Active Stardust runtime at ${ACTIVE_HERMES_ROOT} is usable but the bootstrap marker is missing or stale; skipping first-run bootstrap.`
       )
     }
 
@@ -5061,7 +5059,7 @@ async function resolveHermesBackend(backendArgs) {
       } else if (!isWindowsBinaryPathInWsl(hermesOverride, { isWsl: IS_WSL })) {
         hermesCommand = hermesOverride
       } else {
-        rememberLog(`Ignoring Windows Hermes override under WSL: ${hermesOverride}`)
+        rememberLog(`Ignoring Windows Stardust override under WSL: ${hermesOverride}`)
       }
     } else {
       hermesCommand = findOnPath('hermes')
@@ -5161,7 +5159,7 @@ async function resolveHermesBackend(backendArgs) {
   //    is a recoverable state the GUI can drive through.
   return {
     kind: 'bootstrap-needed',
-    label: 'Hermes Agent not installed yet; bootstrap required',
+    label: 'Stardust Agent not installed yet; bootstrap required',
     command: null,
     args: backendArgs,
     bootstrap: true,
@@ -5199,11 +5197,11 @@ async function runEnsureRuntime(backend: any, assertStillOwned: () => void): Pro
   // will rewire startup to spawn the window first and route bootstrap events
   // to a renderer-side install overlay.
   if (backend.kind === 'bootstrap-needed') {
-    rememberLog('[bootstrap] no Hermes install found; starting first-launch bootstrap')
+    rememberLog('[bootstrap] no Stardust install found; starting first-launch bootstrap')
 
     if (await handOffWindowsBootstrapRecovery('bootstrap-needed')) {
       const handoffError: Error & { isBootstrapFailure?: boolean; bootstrapHandedOff?: boolean } = new Error(
-        'Hermes recovery was handed off to Hermes Setup. The desktop will restart when recovery completes.'
+        'Stardust recovery was handed off to Stardust Setup. The desktop will restart when recovery completes.'
       )
 
       handoffError.isBootstrapFailure = true
@@ -5266,7 +5264,7 @@ async function runEnsureRuntime(backend: any, assertStillOwned: () => void): Pro
     bootstrapAbortController = null
 
     if (bootstrapResult.cancelled) {
-      const cancelledError = new Error('Hermes install was cancelled.') as any
+      const cancelledError = new Error('Stardust install was cancelled.') as any
       cancelledError.isBootstrapFailure = true
       cancelledError.bootstrapCancelled = true
       bootstrapFailure = cancelledError
@@ -5303,7 +5301,9 @@ async function runEnsureRuntime(backend: any, assertStillOwned: () => void): Pro
   // (install.ps1 owns those concerns now and the bootstrap-complete marker
   // attests they ran successfully).
   if (!isHermesSourceRoot(ACTIVE_HERMES_ROOT)) {
-    throw new Error(missingInstallPartMessage(`Hermes source files are missing or incomplete at ${ACTIVE_HERMES_ROOT}`))
+    throw new Error(
+      missingInstallPartMessage(`Stardust source files are missing or incomplete at ${ACTIVE_HERMES_ROOT}`)
+    )
   }
 
   // On Windows, preflight Git Bash. Hermes' terminal tool calls bash.exe
@@ -5314,8 +5314,8 @@ async function runEnsureRuntime(backend: any, assertStillOwned: () => void): Pro
   // here via an external `hermes` on PATH, this check still helps.
   if (IS_WINDOWS && !findGitBash()) {
     throw new Error(
-      "Hermes needs a helper called Git for Windows, which isn't installed. " +
-        'Choose Repair install to add it automatically, or install it yourself from git-scm.com and reopen Hermes.'
+      "Stardust needs a helper called Git for Windows, which isn't installed. " +
+        'Choose Repair install to add it automatically, or install it yourself from git-scm.com and reopen Stardust.'
     )
   }
 
@@ -5333,10 +5333,10 @@ async function runEnsureRuntime(backend: any, assertStillOwned: () => void): Pro
   }
 
   backend.command = getVenvPython(VENV_ROOT)
-  backend.label = `Hermes at ${ACTIVE_HERMES_ROOT} (venv: ${VENV_ROOT})`
+  backend.label = `Stardust at ${ACTIVE_HERMES_ROOT} (venv: ${VENV_ROOT})`
   updateBootProgress({
     phase: 'runtime.ready',
-    message: 'Hermes runtime is ready',
+    message: 'Stardust runtime is ready',
     progress: 82,
     running: true,
     error: null
@@ -5385,7 +5385,7 @@ function fetchJson(url, token, options: any = {}) {
         const timeoutMs = resolveTimeoutMs(options.timeoutMs, DEFAULT_FETCH_TIMEOUT_MS)
 
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          reject(new Error(`Unsupported Hermes backend URL protocol: ${parsed.protocol}`))
+          reject(new Error(`Unsupported Stardust backend URL protocol: ${parsed.protocol}`))
 
           return
         }
@@ -5439,7 +5439,7 @@ function fetchJson(url, token, options: any = {}) {
                 reject(
                   new Error(
                     `Expected JSON from ${url} but got HTML (status ${res.statusCode}). ` +
-                      'The endpoint is likely missing on the Hermes backend.'
+                      'The endpoint is likely missing on the Stardust backend.'
                   )
                 )
 
@@ -5457,7 +5457,7 @@ function fetchJson(url, token, options: any = {}) {
 
         req.on('error', reject)
         req.setTimeout(timeoutMs, () => {
-          req.destroy(new Error(`Timed out connecting to Hermes backend after ${timeoutMs}ms`))
+          req.destroy(new Error(`Timed out connecting to Stardust backend after ${timeoutMs}ms`))
         })
 
         // From here the request goes on the wire: a later transport error can no
@@ -5493,7 +5493,7 @@ function downloadViaTokenToFile(url, token, ctx, options: any = {}) {
     }
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      reject(new Error(`Unsupported Hermes backend URL protocol: ${parsed.protocol}`))
+      reject(new Error(`Unsupported Stardust backend URL protocol: ${parsed.protocol}`))
 
       return
     }
@@ -5528,7 +5528,7 @@ function downloadViaTokenToFile(url, token, ctx, options: any = {}) {
 
     req.on('error', reject)
     req.setTimeout(timeoutMs, () => {
-      req.destroy(new Error(`Timed out connecting to Hermes backend after ${timeoutMs}ms`))
+      req.destroy(new Error(`Timed out connecting to Stardust backend after ${timeoutMs}ms`))
     })
     req.end()
   })
@@ -5559,7 +5559,7 @@ function fetchPublicJson(url, options: any = {}) {
         const timeoutMs = resolveTimeoutMs(options.timeoutMs, DEFAULT_FETCH_TIMEOUT_MS)
 
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          reject(new Error(`Unsupported Hermes backend URL protocol: ${parsed.protocol}`))
+          reject(new Error(`Unsupported Stardust backend URL protocol: ${parsed.protocol}`))
 
           return
         }
@@ -5601,7 +5601,7 @@ function fetchPublicJson(url, options: any = {}) {
                 reject(
                   new Error(
                     `Expected JSON from ${url} but got HTML (status ${res.statusCode}). ` +
-                      'The endpoint is likely missing on the Hermes backend.'
+                      'The endpoint is likely missing on the Stardust backend.'
                   )
                 )
 
@@ -5619,7 +5619,7 @@ function fetchPublicJson(url, options: any = {}) {
 
         req.on('error', reject)
         req.setTimeout(timeoutMs, () => {
-          req.destroy(new Error(`Timed out connecting to Hermes backend after ${timeoutMs}ms`))
+          req.destroy(new Error(`Timed out connecting to Stardust backend after ${timeoutMs}ms`))
         })
 
         // Past this point the request is on the wire — see fetchJson.
@@ -7390,7 +7390,7 @@ function getOauthSession() {
 // cookie auth rides its own partition so two registered gateways can never
 // evict — or be handed — each other's session cookies (Chromium jars ignore
 // the port, so two dashboards on one VPN host used to collide in the shared
-// jar above). The primary / v1 remote / cloud / portal flows keep the legacy
+// jar above). The primary / v1 remote / portal flows keep the legacy
 // shared partition; see oauth-partition.ts for the full rules.
 const oauthSessionsByPartition = new Map()
 
@@ -7620,7 +7620,6 @@ function openOauthLoginWindow(baseUrl) {
         clearInterval(pollTimer)
       }
 
-
       try {
         if (win && !win.isDestroyed()) {
           win.destroy()
@@ -7650,7 +7649,7 @@ function openOauthLoginWindow(baseUrl) {
       win = new BrowserWindow({
         width: 520,
         height: 720,
-        title: 'Sign in to Hermes gateway',
+        title: 'Sign in to Stardust gateway',
         autoHideMenuBar: true,
         show: true,
         webPreferences: {
@@ -7721,7 +7720,7 @@ function fetchJsonViaOauthSession(url, options: any = {}) {
     }
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      reject(new Error(`Unsupported Hermes backend URL protocol: ${parsed.protocol}`))
+      reject(new Error(`Unsupported Stardust backend URL protocol: ${parsed.protocol}`))
 
       return
     }
@@ -7754,7 +7753,7 @@ function fetchJsonViaOauthSession(url, options: any = {}) {
         // already finished
       }
 
-      reject(new Error(`Timed out connecting to Hermes backend after ${timeoutMs}ms`))
+      reject(new Error(`Timed out connecting to Stardust backend after ${timeoutMs}ms`))
     }, timeoutMs)
 
     request.on('response', res => {
@@ -7916,7 +7915,7 @@ function downloadViaOauthSessionToFile(url, ctx, options: any = {}) {
     }
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      reject(new Error(`Unsupported Hermes backend URL protocol: ${parsed.protocol}`))
+      reject(new Error(`Unsupported Stardust backend URL protocol: ${parsed.protocol}`))
 
       return
     }
@@ -7946,7 +7945,7 @@ function downloadViaOauthSessionToFile(url, ctx, options: any = {}) {
         // already finished
       }
 
-      reject(new Error(`Timed out connecting to Hermes backend after ${timeoutMs}ms`))
+      reject(new Error(`Timed out connecting to Stardust backend after ${timeoutMs}ms`))
     }, timeoutMs)
 
     request.on('response', res => {
@@ -8612,13 +8611,11 @@ function sanitizeConnectionProfiles(raw: Record<string, any>) {
     }
 
     const cleaned: {
-      mode: 'remote' | 'local' | 'cloud'
+      mode: 'remote' | 'local'
       url?: string
       authMode?: string
       token?: object
       headers?: object
-      org?: string
-      name?: string
       savedSsh?: object
     } = {
       mode: modeIsRemoteLike(entry.mode) ? entry.mode : 'local'
@@ -8648,22 +8645,6 @@ function sanitizeConnectionProfiles(raw: Record<string, any>) {
 
     if (Object.keys(headers).length > 0) {
       cleaned.headers = headers
-    }
-
-    // Preserve the Hermes Cloud org tag on cloud-mode entries so Settings can
-    // reopen into the same org for a per-profile cloud connection.
-    if (cleaned.mode === 'cloud') {
-      const cloudName = String(entry.name || '').trim()
-
-      if (cloudName) {
-        cleaned.name = cloudName
-      }
-
-      const org = String(entry.org || '').trim()
-
-      if (org) {
-        cleaned.org = org
-      }
     }
 
     out[name] = cleaned
@@ -8942,7 +8923,7 @@ function sanitizeConnectionsRegistry(registry = readDesktopConnectionsRegistry()
 /**
  * Save (create or edit) a registry connection from a renderer payload.
  * Edits merge over the stored entry (mergeConnectionInput) so fields the
- * editor doesn't carry — cloud `org`, ssh `remoteHermesPath`/`remoteProfile` —
+ * editor doesn't carry — ssh `remoteHermesPath`/`remoteProfile` —
  * survive a rename. Token handling mirrors coerceDesktopConnectionConfig: an
  * incoming plaintext token is encrypted (honoring the same allowPlainTextToken
  * opt-in seam as Settings → Gateway); an absent token field inherits the
@@ -8977,7 +8958,7 @@ async function saveRegistryConnection(input: any = {}) {
   const entry = normalizeConnectionInput(merged, registry)
 
   // Token-auth remotes must actually have a token to be dialable. OAuth and
-  // cloud entries authenticate via cookies/native tokens instead.
+  // OAuth entries authenticate via cookies/native tokens instead.
   if (entry.kind === 'remote' && entry.authMode !== 'oauth' && !decryptDesktopSecret(entry.token)) {
     throw new Error('Remote gateway session token is required.')
   }
@@ -9158,9 +9139,6 @@ async function sanitizeDesktopConnectionConfig(config = readDesktopConnectionCon
     remoteAuthMode: authMode,
     remoteOauthConnected,
     remoteUrl,
-    // The persisted Hermes Cloud org (slug/id) for a cloud connection, or '' for
-    // remote/local. Lets Settings → Gateway reopen into the same org.
-    cloudOrg: mode === 'cloud' ? String(block.org || '') : '',
     remoteTokenPreview: tokenPreview(remoteToken),
     remoteTokenSet: Boolean(remoteToken),
     // Whether the OS keyring can encrypt a token; drives the plain-text opt-in
@@ -9183,15 +9161,12 @@ async function sanitizeDesktopConnectionConfig(config = readDesktopConnectionCon
 // Build + validate a `{ url, authMode, token }` remote block. OAuth gateways
 // authenticate via the login-window session cookie (verified at connect time in
 // resolveRemoteBackend), so only token-auth remotes require a saved token.
-// `org` (optional) is the Hermes Cloud org slug/id the instance was discovered
-// under — persisted so Settings can reopen into the same org; omitted from the
-// block when empty so plain remote connections stay unchanged.
-function buildRemoteBlock(remoteUrl, authMode, token, org?: string, headers?: object, name?: string) {
+function buildRemoteBlock(remoteUrl, authMode, token, headers?: object) {
   if (authMode !== 'oauth' && !decryptDesktopSecret(token)) {
     throw new Error('Remote gateway session token is required.')
   }
 
-  const block: { url: string; authMode: string; token: object; headers?: object; org?: string; name?: string } = {
+  const block: { url: string; authMode: string; token: object; headers?: object } = {
     url: normalizeRemoteBaseUrl(remoteUrl),
     authMode,
     token
@@ -9203,62 +9178,25 @@ function buildRemoteBlock(remoteUrl, authMode, token, org?: string, headers?: ob
     block.headers = remoteHeaders
   }
 
-  const nameValue = typeof name === 'string' ? name.trim() : ''
-
-  if (nameValue) {
-    block.name = nameValue
-  }
-
-  const orgValue = typeof org === 'string' ? org.trim() : ''
-
-  if (orgValue) {
-    block.org = orgValue
-  }
-
   return block
 }
 
 function coerceDesktopConnectionConfig(input: any = {}, existing = readDesktopConnectionConfig(), options: any = {}) {
   const persistToken = options.persistToken !== false
   const key = connectionScopeKey(input.profile)
-  // 'cloud' and 'remote' both persist a remote-shaped block; 'cloud' is
-  // remembered as its own provenance (Q6) and resolves to remote downstream.
-  // Anything else collapses to local.
+  // 'remote' persists a remote-shaped block. Anything else, including the
+  // retired 'cloud' mode, collapses to local.
   const mode = input.mode === 'ssh' ? 'ssh' : modeIsRemoteLike(input.mode) ? input.mode : 'local'
   const remoteLike = modeIsRemoteLike(mode)
 
   // The block being edited: a per-profile entry or the global remote block.
   const rawExistingBlock = key ? existing.profiles?.[key] || {} : existing.remote || {}
-  // Leaving a CLOUD connection unselects it: a cloud block's url/org/token
-  // describe a discovered Hermes Cloud instance, NOT a user-owned remote gateway,
-  // so switching to local or remote must NOT inherit them (otherwise the stale
-  // cloud URL lingers and re-selecting Cloud looks "already connected"). When the
-  // saved block was cloud and the new mode is not cloud, start from an empty
-  // block. (remote↔local toggles still preserve a real remote URL as before.)
   const existingMode = key ? existing.profiles?.[key]?.mode : existing.mode
-  const leavingCloud = existingMode === 'cloud' && mode !== 'cloud'
   const leavingSsh = rawExistingBlock.mode === 'ssh' && mode !== 'ssh' && mode !== 'local'
-  const existingBlock = leavingCloud || leavingSsh ? {} : rawExistingBlock
+  const existingBlock = leavingSsh ? {} : rawExistingBlock
   const remoteUrl = String(input.remoteUrl ?? existingBlock.url ?? '').trim()
   // authMode: explicit input wins; otherwise inherit the saved value, default 'token'.
   const authMode = resolveAuthMode(input.remoteAuthMode, existingBlock.authMode)
-  // Cloud org: only meaningful for 'cloud' mode. Explicit input wins; otherwise
-  // inherit the saved org. A plain 'remote' connection never carries an org
-  // (switching cloud→remote drops it), so it stays unset unless mode is cloud.
-  const cloudOrg = mode === 'cloud' ? String(input.cloudOrg ?? existingBlock.org ?? '').trim() : ''
-
-  // A saved name belongs to this exact gateway, not another instance in the same org.
-  const cloudName =
-    mode === 'cloud'
-      ? String(
-          input.cloudName ??
-            (existingBlock.url && normalizeRemoteBaseUrl(remoteUrl) === normalizeRemoteBaseUrl(existingBlock.url)
-              ? existingBlock.name
-              : '') ??
-            ''
-        ).trim()
-      : ''
-
   const incomingToken = typeof input.remoteToken === 'string' ? input.remoteToken.trim() : ''
 
   const remoteHeaders =
@@ -9294,15 +9232,15 @@ function coerceDesktopConnectionConfig(input: any = {}, existing = readDesktopCo
   }
 
   if (key) {
-    // Per-profile scope: a remote/cloud entry pins this profile to its own
+    // Per-profile scope: a remote entry pins this profile to its own
     // backend; a local entry clears the override so the profile inherits the
-    // default. The mode tag (remote vs cloud) is preserved on the entry.
+    // default. The mode tag (remote) is preserved on the entry.
     const profiles = { ...(existing.profiles || {}) }
 
     if (remoteLike) {
       profiles[key] = {
         mode,
-        ...buildRemoteBlock(remoteUrl, authMode, nextToken, cloudOrg, remoteHeaders, cloudName)
+        ...buildRemoteBlock(remoteUrl, authMode, nextToken, remoteHeaders)
       }
     } else {
       const localEntry = localProfileEntry(rawExistingBlock)
@@ -9322,7 +9260,7 @@ function coerceDesktopConnectionConfig(input: any = {}, existing = readDesktopCo
   }
 
   const nextRemote = remoteLike
-    ? buildRemoteBlock(remoteUrl, authMode, nextToken, cloudOrg, remoteHeaders, cloudName)
+    ? buildRemoteBlock(remoteUrl, authMode, nextToken, remoteHeaders)
     : existingMode === 'ssh'
       ? rawExistingBlock
       : { url: remoteUrl ? normalizeRemoteBaseUrl(remoteUrl) : remoteUrl, authMode, token: nextToken }
@@ -9410,7 +9348,7 @@ async function buildRemoteConnection(
 
   if (!token) {
     throw new Error(
-      'Remote Hermes gateway is selected, but no session token is saved. ' +
+      'Remote Stardust gateway is selected, but no session token is saved. ' +
         'Open Settings → Gateway and save a token, or switch back to Local.'
     )
   }
@@ -9785,7 +9723,7 @@ async function resetPreviewReach(webContentsId?: number) {
  * Rewrite a gateway-loopback URL into one this machine can actually load.
  *
  * Returns the URL unchanged when no rewrite is needed or possible — a local
- * backend (the address is already true), a non-loopback host, or a url/cloud
+ * backend (the address is already true), a non-loopback host, or a url
  * remote with no tunnel to borrow. Callers must not treat an unchanged URL as
  * failure; the pane explains an unreachable one on its own.
  */
@@ -10263,7 +10201,7 @@ async function resolveRemoteBackend(profile, options: { poolKey?: string; primar
       token,
       route.source,
       undefined,
-      route.kind === 'cloud' ? 'cloud' : 'url',
+      'url',
       undefined,
       route.headers
     )
@@ -10287,8 +10225,8 @@ function configuredRemoteProfileNames() {
 }
 
 // True when the app is in app-global remote mode (Settings → "All profiles" →
-// Remote/Cloud, or the env override): a SINGLE remote backend serves every
-// profile via ?profile=. Cloud counts — it resolves to a remote backend (Q6).
+// Remote, or the env override): a SINGLE remote backend serves every
+// profile via ?profile=.
 // Distinct from per-profile overrides — here there's one host for all.
 function globalRemoteActive() {
   if (process.env.STARDUST_DESKTOP_REMOTE_URL) {
@@ -10301,7 +10239,7 @@ function globalRemoteActive() {
     return true
   }
 
-  // Registry-primary transport (#91564/#90316): a registered remote/cloud/ssh
+  // Registry-primary transport (#91564/#90316): a registered remote/ssh
   // gateway promoted to primary via connections.json makes the primary
   // backend remote even while the v1 config.mode still says 'local'. Every
   // consumer of this flag ("one remote host serves every profile") must see
@@ -10318,13 +10256,13 @@ function registryPrimaryIsRemote() {
     const registry = readDesktopConnectionsRegistry()
     const entry = registry.connections.find(c => c.id === registry.primary)
 
-    return Boolean(entry && (entry.kind === 'remote' || entry.kind === 'cloud' || entry.kind === 'ssh'))
+    return Boolean(entry && (entry.kind === 'remote' || entry.kind === 'ssh'))
   } catch {
     return false
   }
 }
 
-// True when the PRIMARY profile's backend resolves to a remote/cloud host —
+// True when the PRIMARY profile's backend resolves to a remote host —
 // i.e. resolveRemoteBackend(primaryProfileKey()) would return a descriptor
 // rather than null. Mirrors that function's precedence (per-profile override →
 // env → global) so a startHermes() failure can be classified as remote (never
@@ -10463,7 +10401,7 @@ async function testDesktopConnectionConfig(input: any = {}) {
             return {
               reachable: false,
               sshError: 'update-required',
-              error: 'Update Hermes on the remote host before connecting with Desktop SSH.'
+              error: 'Update Stardust on the remote host before connecting with Desktop SSH.'
             }
           }
 
@@ -10647,7 +10585,7 @@ function sendConnectionApplied() {
 
 // Registry lifecycle push: a connection was removed or materially edited, so
 // every window must tear down (and, for edits, re-dial) its secondary sockets
-// scoped to that connection. Without this, a removed remote/cloud source keeps
+// scoped to that connection. Without this, a removed remote source keeps
 // its renderer WebSocket open and streaming as a ghost, and an edited one
 // keeps talking to the OLD endpoint until idle-reap.
 function broadcastConnectionsChanged(payload: { connectionId: string; reason: 'removed' | 'saved' | 'updated' }) {
@@ -10891,7 +10829,7 @@ async function ensureRegistryBackend(
   }
 
   // The v1 primary and the registry primary can describe the same remote
-  // backend beyond the SSH-fingerprint path above (cloud/url remotes have no
+  // backend beyond the SSH-fingerprint path above (url remotes have no
   // ssh -G identity). Reuse the already-running primary when the registry
   // resolves its live descriptor back to this exact source id; otherwise one
   // Desktop window starts two isolated servers whose transient runtime ids
@@ -11112,7 +11050,7 @@ async function connectRegistryBackend(
     }
   }
 
-  // remote / cloud: one gateway host serves every profile of that source,
+  // remote: one gateway host serves every profile of that source,
   // scoped per request — the descriptor carries the profile + connectionId so
   // renderer-side WS minting and REST scoping target the right agent.
   const token = source.authMode === 'oauth' ? null : decryptDesktopSecret(source.token)
@@ -11123,7 +11061,7 @@ async function connectRegistryBackend(
     token,
     `registry:${source.id}`,
     undefined,
-    source.kind === 'cloud' ? 'cloud' : 'url',
+    'url',
     undefined,
     source.headers
   )
@@ -11671,7 +11609,7 @@ function touchPoolBackend(profile) {
 // but only ever evict backends without a live renderer socket (stale beyond the
 // keepalive window). When every backend is actively kept alive we let the pool
 // exceed the soft cap rather than kill a running session. Process-less
-// descriptor entries (remote/cloud registry sources, per-profile remote
+// descriptor entries (remote registry sources, per-profile remote
 // overrides — `entry.process === null`) are excluded from the cap entirely:
 // they hold no local process, so counting them used to let a roster refresh
 // across N registered remote connections LRU-evict a REAL local backend that
@@ -11925,7 +11863,7 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
   assertLocalProfileCanStart(profile, profileDeletionGate, key =>
     directoryExists(path.join(HERMES_HOME, 'profiles', key))
   )
-  rememberLog(`Starting Hermes backend for profile "${profile}" via ${backend.label}`)
+  rememberLog(`Starting Stardust backend for profile "${profile}" via ${backend.label}`)
 
   const parentStartMarker = await desktopParentStartMarker()
   const backendNonce = crypto.randomBytes(16).toString('hex')
@@ -12001,16 +11939,16 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
   })
 
   child.once('error', error => {
-    rememberLog(`Hermes backend for profile "${profile}" failed to start: ${error.message}`)
+    rememberLog(`Stardust backend for profile "${profile}" failed to start: ${error.message}`)
     void teardownFailedLocalBackend(poolKey, entry).catch(cleanupError => {
       rememberLog(
-        `Hermes backend for profile "${profile}" cleanup failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`
+        `Stardust backend for profile "${profile}" cleanup failed: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`
       )
     })
     rejectStart?.(error)
   })
   child.once('exit', (code, signal) => {
-    rememberLog(`Hermes backend for profile "${profile}" exited (${signal || code})`)
+    rememberLog(`Stardust backend for profile "${profile}" exited (${signal || code})`)
     releaseLocalBackendSlot(entry)
     releaseBackendChild(child)
 
@@ -12021,7 +11959,7 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
     if (!ready) {
       rejectStart?.(
         new Error(
-          `Hermes backend for profile "${profile}" exited before it became ready (${signal || code}).${outputTail.describe()}`
+          `Stardust backend for profile "${profile}" exited before it became ready (${signal || code}).${outputTail.describe()}`
         )
       )
     }
@@ -12044,7 +11982,7 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
 
   const authToken = await adoptServedDashboardToken(baseUrl, token, {
     childAlive: () => child.exitCode === null && !child.killed,
-    label: `Hermes backend for profile "${profile}"`,
+    label: `Stardust backend for profile "${profile}"`,
     rememberLog
   })
 
@@ -12060,7 +11998,7 @@ async function runPoolBackendStart(profile, entry, opts: { forceLocal?: boolean;
 
   if (!wsProbe.ok) {
     throw new Error(
-      `Hermes backend for profile "${profile}" is HTTP-reachable but the WebSocket (/api/ws) rejected the session token: ${wsProbe.reason}`
+      `Stardust backend for profile "${profile}" is HTTP-reachable but the WebSocket (/api/ws) rejected the session token: ${wsProbe.reason}`
     )
   }
 
@@ -12212,7 +12150,7 @@ async function runHermesStart() {
   // otherwise SIGTERMs the running instance's live backend (#87295).
   if (!isPrimaryInstance) {
     rememberLog('[boot] non-primary instance: skipping backend machinery')
-    throw new Error('Hermes Desktop is already running in another window.')
+    throw new Error('Stardust Desktop is already running in another window.')
   }
 
   await reapOrphanedBackendsOnce()
@@ -12244,7 +12182,7 @@ async function runHermesStart() {
   // E2E: simulate a boot failure without breaking the real backend. The boot
   // progresses a few steps, then fails with the given error message.
   if (BOOT_FAKE_ERROR) {
-    await advanceBootProgress('backend.resolve', 'Resolving Hermes backend', 8)
+    await advanceBootProgress('backend.resolve', 'Resolving Stardust backend', 8)
     const error = new Error(BOOT_FAKE_ERROR) as any
     error.isBootstrapFailure = true
     bootstrapFailure = error
@@ -12288,7 +12226,7 @@ async function runHermesStart() {
       // remotes and Apply invalidated this attempt), bail before probing.
       backendConnectionState.assertCurrentAttempt(connectionAttempt)
 
-      await advanceBootProgress('backend.remote', `Connecting to remote Hermes backend at ${remote.baseUrl}`, 24)
+      await advanceBootProgress('backend.remote', `Connecting to remote Stardust backend at ${remote.baseUrl}`, 24)
       await waitForHermes(remote.baseUrl, remote.token, undefined, remote.authMode, remote.headers)
 
       // Second async boundary: the health probe itself can outlive the
@@ -12297,7 +12235,7 @@ async function runHermesStart() {
 
       updateBootProgress({
         phase: 'backend.ready',
-        message: 'Remote Hermes backend is ready',
+        message: 'Remote Stardust backend is ready',
         progress: 94,
         running: true,
         error: null
@@ -12306,7 +12244,7 @@ async function runHermesStart() {
       return createPrimaryRemoteConnection(remote, hermesLog.slice(-80), getWindowState())
     }
 
-    await advanceBootProgress('backend.resolve', 'Resolving Hermes backend', 8)
+    await advanceBootProgress('backend.resolve', 'Resolving Stardust backend', 8)
     // Resolve for the desktop's primary profile so a per-profile remote
     // override on the active profile is honored (falls back to env / global).
 
@@ -12346,7 +12284,7 @@ async function runHermesStart() {
       ensureLocalRuntime: backend =>
         ensureRuntime(backend, () => backendConnectionState.assertCurrentAttempt(connectionAttempt)),
       prepareLocalBackend: async () => {
-        await advanceBootProgress('backend.runtime', 'Resolving Hermes runtime', 28)
+        await advanceBootProgress('backend.runtime', 'Resolving Stardust runtime', 28)
 
         return resolveHermesBackend(backendArgs)
       },
@@ -12386,8 +12324,8 @@ async function runHermesStart() {
     const webDist = resolveWebDist()
     const readyFile = backend.readyFile ? makeDashboardReadyFile() : null
 
-    await advanceBootProgress('backend.spawn', `Starting Hermes backend via ${backend.label}`, 84)
-    rememberLog(`Starting Hermes backend via ${backend.label}`)
+    await advanceBootProgress('backend.spawn', `Starting Stardust backend via ${backend.label}`, 84)
+    rememberLog(`Starting Stardust backend via ${backend.label}`)
 
     const profile = primaryProfileKey()
     const parentStartMarker = await desktopParentStartMarker()
@@ -12470,7 +12408,7 @@ async function runHermesStart() {
       stopBackendChild(hermesProcess)
       await waitForBackendExit(hermesProcess)
       releaseBackendChild(hermesProcess)
-      throw new Error('Hermes backend start was superseded by a newer connection attempt.')
+      throw new Error('Stardust backend start was superseded by a newer connection attempt.')
     }
 
     hermesProcess.stdout.on('data', rememberLog)
@@ -12486,17 +12424,17 @@ async function runHermesStart() {
       releaseBackendChild(hermesProcess)
 
       if (!backendConnectionState.clearForCurrentProcess(processOwner)) {
-        rememberLog(`Ignoring stale Hermes backend error: ${error.message}`)
-        rejectBackendStart?.(new Error('Hermes backend start was superseded by a newer connection attempt.'))
+        rememberLog(`Ignoring stale Stardust backend error: ${error.message}`)
+        rejectBackendStart?.(new Error('Stardust backend start was superseded by a newer connection attempt.'))
 
         return
       }
 
-      rememberLog(`Hermes backend failed to start: ${error.message}`)
+      rememberLog(`Stardust backend failed to start: ${error.message}`)
       updateBootProgress(
         {
           error: error.message,
-          message: `Hermes backend failed to start: ${error.message}`,
+          message: `Stardust backend failed to start: ${error.message}`,
           phase: 'backend.error',
           running: false
         },
@@ -12509,20 +12447,20 @@ async function runHermesStart() {
       releaseBackendChild(hermesProcess)
 
       if (!backendConnectionState.clearForCurrentProcess(processOwner)) {
-        rememberLog(`Ignoring stale Hermes backend exit (${signal || code})`)
+        rememberLog(`Ignoring stale Stardust backend exit (${signal || code})`)
 
         if (!backendReady) {
-          rejectBackendStart?.(new Error('Hermes backend start was superseded by a newer connection attempt.'))
+          rejectBackendStart?.(new Error('Stardust backend start was superseded by a newer connection attempt.'))
         }
 
         return
       }
 
-      rememberLog(`Hermes backend exited (${signal || code})`)
+      rememberLog(`Stardust backend exited (${signal || code})`)
       sendBackendExit({ code, signal })
 
       if (!backendReady) {
-        const message = `Hermes backend exited before it became ready (${signal || code}).${primaryOutputTail.describe()}`
+        const message = `Stardust backend exited before it became ready (${signal || code}).${primaryOutputTail.describe()}`
         updateBootProgress(
           {
             error: message,
@@ -12534,13 +12472,13 @@ async function runHermesStart() {
         )
         rejectBackendStart?.(
           new Error(
-            `Hermes backend exited before it became ready (${signal || code}). Log: ${DESKTOP_LOG_PATH}\n${recentHermesLog()}`
+            `Stardust backend exited before it became ready (${signal || code}). Log: ${DESKTOP_LOG_PATH}\n${recentHermesLog()}`
           )
         )
       }
     })
 
-    await advanceBootProgress('backend.port', 'Waiting for Hermes backend to launch', 86)
+    await advanceBootProgress('backend.port', 'Waiting for Stardust backend to launch', 86)
     backendConnectionState.assertCurrentAttempt(connectionAttempt)
 
     // Discover the ephemeral port the child bound to
@@ -12552,7 +12490,7 @@ async function runHermesStart() {
     }
 
     const baseUrl = `http://127.0.0.1:${port}`
-    await advanceBootProgress('backend.wait', 'Waiting for Hermes backend to become ready', 90)
+    await advanceBootProgress('backend.wait', 'Waiting for Stardust backend to become ready', 90)
     backendConnectionState.assertCurrentAttempt(connectionAttempt)
     await Promise.race([waitForHermes(baseUrl, token, undefined, undefined, {}, true), backendStartFailed])
     backendConnectionState.assertCurrentAttempt(connectionAttempt)
@@ -12573,13 +12511,13 @@ async function runHermesStart() {
 
     if (!wsProbe.ok) {
       throw new Error(
-        `Local Hermes backend is HTTP-reachable but the WebSocket (/api/ws) rejected the session token: ${wsProbe.reason}`
+        `Local Stardust backend is HTTP-reachable but the WebSocket (/api/ws) rejected the session token: ${wsProbe.reason}`
       )
     }
 
     updateBootProgress({
       phase: 'backend.ready',
-      message: 'Hermes backend is ready. Finalizing desktop startup',
+      message: 'Stardust backend is ready. Finalizing desktop startup',
       progress: 94,
       running: true,
       error: null
@@ -12619,12 +12557,6 @@ async function runHermesStart() {
     const message = error instanceof Error ? error.message : String(error)
     const hostKeyChanged = isHostKeyChangedBootFailure(error)
     const isReauth = isReauthRequiredError(error)
-
-    // Carry structured Cloud-down metadata through the boot-progress / IPC
-    // boundary when present, so the renderer overlay can key on it rather than
-    // re-classifying the message string. main owns classification; the renderer
-    // only consumes the structured result (#85335).
-    const isCloudBackendDown = Boolean(error && typeof error === 'object' && (error as any).isCloudBackendDown === true)
 
     const statusCode = readStatusCode(error)
 
@@ -12666,7 +12598,6 @@ async function runHermesStart() {
     updateBootProgress(
       {
         error: message,
-        isCloudBackendDown: isCloudBackendDown || undefined,
         message: `Desktop boot failed: ${message}`,
         phase: 'backend.error',
         // Renderer contract for the self-heal loop (#82679): a transient
@@ -14249,7 +14180,9 @@ function createWindow() {
 
 const browserControlBridgeSupervisor = new BrowserControlBridgeSupervisor({
   resourcesPath: app.getAppPath(),
-  packagedBridgeEntry: app.isPackaged ? appPath => path.join(appPath, 'experiments', 'playwright-mcp-host-bridge', 'src', 'main.mjs') : undefined
+  packagedBridgeEntry: app.isPackaged
+    ? appPath => path.join(appPath, 'experiments', 'playwright-mcp-host-bridge', 'src', 'main.mjs')
+    : undefined
 })
 
 ipcMain.handle('stardust:browser-control:bridge:start', async (event, payload) => {
@@ -14267,7 +14200,11 @@ ipcMain.handle('stardust:browser-control:bridge:start', async (event, payload) =
   event.sender.send('stardust:browser-control:bridge:status', status)
   return status
 })
-ipcMain.handle('stardust:browser-control:bridge:stop', async event => { const status = await browserControlBridgeSupervisor.stop(); event.sender.send('stardust:browser-control:bridge:status', status); return status })
+ipcMain.handle('stardust:browser-control:bridge:stop', async event => {
+  const status = await browserControlBridgeSupervisor.stop()
+  event.sender.send('stardust:browser-control:bridge:status', status)
+  return status
+})
 ipcMain.handle('stardust:browser-control:bridge:status', () => browserControlBridgeSupervisor.status())
 
 ipcMain.handle('stardust:connection', async (_event, profile, extra) => {
@@ -14522,7 +14459,7 @@ ipcMain.handle('stardust:window:openInTerminal', async (_event, sessionId, opts)
     const backend = await resolveHermesBackend(tuiResumeArgs(sessionId.trim(), profile || undefined))
 
     if (!backend.command) {
-      return { ok: false, error: 'Hermes is not installed yet' }
+      return { ok: false, error: 'Stardust is not installed yet' }
     }
 
     const { cwd } = sanitizeWorkspaceCwd(opts?.cwd)
@@ -14755,7 +14692,7 @@ ipcMain.handle('stardust:plugin-profile-routes', async (_event, rawProfileNames)
     ]
   }
 
-  // A local enumeration can fail while remote/cloud sources succeed. Preserve
+  // A local enumeration can fail while remote sources succeed. Preserve
   // cached v1 profile names as explicitly-local rows so those valid routes do
   // not disappear and duplicate names remain source-qualified.
   const localSource = registry.connections.find(source => source.kind === 'local')
@@ -14859,7 +14796,7 @@ ipcMain.handle('stardust:connections:remove', async (_event, id) => {
   // backends under its composite keys and any ssh tunnel scopes it owned.
   await stopRegistryConnectionBackends(key)
   // And the renderer side: without this push, secondaries scoped to the
-  // removed connection keep their WebSocket open (remote/cloud have no local
+  // removed connection keep their WebSocket open (remote have no local
   // process to kill) and stream ghost events until page reload.
   broadcastConnectionsChanged({ connectionId: key, reason: 'removed' })
 
@@ -14914,7 +14851,7 @@ ipcMain.handle('stardust:connections:test', async (_event, id) => {
     return result
   }
 
-  // Remote/cloud/local probe built DIRECTLY from the registry entry. Routing
+  // Remote/local probe built DIRECTLY from the registry entry. Routing
   // through coerceDesktopConnectionConfig would use v1 connection.json as the
   // `existing` base: an entry with a broken/absent token would inherit the v1
   // global remote's token and send it to THIS entry's URL (cross-host
@@ -15319,7 +15256,7 @@ async function requestManagedSshUpdate(rawId) {
 ipcMain.handle('stardust:connections:update-managed', async (_event, rawId) => requestManagedSshUpdate(rawId))
 
 // Fan out `hermes update` to every eligible registered connection at once.
-// Cloud entries are excluded (platform-managed); each dispatch reports
+// Each dispatch reports
 // independently so one dead LAN box can't wedge the batch. Local reuses the
 // app's own update pipeline; Desktop-managed SSH uses the transactional
 // drain/update/restore lifecycle; URL remotes POST their backend updater.
@@ -15340,11 +15277,6 @@ ipcMain.handle('stardust:connections:update-all', async (_event, payload) => {
       .filter(connection => !excludeIds.has(connection.id))
       .map(async connection => {
         const base = { connectionId: connection.id, label: connection.label, kind: connection.kind }
-        const eligibility = updateEligibility(connection)
-
-        if (!eligibility.eligible) {
-          return { ...base, ok: false, skipped: true, reason: eligibility.reason }
-        }
 
         try {
           if (connection.kind === 'local') {
@@ -15969,7 +15901,7 @@ async function mergeRemoteProfileSessions(searchParams, remoteProfiles) {
 
 // Every CONNECTED registry gateway as a session source: resolved descriptors
 // straight from the backend pool, never dialing. SSH sources contribute one
-// backend per pooled (connection, profile) scope; remote/cloud sources are one
+// backend per pooled (connection, profile) scope; remote sources are one
 // shared host (any pooled scope's descriptor serves the cross-profile read).
 // The primary local connection is excluded — the primary aggregate already
 // carries local rows.
@@ -16077,7 +16009,7 @@ async function handleHermesApiRequest(request) {
   // run sessions included — lives in THAT host's state.db, not any local
   // profile's. Resolve the backend through the registry (same pool the job
   // list and WS traffic use) instead of the legacy profile route; a shared
-  // remote/cloud host serves every profile via ?profile=, so scope the path.
+  // remote host serves every profile via ?profile=, so scope the path.
   // An absent/empty id falls through to the byte-identical v1 route below.
   // Explicit `local` stays registry-pinned so it cannot inherit a v1 remote.
   const registryConnectionId = apiRequestRegistryConnectionId(request)
@@ -17233,7 +17165,7 @@ async function runDesktopUninstall(mode) {
     return {
       ok: false,
       error: 'agent-missing',
-      message: `Can't run the uninstaller: no Hermes agent venv at ${VENV_ROOT}.`
+      message: `Can't run the uninstaller: no Stardust agent venv at ${VENV_ROOT}.`
     }
   }
 
@@ -17345,7 +17277,9 @@ ipcMain.handle('stardust:uninstall:run', async (_event, payload) => {
 ipcMain.handle('stardust:vscode-theme:fetch', async (_event, id) => fetchMarketplaceThemes(String(id || '')))
 
 // Search the Marketplace for color-theme extensions (empty query = top installs).
-ipcMain.handle('stardust:vscode-theme:search', async (_event, query) => searchMarketplaceThemes(String(query || ''), 20))
+ipcMain.handle('stardust:vscode-theme:search', async (_event, query) =>
+  searchMarketplaceThemes(String(query || ''), 20)
+)
 
 // ---------------------------------------------------------------------------
 // stardust:// deep links (e.g. stardust://blueprint/morning-brief?time=08:00,

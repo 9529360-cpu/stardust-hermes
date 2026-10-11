@@ -77,7 +77,7 @@ export function enumerationFailureNote(platform: string, env: NodeJS.ProcessEnv,
   if (env.HYPRLAND_INSTANCE_SIGNATURE) {
     return (
       'Could not enumerate windows: Hyprland did not answer on its IPC socket. ' +
-      'Check that `hyprctl clients` works from the same session Hermes is ' +
+      'Check that `hyprctl clients` works from the same session Stardust is ' +
       'running in.'
     )
   }
@@ -88,7 +88,7 @@ export function enumerationFailureNote(platform: string, env: NodeJS.ProcessEnv,
     return (
       'Could not enumerate windows: this is a Wayland session, and Wayland does ' +
       'not let an application see other applications\u2019 windows. Log in to an ' +
-      'X11/Xorg session, or run Hermes under XWayland with DISPLAY set.'
+      'X11/Xorg session, or run Stardust under XWayland with DISPLAY set.'
     )
   }
 
@@ -189,9 +189,7 @@ const loadGetWindows = (): Promise<GetWindowsModule | EnumerationFailure> => {
     // the CJS loader, which this ESM main process never does (every import
     // here is `from 'node:child_process'`). Pointing the import at the
     // unpacked copy gives get-windows a real path to derive from.
-    const staged = resolveOutsideAsar(
-      path.join(app.getAppPath(), 'dist', 'node_modules', 'get-windows', 'index.js')
-    )
+    const staged = resolveOutsideAsar(path.join(app.getAppPath(), 'dist', 'node_modules', 'get-windows', 'index.js'))
     let stagedError = 'not staged in this build'
 
     if (fs.existsSync(staged)) {
@@ -313,7 +311,7 @@ export async function readWindowBelow(
   if (process.platform === 'darwin' && !titlesAvailable) {
     result.note =
       'Window titles are hidden: macOS reveals other apps\u2019 titles only with the ' +
-      'Screen Recording permission, which Hermes does not request for this.'
+      'Screen Recording permission, which Stardust does not request for this.'
   }
 
   return result

@@ -1,8 +1,7 @@
 import crypto from 'node:crypto'
 
 export interface ProfileRouteConfig {
-  cloudOrg: string
-  mode: 'cloud' | 'local' | 'remote' | 'ssh'
+  mode: 'local' | 'remote' | 'ssh'
   remoteUrl: string
   sshHost: string
   sshPort: null | number
@@ -32,7 +31,7 @@ interface RegistryProfileRouteAgent {
 interface RegistryProfileRouteSource {
   [field: string]: unknown
   id: string
-  kind: 'cloud' | 'local' | 'remote' | 'ssh'
+  kind: 'local' | 'remote' | 'ssh'
   remoteProfile?: string
 }
 
@@ -165,13 +164,6 @@ async function connectionScope(
     }
   }
 
-  if (config.mode === 'cloud') {
-    return {
-      key: `cloud\0${normalizeRemoteUrl(config.remoteUrl)}\0${config.cloudOrg.trim()}`,
-      mode: 'remote'
-    }
-  }
-
   if (config.mode === 'remote') {
     return { key: `remote\0${normalizeRemoteUrl(config.remoteUrl)}`, mode: 'remote' }
   }
@@ -193,7 +185,7 @@ function backendTargetProfile(scoped: ProfileRouteConfig, globalConfig: ProfileR
   // A per-profile URL/cloud override selects a standalone remote backend. It
   // does not forward the Desktop alias as a backend profile scope, so that
   // backend answers as its own root profile.
-  if (scoped.mode === 'remote' || scoped.mode === 'cloud') {
+  if (scoped.mode === 'remote') {
     return 'default'
   }
 
