@@ -134,14 +134,14 @@ jobs:
     # Tests-only PRs (~17% of commits) skip this 5-minute job — the longest
     # single job in the workflow — while still running the full pytest lanes.
     #
-    # Re-disabled (Sep 2026): the Sep 1 re-enable is still incredibly flaky.
-    # Keep this a bare `if: false`. The earlier
+    # Re-enabled (Oct 2026) by owner decision, after the Sep 2026 disable for
+    # flakiness. The lane is required through all-checks-pass, so a failure
+    # here blocks merges: fix the flake rather than disabling the lane again.
+    # Keep the plain `${{ ... }}` form below. The earlier
     # `${{ false && (... || ...) }}` form on this reusable-workflow job made
     # GitHub's workflow parser fail at startup ("An unexpected error has
-    # occurred") — every ci.yaml run repo-wide dispatched 0 jobs from
-    # 24f5a60ed1 until this line changed. To re-enable, restore:
-    #   if: ${{ needs.detect.outputs.python_prod == 'true' || needs.detect.outputs.frontend == 'true' }}
-    if: false
+    # occurred") and dispatched 0 jobs repo-wide from 24f5a60ed1.
+    if: ${{ needs.detect.outputs.python_prod == 'true' || needs.detect.outputs.frontend == 'true' }}
     uses: ./.github/workflows/e2e-desktop.yml
 
   docs-site:

@@ -26,13 +26,12 @@ import sys
 from contextlib import suppress
 
 # Keep in sync with ci.yaml: a job listed here must have a bare `if: false` there (not a
-# `needs.detect.outputs.*` condition), and the value should say why it's off.
-HARD_DISABLED_LANES = {
-    "e2e-desktop": "disabled since Sep 2026 — still flaky after the Sep 1 re-enable attempt",
-}
+# `needs.detect.outputs.*` condition), and the value should say why it's off. Empty while
+# every lane runs: Desktop E2E was quarantined in Sep 2026 and re-enabled in Oct 2026.
+HARD_DISABLED_LANES: dict[str, str] = {}
 
-# #11: Desktop E2E remains intentionally disabled, but desktop-affecting changes still need
-# one stable runtime proof. The visual smoke is that proof while full E2E is quarantined.
+# #11: desktop-affecting changes need one stable runtime proof, the visual smoke lane. Full
+# Desktop E2E is a required lane too, so its own failure blocks the gate.
 DESKTOP_RUNTIME_PROOF_LANE = "stardust-visual-smoke"
 DESKTOP_RUNTIME_PROOF_OUTPUTS = ("python_prod", "frontend")
 
