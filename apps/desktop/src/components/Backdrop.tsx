@@ -13,7 +13,7 @@ export function Backdrop() {
   useEffect(() => {
     let canceled = false
 
-    if (!on || !imagePath || !window.hermesDesktop?.readFileDataUrl) {
+    if (!on || !imagePath || !window.stardustDesktop?.readFileDataUrl) {
       setCustomSrc(null)
 
       return () => {
@@ -23,7 +23,7 @@ export function Backdrop() {
 
     setCustomSrc(null)
 
-    void window.hermesDesktop
+    void window.stardustDesktop
       .readFileDataUrl(imagePath)
       .then(src => {
         if (!canceled && src.startsWith('data:image/')) {

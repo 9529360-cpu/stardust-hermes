@@ -3,7 +3,7 @@
  * @mention parse, the round-robin driver, the #93129 member holds, the stop
  * path, and the user send that starts it all.
  */
-import { host } from '@hermes/plugin-sdk'
+import { host } from '@stardust/plugin-sdk'
 
 import { botFriendlyNames, botHandle, mentionNameForms } from './data'
 import { recordGroupActivity } from './group-activity'

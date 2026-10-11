@@ -1,5 +1,5 @@
 // The embedded terminal's PTY host: shell resolution, env scrubbing, session
-// registry, and the hermes:terminal:* IPC surface. Extracted from main.ts; the
+// registry, and the stardust:terminal:* IPC surface. Extracted from main.ts; the
 // factory owns the session map and returns the dispose helpers main.ts needs
 // for SSH teardown. findOnPath / logging / connection routing stay injected.
 import { execFile } from 'node:child_process'
@@ -116,11 +116,11 @@ export function registerTerminalIpc({
   // Resolve the interactive shell for the embedded terminal: an explicit user
   // override wins, otherwise auto-detect the best one installed for the platform.
   function terminalShellCommand() {
-    // HERMES_DESKTOP_SHELL is the cross-platform escape hatch (a path or a bare
+    // STARDUST_DESKTOP_SHELL is the cross-platform escape hatch (a path or a bare
     // name on PATH); $SHELL is honored on POSIX, where it's the user's canonical
     // choice, but ignored on Windows, where it's usually a stray MSYS/Git path
     // node-pty can't spawn natively.
-    const override = (process.env.HERMES_DESKTOP_SHELL || (isWindows ? '' : process.env.SHELL) || '').trim()
+    const override = (process.env.STARDUST_DESKTOP_SHELL || (isWindows ? '' : process.env.SHELL) || '').trim()
 
     if (override) {
       const resolved = isExecutableFile(override) ? override : findOnPath(override)
@@ -173,7 +173,7 @@ export function registerTerminalIpc({
     env.COLORTERM = 'truecolor'
     env.LC_CTYPE = terminalLcCtype(env)
     env.TERM = 'xterm-256color'
-    env.TERM_PROGRAM = 'Hermes'
+    env.TERM_PROGRAM = 'Stardust'
     env.TERM_PROGRAM_VERSION = app.getVersion()
 
     // Let a hermes/--tui launched in this pane know it's embedded in the desktop
@@ -185,7 +185,7 @@ export function registerTerminalIpc({
   }
 
   function terminalChannel(id, suffix) {
-    return `hermes:terminal:${id}:${suffix}`
+    return `stardust:terminal:${id}:${suffix}`
   }
 
   // Best-effort read of a live PTY child's current working directory so a
@@ -299,7 +299,7 @@ export function registerTerminalIpc({
     }
   }
 
-  ipcMain.handle('hermes:terminal:start', async (event, payload = {}) => {
+  ipcMain.handle('stardust:terminal:start', async (event, payload = {}) => {
     ensureNodePtySpawnHelper()
 
     const id = crypto.randomUUID()
@@ -358,7 +358,7 @@ export function registerTerminalIpc({
     return { cwd: remote ? null : cwd, id, shell: remote ? 'ssh' : name }
   })
 
-  ipcMain.handle('hermes:terminal:attach', (event, id) => {
+  ipcMain.handle('stardust:terminal:attach', (event, id) => {
     const sessionInfo = terminalSessions.get(String(id || ''))
 
     if (!sessionInfo || sessionInfo.webContentsId !== event.sender.id) {
@@ -370,7 +370,7 @@ export function registerTerminalIpc({
     return true
   })
 
-  ipcMain.handle('hermes:terminal:write', (_event, id, data) => {
+  ipcMain.handle('stardust:terminal:write', (_event, id, data) => {
     const sessionInfo = terminalSessions.get(String(id || ''))
 
     if (!sessionInfo) {
@@ -382,7 +382,7 @@ export function registerTerminalIpc({
     return true
   })
 
-  ipcMain.handle('hermes:terminal:resize', (_event, id, size = {}) => {
+  ipcMain.handle('stardust:terminal:resize', (_event, id, size = {}) => {
     const sessionInfo = terminalSessions.get(String(id || ''))
 
     if (!sessionInfo) {
@@ -396,7 +396,7 @@ export function registerTerminalIpc({
 
     return true
   })
-  ipcMain.handle('hermes:terminal:cwd', async (_event, id) => {
+  ipcMain.handle('stardust:terminal:cwd', async (_event, id) => {
     const sessionInfo = terminalSessions.get(String(id || ''))
 
     if (!sessionInfo) {
@@ -406,7 +406,7 @@ export function registerTerminalIpc({
     return sessionInfo.sshScope !== undefined ? null : readProcessCwd(sessionInfo.pty.pid)
   })
 
-  ipcMain.handle('hermes:terminal:dispose', (_event, id) => disposeTerminalSession(String(id || '')))
+  ipcMain.handle('stardust:terminal:dispose', (_event, id) => disposeTerminalSession(String(id || '')))
 
   return { disposeTerminalSession, disposeTerminalSessionsForSshScope, disposeAllTerminalSessions }
 }

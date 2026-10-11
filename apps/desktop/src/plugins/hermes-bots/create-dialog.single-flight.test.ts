@@ -16,7 +16,7 @@ import { singleFlight } from './create-dialog'
 // The dialog is a 1200-line surface pulling in most of the SDK; the helper
 // under test touches none of it, so a self-returning stub keeps the module
 // graph linkable without pinning any of that surface.
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   const stub: unknown = new Proxy(function stubbed() {}, {

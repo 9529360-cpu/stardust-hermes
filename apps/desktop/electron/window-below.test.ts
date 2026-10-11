@@ -152,8 +152,8 @@ describe('resolveOutsideAsar', () => {
   // land on the unpacked copy electron-builder ships beside it.
   it('redirects a packaged specifier into app.asar.unpacked', () => {
     expect(
-      resolveOutsideAsar('file:///Applications/Hermes.app/Contents/Resources/app.asar/dist/node_modules/get-windows/index.js')
-    ).toBe('file:///Applications/Hermes.app/Contents/Resources/app.asar.unpacked/dist/node_modules/get-windows/index.js')
+      resolveOutsideAsar('file:///Applications/Stardust.app/Contents/Resources/app.asar/dist/node_modules/get-windows/index.js')
+    ).toBe('file:///Applications/Stardust.app/Contents/Resources/app.asar.unpacked/dist/node_modules/get-windows/index.js')
   })
 
   // The staged specifier is built with path.join, so on Windows the archive

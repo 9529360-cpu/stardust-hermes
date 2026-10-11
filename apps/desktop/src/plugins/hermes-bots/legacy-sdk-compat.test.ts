@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 /** Names an older SDK is allowed not to export. */
 const OPTIONAL_CAPABILITY_EXPORTS = new Set(['McpTab', 'SkillsView', 'ToolsetConfigPanel'])
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   // Everything an older SDK DOES export answers as a callable stand-in, so

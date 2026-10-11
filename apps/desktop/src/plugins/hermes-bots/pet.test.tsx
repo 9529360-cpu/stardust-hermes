@@ -28,7 +28,7 @@ const { hostMock, UnboundedCache, useQueryMock } = vi.hoisted(() => ({
   useQueryMock: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', () => ({
+vi.mock('@stardust/plugin-sdk', () => ({
   Button: (props: React.ComponentProps<'button'>) => <button {...props} />,
   cn: (...parts: unknown[]) => parts.filter(Boolean).join(' '),
   GlyphSpinner: () => <span />,

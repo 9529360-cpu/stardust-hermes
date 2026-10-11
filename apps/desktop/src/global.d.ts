@@ -1,5 +1,5 @@
-import type { GatewayWsUrlResult } from '@hermes/shared'
-import type { TranslucencyState } from '@hermes/shared/translucency'
+import type { GatewayWsUrlResult } from '@stardust/shared'
+import type { TranslucencyState } from '@stardust/shared/translucency'
 
 import type { HermesNotification } from '../electron/notification-types'
 import type { PoolLimits } from '../electron/pool-limits'
@@ -17,7 +17,7 @@ export {}
 
 declare global {
   interface Window {
-    hermesDesktop: {
+    stardustDesktop: {
       // Resolve a backend connection. Omit `profile` (or pass the primary) for
       // the window's backend; pass a named profile to lazily spawn/reuse that
       // profile's backend from the pool.

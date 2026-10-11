@@ -4,7 +4,7 @@
 // ui-tui/src/app/slash/commands (/logs, /retry, /model, /update, /resume,
 // /sessions, /quit) and `hermes doctor` is a real subcommand.
 
-import type { ErrorSurface } from '@hermes/shared/gateway-events'
+import type { ErrorSurface } from '@stardust/shared/gateway-events'
 
 /** JSON-RPC error codes the gateway answers with. */
 export const RPC_INVALID_PARAMS = 4000

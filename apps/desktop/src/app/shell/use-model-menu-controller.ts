@@ -1,5 +1,5 @@
-import { DEFAULT_REASONING_EFFORT, type ModelOptionsResult } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
+import { DEFAULT_REASONING_EFFORT, type ModelOptionsResult } from '@stardust/shared'
 import { useQuery } from '@tanstack/react-query'
 
 import { useSessionView } from '@/app/chat/session-view'

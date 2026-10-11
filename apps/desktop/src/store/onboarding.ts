@@ -1,4 +1,4 @@
-import type { ModelOptionProvider } from '@hermes/shared'
+import type { ModelOptionProvider } from '@stardust/shared'
 import { atom } from 'nanostores'
 
 import {
@@ -719,9 +719,9 @@ export function clearFreeTierIntro() {
 // the flow never silently stalls in a waiting state. Mirrors the pattern in
 // apps/desktop/src/app/artifacts/index.tsx.
 async function openSignInUrl(url: string) {
-  if (window.hermesDesktop?.openExternal) {
+  if (window.stardustDesktop?.openExternal) {
     try {
-      await window.hermesDesktop.openExternal(url)
+      await window.stardustDesktop.openExternal(url)
 
       return
     } catch {

@@ -1,5 +1,5 @@
-import type { ModelOptionProvider } from '@hermes/shared'
-import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@hermes/shared'
+import type { ModelOptionProvider } from '@stardust/shared'
+import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_VALUES } from '@stardust/shared'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -663,7 +663,7 @@ export function ModelSettings({ onMainModelChanged, scopeProfile }: ModelSetting
     setSkewRestart(false)
 
     try {
-      await window.hermesDesktop?.recycleBackend?.(scopeProfile)
+      await window.stardustDesktop?.recycleBackend?.(scopeProfile)
       await refresh()
     } catch (err) {
       setCaughtError(err, m.restartFailed)

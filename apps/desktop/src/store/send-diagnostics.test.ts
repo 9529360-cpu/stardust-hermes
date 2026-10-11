@@ -23,7 +23,7 @@ function stubDesktop(options?: {
   lines?: string[]
   save?: (payload: Record<string, unknown>) => Promise<{ canceled?: boolean; path?: string; saved: boolean }>
 }) {
-  const original = window.hermesDesktop
+  const original = window.stardustDesktop
   const saveGatewayFile =
     options?.save ??
     vi.fn(async () => ({
@@ -31,7 +31,7 @@ function stubDesktop(options?: {
       saved: true
     }))
 
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: {
       getRecentLogs: async () => ({
@@ -45,7 +45,7 @@ function stubDesktop(options?: {
   return {
     saveGatewayFile,
     restore: () =>
-      Object.defineProperty(window, 'hermesDesktop', {
+      Object.defineProperty(window, 'stardustDesktop', {
         configurable: true,
         value: original
       })
@@ -196,9 +196,9 @@ describe('send-diagnostics store', () => {
   it('fails closed when the desktop save bridge is unavailable and still discards the temp bundle', async () => {
     const request = localBundleRequest()
     const restoreGateway = stubGateway(request)
-    const originalDesktop = window.hermesDesktop
+    const originalDesktop = window.stardustDesktop
 
-    Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: undefined })
+    Object.defineProperty(window, 'stardustDesktop', { configurable: true, value: undefined })
 
     try {
       requestSendDiagnostics()
@@ -211,7 +211,7 @@ describe('send-diagnostics store', () => {
       expect($sendDiagnostics.get()?.phase).toBe('error')
       expect($sendDiagnostics.get()?.error).toContain('save bridge')
     } finally {
-      Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: originalDesktop })
+      Object.defineProperty(window, 'stardustDesktop', { configurable: true, value: originalDesktop })
       restoreGateway()
     }
   })

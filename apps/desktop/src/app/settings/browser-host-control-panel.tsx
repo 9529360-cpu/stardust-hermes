@@ -113,7 +113,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
   useEffect(() => {
     void refresh()
 
-    const off = window.hermesDesktop?.browserControl?.onStatus?.(next => {
+    const off = window.stardustDesktop?.browserControl?.onStatus?.(next => {
       if (!next.session_id || next.session_id === activeSessionId) {
         setStatus(next)
       }
@@ -134,7 +134,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
     const timer = window.setInterval(
       async () => {
         try {
-          const next = await window.hermesDesktop.browserControl.status()
+          const next = await window.stardustDesktop.browserControl.status()
 
           if (active && (!next.session_id || next.session_id === activeSessionId)) {
             setStatus(next)
@@ -186,7 +186,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
 
       const launchContext = prepared?.launch_context || prepared
 
-      const started = await window.hermesDesktop.browserControl.start({
+      const started = await window.stardustDesktop.browserControl.start({
         profile: profileKey,
         launchContext,
         chromeProfileDir: profileDir,
@@ -218,7 +218,7 @@ export function BrowserHostControlPanel({ profile }: BrowserHostControlPanelProp
     setBusy(true)
 
     try {
-      const stopped = await window.hermesDesktop.browserControl.stop()
+      const stopped = await window.stardustDesktop.browserControl.stop()
       setStatus(stopped)
     } catch (error) {
       setStatus({ state: 'error', error: error instanceof Error ? error.message : String(error) })

@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
   useQuery
-} from '@hermes/plugin-sdk'
+} from '@stardust/plugin-sdk'
 import { useState } from 'react'
 
 import { labeled } from './dialog-parts'

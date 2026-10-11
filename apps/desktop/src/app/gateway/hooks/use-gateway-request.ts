@@ -1,5 +1,5 @@
-import { isGatewayReauthRequired, resolveGatewayWsUrl } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
+import { isGatewayReauthRequired, resolveGatewayWsUrl } from '@stardust/shared'
 import { useCallback, useEffect, useRef } from 'react'
 
 import type { HermesGateway } from '@/hermes'
@@ -20,7 +20,7 @@ export function useGatewayRequest() {
   const gateway = useStore($gateway) as HermesGateway | null
   const gatewayRef = useRef<HermesGateway | null>(null)
 
-  const connectionRef = useRef<Awaited<ReturnType<NonNullable<typeof window.hermesDesktop>['getConnection']>> | null>(
+  const connectionRef = useRef<Awaited<ReturnType<NonNullable<typeof window.stardustDesktop>['getConnection']>> | null>(
     null
   )
 
@@ -62,7 +62,7 @@ export function useGatewayRequest() {
     }
 
     reconnectingRef.current = (async () => {
-      const desktop = window.hermesDesktop
+      const desktop = window.stardustDesktop
 
       if (!desktop) {
         return null

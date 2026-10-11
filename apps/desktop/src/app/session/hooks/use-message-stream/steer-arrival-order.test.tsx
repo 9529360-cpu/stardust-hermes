@@ -1,4 +1,4 @@
-import type { GatewayEvent } from '@hermes/shared'
+import type { GatewayEvent } from '@stardust/shared'
 // Repro for "when I steer it often sends out of order — a user bubble way
 // above" (#73793 / #83151 class). Drives the REAL stream reducer
 // (useMessageStream.handleGatewayEvent) and the REAL steer entry point

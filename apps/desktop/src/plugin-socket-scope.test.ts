@@ -57,7 +57,7 @@ beforeEach(() => {
   getConnectionFor = vi.fn(async ({ profile }: { connectionId?: null | string; profile?: null | string }) =>
     conn({ baseUrl: 'https://homelab.invalid', profile: profile ?? 'default' })
   )
-  Object.defineProperty(window, 'hermesDesktop', {
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: {
       getConnection,
@@ -76,7 +76,7 @@ afterEach(() => {
   $activeGatewayProfile.set('default')
   setApiRequestProfile(null)
   setApiRequestConnection(null)
-  Reflect.deleteProperty(window, 'hermesDesktop')
+  Reflect.deleteProperty(window, 'stardustDesktop')
   vi.restoreAllMocks()
 })
 

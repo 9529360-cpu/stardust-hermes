@@ -12,7 +12,7 @@
 #   installer-script            the irm | iex one-liner: the install.ps1
 #                               shipped AT the OLD ref, headless.
 #   installer-script+desktop    the same one-liner with -IncludeDesktop:
-#                               builds Hermes.exe AND registers Start Menu /
+#                               builds Stardust.exe AND registers Start Menu /
 #                               Desktop shortcuts.
 #   hermes-update               venv hermes.exe update.
 #   open-app-update             the app's own Update button, app launched

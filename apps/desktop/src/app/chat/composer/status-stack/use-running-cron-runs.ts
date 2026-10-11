@@ -1,5 +1,5 @@
-import type { CronExecutionsListResult, WorkItem } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
+import type { CronExecutionsListResult, WorkItem } from '@stardust/shared'
 import { useEffect, useState } from 'react'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'

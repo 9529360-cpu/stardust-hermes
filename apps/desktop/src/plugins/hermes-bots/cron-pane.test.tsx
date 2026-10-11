@@ -15,7 +15,7 @@
  *      fails closed — the subscription fix must not loosen identity matching.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import type { atom } from 'nanostores'
@@ -33,7 +33,7 @@ beforeAll(() => {
 
 const { request } = vi.hoisted(() => ({ request: vi.fn() }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
   const { atom: nanoAtom } = await import('nanostores')
 
@@ -52,7 +52,7 @@ vi.mock('@hermes/plugin-sdk', async importOriginal => {
   }
 })
 
-const { host } = await import('@hermes/plugin-sdk')
+const { host } = await import('@stardust/plugin-sdk')
 const { $lastRoster } = await import('./data')
 const { $selectedBot } = await import('./bot-state')
 const { RoutinesPane } = await import('./cron')

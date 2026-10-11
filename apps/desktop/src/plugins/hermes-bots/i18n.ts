@@ -29,7 +29,7 @@
  * 机器人 / 機器人, プロファイル / 配置档案 / 設定檔, ゲートウェイ / 网关 / 閘道.
  */
 
-import { type PluginLocaleBundles, type PluginTranslate, usePluginI18n } from '@hermes/plugin-sdk'
+import { type PluginLocaleBundles, type PluginTranslate, usePluginI18n } from '@stardust/plugin-sdk'
 import { useMemo } from 'react'
 
 import { getPluginCtx } from './shared'

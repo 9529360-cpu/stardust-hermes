@@ -34,9 +34,9 @@ test.afterAll(async () => {
   fixture = null
 })
 
-test('window opens with the Hermes title', async () => {
+test('window opens with the Stardust title', async () => {
   const title = await fixture!.page.title()
-  expect(title).toContain('Hermes')
+  expect(title).toContain('Stardust')
 })
 
 test('renderer loads and shows DOM content', async () => {
@@ -72,8 +72,8 @@ test('HUD composer remains fully inside the transparent window', async () => {
 
   await fixture!.page.evaluate(() =>
     (window as typeof window & {
-      hermesDesktop?: { hud?: { open: (options: { sessionId: null }) => Promise<void> } }
-    }).hermesDesktop?.hud?.open({ sessionId: null })
+      stardustDesktop?: { hud?: { open: (options: { sessionId: null }) => Promise<void> } }
+    }).stardustDesktop?.hud?.open({ sessionId: null })
   )
 
   const hudPage = await hudPagePromise

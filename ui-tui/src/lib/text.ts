@@ -1,5 +1,5 @@
-import { stripAnsi } from '@hermes/shared/ansi'
-import { compactNumber } from '@hermes/shared/format'
+import { stripAnsi } from '@stardust/shared/ansi'
+import { compactNumber } from '@stardust/shared/format'
 
 import {
   LIVE_RENDER_MAX_CHARS,

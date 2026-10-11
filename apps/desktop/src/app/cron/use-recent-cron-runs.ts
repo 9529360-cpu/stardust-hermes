@@ -1,4 +1,4 @@
-import type { CronExecutionsListResult } from '@hermes/shared'
+import type { CronExecutionsListResult } from '@stardust/shared'
 import { useEffect, useState } from 'react'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'

@@ -88,13 +88,13 @@
         inherit (processEnvironment) HERMES_MANAGED;
       }
       // lib.optionalAttrs desktopUsesService {
-        HERMES_DESKTOP_REMOTE_URL = "http://${cfg.backend.host}:${toString cfg.backend.port}";
+        STARDUST_DESKTOP_REMOTE_URL = "http://${cfg.backend.host}:${toString cfg.backend.port}";
       };
 
       # The application reaches the backend of the service only when there is
       # a backend to reach AND a shared token to present with. Without the
-      # token the desktop resolver throws ("HERMES_DESKTOP_REMOTE_URL is set
-      # but HERMES_DESKTOP_REMOTE_TOKEN is not"), so the two variables travel
+      # token the desktop resolver throws ("STARDUST_DESKTOP_REMOTE_URL is set
+      # but STARDUST_DESKTOP_REMOTE_TOKEN is not"), so the two variables travel
       # together or not at all.
       desktopUsesService = cfg.enable && cfg.backend.mode != "none" && cfg.backend.sessionTokenFile != null;
 
@@ -102,8 +102,8 @@
       # writes a --set value into the Nix store, which all users can read.
       desktopRun = lib.optional desktopUsesService ''
         if [ -r ${lib.escapeShellArg cfg.backend.sessionTokenFile} ]; then
-          HERMES_DESKTOP_REMOTE_TOKEN="$(tr -d '\r\n' < ${lib.escapeShellArg cfg.backend.sessionTokenFile})"
-          export HERMES_DESKTOP_REMOTE_TOKEN
+          STARDUST_DESKTOP_REMOTE_TOKEN="$(tr -d '\r\n' < ${lib.escapeShellArg cfg.backend.sessionTokenFile})"
+          export STARDUST_DESKTOP_REMOTE_TOKEN
         else
           echo "hermes-desktop: cannot read the session token at ${cfg.backend.sessionTokenFile}." >&2
           echo "hermes-desktop: the application starts its own backend instead of the one of the service." >&2
@@ -223,7 +223,7 @@
 
             The Electron application carries its own Hermes runtime with
             the usual distribution. This module gives it the Nix package
-            instead, with HERMES_DESKTOP_HERMES. It installs no second copy
+            instead, with STARDUST_DESKTOP_HERMES. It installs no second copy
             of Hermes, and it downloads nothing on the first start
           '';
 

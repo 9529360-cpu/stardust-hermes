@@ -1,4 +1,4 @@
-import { JSON_RPC_INTERNAL_ERROR } from '@hermes/shared'
+import { JSON_RPC_INTERNAL_ERROR } from '@stardust/shared'
 
 import { readActivePreview } from '@/app/chat/right-rail/preview-reader'
 import { readActiveTerminal } from '@/app/right-sidebar/terminal/buffer'
@@ -357,7 +357,7 @@ const windowRead: Handler = ({ request }) => {
   // read_window_below tool: main owns native window enumeration. Empty =
   // unavailable (older shell without the handler, Wayland, …) — without an
   // answer the tool would stall its full 30s deadline.
-  const read = window.hermesDesktop?.readWindowBelow
+  const read = window.stardustDesktop?.readWindowBelow
 
   void Promise.resolve(read ? read() : null).then(
     result => answerValue(request, result),

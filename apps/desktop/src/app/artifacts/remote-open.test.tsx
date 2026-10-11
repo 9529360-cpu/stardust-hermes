@@ -42,7 +42,7 @@ afterEach(() => {
 it('keeps discovered file paths and originating session scope intact through remote opening', async () => {
   const saveGatewayFile = vi.fn().mockResolvedValue({ saved: true })
   const openExternal = vi.fn()
-  vi.stubGlobal('hermesDesktop', { saveGatewayFile, openExternal })
+  vi.stubGlobal('stardustDesktop', { saveGatewayFile, openExternal })
   $connection.set({
     isFullscreen: false,
     nativeOverlayWidth: 0,

@@ -34,7 +34,7 @@
  * on every pack; nothing else depends on its prior contents.
  *
  * Cross-platform: the same partial-state trap exists on macOS
- * (the mac-unpacked Hermes.app bundle) and Windows (win-unpacked), so we
+ * (the mac-unpacked Stardust.app bundle) and Windows (win-unpacked), so we
  * clean whatever `appOutDir` electron-builder hands us regardless of platform.
  *
  * Best-effort: a cleanup failure must never mask the real build. We log and
@@ -81,7 +81,7 @@ export function cleanStaleAppOutDir(appOutDir) {
  * tree, preserve it as `<appOutDir>.bak` — but ONLY when it holds the product
  * exe (i.e. it is a previously-working build, not the corrupted partial state
  * cleanStaleAppOutDir exists to remove). If the fresh pack then produces a
- * Hermes.exe that Windows can't load (truncated PE from a corrupt cached
+ * Stardust.exe that Windows can't load (truncated PE from a corrupt cached
  * Electron zip, wrong arch), the updater's integrity gate in
  * `hermes desktop --build-only` (hermes_cli/main.py
  * `_ensure_desktop_exe_launchable`) restores this .bak instead of leaving the
@@ -92,7 +92,7 @@ export function cleanStaleAppOutDir(appOutDir) {
  * A rename failure (AV holding a handle) also returns false — the wipe is the
  * safe fallback and matches pre-#69179 behavior exactly.
  */
-export function preserveRollbackBackup(appOutDir, productExeName = 'Hermes.exe') {
+export function preserveRollbackBackup(appOutDir, productExeName = 'Stardust.exe') {
   if (!appOutDir || typeof appOutDir !== 'string' || !existsSync(appOutDir)) {
     return false
   }
@@ -118,7 +118,7 @@ export default async function beforePack(context) {
     // post-build integrity gate (#69179) instead of destroying it. Falls
     // through to the plain wipe when the old tree is partial/corrupt or the
     // rename fails.
-    const productExe = `${(context && context.packager?.appInfo?.productFilename) || 'Hermes'}.exe`
+    const productExe = `${(context && context.packager?.appInfo?.productFilename) || 'Stardust'}.exe`
     if (platformName === 'win32' && preserveRollbackBackup(appOutDir, productExe)) {
       console.log(`[before-pack] preserved previous unpacked dir for rollback: ${appOutDir}.bak`)
     } else if (cleanStaleAppOutDir(appOutDir)) {

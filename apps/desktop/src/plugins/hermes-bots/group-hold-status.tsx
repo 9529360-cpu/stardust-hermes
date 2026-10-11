@@ -1,4 +1,4 @@
-import { Codicon } from '@hermes/plugin-sdk'
+import { Codicon } from '@stardust/plugin-sdk'
 
 import { groupMemberKey } from './group-membership'
 import { useBots } from './i18n'

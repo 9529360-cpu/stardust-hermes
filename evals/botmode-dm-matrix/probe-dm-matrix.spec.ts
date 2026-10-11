@@ -39,8 +39,8 @@ test.beforeAll(async () => {
   if (process.env.BOT_DM_SERVICE_PATH === '1') {
     fs.writeFileSync(path.join(bin, 'hermes'), `#!/bin/sh\nprintf 'WRONG_PATH_HERMES invoked: %s\\n' "$*" >> ${path.join(evidence, 'wrong-path.log')}\nprintf 'old launcher rejects --query-file\\n' >&2\nexit 2\n`, { mode: 0o755 })
   }
-  env = buildAppEnv(sandbox, { HOME: sandbox.root, HERMES_DESKTOP_PYTHON: python,
-    HERMES_DESKTOP_HERMES: path.join(bin, 'hermes'), PATH: `${bin}:${process.env.PATH}`,
+  env = buildAppEnv(sandbox, { HOME: sandbox.root, STARDUST_DESKTOP_PYTHON: python,
+    STARDUST_DESKTOP_HERMES: path.join(bin, 'hermes'), PATH: `${bin}:${process.env.PATH}`,
     PYTHONPATH: repo, HERMES_SINGLE_QUERY_LINGER_SECONDS: '30' })
   for (const name of ['alpha', 'beta', 'gamma']) {
     const h = path.join(sandbox.hermesHome, 'profiles', name)

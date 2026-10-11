@@ -5,7 +5,7 @@ import {
   registryBackendScopeKey,
   resolveGatewayWsUrl,
   type ServerRequest
-} from '@hermes/shared'
+} from '@stardust/shared'
 import { atom } from 'nanostores'
 
 import type { HermesConnection } from '@/global'
@@ -38,7 +38,7 @@ function dialPriority(spawnPriority: SpawnPriority): { priority: 'foreground' } 
 }
 
 function dialProfile(
-  desktop: NonNullable<typeof window.hermesDesktop>,
+  desktop: NonNullable<typeof window.stardustDesktop>,
   profile: string,
   spawnPriority: SpawnPriority
 ): Promise<HermesConnection> {
@@ -370,7 +370,7 @@ async function isAttachedSharedRemote(
     return false
   }
 
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   if (!desktop?.getConnectionFor) {
     return false
@@ -546,7 +546,7 @@ function clearTimer(entry: Secondary): void {
 }
 
 async function openSecondary(entry: Secondary, spawnPriority: SpawnPriority = 'background'): Promise<void> {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   if (!desktop) {
     return
@@ -880,7 +880,7 @@ function createSecondary(profile: string, connectionId: null | string = null): S
 // poisons the active gateway with "not connected" even though the primary is
 // open right next to it.
 async function sharedPrimaryRoute(profile: string, spawnPriority: SpawnPriority = 'background'): Promise<boolean> {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   if (!desktop) {
     return false
@@ -1050,7 +1050,7 @@ export async function requestGatewayForAgent<T>(
     return requestOnPrimaryGateway<T>(method, { ...params, profile: key }, timeoutMs, signal)
   }
 
-  if (!window.hermesDesktop?.getConnectionFor) {
+  if (!window.stardustDesktop?.getConnectionFor) {
     throw new Error('This Desktop build cannot dial registry connections. Update Hermes Desktop.')
   }
 
@@ -1239,7 +1239,7 @@ export async function retainGatewayForAgent(connectionId: null | string, profile
     return () => undefined
   }
 
-  if (!window.hermesDesktop?.getConnectionFor) {
+  if (!window.stardustDesktop?.getConnectionFor) {
     // No registry dialing in this build — nothing to hold; the request path
     // will throw its own actionable error.
     return () => undefined
@@ -1474,7 +1474,7 @@ export async function openGatewayForAgent(
     return
   }
 
-  if (!window.hermesDesktop?.getConnectionFor) {
+  if (!window.stardustDesktop?.getConnectionFor) {
     throw new Error('This Desktop build cannot dial registry connections. Update Hermes Desktop.')
   }
 
@@ -1528,7 +1528,7 @@ export async function ensureGatewayForAgent(
     return Boolean(isOpen(g.primaryGateway) && !signal?.aborted && applyActive(g.primaryProfile, activationEpoch))
   }
 
-  if (!window.hermesDesktop?.getConnectionFor) {
+  if (!window.stardustDesktop?.getConnectionFor) {
     throw new Error('This Desktop build cannot dial registry connections. Update Hermes Desktop.')
   }
 
@@ -1752,7 +1752,7 @@ export function openSecondaryCount(): number {
 // tile-pinned backend keepalive-fresh forever, so LRU eviction and the idle
 // reaper never freed its pool slot (#103375).
 export function touchSecondaryGateways(): void {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   for (const entry of g.secondaries.values()) {
     if (entry.wantOpen && isOpen(entry.gateway)) {

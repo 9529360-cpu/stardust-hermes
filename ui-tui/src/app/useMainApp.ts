@@ -8,8 +8,8 @@ import {
   useStdout,
   useTerminalTitle
 } from '@hermes/ink'
-import { JSON_RPC_METHOD_NOT_FOUND, type ServerRequest } from '@hermes/shared/json-rpc-channel'
 import { useStore } from '@nanostores/react'
+import { JSON_RPC_METHOD_NOT_FOUND, type ServerRequest } from '@stardust/shared/json-rpc-channel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { DASHBOARD_TUI_MODE, STARTUP_RESUME_ID } from '../config/env.js'

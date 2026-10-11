@@ -8,7 +8,7 @@ import { Backdrop } from './Backdrop'
 const CUSTOM_IMAGE = 'data:image/jpeg;base64,Y3VzdG9t'
 
 describe('Backdrop', () => {
-  const originalDesktop = window.hermesDesktop
+  const originalDesktop = window.stardustDesktop
 
   beforeEach(() => {
     window.localStorage.clear()
@@ -18,7 +18,7 @@ describe('Backdrop', () => {
 
   afterEach(() => {
     cleanup()
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: originalDesktop
     })
@@ -33,7 +33,7 @@ describe('Backdrop', () => {
   it('does not read a saved local image while the backdrop is disabled', async () => {
     const readFileDataUrl = vi.fn(async () => CUSTOM_IMAGE)
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { readFileDataUrl }
     })
@@ -50,7 +50,7 @@ describe('Backdrop', () => {
   it('reads a custom background only through the local Electron file bridge', async () => {
     const readFileDataUrl = vi.fn(async () => CUSTOM_IMAGE)
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { readFileDataUrl }
     })
@@ -75,7 +75,7 @@ describe('Backdrop', () => {
       throw new Error('missing')
     })
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { readFileDataUrl }
     })

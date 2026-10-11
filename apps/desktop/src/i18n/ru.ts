@@ -1160,7 +1160,7 @@ export const ru = defineLocale({
         'По умолчанию — локальный. Используйте удалённый, когда приложение должно управлять бэкендом Stardust в другом месте. Соединения шлюзов — на уровне машины; профили обнаруживаются из подключённых шлюзов.',
       envOverrideTitle: 'Переменные окружения управляют этой сессией приложения.',
       envOverrideDesc:
-        'Сбросьте HERMES_DESKTOP_REMOTE_URL и HERMES_DESKTOP_REMOTE_TOKEN, чтобы использовать сохранённую настройку ниже.',
+        'Сбросьте STARDUST_DESKTOP_REMOTE_URL и STARDUST_DESKTOP_REMOTE_TOKEN, чтобы использовать сохранённую настройку ниже.',
       modeTitle: 'Режим подключения',
       localTitle: 'Локальный шлюз',
       localDesc: 'Запускает приватный бэкенд Stardust на localhost. Это значение по умолчанию, работает офлайн.',

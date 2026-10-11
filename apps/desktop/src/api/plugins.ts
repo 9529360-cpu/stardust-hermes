@@ -1,4 +1,4 @@
-import { reconnectBackoffDelayMs } from '@hermes/shared'
+import { reconnectBackoffDelayMs } from '@stardust/shared'
 
 import type { HermesConnection } from '@/global'
 import { RECONNECT_ATTEMPT_TIMEOUT_MS, withTimeout } from '@/lib/with-timeout'
@@ -20,7 +20,7 @@ import { getApiRequestConnection, getApiRequestProfile, hermesApi, profileScoped
  *
  *  Exported for tests. */
 export async function activeConnection(): Promise<HermesConnection> {
-  const getConnectionFor = window.hermesDesktop.getConnectionFor
+  const getConnectionFor = window.stardustDesktop.getConnectionFor
   const connectionId = getApiRequestConnection()
   const profile = getApiRequestProfile()
 
@@ -33,13 +33,13 @@ export async function activeConnection(): Promise<HermesConnection> {
   }
 
   return withTimeout(
-    window.hermesDesktop.getConnection(profile),
+    window.stardustDesktop.getConnection(profile),
     RECONNECT_ATTEMPT_TIMEOUT_MS,
     `Timed out connecting to profile "${profile}"`
   )
 }
 
-/** Options for a plugin REST call — mirrors the app's own `hermesDesktop.api`
+/** Options for a plugin REST call — mirrors the app's own `stardustDesktop.api`
  *  shape, minus the path (which is namespace-derived). */
 export interface PluginRestOptions {
   method?: string
@@ -70,7 +70,7 @@ function pluginPathSuffix(caller: string, path: string): string {
  *  REST call. Broader reach (core endpoints, another namespace) is the future
  *  declared-capability seam; today the namespace IS the boundary. */
 export async function pluginRest<T>(pluginId: string, path: string, opts: PluginRestOptions = {}): Promise<T> {
-  if (!window.hermesDesktop?.api) {
+  if (!window.stardustDesktop?.api) {
     throw new Error('Stardust Desktop bridge unavailable')
   }
 

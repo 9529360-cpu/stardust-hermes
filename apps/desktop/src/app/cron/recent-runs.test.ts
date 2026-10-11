@@ -1,4 +1,4 @@
-import type { WorkItem } from '@hermes/shared'
+import type { WorkItem } from '@stardust/shared'
 import { describe, expect, it } from 'vitest'
 
 import { en } from '@/i18n/en'

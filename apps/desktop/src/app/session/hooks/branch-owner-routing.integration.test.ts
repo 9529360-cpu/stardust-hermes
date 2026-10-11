@@ -79,7 +79,7 @@ describe('branch owner routing (real router, faked transport)', () => {
 
     // A registry with two backends exposing the SAME profile name — the exact
     // ambiguity that makes profile-only routing wrong.
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: async () => ({ mode: 'local' }),
       getConnectionFor: async ({ connectionId, profile }: { connectionId: string; profile: string }) => {
         dialed.push({ connectionId, profile })

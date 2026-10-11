@@ -266,7 +266,7 @@ export function ConnectionsRegistrySection() {
   const [oauthConnected, setOauthConnected] = useState(false)
   const probeSeq = useRef(0)
 
-  const bridge = window.hermesDesktop?.connections
+  const bridge = window.stardustDesktop?.connections
 
   const hasLocal = Boolean(registry?.connections.some(c => c.kind === 'local'))
 
@@ -283,7 +283,7 @@ export function ConnectionsRegistrySection() {
   // URL doesn't fire a request per keystroke. Best-effort: a failed probe just
   // leaves the generic provider label, it never blocks signing in.
   useEffect(() => {
-    if (!editorWantsOauth || !editorUrl || !window.hermesDesktop?.probeConnectionConfig) {
+    if (!editorWantsOauth || !editorUrl || !window.stardustDesktop?.probeConnectionConfig) {
       setAuthProbe(null)
 
       return
@@ -296,7 +296,7 @@ export function ConnectionsRegistrySection() {
     let cancelled = false
 
     const timer = setTimeout(() => {
-      window.hermesDesktop
+      window.stardustDesktop
         .probeConnectionConfig(editorUrl)
         .then(result => {
           if (!cancelled && seq === probeSeq.current) {
@@ -338,7 +338,7 @@ export function ConnectionsRegistrySection() {
     setSigningIn(true)
 
     try {
-      const result = await window.hermesDesktop.oauthLoginConnectionConfig(editorUrl)
+      const result = await window.stardustDesktop.oauthLoginConnectionConfig(editorUrl)
 
       setOauthConnected(Boolean(result.connected))
 

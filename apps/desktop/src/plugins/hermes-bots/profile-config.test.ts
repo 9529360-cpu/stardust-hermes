@@ -48,7 +48,7 @@ const { confirmMock, hostMock, invalidateMock } = vi.hoisted(() => ({
   invalidateMock: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {

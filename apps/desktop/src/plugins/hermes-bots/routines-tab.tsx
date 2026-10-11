@@ -9,7 +9,7 @@
  * layout off), so the choice is made here and the shell is left alone.
  */
 
-import { Codicon, Tip, useI18n } from '@hermes/plugin-sdk'
+import { Codicon, Tip, useI18n } from '@stardust/plugin-sdk'
 
 export function RoutinesTabLabel() {
   const { t } = useI18n()

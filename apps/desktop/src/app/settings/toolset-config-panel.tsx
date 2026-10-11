@@ -334,7 +334,7 @@ function PostSetupRunner({ toolset, postSetupKey, installed = false, onComplete,
                 message: copy.postSetupErrorMessage(prettyName(postSetupKey)),
                 action: {
                   label: copy.postSetupOpenLogs,
-                  onClick: () => void window.hermesDesktop?.revealLogs?.().catch(() => undefined)
+                  onClick: () => void window.stardustDesktop?.revealLogs?.().catch(() => undefined)
                 },
                 secondaryAction: { label: copy.postSetupRunAgain, onClick: () => void run() }
               }

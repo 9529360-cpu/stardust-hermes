@@ -159,10 +159,10 @@ else
 fi
 
 export HERMES_HOME="$SANDBOX_ROOT/hermes-home"
-export HERMES_DESKTOP_USER_DATA_DIR="$SANDBOX_ROOT/user-data"
-export HERMES_DESKTOP_APP_NAME="$SANDBOX_NAME"
+export STARDUST_DESKTOP_USER_DATA_DIR="$SANDBOX_ROOT/user-data"
+export STARDUST_DESKTOP_APP_NAME="$SANDBOX_NAME"
 
-mkdir -p "$HERMES_HOME" "$HERMES_DESKTOP_USER_DATA_DIR"
+mkdir -p "$HERMES_HOME" "$STARDUST_DESKTOP_USER_DATA_DIR"
 
 if [ -n "$SEED_DIR" ]; then
   # Only seed when the sandbox HERMES_HOME is empty — avoids clobbering an
@@ -176,8 +176,8 @@ if [ -n "$SEED_DIR" ]; then
 fi
 
 echo "[sandbox] HERMES_HOME=$HERMES_HOME" >&2
-echo "[sandbox] userData=$HERMES_DESKTOP_USER_DATA_DIR" >&2
-echo "[sandbox] appName=$HERMES_DESKTOP_APP_NAME" >&2
+echo "[sandbox] userData=$STARDUST_DESKTOP_USER_DATA_DIR" >&2
+echo "[sandbox] appName=$STARDUST_DESKTOP_APP_NAME" >&2
 if [ "$PERSISTENT" = true ]; then
   echo "[sandbox] persistent: $SANDBOX_ROOT" >&2
 else

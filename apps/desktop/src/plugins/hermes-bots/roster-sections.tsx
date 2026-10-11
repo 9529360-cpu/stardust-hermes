@@ -7,7 +7,7 @@
  * without either half knowing about a bot row.
  */
 
-import { cn, Codicon, ConnectionGlyph, DisclosureCaret, RowButton, Tip } from '@hermes/plugin-sdk'
+import { cn, Codicon, ConnectionGlyph, DisclosureCaret, RowButton, Tip } from '@stardust/plugin-sdk'
 import type { ReactNode } from 'react'
 
 import { botHandle, botRosterKey, botSourceStatus, filterBots } from './data'

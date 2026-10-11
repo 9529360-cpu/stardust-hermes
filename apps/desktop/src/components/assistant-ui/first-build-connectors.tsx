@@ -46,7 +46,7 @@ export function FirstBuildConnectorOffer({
     void openFirstBuildLinks(
       storedId,
       { toolCallId, toolName, args, result },
-      { open: window.hermesDesktop?.openExternal ? url => window.hermesDesktop.openExternal(url) : undefined }
+      { open: window.stardustDesktop?.openExternal ? url => window.stardustDesktop.openExternal(url) : undefined }
     )
   }, [storedId, toolCallId, toolName, args, result])
 
@@ -89,7 +89,7 @@ export function FirstBuildConnectorOffer({
               t.connectors.waitingSignIn
             )}
           </span>
-          {row.connectUrl && row.phase !== 'connected' && !window.hermesDesktop?.openExternal ? (
+          {row.connectUrl && row.phase !== 'connected' && !window.stardustDesktop?.openExternal ? (
             <Button asChild size="xs" variant="link">
               <a href={row.connectUrl} rel="noreferrer" target="_blank">
                 {t.connectors.connect}

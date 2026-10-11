@@ -1,8 +1,8 @@
 import type { AppendMessage, ThreadMessage } from '@assistant-ui/react'
-import { JsonRpcGatewayError } from '@hermes/shared'
-import { SLASH_COMMAND_RE } from '@hermes/shared'
-import { stripAnsi } from '@hermes/shared/ansi'
 import { useStore } from '@nanostores/react'
+import { JsonRpcGatewayError } from '@stardust/shared'
+import { SLASH_COMMAND_RE } from '@stardust/shared'
+import { stripAnsi } from '@stardust/shared/ansi'
 import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
 import { transcribeAudio } from '@/hermes'

@@ -1,5 +1,5 @@
-import type { ModelOptionProvider } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
+import type { ModelOptionProvider } from '@stardust/shared'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'

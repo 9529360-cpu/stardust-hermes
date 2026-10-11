@@ -244,7 +244,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         return
       }
 
-      void window.hermesDesktop?.recycleBackend?.(normalizeProfileKey($activeGatewayProfile.get())).catch(err =>
+      void window.stardustDesktop?.recycleBackend?.(normalizeProfileKey($activeGatewayProfile.get())).catch(err =>
         notifyError(err, translateNow('notifications.errors.restartHermesFailed'))
       )
     }
@@ -445,9 +445,9 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // don't have router access); listen and navigate to the settings keybinds tab.
   useEffect(() => {
     const onOpenKeybinds = () => navigate(`${SETTINGS_ROUTE}?tab=keybinds`)
-    window.addEventListener('hermes:open-keybinds', onOpenKeybinds)
+    window.addEventListener('stardust:open-keybinds', onOpenKeybinds)
 
-    return () => window.removeEventListener('hermes:open-keybinds', onOpenKeybinds)
+    return () => window.removeEventListener('stardust:open-keybinds', onOpenKeybinds)
   }, [navigate])
 
   // Dev-only: install the credit-notice demo trigger (Ctrl+Shift+C / ⌘K palette

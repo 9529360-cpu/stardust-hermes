@@ -13,7 +13,7 @@ export function BrandClose({ ref }: BrandCloseProps) {
       ref={ref}
       style={{ willChange: 'transform, opacity' }}
     >
-      <img alt="" className="h-[32vmin] w-auto object-contain" src={assetPath('nous-badge.png')} />
+      <img alt="" className="h-[32vmin] w-auto object-contain" src={assetPath('brand/stardust-mark-mono.svg')} />
       <div className="flex flex-col items-center gap-[1.6vmin]">
         <h1
           className="text-[10.2vmin] leading-none uppercase text-white/95"

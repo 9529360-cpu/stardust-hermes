@@ -341,7 +341,7 @@ describe('requestActiveUpdate', () => {
     $backendUpdateStatus.set(null)
     $updateOverlayOpen.set(false)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
+      stardustDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
     }
     vi.useRealTimers()
   })
@@ -429,7 +429,7 @@ describe('Stardust update targets', () => {
     $mockConnectionsRegistry.set(null)
     setRemote(true)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
+      stardustDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
     }
     vi.useRealTimers()
   })
@@ -535,7 +535,7 @@ describe('applyEverythingUpdate compatibility engine', () => {
     $updateOverlayOpen.set(false)
     $mockConnectionsRegistry.set(null)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: {
+      stardustDesktop: {
         updates: { apply: applyClientMock, check: checkClientMock },
         connections: { updateAll: updateAllMock }
       }
@@ -715,7 +715,7 @@ describe('client nudge after an explicit backend recovery update', () => {
     $mockConnectionsRegistry.set(null)
     setRemote(true)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
+      stardustDesktop: { updates: { apply: applyClientMock, check: checkClientMock } }
     }
     vi.useRealTimers()
   })
@@ -777,7 +777,7 @@ describe('applyUpdates terminal state', () => {
     resetUpdateApplyState()
     $updateOverlayOpen.set(true)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { apply: applyMock } }
+      stardustDesktop: { updates: { apply: applyMock } }
     }
     vi.useRealTimers()
   })
@@ -1306,7 +1306,7 @@ describe('startUpdatePoller', () => {
     })
     $updateStatus.set(null)
     ;(globalThis as unknown as { window: unknown }).window = {
-      hermesDesktop: { updates: { check: checkMock, onProgress: onProgressMock } },
+      stardustDesktop: { updates: { check: checkMock, onProgress: onProgressMock } },
       addEventListener: vi.fn((event: string, handler: Function) => {
         listeners[event] = handler
       }),

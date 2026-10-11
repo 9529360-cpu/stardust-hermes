@@ -57,7 +57,7 @@ describe('BrowserHostControlPanel', () => {
 
       return { status: 'starting', session_id: 'session' }
     })
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: {
         browserControl: { start: mocks.start, onStatus: () => () => {}, status: async () => ({ status: 'starting' }) }

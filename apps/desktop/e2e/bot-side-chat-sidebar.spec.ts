@@ -52,10 +52,10 @@ interface DbFile {
 // Every .db file under this run's HERMES_HOME, read with the repo backend's
 // interpreter. Read-only: nothing is written.
 function dbReport(hermesHome: string): DbFile[] {
-  const python = process.env.HERMES_DESKTOP_PYTHON
+  const python = process.env.STARDUST_DESKTOP_PYTHON
 
   if (!python) {
-    throw new Error('HERMES_DESKTOP_PYTHON must name the repo backend interpreter')
+    throw new Error('STARDUST_DESKTOP_PYTHON must name the repo backend interpreter')
   }
 
   const script = [

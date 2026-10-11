@@ -7,7 +7,7 @@ import { test } from 'vitest'
 
 import { appIconCandidates, decodingFileProbe, resolveAppIcon } from './app-icon'
 
-// Regression: a packaged app.asar can contain a TRUNCATED apple-touch-icon.png
+// Regression: a packaged app.asar can contain a TRUNCATED apple-touch-icon-180.png
 // (interrupted electron-builder run, partial copy). Electron's
 // BrowserWindow({ icon }) / app.dock.setIcon() decode synchronously and THROW
 // on undecodable bytes, which killed the main process inside createWindow()
@@ -22,18 +22,18 @@ test('resolveAppIcon skips an existing but undecodable candidate', () => {
   const probe = (p: string) => {
     probeCalls.push(p)
 
-    return p !== '/packaged/app.asar/public/apple-touch-icon.png'
+    return p !== '/packaged/app.asar/public/apple-touch-icon-180.png'
   }
 
   const picked = resolveAppIcon(
-    ['/packaged/app.asar/public/apple-touch-icon.png', '/packaged/app.asar/dist/apple-touch-icon.png'],
+    ['/packaged/app.asar/public/apple-touch-icon-180.png', '/packaged/app.asar/dist/apple-touch-icon-180.png'],
     probe
   )
 
-  assert.equal(picked, '/packaged/app.asar/dist/apple-touch-icon.png')
+  assert.equal(picked, '/packaged/app.asar/dist/apple-touch-icon-180.png')
   assert.deepEqual(probeCalls, [
-    '/packaged/app.asar/public/apple-touch-icon.png',
-    '/packaged/app.asar/dist/apple-touch-icon.png'
+    '/packaged/app.asar/public/apple-touch-icon-180.png',
+    '/packaged/app.asar/dist/apple-touch-icon-180.png'
   ])
 })
 
@@ -54,7 +54,7 @@ test('decodingFileProbe rejects a missing file', () => {
 
 test('decodingFileProbe rejects an existing but empty (0-byte) file', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-icon-'))
-  const empty = path.join(dir, 'apple-touch-icon.png')
+  const empty = path.join(dir, 'apple-touch-icon-180.png')
   fs.writeFileSync(empty, Buffer.alloc(0))
 
   try {
@@ -79,14 +79,14 @@ test('decodingFileProbe rejects a directory', () => {
 test('appIconCandidates keeps the documented precedence ladder', () => {
   const mac = appIconCandidates({
     isWindows: false,
-    appRoot: '/Applications/Hermes.app/Contents/Resources',
+    appRoot: '/Applications/Stardust.app/Contents/Resources',
     unpackedPathFor: p => `${p}.unpacked`
   })
 
   assert.deepEqual(mac, [
-    path.join('/Applications/Hermes.app/Contents/Resources', 'public', 'apple-touch-icon.png'),
-    path.join('/Applications/Hermes.app/Contents/Resources', 'dist', 'apple-touch-icon.png'),
-    path.join('/Applications/Hermes.app/Contents/Resources.unpacked', 'dist', 'apple-touch-icon.png')
+    path.join('/Applications/Stardust.app/Contents/Resources', 'public', 'apple-touch-icon-180.png'),
+    path.join('/Applications/Stardust.app/Contents/Resources', 'dist', 'apple-touch-icon-180.png'),
+    path.join('/Applications/Stardust.app/Contents/Resources.unpacked', 'dist', 'apple-touch-icon-180.png')
   ])
 
   // Windows prepends the two full-bleed .ico rungs ahead of the PNG ladder.
@@ -105,7 +105,7 @@ test('appIconCandidates keeps the documented precedence ladder', () => {
     'resources/ icon.ico is the highest-precedence Windows rung'
   )
   assert.equal(
-    win.filter(c => c.endsWith('apple-touch-icon.png')).length,
+    win.filter(c => c.endsWith('apple-touch-icon-180.png')).length,
     3,
     'all three PNG rungs remain after the ico rungs'
   )

@@ -311,7 +311,7 @@ ${payload}
 
   it('resolves local file image artifacts through the desktop fs bridge', async () => {
     const readFileDataUrl = vi.fn(async () => 'data:image/png;base64,TE9DQUw=')
-    vi.stubGlobal('window', { hermesDesktop: { readFileDataUrl } })
+    vi.stubGlobal('window', { stardustDesktop: { readFileDataUrl } })
 
     // Local desktop (connection mode != 'remote'): a local image_generate
     // output path must be read through the Electron bridge, not left as a
@@ -331,7 +331,7 @@ ${payload}
       throw new Error(`unexpected path ${path}`)
     })
 
-    vi.stubGlobal('window', { hermesDesktop: { api } })
+    vi.stubGlobal('window', { stardustDesktop: { api } })
     $connection.set({ baseUrl: 'https://gw', mode: 'remote', token: 'secret' } as never)
 
     const path = '/Users/me/.hermes/skills/work-esab/references/images/manual-step03.jpeg'

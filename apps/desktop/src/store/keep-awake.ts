@@ -24,6 +24,6 @@ export function setKeepAwake(on: boolean): void {
 if (typeof window !== 'undefined') {
   $keepAwake.subscribe(on => {
     persistBoolean(KEY, on)
-    window.hermesDesktop?.setKeepAwake?.(on)
+    window.stardustDesktop?.setKeepAwake?.(on)
   })
 }

@@ -1,5 +1,5 @@
 import { Box, Text, useStdout } from '@hermes/ink'
-import { mix } from '@hermes/shared/color'
+import { mix } from '@stardust/shared/color'
 import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 

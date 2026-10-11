@@ -3,7 +3,7 @@
  * frame as the bot's profile picture.
  */
 
-import { Button, cn, GlyphSpinner, host, Input, LruCache, RowButton, useQuery } from '@hermes/plugin-sdk'
+import { Button, cn, GlyphSpinner, host, Input, LruCache, RowButton, useQuery } from '@stardust/plugin-sdk'
 import { useEffect, useState } from 'react'
 
 import { useBots } from './i18n'

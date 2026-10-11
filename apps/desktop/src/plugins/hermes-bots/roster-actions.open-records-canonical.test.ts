@@ -27,7 +27,7 @@ const { hostMock, openBotCanonicalChatMock, notifyBotOpenFailureMock } = vi.hois
   openBotCanonicalChatMock: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   return {

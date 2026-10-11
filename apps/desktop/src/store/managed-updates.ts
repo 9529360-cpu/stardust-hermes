@@ -36,7 +36,7 @@ function managedUpdater(): ((id: string) => Promise<DesktopManagedConnectionUpda
     return null
   }
 
-  return window.hermesDesktop?.connections?.updateManaged ?? null
+  return window.stardustDesktop?.connections?.updateManaged ?? null
 }
 
 /** Whether this product may expose the transactional SSH update bridge.

@@ -4,7 +4,7 @@
  * (`apps/desktop/package.json -> build.mac.extendInfo`) must pin every
  * `NS*UsageDescription` key the renderer relies on.
  *
- * Each entry is a key/value pair that lands in the packaged Hermes.app's
+ * Each entry is a key/value pair that lands in the packaged Stardust.app's
  * Info.plist via electron-builder's `extendInfo` merge. Missing or mis-stated
  * keys cause macOS to either silently deny the related API or surface a
  * mysteriously-worded system permission prompt at runtime (TCC's

@@ -78,7 +78,7 @@ beforeEach(() => {
   $gateway.set({ id: 'live-socket' })
   $activeGatewayProfile.set('default')
   $connection.set(localConn())
-  vi.stubGlobal('window', { hermesDesktop: { getConnection, getConnectionFor }, localStorage })
+  vi.stubGlobal('window', { stardustDesktop: { getConnection, getConnectionFor }, localStorage })
   setComposerSelectionOwner('homelab', 'default')
 })
 

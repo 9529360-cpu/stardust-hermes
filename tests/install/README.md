@@ -79,7 +79,7 @@ gh workflow run install-e2e.yml --ref <branch> -f route=both -f tag-count=2
 
 Cost per run, so nobody is surprised: 41 legs per sampled tag (windows 18, macos 15, linux 8), so scheduled and release-tag runs sample 2 tags for up to 82 legs. Manual dispatch defaults to 3 tags for up to 123 legs. A typical green leg finishes in 7-15 minutes; every leg is capped at 60. Route slices for cheaper reads: `update` (linux only, 8/tag), `windows-desktop` (18/tag), `macos-desktop` (15/tag). `tag-count` is validated to 1-10. GitHub's 256-job cap applies to each OS matrix separately, not to the combined leg count; at 10 tags the matrices hold 180 windows, 150 macos, and 80 linux entries. Windows would first exceed the cap at 15 tags (270).
 
-Running the drivers locally: don't, except in a disposable VM. The windows driver kills every process named Hermes during teardown and the macos driver operates on `/Applications/Hermes.app`; on a machine with a real Hermes install they will interfere with it.
+Running the drivers locally: don't, except in a disposable VM. The windows driver kills every process named Stardust during teardown and the macos driver operates on `/Applications/Stardust.app`; on a machine with a real Hermes install they will interfere with it.
 
 ## Artifacts
 

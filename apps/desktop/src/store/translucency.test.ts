@@ -10,7 +10,7 @@ vi.hoisted(() => {
   Object.defineProperty(globalThis.navigator, 'platform', { configurable: true, value: 'MacIntel' })
 })
 
-import { DEFAULT_GLASS_MATERIAL, DEFAULT_GLASS_SCOPE } from '@hermes/shared/translucency'
+import { DEFAULT_GLASS_MATERIAL, DEFAULT_GLASS_SCOPE } from '@stardust/shared/translucency'
 
 import { onPersistenceEvent, type PersistenceEvent } from '@/lib/storage'
 
@@ -143,7 +143,7 @@ describe('window translucency lever', () => {
   it('mirrors every tick to the desktop bridge so the clear-mode fade tracks the drag', () => {
     vi.useFakeTimers()
     const calls: unknown[] = []
-    window.hermesDesktop = { setTranslucency: (payload: unknown) => calls.push(payload) } as never
+    window.stardustDesktop = { setTranslucency: (payload: unknown) => calls.push(payload) } as never
 
     try {
       for (let intensity = 36; intensity <= 40; intensity += 1) {

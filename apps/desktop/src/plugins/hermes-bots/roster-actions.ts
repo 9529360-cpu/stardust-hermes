@@ -8,7 +8,7 @@
  * them can own an action the others call without importing a sibling surface.
  */
 
-import { ackStoredSessionId, atom, haptic, host, markSessionUnreadFinished } from '@hermes/plugin-sdk'
+import { ackStoredSessionId, atom, haptic, host, markSessionUnreadFinished } from '@stardust/plugin-sdk'
 
 import { $botOpenPending, $openBotChat, $selectedBot, rosterWatermarks, saveSelectedRosterBot } from './bot-state'
 import { CANONICAL_CHAT_TITLE, notifyBotOpenFailure, openBotCanonicalChat, prepareBotSource } from './canonical-chat'

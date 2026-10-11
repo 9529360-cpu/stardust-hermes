@@ -1,4 +1,4 @@
-// drive-update.cjs — launch the INSTALLED Hermes.exe (real Electron desktop
+// drive-update.cjs — launch the INSTALLED Stardust.exe (real Electron desktop
 // app) under Playwright's Electron driver and perform the update the way a
 // user does: Settings -> About -> "Update now". Screenshots at every step.
 //
@@ -6,7 +6,7 @@
 // @playwright/test resolves from ITS node_modules — the same deps the
 // installed app was built with):
 //
-//   node <this file> <path-to-Hermes.exe> <proof-dir>
+//   node <this file> <path-to-Stardust.exe> <proof-dir>
 //
 // Exit codes: 0 = update hand-off started and the app quit (the detached
 // updater takes it from there — the PowerShell driver polls for the result);
@@ -27,7 +27,7 @@ const exePath = process.argv[2]
 const proofDir = process.argv[3]
 
 if (!exePath || !proofDir) {
-  console.error('usage: node drive-update.cjs <Hermes.exe> <proof-dir>')
+  console.error('usage: node drive-update.cjs <Stardust.exe> <proof-dir>')
   process.exit(1)
 }
 
@@ -246,7 +246,7 @@ async function main() {
     // Surface the real git error behind the UI's generic "couldn't reach
     // the update server" line.
     const status = await page.evaluate(() =>
-      window.hermesDesktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
+      window.stardustDesktop?.updates?.check?.() ?? Promise.resolve('no updates.check bridge')
     ).catch((err) => `updates.check failed: ${err?.message || err}`)
     log(`[update-status] ${JSON.stringify(status)}`)
     await shot(page, 'ERROR-no-update-now')

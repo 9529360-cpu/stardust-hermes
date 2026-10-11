@@ -80,7 +80,7 @@ const { cache, hostMock, live } = vi.hoisted(() => {
   }
 })
 
-vi.mock('@hermes/plugin-sdk', async () => {
+vi.mock('@stardust/plugin-sdk', async () => {
   const { atom } = await import('nanostores')
 
   const stub: unknown = new Proxy(function stubbed() {}, {

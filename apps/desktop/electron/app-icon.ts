@@ -14,7 +14,7 @@ import { nativeImage } from 'electron'
  * `createWindow()` and took the whole app down mid-session: the window never
  * appeared, running turns lost their renderer, and the desktop log showed
  * `Uncaught exception: Error: Failed to load image from path
- * '.../app.asar/public/apple-touch-icon.png' at createWindow`.
+ * '.../app.asar/public/apple-touch-icon-180.png' at createWindow`.
  *
  * This helper makes icon resolution fail-soft: a candidate that exists but does
  * not decode is skipped like a missing one, so the app falls through to the
@@ -78,8 +78,8 @@ export function appIconCandidates(opts: {
 
   return [
     ...(isWindows ? [path.join(resourcesPath ?? '', 'icon.ico'), path.join(appRoot, 'assets', 'icon.ico')] : []),
-    path.join(appRoot, 'public', 'apple-touch-icon.png'),
-    path.join(appRoot, 'dist', 'apple-touch-icon.png'),
-    path.join(unpackedPathFor(appRoot), 'dist', 'apple-touch-icon.png')
+    path.join(appRoot, 'public', 'apple-touch-icon-180.png'),
+    path.join(appRoot, 'dist', 'apple-touch-icon-180.png'),
+    path.join(unpackedPathFor(appRoot), 'dist', 'apple-touch-icon-180.png')
   ]
 }

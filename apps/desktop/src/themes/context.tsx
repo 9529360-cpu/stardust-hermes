@@ -9,8 +9,8 @@
  * The two are persisted independently. Shift+X toggles light/dark.
  */
 
-import { ensureContrast, mix, parseColor } from '@hermes/shared/color'
 import { useStore } from '@nanostores/react'
+import { ensureContrast, mix, parseColor } from '@stardust/shared/color'
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 
 import { $registryVersion } from '@/contrib/registry'
@@ -104,7 +104,7 @@ const readBootProfileKey = () => normalizeProfileKey(storedString(LAST_PROFILE_K
 const rememberActiveProfileKey = (profile: string) => persistString(LAST_PROFILE_KEY, profile)
 
 // ─── Color math (for synthesised light variants of dark-only skins) ────────
-// mix / ensureContrast live in @hermes/shared/color (shared with the TUI);
+// mix / ensureContrast live in @stardust/shared/color (shared with the TUI);
 // readableInk in ./color pins the desktop's near-black ink.
 
 function synthLightColors(seed: DesktopTheme): DesktopThemeColors {
@@ -287,7 +287,7 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily 
 
   const chromeBg = chromeBackground(c.background, isDark)
 
-  window.hermesDesktop?.setTitleBarTheme?.({
+  window.stardustDesktop?.setTitleBarTheme?.({
     background: chromeBg,
     foreground: c.foreground
   })
@@ -318,7 +318,7 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily 
 // theme instead of the OS appearance. An explicit light/dark pick is forced;
 // 'system' stays 'system' so prefers-color-scheme keeps tracking the OS.
 const syncNativeTheme = (pref: ThemeMode, rendered: 'light' | 'dark') =>
-  window.hermesDesktop?.setNativeTheme?.(pref === 'system' ? 'system' : rendered)
+  window.stardustDesktop?.setNativeTheme?.(pref === 'system' ? 'system' : rendered)
 
 // Boot-time paint to avoid a flash before <ThemeProvider> mounts. Use the last
 // active profile's appearance so a non-default profile relaunch paints its own

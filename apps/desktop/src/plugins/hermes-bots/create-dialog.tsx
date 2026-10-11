@@ -36,7 +36,7 @@ import {
   Tip,
   useI18n,
   useValue
-} from '@hermes/plugin-sdk'
+} from '@stardust/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
 import { avatarColor, blobatarSvg, botAppearance, BotFace } from './avatar'

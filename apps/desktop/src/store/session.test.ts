@@ -819,7 +819,7 @@ describe('workspaceCwdForNewSession', () => {
     window.localStorage.removeItem('hermes.desktop.workspace-cwd')
     window.localStorage.removeItem('hermes.desktop.workspace-cwd.remote.http%3A%2F%2Fbackend-a.default')
     window.localStorage.removeItem('hermes.desktop.workspace-cwd.remote.http%3A%2F%2Fbackend-b.default')
-    delete (window as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as { stardustDesktop?: unknown }).stardustDesktop
   })
 
   it('does not publish a delayed configured default after ownership is lost', async () => {
@@ -831,7 +831,7 @@ describe('workspaceCwdForNewSession', () => {
 
     const sanitizeWorkspaceCwd = vi.fn(async (cwd: string) => ({ cwd }))
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = {
+    ;(window as { stardustDesktop?: unknown }).stardustDesktop = {
       sanitizeWorkspaceCwd,
       settings: { getDefaultProjectDir: vi.fn(() => settingsResult.promise) }
     }
@@ -851,7 +851,7 @@ describe('workspaceCwdForNewSession', () => {
   it('does not publish a delayed sanitized cwd after ownership is lost', async () => {
     const sanitized = deferred<{ cwd: string }>()
 
-    ;(window as { hermesDesktop?: unknown }).hermesDesktop = {
+    ;(window as { stardustDesktop?: unknown }).stardustDesktop = {
       sanitizeWorkspaceCwd: vi.fn(() => sanitized.promise),
       settings: {
         getDefaultProjectDir: vi.fn(async () => ({

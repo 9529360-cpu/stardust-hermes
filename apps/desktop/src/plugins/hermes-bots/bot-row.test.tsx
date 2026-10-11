@@ -15,7 +15,7 @@
  * old plugin.js bundle and rendered it against a hand-built jsx stub.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -35,7 +35,7 @@ const { ensureAgent, ensureBotMetadata, notifyError, openRosterBot, requestProfi
     warmProfile: vi.fn()
   }))
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   return {

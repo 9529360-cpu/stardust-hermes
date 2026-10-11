@@ -158,7 +158,7 @@ const ARCHIVE_FILTERS = [{ extensions: ['tar.gz', 'tgz'], name: 'Hermes profile'
  *  Returns the archive path, or null when the user cancelled. */
 export async function runExportProfileFlow(profile?: string): Promise<null | string> {
   const target = normalizeProfileKey(profile ?? activeProfileKey())
-  const pick = window.hermesDesktop?.selectSavePath
+  const pick = window.stardustDesktop?.selectSavePath
 
   if (!pick) {
     return null
@@ -189,7 +189,7 @@ export async function runExportProfileFlow(profile?: string): Promise<null | str
 /** Pick an archive and import it as a new profile; lands the user in it on a
  *  fresh chat. Returns the new profile name, or null when cancelled/failed. */
 export async function runImportProfileFlow(): Promise<null | string> {
-  const paths = await window.hermesDesktop?.selectPaths?.({
+  const paths = await window.stardustDesktop?.selectPaths?.({
     title: translateNow('profiles.importProfile'),
     multiple: false,
     filters: ARCHIVE_FILTERS

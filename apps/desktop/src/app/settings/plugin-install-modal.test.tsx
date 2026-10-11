@@ -51,7 +51,7 @@ beforeEach(() => {
   $gatewayState.set('idle')
   $activeGatewayProfile.set('default')
   probePluginRepo.mockResolvedValue({ ok: true, agent: true, desktop: true, warnings: [] })
-  vi.stubGlobal('hermesDesktop', { probePluginRepo, installDesktopPlugin })
+  vi.stubGlobal('stardustDesktop', { probePluginRepo, installDesktopPlugin })
 })
 afterEach(() => {
   cleanup()

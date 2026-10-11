@@ -35,7 +35,7 @@ const { hostMock } = vi.hoisted(() => ({
   }
 }))
 
-vi.mock('@hermes/plugin-sdk', () => ({ host: hostMock }))
+vi.mock('@stardust/plugin-sdk', () => ({ host: hostMock }))
 
 const MOXIE_ROUTE: ProfileRoute = {
   connectionId: 'cloud-abc',

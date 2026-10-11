@@ -1,7 +1,7 @@
 import { Box, type ScrollBoxHandle, stringWidth, Text } from '@hermes/ink'
-import { compactNumber } from '@hermes/shared/format'
-import type { Usage } from '@hermes/shared/gateway-events'
 import { useStore } from '@nanostores/react'
+import { compactNumber } from '@stardust/shared/format'
+import type { Usage } from '@stardust/shared/gateway-events'
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 

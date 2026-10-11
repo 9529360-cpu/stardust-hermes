@@ -7,7 +7,7 @@
  * drives the two doors, startBotRelay / stopBotRelay.
  */
 
-import { host, LruCache } from '@hermes/plugin-sdk'
+import { host, LruCache } from '@stardust/plugin-sdk'
 
 import { botHandle, clearBotAttention, noteBotAttention } from './data'
 import type { ProfileRoute, RosterRow } from './types'

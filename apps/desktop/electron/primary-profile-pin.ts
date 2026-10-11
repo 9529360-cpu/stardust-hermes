@@ -5,7 +5,7 @@
  *
  *   - the stored preference (active-profile.json) — the profile Desktop should
  *     boot into on the NEXT launch. The rail's live workspace switch rewrites
- *     it via `hermes:profile:remember` without re-homing the primary.
+ *     it via `stardust:profile:remember` without re-homing the primary.
  *   - the profile the live primary child was actually spawned with.
  *
  * Routing (`resolveProfileBackendRoute`, `ensureBackend`, the pool) must use

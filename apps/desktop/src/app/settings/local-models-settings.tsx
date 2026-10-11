@@ -974,7 +974,7 @@ function BrowseSection({ onChanged }: { onChanged: () => void }) {
   )
 
   const sideload = useCallback(() => {
-    window.hermesDesktop
+    window.stardustDesktop
       .selectPaths({ filters: [{ extensions: ['gguf'], name: 'GGUF models' }], title: copy.sideloadTitle })
       .then(paths => {
         if (!paths.length) {

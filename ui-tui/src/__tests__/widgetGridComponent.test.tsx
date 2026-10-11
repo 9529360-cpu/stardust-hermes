@@ -1,7 +1,7 @@
 import { PassThrough } from 'stream'
 
 import { renderSync, Text } from '@hermes/ink'
-import { stripAnsi } from '@hermes/shared/ansi'
+import { stripAnsi } from '@stardust/shared/ansi'
 import React, { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 

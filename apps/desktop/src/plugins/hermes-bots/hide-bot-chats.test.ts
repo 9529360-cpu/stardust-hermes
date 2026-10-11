@@ -46,7 +46,7 @@ const { groupChats, hostMock, lastRoster, requestForBotMock } = vi.hoisted(() =>
   requestForBotMock: vi.fn()
 }))
 
-vi.mock('@hermes/plugin-sdk', () => ({ host: hostMock }))
+vi.mock('@stardust/plugin-sdk', () => ({ host: hostMock }))
 
 vi.mock('./canonical-chat', () => ({ PROFILE_SESSION_LIST_LIMIT: 200 }))
 

@@ -623,7 +623,7 @@ test('pathWithGlobalRemoteProfile preserves cross-profile selectors when transla
   )
 })
 
-// --- translateSelfProfileQuery (registry SSH-scoped hermes:api contract) ---
+// --- translateSelfProfileQuery (registry SSH-scoped stardust:api contract) ---
 
 test('translateSelfProfileQuery rewrites the self-profile filter into the backend namespace', () => {
   assert.equal(

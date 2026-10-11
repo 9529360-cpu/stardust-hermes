@@ -59,7 +59,7 @@ test('environment URL without its token keeps the existing error', () => {
         env: { url: 'https://env.test' },
         registry: registry('local', [])
       }),
-    /HERMES_DESKTOP_REMOTE_TOKEN is not/
+    /STARDUST_DESKTOP_REMOTE_TOKEN is not/
   )
 })
 

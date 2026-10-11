@@ -264,7 +264,7 @@ def _stage_entries(extracted: str, entries: list[str], project_root: str) -> lis
             # The source ZIP lacks apps/desktop/release/ (the BUILT desktop app); swapping `apps` without
             # it deletes the build and breaks the shortcut. Graft the live release dir in BEFORE the swap.
             # #70337/#87331: the GitHub source ZIP contains only source — apps/desktop/release/ (the BUILT
-            # desktop app, win-unpacked/ Hermes.exe) exists only in the LIVE tree. Graft the live release
+            # desktop app, win-unpacked/ Stardust.exe) exists only in the LIVE tree. Graft the live release
             # dir into the staged copy BEFORE the swap so the commit preserves it atomically.
             if item == "apps":
                 live_release = os.path.join(dst, "desktop", "release")

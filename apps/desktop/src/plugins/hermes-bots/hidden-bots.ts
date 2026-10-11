@@ -7,7 +7,7 @@
  * reconciliation all read these and none of them owns the state.
  */
 
-import { atom } from '@hermes/plugin-sdk'
+import { atom } from '@stardust/plugin-sdk'
 
 import { $selectedBot } from './bot-state'
 import { $botMeta, $lastRoster, botSelectionKey, isDefaultBot } from './data'

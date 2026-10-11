@@ -1,16 +1,16 @@
-import type { UsageModelData } from '@hermes/shared/billing'
+import type { UsageModelData } from '@stardust/shared/billing'
 import type {
   GatewayEvent,
   GatewayEventName,
   InflightTurn,
   TranscriptMessage,
   Usage
-} from '@hermes/shared/gateway-events'
-import type { HermesSkin } from '@hermes/shared/skin'
+} from '@stardust/shared/gateway-events'
+import type { HermesSkin } from '@stardust/shared/skin'
 
 import type { SessionInfo, SlashCategory } from './types.js'
 
-/** The cross-surface skin contract (canonical shape in `@hermes/shared`).
+/** The cross-surface skin contract (canonical shape in `@stardust/shared`).
  *  Includes the paired light_colors/dark_colors overlays from #20379. */
 export type GatewaySkin = HermesSkin
 
@@ -50,7 +50,7 @@ export interface SlashExecResponse {
 
 // ── Remote Spending (Phase 2b) ───────────────────────────────────────
 
-// Wire shapes now live in @hermes/shared for reuse by TypeScript clients.
+// Wire shapes now live in @stardust/shared for reuse by TypeScript clients.
 export type {
   BillingAutoReload,
   BillingBlock,
@@ -67,7 +67,7 @@ export type {
   SubscriptionUpgradeResponse,
   UsageBarData,
   UsageModelData
-} from '@hermes/shared/billing'
+} from '@stardust/shared/billing'
 
 // ── Config ───────────────────────────────────────────────────────────
 

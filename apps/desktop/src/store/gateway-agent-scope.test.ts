@@ -54,7 +54,7 @@ interface DesktopStub {
 }
 
 function installDesktop(stub: DesktopStub): void {
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = stub
+  ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = stub
 }
 
 function makePrimary(): { connectionState: string } {
@@ -88,7 +88,7 @@ beforeEach(() => {
 afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
 })
 
 describe('registry-agent scope eviction (activeGateway must never silently hit the primary)', () => {

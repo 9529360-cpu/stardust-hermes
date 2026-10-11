@@ -45,7 +45,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'remote' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      stardustDesktop: {
         onPreviewFileChanged,
         watchPreviewFile
       }
@@ -209,10 +209,10 @@ describe('PreviewPane console state', () => {
       })
     })
 
-    const previousDesktop = window.hermesDesktop
+    const previousDesktop = window.stardustDesktop
     let captureCount = 0
 
-    window.hermesDesktop = {
+    window.stardustDesktop = {
       ...previousDesktop,
       capturePreview: vi.fn(async () => {
         captureCount += 1
@@ -267,7 +267,7 @@ describe('PreviewPane console state', () => {
     })
     await waitFor(() => expect(rendered.queryByRole('form', { name: 'Comment 2' })).toBeNull())
     expect(rendered.queryByRole('button', { name: 'Add 1 comment' })).toBeNull()
-    window.hermesDesktop = previousDesktop
+    window.stardustDesktop = previousDesktop
   })
 
   // The webview always runs on THIS machine, so a remote agent's localhost is
@@ -459,7 +459,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      stardustDesktop: {
         readFileDataUrl
       }
     })
@@ -522,7 +522,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      stardustDesktop: {
         readFileDataUrl
       }
     })
@@ -559,7 +559,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      stardustDesktop: {
         readFileDataUrl
       }
     })
@@ -600,7 +600,7 @@ describe('PreviewPane console state', () => {
     $connection.set({ mode: 'local' } as never)
     vi.stubGlobal('window', {
       ...window,
-      hermesDesktop: {
+      stardustDesktop: {
         api,
         readFileDataUrl
       }

@@ -1,4 +1,4 @@
-import type { ModelOptionProvider } from '@hermes/shared'
+import type { ModelOptionProvider } from '@stardust/shared'
 import { describe, expect, it } from 'vitest'
 
 import {

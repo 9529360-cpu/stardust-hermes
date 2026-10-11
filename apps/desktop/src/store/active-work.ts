@@ -37,6 +37,6 @@ if (typeof window !== 'undefined') {
     }
 
     lastSent = next
-    window.hermesDesktop?.setActiveWork?.(work)
+    window.stardustDesktop?.setActiveWork?.(work)
   })
 }

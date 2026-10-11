@@ -8,13 +8,13 @@
 #
 #   INSTALL   - downloads the production Hermes-Setup.exe from the website,
 #               launches it HEADED, and AutoHotkey clicks Install, waits,
-#               then clicks Launch. The real Electron Hermes.exe must appear.
+#               then clicks Launch. The real Electron Stardust.exe must appear.
 #               The exe runs EXACTLY as shipped against serve.git, whose
 #               `main` is parked at OLD (-InstallRef, default: the newest
 #               release tag) -- so the install lands on OLD the same way a
 #               user's install landed on whatever main served that day.
 #   UPDATE    - OLD -> HEAD through the route selected by -Route:
-#                 desktop    (implemented) launch the installed Hermes.exe
+#                 desktop    (implemented) launch the installed Stardust.exe
 #                            under Playwright's Electron driver and CLICK
 #                            Settings -> About -> "Update now". The
 #                            production hand-off chain runs untouched:
@@ -278,8 +278,8 @@ function Get-InstalledHead {
 
 function Get-DesktopExe {
     foreach ($c in @(
-        (Join-Path $InstallDir "apps\desktop\release\win-unpacked\Hermes.exe"),
-        (Join-Path $InstallDir "apps\desktop\release\win-arm64-unpacked\Hermes.exe")
+        (Join-Path $InstallDir "apps\desktop\release\win-unpacked\Stardust.exe"),
+        (Join-Path $InstallDir "apps\desktop\release\win-arm64-unpacked\Stardust.exe")
     )) {
         if (Test-Path -LiteralPath $c) { return $c }
     }
@@ -505,13 +505,13 @@ function Stop-DesktopRecorder($proc, [string]$OutDir) {
 
 function Stop-HermesAppProcesses([string]$Label) {
     # Close the desktop app the blunt way between phases (a user quitting).
-    # Only Hermes.exe (Electron) -- never hermes.exe (the venv CLI shim).
-    $procs = @(Get-Process -Name "Hermes" -ErrorAction SilentlyContinue)
+    # Only Stardust.exe (Electron) -- never hermes.exe (the venv CLI shim).
+    $procs = @(Get-Process -Name "Stardust" -ErrorAction SilentlyContinue)
     foreach ($p in $procs) {
         try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch {}
     }
     if ($procs.Count -gt 0) {
-        Write-Host "  [$Label] stopped $($procs.Count) Hermes.exe process(es)"
+        Write-Host "  [$Label] stopped $($procs.Count) Stardust.exe process(es)"
         Start-Sleep -Seconds 3
     }
 }
@@ -645,7 +645,7 @@ function Invoke-PhaseInstallGui {
         $installer = Start-Process -FilePath $setupExe -PassThru
         Write-Host "  Hermes-Setup.exe launched (pid $($installer.Id))"
 
-        # Drive it: Install click -> wait -> Launch click -> Hermes.exe window.
+        # Drive it: Install click -> wait -> Launch click -> Stardust.exe window.
         # Arg 3 lets the AHK script use the installer's own log as the
         # install-finished fallback signal.
         $ahk = Start-Process -FilePath $ahkExe `
@@ -666,7 +666,7 @@ function Invoke-PhaseInstallGui {
 
         # The Launch hand-off under test: the app the installer spawned must
         # actually be running.
-        Assert-True ($null -ne (Get-Process -Name "Hermes" -ErrorAction SilentlyContinue)) "Hermes.exe process is running (installer Launch hand-off worked)"
+        Assert-True ($null -ne (Get-Process -Name "Stardust" -ErrorAction SilentlyContinue)) "Stardust.exe process is running (installer Launch hand-off worked)"
 
         # Installer should have exited after Launch.
         if (-not $installer.HasExited) {
@@ -698,7 +698,7 @@ function Invoke-PhaseInstallGui {
         Assert-True ($installedSha -ne $state.current) "installed checkout differs from HEAD (an update is genuinely available)"
     }
     Test-HermesRuns "post-$Mode-gui"
-    Assert-True ($null -ne (Get-DesktopExe)) "packaged Desktop Hermes.exe exists"
+    Assert-True ($null -ne (Get-DesktopExe)) "packaged Desktop Stardust.exe exists"
 
     # Seed a provider so the update leg meets the ready app shell, not the
     # onboarding overlay (an updating user has a configured provider).
@@ -725,7 +725,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
     Write-Host "  serve.git main advanced to $TargetSha"
 
     $desktopExe = Get-DesktopExe
-    Assert-True ($null -ne $desktopExe) "packaged Hermes.exe present before update"
+    Assert-True ($null -ne $desktopExe) "packaged Stardust.exe present before update"
 
     $resultPath = Join-Path $HermesHome ".hermes-update-result.json"
     $markerPath = Join-Path $HermesHome ".hermes-update-in-progress"
@@ -834,15 +834,15 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
 
         Assert-True ((Get-InstalledHead) -eq $TargetSha) "checkout landed on target commit"
         Test-HermesRuns "post-update"
-        Assert-True ($null -ne (Get-DesktopExe)) "Hermes.exe still present after update"
+        Assert-True ($null -ne (Get-DesktopExe)) "Stardust.exe still present after update"
 
         # The production hand-off relaunches the desktop (RelaunchExe).
         # A relaunched window is the user-visible proof the update loop closed.
-        Write-Host "  waiting for the relaunched Hermes.exe ..."
+        Write-Host "  waiting for the relaunched Stardust.exe ..."
         $rDeadline = (Get-Date).AddMinutes(5)
         $relaunched = $null
         while ((Get-Date) -lt $rDeadline) {
-            $relaunched = Get-Process -Name "Hermes" -ErrorAction SilentlyContinue
+            $relaunched = Get-Process -Name "Stardust" -ErrorAction SilentlyContinue
             if ($relaunched) { break }
             Start-Sleep -Seconds 5
         }
@@ -852,7 +852,7 @@ function Invoke-GuiUpdateDesktopRoute([string]$TargetSha) {
         # captures IT, not whatever else is on top (the full-desktop grab is
         # otherwise at the mercy of z-order -- an earlier run caught VS Code).
         try {
-            $mainProc = Get-Process -Name "Hermes" -ErrorAction SilentlyContinue |
+            $mainProc = Get-Process -Name "Stardust" -ErrorAction SilentlyContinue |
                 Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
             if ($mainProc) {
                 Add-Type -Namespace HdE2E -Name Win -MemberDefinition @'

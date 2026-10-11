@@ -34,7 +34,7 @@ import { $activeGatewayProfile, $profileScope } from '@/store/profile'
 import { $connection } from '@/store/session'
 import { runGatewayRestart } from '@/store/system-actions'
 
-type ProbeResult = Awaited<ReturnType<NonNullable<NonNullable<Window['hermesDesktop']>['probePluginRepo']>>>
+type ProbeResult = Awaited<ReturnType<NonNullable<NonNullable<Window['stardustDesktop']>['probePluginRepo']>>>
 
 type ProbePhase = 'idle' | 'probing' | 'ready' | 'error'
 
@@ -99,7 +99,7 @@ export function PluginInstallModal() {
       setEnableAgent(payload.enable ?? true)
       setForceReinstall(payload.force ?? false)
 
-      const probeFn = window.hermesDesktop?.probePluginRepo
+      const probeFn = window.stardustDesktop?.probePluginRepo
 
       if (!probeFn) {
         if (token !== probeToken.current) {
@@ -247,7 +247,7 @@ export function PluginInstallModal() {
           // the package folder Electron just watched land. Materialise it from
           // there (one source of truth, follows updates/uninstall) instead of
           // cloning a second, standalone copy under another folder name.
-          const touched = (await window.hermesDesktop?.reconcileDesktopPlugins?.()) ?? []
+          const touched = (await window.stardustDesktop?.reconcileDesktopPlugins?.()) ?? []
 
           successes.push(m.desktopSuccess(probe.agentName ?? request.repo))
 
@@ -255,7 +255,7 @@ export function PluginInstallModal() {
             await discoverRuntimePlugins()
           }
         } else {
-          const installFn = window.hermesDesktop?.installDesktopPlugin
+          const installFn = window.stardustDesktop?.installDesktopPlugin
 
           if (!installFn) {
             errors.push(m.desktopUnavailable)

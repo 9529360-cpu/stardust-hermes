@@ -1,7 +1,7 @@
 /**
  * after-pack.mjs — electron-builder afterPack hook.
  *
- * Stamps the Hermes icon + identity onto the packed Windows Hermes.exe via
+ * Stamps the Hermes icon + identity onto the packed Windows Stardust.exe via
  * rcedit (delegated to set-exe-identity.mjs). This runs for EVERY packed build
  * — first install, `hermes desktop`, the installer's --update rebuild, and a
  * dev's manual `npm run pack` — so the branded exe can never silently revert
@@ -28,7 +28,7 @@ export default async function afterPack(context) {
     return
   }
 
-  const productName = context.packager?.appInfo?.productFilename || 'Hermes'
+  const productName = context.packager?.appInfo?.productFilename || 'Stardust'
   const exe = path.join(context.appOutDir, `${productName}.exe`)
   const desktopRoot = path.resolve(import.meta.dirname, '..')
 
@@ -36,6 +36,6 @@ export default async function afterPack(context) {
     await stampExeIdentity(exe, desktopRoot)
   } catch (err) {
     // Never fail the build over a cosmetic stamp.
-    console.warn(`[after-pack] exe identity stamp failed (${err.message}); Hermes.exe keeps the stock Electron icon`)
+    console.warn(`[after-pack] exe identity stamp failed (${err.message}); Stardust.exe keeps the stock Electron icon`)
   }
 }

@@ -65,7 +65,7 @@ const {
 } = await import('./gateway')
 
 function installDesktop(getConnection: ReturnType<typeof vi.fn>): void {
-  ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+  ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
     getConnection,
     touchBackend: vi.fn(async () => undefined)
   }
@@ -88,7 +88,7 @@ beforeEach(async () => {
 afterEach(() => {
   closeSecondaryGateways()
   vi.clearAllMocks()
-  delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+  delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
 })
 
 describe('requestGatewayForProfile', () => {
@@ -207,7 +207,7 @@ describe('requestGatewayForAgent', () => {
     setPrimaryGateway(primary as never, 'default')
     setPrimaryGatewayConnection({ connectionId: 'remote-primary' })
 
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(),
       getConnectionFor,
       getGatewayWsUrlFor: vi.fn(async () => ({ ok: true as const, wsUrl: 'wss://remote.invalid/api/ws' })),
@@ -245,7 +245,7 @@ describe('requestGatewayForAgent', () => {
     setPrimaryGateway(primary as never, 'default')
     setPrimaryGatewayConnection({ connectionId: 'remote-primary' })
 
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(),
       getConnectionFor,
       getGatewayWsUrlFor: vi.fn(async () => ({ ok: true as const, wsUrl: 'wss://remote.invalid/api/ws' })),
@@ -278,7 +278,7 @@ describe('requestGatewayForAgent', () => {
     }))
 
     setPrimaryGateway(primary as never, 'default')
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection,
       getConnectionFor,
       getGatewayWsUrlFor,
@@ -321,7 +321,7 @@ describe('requestGatewayForAgent', () => {
     }))
 
     setPrimaryGateway(primary as never, 'default')
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection,
       getConnectionFor,
       getGatewayWsUrlFor: vi.fn(async ({ connectionId, profile }) => ({
@@ -349,7 +349,7 @@ describe('requestGatewayForAgent', () => {
 
     setPrimaryGateway(primary as never, 'default')
     configureGatewayRegistry({ onActiveConnectionInvalidated, onEvent: vi.fn() })
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(),
       getConnectionFor,
       getGatewayWsUrlFor: vi.fn(async ({ connectionId, profile }) => ({
@@ -378,7 +378,7 @@ describe('requestGatewayForAgent', () => {
 
     setPrimaryGateway(primary as never, 'pinned')
     configureGatewayRegistry({ onActiveConnectionChanged, onActiveConnectionInvalidated, onEvent: vi.fn() })
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(),
       getConnectionFor: vi.fn(async ({ connectionId, profile }) => ({ connectionId, port: 5151, profile })),
       getGatewayWsUrlFor: vi.fn(async ({ connectionId, profile }) => ({
@@ -415,7 +415,7 @@ describe('requestGatewayForAgent', () => {
 
     setPrimaryGateway(primary as never, 'default')
     configureGatewayRegistry({ onActiveConnectionChanged, onEvent: vi.fn() })
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(async profile => ({ port: 4242, profile })),
       getConnectionFor: vi.fn(async ({ connectionId, profile }) => ({ connectionId, port: 5151, profile })),
       getGatewayWsUrlFor: vi.fn(async ({ connectionId, profile }) => ({
@@ -449,7 +449,7 @@ describe('requestGatewayForAgent', () => {
 
     setPrimaryGateway(primary as never, 'default')
     configureGatewayRegistry({ onActiveConnectionChanged, onEvent: vi.fn() })
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(async profile => ({ port: 4242, profile })),
       getConnectionFor: vi.fn(async ({ connectionId, profile }) => ({ connectionId, port: 5151, profile })),
       getGatewayWsUrlFor: vi.fn(async ({ connectionId, profile }) => ({
@@ -478,7 +478,7 @@ describe('requestGatewayForAgent', () => {
 
 describe('retainGatewayForAgent (#93602)', () => {
   function installRegistryDesktop() {
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(async (profile: null | string) => ({ port: 4242, profile, token: 't' })),
       getConnectionFor: vi.fn(async ({ connectionId, profile }) => ({ connectionId, port: 5151, profile })),
       getGatewayWsUrlFor: vi.fn(async ({ connectionId, profile }) => ({
@@ -576,7 +576,7 @@ describe('attached shared-remote group turns (#96493)', () => {
       sharedRemote: true
     }))
 
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(async (profile: null | string) => ({ port: 4242, profile, token: 't' })),
       getConnectionFor,
       getGatewayWsUrlFor: vi.fn(async ({ connectionId, profile }: { connectionId: string; profile: string }) => ({
@@ -620,7 +620,7 @@ describe('attached shared-remote group turns (#96493)', () => {
     const primary = makePrimary()
     setPrimaryGateway(primary as never, 'default')
     setPrimaryGatewayConnection({ connectionId: 'homelab' })
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(async (profile: null | string) => ({ port: 4242, profile, token: 't' })),
       getConnectionFor: vi.fn(async ({ connectionId, profile }: { connectionId: string; profile: string }) => ({
         connectionId,
@@ -646,7 +646,7 @@ describe('attached shared-remote group turns (#96493)', () => {
     const primary = makePrimary()
     setPrimaryGateway(primary as never, 'default')
     setPrimaryGatewayConnection({ connectionId: 'homelab' })
-    ;(window as unknown as { hermesDesktop: unknown }).hermesDesktop = {
+    ;(window as unknown as { stardustDesktop: unknown }).stardustDesktop = {
       getConnection: vi.fn(async (profile: null | string) => ({ port: 4242, profile, token: 't' })),
       getConnectionFor: vi.fn(async () => {
         throw new Error('Timed out connecting to profile "voter"')

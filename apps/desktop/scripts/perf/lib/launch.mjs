@@ -242,12 +242,12 @@ export async function startIsolatedInstance({
       // remote-debugging-port switch AFTER argv, so on a non-default --port the
       // Chromium flag below loses and the instance binds 9222 anyway. The env
       // override is the supported knob — set it so --port actually wins.
-      HERMES_DESKTOP_CDP_PORT: String(port),
+      STARDUST_DESKTOP_CDP_PORT: String(port),
       XCURSOR_SIZE: '24'
     }
 
     if (devUrl) {
-      env.HERMES_DESKTOP_DEV_SERVER = devUrl
+      env.STARDUST_DESKTOP_DEV_SERVER = devUrl
     }
 
     const spawnAt = Date.now()

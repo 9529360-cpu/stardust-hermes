@@ -26,13 +26,13 @@ function failBoot() {
 }
 
 function stubDesktop(config: Record<string, unknown>, overrides: Record<string, unknown> = {}) {
-  const original = window.hermesDesktop
-  Object.defineProperty(window, 'hermesDesktop', {
+  const original = window.stardustDesktop
+  Object.defineProperty(window, 'stardustDesktop', {
     configurable: true,
     value: { getRecentLogs: async () => ({ lines: [] }), getConnectionConfig: async () => config, ...overrides }
   })
 
-  return () => Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: original })
+  return () => Object.defineProperty(window, 'stardustDesktop', { configurable: true, value: original })
 }
 
 const remoteToken = {
@@ -179,7 +179,7 @@ describe('BootFailureOverlay', () => {
 
       await waitFor(() => expect(nativeLogin).toHaveBeenCalledWith(gatewayUrl))
       expect(logout).toHaveBeenCalledWith(gatewayUrl)
-      expect((window.hermesDesktop as any).cloud).toBeUndefined()
+      expect((window.stardustDesktop as any).cloud).toBeUndefined()
     } finally {
       restore()
     }

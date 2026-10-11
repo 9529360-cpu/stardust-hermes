@@ -1323,10 +1323,10 @@ async function runDevLaunch(): Promise<void> {
   const env: Record<string, string> = {
     ...process.env,
     HERMES_HOME: sandbox.hermesHome,
-    HERMES_DESKTOP_USER_DATA_DIR: sandbox.userDataDir,
+    STARDUST_DESKTOP_USER_DATA_DIR: sandbox.userDataDir,
     HERMES_DESKTOP_IGNORE_EXISTING: '1',
     HERMES_DESKTOP_HERMES_ROOT: repoRoot,
-    HERMES_DESKTOP_APP_NAME: `HermesDevMock-${Date.now()}`,
+    STARDUST_DESKTOP_APP_NAME: `HermesDevMock-${Date.now()}`,
   }
 
   console.log('Launching Electron...')

@@ -21,6 +21,6 @@ export function setDisableF12(on: boolean): void {
 if (typeof window !== 'undefined') {
   $disableF12.subscribe(on => {
     persistBoolean(KEY, on)
-    window.hermesDesktop?.setDisableF12?.(on)
+    window.stardustDesktop?.setDisableF12?.(on)
   })
 }

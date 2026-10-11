@@ -336,7 +336,7 @@ function collectDroppedPaths(t: DataTransfer): string[] {
     // Malformed in-app drag payload — fall through to OS files.
   }
 
-  const getPath = window.hermesDesktop?.getPathForFile
+  const getPath = window.stardustDesktop?.getPathForFile
 
   const addFile = (file: File | null) => {
     if (!file || !getPath) {
@@ -493,7 +493,7 @@ export function useTerminalSession({
   // eslint-disable-next-line no-restricted-syntax -- legitimate non-atom ref write (see eslint rule comment)
   useEffect(() => {
     const host = hostRef.current
-    const terminalApi = window.hermesDesktop?.terminal
+    const terminalApi = window.stardustDesktop?.terminal
 
     if (!host || !terminalApi) {
       setStatus('closed')
@@ -837,7 +837,7 @@ export function useTerminalSession({
         return false
       }
       void (async () => {
-        const text = (await window.hermesDesktop?.readClipboard?.()) ?? ''
+        const text = (await window.stardustDesktop?.readClipboard?.()) ?? ''
 
         if (text) {
           hasSessionActivityRef.current = true
@@ -1064,7 +1064,7 @@ export function useTerminalSession({
       }
 
       hasSessionActivityRef.current = true
-      void window.hermesDesktop?.terminal?.write(sessionId, `${command}\r`)
+      void window.stardustDesktop?.terminal?.write(sessionId, `${command}\r`)
       $terminalInjection.set(null)
       termRef.current?.focus()
     })

@@ -48,7 +48,7 @@ for (const lifecycleEvent of ['focus', 'navigation'] as const) {
       const zoomFile = path.join(sandbox.userDataDir, 'zoom-state.json')
       const savedLevel = () => JSON.parse(readFileSync(zoomFile, 'utf8')).zoomLevel as number
       await page.evaluate(() => {
-        const desktop = (window as unknown as { hermesDesktop: { zoom: { setPercent: (percent: number) => void } } }).hermesDesktop
+        const desktop = (window as unknown as { stardustDesktop: { zoom: { setPercent: (percent: number) => void } } }).stardustDesktop
         desktop.zoom.setPercent(90)
       })
       await expect.poll(savedLevel).toBeCloseTo(Math.log(0.9) / Math.log(1.2))

@@ -176,7 +176,7 @@ describe('extractDroppedFiles', () => {
 
   const stubBridge = (transfer: DataTransfer & { _pathByFile: Map<File, string> }) => {
     vi.stubGlobal('window', {
-      hermesDesktop: {
+      stardustDesktop: {
         getPathForFile: (file: File) => transfer._pathByFile.get(file) ?? ''
       }
     })
@@ -297,7 +297,7 @@ describe('attachmentPreviewDataUrl', () => {
     const readFileDataUrl = vi.fn(async () => LOCAL_PREVIEW)
     const api = vi.fn()
 
-    vi.stubGlobal('window', { hermesDesktop: { api, readFileDataUrl } })
+    vi.stubGlobal('window', { stardustDesktop: { api, readFileDataUrl } })
     $connection.set({ mode: 'remote' } as never)
 
     await expect(attachmentPreviewDataUrl('/Users/me/Pictures/pic.png')).resolves.toBe(LOCAL_PREVIEW)
@@ -319,7 +319,7 @@ describe('attachmentPreviewDataUrl', () => {
       throw new Error(`unexpected path ${path}`)
     })
 
-    vi.stubGlobal('window', { hermesDesktop: { api, readFileDataUrl } })
+    vi.stubGlobal('window', { stardustDesktop: { api, readFileDataUrl } })
     $connection.set({ mode: 'remote' } as never)
 
     await expect(attachmentPreviewDataUrl('/home/gateway/shot.png')).resolves.toBe(REMOTE_PREVIEW)
@@ -334,7 +334,7 @@ describe('attachmentPreviewDataUrl', () => {
 
     const api = vi.fn(async () => ({ dataUrl: REMOTE_PREVIEW }))
 
-    vi.stubGlobal('window', { hermesDesktop: { api, readFileDataUrl } })
+    vi.stubGlobal('window', { stardustDesktop: { api, readFileDataUrl } })
     $connection.set({ mode: 'remote' } as never)
 
     await expect(attachmentPreviewDataUrl('/home/gateway/shot.png')).resolves.toBe(REMOTE_PREVIEW)
@@ -343,7 +343,7 @@ describe('attachmentPreviewDataUrl', () => {
 
 describe('useComposerActions native image drops', () => {
   afterEach(() => {
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'stardustDesktop')
     vi.unstubAllGlobals()
     vi.clearAllMocks()
   })
@@ -371,7 +371,7 @@ describe('useComposerActions native image drops', () => {
 
     const add = vi.fn<(attachment: ComposerAttachment) => void>()
 
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: {
         readFileDataUrl,
@@ -426,7 +426,7 @@ describe('attachImagePath thumbnail separation', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
-    delete (window as unknown as { hermesDesktop?: unknown }).hermesDesktop
+    delete (window as unknown as { stardustDesktop?: unknown }).stardustDesktop
     $composerAttachments.set([])
     $connection.set(null)
   })
@@ -436,9 +436,9 @@ describe('attachImagePath thumbnail separation', () => {
 
     ;(
       window as unknown as {
-        hermesDesktop: { readFileDataUrl: typeof readFileDataUrl }
+        stardustDesktop: { readFileDataUrl: typeof readFileDataUrl }
       }
-    ).hermesDesktop = { readFileDataUrl }
+    ).stardustDesktop = { readFileDataUrl }
 
     let resolveBitmap!: (bitmap: { close: () => void; height: number; width: number }) => void
 
@@ -501,9 +501,9 @@ describe('attachImagePath thumbnail separation', () => {
 
     ;(
       window as unknown as {
-        hermesDesktop: { readFileDataUrl: typeof readFileDataUrl }
+        stardustDesktop: { readFileDataUrl: typeof readFileDataUrl }
       }
-    ).hermesDesktop = { readFileDataUrl }
+    ).stardustDesktop = { readFileDataUrl }
 
     let resolveBitmap!: (bitmap: { close: () => void; height: number; width: number }) => void
 
@@ -570,9 +570,9 @@ describe('attachImagePath thumbnail separation', () => {
 
     ;(
       window as unknown as {
-        hermesDesktop: { readFileDataUrl: typeof readFileDataUrl }
+        stardustDesktop: { readFileDataUrl: typeof readFileDataUrl }
       }
-    ).hermesDesktop = { readFileDataUrl }
+    ).stardustDesktop = { readFileDataUrl }
 
     let resolveBitmap!: (bitmap: { close: () => void; height: number; width: number }) => void
 
@@ -637,9 +637,9 @@ describe('attachImagePath thumbnail separation', () => {
 
     ;(
       window as unknown as {
-        hermesDesktop: { readFileDataUrl: typeof readFileDataUrl }
+        stardustDesktop: { readFileDataUrl: typeof readFileDataUrl }
       }
-    ).hermesDesktop = { readFileDataUrl }
+    ).stardustDesktop = { readFileDataUrl }
 
     // Exercise the real downscale path: 4000×3000 bitmap → 512×384 canvas.
     const drawImage = vi.fn()
@@ -700,9 +700,9 @@ describe('attachImagePath thumbnail separation', () => {
 
     ;(
       window as unknown as {
-        hermesDesktop: { readFileDataUrl: typeof readFileDataUrl }
+        stardustDesktop: { readFileDataUrl: typeof readFileDataUrl }
       }
-    ).hermesDesktop = { readFileDataUrl }
+    ).stardustDesktop = { readFileDataUrl }
 
     vi.stubGlobal(
       'fetch',
@@ -744,9 +744,9 @@ describe('attachImagePath thumbnail separation', () => {
 
     ;(
       window as unknown as {
-        hermesDesktop: { readFileDataUrl: typeof readFileDataUrl }
+        stardustDesktop: { readFileDataUrl: typeof readFileDataUrl }
       }
-    ).hermesDesktop = { readFileDataUrl }
+    ).stardustDesktop = { readFileDataUrl }
 
     const { result } = renderHook(() =>
       useComposerActions({ activeSessionId: null, currentCwd: '', requestGateway: vi.fn() })

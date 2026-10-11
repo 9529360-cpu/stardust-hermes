@@ -74,7 +74,7 @@ Backend resolution 继续按验证后的候选链工作：
 1. `HERMES_DESKTOP_HERMES_ROOT`
 2. 当前开发 checkout
 3. 已完成的 Stardust managed install
-4. `HERMES_DESKTOP_HERMES` 或 `hermes` on `PATH`
+4. `STARDUST_DESKTOP_HERMES` 或 `hermes` on `PATH`
 5. 可导入兼容运行时的 system Python
 6. Stardust first-launch bootstrap installer
 

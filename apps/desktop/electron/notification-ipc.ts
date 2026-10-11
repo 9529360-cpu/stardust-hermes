@@ -14,7 +14,7 @@ export function registerNativeNotifications({ getMainWindow, focusWindow }: Noti
   const isDuplicateNotification = createEventDeduper()
   const notifications = createNotificationRegistry()
 
-  ipcMain.handle('hermes:notify', (event, payload: HermesNotification) => {
+  ipcMain.handle('stardust:notify', (event, payload: HermesNotification) => {
     // The source renderer owns runtime bindings and plugin callbacks.
     const sourceWindow = BrowserWindow.fromWebContents(event.sender)
     const targetWindow = () => (sourceWindow && !sourceWindow.isDestroyed() ? sourceWindow : getMainWindow())
@@ -32,7 +32,7 @@ export function registerNativeNotifications({ getMainWindow, focusWindow }: Noti
     const icon = typeof payload?.icon === 'string' && payload.icon.trim() ? payload.icon.trim() : undefined
 
     const notification = new Notification({
-      title: payload?.title || 'Hermes',
+      title: payload?.title || 'Stardust',
       body: payload?.body || '',
       silent: Boolean(payload?.silent),
       ...(icon ? { icon } : {}),
@@ -51,11 +51,11 @@ export function registerNativeNotifications({ getMainWindow, focusWindow }: Noti
       const focusSessionId = payload?.focusSessionId || payload?.sessionId
 
       if (focusSessionId) {
-        window.webContents.send('hermes:focus-session', focusSessionId)
+        window.webContents.send('stardust:focus-session', focusSessionId)
       }
 
       if (payload?.activate || payload?.notifyId) {
-        window.webContents.send('hermes:notification-activate', {
+        window.webContents.send('stardust:notification-activate', {
           activate: payload?.activate,
           notifyId: window === sourceWindow ? payload?.notifyId : undefined,
           tag: payload?.tag
@@ -81,13 +81,13 @@ export function registerNativeNotifications({ getMainWindow, focusWindow }: Noti
           return
         }
 
-        window.webContents.send('hermes:notification-action', { sessionId: payload.sessionId, actionId: action.id })
+        window.webContents.send('stardust:notification-action', { sessionId: payload.sessionId, actionId: action.id })
 
         return
       }
 
       focusWindow(window)
-      window.webContents.send('hermes:notification-activate', {
+      window.webContents.send('stardust:notification-activate', {
         actionId: action.id,
         activate: action.activate || payload?.activate,
         notifyId: window === sourceWindow ? payload?.notifyId : undefined,

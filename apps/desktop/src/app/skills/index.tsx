@@ -1,5 +1,5 @@
-import { compactNumber } from '@hermes/shared'
 import { useStore } from '@nanostores/react'
+import { compactNumber } from '@stardust/shared'
 import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -347,8 +347,8 @@ export function SkillsView({
   // one gateway is registered. Only then is the (heavier) union agent roster
   // fetched to feed the selector — single-connection setups keep the exact
   // legacy profiles list. Both feature-detected for older Electron mains.
-  const registryBridge = window.hermesDesktop?.connections
-  const rosterBridge = window.hermesDesktop?.getAgentRoster
+  const registryBridge = window.stardustDesktop?.connections
+  const rosterBridge = window.stardustDesktop?.getAgentRoster
 
   const { data: registryData } = useQuery({
     queryKey: ['capabilities-connections-registry'],

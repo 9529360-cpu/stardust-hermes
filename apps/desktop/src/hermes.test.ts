@@ -49,7 +49,7 @@ describe('Hermes REST helpers', () => {
   beforeEach(() => {
     resetSidebarBatchCapability()
     api = vi.fn().mockResolvedValue(emptySessionsResponse)
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { api }
     })
@@ -59,7 +59,7 @@ describe('Hermes REST helpers', () => {
     setApiRequestConnection(null)
     setApiRequestProfile(null)
     vi.restoreAllMocks()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'stardustDesktop')
   })
 
   it('uses a longer timeout for the single-profile session list', async () => {
@@ -253,7 +253,7 @@ describe('Hermes REST helpers', () => {
         // The exact skew failure: Electron surfaces the backend catch-all.
         return Promise.reject(
           new Error(
-            'Error invoking remote method \'hermes:api\': Error: 404: {"detail":"No such API endpoint: /api/profiles/sessions/sidebar"}'
+            'Error invoking remote method \'stardust:api\': Error: 404: {"detail":"No such API endpoint: /api/profiles/sessions/sidebar"}'
           )
         )
       }
@@ -734,7 +734,7 @@ describe('pluginSocket', () => {
 
   beforeEach(() => {
     getConnection = vi.fn().mockResolvedValue(null)
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { api: vi.fn(), getConnection }
     })
@@ -742,7 +742,7 @@ describe('pluginSocket', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'stardustDesktop')
     setApiRequestProfile(null)
   })
 

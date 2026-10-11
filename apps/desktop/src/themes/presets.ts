@@ -18,7 +18,7 @@
  * re-derived. `nous-alt` is first-party — do not re-derive it from GitHub.
  */
 
-import { THEME_PRESET_PALETTES } from '@hermes/shared'
+import { THEME_PRESET_PALETTES } from '@stardust/shared'
 
 import type { DesktopTheme, DesktopThemeTypography } from './types'
 

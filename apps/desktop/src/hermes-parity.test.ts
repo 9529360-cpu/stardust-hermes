@@ -22,7 +22,7 @@ describe('Hermes REST parity helpers (hub / mcp / maintenance)', () => {
 
   beforeEach(() => {
     api = vi.fn().mockResolvedValue({})
-    Object.defineProperty(window, 'hermesDesktop', {
+    Object.defineProperty(window, 'stardustDesktop', {
       configurable: true,
       value: { api }
     })
@@ -30,7 +30,7 @@ describe('Hermes REST parity helpers (hub / mcp / maintenance)', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'stardustDesktop')
   })
 
   it('loads hub sources with a network-tolerant timeout', async () => {

@@ -11,11 +11,11 @@ const api = vi.fn().mockResolvedValue({ ok: true })
 describe('pairing requests carry the active profile', () => {
   beforeEach(() => {
     api.mockClear()
-    Object.defineProperty(window, 'hermesDesktop', { configurable: true, value: { api } })
+    Object.defineProperty(window, 'stardustDesktop', { configurable: true, value: { api } })
   })
 
   afterEach(() => {
-    Reflect.deleteProperty(window, 'hermesDesktop')
+    Reflect.deleteProperty(window, 'stardustDesktop')
   })
 
   it('scopes approve and revoke by body, and the listing by query', async () => {

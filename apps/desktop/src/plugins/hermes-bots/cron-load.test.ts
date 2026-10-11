@@ -18,14 +18,14 @@
  * routing layer (route resolution, error coercion) runs.
  */
 
-import type * as HermesSdk from '@hermes/plugin-sdk'
+import type * as HermesSdk from '@stardust/plugin-sdk'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RoutineJob } from './types'
 
 const request = vi.fn()
 
-vi.mock('@hermes/plugin-sdk', async importOriginal => {
+vi.mock('@stardust/plugin-sdk', async importOriginal => {
   const sdk = await importOriginal<typeof HermesSdk>()
 
   return { ...sdk, host: { ...sdk.host, request } }

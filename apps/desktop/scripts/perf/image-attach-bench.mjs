@@ -58,7 +58,7 @@ const time = fn => {
 // --- the stages, transcribed from the shipped code paths -------------------
 
 // electron/hardening.ts :: readFileDataUrlForIpc — main-process side of
-// window.hermesDesktop.readFileDataUrl.
+// window.stardustDesktop.readFileDataUrl.
 const readFileDataUrl = path => {
   const data = readFileSync(path)
 

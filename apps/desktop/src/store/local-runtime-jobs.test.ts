@@ -62,7 +62,7 @@ beforeEach(() => {
   setApiRequestProfile('default')
   $activeGatewayRoute.set('default')
   $localRuntimeJobs.set([])
-  window.hermesDesktop = { api } as never
+  window.stardustDesktop = { api } as never
 })
 afterEach(async () => {
   api.mockResolvedValue({ jobs: [] })

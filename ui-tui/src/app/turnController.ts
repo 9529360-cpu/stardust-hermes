@@ -1,4 +1,4 @@
-import type { MessageCompletePayload, SubagentEventPayload } from '@hermes/shared/gateway-events'
+import type { MessageCompletePayload, SubagentEventPayload } from '@stardust/shared/gateway-events'
 
 import {
   REASONING_PULSE_MS,

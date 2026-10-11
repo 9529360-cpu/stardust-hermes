@@ -1,4 +1,4 @@
-import type { WorkItem } from '@hermes/shared'
+import type { WorkItem } from '@stardust/shared'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, expect, it, vi } from 'vitest'

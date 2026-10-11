@@ -3,7 +3,7 @@
  * build time. The pipeline every non-bundled plugin takes:
  *
  *   source (plain ESM js) -> [integrity check] -> bare-specifier rewrite
- *   (`@hermes/plugin-sdk` / `react*` -> live shim blobs, see sdk/runtime.ts)
+ *   (`@stardust/plugin-sdk` / `react*` -> live shim blobs, see sdk/runtime.ts)
  *   -> blob `import()` -> validate default HermesPlugin -> register(ctx)
  *
  * Loading the same plugin id again disposes the previous registrations first
@@ -66,7 +66,7 @@ const loaded = new Map<string, (() => void)[]>()
 // literal or comment (e.g. `notify('react')`) is never touched.
 const importSpecifierRe = () => /(from\s*|import\s*\(\s*|import\s+)(['"])([^'"]+)\2/g
 
-/** Rewrite ONLY mapped import specifiers (@hermes/plugin-sdk, react*) to their
+/** Rewrite ONLY mapped import specifiers (@stardust/plugin-sdk, react*) to their
  *  live shim blob URLs — never occurrences inside strings/comments. */
 function rewriteSpecifiers(source: string): string {
   const map = sdkImportMap()
@@ -134,7 +134,7 @@ export async function loadRuntimePlugin(
     if (unsupported.length > 0) {
       throw new Error(
         `unsupported import${unsupported.length > 1 ? 's' : ''}: ${unsupported.join(', ')} — ` +
-          `runtime plugins may only import @hermes/plugin-sdk and react`
+          `runtime plugins may only import @stardust/plugin-sdk and react`
       )
     }
 
@@ -258,7 +258,7 @@ interface DiskRoot {
  *  backend's hermes_home — #66899). Resolving it also runs Electron's
  *  reconcile, so unified packages' desktop halves are current before we scan. */
 async function diskRoots(): Promise<DiskRoot[]> {
-  const root = await window.hermesDesktop?.desktopPluginsRoot?.()
+  const root = await window.stardustDesktop?.desktopPluginsRoot?.()
 
   return root ? [{ dir: root, entrySegments: ['plugin.js'] }] : []
 }
@@ -275,7 +275,7 @@ interface PackageMarker {
   package: string
 }
 
-async function readPackageMarker(desktop: Window['hermesDesktop'], folder: string): Promise<null | PackageMarker> {
+async function readPackageMarker(desktop: Window['stardustDesktop'], folder: string): Promise<null | PackageMarker> {
   try {
     const { entries } = await desktop.readDir(folder)
     const marker = entries.find(entry => entry.name === PACKAGE_MARKER && !entry.isDirectory)
@@ -355,7 +355,7 @@ class PluginSourceOversizeError extends Error {}
  *  the preview read, which silently truncates at 512 KiB — there the read
  *  fails loudly instead of handing a partial file to the evaluator. */
 async function readPluginSourceText(file: string): Promise<string> {
-  const desktop = window.hermesDesktop!
+  const desktop = window.stardustDesktop!
 
   if (desktop.readPluginSource) {
     return (await desktop.readPluginSource(file)).text
@@ -481,7 +481,7 @@ async function loadDiskPlugin(entry: DiskPlugin, trustedNow = false): Promise<bo
 }
 
 async function resolveDiskPluginEntry(
-  desktop: Window['hermesDesktop'],
+  desktop: Window['stardustDesktop'],
   folderPath: string,
   segments: readonly string[]
 ): Promise<string | null> {
@@ -512,7 +512,7 @@ async function resolveDiskPluginEntry(
 }
 
 async function scanDiskPlugins(): Promise<void> {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   // Re-entrancy guard: the 5s poll must not overlap a slow in-flight scan
   // (reads/loads can exceed the interval).
@@ -626,7 +626,7 @@ export const discoverRuntimePlugins = scanDiskPlugins
 /** Start the self-maintaining disk door: initial scan, per-file hot reload,
  *  fs-watched folder reconciliation (poll fallback on older shells). Idempotent. */
 export function watchRuntimePlugins(): void {
-  const desktop = window.hermesDesktop
+  const desktop = window.stardustDesktop
 
   if (watching || !desktop) {
     return

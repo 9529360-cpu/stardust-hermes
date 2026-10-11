@@ -1,4 +1,4 @@
-import type { GatewayEvent } from '@hermes/shared'
+import type { GatewayEvent } from '@stardust/shared'
 import { useCallback, useEffect, useRef } from 'react'
 
 import { revealTreePane } from '@/components/pane-shell/tree/store'
