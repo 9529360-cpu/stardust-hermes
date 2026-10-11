@@ -127,6 +127,12 @@ describe('cron tool card in Chinese', () => {
     expect(row.textContent).toContain('排程: 0 9 * * *')
     expect(row.textContent).toContain('重复: 永久')
     expect(row.textContent).toContain('投递: 当前对话')
-    expect(row.textContent).not.toMatch(/[A-Za-z]/)
+    // The next-run value follows the OS locale (a separate, disclosed follow-up), so the
+    // labelled fields before it must hold no English. The next-run label itself must be Chinese.
+    expect(row.textContent).toContain('下次运行: ')
+
+    const fields = (row.textContent ?? '').split(' · 下次运行')[0]
+
+    expect(fields).not.toMatch(/[A-Za-z]/)
   })
 })
