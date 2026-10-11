@@ -126,6 +126,10 @@ jobs:
           fi
         env:
           CI: 'true'
+          # The suite was written on a zh-CN machine, where the app follows the OS
+          # language. The runner is English, so run the suite in zh-CN too.
+          LANG: zh_CN.UTF-8
+          LC_ALL: zh_CN.UTF-8
           # Some specs need the repo backend interpreter and a writable temp
           # directory. Locally these are set by hand (Windows paths); CI names
           # the Linux equivalents.
