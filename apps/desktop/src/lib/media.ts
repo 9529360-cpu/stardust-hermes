@@ -56,6 +56,12 @@ export function mediaMime(path: string): string {
 }
 
 export function mediaName(path: string): string {
+  // `D:\报告\结果.png` parses as a URL with the scheme `d:`, which keeps the
+  // backslashes and percent-encodes the name. Drive paths split as paths.
+  if (/^[a-z]:[\\/]/i.test(path)) {
+    return path.split(/[\\/]/).filter(Boolean).pop() || path
+  }
+
   try {
     const url = new URL(path)
 
