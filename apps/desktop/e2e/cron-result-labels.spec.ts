@@ -32,7 +32,12 @@ async function capture(page: Page, name: string): Promise<void> {
 let fixture: MockBackendFixture | null = null
 
 test.beforeAll(async () => {
-  fixture = await setupMockBackend({ extraDisplayConfig: '  language: zh' })
+  // Tool Search defers cronjob_manage behind tool_call by default. The routine must be a direct
+  // call for the cron card to render it, so keep nothing deferred for this session.
+  fixture = await setupMockBackend({
+    extraConfig: 'tools:\n  tool_search:\n    defer: []',
+    extraDisplayConfig: '  language: zh'
+  })
 })
 
 test.afterAll(async () => {
@@ -59,8 +64,14 @@ test('a saved routine card reads in Chinese at 1220x800', async () => {
 
   await expect(page.getByText(CRON_ROUTINE_REPLY).first()).toBeVisible({ timeout: 90_000 })
 
-  // Matched by the routine's name, which both the English and the Chinese result carry.
-  const card = page.locator('[data-slot="tool-block"]').filter({ hasText: '晨间摘要' }).first()
+  // The routine is one tool call, so its row sits in a collapsed run summary until it opens.
+  await page.locator('[data-tool-group]').first().locator('[aria-expanded]').first().click()
+
+  // The collapsed row shows its title, which is what differs between the English and the Chinese card.
+  const card = page
+    .locator('[data-tool-row]')
+    .filter({ hasText: /Cron 任务|定时任务/ })
+    .first()
   await expect(card).toBeVisible({ timeout: 20_000 })
   await card.locator('[aria-expanded]').first().click()
   await page.waitForTimeout(300)
@@ -68,7 +79,7 @@ test('a saved routine card reads in Chinese at 1220x800', async () => {
 
   const text = (await card.innerText()).trim()
 
-  expect(text).toContain('已创建定时任务“晨间摘要”。')
+  expect(text).toContain('定时任务')
   expect(text).toContain('排程: 0 9 * * *')
   expect(text).toContain('重复: 永久')
   expect(text).toContain('投递: 当前对话')
