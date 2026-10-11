@@ -4605,6 +4605,34 @@ export const en: Translations = {
       copyFile: 'Copy file',
       copyPath: 'Copy path',
       failedCalls: (count: number) => `${count} tool call${count === 1 ? '' : 's'} failed`,
+      runSummary: {
+        delegate: {
+          past: 'Delegated',
+          present: 'Delegating',
+          counted: count => `${count} task${count === 1 ? '' : 's'}`
+        },
+        edit: {
+          past: 'Edited',
+          present: 'Editing',
+          counted: count => `${count} file${count === 1 ? '' : 's'}`
+        },
+        explore: {
+          past: 'Explored',
+          present: 'Exploring',
+          counted: count => `${count} file${count === 1 ? '' : 's'}`
+        },
+        other: {
+          past: 'Used',
+          present: 'Using',
+          counted: count => `${count} tool${count === 1 ? '' : 's'}`
+        },
+        run: {
+          past: 'Ran',
+          present: 'Running',
+          counted: count => `${count} command${count === 1 ? '' : 's'}`
+        },
+        separator: ', '
+      },
       skillActivity: {
         loading: 'Loading skill',
         loaded: 'Loaded skill',

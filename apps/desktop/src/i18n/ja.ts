@@ -3797,6 +3797,34 @@ export const ja = defineLocale({
       copyFile: 'ファイルをコピー',
       copyPath: 'パスをコピー',
       failedCalls: (count: number) => `失敗したツール呼び出し: ${count}`,
+      runSummary: {
+        delegate: {
+          past: '委任済み',
+          present: '委任中',
+          counted: count => `${count} 件のタスク`
+        },
+        edit: {
+          past: '編集済み',
+          present: '編集中',
+          counted: count => `${count} 件のファイル`
+        },
+        explore: {
+          past: '探索済み',
+          present: '探索中',
+          counted: count => `${count} 件のファイル`
+        },
+        other: {
+          past: '使用済み',
+          present: '使用中',
+          counted: count => `${count} 件のツール`
+        },
+        run: {
+          past: '実行済み',
+          present: '実行中',
+          counted: count => `${count} 件のコマンド`
+        },
+        separator: '、'
+      },
       skillActivity: {
         loading: 'スキルを読み込み中',
         loaded: 'スキルを読み込みました',

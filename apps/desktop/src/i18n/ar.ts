@@ -3154,6 +3154,34 @@ export const ar = defineLocale({
       copyFile: 'نسخ الملف',
       copyPath: 'نسخ المسار',
       failedCalls: (count: number) => `عدد استدعاءات الأدوات الفاشلة: ${count}`,
+      runSummary: {
+        delegate: {
+          past: 'فوّض',
+          present: 'يفوّض',
+          counted: count => (count === 1 ? 'مهمة واحدة' : `${count} مهام`)
+        },
+        edit: {
+          past: 'عدّل',
+          present: 'يعدّل',
+          counted: count => (count === 1 ? 'ملف واحد' : `${count} ملفات`)
+        },
+        explore: {
+          past: 'استكشف',
+          present: 'يستكشف',
+          counted: count => (count === 1 ? 'ملف واحد' : `${count} ملفات`)
+        },
+        other: {
+          past: 'استخدم',
+          present: 'يستخدم',
+          counted: count => (count === 1 ? 'أداة واحدة' : `${count} أدوات`)
+        },
+        run: {
+          past: 'نفّذ',
+          present: 'ينفّذ',
+          counted: count => (count === 1 ? 'أمر واحد' : `${count} أوامر`)
+        },
+        separator: '، '
+      },
       skillActivity: {
         loading: 'جارٍ تحميل المهارة',
         loaded: 'تم تحميل المهارة',
