@@ -82,9 +82,10 @@ function dbReport(hermesHome: string): DbFile[] {
   return JSON.parse(execFileSync(python, ['-c', script, hermesHome], { encoding: 'utf8' }))
 }
 
-// The session rows of the default profile's state DB.
+// The session rows of the default profile's state DB. Matched by exact file name:
+// the sandbox also holds shared-state.db, which a suffix match would take.
 function stateRows(report: DbFile[]): StoredRow[] {
-  const state = report.find(file => file.path.endsWith('state.db'))
+  const state = report.find(file => path.basename(file.path) === 'state.db')
 
   return (state?.sessions ?? []).map(([id, title, hidden]) => ({ hidden, id, title }))
 }
