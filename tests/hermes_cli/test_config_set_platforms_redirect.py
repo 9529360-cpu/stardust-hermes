@@ -1,6 +1,6 @@
 """Regression tests for #71047 (Problem A): per-platform display settings.
 
-`hermes config set platforms.<name>.<display_setting> <value>` must write to
+`stardust config set platforms.<name>.<display_setting> <value>` must write to
 `display.platforms.<name>.<display_setting>` — the path the gateway actually
 reads (gateway/display_config.py::resolve_display_setting). Writing to the
 top-level `platforms.<name>` block is silently ignored by the runtime, so the
@@ -21,8 +21,8 @@ def _write_config(hermes_home: Path, data: dict) -> Path:
 
 
 def _set(monkeypatch, hermes_home, key, value, force=False):
-    """Isolated call to set_config_value against a temp HERMES_HOME."""
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    """Isolated call to set_config_value against a temp STARDUST_HOME."""
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     # set_config_value resolves the home live via get_config_path()/get_hermes_home()
     from hermes_cli.config import set_config_value
     set_config_value(key, value, force=force)
@@ -30,7 +30,7 @@ def _set(monkeypatch, hermes_home, key, value, force=False):
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     # A config that already has a top-level platforms block (connection keys)
     # AND a display.platforms block, mirroring the real-world report.
     cfg = {
@@ -87,7 +87,7 @@ class TestPerPlatformDisplayRedirect:
     def test_no_top_level_platforms_created_when_missing(self, tmp_path, monkeypatch):
         """When there is no pre-existing top-level platforms block, a display
         setting write must not invent one."""
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         _write_config(home, {"model": {"default": "m"}})
         _set(monkeypatch, home, "platforms.telegram.streaming", "true")
         result = yaml.safe_load((home / "config.yaml").read_text())
@@ -127,7 +127,7 @@ class TestRedirectSiblingSurfaces:
     def test_unset_missing_redirected_leaf_exits_nonzero(self, hermes_home, monkeypatch):
         from hermes_cli.config import unset_config_value
 
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         with pytest.raises(SystemExit) as exc:
             unset_config_value("platforms.telegram.streaming")
         assert exc.value.code == 1

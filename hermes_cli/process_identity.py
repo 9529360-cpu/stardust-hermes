@@ -1,8 +1,8 @@
 """Process identity: spawn tags, the machine-wide spawn ledger, and the Windows job-object self-attach.
 
-Three layers make every long-lived Hermes process positively identifiable, so reapers (``hermes
+Three layers make every long-lived Hermes process positively identifiable, so reapers (``stardust
 update``, Desktop startup sweeps) never guess lineage from PPID archaeology or cmdline matching:
-1. spawn tags (``HERMES_SPAWN`` env stamped by the spawner); 2. a ``(pid, create_time)`` ledger;
+1. spawn tags (``STARDUST_SPAWN`` env stamped by the spawner); 2. a ``(pid, create_time)`` ledger;
 3. Windows job-object self-attach with ``KILL_ON_JOB_CLOSE`` so the whole child tree dies with the
 root — no launcher→worker chains left holding ``.pyd`` locks.
 """
@@ -24,7 +24,7 @@ from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
-SPAWN_ENV_VAR = "HERMES_SPAWN"
+SPAWN_ENV_VAR = "STARDUST_SPAWN"
 _TAG_VERSION = "v1"
 LEDGER_FILENAME = "spawn-ledger.json"
 
@@ -78,7 +78,7 @@ class SpawnTag:
 
 
 def build_spawn_tag(purpose: str, *, project_root: Optional[Path] = None) -> str:
-    """Value for the child's ``HERMES_SPAWN`` env var, stamped by the spawner."""
+    """Value for the child's ``STARDUST_SPAWN`` env var, stamped by the spawner."""
     create = _process_create_time()
     create_part = f"{create:.3f}" if create is not None else "-"
     return ":".join((_TAG_VERSION, install_id(project_root), purpose, str(os.getpid()), create_part))
@@ -90,7 +90,7 @@ def spawn_env(purpose: str, *, project_root: Optional[Path] = None) -> dict[str,
 
 
 def parse_spawn_tag(raw: object) -> Optional[SpawnTag]:
-    """Parse a ``HERMES_SPAWN`` value; ``None`` for anything malformed."""
+    """Parse a ``STARDUST_SPAWN`` value; ``None`` for anything malformed."""
     parts = raw.split(":") if isinstance(raw, str) else []
     if len(parts) != 5 or parts[0] != _TAG_VERSION:
         return None
@@ -210,7 +210,7 @@ def register_self(purpose: str, *, project_root: Optional[Path] = None, detail: 
     try:
         import sys as _sys
 
-        # 10 tokens: enough for `hermes serve --host X --port N --profile P` while bounding
+        # 10 tokens: enough for `stardust serve --host X --port N --profile P` while bounding
         # pathological argv. Structured detail is canonical; argv is the human-readable fallback.
         entry.argv = " ".join(_sys.argv[:10])
     except Exception:
@@ -219,16 +219,16 @@ def register_self(purpose: str, *, project_root: Optional[Path] = None, detail: 
 
 
 def _desktop_spawner_identity() -> tuple[Optional[int], Optional[float]]:
-    """Spawner ``(pid, create_time)`` from the Electron app's HERMES_PARENT_PID (+ optional
+    """Spawner ``(pid, create_time)`` from the Electron app's STARDUST_PARENT_PID (+ optional
     ``winms:<ms>`` start marker) parent-death watchdog vars, so ledger lineage works with every
     Desktop version without a TS change. ``(None, None)`` when absent/malformed."""
     try:
-        spawner_pid = int(os.environ.get("HERMES_PARENT_PID", ""))
+        spawner_pid = int(os.environ.get("STARDUST_PARENT_PID", ""))
     except (TypeError, ValueError):
         spawner_pid = 0
     if spawner_pid <= 0:
         return None, None
-    marker = os.environ.get("HERMES_PARENT_START_MARKER", "")
+    marker = os.environ.get("STARDUST_PARENT_START_MARKER", "")
     if not marker.startswith("winms:"):
         return spawner_pid, None
     try:

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-_MANAGED_FILES_ROOT_ENV = "HERMES_DASHBOARD_FILES_ROOT"
+_MANAGED_FILES_ROOT_ENV = "STARDUST_DASHBOARD_FILES_ROOT"
 _HOSTED_MANAGED_FILES_ROOT = Path("/opt/data")
 
 
@@ -82,7 +82,7 @@ def _path_text(raw_path: str | None) -> str:
 
 
 def _default_hermes_root_is_opt_data() -> bool:
-    raw = os.environ.get("HERMES_HOME", "").strip()
+    raw = os.environ.get("STARDUST_HOME", "").strip()
     if not raw:
         return False
     try:
@@ -117,7 +117,7 @@ def _managed_files_policy(request: Request, *, create_root: bool = True) -> Mana
 
     # Remote/OAuth access does not imply a hosted container (a gated macOS launchd
     # install still browses its home). Lock to /opt/data only when the Hermes
-    # root actually IS /opt/data or HERMES_DASHBOARD_FILES_ROOT is set.
+    # root actually IS /opt/data or STARDUST_DASHBOARD_FILES_ROOT is set.
     if _default_hermes_root_is_opt_data():
         root = _ensure_managed_root(_HOSTED_MANAGED_FILES_ROOT) if create_root else _HOSTED_MANAGED_FILES_ROOT
         return ManagedFilesPolicy(default_path=root, locked_root=root, can_change_path=False)

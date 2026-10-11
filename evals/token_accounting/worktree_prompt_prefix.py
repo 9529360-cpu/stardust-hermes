@@ -1,7 +1,7 @@
 """Offline real-worktree prompt prefix probe (no provider requests).
 
 Run with the checkout's Python and PROBE_OUT pointing at a new empty directory.
-The subprocesses use isolated HOME/HERMES_HOME and a localhost dummy provider.
+The subprocesses use isolated HOME/STARDUST_HOME and a localhost dummy provider.
 """
 
 import os, sys, json, subprocess, pathlib, hashlib, dataclasses
@@ -62,7 +62,7 @@ if len(sys.argv) == 1:
     env = {
         "PATH": os.environ["PATH"],
         "HOME": str(home),
-        "HERMES_HOME": str(hh),
+        "STARDUST_HOME": str(hh),
         "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONPATH": str(SRC),
         "PYTHONHASHSEED": "0",

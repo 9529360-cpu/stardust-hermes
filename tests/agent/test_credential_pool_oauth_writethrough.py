@@ -60,7 +60,7 @@ def profile_and_root(tmp_path, monkeypatch):
     """Wire a profile auth store + a distinct global-root auth store on disk.
 
     The pytest seat belt in ``_write_through_provider_state_to_global_root``
-    only refuses the *real* user's ``$HOME/.hermes/auth.json``; a tmp_path
+    only refuses the *real* user's ``$HOME/.stardust/auth.json``; a tmp_path
     root is allowed, so point HOME away from the tmp root to keep the guard
     from tripping on these fixtures.
     """
@@ -324,13 +324,13 @@ def test_write_through_fires_on_every_refresh_not_just_first(
 
 def test_hermes_pkce_refresh_writes_back_to_singleton(tmp_path, monkeypatch):
     """A successful hermes_pkce refresh must update
-    ~/.hermes/.anthropic_oauth.json, or ``_seed_from_singletons()`` on the
+    ~/.stardust/.anthropic_oauth.json, or ``_seed_from_singletons()`` on the
     next ``load_pool()`` re-seeds the pre-refresh (already-consumed,
     single-use) token pair over the freshly rotated one.
     """
     hermes_home = tmp_path / "hermes"
     hermes_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setattr("hermes_cli.auth.is_provider_explicitly_configured", lambda pid: True)
 
     oauth_file = hermes_home / ".anthropic_oauth.json"
@@ -368,7 +368,7 @@ def test_hermes_pkce_refresh_writes_back_to_singleton(tmp_path, monkeypatch):
     on_disk = json.loads(oauth_file.read_text(encoding="utf-8"))
     assert on_disk["refreshToken"] == "rt1", (
         "successful hermes_pkce refresh must write back to "
-        "~/.hermes/.anthropic_oauth.json, or _seed_from_singletons() will "
+        "~/.stardust/.anthropic_oauth.json, or _seed_from_singletons() will "
         "revert the pool entry to the pre-refresh (spent) token on next load"
     )
 
@@ -388,7 +388,7 @@ def test_manual_hermes_pkce_refresh_does_not_create_duplicate_singleton(
     """A pool-owned manual:hermes_pkce entry must not create a second source."""
     hermes_home = tmp_path / "hermes"
     hermes_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setattr("hermes_cli.auth.is_provider_explicitly_configured", lambda pid: True)
     monkeypatch.setattr("agent.anthropic_credentials.read_claude_code_credentials", lambda: None)
     monkeypatch.setattr(

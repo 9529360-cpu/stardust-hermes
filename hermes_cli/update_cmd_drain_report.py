@@ -1,4 +1,4 @@
-"""Name what a draining gateway is waiting on while ``hermes update`` blocks on it.
+"""Name what a draining gateway is waiting on while ``stardust update`` blocks on it.
 
 The gateway's in-band restart (SIGUSR1 → ``request_restart``) defers ``stop()`` until in-flight
 work finishes, capped by ``agent.restart_after_turn_timeout`` (30 min by default). From the

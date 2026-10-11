@@ -1,11 +1,11 @@
-"""``hermes`` must survive git operations on the checkout (launcher layout).
+"""``stardust`` must survive git operations on the checkout (launcher layout).
 
-The Windows ``hermes`` command is a launcher derived from the venv console
-script. Its canonical home is the managed binary dir ``HERMES_HOME\\bin`` —
+The Windows ``stardust`` command is a launcher derived from the venv console
+script. Its canonical home is the managed binary dir ``STARDUST_HOME\\bin`` —
 OUTSIDE the git checkout — because the earlier in-checkout home
-(``hermes-agent\\bin``) was swept by ``hermes update``'s autostash
+(``hermes-agent\\bin``) was swept by ``stardust update``'s autostash
 (``git stash push --include-untracked``) and, with the desktop updater's
-``--keep-stash``, never restored: ``hermes`` stopped resolving in every new
+``--keep-stash``, never restored: ``stardust`` stopped resolving in every new
 terminal (``venv\\Scripts`` itself must stay off PATH — it shadows the
 user's ``python``, #83797).
 
@@ -14,7 +14,7 @@ always for the managed clone; legacy dir only while the user PATH still
 points at it), choosing the form by venv kind: exe copy for normal venvs,
 ``.cmd`` delegator for relocatable venvs whose exe trampolines die when
 copied out of ``venv\\Scripts``. ``migrate_windows_bin_path`` moves an
-existing install's PATH to the canonical layout from the ``hermes update``
+existing install's PATH to the canonical layout from the ``stardust update``
 tail. Platform verdict, PATH values, and registry I/O are injected
 parameters (same pattern as ``hermes_constants.venv_bin_dir``), so these
 tests are host-independent input→output checks, not host fakes.
@@ -33,7 +33,7 @@ from hermes_cli._install_repair import (
 
 
 def _make_managed(tmp_path, monkeypatch, *, relocatable: bool = False):
-    """Fake managed layout: HERMES_HOME/hermes-agent/venv/Scripts + launchers."""
+    """Fake managed layout: STARDUST_HOME/hermes-agent/venv/Scripts + launchers."""
     home = tmp_path / "hermes"
     root = home / "hermes-agent"
     scripts = root / "venv" / "Scripts"
@@ -44,7 +44,7 @@ def _make_managed(tmp_path, monkeypatch, *, relocatable: bool = False):
     if relocatable:
         cfg += "relocatable = true\n"
     (root / "venv" / "pyvenv.cfg").write_text(cfg, encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home, root
 
 
@@ -128,10 +128,10 @@ def test_legacy_bin_not_restaged_without_path_consent(managed_install):
 
 
 def test_source_checkout_untouched(tmp_path, monkeypatch):
-    """A checkout NOT under HERMES_HOME gains nothing anywhere."""
+    """A checkout NOT under STARDUST_HOME gains nothing anywhere."""
     home = tmp_path / "hermes-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     root = tmp_path / "src" / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)
@@ -151,7 +151,7 @@ def test_noop_on_posix(managed_install):
 
 
 def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
-    """Under ``hermes -p <name>`` HERMES_HOME points inside profiles/<name>;
+    """Under ``stardust -p <name>`` STARDUST_HOME points inside profiles/<name>;
     the launcher dir is per-machine, so the heal must anchor on the default
     root and fire anyway — a habitual profile user gets the same repair."""
     home = tmp_path / "hermes"
@@ -161,7 +161,7 @@ def test_profile_session_still_heals_the_shared_bin(tmp_path, monkeypatch):
     for name in _WINDOWS_BIN_LAUNCHERS:
         (scripts / f"{name}.exe").write_bytes(b"MZ")
     (root / "venv" / "pyvenv.cfg").write_text("home = X\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home / "profiles" / "work"))
+    monkeypatch.setenv("STARDUST_HOME", str(home / "profiles" / "work"))
 
     restored = ensure_windows_bin_launchers(root, windows=True, user_path_entries=[])
 
@@ -176,7 +176,7 @@ def test_noop_when_console_scripts_missing(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     assert ensure_windows_bin_launchers(root, windows=True, user_path_entries=[]) == []
 
@@ -191,7 +191,7 @@ def test_no_staging_litter_left_behind(managed_install):
 
 
 # ---------------------------------------------------------------------------
-# migrate_windows_bin_path — the `hermes update` tail migration
+# migrate_windows_bin_path — the `stardust update` tail migration
 # ---------------------------------------------------------------------------
 
 
@@ -218,7 +218,7 @@ def test_migration_moves_path_to_home_bin_and_strips_legacy(managed_install):
         [legacy_bin, legacy_scripts, r"C:\Windows\system32"]
     )
     (root / "bin").mkdir()
-    (root / "bin" / "hermes.exe").write_bytes(b"legacy copy")
+    (root / "bin" / "stardust.exe").write_bytes(b"legacy copy")
 
     ok = migrate_windows_bin_path(
         root, windows=True, read_user_path=read, write_user_path=write
@@ -234,7 +234,7 @@ def test_migration_moves_path_to_home_bin_and_strips_legacy(managed_install):
         assert (home / "bin" / f"{name}.exe").is_file()
     # Legacy FILES stay: editor/ACP configs holding absolute launcher paths
     # keep working. Only the PATH entry (the sweepable resolution route) goes.
-    assert (root / "bin" / "hermes.exe").read_bytes() == b"legacy copy"
+    assert (root / "bin" / "stardust.exe").read_bytes() == b"legacy copy"
 
 
 def test_migration_works_for_relocatable_venv(tmp_path, monkeypatch):
@@ -274,7 +274,7 @@ def test_migration_never_strips_path_when_staging_fails(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     root = home / "hermes-agent"
     (root / "venv" / "Scripts").mkdir(parents=True)  # no launcher exes inside
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     legacy_bin = str(root / "bin")
     state, read, write = _fake_registry([legacy_bin])
 
@@ -290,7 +290,7 @@ def test_migration_never_strips_path_when_staging_fails(tmp_path, monkeypatch):
 def test_migration_skips_source_checkouts(tmp_path, monkeypatch):
     home = tmp_path / "hermes-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     root = tmp_path / "src" / "hermes-agent"
     scripts = root / "venv" / "Scripts"
     scripts.mkdir(parents=True)
@@ -312,8 +312,8 @@ def test_migration_noop_on_posix(managed_install):
 
 def test_normalize_windows_path_equivalences():
     assert (
-        _normalize_windows_path(r"C:\Users\Me\AppData\Local\hermes\bin")
-        == _normalize_windows_path("c:/users/me/appdata/local/HERMES/BIN/")
+        _normalize_windows_path(r"C:\Users\Me\AppData\Local\stardust\bin")
+        == _normalize_windows_path("c:/users/me/appdata/local/stardust/BIN/")
     )
 
 
@@ -321,7 +321,7 @@ def test_repo_gitignores_the_legacy_bin_dir():
     """Transition safety: legacy in-checkout launchers must not be stash-swept.
 
     Until every install has migrated, pre-migration checkouts still carry
-    launchers at ``<checkout>/bin``. ``hermes update`` autostashes with
+    launchers at ``<checkout>/bin``. ``stardust update`` autostashes with
     ``git stash push --include-untracked``; anything untracked and NOT
     ignored inside the checkout gets swept off disk. Exercises git's real
     ignore machinery rather than reading .gitignore text.
@@ -333,10 +333,10 @@ def test_repo_gitignores_the_legacy_bin_dir():
         pytest.skip("not running from a git checkout")
 
     result = subprocess.run(
-        ["git", "-C", str(repo_root), "check-ignore", "-q", "bin/hermes.exe"],
+        ["git", "-C", str(repo_root), "check-ignore", "-q", "bin/stardust.exe"],
         capture_output=True,
     )
     assert result.returncode == 0, (
-        "bin/hermes.exe is not gitignored — hermes update's autostash "
+        "bin/stardust.exe is not gitignored — stardust update's autostash "
         "(--include-untracked) would sweep pre-migration launchers off disk"
     )

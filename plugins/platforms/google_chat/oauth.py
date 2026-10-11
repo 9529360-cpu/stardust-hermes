@@ -5,7 +5,7 @@ attachments each user grants the bot ``chat.messages.create`` ONCE in their own 
 the bot stores per-user refresh tokens and uploads *as the user*
 (https://developers.google.com/chat/api/guides/auth/users). Library API for the
 adapter plus a CLI driven by ``/setup-files`` (``--help``; ``--email`` omitted ==
-legacy single-user mode). Files under ``${HERMES_HOME}``: ``google_chat_user_tokens/
+legacy single-user mode). Files under ``${STARDUST_HOME}``: ``google_chat_user_tokens/
 <email>.json`` (per-user) / ``google_chat_user_token.json`` (legacy); pending PKCE state
 in ``google_chat_user_oauth_pending[/<email>].json``; ``google_chat_user_client_secret.json``.
 """
@@ -32,7 +32,7 @@ from utils import atomic_write_text
 logger = logging.getLogger("gateway.platforms.google_chat_user_oauth")
 
 # Filesystem-safe key: lowercase, keep ``[a-z0-9._-@]`` so token files stay
-# human-readable under ``ls ~/.hermes/google_chat_user_tokens/``.
+# human-readable under ``ls ~/.stardust/google_chat_user_tokens/``.
 _EMAIL_FS_RE = re.compile(r"[^a-z0-9._@-]+")
 
 # Least privilege: chat.messages.create covers BOTH media.upload and the
@@ -61,7 +61,7 @@ def _sanitize_email(email: str) -> str:
 
 
 def _token_rel(email: Optional[str]) -> str:
-    """HERMES_HOME-relative token file: per-user under the tokens dir, else the legacy path."""
+    """STARDUST_HOME-relative token file: per-user under the tokens dir, else the legacy path."""
     return f"google_chat_user_tokens/{_sanitize_email(email)}.json" if email else "google_chat_user_token.json"
 
 
@@ -123,7 +123,7 @@ def load_user_credentials(email: Optional[str] = None) -> Optional[Any]:
     except ImportError:
         logger.warning(
             "[google_chat_user_oauth] google-auth not installed; user-OAuth "
-            "attachment delivery is disabled. Run `hermes setup` to install Google Chat support."
+            "attachment delivery is disabled. Run `stardust setup` to install Google Chat support."
         )
         return None
     try:
@@ -239,7 +239,7 @@ def install_deps() -> bool:
     try:
         from tools.lazy_deps import FeatureUnavailable, ensure as _lazy_ensure
 
-        # lazy_deps honors HERMES_LAZY_INSTALL_TARGET on sealed hosted images;
+        # lazy_deps honors STARDUST_LAZY_INSTALL_TARGET on sealed hosted images;
         # _pip_install always writes the venv and Permission-denied there.
         _lazy_ensure("platform.google_chat", prompt=False)
         remaining = _missing_required_packages()
@@ -249,11 +249,11 @@ def install_deps() -> bool:
         return True
     except FeatureUnavailable as exc:
         print(f"ERROR: Failed to install dependencies: {exc.reason}")
-        print("Run `hermes setup` to repair the managed installation, then retry.")
+        print("Run `stardust setup` to repair the managed installation, then retry.")
         return False
     except Exception as exc:
         print(f"ERROR: Failed to install dependencies: {exc}")
-        print("Run `hermes setup` to repair the managed installation, then retry.")
+        print("Run `stardust setup` to repair the managed installation, then retry.")
         return False
 
 
@@ -271,7 +271,7 @@ def check_auth(email: Optional[str] = None) -> bool:
 
 
 def store_client_secret(path: str) -> None:
-    """Validate and copy the user's OAuth client_secret.json into HERMES_HOME."""
+    """Validate and copy the user's OAuth client_secret.json into STARDUST_HOME."""
     src = Path(path).expanduser().resolve()
     if not src.exists():
         _fail(f"ERROR: File not found: {src}")

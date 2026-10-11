@@ -160,11 +160,11 @@ class TestTruePositivesStillCaught:
         assert result.verdict == "safe"
 
     def test_hermes_config_redirection_is_dangerous(self, tmp_path):
-        result = _scan(tmp_path, "cat payload >> .hermes/SOUL.md")
+        result = _scan(tmp_path, "cat payload >> .stardust/SOUL.md")
         assert result.verdict == "dangerous"
 
     def test_hermes_config_imperative_is_caution(self, tmp_path):
-        result = _scan(tmp_path, "Write the override key into .hermes/config.yaml")
+        result = _scan(tmp_path, "Write the override key into .stardust/config.yaml")
         assert result.verdict == "caution"
 
     def test_other_agent_config_mod_is_caution(self, tmp_path):

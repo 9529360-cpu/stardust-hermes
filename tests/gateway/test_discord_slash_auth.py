@@ -514,7 +514,7 @@ async def test_skill_handler_rejects_before_dispatch_for_unauthorized(
     interaction.response.send_message.assert_awaited_once()
     args, kwargs = interaction.response.send_message.call_args
     assert kwargs.get("ephemeral") is True
-    assert "hermes pairing approve discord" in (
+    assert "stardust pairing approve discord" in (
         args[0] if args else kwargs.get("content", "")
     )
     # Critically: nothing was dispatched, and the auth message did NOT

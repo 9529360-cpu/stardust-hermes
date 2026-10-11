@@ -875,7 +875,7 @@ def _reconcile_send_consent_once() -> None:
 
     Runs BEFORE and INDEPENDENT of the collection gate, so a user with ``enabled: false``
     still gets send-consent windows reconciled. Skipped only when there is no store on disk
-    AND consent is off: nothing to protect, and creating ``~/.hermes/telemetry`` for every
+    AND consent is off: nothing to protect, and creating ``~/.stardust/telemetry`` for every
     fully-disabled user would be the wrong behaviour change.
     """
     global _consent_reconcile_done

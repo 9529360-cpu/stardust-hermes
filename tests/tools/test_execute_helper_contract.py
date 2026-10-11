@@ -22,7 +22,7 @@ print(json.dumps([json_parse('{{"value": 7}}')["value"],
 @pytest.fixture(autouse=True)
 def local_kernel(tmp_path, monkeypatch):
     monkeypatch.setenv("TERMINAL_ENV", "local")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("code_execution:\n  mode: strict\n", encoding="utf-8")
     shutdown_all_kernels()
     yield

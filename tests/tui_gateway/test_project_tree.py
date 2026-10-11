@@ -458,18 +458,18 @@ def test_nested_project_folders_pick_the_deepest_match():
 
 
 def test_junk_root_never_becomes_an_auto_project():
-    # A session whose git root is HERMES_HOME (config/state) must not spawn a
+    # A session whose git root is STARDUST_HOME (config/state) must not spawn a
     # phantom project; it lands in the Home bucket. A real repo alongside it
     # still groups normally.
     resolve = _resolver(
         {
-            "/home/me/.hermes": ("/home/me/.hermes", "/home/me/.hermes"),
+            "/home/me/.stardust": ("/home/me/.stardust", "/home/me/.stardust"),
             "/www/app": ("/www/app", "/www/app"),
         }
     )
-    junk = _session("/home/me/.hermes", branch="main")
+    junk = _session("/home/me/.stardust", branch="main")
     real = _session("/www/app", branch="main")
-    is_junk = lambda root: root == "/home/me/.hermes"
+    is_junk = lambda root: root == "/home/me/.stardust"
 
     tree = pt.build_tree([], [junk, real], [], resolve, hydrate=True, is_junk_root=is_junk)
 
@@ -479,7 +479,7 @@ def test_junk_root_never_becomes_an_auto_project():
 
 
 def test_broad_default_non_git_cwd_stays_unscoped():
-    detached = _session("/home/test/.hermes")
+    detached = _session("/home/test/.stardust")
 
     tree = pt.build_tree(
         [],
@@ -487,7 +487,7 @@ def test_broad_default_non_git_cwd_stays_unscoped():
         [],
         resolve=lambda _cwd: None,
         hydrate=True,
-        is_junk_cwd=lambda path: path in {"/home/test", "/home/test/.hermes"},
+        is_junk_cwd=lambda path: path in {"/home/test", "/home/test/.stardust"},
     )
 
     assert _real_project_ids(tree) == []

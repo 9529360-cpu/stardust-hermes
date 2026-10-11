@@ -1,4 +1,4 @@
-"""Tests for state.db health/stats collection (hermes doctor section).
+"""Tests for state.db health/stats collection (stardust doctor section).
 
 Covers:
 - ``hermes_state_dbfile.collect_state_db_stats``: read-only, best-effort stats
@@ -154,7 +154,7 @@ def test_count_db_holders_sees_open_connection_linux(populated_db):
 
 @pytest.mark.macos_only
 def test_count_db_holders_sees_open_connection_macos(populated_db):
-    # #109641: the doctor's holder count was Linux-only, so `hermes doctor` on the platform with
+    # #109641: the doctor's holder count was Linux-only, so `stardust doctor` on the platform with
     # every reporter in the deleted-WAL cluster printed no holder row at all.
     _assert_sees_own_open_connection(populated_db)
 

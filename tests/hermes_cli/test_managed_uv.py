@@ -246,7 +246,7 @@ class TestEnsureUvUpdateBoundary:
     """``ensure_uv()`` must answer to both the single-value and the legacy
     ``(path, fresh_bootstrap)`` call conventions — **on POSIX**.
 
-    ``hermes update`` runs the call site from the old, already-imported
+    ``stardust update`` runs the call site from the old, already-imported
     ``hermes_cli.main`` against the freshly pulled ``managed_uv``. A release
     parked on a ``(path, fresh)`` tuple runs ``uv_bin, fresh = ensure_uv()``
     against the single-value module; the path is an iterable ``str`` so the
@@ -407,9 +407,9 @@ class TestManagedPythonStore:
         from hermes_cli.managed_uv import managed_python_install_dir
 
         checkout = tmp_path / "checkout"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "alpha"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "profiles" / "alpha"))
         alpha = managed_python_install_dir(checkout)
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "profiles" / "beta"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "profiles" / "beta"))
         beta = managed_python_install_dir(checkout)
 
         expected = checkout / ".hermes-runtime" / "python"
@@ -943,7 +943,7 @@ class TestMinorLineFallForward:
     the provisioner must fall forward to the next supported minor line
     (3.12, then 3.13) -- first via a bare minor request, then via explicit
     patches on that line -- instead of leaving the user stuck on every
-    `hermes update` with no path to a fixed runtime.
+    `stardust update` with no path to a fixed runtime.
     """
 
     @staticmethod
@@ -1281,7 +1281,7 @@ class TestDefaultLiveVenv:
     """_default_live_venv() must cover BOTH install layouts (venv/ and .venv/).
 
     Historically repair hardcoded venv/, so uv-default/.venv checkouts got
-    'not-applicable' on every hermes update and stayed on journal_mode=DELETE
+    'not-applicable' on every stardust update and stayed on journal_mode=DELETE
     (2,600x slower state.db appends) while the WAL warning promised repair.
     """
 
@@ -1329,7 +1329,7 @@ class TestDefaultLiveVenv:
 class TestVenvPythonUpdateBoundary:
     """``_venv_python`` must survive a hermes_constants predating its symbol.
 
-    ``hermes update`` imports hermes_constants from the OLD checkout, ``git
+    ``stardust update`` imports hermes_constants from the OLD checkout, ``git
     pull`` replaces that file, and the freshly-pulled managed_uv then runs its
     lazy ``from hermes_constants import venv_python_path`` against the module
     object already cached in ``sys.modules``. That cached module has no such
@@ -1337,7 +1337,7 @@ class TestVenvPythonUpdateBoundary:
     plainly contains it, which is what made the error so confusing:
 
         cannot import name 'venv_python_path' from 'hermes_constants'
-        (~/.hermes/hermes-agent/hermes_constants.py)
+        (~/.stardust/hermes-agent/hermes_constants.py)
 
     It aborted the managed-Python runtime repair on the first update from any
     release older than the symbol. Same class as the ``ensure_uv()`` arity skew
@@ -1404,7 +1404,7 @@ class TestWindowsRuntimeSelfLock:
     """The repair pre-flight must see the ONE holder the generic scan hides:
     the updater itself (#93032).
 
-    A CLI ``hermes update`` runs from the venv's own python, and
+    A CLI ``stardust update`` runs from the venv's own python, and
     ``_detect_venv_python_processes`` excludes the calling process and its
     ancestors on purpose (correct for the dependency-sync path).  For the
     whole-venv park rename that exemption is fatal on Windows: a directory
@@ -1514,7 +1514,7 @@ class TestWindowsRuntimeSelfLock:
         assert (locked, detail) == (False, "")
 
     def test_venv_launcher_ancestor_is_a_self_lock(self, tmp_path, monkeypatch):
-        r"""The venv\Scripts\hermes.exe shim stays mapped while it waits for
+        r"""The venv\Scripts\stardust.exe shim stays mapped while it waits for
         this child — an ancestor running from the venv blocks the rename too."""
         from hermes_cli import managed_uv
 

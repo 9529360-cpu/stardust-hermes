@@ -1279,9 +1279,9 @@ DEFAULT_BARGE_MULTIPLIER = 3.0  # over the quiet floor: 300 * 3 = 900 vs 3000+ s
 
 
 def _vad_log(msg: str) -> None:
-    """VAD diagnostic: logger.debug, plus stderr when HERMES_VOICE_DEBUG=1 (live tuning)."""
+    """VAD diagnostic: logger.debug, plus stderr when STARDUST_VOICE_DEBUG=1 (live tuning)."""
     logger.debug(msg)
-    if os.environ.get("HERMES_VOICE_DEBUG", "").strip() == "1":
+    if os.environ.get("STARDUST_VOICE_DEBUG", "").strip() == "1":
         with suppress(Exception):
             print(f"[voice-vad] {msg}", file=sys.stderr, flush=True)
 

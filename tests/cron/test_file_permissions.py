@@ -105,7 +105,7 @@ class TestConfigFilePermissions(unittest.TestCase):
             self.assertEqual(file_mode, 0o600)
 
     def test_ensure_hermes_home_sets_0700(self):
-        home = Path(self.tmpdir) / ".hermes"
+        home = Path(self.tmpdir) / ".stardust"
         with patch("hermes_cli.config.get_hermes_home", return_value=home):
             from hermes_cli.config import ensure_hermes_home
             ensure_hermes_home()
@@ -127,17 +127,17 @@ class TestSecureHelpers(unittest.TestCase):
 
     def test_secure_dir_preserves_operator_mode_in_container(self):
         """A bind-mounted data dir shared with sibling containers must keep the operator's mode;
-        an explicit HERMES_HOME_MODE is still honored (#10757)."""
+        an explicit STARDUST_HOME_MODE is still honored (#10757)."""
         from cron.jobs import _secure_dir
         with tempfile.TemporaryDirectory() as tmp:
             d = Path(tmp) / "cron"
             d.mkdir()
             os.chmod(d, 0o755)
-            with patch.dict(os.environ, {"HERMES_CONTAINER": "1"}, clear=False):
-                os.environ.pop("HERMES_HOME_MODE", None)
+            with patch.dict(os.environ, {"STARDUST_CONTAINER": "1"}, clear=False):
+                os.environ.pop("STARDUST_HOME_MODE", None)
                 _secure_dir(d)
                 self.assertEqual(stat.S_IMODE(os.stat(d).st_mode), 0o755)
-                os.environ["HERMES_HOME_MODE"] = "0701"
+                os.environ["STARDUST_HOME_MODE"] = "0701"
                 _secure_dir(d)
                 self.assertEqual(stat.S_IMODE(os.stat(d).st_mode), 0o701)
 

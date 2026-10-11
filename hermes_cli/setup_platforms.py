@@ -1,4 +1,4 @@
-"""Messaging-platform setup wizards (Telegram, BlueBubbles, webhooks) and the ``hermes setup
+"""Messaging-platform setup wizards (Telegram, BlueBubbles, webhooks) and the ``stardust setup
 gateway`` flow. setup.py re-exports the public names, and tests monkeypatch prompt/print/env
 helpers on hermes_cli.setup, so those are imported lazily per function."""
 
@@ -18,7 +18,7 @@ def _is_valid_telegram_bot_token(token: str) -> bool:
 
 
 def _profile_name_from_hermes_home(hermes_home) -> str | None:
-    """Return the active profile name when HERMES_HOME is a profile dir."""
+    """Return the active profile name when STARDUST_HOME is a profile dir."""
     return hermes_home.name if hermes_home.parent.name == "profiles" else None
 
 
@@ -249,8 +249,8 @@ def _setup_webhooks():
           "   https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/messaging/webhooks.md#configuring-routes",
           None,
           # Printed twice upstream; kept verbatim for output parity.
-          "   Open config in your editor:  hermes config edit",
-          "   Open config in your editor:  hermes config edit")
+          "   Open config in your editor:  stardust config edit",
+          "   Open config in your editor:  stardust config edit")
 
 
 # (platform label, credential env var, home-channel env vars — any one satisfies)
@@ -280,7 +280,7 @@ def _warn_missing_home_channels() -> None:
     _info("   Without a home channel, cron jobs and cross-platform",
           "   messages can't be delivered to those platforms.",
           "   Set one later with /set-home in your chat, or:",
-          *(f"     hermes config set {plat.upper()}_HOME_CHANNEL <channel_id>" for plat in missing_home))
+          *(f"     stardust config set {plat.upper()}_HOME_CHANNEL <channel_id>" for plat in missing_home))
 
 
 def _restart_running_gateway(any_messaging: bool, supports_systemd: bool) -> None:
@@ -333,7 +333,7 @@ def setup_gateway(config: dict):
     pre_selected = [i for i, status in enumerate(statuses) if status == "configured"]
     selected = prompt_checklist("Select platforms to configure:", items, pre_selected)
     if not selected:
-        print_info("No platforms selected. Run 'hermes setup gateway' later to configure.")
+        print_info("No platforms selected. Run 'stardust setup gateway' later to configure.")
     for idx in selected or ():
         _configure_platform(platforms[idx])
 
@@ -347,8 +347,8 @@ def setup_gateway(config: dict):
         _warn_missing_home_channels()
 
     # Gateway service setup runs UNCONDITIONALLY — a gateway with zero platforms is a supported
-    # mode (cron keeps running; adapters come up once tokens are added via `hermes import` /
-    # `hermes setup gateway`). Gating it on messaging config left install-then-import machines
+    # mode (cron keeps running; adapters come up once tokens are added via `stardust import` /
+    # `stardust setup gateway`). Gating it on messaging config left install-then-import machines
     # with cron jobs and bot tokens but no process to serve them.
     from hermes_cli.gateway import _is_service_running, supports_systemd_services, ensure_gateway_service
     supports_systemd = supports_systemd_services()

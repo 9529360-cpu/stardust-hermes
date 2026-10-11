@@ -14,17 +14,17 @@ from typing import Optional
 
 
 def _constants_path(getter_name: str) -> Path:
-    """Call ``hermes_constants.<getter_name>()`` (local import avoids cycles); ``~/.hermes`` on any failure."""
+    """Call ``hermes_constants.<getter_name>()`` (local import avoids cycles); ``~/.stardust`` on any failure."""
     try:
         import hermes_constants
 
         return getattr(hermes_constants, getter_name)()
     except Exception:
-        return Path(os.path.expanduser("~/.hermes"))
+        return Path(os.path.expanduser("~/.stardust"))
 
 
 def _hermes_home_path() -> Path:
-    """Active HERMES_HOME (profile-aware). Tests monkeypatch this name."""
+    """Active STARDUST_HOME (profile-aware). Tests monkeypatch this name."""
     return _constants_path("get_hermes_home")
 
 
@@ -34,10 +34,10 @@ def _hermes_root_path() -> Path:
 
 
 def _hermes_dirs() -> list[Path]:
-    """Resolved active HERMES_HOME and global root, deduplicated.
+    """Resolved active STARDUST_HOME and global root, deduplicated.
 
     Both are checked so credential stores at <root>/... stay guarded when
-    running under a profile (HERMES_HOME = <root>/profiles/<name>).
+    running under a profile (STARDUST_HOME = <root>/profiles/<name>).
     """
     return list(dict.fromkeys(_resolve_each((_hermes_home_path(), _hermes_root_path()))))
 
@@ -157,7 +157,7 @@ def build_write_denied_paths(home: str) -> set[str]:
         (".ssh", "authorized_keys"), (".ssh", "id_rsa"), (".ssh", "id_ed25519"),
         (".netrc",), (".pgpass",), (".npmrc",), (".pypirc",), (".git-credentials",),
     )
-    # Secret material under HERMES_HOME, on both the active profile and the global
+    # Secret material under STARDUST_HOME, on both the active profile and the global
     # root: overwriting the root .env leaks credentials across every profile that
     # inherits it, and the root Anthropic PKCE store is still read by default /
     # non-profile sessions when a profile is active. google_oauth.json is an OAuth
@@ -192,9 +192,9 @@ def build_write_denied_prefixes(home: str) -> list[str]:
 
 
 def get_safe_write_roots() -> set[str]:
-    """Resolved HERMES_WRITE_SAFE_ROOT paths (``os.pathsep``-separated list)."""
+    """Resolved STARDUST_WRITE_SAFE_ROOT paths (``os.pathsep``-separated list)."""
     roots: set[str] = set()
-    for path in filter(None, os.getenv("HERMES_WRITE_SAFE_ROOT", "").split(os.pathsep)):
+    for path in filter(None, os.getenv("STARDUST_WRITE_SAFE_ROOT", "").split(os.pathsep)):
         with suppress(OSError, ValueError):
             roots.add(os.path.realpath(os.path.expanduser(path)))
     return roots
@@ -211,7 +211,7 @@ def build_write_approval_paths(home: str) -> set[str]:
     return {os.path.realpath(os.path.join(home, ".ssh", "config"))}
 
 
-# HERMES_HOME / root subpaths that the agent's generic file tools must not
+# STARDUST_HOME / root subpaths that the agent's generic file tools must not
 # rewrite. Session transcripts (state.db, sessions/) are application-owned
 # state whose rewrite can falsify history and break resume/compression;
 # mcp-tokens/, pairing/, vault/ (key + ciphertext side by side) and
@@ -264,7 +264,7 @@ def get_write_denied_error(path: str, *, verb: str = "Write") -> Optional[str]:
     if denial == "safe_root":
         roots_display = os.pathsep.join(sorted(get_safe_write_roots()))
         return (
-            f"{verb} denied: '{path}' is outside HERMES_WRITE_SAFE_ROOT "
+            f"{verb} denied: '{path}' is outside STARDUST_WRITE_SAFE_ROOT "
             f"({roots_display}). Unset the variable or add this path's directory prefix."
         )
     if denial == "nt_namespace":
@@ -288,7 +288,7 @@ _DID_SUFFIX = (
     " (Defense-in-depth — not a security boundary; the terminal tool can still bypass.)"
 )
 
-# Exact-file credential stores under HERMES_HOME / <root>. The agent never
+# Exact-file credential stores under STARDUST_HOME / <root>. The agent never
 # needs these directly — provider tools consume them through internal channels.
 # bws_cache.json is the Bitwarden Secrets Manager disk cache: plaintext secret values.
 _CREDENTIAL_FILE_NAMES = (
@@ -296,7 +296,7 @@ _CREDENTIAL_FILE_NAMES = (
     os.path.join("auth", "google_oauth.json"), os.path.join("cache", "bws_cache.json"),
 )
 
-# Directory-prefix read denies under HERMES_HOME / <root>: (subdir, message for
+# Directory-prefix read denies under STARDUST_HOME / <root>: (subdir, message for
 # the directory itself, message for a file inside). browser-profile/ is a copy
 # of the user's Cookies / Login Data — the same credential class as auth.json.
 _READ_DENIED_DIRS = (
@@ -317,7 +317,7 @@ def get_read_block_error(path: str) -> Optional[str]:
     """Return an error message when a read targets a denied Hermes path.
 
     Blocked: internal skill-hub caches (prompt-injection carriers), credential
-    stores under HERMES_HOME and the global root (exact files, plus anything
+    stores under STARDUST_HOME and the global root (exact files, plus anything
     under ``mcp-tokens/`` and ``browser-profile/``), and project-local ``.env``
     files anywhere on disk (``.env.example`` is the documented-shape substitute).
 
@@ -378,8 +378,8 @@ def raise_if_read_blocked(path: str) -> None:
 
 
 def _resolve_active_profile_name() -> str:
-    """Active profile name from HERMES_HOME: ``~/.hermes`` -> ``"default"``,
-    ``~/.hermes/profiles/X`` -> ``"X"``; ``"default"`` on any resolution failure."""
+    """Active profile name from STARDUST_HOME: ``~/.stardust`` -> ``"default"``,
+    ``~/.stardust/profiles/X`` -> ``"X"``; ``"default"`` on any resolution failure."""
     try:
         parts = _hermes_home_path().resolve().relative_to(_hermes_root_path().resolve() / "profiles").parts
     except (OSError, RuntimeError, ValueError):
@@ -389,7 +389,7 @@ def _resolve_active_profile_name() -> str:
 
 # --- Sandbox-mirror write guard ---
 # Non-local terminal backends bind a sandbox-local dir to the container's $HOME:
-#   <HERMES_HOME>/profiles/<name>/sandboxes/<backend>/<task>/home/.hermes/...
+#   <STARDUST_HOME>/profiles/<name>/sandboxes/<backend>/<task>/home/.stardust/...
 # A host-side write there lands on a mirror the host never reads: silent success,
 # divergent copies. Path-shape-only detection, independent of the active profile;
 # the inner-container case (bind mount strips the prefix) is classify_container_mirror_target.
@@ -411,13 +411,13 @@ def _mirror_info(target: Path, mirror_root: Path, inner_path: str) -> dict:
 def classify_sandbox_mirror_target(path: str) -> Optional[dict]:
     """Classify a write target as a sandbox-mirror of authoritative Hermes state: ``None``
     for non-mirror paths, else ``target_path`` (resolved), ``mirror_root`` (the
-    ``…/home/.hermes`` prefix) and ``inner_path`` (what the agent meant on the host)."""
+    ``…/home/.stardust`` prefix) and ``inner_path`` (what the agent meant on the host)."""
     target = _resolve_target(path)
     parts = target.parts if target is not None else ()
-    # Need at least: sandboxes / <backend> / <task> / home / .hermes / <thing>; inner_idx = the .hermes part.
+    # Need at least: sandboxes / <backend> / <task> / home / .stardust / <thing>; inner_idx = the .stardust part.
     inner_idx = next(
         (i + 4 for i, part in enumerate(parts)
-         if part == "sandboxes" and i + 5 < len(parts) and parts[i + 3] == "home" and parts[i + 4] == ".hermes"),
+         if part == "sandboxes" and i + 5 < len(parts) and parts[i + 3] == "home" and parts[i + 4] == ".stardust"),
         None,
     )
     if inner_idx is None:
@@ -440,14 +440,14 @@ def get_sandbox_mirror_warning(path: str) -> Optional[str]:
         classify_sandbox_mirror_target(path),
         "a per-task mirror created by a non-local terminal backend (docker/daytona/etc.). "
         "Writes here land on a copy that the host Hermes process never reads — the "
-        "authoritative file is likely {inner_path!r} under the real HERMES_HOME.",
+        "authoritative file is likely {inner_path!r} under the real STARDUST_HOME.",
         "this guard after explicit user direction, retry the call",
     )
 
 
 def classify_container_mirror_target(path: str, mirror_prefix: str | None = None) -> Optional[dict]:
     """Classify a write target as a container-side sandbox mirror. Inside the container
-    the bind mount strips the ``sandboxes/`` prefix (the agent sees plain ``/root/.hermes/…``),
+    the bind mount strips the ``sandboxes/`` prefix (the agent sees plain ``/root/.stardust/…``),
     so the caller supplies ``mirror_prefix`` once it knows file tools run in a docker sandbox.
     ``None`` without a prefix or outside it, else ``target_path``/``mirror_root``/``inner_path``."""
     target, mirror = _resolve_target(path), _resolve_target(mirror_prefix) if mirror_prefix else None
@@ -462,6 +462,6 @@ def get_container_mirror_warning(path: str, mirror_prefix: str | None = None) ->
         classify_container_mirror_target(path, mirror_prefix),
         "the container's bind-mounted home — a per-task mirror that the host Hermes "
         "process never reads. The authoritative file is {inner_path!r} under "
-        "the real HERMES_HOME.",
+        "the real STARDUST_HOME.",
         "after explicit user direction, retry",
     )

@@ -2,7 +2,7 @@
  * desktop-uninstall.ts
  *
  * Pure, electron-free helpers for the desktop Chat GUI uninstaller. These map
- * the three user-facing uninstall modes to the `hermes uninstall` CLI flags,
+ * the three user-facing uninstall modes to the `stardust uninstall` CLI flags,
  * resolve the running app bundle/exe so a detached cleanup script can remove
  * it after the app quits, and build that cleanup script for each OS.
  *
@@ -12,14 +12,14 @@
  *
  * The three modes mirror the CLI's options exactly:
  *   - 'gui'  → remove ONLY the Chat GUI, keep the agent + all user data.
- *              `hermes uninstall --gui --yes`
+ *              `stardust uninstall --gui --yes`
  *   - 'lite' → remove the GUI + agent code, KEEP user data (config / sessions
- *              / .env) for a future reinstall. `hermes uninstall --yes`
+ *              / .env) for a future reinstall. `stardust uninstall --yes`
  *   - 'full' → remove everything: GUI + agent + all user data.
- *              `hermes uninstall --full --yes`
+ *              `stardust uninstall --full --yes`
  *
  * Why a detached cleanup script: 'lite'/'full' delete the very venv the
- * `hermes` command runs from, and every mode may need to delete the running
+ * `stardust` command runs from, and every mode may need to delete the running
  * app bundle (locked on macOS/Windows while the process is alive). So we hand
  * the work to a detached child that waits for this app's PID to exit, runs the
  * Python uninstall, then removes the app bundle — then the app quits. Same
@@ -153,7 +153,7 @@ function buildPosixCleanupScript({ desktopPid, pythonExe, pythonPath, agentRoot,
     '    sleep 0.5',
     '  done',
     'fi',
-    `export HERMES_HOME=${q(hermesHome)}`
+    `export STARDUST_HOME=${q(hermesHome)}`
   ]
 
   if (pythonPath) {
@@ -209,7 +209,7 @@ function buildWindowsCleanupScript({
   const lines = [
     '@echo off',
     'setlocal enableextensions',
-    `set "HERMES_HOME=${String(hermesHome).replace(/"/g, '')}"`,
+    `set "STARDUST_HOME=${String(hermesHome).replace(/"/g, '')}"`,
     `set "PID=${pid}"`
   ]
 

@@ -12,7 +12,7 @@ import { notifyError } from '@/store/notifications'
  *
  * Matches the draft against the Nous-approved MCP catalog's `suggest`
  * metadata (`GET /api/mcp/catalog` — the same reviewed manifests behind
- * `hermes mcp catalog`), by whole-word keyword and pasted-link host suffix,
+ * `stardust mcp catalog`), by whole-word keyword and pasted-link host suffix,
  * excluding servers already configured. The catalog is the single source of
  * truth for suggestible servers. A suggestion's invoke runs the whole
  * connect: validated config write → browser OAuth → live tool reload, with

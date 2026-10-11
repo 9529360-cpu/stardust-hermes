@@ -29,8 +29,8 @@ def test_systemctl_failure_is_explained_not_tracebacked(monkeypatch, capsys):
     exc = subprocess.CalledProcessError(1, ["systemctl", "--user", "start", "hermes-gateway"])
     out = _run_gateway_command_raising(monkeypatch, capsys, exc)
     assert not out.lstrip().startswith("Command '")
-    assert "hermes gateway status --deep" in out
-    assert "hermes gateway install --force" in out
+    assert "stardust gateway status --deep" in out
+    assert "stardust gateway install --force" in out
     assert "journalctl" in out
     # The raw detail survives as a secondary line, not the lead sentence.
     assert "Details:" in out
@@ -44,7 +44,7 @@ def test_missing_systemctl_points_at_foreground_run(monkeypatch, capsys):
     with pytest.raises(RuntimeError) as info:
         gateway_cli._run_systemctl(["start", "hermes-gateway"])
     out = _run_gateway_command_raising(monkeypatch, capsys, info.value)
-    assert "hermes gateway run" in out
+    assert "stardust gateway run" in out
     assert "systemd" in out
     assert not out.lstrip().startswith("systemctl is not available")
 
@@ -62,7 +62,7 @@ def test_existing_gateway_guard_says_bots_are_online_and_names_status(monkeypatc
     out = capsys.readouterr().out
     assert "12345" in out
     assert "online" in out
-    for cmd in ("hermes gateway status", "hermes gateway restart", "hermes gateway stop"):
+    for cmd in ("stardust gateway status", "stardust gateway restart", "stardust gateway stop"):
         assert cmd in out
     assert "Another gateway instance" not in out
 
@@ -73,7 +73,7 @@ def test_unsupported_platform_copy_says_what_is_unsupported(subcommand):
     text = "\n".join(lines)
     assert text != "Not supported on this platform."
     assert "background service" in text
-    assert "hermes gateway run" in text or subcommand == "uninstall"
+    assert "stardust gateway run" in text or subcommand == "uninstall"
 
 
 # --- cli-13 / cli-14: profile name errors -----------------------------------------------------
@@ -86,11 +86,11 @@ def test_invalid_profile_name_explains_rule_in_words_with_example():
     assert "Must match" not in msg and "[a-z0-9]" not in msg
     assert "lowercase" in msg
     assert "my-work" in msg
-    assert "hermes profile create my-work" in msg
+    assert "stardust profile create my-work" in msg
 
 
 def test_existing_profile_error_offers_use_and_list(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     profiles.create_profile("work", no_alias=True, no_skills=True)
     with pytest.raises(FileExistsError) as info:
         profiles.create_profile("work", no_alias=True, no_skills=True)
@@ -101,7 +101,7 @@ def test_existing_profile_error_offers_use_and_list(tmp_path, monkeypatch):
 
 
 def test_missing_profile_error_points_at_list(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     with pytest.raises(FileNotFoundError) as info:
         profiles.delete_profile("wrk")
     msg = str(info.value)
@@ -116,5 +116,5 @@ def test_describe_holder_avoids_jargon_and_names_next_steps():
     message = describe_holder(UpdateHolder(pid=4242, age_seconds=190))
     assert "4242" in message and "3m 10s" in message
     assert "PID" not in message and "checkout" not in message
-    assert "hermes logs" in message
-    assert "hermes update" in message
+    assert "stardust logs" in message
+    assert "stardust update" in message

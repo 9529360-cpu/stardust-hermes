@@ -14,19 +14,19 @@ LOOPBACK = "--host 127.0.0.1 --port 0"
 # (cmdline, holder subcommand, desktop-local reap?, Windows updater "Desktop backend"?). Substring
 # scanners get every "trap" row wrong: "serve" appears inside --preserve-cache / observer.py / a flag
 # value. The updater's kill set additionally requires the Desktop's `-m hermes_cli.main` spawn shape —
-# a user-launched `hermes serve` / `hermes dashboard` is refused on, never tree-killed.
+# a user-launched `stardust serve` / `stardust dashboard` is refused on, never tree-killed.
 CMDLINES = [
     ("python -m hermes_cli.main serve " + LOOPBACK, "serve", True, True),
     ("python -m hermes_cli.main dashboard", "dashboard", False, True),
-    ("/venv/bin/hermes serve --isolated --host=127.0.0.1 --port=0 --ssh-owner-nonce abc", "serve", True, False),
-    (r"C:\hermes\.venv\Scripts\hermes.exe serve --host 100.106.105.2 --port 9119", "serve", False, False),
-    ("hermes.exe dashboard", "dashboard", False, False),
-    ("hermes --profile ops serve " + LOOPBACK, "serve", True, False),
-    ("hermes -m serve kanban --preserve-cache " + LOOPBACK, "kanban", False, False),
+    ("/venv/bin/stardust serve --isolated --host=127.0.0.1 --port=0 --ssh-owner-nonce abc", "serve", True, False),
+    (r"C:\hermes\.venv\Scripts\stardust.exe serve --host 100.106.105.2 --port 9119", "serve", False, False),
+    ("stardust.exe dashboard", "dashboard", False, False),
+    ("stardust --profile ops serve " + LOOPBACK, "serve", True, False),
+    ("stardust -m serve kanban --preserve-cache " + LOOPBACK, "kanban", False, False),
     ("python -m hermes_cli.main kanban --preserve-cache " + LOOPBACK, "kanban", False, False),
-    ("hermes --reasoning high dashboard " + LOOPBACK, "dashboard", False, False),
-    ("hermes gateway run --replace", "gateway", False, False),
-    ("hermes chat --model serve", "chat", False, False),
+    ("stardust --reasoning high dashboard " + LOOPBACK, "dashboard", False, False),
+    ("stardust gateway run --replace", "gateway", False, False),
+    ("stardust chat --model serve", "chat", False, False),
     ("python observer.py serve " + LOOPBACK, None, False, False),
 ]
 
@@ -42,9 +42,9 @@ def test_kill_and_relaunch_predicates_agree_with_the_canonical_holder_matcher(
 
 
 def test_desktop_local_serve_spares_fixed_port_and_remote_hosts():
-    assert not _is_desktop_local_serve_cmdline("hermes serve --host 100.106.105.2 --port 9119 --skip-build")
-    assert not _is_desktop_local_serve_cmdline("hermes serve --host 127.0.0.1 --port 9119")
-    assert _is_desktop_local_serve_cmdline("hermes serve --host localhost --port 0")
+    assert not _is_desktop_local_serve_cmdline("stardust serve --host 100.106.105.2 --port 9119 --skip-build")
+    assert not _is_desktop_local_serve_cmdline("stardust serve --host 127.0.0.1 --port 9119")
+    assert _is_desktop_local_serve_cmdline("stardust serve --host localhost --port 0")
 
 
 def test_profile_liveness_is_the_shared_ladder(tmp_path, monkeypatch):

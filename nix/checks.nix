@@ -181,7 +181,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 gateway.enable = true;
                 backend.mode = "serve";
                 settings.model.default = "test/model";
-                environment.HERMES_TEST = "1";
+                environment.STARDUST_TEST = "1";
                 environmentFiles = [ "/run/secrets/hermes-env" ];
                 hermesHomeFiles."SOUL.md" = "test soul";
                 # documents needs an explicit workingDirectory. The check
@@ -197,7 +197,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
             cfg = enabled.config;
 
             # The gateway and the backend are two processes with one
-            # HERMES_HOME.
+            # STARDUST_HOME.
             processes =
               if pkgs.stdenv.hostPlatform.isDarwin then
                 lib.mapAttrs (_: agent: {
@@ -232,35 +232,35 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 "hermes-backend"
               ]) "expected hermes-agent + hermes-backend processes, got: ${toString names}"
               ++ lib.optional (
-                !lib.hasInfix "bin/hermes gateway" (argvOf "hermes-agent")
-              ) "gateway process does not run `hermes gateway`: ${argvOf "hermes-agent"}"
+                !lib.hasInfix "bin/stardust gateway" (argvOf "hermes-agent")
+              ) "gateway process does not run `stardust gateway`: ${argvOf "hermes-agent"}"
               ++ lib.optional (
-                !lib.hasInfix "bin/hermes serve" (argvOf "hermes-backend")
-              ) "backend process does not run `hermes serve`: ${argvOf "hermes-backend"}"
+                !lib.hasInfix "bin/stardust serve" (argvOf "hermes-backend")
+              ) "backend process does not run `stardust serve`: ${argvOf "hermes-backend"}"
               ++ lib.optional (
                 !lib.hasInfix "--no-open" (argvOf "hermes-backend")
               ) "backend must pass --no-open so a service never opens a browser"
               ++ lib.optional (
-                lib.any (n: !lib.hasInfix "/home/hermes-check/.hermes" (envOf n)) names
-              ) "gateway and backend must share one HERMES_HOME"
+                lib.any (n: !lib.hasInfix "/home/hermes-check/.stardust" (envOf n)) names
+              ) "gateway and backend must share one STARDUST_HOME"
               ++ lib.optional (
-                cfg.home.sessionVariables.HERMES_HOME or null != "/home/hermes-check/.hermes"
-              ) "programs.hermes-agent.enable must export HERMES_HOME for interactive shells"
+                cfg.home.sessionVariables.STARDUST_HOME or null != "/home/hermes-check/.stardust"
+              ) "programs.hermes-agent.enable must export STARDUST_HOME for interactive shells"
               ++ lib.optional (
                 !lib.hasInfix "hermes-config-merge" activation
               ) "activation must deep-merge config.yaml, not overwrite it"
               ++ lib.optional (
-                !lib.hasInfix "/home/hermes-check/.hermes/SOUL.md" activation
-              ) "hermesHomeFiles must install into HERMES_HOME"
+                !lib.hasInfix "/home/hermes-check/.stardust/SOUL.md" activation
+              ) "hermesHomeFiles must install into STARDUST_HOME"
               ++ lib.optional (
                 !lib.hasInfix "/home/test-user/workspace/AGENTS.md" activation
               ) "documents must install into workingDirectory"
-              # The CLI reads HERMES_MANAGED to name the rebuild command when
+              # The CLI reads STARDUST_MANAGED to name the rebuild command when
               # it refuses to write the configuration. A Home Manager install
               # has no nixos-rebuild command. Thus it must not report NixOS.
               ++ lib.optional (
-                !lib.any (n: lib.hasInfix "HERMES_MANAGED=home-manager" (envOf n)) names
-              ) "processes must report HERMES_MANAGED=home-manager"
+                !lib.any (n: lib.hasInfix "STARDUST_MANAGED=home-manager" (envOf n)) names
+              ) "processes must report STARDUST_MANAGED=home-manager"
               ++ lib.optional (
                 !lib.hasInfix "hermes-managed" activation
               ) "activation must write a .managed marker naming the managing system";
@@ -353,12 +353,12 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
               ''
           );
 
-        # ── The desktop application shares one HERMES_HOME ───────────────
-        # `programs.enable` exports HERMES_HOME with home.sessionVariables,
+        # ── The desktop application shares one STARDUST_HOME ───────────────
+        # `programs.enable` exports STARDUST_HOME with home.sessionVariables,
         # which reaches an interactive shell only. Home Manager writes that
         # file to etc/profile.d, and a launcher from the desktop menu reads
-        # no shell profile. Thus the desktop application would open ~/.hermes
-        # while the services use the HERMES_HOME of the module, and the user
+        # no shell profile. Thus the desktop application would open ~/.stardust
+        # while the services use the STARDUST_HOME of the module, and the user
         # would see an empty application with no sessions and no keys.
         #
         # The launcher must therefore carry the value itself. This check
@@ -431,14 +431,14 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 lib.length desktopPackages != 1
               ) "programs.desktop.enable must install exactly one hermes-desktop package, got ${toString (lib.length desktopPackages)}"
               ++ lib.optional (
-                setValue "HERMES_HOME" != "/home/hermes-check/.hermes-work"
-              ) "the launcher must carry HERMES_HOME: a GUI launcher reads no shell profile, so home.sessionVariables never reaches it (got: ${toString (setValue "HERMES_HOME")})"
+                setValue "STARDUST_HOME" != "/home/hermes-check/.hermes-work"
+              ) "the launcher must carry STARDUST_HOME: a GUI launcher reads no shell profile, so home.sessionVariables never reaches it (got: ${toString (setValue "STARDUST_HOME")})"
               ++ lib.optional (
-                setValue "HERMES_MANAGED" != "home-manager"
-              ) "the launcher must report HERMES_MANAGED=home-manager while the services own the configuration (got: ${toString (setValue "HERMES_MANAGED")})"
+                setValue "STARDUST_MANAGED" != "home-manager"
+              ) "the launcher must report STARDUST_MANAGED=home-manager while the services own the configuration (got: ${toString (setValue "STARDUST_MANAGED")})"
               ++ lib.optional (
                 lib.length agentPackages == 1
-                && setValue "STARDUST_DESKTOP_HERMES" != "${lib.head agentPackages}/bin/hermes"
+                && setValue "STARDUST_DESKTOP_HERMES" != "${lib.head agentPackages}/bin/stardust"
               ) "the launcher must pin the agent package that programs.enable installs, and not a second runtime: ${toString (setValue "STARDUST_DESKTOP_HERMES")}"
 
               # ── The application reaches the backend of the service ──────
@@ -449,7 +449,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 !lib.hasInfix "STARDUST_DESKTOP_REMOTE_TOKEN" wrapper
               ) "the launcher must give a token with the URL: the desktop resolver throws when the URL is set alone"
               ++ lib.optional (
-                !lib.hasInfix "HERMES_DASHBOARD_SESSION_TOKEN" backendScript
+                !lib.hasInfix "STARDUST_DASHBOARD_SESSION_TOKEN" backendScript
               ) "the backend must read the session token, or it makes a new one that the application cannot know"
 
               # ── The token never enters the Nix store ────────────────────
@@ -471,7 +471,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
               throw "Home Manager desktop check failed:\n${lib.concatMapStringsSep "\n" (f: "  - ${f}") failures}"
             else
               ''
-                echo "PASS: the desktop launcher shares HERMES_HOME, the runtime and the backend of the service"
+                echo "PASS: the desktop launcher shares STARDUST_HOME, the runtime and the backend of the service"
                 mkdir -p $out
                 echo "ok" > $out/result
               ''
@@ -501,10 +501,10 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 lib.length desktopPackages != 1
               ) "programs.desktop.enable must install the application with no services enabled"
               ++ lib.optional (
-                !lib.hasInfix "--set HERMES_HOME" wrapper
-              ) "the launcher must carry HERMES_HOME even with no services"
+                !lib.hasInfix "--set STARDUST_HOME" wrapper
+              ) "the launcher must carry STARDUST_HOME even with no services"
               ++ lib.optional (
-                lib.hasInfix "HERMES_MANAGED" wrapper
+                lib.hasInfix "STARDUST_MANAGED" wrapper
               ) "the launcher must not claim a managed install when no activation writes one"
               ++ lib.optional (
                 lib.hasInfix "STARDUST_DESKTOP_REMOTE_URL" wrapper
@@ -527,7 +527,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
         # ── installPackage names its replacement ─────────────────────────
         # The option was removed by the programs./services. split. It
         # defaulted to true, so a person who never named it still got the
-        # command line. A silent removal thus leaves them with no `hermes`
+        # command line. A silent removal thus leaves them with no `stardust`
         # and no message. The module must refuse the configuration and name
         # the replacement.
         home-manager-install-package-removed =
@@ -669,17 +669,17 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 "hermes-backend"
               ]) "expected hermes-agent + hermes-backend units, got: ${toString names}"
               ++ lib.optional (
-                !lib.hasInfix "bin/hermes gateway" (execOf "hermes-agent")
-              ) "gateway unit does not run `hermes gateway`: ${execOf "hermes-agent"}"
+                !lib.hasInfix "bin/stardust gateway" (execOf "hermes-agent")
+              ) "gateway unit does not run `stardust gateway`: ${execOf "hermes-agent"}"
               ++ lib.optional (
-                !lib.hasInfix "bin/hermes dashboard" (execOf "hermes-backend")
-              ) "backend unit does not run `hermes dashboard`: ${execOf "hermes-backend"}"
+                !lib.hasInfix "bin/stardust dashboard" (execOf "hermes-backend")
+              ) "backend unit does not run `stardust dashboard`: ${execOf "hermes-backend"}"
               ++ lib.optional (
-                units.hermes-agent.environment.HERMES_HOME != units.hermes-backend.environment.HERMES_HOME
-              ) "gateway and backend must share one HERMES_HOME"
+                units.hermes-agent.environment.STARDUST_HOME != units.hermes-backend.environment.STARDUST_HOME
+              ) "gateway and backend must share one STARDUST_HOME"
               ++ lib.optional (
-                !lib.hasInfix "/var/lib/hermes/.hermes/SOUL.md" activation
-              ) "hermesHomeFiles must install into HERMES_HOME";
+                !lib.hasInfix "/var/lib/hermes/.stardust/SOUL.md" activation
+              ) "hermesHomeFiles must install into STARDUST_HOME";
 
             # You cannot use container mode and the backend together. The
             # module says so with an assertion. Without the assertion it
@@ -754,7 +754,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
 
             failures =
               # The default must not change.
-              lib.optional (!lib.hasInfix "bin/hermes serve --host 127.0.0.1" direct)
+              lib.optional (!lib.hasInfix "bin/stardust serve --host 127.0.0.1" direct)
                 "without waitFor the backend must exec hermes directly, got: ${direct}"
               ++ lib.optional (lib.hasInfix "hermes-backend-launch" direct)
                 "without waitFor the backend must not use the launcher"
@@ -776,7 +776,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
                 "the interface launcher must poll backend.interfaceName"
               ++ lib.optional (!lib.hasInfix "_timeout=30" interfaceScript)
                 "the launcher must use backend.waitTimeout"
-              ++ lib.optional (!lib.hasInfix "bin/hermes dashboard" interfaceScript)
+              ++ lib.optional (!lib.hasInfix "bin/stardust dashboard" interfaceScript)
                 "the launcher must keep backend.mode"
 
               # The assertions reject what cannot work.
@@ -855,7 +855,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
 
         # ── How .env is built ────────────────────────────────────────────
         # This check runs the real script that both modules use to build
-        # $HERMES_HOME/.env. The important property is that a second run
+        # $STARDUST_HOME/.env. The important property is that a second run
         # gives the same result. Activation runs at each rebuild. If the
         # script added the secrets to the file that exists, the file would
         # grow at each rebuild. The script writes the file again from the
@@ -866,7 +866,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
             envScript = (import ./moduleCommon.nix { inherit lib; }).mkEnvScript {
               inherit pkgs;
               environment = {
-                HERMES_PUBLIC = "visible";
+                STARDUST_PUBLIC = "visible";
               };
             };
           in
@@ -880,7 +880,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
             ${envScript} "$workdir/.env" 0600 "$workdir/secret-a" "$workdir/secret-b"
             first=$(cat "$workdir/.env")
 
-            grep -qx 'HERMES_PUBLIC=visible' "$workdir/.env" || \
+            grep -qx 'STARDUST_PUBLIC=visible' "$workdir/.env" || \
               (echo "FAIL: non-secret environment missing"; cat "$workdir/.env"; exit 1)
             grep -qx 'SECRET_TOKEN=s3cret' "$workdir/.env" || \
               (echo "FAIL: secret from environmentFile missing"; cat "$workdir/.env"; exit 1)
@@ -991,12 +991,12 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
         package-contents = pkgs.runCommand "hermes-package-contents" { } ''
           set -e
           echo "=== Checking binaries ==="
-          test -x ${hermes-agent}/bin/hermes || (echo "FAIL: hermes binary missing"; exit 1)
+          test -x ${hermes-agent}/bin/stardust || (echo "FAIL: hermes binary missing"; exit 1)
           test -x ${hermes-agent}/bin/hermes-agent || (echo "FAIL: hermes-agent binary missing"; exit 1)
           echo "PASS: All binaries present"
 
           echo "=== Checking version ==="
-          ${hermes-agent}/bin/hermes --version 2>&1 | grep -qi "hermes" || (echo "FAIL: version check"; exit 1)
+          ${hermes-agent}/bin/stardust --version 2>&1 | grep -qi "hermes" || (echo "FAIL: version check"; exit 1)
           echo "PASS: Version check"
 
           echo "=== All checks passed ==="
@@ -1008,7 +1008,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
         entry-points-sync = pkgs.runCommand "hermes-entry-points-sync" { } ''
           set -e
           echo "=== Checking entry points match pyproject.toml [project.scripts] ==="
-          for bin in hermes hermes-agent hermes-acp; do
+          for bin in stardust hermes-agent hermes-acp; do
             test -x ${hermes-agent}/bin/$bin || (echo "FAIL: $bin binary missing from Nix package"; exit 1)
             echo "PASS: $bin present"
           done
@@ -1022,9 +1022,9 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           set -e
           export HOME=$(mktemp -d)
 
-          echo "=== Checking hermes --help ==="
-          ${hermes-agent}/bin/hermes --help 2>&1 | grep -q "gateway" || (echo "FAIL: gateway subcommand missing"; exit 1)
-          ${hermes-agent}/bin/hermes --help 2>&1 | grep -q "config" || (echo "FAIL: config subcommand missing"; exit 1)
+          echo "=== Checking stardust --help ==="
+          ${hermes-agent}/bin/stardust --help 2>&1 | grep -q "gateway" || (echo "FAIL: gateway subcommand missing"; exit 1)
+          ${hermes-agent}/bin/stardust --help 2>&1 | grep -q "config" || (echo "FAIL: config subcommand missing"; exit 1)
           echo "PASS: All subcommands accessible"
 
           echo "=== All CLI checks passed ==="
@@ -1044,9 +1044,9 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           test "$SKILL_COUNT" -gt 0 || (echo "FAIL: no SKILL.md files found in skills directory"; exit 1)
           echo "PASS: $SKILL_COUNT bundled skills found"
 
-          grep -q "HERMES_BUNDLED_SKILLS" ${hermes-agent}/bin/hermes || \
-            (echo "FAIL: HERMES_BUNDLED_SKILLS not in wrapper"; exit 1)
-          echo "PASS: HERMES_BUNDLED_SKILLS set in wrapper"
+          grep -q "STARDUST_BUNDLED_SKILLS" ${hermes-agent}/bin/stardust || \
+            (echo "FAIL: STARDUST_BUNDLED_SKILLS not in wrapper"; exit 1)
+          echo "PASS: STARDUST_BUNDLED_SKILLS set in wrapper"
 
           # Optional skills ship via the wrapper too (pythonSrc excludes
           # them from the wheel, so the env var is the only path in nix).
@@ -1054,9 +1054,9 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
             (echo "FAIL: optional-skills directory missing"; exit 1)
           OPT_COUNT=$(find -L ${hermes-agent}/share/hermes-agent/optional-skills -name "SKILL.md" | wc -l)
           test "$OPT_COUNT" -gt 0 || (echo "FAIL: no SKILL.md files in optional-skills"; exit 1)
-          grep -q "HERMES_OPTIONAL_SKILLS" ${hermes-agent}/bin/hermes || \
-            (echo "FAIL: HERMES_OPTIONAL_SKILLS not in wrapper"; exit 1)
-          echo "PASS: $OPT_COUNT optional skills found, HERMES_OPTIONAL_SKILLS set in wrapper"
+          grep -q "STARDUST_OPTIONAL_SKILLS" ${hermes-agent}/bin/stardust || \
+            (echo "FAIL: STARDUST_OPTIONAL_SKILLS not in wrapper"; exit 1)
+          echo "PASS: $OPT_COUNT optional skills found, STARDUST_OPTIONAL_SKILLS set in wrapper"
 
           echo "=== All bundled skills checks passed ==="
           mkdir -p $out
@@ -1074,9 +1074,9 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
             (echo "FAIL: irc plugin manifest missing"; exit 1)
           echo "PASS: irc plugin manifest present"
 
-          grep -q "HERMES_BUNDLED_PLUGINS" ${hermes-agent}/bin/hermes || \
-            (echo "FAIL: HERMES_BUNDLED_PLUGINS not in wrapper"; exit 1)
-          echo "PASS: HERMES_BUNDLED_PLUGINS set in wrapper"
+          grep -q "STARDUST_BUNDLED_PLUGINS" ${hermes-agent}/bin/stardust || \
+            (echo "FAIL: STARDUST_BUNDLED_PLUGINS not in wrapper"; exit 1)
+          echo "PASS: STARDUST_BUNDLED_PLUGINS set in wrapper"
 
           echo "=== All bundled plugins checks passed ==="
           mkdir -p $out
@@ -1100,18 +1100,18 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           test -f ${hermes-agent}/share/hermes-agent/locales/en.yaml || (echo "FAIL: en.yaml missing"; exit 1)
           echo "PASS: en.yaml present"
 
-          grep -q "HERMES_BUNDLED_LOCALES" ${hermes-agent}/bin/hermes || \
-            (echo "FAIL: HERMES_BUNDLED_LOCALES not in wrapper"; exit 1)
-          echo "PASS: HERMES_BUNDLED_LOCALES set in wrapper"
+          grep -q "STARDUST_BUNDLED_LOCALES" ${hermes-agent}/bin/stardust || \
+            (echo "FAIL: STARDUST_BUNDLED_LOCALES not in wrapper"; exit 1)
+          echo "PASS: STARDUST_BUNDLED_LOCALES set in wrapper"
 
           # locales/ is a bare data dir (no __init__.py), shipped via a
-          # symlink + HERMES_BUNDLED_LOCALES (not via wheel data-files).
+          # symlink + STARDUST_BUNDLED_LOCALES (not via wheel data-files).
           # Verify the wrapper override resolves real strings.
           export HOME=$(mktemp -d)
-          RENDERED=$(cd "$HOME" && HERMES_BUNDLED_LOCALES=${hermes-agent}/share/hermes-agent/locales \
+          RENDERED=$(cd "$HOME" && STARDUST_BUNDLED_LOCALES=${hermes-agent}/share/hermes-agent/locales \
             ${hermesVenv}/bin/python3 -c "from agent import i18n; print(i18n.t('gateway.reset.header_default', lang='en'))")
           echo "rendered: $RENDERED"
-          test "$RENDERED" != "gateway.reset.header_default" || (echo "FAIL: i18n returned the raw key with HERMES_BUNDLED_LOCALES set"; exit 1)
+          test "$RENDERED" != "gateway.reset.header_default" || (echo "FAIL: i18n returned the raw key with STARDUST_BUNDLED_LOCALES set"; exit 1)
           echo "PASS: i18n renders a human string via the wrapper override"
 
           echo "=== All bundled locales checks passed ==="
@@ -1121,7 +1121,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
 
         # Verify bundled optional-mcps catalog is present and resolvable.
         # optional-mcps/ is a bare data dir shipped via symlink +
-        # HERMES_OPTIONAL_MCPS (not via wheel data-files).
+        # STARDUST_OPTIONAL_MCPS (not via wheel data-files).
         bundled-mcps = pkgs.runCommand "hermes-bundled-mcps" { } ''
           set -e
           echo "=== Checking bundled optional-mcps ==="
@@ -1132,14 +1132,14 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           test "$MANIFEST_COUNT" -gt 0 || (echo "FAIL: no manifest.yaml files found"; exit 1)
           echo "PASS: $MANIFEST_COUNT catalog manifests found"
 
-          grep -q "HERMES_OPTIONAL_MCPS" ${hermes-agent}/bin/hermes || \
-            (echo "FAIL: HERMES_OPTIONAL_MCPS not in wrapper"; exit 1)
-          echo "PASS: HERMES_OPTIONAL_MCPS set in wrapper"
+          grep -q "STARDUST_OPTIONAL_MCPS" ${hermes-agent}/bin/stardust || \
+            (echo "FAIL: STARDUST_OPTIONAL_MCPS not in wrapper"; exit 1)
+          echo "PASS: STARDUST_OPTIONAL_MCPS set in wrapper"
 
           export HOME=$(mktemp -d)
-          CATALOG=$(cd "$HOME" && ${hermes-agent}/bin/hermes mcp catalog 2>/dev/null || true)
+          CATALOG=$(cd "$HOME" && ${hermes-agent}/bin/stardust mcp catalog 2>/dev/null || true)
           echo "catalog output: $CATALOG"
-          test -n "$CATALOG" || (echo "FAIL: hermes mcp catalog returned empty"; exit 1)
+          test -n "$CATALOG" || (echo "FAIL: stardust mcp catalog returned empty"; exit 1)
           echo "PASS: mcp catalog resolves entries"
 
           echo "=== All bundled optional-mcps checks passed ==="
@@ -1159,39 +1159,39 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
 
           # self-contained bundle; no runtime node_modules expected
 
-          grep -q "HERMES_TUI_DIR" ${hermes-agent}/bin/hermes || \
-            (echo "FAIL: HERMES_TUI_DIR not in wrapper"; exit 1)
-          echo "PASS: HERMES_TUI_DIR set in wrapper"
+          grep -q "STARDUST_TUI_DIR" ${hermes-agent}/bin/stardust || \
+            (echo "FAIL: STARDUST_TUI_DIR not in wrapper"; exit 1)
+          echo "PASS: STARDUST_TUI_DIR set in wrapper"
 
           echo "=== All bundled TUI checks passed ==="
           mkdir -p $out
           echo "ok" > $out/result
         '';
 
-        # Verify HERMES_NODE is set in wrapper and points to Node 26+
+        # Verify STARDUST_NODE is set in wrapper and points to Node 26+
         # (Hermes pins its toolchain to Node 26 everywhere)
         hermes-node = pkgs.runCommand "hermes-node-version" { } ''
           set -e
-          echo "=== Checking HERMES_NODE in wrapper ==="
-          grep -q "HERMES_NODE" ${hermes-agent}/bin/hermes || \
-            (echo "FAIL: HERMES_NODE not set in wrapper"; exit 1)
-          echo "PASS: HERMES_NODE present in wrapper"
+          echo "=== Checking STARDUST_NODE in wrapper ==="
+          grep -q "STARDUST_NODE" ${hermes-agent}/bin/stardust || \
+            (echo "FAIL: STARDUST_NODE not set in wrapper"; exit 1)
+          echo "PASS: STARDUST_NODE present in wrapper"
 
-          HERMES_NODE=$(sed -n "s/^export HERMES_NODE='\(.*\)'/\1/p" ${hermes-agent}/bin/hermes)
-          test -x "$HERMES_NODE" || (echo "FAIL: HERMES_NODE=$HERMES_NODE not executable"; exit 1)
-          echo "PASS: HERMES_NODE executable at $HERMES_NODE"
+          STARDUST_NODE=$(sed -n "s/^export STARDUST_NODE='\(.*\)'/\1/p" ${hermes-agent}/bin/stardust)
+          test -x "$STARDUST_NODE" || (echo "FAIL: STARDUST_NODE=$STARDUST_NODE not executable"; exit 1)
+          echo "PASS: STARDUST_NODE executable at $STARDUST_NODE"
 
-          NODE_MAJOR=$("$HERMES_NODE" --version | sed 's/^v//' | cut -d. -f1)
+          NODE_MAJOR=$("$STARDUST_NODE" --version | sed 's/^v//' | cut -d. -f1)
           test "$NODE_MAJOR" -ge 26 || \
             (echo "FAIL: Node v$NODE_MAJOR < 26, Hermes requires Node 26"; exit 1)
           echo "PASS: Node v$NODE_MAJOR >= 26"
 
-          echo "=== All HERMES_NODE checks passed ==="
+          echo "=== All STARDUST_NODE checks passed ==="
           mkdir -p $out
           echo "ok" > $out/result
         '';
 
-        # Verify HERMES_MANAGED guard works on all mutation commands
+        # Verify STARDUST_MANAGED guard works on all mutation commands
         managed-guard = pkgs.runCommand "hermes-managed-guard" { } ''
           set -e
           export HOME=$(mktemp -d)
@@ -1199,7 +1199,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           check_blocked() {
             local label="$1"
             shift
-            OUTPUT=$(HERMES_MANAGED=true "$@" 2>&1 || true)
+            OUTPUT=$(STARDUST_MANAGED=true "$@" 2>&1 || true)
             # Case-insensitive: the message names the managing system as the
             # identifier it is keyed by, and the display form is not the
             # property under test here.
@@ -1207,9 +1207,9 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
             echo "PASS: $label blocked in managed mode"
           }
 
-          echo "=== Checking HERMES_MANAGED guards ==="
-          check_blocked "config set" ${hermes-agent}/bin/hermes config set model foo
-          check_blocked "config edit" ${hermes-agent}/bin/hermes config edit
+          echo "=== Checking STARDUST_MANAGED guards ==="
+          check_blocked "config set" ${hermes-agent}/bin/stardust config set model foo
+          check_blocked "config edit" ${hermes-agent}/bin/stardust config edit
 
           echo "=== All guard checks passed ==="
           mkdir -p $out
@@ -1226,16 +1226,16 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           set -e
           echo "=== Checking extraPythonPackages PYTHONPATH injection ==="
 
-          grep -q "PYTHONPATH" ${hermesWithExtra}/bin/hermes || \
+          grep -q "PYTHONPATH" ${hermesWithExtra}/bin/stardust || \
             (echo "FAIL: PYTHONPATH not in wrapper"; exit 1)
           echo "PASS: PYTHONPATH present in wrapper"
 
-          grep -q "${testPkg}" ${hermesWithExtra}/bin/hermes || \
+          grep -q "${testPkg}" ${hermesWithExtra}/bin/stardust || \
             (echo "FAIL: test package path not in PYTHONPATH"; exit 1)
           echo "PASS: test package path found in wrapper"
 
           echo "=== Checking base package has no PYTHONPATH ==="
-          if grep -q "PYTHONPATH" ${hermes-agent}/bin/hermes; then
+          if grep -q "PYTHONPATH" ${hermes-agent}/bin/stardust; then
             echo "FAIL: base package should not have PYTHONPATH"; exit 1
           fi
           echo "PASS: base package clean"
@@ -1351,7 +1351,7 @@ json.dump(sorted(leaf_paths(DEFAULT_CONFIG)), sys.stdout, indent=2)
           # Helper: run merge then load with Python, output merged JSON
           merge_and_load() {
             local hermes_home="$1"
-            export HERMES_HOME="$hermes_home"
+            export STARDUST_HOME="$hermes_home"
             ${configMergeScript} ${nixSettings} "$hermes_home/config.yaml"
             ${hermesVenv}/bin/python3 -c '
 import json, sys

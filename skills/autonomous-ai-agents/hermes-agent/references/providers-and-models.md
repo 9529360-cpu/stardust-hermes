@@ -1,6 +1,6 @@
 # Providers & Model Aliases
 
-Set via `hermes model` (picker) or `hermes setup`. 35+ provider profiles ship as
+Set via `stardust model` (picker) or `stardust setup`. 35+ provider profiles ship as
 plugins under `plugins/model-providers/`; user plugins of the same name override.
 Repository reference: `website/docs/integrations/providers.md`
 
@@ -12,9 +12,9 @@ Stardust does not use the inherited Nous Portal account/subscription path for ne
 |----------|------|----------------|
 | openrouter | API key | `OPENROUTER_API_KEY` |
 | anthropic | API key | `ANTHROPIC_API_KEY` (also `CLAUDE_CODE_OAUTH_TOKEN`) |
-| openai-codex | OAuth | `hermes auth add openai-codex` |
-| qwen-oauth | OAuth | `hermes auth add qwen-oauth` |
-| minimax-oauth | OAuth | `hermes auth add minimax-oauth` |
+| openai-codex | OAuth | `stardust auth add openai-codex` |
+| qwen-oauth | OAuth | `stardust auth add qwen-oauth` |
+| minimax-oauth | OAuth | `stardust auth add minimax-oauth` |
 | copilot | Token | `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` (Copilot device flow — `gh auth login` tokens do NOT work) |
 | copilot-acp | External CLI | Copilot CLI on PATH or `COPILOT_CLI_PATH` |
 | gemini | API key | `GOOGLE_API_KEY` or `GEMINI_API_KEY` |
@@ -30,8 +30,8 @@ Stardust does not use the inherited Nous Portal account/subscription path for ne
 | bedrock / vertex / azure-foundry | Cloud SDK / key | AWS SDK creds / Vertex ADC / `AZURE_FOUNDRY_API_KEY` |
 | custom | Config | `model.base_url` + `model.api_key` in config.yaml |
 
-Multiple credentials per provider pool and rotate automatically (`hermes auth`).
-Fallback chain when the primary fails: `hermes fallback add|remove|list`.
+Multiple credentials per provider pool and rotate automatically (`stardust auth`).
+Fallback chain when the primary fails: `stardust fallback add|remove|list`.
 
 ### User-defined model aliases
 
@@ -56,7 +56,7 @@ model_aliases:
     key_env: THETA_API_KEY        # or: api_key: "${THETA_API_KEY}"
 
 # Short form ("provider/model"), also via CLI:
-#   hermes config set model.aliases.fav openrouter/anthropic/claude-sonnet-4.6
+#   stardust config set model.aliases.fav openrouter/anthropic/claude-sonnet-4.6
 model:
   aliases:
     fav: openrouter/anthropic/claude-sonnet-4.6

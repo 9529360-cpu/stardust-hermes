@@ -3,7 +3,7 @@
 Backends call :func:`ensure(feature)` on first import; missing packages are installed into the
 active venv (or the durable target) unless ``security.allow_lazy_installs: false``, in which
 case :class:`FeatureUnavailable` carries a remediation hint. Security model: venv-scoped
-(never system Python); durable-target mode (``HERMES_LAZY_INSTALL_TARGET``, sealed images)
+(never system Python); durable-target mode (``STARDUST_LAZY_INSTALL_TARGET``, sealed images)
 APPENDS the target to ``sys.path`` so core site-packages wins every collision and a lazy
 package can only add modules, never shadow core; PyPI-by-name specs only (``_spec_is_safe``);
 ``ensure`` accepts only the :data:`LAZY_DEPS` allowlist; failures surface pip's stderr, no retry.
@@ -202,12 +202,12 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
         "starlette==1.3.1",
     ),
     # huggingface-hub is SHARED with transformers (>=1.5.0,<2 via Hindsight) and marked active
-    # on mere presence, so `hermes update` re-asserts this pin everywhere hub exists. MUST stay
+    # on mere presence, so `stardust update` re-asserts this pin everywhere hub exists. MUST stay
     # inside transformers' window and match uv.lock (tests/test_project_metadata.py enforces).
     # HF Agent Trace Viewer upload (hermes trace upload / /upload-trace). huggingface-hub is a SHARED
     # dependency: transformers (pulled by sentence-transformers for local Hindsight embeddings) requires
     # >=1.5.0,<2, and faster-whisper/tokenizers depend on it transitively. Because active_features() marks a
-    # feature active from mere package presence, the `hermes update` lazy-refresh pass re-asserts THIS pin
+    # feature active from mere package presence, the `stardust update` lazy-refresh pass re-asserts THIS pin
     # on every install where hub is present — so an exact pin below 1.5.0 force-downgrades the shared
     # package and breaks Hindsight startup (#60783). Policy: keep the exact pin (no ranges — security
     # posture), but it MUST stay inside transformers' accepted window and MUST match uv.lock so the whole
@@ -243,7 +243,7 @@ class _InstallResult:
 
 # Internal bridge var (set by the Docker image, not user config) redirecting lazy installs from the
 # sealed venv to a writable durable volume.
-_LAZY_TARGET_ENV = "HERMES_LAZY_INSTALL_TARGET"
+_LAZY_TARGET_ENV = "STARDUST_LAZY_INSTALL_TARGET"
 # Stamp of the Python X.Y + ABI the target was populated for; a mismatch after an image rebuild
 # wipes the store so stale .so files are never imported.
 _TARGET_STAMP_NAME = ".python-abi"
@@ -323,7 +323,7 @@ def activate_durable_lazy_target() -> None:
 
 def _allow_lazy_installs() -> bool:
     """Whether lazy installs are permitted: (1) ``security.allow_lazy_installs: false`` blocks in BOTH
-    modes; (2) the sealed venv (``HERMES_DISABLE_LAZY_INSTALLS=1``) blocks only without a durable
+    modes; (2) the sealed venv (``STARDUST_DISABLE_LAZY_INSTALLS=1``) blocks only without a durable
     target to redirect into. Unreadable config fails OPEN — blocking is an explicit opt-in."""
     cfg = None
     with contextlib.suppress(Exception):
@@ -331,7 +331,7 @@ def _allow_lazy_installs() -> bool:
         cfg = load_config()
     if cfg is not None and not bool((cfg.get("security") or {}).get("allow_lazy_installs", True)):
         return False
-    if os.environ.get("HERMES_DISABLE_LAZY_INSTALLS") == "1":
+    if os.environ.get("STARDUST_DISABLE_LAZY_INSTALLS") == "1":
         return _lazy_install_target() is not None
     return True
 
@@ -375,7 +375,7 @@ def _installed_version(spec: str) -> Optional[str]:
 
 
 def _is_satisfied(spec: str) -> bool:
-    """Present AND inside the spec's version range, so ``hermes update`` propagates pin bumps to
+    """Present AND inside the spec's version range, so ``stardust update`` propagates pin bumps to
     installed backends. Unparseable specs/versions or a missing ``packaging`` count as satisfied — err
     toward "don't churn"."""
     installed = _installed_version(spec)
@@ -480,7 +480,7 @@ def _run_installer(cmd: list[str], **kw) -> subprocess.CompletedProcess:
 
 
 def _uv_binary() -> Optional[str]:
-    """Managed uv first ($HERMES_HOME/bin is never on PATH), then PATH. A lookup, not ensure_uv():
+    """Managed uv first ($STARDUST_HOME/bin is never on PATH), then PATH. A lookup, not ensure_uv():
     downloading uv mid-turn is more than the caller asked for; pip covers no-uv."""
     try:
         from hermes_cli.managed_uv import resolve_uv
@@ -662,9 +662,9 @@ def install_specs(specs: list[str] | tuple[str, ...], *, timeout: int = 300) -> 
             return InstallSpecsResult(ok=False, blocked=True, reason=f"refusing to install unsafe spec {spec!r}")
     target = _lazy_install_target()
     if not _allow_lazy_installs():
-        sealed = os.environ.get("HERMES_DISABLE_LAZY_INSTALLS") == "1" and target is None
+        sealed = os.environ.get("STARDUST_DISABLE_LAZY_INSTALLS") == "1" and target is None
         reason = ("runtime installs are disabled on this deployment: the agent environment is immutable "
-                  "and no writable install target is configured (HERMES_LAZY_INSTALL_TARGET)"
+                  "and no writable install target is configured (STARDUST_LAZY_INSTALL_TARGET)"
                   ) if sealed else "runtime installs disabled (security.allow_lazy_installs=false)"
         return InstallSpecsResult(ok=False, blocked=True, reason=reason)
     display = "uv pip install " + (f"--target {target} " if target is not None else "") + " ".join(cleaned)
@@ -681,12 +681,12 @@ def install_specs(specs: list[str] | tuple[str, ...], *, timeout: int = 300) -> 
 
 def active_features() -> list[str]:
     """Features whose ANCHOR package (first spec) is present at any version — shared helpers like
-    asyncpg are deliberately not proof a backend was enabled. Drives ``hermes update``."""
+    asyncpg are deliberately not proof a backend was enabled. Drives ``stardust update``."""
     return [f for f, specs in LAZY_DEPS.items() if specs and _is_present(specs[0])]
 
 
 def refresh_active_features(*, prompt: bool = False) -> dict[str, str]:
-    """Re-run ``ensure`` for every active feature (``hermes update``); returns
+    """Re-run ``ensure`` for every active feature (``stardust update``); returns
     ``{feature: "current" | "refreshed" | "failed: <reason>" | "skipped: <reason>"}``. Never raises."""
     return _refresh_features(active_features(), prompt=prompt, restoring=False)
 

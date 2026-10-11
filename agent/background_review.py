@@ -436,16 +436,16 @@ _SKILL_REVIEW_PROMPT = (
     "curator handles consolidation at scale.\n\n"
     "Protected skills (DO NOT edit these):\n"
     "  • Bundled skills (shipped with Hermes, e.g. 'hermes-agent').\n"
-    "  • Hub-installed skills (installed via 'hermes skills install').\n"
+    "  • Hub-installed skills (installed via 'stardust skills install').\n"
     "  • Skills in skills.external_dirs (externally owned).\n"
-    "  • PINNED skills (marked via 'hermes curator pin'). You are an autonomous no-user-present "
+    "  • PINNED skills (marked via 'stardust curator pin'). You are an autonomous no-user-present "
     "actor, so pin blocks your writes too — content updates included. Only the user, in a "
     "foreground session, can change a pinned skill.\n"
     "  • USER-OWNED skills — anything not curator-managed. A skill the user hand-wrote, installed "
     "by URL, or asked a foreground agent to create is theirs, not yours; your writes to it WILL be "
     "refused. This includes skills that were loaded or consulted this session: being in play does "
     "not make one yours to edit. If such a skill is wrong or outdated, say so in your reply and "
-    "recommend 'hermes curator adopt <name>' — do not try to patch it.\n"
+    "recommend 'stardust curator adopt <name>' — do not try to patch it.\n"
     "If the only skills that need updating are protected, say\n"
     "'Nothing to save.' and stop.\n\n"
     "Do NOT capture" + _DO_NOT_CAPTURE_BLOCK +
@@ -505,15 +505,15 @@ _COMBINED_REVIEW_PROMPT = (
     "consolidation.\n\n"
     "Protected skills (DO NOT edit these):\n"
     "  • Bundled skills (shipped with Hermes, e.g. 'hermes-agent').\n"
-    "  • Hub-installed skills (installed via 'hermes skills install').\n"
+    "  • Hub-installed skills (installed via 'stardust skills install').\n"
     "  • Skills in skills.external_dirs (externally owned).\n"
-    "  • PINNED skills (marked via 'hermes curator pin'). Pin blocks autonomous writes entirely — "
+    "  • PINNED skills (marked via 'stardust curator pin'). Pin blocks autonomous writes entirely — "
     "content updates included — because no user is present to consent. Only a foreground session "
     "can change one.\n"
     "  • USER-OWNED skills — anything not curator-managed (hand-written, URL-installed, or created "
     "by a foreground agent at the user's request). Your writes to these WILL be refused, including "
     "to skills loaded or consulted this session. If one is wrong, say so in your reply and "
-    "recommend 'hermes curator adopt <name>' instead.\n"
+    "recommend 'stardust curator adopt <name>' instead.\n"
     "If the only skills that need updating are protected, say\n"
     "'Nothing to save.' and stop.\n\n"
     "Do NOT capture as skills" + _DO_NOT_CAPTURE_BLOCK +
@@ -703,7 +703,7 @@ def build_memory_write_metadata(
         "execution_context": execution_context or getattr(agent, "_memory_write_context", "foreground"),
         "session_id": agent.session_id or "",
         "parent_session_id": agent._parent_session_id or "",
-        "platform": agent.platform or os.environ.get("HERMES_SESSION_SOURCE", "cli"),
+        "platform": agent.platform or os.environ.get("STARDUST_SESSION_SOURCE", "cli"),
         "tool_name": "memory",
         "task_id": task_id or None,
         "tool_call_id": tool_call_id or None,

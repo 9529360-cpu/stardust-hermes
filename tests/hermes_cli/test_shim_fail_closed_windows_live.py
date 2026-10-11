@@ -2,7 +2,7 @@
 
 Runs ONLY on a real Windows host (the on-demand ``windows-venv-e2e.yml``
 lane). Reproduces the REAL lock shape from the field report: a process
-holding ``hermes.exe`` open WITHOUT FILE_SHARE_DELETE, exactly like a
+holding ``stardust.exe`` open WITHOUT FILE_SHARE_DELETE, exactly like a
 running launcher — then proves the strict quarantine refuses before any
 installer runs, and that the non-contended path still installs.
 
@@ -49,7 +49,7 @@ time.sleep(120)
 def held_shim(tmp_path: Path):
     scripts = tmp_path / "venv" / "Scripts"
     scripts.mkdir(parents=True)
-    shim = scripts / "hermes.exe"
+    shim = scripts / "stardust.exe"
     shim.write_bytes(b"MZ fake shim")
     (scripts / "hermes-gateway.exe").write_bytes(b"MZ fake shim")
     holder = subprocess.Popen(
@@ -70,7 +70,7 @@ def test_locked_shim_really_cannot_be_renamed(held_shim):
     """Premise check: the no-FILE_SHARE_DELETE handle blocks rename."""
     _scripts, shim = held_shim
     with pytest.raises(OSError):
-        os.rename(shim, shim.with_name("hermes.exe.old.premise"))
+        os.rename(shim, shim.with_name("stardust.exe.old.premise"))
 
 
 def test_strict_quarantine_refuses_against_real_lock(held_shim, monkeypatch):
@@ -98,7 +98,7 @@ def test_strict_quarantine_refuses_against_real_lock(held_shim, monkeypatch):
         )
 
     assert install_ran == [], "installer ran against a contended venv"
-    assert "hermes.exe" in exc_info.value.failed_shims
+    assert "stardust.exe" in exc_info.value.failed_shims
     # The unlocked sibling's rename was rolled back — venv untouched.
     assert (scripts / "hermes-gateway.exe").exists()
     assert not list(scripts.glob("*.old.*"))
@@ -124,10 +124,10 @@ def test_release_then_strict_quarantine_succeeds(tmp_path, monkeypatch):
 
     scripts = tmp_path / "venv" / "Scripts"
     scripts.mkdir(parents=True)
-    (scripts / "hermes.exe").write_bytes(b"MZ fake shim")
+    (scripts / "stardust.exe").write_bytes(b"MZ fake shim")
 
     holder = subprocess.Popen(
-        [sys.executable, "-c", _HOLDER_CODE, str(scripts / "hermes.exe")],
+        [sys.executable, "-c", _HOLDER_CODE, str(scripts / "stardust.exe")],
         stdout=subprocess.PIPE,
         text=True,
     )

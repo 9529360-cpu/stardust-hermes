@@ -124,7 +124,7 @@ def _scoped_credential(ai: Any, config: EntraIdentityConfig) -> Any:
 
 def build_credential(config: EntraIdentityConfig) -> Any:
     """Cached Entra credential: the process-wide default chain when unscoped, the routed profile's own
-    credential (built from its secret scope) under a HERMES_HOME override."""
+    credential (built from its secret scope) under a STARDUST_HOME override."""
     from hermes_constants import get_hermes_home_override, hermes_home_key
     if get_hermes_home_override() is None:
         return _default_chain_credential(config)
@@ -301,7 +301,7 @@ def build_bearer_http_client(token_provider: Callable[[], str], **httpx_kwargs: 
             # WARNING so the misconfiguration is visible at default levels.
             logger.warning("Bearer hook: Entra ID token provider returned empty (%s) "
                            "— stripping Authorization headers. Azure will respond 401. "
-                           "Run `hermes doctor` or `az login` to recover.", exc)
+                           "Run `stardust doctor` or `az login` to recover.", exc)
             _strip_auth_headers(request)
             return
         _strip_auth_headers(request)

@@ -31,7 +31,7 @@ def test_local_session_token_mints_bridge_grant_and_binds_ui_session(monkeypatch
         launch = reply["result"]["launch_context"]
         scope = broker.consume_bridge_grant(launch["grant"])
         tokens = server._set_session_context("durable-key")
-        assert get_session_env("HERMES_SESSION_ID") == "durable-id"
+        assert get_session_env("STARDUST_SESSION_ID") == "durable-id"
         assert _bound_identity() == (sid, scope.principal_id, scope.transport_family)
         def send(frame):
             broker.complete(frame['params']['command_id'], scope=scope, ok=True,

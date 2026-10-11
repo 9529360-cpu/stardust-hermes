@@ -21,7 +21,7 @@ from hermes_constants import get_hermes_home
 
 
 def projects_db_path() -> Path:
-    """The per-profile projects DB path (``$HERMES_HOME/projects.db``)."""
+    """The per-profile projects DB path (``$STARDUST_HOME/projects.db``)."""
     return get_hermes_home() / "projects.db"
 
 

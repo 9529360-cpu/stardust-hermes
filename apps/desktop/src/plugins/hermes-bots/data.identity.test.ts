@@ -121,7 +121,7 @@ describe('renamed bots stay taggable', () => {
     expect(botMentionTag(row({ name: 'writer' }))).toBe('research-buddy')
     expect(botMentionTag(row({ name: 'ops' }))).toBe('ops')
     expect(botMentionTag(row({ name: 'default' }))).toBe('stardust')
-    // display_name (`hermes profile rename`) drives the tag too.
+    // display_name (`stardust profile rename`) drives the tag too.
     expect(botMentionTag(row({ display_name: 'Deal Finder', name: 'scout' }))).toBe('deal-finder')
   })
 
@@ -399,7 +399,7 @@ describe('needs-attention badge (#93091 item 3)', () => {
         'Error code: 401 - {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}'
       )
     ).toBe('provider_auth_or_access')
-    expect(reasonFor('No LLM provider configured. Run hermes model to pick one.')).toBe('missing_config')
+    expect(reasonFor('No LLM provider configured. Run stardust model to pick one.')).toBe('missing_config')
     expect(reasonFor('No access token found for profile')).toBe('missing_config')
     expect(reasonFor('Your account is out of funds')).toBe('provider_quota_limit')
     expect(reasonFor('quota exceeded for this billing period')).toBe('provider_quota_limit')

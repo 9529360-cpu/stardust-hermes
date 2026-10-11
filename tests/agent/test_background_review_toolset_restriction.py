@@ -212,7 +212,7 @@ def test_background_review_whitelist_includes_configured_extra_tools(
     thread-local whitelist.  This config hook lets profiles grant a narrowly
     scoped, human-gated proposal tool without enabling unrelated side effects.
     """
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         "auxiliary:\n"
@@ -221,7 +221,7 @@ def test_background_review_whitelist_includes_configured_extra_tools(
         "      - propose_shared_memory\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     import run_agent
     from hermes_cli import config as config_module

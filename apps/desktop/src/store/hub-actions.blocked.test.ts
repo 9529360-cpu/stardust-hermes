@@ -31,7 +31,7 @@ test('the current CLI "Not installed:" tail parses into findings + trust', () =>
     'Scan: 3 findings. Verdict: DANGEROUS',
     "Not installed: the security scan found 3 high-risk pattern(s) in 'org/skill' (listed above). " +
       'Hermes never installs unverified skills with high-risk findings, even with --force. ' +
-      'Review the findings or ask the author to fix them; to read the skill without installing, run `hermes skills inspect org/skill`.'
+      'Review the findings or ask the author to fix them; to read the skill without installing, run `stardust skills inspect org/skill`.'
   ]
 
   expect(parseInstallBlocked(hardBlock)).toEqual({ findings: 3, unverified: true })

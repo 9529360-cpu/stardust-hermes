@@ -114,11 +114,11 @@ def _default_output_dir() -> str:
 
     Same bug class as skills_tool (f8723c478) and skills_sync (#65828): long-lived multi-profile runtimes
     (dashboard console, TUI/Desktop backend, cron, kanban workers) import this module once under the launch
-    HERMES_HOME and later scope requests to a different profile via
+    STARDUST_HOME and later scope requests to a different profile via
     ``hermes_constants.set_hermes_home_override()`` — a frozen module constant keeps writing synthesized
     audio into the launch profile's cache instead of the active profile's (#98749). Keep the legacy
     ``DEFAULT_OUTPUT_DIR`` module attribute for tests and external patchers; when it has not been patched,
-    re-resolve from the live profile-scoped HERMES_HOME on every call.
+    re-resolve from the live profile-scoped STARDUST_HOME on every call.
     """
     if DEFAULT_OUTPUT_DIR != _DEFAULT_OUTPUT_DIR_AT_IMPORT:
         return DEFAULT_OUTPUT_DIR
@@ -165,18 +165,18 @@ _BUILTIN_DISPATCH: Dict[str, tuple] = {
     "xai": (None, "xAI TTS", "_generate_xai_tts", None),
     "mistral": (lambda: _importable(_import_mistral_client), "Mistral Voxtral TTS", "_generate_mistral_tts",
                 "Mistral provider selected but 'mistralai' package not installed. "
-                "Run `hermes setup` to install Mistral support."),
+                "Run `stardust setup` to install Mistral support."),
     "gemini": (None, "Google Gemini TTS", "_generate_gemini_tts", None),
     "neutts": (lambda: _check_neutts_available(), "NeuTTS (local)", "_generate_neutts",
                "NeuTTS provider selected but neutts is not installed. "
-               "Run hermes setup and choose NeuTTS, or install espeak-ng and run python -m pip install -U neutts[all]."),
+               "Run stardust setup and choose NeuTTS, or install espeak-ng and run python -m pip install -U neutts[all]."),
     "kittentts": (lambda: _importable(_import_kittentts), "KittenTTS (local, ~25MB)", "_generate_kittentts",
                   "KittenTTS provider selected but 'kittentts' package not installed. "
-                  "Run 'hermes setup tts' and choose KittenTTS, or install manually: "
+                  "Run 'stardust setup tts' and choose KittenTTS, or install manually: "
                   "pip install https://github.com/KittenML/KittenTTS/releases/download/0.8.1/kittentts-0.8.1-py3-none-any.whl"),
     "piper": (lambda: _importable(_import_piper), "Piper (local)", "_generate_piper_tts",
               "Piper provider selected but 'piper-tts' package not installed. "
-              "Run 'hermes tools' and select Piper under TTS, or install manually: "
+              "Run 'stardust tools' and select Piper under TTS, or install manually: "
               "pip install piper-tts")}
 
 
@@ -264,7 +264,7 @@ def _apply_call_overrides(tts_config: Dict[str, Any], speed: Optional[float], pr
 def _session_platform() -> tuple:
     """``(platform, wants_opus)`` — platforms delivering voice bubbles only as Ogg/Opus want Opus."""
     from gateway.session_context import get_session_env
-    platform = get_session_env("HERMES_SESSION_PLATFORM", "").lower()
+    platform = get_session_env("STARDUST_SESSION_PLATFORM", "").lower()
     return platform, platform in OPUS_VOICE_PLATFORMS
 
 
@@ -536,7 +536,7 @@ TTS_SCHEMA = {
             },
             "output_path": {
                 "type": "string",
-                "description": _output_path_description("the profile HERMES_HOME")
+                "description": _output_path_description("the profile STARDUST_HOME")
             },
             "speed": {
                 "type": "number",

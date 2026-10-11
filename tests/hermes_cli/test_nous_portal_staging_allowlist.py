@@ -119,13 +119,13 @@ class TestResolveAccessTokenEnvOverrideWins:
         self, monkeypatch, tmp_path
     ):
         """The real incident: state ALSO has the staging host stored (from
-        a prior HERMES_AUTH_JSON_BOOTSTRAP seed), and the env var is set to
+        a prior STARDUST_AUTH_JSON_BOOTSTRAP seed), and the env var is set to
         the same staging host. Both must resolve to staging, and the
         allowlist-rejection warning must never fire."""
         import hermes_cli.auth as auth
 
         staging_portal = "https://portal.staging-nousresearch.com"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.setenv("HERMES_PORTAL_BASE_URL", staging_portal)
         self._write_auth_file(tmp_path, stored_portal_url=staging_portal)
 
@@ -145,7 +145,7 @@ class TestResolveAccessTokenEnvOverrideWins:
         allowlist never even logs a warning (nothing was rejected)."""
         import hermes_cli.auth as auth
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.delenv("HERMES_PORTAL_BASE_URL", raising=False)
         monkeypatch.delenv("NOUS_PORTAL_BASE_URL", raising=False)
         self._write_auth_file(tmp_path, stored_portal_url=DEFAULT_NOUS_PORTAL_URL)

@@ -121,10 +121,10 @@ logger = logging.getLogger(__name__)
 
 
 def _debug(msg: str) -> None:
-    """HERMES_VOICE_DEBUG=1 breadcrumb on stderr (the TUI gateway shows it as a gateway.stderr
+    """STARDUST_VOICE_DEBUG=1 breadcrumb on stderr (the TUI gateway shows it as a gateway.stderr
     Activity line). Broken pipes are swallowed: this fires from background threads where a dead
     stderr must not kill the gateway — the stdin/stdout command pipe is what matters."""
-    if os.environ.get("HERMES_VOICE_DEBUG", "").strip() == "1":
+    if os.environ.get("STARDUST_VOICE_DEBUG", "").strip() == "1":
         with contextlib.suppress(BrokenPipeError, OSError):
             print(f"[voice] {msg}", file=sys.stderr, flush=True)
 

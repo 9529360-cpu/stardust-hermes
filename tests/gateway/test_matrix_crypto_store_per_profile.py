@@ -2,11 +2,11 @@
 
 Under ``gateway.multiplex_profiles`` one process imports
 ``plugins.platforms.matrix.adapter`` once; the old module-level
-``_STORE_DIR``/``_CRYPTO_DB_PATH`` resolved against the root HERMES_HOME at
+``_STORE_DIR``/``_CRYPTO_DB_PATH`` resolved against the root STARDUST_HOME at
 import time, so every profile's adapter opened the SAME crypto.db and inbound
 E2EE failed with "no session found" (#89168). ``connect()`` calls
 ``_resolve_store_dir()`` inside ``_profile_runtime_scope`` (context-local
-HERMES_HOME), so resolving there -- and caching on the instance -- gives each
+STARDUST_HOME), so resolving there -- and caching on the instance -- gives each
 profile its own store. Exercised via ``_resolve_store_dir`` directly so the
 test needs no mautrix install.
 """

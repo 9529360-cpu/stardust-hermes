@@ -61,7 +61,7 @@ def _resolve_requests_verify(base_url: str = "") -> bool | str:
                 return ca
         except Exception:
             pass  # fall through to env vars — never break a probe on config lookup
-    for env_var in ("HERMES_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"):
+    for env_var in ("STARDUST_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "SSL_CERT_FILE"):
         val = os.getenv(env_var)
         if val and os.path.isfile(val):
             return val
@@ -282,7 +282,7 @@ def _get_endpoint_metadata_cache_path() -> Path:
 
 def _endpoint_disk_cache_get(normalized: str) -> Optional[Dict[str, Dict[str, Any]]]:
     """Fresh cross-process memo of a remote ``/models`` probe (same TTL as in-memory): one-shot
-    runs (``hermes -q``, cron) start cold and Nous bypasses the persistent context cache, so
+    runs (``stardust -q``, cron) start cold and Nous bypasses the persistent context cache, so
     without this every launch paid the live probe. Local endpoints are never memoized."""
     models = _ttl_memo_get(_get_endpoint_metadata_cache_path(), normalized, _ENDPOINT_MODEL_CACHE_TTL, ts_key="at", value_key="models")
     return models if isinstance(models, dict) else None

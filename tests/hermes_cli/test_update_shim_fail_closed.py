@@ -1,6 +1,6 @@
 """Fail-closed shim quarantine (#87331): a contended venv is never mutated.
 
-The bug class: on Windows, when `hermes.exe`/sibling shims could not be
+The bug class: on Windows, when `stardust.exe`/sibling shims could not be
 renamed aside (another process holds them without FILE_SHARE_DELETE), the
 updater printed a warning and ran the installer anyway — which then died
 partway on the same locks and stranded the venv between versions (3x field
@@ -28,7 +28,7 @@ import hermes_cli._install_repair as ir
 import hermes_cli.update_cmd as update_cmd
 
 
-def _make_shims(scripts_dir: Path, names=("hermes", "hermes-gateway")) -> list[Path]:
+def _make_shims(scripts_dir: Path, names=("stardust", "hermes-gateway")) -> list[Path]:
     scripts_dir.mkdir(parents=True, exist_ok=True)
     shims = []
     for name in names:
@@ -51,11 +51,11 @@ def windows(monkeypatch):
 def test_strict_quarantine_refuses_before_install(windows, tmp_path, monkeypatch):
     scripts = tmp_path / "venv" / "Scripts"
     shims = _make_shims(scripts)
-    # hermes.exe cannot be renamed; hermes-gateway.exe can
+    # stardust.exe cannot be renamed; hermes-gateway.exe can
     real_rename = Path.rename
 
     def deny_hermes(self, target):
-        if self.name == "hermes.exe":
+        if self.name == "stardust.exe":
             raise PermissionError(13, "held open")
         return real_rename(self, target)
 
@@ -77,7 +77,7 @@ def test_strict_quarantine_refuses_before_install(windows, tmp_path, monkeypatch
 
     # The installer NEVER ran — that is the whole fix.
     assert install_ran == []
-    assert "hermes.exe" in exc_info.value.failed_shims
+    assert "stardust.exe" in exc_info.value.failed_shims
     # The successful rename (hermes-gateway.exe) was rolled back.
     assert (scripts / "hermes-gateway.exe").exists()
     assert not list(scripts.glob("hermes-gateway.exe.old.*"))
@@ -85,7 +85,7 @@ def test_strict_quarantine_refuses_before_install(windows, tmp_path, monkeypatch
 
 def test_non_strict_keeps_warn_and_try(windows, tmp_path, monkeypatch):
     scripts = tmp_path / "venv" / "Scripts"
-    shims = _make_shims(scripts, names=("hermes",))
+    shims = _make_shims(scripts, names=("stardust",))
     monkeypatch.setattr(
         Path, "rename",
         mock.Mock(side_effect=PermissionError(13, "held open")),
@@ -149,7 +149,7 @@ def test_update_sync_installs_are_strict(windows, tmp_path, monkeypatch):
 def test_recovery_install_cmd_fail_closed(windows, tmp_path, monkeypatch):
     root = tmp_path
     scripts = root / "venv" / "Scripts"
-    _make_shims(scripts, names=("hermes",))
+    _make_shims(scripts, names=("stardust",))
 
     monkeypatch.setattr(ir, "_venv_scripts_dir", lambda r: scripts)
     monkeypatch.setattr(
@@ -170,7 +170,7 @@ def test_recovery_install_cmd_fail_closed(windows, tmp_path, monkeypatch):
 def test_recovery_install_cmd_ok_when_uncontended(windows, tmp_path, monkeypatch):
     root = tmp_path
     scripts = root / "venv" / "Scripts"
-    _make_shims(scripts, names=("hermes",))
+    _make_shims(scripts, names=("stardust",))
     monkeypatch.setattr(ir, "_venv_scripts_dir", lambda r: scripts)
 
     run_calls = []
@@ -191,13 +191,13 @@ def test_refusal_writes_marker_and_exits_2(monkeypatch, capsys):
     monkeypatch.setattr(
         update_cmd, "_write_update_incomplete_marker", lambda: wrote.append(1)
     )
-    exc = main_install_repair.ShimQuarantineError(["hermes.exe"])
+    exc = main_install_repair.ShimQuarantineError(["stardust.exe"])
     with pytest.raises(SystemExit) as exit_info:
         update_cmd._refuse_update_for_contended_shims(exc)
     assert exit_info.value.code == 2
     assert wrote == [1]
     out = capsys.readouterr().out
-    assert "hermes.exe" in out
+    assert "stardust.exe" in out
     assert "deferred" in out
 
 
@@ -206,5 +206,5 @@ def test_shim_error_type_resolves_real_class():
 
 
 def test_shim_error_is_not_a_zip_fallback_trigger():
-    exc = main_install_repair.ShimQuarantineError(["hermes.exe"])
+    exc = main_install_repair.ShimQuarantineError(["stardust.exe"])
     assert update_cmd._should_zip_fallback_on_update_error(exc) is False

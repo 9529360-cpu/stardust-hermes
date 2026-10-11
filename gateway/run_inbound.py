@@ -147,7 +147,7 @@ class GatewayInboundMixin:
         _config = getattr(self, "config", None)
 
         # 🔴 Cross-session leak guard: this per-message task was create_task()'d with a copy of the
-        # spawning context, which may carry ANOTHER message's HERMES_SESSION_* ContextVars; until
+        # spawning context, which may carry ANOTHER message's STARDUST_SESSION_* ContextVars; until
         # _set_session_env binds ours a subprocess would read the foreign identity. Reset to _UNSET.
         try:
             from gateway.session_context import reset_session_vars
@@ -271,7 +271,7 @@ class GatewayInboundMixin:
     def _hm_estop_gate(
         self, event: "MessageEvent", source: SessionSource, is_internal: bool
     ) -> Optional[str]:
-        """Global emergency-stop (`hermes pause`) notice when this turn must be blocked, else None.
+        """Global emergency-stop (`stardust pause`) notice when this turn must be blocked, else None.
         Placed after auth so unauthorized senders can't probe pause state."""
         if is_internal:
             return None
@@ -474,7 +474,7 @@ class GatewayInboundMixin:
         wall-clock age. The pending sentinel is never evicted (no get_activity_summary() → idle
         reads inf and would race the async setup path)."""
         from gateway.run import _AGENT_PENDING_SENTINEL, _float_env
-        _raw_stale_timeout = _float_env("HERMES_AGENT_TIMEOUT", 1800)
+        _raw_stale_timeout = _float_env("STARDUST_AGENT_TIMEOUT", 1800)
         _quick_state = self._peek_session_state(_quick_key)
         _stale_ts = _quick_state.turn.started_ts if _quick_state else 0
         if _quick_state is None or _quick_state.turn.agent is None or not _stale_ts:
@@ -594,7 +594,7 @@ class GatewayInboundMixin:
         self, event: "MessageEvent", source: SessionSource, _quick_key: str, effective_busy_input_mode: str
     ) -> bool:
         """Queue a Telegram text follow-up that lands within the post-start grace window."""
-        _grace = float(os.getenv("HERMES_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "3.0"))
+        _grace = float(os.getenv("STARDUST_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "3.0"))
         _grace_state = self._peek_session_state(_quick_key)
         _started_at = _grace_state.turn.started_ts if _grace_state else 0
         if not (
@@ -1153,7 +1153,7 @@ class GatewayInboundMixin:
                 if _skill_name and _skill_name in _plat_disabled:
                     return (
                         f"The **{_skill_name}** skill is disabled for {_plat}.\n"
-                        f"Enable it with: `hermes skills config`"
+                        f"Enable it with: `stardust skills config`"
                     )
                 _disabled_extra = [
                     skill_cmds.get(k, {}).get("name", "")
@@ -1164,7 +1164,7 @@ class GatewayInboundMixin:
                     return (
                         f"The **{', '.join(_disabled_extra)}** skill(s) in this "
                         f"stacked invocation are disabled for {_plat}.\n"
-                        f"Enable them with: `hermes skills config`"
+                        f"Enable them with: `stardust skills config`"
                     )
             if extra_keys and _build_stacked is not None:
                 stacked_result = _build_stacked(

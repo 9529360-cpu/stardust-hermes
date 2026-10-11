@@ -44,10 +44,10 @@ def _enable(home, names, entries=None):
 def hermes_home(tmp_path, monkeypatch):
     home = tmp_path / "hermes_home"
     (home / "plugins").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.setenv("HERMES_ENABLE_PROJECT_PLUGINS", "0")
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.setenv("STARDUST_ENABLE_PROJECT_PLUGINS", "0")
     monkeypatch.setenv(
-        "HERMES_BUNDLED_PLUGINS", str(tmp_path / "empty-bundled")
+        "STARDUST_BUNDLED_PLUGINS", str(tmp_path / "empty-bundled")
     )
     (tmp_path / "empty-bundled").mkdir()
     return home

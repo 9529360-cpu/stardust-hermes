@@ -38,7 +38,7 @@ vi.mock('@/hermes', () => ({
 const RUNTIME_ID = 'runtime-tile'
 const STORED_ID = 'stored-tile'
 const HOST_PATH = 'C:\\Users\\alice\\Pictures\\photo.png'
-const STAGED_PATH = '/root/.hermes/attachments/photo.png'
+const STAGED_PATH = '/root/.stardust/attachments/photo.png'
 const THUMBNAIL = 'data:image/png;base64,dGh1bWJuYWls'
 const FULL_SOURCE = 'data:image/png;base64,b3JpZ2luYWw='
 
@@ -299,7 +299,7 @@ describe('session tile attachment occurrence ownership', () => {
       if (method === 'file.attach') {
         return {
           attached: true,
-          ref_text: '@file:.hermes/desktop-attachments/report.txt',
+          ref_text: '@file:.stardust/desktop-attachments/report.txt',
           uploaded: true
         }
       }

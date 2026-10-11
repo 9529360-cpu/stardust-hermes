@@ -1,6 +1,6 @@
 """Channel directory -- cached map of reachable channels/contacts per platform.
 
-Built on gateway startup, refreshed every 5 min, saved to ~/.hermes/channel_directory.json.
+Built on gateway startup, refreshed every 5 min, saved to ~/.stardust/channel_directory.json.
 send_message reads it for action="list" and to resolve friendly channel names to IDs.
 """
 
@@ -436,7 +436,7 @@ def resolve_channel_name(platform_name: str, name: str) -> Optional[str]:
 def format_directory_for_display(platforms: Optional[Dict[str, Any]] = None) -> str:
     """Format the channel directory as a human-readable list for the model.
 
-    ``platforms`` overrides the on-disk directory (``hermes send --list`` merges in
+    ``platforms`` overrides the on-disk directory (``stardust send --list`` merges in
     configured-but-undiscovered platforms); an empty channel list renders a "(no channels
     discovered yet)" hint because the platform is still a valid send target.
     """

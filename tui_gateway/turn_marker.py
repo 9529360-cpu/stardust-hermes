@@ -1,7 +1,7 @@
 """Durable interrupted-turn markers for the desktop/TUI auto-continue path. A running turn's progress
 lives only in process memory (the agent flushes to SQLite at turn end), so a marker is written at turn
 start and cleared on any conclusion — only a process death leaves one behind, and ``session.resume``
-reads it (``_maybe_schedule_auto_continue``). Stored per ``HERMES_HOME`` (profile-aware); writes prune
+reads it (``_maybe_schedule_auto_continue``). Stored per ``STARDUST_HOME`` (profile-aware); writes prune
 entries older than ``_MAX_AGE_SECS`` and cap the count so a crash streak can't grow the file. Writers
 hold a persistent sibling lockfile across load/mutate/atomic replace: a second backend process must not
 overwrite the first process's newly recorded session with a stale snapshot. Every function is

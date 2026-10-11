@@ -1,8 +1,8 @@
-"""Regression tests for the parked-branch guard in ``hermes update``.
+"""Regression tests for the parked-branch guard in ``stardust update``.
 
 Live incident (2026-08-17, Teknium's Linux box): the source checkout was
 parked on a stale feature branch (``claude-code-inspired/local-terminal-
-memory-limit``, days behind main) left there by earlier tooling. ``hermes
+memory-limit``, days behind main) left there by earlier tooling. ``stardust
 update`` autostashed, refreshed lazy backends, synced skills and printed
 "✓ Code updated!" / "✓ Update complete!" — while the checkout stayed on the
 stale branch with none of main's new code. Two sessions burned time on
@@ -187,7 +187,7 @@ def test_skip_warning_names_branch_behind_count_and_commands(repo_pair, capsys):
     assert "CODE UPDATE SKIPPED" in out
     assert "old-feature" in out
     assert "2 commit(s) BEHIND" in out
-    assert f"git -C {repo_pair} checkout main && hermes update" in out
+    assert f"git -C {repo_pair} checkout main && stardust update" in out
 
 
 def test_skip_warning_dirty_reason(repo_pair, capsys):

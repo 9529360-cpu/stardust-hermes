@@ -512,7 +512,7 @@ class TestSegmentedDispatchIntegration:
                 return json.dumps({"bytes_written": 1})
             return json.dumps({"ok": True})
 
-        monkeypatch.setenv("HERMES_CONCURRENT_TOOL_TIMEOUT_S", "1.0")
+        monkeypatch.setenv("STARDUST_CONCURRENT_TOOL_TIMEOUT_S", "1.0")
         try:
             with patch("model_tools.handle_function_call", side_effect=fake_handle):
                 agent._execute_tool_calls(

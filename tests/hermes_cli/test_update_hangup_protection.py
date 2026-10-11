@@ -1,8 +1,8 @@
-"""Tests for SIGHUP protection and stdout mirroring in ``hermes update``.
+"""Tests for SIGHUP protection and stdout mirroring in ``stardust update``.
 
 Covers ``_UpdateOutputStream``, ``_install_hangup_protection``, and
 ``_finalize_update_output`` in ``hermes_cli/main.py``.  These exist so
-that ``hermes update`` survives a terminal disconnect mid-install
+that ``stardust update`` survives a terminal disconnect mid-install
 (SSH drop, shell close) without leaving the venv half-installed.
 """
 
@@ -19,7 +19,7 @@ from hermes_cli.update_cmd import _log_only_write, _print_update_completion, _ru
 
 
 def test_update_completion_includes_bounded_action_identity(monkeypatch, capsys):
-    monkeypatch.setenv("HERMES_ACTION_ID", "a" * 32)
+    monkeypatch.setenv("STARDUST_ACTION_ID", "a" * 32)
     # These tests pin the action-identity receipt contract, not the branch
     # display — neutralize the branch+HEAD suffix added for the 2026-08-17
     # parked-branch incident (covered by test_update_parked_branch_guard.py).
@@ -34,7 +34,7 @@ def test_update_completion_includes_bounded_action_identity(monkeypatch, capsys)
 
 
 def test_update_completion_rejects_untrusted_action_identity(monkeypatch, capsys):
-    monkeypatch.setenv("HERMES_ACTION_ID", "not-safe\nforged")
+    monkeypatch.setenv("STARDUST_ACTION_ID", "not-safe\nforged")
     monkeypatch.setattr("hermes_cli.update_cmd._branch_head_suffix", lambda: "")
 
     _print_update_completion("✓ Update complete!")
@@ -101,7 +101,7 @@ class TestInstallHangupProtection:
 
 
     def test_wraps_stdout_and_stderr_with_mirror(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         # Nuke any cached home path
         import hermes_cli.config as _cfg
         if hasattr(_cfg, "_HERMES_HOME_CACHE"):
@@ -124,7 +124,7 @@ class TestInstallHangupProtection:
             assert log_path.exists()
             contents = log_path.read_text(encoding="utf-8")
             assert "checking mirror" in contents
-            assert "hermes update started" in contents
+            assert "stardust update started" in contents
         finally:
             _finalize_update_output(state)
             # Sanity-check restoration

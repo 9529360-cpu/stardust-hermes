@@ -28,5 +28,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Netlify (or run `hermes mcp login netlify`). Approve access,
+  Netlify (or run `stardust mcp login netlify`). Approve access,
   then restart the session so tools load.

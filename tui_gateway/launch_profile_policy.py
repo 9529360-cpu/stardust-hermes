@@ -1,5 +1,5 @@
-"""Launch-profile policy for a process that hosts several profile homes (``hermes serve`` /
-``hermes dashboard`` pooling, ``?profile=``, hosted rooms; the multiplexed gateway's own worker).
+"""Launch-profile policy for a process that hosts several profile homes (``stardust serve`` /
+``stardust dashboard`` pooling, ``?profile=``, hosted rooms; the multiplexed gateway's own worker).
 
 Two facts anchor this module:
 

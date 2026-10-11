@@ -736,7 +736,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
         # Discovery/admission uncertainty must never open a second-writer fallback.
         return f"bot-chat delivery to profile '{profile_label}' unverified: {exc}"
 
-    hermes_bin = shutil.which("hermes")
+    hermes_bin = shutil.which("stardust")
     if hermes_bin:
         argv = [hermes_bin]
     else:
@@ -746,8 +746,8 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
         except Exception:
             found = False
         if not found:
-            return ("Hermes could not deliver this result to Bot Chat: the `hermes` command was not found. "
-                    "The result is saved; run `hermes cron runs` to see it, or `hermes doctor` if this keeps happening")
+            return ("Hermes could not deliver this result to Bot Chat: the `stardust` command was not found. "
+                    "The result is saved; run `stardust cron runs` to see it, or `stardust doctor` if this keeps happening")
         argv = [sys.executable, "-m", "hermes_cli.main"]
 
     def _fail(msg: str, **log_kwargs) -> str:
@@ -761,7 +761,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
         return _fail(f"bot-chat delivery target no longer exists: {home}; do not resend")
     # Discovery (or deferred admission) owns the destination, not HOME or a
     # subsequently changed active_profile. Do not resolve the name a second time.
-    env["HERMES_HOME"] = str(home)
+    env["STARDUST_HOME"] = str(home)
     if home.parent.name != "profiles":
         argv += ["-p", "default"]
 
@@ -787,7 +787,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
                 job_id, profile_label, result.returncode, home, f": {tail}" if tail else "")
             return (
                 f"Hermes could not deliver this result to Bot Chat (profile '{profile_label}'). "
-                "The result is saved; run `hermes cron runs` to see it, or `hermes doctor` if this keeps happening"
+                "The result is saved; run `stardust cron runs` to see it, or `stardust doctor` if this keeps happening"
                 + (f". Details: {tail[-200:]}" if tail else ""))
         logger.info("Job '%s': delivered to Bot Chat of profile '%s'", job_id, profile_label)
         return None
@@ -803,7 +803,7 @@ def _deliver_to_bot_chat(job: dict, content: str, profile: str, *, deferred: Opt
             str(e) or type(e).__name__, exc_info=True)
         return (
             f"Hermes could not deliver this result to Bot Chat (profile '{profile_label}'). "
-            "The result is saved; run `hermes cron runs` to see it, or `hermes doctor` if this keeps happening")
+            "The result is saved; run `stardust cron runs` to see it, or `stardust doctor` if this keeps happening")
     finally:
         if query_file:
             with contextlib.suppress(OSError):
@@ -1723,7 +1723,7 @@ def _deliver_result(
     # Restart-safe workers have no live gateway adapters: hand the send back through a durable
     # queue so the current or replacement gateway performs it with relay/E2EE parity. The execution
     # id is the idempotency key (the queue never retries an uncertain claimed send). Match on THIS
-    # job's own attempt: a worker's script may dispatch another job in-process (`hermes cron run`),
+    # job's own attempt: a worker's script may dispatch another job in-process (`stardust cron run`),
     # and that nested delivery must not be keyed under the outer execution id.
     external_execution = os.environ.get("_HERMES_CRON_EXTERNAL_WORKER", "")
     if (external_execution and adapters is None
@@ -1749,7 +1749,7 @@ def _deliver_result(
     # Mark live sends FINAL so the platform pushes them (Telegram "important" mode mutes otherwise).
     notify_delivery = _cron_delivery_notify_enabled(user_cfg)
     # Targets acked with NO evidence (bare SendResult(success=True) — Slack/Matrix/Mattermost);
-    # persisted as ``last_delivery_unverified`` so `hermes cron list` shows it.
+    # persisted as ``last_delivery_unverified`` so `stardust cron list` shows it.
     unverified_targets: list = []
     if wrap_response:
         task_name = job.get("name", job["id"])
@@ -1766,7 +1766,7 @@ def _deliver_result(
 
     from gateway.platforms.base import BasePlatformAdapter
     # Bridge media-policy config into the env vars the path validator reads. The gateway does this
-    # at boot; standalone runs (`hermes cron run`) did not, silently dropping files. Idempotent.
+    # at boot; standalone runs (`stardust cron run`) did not, silently dropping files. Idempotent.
     from gateway.media_policy import apply_media_policy_env
     apply_media_policy_env(user_cfg)
     media_files, cleaned_delivery_content = BasePlatformAdapter.extract_media(delivery_content)

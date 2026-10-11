@@ -31,7 +31,7 @@ test.beforeAll(async () => {
     fs.symlinkSync(path.join(sourceVenv, 'lib'), path.join(runtime, 'lib'))
     fs.symlinkSync(python, path.join(runtime, 'bin', 'python'))
     python = path.join(runtime, 'bin', 'python')
-    fs.writeFileSync(path.join(runtime, 'bin', 'hermes'), `#!/bin/sh\ncd ${repo}\nexec ${python} -m hermes_cli.main "$@"\n`, { mode: 0o755 })
+    fs.writeFileSync(path.join(runtime, 'bin', 'stardust'), `#!/bin/sh\ncd ${repo}\nexec ${python} -m hermes_cli.main "$@"\n`, { mode: 0o755 })
   }
   const bin = path.join(sandbox.root, 'bin')
   fs.mkdirSync(bin)
@@ -41,7 +41,7 @@ test.beforeAll(async () => {
   }
   env = buildAppEnv(sandbox, { HOME: sandbox.root, STARDUST_DESKTOP_PYTHON: python,
     STARDUST_DESKTOP_HERMES: path.join(bin, 'hermes'), PATH: `${bin}:${process.env.PATH}`,
-    PYTHONPATH: repo, HERMES_SINGLE_QUERY_LINGER_SECONDS: '30' })
+    PYTHONPATH: repo, STARDUST_SINGLE_QUERY_LINGER_SECONDS: '30' })
   for (const name of ['alpha', 'beta', 'gamma']) {
     const h = path.join(sandbox.hermesHome, 'profiles', name)
     execFileSync(python, ['-c', 'import sys; from pathlib import Path; from hermes_state import SessionDB; d=SessionDB(db_path=Path(sys.argv[1])/"state.db"); d.create_session("matrix-"+sys.argv[2],"cli",cwd=sys.argv[3]); d.set_session_title("matrix-"+sys.argv[2],"Bot Chat"); d.close()', h, name, sandbox.root], { env, cwd: repo })

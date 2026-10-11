@@ -170,10 +170,10 @@ from unittest.mock import MagicMock, patch
 def gateway(tmp_path, monkeypatch):
     from pathlib import Path as _P
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(_P, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     with patch.dict(
         "sys.modules",

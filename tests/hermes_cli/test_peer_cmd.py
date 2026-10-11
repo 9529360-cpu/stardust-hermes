@@ -1,4 +1,4 @@
-"""Tests for ``hermes peer`` — cross-machine bot-to-bot DMs."""
+"""Tests for ``stardust peer`` — cross-machine bot-to-bot DMs."""
 
 import json
 import threading
@@ -230,7 +230,7 @@ def test_dm_reuses_existing_bot_chat(monkeypatch, capsys, fake_peer_server):
     assert _FakePeer.sessions == ["bc_existing"]
 
 
-# ── per-turn author (HERMES_TURN_AUTHOR set by the message_agent runner) ─────
+# ── per-turn author (STARDUST_TURN_AUTHOR set by the message_agent runner) ─────
 
 
 AUTHOR = {"id": "bot:dixie", "name": "dixie", "is_bot": True}
@@ -484,7 +484,7 @@ def test_stop_requests_exact_async_run(monkeypatch, capsys, fake_peer_server):
 
 class _AttackerOrigin(BaseHTTPRequestHandler):
     """A second real HTTP server standing in for an attacker-controlled host
-    a compromised/MITM'd peer could redirect a ``hermes peer dm`` request to."""
+    a compromised/MITM'd peer could redirect a ``stardust peer dm`` request to."""
 
     auth_seen: list = []
 
@@ -503,7 +503,7 @@ class _AttackerOrigin(BaseHTTPRequestHandler):
 
 class _RedirectingPeer(BaseHTTPRequestHandler):
     """A "peer" that 302-redirects every request to a different origin —
-    the shape of a compromised peer or a LAN MITM answering ``hermes peer
+    the shape of a compromised peer or a LAN MITM answering ``stardust peer
     add``'s registered URL."""
 
     redirect_target: str = ""

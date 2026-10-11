@@ -33,7 +33,7 @@ def profile(tmp_path, monkeypatch):
     home = tmp_path / "profile"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     token = set_hermes_home_override(home)
     try:
         yield home

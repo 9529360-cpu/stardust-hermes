@@ -1,7 +1,7 @@
 """Tests for the env-write denylist on the memory-setup ``.env`` writer.
 
 ``hermes_cli.memory_setup._write_env_vars`` persists provider plugin
-credentials to ``~/.hermes/.env``. It previously called ``Path.write_text``
+credentials to ``~/.stardust/.env``. It previously called ``Path.write_text``
 directly, bypassing the ``_ENV_VAR_NAME_DENYLIST`` / ``_ENV_VAR_NAME_RE`` /
 CR-LF-stripping gates that ``save_env_value`` enforces for every other
 ``.env`` writer in the codebase, and left the file at the default umask
@@ -26,7 +26,7 @@ from hermes_cli.memory_setup import _write_env_vars
 
 
 def _env_file_keys() -> set[str]:
-    """Parse ``~/.hermes/.env`` directly and return the set of keys present.
+    """Parse ``~/.stardust/.env`` directly and return the set of keys present.
 
     Used by tests that want to verify a key was NOT written to disk without
     going through ``load_env()`` (whose sanitization/caching could mask the
@@ -46,7 +46,7 @@ def _env_file_keys() -> set[str]:
 
 @pytest.fixture(autouse=True)
 def _hermes_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     ensure_hermes_home()
     return tmp_path
 
@@ -63,10 +63,10 @@ def _hermes_home(tmp_path, monkeypatch):
         "PATH",
         "EDITOR",
         "GIT_SSH_COMMAND",
-        "HERMES_HOME",
-        "HERMES_PROFILE",
-        "HERMES_CONFIG",
-        "HERMES_ENV",
+        "STARDUST_HOME",
+        "STARDUST_PROFILE",
+        "STARDUST_CONFIG",
+        "STARDUST_ENV",
     ],
 )
 def test_denylisted_key_is_skipped(denied_key, capsys):
@@ -92,31 +92,31 @@ def test_denylisted_key_does_not_block_other_writes(capsys):
     legitimate ones still land. The wizard must not abort mid-batch."""
     _write_env_vars({
         "LD_PRELOAD": "/tmp/evil.so",
-        "HERMES_LANGFUSE_PUBLIC_KEY": "pk-test-123",
+        "STARDUST_LANGFUSE_PUBLIC_KEY": "pk-test-123",
         "OPENROUTER_API_KEY": "sk-or-test-456",
     })
 
     assert "LD_PRELOAD" not in _env_file_keys()
     env = load_env()
-    assert env["HERMES_LANGFUSE_PUBLIC_KEY"] == "pk-test-123"
+    assert env["STARDUST_LANGFUSE_PUBLIC_KEY"] == "pk-test-123"
     assert env["OPENROUTER_API_KEY"] == "sk-or-test-456"
 
 
 def test_legitimate_hermes_integration_key_still_writable():
-    """``HERMES_*`` overall is NOT blocked — only the four runtime
+    """``STARDUST_*`` overall is NOT blocked — only the four runtime
     location names (HOME/PROFILE/CONFIG/ENV). Integration credentials
-    following the ``HERMES_*`` convention (HERMES_LANGFUSE_*,
-    HERMES_SPOTIFY_*, HERMES_QWEN_BASE_URL, ...) must keep working or
+    following the ``STARDUST_*`` convention (STARDUST_LANGFUSE_*,
+    STARDUST_SPOTIFY_*, STARDUST_QWEN_BASE_URL, ...) must keep working or
     the memory-setup wizard regresses for every plugin that follows
     the convention."""
     _write_env_vars({
-        "HERMES_LANGFUSE_PUBLIC_KEY": "pk-lf-789",
-        "HERMES_QWEN_BASE_URL": "https://example.com/v1",
+        "STARDUST_LANGFUSE_PUBLIC_KEY": "pk-lf-789",
+        "STARDUST_QWEN_BASE_URL": "https://example.com/v1",
     })
 
     env = load_env()
-    assert env["HERMES_LANGFUSE_PUBLIC_KEY"] == "pk-lf-789"
-    assert env["HERMES_QWEN_BASE_URL"] == "https://example.com/v1"
+    assert env["STARDUST_LANGFUSE_PUBLIC_KEY"] == "pk-lf-789"
+    assert env["STARDUST_QWEN_BASE_URL"] == "https://example.com/v1"
 
 
 def test_malformed_key_name_is_skipped(capsys):

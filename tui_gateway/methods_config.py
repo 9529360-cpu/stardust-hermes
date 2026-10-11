@@ -244,7 +244,7 @@ def _(rid, params: dict) -> dict:
 
 def _readiness_check(rid, params, probe):
     """Shared shell of setup.status / setup.runtime_check. ``probe(profile, scoped)`` runs inside the
-    optional ``profile`` param's HERMES_HOME + ``.env`` secret scope (ContextVars: concurrent checks
+    optional ``profile`` param's STARDUST_HOME + ``.env`` secret scope (ContextVars: concurrent checks
     stay isolated); ``scoped`` is the ``{"profile": ...}`` payload stamp (``{}`` for the launch
     profile). An unknown profile answers ``ok=False`` (never a JSON-RPC error, never a quiet answer
     for the launch profile instead)."""

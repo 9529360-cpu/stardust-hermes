@@ -36,7 +36,7 @@ provides_tools:
   - a2a_list
   - a2a_history
   - a2a_orchestrate
-# requires_env / optional_env are surfaced in the `hermes config` UI via the
+# requires_env / optional_env are surfaced in the `stardust config` UI via the
 # platform-plugin env var injector in hermes_cli/config.py.
 requires_env: []
 optional_env:

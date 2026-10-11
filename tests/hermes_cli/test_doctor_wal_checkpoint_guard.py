@@ -1,4 +1,4 @@
-"""#103339 item 2: ``hermes doctor --fix`` never checkpoints state.db through a bare writable ``sqlite3.connect``
+"""#103339 item 2: ``stardust doctor --fix`` never checkpoints state.db through a bare writable ``sqlite3.connect``
 — the checkpoint runs on the exclusive repair guard, so an opener arriving after the holder scan is refused."""
 
 from __future__ import annotations

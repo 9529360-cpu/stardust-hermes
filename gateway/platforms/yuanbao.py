@@ -56,7 +56,7 @@ from gateway.platforms.yuanbao_media import (
     build_image_msg_body, build_file_msg_body, guess_mime_type, md5_hex,
 )
 from gateway.platforms.yuanbao_proto import (
-    CMD_TYPE, WS_HEARTBEAT_RUNNING, WS_HEARTBEAT_FINISH, HERMES_INSTANCE_ID,
+    CMD_TYPE, WS_HEARTBEAT_RUNNING, WS_HEARTBEAT_FINISH, STARDUST_INSTANCE_ID,
     _fields_to_dict, _get_string, _get_varint, _parse_fields,
     decode_conn_msg, decode_inbound_push, decode_forward_msg_data,
     decode_query_group_info_rsp, decode_get_group_member_list_rsp,
@@ -75,7 +75,7 @@ try:
 except ImportError:
     _HERMES_VERSION = "0.0.0"
 _APP_VERSION = _BOT_VERSION = _HERMES_VERSION
-_YUANBAO_INSTANCE_ID = str(HERMES_INSTANCE_ID)
+_YUANBAO_INSTANCE_ID = str(STARDUST_INSTANCE_ID)
 _OPERATION_SYSTEM = sys.platform
 
 DEFAULT_WS_GATEWAY_URL = "wss://bot-wss.yuanbao.tencent.com/wss/connection"

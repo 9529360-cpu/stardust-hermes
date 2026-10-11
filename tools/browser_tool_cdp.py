@@ -52,7 +52,7 @@ def _get_cdp_override_raw() -> str:
     """Return the *configured* CDP override without any network I/O.
 
     Precedence: ``BROWSER_CDP_URL`` env (live ``/browser connect``), then ``browser.cdp_url``. Is-it-configured
-    gates (check_fns, ``_is_local_mode`` / ``_is_local_backend``, ``hermes doctor``) MUST use this, not
+    gates (check_fns, ``_is_local_mode`` / ``_is_local_backend``, ``stardust doctor``) MUST use this, not
     :func:`_get_cdp_override`: its 10s HTTP discovery against a stale ``cdp_url`` would stall every startup's
     schema build with no error.
     """
@@ -74,7 +74,7 @@ def _get_cdp_override() -> str:
 
 
 def _start_closed_loopback_browser(cdp_url: str) -> None:
-    """Start the ``/browser connect`` debug browser (its own profile under HERMES_HOME) when *cdp_url* is a
+    """Start the ``/browser connect`` debug browser (its own profile under STARDUST_HOME) when *cdp_url* is a
     loopback port nothing answers on: a closed browser otherwise turned every browser task into a 30s failure."""
     from urllib.parse import urlparse
 

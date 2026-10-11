@@ -1,4 +1,4 @@
-"""External-tool checks for hermes doctor: terminal backends, git/rg, Node + agent-browser, npm audit, tool availability.
+"""External-tool checks for stardust doctor: terminal backends, git/rg, Node + agent-browser, npm audit, tool availability.
 Split out of ``hermes_cli/doctor.py``, which re-exports every name so ``hermes_cli.doctor.<name>`` keeps resolving (and monkeypatching)."""
 
 from __future__ import annotations
@@ -108,7 +108,7 @@ def _enabled_cli_toolsets_for_doctor() -> set[str] | None:
 # `requires_env`, so the generic branch would call a missing credential a "system dependency".
 # Name the real fix instead (#9516).
 _TOOLSET_SETUP_HINTS: dict[str, str] = {
-    "image_gen": "(image generation unavailable — check the provider selection and its key or SDK with 'hermes tools')",
+    "image_gen": "(image generation unavailable — check the provider selection and its key or SDK with 'stardust tools')",
 }
 
 
@@ -138,14 +138,14 @@ def _check_docker_backend(terminal_env: str, running_in_container: bool, issues:
     if terminal_env == "docker":
         if not _safe_which("docker"):
             _fail_and_issue("Docker not installed", "(needed for the 'docker' terminal backend)",
-                            "Install Docker, or run `hermes setup terminal` to switch backend.", issues)
+                            "Install Docker, or run `stardust setup terminal` to switch backend.", issues)
         else:
             # `docker version` hits /version, which socket proxies (tecnativa) allow by default; `docker info`
             # needs /info and is commonly blocked, giving a false "daemon not running". The backend itself
             # probes with `docker version` too (environments/docker.py).
             _require(_run_ok(["docker", "version"], timeout=10), ("docker", "(daemon running)"),
                      ("Docker daemon not running", "(needed for the 'docker' terminal backend)"),
-                     "Start Docker, or run `hermes setup terminal` to switch backend.", issues)
+                     "Start Docker, or run `stardust setup terminal` to switch backend.", issues)
     elif _safe_which("docker"):
         check_ok("docker", "(optional)")
     elif _is_termux():
@@ -158,7 +158,7 @@ def _check_ssh_backend(issues: list[str]) -> None:
     ssh_host = os.getenv("TERMINAL_SSH_HOST")
     if not ssh_host:
         return _fail_and_issue("SSH host not configured", "(needed for the 'ssh' terminal backend)",
-                               "run `hermes setup terminal` and enter the SSH host and user.", issues)
+                               "run `stardust setup terminal` and enter the SSH host and user.", issues)
     ssh_user, ssh_port, ssh_key = (os.getenv(f"TERMINAL_SSH_{k}") for k in ("USER", "PORT", "KEY"))
     cmd = ["ssh", "-o", "ConnectTimeout=5", "-o", "BatchMode=yes"]
     if ssh_port:
@@ -179,7 +179,7 @@ def _require(cond, ok, bad, issue: str, issues: list[str]) -> None:
 def _check_daytona_backend(issues: list[str]) -> None:
     _require(os.getenv("DAYTONA_API_KEY"), ("Daytona API key", "(configured)"),
              ("Daytona API key missing", "(needed for the 'daytona' terminal backend)"),
-             "run `hermes setup terminal` (Daytona) to enter it.", issues)
+             "run `stardust setup terminal` (Daytona) to enter it.", issues)
     try:
         from daytona import Daytona  # noqa: F401 — SDK presence check
         check_ok("daytona SDK", "(installed)")
@@ -268,7 +268,7 @@ def _check_agent_browser(should_fix: bool) -> bool:
     if resolved and _is_npx_agent_browser_sentinel(resolved):
         check_ok("agent-browser", "(resolves via npx on first use)")
         if should_fix:
-            # Can't tell whether npx's cache is warm — fire the same warm-up `hermes update` does.
+            # Can't tell whether npx's cache is warm — fire the same warm-up `stardust update` does.
             from tools.browser_tool_install import warm_agent_browser_npx_cache
             check_info("  Warmed npx cache for agent-browser" if warm_agent_browser_npx_cache()
                        else "  Could not warm npx cache (offline or npx unavailable)")
@@ -277,7 +277,7 @@ def _check_agent_browser(should_fix: bool) -> bool:
         check_ok("agent-browser", "(browser automation)")
         return True
     if resolved:
-        # Almost always a dangling global symlink left by npm postinstall after `hermes update` wiped node_modules.
+        # Almost always a dangling global symlink left by npm postinstall after `stardust update` wiped node_modules.
         check_warn("agent-browser found but not runnable", f"(broken symlink at {resolved}? run: npx agent-browser --version)")
     elif _is_termux():
         _termux_browser_hints("agent-browser is not installed (expected in the tested Termux path)",
@@ -334,7 +334,7 @@ def _check_lightpanda() -> None:
         used, reason = False, f"status check failed: {e}"
     if not used:
         check_warn("browser.engine=lightpanda is shadowed", f"({reason})")
-        check_info("Fix: pick Lightpanda in `hermes tools` → Browser Automation, or set browser.engine: auto")
+        check_info("Fix: pick Lightpanda in `stardust tools` → Browser Automation, or set browser.engine: auto")
     elif not check_bool(find_lightpanda_binary(), ("Lightpanda", f"({reason})"),
                         ("Lightpanda selected but binary not found", "(browser tools will fail until it is installed)")):
         check_info(LIGHTPANDA_INSTALL_HINT)
@@ -398,7 +398,7 @@ def _check_npm_audit(should_fix: bool, f: Finding) -> None:
 
     PROJECT_ROOT is audited with --workspaces=false so the apps/* glob (Electron, node-pty, ...) is never
     resolved for a routine check; web and ui-tui via --workspace. The WhatsApp bridge may live under a writable
-    HERMES_HOME mirror rather than the (possibly read-only) Docker install tree, hence the shared resolver.
+    STARDUST_HOME mirror rather than the (possibly read-only) Docker install tree, hence the shared resolver.
     """
     from hermes_cli.doctor import PROJECT_ROOT
     npm_bin = _safe_which("npm")
@@ -407,7 +407,7 @@ def _check_npm_audit(should_fix: bool, f: Finding) -> None:
             # Each entry: (cwd, label, extra_audit_args) PROJECT_ROOT is audited with --workspaces=false so
             # that the apps/* glob (which pulls in Electron, node-pty, etc.) is never resolved for a routine
             # security check. The web and ui-tui workspaces are audited separately via --workspace flags.
-            # See #38772. The WhatsApp bridge may live under a writable HERMES_HOME mirror instead of the
+            # See #38772. The WhatsApp bridge may live under a writable STARDUST_HOME mirror instead of the
             # (possibly read-only) install tree in Docker — resolve it through the shared helper so we audit
             # the dir that actually holds node_modules. See #49561.
             from gateway.platforms.whatsapp_common import resolve_whatsapp_bridge_dir
@@ -456,4 +456,4 @@ def _check_tool_availability(should_fix: bool, f: Finding) -> None:
     # disabled toolsets may warn above but must not pollute it.
     api_disabled = _missing_api_key_toolsets_for_summary(unavailable)
     if api_disabled or any(status != "ok" for status, _, _ in web_rows):
-        f.issues.append("Run 'hermes setup' to configure missing API keys for full tool access")
+        f.issues.append("Run 'stardust setup' to configure missing API keys for full tool access")

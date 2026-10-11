@@ -1,10 +1,10 @@
-"""Regression tests: profile HERMES_HOME override in ephemeral agent threads (#50233).
+"""Regression tests: profile STARDUST_HOME override in ephemeral agent threads (#50233).
 
 Why: normal prompt turns bind ``session['profile_home']`` via
 ``set_hermes_home_override`` before ``run_conversation`` so the turn runs against
 the correct profile home. The two ephemeral RPC paths — ``prompt.background`` and
 ``preview.restart`` — spawn a fresh ``AIAgent`` on a NEW thread, and the
-``HERMES_HOME`` ContextVar set on the session-create thread does NOT propagate to
+``STARDUST_HOME`` ContextVar set on the session-create thread does NOT propagate to
 those threads. Without an explicit re-bind, a background/preview-restart turn under
 a non-default profile would run against the wrong home. This module locks in:
 
@@ -28,7 +28,7 @@ import pytest
 from tui_gateway import server as srv
 
 
-PROFILE_HOME = str(Path("/home/user/.hermes/profiles/work"))
+PROFILE_HOME = str(Path("/home/user/.stardust/profiles/work"))
 
 
 class _InlineThread:

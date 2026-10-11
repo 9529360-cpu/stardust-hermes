@@ -1,4 +1,4 @@
-"""``hermes profile`` subcommand parser."""
+"""``stardust profile`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -34,20 +34,20 @@ def build_profile_parser(subparsers, *, cmd_profile: Callable) -> None:
              "multiplexed gateway.")
     profile_create.add_argument(
         "--sync-imports", action="store_true",
-        help="With --clone/--clone-from: also carry over the `hermes import-agent` sync manifest so "
+        help="With --clone/--clone-from: also carry over the `stardust import-agent` sync manifest so "
              "the new profile stays registered against the same Claude Code / Codex trees "
-             "(`hermes -p <name> import-agent --sync`). Never syncs config from the source profile.")
+             "(`stardust -p <name> import-agent --sync`). Never syncs config from the source profile.")
     profile_create.add_argument(
         "--no-alias", action="store_true", help="Skip wrapper script creation")
     profile_create.add_argument(
         "--no-skills", action="store_true",
-        help="Create an empty profile with no bundled skills (opts out of `hermes update` skill sync)",
+        help="Create an empty profile with no bundled skills (opts out of `stardust update` skill sync)",
     )
     profile_create.add_argument(
         "--description", default=None,
         help="One- or two-sentence description of what this profile is good at. "
              "Used by the kanban decomposer to route tasks based on role instead "
-             "of profile name alone. Skip and add later via `hermes profile describe`.")
+             "of profile name alone. Skip and add later via `stardust profile describe`.")
 
     profile_delete = profile_subparsers.add_parser("delete", help="Delete a profile")
     profile_delete.add_argument("profile_name", help="Profile to delete")

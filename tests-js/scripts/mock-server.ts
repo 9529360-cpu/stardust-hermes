@@ -2,7 +2,7 @@
  * Minimal OpenAI-compatible mock inference server for E2E tests and the
  * dev:mock dev flow.
  *
- * Implements just enough of the /v1/* surface for `hermes serve` to resolve a
+ * Implements just enough of the /v1/* surface for `stardust serve` to resolve a
  * provider, list models, and stream a canned chat completion back to the
  * desktop app — without any real LLM.
  *
@@ -1234,7 +1234,7 @@ interface DevSandbox {
   cleanup: () => void
 }
 
-/** Create an isolated HERMES_HOME + Electron user-data dir in the OS temp dir. */
+/** Create an isolated STARDUST_HOME + Electron user-data dir in the OS temp dir. */
 function createDevSandbox(): DevSandbox {
   const root = fs.mkdtempSync(nodePath.join(os.tmpdir(), `hermes-dev-mock-${Date.now()}`))
   const hermesHome = nodePath.join(root, 'hermes-home')
@@ -1316,16 +1316,16 @@ async function runDevLaunch(): Promise<void> {
 
   const sandbox = createDevSandbox()
   writeMockConfig(sandbox.hermesHome, mock.url)
-  console.log(`  HERMES_HOME: ${sandbox.hermesHome}`)
+  console.log(`  STARDUST_HOME: ${sandbox.hermesHome}`)
 
   const electronBin = findElectron(repoRoot)
 
   const env: Record<string, string> = {
     ...process.env,
-    HERMES_HOME: sandbox.hermesHome,
+    STARDUST_HOME: sandbox.hermesHome,
     STARDUST_DESKTOP_USER_DATA_DIR: sandbox.userDataDir,
-    HERMES_DESKTOP_IGNORE_EXISTING: '1',
-    HERMES_DESKTOP_HERMES_ROOT: repoRoot,
+    STARDUST_DESKTOP_IGNORE_EXISTING: '1',
+    STARDUST_DESKTOP_HERMES_ROOT: repoRoot,
     STARDUST_DESKTOP_APP_NAME: `HermesDevMock-${Date.now()}`,
   }
 

@@ -27,5 +27,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Stripe (or run `hermes mcp login stripe`). Approve access,
+  Stripe (or run `stardust mcp login stripe`). Approve access,
   then restart the session so tools load.

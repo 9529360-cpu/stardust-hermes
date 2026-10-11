@@ -96,7 +96,7 @@ def _escape_unresolved_presentation_mention(content: str, error: str) -> Optiona
 
 _FETCH_LIMIT = 50  # events per poll / seed call
 _SEEN_CAP = 500  # per-channel de-dupe set bound (events)
-_CURSOR_STATE_SUBDIR = "buzz"  # per-channel cursors survive a restart under HERMES_HOME
+_CURSOR_STATE_SUBDIR = "buzz"  # per-channel cursors survive a restart under STARDUST_HOME
 _CURSOR_STATE_FILENAME = "channel-cursors.json"
 _DM_DISCOVERY_EVERY = 5  # re-run DM discovery every N poll sweeps
 _DEFAULT_POLL_INTERVAL = 4.0
@@ -1896,7 +1896,7 @@ async def _standalone_send(
 
 
 def interactive_setup() -> None:
-    """Interactive ``hermes gateway setup`` flow (lazy CLI imports keep the plugin importable elsewhere)."""
+    """Interactive ``stardust gateway setup`` flow (lazy CLI imports keep the plugin importable elsewhere)."""
     from hermes_cli.setup import (
         prompt, prompt_yes_no, save_env_value, get_env_value, print_header, print_info, print_warning, print_success,
     )
@@ -1938,8 +1938,8 @@ def interactive_setup() -> None:
         allowed = ask("Allowed users (comma-separated npubs or hex pubkeys, empty to deny everyone)", "BUZZ_ALLOWED_USERS")
         save_env_value("BUZZ_ALLOWED_USERS", allowed.replace(" ", "") if allowed else "")
     print()
-    print_success("Buzz configuration saved to ~/.hermes/.env")
-    print_info("Restart the gateway for changes to take effect: hermes gateway restart")
+    print_success("Buzz configuration saved to ~/.stardust/.env")
+    print_info("Restart the gateway for changes to take effect: stardust gateway restart")
 
 
 def register(ctx):

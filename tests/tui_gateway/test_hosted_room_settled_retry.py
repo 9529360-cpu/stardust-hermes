@@ -12,11 +12,11 @@ from tui_gateway.hosted_room_service import HostedRoomService
 
 @pytest.mark.parametrize("later_messages", [0, 25])
 def test_settled_discussion_retry_publishes_once(tmp_path, monkeypatch, later_messages):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
-    (tmp_path / ".hermes" / "profiles" / "reviewer").mkdir(parents=True)
+    (tmp_path / ".stardust" / "profiles" / "reviewer").mkdir(parents=True)
     server = SimpleNamespace(_methods={}, _sessions={}, _sessions_lock=threading.Lock())
-    service = HostedRoomService(server, db_path=tmp_path / ".hermes" / "state.db")
+    service = HostedRoomService(server, db_path=tmp_path / ".stardust" / "state.db")
     service.create_room(room_id="room", name="Room", members=[
         {"member_id": "worker", "profile": "default", "handle": "worker"},
         {"member_id": "reviewer", "profile": "reviewer", "handle": "reviewer"},

@@ -1,6 +1,6 @@
 """Dashboard gateway lifecycle actions must elevate on a system-scope install.
 
-Regression for #110820: the Restart Gateway button spawned ``hermes gateway restart`` as the
+Regression for #110820: the Restart Gateway button spawned ``stardust gateway restart`` as the
 dashboard's own user, and the CLI refuses system-scope verbs below root, so the button could
 never work on a systemd *system* install — the refusal only reached the action log while the
 endpoint reported a started action.
@@ -86,7 +86,7 @@ def test_restart_without_passwordless_sudo_fails_the_request(unprivileged, syste
 
 
 def test_targeted_nopasswd_sudoers_still_elevates(unprivileged, system_scope_install, tmp_path):
-    # Same posture as the ``hermes update`` fleet restart: a refused blanket ``sudo -n true`` is
+    # Same posture as the ``stardust update`` fleet restart: a refused blanket ``sudo -n true`` is
     # inconclusive; the exact argv is then checked non-destructively (``sudo -n -l -- <argv>``).
     probes: list = []
     argv = _spawn(tmp_path, ["gateway", "restart"], sudo_ok=True, targeted_only=True, probes=probes)

@@ -2,7 +2,7 @@
 
 Proxies mounting the dashboard at a path inject ``X-Forwarded-Prefix: /hermes``
 so the backend can build prefixed URLs (Location headers, OAuth redirect_uri,
-cookie Path, SPA asset URLs). An operator-declared ``HERMES_DASHBOARD_PUBLIC_URL``
+cookie Path, SPA asset URLs). An operator-declared ``STARDUST_DASHBOARD_PUBLIC_URL``
 / ``dashboard.public_url`` is used verbatim for the OAuth redirect_uri instead
 (relief valve for unreliable proxy header chains). Single source of truth so
 the gate, routes, cookies and SPA mount agree on validation.
@@ -81,7 +81,7 @@ def prefix_from_request(request) -> str:
     return normalise_prefix(request.headers.get("x-forwarded-prefix"))
 
 
-# --- HERMES_DASHBOARD_PUBLIC_URL / dashboard.public_url --------------------
+# --- STARDUST_DASHBOARD_PUBLIC_URL / dashboard.public_url --------------------
 
 def _normalise_public_url(raw: Optional[str]) -> str:
     """Cleaned ``scheme://netloc[/path]`` (trailing slash stripped) or ``""`` when
@@ -116,13 +116,13 @@ def _load_dashboard_section() -> dict:
 
 def resolve_public_url() -> str:
     """Operator-declared dashboard public URL, or ``""`` (reconstruct from request). Precedence:
-    ``HERMES_DASHBOARD_PUBLIC_URL`` env (blank counts as unset so a provisioned-but-blank secret
+    ``STARDUST_DASHBOARD_PUBLIC_URL`` env (blank counts as unset so a provisioned-but-blank secret
     cannot shadow config.yaml), then ``dashboard.public_url``; malformed warns and falls through."""
-    env_raw = os.environ.get("HERMES_DASHBOARD_PUBLIC_URL", "")
+    env_raw = os.environ.get("STARDUST_DASHBOARD_PUBLIC_URL", "")
     env_clean = _normalise_public_url(env_raw)
     if env_clean:
         return env_clean
-    _warn_if_malformed("HERMES_DASHBOARD_PUBLIC_URL env var", env_raw)
+    _warn_if_malformed("STARDUST_DASHBOARD_PUBLIC_URL env var", env_raw)
     cfg_raw = str(_load_dashboard_section().get("public_url", ""))
     cfg_clean = _normalise_public_url(cfg_raw)
     if not cfg_clean:

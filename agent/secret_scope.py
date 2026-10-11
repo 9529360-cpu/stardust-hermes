@@ -36,7 +36,7 @@ def is_multiplex_active() -> bool:
 
 def serves_routed_profile() -> bool:
     """True when the current task runs for a profile other than the process's own: always under
-    multiplexing, else when a HERMES_HOME override names another home (dashboard/desktop backend,
+    multiplexing, else when a STARDUST_HOME override names another home (dashboard/desktop backend,
     per-profile cron ticker). The MCP registry scope and the check_fn cache key both follow this
     predicate so a served profile's view never aliases the launch profile's (#111151)."""
     if is_multiplex_active():
@@ -68,8 +68,8 @@ class UnscopedSecretError(RuntimeError):
         what = f"this profile's {secret_name}" if secret_name else "this profile's API key"
         super().__init__(
             f"Hermes could not read {what} (an internal profile-scoping bug on the multiplexed "
-            "gateway, not your configuration). Run `hermes gateway restart`; if it keeps happening, "
-            "report it with `hermes debug share`."
+            "gateway, not your configuration). Run `stardust gateway restart`; if it keeps happening, "
+            "report it with `stardust debug share`."
         )
         self.secret_name = secret_name
         self.developer_detail = developer_detail
@@ -97,15 +97,15 @@ def current_secret_scope() -> Optional[Mapping[str, str]]:
 # value is a profile secret. Membership is exact name OR prefix.
 _GLOBAL_ENV_EXACT = frozenset({
     # Hermes runtime / deployment
-    "HERMES_HOME", "HERMES_PROFILE", "HERMES_GATEWAY_LOCK_DIR",
-    "HERMES_MAX_ITERATIONS", "HERMES_API_TIMEOUT",
-    "HERMES_REDACT_SECRETS", "HERMES_NOUS_TIMEOUT_SECONDS",
+    "STARDUST_HOME", "STARDUST_PROFILE", "STARDUST_GATEWAY_LOCK_DIR",
+    "STARDUST_MAX_ITERATIONS", "STARDUST_API_TIMEOUT",
+    "STARDUST_REDACT_SECRETS", "HERMES_NOUS_TIMEOUT_SECONDS",
     "_HERMES_GATEWAY",
     # OS / interpreter
     "PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "PWD", "SHELL", "TMPDIR",
     "VIRTUAL_ENV", "PYTHONPATH", "SSL_CERT_FILE",
     # Kanban paths (per-board, not per-profile-secret)
-    "HERMES_KANBAN_DB", "HERMES_KANBAN_WORKSPACES_ROOT", "HERMES_KANBAN_BOARD",
+    "STARDUST_KANBAN_DB", "STARDUST_KANBAN_WORKSPACES_ROOT", "STARDUST_KANBAN_BOARD",
     # API-server LISTENER settings — deployment config (compose/systemd env),
     # which the scoped runner reload must keep seeing or containers silently
     # lose the api_server platform. API_SERVER_KEY is a credential: NOT here.
@@ -124,8 +124,8 @@ _GLOBAL_ENV_EXACT = frozenset({
     "GATEWAY_RELAY_WAKE_URL", "GATEWAY_RELAY_DISPLAY_NAME",
 })
 _GLOBAL_ENV_PREFIXES = (
-    "HERMES_KANBAN_",
-    "HERMES_TELEGRAM_",   # tuning knobs (batch delays, fallback toggles) — NOT the token
+    "STARDUST_KANBAN_",
+    "STARDUST_TELEGRAM_",   # tuning knobs (batch delays, fallback toggles) — NOT the token
     "TERMINAL_",          # terminal/sandbox backend settings
 )
 

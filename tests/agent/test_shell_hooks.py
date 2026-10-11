@@ -27,7 +27,7 @@ def _write_script(tmp_path: Path, name: str, body: str) -> Path:
 
 
 def _allowlist_pair(monkeypatch, tmp_path, event: str, command: str) -> None:
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes_home"))
     shell_hooks._record_approval(event, command)
 
 
@@ -179,8 +179,8 @@ class TestCallbackSubprocess:
             'printf \'{"decision": "block", "reason": "blocked-by-shell"}\\n\'\n',
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
-        monkeypatch.setenv("HERMES_ACCEPT_HOOKS", "1")
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_ACCEPT_HOOKS", "1")
 
         # Fresh manager
         plugins._plugin_manager = plugins.PluginManager()
@@ -349,8 +349,8 @@ class TestIdempotentRegistration:
 
         script = _write_script(tmp_path, "h.sh",
                                "#!/usr/bin/env bash\nprintf '{}\\n'\n")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
-        monkeypatch.setenv("HERMES_ACCEPT_HOOKS", "1")
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_ACCEPT_HOOKS", "1")
 
         plugins._plugin_manager = plugins.PluginManager()
 
@@ -373,8 +373,8 @@ class TestIdempotentRegistration:
 
         script = _write_script(tmp_path, "h.sh",
                                "#!/usr/bin/env bash\nprintf '{}\\n'\n")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
-        monkeypatch.setenv("HERMES_ACCEPT_HOOKS", "1")
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_ACCEPT_HOOKS", "1")
 
         plugins._plugin_manager = plugins.PluginManager()
 
@@ -412,7 +412,7 @@ class TestAllowlistConcurrency:
         import threading
 
         monkeypatch.setattr(shell_hooks, "fcntl", None)
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
 
         completed = threading.Event()
         errors: list = []
@@ -447,7 +447,7 @@ class TestAllowlistConcurrency:
     def test_save_allowlist_uses_unique_tmp_paths(self, tmp_path, monkeypatch):
         """Two save_allowlist calls in flight must use distinct tmp files
         so the loser's os.replace does not ENOENT on the winner's sweep."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         p = shell_hooks.allowlist_path()
         p.parent.mkdir(parents=True, exist_ok=True)
 
@@ -707,7 +707,7 @@ class TestFailSemanticsEndToEnd:
         assert "failed closed" in result["message"]
 
     def test_run_once_reflects_exit_2_block(self, tmp_path):
-        """hermes hooks test must mirror production semantics."""
+        """stardust hooks test must mirror production semantics."""
         script = _write_script(
             tmp_path, "exit2.sh",
             "#!/usr/bin/env bash\n"
@@ -746,19 +746,19 @@ class TestFailSemanticsEndToEnd:
 class TestRoutedProfileEnv:
     @pytest.mark.linux_only
     def test_hook_child_sees_routed_profile_home_and_no_default_secrets(self, tmp_path, monkeypatch):
-        """Under multiplexing the child gets the ROUTED HERMES_HOME, the default profile's secrets
+        """Under multiplexing the child gets the ROUTED STARDUST_HOME, the default profile's secrets
         stay out of its env, and the payload names the firing profile."""
         from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
         launch, routed = tmp_path / "launch", tmp_path / "routed"
         launch.mkdir(); routed.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(launch))
+        monkeypatch.setenv("STARDUST_HOME", str(launch))
         monkeypatch.setenv("OPENAI_API_KEY", "sk-default-profile")
         monkeypatch.setattr("agent.secret_scope.is_multiplex_active", lambda: True)
         script = _write_script(
             tmp_path, "env_dump.sh",
             "#!/usr/bin/env bash\ncat > /dev/null\n"
-            'printf \'{"home": "%s", "key": "%s"}\\n\' "$HERMES_HOME" "${OPENAI_API_KEY:-}"\n',
+            'printf \'{"home": "%s", "key": "%s"}\\n\' "$STARDUST_HOME" "${OPENAI_API_KEY:-}"\n',
         )
         spec = shell_hooks.ShellHookSpec(event="pre_tool_call", command=str(script))
         token = set_hermes_home_override(str(routed))

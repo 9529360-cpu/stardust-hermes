@@ -18,9 +18,9 @@ def _handler(name: str):
 
 @pytest.fixture()
 def local_bundle_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     from hermes_cli import debug
 

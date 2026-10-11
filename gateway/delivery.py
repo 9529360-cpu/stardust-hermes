@@ -221,8 +221,8 @@ class DeliveryRouter:
         return path
 
     def _filter_silence_narration_enabled(self) -> bool:
-        """``HERMES_FILTER_SILENCE_NARRATION`` env overrides the ``gateway.filter_silence_narration`` flag."""
-        env = os.getenv("HERMES_FILTER_SILENCE_NARRATION")
+        """``STARDUST_FILTER_SILENCE_NARRATION`` env overrides the ``gateway.filter_silence_narration`` flag."""
+        env = os.getenv("STARDUST_FILTER_SILENCE_NARRATION")
         return (bool(getattr(self.config, "filter_silence_narration", True)) if env is None
                 else env.strip().lower() in ("1", "true", "yes", "on"))
 

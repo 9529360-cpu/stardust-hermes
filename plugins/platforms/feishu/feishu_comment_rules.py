@@ -1,6 +1,6 @@
 """Feishu document comment access-control rules: exact doc > wildcard "*" > top-level > code defaults, each field
-(enabled/policy/allow_from) falling back independently. Config ~/.hermes/feishu_comment_rules.json (mtime-cached,
-hot-reload); pairing store ~/.hermes/feishu_comment_pairing.json."""
+(enabled/policy/allow_from) falling back independently. Config ~/.stardust/feishu_comment_rules.json (mtime-cached,
+hot-reload); pairing store ~/.stardust/feishu_comment_pairing.json."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ _RULES_FILE_AT_IMPORT, _PAIRING_FILE_AT_IMPORT = RULES_FILE, PAIRING_FILE
 
 def _rules_file() -> Path:
     """Active profile's rules file at call time: the patched ``RULES_FILE`` when a test changed
-    it, else live profile-scoped HERMES_HOME — the multiplexed gateway serves every profile from
+    it, else live profile-scoped STARDUST_HOME — the multiplexed gateway serves every profile from
     one process, so the import-time constant would apply the launch profile's rules everywhere."""
     return RULES_FILE if RULES_FILE != _RULES_FILE_AT_IMPORT else get_hermes_home() / "feishu_comment_rules.json"
 

@@ -715,7 +715,7 @@ def _provider_has_credentials(pid: str) -> bool:
 
 def list_available_providers() -> list[dict[str, str]]:
     """``{id, label, aliases, authenticated}`` for every provider usable with ``provider:model``,
-    derived from :data:`CANONICAL_PROVIDERS` (shared with ``hermes model`` and ``/model``)."""
+    derived from :data:`CANONICAL_PROVIDERS` (shared with ``stardust model`` and ``/model``)."""
     aliases_for: dict[str, list[str]] = {}
     for alias, canonical in _PROVIDER_ALIASES.items():
         aliases_for.setdefault(canonical, []).append(alias)
@@ -1358,7 +1358,7 @@ def _openai_catalog(normalized: str, force_refresh: bool) -> Optional[list[str]]
     base = _openai_discovery_base_url(normalized)
     # Custom OpenAI-compatible endpoints serve a small curated catalog — use it verbatim. Official
     # OpenAI hosts (canonical and data-residency regional) return 120+ embeddings/whisper/tts/…
-    # entries, so intersect with the curated agentic catalog so ``/model`` matches ``hermes model``.
+    # entries, so intersect with the curated agentic catalog so ``/model`` matches ``stardust model``.
     # Model not in live /v1/models — check the curated catalog before rejecting. Providers may omit models
     # from their live listing that are still valid (stale cache, partial rollout, gated previews). Use the
     # pure-catalog helper (no extra live fetch) so we only accept models Hermes actually ships. (#46850)
@@ -1502,7 +1502,7 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
 
 # ---------------------------------------------------------------------------
 # Disk cache for provider_model_ids() — keeps /model picker fast (otherwise every open re-fetches
-# every authed provider's /v1/models). One JSON file at $HERMES_HOME/provider_models_cache.json;
+# every authed provider's /v1/models). One JSON file at $STARDUST_HOME/provider_models_cache.json;
 # entries keyed by credential fingerprint (rotate OPENAI_API_KEY → entry invalidates); 1h TTL;
 # only NON-EMPTY results are cached so a transient failure is never pinned; any read/write error
 # degrades silently to a live fetch.
@@ -1757,7 +1757,7 @@ def cached_provider_model_ids(
 
 def clear_provider_models_cache(provider: Optional[str] = None) -> None:
     """Drop one provider's cache entry, or wipe the whole cache (``provider=None``). Used by
-    ``/model --refresh`` and ``hermes model --refresh``."""
+    ``/model --refresh`` and ``stardust model --refresh``."""
     try:
         # Native Ollama tags are keyed by root URL, not provider slug — a targeted refresh can't
         # identify the root from the name alone, so clear this small in-process cache every time.

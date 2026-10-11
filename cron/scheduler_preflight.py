@@ -96,7 +96,7 @@ def _preflight_check_provider_key(job: dict, cfg: dict) -> Optional[str]:
     _cron_cfg = cfg.get("cron") if isinstance(cfg.get("cron"), dict) else {}
     requested = (
         job.get("provider") or str((_cron_cfg or {}).get("model_provider") or "").strip() or None)
-    model = job.get("model") or cron_env_setting("HERMES_MODEL") or ""
+    model = job.get("model") or cron_env_setting("STARDUST_MODEL") or ""
 
     from hermes_cli.auth import AuthError
     try:
@@ -108,8 +108,8 @@ def _preflight_check_provider_key(job: dict, cfg: dict) -> Optional[str]:
     except AuthError as exc:
         return (
             f"provider credential missing: {exc}. "
-            "Set the provider API key in .env (or `hermes setup`), or pin a "
-            "working provider via `hermes cron edit "
+            "Set the provider API key in .env (or `stardust setup`), or pin a "
+            "working provider via `stardust cron edit "
             f"{job.get('id')} --provider <p>`."
         )
     except Exception:
@@ -270,7 +270,7 @@ def _preflight_check_delivery(job: dict) -> Optional[str]:
             return (
                 f"delivery platform '{platform_name}' has no gateway "
                 "credentials configured (not connected). Configure it via "
-                "`hermes setup` or change the job's `deliver` target."
+                "`stardust setup` or change the job's `deliver` target."
             )
     return None
 

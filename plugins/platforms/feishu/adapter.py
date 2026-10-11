@@ -1317,12 +1317,12 @@ class FeishuAdapter(BasePlatformAdapter):
             bot_open_id=_secret("FEISHU_BOT_OPEN_ID"),
             bot_user_id=_secret("FEISHU_BOT_USER_ID"),
             bot_name=_secret("FEISHU_BOT_NAME"),
-            dedup_cache_size=max(32, env_int("HERMES_FEISHU_DEDUP_CACHE_SIZE", _DEFAULT_DEDUP_CACHE_SIZE)),
-            text_batch_delay_seconds=env_float("HERMES_FEISHU_TEXT_BATCH_DELAY_SECONDS", _DEFAULT_TEXT_BATCH_DELAY_SECONDS),
-            text_batch_split_delay_seconds=env_float("HERMES_FEISHU_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0),
-            text_batch_max_messages=max(1, env_int("HERMES_FEISHU_TEXT_BATCH_MAX_MESSAGES", _DEFAULT_TEXT_BATCH_MAX_MESSAGES)),
-            text_batch_max_chars=max(1, env_int("HERMES_FEISHU_TEXT_BATCH_MAX_CHARS", _DEFAULT_TEXT_BATCH_MAX_CHARS)),
-            media_batch_delay_seconds=env_float("HERMES_FEISHU_MEDIA_BATCH_DELAY_SECONDS", _DEFAULT_MEDIA_BATCH_DELAY_SECONDS),
+            dedup_cache_size=max(32, env_int("STARDUST_FEISHU_DEDUP_CACHE_SIZE", _DEFAULT_DEDUP_CACHE_SIZE)),
+            text_batch_delay_seconds=env_float("STARDUST_FEISHU_TEXT_BATCH_DELAY_SECONDS", _DEFAULT_TEXT_BATCH_DELAY_SECONDS),
+            text_batch_split_delay_seconds=env_float("STARDUST_FEISHU_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0),
+            text_batch_max_messages=max(1, env_int("STARDUST_FEISHU_TEXT_BATCH_MAX_MESSAGES", _DEFAULT_TEXT_BATCH_MAX_MESSAGES)),
+            text_batch_max_chars=max(1, env_int("STARDUST_FEISHU_TEXT_BATCH_MAX_CHARS", _DEFAULT_TEXT_BATCH_MAX_CHARS)),
+            media_batch_delay_seconds=env_float("STARDUST_FEISHU_MEDIA_BATCH_DELAY_SECONDS", _DEFAULT_MEDIA_BATCH_DELAY_SECONDS),
             webhook_host=_extra_or_env("webhook_host", "FEISHU_WEBHOOK_HOST", _DEFAULT_WEBHOOK_HOST),
             webhook_port=int(extra.get("webhook_port") or _get_scoped_secret("FEISHU_WEBHOOK_PORT", str(_DEFAULT_WEBHOOK_PORT))),
             webhook_path=_extra_or_env("webhook_path", "FEISHU_WEBHOOK_PATH", _DEFAULT_WEBHOOK_PATH) or _DEFAULT_WEBHOOK_PATH,
@@ -1386,7 +1386,7 @@ class FeishuAdapter(BasePlatformAdapter):
         """Run a blocking Feishu SDK call on the adapter-owned thread pool.
 
         ``copy_context().run`` mirrors ``asyncio.to_thread``: the worker sees the caller's
-        profile HERMES_HOME override / secret scope (multiplexed dedup flush, thread lookup).
+        profile STARDUST_HOME override / secret scope (multiplexed dedup flush, thread lookup).
         """
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
@@ -4135,7 +4135,7 @@ _MIGRATION_AUDIO_EXTS = {".ogg", ".opus", ".mp3", ".wav", ".m4a", ".flac"}
 async def _standalone_send(pconfig, chat_id, message, *, thread_id=None, media_files=None, force_document=False):
     """standalone_sender_fn: out-of-process delivery (cron without gateway) via a transient adapter."""
     if not await asyncio.to_thread(_load_lark_oapi):
-        return send_error("Feishu dependencies not installed. Run `hermes setup` to install Feishu support.")
+        return send_error("Feishu dependencies not installed. Run `stardust setup` to install Feishu support.")
     try:
         adapter = FeishuAdapter(pconfig)
         adapter._client = adapter._build_lark_client(_sdk_domain(getattr(adapter, "_domain_name", "feishu")))
@@ -4260,7 +4260,7 @@ def interactive_setup() -> None:
         save_env_value("FEISHU_ALLOWED_USERS", "")
         if access_idx == 0:
             print_success("DM pairing enabled.")
-            print_info("Unknown users can request access; approve with `hermes pairing approve`.")
+            print_info("Unknown users can request access; approve with `stardust pairing approve`.")
         else:
             print_warning("Open DM access enabled for Feishu / Lark.")
 
@@ -4308,7 +4308,7 @@ def register(ctx) -> None:
         check_fn=feishu_deps_present, ensure_deps_fn=check_feishu_requirements,
         is_connected=_is_connected, validate_config=_is_connected,
         required_env=["FEISHU_APP_ID", "FEISHU_APP_SECRET"],
-        install_hint="Run `hermes setup` to install Feishu support.", setup_fn=interactive_setup,
+        install_hint="Run `stardust setup` to install Feishu support.", setup_fn=interactive_setup,
         apply_yaml_config_fn=_apply_yaml_config, allowed_users_env="FEISHU_ALLOWED_USERS",
         allow_all_env="FEISHU_ALLOW_ALL_USERS", cron_deliver_env_var="FEISHU_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, max_message_length=8000, emoji="🪽",

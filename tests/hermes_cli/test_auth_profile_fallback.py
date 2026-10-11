@@ -1,6 +1,6 @@
 """Tests for cross-profile auth fallback.
 
-When ``HERMES_HOME`` points to a named profile, ``read_credential_pool()``
+When ``STARDUST_HOME`` points to a named profile, ``read_credential_pool()``
 and ``get_provider_auth_state()`` fall back to the global-root
 ``auth.json`` per-provider when the profile has no entries for that
 provider.  Writes still target the profile only.
@@ -30,21 +30,21 @@ def _make_auth_store(pool: dict | None = None, providers: dict | None = None) ->
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
-    """Set up a global root + an active profile under Path.home()/.hermes/profiles/coder.
+    """Set up a global root + an active profile under Path.home()/.stardust/profiles/coder.
 
     * Path.home() -> tmp_path
-    * Global root -> tmp_path/.hermes            (has its own auth.json fixture)
-    * Profile     -> tmp_path/.hermes/profiles/coder   (active, HERMES_HOME points here)
+    * Global root -> tmp_path/.stardust            (has its own auth.json fixture)
+    * Profile     -> tmp_path/.stardust/profiles/coder   (active, STARDUST_HOME points here)
 
     This mirrors the real "named profile mounted under the default root"
     layout that profile users actually have on disk.
     """
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    global_root = tmp_path / ".hermes"
+    global_root = tmp_path / ".stardust"
     global_root.mkdir()
     profile_dir = global_root / "profiles" / "coder"
     profile_dir.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+    monkeypatch.setenv("STARDUST_HOME", str(profile_dir))
     return {"global": global_root, "profile": profile_dir}
 
 
@@ -331,13 +331,13 @@ def test_auth_lock_reentrancy_is_scoped_after_profile_context_switch(profile_env
 
 @pytest.fixture()
 def classic_env(tmp_path, monkeypatch):
-    """Classic single-root layout (HERMES_HOME != ~/.hermes, no profiles)."""
+    """Classic single-root layout (STARDUST_HOME != ~/.stardust, no profiles)."""
     fake_home = tmp_path / "home"
     fake_home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: fake_home)
     hermes_home = tmp_path / "classic"
     hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     return hermes_home
 
 

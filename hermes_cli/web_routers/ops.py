@@ -245,14 +245,14 @@ async def set_webhook_enabled(name: str, body: WebhookEnabledToggle):
     return {"ok": True, "name": key, "enabled": bool(body.enabled)}
 
 
-# --- Gateway lifecycle: spawn the real `hermes gateway <verb>` so behaviour
+# --- Gateway lifecycle: spawn the real `stardust gateway <verb>` so behaviour
 # matches the CLI exactly (status is surfaced by /api/status).
 
 
 @router.post("/api/gateway/start")
 async def start_gateway(profile: Optional[str] = None):
     from hermes_cli.web_server_gateway import multiplexed_profile_refusal
-    # The spawned `hermes -p X gateway start` would refuse with exit 78 into an action log nobody reads;
+    # The spawned `stardust -p X gateway start` would refuse with exit 78 into an action log nobody reads;
     # surface the same refusal here so the UI can point at the multiplexer instead of showing "started".
     refusal = await asyncio.to_thread(multiplexed_profile_refusal, profile, "start")
     if refusal:
@@ -352,7 +352,7 @@ async def add_credential_pool_entry(body: CredentialPoolAdd):
                 # Add a distinct, self-contained pool entry per account (matching the qwen-oauth /
                 # minimax-oauth multi-account patterns, and the xai-oauth path below) instead of routing
                 # through the singleton ``_save_codex_tokens`` save path. The singleton round-trip collapsed
-                # every added account into the latest login: a second ``hermes auth add openai-codex``
+                # every added account into the latest login: a second ``stardust auth add openai-codex``
                 # overwrote the first account's singleton-mirrored ``device_code`` entry rather than
                 # creating an independent one (#39236). ``manual:device_code`` entries refresh from their
                 # own token pair, so they need no singleton shadow.
@@ -365,7 +365,7 @@ async def add_credential_pool_entry(body: CredentialPoolAdd):
             ))
             # Re-adding is an explicit re-engagement signal: lift every suppression
             # for this provider so a source deleted earlier can seed again
-            # (mirrors `hermes auth add`).
+            # (mirrors `stardust auth add`).
             if not provider.startswith(CUSTOM_POOL_PREFIX):
                 try:
                     from hermes_cli.auth import _load_auth_store, unsuppress_credential_source
@@ -392,7 +392,7 @@ async def remove_credential_pool_entry(provider: str, index: int):
     Removal must be sticky: ``load_pool()`` re-seeds entries from their backing
     source (.env var, OAuth file, custom-provider config) on every call, so
     deleting only the row silently reverts on the next refresh. Dispatch through
-    the same RemovalStep registry as ``hermes auth remove``: each source cleans
+    the same RemovalStep registry as ``stardust auth remove``: each source cleans
     its external state and suppresses ``(provider, source)`` so seeders skip it.
     Manual entries have no step — nothing external, and they aren't re-seeded.
 

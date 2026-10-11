@@ -27,7 +27,7 @@ Frontmatter:
     Bad (123):   `A comprehensive skill that lets the agent search arXiv for
                   academic papers using keywords, authors, and categories.`
 - version: 0.1.0
-- author: always the literal value `Hermes`. NEVER fill it from the host
+- author: always the literal value `Stardust`. NEVER fill it from the host
   environment — the OS/login username (e.g. the `user=` line in your
   environment hints), git config, or any identity you can probe must not be
   written. Skills get shared and published, so an environment-derived name is

@@ -158,7 +158,7 @@ def test_connect_preserves_wal_and_applies_macos_durability_barriers(
     tmp_path, monkeypatch
 ):
     """Each ledger connection must carry the macOS write barriers."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     seed = sqlite3.connect(tmp_path / "state.db")
     try:
         assert seed.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
@@ -175,7 +175,7 @@ def test_connect_preserves_wal_and_applies_macos_durability_barriers(
 
 
 def test_publish_durable_completion_is_idempotent_and_enqueued(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     assert ad.publish_durable_completion(
         delegation_id="cron_exec_1", session_key="desktop-session",
@@ -203,7 +203,7 @@ def test_publish_durable_completion_is_idempotent_and_enqueued(tmp_path, monkeyp
 
 
 def test_external_cron_worker_persists_without_process_local_queue(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setenv("_HERMES_CRON_EXTERNAL_WORKER", "exec-worker")
 
     assert ad.publish_durable_completion(
@@ -217,7 +217,7 @@ def test_external_cron_worker_persists_without_process_local_queue(tmp_path, mon
     assert _drain_for("cron_exec_worker") is not None
 
 def test_restore_matching_completion_recovers_after_in_memory_copy_is_lost(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     ad.publish_durable_completion(
         delegation_id="cron_exec_2", session_key="closed-session",
         parent_session_id="closed-session", goal="Watch inbox", summary="New mail", role="cron_run")
@@ -314,7 +314,7 @@ def test_completion_event_lands_on_shared_queue_with_session_key():
 
 
 def test_durable_receipt_exposes_parent_task_and_terminal_event_for_recovery(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     def runner():
         return {
@@ -682,7 +682,7 @@ def test_in_tool_stall_uses_higher_threshold(monkeypatch):
 def test_real_process_restart_restores_owned_completion_once(tmp_path):
     """Real-import E2E: a fresh interpreter restores a prior process's result."""
     repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    env = {**os.environ, "HERMES_HOME": str(tmp_path), "PYTHONPATH": repo}
+    env = {**os.environ, "STARDUST_HOME": str(tmp_path), "PYTHONPATH": repo}
     producer = r'''
 import time
 from tools import async_delegation as ad
@@ -1243,7 +1243,7 @@ def test_child_finished_before_crash_is_recovered_with_its_result(tmp_path):
     """Real-import E2E: a 2-task group unit whose owner dies mid-run replays the finished child's real result
     and marks only the unfinished sibling unknown — a crash costs the stragglers, never the finished work."""
     repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    env = {**os.environ, "HERMES_HOME": str(tmp_path), "PYTHONPATH": repo}
+    env = {**os.environ, "STARDUST_HOME": str(tmp_path), "PYTHONPATH": repo}
     producer = r'''
 import os, sys, time
 from unittest.mock import MagicMock
@@ -1284,11 +1284,11 @@ print(json.dumps(q.get_nowait(), sort_keys=True))
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX mode bits not enforced on Windows")
 def test_connect_creates_state_db_0o600_under_permissive_umask(tmp_path, monkeypatch):
     """``_connect`` shares state.db with hermes_state.SessionDB -- a fresh
-    HERMES_HOME must land the file (and its WAL sidecar, if created) at 0o600
+    STARDUST_HOME must land the file (and its WAL sidecar, if created) at 0o600
     even under a permissive process umask, not the SessionDB-only path."""
     import stat
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     old_umask = os.umask(0o022)
     try:
         conn = ad._connect()

@@ -31,7 +31,7 @@ class ProcessCheckpointMixin:
                     if s.host_start_time is None and s.pid_scope == "host" and s.pid:
                         s.host_start_time = self._safe_host_start_time(s.pid)
                     entry = {"session_id": s.id, **{f: getattr(s, f) for f in _CHECKPOINT_FIELDS}}
-                    # Redact inline credentials before persisting (~/.hermes/processes.json).
+                    # Redact inline credentials before persisting (~/.stardust/processes.json).
                     # Recovery uses command only for display (adoption re-validates the
                     # PID, never re-runs it), so masking is lossless.
                     # See #77484.
@@ -65,7 +65,7 @@ class ProcessCheckpointMixin:
         owner_home = hermes_home_key()
         current_profile = profile_name_for_home(get_hermes_home())
         if current_profile is None:
-            # Custom single-profile HERMES_HOME roots do not follow the standard
+            # Custom single-profile STARDUST_HOME roots do not follow the standard
             # profiles/<name> layout; their legacy namespace is still agent:main.
             current_profile = "default"
         if not checkpoint_path.exists():

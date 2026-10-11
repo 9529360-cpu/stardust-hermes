@@ -139,12 +139,12 @@ def main() -> None:
 
     _REPLY_KB[0] = a.reply_kb
     home = tempfile.mkdtemp(prefix="hermes_bench_home_")
-    os.environ["HERMES_HOME"] = home
+    os.environ["STARDUST_HOME"] = home
     os.environ["TERMINAL_ENV"] = "local"
     os.environ.pop("OPENROUTER_API_KEY", None)
     sys.path.insert(0, a.repo)
     os.chdir(a.repo)
-    pyright = shutil.which("pyright-langserver", path=os.path.expanduser("~/.hermes/lsp/bin") + os.pathsep + os.environ.get("PATH", ""))
+    pyright = shutil.which("pyright-langserver", path=os.path.expanduser("~/.stardust/lsp/bin") + os.pathsep + os.environ.get("PATH", ""))
     with open(os.path.join(home, "config.yaml"), "w", encoding="utf-8") as f:
         f.write("lsp:\n  enabled: true\n  wait_timeout: 5.0\n  install_strategy: manual\n")
         if pyright:

@@ -1908,7 +1908,7 @@ export const en: Translations = {
     edit: 'Edit',
     archive: 'Archive',
     skillArchivedTitle: 'Skill archived',
-    skillArchivedMessage: 'Restorable via hermes curator restore.',
+    skillArchivedMessage: 'Restorable via stardust curator restore.',
     tabPlugins: 'Plugins',
     plugins: {
       agentTitle: 'Agent plugins',
@@ -4392,7 +4392,7 @@ export const en: Translations = {
       errorUpdateApiKey: 'Update API key',
       errorSignInAgain: provider => `Sign in to ${provider} again`,
       errorOauthExpired: provider =>
-        `Your ${provider} sign-in has expired or was revoked. Run hermes model in a terminal and choose ${provider} to sign in again, or switch to a model API in Settings → Model services.`,
+        `Your ${provider} sign-in has expired or was revoked. Run stardust model in a terminal and choose ${provider} to sign in again, or switch to a model API in Settings → Model services.`,
       errorOpenLogs: 'Open logs',
       errorOpenLogsFailed: 'Could not open the logs folder',
       errorOpenDesktopLogs: 'Open Desktop logs',
@@ -4455,7 +4455,7 @@ export const en: Translations = {
       reject: 'Reject',
       alwaysTitle: 'Always allow this command?',
       alwaysDescription: pattern =>
-        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). Stardust won’t ask again for commands like this — in this chat or any future one.`,
+        `This adds the “${pattern}” pattern to your permanent allowlist (~/.stardust/config.yaml). Stardust won’t ask again for commands like this — in this chat or any future one.`,
       alwaysAllow: 'Always allow'
     },
     clarify: {

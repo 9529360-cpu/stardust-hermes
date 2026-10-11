@@ -1,7 +1,7 @@
-"""User-facing message contracts for `hermes skills/plugins/mcp/cron/doctor` failure paths.
+"""User-facing message contracts for `stardust skills/plugins/mcp/cron/doctor` failure paths.
 
 Every failure line must say what happened and name an existing command to type next; none may
-lead with a raw exception, a status literal, or a hardcoded ``~/.hermes`` path (UX message audit,
+lead with a raw exception, a status literal, or a hardcoded ``~/.stardust`` path (UX message audit,
 findings cli-08/20/21/23/26/34, tools-runtime-13/14/20/27).
 """
 
@@ -26,8 +26,8 @@ def test_skill_fetch_failure_names_search_and_doctor():
     c, buf = _console()
     _print_fetch_failure(c, sources=[], identifier="someone/typo-skill")
     out = buf.getvalue()
-    assert "hermes skills search typo-skill" in out
-    assert "hermes doctor" in out
+    assert "stardust skills search typo-skill" in out
+    assert "stardust doctor" in out
     assert "from any source" not in out
 
 
@@ -37,7 +37,7 @@ def test_scan_block_message_explains_force_and_points_at_inspect():
     msg = _scan_block_message(result, "acme/evil-skill")
     assert "3 high-risk pattern(s)" in msg
     assert "even with --force" in msg
-    assert "hermes skills inspect acme/evil-skill" in msg
+    assert "stardust skills inspect acme/evil-skill" in msg
     assert "verdict" not in msg  # scanner jargon stays in the audit log
 
     soft = _scan_block_message(SimpleNamespace(verdict="suspicious", trust_level="community", findings=[1]),
@@ -51,7 +51,7 @@ def test_plugin_clone_failure_leads_with_next_steps_and_escapes_git_output():
     from hermes_cli.plugins_cmd import _clone_failure_message
     msg = _clone_failure_message("https://github.com/acme/nope", "fatal: repository '[x]' not found")
     assert msg.startswith("Could not download the plugin from https://github.com/acme/nope")
-    assert "hermes plugins search" in msg and "gh auth login" in msg
+    assert "stardust plugins search" in msg and "gh auth login" in msg
     assert "Details:" in msg
     assert "\\[x]" in msg  # Rich markup escaped so the raw git text renders verbatim
 
@@ -60,7 +60,7 @@ def test_unknown_plugin_message_points_at_list_and_full_key_rule():
     from hermes_cli.plugins_cmd import _unknown_plugin_message
     msg = _unknown_plugin_message("firecrawl")
     assert "No plugin named 'firecrawl'" in msg
-    assert "hermes plugins list" in msg and "web/firecrawl" in msg and "hermes plugins install" in msg
+    assert "stardust plugins list" in msg and "web/firecrawl" in msg and "stardust plugins install" in msg
     assert "(none)" not in msg
 
 
@@ -71,11 +71,11 @@ def test_banner_failed_mcp_line_shows_reason_and_command():
     line = _mcp_server_line({"name": "gh", "transport": "stdio", "connected": False, "status": "failed",
                              "error": "missing executable 'npx' (ensure Node.js is installed)"}, dim="grey", text="white")
     assert "could not connect" in line and "missing executable 'npx'" in line
-    assert "hermes mcp test gh" in line
+    assert "stardust mcp test gh" in line
 
     auth = _mcp_server_line({"name": "linear", "transport": "http", "connected": False, "status": "failed",
                              "error": "Client error '401 Unauthorized' for url"}, dim="grey", text="white")
-    assert "hermes mcp login linear" in auth
+    assert "stardust mcp login linear" in auth
 
 
 def test_mcp_probe_failure_unwraps_group_and_points_at_login_for_401():
@@ -90,11 +90,11 @@ def test_mcp_probe_failure_unwraps_group_and_points_at_login_for_401():
     group = ExceptionGroup("unhandled errors in a TaskGroup", [_HttpErr("Client error '401 Unauthorized'")])
     assert "ExceptionGroup" not in _probe_failure_reason(group)
     assert "401" in _probe_failure_reason(group)
-    assert "hermes mcp login linear" in _probe_failure_next_step("linear", group)
+    assert "stardust mcp login linear" in _probe_failure_next_step("linear", group)
 
     missing = FileNotFoundError(2, "No such file or directory", "npx")
     assert "config.yaml" in _probe_failure_next_step("gh", missing)
-    assert "~/.hermes" not in _probe_failure_next_step("gh", missing) or "profiles" in _probe_failure_next_step("gh", missing)
+    assert "~/.stardust" not in _probe_failure_next_step("gh", missing) or "profiles" in _probe_failure_next_step("gh", missing)
 
 
 # ── cron ──────────────────────────────────────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ def test_cron_delivery_failure_lines_have_no_status_literals_and_name_the_fix():
     joined = "\n".join(texts)
     assert "delivery_failed" not in joined and "delivery_queued" not in joined
     assert "second raw line" not in joined  # only the first line of the raw blob is shown
-    assert "hermes cron edit job42 --deliver" in joined
-    assert "hermes gateway restart" in joined and "hermes cron run job42" in joined
+    assert "stardust cron edit job42 --deliver" in joined
+    assert "stardust gateway restart" in joined and "stardust cron run job42" in joined
     assert "gateway was unreachable" in joined
 
 
@@ -123,26 +123,26 @@ def test_cron_queued_status_reads_as_in_progress():
 
 def test_advisory_remediation_uses_active_hermes_home(monkeypatch, tmp_path):
     from hermes_cli import security_advisories as sa
-    monkeypatch.setattr(sa, "display_hermes_home", lambda: "~/.hermes/profiles/work")
+    monkeypatch.setattr(sa, "display_hermes_home", lambda: "~/.stardust/profiles/work")
     hit = SimpleNamespace(advisory=sa.ADVISORIES[0], package="mistralai", installed_version="2.4.6")
     text = "\n".join(sa.full_remediation_text(hit))
-    assert "~/.hermes/profiles/work/.env" in text
+    assert "~/.stardust/profiles/work/.env" in text
     assert "{hermes_home}" not in text
-    assert not re.search(r"~/\.hermes/\.env", text)
+    assert not re.search(r"~/\.stardust/\.env", text)
 
 
 def test_doctor_ack_failure_names_config_path_and_retry(monkeypatch, capsys):
     import hermes_cli.doctor as doctor
     monkeypatch.setattr("hermes_cli.security_advisories.ack_advisory", lambda _id: False)
-    monkeypatch.setattr(doctor, "_DHH", "~/.hermes/profiles/work")
+    monkeypatch.setattr(doctor, "_DHH", "~/.stardust/profiles/work")
     from hermes_cli.security_advisories import ADVISORIES
     try:
         doctor._ack_advisory(ADVISORIES[0].id)
     except SystemExit as exc:
         assert exc.code == 1
     out = capsys.readouterr().out
-    assert "~/.hermes/profiles/work/config.yaml" in out
-    assert "hermes config path" in out and f"hermes doctor --ack {ADVISORIES[0].id}" in out
+    assert "~/.stardust/profiles/work/config.yaml" in out
+    assert "stardust config path" in out and f"stardust doctor --ack {ADVISORIES[0].id}" in out
     assert "Failed to persist" not in out
 
 

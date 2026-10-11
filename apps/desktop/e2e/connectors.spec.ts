@@ -8,7 +8,7 @@ test.describe('flagged connector onboarding', () => {
   test('shows the optional connector controls in a fresh flagged session', async () => {
     const sandbox = createSandbox('connectors-ui')
     const { app, page } = await launchDesktop(buildAppEnv(sandbox, {
-      HERMES_GUEST_ONBOARDING: '1'
+      STARDUST_GUEST_ONBOARDING: '1'
     }))
 
     try {

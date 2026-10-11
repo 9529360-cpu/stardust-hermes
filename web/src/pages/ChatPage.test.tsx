@@ -360,7 +360,7 @@ describe("ChatPage", () => {
 
       expect(container.textContent).not.toMatch(/code 1006/);
       expect(container.textContent).toMatch(/Lost connection to the Hermes dashboard server/);
-      expect(container.textContent).toContain("hermes dashboard");
+      expect(container.textContent).toContain("stardust dashboard");
       const labels = Array.from(container.querySelectorAll("button")).map((b) => b.textContent?.trim());
       expect(labels).toContain("Reconnect now");
       expect(labels).toContain("Check server status");

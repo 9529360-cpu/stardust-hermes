@@ -59,9 +59,9 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
         if db is not None:
             db.close()
 
-    print(f"\nResume this session with:\n  hermes --tui --resume {target}")
+    print(f"\nResume this session with:\n  stardust --tui --resume {target}")
     if title:
-        print(f'  hermes --tui -c "{title}"')
+        print(f'  stardust --tui -c "{title}"')
     print(f"\nSession:        {target}")
     if title:
         print(f"Title:          {title}")
@@ -305,8 +305,8 @@ def _iter_tui_build_inputs(root: Path):
 
 def _tui_need_rebuild(root: Path) -> bool:
     """True when ``dist/entry.js`` is missing or older than TUI inputs (Termux cold-start saver);
-    ``HERMES_TUI_FORCE_BUILD=1`` forces a rebuild."""
-    force = (os.environ.get("HERMES_TUI_FORCE_BUILD") or "").strip().lower()
+    ``STARDUST_TUI_FORCE_BUILD=1`` forces a rebuild."""
+    force = (os.environ.get("STARDUST_TUI_FORCE_BUILD") or "").strip().lower()
     if force in {"1", "true", "yes", "on"}:
         return True
 
@@ -326,11 +326,11 @@ def _tui_need_rebuild(root: Path) -> bool:
 
 def _ensure_tui_node() -> None:
     """Ensure `node` + `npm` are on PATH: else run node-bootstrap.sh `ensure_node` and prepend
-    the resolved node dir to PATH. ``HERMES_SKIP_NODE_BOOTSTRAP=1`` disables auto-install."""
+    the resolved node dir to PATH. ``STARDUST_SKIP_NODE_BOOTSTRAP=1`` disables auto-install."""
     from hermes_cli.main import PROJECT_ROOT
     if shutil.which("node") and shutil.which("npm"):
         return
-    if os.environ.get("HERMES_SKIP_NODE_BOOTSTRAP"):
+    if os.environ.get("STARDUST_SKIP_NODE_BOOTSTRAP"):
         return
 
     helper = PROJECT_ROOT / "scripts" / "lib" / "node-bootstrap.sh"
@@ -344,7 +344,7 @@ def _ensure_tui_node() -> None:
         # edits don't leak back into Python, so the capture is the bridge.
         result = subprocess.run(
             ["bash", "-c", f'source "{helper}" >&2 && ensure_node >&2 && command -v node'],
-            env={**os.environ, "HERMES_HOME": hermes_home},
+            env={**os.environ, "STARDUST_HOME": hermes_home},
             capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
     except (OSError, subprocess.SubprocessError):
         return
@@ -370,10 +370,10 @@ def _find_bundled_tui(hermes_cli_dir: Path | None = None) -> Path | None:
 
 def _restore_tui_workspace(tui_dir: Path) -> bool:
     """Best-effort ``git restore`` of a missing ``ui-tui/`` (Windows AV/NTFS filters can delete
-    tracked files after ``hermes update``); True when the directory exists afterwards.
+    tracked files after ``stardust update``); True when the directory exists afterwards.
 
     On Windows an antivirus / NTFS filter driver can leave tracked ``ui-tui/`` files deleted in the working
-    tree after ``hermes update`` (HEAD stays intact; the files just vanish — see issue #49145). Those files
+    tree after ``stardust update`` (HEAD stays intact; the files just vanish — see issue #49145). Those files
     are tracked, so ``git restore`` puts them back deterministically. Best-effort: returns False (rather
     than raising) when git is unavailable, this isn't a checkout, or the restore leaves the directory still
     missing — the caller then prints the manual-recovery message.
@@ -403,19 +403,19 @@ def _ensure_tui_workspace(tui_dir: Path) -> None:
         return
 
     if _restore_tui_workspace(tui_dir):
-        if not os.environ.get("HERMES_QUIET"):
+        if not os.environ.get("STARDUST_QUIET"):
             print(f"Restored missing TUI workspace: {tui_dir}")
         return
 
     print(
         "Error: the TUI workspace is missing from this Hermes checkout.\n"
         f"Expected directory: {tui_dir}\n"
-        "This usually means `hermes update` left tracked ui-tui files deleted.\n"
+        "This usually means `stardust update` left tracked ui-tui files deleted.\n"
         "Recovery:\n"
         "  1. From the Hermes checkout, run `git restore -- ui-tui`\n"
         "  2. Run `npm install --silent --no-fund --no-audit --progress=false`\n"
-        "  3. Retry `hermes --tui`\n"
-        "If the checkout is still inconsistent, run `hermes update --force`.",
+        "  3. Retry `stardust --tui`\n"
+        "If the checkout is still inconsistent, run `stardust update --force`.",
         file=sys.stderr)
     sys.exit(1)
 
@@ -429,8 +429,8 @@ def _npm_lifecycle_env(env: dict[str, str] | None = None) -> dict[str, str]:
     # The repo-root ``.npmrc`` is git-tracked, so the updater's autostash parks
     # any mirror/proxy line added there and every update reinstalls without it
     # (restricted networks then prune optional native deps like get-windows and
-    # the rebuild fails). ``$HERMES_HOME`` lives outside the git tree and the
-    # update hand-off already carries ``HERMES_HOME`` down to every npm child.
+    # the rebuild fails). ``$STARDUST_HOME`` lives outside the git tree and the
+    # update hand-off already carries ``STARDUST_HOME`` down to every npm child.
     # An explicit ``NPM_CONFIG_USERCONFIG`` wins (#106373).
     from hermes_constants import get_hermes_home
     npmrc = get_hermes_home() / "npmrc"
@@ -440,10 +440,10 @@ def _npm_lifecycle_env(env: dict[str, str] | None = None) -> dict[str, str]:
 
 
 def _tui_node_bin(bin: str) -> str:
-    """Resolve ``node``/``npm`` for the TUI launch, or exit with a hint. ``HERMES_NODE`` wins for node;
-    ``find_node_executable()`` sees the managed ``$HERMES_HOME/node`` tree a bare which() misses."""
+    """Resolve ``node``/``npm`` for the TUI launch, or exit with a hint. ``STARDUST_NODE`` wins for node;
+    ``find_node_executable()`` sees the managed ``$STARDUST_HOME/node`` tree a bare which() misses."""
     if bin == "node":
-        env_node = os.environ.get("HERMES_NODE")
+        env_node = os.environ.get("STARDUST_NODE")
         if env_node and os.path.isfile(env_node) and os.access(env_node, os.X_OK):
             return env_node
     from hermes_constants import find_node_executable
@@ -456,8 +456,8 @@ def _tui_node_bin(bin: str) -> str:
     if not path:
         print(
             f"Node.js is required for the TUI but `{bin}` was not found. Install it from "
-            "https://nodejs.org (run `hermes doctor` for the install hint for your OS), then "
-            "retry `hermes --tui`. To keep working now, run `hermes --cli`."
+            "https://nodejs.org (run `stardust doctor` for the install hint for your OS), then "
+            "retry `stardust --tui`. To keep working now, run `stardust --cli`."
         )
         sys.exit(1)
     return path
@@ -492,7 +492,7 @@ def _install_tui_dependencies(tui_dir: Path, *, termux_startup: bool) -> None:
     ``omit=dev`` would silently skip it.
     """
     npm = _tui_node_bin("npm")
-    if not os.environ.get("HERMES_QUIET"):
+    if not os.environ.get("STARDUST_QUIET"):
         print("Installing TUI dependencies…")
     npm_cwd = _workspace_root(tui_dir)
     # --workspace ui-tui avoids resolving apps/desktop (Electron + node-pty). See #38772. When ui-tui/ has
@@ -530,17 +530,17 @@ def _install_tui_dependencies(tui_dir: Path, *, termux_startup: bool) -> None:
 
 
 def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
-    """TUI: --dev → tsx src; else node dist (HERMES_TUI_DIR prebuilt or esbuild)."""
+    """TUI: --dev → tsx src; else node dist (STARDUST_TUI_DIR prebuilt or esbuild)."""
     from hermes_cli.main import _is_termux_startup_environment
     _ensure_tui_node()
 
     # Footgun: --dev against a prebuilt bundle that has no source/node_modules.
-    ext_dir = os.environ.get("HERMES_TUI_DIR")
+    ext_dir = os.environ.get("STARDUST_TUI_DIR")
     if tui_dev and ext_dir:
         print(
-            f"Error: --dev is incompatible with HERMES_TUI_DIR={ext_dir}\n"
+            f"Error: --dev is incompatible with STARDUST_TUI_DIR={ext_dir}\n"
             f"The prebuilt TUI has no source code to hot-reload.\n"
-            f"Unset HERMES_TUI_DIR (e.g. `unset HERMES_TUI_DIR`) to use --dev from a checkout.",
+            f"Unset STARDUST_TUI_DIR (e.g. `unset STARDUST_TUI_DIR`) to use --dev from a checkout.",
             file=sys.stderr)
         sys.exit(1)
 
@@ -681,24 +681,24 @@ def _safe_tui_cwd(env: Optional[dict] = None) -> str:
 def _apply_tui_python_env(env: dict) -> None:
     """Seed/repair Python-related env vars shared by CLI and dashboard TUI launches."""
     from hermes_cli.main import PROJECT_ROOT
-    src_root = str(env.get("HERMES_PYTHON_SRC_ROOT") or "").strip()
+    src_root = str(env.get("STARDUST_PYTHON_SRC_ROOT") or "").strip()
     if not src_root or not Path(src_root).is_dir():
-        env["HERMES_PYTHON_SRC_ROOT"] = str(PROJECT_ROOT)
+        env["STARDUST_PYTHON_SRC_ROOT"] = str(PROJECT_ROOT)
 
-    cwd = str(env.get("HERMES_CWD") or "").strip()
+    cwd = str(env.get("STARDUST_CWD") or "").strip()
     if not cwd or not Path(cwd).is_dir():
-        env["HERMES_CWD"] = _safe_tui_cwd(env)
+        env["STARDUST_CWD"] = _safe_tui_cwd(env)
 
-    python = str(env.get("HERMES_PYTHON") or "").strip()
+    python = str(env.get("STARDUST_PYTHON") or "").strip()
     if os.path.dirname(python):
         python_path = Path(python)
         if not python_path.is_absolute():
-            python_path = Path(env["HERMES_CWD"]) / python_path
+            python_path = Path(env["STARDUST_CWD"]) / python_path
         python_is_executable = python_path.is_file() and os.access(python_path, os.X_OK)
     else:
         python_is_executable = bool(shutil.which(python, path=env.get("PATH")))
     if not python_is_executable:
-        env["HERMES_PYTHON"] = sys.executable
+        env["STARDUST_PYTHON"] = sys.executable
 
 
 def _setup_tui_worktree() -> dict:
@@ -752,13 +752,13 @@ def _launch_tui(
     active_session_fd, active_session_file = tempfile.mkstemp(
         prefix="hermes-tui-active-session-", suffix=".json")
     os.close(active_session_fd)
-    env["HERMES_TUI_ACTIVE_SESSION_FILE"] = active_session_file
+    env["STARDUST_TUI_ACTIVE_SESSION_FILE"] = active_session_file
     env.setdefault("NODE_ENV", "development" if tui_dev else "production")
 
     wt_info = None
     if worktree:
         wt_info = _setup_tui_worktree()
-        env["HERMES_CWD"] = wt_info["path"]
+        env["STARDUST_CWD"] = wt_info["path"]
         env["TERMINAL_CWD"] = wt_info["path"]
 
     _apply_tui_python_env(env)
@@ -768,16 +768,16 @@ def _launch_tui(
         skills_value = (
             ",".join(_split_comma_items(skills)) if isinstance(skills, (list, tuple)) else str(skills).strip())
     for key, value in (
-        ("HERMES_MODEL", model), ("HERMES_INFERENCE_MODEL", model),
-        ("HERMES_TUI_PROVIDER", provider), ("HERMES_INFERENCE_PROVIDER", provider),
-        ("HERMES_TUI_TOOLSETS", ",".join(_normalize_tui_toolsets(toolsets))),
-        ("HERMES_TUI_SKILLS", skills_value),
-        ("HERMES_TUI_QUERY", query), ("HERMES_TUI_IMAGE", image),
-        ("HERMES_TUI_CHECKPOINTS", "1" if checkpoints else None),
-        ("HERMES_TUI_PASS_SESSION_ID", "1" if pass_session_id else None),
-        ("HERMES_TUI_MAX_TURNS", str(max_turns) if max_turns is not None else None),
-        ("HERMES_TUI_TOOL_PROGRESS", "verbose" if verbose else "off" if quiet else None),
-        ("HERMES_ACCEPT_HOOKS", "1" if accept_hooks else None)):
+        ("STARDUST_MODEL", model), ("STARDUST_INFERENCE_MODEL", model),
+        ("STARDUST_TUI_PROVIDER", provider), ("STARDUST_INFERENCE_PROVIDER", provider),
+        ("STARDUST_TUI_TOOLSETS", ",".join(_normalize_tui_toolsets(toolsets))),
+        ("STARDUST_TUI_SKILLS", skills_value),
+        ("STARDUST_TUI_QUERY", query), ("STARDUST_TUI_IMAGE", image),
+        ("STARDUST_TUI_CHECKPOINTS", "1" if checkpoints else None),
+        ("STARDUST_TUI_PASS_SESSION_ID", "1" if pass_session_id else None),
+        ("STARDUST_TUI_MAX_TURNS", str(max_turns) if max_turns is not None else None),
+        ("STARDUST_TUI_TOOL_PROGRESS", "verbose" if verbose else "off" if quiet else None),
+        ("STARDUST_ACCEPT_HOOKS", "1" if accept_hooks else None)):
         if value:
             env[key] = value
     # Generous V8 heap (8GB target; default cap can fatal-OOM on long sessions),
@@ -789,13 +789,13 @@ def _launch_tui(
     if not any(t.startswith("--max-old-space-size=") for t in _tokens):
         _tokens.append(f"--max-old-space-size={_resolve_tui_heap_mb()}")
     env["NODE_OPTIONS"] = " ".join(_tokens)
-    # HERMES_TUI_RESUME is an internal hand-off to the Ink app. We start from a
+    # STARDUST_TUI_RESUME is an internal hand-off to the Ink app. We start from a
     # full os.environ snapshot, so a stale exported value would make a plain
-    # `hermes --tui` try to resume a non-existent session; only forward the id
+    # `stardust --tui` try to resume a non-existent session; only forward the id
     # argparse resolved for this invocation.
-    env.pop("HERMES_TUI_RESUME", None)
+    env.pop("STARDUST_TUI_RESUME", None)
     if resume_session_id:
-        env["HERMES_TUI_RESUME"] = resume_session_id
+        env["STARDUST_TUI_RESUME"] = resume_session_id
 
     argv, cwd = _make_tui_argv(tui_dir, tui_dev)
     code: Optional[int] = None
@@ -815,7 +815,7 @@ def _launch_tui(
                 from cli import _cleanup_worktree
                 _cleanup_worktree(wt_info)
 
-    # Exit code 42 = TUI requested an update. Relaunch as `hermes update`;
+    # Exit code 42 = TUI requested an update. Relaunch as `stardust update`;
     # preserve_inherited=False keeps --tui and other flags out of the subcommand.
     if code == 42:
         from hermes_cli.relaunch import relaunch
@@ -826,7 +826,7 @@ def _launch_tui(
 
 
 def _sync_bundled_skills_quietly() -> None:
-    """Seed ``~/.hermes/skills/`` with the bundled library (idempotent, milliseconds when synced).
+    """Seed ``~/.stardust/skills/`` with the bundled library (idempotent, milliseconds when synced).
     Failures are swallowed: skills are an enhancement, not a hard dependency."""
     with contextlib.suppress(Exception):
         from tools.skills_sync import sync_skills
@@ -835,10 +835,10 @@ def _sync_bundled_skills_quietly() -> None:
 
 def _resolve_use_tui(args) -> bool:
     """Decide whether to launch the TUI: ``--cli`` → classic; ``--tui`` → TUI; no TTY → classic;
-    ``HERMES_TUI=1`` → TUI; ``display.interface`` config; default classic.
+    ``STARDUST_TUI=1`` → TUI; ``display.interface`` config; default classic.
 
     The TTY gate is load-bearing: ambient preferences must never hijack a piped
-    ``hermes chat -q`` (kanban workers, cron) — the Ink no-TTY bail-out exits 0 and
+    ``stardust chat -q`` (kanban workers, cron) — the Ink no-TTY bail-out exits 0 and
     the worker dies with a protocol violation. Explicit ``--tui`` still bails out.
     """
     if getattr(args, "cli", False):
@@ -850,7 +850,7 @@ def _resolve_use_tui(args) -> bool:
             return False
     except Exception:
         return False
-    if os.environ.get("HERMES_TUI") == "1":
+    if os.environ.get("STARDUST_TUI") == "1":
         return True
     try:
         from hermes_cli.config import load_config

@@ -41,8 +41,8 @@ def capture_local_session_origin(
         return None
     try:
         from gateway.session_context import get_session_env
-        source = get_session_env("HERMES_SESSION_SOURCE", "")
-        durable_session_id = get_session_env("HERMES_SESSION_ID", "") or session_id
+        source = get_session_env("STARDUST_SESSION_SOURCE", "")
+        durable_session_id = get_session_env("STARDUST_SESSION_ID", "") or session_id
     except Exception:
         return None
     return local_session_origin(deliver, source, durable_session_id)

@@ -151,13 +151,13 @@ def test_fallback_name_respects_the_desktop_code_point_limit() -> None:
 def test_effective_defaults_match_scheduler_config_over_env_precedence() -> None:
     assert resolve_cron_model_drift_defaults(
         {"model": {"provider": "managed", "default": "managed/model"}},
-        environ={"HERMES_MODEL": "env/model"},
+        environ={"STARDUST_MODEL": "env/model"},
     ) == ("managed", "managed/model")
     assert resolve_cron_model_drift_defaults(
-        {"model": {}}, environ={"HERMES_MODEL": "env/model"}
+        {"model": {}}, environ={"STARDUST_MODEL": "env/model"}
     ) == ("", "env/model")
     assert resolve_cron_model_drift_defaults(
-        {"model": "legacy/model"}, environ={"HERMES_MODEL": "env/model"}
+        {"model": "legacy/model"}, environ={"STARDUST_MODEL": "env/model"}
     ) == ("", "legacy/model")
 
 

@@ -14,9 +14,9 @@ from acp_adapter.session import SessionState, _expand_acp_enabled_toolsets
 logger = logging.getLogger("acp_adapter.server")
 
 try:
-    from hermes_cli import __version__ as HERMES_VERSION
+    from hermes_cli import __version__ as STARDUST_VERSION
 except Exception:
-    HERMES_VERSION = "0.0.0"
+    STARDUST_VERSION = "0.0.0"
 
 
 def _estimate_tokens(history: list, agent: Any, system_prompt: str | None = None, tools: Any = None) -> int:
@@ -284,4 +284,4 @@ class SlashCommandsMixin:
         return f"Queued for the next turn. ({_queue_prompt(state, queued_text)} queued)"
 
     def _cmd_version(self, args: str, state: SessionState) -> str:
-        return f"Hermes Agent v{HERMES_VERSION}"
+        return f"Hermes Agent v{STARDUST_VERSION}"

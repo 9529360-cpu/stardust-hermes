@@ -2,7 +2,7 @@
 
 Snapshots a working directory before file-mutating tool calls (once per directory per turn)
 and restores any previous checkpoint.  Not a model tool; controlled by the ``checkpoints``
-config / ``--checkpoints`` flag.  One store under ``~/.hermes/checkpoints/`` so git dedupes
+config / ``--checkpoints`` flag.  One store under ``~/.stardust/checkpoints/`` so git dedupes
 blobs across projects (pre-v2 one-repo-per-workdir re-stored ~40 MB each): ``store/`` bare
 repo with per-project ``refs/hermes/<hash16>``, ``indexes/<hash16>``, ``projects/<hash16>.json``
 (workdir, timestamps, parent identity), ``ledgers/<hash16>.json`` (agent-write ledger), shared
@@ -36,7 +36,7 @@ _CHECKPOINT_BASE_AT_IMPORT = CHECKPOINT_BASE
 
 def _resolve_checkpoint_base() -> Path:
     """Active profile's checkpoint root at call time: the patched ``CHECKPOINT_BASE`` when a test
-    changed it, else live profile-scoped HERMES_HOME — under the multiplexed gateway one process
+    changed it, else live profile-scoped STARDUST_HOME — under the multiplexed gateway one process
     serves every profile, so the import-time constant would write every profile's code-edit
     checkpoints into the launch profile's store."""
     return CHECKPOINT_BASE if CHECKPOINT_BASE != _CHECKPOINT_BASE_AT_IMPORT else get_hermes_home() / "checkpoints"
@@ -58,7 +58,7 @@ DEFAULT_EXCLUDES = [
     ".DS_Store", "Thumbs.db", "*.log",  # OS junk / logs
 ]
 
-_GIT_TIMEOUT: int = max(10, min(60, env_int("HERMES_CHECKPOINT_TIMEOUT", 30)))
+_GIT_TIMEOUT: int = max(10, min(60, env_int("STARDUST_CHECKPOINT_TIMEOUT", 30)))
 _MAX_FILES = 50_000  # skip huge directories to avoid slowdowns
 _COMMIT_HASH_RE = re.compile(r'^[0-9a-fA-F]{4,64}$')  # short or full SHA-1/SHA-256
 _MB = 1024 * 1024
@@ -365,7 +365,7 @@ def _shrink_store_to_cap(store: Path, working_dir: str, cap_bytes: int) -> bool:
 
 def _migrate_legacy_store(base: Path) -> Optional[Path]:
     """Archive pre-v2 per-project shadow repos into ``legacy-<ts>/`` (moved, not deleted —
-    users may want to recover; the archive falls under retention and ``hermes checkpoints
+    users may want to recover; the archive falls under retention and ``stardust checkpoints
     clear-legacy``).  Returns the archive path or None."""
     if not base.exists():
         return None
@@ -385,7 +385,7 @@ def _migrate_legacy_store(base: Path) -> Optional[Path]:
         except OSError as exc:
             logger.warning("Could not archive legacy checkpoint %s: %s", child, exc)
     logger.info("Migrated pre-v2 checkpoint repos to %s. "
-                "Clear with `hermes checkpoints clear-legacy` when safe.", legacy_root)
+                "Clear with `stardust checkpoints clear-legacy` when safe.", legacy_root)
     return legacy_root
 
 
@@ -471,8 +471,8 @@ def _pre_v2_shadow_repos(base: Path) -> List[Dict]:
         workdir: Optional[str] = None
         marker_unreadable = False
         try:
-            if (child / "HERMES_WORKDIR").exists():
-                workdir = (child / "HERMES_WORKDIR").read_text(encoding="utf-8").strip()
+            if (child / "STARDUST_WORKDIR").exists():
+                workdir = (child / "STARDUST_WORKDIR").read_text(encoding="utf-8").strip()
         except (OSError, UnicodeDecodeError):
             marker_unreadable = True  # present but unreadable: no evidence the project is gone
         out.append({"path": child, "workdir": workdir, "marker_unreadable": marker_unreadable,

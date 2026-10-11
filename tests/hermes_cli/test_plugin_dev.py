@@ -155,10 +155,10 @@ def test_resolve_rejects_directory_without_manifest(tmp_path: Path) -> None:
 def test_doctor_default_target_does_not_copy_cwd(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """``hermes plugins doctor`` with no argument defaults to ``.``.
+    """``stardust plugins doctor`` with no argument defaults to ``.``.
 
     Before the manifest guard, that copied the whole working directory into
-    a temporary HERMES_HOME — running it from ``$HOME`` copied the home
+    a temporary STARDUST_HOME — running it from ``$HOME`` copied the home
     directory, cloud-storage placeholders included.
     """
     import os

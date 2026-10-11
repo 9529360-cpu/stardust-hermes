@@ -116,7 +116,7 @@ def _clone_all_copytree_ignore(source_dir: Path):
     return _ignore
 
 
-# Allow-list for ``export_profile("default")``: when HERMES_HOME equals the cwd
+# Allow-list for ``export_profile("default")``: when STARDUST_HOME equals the cwd
 # (Docker/custom deployments) the default home holds arbitrary user files that must NOT
 # be bundled. Only known Hermes profile artifacts at the root survive; sensitive runtime
 # infrastructure (``state.db``, ``logs/``, ``auth.*``, other profiles) is deliberately
@@ -150,13 +150,13 @@ _HERMES_SUBCOMMANDS = frozenset({
 # Path helpers
 
 def _get_profiles_root() -> Path:
-    """Named-profiles root, anchored to the hermes root (NOT the current HERMES_HOME, which
+    """Named-profiles root, anchored to the hermes root (NOT the current STARDUST_HOME, which
     may itself be a profile) so ``coder profile list`` sees all profiles."""
     return _get_default_hermes_home() / "profiles"
 
 
 def _get_default_hermes_home() -> Path:
-    """Default (pre-profile) HERMES_HOME: ``~/.hermes``, or HERMES_HOME itself in
+    """Default (pre-profile) STARDUST_HOME: ``~/.hermes``, or STARDUST_HOME itself in
     Docker/custom deployments (e.g. ``/opt/data``)."""
     from hermes_constants import get_default_hermes_root
     return get_default_hermes_root()
@@ -176,9 +176,9 @@ def _wrapper_path(alias: str) -> Path:
 
 
 def _is_our_wrapper(path: Path) -> bool:
-    """True when *path* reads as a Hermes-generated wrapper (contains ``hermes -p``)."""
+    """True when *path* reads as a Hermes-generated wrapper (contains ``stardust -p``)."""
     try:
-        return "hermes -p" in path.read_text(encoding="utf-8")
+        return "stardust -p" in path.read_text(encoding="utf-8")
     except Exception:
         return False
 
@@ -215,7 +215,7 @@ def _invalid_profile_name_error(name: str) -> ValueError:
     suggestion = _suggest_profile_name(name)
     return ValueError(
         f"{name!r} is not a valid profile name. {_PROFILE_NAME_RULE} (for example: {suggestion}). "
-        f"Then run `hermes profile create {suggestion}`."
+        f"Then run `stardust profile create {suggestion}`."
     )
 
 
@@ -282,7 +282,7 @@ def _existing_profile_dir(name: str) -> Tuple[str, Path]:
 
 
 def get_profile_dir(name: str) -> Path:
-    """Resolve a profile name to its HERMES_HOME directory."""
+    """Resolve a profile name to its STARDUST_HOME directory."""
     canon = normalize_profile_name(name)
     if canon == "default":
         return _get_default_hermes_home()
@@ -395,9 +395,9 @@ def create_wrapper_script(name: str, target: Optional[str] = None) -> Optional[P
     wrapper_path = _wrapper_path(canon)
     try:
         if sys.platform == "win32":
-            wrapper_path.write_text(f"@echo off\r\nhermes -p {profile} %*\r\n", encoding="utf-8")
+            wrapper_path.write_text(f"@echo off\r\nstardust -p {profile} %*\r\n", encoding="utf-8")
         else:
-            hermes_exe = shutil.which("hermes") or "hermes"
+            hermes_exe = shutil.which("stardust") or "stardust"
             wrapper_path.write_text(f'#!/bin/sh\nexec {shlex.quote(hermes_exe)} -p {profile} "$@"\n', encoding="utf-8")
             wrapper_path.chmod(wrapper_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         return wrapper_path
@@ -454,7 +454,7 @@ def find_alias_for_profile(profile_name: str) -> Optional[str]:
 
 
 # Cap on how much of a wrapper file is read when reverse-looking-up its profile. Real
-# wrappers are a few hundred bytes with the ``hermes -p X`` needle near the top; the wrapper
+# wrappers are a few hundred bytes with the ``stardust -p X`` needle near the top; the wrapper
 # dir commonly also holds large binaries (ffmpeg, node, …) whose whole-file reads, N times,
 # dominated ``list_profiles`` (~4.5s).
 _WRAPPER_READ_LIMIT = 8192
@@ -471,7 +471,7 @@ def build_alias_map() -> dict[str, str]:
     if not wrapper_dir.is_dir():
         return result
     is_windows = sys.platform == "win32"
-    prefix = "hermes -p "
+    prefix = "stardust -p "
     for entry in sorted(wrapper_dir.iterdir()):
         if not entry.is_file():
             continue
@@ -588,7 +588,7 @@ def _seed_model_config(profile_dir: Path) -> None:
 
 
 def _check_gateway_running(profile_dir: Path) -> bool:
-    """Gateway liveness for a profile dir, never mutating HERMES_HOME.
+    """Gateway liveness for a profile dir, never mutating STARDUST_HOME.
 
     Primary signal is ``gateway.pid`` verified against the runtime lock (fails closed when
     the lock isn't held by *this* reader: dashboard as a separate s6 service, launch-service
@@ -1000,8 +1000,8 @@ def _finish_profile_layout(profile_dir: Path, *, no_skills: bool, clone_all: boo
     if no_skills:
         _seed_file_if_missing(
             profile_dir / NO_BUNDLED_SKILLS_MARKER,
-            "This profile opted out of bundled-skill seeding (`hermes profile create --no-skills`).\n"
-            "Delete this file to re-enable sync on the next `hermes update`.\n",
+            "This profile opted out of bundled-skill seeding (`stardust profile create --no-skills`).\n"
+            "Delete this file to re-enable sync on the next `stardust update`.\n",
         )
 
     # Migrate config-only clones now so desktop/status don't warn that a just-created
@@ -1032,7 +1032,7 @@ def _live_default_multiplexer() -> bool:
 
 
 def seed_profile_skills(profile_dir: Path, quiet: bool = False) -> Optional[dict]:
-    """Seed bundled skills into a profile via subprocess (sync_skills() caches HERMES_HOME at
+    """Seed bundled skills into a profile via subprocess (sync_skills() caches STARDUST_HOME at
     module level). Returns the sync result dict, or None on failure. ``--no-skills`` profiles
     still run the sync: ``sync_skills()`` detects the marker and seeds only essentials."""
     project_root = Path(__file__).parent.parent.resolve()
@@ -1041,7 +1041,7 @@ def seed_profile_skills(profile_dir: Path, quiet: bool = False) -> Optional[dict
             [sys.executable, "-c",
              "import json; from tools.skills_sync import sync_skills; "
              "r = sync_skills(quiet=True); print(json.dumps(r))"],
-            env={**os.environ, "HERMES_HOME": str(profile_dir)},
+            env={**os.environ, "STARDUST_HOME": str(profile_dir)},
             cwd=str(project_root),
             capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
         )
@@ -1096,21 +1096,21 @@ _BACKEND_TOKENS = frozenset({"serve", "dashboard", "gateway"})
 _HERMES_ARGV_MARKERS = ("hermes_cli.main", "hermes-gateway", "tui_gateway")
 # python / python3 / python3.12 / pythonw(.exe): the interpreter basenames a
 # `#!/…/python3` console-script shim is exec'd through when something (e.g. Electron's
-# `findOnPath('hermes')`) spawns the shim by handing the interpreter its path — then the
-# OS-reported argv[0] is the interpreter, not "hermes".
+# `findOnPath('stardust')`) spawns the shim by handing the interpreter its path — then the
+# OS-reported argv[0] is the interpreter, not "stardust".
 _PYTHON_INTERPRETER_RE = re.compile(r"^python[\d.]*w?(\.exe)?$")
 # Console-script entry points this project ships (pyproject.toml [project.scripts]).
 # argv[1] is matched against exact names, not ``startswith("hermes")``: with a bare
 # interpreter argv[0], argv[1] can be ANY user script ("hermes-notes.py").
-_HERMES_CONSOLE_SCRIPT_NAMES = frozenset({"hermes", "hermes-agent", "hermes-acp"})
+_HERMES_CONSOLE_SCRIPT_NAMES = frozenset({"stardust", "hermes", "hermes-agent", "hermes-acp"})
 
 
 def _is_hermes_argv(argv: list) -> bool:
-    """True for a Hermes process: entrypoint marker in argv, executable named ``hermes*``,
-    or a python interpreter directly exec'ing a known ``hermes`` console-script shim."""
+    """True for a Hermes process: entrypoint marker in argv, executable named ``hermes*`` or ``stardust*``,
+    or a python interpreter directly exec'ing a known ``stardust`` or ``hermes`` console-script shim."""
     joined = " ".join(argv)
     exe_name = os.path.basename(argv[0]).lower()
-    if any(marker in joined for marker in _HERMES_ARGV_MARKERS) or exe_name.startswith("hermes"):
+    if any(marker in joined for marker in _HERMES_ARGV_MARKERS) or exe_name.startswith(("hermes", "stardust")):
         return True
     if len(argv) >= 2 and _PYTHON_INTERPRETER_RE.match(exe_name):
         script_name = os.path.basename(str(argv[1])).lower()
@@ -1168,11 +1168,11 @@ def _profile_bound_backend_pids(canon: str, profile_dir: Path) -> list[int]:
             if not ({tok.lower() for tok in argv} & _BACKEND_TOKENS):
                 continue
 
-            # Bound to THIS profile by selector flag, or by HERMES_HOME pointing at its dir.
+            # Bound to THIS profile by selector flag, or by STARDUST_HOME pointing at its dir.
             bound = any(normalize_profile_name(sel) == canon for sel in _argv_profile_selectors(argv))
             if not bound:
                 with contextlib.suppress(Exception):  # environ() can raise AccessDenied even same-user
-                    env_home = (proc.environ() or {}).get("HERMES_HOME", "")
+                    env_home = (proc.environ() or {}).get("STARDUST_HOME", "")
                     bound = bool(env_home) and Path(env_home).resolve() == resolved_dir
             if bound:
                 pids.append(pid)
@@ -1377,7 +1377,7 @@ def _maybe_register_gateway_service(profile_name: str) -> None:
     """Register a profile's gateway with s6 inside the container. Best-effort: profile
     creation must not fail over a supervision-tree hiccup; `gateway start` re-registers.
 
-    Port selection: each supervised profile gateway loads its own ``HERMES_HOME`` and binds the port
+    Port selection: each supervised profile gateway loads its own ``STARDUST_HOME`` and binds the port
     resolved by ``gateway/config.py`` from that profile's environment — ``API_SERVER_PORT`` (or
     ``platforms.api_server.extra.port`` in the profile's ``config.yaml``), defaulting to 8642. There is no
     ``[gateway] port`` key and no Python-side allocator (PR #30136 review item I5 retired the
@@ -1410,10 +1410,10 @@ def _cleanup_gateway_service(name: str, profile_dir: Path) -> None:
     """Disable and remove systemd/launchd service for a profile."""
     import platform as _platform
 
-    # HERMES_HOME is set temporarily so _profile_suffix resolves the service name.
-    old_home = os.environ.get("HERMES_HOME")
+    # STARDUST_HOME is set temporarily so _profile_suffix resolves the service name.
+    old_home = os.environ.get("STARDUST_HOME")
     try:
-        os.environ["HERMES_HOME"] = str(profile_dir)
+        os.environ["STARDUST_HOME"] = str(profile_dir)
         from hermes_cli.gateway import get_service_name, get_launchd_plist_path
 
         def _run(*cmd: str) -> None:
@@ -1438,9 +1438,9 @@ def _cleanup_gateway_service(name: str, profile_dir: Path) -> None:
     except Exception as e:
         print(f"⚠ Service cleanup: {e}")
     finally:
-        os.environ.pop("HERMES_HOME", None)
+        os.environ.pop("STARDUST_HOME", None)
         if old_home is not None:
-            os.environ["HERMES_HOME"] = old_home
+            os.environ["STARDUST_HOME"] = old_home
 
 
 def _stop_gateway_process(profile_dir: Path) -> None:
@@ -1458,7 +1458,7 @@ def _stop_gateway_process(profile_dir: Path) -> None:
         from gateway.status import get_process_start_time, recorded_gateway_home_conflicts, terminate_pid
         if recorded_gateway_home_conflicts(data, expected_home=profile_dir):
             print(
-                f"✗ Refusing to stop PID {pid}: its recorded HERMES_HOME "
+                f"✗ Refusing to stop PID {pid}: its recorded STARDUST_HOME "
                 f"belongs to a different profile than {profile_dir} "
                 "(stale/poisoned PID record, #89315)."
             )
@@ -1514,7 +1514,7 @@ def _retarget_active_profile(old: str, new: str, message: str) -> None:
 
 
 def get_active_profile_name() -> str:
-    """Profile name inferred from HERMES_HOME: ``"default"`` when unset or ``~/.hermes``, the
+    """Profile name inferred from STARDUST_HOME: ``"default"`` when unset or ``~/.hermes``, the
     name under ``~/.hermes/profiles/<name>``, ``"custom"`` for any other path."""
     from hermes_constants import get_hermes_home
     resolved = get_hermes_home().resolve()
@@ -1534,7 +1534,7 @@ def get_active_profile_name() -> str:
 
 def _inside_git_checkout(path: Path) -> bool:
     """True when *path* lies inside a Git checkout. Walks the path's OWN resolved ancestry
-    (not cwd) so the check holds when HERMES_HOME sits in a checkout but the process runs
+    (not cwd) so the check holds when STARDUST_HOME sits in a checkout but the process runs
     elsewhere (cron, service manager). Resolution failure reports True (fail closed)."""
     try:
         resolved = path.resolve()
@@ -1550,7 +1550,7 @@ def _profile_export_directory() -> Path:
     if not _inside_git_checkout(export_dir):
         return export_dir
 
-    # A custom deployment may point HERMES_HOME at its source checkout: use a sibling store,
+    # A custom deployment may point STARDUST_HOME at its source checkout: use a sibling store,
     # falling back to the OS temp dir only when the user's home itself is a checkout (dotfiles
     # repo). Per-uid temp name: a fixed /tmp/hermes-profile-exports is a predictable shared
     # path another local user could pre-create (or symlink) first.
@@ -1600,8 +1600,8 @@ def _default_export_ignore(root_dir: Path):
 
     * **Root-level allow-list** — only entries whose name appears in ``_DEFAULT_EXPORT_INCLUDE_ROOT``
     survive. Everything else (such as an unrelated ``x11-dev/`` directory in a Docker deployment where
-    HERMES_HOME equals the cwd) is excluded. Blacklisting was tried first and proved unable to anticipate
-    every non-Hermes file the user may have lying alongside HERMES_HOME (#58394). * **Universal exclusions
+    STARDUST_HOME equals the cwd) is excluded. Blacklisting was tried first and proved unable to anticipate
+    every non-Hermes file the user may have lying alongside STARDUST_HOME (#58394). * **Universal exclusions
     at any depth** — ``__pycache__``, sockets and other special files, temp files
     (:func:`_non_exportable_entries`); plus npm lockfiles, which may appear at the root.
     """
@@ -1868,17 +1868,17 @@ def rename_profile(old_name: str, new_name: str) -> Path:
 # Profile env resolution (called from _apply_profile_override)
 
 def resolve_profile_env(profile_name: str) -> str:
-    """Resolve a profile name to a HERMES_HOME path string. Called early in the CLI entry
-    point, before hermes modules are imported, to set HERMES_HOME.
+    """Resolve a profile name to a STARDUST_HOME path string. Called early in the CLI entry
+    point, before hermes modules are imported, to set STARDUST_HOME.
 
-    When HERMES_HOME is already set, the configured spelling IS the launch root (it may be a
+    When STARDUST_HOME is already set, the configured spelling IS the launch root (it may be a
     junction/symlink alias of the platform default). Keep that spelling so profile re-home does not destroy
     the launcher's lexical provenance -- the subprocess sanitizer needs it to match Hermes-owned PYTHONPATH
     entries written in the same spelling (#82581 junction follow-up). Physically the paths are identical
     (junction-transparent); only the spelling is preserved.
     """
     canon = _canon_valid(profile_name)
-    env_home = os.environ.get("HERMES_HOME", "").strip()
+    env_home = os.environ.get("STARDUST_HOME", "").strip()
     if env_home:
         env_path = Path(env_home)
         # A profile-shaped env value means the root is the grandparent (mirrors

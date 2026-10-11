@@ -1,6 +1,6 @@
 """Website access policy helpers for URL-capable tools.
 
-Loads a user-managed website blocklist (``security.website_blocklist`` in ~/.hermes/config.yaml plus
+Loads a user-managed website blocklist (``security.website_blocklist`` in ~/.stardust/config.yaml plus
 optional shared list files) without the heavier CLI config stack. The parsed policy is cached with a
 short TTL so config edits take effect quickly without re-parsing YAML on every URL check.
 """

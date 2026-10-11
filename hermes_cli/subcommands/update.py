@@ -1,4 +1,4 @@
-"""``hermes update`` subcommand parser."""
+"""``stardust update`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -29,11 +29,11 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
     )
     update_parser.add_argument(
         "--backup", action="store_true", default=False,
-        help="Force a FULL pre-update backup (quick state snapshot + HERMES_HOME zip) for this run, regardless of updates.pre_update_backup",
+        help="Force a FULL pre-update backup (quick state snapshot + STARDUST_HOME zip) for this run, regardless of updates.pre_update_backup",
     )
     update_parser.add_argument(
         "--yes", "-y", action="store_true", default=False,
-        help="Run without blocking on prompts: accepts the config-migration and stash-restore prompts, skips the fork-upstream prompt without adding a remote. API-key entry is skipped; run 'hermes config migrate' separately for those.",
+        help="Run without blocking on prompts: accepts the config-migration and stash-restore prompts, skips the fork-upstream prompt without adding a remote. API-key entry is skipped; run 'stardust config migrate' separately for those.",
     )
     update_parser.add_argument(
         "--keep-stash", action="store_true", default=False,
@@ -60,7 +60,7 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
             "Still refuses to touch a dirty tree.")
     update_parser.add_argument(
         "--force", action="store_true", default=False,
-        help="Windows: proceed with the update even when another hermes.exe is detected. The concurrent process will likely cause WinError 32 warnings. Does NOT bypass the venv-process guard (see --force-venv).",
+        help="Windows: proceed with the update even when another stardust.exe is detected. The concurrent process will likely cause WinError 32 warnings. Does NOT bypass the venv-process guard (see --force-venv).",
     )
     update_parser.add_argument(
         "--force-venv", action="store_true", default=False,

@@ -1238,7 +1238,7 @@ export function groupSpeakerLabel(name?: null | string) {
     return title
   }
 
-  // Core profile display_name (`hermes profile rename …` / dashboard) from
+  // Core profile display_name (`stardust profile rename …` / dashboard) from
   // the ACTIVE gateway's roster row. Source-scoped remote speakers carry
   // their device suffix separately and keep their raw name here.
   const roster = $lastRoster.get()

@@ -14,7 +14,7 @@ from tools.environments.local import hermes_subprocess_env
 _IS_WINDOWS = platform.system() == "Windows"
 
 _DEP_CHECKS = {
-    # find_node_executable() rather than a bare which(): $HERMES_HOME/node is not on PATH, so
+    # find_node_executable() rather than a bare which(): $STARDUST_HOME/node is not on PATH, so
     # which() would report Node missing on a managed install and trigger a redundant re-install.
     "node": lambda: find_node_executable("node") is not None,
     "browser": lambda: (agent_browser_runnable(shutil.which("agent-browser")) or _has_system_browser()
@@ -54,7 +54,7 @@ def _has_hermes_agent_browser() -> bool:
     home = get_hermes_home()
     if _IS_WINDOWS:  # npm -g --prefix puts .cmd shims directly in the prefix dir
         return (home / "node" / "agent-browser.cmd").is_file()
-    # install.sh installs into $HERMES_HOME/node/bin/ via npm -g --prefix; legacy git clones used node_modules/.bin/.
+    # install.sh installs into $STARDUST_HOME/node/bin/ via npm -g --prefix; legacy git clones used node_modules/.bin/.
     return ((home / "node" / "bin" / "agent-browser").is_file()
             or (home / "node_modules" / ".bin" / "agent-browser").is_file())
 

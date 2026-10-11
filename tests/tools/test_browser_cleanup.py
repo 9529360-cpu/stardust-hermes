@@ -18,9 +18,9 @@ class TestScreenshotPathRecovery:
 
         assert (
             _extract_screenshot_path_from_text(
-                "Screenshot saved to '/Users/david/.hermes/browser_screenshots/shot.png'"
+                "Screenshot saved to '/Users/david/.stardust/browser_screenshots/shot.png'"
             )
-            == "/Users/david/.hermes/browser_screenshots/shot.png"
+            == "/Users/david/.stardust/browser_screenshots/shot.png"
         )
 
 
@@ -123,7 +123,7 @@ class TestInactivityJanitorMultiplex:
             get_hermes_home, reset_hermes_home_override, set_hermes_home_override,
         )
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.delenv("CAMOFOX_URL", raising=False)
         monkeypatch.delenv("BROWSER_CDP_URL", raising=False)
         p1 = tmp_path / "profiles" / "p1"

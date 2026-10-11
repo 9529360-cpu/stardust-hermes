@@ -461,7 +461,7 @@ class TestHasAzureIdentityCredentials:
 
 
 # ---------------------------------------------------------------------------
-# describe_active_credential — used by hermes doctor + hermes auth
+# describe_active_credential — used by stardust doctor + stardust auth
 # ---------------------------------------------------------------------------
 
 

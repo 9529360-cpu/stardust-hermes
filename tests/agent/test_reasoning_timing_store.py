@@ -13,7 +13,7 @@ from tui_gateway import server
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     return SessionDB(db_path=tmp_path / "state.db")
 
 

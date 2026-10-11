@@ -16,7 +16,7 @@ def test_passive_check_obeys_config_before_using_cached_notice(monkeypatch):
     (home / ".update_check").write_text(json.dumps({
         "ts": time.time(), "behind": 17, "rev": None, "ver": banner.VERSION, "head": head,
     }), encoding="utf-8")
-    monkeypatch.delenv("HERMES_REVISION", raising=False)
+    monkeypatch.delenv("STARDUST_REVISION", raising=False)
     config = home / "config.yaml"
     config.write_text("updates:\n  check: true\n", encoding="utf-8")
     assert banner.check_for_updates(passive=True) == 17

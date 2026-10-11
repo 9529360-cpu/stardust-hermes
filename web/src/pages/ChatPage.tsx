@@ -1,5 +1,5 @@
 /**
- * ChatPage — embeds `hermes --tui` inside the dashboard.
+ * ChatPage — embeds `stardust --tui` inside the dashboard.
  *
  *   <div host> (dashboard chrome)                                         .
  *     └─ <div wrapper> (rounded, dark bg, padded — the "terminal window"  .
@@ -608,7 +608,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     //      terminal has a selection, then emits an OSC 52 escape.  Our
     //      OSC 52 handler below decodes that escape and writes to the
     //      browser clipboard — so the flow works just like it does in
-    //      `hermes --tui`.
+    //      `stardust --tui`.
     //
     //   2. **Ctrl/Cmd+Shift+C.**  Belt-and-suspenders shortcut that
     //      operates directly on xterm's selection, useful if the TUI
@@ -623,7 +623,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     //
     //   4. **DOM paste / drop on the host.**  Bare Ctrl+V and context-menu
     //      paste fire a ClipboardEvent; drag-drop lands files. Image
-    //      payloads upload to HERMES_HOME/images then drive `/image`.
+    //      payloads upload to STARDUST_HOME/images then drive `/image`.
     //
     // OSC 52 reads (terminal asking to read the clipboard) are not
     // supported — that would let any content the TUI renders exfiltrate
@@ -659,7 +659,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     // ── Image paste / drop ───────────────────────────────────────────────
     // The Chat tab is an xterm mirror of a TUI inside the gateway. Server-side
     // clipboard.paste / xclip never see the browser clipboard, so image paste
-    // must upload browser bytes to HERMES_HOME/images, then drive `/image`
+    // must upload browser bytes to STARDUST_HOME/images, then drive `/image`
     // over the PTY (same burst-then-Return timing as handleCopyLast).
     let imageUploadDisposed = false;
     const pasteDelay = () =>
@@ -1227,7 +1227,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       // refresh/transient drops. A forced-fresh start rotates the token so
       // the previous keep-alive PTY is not reattached (registry reaps it).
       params.attach = ptyAttachToken(forceFresh);
-      // Profile-scoped chat: the PTY child gets HERMES_HOME pointed at the
+      // Profile-scoped chat: the PTY child gets STARDUST_HOME pointed at the
       // selected profile, so the conversation runs with that profile's model,
       // skills, memory, and sessions (see web_server._resolve_chat_argv).
       if (scopedProfile) params.profile = scopedProfile;

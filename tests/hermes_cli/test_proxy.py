@@ -1,4 +1,4 @@
-"""Tests for the `hermes proxy` subcommand and its upstream adapters."""
+"""Tests for the `stardust proxy` subcommand and its upstream adapters."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def test_public_proxy_registry_excludes_nous_account_adapter():
 
 
 def _write_auth_store(hermes_home: Path, nous_state: Dict[str, Any]) -> Path:
-    """Write an auth.json with the given nous state into a hermetic HERMES_HOME."""
+    """Write an auth.json with the given nous state into a hermetic STARDUST_HOME."""
     auth_path = hermes_home / "auth.json"
     auth_path.write_text(json.dumps({
         "version": 1,
@@ -53,7 +53,7 @@ def _write_auth_store(hermes_home: Path, nous_state: Dict[str, Any]) -> Path:
 
 def test_nous_adapter_concurrent_refresh_serialized(tmp_path, monkeypatch):
     """Two parallel get_credential() calls must serialize through the lock."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     _write_auth_store(tmp_path, {
         "access_token": "a", "refresh_token": "r",
     })
@@ -125,7 +125,7 @@ def _write_xai_pool_entry(
     base_url: str = "https://api.x.ai/v1",
     source: str = "manual:xai_pkce",
 ) -> Path:
-    """Write an xai-oauth pool entry into a hermetic HERMES_HOME."""
+    """Write an xai-oauth pool entry into a hermetic STARDUST_HOME."""
     auth_path = hermes_home / "auth.json"
     auth_path.write_text(json.dumps({
         "version": 1,
@@ -149,7 +149,7 @@ def _write_xai_pool_entry(
 
 
 def test_xai_adapter_not_authenticated_when_no_pool_entry(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "auth.json").write_text(json.dumps({
         "version": 1,
         "providers": {},
@@ -171,7 +171,7 @@ def test_xai_adapter_retry_rotates_pool_entry_on_429(tmp_path, monkeypatch):
     via ``EXHAUSTED_TTL_429_SECONDS`` on the offending key, and
     returns the next available credential.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
     # Two pool entries so rotation has somewhere to go.
     auth_path = tmp_path / "auth.json"

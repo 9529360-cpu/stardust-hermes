@@ -1,7 +1,7 @@
 """Tool result persistence -- preserves large outputs instead of truncating. Layers against
 context overflow: (1) per-tool caps inside each tool; (2) ``maybe_persist_tool_result`` —
 output over the tool's threshold is persisted and replaced by a preview + path; canonical home
-is ALWAYS host-side ``$HERMES_HOME/cache/spillover/{id}.txt`` (works for sessions that never
+is ALWAYS host-side ``$STARDUST_HOME/cache/spillover/{id}.txt`` (works for sessions that never
 ran a terminal), remote backends get the translated in-sandbox path (probed for readability)
 else a copy in the sandbox temp dir; (3) ``enforce_turn_budget``."""
 
@@ -30,7 +30,7 @@ _spillover_pruned_homes: set = set()  # profile home keys already swept this pro
 
 
 def get_spillover_dir():
-    """Return $HERMES_HOME/cache/spillover as a Path (not created)."""
+    """Return $STARDUST_HOME/cache/spillover as a Path (not created)."""
     from hermes_constants import get_hermes_home
     return get_hermes_home() / SPILLOVER_SUBDIR
 
@@ -84,7 +84,7 @@ def _is_host_side_env(env) -> bool:
 
 
 def _write_to_spillover(content: str, filename: str):
-    """Write host-side to $HERMES_HOME/cache/spillover; returns path str or None.
+    """Write host-side to $STARDUST_HOME/cache/spillover; returns path str or None.
 
     The write is size-verified before the caller tells the model "Full output saved":
     a partially-flushed file (quota, ENOSPC race) fails closed to the bounded inline

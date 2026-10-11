@@ -23,7 +23,7 @@ def _exe(path: Path, content: str) -> Path:
 def _run_prerequisites(tmp_path: Path, *, uv_find_script: str) -> subprocess.CompletedProcess[str]:
     """Run the real ``--stage prerequisites`` with a stub managed uv whose ``python find`` we script."""
     home = tmp_path / "home"
-    hermes_home = home / ".hermes"
+    hermes_home = home / ".stardust"
     (hermes_home / "bin").mkdir(parents=True)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -40,7 +40,7 @@ def _run_prerequisites(tmp_path: Path, *, uv_find_script: str) -> subprocess.Com
     for manager in ("sudo", "apt", "apt-get", "dnf", "pacman", "brew", "pkg"):
         _exe(bin_dir / manager, f"#!/bin/sh\necho \"{manager} $*\" >> '{attempts}'\nexit 1\n")
     env = os.environ.copy()
-    env.update({"HOME": str(home), "HERMES_HOME": str(hermes_home),
+    env.update({"HOME": str(home), "STARDUST_HOME": str(hermes_home),
                 "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', os.defpath)}"})
     bash = shutil.which("bash") or "/bin/bash"
     result = subprocess.run([bash, str(INSTALL_SH), "--stage", "prerequisites", "--non-interactive"],

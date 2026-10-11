@@ -374,7 +374,7 @@ def _oneshot_dispatch_limit_reached(job: Dict[str, Any], scan: _DueScan) -> bool
             "Job '%s': one-shot dispatch limit reached (%d/%d) on a record that already completed "
             "a run (last_run_at=%s) — removing it WITHOUT firing. This record was re-armed "
             "without a budget reset (pre-#93615 store or hand edit); re-run it with "
-            "'hermes cron resume <job> --run-now' (#93524).",
+            "'stardust cron resume <job> --run-now' (#93524).",
             name, completed, times, job.get("last_run_at"))
     else:
         logger.info(
@@ -460,7 +460,7 @@ def _evaluate_due_job(job: Dict[str, Any], scan: _DueScan, run_claim_ttl: float)
         if _retire_expired_oneshot(d) or _oneshot_dispatch_limit_reached(job, scan):
             return False
         # Durably claim the one-shot for the DURATION of its run: a second scheduler process on the
-        # same HERMES_HOME must not re-dispatch it while in flight, and advancing next_run_at by a
+        # same STARDUST_HOME must not re-dispatch it while in flight, and advancing next_run_at by a
         # fixed window is not enough for a run that outlives a tick. The other process sees the
         # fresh claim and skips; mark_job_run() clears it. The TTL only covers a tick that DIES.
         claim = {"at": now.isoformat(), "by": _jobs._machine_id()}

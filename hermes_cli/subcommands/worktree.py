@@ -1,4 +1,4 @@
-"""``hermes worktree`` subcommand parser."""
+"""``stardust worktree`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ def build_worktree_parser(subparsers) -> None:
     """Attach the ``worktree`` subcommand to ``subparsers``."""
     worktree_parser = subparsers.add_parser(
         "worktree", help="Audit and reclaim accumulated git worktrees and merged branches",
-        description="Attended reclaim for the .worktrees/ directory hermes -w sessions "
+        description="Attended reclaim for the .worktrees/ directory stardust -w sessions "
             "accumulate. Never deletes uncommitted tracked changes, unique "
             "unpushed commits, or in-use trees; untracked-only scratch is "
-            "archived to ~/.hermes/archive/worktree-prune/ before removal. See: "
+            "archived to ~/.stardust/archive/worktree-prune/ before removal. See: "
             "https://github.com/9529360-cpu/stardust-hermes/blob/main/website/docs/user-guide/cli.md#worktree-cleanup")
     worktree_subparsers = worktree_parser.add_subparsers(dest="worktree_action")
     worktree_list = worktree_subparsers.add_parser(

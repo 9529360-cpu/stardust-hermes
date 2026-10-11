@@ -3,8 +3,8 @@
 pytest prints its summary and then returns. A child still alive well after that is hung in
 interpreter exit, which the runner otherwise reports only as a bare file timeout. This plugin
 arms a one-shot faulthandler dump in pytest_unconfigure: if the process is still running
-HERMES_TEST_TEARDOWN_DUMP_SECONDS later (default 90; 0 disables), every thread's stack is written.
-The runner names the destination in HERMES_TEST_TEARDOWN_DUMP_FILE and reads it back after the
+STARDUST_TEST_TEARDOWN_DUMP_SECONDS later (default 90; 0 disables), every thread's stack is written.
+The runner names the destination in STARDUST_TEST_TEARDOWN_DUMP_FILE and reads it back after the
 child exits; without that variable the dump goes to the process's original stderr.
 
 The dump never exits the process, so the runner's timeout and failure accounting are unchanged.
@@ -19,14 +19,14 @@ import sys
 
 import pytest
 
-DUMP_FILE_ENV = "HERMES_TEST_TEARDOWN_DUMP_FILE"
+DUMP_FILE_ENV = "STARDUST_TEST_TEARDOWN_DUMP_FILE"
 _DEFAULT_DUMP_SECONDS = 90.0
 # Keeps the dump file object alive until the timer fires (faulthandler keeps only the descriptor).
 _DUMP_STREAMS: list = []
 
 
 def _dump_seconds() -> float:
-    raw = os.environ.get("HERMES_TEST_TEARDOWN_DUMP_SECONDS", "").strip()
+    raw = os.environ.get("STARDUST_TEST_TEARDOWN_DUMP_SECONDS", "").strip()
     if not raw:
         return _DEFAULT_DUMP_SECONDS
     try:

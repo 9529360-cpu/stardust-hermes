@@ -209,7 +209,7 @@ class MCPServerTransportMixin:
                            "HTTP/SSE transports — ignored for stdio servers", self.name)
         if not _core._ensure_mcp_sdk():
             raise ImportError(f"MCP server '{self.name}' requires the 'mcp' Python SDK, but "
-                              "it is not installed. Run `hermes setup` to install MCP support, then retry.")
+                              "it is not installed. Run `stardust setup` to install MCP support, then retry.")
         command = config.get("command")
         if not command:
             raise ValueError(f"MCP server '{self.name}' has no 'command' in config")
@@ -232,7 +232,7 @@ class MCPServerTransportMixin:
         # thread: the reaper blocks up to 2s (SIGTERM → wait → SIGKILL) when orphans exist, which would
         # otherwise stall the shared MCP event loop.
         new_pids: set = set()
-        # Subprocess stderr goes to ~/.hermes/logs/mcp-stderr.log so banners can't corrupt the TUI.
+        # Subprocess stderr goes to ~/.stardust/logs/mcp-stderr.log so banners can't corrupt the TUI.
         _config._write_stderr_log_header(self.name)
         try:
             errlog = _config._get_mcp_stderr_log()

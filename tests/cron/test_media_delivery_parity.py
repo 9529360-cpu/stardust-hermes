@@ -2,7 +2,7 @@
 
 Field report (enterprise, v0.20.0/2026.8.3): cron jobs whose output carries
 PDF/image MEDIA attachments deliver text+attachment on scheduled ticks but
-text-only on manual ``hermes cron run <job-id>``. Same box, same token, same
+text-only on manual ``stardust cron run <job-id>``. Same box, same token, same
 scopes — the divergence is process context and error visibility, not
 credentials.
 
@@ -91,8 +91,8 @@ def slack_platform_config(monkeypatch, tmp_path):
     (home / "config.yaml").write_text(
         "platforms:\n  slack:\n    enabled: true\n    token: xoxb-test\n"
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    # Config caches are process-global; clear them so the temp HERMES_HOME wins.
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    # Config caches are process-global; clear them so the temp STARDUST_HOME wins.
     try:
         from gateway import config as gwconfig
 
@@ -235,11 +235,11 @@ class TestMediaPolicyEnvBridge:
             f"  media_delivery_allow_dirs: [{str(allow_dir)!r}]\n"
             "  trust_recent_files: false\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         for var in (
-            "HERMES_MEDIA_DELIVERY_STRICT",
-            "HERMES_MEDIA_ALLOW_DIRS",
-            "HERMES_MEDIA_TRUST_RECENT_FILES",
+            "STARDUST_MEDIA_DELIVERY_STRICT",
+            "STARDUST_MEDIA_ALLOW_DIRS",
+            "STARDUST_MEDIA_TRUST_RECENT_FILES",
         ):
             monkeypatch.delenv(var, raising=False)
 
@@ -247,9 +247,9 @@ class TestMediaPolicyEnvBridge:
 
         apply_media_policy_env()
 
-        assert os.environ.get("HERMES_MEDIA_DELIVERY_STRICT") == "1"
-        assert str(allow_dir) in os.environ.get("HERMES_MEDIA_ALLOW_DIRS", "")
-        assert os.environ.get("HERMES_MEDIA_TRUST_RECENT_FILES") == "0"
+        assert os.environ.get("STARDUST_MEDIA_DELIVERY_STRICT") == "1"
+        assert str(allow_dir) in os.environ.get("STARDUST_MEDIA_ALLOW_DIRS", "")
+        assert os.environ.get("STARDUST_MEDIA_TRUST_RECENT_FILES") == "0"
 
     def test_standalone_filter_honors_bridged_allowlist(self, monkeypatch, tmp_path):
         """End-to-end: strict-mode file inside allow_dirs passes validation
@@ -269,8 +269,8 @@ class TestMediaPolicyEnvBridge:
             "  strict: true\n"
             f"  media_delivery_allow_dirs: [{str(allow_dir)!r}]\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
-        for var in ("HERMES_MEDIA_DELIVERY_STRICT", "HERMES_MEDIA_ALLOW_DIRS"):
+        monkeypatch.setenv("STARDUST_HOME", str(home))
+        for var in ("STARDUST_MEDIA_DELIVERY_STRICT", "STARDUST_MEDIA_ALLOW_DIRS"):
             monkeypatch.delenv(var, raising=False)
 
         from gateway.media_policy import apply_media_policy_env
@@ -288,7 +288,7 @@ class TestMediaPolicyEnvBridge:
     def test_deliver_result_runs_bridge(self, monkeypatch, tmp_path, media_file):
         """_deliver_result itself must apply the bridge before filtering.
 
-        Realistic enterprise shape: HERMES_MEDIA_DELIVERY_STRICT=1 arrives via
+        Realistic enterprise shape: STARDUST_MEDIA_DELIVERY_STRICT=1 arrives via
         .env (loaded by BOTH processes), but the allowlist lives in
         config.yaml's gateway block — bridged only at gateway boot. Without
         the bridge, a CLI manual run is strict WITHOUT the allowlist and
@@ -304,12 +304,12 @@ class TestMediaPolicyEnvBridge:
             f"  media_delivery_allow_dirs: [{media_dir!r}]\n"
             "  trust_recent_files: false\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         # Strict comes from the shared .env in both processes...
-        monkeypatch.setenv("HERMES_MEDIA_DELIVERY_STRICT", "1")
-        monkeypatch.setenv("HERMES_MEDIA_TRUST_RECENT_FILES", "0")
+        monkeypatch.setenv("STARDUST_MEDIA_DELIVERY_STRICT", "1")
+        monkeypatch.setenv("STARDUST_MEDIA_TRUST_RECENT_FILES", "0")
         # ...but the allowlist is config-only (gateway-boot bridge).
-        monkeypatch.delenv("HERMES_MEDIA_ALLOW_DIRS", raising=False)
+        monkeypatch.delenv("STARDUST_MEDIA_ALLOW_DIRS", raising=False)
         old = 1_600_000_000
         os.utime(media_file, (old, old))
 

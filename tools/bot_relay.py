@@ -378,18 +378,18 @@ def waiter_command(root: Path | str, envelope: dict) -> str:
 
 
 def _hermes_cli() -> str:
-    """hermes CLI beside this interpreter, then ``shutil.which``, then the bare name
-    (service contexts lack PATH, so a bare "hermes" died with ENOENT).
+    """stardust CLI beside this interpreter, then ``shutil.which``, then the bare name
+    (service contexts lack PATH, so a bare "stardust" died with ENOENT).
 
     The deliver RPC runs on the target gateway, whose process is the venv python — its bin/Scripts directory
-    holds the matching ``hermes`` entrypoint. A bare ``"hermes"`` relies on PATH, which is exactly what
+    holds the matching ``stardust`` entrypoint. A bare ``"stardust"`` relies on PATH, which is exactly what
     service contexts (systemd units, desktop launchers, non-login SSH shells) do not provide, so delivery
     died with ENOENT there (#93590). When no sibling exists (e.g. running from a source tree without an
     installed script), a ``shutil.which`` lookup runs next — it honors whatever PATH the process does have —
     before falling back to the bare name, preserving today's behavior for interactive shells.
     """
-    sibling = Path(sys.executable or "").parent / ("hermes.exe" if sys.platform == "win32" else "hermes")
-    return str(sibling) if sibling.is_file() else shutil.which("hermes") or "hermes"
+    sibling = Path(sys.executable or "").parent / ("stardust.exe" if sys.platform == "win32" else "stardust")
+    return str(sibling) if sibling.is_file() else shutil.which("stardust") or "stardust"
 
 
 def local_delivery_command(profile: str, query_file: str) -> list[str]:
@@ -432,8 +432,8 @@ def _delivery_child_session_env_names() -> "tuple[str, ...]":
     """Session-bound env names to strip from a delivery child, from ``gateway.session_context``.
 
     Synced with the session binding surface as vars are added; deliberately NOT a
-    ``HERMES_SESSION_*`` prefix match, which would also strip non-identity knobs
-    (e.g. ``HERMES_SESSION_STALL_TIMEOUT``)."""
+    ``STARDUST_SESSION_*`` prefix match, which would also strip non-identity knobs
+    (e.g. ``STARDUST_SESSION_STALL_TIMEOUT``)."""
     from gateway.session_context import _VAR_MAP
 
     return tuple(_VAR_MAP)
@@ -441,13 +441,13 @@ def _delivery_child_session_env_names() -> "tuple[str, ...]":
 
 def delivery_env(author: Optional[dict], profile_home: "str | Path | None" = None) -> dict[str, str]:
     """Environment for one delivery turn's ``hermes -p <profile>`` child. The dispatcher's own
-    HERMES_TURN_AUTHOR is dropped first so a delivery without an author never inherits the author of the turn
+    STARDUST_TURN_AUTHOR is dropped first so a delivery without an author never inherits the author of the turn
     that sent it. Dispatcher session identity (the canonical ``gateway.session_context`` session env names) is
     dropped too: a nested recipient that ``message_agent``s onward must not stamp that grandchild
     notify with the grandparent's key, or the live recipient never resumes. The child runs the target
     profile's Bot Chat turn, so it starts from THAT profile's env (``served_profile_child_env``: launch
     profile ``.env`` / TERMINAL_* residue dropped, target secrets overlaid), never the multiplexer's raw
-    ``os.environ``; ``-p`` alone only pinned HERMES_HOME. ``profile_home`` is the target's home when the
+    ``os.environ``; ``-p`` alone only pinned STARDUST_HOME. ``profile_home`` is the target's home when the
     caller knows it (relay RPC, roster); otherwise the active override."""
     from agent.turn_author import TURN_AUTHOR_ENV, turn_author_env
     from tools.environments.local import served_profile_child_env

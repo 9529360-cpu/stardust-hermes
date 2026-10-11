@@ -115,7 +115,7 @@ async def test_secondary_profile_busy_mode_controls_live_busy_behavior(
     expected_text_mode,
 ):
     """A routed profile chooses queue/steer/interrupt independently."""
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("STARDUST_GATEWAY_BUSY_ACK_ENABLED", "false")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -155,7 +155,7 @@ async def test_secondary_profile_busy_mode_controls_priority_path(
     secondary_mode,
 ):
     """The runner's early active-agent path uses the same routed policy."""
-    monkeypatch.setenv("HERMES_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
+    monkeypatch.setenv("STARDUST_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -208,7 +208,7 @@ async def test_busy_change_updates_only_routed_profile(tmp_path, monkeypatch):
         "display:\n  busy_input_mode: interrupt\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
 
     runner = _runner(default_mode="interrupt")
     profile_home = tmp_path / "research"
@@ -270,7 +270,7 @@ async def test_secondary_profile_busy_mode_controls_priority_restart_drain(
     tmp_path,
     monkeypatch,
 ):
-    monkeypatch.setenv("HERMES_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
+    monkeypatch.setenv("STARDUST_TELEGRAM_FOLLOWUP_GRACE_SECONDS", "0")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -299,7 +299,7 @@ async def test_secondary_adapter_busy_guard_stamps_profile_before_resolving_mode
     monkeypatch,
 ):
     """Per-profile adapters route busy events before the message wrapper runs."""
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("STARDUST_GATEWAY_BUSY_ACK_ENABLED", "false")
     runner = _runner(default_mode="interrupt")
     adapter = await _load_profile_snapshot(
         runner,
@@ -354,7 +354,7 @@ async def test_secondary_legacy_busy_text_mode_is_profile_specific(tmp_path):
 
 @pytest.mark.asyncio
 async def test_default_busy_mode_is_unchanged_by_secondary_profile(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("STARDUST_GATEWAY_BUSY_ACK_ENABLED", "false")
     runner = _runner(default_mode="interrupt")
     await _load_profile_snapshot(runner, tmp_path / "research", "steer")
     adapter = _adapter()
@@ -463,13 +463,13 @@ async def test_primary_adapter_busy_origin_uses_routed_privacy(
     from hermes_constants import get_hermes_home_override
     from run_agent import AIAgent
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     secondary = home / "profiles" / "research"
     secondary.mkdir(parents=True)
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr("gateway.run._hermes_home", home)
-    monkeypatch.setenv("HERMES_GATEWAY_BUSY_ACK_ENABLED", "false")
+    monkeypatch.setenv("STARDUST_GATEWAY_BUSY_ACK_ENABLED", "false")
     for directory, privacy in ((home, not secondary_privacy), (secondary, secondary_privacy)):
         (directory / "config.yaml").write_text(
             f"privacy:\n  redact_pii: {str(privacy).lower()}\n", encoding="utf-8",

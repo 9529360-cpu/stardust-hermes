@@ -69,7 +69,7 @@ async def test_secondary_whatsapp_without_primary_is_reported_unserved(monkeypat
     assert infos and "'work'" in infos[0].getMessage() and "default profile" in infos[0].getMessage()
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert any("whatsapp" in w and "not being served" in w and "work" in w for w in warnings), warnings
-    # Stamped so `hermes gateway status --profile work` / the dashboard can show the reason.
+    # Stamped so `stardust gateway status --profile work` / the dashboard can show the reason.
     assert ("work:whatsapp", {
         "platform_state": "disabled", "error_code": "multiplex_shared_ingress",
         "error_message": "not served under multiplex (shared ingress owned by default)",

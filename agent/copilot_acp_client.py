@@ -59,9 +59,9 @@ _DEPRECATED_CLI_ERROR = (
     "spawned is the deprecated `gh copilot` extension.\n\n"
     "Install the new CLI:\n  npm install -g @github/copilot\n  # then verify with: copilot --help\n\n"
     "If `copilot` already resolves to the new CLI but you still see this,\npoint Hermes at it explicitly:\n"
-    "  export HERMES_COPILOT_ACP_COMMAND=/path/to/new/copilot\n\n"
+    "  export STARDUST_COPILOT_ACP_COMMAND=/path/to/new/copilot\n\n"
     "Alternative: use the `copilot` provider (no ACP, hits the Copilot API\ndirectly with a Copilot subscription "
-    "token) via `hermes setup`.\n\nOriginal error:\n"
+    "token) via `stardust setup`.\n\nOriginal error:\n"
 )
 
 
@@ -72,11 +72,11 @@ def _is_gh_copilot_deprecation_message(stderr_text: str) -> bool:
 
 
 def _resolve_command() -> str:
-    return os.getenv("HERMES_COPILOT_ACP_COMMAND", "").strip() or os.getenv("COPILOT_CLI_PATH", "").strip() or "copilot"
+    return os.getenv("STARDUST_COPILOT_ACP_COMMAND", "").strip() or os.getenv("COPILOT_CLI_PATH", "").strip() or "copilot"
 
 
 def _resolve_args() -> list[str]:
-    return shlex.split(os.getenv("HERMES_COPILOT_ACP_ARGS", "").strip()) or ["--acp", "--stdio"]
+    return shlex.split(os.getenv("STARDUST_COPILOT_ACP_ARGS", "").strip()) or ["--acp", "--stdio"]
 
 
 def _acp_supported(command: str, args: list[str]) -> bool | None:
@@ -274,8 +274,8 @@ class CopilotACPClient:
 
     # Declared for agent/auxiliary_client.py: this shim drives an ACP subprocess over stdio, so it is
     # already a complete client (never re-dispatch through a wire adapter) and async-safe as-is.
-    HERMES_SKIP_TRANSPORT_WRAP = True
-    HERMES_SKIP_ASYNC_WRAP = True
+    STARDUST_SKIP_TRANSPORT_WRAP = True
+    STARDUST_SKIP_ASYNC_WRAP = True
 
     def __init__(
         self, *, api_key: str | None = None, base_url: str | None = None, default_headers: dict[str, str] | None = None,
@@ -330,7 +330,7 @@ class CopilotACPClient:
                 f"ACP transport not supported by '{self._acp_command}': `{preview}` is rejected as an unknown option. This "
                 "usually means the CLI is an older release (e.g. Claude Code v2.x) or a different tool than expected. Either "
                 "install a CLI that ships with --acp support (e.g. `@github/copilot` late 2025+), or set "
-                "HERMES_COPILOT_ACP_COMMAND / HERMES_COPILOT_ACP_ARGS to a working pair."
+                "STARDUST_COPILOT_ACP_COMMAND / STARDUST_COPILOT_ACP_ARGS to a working pair."
             )
         try:
             from hermes_cli._subprocess_compat import windows_hide_flags  # hide the Windows console flash (#56747); pipes intact for the ACP wire
@@ -344,7 +344,7 @@ class CopilotACPClient:
             )
         except FileNotFoundError as exc:
             raise RuntimeError(f"Could not start Copilot ACP command '{self._acp_command}'. Install GitHub Copilot CLI or set "
-                               "HERMES_COPILOT_ACP_COMMAND/COPILOT_CLI_PATH.") from exc
+                               "STARDUST_COPILOT_ACP_COMMAND/COPILOT_CLI_PATH.") from exc
         if proc.stdin is None or proc.stdout is None:
             proc.kill()
             raise RuntimeError("Copilot ACP process did not expose stdin/stdout pipes.")

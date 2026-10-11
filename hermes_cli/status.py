@@ -1,4 +1,4 @@
-"""Status command for hermes CLI."""
+"""Status command for stardust CLI."""
 
 import json
 import os
@@ -91,7 +91,7 @@ def _effective_provider_label() -> str:
 
 
 def _estop_status_line():
-    """One-line pause banner for `hermes status`, or None when not paused."""
+    """One-line pause banner for `stardust status`, or None when not paused."""
     try:
         from agent.estop import get_state
     except ImportError:
@@ -100,7 +100,7 @@ def _estop_status_line():
     if state is None:
         return None
     reason = state.get("reason")
-    return f"⏸️  PAUSED (global emergency stop{f' — reason: {reason}' if reason else ''}; `hermes resume` to lift)"
+    return f"⏸️  PAUSED (global emergency stop{f' — reason: {reason}' if reason else ''}; `stardust resume` to lift)"
 
 
 # --- Data tables driving the per-section renderers -------------------------
@@ -181,7 +181,7 @@ def _render_terminal(ctx):
         _kv("Processes:", "live processes do not survive cleanup, snapshots, or sandbox recreation")
     else:
         # Plugin-registered terminal backends: show availability via the provider's doctor rows
-        # (fail-soft — never break `hermes status`).
+        # (fail-soft — never break `stardust status`).
         try:
             from hermes_cli.plugins import discover_plugins
             discover_plugins()
@@ -226,7 +226,7 @@ def _render_gateway(ctx):
         # A satellite profile has no gateway.pid of its own; the default multiplexer is its live process.
         if not snapshot.running and named_profile_served_by_running_multiplexer():
             _kv_flag("Status:", True, "running (via the default-profile multiplexer)", "stopped")
-            _kv("Manage with:", "hermes gateway status   # from the default profile")
+            _kv("Manage with:", "stardust gateway status   # from the default profile")
             return
         _kv_flag("Status:", snapshot.running, "running", "stopped")
         _kv("Manager:", snapshot.manager)
@@ -241,7 +241,7 @@ def _render_gateway(ctx):
         if snapshot.has_process_service_mismatch:
             _kv("Service:", "installed but not managing the current running gateway")
         elif _is_termux() and not snapshot.gateway_pids:
-            _kv("Start with:", "hermes gateway")
+            _kv("Start with:", "stardust gateway")
             _kv("Note:", "Android may stop background jobs when Termux is suspended")
         elif snapshot.service_installed and not snapshot.service_running:
             _kv("Service:", "installed but stopped")
@@ -348,12 +348,12 @@ def _render_deep(ctx):
 
 
 def _render_footer(ctx):
-    _banner(("─" * 60, "  Run 'hermes doctor' for detailed diagnostics", "  Run 'hermes setup' to configure"),
+    _banner(("─" * 60, "  Run 'stardust doctor' for detailed diagnostics", "  Run 'stardust setup' to configure"),
             Colors.DIM)
     print()
 
 
-# Print order of `hermes status`; each renderer takes the shared _StatusContext.
+# Print order of `stardust status`; each renderer takes the shared _StatusContext.
 _SECTIONS = (
     _render_header, _render_environment, _render_api_keys, _render_auth_providers, _render_nous_gateway,
     _render_apikey_providers, _render_terminal, _render_platforms, _render_gateway, _render_cron,

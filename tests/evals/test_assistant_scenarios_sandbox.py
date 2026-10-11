@@ -1,4 +1,4 @@
-"""The exam's sandbox: an isolated HERMES_HOME that routes the agent to the chosen endpoint, a
+"""The exam's sandbox: an isolated STARDUST_HOME that routes the agent to the chosen endpoint, a
 hermetic child environment (no host secrets, no approval bypass), and readers for the state the
 graders need. Readers are exercised against files written by the real cron store and the real
 state.db schema, so a storage-format change breaks these tests instead of silently blinding the exam.
@@ -18,8 +18,8 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def in_home(home, code, **env):
-    """Run ``code`` in a fresh interpreter whose HERMES_HOME is ``home`` (import-time paths included)."""
-    full_env = {**os.environ, "HERMES_HOME": str(home), "PYTHONPATH": str(REPO), **env}
+    """Run ``code`` in a fresh interpreter whose STARDUST_HOME is ``home`` (import-time paths included)."""
+    full_env = {**os.environ, "STARDUST_HOME": str(home), "PYTHONPATH": str(REPO), **env}
     result = subprocess.run([sys.executable, "-c", code], cwd=REPO, env=full_env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return result.stdout
@@ -55,15 +55,15 @@ def test_home_config_routes_the_agent_to_the_exam_endpoint(tmp_path):
 
 def test_child_env_carries_no_host_secrets_or_approval_bypass(tmp_path):
     base = {"PATH": "/usr/bin", "OPENAI_API_KEY": "host-key", "TELEGRAM_BOT_TOKEN": "t", "AWS_SECRET_ACCESS_KEY": "s",
-            "HERMES_PROFILE": "work", "HERMES_YOLO_MODE": "1", "HERMES_HOME": "/real/home",
-            "HERMES_GIT_BASH_PATH": "C:/Git/bin/bash.exe", "PYTHONPATH": "/elsewhere"}
+            "STARDUST_PROFILE": "work", "STARDUST_YOLO_MODE": "1", "STARDUST_HOME": "/real/home",
+            "STARDUST_GIT_BASH_PATH": "C:/Git/bin/bash.exe", "PYTHONPATH": "/elsewhere"}
     env = sandbox.child_env(base, home=tmp_path, repo_root=REPO, api_key="sk-exam", tool_bin=tmp_path / "bin",
                             profile=tmp_path / "profile")
 
     assert {k for k in ("OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN", "AWS_SECRET_ACCESS_KEY",
-                        "HERMES_PROFILE", "HERMES_YOLO_MODE") if k in env} == set()
-    assert (env["HERMES_HOME"], env["PYTHONPATH"], env[sandbox.EXAM_KEY_ENV]) == (str(tmp_path), str(REPO), "sk-exam")
-    assert env["HERMES_GIT_BASH_PATH"] == "C:/Git/bin/bash.exe"
+                        "STARDUST_PROFILE", "STARDUST_YOLO_MODE") if k in env} == set()
+    assert (env["STARDUST_HOME"], env["PYTHONPATH"], env[sandbox.EXAM_KEY_ENV]) == (str(tmp_path), str(REPO), "sk-exam")
+    assert env["STARDUST_GIT_BASH_PATH"] == "C:/Git/bin/bash.exe"
     assert env["PATH"].split(os.pathsep)[0] == str(tmp_path / "bin")
 
 

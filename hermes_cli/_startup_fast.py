@@ -66,17 +66,17 @@ def is_container_startup_environment() -> bool:
 
 
 def active_profile_may_override_home(hermes_root: str) -> bool:
-    """Cheap probe: does an active non-default profile redirect HERMES_HOME?"""
+    """Cheap probe: does an active non-default profile redirect STARDUST_HOME?"""
     active = (_read_text(os.path.join(hermes_root, "active_profile")) or "").strip()
     return bool(active and active != "default")
 
 
 def _default_home() -> str:
-    return os.path.join(os.path.expanduser("~"), ".hermes")
+    return os.path.join(os.path.expanduser("~"), ".stardust")
 
 
 def _resolved_home() -> str:
-    return os.environ.get("HERMES_HOME", "").strip() or _default_home()
+    return os.environ.get("STARDUST_HOME", "").strip() or _default_home()
 
 
 def container_mode_may_be_active() -> bool:
@@ -86,9 +86,9 @@ def container_mode_may_be_active() -> bool:
     they'd print the host's version instead of the container's — so any profile ambiguity means "may
     be active".
     """
-    if os.environ.get("HERMES_DEV") == "1" or is_container_startup_environment():
+    if os.environ.get("STARDUST_DEV") == "1" or is_container_startup_environment():
         return False
-    hermes_home = os.environ.get("HERMES_HOME", "").strip()
+    hermes_home = os.environ.get("STARDUST_HOME", "").strip()
     if hermes_home:
         if os.path.exists(os.path.join(hermes_home, ".container-mode")):
             return True
@@ -128,7 +128,7 @@ def read_install_method() -> str | None:
 
 
 def print_fast_version_info(*, check_updates: bool = True) -> None:
-    """THE canonical ``hermes --version`` output (also used by /version).
+    """THE canonical ``stardust --version`` output (also used by /version).
 
     Every lazy block degrades gracefully — a broken/heavy import can never take the basic version
     output down.
@@ -180,16 +180,16 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
 
 
 def try_fast_version(argv: list[str] | None = None) -> bool:
-    """Handle ``hermes --version`` before the heavy import wall.
+    """Handle ``stardust --version`` before the heavy import wall.
 
     Only ``--version``/``-V`` (``--version`` carries the full output incl. update status), and never
     when container mode may need to route the command into the container. Termux keeps the
-    HERMES_TERMUX_DISABLE_FAST_CLI escape hatch.
+    STARDUST_TERMUX_DISABLE_FAST_CLI escape hatch.
     """
     if argv is None:
         argv = sys.argv[1:]
     is_termux = is_termux_env()
-    if is_termux and os.environ.get("HERMES_TERMUX_DISABLE_FAST_CLI") == "1":
+    if is_termux and os.environ.get("STARDUST_TERMUX_DISABLE_FAST_CLI") == "1":
         return False
     if is_termux:
         if not is_termux_fast_version_argv(argv):

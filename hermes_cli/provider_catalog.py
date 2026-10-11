@@ -37,7 +37,7 @@ class ProviderDescriptor:
     api_key_env_vars: tuple[str, ...]  # credential env vars (may be empty)
     base_url_env_var: str          # base-URL override env var (may be "")
     signup_url: str                # signup / console URL (may be "")
-    order: int                     # CANONICAL_PROVIDERS index — mirrors `hermes model`
+    order: int                     # CANONICAL_PROVIDERS index — mirrors `stardust model`
     keyless: bool = False          # served anonymously — no credential exists to configure
 
 
@@ -66,7 +66,7 @@ def _safe_import(module: str, attr: str, default):
 
 
 def provider_catalog() -> list[ProviderDescriptor]:
-    """One descriptor per provider in the ``hermes model`` universe (:data:`CANONICAL_PROVIDERS`,
+    """One descriptor per provider in the ``stardust model`` universe (:data:`CANONICAL_PROVIDERS`,
     auto-extended by provider plugins). Auth/env from ``PROVIDER_REGISTRY``; display metadata from
     ``ProviderProfile`` with canonical/env fallbacks so profile-less providers still resolve."""
     from hermes_cli.models import CANONICAL_PROVIDERS
@@ -74,7 +74,7 @@ def provider_catalog() -> list[ProviderDescriptor]:
     OPTIONAL_ENV_VARS = _safe_import("hermes_cli.config", "OPTIONAL_ENV_VARS", {})
     # Overlays carry auth_type for providers with no registry/profile entry — notably the ``moa``
     # virtual provider (auth_type "virtual"), which has no credential and no network endpoint.
-    HERMES_OVERLAYS = _safe_import("hermes_cli.providers", "HERMES_OVERLAYS", {})
+    STARDUST_OVERLAYS = _safe_import("hermes_cli.providers", "STARDUST_OVERLAYS", {})
     try:
         from providers import list_providers
         profiles = {p.name: p for p in list_providers()}
@@ -85,7 +85,7 @@ def provider_catalog() -> list[ProviderDescriptor]:
         slug = entry.slug
         cfg = PROVIDER_REGISTRY.get(slug)
         prof = profiles.get(slug)
-        overlay = HERMES_OVERLAYS.get(slug)
+        overlay = STARDUST_OVERLAYS.get(slug)
         # auth_type: registry is authoritative; then profile, then overlay (moa → "virtual"), then api_key.
         auth_type = ((cfg.auth_type if cfg else "") or (prof.auth_type if prof else "")
                      or (overlay.auth_type if overlay else "") or "api_key")

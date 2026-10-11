@@ -393,7 +393,7 @@ def _ensure_codex_session(agent) -> None:
         from tools.terminal_tool import _get_approval_callback
         approval_callback = _get_approval_callback()
     # Gateway/cron have no UI for codex approval requests, so exec/apply_patch fail closed by default. Only an
-    # explicit approval bypass (approvals.mode: off, /yolo, --yolo, HERMES_YOLO_MODE) hands policy to codex's sandbox.
+    # explicit approval bypass (approvals.mode: off, /yolo, --yolo, STARDUST_YOLO_MODE) hands policy to codex's sandbox.
     auto_approve_requests = False
     try:
         from tools.approval import is_approval_bypass_active
@@ -862,8 +862,8 @@ def _bypass_sdk_request_transform(stream_kwargs: dict) -> dict:
     ``responses.create`` re-walks the whole body against the ResponseCreateParams union with the GIL held —
     multi-MB conversations can wedge for hours, pre-network, where no watchdog socket kill helps. The SDK
     merges ``extra_body`` AFTER the transform, so moving wire-format bulk fields there yields a byte-identical
-    request without the walk. HERMES_CODEX_SDK_TRANSFORM=1 disables."""
-    if os.environ.get("HERMES_CODEX_SDK_TRANSFORM", "").strip().lower() in {"1", "true", "yes", "on"}:
+    request without the walk. STARDUST_CODEX_SDK_TRANSFORM=1 disables."""
+    if os.environ.get("STARDUST_CODEX_SDK_TRANSFORM", "").strip().lower() in {"1", "true", "yes", "on"}:
         return stream_kwargs
     moved = {f: stream_kwargs[f] for f in _SDK_TRANSFORM_BYPASS_FIELDS
              if isinstance(stream_kwargs.get(f), (dict, list)) and _is_plain_json_data(stream_kwargs[f])}

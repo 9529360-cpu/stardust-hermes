@@ -1,4 +1,4 @@
-"""Tests for file write safety and HERMES_WRITE_SAFE_ROOT sandboxing.
+"""Tests for file write safety and STARDUST_WRITE_SAFE_ROOT sandboxing.
 
 Based on PR #1085 by ismoilh (salvaged).
 """
@@ -68,36 +68,36 @@ class TestSshConfigApprovalGate:
 
 
 class TestSafeWriteRoot:
-    """HERMES_WRITE_SAFE_ROOT should sandbox writes to a specific subtree."""
+    """STARDUST_WRITE_SAFE_ROOT should sandbox writes to a specific subtree."""
 
     def test_writes_inside_safe_root_are_allowed(self, tmp_path: Path, monkeypatch):
         safe_root = tmp_path / "workspace"
         child = safe_root / "subdir" / "file.txt"
         os.makedirs(child.parent, exist_ok=True)
 
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", str(safe_root))
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", str(safe_root))
         assert _is_write_denied(str(child)) is False
 
 
     def test_safe_root_with_tilde_expansion(self, tmp_path: Path, monkeypatch):
-        """~ in HERMES_WRITE_SAFE_ROOT should be expanded."""
+        """~ in STARDUST_WRITE_SAFE_ROOT should be expanded."""
         # Use a real subdirectory of tmp_path so we can test tilde-style paths
         safe_root = tmp_path / "workspace"
         inside = safe_root / "file.txt"
         os.makedirs(safe_root, exist_ok=True)
 
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", str(safe_root))
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", str(safe_root))
         assert _is_write_denied(str(inside)) is False
 
     def test_safe_root_does_not_override_static_deny(self, tmp_path: Path, monkeypatch):
         """Even if a static-denied path is inside the safe root, it's still denied."""
         # Point safe root at home to include ~/.ssh
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", os.path.expanduser("~"))
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", os.path.expanduser("~"))
         assert _is_write_denied(os.path.expanduser("~/.ssh/id_rsa")) is True
 
 
 class TestMultipleSafeWriteRoots:
-    """HERMES_WRITE_SAFE_ROOT with multiple colon-separated directories."""
+    """STARDUST_WRITE_SAFE_ROOT with multiple colon-separated directories."""
 
     def test_write_inside_first_root_allowed(self, tmp_path: Path, monkeypatch):
         root_a = tmp_path / "workspace_a"
@@ -106,7 +106,7 @@ class TestMultipleSafeWriteRoots:
         os.makedirs(child.parent, exist_ok=True)
         os.makedirs(root_b, exist_ok=True)
 
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", f"{root_a}{os.pathsep}{root_b}")
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", f"{root_a}{os.pathsep}{root_b}")
         assert _is_write_denied(str(child)) is False
 
 
@@ -115,7 +115,7 @@ class TestMultipleSafeWriteRoots:
         inside = root / "file.txt"
         os.makedirs(root, exist_ok=True)
 
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", f"{root}{os.pathsep}")
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", f"{root}{os.pathsep}")
         assert _is_write_denied(str(inside)) is False
 
 
@@ -125,7 +125,7 @@ class TestMultipleSafeWriteRoots:
         os.makedirs(root, exist_ok=True)
 
         monkeypatch.setenv(
-            "HERMES_WRITE_SAFE_ROOT",
+            "STARDUST_WRITE_SAFE_ROOT",
             f"{root}{os.pathsep}{os.path.expanduser('~')}",
         )
         assert _is_write_denied(os.path.expanduser("~/.ssh/id_rsa")) is True
@@ -136,7 +136,7 @@ class TestMultipleSafeWriteRoots:
         os.makedirs(root, exist_ok=True)
 
         monkeypatch.setenv(
-            "HERMES_WRITE_SAFE_ROOT",
+            "STARDUST_WRITE_SAFE_ROOT",
             f"{root}{os.pathsep}{root}",
         )
         assert _is_write_denied(str(inside)) is False
@@ -151,7 +151,7 @@ class TestGetWriteDeniedError:
         err = get_write_denied_error(os.path.expanduser("~/.ssh/id_rsa"))
         assert err is not None
         assert "protected system/credential file" in err
-        assert "HERMES_WRITE_SAFE_ROOT" not in err
+        assert "STARDUST_WRITE_SAFE_ROOT" not in err
 
     def test_safe_root_message(self, tmp_path: Path, monkeypatch):
         from agent.file_safety import get_write_denied_error
@@ -160,10 +160,10 @@ class TestGetWriteDeniedError:
         outside = tmp_path / "outside.txt"
         os.makedirs(safe_root, exist_ok=True)
 
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", str(safe_root))
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", str(safe_root))
         err = get_write_denied_error(str(outside))
         assert err is not None
-        assert "outside HERMES_WRITE_SAFE_ROOT" in err
+        assert "outside STARDUST_WRITE_SAFE_ROOT" in err
         assert str(safe_root) in err
         assert "protected system/credential file" not in err
 
@@ -176,7 +176,7 @@ class TestGetWriteDeniedError:
 
 class TestSafeRootDenialMessageIntegration:
     """Regression tests verifying that file-tools surface the correct denial
-    message when HERMES_WRITE_SAFE_ROOT blocks a path.
+    message when STARDUST_WRITE_SAFE_ROOT blocks a path.
 
     Prior to this fix, ALL write denials returned the same "protected
     system/credential file" message regardless of root cause.  These tests
@@ -198,11 +198,11 @@ class TestSafeRootDenialMessageIntegration:
         safe_root.mkdir()
         outside = tmp_path / "other" / "file.txt"
         outside.parent.mkdir()
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", str(safe_root))
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", str(safe_root))
 
         res = ops.write_file(str(outside), "content")
         assert res.error is not None
-        assert "outside HERMES_WRITE_SAFE_ROOT" in res.error
+        assert "outside STARDUST_WRITE_SAFE_ROOT" in res.error
         assert str(safe_root) in res.error
         assert "credential" not in res.error
         assert not outside.exists()
@@ -222,7 +222,7 @@ class TestSafeRootDenialMessageIntegration:
         safe_root = tmp_path / "workspace"
         safe_root.mkdir()
         inside = safe_root / "file.txt"
-        monkeypatch.setenv("HERMES_WRITE_SAFE_ROOT", str(safe_root))
+        monkeypatch.setenv("STARDUST_WRITE_SAFE_ROOT", str(safe_root))
 
         res = ops.write_file(str(inside), "content")
         assert res.error is None
@@ -385,7 +385,7 @@ class TestBomHandling:
 class TestProtectedInstructionFiles:
     """Protected instruction writes require approval in manual/smart modes.
 
-    AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules / project-local .hermes
+    AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules / project-local .stardust
     config steer future agent behavior, so a prompt-injected agent writing
     them is a persistence vector. The gate asks the human in manual/smart modes
     even under session yolo/auto-approve, and fails closed when no human channel
@@ -557,17 +557,17 @@ class TestProtectedInstructionFiles:
         assert res.get("error") and "BLOCKED" in res["error"]
 
     def test_project_local_hermes_dir_is_gated(self, tmp_path, approvals):
-        proj = tmp_path / "proj" / ".hermes"
+        proj = tmp_path / "proj" / ".stardust"
         proj.mkdir(parents=True)
         approvals["answer"] = "deny"
         res = self._write(proj / "config.yaml")
         assert res.get("error") and "BLOCKED" in res["error"]
 
     def test_checkout_nested_under_hermes_dir_not_gated(self, tmp_path, approvals):
-        """A repo living UNDER a .hermes dir (e.g. ~/.hermes/hermes-agent)
+        """A repo living UNDER a .stardust dir (e.g. ~/.stardust/hermes-agent)
         must not have every write gated — only files directly inside a
-        .hermes dir count as project config."""
-        repo = tmp_path / ".hermes" / "some-repo" / "src"
+        .stardust dir count as project config."""
+        repo = tmp_path / ".stardust" / "some-repo" / "src"
         repo.mkdir(parents=True)
         res = self._write(repo / "module.py", "x = 1\n")
         assert not res.get("error"), res
@@ -576,9 +576,9 @@ class TestProtectedInstructionFiles:
     def test_real_hermes_home_not_gated_by_this_check(
         self, tmp_path, approvals, monkeypatch
     ):
-        """~/.hermes itself is governed by existing guards, not this gate."""
+        """~/.stardust itself is governed by existing guards, not this gate."""
         import tools.file_tools_write_guards as ft
-        fake_home = tmp_path / ".hermes"
+        fake_home = tmp_path / ".stardust"
         (fake_home / "notes").mkdir(parents=True)
         monkeypatch.setattr(
             ft, "_get_real_hermes_home", lambda: str(fake_home.resolve())
@@ -706,10 +706,10 @@ class TestProtectedInstructionFiles:
 
 
 class TestProfileHomeExemptsHermesRoot:
-    """issue #60: under ``hermes -p <name>`` (``HERMES_HOME=<root>/profiles/<name>``)
+    """issue #60: under ``stardust -p <name>`` (``STARDUST_HOME=<root>/profiles/<name>``)
     the exemption used to cover ONLY the profile dir, so the ROOT's direct files
-    (LEDGER.md / MEMORY.md / SOUL.md ...) fell through to the ``.hermes`` component
-    rule, were read as project-local ``.hermes`` config, and — having no approval
+    (LEDGER.md / MEMORY.md / SOUL.md ...) fell through to the ``.stardust`` component
+    rule, were read as project-local ``.stardust`` config, and — having no approval
     channel headless — failed closed. That blocked #54 (LEDGER.md edit). The gate
     must exempt the whole Hermes tree, exactly like the default profile does.
     """
@@ -753,12 +753,12 @@ class TestProfileHomeExemptsHermesRoot:
 
     def test_named_profile_scope_exempts_root_direct_files(self, tmp_path, monkeypatch, approvals):
         """Under a named profile bound by the per-turn scope (multiplex path), the ROOT's own store is
-        not project-local ``.hermes`` config: the write lands with no approval prompt."""
+        not project-local ``.stardust`` config: the write lands with no approval prompt."""
         import tools.file_tools_write_guards as ft
         from hermes_constants import reset_hermes_home_override, set_hermes_home_override
 
         root, profile = self._profile_layout(tmp_path)
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         token = set_hermes_home_override(str(profile))
         try:
             assert os.path.realpath(str(root)) in ft._hermes_exempt_homes()
@@ -772,7 +772,7 @@ class TestProfileHomeExemptsHermesRoot:
         assert approvals["calls"] == []
 
     def test_only_a_real_hermes_root_is_exempt(self, tmp_path, monkeypatch, approvals):
-        """Negatives hold with a named profile active: a checkout's ``.hermes/config.yaml`` and
+        """Negatives hold with a named profile active: a checkout's ``.stardust/config.yaml`` and
         protected basenames stay gated (fail-closed, unwritten), and a coincidental
         ``.../profiles/<name>`` tree that is NOT a Hermes root never exempts its parent."""
         import tools.file_tools_write_guards as ft
@@ -780,13 +780,13 @@ class TestProfileHomeExemptsHermesRoot:
 
         root, profile = self._profile_layout(tmp_path)
         repo = tmp_path / "repo"
-        (repo / ".hermes").mkdir(parents=True)
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        (repo / ".stardust").mkdir(parents=True)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         token = set_hermes_home_override(str(profile))
         try:
-            assert ft._protected_instruction_reason(str(repo / ".hermes" / "config.yaml"))
+            assert ft._protected_instruction_reason(str(repo / ".stardust" / "config.yaml"))
             assert ft._protected_instruction_reason(str(repo / "AGENTS.md")) == "AGENTS.md"
-            target = repo / ".hermes" / "config.yaml"
+            target = repo / ".stardust" / "config.yaml"
             res = self._write(target, "gate: off\n")
         finally:
             reset_hermes_home_override(token)
@@ -804,7 +804,7 @@ class TestProfileHomeExemptsHermesRoot:
 
 
 class TestMultiplexProfileWriteGuardsAreProfileScoped:
-    """#107327: a multiplexed gateway scopes ``HERMES_HOME`` per turn via a
+    """#107327: a multiplexed gateway scopes ``STARDUST_HOME`` per turn via a
     contextvar. The home/config path getters must resolve per call, or whichever
     profile ran first in the process freezes both the protected-instruction gate
     and the ``config.yaml`` hard-block for every later profile — up to letting a

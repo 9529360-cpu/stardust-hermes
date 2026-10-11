@@ -31,7 +31,7 @@ export function hasSeenIntroReveal(): boolean {
   return readKey(SEEN_KEY) === '1'
 }
 
-/** The film will never play for this identity (HERMES_SKIP_INTRO). Record it
+/** The film will never play for this identity (STARDUST_SKIP_INTRO). Record it
  * as seen so a later launch without the flag cannot replay it over the
  * guided flow that ran in its place. */
 export function markIntroRevealSeen(): void {
@@ -43,7 +43,7 @@ export function isIntroRevealEnabled(): boolean {
 }
 
 /** The guided flow is on but its intro film was turned off at launch
- * (HERMES_SKIP_INTRO). Distinct from isIntroRevealEnabled(): false there also
+ * (STARDUST_SKIP_INTRO). Distinct from isIntroRevealEnabled(): false there also
  * covers onboarding being off entirely, where nothing may queue. */
 export function isIntroRevealSkipped(): boolean {
   return isOnboardingEnabled() && window.stardustDesktop?.skipIntro === true

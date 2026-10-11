@@ -1,11 +1,11 @@
 """CLI entry point for the hermes-agent ACP adapter.
 
-Loads ``~/.hermes/.env``, routes logging to stderr (stdout is reserved for ACP
+Loads ``~/.stardust/.env``, routes logging to stderr (stdout is reserved for ACP
 JSON-RPC), and starts the ACP agent server.
 
 Usage::
 
-    python -m acp_adapter.entry   # or: hermes acp / hermes-acp
+    python -m acp_adapter.entry   # or: stardust acp / hermes-acp
 """
 
 # IMPORTANT: hermes_bootstrap must be the very first import — UTF-8 stdio
@@ -13,7 +13,7 @@ Usage::
 try:
     import hermes_bootstrap  # noqa: F401
 except ModuleNotFoundError:
-    # Partial ``hermes update`` (git-reset landed, ``uv pip install -e .`` did not):
+    # Partial ``stardust update`` (git-reset landed, ``uv pip install -e .`` did not):
     # UTF-8 stdio setup is skipped on Windows; POSIX is unaffected.
     pass
 else:
@@ -72,7 +72,7 @@ def _setup_logging() -> None:
 
 
 def _load_env() -> None:
-    """Load .env from HERMES_HOME (default ``~/.hermes``)."""
+    """Load .env from STARDUST_HOME (default ``~/.stardust``)."""
     from hermes_cli.env_loader import load_hermes_dotenv
 
     hermes_home = get_hermes_home()
@@ -91,7 +91,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--setup", action="store_true",
                         help="Run interactive Hermes provider/model setup for ACP terminal auth")
     parser.add_argument("--setup-browser", action="store_true",
-                        help="Install agent-browser + Playwright Chromium into ~/.hermes/node/ "
+                        help="Install agent-browser + Playwright Chromium into ~/.stardust/node/ "
                              "for browser tool support. Idempotent.")
     parser.add_argument("--yes", "-y", action="store_true", dest="assume_yes",
                         help="Accept all prompts (currently used by --setup-browser to skip the "
@@ -117,7 +117,7 @@ def _run_setup() -> None:
 
     old_argv = sys.argv[:]
     try:
-        sys.argv = [old_argv[0] if old_argv else "hermes", "model"]
+        sys.argv = [old_argv[0] if old_argv else "stardust", "model"]
         hermes_main()
     finally:
         sys.argv = old_argv
@@ -188,7 +188,7 @@ def main(argv: list[str] | None = None) -> None:
     # Previously this blocked asyncio.run() for 2-5 s. (ACP also registers per-session MCP servers
     # dynamically via asyncio.to_thread inside the event loop; that path is unaffected.)  Moved from
     # model_tools.py module scope to avoid freezing the gateway's loop on lazy import (#16856).
-    if os.environ.get("HERMES_ACP_SKIP_CONFIGURED_MCP", "").strip() != "1":
+    if os.environ.get("STARDUST_ACP_SKIP_CONFIGURED_MCP", "").strip() != "1":
         try:
             from hermes_cli.mcp_startup import start_background_mcp_discovery
 

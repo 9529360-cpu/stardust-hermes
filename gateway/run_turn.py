@@ -158,7 +158,7 @@ class GatewayTurnMixin:
         if override and skey:
             model, runtime_kwargs = self._apply_session_model_override(skey, model, runtime_kwargs)
 
-        # Provider resolved but no model.default (`hermes auth add` without `hermes model`): use the
+        # Provider resolved but no model.default (`stardust auth add` without `stardust model`): use the
         # provider's first catalog model.
         if not model and runtime_kwargs.get("provider"):
             with suppress(Exception):
@@ -500,7 +500,7 @@ class GatewayTurnMixin:
         try:
             _lease_token = await _lease_registry.acquire(
                 session_entry.session_id, owner_key=_quick_key, generation=run_generation,
-                timeout=_float_env("HERMES_TURN_LEASE_TIMEOUT", DEFAULT_LEASE_WAIT),
+                timeout=_float_env("STARDUST_TURN_LEASE_TIMEOUT", DEFAULT_LEASE_WAIT),
             )
         except TurnLeaseTimeoutError:
             # The cleanup finally starts later; restore the tokens here or this exit leaks identity.
@@ -1096,7 +1096,7 @@ class GatewayTurnMixin:
                     source, attempt.meta,
                     "⚠️ Shortening the conversation history failed, so I kept everything as-is. "
                     "Run /compress to try again or /new to start fresh. If this keeps happening, "
-                    "run `hermes doctor` on the host.",
+                    "run `stardust doctor` on the host.",
                     "compression-failure warning",
                 )
         # Configured aux model failed, recovered on the main model: only the user can fix that config.
@@ -1195,7 +1195,7 @@ class GatewayTurnMixin:
             attempt.future = loop.run_in_executor(
                 None,
                 # But it MUST run inside the caller's contextvars: under multiplex_profiles the profile
-                # secret scope / HERMES_HOME override live in ContextVars, and a bare run_in_executor worker
+                # secret scope / STARDUST_HOME override live in ContextVars, and a bare run_in_executor worker
                 # starts with an empty Context — the summary model's get_secret(<PROVIDER>_API_KEY) then
                 # fails closed (UnscopedSecretError) and every hygiene compaction silently degrades to a
                 # lossy truncation (#100849 bundle).
@@ -1826,7 +1826,7 @@ class GatewayTurnMixin:
     # on the provider-config path instead of exposing the inherited Nous account login.
     _STATUS_HINTS = {
         401: (" Your AI model credential has expired or the API key is wrong. "
-              "Use /model to choose a configured model, or run `hermes auth` on the host."),
+              "Use /model to choose a configured model, or run `stardust auth` on the host."),
         402: " Your AI model service balance or quota is used up. Top it up on the service's website, or use /model to switch models.",
         529: " The AI model service is temporarily overloaded. Wait a moment, then use /retry.",
     }
@@ -1879,7 +1879,7 @@ class GatewayTurnMixin:
         return self._hmwa_add_failed_turn_notice(
             f"⚠️ Something went wrong and I couldn't finish this reply.{status_hint}\n"
             "Use /retry to try again, or /new to start a fresh conversation. "
-            "Technical details are in the gateway log (`hermes logs`).",
+            "Technical details are in the gateway log (`stardust logs`).",
             self._PARTIAL_FAILED_TURN_NOTICE,
         )
 
@@ -2226,7 +2226,7 @@ class GatewayTurnMixin:
                     source.chat_id,
                     "❌ The background task couldn't start because no AI model credential is "
                     "configured. Use /model to choose a configured model, or run "
-                    "`hermes auth` on the host.",
+                    "`stardust auth` on the host.",
                     metadata=_thread_metadata,
                 )
                 return
@@ -2401,7 +2401,7 @@ class GatewayTurnMixin:
             # Explicit reload also re-probes tool availability (check_fn).
             reprobe_tool_availability()
             # Reconnect by discovering tools (reads config.yaml fresh). A chat command cannot finish
-            # a browser OAuth flow either: an expired token parks with a `hermes mcp login` hint.
+            # a browser OAuth flow either: an expired token parks with a `stardust mcp login` hint.
             from tools.mcp_oauth import suppress_interactive_oauth
             with suppress_interactive_oauth():
                 new_tools = await self._run_in_executor_with_context(discover_mcp_tools)
@@ -2754,7 +2754,7 @@ class GatewayTurnMixin:
 
         # Resolve the mode and its provenance together: null inherits, tier off is not intent.
         progress_mode, _tool_progress_explicit = resolve_tool_progress(
-            user_config, platform_key, os.getenv("HERMES_TOOL_PROGRESS_MODE"),
+            user_config, platform_key, os.getenv("STARDUST_TOOL_PROGRESS_MODE"),
         )
         # "accumulate" (edit one bubble) or "separate" (one msg per tool)
         progress_grouping = resolve_display_setting(user_config, platform_key, "tool_progress_grouping") or "accumulate"
@@ -2797,7 +2797,7 @@ class GatewayTurnMixin:
         _live_status_adapter = (
             adapter if getattr(adapter, "supports_status_text", False) and _live_status_mode != "off" else None
         )
-        # "log" mode: tool calls go to ~/.hermes/logs/tool_calls.log instead of the chat. Gateway-only.
+        # "log" mode: tool calls go to ~/.stardust/logs/tool_calls.log instead of the chat. Gateway-only.
         log_mode_enabled = progress_mode == "log" and not is_webhook
         # Interim assistant messages and thinking_progress are independent of tool progress (same
         # queue). Mattermost requires a per-platform opt-in: scratch text leaks into public threads.
@@ -3212,7 +3212,7 @@ class GatewayTurnMixin:
     def _run_agent_start_turn_worker(self, turn_ctx: TurnContext, run_sync: Callable[[], Any]) -> "GatewayRunner._RunAgentWorker":
         """Schedule ``run_sync`` on the executor plus the inactivity watchdog thread.
 
-        *Inactivity* timeout (agent.gateway_timeout / HERMES_AGENT_TIMEOUT, env wins; 0 = unlimited),
+        *Inactivity* timeout (agent.gateway_timeout / STARDUST_AGENT_TIMEOUT, env wins; 0 = unlimited),
         not wall-clock. The daemon watchdog is independent of asyncio: cgroup memory reclaim can
         starve the loop that runs the normal timeout poll."""
         from gateway.run import _float_env, _watch_gateway_turn_inactivity
@@ -3220,7 +3220,7 @@ class GatewayTurnMixin:
         agent_holder, session_key, run_generation = turn_ctx.agent_holder, turn_ctx.session_key, turn_ctx.run_generation
         _agent_timeout, _agent_warning = (
             v if v > 0 else None
-            for v in (_float_env("HERMES_AGENT_TIMEOUT", 1800), _float_env("HERMES_AGENT_TIMEOUT_WARNING", 900))
+            for v in (_float_env("STARDUST_AGENT_TIMEOUT", 1800), _float_env("STARDUST_AGENT_TIMEOUT_WARNING", 900))
         )
 
         # background=true processes survive a turn: reap only children created by THIS turn on timeout.
@@ -3921,11 +3921,11 @@ class GatewayTurnMixin:
         no longer owns the session slot or the executor finished. ``_executor_task_holder[0]`` is
         bound just after this task is scheduled (reads as None until then).
 
-        Interval: agent.gateway_notify_interval / HERMES_AGENT_NOTIFY_INTERVAL (default 180s; 0 or
+        Interval: agent.gateway_notify_interval / STARDUST_AGENT_NOTIFY_INTERVAL (default 180s; 0 or
         long_running_notifications=off disables)."""
         from gateway.run import _float_env, _interim_metadata, _non_conversational_metadata
         _notify_start = time.time()
-        _NOTIFY_INTERVAL = _float_env("HERMES_AGENT_NOTIFY_INTERVAL", 180)
+        _NOTIFY_INTERVAL = _float_env("STARDUST_AGENT_NOTIFY_INTERVAL", 180)
         _long_running_mode = disp._display_surface_mode("long_running_notifications", default=True, allow_generic=True)
         if _NOTIFY_INTERVAL <= 0 or _long_running_mode == "off":
             return

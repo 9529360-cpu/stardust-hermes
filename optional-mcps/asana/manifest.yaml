@@ -27,5 +27,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Asana (or run `hermes mcp login asana`). Approve access,
+  Asana (or run `stardust mcp login asana`). Approve access,
   then restart the session so tools load.

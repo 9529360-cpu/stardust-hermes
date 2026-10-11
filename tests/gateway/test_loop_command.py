@@ -33,9 +33,9 @@ class _FakeSessionStore:
 
 @pytest.fixture
 def loop_env(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     goals._DB_CACHE.clear()
     # Pre-warm the SessionDB cache from this sync (non-loop) context. Inside
     # the async tests, a cold cache makes GoalManager.set() kick the bounded

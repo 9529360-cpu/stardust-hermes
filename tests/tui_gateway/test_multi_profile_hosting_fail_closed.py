@@ -2,10 +2,10 @@
 the FULL runtime scope of the requested profile (home + secrets + terminal), the launch profile
 included once the process multiplexes.
 
-Regression for the silent cross-profile secret leak class: ``hermes serve`` hosted many profile
+Regression for the silent cross-profile secret leak class: ``stardust serve`` hosted many profile
 homes but never called ``set_multiplex_active(True)``, so every unscoped ``get_secret`` read for a
 secondary silently returned the LAUNCH profile's ``os.environ`` value; ``@_profile_scoped`` bound
-only HERMES_HOME. And the launch-profile asymmetry: a default-member hosted-room turn in a
+only STARDUST_HOME. And the launch-profile asymmetry: a default-member hosted-room turn in a
 ``multiplex_profiles: true`` gateway died at agent build with ``UnscopedSecretError``.
 """
 
@@ -36,7 +36,7 @@ def two_homes(tmp_path, monkeypatch):
         (home / "config.yaml").write_text(
             "probe:\n  a_ref: ${A_ONLY_TOKEN}\n  b_ref: ${B_ONLY_TOKEN}\n  env_ref: ${INJECTED_TOKEN}\n",
             encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.setenv("A_ONLY_TOKEN", A_VAL)  # the launch process loaded its own .env
     monkeypatch.setenv("INJECTED_TOKEN", ENV_VAL)  # systemd / op run credential injection
     monkeypatch.setattr(server, "_hermes_home", root)
@@ -100,7 +100,7 @@ def test_rpc_scope_reaches_llm_oneshot_and_model_options(two_homes, monkeypatch)
     seen = {}
 
     def fake_oneshot(**kwargs):
-        seen["oneshot"] = (Path(os.environ.get("HERMES_HOME", "")), get_secret("B_ONLY_TOKEN"), get_secret("A_ONLY_TOKEN"))
+        seen["oneshot"] = (Path(os.environ.get("STARDUST_HOME", "")), get_secret("B_ONLY_TOKEN"), get_secret("A_ONLY_TOKEN"))
         from hermes_constants import get_hermes_home
         seen["oneshot_home"] = Path(get_hermes_home())
         return "t"

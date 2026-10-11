@@ -36,7 +36,7 @@ def test_check_node_managed_requires_npm() -> None:
     """The Hermes-managed Node fallback also requires its npm to exist."""
     text = INSTALL_SH.read_text()
     assert (
-        '[ -x "$HERMES_HOME/node/bin/node" ] && [ -x "$HERMES_HOME/node/bin/npm" ] \\'
+        '[ -x "$STARDUST_HOME/node/bin/node" ] && [ -x "$STARDUST_HOME/node/bin/npm" ] \\'
         in text
     )
 

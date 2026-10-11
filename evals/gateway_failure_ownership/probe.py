@@ -12,8 +12,8 @@ os.environ.clear()
 os.environ.update(keep)
 os.environ.update(
     HOME=str(HOME),
-    HERMES_HOME=str(HOME),
-    HERMES_DISABLE_PLUGINS="1",
+    STARDUST_HOME=str(HOME),
+    STARDUST_DISABLE_PLUGINS="1",
     NO_PROXY="127.0.0.1,localhost",
 )
 sys.path.insert(0, str(ROOT))

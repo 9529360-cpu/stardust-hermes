@@ -5,7 +5,7 @@
  * maps, while this file owns the security-sensitive ordering and the remote
  * wire protocol:
  *
- *   gate dials -> drain every captured scope -> detached `hermes update`
+ *   gate dials -> drain every captured scope -> detached `stardust update`
  *   -> correlated terminal marker + durable receipt -> restore every scope
  *   -> lift the gate
  *
@@ -222,11 +222,11 @@ function buildPosixManagedUpdateLaunch(target: RemoteUpdateTarget, correlationId
   const launcherWord = expandRemotePath(hermesPath)
 
   const updateCommand =
-    `env HERMES_HOME=${homeWord} ` +
-    `HERMES_UPDATE_CORRELATION_ID=${shq(correlation)} ` +
-    'HERMES_UPDATE_ORIGIN_PROFILE=default ' +
-    `HERMES_UPDATE_ORIGIN_HOME=${homeWord} ` +
-    `HERMES_UPDATE_OUTPUT_PATH=${outputWord} ` +
+    `env STARDUST_HOME=${homeWord} ` +
+    `STARDUST_UPDATE_CORRELATION_ID=${shq(correlation)} ` +
+    'STARDUST_UPDATE_ORIGIN_PROFILE=default ' +
+    `STARDUST_UPDATE_ORIGIN_HOME=${homeWord} ` +
+    `STARDUST_UPDATE_OUTPUT_PATH=${outputWord} ` +
     `${launcherWord} update --yes`
 
   const inner =
@@ -264,16 +264,16 @@ function buildWindowsManagedUpdateLaunch(target: RemoteUpdateTarget, correlation
 
   const wrapper = [
     '$ErrorActionPreference="Continue"',
-    `$env:HERMES_HOME=${psLiteral(home)}`,
-    `$env:HERMES_UPDATE_CORRELATION_ID=${psLiteral(correlation)}`,
-    '$env:HERMES_UPDATE_ORIGIN_PROFILE="default"',
-    `$env:HERMES_UPDATE_ORIGIN_HOME=${psLiteral(home)}`,
-    `$env:HERMES_UPDATE_OUTPUT_PATH=${psLiteral(outputPath)}`,
+    `$env:STARDUST_HOME=${psLiteral(home)}`,
+    `$env:STARDUST_UPDATE_CORRELATION_ID=${psLiteral(correlation)}`,
+    '$env:STARDUST_UPDATE_ORIGIN_PROFILE="default"',
+    `$env:STARDUST_UPDATE_ORIGIN_HOME=${psLiteral(home)}`,
+    `$env:STARDUST_UPDATE_OUTPUT_PATH=${psLiteral(outputPath)}`,
     // The copied Windows coordinator verifies this correlation AND its actual
     // breakaway state before accepting it; the string alone grants nothing.
-    `$env:HERMES_UPDATE_WINDOWS_DETACHED=${psLiteral(correlation)}`,
-    `$env:HERMES_UPDATE_TAURI_OUTCOME_PATH=${psLiteral(statusPath)}`,
-    `$env:HERMES_UPDATE_TAURI_READY_PATH=${psLiteral(readyPath)}`,
+    `$env:STARDUST_UPDATE_WINDOWS_DETACHED=${psLiteral(correlation)}`,
+    `$env:STARDUST_UPDATE_TAURI_OUTCOME_PATH=${psLiteral(statusPath)}`,
+    `$env:STARDUST_UPDATE_TAURI_READY_PATH=${psLiteral(readyPath)}`,
     `$intentTmp=${psLiteral(intentPath)}+"."+$PID+".tmp"`,
     '$intentCreation="windows:"+[string]([Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().ToFileTimeUtc())',
     `$intentPayload=[ordered]@{correlation=${psLiteral(correlation)};pid=$PID;creation=$intentCreation}|ConvertTo-Json -Compress`,

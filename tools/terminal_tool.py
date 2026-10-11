@@ -51,7 +51,7 @@ from tools.terminal_tool_backends import (
     _REQUIREMENT_CHECKERS, _VERCEL_SANDBOX_DEFAULT_CWD, _check_plugin_requirements,
     _record_unavailable_reason, terminal_backend_unavailable_reason,  # noqa: F401 — re-exported
 )
-# display_hermes_home imported lazily at call site (stale-module safety during hermes update)
+# display_hermes_home imported lazily at call site (stale-module safety during stardust update)
 from tools.tool_backend_helpers import coerce_modal_mode, managed_nous_tools_enabled
 
 
@@ -108,7 +108,7 @@ def _current_session_key() -> str:
     the ``get_session_env`` os.environ fallback for CLI/cron/tests)."""
     from gateway.session_context import get_session_env
 
-    return get_session_env("HERMES_SESSION_KEY", "")
+    return get_session_env("STARDUST_SESSION_KEY", "")
 
 
 def _current_session_profile() -> str:
@@ -116,7 +116,7 @@ def _current_session_profile() -> str:
     :func:`_current_session_key`)."""
     from gateway.session_context import get_session_env
 
-    return get_session_env("HERMES_SESSION_PROFILE", "")
+    return get_session_env("STARDUST_SESSION_PROFILE", "")
 
 
 from tools.approval import (
@@ -531,18 +531,18 @@ def _ensure_terminal_env_bridged() -> None:
     """Backfill TERMINAL_* env vars from config.yaml when no launcher did.
 
     CLI, gateway and TUI/dashboard PTY launches bridge ``terminal.*`` into env vars
-    at startup; processes that skip those paths (``hermes serve``, Desktop
+    at startup; processes that skip those paths (``stardust serve``, Desktop
     in-process agents, desktop cron ticker, ACP) would otherwise fall back to the
     local backend even when config selects docker — running on the host the user
     meant to sandbox. Explicit keys in the ``terminal`` section override matching
-    env values (possibly stale from ``hermes setup``); env values for omitted keys
+    env values (possibly stale from ``stardust setup``); env values for omitted keys
     are preserved. Without a terminal section an existing TERMINAL_ENV is kept and
     defaults are backfilled only when none is set. A per-turn terminal scope
     suppresses the bridge entirely: writing scope values into the process-global
     env would re-create the first-writer-wins cross-profile leak the scope fixes.
 
     Ambient ``os.environ`` is the *launch* profile's authority only. Under a
-    context-local ``HERMES_HOME`` override (multiplexed dashboard / gateway
+    context-local ``STARDUST_HOME`` override (multiplexed dashboard / gateway
     secondary profile), this bridge is a no-op — otherwise the first unscoped
     call under that override would latch the secondary profile's ``terminal.*``
     into process-global env and poison later unscoped launch-profile turns

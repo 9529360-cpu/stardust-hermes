@@ -1,4 +1,4 @@
-"""PTY bridge for `hermes dashboard` chat tab.
+"""PTY bridge for `stardust dashboard` chat tab.
 
 Wraps a child process behind a pseudo-terminal so its ANSI output can be streamed to xterm.js and
 keystrokes fed back in; the only caller is the ``/api/pty`` WebSocket endpoint in
@@ -32,7 +32,7 @@ __all__ = ["PTY_HOST_DASHBOARD", "PTY_HOST_ENV", "PtyBridge", "PtyUnavailableErr
 
 # Set on the spawned TUI so Ink knows which emulator is hosting it. Mirrored in
 # ui-tui/packages/hermes-ink/src/ink/termio/host.ts — keep the two in sync.
-PTY_HOST_ENV = "HERMES_PTY_HOST"
+PTY_HOST_ENV = "STARDUST_PTY_HOST"
 PTY_HOST_DASHBOARD = "dashboard"
 
 

@@ -62,7 +62,7 @@ def main():
     server = ThreadingHTTPServer(('127.0.0.1', 0), Model)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     home = Path(tempfile.mkdtemp(prefix='hermes-acp-empty-'))
-    hermes = home / '.hermes'
+    hermes = home / '.stardust'
     hermes.mkdir()
     (hermes / 'config.yaml').write_text(
         'model:\n  provider: custom\n  default: fixture-model\n'
@@ -72,8 +72,8 @@ def main():
         'agent:\n  max_iterations: 1\n  disabled_toolsets: [all]\n'
     )
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ') if k in os.environ}
-    env.update(HOME=str(home), HERMES_HOME=str(hermes), PYTHONPATH=os.pathsep.join([str(repo), os.environ.get('PYTHONPATH', '')]),
-               HERMES_ACP_SKIP_CONFIGURED_MCP='1', OPENAI_API_KEY='local-fixture-key',
+    env.update(HOME=str(home), STARDUST_HOME=str(hermes), PYTHONPATH=os.pathsep.join([str(repo), os.environ.get('PYTHONPATH', '')]),
+               STARDUST_ACP_SKIP_CONFIGURED_MCP='1', OPENAI_API_KEY='local-fixture-key',
                OPENAI_BASE_URL=f'http://127.0.0.1:{server.server_port}/v1')
     stderr = open(str(args.output) + '.stderr', 'w', encoding='utf-8')
     proc = subprocess.Popen([sys.executable, '-m', 'acp_adapter'], cwd=repo, env=env,

@@ -48,21 +48,21 @@ from hermes_cli.config import DEFAULT_CONFIG
 
 
 # ---------------------------------------------------------------------------
-# Shared fixture: redirect Path.home() and HERMES_HOME for profile tests
+# Shared fixture: redirect Path.home() and STARDUST_HOME for profile tests
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
     """Set up an isolated environment for profile tests.
 
-    * Path.home() -> tmp_path  (so _get_profiles_root() = tmp_path/.hermes/profiles)
-    * HERMES_HOME  -> tmp_path/.hermes  (so get_hermes_home() agrees)
-    * Creates the bare-minimum ~/.hermes directory.
+    * Path.home() -> tmp_path  (so _get_profiles_root() = tmp_path/.stardust/profiles)
+    * STARDUST_HOME  -> tmp_path/.stardust  (so get_hermes_home() agrees)
+    * Creates the bare-minimum ~/.stardust directory.
     """
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     return tmp_path
 
 
@@ -103,7 +103,7 @@ class TestGetProfileDir:
     def test_default_returns_hermes_home(self, profile_env):
         tmp_path = profile_env
         result = get_profile_dir("default")
-        assert result == tmp_path / ".hermes"
+        assert result == tmp_path / ".stardust"
 
     @pytest.mark.parametrize("name", ["..", "../outside", "../../tmp", "a/b", "a\\b", ".hidden", "has space"])
     def test_traversal_and_invalid_names_rejected(self, name, profile_env):
@@ -150,7 +150,7 @@ class TestCreateProfile:
         with "No LLM provider configured" — created, but unable to run. Fresh
         means fresh skills and SOUL, not unreachable.
         """
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".stardust"
         (default_home / "config.yaml").write_text(
             "model:\n  provider: nous\n  default: some/model\n"
         )
@@ -168,7 +168,7 @@ class TestCreateProfile:
         The model block is copied at creation, so later edits to the source
         profile never reach one already created from it.
         """
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".stardust"
         (default_home / "config.yaml").write_text(
             "model:\n  provider: nous\n  default: some/model\n"
         )
@@ -187,7 +187,7 @@ class TestCreateProfile:
 
     def test_clone_config_copies_files(self, profile_env):
         tmp_path = profile_env
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".stardust"
         # Create source config files in default profile
         (default_home / "config.yaml").write_text("model: test")
         (default_home / ".env").write_text("KEY=val")
@@ -206,7 +206,7 @@ class TestCreateProfile:
         else changes: the clone still gets its own config/skills copies, never a live link."""
         from hermes_cli.agent_import_sync import SYNC_MANIFEST_NAME, load_sync_manifest
 
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".stardust"
         (default_home / "config.yaml").write_text("model: test")
         manifest = {"version": 1, "agents": {"claude-code": {
             "source": str(profile_env / ".claude"), "digest": "d", "overwrite": False,
@@ -229,7 +229,7 @@ class TestCreateProfile:
     def test_clone_all_does_not_copy_cron_jobs(self, profile_env):
         # Cron jobs are scheduled work bound to the source profile + origin channel; a clone
         # that inherits jobs.json fires every job twice (two gateways, same job ids).
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".stardust"
         (default_home / "config.yaml").write_text("model: test")
         (default_home / "cron").mkdir()
         (default_home / "cron" / "jobs.json").write_text(json.dumps({"jobs": [{"id": "abc123def456"}]}))
@@ -245,7 +245,7 @@ class TestCreateProfile:
     def test_clone_all_skips_special_files(self, profile_env):
         # A live source profile holds special files copytree cannot copy (e.g. a suffixless
         # agent-browser control socket); one of them must not abort the whole clone.
-        default_home = profile_env / ".hermes"
+        default_home = profile_env / ".stardust"
         (default_home / "config.yaml").write_text("model: test")
         browser_dir = default_home / "home" / ".agent-browser"
         browser_dir.mkdir(parents=True)
@@ -266,7 +266,7 @@ class TestCreateProfile:
 # ===================================================================
 
 class TestNoSkillsOptOut:
-    """Tests for `hermes profile create --no-skills` and the opt-out marker."""
+    """Tests for `stardust profile create --no-skills` and the opt-out marker."""
 
     def test_no_skills_writes_marker_and_skips_seeding(self, profile_env):
         profile_dir = create_profile("orchestrator", no_alias=True, no_skills=True)
@@ -327,14 +327,14 @@ class TestNoSkillsOptOut:
 # ===================================================================
 
 class TestBackfillProfileEnvs:
-    """Tests for backfill_profile_envs() — the `hermes update` pass that
+    """Tests for backfill_profile_envs() — the `stardust update` pass that
     gives pre-#44792 profiles (created before .env seeding) their own
     .env, copied from the default install so credentials don't break."""
 
     def test_copies_default_env_into_envless_profiles(self, profile_env):
         import stat
         tmp_path = profile_env
-        (tmp_path / ".hermes" / ".env").write_text("OPENROUTER_API_KEY=root-key\n")
+        (tmp_path / ".stardust" / ".env").write_text("OPENROUTER_API_KEY=root-key\n")
         p1 = create_profile("old1", no_alias=True)
         p2 = create_profile("old2", no_alias=True)
         # Simulate pre-#44792 profiles: no .env
@@ -433,9 +433,9 @@ class TestDeleteProfile:
         assert pids == [101]
 
     def test_backend_scan_matches_shebang_exec_of_hermes_shim(self, profile_env, monkeypatch):
-        """A `hermes` console-script shim spawned directly (e.g. Electron's
-        findOnPath('hermes') resolution) reports argv[0] as the interpreter
-        (python3) and argv[1] as the shim's path -- not "hermes" -- because
+        """A `stardust` console-script shim spawned directly (e.g. Electron's
+        findOnPath('stardust') resolution) reports argv[0] as the interpreter
+        (python3) and argv[1] as the shim's path -- not "stardust" -- because
         the OS execs the shebang. The scanner must still recognize it so
         profile delete doesn't leave a zombie Desktop-spawned backend behind
         (issue: deleting a Desktop profile kept reappearing after relaunch).
@@ -461,10 +461,10 @@ class TestDeleteProfile:
         procs = [
             # Shebang-exec'd shim bound to coder → matched despite argv[0]
             # being the python interpreter, not "hermes".
-            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "coder", "serve",
+            FakeProc(201, ["/usr/bin/python3", "/Users/x/.local/bin/stardust", "--profile", "coder", "serve",
                             "--host", "127.0.0.1", "--port", "0"]),
             # Same shape but a different profile → skipped.
-            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/hermes", "--profile", "other", "serve"]),
+            FakeProc(202, ["/usr/bin/python3", "/Users/x/.local/bin/stardust", "--profile", "other", "serve"]),
             # Non-hermes script run by python3 → skipped.
             FakeProc(203, ["/usr/bin/python3", "/Users/x/some_script.py", "--profile", "coder", "serve"]),
         ]
@@ -604,7 +604,7 @@ class TestActiveProfile:
         tmp_path = profile_env
         create_profile("coder", no_alias=True)
         set_active_profile("coder")
-        active_path = tmp_path / ".hermes" / "active_profile"
+        active_path = tmp_path / ".stardust" / "active_profile"
         assert active_path.exists()
 
         set_active_profile("default")
@@ -622,17 +622,17 @@ class TestGetActiveProfileName:
     def test_profile_path_returns_profile_name(self, profile_env, monkeypatch):
         tmp_path = profile_env
         create_profile("coder", no_alias=True)
-        profile_dir = tmp_path / ".hermes" / "profiles" / "coder"
-        monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+        profile_dir = tmp_path / ".stardust" / "profiles" / "coder"
+        monkeypatch.setenv("STARDUST_HOME", str(profile_dir))
         assert get_active_profile_name() == "coder"
 
     def test_custom_path_returns_default(self, profile_env, monkeypatch):
-        """A custom HERMES_HOME (Docker, etc.) IS the default root."""
+        """A custom STARDUST_HOME (Docker, etc.) IS the default root."""
         tmp_path = profile_env
         custom = tmp_path / "some" / "other" / "path"
         custom.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(custom))
-        # With Docker-aware roots, a custom HERMES_HOME is the default —
+        monkeypatch.setenv("STARDUST_HOME", str(custom))
+        # With Docker-aware roots, a custom STARDUST_HOME is the default —
         # not "custom".  The user is on the default profile of their
         # custom deployment.
         assert get_active_profile_name() == "default"
@@ -660,7 +660,7 @@ class TestAliasCollision:
         wrapper_dir = profile_env / ".local" / "bin"
         wrapper_dir.mkdir(parents=True, exist_ok=True)
         bat_path = wrapper_dir / "mybot.bat"
-        bat_path.write_text("@echo off\r\nhermes -p mybot %*\r\n")
+        bat_path.write_text("@echo off\r\nstardust -p mybot %*\r\n")
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout=str(bat_path),
@@ -685,14 +685,14 @@ class TestWrapperScript:
     """Tests for create_wrapper_script() and remove_wrapper_script()."""
 
     def test_creates_sh_on_posix(self, profile_env, monkeypatch):
-        monkeypatch.setattr("hermes_cli.profiles.shutil.which", lambda name: "/opt/hermes/bin/hermes")
+        monkeypatch.setattr("hermes_cli.profiles.shutil.which", lambda name: "/opt/hermes/bin/stardust")
         from hermes_cli.profiles import create_wrapper_script
         wrapper = create_wrapper_script("mybot")
         assert wrapper is not None
         assert wrapper.name == "mybot"
         content = wrapper.read_text()
         assert content.startswith("#!/bin/sh")
-        assert "exec /opt/hermes/bin/hermes -p mybot" in content
+        assert "exec /opt/hermes/bin/stardust -p mybot" in content
 
 
     @pytest.mark.windows_only
@@ -782,7 +782,7 @@ class TestRenameProfile:
     def test_renames_directory(self, profile_env):
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
+        old_dir = tmp_path / ".stardust" / "profiles" / "oldname"
         assert old_dir.is_dir()
 
         # Mock alias collision to avoid subprocess calls
@@ -791,12 +791,12 @@ class TestRenameProfile:
 
         assert not old_dir.is_dir()
         assert new_dir.is_dir()
-        assert new_dir == tmp_path / ".hermes" / "profiles" / "newname"
+        assert new_dir == tmp_path / ".stardust" / "profiles" / "newname"
 
     def test_renames_root_honcho_host_without_changing_ai_peer(self, profile_env):
         tmp_path = profile_env
         create_profile("ssi_health", no_alias=True)
-        honcho_path = tmp_path / ".hermes" / "honcho.json"
+        honcho_path = tmp_path / ".stardust" / "honcho.json"
         honcho_path.write_text(json.dumps({
             "hosts": {
                 "hermes.ssi_health": {
@@ -827,8 +827,8 @@ class TestRenameProfile:
         from hermes_constants import mkdir_under_hermes_home
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
-        new_dir = tmp_path / ".hermes" / "profiles" / "newname"
+        old_dir = tmp_path / ".stardust" / "profiles" / "oldname"
+        new_dir = tmp_path / ".stardust" / "profiles" / "newname"
 
         calls = []
 
@@ -855,7 +855,7 @@ class TestRenameProfile:
         """No live multiplexer → rename must neither tombstone nor ping (single-profile installs)."""
         tmp_path = profile_env
         create_profile("oldname", no_alias=True)
-        old_dir = tmp_path / ".hermes" / "profiles" / "oldname"
+        old_dir = tmp_path / ".stardust" / "profiles" / "oldname"
 
         with patch("hermes_cli.profiles.check_alias_collision", return_value="skip"), \
              patch("hermes_cli.profiles._live_default_multiplexer", return_value=False), \
@@ -863,7 +863,7 @@ class TestRenameProfile:
             new_dir = rename_profile("oldname", "newname")
 
         notify.assert_not_called()
-        assert not (tmp_path / ".hermes" / "profiles" / ".deleted").exists()
+        assert not (tmp_path / ".stardust" / "profiles" / ".deleted").exists()
         assert not old_dir.exists() and new_dir.is_dir()
 
 
@@ -887,10 +887,10 @@ class TestExportImport:
 
     def test_export_default_includes_profile_data(self, profile_env, tmp_path):
         """Profile data files end up in the archive (credentials excluded)."""
-        # Write through HERMES_HOME, not get_profile_dir("default"): the latter resolves to the
+        # Write through STARDUST_HOME, not get_profile_dir("default"): the latter resolves to the
         # OPERATOR's real install whenever basetest sits inside it, so this test used to
         # overwrite the live config.yaml / .env / MEMORY.md with its fixtures.
-        default_dir = profile_env / ".hermes"
+        default_dir = profile_env / ".stardust"
         (default_dir / "config.yaml").write_text("model: test")
         (default_dir / ".env").write_text("KEY=val")
         (default_dir / "SOUL.md").write_text("Be nice.")
@@ -920,7 +920,7 @@ class TestExportImport:
         symlinks; the link and its target are both retained.
         """
         # Same reason as above: never resolve the operator's real default home from a test.
-        default_dir = profile_env / ".hermes"
+        default_dir = profile_env / ".stardust"
         (default_dir / "config.yaml").write_text("ok")
         # Place broken symlink *inside* the allowed ``skills/`` tree so the
         # root-level allow-list passes the directory through; the
@@ -984,22 +984,22 @@ class TestInternalHelpers:
 
 
     def test_default_hermes_home_docker(self, tmp_path, monkeypatch):
-        """In Docker, _get_default_hermes_home() returns HERMES_HOME itself."""
+        """In Docker, _get_default_hermes_home() returns STARDUST_HOME itself."""
         docker_home = tmp_path / "opt" / "data"
         docker_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(docker_home))
+        monkeypatch.setenv("STARDUST_HOME", str(docker_home))
         home = _get_default_hermes_home()
         assert home == docker_home
 
 
 
     def test_create_profile_docker(self, tmp_path, monkeypatch):
-        """Profile created in Docker lands under HERMES_HOME/profiles/."""
+        """Profile created in Docker lands under STARDUST_HOME/profiles/."""
         docker_home = tmp_path / "opt" / "data"
         docker_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(docker_home))
+        monkeypatch.setenv("STARDUST_HOME", str(docker_home))
         result = create_profile("orchestrator", no_alias=True)
         expected = docker_home / "profiles" / "orchestrator"
         assert result == expected
@@ -1138,7 +1138,7 @@ class TestEdgeCases:
         from hermes_cli.profiles import _check_gateway_running
 
         tmp_path = profile_env
-        default_home = tmp_path / ".hermes"
+        default_home = tmp_path / ".stardust"
         default_home.mkdir(parents=True, exist_ok=True)
 
         # Write a realistic gateway_state.json pointing at THIS live process with
@@ -1167,7 +1167,7 @@ class TestEdgeCases:
         # runs the gateway with no profile flag).
         with patch("gateway.status.get_running_pid", return_value=None), patch(
             "gateway.status._read_process_cmdline",
-            return_value="hermes gateway run --replace",
+            return_value="stardust gateway run --replace",
         ):
             assert _check_gateway_running(default_home) is True
 
@@ -1200,10 +1200,10 @@ class TestProfilesToServe:
 
 
     def test_off_returns_only_active_named(self, profile_env, monkeypatch):
-        # A named profile's gateway runs with HERMES_HOME pointing at the
+        # A named profile's gateway runs with STARDUST_HOME pointing at the
         # profile dir; get_active_profile_name() infers the name from there.
         create_profile("coder", no_alias=True)
-        monkeypatch.setenv("HERMES_HOME", str(get_profile_dir("coder")))
+        monkeypatch.setenv("STARDUST_HOME", str(get_profile_dir("coder")))
         serve = profiles_to_serve(multiplex=False)
         assert len(serve) == 1
         assert serve[0][0] == "coder"
@@ -1224,7 +1224,7 @@ class TestProfilesToServe:
 
 
 class TestResolveProfileEnvSpelling:
-    """resolve_profile_env() keeps the configured HERMES_HOME spelling as
+    """resolve_profile_env() keeps the configured STARDUST_HOME spelling as
 
     the launch root (junction installs) while preserving the pre-existing
     profile-path handling and existence/validation semantics.
@@ -1248,18 +1248,18 @@ class TestResolveProfileEnvSpelling:
             (custom, "beta", custom / "profiles" / "beta"),
         ]
         for env_home, profile, expected in cases:
-            monkeypatch.setenv("HERMES_HOME", str(env_home))
+            monkeypatch.setenv("STARDUST_HOME", str(env_home))
             assert Path(resolve_profile_env(profile)) == expected
 
     def test_missing_named_profile_still_raises(self, monkeypatch, tmp_path):
         root = tmp_path / "configured-root"
-        monkeypatch.setenv("HERMES_HOME", str(root))
+        monkeypatch.setenv("STARDUST_HOME", str(root))
         with pytest.raises(FileNotFoundError):
             resolve_profile_env("nope")
 
     def test_unset_env_falls_back_to_default_root(self, monkeypatch):
-        # No HERMES_HOME: the platform default root applies (existing contract).
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        # No STARDUST_HOME: the platform default root applies (existing contract).
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         assert Path(resolve_profile_env("default")) == _get_default_hermes_home()
 
 

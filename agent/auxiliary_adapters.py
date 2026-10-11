@@ -789,13 +789,13 @@ def _maybe_wrap_anthropic(
     ``client_obj`` unchanged for probe stubs/specialized adapters, OpenAI-wire, explicit non-Anthropic
     ``api_mode``, or missing ``anthropic`` SDK.
     """
-    # Anthropic/Bedrock/Codex wrappers, plus any client declaring HERMES_SKIP_TRANSPORT_WRAP
+    # Anthropic/Bedrock/Codex wrappers, plus any client declaring STARDUST_SKIP_TRANSPORT_WRAP
     # (native/ACP shims, in-tree or plugin), must never be re-dispatched through a wire adapter —
     # a class-attribute declaration rather than isinstance so this hot path never imports them.
     if (
         isinstance(client_obj, _aux._AuxProbeClientStub)
         or _aux._safe_isinstance(client_obj, (AnthropicAuxiliaryClient, BedrockAuxiliaryClient, CodexAuxiliaryClient))
-        or _aux._client_declares(client_obj, "HERMES_SKIP_TRANSPORT_WRAP")
+        or _aux._client_declares(client_obj, "STARDUST_SKIP_TRANSPORT_WRAP")
     ):
         return client_obj
     # Explicit non-anthropic api_mode wins over URL heuristics.

@@ -146,10 +146,10 @@ def test_turn_wait_seconds_reads_config(monkeypatch):
 
 
 def test_run_delivery_holds_profile_lock_during_turn(root, tmp_path, monkeypatch):
-    """The local `hermes -p <profile>` turn runs UNDER the profile lock."""
-    home = root / ".hermes"
+    """The local `stardust -p <profile>` turn runs UNDER the profile lock."""
+    home = root / ".stardust"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     dm = tmp_path / "dm.txt"
     dm.write_text("hi", encoding="utf-8")
     observed = {}
@@ -181,9 +181,9 @@ def test_run_delivery_holds_profile_lock_during_turn(root, tmp_path, monkeypatch
 
 def test_delivery_main_reports_target_busy_json(root, tmp_path, monkeypatch, capsys):
     """A queued delivery that exceeds its budget surfaces the structured error."""
-    home = root / ".hermes"
+    home = root / ".stardust"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setattr(bot_relay, "turn_wait_seconds", lambda: 0.2)
     dm = tmp_path / "dm.txt"
     dm.write_text("hi", encoding="utf-8")
@@ -211,9 +211,9 @@ def test_delivery_main_reports_target_busy_json(root, tmp_path, monkeypatch, cap
 
 def test_peer_stdin_delivery_skips_local_lock(root, tmp_path, monkeypatch):
     """Peer transports run their turn on the remote gateway — no local lock."""
-    home = root / ".hermes"
+    home = root / ".stardust"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     dm = tmp_path / "dm.txt"
     dm.write_text("hi", encoding="utf-8")
 
@@ -247,9 +247,9 @@ def test_peer_stdin_delivery_skips_local_lock(root, tmp_path, monkeypatch):
 
 def test_local_delivery_command_never_reenters_the_lock():
     """The gateway deliver handler runs local_delivery_command ALREADY holding
-    the profile lock. That argv must stay a raw hermes CLI invocation:
+    the profile lock. That argv must stay a raw stardust CLI invocation:
     routing it through the --run-delivery wrapper would make the child hit
-    _delivery_lock (hermes CLI + '-p'), burn the full wait
+    _delivery_lock (stardust CLI + '-p'), burn the full wait
     budget against its parent's flock, and fail every relay delivery with
     target_busy. argv[0] may be a resolved venv path (#93590) — the lock
     matcher and this assertion both go by basename."""
@@ -257,7 +257,7 @@ def test_local_delivery_command_never_reenters_the_lock():
 
     argv = bot_relay.local_delivery_command("ops", "/tmp/q.txt")
     assert argv[1:3] == ["-p", "ops"]
-    assert Path(argv[0]).name in ("hermes", "hermes.exe")
+    assert Path(argv[0]).name in ("stardust", "stardust.exe")
     assert "--run-delivery" not in argv
     assert not any("bot_mode_dm" in part for part in argv)
 
@@ -267,7 +267,7 @@ def test_relay_deliver_returns_target_busy_error(tmp_path, monkeypatch):
 
     h = tmp_path / "h"
     (h / "profiles" / "ops").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("STARDUST_HOME", str(h))
     monkeypatch.setattr(bot_relay, "turn_wait_seconds", lambda: 0.2)
 
     spawned = {}
@@ -317,7 +317,7 @@ def test_relay_deliver_serializes_then_succeeds(tmp_path, monkeypatch):
 
     h = tmp_path / "h"
     (h / "profiles" / "ops").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("STARDUST_HOME", str(h))
     monkeypatch.setattr(bot_relay, "turn_wait_seconds", lambda: 5.0)
 
     class _Proc:

@@ -58,7 +58,7 @@ async def test_hermes_provider_forwards_asend_values(tmp_path, monkeypatch):
 
     assert _HERMES_PROVIDER_CLS is not None, "SDK OAuth types must be available"
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     reset_manager_for_tests()
 
     # Seed a valid-looking token so the SDK's _initialize loads something and
@@ -144,7 +144,7 @@ async def test_hermes_provider_forwards_401_triggers_refresh(tmp_path, monkeypat
 
     assert _HERMES_PROVIDER_CLS is not None
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     reset_manager_for_tests()
 
     storage = HermesTokenStorage("srv")
@@ -229,7 +229,7 @@ async def test_long_lived_resource_request_does_not_block_concurrent_post(
 
     assert _HERMES_PROVIDER_CLS is not None
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     reset_manager_for_tests()
 
     storage = HermesTokenStorage("srv")

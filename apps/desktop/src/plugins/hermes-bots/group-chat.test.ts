@@ -125,7 +125,7 @@ describe('speaker labels', () => {
     const { formatGroupChatLine } = await import('./group-round-prompt')
     const data = await import('./data')
 
-    // A renamed default (core display_name via `hermes profile rename`) must
+    // A renamed default (core display_name via `stardust profile rename`) must
     // read as its new name — the community report was "Lucy" still showing
     // "Hermes is thinking…" in group rooms.
     data.$lastRoster.set([{ display_name: 'Lucy', name: 'default' }])

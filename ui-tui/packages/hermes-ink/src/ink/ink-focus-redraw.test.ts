@@ -323,7 +323,7 @@ describe.each([
     // so there is no stale row to heal — the clear+repaint is only a flash on
     // every OS app-switch (hermes-agent#94337). The focus report itself must
     // still be processed (this handler runs), only the repaint is skipped.
-    const { beforeFocus, afterFocus, chunks } = await focusRegain(altScreen, { HERMES_PTY_HOST: 'dashboard' })
+    const { beforeFocus, afterFocus, chunks } = await focusRegain(altScreen, { STARDUST_PTY_HOST: 'dashboard' })
 
     const out = chunks.join('')
 

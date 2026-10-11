@@ -1,4 +1,4 @@
-"""``hermes logs`` subcommand parser."""
+"""``stardust logs`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -14,18 +14,18 @@ def build_logs_parser(subparsers, *, cmd_logs: Callable) -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
-    hermes logs                    Show last 50 lines of agent.log
-    hermes logs -f                 Follow agent.log in real time
-    hermes logs errors             Show last 50 lines of errors.log
-    hermes logs gateway -n 100     Show last 100 lines of gateway.log
-    hermes logs gui -f             Follow gui.log in real time
-    hermes logs desktop -f         Follow desktop.log (Electron app boot/backend)
-    hermes logs --level WARNING    Only show WARNING and above
-    hermes logs --session abc123   Filter by session ID
-    hermes logs --component tools  Only show tool-related lines
-    hermes logs --since 1h         Lines from the last hour
-    hermes logs --since 30m -f     Follow, starting from 30 min ago
-    hermes logs list               List available log files with sizes
+    stardust logs                    Show last 50 lines of agent.log
+    stardust logs -f                 Follow agent.log in real time
+    stardust logs errors             Show last 50 lines of errors.log
+    stardust logs gateway -n 100     Show last 100 lines of gateway.log
+    stardust logs gui -f             Follow gui.log in real time
+    stardust logs desktop -f         Follow desktop.log (Electron app boot/backend)
+    stardust logs --level WARNING    Only show WARNING and above
+    stardust logs --session abc123   Filter by session ID
+    stardust logs --component tools  Only show tool-related lines
+    stardust logs --since 1h         Lines from the last hour
+    stardust logs --since 30m -f     Follow, starting from 30 min ago
+    stardust logs list               List available log files with sizes
 """)
     logs_parser.add_argument(
         "log_name", nargs="?", default="agent",

@@ -61,7 +61,7 @@ def _clean_spent_registry():
 def hermes_home(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"):
         monkeypatch.delenv(var, raising=False)
     (home / "auth.json").write_text(
@@ -348,7 +348,7 @@ def test_second_process_adopts_the_terminal_verdict(
         __import__("pathlib").Path(_agent_pkg.__file__).resolve().parents[1]
     )
     env = dict(os.environ)
-    env["HERMES_HOME"] = str(hermes_home)
+    env["STARDUST_HOME"] = str(hermes_home)
     env["PYTHONPATH"] = repo_root
     for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"):
         env.pop(var, None)

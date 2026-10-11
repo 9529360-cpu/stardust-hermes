@@ -21,7 +21,7 @@ auth:
 
 # Curated default: the 9 core catalog/SQL tools. The other 30 (Dive, Flight
 # scheduled-jobs, Guide products + ask_docs_question) stay available via
-# `hermes mcp configure motherduck`.
+# `stardust mcp configure motherduck`.
 tools:
   default_enabled:
     - list_columns
@@ -44,5 +44,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  MotherDuck (or run `hermes mcp login motherduck`). Approve access,
+  MotherDuck (or run `stardust mcp login motherduck`). Approve access,
   then restart the session so tools load.

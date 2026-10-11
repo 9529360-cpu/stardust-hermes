@@ -41,7 +41,7 @@ _RESULT = ModelSwitchResult(
 def seeded_home(tmp_path, monkeypatch):
     import cli
     (tmp_path / "config.yaml").write_text(_SEED, encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setattr(cli, "_hermes_home", tmp_path)
     return tmp_path
 
@@ -149,28 +149,28 @@ def test_provider_switch_drops_the_key_env_pointer_but_a_same_route_repick_keeps
     persist_model_selection(same_route)
     assert _model_block(seeded_home)["key_env"] == "CUSTOM_BOX_API_KEY"
 
-    # Registry providers get the pointer too (Desktop stores e.g. HERMES_CUSTOM_LMSTUDIO_API_KEY
+    # Registry providers get the pointer too (Desktop stores e.g. STARDUST_CUSTOM_LMSTUDIO_API_KEY
     # as model.key_env with provider lmstudio, #106336): a same-route model re-pick keeps it.
     (seeded_home / "config.yaml").write_text(
         seed.replace("provider: custom\n", "provider: lmstudio\n")
-            .replace("CUSTOM_BOX_API_KEY", "HERMES_CUSTOM_LMSTUDIO_API_KEY"), encoding="utf-8")
+            .replace("CUSTOM_BOX_API_KEY", "STARDUST_CUSTOM_LMSTUDIO_API_KEY"), encoding="utf-8")
     persist_model_selection(ModelSwitchResult(
         success=True, new_model="qwen3-8b", target_provider="lmstudio",
         base_url="http://localhost:1234/v1", api_mode="openai_chat", is_global=True))
     block = _model_block(seeded_home)
     assert block["default"] == "qwen3-8b"
-    assert block["key_env"] == "HERMES_CUSTOM_LMSTUDIO_API_KEY"
+    assert block["key_env"] == "STARDUST_CUSTOM_LMSTUDIO_API_KEY"
 
 
 def test_gateway_persists_to_the_profile_config_it_was_given(tmp_path, monkeypatch):
     """Multiplexed gateway: the write lands in the routed profile's config.yaml, never the
-    process-level HERMES_HOME."""
+    process-level STARDUST_HOME."""
     from gateway.slash_commands_model import _persist_model_switch_to_config
     process_home, profile_home = tmp_path / "default", tmp_path / "profiles" / "named"
     for home in (process_home, profile_home):
         home.mkdir(parents=True)
         (home / "config.yaml").write_text("model:\n  default: old\n  provider: openai-codex\n")
-    monkeypatch.setenv("HERMES_HOME", str(process_home))
+    monkeypatch.setenv("STARDUST_HOME", str(process_home))
     asyncio.run(_persist_model_switch_to_config(_RESULT, profile_home / "config.yaml"))
     assert _model_block(profile_home)["default"] == "claude-haiku"
     assert _model_block(process_home)["default"] == "old"

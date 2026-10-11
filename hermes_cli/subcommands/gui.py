@@ -1,4 +1,4 @@
-"""``hermes gui`` subcommand parser."""
+"""``stardust gui`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -23,13 +23,13 @@ def build_gui_parser(subparsers, *, cmd_gui: Callable) -> None:
         help="Enable deterministic desktop boot delays for validating startup UI")
     gui_parser.add_argument(
         "--ignore-existing", action="store_true",
-        help="Force Desktop to ignore any hermes CLI already on PATH during backend resolution")
+        help="Force Desktop to ignore any stardust CLI already on PATH during backend resolution")
     gui_parser.add_argument(
         "--hermes-root",
-        help="Override the Hermes source root used by Desktop (sets HERMES_DESKTOP_HERMES_ROOT)")
+        help="Override the Hermes source root used by Desktop (sets STARDUST_DESKTOP_HERMES_ROOT)")
     gui_parser.add_argument(
         "--cwd",
-        help="Initial project directory for Desktop chat sessions (sets HERMES_DESKTOP_CWD)")
+        help="Initial project directory for Desktop chat sessions (sets STARDUST_DESKTOP_CWD)")
     gui_parser.add_argument(
         "--skip-build", action="store_true",
         help="Skip npm install/package and launch the existing unpacked app from apps/desktop/release",

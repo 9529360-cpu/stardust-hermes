@@ -93,9 +93,9 @@ def _capture_required_environment_variables(
         return _capture_result([])
     missing_names = [entry["name"] for entry in missing_entries]
     # Messaging-platform gateway surfaces can't prompt for a secret, so they get the "unsupported"
-    # hint. Interactive gateway surfaces (desktop app / TUI) set HERMES_INTERACTIVE (same flag
+    # hint. Interactive gateway surfaces (desktop app / TUI) set STARDUST_INTERACTIVE (same flag
     # tools/approval.py uses) and register a callback routing to a secure secret.request overlay.
-    if _is_gateway_surface() and not env_var_enabled("HERMES_INTERACTIVE"):
+    if _is_gateway_surface() and not env_var_enabled("STARDUST_INTERACTIVE"):
         try:
             from gateway.platforms.base import GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE as hint
         except Exception:
@@ -119,10 +119,10 @@ def _capture_required_environment_variables(
 
 
 def _is_gateway_surface() -> bool:
-    if env_var_enabled("HERMES_GATEWAY_SESSION"):
+    if env_var_enabled("STARDUST_GATEWAY_SESSION"):
         return True
     from gateway.session_context import get_session_env
-    return bool(get_session_env("HERMES_SESSION_PLATFORM"))
+    return bool(get_session_env("STARDUST_SESSION_PLATFORM"))
 
 
 def _is_env_var_persisted(var_name: str, env_snapshot: Dict[str, str]) -> bool:

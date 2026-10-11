@@ -37,5 +37,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Railway (or run `hermes mcp login railway`). Approve access,
+  Railway (or run `stardust mcp login railway`). Approve access,
   then restart the session so tools load.

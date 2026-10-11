@@ -1,6 +1,6 @@
 """Memory provider plugin discovery: bundled ``plugins/memory/<name>/``, user
-``$HERMES_HOME/plugins/<name>/``, project ``./.hermes/plugins/<name>/`` (opt-in via
-HERMES_ENABLE_PROJECT_PLUGINS), then ``hermes_agent.memory_providers`` entry points.
+``$STARDUST_HOME/plugins/<name>/``, project ``./.stardust/plugins/<name>/`` (opt-in via
+STARDUST_ENABLE_PROJECT_PLUGINS), then ``hermes_agent.memory_providers`` entry points.
 Precedence is deliberately the REVERSE of PluginManager's later-source-wins:
 bundled wins, then user, project, entry point — a provider is activated by name
 (``memory.provider``, one at a time), so a directory dropped into the working tree
@@ -46,14 +46,14 @@ _get_user_plugins_dir = _loader.user_plugins_dir
 
 
 def _get_project_plugins_dir() -> Optional[Path]:
-    """``./.hermes/plugins/`` or None. Gated on HERMES_ENABLE_PROJECT_PLUGINS like the
+    """``./.stardust/plugins/`` or None. Gated on STARDUST_ENABLE_PROJECT_PLUGINS like the
     PluginManager scan: a repo you merely ``cd`` into must not offer a memory backend."""
     try:
         from hermes_cli.plugins import _env_enabled
 
-        if not _env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
+        if not _env_enabled("STARDUST_ENABLE_PROJECT_PLUGINS"):
             return None
-        d = Path.cwd() / ".hermes" / "plugins"
+        d = Path.cwd() / ".stardust" / "plugins"
         return d if d.is_dir() else None
     except Exception:
         return None

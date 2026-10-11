@@ -55,24 +55,24 @@ def _egress_proxy_args_for_docker() -> tuple[list[str], dict[str, str], list[str
     if not status.configured:
         return _degraded(
             "proxy.enabled is true but iron-proxy is not configured. "
-            "Run `hermes egress setup` to mint tokens and write proxy.yaml.")
+            "Run `stardust egress setup` to mint tokens and write proxy.yaml.")
     if not (status.pid and status.listening):
         return _degraded(
             f"iron-proxy is enabled but not running on port {status.tunnel_port}. "
-            "Start it with `hermes egress start`.")
+            "Start it with `stardust egress start`.")
     if status.ca_cert_path is None or not status.ca_cert_path.exists():
         # Configured a moment ago but the trust anchor vanished: proxy env vars
         # without the CA would make every TLS handshake fail.
         return _degraded(
             f"iron-proxy CA cert vanished from {status.ca_cert_path}. "
-            "Re-run `hermes egress setup` to regenerate it.")
+            "Re-run `stardust egress setup` to regenerate it.")
     # Empty/corrupt mappings look like an upstream outage from inside the
     # sandbox (every request 403s); refuse rather than ship a broken sandbox.
     mappings = ip.load_mappings()
     if not mappings:
         return _degraded(
             "iron-proxy is configured but mappings.json is empty or "
-            "corrupt.  Re-run `hermes egress setup` to mint provider "
+            "corrupt.  Re-run `stardust egress setup` to mint provider "
             "tokens before starting a sandbox.")
 
     volume_args = ["-v", f"{status.ca_cert_path}:{_CONTAINER_CA}:ro"]
@@ -97,14 +97,14 @@ def _egress_proxy_args_for_docker() -> tuple[list[str], dict[str, str], list[str
         "SSL_CERT_FILE": _CONTAINER_CA,
         "CURL_CA_BUNDLE": _CONTAINER_CA,
         "NODE_EXTRA_CA_CERTS": _CONTAINER_CA,
-        "HERMES_EGRESS_PROXY": "1",  # lets the in-sandbox agent know it is proxy-aware
+        "STARDUST_EGRESS_PROXY": "1",  # lets the in-sandbox agent know it is proxy-aware
         _NODE_OPTIONS_SENTINEL: "--use-openssl-ca"}
 
     # Proxy tokens under the standard provider env names (and their aliases) so
-    # SDKs work unchanged; HERMES_PROXY_TOKEN_* copies are for diagnostics.
+    # SDKs work unchanged; STARDUST_PROXY_TOKEN_* copies are for diagnostics.
     for m in mappings:
         env_overrides[m.real_env_name] = m.proxy_token
-        env_overrides[f"HERMES_PROXY_TOKEN_{m.real_env_name}"] = m.proxy_token
+        env_overrides[f"STARDUST_PROXY_TOKEN_{m.real_env_name}"] = m.proxy_token
         for alias in getattr(m, "alias_env_names", ()) or ():
             env_overrides[alias] = m.proxy_token
 

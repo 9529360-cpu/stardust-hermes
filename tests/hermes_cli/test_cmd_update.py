@@ -106,7 +106,7 @@ class TestCmdUpdateNpmLockfileCache:
 
     def test_package_json_only_edit_defeats_skip(self, tmp_path, monkeypatch):
         """Reviewer scenario (#61580): dev edits package.json WITHOUT running
-        npm — lockfile unchanged. `hermes update` must still install (the
+        npm — lockfile unchanged. `stardust update` must still install (the
         npm-install fallback is what syncs node_modules in that state)."""
         from hermes_cli import main as hm
 
@@ -138,7 +138,7 @@ class TestCmdUpdateNpmLockfileCache:
         checkout = tmp_path / "checkout"
         checkout.mkdir()
         (checkout / "package.json").write_text("{}")
-        shared_root = tmp_path / ".hermes"
+        shared_root = tmp_path / ".stardust"
         named_profile = shared_root / "profiles" / "work"
         named_profile.mkdir(parents=True)
 
@@ -154,10 +154,10 @@ class TestCmdUpdateNpmLockfileCache:
             "_npm_lockfile_changed",
             side_effect=lambda root: cache_roots.append(root) or False,
         ):
-            monkeypatch.setenv("HERMES_HOME", str(shared_root))
+            monkeypatch.setenv("STARDUST_HOME", str(shared_root))
             update_cmd._update_node_dependencies()
 
-            monkeypatch.setenv("HERMES_HOME", str(named_profile))
+            monkeypatch.setenv("STARDUST_HOME", str(named_profile))
             update_cmd._update_node_dependencies()
 
         assert cache_roots == [shared_root, shared_root]
@@ -199,7 +199,7 @@ class TestCmdUpdateTermuxUvBootstrap:
 
         pkg_uv = "/data/data/com.termux/files/usr/bin/uv"
         monkeypatch.setattr(hm, "_is_termux_env", lambda env=None: True)
-        # Production resolve_uv only checks $HERMES_HOME/bin/uv; model an empty
+        # Production resolve_uv only checks $STARDUST_HOME/bin/uv; model an empty
         # managed dir so the PATH probe is what surfaces the packaged uv.
         monkeypatch.setattr("hermes_cli.managed_uv.resolve_uv", lambda: None)
         monkeypatch.setattr("shutil.which", lambda name: pkg_uv if name == "uv" else None)
@@ -675,7 +675,7 @@ class TestConfigVersionCheckUsesFreshModules:
     """Regression: config migration must use freshly-reloaded modules, not the
     sys.modules cache from before git pull.
 
-    Before the fix, ``hermes update`` ran in the PRE-pull Python process.
+    Before the fix, ``stardust update`` ran in the PRE-pull Python process.
     After ``git pull`` updated the source on disk, function-level imports
     returned the OLD cached ``hermes_cli.config`` module — so
     ``DEFAULT_CONFIG["_config_version"]`` was stale and
@@ -720,9 +720,9 @@ class TestCmdUpdateProfileSkillSync:
             branch="main", verify_ok=True, commit_count="1"
         )
 
-        default_p = SimpleNamespace(name="default", path=Path("/fake/.hermes"))
-        active_p = SimpleNamespace(name="bit", path=Path("/fake/.hermes/profiles/bit"))
-        other_p = SimpleNamespace(name="work", path=Path("/fake/.hermes/profiles/work"))
+        default_p = SimpleNamespace(name="default", path=Path("/fake/.stardust"))
+        active_p = SimpleNamespace(name="bit", path=Path("/fake/.stardust/profiles/bit"))
+        other_p = SimpleNamespace(name="work", path=Path("/fake/.stardust/profiles/work"))
         all_profiles = [default_p, active_p, other_p]
 
         synced_paths = []
@@ -758,7 +758,7 @@ class TestCmdUpdateProfileSkillSync:
             branch="main", verify_ok=True, commit_count="1"
         )
 
-        default_p = SimpleNamespace(name="default", path=Path("/fake/.hermes"))
+        default_p = SimpleNamespace(name="default", path=Path("/fake/.stardust"))
         synced_paths = []
 
         def fake_seed(path, quiet=False):
@@ -778,7 +778,7 @@ class TestCmdUpdateProfileSkillSync:
 
 
 class TestCmdUpdateBranchFlag:
-    """``hermes update --branch <name>`` targets the requested branch.
+    """``stardust update --branch <name>`` targets the requested branch.
 
     The CLI default stays 'main'; --branch lets callers pick a different
     target without monkey-patching the implementation.
@@ -865,7 +865,7 @@ class TestCmdUpdateBranchFlag:
 
 
 class TestCmdUpdateCheckBranchFlag:
-    """``hermes update --check --branch <name>`` honors the branch override.
+    """``stardust update --check --branch <name>`` honors the branch override.
 
     The check path used to call ``git rev-list HEAD..origin/<branch> --count``
     with ``check=True``. When the branch didn't exist on origin, the fetch
@@ -992,7 +992,7 @@ class TestCmdUpdateCheckBranchFlag:
 
 
 class TestCmdUpdateZipBranchRefusal:
-    """``hermes update --branch=<non-main>`` must refuse on the ZIP fallback path.
+    """``stardust update --branch=<non-main>`` must refuse on the ZIP fallback path.
 
     The ZIP fallback hard-codes a GitHub archive URL for main.zip; honoring
     --branch arbitrarily would require remote-branch existence checks the
@@ -1611,7 +1611,7 @@ class TestGitTrampolineSelfHeal:
         run.assert_not_called()
 
     def test_portable_git_candidates_check_shared_root_first(self, tmp_path, monkeypatch):
-        # Profile-scoped layout: HERMES_HOME = <root>/profiles/foo, but the
+        # Profile-scoped layout: STARDUST_HOME = <root>/profiles/foo, but the
         # PortableGit tree lives under the SHARED root (monerostar review on
         # #88136). The candidate list must check get_default_hermes_root()
         # before the profile home.

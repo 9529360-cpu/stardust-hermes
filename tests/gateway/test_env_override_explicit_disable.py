@@ -7,7 +7,7 @@ homeassistant, email, sms, dingtalk, feishu, wecom, wecom_callback, bluebubbles,
 qqbot, yuanbao) force-set ``enabled = True`` unconditionally, while Telegram /
 Discord / Slack routed through ``_enable_from_env`` and honored the
 ``_enabled_explicit`` marker.  These tests drive the real ``load_gateway_config``
-against a temp HERMES_HOME — real YAML I/O, no mocks of the code under test.
+against a temp STARDUST_HOME — real YAML I/O, no mocks of the code under test.
 """
 
 import logging
@@ -68,9 +68,9 @@ def _isolate(monkeypatch, tmp_path, env):
     for key in list(os.environ):
         if key.startswith(_PLATFORM_ENV_PREFIXES):
             monkeypatch.delenv(key, raising=False)
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     return hermes_home

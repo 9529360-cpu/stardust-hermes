@@ -103,7 +103,7 @@ class CLIBillingMixin:
             self._dim(f"{load_failed}: {state.error}", icon="💳 ", lead=True)
         else:
             self._dim("Not logged into Nous Portal.", icon="💳 ", lead=True)
-            print(f"  Run `hermes portal` to log in, then {cmd}.")
+            print(f"  Run `stardust portal` to log in, then {cmd}.")
 
     def _print_org_line(self, state) -> None:
         """Dim ``Org: <name> · <Role>`` line (skipped when there is no org)."""
@@ -549,7 +549,7 @@ class CLIBillingMixin:
         """insufficient_scope → step-up, then replay `retry` ONCE so the user never re-runs the command."""
         granted = self._step_up_remote_spending(
             explain="To change your plan from the terminal, allow Remote Spending once. It opens your browser to authorize, then your change picks up right here.",
-            noninteractive_msg="  Run `hermes portal` and allow Remote Spending, then re-run /subscription.",
+            noninteractive_msg="  Run `stardust portal` and allow Remote Spending, then re-run /subscription.",
             declined_msg="  No change made. Allow Remote Spending when you're ready.",
             not_granted_msg="  Couldn't allow Remote Spending — an org admin or owner has to approve it for this org.")
         if not granted:
@@ -844,9 +844,9 @@ class CLIBillingMixin:
         if isinstance(exc, BillingRemoteSpendingRevoked) or code == "remote_spending_revoked":
             # This terminal's spend was revoked; recovery is reconnect.
             who = "An admin stopped this terminal's spending." if exc.actor == "admin" else "You stopped this terminal's spending."
-            print(f"  🔴 {who} Reconnect to restore — run `hermes portal` to re-authorize.")
+            print(f"  🔴 {who} Reconnect to restore — run `stardust portal` to re-authorize.")
         elif isinstance(exc, BillingSessionRevoked) or code == "session_revoked":
-            print("  🔴 Your session was logged out. Run `hermes portal` to log in again.")
+            print("  🔴 Your session was logged out. Run `stardust portal` to log in again.")
         elif code in _CHARGE_ERROR_COPY or exc.code == "remote_spending_disabled":
             # Fixed copy by `error`; the gate's dual error/code payload may carry it in `.code` only.
             print(_CHARGE_ERROR_COPY.get(code) or _CHARGE_ERROR_COPY["cli_billing_disabled"])
@@ -871,7 +871,7 @@ class CLIBillingMixin:
         amount_str = format_money(amount) if amount is not None else "your top-up"
         granted = self._step_up_remote_spending(
             explain=f"To charge from this terminal, allow Remote Spending once. It opens your browser to authorize, then {amount_str} picks up right here.",
-            noninteractive_msg="  Run `hermes portal` and allow Remote Spending, then retry.",
+            noninteractive_msg="  Run `stardust portal` and allow Remote Spending, then retry.",
             declined_msg="  No charge made. Run /topup when you want to allow Remote Spending.",
             not_granted_msg="  Couldn't allow Remote Spending — an org admin or owner has to approve it. Your card was not charged.")
         if not granted:

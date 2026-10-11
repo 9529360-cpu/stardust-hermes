@@ -334,7 +334,7 @@ def test_public_url_aware_gate_requires_auth_for_loopback_proxy(monkeypatch):
     from hermes_cli.web_server import should_require_dashboard_auth
 
     monkeypatch.setenv(
-        "HERMES_DASHBOARD_PUBLIC_URL",
+        "STARDUST_DASHBOARD_PUBLIC_URL",
         "https://dashboard.example.test:9443",
     )
     assert should_require_dashboard_auth("127.0.0.1") is True
@@ -345,7 +345,7 @@ def test_public_url_aware_gate_preserves_local_only_mode(monkeypatch):
     from hermes_cli.web_server import should_require_dashboard_auth
 
     monkeypatch.setenv(
-        "HERMES_DASHBOARD_PUBLIC_URL",
+        "STARDUST_DASHBOARD_PUBLIC_URL",
         "http://localhost:9119",
     )
     assert should_require_dashboard_auth("127.0.0.1") is False
@@ -357,7 +357,7 @@ def test_start_server_loopback_public_url_enables_gate(monkeypatch):
     from tests.hermes_cli.conftest_dashboard_auth import StubAuthProvider
 
     monkeypatch.setenv(
-        "HERMES_DASHBOARD_PUBLIC_URL",
+        "STARDUST_DASHBOARD_PUBLIC_URL",
         "https://dashboard.example.test:9443",
     )
     clear_providers()
@@ -390,7 +390,7 @@ def test_start_server_loopback_public_url_without_provider_fails_closed(monkeypa
     from hermes_cli.dashboard_auth import clear_providers
 
     monkeypatch.setenv(
-        "HERMES_DASHBOARD_PUBLIC_URL",
+        "STARDUST_DASHBOARD_PUBLIC_URL",
         "https://dashboard.example.test:9443",
     )
     clear_providers()
@@ -421,7 +421,7 @@ def test_loopback_public_url_fail_closed_message_is_actionable(monkeypatch):
     from hermes_cli.dashboard_auth import clear_providers
 
     monkeypatch.setenv(
-        "HERMES_DASHBOARD_PUBLIC_URL",
+        "STARDUST_DASHBOARD_PUBLIC_URL",
         "https://dashboard.example.test:9443",
     )
     clear_providers()
@@ -445,9 +445,9 @@ def test_loopback_public_url_fail_closed_message_is_actionable(monkeypatch):
     assert "https://dashboard.example.test:9443" in msg
     # Exit 1: configure a Stardust-owned auth path.
     assert "basic_auth" in msg
-    assert "HERMES_DASHBOARD_OIDC_ISSUER" in msg
-    assert "HERMES_DASHBOARD_OIDC_CLIENT_ID" in msg
-    assert "hermes dashboard register" not in msg
+    assert "STARDUST_DASHBOARD_OIDC_ISSUER" in msg
+    assert "STARDUST_DASHBOARD_OIDC_CLIENT_ID" in msg
+    assert "stardust dashboard register" not in msg
     assert "Nous Portal" not in msg
     # Exit 2: remove public_url to restore local-only mode.
     assert "remove dashboard.public_url" in msg
@@ -476,10 +476,10 @@ def test_should_require_dashboard_auth_truth_table(
     from hermes_cli.web_server import should_require_dashboard_auth
 
     if public_url is None:
-        monkeypatch.delenv("HERMES_DASHBOARD_PUBLIC_URL", raising=False)
+        monkeypatch.delenv("STARDUST_DASHBOARD_PUBLIC_URL", raising=False)
         monkeypatch.setattr(
             web_server, "_dashboard_public_hosts", lambda: frozenset()
         )
     else:
-        monkeypatch.setenv("HERMES_DASHBOARD_PUBLIC_URL", public_url)
+        monkeypatch.setenv("STARDUST_DASHBOARD_PUBLIC_URL", public_url)
     assert should_require_dashboard_auth(host) is expected

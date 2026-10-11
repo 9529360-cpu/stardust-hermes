@@ -1038,7 +1038,7 @@ export function agentTargetHandle(name: string, bot?: Partial<RosterRow> | null)
 }
 
 /** Taggable @-forms derived from a bot's friendly names — the core profile display name
- *  (`hermes profile rename`) and the Bot Mode title. Free text reduces to the mention charset two
+ *  (`stardust profile rename`) and the Bot Mode title. Free text reduces to the mention charset two
  *  ways: slugified ("Research Buddy" → research-buddy, the form autocomplete inserts) and collapsed
  *  (researchbuddy). Reserved tokens are dropped so a bot renamed "Stardust" or "Hermes" can never
  *  take the primary profile's handle or its legacy alias. */

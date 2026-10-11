@@ -81,7 +81,7 @@ def test_keepalive_thread_starts_when_an_agent_routes_to_nous(monkeypatch, tmp_p
     """Real construction path: the CLI process builds agents through AIAgent, never through the gateway boot."""
     from run_agent import AIAgent
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hh"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hh"))
     started = []
     monkeypatch.setattr("hermes_cli.nous_auth_keepalive.start_nous_auth_keepalive", lambda: started.append(1))
     AIAgent(api_key="k", base_url="https://inference-api.nousresearch.com/v1", provider="nous",

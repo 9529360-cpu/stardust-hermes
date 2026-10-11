@@ -4,7 +4,7 @@ silently shadow a valid credential-pool key.
 Before the fix, ``_resolve_api_key_provider_secret`` returned the FIRST env
 value that passed ``has_usable_secret`` (length + placeholder check only), so
 an obviously malformed OPENROUTER_API_KEY (e.g. a truncated paste or another
-provider's key) in ~/.hermes/.env won over a valid pool entry and produced
+provider's key) in ~/.stardust/.env won over a valid pool entry and produced
 opaque ``401 Missing Authentication header`` errors.
 
 The fix:
@@ -37,10 +37,10 @@ def _make_pconfig(provider_id, env_vars=None):
 
 @pytest.fixture
 def isolated_hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     for key in ["OPENROUTER_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY"]:
         monkeypatch.delenv(key, raising=False)
     return home

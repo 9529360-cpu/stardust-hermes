@@ -93,8 +93,8 @@ class TestWindowsPathVariant:
         r"del C:\Users\me\.ssh\id_rsa",
         r"type C:\Users\me\.ssh\id_ed25519",
         "cat C:/Users/me/.ssh/id_rsa",
-        r"copy C:\Users\me\AppData\Local\hermes\.env D:\exfil\e.txt",
-        "cat C:/Users/me/AppData/Local/hermes/.env",
+        r"copy C:\Users\me\AppData\Local\stardust\.env D:\exfil\e.txt",
+        "cat C:/Users/me/AppData/Local/stardust/.env",
     ])
     def test_windows_credential_paths_flagged(self, cmd):
         assert _is_dangerous(cmd), f"should be flagged: {cmd}"

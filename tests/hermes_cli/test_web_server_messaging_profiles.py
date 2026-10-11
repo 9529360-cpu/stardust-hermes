@@ -5,7 +5,7 @@ read/wrote the dashboard process's own (root) ``.env`` via ``load_env()`` /
 ``save_env_value()`` — so a dashboard switched to a freshly created profile
 still displayed and persisted the ROOT install's messaging credentials.
 These tests pin the new behavior: reads and writes land in the REQUESTED
-profile's HERMES_HOME, and the dashboard's own profile stays untouched.
+profile's STARDUST_HOME, and the dashboard's own profile stays untouched.
 """
 import pytest
 import yaml
@@ -110,7 +110,7 @@ class TestProfileScopedMessagingReads:
             "read_runtime_status",
             # Accepts path= : the profile-scoped read now passes the
             # profile's own gateway_state.json explicitly rather than
-            # relying on process-level HERMES_HOME resolution (#71211).
+            # relying on process-level STARDUST_HOME resolution (#71211).
             lambda *a, **k: {
                 "gateway_state": "startup_failed",
                 "exit_reason": "all configured messaging platforms failed to connect",
@@ -126,7 +126,7 @@ class TestProfileScopedMessagingReads:
         payload = resp.json()
         assert payload["env_path"] == str(worker_home / ".env")
         assert payload["gateway_start_command"] == (
-            "hermes -p worker_alpha gateway start"
+            "stardust -p worker_alpha gateway start"
         )
         telegram = _telegram(payload)
         assert telegram["state"] == "startup_failed"
@@ -311,7 +311,7 @@ def test_scoped_enablement_uses_only_own_credentials(client, isolated_profiles, 
 def test_credential_write_hot_serves_a_multiplexed_profile(client, isolated_profiles, monkeypatch, topology):
     """A token saved for a profile the live multiplexer serves is handed to the multiplexer right
     away (``hot_served``), so the UI skips its restart banner. Both Desktop topologies: the dashboard's
-    ``?profile=`` and a pooled ``hermes --profile X serve`` that receives the PUT unscoped (#109088)."""
+    ``?profile=`` and a pooled ``stardust --profile X serve`` that receives the PUT unscoped (#109088)."""
     import hermes_cli.gateway as gateway_cli
     import hermes_cli.gateway_multiplex_served as served_mod
     notified = []

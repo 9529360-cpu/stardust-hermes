@@ -399,7 +399,7 @@ def _post_provision(
 def _resolve_relay_identity_token() -> str:
     """Resolve the caller-identity bearer token the connector introspects to a tenant.
 
-    Canonical resolver shared by runtime self-provision and ``hermes gateway enroll``.
+    Canonical resolver shared by runtime self-provision and ``stardust gateway enroll``.
     Modes, in precedence order:
       1.  Generic OIDC client-credentials (self-hosted IdP): ``gateway.idp.token_url``
           (``GATEWAY_RELAY_IDP_TOKEN_URL``) set together with client id + secret ->
@@ -494,7 +494,7 @@ def self_provision_relay() -> bool:
     identity token, POSTs ``/relay/provision`` for EACH fronted platform and sets
     ``GATEWAY_RELAY_ID`` / ``_SECRET`` / ``_DELIVERY_KEY`` in ``os.environ`` for
     ``register_relay_adapter()``. Creds live ONLY in process memory (never
-    ``~/.hermes/.env``), so a hosted container re-provisions every boot; the
+    ``~/.stardust/.env``), so a hosted container re-provisions every boot; the
     connector's rotation window covers a still-connected prior instance. The trigger
     is deliberately NOT ``is_managed()`` (False on a NAS-hosted Fly agent): "pointed
     at a connector without a pinned secret" is the real signal and self-guards (an

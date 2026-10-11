@@ -1,4 +1,4 @@
-"""Audit log for dashboard-auth events: ``$HERMES_HOME/logs/dashboard-auth.log``, one JSON object
+"""Audit log for dashboard-auth events: ``$STARDUST_HOME/logs/dashboard-auth.log``, one JSON object
 per line. Token-like fields are stripped before serialisation so refresh tokens / JWTs never
 reach disk. Minimal import surface (no ``hermes_constants`` at import time) so early-loading
 middleware can import it."""

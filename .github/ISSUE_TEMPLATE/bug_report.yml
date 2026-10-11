@@ -10,10 +10,10 @@ body:
 
         **Before submitting**, please:
         - [ ] Search [existing Stardust issues](https://github.com/9529360-cpu/stardust-hermes/issues) to avoid duplicates
-        - [ ] Run `hermes doctor` and include any relevant failures below
-        - [ ] Record `hermes version`; if this is a source checkout, also record `git rev-parse --short HEAD`
+        - [ ] Run `stardust doctor` and include any relevant failures below
+        - [ ] Record `stardust version`; if this is a source checkout, also record `git rev-parse --short HEAD`
 
-        Stardust's inherited `hermes update` path is intentionally disabled while the project is on its pinned/local release policy. Do **not** update from the upstream Hermes repository as a troubleshooting step.
+        Stardust's inherited `stardust update` path is intentionally disabled while the project is on its pinned/local release policy. Do **not** update from the upstream Hermes repository as a troubleshooting step.
 
   - type: textarea
     id: description
@@ -31,7 +31,7 @@ body:
       label: Steps to Reproduce
       description: Minimal steps to trigger the bug. The more specific, the faster it can be fixed.
       placeholder: |
-        1. Start the Stardust desktop app or run `hermes chat`
+        1. Start the Stardust desktop app or run `stardust chat`
         2. Perform the action "..."
         3. Agent calls tool X
         4. Error appears: ...
@@ -71,7 +71,7 @@ body:
         - Agent Core (conversation loop, context compression, memory)
         - Model routing / failover
         - Cron / Automations
-        - Configuration (config.yaml, .env, hermes setup)
+        - Configuration (config.yaml, .env, stardust setup)
         - Other
     validations:
       required: true
@@ -94,15 +94,15 @@ body:
     attributes:
       label: Local Diagnostics
       description: |
-        Prefer local diagnostics first. Run `hermes doctor`, then `hermes debug share --local` if more detail is needed.
+        Prefer local diagnostics first. Run `stardust doctor`, then `stardust debug share --local` if more detail is needed.
         Review the output before attaching or pasting it. Do not include API keys, tokens, cookies, private prompts, or other secrets.
 
         If the desktop app offers an explicit diagnostics upload, that is a separate opt-in transport; it is not required to file a Stardust issue.
       placeholder: |
-        hermes doctor:
+        stardust doctor:
         ...
 
-        hermes debug share --local:
+        stardust debug share --local:
         ...
       render: shell
     validations:
@@ -128,7 +128,7 @@ body:
     id: hermes-version
     attributes:
       label: Stardust / Hermes Runtime Version
-      description: Output of `hermes version`
+      description: Output of `stardust version`
       placeholder: "0.21.3"
 
   - type: input

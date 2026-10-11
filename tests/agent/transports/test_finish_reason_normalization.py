@@ -68,7 +68,7 @@ def test_streaming_capture_folds_uppercase_finish_reason(_mock_close, mock_creat
     mock_client = MagicMock()
     mock_client.chat.completions.create.side_effect = lambda *a, **kw: _stream()
     mock_create.return_value = mock_client
-    monkeypatch.setenv("HERMES_STREAM_RETRIES", "0")
+    monkeypatch.setenv("STARDUST_STREAM_RETRIES", "0")
 
     agent = AIAgent(api_key="test-key", base_url="https://example.com/v1", model="test/model",
                     quiet_mode=True, skip_context_files=True, skip_memory=True)

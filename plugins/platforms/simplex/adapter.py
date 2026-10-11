@@ -5,7 +5,7 @@ Env: SIMPLEX_WS_URL (required; default ws://127.0.0.1:5225) · SIMPLEX_ALLOWED_U
 contactIds — stable across renames, see ``/contacts`` — or display names) · SIMPLEX_ALLOW_ALL_USERS ·
 SIMPLEX_AUTO_ACCEPT ('false' disables contact-request auto-accept; default true) ·
 SIMPLEX_GROUP_ALLOWED (group IDs or '*'; omit to ignore groups) · SIMPLEX_HOME_CHANNEL[_NAME] ·
-HERMES_SIMPLEX_TEXT_BATCH_DELAY (quiet seconds, default 0.8, merging rapid-fire inbound text).
+STARDUST_SIMPLEX_TEXT_BATCH_DELAY (quiet seconds, default 0.8, merging rapid-fire inbound text).
 ``websockets`` is imported lazily so the plugin stays discoverable when the package is missing.
 """
 
@@ -119,7 +119,7 @@ class SimplexAdapter(BasePlatformAdapter):
         self._pending_responses: Dict[str, asyncio.Future] = {}  # awaited command replies
         self._corr_counter = 0
         # SimpleX has no client-side split, so the split delay equals the plain one.
-        self._text_batch_delay_seconds = float(os.getenv("HERMES_SIMPLEX_TEXT_BATCH_DELAY", "0.8"))
+        self._text_batch_delay_seconds = float(os.getenv("STARDUST_SIMPLEX_TEXT_BATCH_DELAY", "0.8"))
         self._text_batch_split_delay_seconds = self._text_batch_delay_seconds
         logger.info(
             "SimpleX adapter initialized: url=%s auto_accept=%s groups=%s",
@@ -606,7 +606,7 @@ async def _standalone_send(
     thread_id: Optional[str] = None, media_files: Optional[List[str]] = None, force_document: bool = False,
 ) -> Dict[str, Any]:
     """Ephemeral WebSocket send for ``tools/send_message_tool`` when the gateway runner is not in
-    this process (``hermes cron``). ``thread_id``/``force_document`` are signature parity only;
+    this process (``stardust cron``). ``thread_id``/``force_document`` are signature parity only;
     ``media_files`` is accepted but only the text body is delivered — SimpleX file transfers need
     the daemon's filesystem-backed flow, which an ephemeral connection cannot drive safely."""
     try:
@@ -638,7 +638,7 @@ _SETUP_PROMPTS = (
 
 
 def interactive_setup() -> None:
-    """``hermes setup gateway`` → SimpleX wizard (writes ``~/.hermes/.env``); CLI helpers are lazy-imported."""
+    """``stardust setup gateway`` → SimpleX wizard (writes ``~/.stardust/.env``); CLI helpers are lazy-imported."""
     from hermes_cli.config import get_env_value, save_env_value
     from hermes_cli.cli_output import print_header, print_info, prompt
     from hermes_cli.setup_platforms import declines_reconfigure

@@ -1368,7 +1368,7 @@ def _rebind_session_context(session_id: str) -> None:
         from gateway.session_context import set_current_session_id
         set_current_session_id(session_id)
     except Exception:
-        os.environ["HERMES_SESSION_ID"] = session_id
+        os.environ["STARDUST_SESSION_ID"] = session_id
     with contextlib.suppress(Exception):
         from hermes_logging import set_session_context
         set_session_context(session_id)
@@ -1815,7 +1815,7 @@ def check_compression_model_feasibility(agent: Any) -> None:
             else:
                 msg = (
                     "⚠ No auxiliary LLM provider configured: Hermes has no helper model for summarising "
-                    "long chats, so older messages will be cut without a summary. Run `hermes setup` to add one."
+                    "long chats, so older messages will be cut without a summary. Run `stardust setup` to add one."
                 )
             agent._compression_warning = msg
             agent._emit_status(msg)
@@ -2494,7 +2494,7 @@ def _acquire_compression_lease(
                 agent._last_compression_lock_error_sid = _lock_sid
                 logger.warning(
                     "compression lock subsystem unavailable for session=%s — proceeding without lock. This usually means a stale "
-                    "in-memory module after an update; restart the process (or `hermes update`) to resync.",
+                    "in-memory module after an update; restart the process (or `stardust update`) to resync.",
                     _lock_sid,
                 )
             _lock_acquired = True  # acquired-but-unlocked compatibility path
@@ -2972,7 +2972,7 @@ def _publish_rotated_compaction(
         agent._flush_messages_to_session_db(messages, conversation_history=persisted_history)
     # Publish closure + child + handoff in one transaction so no reader sees an
     # empty child. Child stays on the parent's profile ("default" persists as NULL);
-    # publish also COALESCEs from the parent row for threads lacking HERMES_HOME.
+    # publish also COALESCEs from the parent row for threads lacking STARDUST_HOME.
     _profile_for_child = None
     with contextlib.suppress(Exception):
         from hermes_cli.profiles import get_active_profile_name
@@ -2997,7 +2997,7 @@ def _publish_rotated_compaction(
             child_model_config[TODO_SESSION_STATE_KEY] = todo_state
     agent._session_db.publish_compression_child(
         parent_session_id=old_session_id, child_session_id=new_session_id,
-        source=agent.platform or os.environ.get("HERMES_SESSION_SOURCE", "cli"), model=agent.model,
+        source=agent.platform or os.environ.get("STARDUST_SESSION_SOURCE", "cli"), model=agent.model,
         model_config=child_model_config, system_prompt=new_system_prompt, messages=compressed,
         cwd=getattr(agent, "working_directory", None), profile_name=_profile_for_child,
         compression_lock_holder=lease.holder, require_compression_lease=lease.holder is not None,

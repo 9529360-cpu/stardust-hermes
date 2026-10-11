@@ -40,11 +40,11 @@ def home(tmp_path, monkeypatch):
 
     root = tmp_path / "hermes"
     root.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     # The suite-wide fixture re-points DEFAULT_DB_PATH, which trips the
     # deliberate escape hatch in _default_db_path() and would pin every lookup
     # to one fixed path. Restore the import-time snapshot so resolution runs
-    # through get_hermes_home() the way production does; HERMES_HOME above
+    # through get_hermes_home() the way production does; STARDUST_HOME above
     # keeps it inside tmp_path. Same reasoning as
     # test_multiplex_session_db_profile_scope.py.
     monkeypatch.setattr(

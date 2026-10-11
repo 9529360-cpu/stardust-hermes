@@ -173,7 +173,7 @@ class TestManagerUserPeerOverride:
 
 class TestConfigFlag:
     def _config(self, tmp_path, monkeypatch, raw: dict) -> HonchoClientConfig:
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         path = tmp_path / "honcho.json"
         path.write_text(json.dumps({"apiKey": "k", **raw}))
         return HonchoClientConfig.from_global_config(config_path=path)

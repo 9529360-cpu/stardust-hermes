@@ -15,7 +15,7 @@ BASE = Path(os.environ['AUDIT_DIR'])
 REPO = Path(os.environ['AUDIT_REPO'])
 BASE.mkdir(parents=True, exist_ok=True)
 env = {'PATH': f'{BASE}/bin:/usr/bin:/bin', 'HOME': str(BASE/'home'),
-       'HERMES_HOME': str(BASE/'hermes'), 'PYTHONPATH': str(REPO),
+       'STARDUST_HOME': str(BASE/'hermes'), 'PYTHONPATH': str(REPO),
        'PYTHONDONTWRITEBYTECODE': '1', 'AUDIT_DIR': str(BASE), 'AUDIT_REPO': str(REPO)}
 for name in ('home', 'hermes', 'bin'):
     (BASE/name).mkdir(exist_ok=True)

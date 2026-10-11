@@ -43,7 +43,7 @@ def _process_claude_code_refresh_worker(
     result_queue,
 ) -> None:
     """Refresh one shared Claude Code credential from an independent process."""
-    os.environ["HERMES_HOME"] = profile_home
+    os.environ["STARDUST_HOME"] = profile_home
 
     from agent import anthropic_credentials as anthropic_mod
     from agent import credential_pool as credential_pool_mod
@@ -169,11 +169,11 @@ class _SingleUseTokenServer:
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    """Real, throwaway HERMES_HOME so _auth_store_lock and
+    """Real, throwaway STARDUST_HOME so _auth_store_lock and
     write_credential_pool/read_credential_pool exercise the genuine
     file-lock + on-disk persistence path, not a mock.
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     return tmp_path
 
 

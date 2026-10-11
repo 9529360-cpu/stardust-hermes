@@ -75,9 +75,9 @@ def test_model_not_found_chat_text_points_at_model_picker_not_http():
 def test_api_key_rejection_chat_text_names_the_fix_and_the_provider_label():
     result = _nonretryable(401, "HTTP 401: Invalid API key provided")
     text = result["final_response"]
-    assert "hermes setup" in text and "OpenRouter" in text
+    assert "stardust setup" in text and "OpenRouter" in text
     assert "Provider said:" in text  # raw detail demoted to a trailing line
-    assert text.index("hermes setup") < text.index("Provider said:")
+    assert text.index("stardust setup") < text.index("Provider said:")
 
 
 def test_max_retries_exhausted_chat_text_has_next_step_and_no_mechanism_lead():
@@ -89,7 +89,7 @@ def test_max_retries_exhausted_chat_text_has_next_step_and_no_mechanism_lead():
         approx_tokens=10, provider="openrouter", base_url="https://openrouter.ai/api/v1", model="m",
     )
     text = result["final_response"]
-    assert "/retry" in text and "/model" in text and "hermes fallback add" in text
+    assert "/retry" in text and "/model" in text and "stardust fallback add" in text
     assert not text.startswith("API call failed")
     assert result["failure_reason"] == classified.reason.value
     assert result["failure_retryable"] is True
@@ -126,7 +126,7 @@ def test_outer_loop_error_copy_has_no_apology_and_routes_to_gateway_layer():
     assert verdict.action == "break" and verdict.failed is True
     text = verdict.final_response
     assert "apologize" not in text.lower() and "OpenAI-compatible" not in text
-    assert "hermes doctor" in text and "/new" in text
+    assert "stardust doctor" in text and "/new" in text
     assert text.rstrip().endswith("expected str, got list")  # raw detail last, not first
     from agent.turn_failure_copy import exit_reason_failure
 
@@ -164,7 +164,7 @@ def test_interpreter_shutdown_copy_substitutes_the_real_session_id():
         _outer_error_count=0, api_call_count=1, messages=[], conversation_history=None,
         _turn_exit_reason="unknown", failed=False, final_response=None,
     )
-    assert "hermes --resume 20260914_abc" in verdict.final_response
+    assert "stardust --resume 20260914_abc" in verdict.final_response
     assert "<session-id>" not in verdict.final_response
 
 

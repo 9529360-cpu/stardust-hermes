@@ -45,7 +45,7 @@ def _run_agent_with_watchdog(
     worker_state: Optional[dict] = None,
 ) -> dict:
     """Run ``agent.run_conversation`` on a worker thread under the inactivity (not wall-clock)
-    watchdog: default 600s, override HERMES_CRON_TIMEOUT, 0 = unlimited."""
+    watchdog: default 600s, override STARDUST_CRON_TIMEOUT, 0 = unlimited."""
     _cron_timeout = _sched._cron_inactivity_seconds()
     _cron_inactivity_limit = _cron_timeout if _cron_timeout > 0 else None
     _POLL_INTERVAL = 5.0
@@ -236,7 +236,7 @@ def _finalize_cron_session(session_db, agent, job_id: str, job_name: str, cron_s
         with contextlib.suppress((Exception, KeyboardInterrupt)):
             _agent_session_id = getattr(agent, "session_id", None)
             # CLI (single-process) path: the approval contextvar is only bound during gateway/TUI turns and
-            # HERMES_SESSION_KEY is not in the CLI environment, so the key resolves empty here. Since #64240
+            # STARDUST_SESSION_KEY is not in the CLI environment, so the key resolves empty here. Since #64240
             # the CLI drains completions through a positive-ownership filter keyed on the durable
             # AIAgent.session_id — an empty session_key would fail closed and the CLI could never claim its
             # own completions, while a restored foreign event with an empty key could leak into any
@@ -331,7 +331,7 @@ def _prepare_job_prompt(
     result short-circuits ``run_job`` (no_agent job, empty payload, monitor gate, wake gate,
     injection block, empty prompt); otherwise ``prompt`` is set."""
     # Fail closed on a corrupt config.yaml: defaults would let auto-detection bill a provider the
-    # user never chose. no_agent jobs are exempt. Escape hatch: HERMES_IGNORE_USER_CONFIG=1.
+    # user never chose. no_agent jobs are exempt. Escape hatch: STARDUST_IGNORE_USER_CONFIG=1.
     if not job.get("no_agent"):
         from hermes_cli.config import InvalidUserConfigError, require_parseable_user_config
 
@@ -410,9 +410,9 @@ def _prepare_job_prompt(
 
 
 _CRON_DELIVERY_VARS = (
-    "HERMES_CRON_AUTO_DELIVER_PLATFORM",
-    "HERMES_CRON_AUTO_DELIVER_CHAT_ID",
-    "HERMES_CRON_AUTO_DELIVER_THREAD_ID")
+    "STARDUST_CRON_AUTO_DELIVER_PLATFORM",
+    "STARDUST_CRON_AUTO_DELIVER_CHAT_ID",
+    "STARDUST_CRON_AUTO_DELIVER_THREAD_ID")
 
 
 class _CronRunScope:
@@ -420,9 +420,9 @@ class _CronRunScope:
     parallel jobs don't clobber each other). Construct before the try, ``enter()`` as its first
     statement, ``exit()`` in the finally — every setter here has a matching reset there.
 
-    HERMES_SESSION_* are deliberately NOT seeded from job["origin"]: it is delivery metadata, not
+    STARDUST_SESSION_* are deliberately NOT seeded from job["origin"]: it is delivery metadata, not
     a sender, and terminal/tts/skills/send_message tools would act as if the origin user were
-    driving the agent. Delivery reads job["origin"] / HERMES_CRON_AUTO_DELIVER_* directly.
+    driving the agent. Delivery reads job["origin"] / STARDUST_CRON_AUTO_DELIVER_* directly.
     """
 
     def __init__(self, job: dict, job_id: str, execution_id: Optional[str]):
@@ -438,12 +438,12 @@ class _CronRunScope:
             chat_name="",
             # Cron can't receive completions after its turn; async delegation output could
             # otherwise route to an unrelated chat via the ambient session key => inline delegation.
-            # We clear the HERMES_SESSION_* routing keys just below, so an async delegation's completion
+            # We clear the STARDUST_SESSION_* routing keys just below, so an async delegation's completion
             # event carries session_key="" — _enrich_async_delegation_routing cannot resolve it and
             # _inject_watch_notification drops it ("no routing metadata"). And by the time a child finishes,
             # run_job has already shipped the job's final response via _deliver_result; there is no turn
             # left to re-enter. (Worse, get_current_session_key() can fall back to the ambient os.environ
-            # HERMES_SESSION_KEY, which risks routing a cron subagent's output into an unrelated user chat.)
+            # STARDUST_SESSION_KEY, which risks routing a cron subagent's output into an unrelated user chat.)
             # Declaring the channel stateless routes delegate_task to its existing inline/synchronous path,
             # so results return within the job's own turn. See declare_stateless_channel(). Upstream:
             # #53027, #63142.
@@ -457,7 +457,7 @@ class _CronRunScope:
         self.task_id = f"cron:{job_id}:{execution_id or job.get('execution_id') or uuid.uuid4().hex}"
         if self.workdir:
             record_session_cwd(self.task_id, self.workdir)
-        self._cron_session_var = _VAR_MAP["HERMES_CRON_SESSION"]
+        self._cron_session_var = _VAR_MAP["STARDUST_CRON_SESSION"]
         self._cron_session_token = None
         self._approval_mode = job.get("approval_mode")
         self._approval_mode_token = None
@@ -498,9 +498,9 @@ def _reload_dotenv_and_publish_delivery_target(job: dict) -> None:
 
     delivery_target = _sched._resolve_delivery_target(job)
     if delivery_target:
-        _VAR_MAP["HERMES_CRON_AUTO_DELIVER_PLATFORM"].set(delivery_target["platform"])
-        _VAR_MAP["HERMES_CRON_AUTO_DELIVER_CHAT_ID"].set(str(delivery_target["chat_id"]))
-        _VAR_MAP["HERMES_CRON_AUTO_DELIVER_THREAD_ID"].set(
+        _VAR_MAP["STARDUST_CRON_AUTO_DELIVER_PLATFORM"].set(delivery_target["platform"])
+        _VAR_MAP["STARDUST_CRON_AUTO_DELIVER_CHAT_ID"].set(str(delivery_target["chat_id"]))
+        _VAR_MAP["STARDUST_CRON_AUTO_DELIVER_THREAD_ID"].set(
             "" if delivery_target.get("thread_id") is None else str(delivery_target["thread_id"])
         )
 

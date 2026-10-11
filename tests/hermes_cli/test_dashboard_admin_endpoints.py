@@ -24,7 +24,7 @@ def _client():
 
     client = TestClient(app)
     client.headers[_SESSION_HEADER_NAME] = _SESSION_TOKEN
-    # Keep the state DB under the isolated HERMES_HOME for any handler that
+    # Keep the state DB under the isolated STARDUST_HOME for any handler that
     # touches it.
     hermes_state.DEFAULT_DB_PATH = get_hermes_home() / "state.db"
     return client, _SESSION_HEADER_NAME
@@ -155,9 +155,9 @@ class TestCredentialPoolEndpoints:
     def test_env_seeded_delete_stays_deleted(self):
         """#55217: DELETE must suppress the source or load_pool() resurrects it.
 
-        load_pool() re-seeds from ~/.hermes/.env on every call, so removing
+        load_pool() re-seeds from ~/.stardust/.env on every call, so removing
         just the pool row silently reverts on the next dashboard refresh.
-        The endpoint must mirror `hermes auth remove`: clean up the backing
+        The endpoint must mirror `stardust auth remove`: clean up the backing
         source and suppress (provider, source).
         """
         from agent.credential_pool import load_pool
@@ -185,7 +185,7 @@ class TestCredentialPoolEndpoints:
     def test_post_readd_lifts_suppression(self):
         """Re-adding via POST is an explicit re-engagement — suppressions lift.
 
-        Mirrors `hermes auth add`, which clears every suppression for the
+        Mirrors `stardust auth add`, which clears every suppression for the
         provider so a user who deleted a credential and re-adds one isn't
         silently blocked from env re-seeding.
         """
@@ -838,7 +838,7 @@ class TestUpdateCheckEndpoint:
 
     Powers the dashboard's check-before-you-update flow: the System page
     shows the commit-behind count and asks the user to confirm before
-    ``POST /api/hermes/update`` runs ``hermes update``.
+    ``POST /api/hermes/update`` runs ``stardust update``.
     """
 
     @pytest.fixture(autouse=True)
@@ -931,7 +931,7 @@ class TestDebugShareEndpoint:
 
 class TestToolsConfigEndpoints:
     """Provider selection, API-key save, and post-setup spawn for toolsets —
-    the dashboard surface that replicates the `hermes tools` configurator."""
+    the dashboard surface that replicates the `stardust tools` configurator."""
 
     @pytest.fixture(autouse=True)
     def _setup(self, _isolate_hermes_home):
@@ -1011,7 +1011,7 @@ def test_spawn_hermes_action_scrubs_gateway_loop_guard_env(monkeypatch, tmp_path
     _web_server_gateway._spawn_hermes_action(["gateway", "restart"], "gateway-restart")
 
     assert "_HERMES_GATEWAY" not in captured["env"]
-    assert captured["env"]["HERMES_NONINTERACTIVE"] == "1"
+    assert captured["env"]["STARDUST_NONINTERACTIVE"] == "1"
     # Default-profile actions preserve the historical process environment.
     assert captured["env"]["OPENAI_API_KEY"] == "default-action-provider-key"
 
@@ -1028,7 +1028,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
     import hermes_cli.web_server as ws
 
     user_home = tmp_path / "user"
-    default_home = user_home / ".hermes"
+    default_home = user_home / ".stardust"
     target_home = default_home / "profiles" / "verifier"
     target_home.mkdir(parents=True)
 
@@ -1054,7 +1054,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
     )
 
     monkeypatch.setattr(Path, "home", lambda: user_home)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     for key, value in {
         "DISCORD_BOT_TOKEN": "default-discord",
         "API_SERVER_ENABLED": "true",
@@ -1067,7 +1067,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
         "ZAI_API_KEY": "default-zai",
         "A2A_AUTH_MINI": "default-a2a-auth",
         "EXTERNAL_PROFILE_AUTH": "default-secret-source-auth",
-        "HERMES_ACP_AUTH_METHOD": "default-acp",
+        "STARDUST_ACP_AUTH_METHOD": "default-acp",
         "PROFILE_ENV_TEST_BENIGN": "keep-me",
     }.items():
         monkeypatch.setenv(key, value)
@@ -1098,13 +1098,13 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
 
     child_env = captured["env"]
     assert captured["cmd"][-4:] == ["-p", "verifier", "gateway", "restart"]
-    assert child_env["HERMES_HOME"] == str(target_home)
-    assert child_env["HERMES_NONINTERACTIVE"] == "1"
+    assert child_env["STARDUST_HOME"] == str(target_home)
+    assert child_env["STARDUST_NONINTERACTIVE"] == "1"
     assert child_env["PROFILE_ENV_TEST_BENIGN"] == "keep-me"
     for leaked_key in (
         "DISCORD_BOT_TOKEN", "API_SERVER_ENABLED", "API_SERVER_KEY", "BLUEBUBBLES_SERVER_URL",
         "BLUEBUBBLES_PASSWORD", "NTFY_TOPIC", "NTFY_TOKEN", "OPENAI_API_KEY", "ZAI_API_KEY",
-        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "HERMES_ACP_AUTH_METHOD",
+        "A2A_AUTH_MINI", "EXTERNAL_PROFILE_AUTH", "STARDUST_ACP_AUTH_METHOD",
     ):
         assert leaked_key not in child_env, leaked_key
 
@@ -1117,7 +1117,7 @@ def test_named_profile_action_isolates_parent_env_and_loads_target_env(monkeypat
             sys.executable, "-c",
             "import json, os; "
             "from hermes_cli.env_loader import load_hermes_dotenv; "
-            "load_hermes_dotenv(hermes_home=os.environ['HERMES_HOME']); "
+            "load_hermes_dotenv(hermes_home=os.environ['STARDUST_HOME']); "
             "keys=['A2A_PORT','OPENAI_API_KEY','TARGET_ONLY_TOKEN','DISCORD_BOT_TOKEN',"
             "'API_SERVER_ENABLED','API_SERVER_KEY','BLUEBUBBLES_SERVER_URL','BLUEBUBBLES_PASSWORD',"
             "'NTFY_TOPIC','NTFY_TOKEN','ZAI_API_KEY','A2A_AUTH_MINI','EXTERNAL_PROFILE_AUTH']; "
@@ -1156,7 +1156,7 @@ def test_desktop_lifespan_reaps_orphan_gateways_on_startup(
     Graceful shutdown reaps the managed child, but an abnormal exit reparents
     the old gateway to launchd (PPID=1) where it keeps holding the QQ
     WebSocket. The lifespan calls _reap_unsupervised_gateway_orphans() once at
-    startup under HERMES_DESKTOP=1 so the stale orphan is cleared first.
+    startup under STARDUST_DESKTOP=1 so the stale orphan is cleared first.
     """
     import hermes_cli.web_server as ws
 
@@ -1166,7 +1166,7 @@ def test_desktop_lifespan_reaps_orphan_gateways_on_startup(
         called.append(True)
         return True
 
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
+    monkeypatch.setenv("STARDUST_DESKTOP", "1")
     # Keep the lifespan cheap: don't re-import the gateway module or spin up the
     # real cron scheduler thread.
     monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
@@ -1197,7 +1197,7 @@ def test_desktop_lifespan_terminates_managed_gateway_restart(monkeypatch):
         def terminate(self):
             calls.append("terminate")
 
-    monkeypatch.setenv("HERMES_DESKTOP", "1")
+    monkeypatch.setenv("STARDUST_DESKTOP", "1")
     monkeypatch.setattr(ws, "_warm_gateway_module", lambda: None)
     monkeypatch.setattr(ws, "_start_desktop_cron_ticker", lambda *_args: None)
     monkeypatch.setitem(_web_server_gateway._ACTION_PROCS, "gateway-restart", _FakeRunningProc())

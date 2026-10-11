@@ -4,7 +4,7 @@ Regression for #108383: ``resolve_provider("auto")`` recognised only registry pr
 ``model.provider``, so the boot inventory (``free_tier_bootstrap``) read a llama.cpp / vLLM /
 ollama install as "nothing configured" and ``setup.status`` reported ``provider_configured:
 False`` — the dashboard's Ink chat parked every new session on "Setup Required" while
-``hermes chat`` (which resolves the runtime directly) worked against the same config.
+``stardust chat`` (which resolves the runtime directly) worked against the same config.
 """
 
 from __future__ import annotations
@@ -17,10 +17,10 @@ def isolated_home(tmp_path, monkeypatch):
     home = tmp_path / "hermes"
     home.mkdir()
     (home / ".env").write_text("", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_GUEST_ONBOARDING", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.delenv("STARDUST_GUEST_ONBOARDING", raising=False)
     for var in ("OPENAI_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL",
-                "OPENROUTER_BASE_URL", "HERMES_INFERENCE_PROVIDER", "NOUS_API_KEY"):
+                "OPENROUTER_BASE_URL", "STARDUST_INFERENCE_PROVIDER", "NOUS_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda: False)
     from hermes_cli import free_tier_bootstrap as fb

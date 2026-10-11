@@ -311,7 +311,7 @@ class TestDefaultContextLengths:
     ])
     def test_muse_spark_resolves_1m_without_network(self, model, provider, base_url):
         """Muse Spark is 1,048,576 on every host even when models.dev and the
-        live /models probe are unavailable (fresh HERMES_HOME, offline)."""
+        live /models probe are unavailable (fresh STARDUST_HOME, offline)."""
         with patch("agent.model_metadata.get_cached_context_length", return_value=None), \
              patch("agent.model_metadata._query_ollama_api_show", return_value=None), \
              patch("agent.model_metadata.fetch_endpoint_model_metadata", return_value={}), \
@@ -1642,7 +1642,7 @@ class TestGrok43StaleCacheGuard:
         assert not _stale_pre_catalog_cache_entry("grok-4", 256_000)
 
     def test_stale_grok_4_3_dropped_and_reresolves_to_1m(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         import importlib
         import agent.model_metadata as mm
         importlib.reload(mm)
@@ -1655,7 +1655,7 @@ class TestGrok43StaleCacheGuard:
 
 
     def test_grok_4_not_clobbered(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         import importlib
         import agent.model_metadata as mm
         importlib.reload(mm)
@@ -1701,7 +1701,7 @@ class TestGrok46StaleCacheGuard:
         assert not _stale_pre_catalog_cache_entry("grok-4.5", 500_000)
 
     def test_stale_grok_4_6_dropped_and_reresolves_to_500k(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         import importlib
         import agent.model_metadata as mm
         importlib.reload(mm)
@@ -1752,7 +1752,7 @@ class TestGenericPreCatalogStaleGuard:
         assert not _stale_pre_catalog_cache_entry("minimax", 204_800)
 
     def test_stale_qwen36_plus_dropped_and_reresolves(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         import importlib
         import agent.model_metadata as mm
         importlib.reload(mm)
@@ -1797,8 +1797,8 @@ class TestMoAContextLength:
             yaml.safe_dump(payload, f)
 
     def test_moa_resolves_from_aggregator(self, tmp_path, monkeypatch):
-        home = str(tmp_path / ".hermes")
-        monkeypatch.setenv("HERMES_HOME", home)
+        home = str(tmp_path / ".stardust")
+        monkeypatch.setenv("STARDUST_HOME", home)
         self._write_moa_config(home, {"provider": "openrouter", "model": "anthropic/claude-opus-4.8"})
 
         # The MoA preset name + virtual base_url would otherwise fall through to
@@ -1818,8 +1818,8 @@ class TestMoAContextLength:
         from agent.context_compressor import ContextCompressor
 
         configured_context = 600_000
-        home = str(tmp_path / ".hermes")
-        monkeypatch.setenv("HERMES_HOME", home)
+        home = str(tmp_path / ".stardust")
+        monkeypatch.setenv("STARDUST_HOME", home)
         self._write_moa_config(
             home,
             {"provider": "custom:example", "model": "example-model"},

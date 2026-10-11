@@ -109,7 +109,7 @@ class FakeConnectorClient:
 def owned_session(monkeypatch, tmp_path):
     home = tmp_path / "hermes-home"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     reset_session_vars()
     live.reset_for_tests()
     with ExitStack() as stack:

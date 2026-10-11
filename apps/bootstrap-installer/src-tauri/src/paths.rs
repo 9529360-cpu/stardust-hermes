@@ -1,12 +1,12 @@
 //! Filesystem paths + logging setup.
 //!
 //! Mirrors `hermes_constants.get_hermes_home()` from the Python CLI:
-//!   Windows: %LOCALAPPDATA%\hermes
-//!   macOS:   ~/.hermes
-//!   Linux:   ~/.hermes  (override via $HERMES_HOME)
+//!   Windows: %LOCALAPPDATA%\stardust
+//!   macOS:   ~/.stardust
+//!   Linux:   ~/.stardust  (override via $STARDUST_HOME)
 //!
 //! NOTE (macOS): Python's get_hermes_home(), scripts/install.sh, and the
-//! Electron desktop's resolveHermesHome() ALL use ~/.hermes on macOS — there
+//! Electron desktop's resolveHermesHome() ALL use ~/.stardust on macOS — there
 //! is no ~/Library/Application Support branch anywhere else. An earlier
 //! version of this file used Application Support, which drifted from every
 //! other component: the installer wrote the install to one dir and the
@@ -21,9 +21,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tracing_appender::non_blocking::WorkerGuard;
 
-/// Returns the canonical Hermes home directory, respecting $HERMES_HOME if set.
+/// Returns the canonical Hermes home directory, respecting $STARDUST_HOME if set.
 pub fn hermes_home() -> PathBuf {
-    if let Ok(override_path) = std::env::var("HERMES_HOME") {
+    if let Ok(override_path) = std::env::var("STARDUST_HOME") {
         if !override_path.trim().is_empty() {
             return PathBuf::from(override_path);
         }
@@ -31,21 +31,21 @@ pub fn hermes_home() -> PathBuf {
 
     #[cfg(target_os = "windows")]
     {
-        // %LOCALAPPDATA%\hermes — matches scripts/install.ps1's $HermesHome.
+        // %LOCALAPPDATA%\stardust — matches scripts/install.ps1's $HermesHome.
         if let Some(local_app_data) = dirs::data_local_dir() {
-            return local_app_data.join("hermes");
+            return local_app_data.join("stardust");
         }
     }
 
-    // macOS + Linux + fallback: ~/.hermes (matches Python get_hermes_home(),
+    // macOS + Linux + fallback: ~/.stardust (matches Python get_hermes_home(),
     // install.sh, and the Electron desktop's resolveHermesHome()).
     if let Some(home) = dirs::home_dir() {
-        return home.join(".hermes");
+        return home.join(".stardust");
     }
 
     // Last resort — current dir, almost certainly wrong but at least
     // doesn't panic.
-    PathBuf::from(".hermes")
+    PathBuf::from(".stardust")
 }
 
 pub fn log_dir() -> PathBuf {
@@ -63,10 +63,10 @@ pub fn bootstrap_cache_dir() -> PathBuf {
 /// Stable location the installer copies itself to after a successful install.
 /// The desktop app re-invokes this with `--update`, and the start-menu /
 /// desktop shortcuts can point users back to it. Lives directly under
-/// HERMES_HOME so it survives repo checkout deletion (unlike anything under
+/// STARDUST_HOME so it survives repo checkout deletion (unlike anything under
 /// hermes-agent/).
 ///
-/// On Windows this is `%LOCALAPPDATA%\hermes\hermes-setup.exe`; on other
+/// On Windows this is `%LOCALAPPDATA%\stardust\hermes-setup.exe`; on other
 /// platforms the extension differs but the directory is the same.
 pub fn installer_dest() -> PathBuf {
     let name = if cfg!(target_os = "windows") {
@@ -83,8 +83,8 @@ pub fn installer_dest() -> PathBuf {
 /// mid-update re-locks the venv shim and triggers `force_kill_other_hermes`,
 /// which then kills that legitimate backend in a respawn loop (#50238).
 ///
-/// Lives directly under HERMES_HOME (same rationale as `installer_dest`) so the
-/// Electron desktop — which resolves HERMES_HOME identically and pins it into
+/// Lives directly under STARDUST_HOME (same rationale as `installer_dest`) so the
+/// Electron desktop — which resolves STARDUST_HOME identically and pins it into
 /// the updater's env — agrees on the exact path.
 pub fn update_in_progress_marker() -> PathBuf {
     hermes_home().join(".hermes-update-in-progress")
@@ -125,7 +125,7 @@ pub fn copy_self_to_hermes_home() -> std::io::Result<()> {
     }
     std::fs::copy(&src, &dest)?;
     repair_macos_installer_helper(&dest);
-    tracing::info!(?src, ?dest, "copied installer to HERMES_HOME");
+    tracing::info!(?src, ?dest, "copied installer to STARDUST_HOME");
     Ok(())
 }
 
@@ -164,7 +164,7 @@ pub fn likely_bootstrap_marker(install_root: &Path) -> PathBuf {
     install_root.join(".hermes-bootstrap-complete")
 }
 
-/// Initializes tracing to bootstrap-installer.log under HERMES_HOME/logs/.
+/// Initializes tracing to bootstrap-installer.log under STARDUST_HOME/logs/.
 /// Returns a guard that flushes the appender on drop — keep it alive for
 /// the lifetime of the process.
 pub fn init_logging() -> Option<WorkerGuard> {
@@ -179,7 +179,7 @@ pub fn init_logging() -> Option<WorkerGuard> {
     let file_appender = tracing_appender::rolling::never(&dir, "bootstrap-installer.log");
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
 
-    let env_filter = tracing_subscriber::EnvFilter::try_from_env("HERMES_BOOTSTRAP_LOG")
+    let env_filter = tracing_subscriber::EnvFilter::try_from_env("STARDUST_BOOTSTRAP_LOG")
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
 
     tracing_subscriber::fmt()

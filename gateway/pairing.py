@@ -4,7 +4,7 @@ Unknown users receive a one-time pairing code that the bot owner approves via th
 CLI, instead of static user-ID allowlists. Security properties (OWASP + NIST SP
 800-63-4): 8-char codes from a 32-char unambiguous alphabet via ``secrets``, 1-hour
 expiry, max 3 pending per platform, 1 request per user per 10 min, lockout after 5
-failed approvals, chmod 0600 data files, codes never logged. Storage: ~/.hermes/pairing/
+failed approvals, chmod 0600 data files, codes never logged. Storage: ~/.stardust/pairing/
 """
 
 import contextlib
@@ -37,18 +37,18 @@ MAX_FAILED_ATTEMPTS = 5             # Failed approvals before lockout
 DECLINE_DEDUPE_SECONDS = 24 * 3600  # One polite decline per (platform, sender) per window (#88028)
 
 # Default pairing directory override. Deliberately ``None``: an eagerly computed
-# path would freeze the HERMES_HOME/profile context at gateway boot, ignoring later
-# context-local overrides, so the gateway and ``hermes pairing`` CLI wrote different
+# path would freeze the STARDUST_HOME/profile context at gateway boot, ignoring later
+# context-local overrides, so the gateway and ``stardust pairing`` CLI wrote different
 # directories. ``_default_pairing_dir()`` resolves fresh per call; tests patch this.
 PAIRING_DIR = None
 
 
 # Default (non-profile-scoped) pairing directory. Left unresolved (``None``) here rather than computed
 # eagerly: this module is imported once by the long-lived gateway process at container/process boot, and
-# computing the path eagerly freezes it to whatever HERMES_HOME/profile context existed at that exact import
+# computing the path eagerly freezes it to whatever STARDUST_HOME/profile context existed at that exact import
 # moment for the rest of the process's lifetime -- even if a context-local override (see
 # hermes_constants.set_hermes_home_override) is established afterward. A freshly-started, short-lived
-# process (e.g. the ``hermes pairing`` CLI) re-imports this module later with the final environment already
+# process (e.g. the ``stardust pairing`` CLI) re-imports this module later with the final environment already
 # in place, so it never observes the stale value -- the resulting asymmetry is what made pending pairing
 # codes issued by the gateway unrecoverable while CLI-side writes to the same directory kept working
 # (NousResearch/hermes-agent#93449). ``_default_pairing_dir()`` below resolves this fresh on every call in
@@ -257,7 +257,7 @@ def _load_json_file(path: Path) -> dict:
     except PermissionError as e:
         try:
             # Surface this loudly: a 0600 file owned by a different user (classic Docker symptom: `docker
-            # exec` runs as root and writes the file, then the gateway process — running as `hermes` after
+            # exec` runs as root and writes the file, then the gateway process — running as `stardust` after
             # gosu drop — can't read it) would otherwise be swallowed by the generic OSError branch below,
             # silently leaving the user marked unauthorized. See issue #10270.
             st = path.stat()
@@ -267,7 +267,7 @@ def _load_json_file(path: Path) -> dict:
         euid = os.geteuid() if hasattr(os, "geteuid") else "n/a"  # no geteuid on Windows
         logger.warning(
             "Pairing file %s exists but is not readable as uid=%s (%s; %s). "
-            "If you ran `docker exec <container> hermes pairing approve ...` as root, "
+            "If you ran `docker exec <container> stardust pairing approve ...` as root, "
             "re-run with `docker exec -u hermes <container> ...` and "
             "chown the existing file to the hermes user, or restart the "
             "container so the entrypoint can fix ownership.",
@@ -320,7 +320,7 @@ class PairingStore:
 
     Files per platform: ``{platform}-pending.json``, ``{platform}-approved.json``, plus
     shared ``_rate_limits.json``. With ``profile="<name>"`` storage resolves from that
-    profile's HERMES_HOME exactly as ``hermes -p <name> pairing ...`` does, so multiplex
+    profile's STARDUST_HOME exactly as ``stardust -p <name> pairing ...`` does, so multiplex
     gateways and profile-scoped CLI approvals share one whitelist.
     """
 

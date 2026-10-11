@@ -126,7 +126,7 @@ def test_find_by_primary_path(conn):
 
 
 def test_per_profile_isolation(tmp_path):
-    # Two distinct DB paths stand in for two profiles' HERMES_HOME.
+    # Two distinct DB paths stand in for two profiles' STARDUST_HOME.
     a = pdb.connect(db_path=tmp_path / "a" / "projects.db")
     b = pdb.connect(db_path=tmp_path / "b" / "projects.db")
     try:

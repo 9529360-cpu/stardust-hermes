@@ -141,7 +141,7 @@ async def update_config(
         # REST saves bypass the config.set RPC (which re-emits itself), so
         # refresh live sessions' cached approval/YOLO indicators after a mode
         # change. Own-profile saves only: a profile-scoped save targets a
-        # different HERMES_HOME than this process's gateway sessions.
+        # different STARDUST_HOME than this process's gateway sessions.
         if approvals_mode_changed and not _is_other_profile(body.profile or profile):
             _broadcast_gateway_session_info()
         return {"ok": True}
@@ -171,7 +171,7 @@ def _catalog_provider_env_metadata() -> dict:
 
     Returns ``{env_var: {provider, provider_label, description, url, is_password,
     advanced}}`` for every API-key provider in the unified ``provider_catalog()``
-    (the ``hermes model`` universe), so the desktop Keys tab renders a card even
+    (the ``stardust model`` universe), so the desktop Keys tab renders a card even
     for providers never hand-added to ``OPTIONAL_ENV_VARS``. Hand
     ``OPTIONAL_ENV_VARS`` prose is layered on top in the endpoint; this only
     supplies membership + grouping + fallbacks.
@@ -253,7 +253,7 @@ def _get_env_vars_sync(profile: Optional[str] = None):
             # Keys/Env page hides it rather than duplicate the richer UI.
             "channel_managed": var_name in channel_keys,
             # Provider grouping from the unified catalog, so the desktop groups
-            # by the SAME provider identity the CLI `hermes model` picker uses.
+            # by the SAME provider identity the CLI `stardust model` picker uses.
             "provider": cat_meta.get("provider", ""),
             "provider_label": cat_meta.get("provider_label", ""),
             # True for a .env key in no catalog at all — an arbitrary/custom var
@@ -593,7 +593,7 @@ def list_custom_endpoints(profile: Optional[str] = None):
 
     Scoped to the requested profile's config.yaml: the desktop settings UI
     targets the active profile, so read/write must resolve that profile's home
-    rather than the process-level HERMES_HOME (mirrors ``/api/config``).
+    rather than the process-level STARDUST_HOME (mirrors ``/api/config``).
     """
     with http_failure("GET /api/providers/custom-endpoints failed", 500, detail="Failed to list custom endpoints"):
         with _config_profile_scope(profile):

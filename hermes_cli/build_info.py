@@ -108,7 +108,7 @@ def get_code_identity(refresh: bool = False) -> dict:
 
 
 def get_build_sha(short: int = 8) -> Optional[str]:
-    """Baked-in build SHA (Dockerfile ``HERMES_GIT_SHA`` build-arg, full 40-char hash on one
+    """Baked-in build SHA (Dockerfile ``STARDUST_GIT_SHA`` build-arg, full 40-char hash on one
     line), truncated to ``short`` chars (``short<=0`` = full), or None."""
     try:
         if not _BUILD_SHA_FILE.is_file():

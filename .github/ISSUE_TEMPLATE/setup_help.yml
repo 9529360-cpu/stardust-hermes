@@ -9,12 +9,12 @@ body:
         Please fill out the details below so the failing stage can be identified without changing the installation underneath it.
 
         **Quick checks first:**
-        - Run `hermes doctor` if the CLI is available
-        - Record `hermes version`; for source installs also record `git rev-parse --short HEAD`
-        - If more detail is needed, run `hermes debug share --local` and review the output before posting it
+        - Run `stardust doctor` if the CLI is available
+        - Record `stardust version`; for source installs also record `git rev-parse --short HEAD`
+        - If more detail is needed, run `stardust debug share --local` and review the output before posting it
         - Check the [Stardust README](https://github.com/9529360-cpu/stardust-hermes/blob/main/README.md)
 
-        Stardust's inherited `hermes update` path is intentionally disabled while the project uses its pinned/local release policy. Do **not** update from the upstream Hermes repository as a troubleshooting step.
+        Stardust's inherited `stardust update` path is intentionally disabled while the project uses its pinned/local release policy. Do **not** update from the upstream Hermes repository as a troubleshooting step.
 
   - type: textarea
     id: description
@@ -33,9 +33,9 @@ body:
       description: What did you do? Include the exact commands you ran.
       placeholder: |
         1. Ran the Stardust install command from this repository
-        2. Ran `hermes setup`
+        2. Ran `stardust setup`
         3. Selected provider/model ...
-        4. Started the desktop app / `hermes chat`
+        4. Started the desktop app / `stardust chat`
         5. Error appeared: ...
     validations:
       required: true
@@ -73,7 +73,7 @@ body:
     id: hermes-version
     attributes:
       label: Stardust / Hermes Runtime Version
-      description: Output of `hermes version` (if install got that far)
+      description: Output of `stardust version` (if install got that far)
       placeholder: "0.21.3"
 
   - type: input
@@ -88,14 +88,14 @@ body:
     attributes:
       label: Local Diagnostics
       description: |
-        Paste the relevant output from `hermes doctor` and, when needed, `hermes debug share --local`.
+        Paste the relevant output from `stardust doctor` and, when needed, `stardust debug share --local`.
         Review it first and remove API keys, tokens, cookies, private prompts, or unrelated personal data.
         An explicit diagnostics upload offered by the desktop app is optional and is not required for Stardust support.
       placeholder: |
-        hermes doctor:
+        stardust doctor:
         ...
 
-        hermes debug share --local:
+        stardust debug share --local:
         ...
       render: shell
 
@@ -114,6 +114,6 @@ body:
       label: What I've Already Tried
       description: List any fixes or workarounds you've already attempted.
       placeholder: |
-        - Re-ran `hermes doctor`
+        - Re-ran `stardust doctor`
         - Re-ran the Stardust installer at the same source revision
         - Verified the provider credential is configured

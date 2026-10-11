@@ -1,6 +1,6 @@
 # Configuration, Toolsets & Voice
 
-Edit with `hermes config edit` or `hermes config set section.key value`.
+Edit with `stardust config edit` or `stardust config set section.key value`.
 Full reference: https://hermes-agent.nousresearch.com/docs/user-guide/configuration
 
 ### Config Sections (most-used keys)
@@ -21,11 +21,11 @@ Full reference: https://hermes-agent.nousresearch.com/docs/user-guide/configurat
 | `checkpoints` | `enabled`, `max_snapshots` (50) |
 | `curator` | `enabled`, `consolidate` (true by default for agent-owned Skill convergence), `interval_hours`, `stale_after_days` |
 
-`hermes config check` reports sections missing from an older config.
+`stardust config check` reports sections missing from an older config.
 
 ### Toolsets
 
-Enable/disable via `hermes tools` (interactive) or `hermes tools enable/disable NAME`.
+Enable/disable via `stardust tools` (interactive) or `stardust tools enable/disable NAME`.
 Full enumeration: `TOOLSETS` dict in `toolsets.py` (`_HERMES_CORE_TOOLS` is the default bundle most platforms inherit).
 
 | Toolset | What it provides |

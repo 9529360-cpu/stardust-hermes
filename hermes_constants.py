@@ -47,14 +47,14 @@ def _get_platform_default_hermes_home() -> Path:
     if sys.platform == "win32":
         local_appdata = os.environ.get("LOCALAPPDATA", "").strip()
         base = Path(local_appdata) if local_appdata else Path.home() / "AppData" / "Local"
-        return base / "hermes"
-    return Path.home() / ".hermes"
+        return base / "stardust"
+    return Path.home() / ".stardust"
 
 
 def sudo_invoker_default_home() -> Path | None:
-    """The invoking user's native ``~/.hermes`` when this process is root under ``sudo``, else None.
+    """The invoking user's native ``~/.stardust`` when this process is root under ``sudo``, else None.
 
-    sudo strips HERMES_HOME and sets HOME=/root, so the process's own default is root's; the profile
+    sudo strips STARDUST_HOME and sets HOME=/root, so the process's own default is root's; the profile
     store and the system service being operated on belong to SUDO_USER.
     """
     if not hasattr(os, "geteuid") or os.geteuid() != 0:
@@ -65,13 +65,13 @@ def sudo_invoker_default_home() -> Path | None:
     import pwd
 
     try:
-        return Path(pwd.getpwnam(sudo_user).pw_dir) / ".hermes"
+        return Path(pwd.getpwnam(sudo_user).pw_dir) / ".stardust"
     except KeyError:  # SUDO_USER not in passwd (chroot/container)
         return None
 
 
 def _warn_profile_fallback_once() -> None:
-    """Warn once when HERMES_HOME is unset but a non-default profile is sticky-active (wrong fallback)."""
+    """Warn once when STARDUST_HOME is unset but a non-default profile is sticky-active (wrong fallback)."""
     global _profile_fallback_warned
     if _profile_fallback_warned:
         return
@@ -86,11 +86,11 @@ def _warn_profile_fallback_once() -> None:
         # Direct stderr, not logging: runs at import time (often before logging is
         # configured) and root-logger propagation would double-emit.
         msg = (
-            f"[HERMES_HOME fallback] HERMES_HOME is unset but active "
+            f"[STARDUST_HOME fallback] STARDUST_HOME is unset but active "
             f"profile is {active!r}. Falling back to {fallback_home}, which "
             f"is the DEFAULT profile — not {active!r}. Any data this "
             f"process writes will land in the wrong profile. The "
-            f"subprocess spawner should pass HERMES_HOME explicitly "
+            f"subprocess spawner should pass STARDUST_HOME explicitly "
             f"(see issue #18594)."
         )
         with contextlib.suppress(Exception):
@@ -99,11 +99,11 @@ def _warn_profile_fallback_once() -> None:
 
 
 def get_hermes_home() -> Path:
-    """Hermes home: context-local override → ``HERMES_HOME`` env var → platform default."""
+    """Hermes home: context-local override → ``STARDUST_HOME`` env var → platform default."""
     override = get_hermes_home_override()
     if override:
         return Path(override)
-    if not os.environ.get("HERMES_HOME", "").strip():
+    if not os.environ.get("STARDUST_HOME", "").strip():
         _warn_profile_fallback_once()
     return get_process_hermes_home()
 
@@ -153,20 +153,20 @@ def get_process_hermes_home() -> Path:
     For process-level assets (theme YAML, dashboard plugin manifests) that must stay visible while a
     request is scoped to another profile (e.g. embedded ``/chat`` under ``--open-profile``).
     """
-    val = os.environ.get("HERMES_HOME", "").strip()
+    val = os.environ.get("STARDUST_HOME", "").strip()
     return Path(val) if val else _get_platform_default_hermes_home()
 
 
-# get_default_hermes_root() memo keyed on (native home, HERMES_HOME) so it stays
-# fresh when a test or plugin mutates HERMES_HOME; saves ~80us/call at 31+ sites.
+# get_default_hermes_root() memo keyed on (native home, STARDUST_HOME) so it stays
+# fresh when a test or plugin mutates STARDUST_HOME; saves ~80us/call at 31+ sites.
 _default_hermes_root_memo: "tuple[str, str, Path] | None" = None
 
 
 def get_default_hermes_root() -> Path:
-    """Root Hermes dir for profile-level ops: ``<root>`` when ``HERMES_HOME=<root>/profiles/<name>``."""
+    """Root Hermes dir for profile-level ops: ``<root>`` when ``STARDUST_HOME=<root>/profiles/<name>``."""
     global _default_hermes_root_memo
     native_home = _get_platform_default_hermes_home()
-    env_home = os.environ.get("HERMES_HOME", "")
+    env_home = os.environ.get("STARDUST_HOME", "")
     memo = _default_hermes_root_memo
     if memo is not None and memo[:2] == (str(native_home), env_home):
         return memo[2]
@@ -174,8 +174,8 @@ def get_default_hermes_root() -> Path:
     if env_home:
         env_path = Path(env_home)
         try:
-            env_path.resolve().relative_to(native_home.resolve())  # under ~/.hermes (normal or profile mode)
-        except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else HERMES_HOME itself
+            env_path.resolve().relative_to(native_home.resolve())  # under ~/.stardust (normal or profile mode)
+        except ValueError:  # Docker/custom root: <root>/profiles/<name> -> <root>, else STARDUST_HOME itself
             result = env_path.parent.parent if env_path.parent.name == "profiles" else env_path
     _default_hermes_root_memo = (str(native_home), env_home, result)
     return result
@@ -190,11 +190,11 @@ _HERMES_HOME_MARKERS = ("config.yaml", ".env", "state.db")
 def _is_hermes_profiles_root(profiles_dir: Path) -> bool:
     """True when *profiles_dir* is provably ``<hermes-home>/profiles``.
 
-    Accepts the classic ``~/.hermes`` layout, a root carrying Hermes-home marker files, a
+    Accepts the classic ``~/.stardust`` layout, a root carrying Hermes-home marker files, a
     ``profiles/.deleted`` tombstone dir (only ``profile delete`` creates it), or the default root.
     """
     root = profiles_dir.parent
-    if root.name == ".hermes":
+    if root.name == ".stardust":
         return True
     try:
         if (profiles_dir / _DELETED_PROFILES_DIR).is_dir() or any(
@@ -220,7 +220,7 @@ def named_profile_home(path: str | Path) -> Path | None:
         if (candidate.parent.name == "profiles" and not candidate.name.startswith(".")
                 and _is_hermes_profiles_root(candidate.parent)):
             return candidate
-        if candidate.name == ".hermes":  # default home: a coincidental profiles/ ancestor is not a root
+        if candidate.name == ".stardust":  # default home: a coincidental profiles/ ancestor is not a root
             return None
     return None
 
@@ -228,8 +228,8 @@ def named_profile_home(path: str | Path) -> Path | None:
 def profile_name_for_home(path: str | Path | None) -> str | None:
     """Return the canonical profile id owning *path*, or ``None`` when it is not a profile home.
 
-    The default home is the Hermes root itself, so its basename is an installation detail (``.hermes``
-    on POSIX and commonly ``hermes`` on Windows), not the profile id ``default``.
+    The default home is the Hermes root itself, so its basename is an installation detail (``.stardust``
+    on POSIX and commonly ``stardust`` on Windows), not the profile id ``default``.
     """
     if path is None or not str(path).strip():
         return None
@@ -291,7 +291,7 @@ def _packaged_dir(env_var: str, default: Path | None, subdir: str) -> Path:
     """Resolve a package-manager-relocatable directory.
 
     Order: *env_var* (Nix wrapper / explicit override) → caller ``default`` (source checkout) →
-    ``<HERMES_HOME>/<subdir>``.
+    ``<STARDUST_HOME>/<subdir>``.
     """
     override = os.getenv(env_var, "").strip()
     return Path(override) if override else default if default is not None else get_hermes_home() / subdir
@@ -299,17 +299,17 @@ def _packaged_dir(env_var: str, default: Path | None, subdir: str) -> Path:
 
 def get_optional_skills_dir(default: Path | None = None) -> Path:
     """Return the optional-skills directory, honoring package-manager wrappers."""
-    return _packaged_dir("HERMES_OPTIONAL_SKILLS", default, "optional-skills")
+    return _packaged_dir("STARDUST_OPTIONAL_SKILLS", default, "optional-skills")
 
 
 def get_optional_mcps_dir(default: Path | None = None) -> Path:
-    """Return the optional-mcps directory, honoring package-manager wrappers (``HERMES_OPTIONAL_MCPS``)."""
-    return _packaged_dir("HERMES_OPTIONAL_MCPS", default, "optional-mcps")
+    """Return the optional-mcps directory, honoring package-manager wrappers (``STARDUST_OPTIONAL_MCPS``)."""
+    return _packaged_dir("STARDUST_OPTIONAL_MCPS", default, "optional-mcps")
 
 
 def get_bundled_skills_dir(default: Path | None = None) -> Path:
-    """Return the bundled skills directory, honoring package-manager wrappers (``HERMES_BUNDLED_SKILLS``)."""
-    return _packaged_dir("HERMES_BUNDLED_SKILLS", default, "skills")
+    """Return the bundled skills directory, honoring package-manager wrappers (``STARDUST_BUNDLED_SKILLS``)."""
+    return _packaged_dir("STARDUST_BUNDLED_SKILLS", default, "skills")
 
 
 def get_hermes_dir(new_subpath: str, old_name: str, *, home: Path | None = None) -> Path:
@@ -386,7 +386,7 @@ def _version_probe_ok(path: str) -> bool:
     return result is not None and result.returncode == 0
 
 
-_HERMES_NODE_TARGET_MAJOR = int(os.environ.get("HERMES_NODE_TARGET_MAJOR", "22"))
+_HERMES_NODE_TARGET_MAJOR = int(os.environ.get("STARDUST_NODE_TARGET_MAJOR", "22"))
 _managed_node_heal_attempted = False
 _NODE_BOOTSTRAP_SCRIPT = Path(__file__).resolve().parent / "scripts" / "lib" / "node-bootstrap.sh"
 
@@ -435,7 +435,7 @@ def managed_node_tree_in_use(home: Path | None = None) -> bool:
     """True when a running process executes from the managed Node tree.
 
     Windows locks running executables against delete/overwrite, so the updater must not rewrite
-    ``%HERMES_HOME%\\node`` while the desktop app holds it (``[WinError 5]`` on ``npm.cmd``).
+    ``%STARDUST_HOME%\\node`` while the desktop app holds it (``[WinError 5]`` on ``npm.cmd``).
 
     Always ``False`` on POSIX, which has no equivalent lock semantics. See #80926.
     """
@@ -484,7 +484,7 @@ def _print_managed_node_in_use_notice() -> None:
     _managed_node_in_use_notice_printed = True
     print(
         "→ Hermes-managed Node.js is in use by a running app; deferring its "
-        "upgrade until the app is closed (re-run `hermes update` afterwards).", flush=True,
+        "upgrade until the app is closed (re-run `stardust update` afterwards).", flush=True,
     )
 
 
@@ -571,7 +571,7 @@ def _swap_node_tree(target: Path, staged: Path) -> bool | None:
 
 
 def _heal_managed_node_windows(home: Path | None = None) -> bool | None:
-    """Redownload the portable Node zip into ``%HERMES_HOME%\\node`` on Windows.
+    """Redownload the portable Node zip into ``%STARDUST_HOME%\\node`` on Windows.
 
     ``True`` on success, ``False`` on genuine failure (offline, bad archive), ``None`` when the
     tree is in use and the heal is deferred — callers must not record the once-per-process attempt
@@ -582,7 +582,7 @@ def _heal_managed_node_windows(home: Path | None = None) -> bool | None:
     ``node.new-*`` directory, then the live tree is renamed aside (``node.old-*``) and the staged tree
     renamed into place. The live tree is never deleted before its replacement is ready, so an interrupted
     heal cannot gut the running installation. Windows allows renaming a tree whose executables are running
-    (images are mapped with ``FILE_SHARE_DELETE`` — the same mechanism as the hermes.exe quarantine); when
+    (images are mapped with ``FILE_SHARE_DELETE`` — the same mechanism as the stardust.exe quarantine); when
     the OS refuses the rename, that refusal *is* the in-use signal and the heal defers instead of forcing
     the write and crashing with ``PermissionError: [WinError 5]`` on ``npm.cmd`` (#80926).
     """
@@ -620,7 +620,7 @@ def _run_node_bootstrap(func: str, *, timeout: int, **extra_env: str) -> bool:
     try:
         result = subprocess.run(
             ["bash", "-c", f'source "{_NODE_BOOTSTRAP_SCRIPT}" && {func}'],
-            env={**os.environ, "HERMES_HOME": str(get_hermes_home()), **extra_env},
+            env={**os.environ, "STARDUST_HOME": str(get_hermes_home()), **extra_env},
             capture_output=True, timeout=timeout, check=False,
         )
     except (OSError, subprocess.SubprocessError):
@@ -629,7 +629,7 @@ def _run_node_bootstrap(func: str, *, timeout: int, **extra_env: str) -> bool:
 
 
 def bootstrap_hermes_managed_node() -> str | None:
-    """Install a Hermes-managed Node tree under ``$HERMES_HOME/node`` and return its npm path.
+    """Install a Hermes-managed Node tree under ``$STARDUST_HOME/node`` and return its npm path.
 
     Hermes never modifies a user-owned toolchain (system, nvm, brew, Nix) that fails ``engines``.
     """
@@ -639,8 +639,8 @@ def bootstrap_hermes_managed_node() -> str | None:
     if sys.platform == "win32":
         ok = _heal_managed_node_windows()
     else:
-        # HERMES_NODE_SKIP_LINKS=1 keeps node/npm/npx out of ~/.local/bin: never shadow the user toolchain.
-        ok = _run_node_bootstrap("_nb_install_bundled_node", timeout=600, HERMES_NODE_SKIP_LINKS="1")
+        # STARDUST_NODE_SKIP_LINKS=1 keeps node/npm/npx out of ~/.local/bin: never shadow the user toolchain.
+        ok = _run_node_bootstrap("_nb_install_bundled_node", timeout=600, STARDUST_NODE_SKIP_LINKS="1")
     if not ok:
         return None
     return _first_runnable_managed(_candidate_node_command_names("npm"))[0]
@@ -744,7 +744,7 @@ def agent_browser_runnable(path: str | None) -> bool:
 
     A bare presence check (``shutil.which`` / ``Path.exists``) is not enough: agent-browser's npm
     ``postinstall`` re-points a *global* install symlink (e.g. ``/opt/homebrew/bin/agent-browser``) at our
-    local ``node_modules/agent-browser/bin/...`` binary, which then disappears on the next ``hermes update``
+    local ``node_modules/agent-browser/bin/...`` binary, which then disappears on the next ``stardust update``
     — leaving a **dangling symlink** that ``which`` still reports but exec fails on with exit 127 (issue
     #48521). Callers that trust such a path silently break every browser tool.
     """
@@ -782,9 +782,9 @@ def _legacy_path_has_content(path: Path) -> bool:
 
 
 def display_hermes_home() -> str:
-    """User-facing ``~/`` display string for HERMES_HOME (``~/.hermes/profiles/coder``)."""
+    """User-facing ``~/`` display string for STARDUST_HOME (``~/.stardust/profiles/coder``)."""
     home = get_hermes_home()
-    try:  # as_posix(): str() on Windows yields chimeras like ~/AppData\Local\hermes/skills/
+    try:  # as_posix(): str() on Windows yields chimeras like ~/AppData\Local\stardust/skills/
         return "~/" + home.relative_to(Path.home()).as_posix()
     except ValueError:
         return str(home)
@@ -792,20 +792,20 @@ def display_hermes_home() -> str:
 
 def profile_cli_selector() -> str:
     """``-p <name> `` (trailing space) pinning copy-pasteable ``hermes ...`` guidance to the
-    active NAMED profile, else ``""``: a bare ``hermes`` follows the sticky ``active_profile``
+    active NAMED profile, else ``""``: a bare ``stardust`` follows the sticky ``active_profile``
     file, which can name a different database than the one that failed (#105887). A custom
-    home outside the profile tree has no selector (only HERMES_HOME names it)."""
+    home outside the profile tree has no selector (only STARDUST_HOME names it)."""
     name = profile_name_for_home(get_hermes_home())
     return f"-p {name} " if name and name != "default" else ""
 
 
 def secure_parent_dir(path: Path) -> None:
-    """Chmod ``0o700`` on *path*'s parent, refusing ``/`` and top-level dirs (misresolved HERMES_HOME)."""
+    """Chmod ``0o700`` on *path*'s parent, refusing ``/`` and top-level dirs (misresolved STARDUST_HOME)."""
     parent = path.parent.resolve()
     if parent == Path("/") or len(parent.parts) < 3:
         return
     # Refuse the install tree: chmod 0700 breaks hermes-user traversal in Docker (UID 10000).
-    # A credential file here means HERMES_HOME misresolved; surface it (caused production lockouts).
+    # A credential file here means STARDUST_HOME misresolved; surface it (caused production lockouts).
     # See #25821, #93050.
     if parent == _INSTALL_ROOT or _INSTALL_ROOT in parent.parents:
         import logging
@@ -832,8 +832,8 @@ def _norm_home_path(path: str | None) -> str:
 
 
 def _profile_home_path(env: dict[str, str] | None = None) -> str | None:
-    """Return ``{HERMES_HOME}/home`` when the profile-home directory exists."""
-    hermes_home = get_hermes_home_override() or (env or {}).get("HERMES_HOME") or os.getenv("HERMES_HOME")
+    """Return ``{STARDUST_HOME}/home`` when the profile-home directory exists."""
+    hermes_home = get_hermes_home_override() or (env or {}).get("STARDUST_HOME") or os.getenv("STARDUST_HOME")
     if not hermes_home:
         return None
     profile_home = os.path.join(hermes_home, "home")
@@ -852,7 +852,7 @@ def _env_get(env: dict[str, str], key: str, default: str = "") -> str:
 def _iter_real_home_candidates(env: dict[str, str] | None = None) -> list[str]:
     """Return likely OS-user home candidates in trust order."""
     env = env or {}
-    candidates = [_env_get(env, "HERMES_REAL_HOME"), _env_get(env, "HOME")]
+    candidates = [_env_get(env, "STARDUST_REAL_HOME"), _env_get(env, "HOME")]
     with contextlib.suppress(Exception):
         import pwd
         candidates.append(pwd.getpwuid(os.getuid()).pw_dir.strip())  # windows-footgun: ok — POSIX-only module inside try/except
@@ -870,7 +870,7 @@ def get_real_home(env: dict[str, str] | None = None) -> str:
     """The OS user's real home, avoiding the Hermes profile HOME.
 
     ``HOME`` belongs to the OS account and external CLIs keeping credentials under ``~``; a parent
-    already running with ``HOME={HERMES_HOME}/home`` is repaired back when possible.
+    already running with ``HOME={STARDUST_HOME}/home`` is repaired back when possible.
     """
     profile_home = _profile_home_path(env)
     seen: set[str] = set()
@@ -892,7 +892,7 @@ def get_subprocess_home(env: dict[str, str] | None = None) -> str | None:
     """Subprocess ``HOME`` override, or ``None``.
 
     ``auto``: hosts keep real HOME (repairing a profile-home parent), containers use
-    ``{HERMES_HOME}/home``; ``real``: always real HOME; ``profile``: always the profile home.
+    ``{STARDUST_HOME}/home``; ``real``: always real HOME; ``profile``: always the profile home.
     """
     env = env or {}
     profile_home = _profile_home_path(env)
@@ -918,7 +918,7 @@ def apply_subprocess_home_env(env: dict[str, str]) -> None:
     """Apply Hermes' subprocess HOME contract to *env* in-place."""
     real_home = get_real_home(env)
     if real_home:
-        env["HERMES_REAL_HOME"] = real_home
+        env["STARDUST_REAL_HOME"] = real_home
     home = get_subprocess_home(env)
     if home:
         env["HOME"] = home
@@ -1131,17 +1131,17 @@ def _root_mount_has_marker(path: str, markers: tuple[str, ...]) -> bool:
 
 
 def get_config_path() -> Path:
-    """Return the path to ``config.yaml`` under HERMES_HOME."""
+    """Return the path to ``config.yaml`` under STARDUST_HOME."""
     return get_hermes_home() / "config.yaml"
 
 
 def get_skills_dir() -> Path:
-    """Return the path to the skills directory under HERMES_HOME."""
+    """Return the path to the skills directory under STARDUST_HOME."""
     return get_hermes_home() / "skills"
 
 
 def get_env_path() -> Path:
-    """Return the path to the ``.env`` file under HERMES_HOME."""
+    """Return the path to the ``.env`` file under STARDUST_HOME."""
     return get_hermes_home() / ".env"
 
 
@@ -1278,7 +1278,7 @@ def partial_update_hint(exc: BaseException) -> list[str]:
         "This looks like a partially-updated install: one module was refreshed "
         "and a related one was not.",
         "Re-run the update to bring the whole tree to the same version:",
-        "    hermes update",
+        "    stardust update",
         "If that also fails, reinstall: https://hermes-agent.nousresearch.com",
     ]
 

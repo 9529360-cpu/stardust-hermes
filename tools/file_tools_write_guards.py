@@ -57,7 +57,7 @@ def _hermes_home_real() -> str:
 def _get_hermes_config_resolved() -> str | None:
     """Resolved absolute path of the Hermes config file for the ACTIVE profile.
 
-    Resolved per call so it tracks the per-turn ``HERMES_HOME`` scope (#107327);
+    Resolved per call so it tracks the per-turn ``STARDUST_HOME`` scope (#107327);
     a test may pin it via ``_hermes_config_resolved`` + ``_hermes_config_resolved_loaded``."""
     if _hermes_config_resolved_loaded:
         return _hermes_config_resolved
@@ -67,7 +67,7 @@ def _get_hermes_config_resolved() -> str | None:
         # Resolver failure must stay bound to the ACTIVE profile's home, not the
         # subprocess HOME. ``_expand_tilde("~/...")`` follows the subprocess-HOME
         # contract, which under host ``auto`` mode can be the real/default user
-        # home rather than the active multiplex ``HERMES_HOME`` — comparing
+        # home rather than the active multiplex ``STARDUST_HOME`` — comparing
         # beta's ``config.yaml`` against the default/root config would let the
         # hard-block fail open on the exception path. Re-derive from the same
         # ``get_hermes_home()`` key the happy path uses, and substitute no
@@ -82,7 +82,7 @@ def _get_hermes_config_resolved() -> str | None:
 def _get_real_hermes_home() -> str | None:
     """Realpath of the authoritative Hermes home for the ACTIVE profile.
 
-    Resolved per call so it tracks the per-turn ``HERMES_HOME`` scope (#107327);
+    Resolved per call so it tracks the per-turn ``STARDUST_HOME`` scope (#107327);
     a test may pin it via ``_real_hermes_home_cached`` + ``_real_hermes_home_loaded``.
     Consumers exempting a whole TREE want ``_hermes_exempt_homes()``: under a named
     profile this home is ``<root>/profiles/<name>`` and the root is exempt too."""
@@ -93,11 +93,11 @@ def _get_real_hermes_home() -> str | None:
     except Exception:
         # Same active-profile binding on the exception path (see
         # ``_get_hermes_config_resolved``): re-derive from ``get_hermes_home()``
-        # rather than ``_expand_tilde("~/.hermes")`` so the protected-instruction
+        # rather than ``_expand_tilde("~/.stardust")`` so the protected-instruction
         # exemption resolves against the active profile — not the subprocess /
         # default home — and substitute no unrelated home if the active security
         # path cannot be established (PR #107335). A ``None`` here fails closed at
-        # the consumer: the ``~/.hermes`` exemption is skipped, so the gate runs.
+        # the consumer: the ``~/.stardust`` exemption is skipped, so the gate runs.
         try:
             from hermes_constants import get_hermes_home
             return os.path.realpath(str(get_hermes_home()))
@@ -109,12 +109,12 @@ def _hermes_exempt_homes() -> tuple[str, ...]:
     """Realpaths of the Hermes home tree(s) the protected-instruction gate must stay out of:
     the ACTIVE profile's home, plus the Hermes ROOT when that home is a named profile
     (``<root>/profiles/<name>``). Exempting only the profile dir left the root's DIRECT files
-    (LEDGER.md / MEMORY.md / SOUL.md / AGENTS.md ...) to the ``.hermes`` component rule, which
-    gated them like a project-local ``<repo>/.hermes/config.yaml`` — fail-closed headless
+    (LEDGER.md / MEMORY.md / SOUL.md / AGENTS.md ...) to the ``.stardust`` component rule, which
+    gated them like a project-local ``<repo>/.stardust/config.yaml`` — fail-closed headless
     (#110630). They are the agent's own store, governed by their own guards, exactly like
-    ``~/.hermes`` under the default profile. The root is added only when the shape really is a
+    ``~/.stardust`` under the default profile. The root is added only when the shape really is a
     named profile (``named_profile_home``), so a coincidental ``profiles/`` dir elsewhere never
-    exempts its parent; the home comes from the ACTIVE scope, never ``HERMES_HOME`` alone."""
+    exempts its parent; the home comes from the ACTIVE scope, never ``STARDUST_HOME`` alone."""
     home = _get_real_hermes_home()
     if not home:
         return ()
@@ -159,14 +159,14 @@ def _check_sensitive_path(filepath: str, task_id: str = "default") -> str | None
         return (
             f"Refusing to write to Hermes config file: {filepath}\n"
             "Do not abandon an explicitly requested configuration change: use the supported "
-            "'hermes config' command or the dedicated settings/RPC surface instead, so security "
+            "'stardust config' command or the dedicated settings/RPC surface instead, so security "
             "settings stay behind their normal validation and approval path.")
     return None
 
 
 # ── Protected agent-instruction files (always-ask approval gate) ─────────
 # Files that steer FUTURE agent behavior are a prompt-injection persistence
-# vector (AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules / project .hermes tree).
+# vector (AGENTS.md / CLAUDE.md / SOUL.md / .cursorrules / project .stardust tree).
 # Writes ALWAYS require human approval — even under --yolo — and fail closed
 # without a human channel. Basenames match in ANY directory, case-insensitively.
 # Ported from: RooCodeInc/Roo-Code RooProtectedController (Apache-2.0). Companion: the terminal-tool vector
@@ -219,11 +219,11 @@ def _protected_instruction_reason(filepath: str, task_id: str = "default",
     except (OSError, ValueError, RuntimeError):
         resolved = os.path.realpath(normalized)
 
-    # ~/.hermes itself is governed by its own guards (config.yaml hard-block,
+    # ~/.stardust itself is governed by its own guards (config.yaml hard-block,
     # mirror guard, write_approval); this gate targets PROJECT-LOCAL files only.
-    # Must run before the ``.hermes`` component rule, which would match the home.
+    # Must run before the ``.stardust`` component rule, which would match the home.
     # ``_hermes_exempt_homes`` also covers the ROOT when the active home is a named
-    # profile, so ~/.hermes/<file> cannot read as project-local ``.hermes`` config.
+    # profile, so ~/.stardust/<file> cannot read as project-local ``.stardust`` config.
     for real_home in _hermes_exempt_homes():
         if resolved == real_home or resolved.startswith(real_home + os.sep):
             return None
@@ -234,11 +234,11 @@ def _protected_instruction_reason(filepath: str, task_id: str = "default",
         if base_lower in _PROTECTED_INSTRUCTION_BASENAMES or any(
                 fnmatch.fnmatch(base_lower, pattern.lower()) for pattern in extra_patterns):
             return base
-        # Project-local .hermes config dirs (<repo>/.hermes/config.yaml) steer
+        # Project-local .stardust config dirs (<repo>/.stardust/config.yaml) steer
         # behavior too. Only the IMMEDIATE parent counts — matching any ancestor
-        # would gate every write inside a checkout living under ~/.hermes.
+        # would gate every write inside a checkout living under ~/.stardust.
         parts = candidate.replace("\\", "/").rstrip("/").split("/")
-        if len(parts) >= 2 and parts[-2] == ".hermes":
+        if len(parts) >= 2 and parts[-2] == ".stardust":
             return candidate
     return None
 
@@ -392,12 +392,12 @@ def _get_container_mirror_prefix_for_task(task_id: str = "default") -> str | Non
         if env is not None:
             persistent_docker = (env.__class__.__name__ == "DockerEnvironment"
                                  and bool(getattr(env, "_persistent", False)))
-            return "/root/.hermes" if persistent_docker else None
+            return "/root/.stardust" if persistent_docker else None
         config = _get_env_config()
     except Exception:
         return None
     if config.get("env_type") == "docker" and config.get("container_persistent", True):
-        return "/root/.hermes"
+        return "/root/.stardust"
     return None
 
 

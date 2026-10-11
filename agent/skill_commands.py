@@ -132,9 +132,9 @@ def _resolve_skill_commands_platform() -> Optional[str]:
     """
     try:
         from gateway.session_context import get_session_env
-        resolved_platform = os.getenv("HERMES_PLATFORM") or get_session_env("HERMES_SESSION_PLATFORM")
+        resolved_platform = os.getenv("STARDUST_PLATFORM") or get_session_env("STARDUST_SESSION_PLATFORM")
     except Exception:
-        resolved_platform = os.getenv("HERMES_PLATFORM")
+        resolved_platform = os.getenv("STARDUST_PLATFORM")
     return resolved_platform or None
 
 
@@ -590,7 +590,7 @@ def build_preloaded_skills_prompt(
 ) -> tuple[str, list[str], list[str]]:
     """Load skills for session-wide CLI/TUI preloading; returns (prompt_text,
     loaded_skill_names, missing_identifiers). Disabled skills count as missing:
-    this path bypasses the scan-time filter, and ``hermes -s <skill>`` must not
+    this path bypasses the scan-time filter, and ``stardust -s <skill>`` must not
     force-load an operator-disabled skill. *excluded_loaded_names* are canonical
     names the session already carries (skills.auto_load): they resolve as loaded
     but are not rendered again.
@@ -637,7 +637,7 @@ def build_auto_load_prompt(
 
     *home_override* makes home resolution EXPLICIT (same seam as ``build_skills_system_prompt``): the config,
     the disabled list and the ``<home>/skills`` lookup all resolve under that home, so a gateway build thread
-    that lost the HERMES_HOME ContextVar cannot pin the launch profile's skills into another profile's prompt.
+    that lost the STARDUST_HOME ContextVar cannot pin the launch profile's skills into another profile's prompt.
     """
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
     home_token = set_hermes_home_override(str(home_override)) if home_override is not None else None

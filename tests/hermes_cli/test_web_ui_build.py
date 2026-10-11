@@ -1,8 +1,8 @@
 """Tests for _web_ui_build_needed — staleness check for the web UI dist.
 
 The freshness check uses a SHA-256 content hash of the web source tree
-(mirroring the desktop build), recorded in a stamp file under $HERMES_HOME,
-NOT mtime comparison — so ``git pull`` / ``hermes update`` that rewrite
+(mirroring the desktop build), recorded in a stamp file under $STARDUST_HOME,
+NOT mtime comparison — so ``git pull`` / ``stardust update`` that rewrite
 source mtimes without changing content no longer fool it.
 
 Critical invariant: the dashboard Vite build outputs to hermes_cli/web_dist/
@@ -26,7 +26,7 @@ from hermes_cli.update_cmd import _web_build_toolchain_ready, _web_toolchain_roo
 @pytest.fixture(autouse=True)
 def _isolated_hermes_home(tmp_path, monkeypatch):
     """Keep web-build-stamp writes inside the test's tmp dir, never the real home."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "_hermes_home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "_hermes_home"))
 
 
 def _touch(path: Path, offset: float = 0.0) -> None:
@@ -68,7 +68,7 @@ class TestWebUIBuildNeeded:
 
     def test_mtime_only_change_is_not_stale(self, tmp_path):
         """The whole point: bumping mtimes without changing bytes (what
-        ``git pull`` / ``hermes update`` do) must NOT report stale."""
+        ``git pull`` / ``stardust update`` do) must NOT report stale."""
         web_dir, dist_dir = _make_web_dir(tmp_path)
         src = web_dir / "src" / "App.tsx"
         src.parent.mkdir(parents=True, exist_ok=True)
@@ -153,7 +153,7 @@ class TestBuildWebUISkipsWhenFresh:
 
     def test_workspace_root_install_names_update_closure(self, tmp_path, monkeypatch):
         """From the workspace root, _build_web_ui must install the SAME
-        closure as `hermes update` (ui-tui + web + --include-workspace-root).
+        closure as `stardust update` (ui-tui + web + --include-workspace-root).
 
         The install helper prefers `npm ci`, which deletes node_modules before
         reifying the requested tree — a narrower `--workspace web`-only pass

@@ -46,9 +46,9 @@ class TestUserSystemdPrivateSocketPreflight:
 class TestSystemdServiceRefresh:
 
     def test_systemd_restart_timeout_prints_status_guidance(self, monkeypatch, capsys):
-        """`hermes gateway restart` must not surface a raw TimeoutExpired traceback.
+        """`stardust gateway restart` must not surface a raw TimeoutExpired traceback.
 
-        The dashboard spawns `hermes gateway restart` in the background; when a
+        The dashboard spawns `stardust gateway restart` in the background; when a
         wedged adapter websocket pushes drain past the 90s CLI timeout, the
         dashboard would previously show a Python traceback (issue #19937
         follow-up: the same failure mode applies to restart, not just stop).
@@ -82,7 +82,7 @@ class TestSystemdServiceRefresh:
 
         output = capsys.readouterr().out
         assert "still restarting after 90s" in output
-        assert "hermes gateway status" in output
+        assert "stardust gateway status" in output
 
     def test_refresh_refuses_to_bake_pytest_tmpdir_into_real_user_unit(
         self, tmp_path, monkeypatch
@@ -90,11 +90,11 @@ class TestSystemdServiceRefresh:
         """Defense in depth: ``refresh_systemd_unit_if_needed()`` runs every
         time ``run_gateway()`` starts. The user-scope unit path resolves
         under ``Path.home()`` (NOT sandboxed by conftest), and
-        ``generate_systemd_unit()`` bakes ``HERMES_HOME`` into the unit's
+        ``generate_systemd_unit()`` bakes ``STARDUST_HOME`` into the unit's
         ``Environment=`` line. Without this guard, any test that drives
         ``run_gateway()`` end-to-end on a real Linux dev box silently
         rewrites the developer's installed gateway unit with a
-        ``/tmp/pytest-of-.../hermes_test`` HERMES_HOME — silently breaking
+        ``/tmp/pytest-of-.../hermes_test`` STARDUST_HOME — silently breaking
         their gateway on the next boot. The guard sniffs the generated
         unit body for tmpdir markers and refuses the write. Tests that
         legitimately exercise the refresh flow patch
@@ -107,10 +107,10 @@ class TestSystemdServiceRefresh:
         monkeypatch.setattr(
             gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path
         )
-        # Realistic generated unit referencing a pytest tmpdir HERMES_HOME
+        # Realistic generated unit referencing a pytest tmpdir STARDUST_HOME
         polluted_unit = (
             "[Service]\n"
-            'Environment="HERMES_HOME=/tmp/pytest-of-alice/pytest-42/'
+            'Environment="STARDUST_HOME=/tmp/pytest-of-alice/pytest-42/'
             'popen-gw0/test_x/hermes_test"\n'
         )
         monkeypatch.setattr(
@@ -143,7 +143,7 @@ class TestTempHomeServiceDefinitionGuard:
     """_temp_home_in_service_definition() — structural temp-dir detection."""
 
     def test_detects_tmp_home_in_systemd_unit(self):
-        unit = '[Service]\nEnvironment="HERMES_HOME=/tmp/hermes-e2e-41264"\n'
+        unit = '[Service]\nEnvironment="STARDUST_HOME=/tmp/hermes-e2e-41264"\n'
         assert (
             gateway_cli._temp_home_in_service_definition(unit)
             == "/tmp/hermes-e2e-41264"
@@ -153,7 +153,7 @@ class TestTempHomeServiceDefinitionGuard:
         import tempfile as _tempfile
 
         monkeypatch.setattr(_tempfile, "gettempdir", lambda: str(tmp_path))
-        unit = f'[Service]\nEnvironment="HERMES_HOME={tmp_path}/hermes-home"\n'
+        unit = f'[Service]\nEnvironment="STARDUST_HOME={tmp_path}/hermes-home"\n'
         assert gateway_cli._temp_home_in_service_definition(unit) is not None
 
 
@@ -168,7 +168,7 @@ class TestRequireServiceInstalled:
         assert exc_info.value.code == 1
         out = capsys.readouterr().out
         assert "not installed" in out
-        assert "hermes gateway install" in out
+        assert "stardust gateway install" in out
 
     def test_passes_when_unit_exists(self, tmp_path, monkeypatch):
         unit_path = tmp_path / "hermes-gateway.service"
@@ -179,7 +179,7 @@ class TestRequireServiceInstalled:
 
 
 class TestServiceIdentityForForeignHome:
-    """A HERMES_HOME that is neither ``~/.hermes`` nor ``~/.hermes/profiles/<name>`` must never resolve to
+    """A STARDUST_HOME that is neither ``~/.stardust`` nor ``~/.stardust/profiles/<name>`` must never resolve to
     the default profile's ``hermes-gateway`` unit (a temp-home harness uninstalled the production gateway)."""
 
     @pytest.fixture
@@ -192,7 +192,7 @@ class TestServiceIdentityForForeignHome:
     def test_foreign_home_gets_its_own_unit(self, machine_home, tmp_path, monkeypatch):
         foreign = tmp_path / "elsewhere"
         foreign.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(foreign))
+        monkeypatch.setenv("STARDUST_HOME", str(foreign))
 
         default_unit = machine_home / ".config" / "systemd" / "user" / "hermes-gateway.service"
         assert gateway_cli.get_service_name() != "hermes-gateway"
@@ -200,39 +200,39 @@ class TestServiceIdentityForForeignHome:
         assert gateway_cli.get_systemd_unit_path().parent == default_unit.parent
 
     def test_default_and_named_profile_homes_keep_their_names(self, machine_home, monkeypatch):
-        default_home = machine_home / ".hermes"
+        default_home = machine_home / ".stardust"
         (default_home / "profiles" / "alpha").mkdir(parents=True)
 
-        monkeypatch.setenv("HERMES_HOME", str(default_home))
+        monkeypatch.setenv("STARDUST_HOME", str(default_home))
         assert gateway_cli.get_service_name() == "hermes-gateway"
 
-        monkeypatch.setenv("HERMES_HOME", str(default_home / "profiles" / "alpha"))
+        monkeypatch.setenv("STARDUST_HOME", str(default_home / "profiles" / "alpha"))
         assert gateway_cli.get_service_name() == "hermes-gateway-alpha"
 
     def test_sudo_user_default_home_keeps_bare_service_name(self, machine_home, tmp_path, monkeypatch):
         sudo_home = tmp_path / "alice"
-        sudo_default = sudo_home / ".hermes"
+        sudo_default = sudo_home / ".stardust"
         sudo_default.mkdir(parents=True)
         monkeypatch.setattr(os, "geteuid", lambda: 0)
         monkeypatch.setenv("SUDO_USER", "alice")
         monkeypatch.setattr(pwd, "getpwnam", lambda user: SimpleNamespace(pw_dir=str(sudo_home)))
 
         # Before unit sync, sudo resolves the root process's native home.
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         assert gateway_cli.get_service_name() == "hermes-gateway"
 
-        # After unit sync, HERMES_HOME points at the invoking user's native home.
-        monkeypatch.setenv("HERMES_HOME", str(sudo_default))
+        # After unit sync, STARDUST_HOME points at the invoking user's native home.
+        monkeypatch.setenv("STARDUST_HOME", str(sudo_default))
         assert gateway_cli.get_service_name() == "hermes-gateway"
 
 
 class TestUninstallRefusesForeignUnit:
-    """systemd_uninstall must not stop/disable/unlink a unit pinned to another HERMES_HOME."""
+    """systemd_uninstall must not stop/disable/unlink a unit pinned to another STARDUST_HOME."""
 
     def test_unit_for_other_home_is_left_alone(self, tmp_path, monkeypatch, capsys):
         unit_path = tmp_path / "hermes-gateway.service"
-        unit_path.write_text('[Service]\nEnvironment="HERMES_HOME=/somewhere/else"\n', encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "mine"))
+        unit_path.write_text('[Service]\nEnvironment="STARDUST_HOME=/somewhere/else"\n', encoding="utf-8")
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "mine"))
         monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
         monkeypatch.setattr(gateway_cli, "_systemd_scope_preamble", lambda *a, **k: False)
         calls = []
@@ -247,14 +247,14 @@ class TestUninstallRefusesForeignUnit:
 
 class TestGetCronDrainTimeout:
     def test_missing_config_falls_back_to_default(self, monkeypatch):
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(gateway_cli, "read_raw_config", lambda: {})
         assert (
             gateway_cli._get_cron_drain_timeout() == DEFAULT_GATEWAY_CRON_DRAIN_TIMEOUT
         )
 
     def test_zero_in_config_is_opt_out(self, monkeypatch):
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(
             gateway_cli,
             "read_raw_config",
@@ -263,7 +263,7 @@ class TestGetCronDrainTimeout:
         assert gateway_cli._get_cron_drain_timeout() == 0.0
 
     def test_env_overrides_config(self, monkeypatch):
-        monkeypatch.setenv("HERMES_CRON_DRAIN_TIMEOUT", "45")
+        monkeypatch.setenv("STARDUST_CRON_DRAIN_TIMEOUT", "45")
         monkeypatch.setattr(
             gateway_cli,
             "read_raw_config",
@@ -284,8 +284,8 @@ class TestGeneratedSystemdUnits:
         """#94759: default restart_drain_timeout=0 still leaves a 30s cron
         floor plus cleanup reserve. The old max(60, drain+30)=60 unit
         SIGKILLed that in-budget drain."""
-        monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_RESTART_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(gateway_cli, "_get_restart_drain_timeout", lambda: 0.0)
         monkeypatch.setattr(
             gateway_cli,
@@ -321,8 +321,8 @@ class TestGeneratedSystemdUnits:
         """#104251: a planned restart (gateway/restart.py's exit 75) is force-restarted
         via RestartForceExitStatus, but without SuccessExitStatus=75 too, systemd still
         classifies the exit as a failure -- the unit flips to ``failed``/``Result=exit-code``
-        and any OnFailure= alert unit fires on every routine restart (hermes update,
-        hermes gateway restart, the in-app restart). SuccessExitStatus=75 keeps the same
+        and any OnFailure= alert unit fires on every routine restart (stardust update,
+        stardust gateway restart, the in-app restart). SuccessExitStatus=75 keeps the same
         force-restart behavior while letting the unit land back in ``active``/``success``,
         so OnFailure= stays reserved for actual failures."""
         unit = gateway_cli.generate_systemd_unit(system=False)
@@ -335,8 +335,8 @@ class TestGeneratedSystemdUnits:
     def test_unit_stop_budget_beats_drain_only_formula_with_real_loaders(
         self, monkeypatch
     ):
-        monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_RESTART_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_DRAIN_TIMEOUT", raising=False)
         drain = gateway_cli._get_restart_drain_timeout()
         cron = gateway_cli._get_cron_drain_timeout()
         unit = gateway_cli.generate_systemd_unit(system=False)
@@ -355,7 +355,7 @@ class TestGeneratedSystemdUnits:
         # systemd_unit_is_current() perpetually false and forcing a
         # daemon-reload restart loop on every boot.
         local_bin = tmp_path / ".local" / "bin"
-        profile_node_bin = tmp_path / ".hermes" / "profiles" / "jarvis" / "node" / "bin"
+        profile_node_bin = tmp_path / ".stardust" / "profiles" / "jarvis" / "node" / "bin"
         local_bin.mkdir(parents=True)
         profile_node_bin.mkdir(parents=True)
         real_node = profile_node_bin / "node"
@@ -373,7 +373,7 @@ class TestGeneratedSystemdUnits:
     def test_launchd_plist_does_not_leak_profile_node_symlink_target(self, tmp_path, monkeypatch):
         # Same #48700 regression for the macOS twin generate_launchd_plist().
         local_bin = tmp_path / ".local" / "bin"
-        profile_node_bin = tmp_path / ".hermes" / "profiles" / "jarvis" / "node" / "bin"
+        profile_node_bin = tmp_path / ".stardust" / "profiles" / "jarvis" / "node" / "bin"
         local_bin.mkdir(parents=True)
         profile_node_bin.mkdir(parents=True)
         real_node = profile_node_bin / "node"
@@ -390,7 +390,7 @@ class TestGeneratedSystemdUnits:
 
     def test_launchd_plist_persists_configured_nofile_soft_limit(self, monkeypatch):
         """The generated plist must carry SoftResourceLimits/NumberOfFiles so a
-        plist rewrite by `hermes gateway start` cannot strip the FD floor and
+        plist rewrite by `stardust gateway start` cannot strip the FD floor and
         reintroduce EMFILE crashes (launchd default soft limit is 256)."""
         import hermes_cli.resource_limits as resource_limits
 
@@ -485,8 +485,8 @@ class TestLaunchdServiceRecovery:
             gateway_cli,
             "generate_launchd_plist",
             lambda: (
-                "<plist>--replace\n<key>HERMES_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<plist>--replace\n<key>STARDUST_HOME</key>"
+                "<string>/Users/alice/.stardust</string></plist>"
             ),
         )
         # Pretend the gateway is running and that we ARE inside its tree.
@@ -560,8 +560,8 @@ class TestLaunchdServiceRecovery:
             gateway_cli,
             "generate_launchd_plist",
             lambda: (
-                "<plist>--replace\n<key>HERMES_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<plist>--replace\n<key>STARDUST_HOME</key>"
+                "<string>/Users/alice/.stardust</string></plist>"
             ),
         )
         # Gateway running, but we are NOT inside its tree.
@@ -611,8 +611,8 @@ class TestLaunchdServiceRecovery:
             gateway_cli,
             "generate_launchd_plist",
             lambda: (
-                "<plist>--replace\n<key>HERMES_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<plist>--replace\n<key>STARDUST_HOME</key>"
+                "<string>/Users/alice/.stardust</string></plist>"
             ),
         )
         monkeypatch.setattr("gateway.status.get_running_pid", lambda *a, **k: 4242)
@@ -663,8 +663,8 @@ class TestLaunchdServiceRecovery:
             gateway_cli,
             "generate_launchd_plist",
             lambda: (
-                "<plist>--replace\n<key>HERMES_HOME</key>"
-                "<string>/Users/alice/.hermes</string></plist>"
+                "<plist>--replace\n<key>STARDUST_HOME</key>"
+                "<string>/Users/alice/.stardust</string></plist>"
             ),
         )
         monkeypatch.setattr("gateway.status.get_running_pid", lambda *a, **k: 4242)
@@ -1247,26 +1247,26 @@ class TestDetectVenvDir:
 
 
 class TestSystemUnitHermesHome:
-    """HERMES_HOME in system units must reference the target user, not root."""
+    """STARDUST_HOME in system units must reference the target user, not root."""
 
     def test_empty_managed_node_dir_uses_only_ambient_fallback(
         self, monkeypatch, tmp_path
     ):
-        managed_bin = tmp_path / ".hermes" / "node" / "bin"
+        managed_bin = tmp_path / ".stardust" / "node" / "bin"
         managed_bin.mkdir(parents=True)
         monkeypatch.setattr(
             gateway_cli.shutil, "which", lambda name: "/opt/external-node/bin/node"
         )
         entries: list[str] = []
 
-        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".hermes")
+        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".stardust")
 
         assert entries == ["/opt/external-node/bin"]
 
     def test_non_executable_managed_node_uses_only_ambient_fallback(
         self, monkeypatch, tmp_path
     ):
-        managed_bin = tmp_path / ".hermes" / "node" / "bin"
+        managed_bin = tmp_path / ".stardust" / "node" / "bin"
         managed_bin.mkdir(parents=True)
         node = managed_bin / "node"
         node.write_text("#!/bin/sh\n")
@@ -1276,7 +1276,7 @@ class TestSystemUnitHermesHome:
         )
         entries: list[str] = []
 
-        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".hermes")
+        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".stardust")
 
         assert entries == ["/opt/external-node/bin"]
 
@@ -1285,9 +1285,9 @@ class TestSystemUnitHermesHome:
     ):
         """A target-managed Node must suppress caller-specific PATH fallbacks."""
         target_home = tmp_path / "home" / "alice"
-        target_hermes = target_home / ".hermes"
+        target_hermes = target_home / ".stardust"
         root_home = tmp_path / "root"
-        root_hermes = root_home / ".hermes"
+        root_hermes = root_home / ".stardust"
         managed_bin = target_hermes / "node" / "bin"
         managed_bin.mkdir(parents=True)
         node = managed_bin / "node"
@@ -1296,7 +1296,7 @@ class TestSystemUnitHermesHome:
         root_hermes.mkdir(parents=True)
 
         monkeypatch.setattr(Path, "home", staticmethod(lambda: root_home))
-        monkeypatch.setenv("HERMES_HOME", str(root_hermes))
+        monkeypatch.setenv("STARDUST_HOME", str(root_hermes))
         monkeypatch.setattr(
             gateway_cli,
             "_system_service_identity",
@@ -1331,14 +1331,14 @@ class TestSystemUnitHermesHome:
         )
         entries: list[str] = []
 
-        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".hermes")
+        gateway_cli._append_node_dir_for_service(entries, tmp_path / ".stardust")
 
         assert entries == ["/opt/external-node/bin"]
 
     def test_system_unit_orders_after_target_user_manager(self, monkeypatch, tmp_path):
         """#104893: restart-safe workers need user@<uid>.service; the system unit must not race it at boot."""
         monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
         monkeypatch.setattr(
             gateway_cli, "_system_service_identity",
             lambda run_as_user=None: ("alice", "alice", str(tmp_path), 1001),
@@ -1356,7 +1356,7 @@ class TestSystemUnitHermesHome:
     def test_system_unit_uses_target_user_home_not_calling_user(self, monkeypatch):
         # Simulate sudo: Path.home() returns /root, target user is alice
         monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/root")))
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
         monkeypatch.setattr(
             gateway_cli, "_system_service_identity",
             lambda run_as_user=None: ("alice", "alice", "/home/alice", 1001),
@@ -1368,15 +1368,15 @@ class TestSystemUnitHermesHome:
 
         unit = gateway_cli.generate_systemd_unit(system=True, run_as_user="alice")
 
-        assert 'HERMES_HOME=/home/alice/.hermes' in unit
-        assert '/root/.hermes' not in unit
+        assert 'STARDUST_HOME=/home/alice/.stardust' in unit
+        assert '/root/.stardust' not in unit
 
     def test_user_unit_unaffected_by_change(self):
-        # User-scope units should still use the calling user's HERMES_HOME
+        # User-scope units should still use the calling user's STARDUST_HOME
         unit = gateway_cli.generate_systemd_unit(system=False)
 
         hermes_home = str(gateway_cli.get_hermes_home().resolve())
-        assert f'HERMES_HOME={hermes_home}' in unit
+        assert f'STARDUST_HOME={hermes_home}' in unit
 
 
 class TestSystemUnitRefreshSyncsHermesHome:
@@ -1385,8 +1385,8 @@ class TestSystemUnitRefreshSyncsHermesHome:
     def test_refresh_adopts_unit_hermes_home_before_rewriting(self, tmp_path, monkeypatch):
         root_home = tmp_path / "root"
         alice_home = tmp_path / "alice"
-        root_hermes = root_home / ".hermes"
-        alice_hermes = alice_home / ".hermes"
+        root_hermes = root_home / ".stardust"
+        alice_hermes = alice_home / ".stardust"
         root_hermes.mkdir(parents=True)
         alice_hermes.mkdir(parents=True)
         (root_hermes / "config.yaml").write_text(
@@ -1409,24 +1409,24 @@ class TestSystemUnitRefreshSyncsHermesHome:
         monkeypatch.setattr(gateway_cli.shutil, "which", lambda cmd: None)
         monkeypatch.setattr(gateway_cli, "get_systemd_unit_path", lambda system=False: unit_path)
         monkeypatch.setattr(gateway_cli, "_run_systemctl", lambda *a, **k: None)
-        monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_RESTART_DRAIN_TIMEOUT", raising=False)
 
-        # Correct installed unit (operator's HERMES_HOME + drain timeout).
-        monkeypatch.setenv("HERMES_HOME", str(alice_hermes))
+        # Correct installed unit (operator's STARDUST_HOME + drain timeout).
+        monkeypatch.setenv("STARDUST_HOME", str(alice_hermes))
         good_unit = gateway_cli.generate_systemd_unit(system=True, run_as_user="alice")
         assert "TimeoutStopSec=210" in good_unit
         unit_path.write_text(good_unit, encoding="utf-8")
 
-        # Simulate sudo without inherited HERMES_HOME (falls back to root).
-        monkeypatch.setenv("HERMES_HOME", str(root_hermes))
+        # Simulate sudo without inherited STARDUST_HOME (falls back to root).
+        monkeypatch.setenv("STARDUST_HOME", str(root_hermes))
         assert gateway_cli.refresh_systemd_unit_if_needed(system=True) is False
         assert unit_path.read_text(encoding="utf-8") == good_unit
-        assert os.environ["HERMES_HOME"] == str(alice_hermes)
+        assert os.environ["STARDUST_HOME"] == str(alice_hermes)
         assert gateway_cli.systemd_unit_is_current(system=True) is True
 
     def test_is_current_syncs_before_reading_unit(self, tmp_path, monkeypatch):
         """CHOKEPOINT INVARIANT: systemd_unit_is_current() must adopt the
-        unit's pinned HERMES_HOME *before* it reads/compares the unit.
+        unit's pinned STARDUST_HOME *before* it reads/compares the unit.
 
         This is the single site that enforces sync-before-compare for every
         path (refresh gates on it; status/install call it). If a future edit
@@ -1515,10 +1515,10 @@ class TestHermesHomeForTargetUser:
 
     def test_remaps_default_home(self, monkeypatch):
         monkeypatch.setattr(Path, "home", staticmethod(lambda: Path("/root")))
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
 
         result = gateway_cli._hermes_home_for_target_user("/home/alice")
-        assert result == "/home/alice/.hermes"
+        assert result == "/home/alice/.stardust"
 
 
 class TestGeneratedUnitUsesDetectedVenv:
@@ -1653,7 +1653,7 @@ class TestPreflightUserSystemd:
 
         msg = str(exc_info.value)
         assert "sudo loginctl enable-linger" in msg
-        assert "hermes gateway run" in msg  # foreground fallback mentioned
+        assert "stardust gateway run" in msg  # foreground fallback mentioned
         assert "Interactive authentication required" in msg
 
     def test_enable_linger_succeeds_and_socket_appears(self, monkeypatch, capsys):
@@ -1697,11 +1697,11 @@ class TestProfileArg:
         """sudo system install must keep the target user's named profile in ExecStart."""
         root_home = tmp_path / "root"
         target_home = tmp_path / "home" / "alice"
-        root_profile = root_home / ".hermes" / "profiles" / "mybot"
+        root_profile = root_home / ".stardust" / "profiles" / "mybot"
         root_profile.mkdir(parents=True)
 
         monkeypatch.setattr(Path, "home", lambda: root_home)
-        monkeypatch.setenv("HERMES_HOME", str(root_profile))
+        monkeypatch.setenv("STARDUST_HOME", str(root_profile))
         monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: root_profile)
         monkeypatch.setattr(
             gateway_cli,
@@ -1713,13 +1713,13 @@ class TestProfileArg:
 
         assert "ExecStart=" in unit
         assert "--profile mybot gateway run" in unit
-        assert f'HERMES_HOME={target_home / ".hermes" / "profiles" / "mybot"}' in unit
+        assert f'STARDUST_HOME={target_home / ".stardust" / "profiles" / "mybot"}' in unit
 
     def test_launchd_plist_wraps_gateway_stderr_with_timestamps(self, tmp_path, monkeypatch):
-        profile_dir = tmp_path / ".hermes" / "profiles" / "mybot"
+        profile_dir = tmp_path / ".stardust" / "profiles" / "mybot"
         profile_dir.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_dir))
         monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: profile_dir)
         monkeypatch.setattr(gateway_cli, "get_python_path", lambda: "/usr/bin/python3")
 
@@ -1744,7 +1744,7 @@ class TestProfileArg:
         ]
 
     def test_launchd_plist_path_uses_real_user_home_not_profile_home(self, tmp_path, monkeypatch):
-        profile_dir = tmp_path / ".hermes" / "profiles" / "orcha"
+        profile_dir = tmp_path / ".stardust" / "profiles" / "orcha"
         profile_dir.mkdir(parents=True)
         machine_home = tmp_path / "machine-home"
         machine_home.mkdir()
@@ -1752,7 +1752,7 @@ class TestProfileArg:
         profile_home.mkdir()
 
         monkeypatch.setattr(Path, "home", lambda: profile_home)
-        monkeypatch.setenv("HERMES_HOME", str(profile_dir))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_dir))
         monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: profile_dir)
         monkeypatch.setattr(pwd, "getpwuid", lambda uid: SimpleNamespace(pw_dir=str(machine_home)))
 
@@ -1768,10 +1768,10 @@ class TestRemapPathForUser:
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "root")
         (tmp_path / "root").mkdir()
         result = gateway_cli._remap_path_for_user(
-            str(tmp_path / "root" / ".hermes" / "hermes-agent"),
+            str(tmp_path / "root" / ".stardust" / "hermes-agent"),
             str(tmp_path / "alice"),
         )
-        assert result == str(tmp_path / "alice" / ".hermes" / "hermes-agent")
+        assert result == str(tmp_path / "alice" / ".stardust" / "hermes-agent")
 
 
 class TestSystemUnitPathRemapping:
@@ -1780,7 +1780,7 @@ class TestSystemUnitPathRemapping:
     def test_system_unit_has_no_root_paths(self, monkeypatch, tmp_path):
         root_home = tmp_path / "root"
         root_home.mkdir()
-        project = root_home / ".hermes" / "hermes-agent"
+        project = root_home / ".stardust" / "hermes-agent"
         project.mkdir(parents=True)
         venv_bin = project / "venv" / "bin"
         venv_bin.mkdir(parents=True)
@@ -1789,8 +1789,8 @@ class TestSystemUnitPathRemapping:
         target_home = "/home/alice"
 
         monkeypatch.setattr(Path, "home", lambda: root_home)
-        monkeypatch.setenv("HERMES_HOME", str(root_home / ".hermes"))
-        monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: root_home / ".hermes")
+        monkeypatch.setenv("STARDUST_HOME", str(root_home / ".stardust"))
+        monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: root_home / ".stardust")
         monkeypatch.setattr(gateway_cli, "PROJECT_ROOT", project)
         monkeypatch.setattr(gateway_cli, "_detect_venv_dir", lambda: project / "venv")
         monkeypatch.setattr(gateway_cli, "get_python_path", lambda: str(venv_bin / "python"))
@@ -1805,12 +1805,12 @@ class TestSystemUnitPathRemapping:
         assert str(root_home) not in unit
         # Target user paths should be present
         assert "/home/alice" in unit
-        # WorkingDirectory is anchored at the target user's HERMES_HOME (stable,
+        # WorkingDirectory is anchored at the target user's STARDUST_HOME (stable,
         # always exists) — NOT the source checkout under it. Pinning cwd to the
         # checkout is the rot bug fixed alongside this: a relocated/removed
         # checkout would crash-loop the unit on CHDIR (status=200).
-        assert "WorkingDirectory=/home/alice/.hermes" in unit
-        assert "WorkingDirectory=/home/alice/.hermes/hermes-agent" not in unit
+        assert "WorkingDirectory=/home/alice/.stardust" in unit
+        assert "WorkingDirectory=/home/alice/.stardust/hermes-agent" not in unit
 
 
 class TestDockerAwareGateway:
@@ -1846,7 +1846,7 @@ class TestDockerAwareGateway:
         assert "status" in calls[0]
 
     def test_install_in_container_prints_docker_guidance(self, monkeypatch, capsys):
-        """'hermes gateway install' inside Docker exits 0 with container guidance."""
+        """'stardust gateway install' inside Docker exits 0 with container guidance."""
         import pytest
 
         monkeypatch.setattr(gateway_cli, "is_managed", lambda: False)
@@ -1918,14 +1918,14 @@ class TestLegacyHermesUnitDetection:
         ExecStart variants we've seen in the wild:
           - python -m hermes_cli.main gateway run
           - python path/to/hermes_cli/main.py gateway run
-          - hermes gateway run   (direct binary)
+          - stardust gateway run   (direct binary)
           - python path/to/gateway/run.py
         """
         user_dir, _ = self._setup_search_paths(tmp_path, monkeypatch)
         variants = [
             "ExecStart=/venv/bin/python -m hermes_cli.main gateway run --replace",
             "ExecStart=/venv/bin/python /opt/hermes/hermes_cli/main.py gateway run",
-            "ExecStart=/usr/local/bin/hermes gateway run --replace",
+            "ExecStart=/usr/local/bin/stardust gateway run --replace",
             "ExecStart=/venv/bin/python /opt/hermes/gateway/run.py",
         ]
         for i, execstart in enumerate(variants):
@@ -1947,7 +1947,7 @@ class TestLegacyHermesUnitDetection:
 
         assert "Legacy" in out
         assert "hermes.service" in out
-        assert "hermes gateway migrate-legacy" in out
+        assert "stardust gateway migrate-legacy" in out
 
 
 class TestRemoveLegacyHermesUnits:
@@ -2018,7 +2018,7 @@ class TestRemoveLegacyHermesUnits:
 
 
 class TestMigrateLegacyCommand:
-    """Tests for the `hermes gateway migrate-legacy` subcommand dispatch."""
+    """Tests for the `stardust gateway migrate-legacy` subcommand dispatch."""
 
     def test_migrate_legacy_subparser_accepts_dry_run_and_yes(self):
         """Verify the argparse subparser is registered and parses flags."""
@@ -2028,7 +2028,7 @@ class TestMigrateLegacyCommand:
         # Fall back to calling main's setup helper if direct access isn't exposed
         # The key thing: the subparser must exist. We verify by constructing
         # a namespace through argparse directly — but if build_parser isn't
-        # public, just confirm that `hermes gateway --help` shows it.
+        # public, just confirm that `stardust gateway --help` shows it.
         import subprocess
         import sys
 
@@ -2292,7 +2292,7 @@ class TestSystemScopeWizardPreCheck:
         assert gateway_cli._system_scope_wizard_would_need_root() is True
 
     def test_non_root_with_explicit_system_arg_returns_true(self, tmp_path, monkeypatch):
-        # Caller passed system=True explicitly (e.g. ``hermes gateway start --system``).
+        # Caller passed system=True explicitly (e.g. ``stardust gateway start --system``).
         self._setup_units(tmp_path, monkeypatch, system_present=False, user_present=False)
         monkeypatch.setattr(gateway_cli.os, "geteuid", lambda: 1000)
 
@@ -2313,12 +2313,12 @@ class TestSystemScopeRemediationOutput:
         assert "system-wide service" in out
         assert "start requires root" in out
         assert "sudo systemctl start hermes-gateway" in out
-        assert "sudo hermes gateway uninstall --system" in out
-        assert "hermes gateway install" in out
+        assert "sudo stardust gateway uninstall --system" in out
+        assert "stardust gateway install" in out
 
 
 class TestGatewayCommandCatchesSystemScopeError:
-    """The direct CLI path (``hermes gateway start --system`` etc.) must
+    """The direct CLI path (``stardust gateway start --system`` etc.) must
     still exit 1 with a clean message when non-root. The top-level
     ``gateway_command`` catches ``SystemScopeRequiresRootError`` and
     converts it back to ``sys.exit(1)``, preserving existing CLI behavior.
@@ -2354,12 +2354,12 @@ class TestGatewayCommandCatchesSystemScopeError:
 
 class TestServiceWorkingDirIsStable:
     """The gateway service must anchor WorkingDirectory at a stable path
-    (HERMES_HOME), never the source checkout / worktree, so a relocated or
+    (STARDUST_HOME), never the source checkout / worktree, so a relocated or
     deleted checkout can't crash-loop the unit on CHDIR (status=200).
     """
 
     def test_user_unit_workingdirectory_is_hermes_home_not_checkout(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: home)
         unit = gateway_cli.generate_systemd_unit(system=False)
@@ -2373,7 +2373,7 @@ class TestServiceWorkingDirIsStable:
     def test_launchd_workingdirectory_is_hermes_home(self, tmp_path, monkeypatch):
         import re
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: home)
         plist = gateway_cli.generate_launchd_plist()
@@ -2398,7 +2398,7 @@ class TestServiceTakeoverGovernance:
     """
 
     def test_launchd_plist_does_not_arm_takeover(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: home)
         plist = gateway_cli.generate_launchd_plist()
@@ -2411,7 +2411,7 @@ class TestServiceTakeoverGovernance:
         assert "<true/>" in plist
 
     def test_systemd_unit_does_not_arm_takeover(self, tmp_path, monkeypatch):
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir()
         monkeypatch.setattr(gateway_cli, "get_hermes_home", lambda: home)
         unit = gateway_cli.generate_systemd_unit(system=False)
@@ -2650,12 +2650,12 @@ class TestTimeoutStopSecCoversCronFloor:
     max(restart_drain, cron_floor) + 30 — not the restart drain alone."""
 
     def _unit_with_config(self, tmp_path, monkeypatch, config_yaml, env=None):
-        hermes = tmp_path / "home" / ".hermes"
+        hermes = tmp_path / "home" / ".stardust"
         hermes.mkdir(parents=True)
         (hermes / "config.yaml").write_text(config_yaml, encoding="utf-8")
-        monkeypatch.setenv("HERMES_HOME", str(hermes))
-        monkeypatch.delenv("HERMES_RESTART_DRAIN_TIMEOUT", raising=False)
-        monkeypatch.delenv("HERMES_CRON_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.setenv("STARDUST_HOME", str(hermes))
+        monkeypatch.delenv("STARDUST_RESTART_DRAIN_TIMEOUT", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_DRAIN_TIMEOUT", raising=False)
         monkeypatch.setattr(gateway_cli.shutil, "which", lambda cmd: None)
         monkeypatch.setattr(
             gateway_cli, "_build_user_local_paths", lambda home, existing: []
@@ -2691,14 +2691,14 @@ class TestTimeoutStopSecCoversCronFloor:
             tmp_path,
             monkeypatch,
             "agent:\n  restart_drain_timeout: 0\n",
-            env={"HERMES_CRON_DRAIN_TIMEOUT": "200"},
+            env={"STARDUST_CRON_DRAIN_TIMEOUT": "200"},
         )
         assert "TimeoutStopSec=240" in unit
 
 
 class TestUnitAnchoredServiceIdentity:
     """The installed ``hermes-gateway.service`` owns the bare name: under ``sudo`` the naming basis moves
-    mid-command when ``_sync_hermes_home_from_systemd_unit()`` adopts the unit's HERMES_HOME (#108674).
+    mid-command when ``_sync_hermes_home_from_systemd_unit()`` adopts the unit's STARDUST_HOME (#108674).
 
     ``linux_only`` because ``_bare_unit_pinned_home()`` is Linux- and root-gated on purpose: a systemd unit
     is not an identity authority for launchd labels, Windows tasks, or s6 slots, which share the same
@@ -2707,20 +2707,20 @@ class TestUnitAnchoredServiceIdentity:
 
     @pytest.mark.linux_only
     def test_home_not_pinned_by_unit_keeps_its_suffix(self, tmp_path, monkeypatch):
-        alice_home = tmp_path / "alice" / ".hermes"
+        alice_home = tmp_path / "alice" / ".stardust"
         alice_home.mkdir(parents=True)
-        bob_home = tmp_path / "bob" / ".hermes"
+        bob_home = tmp_path / "bob" / ".stardust"
         bob_home.mkdir(parents=True)
-        root_home = tmp_path / "root" / ".hermes"
+        root_home = tmp_path / "root" / ".stardust"
         root_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()
         (unit_dir / f"{gateway_cli._SERVICE_BASE}.service").write_text(
-            f'[Service]\nEnvironment="HERMES_HOME={alice_home}"\n', encoding="utf-8"
+            f'[Service]\nEnvironment="STARDUST_HOME={alice_home}"\n', encoding="utf-8"
         )
         monkeypatch.setattr(gateway_cli, "_SYSTEM_UNIT_DIR", unit_dir)
         monkeypatch.setattr(hermes_constants, "_get_platform_default_hermes_home", lambda: root_home)
-        monkeypatch.setenv("HERMES_HOME", str(bob_home))
+        monkeypatch.setenv("STARDUST_HOME", str(bob_home))
         name = gateway_cli.get_service_name()
         assert name != gateway_cli._SERVICE_BASE
         assert name.startswith(gateway_cli._SERVICE_BASE + "-")
@@ -2729,17 +2729,17 @@ class TestUnitAnchoredServiceIdentity:
     def test_unprivileged_profile_command_ignores_the_system_unit(self, tmp_path, monkeypatch):
         """A bare system unit pinning ``profiles/<name>`` must not alias that profile onto the user's
         default unit when an unprivileged user-scope command resolves the name."""
-        profile_home = tmp_path / "alice" / ".hermes" / "profiles" / "kimi"
+        profile_home = tmp_path / "alice" / ".stardust" / "profiles" / "kimi"
         profile_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()
         (unit_dir / f"{gateway_cli._SERVICE_BASE}.service").write_text(
-            f'[Service]\nEnvironment="HERMES_HOME={profile_home}"\n', encoding="utf-8"
+            f'[Service]\nEnvironment="STARDUST_HOME={profile_home}"\n', encoding="utf-8"
         )
         monkeypatch.setattr(gateway_cli, "_SYSTEM_UNIT_DIR", unit_dir)
         monkeypatch.setattr(Path, "home", lambda: tmp_path / "alice")
         monkeypatch.setattr(os, "geteuid", lambda: 1000)
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         assert gateway_cli.get_service_name() == "hermes-gateway-kimi"
 
     @pytest.mark.linux_only
@@ -2748,18 +2748,18 @@ class TestUnitAnchoredServiceIdentity:
         remapped home, so the BARE unit legitimately carries a ``profiles/<name>`` home. The unit-pinned
         check therefore has to win over the profile branch, which would answer ``-kimi`` for a unit that
         was installed bare."""
-        profile_home = tmp_path / "alice" / ".hermes" / "profiles" / "kimi"
+        profile_home = tmp_path / "alice" / ".stardust" / "profiles" / "kimi"
         profile_home.mkdir(parents=True)
-        root_home = tmp_path / "root" / ".hermes"
+        root_home = tmp_path / "root" / ".stardust"
         root_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()
         unit_path = unit_dir / f"{gateway_cli._SERVICE_BASE}.service"
-        unit_path.write_text(f'[Service]\nEnvironment="HERMES_HOME={profile_home}"\n', encoding="utf-8")
+        unit_path.write_text(f'[Service]\nEnvironment="STARDUST_HOME={profile_home}"\n', encoding="utf-8")
         monkeypatch.setattr(gateway_cli, "_SYSTEM_UNIT_DIR", unit_dir)
         monkeypatch.setattr(os, "geteuid", lambda: 0)
         monkeypatch.setattr(hermes_constants, "_get_platform_default_hermes_home", lambda: root_home)
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         assert gateway_cli.get_service_name() == gateway_cli._SERVICE_BASE
         # The profile branch, consulted against the home that owns the profile, would have answered
         # with the readable suffix -- which is why the unit-pinned check has to be evaluated first.
@@ -2769,22 +2769,22 @@ class TestUnitAnchoredServiceIdentity:
     def test_real_unit_sync_keeps_the_name_it_validated(self, tmp_path, monkeypatch):
         """Drive the production sync instead of simulating the adoption with setenv: the name resolved
         before ``_sync_hermes_home_from_systemd_unit()`` must survive the mutation it performs."""
-        alice_home = tmp_path / "alice" / ".hermes"
+        alice_home = tmp_path / "alice" / ".stardust"
         alice_home.mkdir(parents=True)
-        root_home = tmp_path / "root" / ".hermes"
+        root_home = tmp_path / "root" / ".stardust"
         root_home.mkdir(parents=True)
         unit_dir = tmp_path / "systemd"
         unit_dir.mkdir()
         (unit_dir / f"{gateway_cli._SERVICE_BASE}.service").write_text(
-            f'[Service]\nEnvironment="HERMES_HOME={alice_home}"\n', encoding="utf-8"
+            f'[Service]\nEnvironment="STARDUST_HOME={alice_home}"\n', encoding="utf-8"
         )
         monkeypatch.setattr(gateway_cli, "_SYSTEM_UNIT_DIR", unit_dir)
         monkeypatch.setattr(os, "geteuid", lambda: 0)
         monkeypatch.setattr(hermes_constants, "_get_platform_default_hermes_home", lambda: root_home)
-        monkeypatch.delenv("HERMES_HOME", raising=False)
+        monkeypatch.delenv("STARDUST_HOME", raising=False)
 
         pre_sync_name = gateway_cli.get_service_name()
         gateway_cli._sync_hermes_home_from_systemd_unit(system=True)
 
-        assert os.environ["HERMES_HOME"] == str(alice_home)  # the sync really ran
+        assert os.environ["STARDUST_HOME"] == str(alice_home)  # the sync really ran
         assert gateway_cli.get_service_name() == pre_sync_name

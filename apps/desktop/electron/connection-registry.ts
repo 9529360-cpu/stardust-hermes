@@ -622,7 +622,7 @@ export function shouldRetrySshInventory(
 
 const PROFILE_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/
 
-/** Turn `ls ~/.hermes/profiles` output into roster names. Always includes
+/** Turn `ls ~/.stardust/profiles` output into roster names. Always includes
  *  `default`. Drops rollback snapshots and junk lines. */
 export function parseRemoteProfileListing(text: string): string[] {
   const names = new Set<string>(['default'])

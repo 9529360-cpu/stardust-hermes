@@ -18,14 +18,14 @@ from hermes_constants import display_hermes_home
 logger = logging.getLogger(__name__)
 
 # Heartbeat cadence keeping the caller's inactivity watchdog at bay while a manual
-# `cronjob(action="run")` executes in-process (comfortably below HERMES_AGENT_TIMEOUT).
+# `cronjob(action="run")` executes in-process (comfortably below STARDUST_AGENT_TIMEOUT).
 # Mirrors the 10s cadence of tools/environments/base.py::touch_activity_if_due (delegate_task's heartbeat
-# uses 30s) — comfortably below the 1800s default HERMES_AGENT_TIMEOUT. See #76502.
+# uses 30s) — comfortably below the 1800s default STARDUST_AGENT_TIMEOUT. See #76502.
 _CRON_RUN_HEARTBEAT_INTERVAL = 10.0
-# Hard ceiling: with HERMES_CRON_TIMEOUT=0 a truly hung run would otherwise mask the
+# Hard ceiling: with STARDUST_CRON_TIMEOUT=0 a truly hung run would otherwise mask the
 # gateway watchdog forever; past this the heartbeat stops and the watchdog regains authority.
-# The child cron run has its own inactivity watchdog (HERMES_CRON_TIMEOUT, default 600s) that bounds a
-# wedged job, but with HERMES_CRON_TIMEOUT=0 (explicit "unlimited") a truly hung run_one_job would otherwise
+# The child cron run has its own inactivity watchdog (STARDUST_CRON_TIMEOUT, default 600s) that bounds a
+# wedged job, but with STARDUST_CRON_TIMEOUT=0 (explicit "unlimited") a truly hung run_one_job would otherwise
 # mask the gateway watchdog forever — pre-#76502 the parent was at least reaped at ~1800s.
 _CRON_RUN_HEARTBEAT_CEILING = 6 * 3600.0
 
@@ -452,12 +452,12 @@ def _latest_job_output_excerpt(job_id: str, max_chars: int = 2000) -> Optional[s
 
 def _reap_stale_executions(job_name: str) -> None:
     """Reap execution rows left 'claimed'/'running' by a provably-dead owner (e.g. a prior
-    one-shot `hermes cron run` that died mid-run). The ticker does this at startup; one-shot
+    one-shot `stardust cron run` that died mid-run). The ticker does this at startup; one-shot
     invocations have no such moment, so a stale claim would block every later manual run.
     Best-effort self-heal: must not block dispatch."""
     try:
         # Reap any execution row this job (or any job) left stranded 'claimed'/ 'running' by a dead owner
-        # process -- e.g. a PRIOR one-shot `hermes cron run` invocation whose dispatched runner died with
+        # process -- e.g. a PRIOR one-shot `stardust cron run` invocation whose dispatched runner died with
         # the exiting process before writing a terminal status (issue #86721). Safe and cheap: only
         # provably-dead owners (PID gone, or PID reused by a different process per its start time) are
         # reaped; a genuinely live owner's row is left untouched.
@@ -530,7 +530,7 @@ def _try_dispatch_background_run(
     _reap_stale_executions(job_name)
 
     # Routing capture BEFORE the claim: no routable session = no durable consumer for a detached
-    # completion, so don't claim-and-dispatch (direct callers like `hermes cron run` exit right after).
+    # completion, so don't claim-and-dispatch (direct callers like `stardust cron run` exit right after).
     session_key = _background_session_key(session_id)
     # CLI path: the approval contextvar is only bound during gateway/TUI turns. The CLI drain filters
     # completions by the durable agent session id (#64240), so stamp it as the key — an empty key would fail
@@ -556,7 +556,7 @@ def _try_dispatch_background_run(
     origin_ui_session_id = ""
     try:
         from gateway.session_context import get_session_env
-        origin_ui_session_id = get_session_env("HERMES_UI_SESSION_ID", "") or ""
+        origin_ui_session_id = get_session_env("STARDUST_UI_SESSION_ID", "") or ""
     except Exception:
         pass
 
@@ -1246,7 +1246,7 @@ Jobs run in a fresh session. Normally they have no current-chat context, so prom
             },
             "script": {
                 "type": "string",
-                "description": _script_description("the profile HERMES_HOME")
+                "description": _script_description("the profile STARDUST_HOME")
             },
             "monitor": {
                 "type": "string",
@@ -1302,15 +1302,15 @@ def check_cronjob_requirements() -> bool:
     from gateway.session_context import get_session_env
     from utils import env_var_enabled, is_truthy_value
     return (
-        env_var_enabled("HERMES_INTERACTIVE")
-        or env_var_enabled("HERMES_GATEWAY_SESSION")
-        or env_var_enabled("HERMES_EXEC_ASK")
-        or is_truthy_value(get_session_env("HERMES_CRON_SESSION", ""))
+        env_var_enabled("STARDUST_INTERACTIVE")
+        or env_var_enabled("STARDUST_GATEWAY_SESSION")
+        or env_var_enabled("STARDUST_EXEC_ASK")
+        or is_truthy_value(get_session_env("STARDUST_CRON_SESSION", ""))
     )
 
 
 # Agent-facing arguments forwarded verbatim to cronjob(). model / provider / base_url are
-# intentionally NOT here: per-job inference pins are user-owned (dashboard, `hermes cron
+# intentionally NOT here: per-job inference pins are user-owned (dashboard, `stardust cron
 # create/edit --model`, hand-edited jobs) — the agent must not point unattended spend at a
 # different model. Programmatic callers of cronjob() itself retain the parameters.
 _HANDLER_FORWARDED_ARGS = (

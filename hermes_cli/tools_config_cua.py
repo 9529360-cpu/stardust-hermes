@@ -1,5 +1,5 @@
-"""cua-driver installer, lock hygiene and pip-install helper for `hermes tools` /
-`hermes computer-use install`."""
+"""cua-driver installer, lock hygiene and pip-install helper for `stardust tools` /
+`stardust computer-use install`."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ _CUA_INSTALLER_TIMEOUT = 660
 # immediately, so this costs nothing in the normal case; it only caps how long a failed one can stall the
 # update. See #87703.
 _CUA_INSTALLER_DRAIN_GRACE = 15
-# Quiet ``hermes update`` refreshes stay bounded even when upstream waits on Read-Host / a consent
+# Quiet ``stardust update`` refreshes stay bounded even when upstream waits on Read-Host / a consent
 # prompt (explicit ``install --upgrade`` keeps the full ceiling); safe because the lock/network
 # preflights make a legitimate long wait impossible here.
 _CUA_BACKGROUND_UPDATE_TIMEOUT = 120
@@ -46,7 +46,7 @@ _CUA_INSTALL_PS1_URL = (
 _CUA_INSTALL_SH_URL = (
     "https://raw.githubusercontent.com/trycua/cua/main/libs/cua-driver/scripts/install.sh")
 _CUA_MANUAL_README = "https://github.com/trycua/cua/blob/main/libs/cua-driver/README.md"
-_UPGRADE_CMD = "hermes computer-use install --upgrade"
+_UPGRADE_CMD = "stardust computer-use install --upgrade"
 
 
 def _run_text(cmd: list, *, timeout, capture_output: bool = True,
@@ -88,7 +88,7 @@ def _post_setup_no_window_flags(*, streams_to_console: bool = False) -> int:
 
 def _cua_driver_cmd() -> str:
     """Return the configured cua-driver override, or the bare default name."""
-    return os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip() or "cua-driver"
+    return os.environ.get("STARDUST_CUA_DRIVER_CMD", "").strip() or "cua-driver"
 
 
 def _cua_version_summary(raw: str, *, limit: int = 120) -> str:
@@ -149,7 +149,7 @@ def _pip_install(args: List[str], *, timeout: int = 300, capture_output: bool = 
     venv_root = Path(sys.executable).parent.parent
     install_flags = _post_setup_no_window_flags(streams_to_console=not capture_output)
 
-    # Managed uv first: $HERMES_HOME/bin is never on PATH, so a bare which() misses the uv Hermes
+    # Managed uv first: $STARDUST_HOME/bin is never on PATH, so a bare which() misses the uv Hermes
     # installed; ensure_uv() (not a pure lookup) because installing uv is in scope during setup.
     from hermes_cli.managed_uv import ensure_uv
     uv_bin = ensure_uv()
@@ -210,7 +210,7 @@ def _confirmed_update_check(driver_cmd: str, require_confirmed_update: bool) -> 
     """Ask the installed driver whether a newer release exists; returns ``(proceed, pin_version)``.
     ``proceed=False`` = stop with success (already latest, or indeterminate under
     ``require_confirmed_update``). An old driver (no check-update verb) or offline check yields
-    None: `hermes update` then keeps the installed version — an indeterminate check must never
+    None: `stardust update` then keeps the installed version — an indeterminate check must never
     cost a multi-minute silent reinstall on every update — while explicit `install --upgrade`
     falls through."""
     try:
@@ -246,7 +246,7 @@ def _report_repair_or_upgrade(ok: bool, *, repair_existing: bool, binary, before
         if not repaired.get("ready"):
             return _fail("    cua-driver was reinstalled, but its runtime contract is still "
                          f"unusable: {repaired.get('reason') or 'unknown error'}.",
-                         "    Run: hermes computer-use doctor")
+                         "    Run: stardust computer-use doctor")
     if ok and before:
         after = _cua_driver_version(binary)
         if after and after != before:
@@ -264,7 +264,7 @@ def install_cua_driver(upgrade: bool = False, require_confirmed_update: bool = F
     old/incomplete one and installs when missing; ``upgrade=True`` always refreshes."""
     system = platform.system()
     if system not in ("Darwin", "Windows", "Linux"):
-        if not upgrade:  # silent under `hermes update`, which calls this for every user
+        if not upgrade:  # silent under `stardust update`, which calls this for every user
             _print_warning(
                 "    Computer Use (cua-driver) is unsupported on this platform; skipping.")
         return False
@@ -274,9 +274,9 @@ def install_cua_driver(upgrade: bool = False, require_confirmed_update: bool = F
     driver_cmd, binary = _cua_driver_cmd(), _resolved_cua_driver_cmd()
     # An explicit override is authoritative even when broken: installing the standard driver
     # cannot repair the configured path and would mutate an unrelated installation.
-    override = os.environ.get("HERMES_CUA_DRIVER_CMD", "").strip()
+    override = os.environ.get("STARDUST_CUA_DRIVER_CMD", "").strip()
     if override and not binary:
-        return _fail(f"    HERMES_CUA_DRIVER_CMD does not resolve to an executable: {override}",
+        return _fail(f"    STARDUST_CUA_DRIVER_CMD does not resolve to an executable: {override}",
                      "    Fix or unset the override before running computer-use install.")
 
     # Not installed → fresh install path (only when caller asked for it).
@@ -311,7 +311,7 @@ def install_cua_driver(upgrade: bool = False, require_confirmed_update: bool = F
                        "Hermes cannot use its current runtime contract: "
                        f"{contract.get('reason') or 'required runtime features are missing'}.")
         if override:
-            return _fail("    Update the binary selected by HERMES_CUA_DRIVER_CMD, or unset the "
+            return _fail("    Update the binary selected by STARDUST_CUA_DRIVER_CMD, or unset the "
                          f"override and run: {_UPGRADE_CMD}", warn=False)
         if is_windows and require_confirmed_update:
             return _fail("    Automatic Windows updates cannot safely run cua-driver's interactive "
@@ -682,7 +682,7 @@ def _installer_popen_kwargs(is_windows: bool, verbose: bool, env: dict) -> dict:
     """Popen kwargs for the upstream installer.
     POSIX: own process group so a timeout kill takes out the whole `curl | bash` pipeline (and the
     exec'd _install-rust.sh), not just the outer shell — surviving grandchildren would keep
-    holding the install lock and wedge every later run. Non-verbose (`hermes update` refresh):
+    holding the install lock and wedge every later run. Non-verbose (`stardust update` refresh):
     capture the chatty "Next steps" wall and log it so a failure stays debuggable; verbose
     interactive installs stream live."""
     kwargs: dict = {"shell": False, "env": env}
@@ -699,8 +699,8 @@ def _installer_popen_kwargs(is_windows: bool, verbose: bool, env: dict) -> dict:
 
 def _record_installer_output(out: str, returncode: int) -> None:
     """Keep a captured (non-verbose) installer transcript without echoing it to the terminal.
-    During `hermes update`, sys.stdout is the mirroring _UpdateOutputStream whose `_log` handle is
-    ~/.hermes/logs/update.log — write straight to it so the full output is kept (success AND
+    During `stardust update`, sys.stdout is the mirroring _UpdateOutputStream whose `_log` handle is
+    ~/.stardust/logs/update.log — write straight to it so the full output is kept (success AND
     failure)."""
     _update_log = getattr(sys.stdout, "_log", None)
     if _update_log is not None:
@@ -737,8 +737,8 @@ def _run_cua_driver_installer(label: str = "Installing", verbose: bool = True,
     # See #58762.
     _clear_stale_cua_install_lock()
 
-    # Unattended refreshes (installer_timeout set by `hermes update`) preflight and may skip.
-    # Unattended refreshes (installer_timeout set by `hermes update`) fail FAST on the two conditions that
+    # Unattended refreshes (installer_timeout set by `stardust update`) preflight and may skip.
+    # Unattended refreshes (installer_timeout set by `stardust update`) fail FAST on the two conditions that
     # otherwise consume the whole ceiling: 1. Install lock held by a live process — upstream would poll it
     # for up to LOCK_STALE_AFTER_SECONDS=600 before probing the holder. That is the 11-minute silent hang
     # class (#87703; observed live 2026-08-25: "cua-driver refreshing timed out after 660s"). 2. Release

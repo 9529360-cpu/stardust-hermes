@@ -107,7 +107,7 @@ def _active_profile_name() -> str:
         from hermes_cli.profiles import get_active_profile_name
         return get_active_profile_name() or "default"
     except Exception:
-        return os.getenv("HERMES_PROFILE", "default") or "default"
+        return os.getenv("STARDUST_PROFILE", "default") or "default"
 
 
 def _profile_home(profile: str) -> Optional[str]:
@@ -115,7 +115,7 @@ def _profile_home(profile: str) -> Optional[str]:
         from hermes_cli.profiles import get_profile_dir
         return str(get_profile_dir(profile))
     if profile and profile != "default":
-        return os.path.expanduser(f"~/.hermes/profiles/{profile}")
+        return os.path.expanduser(f"~/.stardust/profiles/{profile}")
     with contextlib.suppress(Exception):
         from hermes_cli.config import get_hermes_home
         return str(get_hermes_home())
@@ -590,7 +590,7 @@ class A2AAdapter(BasePlatformAdapter):
         return None, {"task_id": task_id, "context_id": context_id, "peer": peer, "future": fut, "created_iso": rec["created_iso"], "started": time.time()}
 
     def _forward_to_profile(self, agent: dict, peer: str, context_id: str, framed_text: str) -> tuple[str, str]:
-        """Forward a routed task to another local profile via ``hermes chat``. First contact creates a
+        """Forward a routed task to another local profile via ``stardust chat``. First contact creates a
         ``source=a2a`` session and titles it deterministically; later turns ``--resume`` that id."""
         profile = str(agent.get("profile") or agent.get("slug") or "").strip()
         slug = str(agent.get("slug") or profile or "agent")
@@ -602,12 +602,12 @@ class A2AAdapter(BasePlatformAdapter):
             session_id = self._profile_sessions.get(key) or _state_db(
                 profile, "SELECT id FROM sessions WHERE title = ? ORDER BY started_at DESC LIMIT 1",
                 (session_title,), "A2A: could not lookup forwarded session")
-            cmd = ["hermes", "chat", "-q", framed_text, "-Q", "--source", "a2a"] + (["--resume", session_id] if session_id else [])
+            cmd = ["stardust", "chat", "-q", framed_text, "-Q", "--source", "a2a"] + (["--resume", session_id] if session_id else [])
             # The child IS the target profile's turn: build its env for that home (launch .env /
             # TERMINAL_* residue dropped, the target's own secrets overlaid), not the gateway's raw environ.
             from tools.environments.local import served_profile_child_env
             env = served_profile_child_env(target_home=_profile_home(profile), inherit_credentials=True)
-            env["HERMES_A2A_PEER"] = peer
+            env["STARDUST_A2A_PEER"] = peer
             start = time.time()
             try:
                 proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace",

@@ -4,7 +4,7 @@ manager, so every ``invoke_hook()`` site can POST lifecycle events (mirror of
 ``gateway/platforms/webhook.py``).  Fire-and-forget through a bounded queue + one daemon worker,
 so a target can never block a tool call or influence agent flow.  HMAC-SHA256 signed
 (``X-Hermes-Signature-256: sha256=<hex>`` over the raw body) when a secret is configured;
-``HERMES_SAFE_MODE=1`` skips registration; registration is idempotent.
+``STARDUST_SAFE_MODE=1`` skips registration; registration is idempotent.
 """
 
 from __future__ import annotations
@@ -74,8 +74,8 @@ def register_from_config(cfg: Optional[Dict[str, Any]]) -> List[WebhookTarget]:
     if not isinstance(cfg, dict):
         return []
     from utils import env_var_enabled
-    if env_var_enabled("HERMES_SAFE_MODE"):
-        logger.info("HERMES_SAFE_MODE=1 — outbound webhook registration skipped")
+    if env_var_enabled("STARDUST_SAFE_MODE"):
+        logger.info("STARDUST_SAFE_MODE=1 — outbound webhook registration skipped")
         return []
     targets = iter_configured_targets(cfg)
     if not targets:
@@ -104,7 +104,7 @@ def register_from_config(cfg: Optional[Dict[str, Any]]) -> List[WebhookTarget]:
 
 
 def iter_configured_targets(cfg: Optional[Dict[str, Any]]) -> List[WebhookTarget]:
-    """Parse ``hooks.outbound`` without registering anything (``hermes hooks list``)."""
+    """Parse ``hooks.outbound`` without registering anything (``stardust hooks list``)."""
     if not isinstance(cfg, dict):
         return []
     hooks_cfg = cfg.get("hooks")

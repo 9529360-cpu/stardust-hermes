@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # custom provider headers routinely carry credentials under arbitrary names.
 _CROSS_ORIGIN_SAFE_HEADERS = frozenset({"accept", "user-agent"})
 _DEFAULT_PORTS = {"http": 80, "https": 443}
-_CA_BUNDLE_ENV_VARS = ("HERMES_CA_BUNDLE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
+_CA_BUNDLE_ENV_VARS = ("STARDUST_CA_BUNDLE", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
 
 
 def url_origin(url: str) -> tuple[str, str, int | None]:

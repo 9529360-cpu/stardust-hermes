@@ -395,7 +395,7 @@ class TestAppMentionHandler:
         assert "assistant_thread_started" in registered_events
         assert "assistant_thread_context_changed" in registered_events
         # Slack slash commands are registered via a single regex matcher
-        # covering every COMMAND_REGISTRY entry (e.g. /hermes, /btw, /stop,
+        # covering every COMMAND_REGISTRY entry (e.g. /stardust, /btw, /stop,
         # /model, ...) so users get native-slash parity with Discord and
         # Telegram. Verify the regex matches the key expected slashes.
         assert (
@@ -405,7 +405,7 @@ class TestAppMentionHandler:
         import re as _re
 
         assert isinstance(slash_matcher, _re.Pattern)
-        for expected in ("/hermes", "/btw", "/stop", "/model", "/help"):
+        for expected in ("/stardust", "/btw", "/stop", "/model", "/help"):
             assert slash_matcher.match(
                 expected
             ), f"Slack slash regex does not match {expected}"
@@ -574,7 +574,7 @@ class TestSlackConnectCleanup:
     async def test_disconnect_closes_workspace_clients_and_clears_runtime_state(self):
         """Regression for #51465: shutdown must close Slack WebClients.
 
-        ``hermes gateway run --replace`` takes the old process through the
+        ``stardust gateway run --replace`` takes the old process through the
         normal adapter.disconnect() path. If Slack leaves AsyncWebClient
         instances open there, aiohttp logs ``Unclosed client session`` while
         the old gateway exits after SIGTERM.
@@ -3576,7 +3576,7 @@ class TestMessageSplitting:
 
     @pytest.mark.asyncio
     async def test_send_coerces_string_unfurl_options(self, adapter):
-        """`hermes config set` / Railway persist YAML booleans as strings.
+        """`stardust config set` / Railway persist YAML booleans as strings.
 
         Relay-plane parity: string "false"/"true" must coerce instead of
         being silently dropped (which would leave previews on with no error).
@@ -4487,7 +4487,7 @@ class TestMissingCredentials:
         assert fatal_errors[0]["code"] == "missing_slack_app_token"
         assert fatal_errors[0]["retryable"] is False
         assert "SLACK_APP_TOKEN" in fatal_errors[0]["message"]
-        assert "hermes gateway setup" in fatal_errors[0]["message"].lower() or ".env" in fatal_errors[0]["message"]
+        assert "stardust gateway setup" in fatal_errors[0]["message"].lower() or ".env" in fatal_errors[0]["message"]
 
 
 # ---------------------------------------------------------------------------

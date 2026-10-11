@@ -1,4 +1,4 @@
-"""Windows ConPTY bridge for the `hermes dashboard` chat tab."""
+"""Windows ConPTY bridge for the `stardust dashboard` chat tab."""
 
 from __future__ import annotations
 

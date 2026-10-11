@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SIDECAR_PORT = 8789
 _DEFAULT_SIDECAR_BIND = "127.0.0.1"
 _MAX_MESSAGE_LENGTH = 8000  # iMessage caps practical size at ~16 KB; conservative, matches BlueBubbles
-# Out-of-process senders (cron, `hermes send`) need the live sidecar's port + spawn-time
+# Out-of-process senders (cron, `stardust send`) need the live sidecar's port + spawn-time
 # token; persisted once /healthz passes, removed on every stop / failed-start path.
 # --------------------------------------------------------------------------- Sidecar runtime record The
 # gateway persists this record once the sidecar passes its /healthz readiness check, and removes it on every
@@ -231,13 +231,13 @@ def check_requirements() -> bool:
             if _npm_error_log().exists():
                 npm_error = _npm_error_log().read_text(encoding="utf-8").strip()[:_NPM_ERROR_LOG_MAX_CHARS]
         hint = f" (last npm error: {npm_error})" if npm_error else ""
-        logger.debug("photon: spectrum-ts not installed at %s%s — run: hermes photon setup", _sidecar_dir(), hint)
+        logger.debug("photon: spectrum-ts not installed at %s%s — run: stardust photon setup", _sidecar_dir(), hint)
         return False
     return True
 
 
 def _sidecar_deps_stale() -> bool:
-    """True when node_modules predates the lockfile (`hermes update` rewrites it without
+    """True when node_modules predates the lockfile (`stardust update` rewrites it without
     reinstalling); False if either file is missing."""
     return _lock_newer_than_install(_sidecar_dir())
 
@@ -548,7 +548,7 @@ class PhotonAdapter(BasePlatformAdapter):
         if not self._project_id or not self._project_secret:
             self._set_fatal_error(
                 "MISSING_CREDENTIALS",
-                "PHOTON_PROJECT_ID and PHOTON_PROJECT_SECRET are required. Run: hermes photon setup",
+                "PHOTON_PROJECT_ID and PHOTON_PROJECT_SECRET are required. Run: stardust photon setup",
                 retryable=False)
             return False
         client = httpx.AsyncClient(timeout=30.0, trust_env=False)
@@ -869,7 +869,7 @@ class PhotonAdapter(BasePlatformAdapter):
     async def _ensure_sidecar_deps(self) -> None:
         """Cold-install or refresh sidecar node_modules before spawn (off the loop)."""
         if not sidecar_deps_installed():
-            # Hosted images have no CLI for `hermes photon setup`: connect bootstraps deps itself.
+            # Hosted images have no CLI for `stardust photon setup`: connect bootstraps deps itself.
             logger.info("[photon] sidecar deps not installed; installing into %s", _sidecar_dir())
             await asyncio.to_thread(_reinstall_sidecar_deps)
             if not sidecar_deps_installed():
@@ -877,9 +877,9 @@ class PhotonAdapter(BasePlatformAdapter):
                 raise PhotonSidecarStartupError(
                     f"Photon sidecar deps could not be installed into "
                     f"{_sidecar_dir()} (see log for the npm error). "
-                    f"Run: cd {_sidecar_dir()} && npm ci   (or `hermes photon setup`)",
+                    f"Run: cd {_sidecar_dir()} && npm ci   (or `stardust photon setup`)",
                     code="SIDECAR_DEPS_MISSING", retryable=False)
-        # `hermes update` bumps the lockfile without reinstalling node_modules; the sidecar
+        # `stardust update` bumps the lockfile without reinstalling node_modules; the sidecar
         # would spawn against stale deps and die on every reconnect.
         if _sidecar_deps_stale():
             logger.warning("[photon] sidecar deps are stale (lockfile newer than install); reinstalling before start")
@@ -1534,10 +1534,10 @@ def register(ctx) -> None:
         check_fn=check_requirements, validate_config=validate_config, is_connected=is_connected,
         required_env=["PHOTON_PROJECT_ID", "PHOTON_PROJECT_SECRET"],
         install_hint=(
-            "Run: hermes photon setup  (logs in via device flow, creates a "
+            "Run: stardust photon setup  (logs in via device flow, creates a "
             "Spectrum project, links your phone number, installs the "
             "spectrum-ts sidecar)."),
-        setup_fn=_cli.gateway_setup,  # surfaces Photon in the unified `hermes gateway setup` wizard
+        setup_fn=_cli.gateway_setup,  # surfaces Photon in the unified `stardust gateway setup` wizard
         env_enablement_fn=_env_enablement, cron_deliver_env_var="PHOTON_HOME_CHANNEL",
         standalone_sender_fn=_standalone_send, allowed_users_env="PHOTON_ALLOWED_USERS",
         allow_all_env="PHOTON_ALLOW_ALL_USERS", max_message_length=_MAX_MESSAGE_LENGTH, emoji="📱",

@@ -14,7 +14,7 @@ from hermes_cli import main_platform_setup
 
 
 def _parse_slack_args(argv):
-    """Build the real `hermes slack` parser and parse argv against it."""
+    """Build the real `stardust slack` parser and parse argv against it."""
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
     build_slack_parser(subparsers, cmd_slack=lambda _args: 0)
@@ -115,7 +115,7 @@ class TestSlackManifestArgparse:
 
 
 class TestSlackFullManifest:
-    """Generated full Slack app manifest used by `hermes slack manifest`."""
+    """Generated full Slack app manifest used by `stardust slack manifest`."""
 
 
 

@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agent.prompt_builder import (
     ASSISTANT_OPERATING_CONTRACT, DEFAULT_AGENT_IDENTITY, EXECUTION_GUIDANCE_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
-    HERMES_AGENT_HELP_GUIDANCE, HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS,
+    STARDUST_AGENT_HELP_GUIDANCE, STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS,
     PARALLEL_TOOL_CALL_GUIDANCE, PLATFORM_HINTS, SESSION_SEARCH_GUIDANCE, SKILLS_GUIDANCE,
     SOUL_OPERATING_DEFAULTS, STEER_CHANNEL_NOTE, TASK_COMPLETION_GUIDANCE, TELEGRAM_RICH_MESSAGES_HINT,
     TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, drain_truncation_warnings,
@@ -97,9 +97,9 @@ _TUI_EMBEDDED_PANE_CLARIFIER = (
 
 
 def _tui_embedded_pane_clarifier(hint: str) -> str:
-    """Append the desktop embedded-terminal clarifier when ``HERMES_DESKTOP_TERMINAL``
+    """Append the desktop embedded-terminal clarifier when ``STARDUST_DESKTOP_TERMINAL``
     is set (only the desktop's TUI PTY, never the chat backend). Idempotent."""
-    if not hint or _TUI_EMBEDDED_PANE_CLARIFIER in hint or not is_truthy_value(os.getenv("HERMES_DESKTOP_TERMINAL")):
+    if not hint or _TUI_EMBEDDED_PANE_CLARIFIER in hint or not is_truthy_value(os.getenv("STARDUST_DESKTOP_TERMINAL")):
         return hint
     return hint + _TUI_EMBEDDED_PANE_CLARIFIER
 
@@ -122,7 +122,7 @@ def _ambient_plugin_profile_name() -> str:
 
 def _active_profile_name(agent: Any, ambient) -> str:
     """Profile name from the agent's OWN home, else *ambient()*; "default" on any
-    failure. Ambient resolution misreports on threads that lost the HERMES_HOME
+    failure. Ambient resolution misreports on threads that lost the STARDUST_HOME
     ContextVar, which is why the agent's home is preferred."""
     try:
         home = _agent_home(agent)
@@ -244,7 +244,7 @@ def _session_start_like(agent: Any, now: Any) -> Any:
 
 def _agent_home(agent: Any) -> Optional[Path]:
     """The agent's OWN profile home, or None to use ambient resolution.
-    A bound HERMES_HOME ContextVar override wins (the gateway multiplexes
+    A bound STARDUST_HOME ContextVar override wins (the gateway multiplexes
     profiles over one shared session DB and binds the home per turn); else the
     parent of ``_session_db.db_path`` — ground truth on threads that lost the
     ContextVar, where ambient resolution would leak the launch profile.
@@ -394,7 +394,7 @@ def _skills_prompt(agent: Any) -> str:
 
 def _auto_load_parts(agent: Any) -> List[str]:
     """``skills.auto_load`` blocks, resolved once per agent lifecycle (config, skill files and
-    HERMES_IGNORE_RULES are read on the first build only) so the prompt stays byte-stable
+    STARDUST_IGNORE_RULES are read on the first build only) so the prompt stays byte-stable
     across model switches, compression and static-prefix restoration.
 
     Same gate as ``_skills_prompt``: nothing without the skills toolset, and nothing for agents that skip
@@ -406,7 +406,7 @@ def _auto_load_parts(agent: Any) -> List[str]:
     if not getattr(agent, "_auto_load_skills_resolved", False):
         result: Tuple[str, List[str], List[str]] = ("", [], [])
         try:
-            if not is_truthy_value(os.environ.get("HERMES_IGNORE_RULES")):
+            if not is_truthy_value(os.environ.get("STARDUST_IGNORE_RULES")):
                 from agent.skill_commands import build_auto_load_prompt
                 result = build_auto_load_prompt(task_id=getattr(agent, "session_id", None), home_override=_agent_home(agent))
             if result[2]:
@@ -449,8 +449,8 @@ def _ambient_file_safety_profile_name() -> str:
 
 
 def _active_profile_line(agent: Any) -> str:
-    """Name the running profile so the agent doesn't conflate ``~/.hermes/skills``
-    (default) with ``~/.hermes/profiles/<active>/skills``.  Resolved from the
+    """Name the running profile so the agent doesn't conflate ``~/.stardust/skills``
+    (default) with ``~/.stardust/profiles/<active>/skills``.  Resolved from the
     agent's OWN home first (a build thread that lost the ContextVar would
     otherwise print "default" for a bot profile)."""
     _agent_home_path = _agent_home(agent)
@@ -822,13 +822,13 @@ def build_system_prompt_parts(agent: Any, system_message: Optional[str] = None) 
     # hermes-agent skill installed, so the variant is chosen after the skills
     # index is built; this slot holds its position.
     _help_guidance_slot = len(stable_parts)
-    stable_parts.append(HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS)
+    stable_parts.append(STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS)
     stable_parts.extend(_guidance_parts(agent))
     skills_prompt = _skills_prompt(agent)
     # Skill-pointer variant requires BOTH skill_view AND the hermes-agent skill
     # in the rendered index (pure string check — inherits the index's stability).
     if "skill_view" in (agent.valid_tool_names or set()) and "- hermes-agent:" in skills_prompt:
-        stable_parts[_help_guidance_slot] = HERMES_AGENT_HELP_GUIDANCE
+        stable_parts[_help_guidance_slot] = STARDUST_AGENT_HELP_GUIDANCE
     stable_parts.extend(_alibaba_identity_part(agent))
     # Pinned skills are per-agent constants (resolved once), so they live in the stable prefix.
     stable_parts.extend(_auto_load_parts(agent))

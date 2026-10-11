@@ -1,4 +1,4 @@
-"""`hermes computer-use doctor` — thin client for cua-driver's `health_report` MCP tool. cua-driver owns the health
+"""`stardust computer-use doctor` — thin client for cua-driver's `health_report` MCP tool. cua-driver owns the health
 model; we drive the stdio JSON-RPC handshake, call `health_report` and render the stable ``schema_version="1"``
 payload. cua-driver 0.10.x marks `health_report` risk-unclassified (isError=true, structuredContent
 ``{"exit_code": 1}``) — we detect that and synthesize a composite report from working probes (check_permissions,
@@ -332,7 +332,7 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
     from tools.computer_use.cua_backend_driver import resolve_cua_driver_cmd
     binary = resolve_cua_driver_cmd(driver_cmd)
     if not binary:
-        print(f"cua-driver: not installed (looked for {driver_cmd or 'cua-driver (PATH and canonical install paths)'!r}).\n  Run: hermes computer-use install")
+        print(f"cua-driver: not installed (looked for {driver_cmd or 'cua-driver (PATH and canonical install paths)'!r}).\n  Run: stardust computer-use install")
         return 2
     try:  # prefer real health_report; on denial/non-schema, synthesize via probes
         try:
@@ -345,8 +345,8 @@ def run_doctor(driver_cmd: Optional[str] = None, *, include: Sequence[str] = (),
         print(f"cua-driver could not be started from {binary!r}: {e}\n"
               "  The Hermes runtime interpreter cannot execute this binary; the tool may still work because the\n"
               "  shell resolves a different copy on PATH. Fix: install cua-driver outside the protected directory\n"
-              "  (e.g. the upstream installer's default under your user profile) or point HERMES_CUA_DRIVER_CMD at\n"
-              "  a copy the runtime can execute, then re-run `hermes computer-use doctor`.", file=sys.stderr)
+              "  (e.g. the upstream installer's default under your user profile) or point STARDUST_CUA_DRIVER_CMD at\n"
+              "  a copy the runtime can execute, then re-run `stardust computer-use doctor`.", file=sys.stderr)
         return 2
     except RuntimeError as e:
         print(f"cua-driver health_report failed: {e}", file=sys.stderr)

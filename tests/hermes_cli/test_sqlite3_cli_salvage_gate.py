@@ -10,8 +10,8 @@ store into two concurrent generations. Both generations report
 ``integrity_check ok`` while an old-generation acknowledged write is lost.
 
 Hermes' own corruption banners used to instruct exactly that command
-(`sqlite3 ~/.hermes/state.db ".recover"`). The fix routes operators to
-`hermes sessions recover --source ...`, whose lane snapshots the damaged
+(`sqlite3 ~/.stardust/state.db ".recover"`). The fix routes operators to
+`stardust sessions recover --source ...`, whose lane snapshots the damaged
 bundle before any shell touches it, and refuses a WAL-reset-vulnerable
 sqlite3 CLI for the page-level salvage lane even on the snapshot.
 """
@@ -37,7 +37,7 @@ from hermes_cli.session_lost_and_found import (
 from hermes_cli.sqlite_runtime import is_sqlite_wal_reset_vulnerable
 
 
-LIVE_DB_SALVAGE_COMMAND = 'sqlite3 ~/.hermes/state.db ".recover"'
+LIVE_DB_SALVAGE_COMMAND = 'sqlite3 ~/.stardust/state.db ".recover"'
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ class TestGuidanceNeverNamesLiveDb:
             "session_persistence_failed", "corrupt"
         )
         assert LIVE_DB_SALVAGE_COMMAND not in explanation
-        assert "hermes sessions recover --source" in explanation
+        assert "stardust sessions recover --source" in explanation
         assert "--inspect-only" in explanation
         assert "--output recovered-state.db" in explanation
         assert ".recover" in explanation  # the warning still names the hazard
@@ -258,7 +258,7 @@ class TestGuidanceNeverNamesLiveDb:
 # The emitted command satisfies the real CLI contract
 # ---------------------------------------------------------------------------
 # The reviewer's blocker on the first iteration of this fix: the banners
-# printed `hermes sessions recover --source <db>` — which cmd_sessions
+# printed `stardust sessions recover --source <db>` — which cmd_sessions
 # rejects with exit 2 ("--output is required unless --inspect-only is
 # used") before any snapshot is taken. These tests dispatch the EXACT argv
 # shapes the banners emit through the real parser + cmd_sessions, so a
@@ -270,12 +270,12 @@ class TestEmittedCommandsSatisfyCliContract:
     """Every `sessions recover` argv the guidance prints must be accepted
     by the real CLI contract — the reviewer's blocker on the first
     iteration of this fix was exactly this: the banners printed
-    `hermes sessions recover --source <db>`, which cmd_sessions rejects
+    `stardust sessions recover --source <db>`, which cmd_sessions rejects
     with exit 2 ("--output is required unless --inspect-only is used")
     before any snapshot is taken.
 
     These tests dispatch the EXACT argv shapes the banners emit through
-    the real `cmd_sessions` (the same function `hermes` main() hands the
+    the real `cmd_sessions` (the same function `stardust` main() hands the
     parsed namespace to), so a guidance string can never again pass a
     source-substring test while the command it prints deterministically
     fails.

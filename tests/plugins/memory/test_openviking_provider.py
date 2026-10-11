@@ -120,7 +120,7 @@ memory:
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     settings = openviking_module._resolve_connection_settings(
         openviking_module._load_hermes_openviking_config()
@@ -276,7 +276,7 @@ def test_post_setup_existing_profile_picker_validates_and_links_saved_profile(
     if peer_key:
         saved_values[peer_key] = "existing-peer"
     saved_path.write_text(json.dumps(saved_values), encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setattr(openviking_module.Path, "home", staticmethod(lambda: tmp_path))
 
     from hermes_cli import memory_setup
@@ -388,7 +388,7 @@ def test_start_local_openviking_server_strips_pythonpath_from_child_env(monkeypa
 
     Inheriting it makes openviking-server import packages from the Hermes
     venv instead of its own, and on Windows locks Hermes venv DLLs so the
-    venv cannot be rebuilt during `hermes update`.
+    venv cannot be rebuilt during `stardust update`.
     """
     popen_calls = []
 
@@ -400,7 +400,7 @@ def test_start_local_openviking_server_strips_pythonpath_from_child_env(monkeypa
     monkeypatch.setattr(openviking_module.shutil, "which", lambda name: "/usr/local/bin/openviking-server")
     monkeypatch.setattr(openviking_module.subprocess, "Popen", fake_popen)
     monkeypatch.setenv("PYTHONPATH", "/opt/hermes/.venv/Lib/site-packages")
-    monkeypatch.setenv("HERMES_PROFILE", "test-profile")
+    monkeypatch.setenv("STARDUST_PROFILE", "test-profile")
 
     state, _message = openviking_module._start_local_openviking_server("http://127.0.0.1:1934")
 
@@ -409,7 +409,7 @@ def test_start_local_openviking_server_strips_pythonpath_from_child_env(monkeypa
     child_env = kwargs["env"]
     assert child_env is not None
     assert "PYTHONPATH" not in child_env
-    assert child_env.get("HERMES_PROFILE") == "test-profile"
+    assert child_env.get("STARDUST_PROFILE") == "test-profile"
 
 
 def test_start_local_openviking_server_does_not_spawn_when_port_already_open(monkeypatch):

@@ -208,7 +208,7 @@ class TestStartRun:
     async def test_start_binds_chat_id_for_delegation_wake_target(self, adapter):
         """/v1/runs must bind the raw session id as the api_server chat_id
         (like every other agent-entry route does via _run_agent): the async
-        delegation dispatch reads HERMES_SESSION_CHAT_ID to pick its wake
+        delegation dispatch reads STARDUST_SESSION_CHAT_ID to pick its wake
         self-post target, and an empty binding forces background delegations
         on this route back to synchronous execution."""
         app = _create_runs_app(adapter)
@@ -1607,9 +1607,9 @@ class TestHostedRoomRuns:
     async def test_invitation_uses_validated_app_managed_local_catalog(
         self, auth_adapter, monkeypatch
     ):
-        monkeypatch.setenv("HERMES_DESKTOP", "1")
+        monkeypatch.setenv("STARDUST_DESKTOP", "1")
         monkeypatch.setenv(
-            "HERMES_ROOM_LINK_URL", "https://peer.example.test/hermes"
+            "STARDUST_ROOM_LINK_URL", "https://peer.example.test/hermes"
         )
         app = _create_runs_app(auth_adapter)
         async with TestClient(TestServer(app)) as cli:

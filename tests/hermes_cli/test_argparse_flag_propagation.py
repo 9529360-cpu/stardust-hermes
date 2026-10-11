@@ -1,7 +1,7 @@
 """Tests for parent→subparser flag propagation.
 
 When flags like --yolo, -w, -s exist on both the parent parser and the 'chat'
-subparser, placing the flag BEFORE the subcommand (e.g. 'hermes --yolo chat')
+subparser, placing the flag BEFORE the subcommand (e.g. 'stardust --yolo chat')
 must not silently drop the flag value.
 
 Regression test for: argparse subparser default=False overwriting parent's
@@ -25,7 +25,7 @@ def _build_parser():
     Since main() is a large function that does much more than parse args,
     we replicate just the parser structure here to avoid side effects.
     """
-    parser = argparse.ArgumentParser(prog="hermes")
+    parser = argparse.ArgumentParser(prog="stardust")
     parser.add_argument("--resume", "-r", metavar="SESSION", default=None)
     parser.add_argument(
         "--continue", "-c", dest="continue_last", nargs="?",
@@ -102,27 +102,27 @@ class TestChatVerboseArg:
 
 
 class TestYoloEnvVar:
-    """Verify --yolo sets HERMES_YOLO_MODE regardless of flag position.
+    """Verify --yolo sets STARDUST_YOLO_MODE regardless of flag position.
 
     This tests the actual cmd_chat logic pattern (getattr → os.environ).
     """
 
     @pytest.fixture(autouse=True)
     def _clean_env(self):
-        os.environ.pop("HERMES_YOLO_MODE", None)
+        os.environ.pop("STARDUST_YOLO_MODE", None)
         yield
-        os.environ.pop("HERMES_YOLO_MODE", None)
+        os.environ.pop("STARDUST_YOLO_MODE", None)
 
     def _simulate_cmd_chat_yolo_check(self, args):
         """Replicate the exact check from cmd_chat in main.py."""
         if getattr(args, "yolo", False):
-            os.environ["HERMES_YOLO_MODE"] = "1"
+            os.environ["STARDUST_YOLO_MODE"] = "1"
 
     def test_yolo_before_chat_sets_env(self):
         parser = _build_parser()
         args = parser.parse_args(["--yolo", "chat"])
         self._simulate_cmd_chat_yolo_check(args)
-        assert os.environ.get("HERMES_YOLO_MODE") == "1"
+        assert os.environ.get("STARDUST_YOLO_MODE") == "1"
 
 
 class TestAcceptHooksOnAgentSubparsers:
@@ -130,7 +130,7 @@ class TestAcceptHooksOnAgentSubparsers:
     position (before the subcommand, between group/subcommand, and
     after the leaf subcommand) for gateway/cron/mcp/acp.  Regression
     against prior behaviour where the flag only worked on the root
-    parser and `chat`, so `hermes gateway run --accept-hooks` failed
+    parser and `chat`, so `stardust gateway run --accept-hooks` failed
     with `unrecognized arguments`."""
 
     ARGVS = [
@@ -205,7 +205,7 @@ class TestChatSubparserInheritedValueFlags:
     """Verify -t/--toolsets, -m/--model and --provider survive parent→chat
     subparser dispatch.
 
-    Regression test for #28780: `hermes -t web chat` silently dropped the
+    Regression test for #28780: `stardust -t web chat` silently dropped the
     toolset because the chat subparser re-declared `-t/--toolsets` with
     `default=None`, which clobbered the top-level parser's value during
     subparser dispatch.

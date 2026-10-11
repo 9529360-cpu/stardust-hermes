@@ -62,7 +62,7 @@ function localBundleRequest(overrides?: {
         return (
           overrides?.prepare ?? {
             ok: true,
-            path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-x.zip',
+            path: '/srv/.stardust/cache/diagnostics/stardust-diagnostics-x.zip',
             filename: 'stardust-diagnostics-x.zip',
             byte_size: 123
           }
@@ -120,7 +120,7 @@ describe('send-diagnostics store', () => {
 
       expect(desktop.saveGatewayFile).toHaveBeenCalledWith(
         expect.objectContaining({
-          path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-x.zip',
+          path: '/srv/.stardust/cache/diagnostics/stardust-diagnostics-x.zip',
           suggestedName: 'stardust-diagnostics-x.zip'
         })
       )
@@ -174,7 +174,7 @@ describe('send-diagnostics store', () => {
 
       resolvePrepare({
         ok: true,
-        path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-pinned.zip',
+        path: '/srv/.stardust/cache/diagnostics/stardust-diagnostics-pinned.zip',
         filename: 'stardust-diagnostics-pinned.zip'
       })
       await pending
@@ -183,7 +183,7 @@ describe('send-diagnostics store', () => {
         expect.objectContaining({
           connectionId: 'old-connection',
           profile: 'old-profile',
-          path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-pinned.zip'
+          path: '/srv/.stardust/cache/diagnostics/stardust-diagnostics-pinned.zip'
         })
       )
     } finally {
@@ -360,7 +360,7 @@ describe('send-diagnostics store', () => {
 
       resolvePrepare({
         ok: true,
-        path: '/srv/.hermes/cache/diagnostics/stardust-diagnostics-stale.zip',
+        path: '/srv/.stardust/cache/diagnostics/stardust-diagnostics-stale.zip',
         filename: 'stardust-diagnostics-stale.zip'
       })
       await pending

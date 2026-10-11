@@ -2,7 +2,7 @@
 
 Catalogs are ``locales/<lang>.yaml`` flattened to dotted keys. Missing keys
 fall back to English, then to the key itself, so a broken catalog never crashes.
-Language resolution: explicit ``lang=`` > ``HERMES_LANGUAGE`` > ``display.language`` > ``en``.
+Language resolution: explicit ``lang=`` > ``STARDUST_LANGUAGE`` > ``display.language`` > ``en``.
 """
 
 from __future__ import annotations
@@ -54,17 +54,17 @@ _catalog_lock = threading.Lock()
 
 
 def _locales_dir() -> Path:
-    """Locale dir: ``HERMES_BUNDLED_LOCALES`` (sealed packaging, e.g. Nix) if it exists, else ``<repo-root>/locales``.
+    """Locale dir: ``STARDUST_BUNDLED_LOCALES`` (sealed packaging, e.g. Nix) if it exists, else ``<repo-root>/locales``.
 
     The source path is returned even when missing so ``_load_catalog`` can log
     the path it looked at rather than raise.
     """
-    override = os.getenv("HERMES_BUNDLED_LOCALES", "").strip()
+    override = os.getenv("STARDUST_BUNDLED_LOCALES", "").strip()
     if override and Path(override).is_dir():
         return Path(override)
     if override:
         logger.warning(
-            "HERMES_BUNDLED_LOCALES points to a non-directory path (%s); "
+            "STARDUST_BUNDLED_LOCALES points to a non-directory path (%s); "
             "falling back to bundled/source locale resolution", override,
         )
     return Path(__file__).resolve().parent.parent / "locales"
@@ -145,14 +145,14 @@ def reset_language_cache() -> None:
 
 
 def get_language() -> str:
-    """Resolve the active language using env > config > default order. ``HERMES_LANGUAGE`` is a
+    """Resolve the active language using env > config > default order. ``STARDUST_LANGUAGE`` is a
     per-profile ``.env`` value, so it is read through the secret scope: under multiplexing a raw
     environ read would impose the default profile's language on every other profile."""
     from agent.secret_scope import UnscopedSecretError, get_secret
     try:
-        env_lang = get_secret("HERMES_LANGUAGE")
+        env_lang = get_secret("STARDUST_LANGUAGE")
     except UnscopedSecretError:
-        env_lang = os.environ.get("HERMES_LANGUAGE")  # unscoped default-profile path: environ IS its own value
+        env_lang = os.environ.get("STARDUST_LANGUAGE")  # unscoped default-profile path: environ IS its own value
     return _normalize_lang(env_lang) if env_lang else _config_language() or DEFAULT_LANGUAGE
 
 

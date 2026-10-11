@@ -29,8 +29,8 @@ from hermes_cli.plugin_capabilities import (
 
 @pytest.fixture()
 def hermes_home(tmp_path, monkeypatch):
-    """Point HERMES_HOME at a tmp dir with an empty config.yaml."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Point STARDUST_HOME at a tmp dir with an empty config.yaml."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text("{}\n", encoding="utf-8")
     return tmp_path
 
@@ -248,7 +248,7 @@ class TestUpdateReconsent:
 
 class TestFailClosed:
     def test_missing_config_not_granted(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "nonexistent"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "nonexistent"))
         assert plugin_capability_granted("capplug", "tools.override") is False
         assert granted_capabilities("capplug") == frozenset()
 

@@ -14,11 +14,11 @@ import pytest
 
 @pytest.fixture
 def profile_home(tmp_path, monkeypatch):
-    """A NAMED-profile HERMES_HOME under <root>/profiles/<name>."""
-    root = tmp_path / ".hermes"
+    """A NAMED-profile STARDUST_HOME under <root>/profiles/<name>."""
+    root = tmp_path / ".stardust"
     profile = root / "profiles" / "coder"
     profile.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(profile))
+    monkeypatch.setenv("STARDUST_HOME", str(profile))
     # hermes_constants memoizes root resolution per (native, env) pair;
     # reload to make the new env authoritative for this test.
     import hermes_constants
@@ -64,11 +64,11 @@ def test_all_runtime_state_follows_runtimes_root(profile_home):
 
 
 def test_default_profile_paths_unchanged(tmp_path, monkeypatch):
-    """HERMES_HOME at the root itself (default profile) resolves exactly
+    """STARDUST_HOME at the root itself (default profile) resolves exactly
     as before the scoping change — no migration for existing installs."""
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     root.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     import hermes_constants
 
     importlib.reload(hermes_constants)

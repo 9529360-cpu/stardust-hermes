@@ -1,11 +1,11 @@
 """Regression tests for the quarantine no-op restore gap (#75584).
 
 On Windows, ``_run_quarantined_install`` / ``_run_install_cmd`` rename live
-``hermes*.exe`` shims aside (``hermes.exe.old.<ms>``) before invoking the
+``hermes*.exe`` shims aside (``stardust.exe.old.<ms>``) before invoking the
 installer so uv/pip can write fresh replacements. When the install SUCCEEDS
 but never rewrites entry points (uv audits an already-satisfied editable
 install as a no-op), the old code only restored the shims on FAILURE — the
-quarantined shims stayed renamed aside and ``hermes`` vanished from PATH
+quarantined shims stayed renamed aside and ``stardust`` vanished from PATH
 after a green install.
 
 These tests exercise both wrapper sites with a fake installer and assert the
@@ -29,7 +29,7 @@ from hermes_cli import main_install_repair
 def _make_scripts_dir(tmp_path: Path) -> Path:
     scripts = tmp_path / "venv" / "Scripts"
     scripts.mkdir(parents=True)
-    for name in ("hermes", "hermes-agent", "hermes-acp", "hermes-gateway"):
+    for name in ("stardust", "hermes-agent", "hermes-acp", "hermes-gateway"):
         (scripts / f"{name}.exe").write_bytes(b"MZ-old-" + name.encode())
     return scripts
 
@@ -52,10 +52,10 @@ def test_main_noop_success_restores_shims(tmp_path):
         main_install_repair._run_quarantined_install(["fake"], scripts_dir=scripts)
 
     names = _shim_names(scripts)
-    assert "hermes.exe" in names, "hermes.exe must be restored after a no-op install"
+    assert "stardust.exe" in names, "stardust.exe must be restored after a no-op install"
     assert "hermes-acp.exe" in names
     assert "hermes-gateway.exe" in names
-    assert (scripts / "hermes.exe").read_bytes() == b"MZ-old-hermes"
+    assert (scripts / "stardust.exe").read_bytes() == b"MZ-old-stardust"
 
 
 def test_main_rewriting_success_keeps_fresh_shims(tmp_path):
@@ -63,14 +63,14 @@ def test_main_rewriting_success_keeps_fresh_shims(tmp_path):
     scripts = _make_scripts_dir(tmp_path)
 
     def fake_install(cmd, env=None):
-        for name in ("hermes", "hermes-agent", "hermes-acp", "hermes-gateway"):
+        for name in ("stardust", "hermes-agent", "hermes-acp", "hermes-gateway"):
             (scripts / f"{name}.exe").write_bytes(b"MZ-new-" + name.encode())
 
     with patch.object(main_install_repair, "_is_windows", lambda: True), patch.object(main_install_repair, "_run_install_with_heartbeat", fake_install
     ):
         main_install_repair._run_quarantined_install(["fake"], scripts_dir=scripts)
 
-    assert (scripts / "hermes.exe").read_bytes() == b"MZ-new-hermes"
+    assert (scripts / "stardust.exe").read_bytes() == b"MZ-new-stardust"
 
 
 def test_main_failure_restores_shims_and_reraises(tmp_path):
@@ -84,7 +84,7 @@ def test_main_failure_restores_shims_and_reraises(tmp_path):
         with pytest.raises(RuntimeError, match="install died"):
             main_install_repair._run_quarantined_install(["fake"], scripts_dir=scripts)
 
-    assert (scripts / "hermes.exe").read_bytes() == b"MZ-old-hermes"
+    assert (scripts / "stardust.exe").read_bytes() == b"MZ-old-stardust"
 
 
 # ---------------------------------------------------------------------------
@@ -109,8 +109,8 @@ def test_repair_noop_success_restores_shims(tmp_path):
         ir._run_install_cmd(["fake"], env=None, root=tmp_path)
 
     names = _shim_names(scripts)
-    assert "hermes.exe" in names, "hermes.exe must be restored after a no-op recovery install"
-    assert (scripts / "hermes.exe").read_bytes() == b"MZ-old-hermes"
+    assert "stardust.exe" in names, "stardust.exe must be restored after a no-op recovery install"
+    assert (scripts / "stardust.exe").read_bytes() == b"MZ-old-stardust"
 
 
 def test_repair_rewriting_success_keeps_fresh_shims(tmp_path):
@@ -118,12 +118,12 @@ def test_repair_rewriting_success_keeps_fresh_shims(tmp_path):
     win, vdir = _patch_repair_windows(scripts)
 
     def fake_run(cmd, cwd=None, check=None, env=None):
-        (scripts / "hermes.exe").write_bytes(b"MZ-new-hermes")
+        (scripts / "stardust.exe").write_bytes(b"MZ-new-stardust")
 
     with win, vdir, patch.object(ir.subprocess, "run", fake_run):
         ir._run_install_cmd(["fake"], env=None, root=tmp_path)
 
-    assert (scripts / "hermes.exe").read_bytes() == b"MZ-new-hermes"
+    assert (scripts / "stardust.exe").read_bytes() == b"MZ-new-stardust"
 
 
 def test_repair_failure_restores_shims_and_reraises(tmp_path):
@@ -137,4 +137,4 @@ def test_repair_failure_restores_shims_and_reraises(tmp_path):
         with pytest.raises(ir.subprocess.CalledProcessError):
             ir._run_install_cmd(["fake"], env=None, root=tmp_path)
 
-    assert (scripts / "hermes.exe").read_bytes() == b"MZ-old-hermes"
+    assert (scripts / "stardust.exe").read_bytes() == b"MZ-old-stardust"

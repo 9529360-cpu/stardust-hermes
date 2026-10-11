@@ -475,7 +475,7 @@ def browser_vault_save_login(
         if prompt is None or not can_prompt_here():
             return json.dumps({"success": False, "error_type": "prompt_unavailable",
                                "error": (f"This session cannot ask the user for a login (headless/cron/API). Tell them to run "
-                                         f"`hermes vault add` or use Desktop -> Settings -> Passwords & Logins for {origin}.")})
+                                         f"`stardust vault add` or use Desktop -> Settings -> Passwords & Logins for {origin}.")})
         answer = prompt(origin, host) or {}
         if not answer.get("password") or not answer.get("identifier"):
             return json.dumps({"success": False, "error_type": "save_declined",
@@ -642,7 +642,7 @@ def browser_vault_fill(handle: str, task_id: Optional[str] = None, purpose: str 
                 "success": False,
                 "error": (
                     f"No vault item with handle {handle!r}. Use browser_vault_list. "
-                    "To save a credential: run `hermes vault add` in a terminal, or "
+                    "To save a credential: run `stardust vault add` in a terminal, or "
                     "in the desktop app open Settings → Credential Vault."
                 ),
             }

@@ -533,7 +533,7 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             "try:\n"
             "    size = os.path.getsize(p)\n"
             "    if size > MAX:\n"
-            "        print('HERMES_UTF16:NO'); sys.exit(0)\n"
+            "        print('STARDUST_UTF16:NO'); sys.exit(0)\n"
             "    with open(p, 'rb') as f:\n"
             "        data = f.read()\n"
             "    sample = data[:SAMPLE]\n"
@@ -550,7 +550,7 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             "        elif odd == 0 and even >= 2:\n"
             "            enc = 'utf-16-be'\n"
             "    if enc is None:\n"
-            "        print('HERMES_UTF16:NO'); sys.exit(0)\n"
+            "        print('STARDUST_UTF16:NO'); sys.exit(0)\n"
             "    text = data.decode(enc, 'replace')\n"
             "    if text[:1] == '\\ufeff':\n"
             "        text = text[1:]\n"
@@ -560,16 +560,16 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
             "    sel = lines[offset - 1: offset - 1 + limit]\n"
             "    out = {'total_lines': total, 'encoding': enc,\n"
             "           'content': '\\n'.join(sel)}\n"
-            "    print('HERMES_UTF16:OK')\n"
+            "    print('STARDUST_UTF16:OK')\n"
             "    print(json.dumps(out, ensure_ascii=True))\n"
             "except Exception:\n"
-            "    print('HERMES_UTF16:NO'); sys.exit(0)\n")
+            "    print('STARDUST_UTF16:NO'); sys.exit(0)\n")
         result = self._run_python_snippet(snippet)
         stdout = _strip_terminal_fence_leaks(result.stdout or "")
-        marker = stdout.find("HERMES_UTF16:OK")
+        marker = stdout.find("STARDUST_UTF16:OK")
         if result.exit_code != 0 or marker < 0:
             return None
-        payload = stdout[marker + len("HERMES_UTF16:OK"):].strip()
+        payload = stdout[marker + len("STARDUST_UTF16:OK"):].strip()
         try:
             data = json.loads(payload.split("\n", 1)[0] if "\n" in payload else payload)
             content = data["content"]
@@ -683,9 +683,9 @@ class ShellFileOperations(LintMixin, SearchMixin, FileOperations):
     def _native_read_enabled(self) -> bool:
         """Whether ``read_file`` and ``search_files`` may bypass the shell: only POSIX + ``LocalEnvironment``
         (file is on this host, path already native; Windows keeps the shell path since
-        file_operations holds Git-Bash-style paths there). ``HERMES_NATIVE_FILE_READ=0``
+        file_operations holds Git-Bash-style paths there). ``STARDUST_NATIVE_FILE_READ=0``
         turns the fast path off."""
-        flag = os.environ.get("HERMES_NATIVE_FILE_READ", "1").strip().lower()
+        flag = os.environ.get("STARDUST_NATIVE_FILE_READ", "1").strip().lower()
         if flag in ("0", "false", "no", "off"):
             return False
         # Same "is this env the local host" test the LSP path uses; isinstance is

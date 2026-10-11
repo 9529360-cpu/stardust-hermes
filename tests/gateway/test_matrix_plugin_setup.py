@@ -66,7 +66,7 @@ class TestMatrixHomeChannelClear:
     """Blank home-room answer must clear MATRIX_HOME_ROOM (#12423)."""
 
     def test_blank_removes_existing_home_room(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         saved, removed = {}, []
         _patch_setup_io(
             monkeypatch,
@@ -83,7 +83,7 @@ class TestMatrixHomeChannelClear:
 
 def test_missing_matrix_deps_use_lazy_installer(monkeypatch, tmp_path):
     """The Matrix setup owner installs its declared dependency group when needed."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     saved, removed = {}, []
     _patch_setup_io(
         monkeypatch,

@@ -112,7 +112,7 @@ def test_command_grant_keeps_prompt_and_floor(prompt):
 
 def test_profile_isolation(monkeypatch, tmp_path):
     grants.add_grant("send_message", "telegram:123")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "other"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "other"))
     assert grants.list_grants() == []
 
 

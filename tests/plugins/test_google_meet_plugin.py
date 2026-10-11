@@ -25,9 +25,9 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _isolate_home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     yield hermes_home
 
 
@@ -115,7 +115,7 @@ def test_status_reports_no_active_meeting():
 def test_transcript_reads_last_n_lines(tmp_path):
     from plugins.google_meet import process_manager as pm
 
-    meeting_dir = Path(os.environ["HERMES_HOME"]) / "workspace" / "meetings" / "abc-defg-hij"
+    meeting_dir = Path(os.environ["STARDUST_HOME"]) / "workspace" / "meetings" / "abc-defg-hij"
     meeting_dir.mkdir(parents=True)
     (meeting_dir / "transcript.txt").write_text(
         "[10:00:00] Alice: one\n"
@@ -228,11 +228,11 @@ def test_enqueue_say_requires_text():
 
 
 def test_cli_register_includes_node_subcommand():
-    """`hermes meet` argparse tree includes the node subtree."""
+    """`stardust meet` argparse tree includes the node subtree."""
     import argparse
     from plugins.google_meet.cli import register_cli
 
-    parser = argparse.ArgumentParser(prog="hermes meet")
+    parser = argparse.ArgumentParser(prog="stardust meet")
     register_cli(parser)
 
     # Parse a known-good node invocation to prove the subtree is wired.
@@ -283,7 +283,7 @@ def test_realtime_session_cancel_response_when_disconnected():
 
 
 # ---------------------------------------------------------------------------
-# hermes meet install CLI
+# stardust meet install CLI
 # ---------------------------------------------------------------------------
 
 

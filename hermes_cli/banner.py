@@ -59,14 +59,14 @@ def _skin_color(key: str, fallback: str) -> str:
 
 from hermes_cli import __version__ as VERSION, __release_date__ as RELEASE_DATE
 
-HERMES_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
+STARDUST_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
 [bold #FFD700]██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
 [#FFBF00]███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
 [#FFBF00]██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
 [#CD7F32]██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
 [#CD7F32]╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]"""
 
-HERMES_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+STARDUST_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
 [#CD7F32]⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀[/]
 [#FFBF00]⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀[/]
 [#FFBF00]⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀[/]
@@ -85,7 +85,7 @@ HERMES_CADUCEUS = """[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀�
 # === Skills scanning ===
 
 # Per-process caches: ``None`` until computed, then a 1-tuple ``(value,)`` so a computed ``None``
-# is distinguishable from "not yet computed". Reset by assigning ``None`` (tests, ``hermes skills``).
+# is distinguishable from "not yet computed". Reset by assigning ``None`` (tests, ``stardust skills``).
 _available_skills_cache: Optional[tuple] = None
 _git_banner_state_cache: Optional[tuple] = None
 _latest_release_cache: Optional[tuple] = None
@@ -96,7 +96,7 @@ _UNCACHED = object()  # compute() result that must not be memoized
 def _memo(cache_name: str, compute):
     """Return the cached value under module global ``cache_name``, computing (and storing) it once.
 
-    Not consulted under a routed profile (HERMES_HOME override): every memo here is derived from the
+    Not consulted under a routed profile (STARDUST_HOME override): every memo here is derived from the
     launch home (its skills tree, its checkout), and the TUI gateway calls these per profile."""
     from hermes_constants import get_hermes_home_override
     if get_hermes_home_override() is not None:
@@ -186,7 +186,7 @@ def _git_run(args: list[str], *, cwd: Optional[Path] = None, timeout: int = 5, t
     from hermes_cli._subprocess_compat import noninteractive_git_env, windows_hide_flags
 
     # The banner/update probes run from GUI-hosted backends too (desktop-spawned
-    # ``hermes serve``), where a bare git child flashes a console window.
+    # ``stardust serve``), where a bare git child flashes a console window.
     kwargs: dict = {"creationflags": windows_hide_flags()}
     if network:
         kwargs.update({"stdin": subprocess.DEVNULL, "env": noninteractive_git_env()})
@@ -354,7 +354,7 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     with GitHub, and across the install base that was tens of millions of fetch requests a day
     (GitHub asked us to poll the API instead). Two tip SHAs are enough — the remote one from the
     API, the local one from ``rev-parse`` — and ``_tips_behind`` recovers the exact count through
-    the compare API when they differ. ``git fetch`` happens only inside ``hermes update``.
+    the compare API when they differ. ``git fetch`` happens only inside ``stardust update``.
     """
     # Probe the origin URL under the config-isolated env: a global url.<https>.insteadOf rewrite
     # otherwise makes an SSH origin masquerade as HTTPS (#104591).
@@ -375,7 +375,7 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
     _last_target_rev = target_rev
     _last_repo_slug = repo_slug
     # Tip SHAs alone can't distinguish "behind" from a local commit AHEAD of origin/main, and
-    # misreporting an ahead checkout nudges the user into `hermes update`, which can wipe carried
+    # misreporting an ahead checkout nudges the user into `stardust update`, which can wipe carried
     # work — hence the ancestor check inside _tips_behind, against the FRESH upstream SHA.
     return _tips_behind(head_rev, target_rev, repo_dir, repo_slug=repo_slug)
 
@@ -389,7 +389,7 @@ def _read_json(path: Path) -> Optional[dict]:
 def check_for_updates(*, passive: bool = False) -> Optional[int]:
     """Check whether a Hermes update is available.
 
-    If ``HERMES_REVISION`` is set (nix builds embed it), compare it to upstream main; otherwise
+    If ``STARDUST_REVISION`` is set (nix builds embed it), compare it to upstream main; otherwise
     compare the local checkout's HEAD. Both go through the GitHub API, never ``git fetch``.
     """
     def _read_config_opt_out():
@@ -400,8 +400,8 @@ def check_for_updates(*, passive: bool = False) -> Optional[int]:
         return None
 
     cache_file = get_hermes_home() / ".update_check"
-    embedded_rev = os.environ.get("HERMES_REVISION") or None
-    # Docker images have no working tree (the image excludes `.git`) and set no HERMES_REVISION.
+    embedded_rev = os.environ.get("STARDUST_REVISION") or None
+    # Docker images have no working tree (the image excludes `.git`) and set no STARDUST_REVISION.
     # None makes both the Rich banner and the Ink badge show nothing, mirroring the dashboard's
     # `/api/hermes/update/check` short-circuit so the surfaces agree.
     def _install_method():
@@ -411,7 +411,7 @@ def check_for_updates(*, passive: bool = False) -> Optional[int]:
     if _quiet(_install_method) in {"docker", "apt"}:
         return None
     # Cache is invalidated when the embedded rev OR installed version changed since the last check.
-    # For a git checkout the local HEAD is part of the key too: `hermes update` moves HEAD, and a
+    # For a git checkout the local HEAD is part of the key too: `stardust update` moves HEAD, and a
     # stale "3 behind" must not survive the update it just prompted.
     now = time.time()
     repo_dir = None if embedded_rev else _resolve_repo_dir()
@@ -437,7 +437,7 @@ def check_for_updates(*, passive: bool = False) -> Optional[int]:
 def _resolve_repo_dir() -> Optional[Path]:
     """The active Hermes git checkout, or None if this isn't a git install.
 
-    Prefers the running code's location: ``$HERMES_HOME/hermes-agent/`` may be a stale copy
+    Prefers the running code's location: ``$STARDUST_HOME/hermes-agent/`` may be a stale copy
     carried over by ``--clone-all``.
     """
     repo_dir = Path(__file__).parent.parent.resolve()
@@ -775,8 +775,8 @@ def _mcp_failed_line(name: str, transport: str, error: Optional[str]) -> str:
     exact next command, so 'failed' is never the whole story."""
     from rich.markup import escape
     reason = escape(" ".join(str(error or "").split())[:120]) or "no details recorded"
-    next_cmd = (f"hermes mcp login {name}" if re.search(r"\b401\b|unauthori[sz]ed", reason, re.I)
-                else f"hermes mcp test {name}")
+    next_cmd = (f"stardust mcp login {name}" if re.search(r"\b401\b|unauthori[sz]ed", reason, re.I)
+                else f"stardust mcp test {name}")
     return (f"[red]{name}[/] [dim]({transport})[/] [red]— could not connect:[/] {reason} "
             f"[dim]— run `{next_cmd}`[/]")
 
@@ -883,11 +883,11 @@ def _banner_left_lines(model: str, cwd: str, session_id, context_length, provide
         lines.append(f"[{accent}]MoA: {_short_label(model)}[/]{agg_str}{ctx_str}{nous_str}")
     elif not (model or "").strip() or (model or "").strip().lower() == "unknown":
         # Unconfigured install: the clearest place to say what is wrong and how to fix it.
-        lines.append(f"[bold red]no model configured[/] [dim {dim}]— run /model or hermes setup[/]")
+        lines.append(f"[bold red]no model configured[/] [dim {dim}]— run /model or stardust setup[/]")
     else:
         model_short = model.split("/")[-1].removesuffix(".gguf")
         lines.append(f"[{accent}]{_short_label(model_short)}[/]{ctx_str}{nous_str}")
-    if os.getenv("HERMES_YOLO_MODE"):
+    if os.getenv("STARDUST_YOLO_MODE"):
         lines.append(f"[bold red]⚠ YOLO mode[/] [dim {dim}]— all approval prompts bypassed[/]")
     lines.append(f"[dim {dim}]{cwd}[/]")
     if session_id:
@@ -966,7 +966,7 @@ def build_welcome_banner(
     text = _skin_color("banner_text", "#FFF8DC")
     # Use skin's custom caduceus art if provided
     _bskin = _quiet(_active_skin)
-    left_lines = ["", getattr(_bskin, "banner_hero", None) or HERMES_CADUCEUS, ""]
+    left_lines = ["", getattr(_bskin, "banner_hero", None) or STARDUST_CADUCEUS, ""]
     left_lines += _banner_left_lines(model, cwd, session_id, context_length, provider, accent=accent, dim=dim)
     right_lines = _banner_tool_lines(
         tools, availability.get("unavailable_toolsets", []), get_toolset_for_tool,
@@ -1027,6 +1027,6 @@ def build_welcome_banner(
         border_style=_skin_color("banner_border", "#CD7F32"), padding=(0, 2))
     console.print()
     if shutil.get_terminal_size().columns >= 95:
-        console.print(getattr(_bskin, "banner_logo", None) or HERMES_AGENT_LOGO)
+        console.print(getattr(_bskin, "banner_logo", None) or STARDUST_AGENT_LOGO)
         console.print()
     console.print(outer_panel)

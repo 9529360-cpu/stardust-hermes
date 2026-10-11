@@ -10,7 +10,7 @@ the consolidation fix intentionally pin the CORRECT behavior, so on
 unfixed main the buggy ones fail — that failure on the Windows runner is
 the empirical premise-check for each issue:
 
-  #90778 — holder message mislabels `hermes dashboard` as the Desktop
+  #90778 — holder message mislabels `stardust dashboard` as the Desktop
            backend, and matches subcommands by substring ("--preserve"
            contains "serve").
   #78089 — pausable-gateway exemption vs. long managed-runtime
@@ -163,7 +163,7 @@ class TestHolderMessage:
             assert matches, "dashboard process not detected"
             message = _format_venv_python_holders_message(matches)
             assert "close the desktop app" not in message.lower(), (
-                "standalone `hermes dashboard` mislabeled as the Desktop "
+                "standalone `stardust dashboard` mislabeled as the Desktop "
                 f"backend (#90778):\n{message}"
             )
         finally:
@@ -297,9 +297,9 @@ class TestConcurrentGateClassification:
         _kill(dead)  # reaped → unreadable cmdline → unknown → kept
         try:
             matches = [
-                (gw.pid, "hermes.exe"),
-                (backend.pid, "hermes.exe"),
-                (dead.pid, "hermes.exe"),
+                (gw.pid, "stardust.exe"),
+                (backend.pid, "stardust.exe"),
+                (dead.pid, "stardust.exe"),
             ]
             kept = _filter_non_gateway_concurrent_instances(matches)
             kept_pids = {pid for pid, _ in kept}
@@ -313,7 +313,7 @@ class TestConcurrentGateClassification:
 class TestUpdaterOwnedBackendDeferral:
     """#98336 — ledger-verified serve/dashboard holders defer to the CLI
     updater's stop/relaunch rungs instead of dead-ending the Desktop
-    hand-off (and leaving hermes.exe locked → quarantine os error 32)."""
+    hand-off (and leaving stardust.exe locked → quarantine os error 32)."""
 
     @staticmethod
     def _ledger_write(pid: int, purpose: str, spawner_pid: int | None,
@@ -341,7 +341,7 @@ class TestUpdaterOwnedBackendDeferral:
     def test_dead_spawner_serve_is_deferred_live(self, tmp_path, monkeypatch):
         """A REAL serve-argv process, ledger-registered with a provably dead
         spawner, must classify as updater-owned (deferred, not a blocker)."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import psutil
 
@@ -370,7 +370,7 @@ class TestUpdaterOwnedBackendDeferral:
     def test_live_foreign_spawner_serve_still_blocks_live(self, tmp_path, monkeypatch):
         """Same real serve process, but its recorded spawner is a LIVE
         process outside this scan's ancestry — must keep blocking."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import psutil
 
@@ -397,7 +397,7 @@ class TestUpdaterOwnedBackendDeferral:
     def test_unregistered_serve_still_blocks_live(self, tmp_path, monkeypatch):
         """A serve-argv process with NO ledger entry keeps blocking —
         positive identity only, never argv-shape alone."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import psutil
 
@@ -414,7 +414,7 @@ class TestUpdaterOwnedBackendDeferral:
         """The #98336 field topology: the recorded spawner is the scan's own
         ANCESTOR (the Desktop performing the hand-off). Run the check in a
         real child process whose parent chain contains the spawner."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         import json as _json
 
@@ -463,7 +463,7 @@ class TestUpdaterOwnedBackendDeferral:
                 text=True,
                 cwd=str(PROJECT_ROOT),
                 timeout=120,
-                env={**os.environ, "HERMES_HOME": str(tmp_path)},
+                env={**os.environ, "STARDUST_HOME": str(tmp_path)},
             )
             line = result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "{}"
             payload = _json.loads(line)

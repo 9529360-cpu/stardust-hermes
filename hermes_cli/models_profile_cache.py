@@ -2,7 +2,7 @@
 
 Several caches on the facade (curated OpenRouter list, reasoning-capability catalogs and their
 once-per-process guards) hold values derived from ONE profile's config, ``.env`` and ``<home>/cache``
-files. In a multiplexed gateway every turn runs under a HERMES_HOME override, so a single module slot
+files. In a multiplexed gateway every turn runs under a STARDUST_HOME override, so a single module slot
 would hand the launch profile's value to every other profile. Under an override the slot is read and
 written per home key (routed profiles start cold, never from the launch profile's warmed value);
 without one the module attribute stays the slot, so single-profile behaviour and the tests that reset

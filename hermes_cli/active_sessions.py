@@ -360,7 +360,7 @@ class ActiveSessionLease:
     surface: str
     enabled: bool = True
     released: bool = False
-    # Pinned at acquisition: a lease taken under the root HERMES_HOME must release
+    # Pinned at acquisition: a lease taken under the root STARDUST_HOME must release
     # against the same registry even inside a profile-home override, or phantom
     # leases fill the session cap.
     # See #85431.
@@ -528,7 +528,7 @@ def try_acquire_active_session(
 
 def release_active_session(lease: ActiveSessionLease) -> None:
     # Prefer the registry the lease was acquired against: the caller may be
-    # running under a profile HERMES_HOME override.
+    # running under a profile STARDUST_HOME override.
     # See #85431.
     state_path, lock_path = _lease_paths(lease)
     with _FileLock(lock_path):

@@ -1,4 +1,4 @@
-"""``hermes dashboard`` / ``hermes serve`` subcommand parsers.
+"""``stardust dashboard`` / ``stardust serve`` subcommand parsers.
 
 ``dashboard`` is the browser web UI; ``serve`` is the same gateway, headless —
 what the desktop app and remote backends run. ``serve`` also skips the web UI
@@ -37,8 +37,8 @@ def _add_server_runtime_args(parser) -> None:
     # Internal: set by the unified-launch re-exec to preselect the launching profile.
     parser.add_argument("--open-profile", dest="open_profile", default="", help=argparse.SUPPRESS)
     # Lifecycle flags win over the start-a-server flags (they exit first). No service
-    # manager / PID file: they scan the process table for `hermes dashboard|serve`
-    # cmdlines and SIGTERM them — the same path `hermes update` uses.
+    # manager / PID file: they scan the process table for `stardust dashboard|serve`
+    # cmdlines and SIGTERM them — the same path `stardust update` uses.
     parser.add_argument(
         "--stop", action="store_true", help="Stop all running Hermes web server processes and exit")
     parser.add_argument(
@@ -64,7 +64,7 @@ def build_serve_parser(
 ) -> argparse.ArgumentParser:
     """Build the standalone parser used by the lean ``serve`` dispatch path."""
     parser = argparse.ArgumentParser(
-        prog="hermes serve",
+        prog="stardust serve",
         description="Run the Hermes backend server - the JSON-RPC/WebSocket gateway the "
             "desktop app and remote clients connect to. Headless: it never opens "
             "a browser UI.",
@@ -83,7 +83,7 @@ def build_dashboard_parser(
     _add_server_runtime_args(dashboard_parser)
     dashboard_parser.add_argument(
         "--no-open", action="store_true", help="Don't open browser automatically")
-    # Compat shim: desktop shells <= 0.15.x spawn `hermes dashboard --no-open --tui ...`;
+    # Compat shim: desktop shells <= 0.15.x spawn `stardust dashboard --no-open --tui ...`;
     # `--tui` was removed (embedded chat always on). Accept + ignore so an old app with a
     # new CLI doesn't die on "unrecognized arguments". Drop once the app floor is > 0.16.0.
     dashboard_parser.add_argument("--tui", action="store_true", help=argparse.SUPPRESS)

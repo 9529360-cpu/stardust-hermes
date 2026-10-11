@@ -5,7 +5,7 @@ server wrapping Camoufox (Firefox fork with C++ fingerprint spoofing); its REST 
 1:1 to our browser tool interface (accessibility snapshots with element refs, click/type/
 scroll by ref, screenshots). Setup: ``npm start`` in a checkout or ``docker run -p 9377:9377
 -e CAMOFOX_PORT=9377 jo-inc/camofox-browser``, then ``CAMOFOX_URL=http://localhost:9377`` in
-``~/.hermes/.env`` (Docker: see ``CAMOFOX_REWRITE_LOOPBACK_URLS`` below).
+``~/.stardust/.env`` (Docker: see ``CAMOFOX_REWRITE_LOOPBACK_URLS`` below).
 """
 
 from __future__ import annotations
@@ -558,7 +558,7 @@ def _vision_llm_settings() -> tuple[float, float]:
 
 
 def _save_screenshot(content: bytes) -> str:
-    """Write PNG bytes under ``$HERMES_HOME/browser_screenshots`` and return the path."""
+    """Write PNG bytes under ``$STARDUST_HOME/browser_screenshots`` and return the path."""
     from hermes_constants import get_hermes_home
     screenshots_dir = get_hermes_home() / "browser_screenshots"
     screenshots_dir.mkdir(parents=True, exist_ok=True)

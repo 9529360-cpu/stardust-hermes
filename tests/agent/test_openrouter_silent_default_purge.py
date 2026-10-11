@@ -47,7 +47,7 @@ class TestEnvIngestionWarning:
     def _fresh_home(self, tmp_path, monkeypatch, token="sk-or-FAKEINGEST123"):
         home = tmp_path / "hermes"
         home.mkdir(parents=True, exist_ok=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setenv("OPENROUTER_API_KEY", token)
         return home
 
@@ -69,7 +69,7 @@ class TestEnvIngestionWarning:
         ]
         assert warnings, "expected a WARNING for env->pool openrouter ingestion"
         assert "OpenRouter spend" in warnings[0]
-        assert "hermes auth remove openrouter" in warnings[0]
+        assert "stardust auth remove openrouter" in warnings[0]
 
     def test_warning_once_per_process(self, tmp_path, monkeypatch, caplog):
         self._fresh_home(tmp_path, monkeypatch)

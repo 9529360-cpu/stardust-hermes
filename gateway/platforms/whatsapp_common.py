@@ -280,7 +280,7 @@ class WhatsAppBehaviorMixin(OwnAccessPolicyMixin):
 
 def resolve_whatsapp_bridge_dir() -> Path:
     """Bridge directory for CLI and adapter. A read-only install tree (e.g. Docker
-    /opt/hermes) is mirrored to HERMES_HOME so npm install works."""
+    /opt/hermes) is mirrored to STARDUST_HOME so npm install works."""
     import shutil
     from hermes_constants import get_hermes_home
     install_bridge = Path(__file__).resolve().parents[2] / "scripts" / "whatsapp-bridge"

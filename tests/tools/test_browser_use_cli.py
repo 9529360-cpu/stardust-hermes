@@ -3,7 +3,7 @@
 Covers the three seams the integration relies on:
 
 * Mode detection — ``browser.backend: browser-use`` in config (set via the
-  ``hermes tools`` picker); off by default.
+  ``stardust tools`` picker); off by default.
 * Tool-surface swap — when the mode is on, ``check_browser_requirements``
   returns False so every legacy ``browser_*`` tool (including
   browser_cdp/browser_dialog, whose check_fns funnel through it) is hidden,
@@ -618,7 +618,7 @@ class TestBackendCdpResolution:
         assert "BU_CDP_WS" not in env and "BU_CDP_URL" not in env
 
     def test_picker_managed_selection_resolves_gateway_provider(self, monkeypatch):
-        """``cloud_provider: nous`` (the `hermes tools` managed row) must resolve through the
+        """``cloud_provider: nous`` (the `stardust tools` managed row) must resolve through the
         provider: the picker never writes the legacy ``use_gateway`` flag, and the direct-API
         branch leaves browser_exec with no CDP endpoint at all (#108310)."""
         import tools.browser_tool as bt  # noqa: F401 — imported for parity with sibling tests
@@ -722,7 +722,7 @@ class TestOwnTabPreamble:
 
 
 class TestProviderPickerIntegration:
-    """The `hermes tools` Browser Automation picker row (browser_backend
+    """The `stardust tools` Browser Automation picker row (browser_backend
     marker) must enter/leave CLI mode cleanly and highlight correctly."""
 
     def _rows(self):
@@ -1148,7 +1148,7 @@ class TestBrowserExecErrorContract:
 
 
 class TestFindCliManagedBin:
-    """MANAGED-FIRST: _find_cli probes $HERMES_HOME/bin before PATH and
+    """MANAGED-FIRST: _find_cli probes $STARDUST_HOME/bin before PATH and
     ~/.local/bin, so the Hermes-installed copy always wins."""
 
     @pytest.fixture(autouse=True)
@@ -1156,7 +1156,7 @@ class TestFindCliManagedBin:
         """Pin HOME so the ~/.local/bin probe can't leak the host's real
         user-level installs into these real-PATH-probing tests."""
         monkeypatch.setenv("HOME", str(tmp_path / "userhome"))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setenv("PATH", str(tmp_path / "empty"))
 
     def test_managed_bin_browser_use_found(self, tmp_path, monkeypatch):
@@ -1236,7 +1236,7 @@ class TestInstallCli:
         and must NOT satisfy install_cli() — only the managed copy does,
         otherwise resolution stays pinned to a binary Hermes can't update."""
         cli = _fake_cli(tmp_path, "")
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setattr(bu_cli.shutil, "which", lambda name, path=None: cli if name == "browser-use" and path is None else None)
         import sys as _sys
         import types as _types
@@ -1255,14 +1255,14 @@ class TestInstallCli:
         cli = bin_dir / "browser-use"
         cli.write_text("#!/bin/sh\n", encoding="utf-8")
         cli.chmod(cli.stat().st_mode | stat.S_IXUSR)
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setenv("PATH", str(tmp_path / "empty"))
         ok, msg = bu_cli.install_cli()
         assert ok is True
         assert "already installed" in msg
 
     def test_no_uv_anywhere_fails_with_guidance(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setenv("PATH", str(tmp_path / "empty"))
         import sys as _sys
         import types as _types
@@ -1277,7 +1277,7 @@ class TestInstallCli:
         home = tmp_path / "home"
         bin_dir = home / "bin"
         bin_dir.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setenv("PATH", str(tmp_path / "empty"))
         # install_cli verifies via _find_cli(), which the tests/tools conftest
         # pins to None — restore the real resolver for this test.
@@ -1303,7 +1303,7 @@ class TestInstallCli:
 
     def test_failed_install_surfaces_stderr_tail(self, tmp_path, monkeypatch):
         home = tmp_path / "home"
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.setenv("PATH", str(tmp_path / "empty"))
         uv = tmp_path / "uv"
         uv.write_text('#!/bin/sh\necho "no network" >&2\nexit 1\n', encoding="utf-8")
@@ -1320,7 +1320,7 @@ class TestInstallCli:
 
 class TestDefaultDowngradeNotice:
     def _isolate(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setattr("hermes_cli.config.read_raw_config", lambda: {})
 
     def test_notice_when_default_and_cli_missing(self, tmp_path, monkeypatch):
@@ -1328,7 +1328,7 @@ class TestDefaultDowngradeNotice:
         monkeypatch.setattr(bu_cli, "_find_cli", lambda: None)
         notice = bu_cli.default_downgrade_notice()
         assert notice is not None
-        assert "hermes tools" in notice
+        assert "stardust tools" in notice
 
     def test_rate_limited_within_24h(self, tmp_path, monkeypatch):
         self._isolate(tmp_path, monkeypatch)
@@ -1342,7 +1342,7 @@ class TestDefaultDowngradeNotice:
         assert bu_cli.default_downgrade_notice() is None
 
     def test_no_notice_on_explicit_backend(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "home"))
         monkeypatch.setattr(
             "hermes_cli.config.read_raw_config",
             lambda: {"browser": {"backend": bu_cli.BACKEND_DISABLED}},

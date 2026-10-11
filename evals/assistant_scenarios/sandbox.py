@@ -1,9 +1,9 @@
 """Isolated homes, hermetic child environments, and read-only views of the state graders need.
 
-Every scenario gets its own HERMES_HOME (sessions, memory, cron store, delegation ledger all live
+Every scenario gets its own STARDUST_HOME (sessions, memory, cron store, delegation ledger all live
 there) and its own workspace. The model's key reaches the backend only through ``EXAM_KEY_ENV`` in
 the child environment — never written to disk — and host secrets, profile selection, and approval
-bypasses (``HERMES_YOLO_MODE`` …) are stripped so the exam measures shipped defaults.
+bypasses (``STARDUST_YOLO_MODE`` …) are stripped so the exam measures shipped defaults.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ PROVIDER_NAME = "exam"
 
 _SKIP_DIRS = frozenset({"__pycache__", ".pytest_cache", ".git", ".venv", "node_modules"})
 _SECRET_SUFFIXES = ("_KEY", "_TOKEN", "_SECRET", "_PASSWORD")
-_KEEP_HERMES_VARS = frozenset({"HERMES_GIT_BASH_PATH"})
+_KEEP_HERMES_VARS = frozenset({"STARDUST_GIT_BASH_PATH"})
 # Pointers to other tools' login stores; the profile redirect covers their default locations.
 _CREDENTIAL_DIR_VARS = frozenset({"PYTHONPATH", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "GH_CONFIG_DIR"})
 
@@ -62,7 +62,7 @@ def child_env(base: Mapping[str, str], *, home: Path, repo_root: Path, api_key: 
     exam must neither use nor refresh them."""
     env = {k: v for k, v in base.items() if not _stripped(k)}
     profile.mkdir(parents=True, exist_ok=True)
-    env.update({"HERMES_HOME": str(home), "PYTHONPATH": str(repo_root), "PYTHONUTF8": "1",
+    env.update({"STARDUST_HOME": str(home), "PYTHONPATH": str(repo_root), "PYTHONUTF8": "1",
                 "PYTHONIOENCODING": "utf-8", EXAM_KEY_ENV: api_key,
                 "HOME": str(profile), "USERPROFILE": str(profile), "GH_CONFIG_DIR": str(profile / "gh"),
                 # An explicitly set (here: unusable) Copilot token makes copilot_auth skip its `gh auth token`
@@ -75,7 +75,7 @@ def child_env(base: Mapping[str, str], *, home: Path, repo_root: Path, api_key: 
 
 def _stripped(name: str) -> bool:
     upper = name.upper()
-    if upper.startswith("HERMES_"):
+    if upper.startswith("STARDUST_"):
         return upper not in _KEEP_HERMES_VARS
     return upper in _CREDENTIAL_DIR_VARS or upper.endswith(_SECRET_SUFFIXES)
 

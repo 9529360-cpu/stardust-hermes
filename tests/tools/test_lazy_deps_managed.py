@@ -20,7 +20,7 @@ def _missing_and_installable(monkeypatch):
     """Reach the guard: deps missing, installs allowed, no durable target.
 
     ``_allow_lazy_installs`` is patched explicitly so the suite does not
-    depend on the host's ~/.hermes/config.yaml (a local
+    depend on the host's ~/.stardust/config.yaml (a local
     ``allow_lazy_installs: false`` otherwise short-circuits with a different
     rejection reason).
     """
@@ -74,10 +74,10 @@ def test_unmanaged_install_is_not_blocked_by_the_guard(monkeypatch):
 
 
 def test_durable_install_target_overrides_the_guard(monkeypatch, tmp_path):
-    """The container deployment sets HERMES_MANAGED *and* a writable target.
+    """The container deployment sets STARDUST_MANAGED *and* a writable target.
 
-    Dockerfile sets HERMES_LAZY_INSTALL_TARGET and the NixOS container module
-    passes HERMES_MANAGED=true; blocking there would break that deployment.
+    Dockerfile sets STARDUST_LAZY_INSTALL_TARGET and the NixOS container module
+    passes STARDUST_MANAGED=true; blocking there would break that deployment.
     """
     monkeypatch.setattr("hermes_cli.config.get_managed_system", lambda: "nixos")
     monkeypatch.setattr(lazy_deps, "_lazy_install_target", lambda: tmp_path)

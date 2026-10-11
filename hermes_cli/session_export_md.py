@@ -16,7 +16,7 @@ from typing import Any
 
 from hermes_cli.timefmt import coerce_epoch
 
-EXPORTER_VERSION = "hermes sessions export (md/qmd) v1"
+EXPORTER_VERSION = "stardust sessions export (md/qmd) v1"
 _SHA_LINE_RE = re.compile(r"- SHA256 of exported body: `([0-9a-f]{64})`")
 _SHA_PLACEHOLDER = "__SHA256_PLACEHOLDER__"
 _VERIFICATION_HEADING = "## Export verification"

@@ -3,7 +3,7 @@
 Bug class ("update reports success while reality disagrees" — #88654,
 #88848, #91378, #91439, #91962, #92780, #92902): the updater's word must be
 backed by evidence. This suite pins the honesty contract of the receipt
-subsystem with REAL module functions against a temp HERMES_HOME — it is not
+subsystem with REAL module functions against a temp STARDUST_HOME — it is not
 a fleet E2E (that lives in the CI install/update harness).
 
 Invariants pinned, and WHERE each is enforced:
@@ -54,8 +54,8 @@ from hermes_cli.update_inventory import (
 
 @pytest.fixture()
 def receipt_home(tmp_path, monkeypatch):
-    """Hermetic HERMES_HOME so receipts never touch the real profile."""
-    home = tmp_path / ".hermes"
+    """Hermetic STARDUST_HOME so receipts never touch the real profile."""
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(
         "hermes_cli.config.get_hermes_home", lambda: home, raising=False
@@ -267,7 +267,7 @@ class TestRefusalIsNotFailure:
         """#91439: the refused run's receipt keeps the evidence of WHY —
         the failing preflight step is preserved, not lost."""
         ur.begin_update_receipt()
-        ur.record_step("windows_preflight", False, "hermes.exe running")
+        ur.record_step("windows_preflight", False, "stardust.exe running")
         path = ur.finalize_pending_update_receipt(2, "concurrent instance")
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert payload["steps"][0]["name"] == "windows_preflight"

@@ -9,7 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DUMP_MARKER = "most recent call first"
-DUMP_ENV = "HERMES_TEST_TEARDOWN_DUMP_SECONDS"
+DUMP_ENV = "STARDUST_TEST_TEARDOWN_DUMP_SECONDS"
 
 
 def _load_runner():
@@ -71,7 +71,7 @@ def test_clean_run_writes_no_stack_dump(tmp_path, monkeypatch):
 def test_child_imports_hermes_cli_main_while_the_watchdog_is_loaded(tmp_path, monkeypatch):
     # hermes_cli.main reads `-p <profile>` from sys.argv when it is imported. The plugin must reach
     # the child without a `-p` on its command line, or every import of hermes_cli.main exits it.
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes"))
     test_file = tmp_path / "test_imports_hermes_cli_main.py"
     test_file.write_text("import hermes_cli.main\n\n\ndef test_imports():\n    pass\n", encoding="utf-8")
     runner = _load_runner()

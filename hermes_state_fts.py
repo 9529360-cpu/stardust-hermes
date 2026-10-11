@@ -98,13 +98,13 @@ END;
 
 def fts5_cjk_so_path() -> Path:
     """Location of the cjk_unicode61 loadable extension."""
-    env = os.getenv("HERMES_FTS5_CJK_SO")
+    env = os.getenv("STARDUST_FTS5_CJK_SO")
     return Path(env).expanduser() if env else get_hermes_home() / "lib" / "libfts5_cjk.so"
 
 
 def _cjk_fts_config_enabled() -> bool:
     """config.yaml ``sessions.cjk_fts`` (default on) for the profile being served."""
-    value = routed_sessions_setting("cjk_fts", "HERMES_CJK_FTS")
+    value = routed_sessions_setting("cjk_fts", "STARDUST_CJK_FTS")
     return value is None or str(value).strip().lower() not in ("0", "false", "off", "no")
 
 
@@ -233,7 +233,7 @@ class SessionFtsSetupMixin:
         self._fts_unavailable_warned = True
         logger.warning(
             "SQLite FTS5 unavailable for %s; full-text session search "
-            "disabled. Run `hermes update` to rebuild the venv with a "
+            "disabled. Run `stardust update` to rebuild the venv with a "
             "current Python (managed uv guarantees FTS5). (underlying error: %s)",
             self.db_path,
             exc,
@@ -263,7 +263,7 @@ class SessionFtsSetupMixin:
                             "cjk_unicode61 tokenizer is unavailable (%s) — "
                             "dropping the cjk triggers so message writes keep "
                             "working. CJK search falls back to trigram/LIKE; "
-                            "run `hermes sessions optimize-storage` on a host "
+                            "run `stardust sessions optimize-storage` on a host "
                             "with the extension to rebuild.",
                             fts5_cjk_so_path(),
                         )

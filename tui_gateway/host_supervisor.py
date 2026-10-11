@@ -379,7 +379,7 @@ class HostSupervisor:
         self._host_generation += 1
         host_generation = self._host_generation
         env = {**hermes_subprocess_env(inherit_credentials=True), **os.environ, **(self.env or {})}
-        env["HERMES_COMPUTE_HOST_HEARTBEAT_SECS"] = str(self.heartbeat_secs)
+        env["STARDUST_COMPUTE_HOST_HEARTBEAT_SECS"] = str(self.heartbeat_secs)
         root = str(_repo_root())
         env.setdefault("PYTHONPATH", root)
         if root not in env["PYTHONPATH"].split(os.pathsep):
@@ -430,7 +430,7 @@ class HostSupervisor:
         got_home = str(hello.get("hermes_home") or "")
         if got_home and got_home != self.expected_hermes_home:
             raise RuntimeError(
-                f"compute host HERMES_HOME mismatch: {got_home} != {self.expected_hermes_home}")
+                f"compute host STARDUST_HOME mismatch: {got_home} != {self.expected_hermes_home}")
         got_sha = str(hello.get("build_sha") or "")
         expected = self.expected_build_sha
         if expected != "unknown" and got_sha not in {"", "unknown", expected}:

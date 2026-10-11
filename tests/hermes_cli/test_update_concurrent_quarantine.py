@@ -1,5 +1,5 @@
-"""Tests for issue #26670 — concurrent hermes.exe detection and improved
-quarantine retry / reboot-deferred fallback during `hermes update` on Windows.
+"""Tests for issue #26670 — concurrent stardust.exe detection and improved
+quarantine retry / reboot-deferred fallback during `stardust update` on Windows.
 
 These tests force ``_is_windows`` to return ``True`` via patching so the
 Windows-specific code paths can be exercised on any host.
@@ -35,7 +35,7 @@ pytestmark = pytest.mark.real_concurrent_gate
 # ---------------------------------------------------------------------------
 
 
-def _make_proc(pid: int, exe: str, name: str = "hermes.exe"):
+def _make_proc(pid: int, exe: str, name: str = "stardust.exe"):
     """Build a duck-typed psutil Process stand-in with the .info dict."""
     proc = MagicMock()
     proc.info = {"pid": pid, "exe": exe, "name": name}
@@ -108,14 +108,14 @@ def test_detect_concurrent_parents_call_robust_to_one_bad_hop(_winp, tmp_path):
     ancestor independently, so one unreadable hop never strands the launcher.
     """
     scripts_dir = tmp_path
-    shim = scripts_dir / "hermes.exe"
+    shim = scripts_dir / "stardust.exe"
     shim.write_bytes(b"")
     me = os.getpid()
     launcher_pid = me + 100
 
     rows = [
         _make_proc(me, str(shim), "python.exe"),
-        _make_proc(launcher_pid, str(shim), "hermes.exe"),
+        _make_proc(launcher_pid, str(shim), "stardust.exe"),
     ]
     # ancestor_exe=None → every ancestor's .exe() raises OSError. The helper
     # must swallow it per-ancestor and not crash; the launcher won't be
@@ -129,7 +129,7 @@ def test_detect_concurrent_parents_call_robust_to_one_bad_hop(_winp, tmp_path):
         result = cli_main._detect_concurrent_hermes_instances(scripts_dir)
 
     # No crash; helper completes. (Degenerate stub: launcher exe unreadable.)
-    assert result == [(launcher_pid, "hermes.exe")]
+    assert result == [(launcher_pid, "stardust.exe")]
 
 
 
@@ -149,7 +149,7 @@ def test_detect_concurrent_parents_call_robust_to_one_bad_hop(_winp, tmp_path):
 @patch.object(main_install_repair, "_is_windows", return_value=True)
 def test_quarantine_succeeds_first_attempt(_winp, tmp_path):
     """When the rename works immediately, no warning, single rename pair returned."""
-    shim = tmp_path / "hermes.exe"
+    shim = tmp_path / "stardust.exe"
     shim.write_bytes(b"old")
 
     pairs = main_install_repair._quarantine_running_hermes_exe(tmp_path)
@@ -157,7 +157,7 @@ def test_quarantine_succeeds_first_attempt(_winp, tmp_path):
     assert len(pairs) == 1
     orig, quarantine = pairs[0]
     assert orig == shim
-    assert quarantine.name.startswith("hermes.exe.old.")
+    assert quarantine.name.startswith("stardust.exe.old.")
     assert quarantine.exists()
     assert not shim.exists()
 
@@ -165,7 +165,7 @@ def test_quarantine_succeeds_first_attempt(_winp, tmp_path):
 @patch.object(main_install_repair, "_is_windows", return_value=True)
 def test_quarantine_reports_a_lock_it_cannot_break(_winp, tmp_path, capsys, monkeypatch):
     """Every retry failed: name the likely culprits, queue nothing for reboot."""
-    shim = tmp_path / "hermes.exe"
+    shim = tmp_path / "stardust.exe"
     shim.write_bytes(b"locked")
 
     def always_fails(self, target):
@@ -902,7 +902,7 @@ def test_unreadable_argv_falls_back_to_the_captured_prefix(monkeypatch):
 # _classify_concurrent_instance / _filter_non_gateway_concurrent_instances
 #
 # #37039: the pre-update concurrent-instance gate lets the update proceed
-# when every concurrent hermes.exe is a gateway runtime — the pause
+# when every concurrent stardust.exe is a gateway runtime — the pause
 # machinery (_pause_windows_gateways_for_update) stops those before any
 # file mutation and the post-update restart phase brings them back.
 # Classification delegates to _is_pausable_gateway → the canonical
@@ -928,17 +928,17 @@ def _fake_psutil_classify(argv_by_pid):
 
 def test_classify_concurrent_instance_recognises_gateway_runtimes(monkeypatch):
     """Gateway runtime command lines classify as ``gateway`` regardless of
-    launcher shape (python -m, hermes.exe shim, hermes-gateway.exe,
-    gateway/run.py, bare `hermes gateway` which defaults to run)."""
+    launcher shape (python -m, stardust.exe shim, hermes-gateway.exe,
+    gateway/run.py, bare `stardust gateway` which defaults to run)."""
     cases = [
         [r"C:\venv\Scripts\python.exe", "-m", "hermes_cli.main", "gateway", "run"],
-        [r"C:\venv\Scripts\hermes.exe", "gateway", "run"],
+        [r"C:\venv\Scripts\stardust.exe", "gateway", "run"],
         [r"C:\venv\Scripts\hermes-gateway.exe"],
         [r"C:\venv\Scripts\python.exe", "gateway/run.py"],
-        ["hermes.exe", "GATEWAY", "RUN"],  # matcher is case-insensitive
-        ["hermes.exe", "gateway"],  # bare `hermes gateway` defaults to run
+        ["stardust.exe", "GATEWAY", "RUN"],  # matcher is case-insensitive
+        ["stardust.exe", "gateway"],  # bare `stardust gateway` defaults to run
         # profile selector before the subcommand — canonical matcher strips it
-        ["hermes.exe", "--profile", "work", "gateway", "run"],
+        ["stardust.exe", "--profile", "work", "gateway", "run"],
     ]
     for argv in cases:
         monkeypatch.setitem(sys.modules, "psutil", _fake_psutil_classify({77: argv}))
@@ -952,10 +952,10 @@ def test_classify_concurrent_instance_recognises_non_gateways(monkeypatch):
     matcher rejects but a substring matcher would misclassify. These keep
     the pre-update abort."""
     cases = [
-        [r"C:\venv\Scripts\hermes.exe"],  # interactive REPL
-        [r"C:\venv\Scripts\hermes.exe", "dashboard"],
-        ["hermes.exe", "gateway", "status"],  # management, not runtime
-        ["hermes.exe", "gateway", "stop"],
+        [r"C:\venv\Scripts\stardust.exe"],  # interactive REPL
+        [r"C:\venv\Scripts\stardust.exe", "dashboard"],
+        ["stardust.exe", "gateway", "status"],  # management, not runtime
+        ["stardust.exe", "gateway", "stop"],
         ["python", "-m", "hermes_cli.main"],
         [],
     ]
@@ -987,21 +987,21 @@ def test_filter_non_gateway_concurrent_instances_splits(monkeypatch):
         "psutil",
         _fake_psutil_classify(
             {
-                100: ["hermes.exe", "gateway", "run"],
-                200: ["hermes.exe"],  # REPL — keep
-                300: ["hermes.exe", "dashboard"],  # keep
+                100: ["stardust.exe", "gateway", "run"],
+                200: ["stardust.exe"],  # REPL — keep
+                300: ["stardust.exe", "dashboard"],  # keep
                 # 400 missing → unknown → keep
             }
         ),
     )
     matches = [
-        (100, "hermes.exe"),
-        (200, "hermes.exe"),
-        (300, "hermes.exe"),
-        (400, "hermes.exe"),
+        (100, "stardust.exe"),
+        (200, "stardust.exe"),
+        (300, "stardust.exe"),
+        (400, "stardust.exe"),
     ]
     kept = cli_main._filter_non_gateway_concurrent_instances(matches)
-    assert kept == [(200, "hermes.exe"), (300, "hermes.exe"), (400, "hermes.exe")]
+    assert kept == [(200, "stardust.exe"), (300, "stardust.exe"), (400, "stardust.exe")]
 
 
 def test_filter_non_gateway_concurrent_instances_gateway_only(monkeypatch):
@@ -1012,12 +1012,12 @@ def test_filter_non_gateway_concurrent_instances_gateway_only(monkeypatch):
         "psutil",
         _fake_psutil_classify(
             {
-                111: ["hermes.exe", "gateway", "run"],
+                111: ["stardust.exe", "gateway", "run"],
                 222: [r"C:\venv\Scripts\hermes-gateway.exe"],
             }
         ),
     )
-    matches = [(111, "hermes.exe"), (222, "hermes-gateway.exe")]
+    matches = [(111, "stardust.exe"), (222, "hermes-gateway.exe")]
     assert cli_main._filter_non_gateway_concurrent_instances(matches) == []
 
 
@@ -1052,7 +1052,7 @@ def test_update_gate_skips_abort_when_only_concurrent_is_gateway(
     ), patch.object(
         cli_main,
         "_detect_concurrent_hermes_instances",
-        return_value=[(1000, "hermes.exe"), (2000, "hermes-gateway.exe")],
+        return_value=[(1000, "stardust.exe"), (2000, "hermes-gateway.exe")],
     ), patch.object(
         cli_main, "_filter_non_gateway_concurrent_instances", return_value=[]
     ) as mock_filter, patch.object(
@@ -1065,7 +1065,7 @@ def test_update_gate_skips_abort_when_only_concurrent_is_gateway(
     mock_filter.assert_called_once()
     mock_backup.assert_called_once()
     captured = capsys.readouterr().out
-    assert "Another hermes.exe is running" not in captured
+    assert "Another stardust.exe is running" not in captured
 
 
 @patch.object(cli_main, "_is_windows", return_value=True)
@@ -1083,11 +1083,11 @@ def test_update_gate_still_aborts_on_non_gateway_concurrent(
     ), patch.object(
         cli_main,
         "_detect_concurrent_hermes_instances",
-        return_value=[(1000, "hermes.exe"), (3000, "hermes.exe")],
+        return_value=[(1000, "stardust.exe"), (3000, "stardust.exe")],
     ), patch.object(
         cli_main,
         "_filter_non_gateway_concurrent_instances",
-        return_value=[(3000, "hermes.exe")],
+        return_value=[(3000, "stardust.exe")],
     ), patch.object(
         cli_main, "_run_pre_update_backup"
     ) as mock_backup:

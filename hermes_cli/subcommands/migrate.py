@@ -1,4 +1,4 @@
-"""``hermes migrate`` subcommand parser."""
+"""``stardust migrate`` subcommand parser."""
 
 from __future__ import annotations
 
@@ -28,14 +28,14 @@ def build_migrate_parser(subparsers) -> None:
     migrate_xai.set_defaults(func=cmd_migrate_xai)
 
     migrate_relay = migrate_subparsers.add_parser(
-        "relay", help="Convert legacy HERMES_NEMO_RELAY_ATIF_*/ATOF_* exporter vars into relay-plugins.toml",
+        "relay", help="Convert legacy STARDUST_NEMO_RELAY_ATIF_*/ATOF_* exporter vars into relay-plugins.toml",
         description="The NeMo Relay cutover stopped reading the legacy exporter variables; a .env that still "
-            "carries them (and no HERMES_NEMO_RELAY_PLUGINS_TOML) exports nothing. Generate "
-            "<hermes home>/relay-plugins.toml from them, point HERMES_NEMO_RELAY_PLUGINS_TOML at it, "
-            "and comment the legacy lines out. `hermes update` runs this for every profile automatically.")
+            "carries them (and no STARDUST_NEMO_RELAY_PLUGINS_TOML) exports nothing. Generate "
+            "<hermes home>/relay-plugins.toml from them, point STARDUST_NEMO_RELAY_PLUGINS_TOML at it, "
+            "and comment the legacy lines out. `stardust update` runs this for every profile automatically.")
     migrate_relay.add_argument(
         "--all-profiles", action="store_true",
-        help="Migrate the default home and every named profile (what `hermes update` does)")
+        help="Migrate the default home and every named profile (what `stardust update` does)")
     migrate_relay.add_argument(
         "--no-validate", action="store_true",
         help="Skip activating the generated file through Relay's validator before writing it")

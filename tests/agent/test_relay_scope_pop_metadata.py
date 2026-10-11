@@ -73,7 +73,7 @@ def test_end_turn_finalization_survives_pop_without_metadata(monkeypatch, caplog
     """Mirror #78993: nemo-relay 0.3.x rejects metadata= on scope.pop."""
     pytest.importorskip("nemo_relay")
 
-    monkeypatch.setenv("HERMES_HOME", tempfile.mkdtemp())
+    monkeypatch.setenv("STARDUST_HOME", tempfile.mkdtemp())
     relay_runtime._reset_for_tests()
     lease = relay_runtime.SESSION_COORDINATOR.acquire_conversation(
         profile_key=relay_runtime.current_profile_key(),

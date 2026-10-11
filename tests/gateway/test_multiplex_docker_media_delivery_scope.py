@@ -65,7 +65,7 @@ async def test_secondary_docker_media_resolves_via_its_own_mounts(tmp_path, monk
     _docker_profile(root, default_out)
     _docker_profile(root / "profiles" / "public", public_out)
     # The launch process carries the DEFAULT profile's bridged terminal env.
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     monkeypatch.setenv("TERMINAL_ENV", "docker")
     monkeypatch.setenv("TERMINAL_DOCKER_VOLUMES", json.dumps([f"{default_out}:/output"]))
     (public_out / "pic.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"public" * 8)

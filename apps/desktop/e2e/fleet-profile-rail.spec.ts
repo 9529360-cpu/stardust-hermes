@@ -2,8 +2,8 @@
  * E2E: the fleet profile rail with two registered gateways.
  *
  * "This device" is the Electron-managed local backend (mock inference). The
- * second gateway, "Homelab", is a REAL second `hermes serve` this spec spawns
- * with its own HERMES_HOME, profiles and session token, registered in the v2
+ * second gateway, "Homelab", is a REAL second `stardust serve` this spec spawns
+ * with its own STARDUST_HOME, profiles and session token, registered in the v2
  * connections.json as a remote URL connection. A click on an at-rest square
  * therefore performs the same dial → commit → re-home the statusbar switcher
  * does, against a real backend — not a stub.
@@ -44,13 +44,13 @@ interface RemoteGateway {
 }
 
 function findHermesBinary(): string {
-  const venv = path.join(REPO_ROOT, '.venv', 'bin', 'hermes')
+  const venv = path.join(REPO_ROOT, '.venv', 'bin', 'stardust')
 
   if (fs.existsSync(venv)) {
     return venv
   }
 
-  const result = spawnSync('which', ['hermes'], { encoding: 'utf8' })
+  const result = spawnSync('which', ['stardust'], { encoding: 'utf8' })
 
   if (result.status === 0 && result.stdout.trim()) {
     return result.stdout.trim()
@@ -81,8 +81,8 @@ function seedProfiles(home: string, names: string[]): void {
 }
 
 /**
- * Spawn a second, fully real `hermes serve` as the remote gateway. Its
- * session token is pinned through HERMES_DASHBOARD_SESSION_TOKEN so the
+ * Spawn a second, fully real `stardust serve` as the remote gateway. Its
+ * session token is pinned through STARDUST_DASHBOARD_SESSION_TOKEN so the
  * registry entry can carry a plaintext token envelope.
  */
 async function startRemoteGateway(root: string, mockUrl: string, profiles: string[]): Promise<RemoteGateway> {
@@ -103,8 +103,8 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
       detached: true,
       env: {
         ...process.env,
-        HERMES_HOME: home,
-        HERMES_DASHBOARD_SESSION_TOKEN: REMOTE_TOKEN,
+        STARDUST_HOME: home,
+        STARDUST_DASHBOARD_SESSION_TOKEN: REMOTE_TOKEN,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
@@ -122,7 +122,7 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
 
   while (Date.now() < deadline) {
     if (child.exitCode !== null) {
-      throw new Error(`remote hermes serve exited early (${child.exitCode}):\n${log}`)
+      throw new Error(`remote stardust serve exited early (${child.exitCode}):\n${log}`)
     }
 
     try {
@@ -141,7 +141,7 @@ async function startRemoteGateway(root: string, mockUrl: string, profiles: strin
   }
 
   if (Date.now() >= deadline) {
-    throw new Error(`remote hermes serve never became ready:\n${log}`)
+    throw new Error(`remote stardust serve never became ready:\n${log}`)
   }
 
   return {

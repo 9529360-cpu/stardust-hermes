@@ -289,7 +289,7 @@ _call_lock = threading.Lock()
 def _connect():
     """Connect to the parent's RPC server via the transport it picked.
 
-    HERMES_RPC_SOCKET can be either:
+    STARDUST_RPC_SOCKET can be either:
       - a filesystem path (POSIX Unix domain socket — the default on
         Linux and macOS)
       - a string of the form ``tcp://127.0.0.1:<port>`` (Windows, where
@@ -297,7 +297,7 @@ def _connect():
     """
     global _sock
     if _sock is None:
-        endpoint = os.environ["HERMES_RPC_SOCKET"]
+        endpoint = os.environ["STARDUST_RPC_SOCKET"]
         if endpoint.startswith("tcp://"):
             # tcp://host:port  (host is always 127.0.0.1 in practice — we
             # only bind loopback server-side)
@@ -316,12 +316,12 @@ def _call(tool_name, args):
     request = json.dumps({
         "tool": tool_name,
         "args": args,
-        "token": os.environ.get("HERMES_RPC_TOKEN", ""),
+        "token": os.environ.get("STARDUST_RPC_TOKEN", ""),
     }) + "\\n"
     # Session kernels outlive the RPC server's 300s idle window, so their
     # connection can be legitimately gone by the next cell. The server
-    # re-accepts (HERMES_RPC_PERSISTENT=1); retry once on a fresh socket.
-    _attempts = 2 if os.environ.get("HERMES_RPC_PERSISTENT") == "1" else 1
+    # re-accepts (STARDUST_RPC_PERSISTENT=1); retry once on a fresh socket.
+    _attempts = 2 if os.environ.get("STARDUST_RPC_PERSISTENT") == "1" else 1
     with _call_lock:
         for _attempt in range(_attempts):
             try:
@@ -363,7 +363,7 @@ _FILE_TRANSPORT_HEADER = '''\
 """Auto-generated Hermes tools RPC stubs (file-based transport)."""
 import json, os, shlex, tempfile, threading, time
 
-_RPC_DIR = os.environ.get("HERMES_RPC_DIR") or os.path.join(tempfile.gettempdir(), "hermes_rpc")
+_RPC_DIR = os.environ.get("STARDUST_RPC_DIR") or os.path.join(tempfile.gettempdir(), "hermes_rpc")
 _seq = 0
 # `_seq += 1` is not atomic (read-modify-write), so concurrent _call()
 # invocations from multiple threads could allocate the same sequence number
@@ -391,7 +391,7 @@ def _call(tool_name, args):
             "tool": tool_name,
             "args": args,
             "seq": seq,
-            "token": os.environ.get("HERMES_RPC_TOKEN", ""),
+            "token": os.environ.get("STARDUST_RPC_TOKEN", ""),
         }, f)
     os.rename(tmp, req_file)
 
@@ -615,7 +615,7 @@ def _run_remote_per_call(env, env_type: str, code: str, effective_task_id: str,
                     "enabled_tools": list(getattr(capability_context, "allowed_tools", ()) or sandbox_tools),
                     "capability_grant": capability_context})
         rpc_thread.start()
-        env_prefix = (f"HERMES_RPC_DIR={quoted_rpc_dir} HERMES_RPC_TOKEN={shlex.quote(rpc_token)} "
+        env_prefix = (f"STARDUST_RPC_DIR={quoted_rpc_dir} STARDUST_RPC_TOKEN={shlex.quote(rpc_token)} "
                       "PYTHONDONTWRITEBYTECODE=1")
         tz = get_timezone_name()  # routed profile's timezone, not the bridged default's
         if tz:
@@ -872,7 +872,7 @@ def build_execute_code_schema(enabled_sandbox_tools: set = None,
     if mode == "strict":
         cwd_note = (
             "Scripts run in their own temp dir, not the session's CWD — use absolute paths "
-            "(os.path.expanduser('~/.hermes/.env')) or terminal()/read_file() for user files."
+            "(os.path.expanduser('~/.stardust/.env')) or terminal()/read_file() for user files."
         )
     else:
         cwd_note = (

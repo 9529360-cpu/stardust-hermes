@@ -1,5 +1,5 @@
 """Plugin module-level caches must not hand profile A's state to profile B under a multiplexed
-HERMES_HOME override (``hermes_constants.set_hermes_home_override``).
+STARDUST_HOME override (``hermes_constants.set_hermes_home_override``).
 
 One invariant per mechanism: home-keyed slot with the unscoped module slot intact (router; yuanbao's
 ClassVar twin), credential-fingerprinted catalog keys (openrouter), per-home registries (memory
@@ -27,8 +27,8 @@ REPO = Path(__file__).resolve().parents[2]
 
 @pytest.fixture
 def homes(tmp_path, monkeypatch):
-    """Profile A (launch home, ``HERMES_HOME``) and profile B with different config/.env values."""
-    root = tmp_path / ".hermes"
+    """Profile A (launch home, ``STARDUST_HOME``) and profile B with different config/.env values."""
+    root = tmp_path / ".stardust"
     a, b = root, root / "profiles" / "B"
     for home, tag in ((a, "A"), (b, "B")):
         home.mkdir(parents=True)
@@ -36,7 +36,7 @@ def homes(tmp_path, monkeypatch):
         (home / ".env").write_text(
             f"RAMP_ROUTER_API_KEY=router-key-{tag}\nRAMP_ROUTER_BASE_URL=https://{tag.lower()}.router.test/v1\n",
             encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(a))
+    monkeypatch.setenv("STARDUST_HOME", str(a))
     for var in ("RAMP_ROUTER_API_KEY", "RAMP_ROUTER_BASE_URL", "PYTEST_CURRENT_TEST"):
         monkeypatch.delenv(var, raising=False)
     return a, b

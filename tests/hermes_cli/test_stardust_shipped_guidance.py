@@ -12,10 +12,10 @@ SHIPPED_GUIDANCE = (
 )
 
 FORBIDDEN = (
-    "hermes auth add nous",
+    "stardust auth add nous",
     "Nous-approved",
     "Nous Portal OAuth",
-    "hermes portal",
+    "stardust portal",
     "hermes-agent.nousresearch.com/docs",
 )
 

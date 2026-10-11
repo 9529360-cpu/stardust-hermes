@@ -26,7 +26,7 @@ Config: `delegation.*` in `config.yaml`.
 ### Cron (scheduled jobs)
 
 Durable scheduler — `cron/jobs.py` + `cron/scheduler.py`. Drive it via
-the `cronjob` tool, the `hermes cron` CLI (`list`, `add`, `edit`,
+the `cronjob` tool, the `stardust cron` CLI (`list`, `add`, `edit`,
 `pause`, `resume`, `run`, `remove`), or the `/cron` slash command.
 
 - **Schedules:** duration (`"30m"`, `"2h"`), "every" phrase
@@ -50,7 +50,7 @@ Background maintenance for agent-created skills. Tracks usage, marks
 idle skills stale, archives stale ones, keeps a pre-run tar.gz backup
 so nothing is lost.
 
-- **CLI:** `hermes curator <verb>` — `status`, `usage`, `run`, `pause`,
+- **CLI:** `stardust curator <verb>` — `status`, `usage`, `run`, `pause`,
   `resume`, `pin`, `unpin`, `archive`, `restore`, `list-archived`, `prune`,
   `backup`, `rollback`.
 - **Slash:** `/curator <subcommand>` mirrors the CLI.
@@ -65,9 +65,9 @@ so nothing is lost.
   default for curator-managed `created_by: "agent"` skills, but only on the
   normal low-frequency curator cycle; it is skipped entirely when there are no
   agent-owned candidates. Set `curator.consolidate: false` for prune-only,
-  zero-LLM maintenance; `hermes curator run --consolidate` can still force
+  zero-LLM maintenance; `stardust curator run --consolidate` can still force
   one pass.
-- **Telemetry:** sidecar at `~/.hermes/skills/.usage.json` holds
+- **Telemetry:** sidecar at `~/.stardust/skills/.usage.json` holds
   per-skill `use_count`, `view_count`, `patch_count`,
   `last_activity_at`, `state`, `pinned`.
 

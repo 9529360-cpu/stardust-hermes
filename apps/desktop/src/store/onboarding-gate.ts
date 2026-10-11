@@ -62,7 +62,7 @@ export function beginOnboardingFlow(): void {
   }
 }
 
-/** The guided first launch without its intro film (HERMES_SKIP_INTRO). Same
+/** The guided first launch without its intro film (STARDUST_SKIP_INTRO). Same
  * eligibility as the film path minus the film itself: the film is recorded as
  * watched and the film-to-guide seam fires immediately, instead of waiting
  * for a completion that never comes. */

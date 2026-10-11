@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 /**
  * Launch-flag gate for every local-models surface in the GUI.
  *
- * Local models ship on main behind `--local` (either `hermes desktop --local`
+ * Local models ship on main behind `--local` (either `stardust desktop --local`
  * or the flag on Stardust.exe itself). The flag is strict: without it the GUI
  * shows no local-models surface at all, even on a machine where local models
  * are configured and running — the backend routes stay live, only the

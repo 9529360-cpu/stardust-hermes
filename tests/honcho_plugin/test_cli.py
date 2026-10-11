@@ -518,7 +518,7 @@ class TestSetupWizardDeploymentShape:
 
     def test_mapping_step_points_at_peers_map(self, monkeypatch, tmp_path, capsys):
         self._run_setup(monkeypatch, tmp_path, answers=["cloud", "", "eri", "hermetika", "hermes", "s"])
-        assert "hermes honcho peers map" in capsys.readouterr().out
+        assert "stardust honcho peers map" in capsys.readouterr().out
 
     def test_host_pin_user_peer_true_is_detected_as_single(self, monkeypatch, tmp_path):
         """Host-level ``pinUserPeer: true`` must classify as ``single``.
@@ -875,10 +875,10 @@ class TestEnabledRequiresACredential:
     @pytest.mark.parametrize("cfg, env_key, profile, expect, enabled", [
         ({"hosts": {"hermes_dreamer": {"workspace": "hermes"}}}, "hch-v3-from-env", "dreamer", ["setup"], False),
         (_OAUTH_DEFAULT, None, "dreamer",
-         ["stays disabled", "hermes honcho setup --target-profile dreamer", "hosts.hermes_dreamer"], False),
+         ["stays disabled", "stardust honcho setup --target-profile dreamer", "hosts.hermes_dreamer"], False),
         ({"hosts": {"hermes_dreamer": {"enabled": True, "aiPeer": "dreamer", "workspace": "hermes"}}}, None, "dreamer",
          ["stays disabled"], False),
-        ({"hosts": {}}, None, "default", ["Run 'hermes honcho setup' to sign in"], False),
+        ({"hosts": {}}, None, "default", ["Run 'stardust honcho setup' to sign in"], False),
         ({"apiKey": "hch-v3-root", **_KEYLESS_DEFAULT}, None, "dreamer", ["Honcho enabled"], True),
     ], ids=["env key only", "empty block", "legacy enabled keyless block", "default profile hint", "root key"])
     def test_enable_writes_enabled_only_for_an_on_disk_credential(self, monkeypatch, tmp_path, capsys,

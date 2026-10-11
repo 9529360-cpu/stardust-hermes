@@ -1,6 +1,6 @@
 """Image-authored deployment provenance for immutable Hermes runtimes.
 
-The image bakes ``/etc/hermes/image-provenance.json`` outside ``$HERMES_HOME`` and the checkout, so a
+The image bakes ``/etc/hermes/image-provenance.json`` outside ``$STARDUST_HOME`` and the checkout, so a
 bind-mounted checkout cannot hide the build fact and env/config cannot forge it. Absence preserves every
 source/package install path. Presence fails closed: an unreadable, non-regular, or malformed marker still
 means image-managed — an integrity defect, never permission to mutate the image in place."""

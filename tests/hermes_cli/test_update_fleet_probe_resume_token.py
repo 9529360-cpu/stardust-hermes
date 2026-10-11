@@ -14,7 +14,7 @@ so ``collect_fleet_versions()`` can legitimately return zero rows for a
 perfectly healthy Windows update. With the token counted as an expected
 runtime, ``_fleet_rows_expected`` is True, the verification loop silently
 waits out its polling window (~14 min wall clock on an end-user report with
-the retry loop), prints "Fleet version check returned no rows", and ``hermes
+the retry loop), prints "Fleet version check returned no rows", and ``stardust
 update`` exits 1 — for an update that succeeded.
 
 The invariant this file pins: ``_fleet_probe_expected_runtimes`` may only

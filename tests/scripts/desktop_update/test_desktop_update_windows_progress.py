@@ -1,7 +1,7 @@
 """The Windows hand-off keeps serving progress while its main thread blocks.
 
 windows.ps1 answers /progress from a dedicated runspace precisely so the
-window keeps moving through the long silent stretches (`hermes update`, pip,
+window keeps moving through the long silent stretches (`stardust update`, pip,
 the desktop rebuild) that made an 18-minute update look hung. This drives the
 real script and polls the real listener; the posix half of the same contract
 is covered in test_desktop_update_shim_progress.py.
@@ -74,7 +74,7 @@ def test_progress_advances_while_the_orchestrator_blocks(tmp_path: Path) -> None
     # stability window + retry sleeps), so: 30s, and every sampling deadline
     # below is derived from the moment the held stage lands, keeping the
     # whole window comfortably inside the hold.
-    env["HERMES_SELFTEST_HOLD_SECONDS"] = "30"
+    env["STARDUST_SELFTEST_HOLD_SECONDS"] = "30"
 
     with output_path.open("wb") as output:
         process = subprocess.Popen(

@@ -8,7 +8,7 @@ the browser fill path and never enter tool results, logs, or the session DB.
 
 Design notes:
 - Follows the repo's "default frictionless, 0600 files OK" policy: the key
-  file and vault file are created 0600 under ``<HERMES_HOME>/vault/``.
+  file and vault file are created 0600 under ``<STARDUST_HOME>/vault/``.
 - Ported design (opaque-handle vault fill) from Merit-Systems/OpenInstinct
   (MIT): lib/manager/server/secret-store.ts + vault services.
 - Three item kinds: ``login`` (password-only secret), ``payment`` (card fields) and
@@ -37,7 +37,7 @@ VAULT_KINDS = ("login", "payment", "address")
 LOGIN_IDENTIFIER_TYPES = ("email", "phone", "username")
 
 # Canonical secret-payload fields per non-login kind. Each maps to the WHATWG autocomplete token the
-# browser fill targets (agent/vault_login_classifier.py); the Desktop Add dialog and `hermes vault add`
+# browser fill targets (agent/vault_login_classifier.py); the Desktop Add dialog and `stardust vault add`
 # both write these names, so the fill never has to guess a user's ad-hoc field naming.
 PAYMENT_FIELDS = {
     "card_number": "cc-number", "cardholder_name": "cc-name", "exp_month": "cc-exp-month",
@@ -203,7 +203,7 @@ class VaultItemMeta:
 
 
 class VaultStore:
-    """Encrypted, profile-scoped vault under ``<HERMES_HOME>/vault/``."""
+    """Encrypted, profile-scoped vault under ``<STARDUST_HOME>/vault/``."""
 
     def __init__(self, base_dir: Optional[Path] = None):
         self._base = Path(base_dir) if base_dir is not None else (
@@ -217,7 +217,7 @@ class VaultStore:
     def _ensure_dir(self) -> None:
         self._base.mkdir(mode=0o700, parents=True, exist_ok=True)
         # Route through the canonical securer (honors managed/NixOS
-        # group-share mode and HERMES_UID/GID ownership) rather than a
+        # group-share mode and STARDUST_UID/GID ownership) rather than a
         # bespoke chmod — same requirement as the browser-profile snapshot
         # dir (f1d05c review).
         try:
@@ -233,7 +233,7 @@ class VaultStore:
     @contextmanager
     def _locked(self):
         """Serialize read-modify-write cycles across threads AND processes: the Desktop gateway, a CLI
-        `hermes vault add` and a TUI slash worker all write the same ``vault.json.enc``; two unlocked
+        `stardust vault add` and a TUI slash worker all write the same ``vault.json.enc``; two unlocked
         writers would drop each other's items."""
         with _LOCK:
             self._ensure_dir()

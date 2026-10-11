@@ -37,7 +37,7 @@ def _is_current_profile(profile: Optional[str]) -> bool:
 @contextmanager
 def _hermes_home_scope(path) -> Any:
     """Scope ``load_config``/``save_config`` (anything resolving ``get_hermes_home()`` at call
-    time) to ``path`` for the block via the context-local HERMES_HOME override."""
+    time) to ``path`` for the block via the context-local STARDUST_HOME override."""
     from hermes_constants import set_hermes_home_override, reset_hermes_home_override
     token = set_hermes_home_override(str(path))
     try:
@@ -155,7 +155,7 @@ def _resolve_profile_dir(name: str) -> Path:
 
 
 def _write_profile_mcp_servers(profile_dir: Path, servers: List["MCPServerCreate"]) -> int:
-    """Write MCP server entries into ``profile_dir``'s config.yaml (HERMES_HOME-scoped).
+    """Write MCP server entries into ``profile_dir``'s config.yaml (STARDUST_HOME-scoped).
 
     Mirrors the per-server shape ``POST /api/mcp/servers`` builds, batched so the whole
     profile-create write is one config save. Returns the number of servers written.
@@ -206,7 +206,7 @@ def _profile_scope(profile: Optional[str]):
     under a lock and restored after. For the dashboard's own profile config resolution is
     untouched, but the skill-module globals are still retargeted to the *current*
     ``get_hermes_home()`` so writes land in the live home even when the import-time binding
-    is stale (test isolation, late HERMES_HOME override). Yields the profile dir for a named
+    is stale (test isolation, late STARDUST_HOME override). Yields the profile dir for a named
     profile, None for the current one.
 
     ``tools.skills_sync`` (reset/diff/list-modified/opt-in/opt-out/ repair-official) needs NO retargeting:
@@ -220,19 +220,19 @@ def _profile_scope(profile: Optional[str]):
         profile_dir = get_hermes_home() if scoped is None else scoped
         modules = (_skills_tool, _skill_mgr)
         with _SKILLS_PROFILE_LOCK:
-            saved = [(m.HERMES_HOME, m.SKILLS_DIR) for m in modules]
+            saved = [(m.STARDUST_HOME, m.SKILLS_DIR) for m in modules]
             for m in modules:
-                m.HERMES_HOME, m.SKILLS_DIR = profile_dir, profile_dir / "skills"
+                m.STARDUST_HOME, m.SKILLS_DIR = profile_dir, profile_dir / "skills"
             try:
                 yield scoped
             finally:
                 for m, (home, skills_dir) in zip(modules, saved):
-                    m.HERMES_HOME, m.SKILLS_DIR = home, skills_dir
+                    m.STARDUST_HOME, m.SKILLS_DIR = home, skills_dir
 
 
 @contextmanager
 def _config_profile_scope(profile: Optional[str]):
-    """Await-safe profile scope: the task-local HERMES_HOME contextvar PLUS the profile's secret
+    """Await-safe profile scope: the task-local STARDUST_HOME contextvar PLUS the profile's secret
     scope, never the process-global skills-module attributes ``_profile_scope`` swaps (holding
     those across an ``await`` lets a concurrent request restore THIS request's dir on its
     ``finally``). None/""/"current" = no override.
@@ -393,7 +393,7 @@ def _aux_task_summary(aux_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _profile_cli_args(profile: Optional[str]) -> List[str]:
     """``["-p", <name>]`` for a validated non-default profile, else ``[]``. Hub actions run in
-    a fresh ``hermes`` subprocess whose ``_apply_profile_override()`` reads ``-p`` from argv —
+    a fresh ``stardust`` subprocess whose ``_apply_profile_override()`` reads ``-p`` from argv —
     the only mechanism that reaches import-time-bound globals like ``skills_hub.SKILLS_DIR``."""
     requested = (profile or "").strip()
     if not requested or requested.lower() in {"current", "default"}:

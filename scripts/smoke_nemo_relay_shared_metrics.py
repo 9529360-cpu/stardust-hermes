@@ -29,13 +29,13 @@ INSTALLED_SKILL_CANARY = "relay-smoke-private-installed-skill"
 
 def _resolve_hermes_executable(hermes_repo: Path) -> Path:
     for relative_path in (
-        Path(".venv") / "bin" / "hermes",
-        Path(".venv") / "Scripts" / "hermes.exe",
+        Path(".venv") / "bin" / "stardust",
+        Path(".venv") / "Scripts" / "stardust.exe",
     ):
         candidate = hermes_repo / relative_path
         if candidate.is_file():
             return candidate
-    discovered = shutil.which("hermes")
+    discovered = shutil.which("stardust")
     if discovered:
         return Path(discovered)
     raise SystemExit(
@@ -238,7 +238,7 @@ def _arguments() -> argparse.Namespace:
         "--hermes-repo",
         type=Path,
         default=Path.cwd(),
-        help="Hermes source checkout containing .venv/bin/hermes",
+        help="Hermes source checkout containing .venv/bin/stardust",
     )
     parser.add_argument(
         "--relay-python",
@@ -250,7 +250,7 @@ def _arguments() -> argparse.Namespace:
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for the isolated HERMES_HOME and captured output",
+        help="Directory for the isolated STARDUST_HOME and captured output",
     )
     return parser.parse_args()
 
@@ -608,7 +608,7 @@ def main() -> int:
     try:
         _write_config(home, server.server_port)
         env = os.environ.copy()
-        env["HERMES_HOME"] = str(home)
+        env["STARDUST_HOME"] = str(home)
         python_paths = [str(hermes_repo)]
         if relay_python is not None:
             python_paths.append(str(relay_python))

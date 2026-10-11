@@ -1,13 +1,13 @@
 /**
  * Invariants for what is eager vs lazy in the root ``package.json``.
  *
- * The root ``package.json`` is installed by ``hermes update`` on every user,
+ * The root ``package.json`` is installed by ``stardust update`` on every user,
  * including users who never opted into a given browser backend. Anything
  * listed in ``dependencies`` therefore runs its npm postinstall script for
  * everyone, and — per #43564 — is also part of the npm workspace install
  * graph, where a workspace-scoped ``npm ci`` (``--workspace ui-tui
  * --workspace web``) can silently prune it right back out on the next
- * ``hermes update``.
+ * ``stardust update``.
  *
  * The contract:
  *
@@ -18,7 +18,7 @@
  *   the ui-tui/web workspace install and risks it being pruned. It now
  *   resolves at runtime via ``npx agent-browser`` (see
  *   ``tools/browser_tool.py::_find_agent_browser``), which sidesteps the
- *   workspace graph entirely. ``hermes update`` and ``hermes doctor --fix``
+ *   workspace graph entirely. ``stardust update`` and ``stardust doctor --fix``
  *   both fire-and-forget ``warm_agent_browser_npx_cache()`` to keep npx's
  *   own cache warm, preserving the "available before any session starts"
  *   property #27055 cared about without re-entangling the dependency.
@@ -30,9 +30,9 @@
  *
  * - ``@askjo/camofox-browser`` is NOT eager. It is an explicit opt-in
  *   alternative browser backend, selected by the user via
- *   ``hermes tools`` → Browser Automation → Camofox, and only used at
+ *   ``stardust tools`` → Browser Automation → Camofox, and only used at
  *   runtime when ``CAMOFOX_URL`` is set. Its postinstall fetches a ~300MB
- *   Firefox-fork binary, which silently blocked ``hermes update`` for
+ *   Firefox-fork binary, which silently blocked ``stardust update`` for
  *   multi-minute stretches on slow / network-restricted connections
  *   (notably users in China running through a VPN). The package is
  *   installed on demand by ``tools_config.py`` ``post_setup_key ==
@@ -66,7 +66,7 @@ test('camofox is not in root dependencies (must stay opt-in)', () => {
       'out of root package.json dependencies. It belongs in the ' +
       'Camofox post_setup handler in hermes_cli/tools_config.py so it ' +
       'only installs when the user explicitly selects Camofox via ' +
-      '`hermes tools` → Browser Automation → Camofox.'
+      '`stardust tools` → Browser Automation → Camofox.'
   )
 })
 

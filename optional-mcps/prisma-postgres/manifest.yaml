@@ -33,5 +33,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Prisma Postgres (or run `hermes mcp login prisma-postgres`). Approve access,
+  Prisma Postgres (or run `stardust mcp login prisma-postgres`). Approve access,
   then restart the session so tools load.

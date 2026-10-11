@@ -1,10 +1,10 @@
 """
-Hermes MCP Server — expose messaging conversations as MCP tools (`hermes mcp serve`).
+Hermes MCP Server — expose messaging conversations as MCP tools (`stardust mcp serve`).
 
 A stdio MCP server letting any MCP client (Claude Code, Cursor, Codex, ...) list
 conversations, read history, send messages, and poll live message events. The
 approval tool names are retained for bridge compatibility, but standalone
-`hermes mcp serve` cannot observe or resolve the gateway process's in-memory
+`stardust mcp serve` cannot observe or resolve the gateway process's in-memory
 approval queue and reports that limitation explicitly.
 Client config: {"mcpServers": {"hermes": {"command": "hermes", "args": ["mcp", "serve"]}}}
 """
@@ -26,7 +26,7 @@ from typing import Dict, List, Optional
 logger = logging.getLogger("hermes.mcp_serve")
 
 _APPROVAL_BRIDGE_UNAVAILABLE = (
-    "Live gateway approvals are not available from standalone 'hermes mcp serve': "
+    "Live gateway approvals are not available from standalone 'stardust mcp serve': "
     "the authoritative approval queue lives in the gateway process and has no cross-process "
     "broker on this surface. Resolve the approval in the owning Hermes UI/gateway."
 )
@@ -50,7 +50,7 @@ def _hermes_home() -> Path:
         from hermes_constants import get_hermes_home
         return get_hermes_home()
     except ImportError:
-        return Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+        return Path(os.environ.get("STARDUST_HOME", Path.home() / ".stardust"))
 
 
 def _get_sessions_dir() -> Path:

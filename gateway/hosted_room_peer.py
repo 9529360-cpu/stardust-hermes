@@ -90,9 +90,9 @@ def gateway_room_grant_secret(root: Path | str | None = None) -> bytes:
     """
     if root is None:
         from hermes_constants import get_hermes_home
-        # Profile routing uses a context-local HERMES_HOME override; the process environment
+        # Profile routing uses a context-local STARDUST_HOME override; the process environment
         # retains the installation root and is the authority here.
-        root = os.environ.get("HERMES_HOME") or get_hermes_home()
+        root = os.environ.get("STARDUST_HOME") or get_hermes_home()
     return _gateway_room_grant_secret_for_home(str(Path(root).expanduser().resolve()))
 
 
@@ -248,8 +248,8 @@ def catalog_mapping(
     execution_policy: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Build a canonical catalog mapping with its digest."""
     # A Desktop-managed gateway exits with the app: the caller's flag is only an upper bound.
-    persistent_process = bool(persistent_process and os.getenv("HERMES_DESKTOP") != "1")
-    profile = str(target_profile or "").strip() or (os.getenv("HERMES_PROFILE") or "default").strip() or "default"
+    persistent_process = bool(persistent_process and os.getenv("STARDUST_DESKTOP") != "1")
+    profile = str(target_profile or "").strip() or (os.getenv("STARDUST_PROFILE") or "default").strip() or "default"
     checked_policy = RoomExecutionPolicy.from_mapping(
         execution_policy or execution_policy_mapping(target_profile=profile))
     # A RoomLink run is initiated by another installation. Process-wide YOLO mode bypasses the scoped
@@ -302,7 +302,7 @@ def _room_link_url_from_config(home: str) -> str | None:
 
 def _configured_room_link_url() -> str | None:
     """Resolve the explicit endpoint: env override > profile config > root config."""
-    if (override := os.getenv("HERMES_ROOM_LINK_URL")) is not None:
+    if (override := os.getenv("STARDUST_ROOM_LINK_URL")) is not None:
         return override
     from hermes_constants import get_default_hermes_root, get_hermes_home
     home = get_hermes_home()

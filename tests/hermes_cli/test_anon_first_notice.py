@@ -50,8 +50,8 @@ class _NoticeCLI(CLIAgentSetupMixin):
 
 @pytest.fixture(autouse=True)
 def _isolated_store(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
-    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    monkeypatch.setenv("STARDUST_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    monkeypatch.setenv("STARDUST_GUEST_ONBOARDING", "1")
 
 
 def test_notice_prints_once_after_identity_appears_and_persists_the_flag():

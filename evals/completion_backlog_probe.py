@@ -181,7 +181,7 @@ def main():
     args = parser.parse_args()
     sys.path.insert(0, args.repo)
     with tempfile.TemporaryDirectory(prefix='completion-probe-') as home:
-        os.environ['HERMES_HOME'] = home
+        os.environ['STARDUST_HOME'] = home
         os.environ['HOME'] = home
         results = [probe(surface, scenario, Path(home) / surface / scenario)
                    for surface in ('cli', 'poller', 'post-turn')

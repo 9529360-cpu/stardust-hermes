@@ -43,7 +43,7 @@ def _to_async_client(sync_client, model: str, is_vision: bool = False):
         if isinstance(sync_client, GeminiNativeClient):
             return AsyncGeminiNativeClient(sync_client), model
     # ACP shims (subprocess, not an HTTP pool) are already async-safe and opt out of the wrapper.
-    if _aux._client_declares(sync_client, "HERMES_SKIP_ASYNC_WRAP"):
+    if _aux._client_declares(sync_client, "STARDUST_SKIP_ASYNC_WRAP"):
         return sync_client, model
     sync_base_url = str(sync_client.base_url)
     async_kwargs = {"api_key": sync_client.api_key, "base_url": sync_base_url}
@@ -331,7 +331,7 @@ def _resolve_nous_branch(req: _ResolveRequest) -> _ResolveResult:
     client, default = _aux._try_nous(vision=(req.is_vision or model in _aux._PROVIDER_VISION_MODELS.values()
                                         or (model or "").strip().lower() == "mimo-v2-omni"))
     if client is None:
-        logger.warning("resolve_provider_client: nous requested but Nous Portal not configured (run: hermes auth)")
+        logger.warning("resolve_provider_client: nous requested but Nous Portal not configured (run: stardust auth)")
         return None, None
     final_model = _normalize_resolved_model(model or default, req.provider)
     # Dual-wire: anthropic/* → /v1/messages, else /chat/completions. Derive from the catalog id
@@ -352,7 +352,7 @@ def _resolve_openai_codex_branch(req: _ResolveRequest) -> _ResolveResult:
                        "model; pass model explicitly (e.g. model.model in config.yaml "
                        "or auxiliary.<task>.model for per-task aux routing).")
         return None, None
-    no_token_msg = "resolve_provider_client: openai-codex requested but no Codex OAuth token found (run: hermes model)"
+    no_token_msg = "resolve_provider_client: openai-codex requested but no Codex OAuth token found (run: stardust model)"
     if req.raw_codex:
         # Raw OpenAI client for callers needing responses.stream() (main agent loop).
         codex_token = _aux._read_codex_access_token()
@@ -373,7 +373,7 @@ def _resolve_xai_oauth_branch(req: _ResolveRequest) -> _ResolveResult:
     client, default = _aux._build_xai_oauth_aux_client(req.model)
     return _route_or_warn(req, client, default,
                           "resolve_provider_client: xai-oauth requested but no xAI "
-                          "OAuth token found (run: hermes model -> xAI Grok OAuth — SuperGrok / Premium+)")
+                          "OAuth token found (run: stardust model -> xAI Grok OAuth — SuperGrok / Premium+)")
 
 
 def _resolve_custom_branch(req: _ResolveRequest) -> _ResolveResult:
@@ -519,7 +519,7 @@ def _resolve_azure_foundry_branch(req: _ResolveRequest) -> _ResolveResult:
                                                explicit_base_url=req.explicit_base_url, api_mode=req.api_mode)
     return _route_or_warn(req, client, default_model,
                           "resolve_provider_client: azure-foundry requested but "
-                          "runtime resolution failed (run: hermes doctor for diagnostics)")
+                          "runtime resolution failed (run: stardust doctor for diagnostics)")
 
 
 def _resolve_api_key_branch(req: _ResolveRequest, pconfig: Any, resolve_creds: Callable) -> _ResolveResult:

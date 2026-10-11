@@ -84,8 +84,8 @@ def discover_attach_url(session_id: str, *, registry_home: str | Path | None = N
 def configure_tui_attachment(env: dict[str, str], session_id: str | None, *,
                              registry_home: str | Path | None = None) -> None:
     """Retain an explicit transport, otherwise attach a resumed owner's runtime."""
-    if not session_id or env.get("HERMES_TUI_GATEWAY_URL", "").strip():
+    if not session_id or env.get("STARDUST_TUI_GATEWAY_URL", "").strip():
         return
     url = discover_attach_url(session_id, registry_home=registry_home)
     if url is not None:
-        env["HERMES_TUI_GATEWAY_URL"] = url
+        env["STARDUST_TUI_GATEWAY_URL"] = url

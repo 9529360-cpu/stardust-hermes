@@ -72,7 +72,7 @@ async def test_is_duplicate_flush_survives_default_executor_teardown(
     (#111020). The flush now runs on the adapter-owned pool, mirroring the
     outbound SDK calls (#10849).
     """
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from gateway.config import PlatformConfig
 
     adapter = FeishuAdapter(PlatformConfig())
@@ -103,9 +103,9 @@ async def test_is_duplicate_flush_survives_default_executor_teardown(
 @pytest.mark.asyncio
 async def test_run_blocking_propagates_caller_contextvars(tmp_path, monkeypatch):
     """Call sites moved off asyncio.to_thread must keep seeing the caller's context: a
-    multiplexed profile's HERMES_HOME override is a contextvar, and a worker that lost it
+    multiplexed profile's STARDUST_HOME override is a contextvar, and a worker that lost it
     would flush dedup state / look up threads under the wrong profile."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from gateway.config import PlatformConfig
     from hermes_constants import get_hermes_home_override, reset_hermes_home_override, set_hermes_home_override
 

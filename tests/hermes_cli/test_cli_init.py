@@ -27,7 +27,7 @@ def _make_cli(env_overrides=None, config_overrides=None, **kwargs):
     }
     if config_overrides:
         _clean_config.update(config_overrides)
-    clean_env = {"LLM_MODEL": "", "HERMES_MAX_ITERATIONS": ""}
+    clean_env = {"LLM_MODEL": "", "STARDUST_MAX_ITERATIONS": ""}
     if env_overrides:
         clean_env.update(env_overrides)
     prompt_toolkit_stubs = {
@@ -543,9 +543,9 @@ class TestRootLevelProviderOverride:
         """model.provider takes priority — root-level provider is only a fallback."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config_path = hermes_home / "config.yaml"
         config_path.write_text(yaml.safe_dump({
@@ -566,9 +566,9 @@ class TestRootLevelProviderOverride:
         """Legacy root-level provider still populates model.provider in the CLI loader."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config_path = hermes_home / "config.yaml"
         config_path.write_text(yaml.safe_dump({
@@ -589,9 +589,9 @@ class TestRootLevelProviderOverride:
         """Legacy root-level base_url still populates model.base_url in the CLI loader."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         config_path = hermes_home / "config.yaml"
         config_path.write_text(yaml.safe_dump({
@@ -611,9 +611,9 @@ class TestRootLevelProviderOverride:
         """Classic CLI must expose terminal.vercel_runtime to terminal_tool.py."""
         import yaml
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.delenv("TERMINAL_VERCEL_RUNTIME", raising=False)
 
         config_path = hermes_home / "config.yaml"

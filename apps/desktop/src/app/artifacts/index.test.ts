@@ -179,7 +179,7 @@ ${payload}
         tool_name: 'browser_vision'
       },
       {
-        content: 'Image attached. Screenshot path: C:\\Users\\Example User\\.hermes\\screenshot.png',
+        content: 'Image attached. Screenshot path: C:\\Users\\Example User\\.stardust\\screenshot.png',
         role: 'tool',
         timestamp: 1_781_774_003,
         tool_name: 'browser_vision'
@@ -189,7 +189,7 @@ ${payload}
     expect(artifacts.map(artifact => artifact.value)).toEqual([
       '/tmp/hermes-browser/native-screenshot.png',
       '/tmp/hermes browser/summary screenshot.png',
-      'C:\\Users\\Example User\\.hermes\\screenshot.png'
+      'C:\\Users\\Example User\\.stardust\\screenshot.png'
     ])
   })
 
@@ -316,7 +316,7 @@ ${payload}
     // Local desktop (connection mode != 'remote'): a local image_generate
     // output path must be read through the Electron bridge, not left as a
     // file:// URL the renderer cannot load (#83380).
-    const path = '/home/me/.hermes/cache/image_generate/out.png'
+    const path = '/home/me/.stardust/cache/image_generate/out.png'
 
     await expect(artifactImageSrc(path)).resolves.toBe('data:image/png;base64,TE9DQUw=')
     expect(readFileDataUrl).toHaveBeenCalledWith(path)
@@ -334,12 +334,12 @@ ${payload}
     vi.stubGlobal('window', { stardustDesktop: { api } })
     $connection.set({ baseUrl: 'https://gw', mode: 'remote', token: 'secret' } as never)
 
-    const path = '/Users/me/.hermes/skills/work-esab/references/images/manual-step03.jpeg'
+    const path = '/Users/me/.stardust/skills/work-esab/references/images/manual-step03.jpeg'
 
     await expect(artifactImageSrc(path)).resolves.toBe('data:image/jpeg;base64,cmVtb3Rl')
 
     expect(api).toHaveBeenCalledWith({
-      path: '/api/fs/read-data-url?path=%2FUsers%2Fme%2F.hermes%2Fskills%2Fwork-esab%2Freferences%2Fimages%2Fmanual-step03.jpeg'
+      path: '/api/fs/read-data-url?path=%2FUsers%2Fme%2F.stardust%2Fskills%2Fwork-esab%2Freferences%2Fimages%2Fmanual-step03.jpeg'
     })
   })
 })

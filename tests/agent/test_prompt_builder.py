@@ -64,7 +64,7 @@ def _drain_truncation_warnings():
 class TestGuidanceConstants:
     def test_default_identity_is_stardust_personal_assistant_and_matches_seed(self):
         from hermes_cli.default_soul import DEFAULT_SOUL_MD
-        from agent.prompt_builder import HERMES_AGENT_HELP_GUIDANCE
+        from agent.prompt_builder import STARDUST_AGENT_HELP_GUIDANCE
 
         assert DEFAULT_AGENT_IDENTITY == DEFAULT_SOUL_MD
         assert DEFAULT_AGENT_IDENTITY.startswith("You are Stardust")
@@ -91,8 +91,8 @@ class TestGuidanceConstants:
         assert "moves money or completes a purchase" not in DEFAULT_AGENT_IDENTITY
         assert "secure local credential capture or Vault resolution" in DEFAULT_AGENT_IDENTITY
         assert "built by Nous Research" not in DEFAULT_AGENT_IDENTITY
-        assert "9529360-cpu/stardust-hermes" in HERMES_AGENT_HELP_GUIDANCE
-        assert "authoritative" in HERMES_AGENT_HELP_GUIDANCE
+        assert "9529360-cpu/stardust-hermes" in STARDUST_AGENT_HELP_GUIDANCE
+        assert "authoritative" in STARDUST_AGENT_HELP_GUIDANCE
 
     def test_default_guidance_routes_missing_credentials_to_secure_capture(self):
         assert "secure local credential capture or Vault resolution" in DEFAULT_AGENT_IDENTITY
@@ -357,7 +357,7 @@ class TestBuildSkillsSystemPrompt:
         clear_skills_system_prompt_cache(clear_snapshot=True)
 
     def test_loading_policy_requires_clear_relevance(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         skill_dir = tmp_path / "skills" / "tools" / "focused-skill"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
@@ -375,7 +375,7 @@ class TestBuildSkillsSystemPrompt:
 
 
     def test_deduplicates_skills(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         cat_dir = tmp_path / "skills" / "tools"
         for subdir in ["search", "search"]:
             d = cat_dir / subdir
@@ -389,7 +389,7 @@ class TestBuildSkillsSystemPrompt:
     def test_compact_categories_demote_nested_and_miss_cache_separately(
         self, monkeypatch, tmp_path
     ):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         d = tmp_path / "skills" / "social-media" / "twitter" / "thread-writer"
         d.mkdir(parents=True)
         (d / "SKILL.md").write_text(
@@ -410,7 +410,7 @@ class TestBuildSkillsSystemPrompt:
 
     def test_excludes_disabled_skills(self, monkeypatch, tmp_path):
         """Skills in the user's disabled list should not appear in the system prompt."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         skills_dir = tmp_path / "skills" / "tools"
         skills_dir.mkdir(parents=True)
 
@@ -438,7 +438,7 @@ class TestBuildSkillsSystemPrompt:
         assert "old-tool" not in result
 
     def test_rebuilds_prompt_when_disabled_skills_change(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         skill_dir = tmp_path / "skills" / "tools" / "cached-skill"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
@@ -587,7 +587,7 @@ class TestBuildContextFilesPrompt:
 
 
     def test_empty_soul_md_adds_nothing(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes_home"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes_home"))
         hermes_home = tmp_path / "hermes_home"
         hermes_home.mkdir()
         (hermes_home / "SOUL.md").write_text("\n\n", encoding="utf-8")
@@ -1027,7 +1027,7 @@ class TestEnvironmentHints:
 
     def test_probe_remote_backend_ssh_is_probe_only_and_torn_down(self, monkeypatch):
         """SSH probe: a normal SSHEnvironment would create remote dirs, force-upload
-        ~/.hermes and snapshot a session just to run `uname`, and its __del__ would
+        ~/.stardust and snapshot a session just to run `uname`, and its __del__ would
         later sync_back() and close the ControlMaster shared with the agent's real
         environment. The probe must request a probe-only instance (own socket, no
         setup/sync) and tear it down itself."""
@@ -1064,11 +1064,11 @@ class TestEnvironmentHints:
         assert calls == ["cleanup"]
 
     def test_environment_hint_from_env_var_is_appended(self, monkeypatch):
-        """HERMES_ENVIRONMENT_HINT lets an embedder describe the runtime env."""
+        """STARDUST_ENVIRONMENT_HINT lets an embedder describe the runtime env."""
         import agent.prompt_builder as _pb
         monkeypatch.setattr(_pb, "is_wsl", lambda: False)
         monkeypatch.delenv("TERMINAL_ENV", raising=False)
-        monkeypatch.setenv("HERMES_ENVIRONMENT_HINT", "Running inside an OpenShell sandbox.")
+        monkeypatch.setenv("STARDUST_ENVIRONMENT_HINT", "Running inside an OpenShell sandbox.")
         _pb._BACKEND_PROBE_CACHE.clear()
         result = _pb.build_environment_hints()
         assert "Running inside an OpenShell sandbox." in result
@@ -1126,7 +1126,7 @@ class TestBuildSkillsSystemPromptConditional:
 
 
     def test_requires_skill_hidden_when_toolset_missing(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         skill_dir = tmp_path / "skills" / "iot" / "openhue"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(
@@ -1142,7 +1142,7 @@ class TestBuildSkillsSystemPromptConditional:
 
     def test_no_args_shows_all_skills(self, monkeypatch, tmp_path):
         """Backward compat: calling with no args shows everything."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         skill_dir = tmp_path / "skills" / "search" / "duckduckgo"
         skill_dir.mkdir(parents=True)
         (skill_dir / "SKILL.md").write_text(

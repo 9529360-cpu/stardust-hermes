@@ -1,9 +1,9 @@
 """disk_cleanup — ephemeral file cleanup library behind the disk-cleanup plugin.
 
 Rules: test files delete at task end (age >= 0); temp after 7 days; cron-output
-after 14 days; empty dirs under HERMES_HOME always. Prompt-only: research
+after 14 days; empty dirs under STARDUST_HOME always. Prompt-only: research
 (keep 10 newest, > 30 days), chrome-profile > 14 days, any file > 500 MB.
-Scope: strictly HERMES_HOME and /tmp/hermes-*; never ~/.hermes/logs/ or system dirs.
+Scope: strictly STARDUST_HOME and /tmp/hermes-*; never ~/.stardust/logs/ or system dirs.
 """
 
 from __future__ import annotations
@@ -25,12 +25,12 @@ _LARGE_FILE_BYTES = 500 * 1024 * 1024
 
 
 def _state_file(name: str) -> Path:
-    """``$HERMES_HOME/disk-cleanup/<name>`` — deliberately outside ``$HERMES_HOME/logs/``."""
+    """``$STARDUST_HOME/disk-cleanup/<name>`` — deliberately outside ``$STARDUST_HOME/logs/``."""
     return get_hermes_home() / "disk-cleanup" / name
 
 
 def is_safe_path(path: Path) -> bool:
-    """Accept only paths under HERMES_HOME or ``/tmp/hermes-*`` (rejects /mnt/c etc.)."""
+    """Accept only paths under STARDUST_HOME or ``/tmp/hermes-*`` (rejects /mnt/c etc.)."""
     with contextlib.suppress(ValueError, OSError):
         path.resolve().relative_to(get_hermes_home())
         return True
@@ -80,7 +80,7 @@ def save_tracked(tracked: List[Dict[str, Any]]) -> None:
 ALLOWED_CATEGORIES = {
     "temp", "test", "research", "download", "chrome-profile", "cron-output", "other"}
 
-# Top-level HERMES_HOME dirs whose empty subdirs are never swept (last row: user project trees).
+# Top-level STARDUST_HOME dirs whose empty subdirs are never swept (last row: user project trees).
 _EMPTY_DIR_PROTECTED_TOP_LEVEL = frozenset({
     "logs", "memories", "sessions", "cron", "cronjobs",
     "cache", "skills", "plugins", "disk-cleanup", "optional-skills",
@@ -90,7 +90,7 @@ _EMPTY_DIR_PROTECTED_TOP_LEVEL = frozenset({
 _EMPTY_DIR_SWEEP_PRUNE_DIRS = frozenset({
     ".git", "node_modules", "venv", ".venv", "site-packages", "__pycache__"})
 
-# Top-level HERMES_HOME entries guess_category() never auto-tracks: state, logs, memory,
+# Top-level STARDUST_HOME entries guess_category() never auto-tracks: state, logs, memory,
 # sessions, config/secrets, and user project trees (test_* inside projects/ is not disposable).
 _NEVER_TRACK_TOP_LEVEL = frozenset({
     "disk-cleanup", "logs", "memories", "sessions", "config.yaml",
@@ -112,7 +112,7 @@ def _protected_cron_paths(home: Path) -> frozenset:
                      for x in (base, base / "output", base / "jobs.json", base / ".tick.lock"))
 
 
-# Paths under $HERMES_HOME that must NEVER be deleted by quick(), regardless of what the stored category
+# Paths under $STARDUST_HOME that must NEVER be deleted by quick(), regardless of what the stored category
 # says. This is a defense-in-depth guard against stale tracked.json entries from before #34840.
 def _is_protected_cron_path(p: Path) -> bool:
     return str(p.resolve()) in _protected_cron_paths(get_hermes_home())
@@ -136,7 +136,7 @@ def track(path_str: str, category: str, silent: bool = False) -> bool:
         _log(f"SKIP: {path} (does not exist)")
         return False
     if not is_safe_path(path):
-        _log(f"REJECT: {path} (outside HERMES_HOME)")
+        _log(f"REJECT: {path} (outside STARDUST_HOME)")
         return False
     size = path.stat().st_size if path.is_file() else 0
     tracked = load_tracked()
@@ -261,8 +261,8 @@ def _subdirs(dirpath: Path, exclude: frozenset) -> List[Path]:
 
 
 def _sweep_empty_dirs(hermes_home: Path) -> int:
-    """Remove empty dirs under HERMES_HOME without recursing into durable/heavy trees (a full
-    rglob over a checkout+venv under HERMES_HOME can stall the gateway loop for minutes).
+    """Remove empty dirs under STARDUST_HOME without recursing into durable/heavy trees (a full
+    rglob over a checkout+venv under STARDUST_HOME can stall the gateway loop for minutes).
     Iterative post-order so parents emptied by child removal are caught."""
     removed = 0
     stack: List[Tuple[Path, bool]] = [
@@ -318,7 +318,7 @@ def guess_category(path: Path) -> Optional[str]:
     """Category label for *path*, or None if we shouldn't track it (``post_tool_call`` hook)."""
     if not is_safe_path(path):
         return None
-    with contextlib.suppress(ValueError):  # not under HERMES_HOME (/tmp/hermes-*) — name rules only
+    with contextlib.suppress(ValueError):  # not under STARDUST_HOME (/tmp/hermes-*) — name rules only
         rel = path.resolve().relative_to(get_hermes_home())
         top = rel.parts[0] if rel.parts else ""
         if top in _NEVER_TRACK_TOP_LEVEL:

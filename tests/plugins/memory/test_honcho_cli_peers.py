@@ -1,4 +1,4 @@
-"""Regression tests for #76414: `hermes honcho peers` showed "(not set)"
+"""Regression tests for #76414: `stardust honcho peers` showed "(not set)"
 for every non-default profile.
 
 _all_profile_host_configs() built the per-profile host key inline as
@@ -9,7 +9,7 @@ always missed, so cmd_peers fell back to "(not set)" and leaked the raw
 malformed key into the AI-peer column.
 
 These tests drive the real cmd_peers / _all_profile_host_configs against
-a real honcho.json (temp HERMES_HOME, no network).
+a real honcho.json (temp STARDUST_HOME, no network).
 """
 import io
 import json

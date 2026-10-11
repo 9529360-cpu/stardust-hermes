@@ -51,7 +51,7 @@ def _is_pkce_row(row: Dict[str, Any]) -> bool:
 def strip_cloned_single_use_oauth_grants(profile_dir: Path) -> Dict[str, Any]:
     """Remove forked single-use OAuth grants from a freshly cloned profile.
 
-    Called after any path that copies credential files between profiles (``hermes profile create
+    Called after any path that copies credential files between profiles (``stardust profile create
     --clone-all``, the dashboard/TUI ``mirror_credentials`` flow). API-key pool rows are kept — a
     static key is safe to duplicate. Returns ``{"pool": [...provider ids], "providers": [...],
     "files": [...]}`` of what was stripped. Never raises: a clone must not fail because hygiene
@@ -137,7 +137,7 @@ _oauth_heal_notices: List[str] = []
 _oauth_heal_clean_marks: Dict[str, Tuple[Any, ...]] = {}
 
 # Filename for the ON-DISK twin of ``_oauth_heal_clean_marks``. The in-memory mark only silences
-# the heal for the life of ONE process, so every fresh `hermes` invocation and every new worker
+# the heal for the life of ONE process, so every fresh `stardust` invocation and every new worker
 # re-pays the heal's two nested EXCLUSIVE auth-store locks just to discover there is nothing to
 # consolidate. Behind a sibling holding those locks that costs a full AUTH_LOCK_TIMEOUT_SECONDS
 # per provider (measured: 30s for two providers on an otherwise-idle machine) before the process
@@ -224,7 +224,7 @@ def _mark_oauth_heal_clean(provider_id: str, fingerprint: tuple) -> None:
 def consume_oauth_heal_notices() -> List[str]:
     """Return (and clear) human-readable notes about heals run in this process.
 
-    ``hermes auth list`` / ``hermes auth status`` print them so the user sees the consolidation.
+    ``stardust auth list`` / ``stardust auth status`` print them so the user sees the consolidation.
     """
     from hermes_cli.auth import _oauth_heal_notices
     notes = list(_oauth_heal_notices)
@@ -329,7 +329,7 @@ def heal_forked_single_use_oauth_grants(provider_id: str) -> Optional[Dict[str, 
     LINEAGE with a root row (same pool id or shared token material), keeps the
     freshest rotation, writes it into ROOT when root's is older, and strips the profile's copy so
     the profile borrows root from then on. Idempotent; never touches API-key rows; never deletes a
-    row with no root counterpart (an independent ``hermes -p <p> auth add`` grant, or the only
+    row with no root counterpart (an independent ``stardust -p <p> auth add`` grant, or the only
     surviving copy); reads only the two auth.json files the root fallback already reads. Returns
     ``{"adopted", "stripped_ids", "files", "providers_block"}`` when something healed, else None.
     Never raises.
@@ -448,7 +448,7 @@ class _HealPass:
                 self.lineage_proven = True
                 self._adopt_root_row(match_idx, row)
             # No root pool counterpart. Root's grant may live only in its .anthropic_oauth.json
-            # (the ``hermes auth`` PKCE shape); a profile hermes_pkce-family row is its copy.
+            # (the ``stardust auth`` PKCE shape); a profile hermes_pkce-family row is its copy.
             elif _is_pkce_row(row) and self.root_singleton_row is not None and not self.r_oauth:
                 self._adopt_root_singleton(row)
             else:
@@ -556,9 +556,9 @@ def _heal_forked_single_use_oauth_grants(provider_id: str) -> Optional[Dict[str,
         return None  # classic mode: nothing to consolidate into
     if os.environ.get("PYTEST_CURRENT_TEST"):
         # Same seat belt as the write-through paths: never touch the real user's
-        # ~/.hermes/auth.json from a test that forgot to isolate HOME.
+        # ~/.stardust/auth.json from a test that forgot to isolate HOME.
         real_home_env = os.environ.get("HOME", "")
-        if real_home_env and _same_path(root_path, Path(real_home_env) / ".hermes" / "auth.json"):
+        if real_home_env and _same_path(root_path, Path(real_home_env) / ".stardust" / "auth.json"):
             return None
     profile_path = _auth_file_path()
     profile_home = profile_path.parent

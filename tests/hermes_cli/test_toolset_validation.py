@@ -8,8 +8,8 @@ import pytest
 
 from hermes_cli.toolset_validation import validate_platform_toolsets
 
-# A representative set of real toolset names. `hermes` is deliberately absent —
-# that is the corruption #38798 reported (`hermes-cli` rewritten to `hermes`).
+# A representative set of real toolset names. `stardust` is deliberately absent —
+# that is the corruption #38798 reported (`hermes-cli` rewritten to `stardust`).
 _KNOWN = {
     "hermes-cli",
     "hermes-telegram",

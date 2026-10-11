@@ -1,4 +1,4 @@
-"""`hermes sessions export` single-file formats accept a directory as OUTPUT."""
+"""`stardust sessions export` single-file formats accept a directory as OUTPUT."""
 
 import json
 import sys

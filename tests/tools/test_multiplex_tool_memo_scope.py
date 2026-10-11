@@ -1,5 +1,5 @@
 """Under ``gateway.multiplex_profiles`` one process serves every profile; each routed turn runs with
-a context-local HERMES_HOME override. Tool-side state resolved once at import, or cached in a
+a context-local STARDUST_HOME override. Tool-side state resolved once at import, or cached in a
 single unkeyed slot, would hand the launch profile's paths/limits to every other profile.
 
 Each test warms the site under profile A, flips the override to profile B with different
@@ -23,7 +23,7 @@ def two_profiles(tmp_path, monkeypatch):
             f"file_read_max_chars: {max_bytes}\ntool_output:\n  max_bytes: {max_bytes}\n"
             f"browser:\n  command_timeout: {timeout}\n  snapshot_threshold: {threshold}\n",
             encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(prof_a))
+    monkeypatch.setenv("STARDUST_HOME", str(prof_a))
     return prof_a, prof_b
 
 

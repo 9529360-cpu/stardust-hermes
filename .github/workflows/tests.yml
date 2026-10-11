@@ -103,7 +103,7 @@ jobs:
           TEST_FILES: ${{ matrix.slice.files }}
           # Leopard exposes 8 logical CPUs backed by 4 physical cores. Keep
           # per-runner pressure at the proven physical-core budget.
-          HERMES_TEST_WORKERS: 4
+          STARDUST_TEST_WORKERS: 4
           OPENROUTER_API_KEY: ""
           OPENAI_API_KEY: ""
           NOUS_API_KEY: ""

@@ -3,7 +3,7 @@
  *
  * The detached updater (scripts/desktop-update/posix.sh mac_swap /
  * windows.ps1) rebuilds and swaps the packaged app on disk AFTER
- * `hermes update` exits. An instance that was launched from the PRE-swap
+ * `stardust update` exits. An instance that was launched from the PRE-swap
  * bundle — the user reopened Hermes mid-update, the #50238 gesture the boot
  * gate exists for — would otherwise proceed to run the NEW runtime under the
  * OLD renderer. The updater's own `open`/relaunch leg cannot rescue it: the

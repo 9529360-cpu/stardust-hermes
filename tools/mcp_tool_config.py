@@ -149,7 +149,7 @@ def _which_with_config_pathext(command: str, path_arg, env: dict):
 def _node_fallback(command: str) -> str:
     """Well-known Node install locations for bare ``npx``/``npm``/``node``; *command* unchanged when none exists."""
     home = os.path.expanduser("~")
-    hermes_home = os.path.expanduser(os.getenv("HERMES_HOME", os.path.join(home, ".hermes")))
+    hermes_home = os.path.expanduser(os.getenv("STARDUST_HOME", os.path.join(home, ".stardust")))
     # /usr/local/bin: canonical Node location (from-source Linux, Hermes Docker image, Intel Homebrew),
     # needed when a hand-authored env.PATH omits it — npx's shebang re-execs /usr/bin/env node.
     candidates = (os.path.join(hermes_home, "node", "bin", command), os.path.join(home, ".local", "bin", command),
@@ -336,7 +336,7 @@ def _load_mcp_config() -> Dict[str, dict]:
     try:
         from hermes_cli.config import load_config
         from utils import env_var_enabled as _env_enabled
-        if _env_enabled("HERMES_SAFE_MODE"):
+        if _env_enabled("STARDUST_SAFE_MODE"):
             return {}
         servers = load_config().get("mcp_servers")
         try:  # ensure .env vars are available for interpolation

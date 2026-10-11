@@ -32,7 +32,7 @@ from agent.model_metadata import _resolve_requests_verify
 from hermes_cli.models import _custom_provider_ssl_context
 
 _CA_ENV_VARS = (
-    "HERMES_CA_BUNDLE",
+    "STARDUST_CA_BUNDLE",
     "REQUESTS_CA_BUNDLE",
     "SSL_CERT_FILE",
     "CURL_CA_BUNDLE",
@@ -103,7 +103,7 @@ class TestResolveRequestsVerifyProviderScoped:
 
     def test_no_base_url_does_not_consult_config(self, clean_env, bundle_file):
         """Existing callers pass no base_url — env-only behavior, no config read."""
-        clean_env.setenv("HERMES_CA_BUNDLE", bundle_file)
+        clean_env.setenv("STARDUST_CA_BUNDLE", bundle_file)
         probe = MagicMock(return_value=[])
         with patch("hermes_cli.config.get_compatible_custom_providers", probe):
             assert _resolve_requests_verify() == bundle_file

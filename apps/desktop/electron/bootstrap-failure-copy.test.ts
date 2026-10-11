@@ -31,10 +31,10 @@ test('missing stage and missing error still produce a complete message', () => {
 })
 
 test('missing-install-part copy names Repair install and keeps the path in Details', () => {
-  const message = missingInstallPartMessage('Python environment missing at /home/me/.hermes/venv')
+  const message = missingInstallPartMessage('Python environment missing at /home/me/.stardust/venv')
   const [lead, details] = message.split('Details: ')
 
   assert.match(lead, /Repair install/)
   assert.doesNotMatch(lead, /venv|install\.ps1|\//)
-  assert.equal(details, 'Python environment missing at /home/me/.hermes/venv')
+  assert.equal(details, 'Python environment missing at /home/me/.stardust/venv')
 })

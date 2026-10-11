@@ -1,6 +1,6 @@
 # Hermes CLI Reference
 
-Live sources when anything looks stale: `hermes --help`, `hermes <command> --help`,
+Live sources when anything looks stale: `stardust --help`, `hermes <command> --help`,
 and this checkout's `website/docs/reference/cli-commands.md`.
 
 ### Global Flags
@@ -27,7 +27,7 @@ hermes [flags] [command]        (no subcommand = interactive chat)
 ### Chat
 
 ```
-hermes chat [flags]
+stardust chat [flags]
   -q, --query TEXT          Single query, non-interactive
   --image PATH              Attach a local image to a single query
   -Q, --quiet               Suppress banner, spinner, tool previews
@@ -40,109 +40,109 @@ hermes chat [flags]
 ### Configuration
 
 ```
-hermes setup [section]      Wizard (model|tts|terminal|gateway|tools|agent)
-hermes model                Interactive model/provider picker
-hermes fallback [add|remove|list]  Fallback provider chain
-hermes config [show|edit|get|set|unset|path|env-path|check|migrate]
-hermes login / logout       OAuth sign-in / clear stored auth
-hermes doctor [--fix]       Check dependencies and config
-hermes status [--all]       Component status
+stardust setup [section]      Wizard (model|tts|terminal|gateway|tools|agent)
+stardust model                Interactive model/provider picker
+stardust fallback [add|remove|list]  Fallback provider chain
+stardust config [show|edit|get|set|unset|path|env-path|check|migrate]
+stardust login / logout       OAuth sign-in / clear stored auth
+stardust doctor [--fix]       Check dependencies and config
+stardust status [--all]       Component status
 ```
 
 ### Tools & Skills
 
 ```
-hermes tools [list|enable NAME|disable NAME]   Per-platform toolsets (curses UI with no args)
+stardust tools [list|enable NAME|disable NAME]   Per-platform toolsets (curses UI with no args)
 
-hermes skills list|browse|search QUERY|inspect ID
-hermes skills install ID    Hub identifier OR a direct https://…/SKILL.md URL
-hermes skills config        Enable/disable skills per platform
-hermes skills check|update|uninstall|publish PATH
-hermes skills tap add REPO  Add a GitHub repo as a skill source
-hermes bundles              Skill bundles (one /<name> alias loads several skills)
+stardust skills list|browse|search QUERY|inspect ID
+stardust skills install ID    Hub identifier OR a direct https://…/SKILL.md URL
+stardust skills config        Enable/disable skills per platform
+stardust skills check|update|uninstall|publish PATH
+stardust skills tap add REPO  Add a GitHub repo as a skill source
+stardust bundles              Skill bundles (one /<name> alias loads several skills)
 ```
 
 ### MCP Servers
 
 ```
-hermes mcp add NAME (--url or --command) | remove | list | test NAME
-hermes mcp catalog | install NAME     Curated catalog install
-hermes mcp configure NAME             Toggle tool selection
-hermes mcp serve                      Run Hermes as an MCP server
+stardust mcp add NAME (--url or --command) | remove | list | test NAME
+stardust mcp catalog | install NAME     Curated catalog install
+stardust mcp configure NAME             Toggle tool selection
+stardust mcp serve                      Run Hermes as an MCP server
 ```
 Details (transport, tool discovery, catalog): `references/native-mcp.md`.
 
 ### Gateway (Messaging Platforms)
 
 ```
-hermes gateway run|install|start|stop|restart|status|setup
+stardust gateway run|install|start|stop|restart|status|setup
 ```
 
-20+ platforms: Telegram, Discord, Slack, WhatsApp (Baileys + Business Cloud API), iMessage (Photon — `hermes photon setup`), Signal, Email, SMS, Matrix, Mattermost, Teams, LINE, SimpleX, ntfy, Google Chat, Home Assistant, DingTalk, Feishu, WeCom, Weixin, API Server, Webhooks. Open WebUI connects via the API Server adapter. Most adapters ship under `plugins/platforms/`.
+20+ platforms: Telegram, Discord, Slack, WhatsApp (Baileys + Business Cloud API), iMessage (Photon — `stardust photon setup`), Signal, Email, SMS, Matrix, Mattermost, Teams, LINE, SimpleX, ntfy, Google Chat, Home Assistant, DingTalk, Feishu, WeCom, Weixin, API Server, Webhooks. Open WebUI connects via the API Server adapter. Most adapters ship under `plugins/platforms/`.
 Repository docs: `website/docs/user-guide/messaging/`
 
 ### Sessions
 
 ```
-hermes sessions list|browse|rename ID TITLE|delete ID|export OUT|prune|stats
+stardust sessions list|browse|rename ID TITLE|delete ID|export OUT|prune|stats
 ```
 
 ### Cron / Webhooks
 
 ```
-hermes cron list|create SCHED|edit ID|pause|resume|run ID|remove|status
+stardust cron list|create SCHED|edit ID|pause|resume|run ID|remove|status
     Schedules: '30m', 'every 2h', '0 9 * * *', ISO timestamp
-hermes webhook subscribe NAME|list|remove NAME|test NAME
+stardust webhook subscribe NAME|list|remove NAME|test NAME
 ```
 Webhook payloads/routes: `references/webhooks.md`.
 
 ### Profiles
 
 ```
-hermes profile list|create NAME (--clone|--clone-all|--clone-from)|use|show|delete
-hermes profile rename A B | alias NAME | export NAME | import FILE
+stardust profile list|create NAME (--clone|--clone-all|--clone-from)|use|show|delete
+stardust profile rename A B | alias NAME | export NAME | import FILE
 ```
 
 ### Credentials & Pools
 
 ```
-hermes auth                 Interactive credential manager
-hermes auth add [PROVIDER]  Add a supported OAuth/API credential (openai-codex, qwen-oauth, …)
-hermes auth list|remove P IDX|reset PROVIDER|status
+stardust auth                 Interactive credential manager
+stardust auth add [PROVIDER]  Add a supported OAuth/API credential (openai-codex, qwen-oauth, …)
+stardust auth list|remove P IDX|reset PROVIDER|status
 ```
 Multiple credentials per provider form a pool that rotates automatically and skips exhausted keys.
 
 ### Other
 
 ```
-hermes desktop / gui        Native desktop app
-hermes dashboard            Web admin panel + embedded chat (--stop / --status)
-hermes proxy                OpenAI-compatible local proxy backed by an OAuth provider
-hermes project              Named multi-folder workspaces
-hermes skin list|use|set    Switch/tweak skins (see references/themes.md)
-hermes pets <verb>          Pet mascots (see references/petdex.md)
-hermes memory setup|status|off|reset   Memory provider
-hermes secrets bitwarden|onepassword   External secret stores
-hermes moa                  Mixture-of-Agents slots
-hermes hooks / security / backup / import / checkpoints / console
-hermes logs [-f] [errors]   View agent/error logs
-hermes send                 One-off message through a gateway platform
-hermes pairing / plugins / insights / journey / computer-use
-hermes acp                  ACP server (IDE integration)
-hermes completion bash|zsh|fish
-hermes update / uninstall / claw migrate
+stardust desktop / gui        Native desktop app
+stardust dashboard            Web admin panel + embedded chat (--stop / --status)
+stardust proxy                OpenAI-compatible local proxy backed by an OAuth provider
+stardust project              Named multi-folder workspaces
+stardust skin list|use|set    Switch/tweak skins (see references/themes.md)
+stardust pets <verb>          Pet mascots (see references/petdex.md)
+stardust memory setup|status|off|reset   Memory provider
+stardust secrets bitwarden|onepassword   External secret stores
+stardust moa                  Mixture-of-Agents slots
+stardust hooks / security / backup / import / checkpoints / console
+stardust logs [-f] [errors]   View agent/error logs
+stardust send                 One-off message through a gateway platform
+stardust pairing / plugins / insights / journey / computer-use
+stardust acp                  ACP server (IDE integration)
+stardust completion bash|zsh|fish
+stardust update / uninstall / claw migrate
 ```
 
-Plugin- and provider-supplied subcommands (e.g. `hermes photon setup`) only appear once their plugin is installed/active.
+Plugin- and provider-supplied subcommands (e.g. `stardust photon setup`) only appear once their plugin is installed/active.
 
 ### Where to Find Things
 
 | Looking for... | Location |
 |---|---|
-| Config options | `hermes config edit` · `website/docs/user-guide/configuration.md` |
-| Tools / toolsets | `hermes tools list` · `website/docs/reference/tools-reference.md` |
-| Skills catalog | `hermes skills browse` · `website/docs/reference/skills-catalog.md` |
-| Provider setup | `hermes model` · `website/docs/integrations/providers.md` |
-| Env variables | `hermes config env-path` · `website/docs/reference/environment-variables.md` |
-| Gateway logs | `~/.hermes/logs/gateway.log` (or `hermes logs`) |
-| Sessions | `hermes sessions browse` (reads state.db) |
+| Config options | `stardust config edit` · `website/docs/user-guide/configuration.md` |
+| Tools / toolsets | `stardust tools list` · `website/docs/reference/tools-reference.md` |
+| Skills catalog | `stardust skills browse` · `website/docs/reference/skills-catalog.md` |
+| Provider setup | `stardust model` · `website/docs/integrations/providers.md` |
+| Env variables | `stardust config env-path` · `website/docs/reference/environment-variables.md` |
+| Gateway logs | `~/.stardust/logs/gateway.log` (or `stardust logs`) |
+| Sessions | `stardust sessions browse` (reads state.db) |

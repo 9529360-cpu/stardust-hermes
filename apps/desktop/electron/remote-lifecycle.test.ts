@@ -72,8 +72,8 @@ function ownedLock(over: any = {}) {
     pid: 333,
     port: 40000,
     profile: '',
-    hermesPath: '~/.local/bin/hermes',
-    hermesHome: '~/.hermes',
+    hermesPath: '~/.local/bin/stardust',
+    hermesHome: '~/.stardust',
     logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE),
     tokenFingerprint: fingerprintToken('stored-token'),
     startedAt: '2026-07-14T00:00:00.000Z',
@@ -144,8 +144,8 @@ test('POSIX relaunch gate refuses live and uncertain install markers without exe
           return 'Linux\nx86_64\n'
         }
 
-        if (command.includes('HERMES_HOME')) {
-          return '/home/alice/.hermes\n'
+        if (command.includes('STARDUST_HOME')) {
+          return '/home/alice/.stardust\n'
         }
 
         if (command.includes('.hermes-update-in-progress')) {
@@ -178,7 +178,7 @@ test('POSIX relaunch gate permits absent/dead markers and normalizes named-profi
     }
   }
 
-  await assertRemoteInstallUpdateClear(ssh, '/home/alice/.hermes/profiles/research')
+  await assertRemoteInstallUpdateClear(ssh, '/home/alice/.stardust/profiles/research')
   assert.match(commands[0], /home\.parent\.name/)
   assert.match(commands[0], /profiles/)
   assert.match(commands[0], /\.hermes-update-in-progress/)
@@ -196,8 +196,8 @@ test('POSIX relaunch gate rechecks after token upload immediately before process
         return 'Linux\nx86_64\n'
       }
 
-      if (command.includes('HERMES_HOME')) {
-        return '/home/alice/.hermes\n'
+      if (command.includes('STARDUST_HOME')) {
+        return '/home/alice/.stardust\n'
       }
 
       if (command.includes('.hermes-update-in-progress')) {
@@ -239,7 +239,7 @@ test('POSIX relaunch gate rechecks after token upload immediately before process
 
 test('listRemoteHermesProfiles inventories Mini-style profile dirs without spawning a dashboard', async () => {
   const ssh = fakeSsh([
-    [/HERMES_HOME/, '/Users/zillajr/.hermes\n'],
+    [/STARDUST_HOME/, '/Users/zillajr/.stardust\n'],
     [/ls -1/, 'bob\ndixie\ngoose\nrambo\nbob.rollback-old\n']
   ])
 
@@ -250,8 +250,8 @@ test('listRemoteHermesProfiles inventories Mini-style profile dirs without spawn
   )
 })
 
-test('listRemoteHermesProfiles rejects a hostile HERMES_HOME', async () => {
-  const ssh = fakeSsh([[/HERMES_HOME/, '/tmp/x; echo pwned\n']])
+test('listRemoteHermesProfiles rejects a hostile STARDUST_HOME', async () => {
+  const ssh = fakeSsh([[/STARDUST_HOME/, '/tmp/x; echo pwned\n']])
 
   await assert.rejects(
     () => listRemoteHermesProfiles(ssh),
@@ -276,8 +276,8 @@ test('locateHermes throws (no silent fallback) when an EXPLICIT path is not exec
   // command -v WOULD find a different install, but an explicit path must not
   // silently fall back to it — that is the "connected to the wrong hermes" bug.
   const ssh = fakeSsh([
-    [/command -v hermes/, '/home/u/.local/bin/hermes\n'],
-    [/\[ -x .*\.local\/bin\/hermes/, 'OK']
+    [/command -v stardust/, '/home/u/.local/bin/stardust\n'],
+    [/\[ -x .*\.local\/bin\/stardust/, 'OK']
   ])
 
   await assert.rejects(
@@ -293,11 +293,11 @@ test('locateHermes throws (no silent fallback) when an EXPLICIT path is not exec
 
 test('locateHermes falls back to the login-shell command -v probe', async () => {
   const ssh = fakeSsh([
-    [/command -v hermes/, '/home/u/.local/bin/hermes\n'],
-    [/\[ -x .*\.local\/bin\/hermes/, 'OK']
+    [/command -v stardust/, '/home/u/.local/bin/stardust\n'],
+    [/\[ -x .*\.local\/bin\/stardust/, 'OK']
   ])
 
-  assert.equal(await locateHermes(ssh, ''), '/home/u/.local/bin/hermes')
+  assert.equal(await locateHermes(ssh, ''), '/home/u/.local/bin/stardust')
 })
 
 test('locateHermes names the Stardust installer when no hermes is installed on the remote', async () => {
@@ -321,20 +321,20 @@ test('locateHermes names the Stardust installer when no hermes is installed on t
 })
 
 test('locateHermes preserves an installer wrapper instead of resolving its interpreter', async () => {
-  // install.sh venv mode writes: exec "$HERMES_BIN" "$HERMES_ENTRYPOINT" "$@",
-  // where $HERMES_BIN is the venv python. The old canonicalization returned
+  // install.sh venv mode writes: exec "$STARDUST_BIN" "$STARDUST_ENTRYPOINT" "$@",
+  // where $STARDUST_BIN is the venv python. The old canonicalization returned
   // that interpreter, so `<python> --version` printed "Python x.y.z" and
   // `<python> serve --help` failed outright (#74411). The wrapper itself is
   // executable and forwards args correctly — return it untouched.
   const ssh = fakeSsh([
-    [/command -v hermes/, '/home/u/.local/bin/hermes\n'],
-    [/\[ -x .*\.local\/bin\/hermes/, 'OK'],
+    [/command -v stardust/, '/home/u/.local/bin/stardust\n'],
+    [/\[ -x .*\.local\/bin\/stardust/, 'OK'],
     // If the removed python3 wrapper-parser were ever reintroduced, this rule
     // would reward it with an interpreter path and the assertions below fail.
-    [/python3 -c/, '/home/u/.hermes/hermes-agent/venv/bin/python\n']
+    [/python3 -c/, '/home/u/.stardust/hermes-agent/venv/bin/python\n']
   ])
 
-  assert.equal(await locateHermes(ssh, ''), '/home/u/.local/bin/hermes')
+  assert.equal(await locateHermes(ssh, ''), '/home/u/.local/bin/stardust')
   assert.ok(
     !ssh.calls.some(cmd => cmd.includes('python3 -c')),
     'locateHermes must not shell out to a python3 parser to rewrite the launcher'
@@ -344,29 +344,29 @@ test('locateHermes preserves an installer wrapper instead of resolving its inter
 test('locateHermes returns an explicit remoteHermesPath unchanged', async () => {
   // The override half of #74411: an explicit remoteHermesPath pointing at a
   // wrapper was also canonicalized to its interpreter, so overriding to
-  // ~/.local/bin/hermes changed nothing for affected users.
+  // ~/.local/bin/stardust changed nothing for affected users.
   const ssh = fakeSsh([
-    [/\[ -x .*\.local\/bin\/hermes/, 'OK'],
-    [/python3 -c/, '/home/u/.hermes/hermes-agent/venv/bin/python\n']
+    [/\[ -x .*\.local\/bin\/stardust/, 'OK'],
+    [/python3 -c/, '/home/u/.stardust/hermes-agent/venv/bin/python\n']
   ])
 
-  assert.equal(await locateHermes(ssh, '~/.local/bin/hermes'), '~/.local/bin/hermes')
+  assert.equal(await locateHermes(ssh, '~/.local/bin/stardust'), '~/.local/bin/stardust')
   assert.ok(!ssh.calls.some(cmd => cmd.includes('python3 -c')), 'an explicit remoteHermesPath must never be rewritten')
 })
 
-test('locateHermes falls back to ~/.local/bin/hermes when the login-shell probe misses', async () => {
+test('locateHermes falls back to ~/.local/bin/stardust when the login-shell probe misses', async () => {
   // ~/.local/bin is the non-root installer's command location (scripts/install.sh).
   const ssh = fakeSsh([
-    [/command -v hermes/, ''],
-    [/\[ -x .*\.local\/bin\/hermes/, 'OK']
+    [/command -v stardust/, ''],
+    [/\[ -x .*\.local\/bin\/stardust/, 'OK']
   ])
 
-  assert.equal(await locateHermes(ssh, ''), '~/.local/bin/hermes')
+  assert.equal(await locateHermes(ssh, ''), '~/.local/bin/stardust')
 })
 
 test('locateHermes tries the conventional venv path last', async () => {
-  const ssh = fakeSsh([[/\[ -x .*venv\/bin\/hermes/, 'OK']])
-  assert.equal(await locateHermes(ssh, ''), '~/.hermes/hermes-agent/venv/bin/hermes')
+  const ssh = fakeSsh([[/\[ -x .*venv\/bin\/stardust/, 'OK']])
+  assert.equal(await locateHermes(ssh, ''), '~/.stardust/hermes-agent/venv/bin/stardust')
 })
 
 test('locateHermes throws a hermes-not-found error with an install hint', async () => {
@@ -384,7 +384,7 @@ test('locateHermes throws a hermes-not-found error with an install hint', async 
 
 test('locateHermes uses a login shell for the command -v probe', async () => {
   const ssh = fakeSsh([
-    [/command -v hermes/, '/x/hermes'],
+    [/command -v stardust/, '/x/hermes'],
     [/\[ -x/, 'OK']
   ])
 
@@ -418,9 +418,9 @@ test('probeRemotePlatform rejects unsupported remote platforms', async () => {
 })
 
 test('ownership paths are isolated by ownership ID and spawn nonce', () => {
-  assert.equal(ownershipDirectory(OWNERSHIP_ID), `~/.hermes/desktop-ssh/${OWNERSHIP_ID}`)
-  assert.equal(lockfilePath(OWNERSHIP_ID), `~/.hermes/desktop-ssh/${OWNERSHIP_ID}/backend.lock.json`)
-  assert.equal(spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE), `~/.hermes/desktop-ssh/${OWNERSHIP_ID}/${SPAWN_NONCE}.log`)
+  assert.equal(ownershipDirectory(OWNERSHIP_ID), `~/.stardust/desktop-ssh/${OWNERSHIP_ID}`)
+  assert.equal(lockfilePath(OWNERSHIP_ID), `~/.stardust/desktop-ssh/${OWNERSHIP_ID}/backend.lock.json`)
+  assert.equal(spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE), `~/.stardust/desktop-ssh/${OWNERSHIP_ID}/${SPAWN_NONCE}.log`)
 })
 
 test('readLockfile returns null ONLY for a missing/empty lockfile', async () => {
@@ -586,10 +586,10 @@ test('pidIsOurDashboard accepts the venv entrypoint an installer wrapper execs i
   ])
 
   assert.equal(
-    await pidIsOurDashboard(ssh, 5, SPAWN_NONCE, '~/.local/bin/hermes', '/Users/cd9c/.hermes', OWNERSHIP_ID, 'ops'),
+    await pidIsOurDashboard(ssh, 5, SPAWN_NONCE, '~/.local/bin/stardust', '/Users/cd9c/.stardust', OWNERSHIP_ID, 'ops'),
     true
   )
-  assert.match(ownershipProbe, /hermes-agent.*venv.*bin.*hermes/)
+  assert.match(ownershipProbe, /hermes-agent.*venv.*bin.*stardust/)
   assert.match(ownershipProbe, /desktop-ssh.*0123456789abcdef\.token/)
   assert.match(ownershipProbe, /expected_profile=.*ops/)
 })
@@ -799,7 +799,7 @@ test('buildSpawnCommand is headless serve, detached, token not in argv', () => {
   assert.match(cmd, /<\/dev\/null/)
   assert.match(cmd, /echo \$!/)
   assert.ok(!cmd.includes('tok_secret_value'), 'token must not appear in spawn command')
-  assert.ok(!cmd.includes('HERMES_DASHBOARD_SESSION_TOKEN'), 'token env var must not appear')
+  assert.ok(!cmd.includes('STARDUST_DASHBOARD_SESSION_TOKEN'), 'token env var must not appear')
 })
 
 test('buildSpawnCommand always uses serve (legacy dashboard path removed)', () => {
@@ -813,7 +813,7 @@ test('buildSpawnCommand always uses serve (legacy dashboard path removed)', () =
 
 test('buildSpawnCommand atomically reserves the ownership slot through spawn and lock publication', () => {
   const cmd = buildSpawnCommand('/x/hermes', 'work', {
-    hermesHome: '~/.hermes',
+    hermesHome: '~/.stardust',
     logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE),
     ownershipId: OWNERSHIP_ID,
     reservationNonce: SPAWN_NONCE,
@@ -825,7 +825,7 @@ test('buildSpawnCommand atomically reserves the ownership slot through spawn and
       port: 0,
       profile: 'work',
       hermesPath: '/x/hermes',
-      hermesHome: '~/.hermes',
+      hermesHome: '~/.stardust',
       logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE),
       tokenFingerprint: fingerprintToken('stored-token'),
       protocolVersion: PROTOCOL_VERSION,
@@ -934,10 +934,10 @@ test('spawnRemoteDashboard always spawns serve (legacy dashboard path removed)',
 })
 
 test('READY_RE accepts both serve and dashboard sentinels', () => {
-  assert.equal(READY_RE.exec('HERMES_BACKEND_READY port=4321')?.[1], '4321')
-  assert.equal(READY_RE.exec('HERMES_DASHBOARD_READY port=8765')?.[1], '8765')
+  assert.equal(READY_RE.exec('STARDUST_BACKEND_READY port=4321')?.[1], '4321')
+  assert.equal(READY_RE.exec('STARDUST_DASHBOARD_READY port=8765')?.[1], '8765')
   // The remote log is `>> log 2>&1`, so a stderr chunk without a newline can be spliced onto the sentinel.
-  assert.equal(READY_RE.exec('INFO  Started server process [4711]HERMES_BACKEND_READY port=65238')?.[1], '65238')
+  assert.equal(READY_RE.exec('INFO  Started server process [4711]STARDUST_BACKEND_READY port=65238')?.[1], '65238')
 })
 
 test('spawnRemoteDashboard rejects when no pid is returned', async () => {
@@ -960,7 +960,7 @@ test('spawnRemoteDashboard rejects when no pid is returned', async () => {
 
 test('scrapeReadyPort reads only the named spawn log', async () => {
   const logPath = spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE)
-  const ssh = fakeSsh([[/cat/, 'some noise\nHERMES_DASHBOARD_READY port=51234\n']])
+  const ssh = fakeSsh([[/cat/, 'some noise\nSTARDUST_DASHBOARD_READY port=51234\n']])
   const port = await scrapeReadyPort(ssh, logPath, { timeoutMs: 1000 })
   assert.equal(port, 51234)
   assert.ok(ssh.calls.every(call => !call.includes('desktop-ssh.log')))
@@ -1019,7 +1019,7 @@ test('connect() spawns fresh when there is no lockfile, adopts the served token'
     [/printf '%s\\n'/, ''],
     [/setsid/, '777\n'],
     [/kill -0 777/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=51999\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=51999\n']
   ])
 
   const result = await connect(
@@ -1066,7 +1066,7 @@ test('managed SSH maps a local scope to a different non-default remote profile',
     [/printf '%s\\n'/, ''],
     [/setsid/, '778\n'],
     [/kill -0 778/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_BACKEND_READY port=52000\n']
+    [/cat .*\.log/, 'STARDUST_BACKEND_READY port=52000\n']
   ])
 
   await connect(
@@ -1080,7 +1080,7 @@ test('managed SSH maps a local scope to a different non-default remote profile',
   assert.match(spawn, /--profile\b/)
   assert.ok(spawn.includes('writer_2'))
   assert.match(spawn, /serve\s+--isolated/)
-  assert.match(spawn, /\.hermes\/desktop-ssh\/[0-9a-f]{32}\/[0-9a-f]{16}\.token/)
+  assert.match(spawn, /\.stardust\/desktop-ssh\/[0-9a-f]{32}\/[0-9a-f]{16}\.token/)
   assert.ok(!spawn.includes(' work'), 'the local Desktop scope must not become the remote profile')
 })
 
@@ -1121,7 +1121,7 @@ test('connect() respawns when the requested remote profile differs from the lock
     [/python3 -c/, ''],
     [/setsid/, '890\n'],
     [/kill -0 890/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=52050\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=52050\n']
   ])
 
   const result = await connect(
@@ -1149,7 +1149,7 @@ test('connect() respawns when the lockfile hermesPath differs from the resolved 
     [/grep -q ssh-session-token-file/, 'YES\n'],
     [/python3 -c/, ''],
     [/setsid/, '890\n'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=52050\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=52050\n']
   ])
 
   const result = await connect(
@@ -1181,7 +1181,7 @@ test('connect() respawns when the lockfile protocolVersion is incompatible', asy
     [/python3 -c/, ''],
     [/setsid/, '901\n'],
     [/kill -0 901/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=44100\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=44100\n']
   ])
 
   const result = await connect(connectDeps(ssh, { reuseToken, adoptServedToken: async () => 'fresh' }))
@@ -1196,13 +1196,13 @@ test('connect() fresh spawn writes hermesHome + protocolVersion into the lockfil
     [/uname/, 'Linux\nx86_64'],
     [/\[ -x/, 'OK'],
     [/cat .*lock\.json/, ''], // no lockfile
-    [/HERMES_HOME/, '/home/alice/.hermes\n'],
+    [/STARDUST_HOME/, '/home/alice/.stardust\n'],
     [/grep -q ssh-session-token-file/, 'YES\n'],
     [/python3 -c/, ''],
     [/printf '%s\\n'/, ''],
     [/setsid/, '700\n'],
     [/kill -0 700/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=45500\n'],
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=45500\n'],
     [
       /printf '%s' '/,
       c => {
@@ -1216,7 +1216,7 @@ test('connect() fresh spawn writes hermesHome + protocolVersion into the lockfil
   await connect(connectDeps(ssh, { adoptServedToken: async () => 'fresh' }))
   const lockWrite = writes.find(c => c.includes('schemaVersion')) || ''
   assert.match(lockWrite, new RegExp(`"protocolVersion":${PROTOCOL_VERSION}`))
-  assert.match(lockWrite, /"hermesHome":"\/home\/alice\/\.hermes"/)
+  assert.match(lockWrite, /"hermesHome":"\/home\/alice\/\.stardust"/)
 })
 
 test('connect() respawns when the lockfile pid is dead (killed dashboard)', async () => {
@@ -1232,7 +1232,7 @@ test('connect() respawns when the lockfile pid is dead (killed dashboard)', asyn
     [/python3 -c/, ''],
     [/setsid/, '888\n'],
     [/kill -0 888/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=42000\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=42000\n']
   ])
 
   const result = await connect(connectDeps(ssh, { reuseToken: 't', adoptServedToken: async () => 'fresh' }))
@@ -1335,7 +1335,7 @@ test('connect() respawns when the dashboard is wedged (alive pid, probe fails)',
     [/python3 -c/, ''],
     [/setsid/, '999\n'],
     [/kill -0 999/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=43000\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=43000\n']
   ])
 
   const result = await connect(
@@ -1415,13 +1415,13 @@ test('connect() preserves an owned backend when a reuse transport throws', async
 })
 
 test('validateRemotePath accepts absolute POSIX paths', () => {
-  assert.doesNotThrow(() => validateRemotePath('/usr/bin/hermes'))
-  assert.doesNotThrow(() => validateRemotePath('/home/user/.hermes/hermes-agent/venv/bin/hermes'))
+  assert.doesNotThrow(() => validateRemotePath('/usr/bin/stardust'))
+  assert.doesNotThrow(() => validateRemotePath('/home/user/.stardust/hermes-agent/venv/bin/stardust'))
 })
 
 test('validateRemotePath accepts ~/ prefix paths', () => {
-  assert.doesNotThrow(() => validateRemotePath('~/bin/hermes'))
-  assert.doesNotThrow(() => validateRemotePath('~/.hermes/logs/desktop-ssh.log'))
+  assert.doesNotThrow(() => validateRemotePath('~/bin/stardust'))
+  assert.doesNotThrow(() => validateRemotePath('~/.stardust/logs/desktop-ssh.log'))
   assert.doesNotThrow(() => validateRemotePath('~'))
 })
 
@@ -1433,14 +1433,14 @@ test('validateRemotePath accepts paths with spaces and quotes', () => {
 
 test('validateRemotePath rejects relative paths', () => {
   assert.throws(() => validateRemotePath('hermes'), /absolute|relative/i)
-  assert.throws(() => validateRemotePath('./bin/hermes'), /absolute|relative/i)
+  assert.throws(() => validateRemotePath('./bin/stardust'), /absolute|relative/i)
   assert.throws(() => validateRemotePath('../etc/passwd'), /absolute|relative/i)
 })
 
 test('validateRemotePath rejects NUL and newline', () => {
-  assert.throws(() => validateRemotePath('/usr/bin/hermes\x00'), /unsafe/i)
-  assert.throws(() => validateRemotePath('/usr/bin/hermes\n'), /unsafe/i)
-  assert.throws(() => validateRemotePath('/usr/bin/hermes\r'), /unsafe/i)
+  assert.throws(() => validateRemotePath('/usr/bin/stardust\x00'), /unsafe/i)
+  assert.throws(() => validateRemotePath('/usr/bin/stardust\n'), /unsafe/i)
+  assert.throws(() => validateRemotePath('/usr/bin/stardust\r'), /unsafe/i)
 })
 
 test('validateRemotePath preserves shell metacharacters as path data', () => {
@@ -1451,15 +1451,15 @@ test('validateRemotePath preserves shell metacharacters as path data', () => {
 })
 
 test('expandRemotePath expands ~/ to "$HOME"/', () => {
-  const result = expandRemotePath('~/.hermes/logs/desktop-ssh.log')
+  const result = expandRemotePath('~/.stardust/logs/desktop-ssh.log')
   assert.match(result, /\$HOME/)
   assert.ok(!result.includes('eval'), 'must not use eval')
   assert.ok(!result.includes('echo'), 'must not use echo for expansion')
 })
 
 test('expandRemotePath returns quoted absolute paths unchanged', () => {
-  const result = expandRemotePath('/usr/local/bin/hermes')
-  assert.ok(result.includes('/usr/local/bin/hermes'))
+  const result = expandRemotePath('/usr/local/bin/stardust')
+  assert.ok(result.includes('/usr/local/bin/stardust'))
   assert.ok(!result.includes('eval'))
 })
 
@@ -1471,18 +1471,18 @@ test('expandRemotePath preserves spaces as data', () => {
 test('buildSpawnCommand does not embed the token in the command string', () => {
   const cmd = buildSpawnCommand('/x/hermes', 'work', { logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE) })
   assert.ok(!cmd.includes('super_secret_token_value'), 'token must not appear in the spawn command')
-  assert.ok(!cmd.includes('HERMES_DASHBOARD_SESSION_TOKEN'), 'env var name must not appear')
+  assert.ok(!cmd.includes('STARDUST_DASHBOARD_SESSION_TOKEN'), 'env var name must not appear')
 })
 
 test('buildSpawnCommand includes --ssh-session-token-file when tokenFilePath is provided', () => {
   const cmd = buildSpawnCommand('/x/hermes', 'work', {
-    tokenFilePath: `~/.hermes/desktop-ssh/${OWNERSHIP_ID}/${SPAWN_NONCE}.token`,
+    tokenFilePath: `~/.stardust/desktop-ssh/${OWNERSHIP_ID}/${SPAWN_NONCE}.token`,
     logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE),
     spawnNonce: SPAWN_NONCE
   })
 
   assert.match(cmd, /--ssh-session-token-file/)
-  assert.match(cmd, /\.hermes\/desktop-ssh\//)
+  assert.match(cmd, /\.stardust\/desktop-ssh\//)
 })
 
 test('buildSpawnCommand always uses serve, never dashboard', () => {
@@ -1495,13 +1495,13 @@ test('buildSpawnCommand always uses serve, never dashboard', () => {
 
 test('buildSpawnCommand raises the SSH child file limit before execing Hermes', () => {
   const cmd = buildSpawnCommand('/x/hermes', '', { logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE) })
-  assert.match(cmd, /ulimit -n 65536 2>\/dev\/null \|\| true; exec env HERMES_DESKTOP=1/)
+  assert.match(cmd, /ulimit -n 65536 2>\/dev\/null \|\| true; exec env STARDUST_DESKTOP=1/)
   assert.ok(cmd.indexOf('ulimit -n 65536') < cmd.indexOf('serve --isolated'))
 })
 
 test('buildSpawnCommand payload variables keep $HOME expandable (no double quoting)', () => {
   const cmd = buildSpawnCommand('/x/hermes', 'work', {
-    hermesHome: '~/.hermes',
+    hermesHome: '~/.stardust',
     logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE),
     ownershipId: OWNERSHIP_ID,
     reservationNonce: SPAWN_NONCE,
@@ -1522,7 +1522,7 @@ test('buildSpawnCommand payload variables keep $HOME expandable (no double quoti
 
 test('buildSpawnCommand lockfile publication is POSIX sh (no bash substitution)', () => {
   const cmd = buildSpawnCommand('/x/hermes', 'work', {
-    hermesHome: '~/.hermes',
+    hermesHome: '~/.stardust',
     logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE),
     ownershipId: OWNERSHIP_ID,
     reservationNonce: SPAWN_NONCE,
@@ -1705,7 +1705,7 @@ test('spawnRemoteDashboard fails with update-required when remote lacks --ssh-se
 })
 
 test('readLockfile treats a log path outside the exact ownership and spawn path as skew', async () => {
-  const lock = ownedLock({ logPath: '~/.hermes/desktop-ssh/other.log' })
+  const lock = ownedLock({ logPath: '~/.stardust/desktop-ssh/other.log' })
   const ssh = fakeSsh([[/cat .*lock\.json/, JSON.stringify(lock)]])
   assert.equal(isLockfileSkew(await readLockfile(ssh, OWNERSHIP_ID)), true)
 })
@@ -1716,7 +1716,7 @@ test('cleanupStale never deletes a lock-supplied unexpected log path', async () 
     [cmd => /pidfd_open/.test(cmd), 'TERMINATED\n']
   ])
 
-  await cleanupStale(ssh, OWNERSHIP_ID, ownedLock({ logPath: '~/.hermes/unrelated.log' }))
+  await cleanupStale(ssh, OWNERSHIP_ID, ownedLock({ logPath: '~/.stardust/unrelated.log' }))
   assert.ok(!ssh.calls.some(command => command.includes('unrelated.log')))
 })
 
@@ -1785,7 +1785,7 @@ test('connect replaces an exact-owned backend only after authenticated stale pro
     [/python3 -c/, ''],
     [/setsid/, '999\n'],
     [/kill -0 999/, 'ALIVE'],
-    [/cat .*\.log/, 'HERMES_DASHBOARD_READY port=43000\n']
+    [/cat .*\.log/, 'STARDUST_DASHBOARD_READY port=43000\n']
   ])
 
   const result = await connect(
@@ -1923,7 +1923,7 @@ test.skipIf(process.platform === 'win32')(
     // characters to the remote python. Parse the composed command with a real sh,
     // as the remote login shell does, and require every path to come out clean.
     const cmd = buildSpawnCommand('/x/hermes', 'work', {
-      hermesHome: '~/.hermes',
+      hermesHome: '~/.stardust',
       logPath: spawnLogPath(OWNERSHIP_ID, SPAWN_NONCE),
       ownershipId: OWNERSHIP_ID,
       reservationNonce: SPAWN_NONCE,
@@ -1952,7 +1952,7 @@ test.skipIf(process.platform === 'win32')(
       // argv: ['-c', <mutex script>, <mutex path>, <payload>]
       assert.equal(
         argv[2],
-        `${fakeHome}/.hermes/.hermes-update-in-progress.mutex`,
+        `${fakeHome}/.stardust/.hermes-update-in-progress.mutex`,
         'mutex path must reach python fully expanded, with no quote characters'
       )
 
@@ -1970,7 +1970,7 @@ test.skipIf(process.platform === 'win32')(
       )
 
       const [reservation, lock, ownerFile] = stdout.split('\n')
-      const base = `${fakeHome}/.hermes/desktop-ssh/${OWNERSHIP_ID}`
+      const base = `${fakeHome}/.stardust/desktop-ssh/${OWNERSHIP_ID}`
       assert.equal(reservation, `${base}/.connect.lock`)
       assert.equal(lock, `${base}/backend.lock.json`)
       assert.equal(ownerFile, `${base}/.connect.lock/owner`)

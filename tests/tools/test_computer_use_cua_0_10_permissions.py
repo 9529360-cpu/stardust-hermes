@@ -220,7 +220,7 @@ def test_retired_browser_grant_cannot_change_standard_runtime(tmp_path, monkeypa
         "computer_use:\n  grant_existing_profile: true\n",
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     session = _CuaDriverSession(_AsyncBridge())
     captured = {}
 

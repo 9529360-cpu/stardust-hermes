@@ -36,7 +36,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CHILD_CODE = r"""
 import asyncio, os, sys
 sys.path.insert(0, sys.argv[1])
-os.environ["HERMES_HOME"] = sys.argv[2]
+os.environ["STARDUST_HOME"] = sys.argv[2]
 from gateway.control_socket import GatewayControlServer
 
 async def main():
@@ -57,7 +57,7 @@ asyncio.run(main())
 
 @pytest.fixture()
 def live_server(tmp_path: Path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     proc = subprocess.Popen(
         [sys.executable, "-c", _CHILD_CODE, str(PROJECT_ROOT), str(home)],

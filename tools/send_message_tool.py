@@ -21,7 +21,7 @@ from tools.registry import tool_error
 
 # NOTE: ``send_message`` is intentionally NOT registered as an agent-callable model tool
 # (the agent must not fire cross-platform messages on its own); cron delivery, the
-# ``hermes send`` CLI, the kanban notifier and the opt-in MCP server import the helpers.
+# ``stardust send`` CLI, the kanban notifier and the opt-in MCP server import the helpers.
 
 
 def prepare_send_message_platforms() -> None:
@@ -306,7 +306,7 @@ def _resolve_platform_config(platform_name, config):
         pconfig = _weixin_env_pconfig() if platform_name == "weixin" else None
     if pconfig is None:
         return None, None, None, (f"Platform '{platform_name}' is not configured. Set up credentials in "
-                                  "~/.hermes/config.yaml or environment variables.")
+                                  "~/.stardust/config.yaml or environment variables.")
     return platform, pconfig, entry, None
 
 
@@ -323,7 +323,7 @@ def _home_chat_id(config, platform, platform_name):
     home_env = _HOME_CHANNEL_ENV_OVERRIDES.get(platform_name, f"{platform_name.upper()}_HOME_CHANNEL")
     return None, (f"No home channel set for {platform_name} to determine where to send the message. "
                   f"Either specify a channel directly with '{platform_name}:CHANNEL_NAME', "
-                  f"or set a home channel via: hermes config set {home_env} <channel_id>")
+                  f"or set a home channel via: stardust config set {home_env} <channel_id>")
 
 
 def _slack_dm_chat_id(pconfig, chat_id):
@@ -343,8 +343,8 @@ def _mirror_sent_message(platform_name, chat_id, mirror_text, thread_id):
         from gateway.session_context import get_session_env
         return bool(mirror_to_session(
             platform_name, chat_id, mirror_text, thread_id=thread_id,
-            source_label=get_session_env("HERMES_SESSION_PLATFORM", "cli"),
-            user_id=get_session_env("HERMES_SESSION_USER_ID", "") or None))
+            source_label=get_session_env("STARDUST_SESSION_PLATFORM", "cli"),
+            user_id=get_session_env("STARDUST_SESSION_USER_ID", "") or None))
     except Exception:
         return False
 
@@ -379,10 +379,10 @@ def _describe_media_for_mirror(media_files):
 def _maybe_skip_cron_duplicate_send(platform_name: str, chat_id: str, thread_id: str | None):
     """Skip redundant cron send_message calls when the scheduler will auto-deliver there."""
     from gateway.session_context import get_session_env
-    auto_platform = get_session_env("HERMES_CRON_AUTO_DELIVER_PLATFORM", "").strip().lower()
-    auto_chat_id = get_session_env("HERMES_CRON_AUTO_DELIVER_CHAT_ID", "").strip()
+    auto_platform = get_session_env("STARDUST_CRON_AUTO_DELIVER_PLATFORM", "").strip().lower()
+    auto_chat_id = get_session_env("STARDUST_CRON_AUTO_DELIVER_CHAT_ID", "").strip()
     if not (auto_platform and auto_chat_id and auto_platform == platform_name and auto_chat_id == str(chat_id)
-            and (get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID", "").strip() or None) == thread_id):
+            and (get_session_env("STARDUST_CRON_AUTO_DELIVER_THREAD_ID", "").strip() or None) == thread_id):
         return None
     target_label = f"{platform_name}:{chat_id}" + (f":{thread_id}" if thread_id is not None else "")
     return {"success": True, "skipped": True, "reason": "cron_auto_delivery_duplicate_target", "target": target_label,

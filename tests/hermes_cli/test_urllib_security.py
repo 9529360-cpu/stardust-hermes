@@ -383,7 +383,7 @@ def test_azure_anthropic_probe_drops_api_key_and_bearer_on_redirect():
 
 def _clear_ca_bundle_env(monkeypatch) -> None:
     for name in (
-        "HERMES_CA_BUNDLE",
+        "STARDUST_CA_BUNDLE",
         "SSL_CERT_FILE",
         "REQUESTS_CA_BUNDLE",
         "CURL_CA_BUNDLE",
@@ -424,7 +424,7 @@ def test_resolved_https_context_prefers_configured_ca_bundle(monkeypatch, tmp_pa
         seen.append(cafile)
         return expected_context
 
-    monkeypatch.setenv("HERMES_CA_BUNDLE", str(ca_bundle))
+    monkeypatch.setenv("STARDUST_CA_BUNDLE", str(ca_bundle))
     monkeypatch.setattr(ssl, "create_default_context", create_default_context)
 
     assert urllib_security._resolved_https_context() is expected_context
@@ -464,7 +464,7 @@ def test_invalid_ca_bundle_falls_back_to_certifi_on_macos(monkeypatch, tmp_path)
         seen.append(cafile)
         return expected_context
 
-    monkeypatch.setenv("HERMES_CA_BUNDLE", str(missing_bundle))
+    monkeypatch.setenv("STARDUST_CA_BUNDLE", str(missing_bundle))
     monkeypatch.setattr(urllib_security.sys, "platform", "darwin")
     monkeypatch.setattr(certifi, "where", lambda: "/certifi/cacert.pem")
     monkeypatch.setattr(ssl, "create_default_context", create_default_context)

@@ -1,8 +1,8 @@
 """Oneshot (-z) mode: send a prompt, get the final content block, exit.
 
-Toolsets = explicit --toolsets, else the user's "cli" toolsets from `hermes tools`. Rules /
+Toolsets = explicit --toolsets, else the user's "cli" toolsets from `stardust tools`. Rules /
 memory / AGENTS.md / preloaded skills = same as a normal chat turn. Approvals are auto-bypassed
-(HERMES_YOLO_MODE=1). Model/provider mirror `hermes chat`: both optional; only --model → auto-detect
+(STARDUST_YOLO_MODE=1). Model/provider mirror `stardust chat`: both optional; only --model → auto-detect
 the provider; only --provider → error (ambiguous).
 """
 
@@ -61,7 +61,7 @@ def _build_preloaded_skills_prompt(skills: object = None) -> str | None:
             raise ValueError(f"Unknown skill(s): {missing_display}")
         logging.warning(
             "Unknown skill(s) requested, skipping: %s. Continuing with: %s. "
-            "List available skills with `hermes skills list`.",
+            "List available skills with `stardust skills list`.",
             missing_display,
             ", ".join(loaded_skills),
         )
@@ -96,7 +96,7 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
     try:
         from toolsets import validate_toolset
     except Exception as exc:
-        return None, f"hermes -z: failed to validate --toolsets: {exc}\n"
+        return None, f"stardust -z: failed to validate --toolsets: {exc}\n"
 
     built_in = [name for name in normalized if validate_toolset(name)]
     unresolved = [name for name in normalized if name not in built_in]
@@ -116,7 +116,7 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
         ignored = [name for name in normalized if name not in _ALL_TOOLSETS]
         if ignored:
             sys.stderr.write(
-                "hermes -z: --toolsets all enables every toolset; "
+                "stardust -z: --toolsets all enables every toolset; "
                 f"ignoring additional entries: {', '.join(ignored)}\n"
             )
         return None, None
@@ -128,14 +128,14 @@ def _validate_explicit_toolsets(toolsets: object = None) -> tuple[list[str] | No
     valid = built_in + mcp_valid
 
     if unknown:
-        sys.stderr.write(f"hermes -z: ignoring unknown --toolsets entries: {', '.join(unknown)}\n")
+        sys.stderr.write(f"stardust -z: ignoring unknown --toolsets entries: {', '.join(unknown)}\n")
     if disabled:
         sys.stderr.write(
-            "hermes -z: ignoring disabled MCP servers (set enabled: true in config.yaml to use): "
+            "stardust -z: ignoring disabled MCP servers (set enabled: true in config.yaml to use): "
             f"{', '.join(disabled)}\n"
         )
     if not valid:
-        return None, "hermes -z: --toolsets did not contain any valid toolsets.\n"
+        return None, "stardust -z: --toolsets did not contain any valid toolsets.\n"
     return valid, None
 
 
@@ -172,7 +172,7 @@ def run_oneshot(
 ) -> int:
     """Execute a single prompt and print only the final content block.
 
-    Model/provider fall back to ``HERMES_INFERENCE_MODEL`` and config.yaml. ``usage_file`` gets a
+    Model/provider fall back to ``STARDUST_INFERENCE_MODEL`` and config.yaml. ``usage_file`` gets a
     JSON usage report even when the run fails. ``resume`` is a session id (already normalized by
     the CLI layer: latest/title/--continue resolution) whose transcript is loaded and continued
     by this turn. Returns the exit code; the caller owns process termination.
@@ -183,10 +183,10 @@ def run_oneshot(
 
     # --provider without --model is ambiguous (the provider may not host the configured model, and
     # picking its catalog default hides the mismatch). Validate BEFORE the stderr redirect.
-    env_model_early = os.getenv("HERMES_INFERENCE_MODEL", "").strip()
+    env_model_early = os.getenv("STARDUST_INFERENCE_MODEL", "").strip()
     if provider and not ((model or "").strip() or env_model_early):
         sys.stderr.write(
-            "hermes -z: --provider requires --model (or HERMES_INFERENCE_MODEL). "
+            "stardust -z: --provider requires --model (or STARDUST_INFERENCE_MODEL). "
             "Pass both explicitly, or neither to use your configured defaults.\n"
         )
         return 2
@@ -198,8 +198,8 @@ def run_oneshot(
     use_config_toolsets = _normalize_toolsets(toolsets) is None
 
     # Non-interactive by definition — an approval prompt would hang forever.
-    os.environ["HERMES_YOLO_MODE"] = "1"
-    os.environ["HERMES_ACCEPT_HOOKS"] = "1"
+    os.environ["STARDUST_YOLO_MODE"] = "1"
+    os.environ["STARDUST_ACCEPT_HOOKS"] = "1"
 
     # Nothing here drains process_registry.completion_queue (only cli.py's process_loop and the
     # gateway watchers do), so left unbound delegate_task would be forced background and every
@@ -238,7 +238,7 @@ def run_oneshot(
             _write_usage_file(usage_file, result, failure=repr(failure))
             raise failure
         _write_usage_file(usage_file, result, failure=str(failure))
-        real_stderr.write(f"hermes -z: agent failed: {failure}\n")
+        real_stderr.write(f"stardust -z: agent failed: {failure}\n")
         real_stderr.flush()
         return 1
 
@@ -259,7 +259,7 @@ def run_oneshot(
     if not (response or "").strip():
         if result.get("failed") or result.get("partial"):
             return 2
-        real_stderr.write("hermes -z: no final response was produced; treating the run as failed.\n")
+        real_stderr.write("stardust -z: no final response was produced; treating the run as failed.\n")
         real_stderr.flush()
         return 1
     return 0
@@ -309,7 +309,7 @@ def _resolve_model_and_provider(cfg: dict, model: Optional[str], provider: Optio
     from hermes_cli.models import detect_provider_for_model
 
     model_cfg = cfg.get("model") or {}
-    env_model = os.getenv("HERMES_INFERENCE_MODEL", "").strip()
+    env_model = os.getenv("STARDUST_INFERENCE_MODEL", "").strip()
     explicit_model = (model or "").strip() or env_model
     choice = _ModelChoice(explicit_model or _configured_model(model_cfg), (provider or "").strip() or None)
     if choice.provider is not None or not explicit_model:
@@ -327,7 +327,7 @@ def _resolve_model_and_provider(cfg: dict, model: Optional[str], provider: Optio
         cfg_provider = ""
         if isinstance(model_cfg, dict):
             cfg_provider = str(model_cfg.get("provider") or "").strip().lower()
-        current_provider = cfg_provider or os.getenv("HERMES_INFERENCE_PROVIDER", "").strip().lower() or "auto"
+        current_provider = cfg_provider or os.getenv("STARDUST_INFERENCE_PROVIDER", "").strip().lower() or "auto"
         detected = detect_provider_for_model(explicit_model, current_provider)
         if detected:
             choice.provider, choice.model = detected
@@ -356,7 +356,7 @@ def _load_resume_target(session_db, resume: Optional[str]) -> tuple[Optional[str
     ``session_meta`` rows dropped. An unknown session raises (the user passed an explicit id;
     silently starting a fresh session is the resume-dropped failure mode this exists to fix —
     see #105892). An empty stored transcript still returns the resolved id: the turn replays
-    nothing but is recorded under the requested session — ``hermes -z "hello" -c <title>
+    nothing but is recorded under the requested session — ``stardust -z "hello" -c <title>
     --create-if-missing`` must fill the titled session it created, not mint a fresh id
     (same contract as the interactive /resume of an empty session).
 
@@ -491,8 +491,8 @@ def _run_agent(
             ephemeral_system_prompt=skills_prompt,
             reasoning_config=reasoning_config,
             # The only interactive callback wired: no user sits at a terminal. Sudo prompts gate on
-            # HERMES_INTERACTIVE (never set), hook approval via HERMES_ACCEPT_HOOKS=1, dangerous
-            # commands via HERMES_YOLO_MODE=1, skill secret capture degrades gracefully.
+            # STARDUST_INTERACTIVE (never set), hook approval via STARDUST_ACCEPT_HOOKS=1, dangerous
+            # commands via STARDUST_YOLO_MODE=1, skill secret capture degrades gracefully.
             clarify_callback=_oneshot_clarify_callback,
         )
         # Belt-and-braces: no streaming display callbacks may bypass our stdout capture.

@@ -40,7 +40,7 @@ def test_declining_reconfigure_goes_through_shared_gate(monkeypatch, tmp_path, m
     import hermes_cli.config as config_mod
     import hermes_cli.setup as setup_mod
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setenv(env_var, "already-set")
 
     gated: list[tuple[str, ...]] = []

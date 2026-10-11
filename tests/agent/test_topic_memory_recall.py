@@ -23,7 +23,7 @@ def _agent():
 
 
 def test_topic_summary_recall_works_without_external_memory_provider(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     upsert_topic_summary(
         "stardust",
         "Stardust is the only active product line.",
@@ -38,7 +38,7 @@ def test_topic_summary_recall_works_without_external_memory_provider(tmp_path, m
 
 
 def test_unchanged_topic_is_injected_once_per_session_and_new_version_reappears(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     upsert_topic_summary("stardust", "Version one.", title="Stardust", keywords=["星尘"])
     agent = _agent()
 
@@ -53,7 +53,7 @@ def test_unchanged_topic_is_injected_once_per_session_and_new_version_reappears(
 
 
 def test_unrelated_turn_injects_no_topic_context(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     upsert_topic_summary("stardust", "Desktop state.", title="Stardust", keywords=["星尘"])
     agent = _agent()
     assert _memory_turn_start_and_prefetch(agent, "帮我算一下二加二", None) == ""

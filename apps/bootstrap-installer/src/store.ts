@@ -177,8 +177,8 @@ export async function initialize(): Promise<void> {
 
   if (fake) {
     unlisten = () => {}
-    $logPath.set('~/.hermes/logs/bootstrap-installer.log')
-    $hermesHome.set('~/.hermes')
+    $logPath.set('~/.stardust/logs/bootstrap-installer.log')
+    $hermesHome.set('~/.stardust')
     $mode.set(fake === 'update' ? 'update' : 'install')
 
     // Update auto-runs (it's a hand-off); install/failure wait for the welcome click.

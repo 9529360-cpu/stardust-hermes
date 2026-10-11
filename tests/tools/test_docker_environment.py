@@ -213,7 +213,7 @@ def test_init_env_args_uses_hermes_dotenv_for_empty_shell_env(monkeypatch):
 
     Regression: the disk fallback used to fire only on `value is None`, so a
     present-but-empty `MY_SECRET=""` skipped it and was forwarded as `-e
-    MY_SECRET=`, clobbering the correct value sitting in ~/.hermes/.env.
+    MY_SECRET=`, clobbering the correct value sitting in ~/.stardust/.env.
     """
     env = _make_execute_only_env(["MY_SECRET"])
 
@@ -1499,7 +1499,7 @@ def test_credential_mount_skipped_when_source_is_directory(monkeypatch, tmp_path
 
     # Mock get_credential_file_mounts to return the corrupted entry
     fake_mounts = [
-        {"host_path": str(corrupted_dir), "container_path": "/root/.hermes/google_token.json"},
+        {"host_path": str(corrupted_dir), "container_path": "/root/.stardust/google_token.json"},
     ]
     monkeypatch.setattr(
         "tools.credential_files.get_credential_file_mounts",
@@ -1539,7 +1539,7 @@ def test_credential_mount_skipped_when_source_missing(monkeypatch, tmp_path, cap
     calls = _mock_subprocess_run(monkeypatch)
 
     fake_mounts = [
-        {"host_path": str(missing_path), "container_path": "/root/.hermes/deleted_token.json"},
+        {"host_path": str(missing_path), "container_path": "/root/.stardust/deleted_token.json"},
     ]
     monkeypatch.setattr(
         "tools.credential_files.get_credential_file_mounts",

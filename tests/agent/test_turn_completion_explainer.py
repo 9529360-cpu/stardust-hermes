@@ -129,7 +129,7 @@ def test_explanation_persistence_turn_lease_cause_is_specific():
     assert "not saved" in lower
     assert "disk" not in lower
     assert "compression" not in lower
-    assert "hermes doctor" not in lower
+    assert "stardust doctor" not in lower
 
 
 def test_explanation_persistence_disk_cause_keeps_disk_wording():
@@ -150,26 +150,26 @@ def test_explanation_persistence_corrupt_cause_never_says_free_space():
     )
     lower = out.lower()
     assert "corrupt" in lower
-    assert "hermes doctor" in lower
+    assert "stardust doctor" in lower
     assert "free some space" not in lower
     assert "full disk" not in lower
 
 
 def test_explanation_persistence_corrupt_backups_dir_follows_hermes_home(monkeypatch, tmp_path):
-    """Step 3 must name the backups dir under the ACTIVE home, not ~/.hermes (#104250).
+    """Step 3 must name the backups dir under the ACTIVE home, not ~/.stardust (#104250).
 
     Pre-update backups live at ``<hermes_root>/backups`` (``hermes_cli/backup.py``), so a
-    custom-HERMES_HOME deployment told to restore from ``~/.hermes/backups/`` is misdirected
+    custom-STARDUST_HOME deployment told to restore from ``~/.stardust/backups/`` is misdirected
     mid data-loss incident: that directory may not exist at all, or may hold an unrelated
     install's backups.
     """
     custom_home = tmp_path / "custom-hermes-home"
-    monkeypatch.setenv("HERMES_HOME", str(custom_home / "profiles" / "research"))
+    monkeypatch.setenv("STARDUST_HOME", str(custom_home / "profiles" / "research"))
     out = AIAgent._format_turn_completion_explanation(
         "session_persistence_failed", "corrupt"
     )
     assert f"{custom_home / 'backups'}" in out
-    assert "~/.hermes/backups" not in out
+    assert "~/.stardust/backups" not in out
     assert "{backups_dir}" not in out
 
 
@@ -188,7 +188,7 @@ def test_explanation_persistence_fts_index_never_advises_recovery():
     assert "restore from a backup" not in lower and "backups/" not in lower
     assert "would have been lost" not in lower
     assert "free" not in lower  # never disk-space advice
-    assert "hermes doctor" in lower
+    assert "stardust doctor" in lower
     assert "search index" in lower and "not damaged" in lower
     assert "send your message again" in lower  # the handle stays live
 
@@ -213,11 +213,11 @@ def test_deleted_wal_cause_is_plain_first_steps_not_a_forensic_runbook():
         "session_persistence_failed", "deleted_wal"
     ).lower()
     assert "deleted_wal" in PERSISTENCE_ERROR_CAUSES
-    assert "hermes gateway stop" in out and "hermes doctor" in out
+    assert "stardust gateway stop" in out and "stardust doctor" in out
     assert "send your message once more" in out
     for jargon in ("manifest", "state.db-wal", "sidecar", "header_only", "--inspect-only", "generation"):
         assert jargon not in out, jargon
-    assert "~/.hermes" not in out  # display_hermes_home(), never a hardcoded path
+    assert "~/.stardust" not in out  # display_hermes_home(), never a hardcoded path
 
 
 def test_explanation_persistence_unknown_cause_is_neutral():
@@ -230,7 +230,7 @@ def test_explanation_persistence_unknown_cause_is_neutral():
         assert out.strip() != ""
         assert "disk space" not in lower
         assert "full disk" not in lower
-        assert "hermes doctor" in lower
+        assert "stardust doctor" in lower
         assert "again" in lower
 
 
@@ -238,7 +238,7 @@ def test_explanation_persistence_one_arg_backward_compat():
     """Existing one-arg callers must keep working (optional second param)."""
     out = AIAgent._format_turn_completion_explanation("session_persistence_failed")
     assert out.strip() != ""
-    assert "couldn't save" in out.lower() and "hermes doctor" in out.lower()
+    assert "couldn't save" in out.lower() and "stardust doctor" in out.lower()
 
 
 def test_explanation_cause_ignored_for_other_reasons():
@@ -445,7 +445,7 @@ def test_classify_persistence_error_fts_provenance_order():
 def test_explainer_enabled_by_default():
     agent = _make_agent()
     with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("HERMES_TURN_COMPLETION_EXPLAINER", None)
+        os.environ.pop("STARDUST_TURN_COMPLETION_EXPLAINER", None)
         with patch("hermes_cli.config.load_config", return_value={}):
             assert agent._turn_completion_explainer_enabled() is True
 
@@ -453,7 +453,7 @@ def test_explainer_enabled_by_default():
 def test_explainer_disabled_via_env():
     agent = _make_agent()
     with patch.dict(
-        os.environ, {"HERMES_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
+        os.environ, {"STARDUST_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
     ):
         assert agent._turn_completion_explainer_enabled() is False
 
@@ -476,7 +476,7 @@ def test_explainer_config_read_once_then_cached():
         return {"display": {"turn_completion_explainer": True}}
 
     with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("HERMES_TURN_COMPLETION_EXPLAINER", None)
+        os.environ.pop("STARDUST_TURN_COMPLETION_EXPLAINER", None)
         with patch("hermes_cli.config.load_config", counting_load):
             # First call reads config and caches the result.
             assert agent._turn_completion_explainer_enabled() is True
@@ -487,7 +487,7 @@ def test_explainer_config_read_once_then_cached():
             assert calls["n"] == 1
             # Env override stays authoritative even after the cache is warm.
             with patch.dict(
-                os.environ, {"HERMES_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
+                os.environ, {"STARDUST_TURN_COMPLETION_EXPLAINER": "0"}, clear=False
             ):
                 assert agent._turn_completion_explainer_enabled() is False
             assert calls["n"] == 1  # env path never touches config

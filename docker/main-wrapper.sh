@@ -8,25 +8,25 @@
 #
 # Env note: /init scrubs env before invoking CMD, so when this wrapper
 # is launched through the supervised path it must rehydrate via
-# with-contenv before touching HERMES_HOME / PATH. On the non-PID-1
+# with-contenv before touching STARDUST_HOME / PATH. On the non-PID-1
 # fallback path the Dockerfile env is still intact, so we skip the
 # re-exec and continue directly.
 #
 # Routing:
-#   no args                       → exec `hermes` (the default)
+#   no args                       → exec `stardust` (the default)
 #   first arg is an executable    → exec it directly (sleep, bash, sh, …)
-#   first arg is anything else    → exec `hermes <args>` (subcommand passthrough)
+#   first arg is anything else    → exec `stardust <args>` (subcommand passthrough)
 #
-# Drop to hermes via s6-setuidgid, but skip it when already non-root.
+# Drop to the hermes user via s6-setuidgid, but skip it when already non-root.
 set -e
 
-if [ -z "${HERMES_MAIN_WRAPPER_ENV_READY:-}" ] && \
-   [ -z "${HERMES_HOME:-}" ] && \
+if [ -z "${STARDUST_MAIN_WRAPPER_ENV_READY:-}" ] && \
+   [ -z "${STARDUST_HOME:-}" ] && \
    [ -x /command/with-contenv ]; then
-    export HERMES_MAIN_WRAPPER_ENV_READY=1
+    export STARDUST_MAIN_WRAPPER_ENV_READY=1
     exec /command/with-contenv sh "$0" "$@"
 fi
-unset HERMES_MAIN_WRAPPER_ENV_READY
+unset STARDUST_MAIN_WRAPPER_ENV_READY
 
 drop() { [ "$(id -u)" = 0 ] && set -- s6-setuidgid hermes "$@"; exec "$@"; }
 
@@ -45,7 +45,7 @@ if [ "$cur_uid" != 0 ] && [ "$cur_uid" != "$(id -u hermes)" ]; then
 To make container-written files match your HOST user, don't use --user.
 Start as root (the default) and pass your host UID/GID instead:
 
-    docker run -e HERMES_UID=\$(id -u) -e HERMES_GID=\$(id -g) ...
+    docker run -e STARDUST_UID=\$(id -u) -e STARDUST_GID=\$(id -g) ...
 
 NAS users (Synology / unRAID / UGOS) can use the PUID/PGID aliases:
 
@@ -67,19 +67,19 @@ export HOME=/opt/data
 # Save the Docker -w (or default) working directory before init
 # scripts cd to /opt/data, so the container starts in the
 # directory the user requested.
-_hermes_orig_cwd="${HERMES_ORIG_CWD:-$PWD}"
+_hermes_orig_cwd="${STARDUST_ORIG_CWD:-$PWD}"
 
 cd /opt/data
 # shellcheck disable=SC1091
 . /opt/hermes/.venv/bin/activate
 
 # Restore the original working directory before handing off to
-# the user's command so `hermes chat` starts in the Docker -w
+# the user's command so `stardust chat` starts in the Docker -w
 # directory, not /opt/data.
 cd "$_hermes_orig_cwd"
 
 if [ $# -eq 0 ]; then
-    drop hermes
+    drop stardust
 fi
 
 if command -v "$1" >/dev/null 2>&1; then
@@ -87,5 +87,5 @@ if command -v "$1" >/dev/null 2>&1; then
     drop "$@"
 fi
 
-# Hermes subcommand pass-through.
-drop hermes "$@"
+# stardust subcommand pass-through.
+drop stardust "$@"

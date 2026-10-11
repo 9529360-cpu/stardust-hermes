@@ -25,10 +25,10 @@ UPDATE_MARKER_MAX_AGE_SECONDS = 20 * 60
 MARKER_NAME = ".hermes-update-in-progress"
 
 # Set by an orchestrating updater (Tauri `hermes-setup --update`) to its own pid before
-# spawning `hermes update` as a child stage; the parent holds the marker for its whole run,
+# spawning `stardust update` as a child stage; the parent holds the marker for its whole run,
 # so without this the child would refuse its own parent's lock. Keep in sync with
 # update_child_env in apps/bootstrap-installer/src-tauri/src/update.rs.
-HANDOFF_PID_ENV = "HERMES_UPDATE_HANDOFF_PID"
+HANDOFF_PID_ENV = "STARDUST_UPDATE_HANDOFF_PID"
 
 # Exit code meaning "another updater/instance owns this install right now" — the same
 # contract as the Windows shim / venv-holder guards in _cmd_update_impl, matched by the
@@ -40,7 +40,7 @@ def update_marker_path() -> Path:
     """Path of the shared update marker.
 
     Uses the *process* Hermes home (never the context-local profile override): the Rust
-    updater resolves ``$HERMES_HOME`` or the platform default and the desktop pins that same
+    updater resolves ``$STARDUST_HOME`` or the platform default and the desktop pins that same
     value into the updater's env, so a profile-scoped path would be one the other owners never look at.
     """
     from hermes_constants import get_process_hermes_home
@@ -78,7 +78,7 @@ def _handoff_pid() -> int | None:
 def _is_ancestor_pid(pid: int) -> bool:
     """True when ``pid`` is a live ancestor of this process.
 
-    The orchestrating updater spawns ``hermes update`` as a (grand)child, so a live marker
+    The orchestrating updater spawns ``stardust update`` as a (grand)child, so a live marker
     owned by an ancestor can only be the claim we already run under — an unrelated concurrent
     updater is never in our parent chain. Never our own pid; any failure is "not an ancestor".
     """
@@ -138,8 +138,8 @@ def describe_holder(holder: UpdateHolder) -> str:
         f"process {holder.pid}).\n"
         "\n"
         "  Running two at once would corrupt the install. Wait for it to finish\n"
-        "  (watch `hermes logs`), or close the Desktop/dashboard window that\n"
-        "  started it, then run `hermes update` again."
+        "  (watch `stardust logs`), or close the Desktop/dashboard window that\n"
+        "  started it, then run `stardust update` again."
     )
 
 

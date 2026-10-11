@@ -2,7 +2,7 @@
 
 Cross-session user modeling with dialectic Q&A, semantic search, peer cards and
 persistent conclusions; five tools (profile, search, reasoning, context, conclude).
-Config chain: $HERMES_HOME/honcho.json -> ~/.honcho/config.json -> env vars.
+Config chain: $STARDUST_HOME/honcho.json -> ~/.honcho/config.json -> env vars.
 """
 
 from __future__ import annotations
@@ -193,7 +193,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
             return False
 
     def save_config(self, values, hermes_home):
-        """Merge ``values`` into $HERMES_HOME/honcho.json (Honcho SDK native format); a file that does not parse raises.
+        """Merge ``values`` into $STARDUST_HOME/honcho.json (Honcho SDK native format); a file that does not parse raises.
         Holds the token refresh locks so a rotation cannot land between the read and the write."""
         from pathlib import Path
         from utils import atomic_json_write
@@ -607,7 +607,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
             msg = self._init_auth_failure
         return ("[Honcho memory status] Authentication with the Honcho memory backend has expired and automatic "
                 f"token refresh failed, so memory sync and recall are paused. Reason: {msg}\n"
-                "Tell the user (once) that Honcho memory is paused and that running 'hermes honcho setup' "
+                "Tell the user (once) that Honcho memory is paused and that running 'stardust honcho setup' "
                 "to re-authenticate will restore it.")
 
     def _peer_failure_text(self) -> str:
@@ -615,7 +615,7 @@ class HonchoMemoryProvider(DialecticMixin, MemoryProvider):
         user id from the transport, never peerName: a shared peerName would merge every user onto one peer."""
         text = self._init_peer_failure or ""
         if self._init_peer_platform in _LOCAL_PLATFORMS:
-            return f"{text} Set one with 'hermes honcho peer --user <name>'."
+            return f"{text} Set one with 'stardust honcho peer --user <name>'."
         return f"{text} This platform supplied no user id for the chat, so memory stays off here."
 
     def _pop_peer_notice(self) -> str:

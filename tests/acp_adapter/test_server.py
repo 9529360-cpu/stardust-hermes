@@ -40,7 +40,7 @@ from acp_adapter.model_catalog import ACP_MAX_MODELS_PER_PROVIDER
 from acp_adapter.permissions import ApprovalTrustPosture
 from acp_adapter.server import (
     HermesACPAgent,
-    HERMES_VERSION,
+    STARDUST_VERSION,
 )
 from acp_adapter.session import SessionManager
 from hermes_state import SessionDB
@@ -432,10 +432,10 @@ class TestPrompt:
         """The ACP prompt path must bridge the session id into child subprocesses.
 
         Regression: ``set_session_vars`` was called with ``session_key`` only,
-        leaving the ``HERMES_SESSION_ID`` ContextVar bound to the explicit ""
+        leaving the ``STARDUST_SESSION_ID`` ContextVar bound to the explicit ""
         default. Once the session-context machinery is engaged, that empty value
         is authoritative — so ``_make_run_env`` handed child subprocesses an
-        empty ``HERMES_SESSION_ID`` instead of the session's own id.
+        empty ``STARDUST_SESSION_ID`` instead of the session's own id.
         """
         from tools.environments.local import _make_run_env
 
@@ -446,7 +446,7 @@ class TestPrompt:
 
         def _run(*args, **kwargs):
             # Runs inside the session context copy set up by prompt().
-            captured["child"] = _make_run_env({}).get("HERMES_SESSION_ID")
+            captured["child"] = _make_run_env({}).get("STARDUST_SESSION_ID")
             return {"final_response": "ok", "messages": []}
 
         state.agent.run_conversation = _run

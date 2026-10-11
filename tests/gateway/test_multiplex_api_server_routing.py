@@ -91,11 +91,11 @@ class TestApiServerModelsUnderProfile:
 
 
 class TestApiServerSessionProfileBinding:
-    """HERMES_SESSION_PROFILE must be bound per /p/<profile>/ request.
+    """STARDUST_SESSION_PROFILE must be bound per /p/<profile>/ request.
 
     Regression guard for cross-profile sandbox reuse: before the fix,
     _bind_api_server_session never passed ``profile`` to set_session_vars,
-    so every API-server turn bound HERMES_SESSION_PROFILE="" and the
+    so every API-server turn bound STARDUST_SESSION_PROFILE="" and the
     terminal tool collapsed ALL api_server sessions (default AND org
     profiles) onto the shared "default" container key — letting org-profile
     turns reuse the default profile's sandbox (SSH key / secrets exposure).
@@ -112,7 +112,7 @@ class TestApiServerSessionProfileBinding:
             profile="nm-media",
         )
         try:
-            assert get_session_env("HERMES_SESSION_PROFILE") == "nm-media"
+            assert get_session_env("STARDUST_SESSION_PROFILE") == "nm-media"
         finally:
             clear_session_vars(tokens)
 

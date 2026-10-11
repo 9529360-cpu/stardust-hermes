@@ -684,7 +684,7 @@ class QQAdapter(OwnAccessPolicyMixin, BasePlatformAdapter):
     async def _default_interaction_dispatch(self, event: InteractionEvent) -> None:
         """Default interaction callback: ``approve:<session_key>:<decision>`` →
         tools.approval.resolve_gateway_approval; ``update_prompt:<answer>`` →
-        ``~/.hermes/.update_response``; anything else is ignored at DEBUG."""
+        ``~/.stardust/.update_response``; anything else is ignored at DEBUG."""
         button_data = event.button_data
         if not button_data:
             return
@@ -727,7 +727,7 @@ class QQAdapter(OwnAccessPolicyMixin, BasePlatformAdapter):
     @staticmethod
     def _write_update_response(answer: str, operator: str = "") -> None:
         """Atomically (tmp + rename) write the update-prompt answer to
-        ``.update_response``, polled by the detached ``hermes update --gateway`` watcher."""
+        ``.update_response``, polled by the detached ``stardust update --gateway`` watcher."""
         try:
             from hermes_constants import get_hermes_home
             response_path = get_hermes_home() / ".update_response"
@@ -1490,7 +1490,7 @@ class QQAdapter(OwnAccessPolicyMixin, BasePlatformAdapter):
         self, chat_id: str, prompt: str, default: str = "", session_key: str = "",
         metadata: Optional[Dict[str, Any]] = None) -> SendResult:
         """Yes/No update-confirmation prompt; button clicks (``update_prompt:y|n``)
-        are written to ``~/.hermes/.update_response`` by the interaction callback."""
+        are written to ``~/.stardust/.update_response`` by the interaction callback."""
         del session_key, metadata  # present for contract parity only.
         default_hint = f" (default: {default})" if default else ""
         content = f"☤ **Update Needs Your Input**\n\n{prompt}{default_hint}"

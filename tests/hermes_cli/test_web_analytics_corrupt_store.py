@@ -27,7 +27,7 @@ def _malformed_state_db(home: Path) -> Path:
 
 
 def test_corrupt_store_polls_return_status_and_warn_once_per_interval(tmp_path, monkeypatch, caplog):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     import hermes_state
     db_path = _malformed_state_db(tmp_path)
     monkeypatch.setattr(hermes_state, "_default_db_path", lambda: db_path)
@@ -43,7 +43,7 @@ def test_corrupt_store_polls_return_status_and_warn_once_per_interval(tmp_path, 
     for resp in (first, second, third):
         assert resp.status_code == 503
         assert resp.json()["detail"]["error"] == "state_db_corrupt"
-        assert "hermes doctor" in resp.json()["detail"]["message"]
+        assert "stardust doctor" in resp.json()["detail"]["message"]
     # Only the dashboard's own warning counts: hermes_state logs an unrelated
     # once-per-process SQLite-version advisory on some interpreters (CI's 3.50.4).
     warnings = [

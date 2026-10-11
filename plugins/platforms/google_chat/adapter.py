@@ -194,7 +194,7 @@ def ensure_google_chat_deps() -> bool:
     """ACTIVE installer (registry ``ensure_deps_fn``).
 
     Routes through ``tools.lazy_deps`` so sealed hosted/Docker images write
-    ``HERMES_LAZY_INSTALL_TARGET`` instead of the read-only venv. Resets the
+    ``STARDUST_LAZY_INSTALL_TARGET`` instead of the read-only venv. Resets the
     failed-import cache so ``create_adapter()`` can load modules after install.
     ``FeatureUnavailable`` propagates: the registry logs its ``reason`` (quarantine
     404, no writable target, network), which is exactly what a hosted operator needs.
@@ -385,7 +385,7 @@ class GoogleChatAdapter(BasePlatformAdapter):
         self._project_id = self._subscription_path = self._bot_user_id = None  # bot id is users/{id}
         self._supervisor_task: Optional[asyncio.Task] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        # The profile scope this adapter was connected under (multiplex: HERMES_HOME override + secret
+        # The profile scope this adapter was connected under (multiplex: STARDUST_HOME override + secret
         # scope). Pub/Sub callbacks arrive on the gRPC SubscriberClient's own threads with an EMPTY
         # context, and ``run_coroutine_threadsafe`` copies THAT context onto the loop task — so
         # ``_dispatch_message`` and everything it reaches (attachment cache, per-user OAuth token
@@ -1611,7 +1611,7 @@ Full guide: website/docs/user-guide/messaging/google_chat.md
 
 
 def interactive_setup() -> None:
-    """``hermes setup`` wizard: print GCP instructions, prompt for env vars, persist to ``~/.hermes/.env``."""
+    """``stardust setup`` wizard: print GCP instructions, prompt for env vars, persist to ``~/.stardust/.env``."""
     from hermes_cli.cli_output import print_info, print_success, print_warning, prompt, prompt_yes_no
     from hermes_cli.config import get_env_value, save_env_value
     from hermes_cli.setup_platforms import declines_reconfigure
@@ -1648,8 +1648,8 @@ def interactive_setup() -> None:
     if home:
         save_env_value("GOOGLE_CHAT_HOME_CHANNEL", home.strip())
     print()
-    print_success("Google Chat configuration saved to ~/.hermes/.env")
-    print_info("Restart the gateway: hermes gateway restart")
+    print_success("Google Chat configuration saved to ~/.stardust/.env")
+    print_info("Restart the gateway: stardust gateway restart")
 
 
 # Strict resource-name patterns: anything outside Chat's documented character set
@@ -1678,7 +1678,7 @@ async def _standalone_send(
     media_files: Optional[List[str]] = None, force_document: bool = False,
 ) -> Dict[str, Any]:
     """POST one Chat message via REST without the SDK (``send_message_tool`` when the
-    gateway runner is not in-process, e.g. ``hermes cron``). Needs SA credentials and a
+    gateway runner is not in-process, e.g. ``stardust cron``). Needs SA credentials and a
     validated space name; ``media_files`` / ``force_document`` are signature parity only."""
     if not chat_id:
         return _standalone_error("chat_id (space resource) is required")
@@ -1744,7 +1744,7 @@ def register(ctx) -> None:
         validate_config=_validate_config,
         is_connected=_is_connected,
         required_env=["GOOGLE_CHAT_SERVICE_ACCOUNT_JSON"],
-        install_hint="Run `hermes setup` to install Google Chat support.",
+        install_hint="Run `stardust setup` to install Google Chat support.",
         setup_fn=interactive_setup,
         env_enablement_fn=_env_enablement,
         cron_deliver_env_var="GOOGLE_CHAT_HOME_CHANNEL",

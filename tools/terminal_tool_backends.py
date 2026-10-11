@@ -25,7 +25,7 @@ from tools.tool_backend_helpers import (has_direct_modal_credentials, managed_no
 logger = logging.getLogger("tools.terminal_tool")
 
 # Human reason for the most recent failed requirements check (None after a passing one). The CLI
-# startup notice and `hermes doctor` read it through terminal_backend_unavailable_reason() so the user
+# startup notice and `stardust doctor` read it through terminal_backend_unavailable_reason() so the user
 # hears WHY the terminal tool is missing instead of discovering it on first use.
 _last_unavailable_reason: Optional[str] = None
 
@@ -287,7 +287,7 @@ def _ssh_pre(config: Dict[str, Any]) -> bool:
     if config.get("ssh_host") and config.get("ssh_user"):
         return True
     return _reject("the SSH host and user are not configured (TERMINAL_SSH_HOST / TERMINAL_SSH_USER); "
-                   "run `hermes setup terminal` to enter them or pick the 'local' backend")
+                   "run `stardust setup terminal` to enter them or pick the 'local' backend")
 
 
 def _daytona_post(config: Dict[str, Any]) -> bool:

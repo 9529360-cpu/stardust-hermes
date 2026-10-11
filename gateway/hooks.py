@@ -1,6 +1,6 @@
 """Event hook system: fires handlers at gateway lifecycle points.
 
-Hooks live in ~/.hermes/hooks/<name>/ with HOOK.yaml (name, description, events) and
+Hooks live in ~/.stardust/hooks/<name>/ with HOOK.yaml (name, description, events) and
 handler.py (``def handle(event_type, context)``, sync or async); errors never block
 the pipeline.  Events: gateway:startup, session:start/end/reset, agent:start,
 agent:step (each tool-loop turn), agent:end, command:* (wildcard).  agent:* context:
@@ -140,13 +140,13 @@ class HookRegistry:
 
 
 class ProfileHookRegistries:
-    """``HookRegistry`` per served profile home, picked at emit time from the active HERMES_HOME.
+    """``HookRegistry`` per served profile home, picked at emit time from the active STARDUST_HOME.
 
     The gateway holds ONE of these. Every hook emit already runs inside the routed profile's
     ``_profile_runtime_scope`` (message handlers, /new, turn wiring), so resolving the registry by
     ``get_hermes_home()`` there gives each profile its own ``hooks/`` and keeps the default
     profile's handlers from seeing other profiles' messages. Each home's registry is loaded on its
-    first emit, i.e. inside that profile's scope (handler imports see its HERMES_HOME); multiplexing off
+    first emit, i.e. inside that profile's scope (handler imports see its STARDUST_HOME); multiplexing off
     means a single entry for the launch home, i.e. exactly the old behaviour.
     """
 

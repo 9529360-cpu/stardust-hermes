@@ -169,7 +169,7 @@ class _BoundedOutputCollector:
 def _new_output_collector(proc, bounded_capture: bool) -> _BoundedOutputCollector:
     """Build the collector for one ``_wait_for_process`` call. ``bounded_capture`` (foreground
     terminal path only) caps retention at ``tool_output.max_bytes`` and tees overflow to a
-    spill file under ``$HERMES_HOME/cache/terminal-output`` (created only on actual overflow;
+    spill file under ``$STARDUST_HOME/cache/terminal-output`` (created only on actual overflow;
     spills older than 7 days are pruned opportunistically). Otherwise the collector is
     effectively unbounded so internal consumers keep full-fidelity output."""
     if not bounded_capture:

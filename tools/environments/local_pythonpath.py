@@ -36,8 +36,8 @@ def _build_hermes_repo_root_aliases(
 ) -> tuple[Path, ...]:
     """Exact repo-root spellings emitted by Hermes launchers. Mirrors
     ``gateway_windows._preserve_hermes_home_path`` (physical path under the resolved
-    HERMES_HOME -> configured spelling) so a junction-backed install matches without
-    treating arbitrary HERMES_HOME descendants as Hermes-owned. A repo-level junction
+    STARDUST_HOME -> configured spelling) so a junction-backed install matches without
+    treating arbitrary STARDUST_HOME descendants as Hermes-owned. A repo-level junction
     (possibly cross-drive) is accepted only when a strict resolve proves
     <root>/<repo dirname> is the physical root (fail-closed)."""
     candidates = [resolved_root, lexical_root]

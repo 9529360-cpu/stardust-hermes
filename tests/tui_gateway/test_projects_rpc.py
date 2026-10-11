@@ -300,7 +300,7 @@ def test_record_repos_persists_and_shows_zero_session_repo(tmp_path):
     repo = tmp_path / "fresh-repo"
     repo.mkdir()
 
-    # Repo-first: a scanned repo with no hermes sessions still surfaces.
+    # Repo-first: a scanned repo with no stardust sessions still surfaces.
     _call("projects.record_repos", {"repos": [{"root": str(repo), "label": "fresh-repo"}]})
 
     by_label = {r["label"]: r for r in _call("projects.discover_repos")["repos"]}
@@ -893,6 +893,6 @@ def test_projects_without_a_profile_stay_on_the_launch_home(monkeypatch, tmp_pat
 
     assert _cached_repo_labels(launch_home) == ["only"]
     assert not (coder_home / "projects.db").exists()
-    assert not (Path(os.environ["HERMES_HOME"]) / "projects.db").exists()
+    assert not (Path(os.environ["STARDUST_HOME"]) / "projects.db").exists()
 
 

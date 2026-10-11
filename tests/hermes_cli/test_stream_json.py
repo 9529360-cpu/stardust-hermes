@@ -1,4 +1,4 @@
-"""``hermes chat -q … --format stream-json`` emits a parseable JSONL event stream and nothing else on stdout."""
+"""``stardust chat -q … --format stream-json`` emits a parseable JSONL event stream and nothing else on stdout."""
 
 import json
 import signal

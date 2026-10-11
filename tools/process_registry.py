@@ -45,7 +45,7 @@ _CHECKPOINT_PATH_AT_IMPORT = CHECKPOINT_PATH
 
 def _checkpoint_path() -> Path:
     """Active profile's checkpoint file at call time: the patched ``CHECKPOINT_PATH`` when a test
-    changed it, else live profile-scoped HERMES_HOME — the multiplexed gateway serves every
+    changed it, else live profile-scoped STARDUST_HOME — the multiplexed gateway serves every
     profile from one process, so the import-time constant would pin every profile's process
     checkpoint to the launch home."""
     return CHECKPOINT_PATH if CHECKPOINT_PATH != _CHECKPOINT_PATH_AT_IMPORT else get_hermes_home() / "processes.json"
@@ -906,7 +906,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
             id=f"proc_{uuid.uuid4().hex[:12]}", command=command, task_id=task_id,
             owner_task_id=owner_task_id or task_id, session_key=session_key, cwd=cwd,
             owner_home=hermes_home_key(),
-            parent_session_id=get_session_env("HERMES_SESSION_ID", ""),
+            parent_session_id=get_session_env("STARDUST_SESSION_ID", ""),
             started_at=time.time(), **extra)
 
     @staticmethod
@@ -1502,7 +1502,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         self, task_id: Optional[str] = None, *, timeout: float | None = None, poll_interval: float = 1.0,
     ) -> dict:
         """Bounded linger for ``notify_on_complete`` background processes at one-shot exit.
-        A one-shot CLI run (``hermes -q/-Q/-z``) exits when its turn ends; a background
+        A one-shot CLI run (``stardust -q/-Q/-z``) exits when its turn ends; a background
         process it spawned still holds a stdout pipe owned by the dying parent and dies of
         SIGPIPE seconds later (Bot Mode handoff replies were the visible casualty). Only
         ``notify_on_complete`` processes carry a completion contract — servers/daemons/
@@ -1511,7 +1511,7 @@ class ProcessRegistry(ProcessCheckpointMixin):
         disables). Each pass re-reconciles child state so an orphaned-pipe exit can't wedge
         the linger. Returns ``{"waited", "completed", "timed_out"}`` id lists.
 
-        Bot Mode handoff REPLIES are the visible casualty (#90879): a recipient invoked as ``hermes -p <bot>
+        Bot Mode handoff REPLIES are the visible casualty (#90879): a recipient invoked as ``stardust -p <bot>
         chat -Q --query-file ...`` dispatches its reply via ``message_agent`` / ``bot_relay`` exactly this
         way, then exits, and the reply process is destroyed ~3s later. The sender waits forever for a reply
         that was already killed.
@@ -1719,14 +1719,14 @@ class ProcessRegistry(ProcessCheckpointMixin):
     def _reconcile_local_exit(self, session: "ProcessSession") -> None:
         """Reconcile ``session.exited`` against the real child state.
         The reader flips ``exited`` only at EOF; when the direct child has exited but a
-        descendant (e.g. a daemon from ``hermes update``) holds the pipe open, poll()
+        descendant (e.g. a daemon from ``stardust update``) holds the pipe open, poll()
         would report "running" forever. If ``Popen.poll()`` has an exit code, drain
         readable bytes non-blocking and flip ``exited``. No-op for env/PTY, exited and
         detached sessions.
 
         The reader thread (`_reader_loop`) sets `session.exited = True` only in its `finally` block, which
         runs when `stdout.read()` returns EOF. If the direct `Popen` child has exited but a descendant
-        process (e.g. a daemon spawned by `hermes update` restarting the gateway) is still holding the
+        process (e.g. a daemon spawned by `stardust update` restarting the gateway) is still holding the
         stdout pipe open, the reader blocks forever and poll() keeps returning "running" indefinitely (issue
         #17327 — 74 polls over 7 minutes on Feishu).
         """

@@ -1,4 +1,4 @@
-"""Per-provider model-selection wizard flows for ``hermes setup`` / ``hermes model``.
+"""Per-provider model-selection wizard flows for ``stardust setup`` / ``stardust model``.
 
 main / config / auth / models helpers are imported lazily inside bodies: avoids the main.py import
 cycle and lets tests patch ``hermes_cli.config.load_config`` etc. at call time. The shared skeleton
@@ -108,7 +108,7 @@ def _model_flow_moa(config, current_model=""):
     moa = normalize_moa_config(config.get("moa") if isinstance(config, dict) else {})
     presets = moa.get("presets") or {}
     if not presets:
-        print("No MoA presets configured. Run `hermes moa configure <name>` first.")
+        print("No MoA presets configured. Run `stardust moa configure <name>` first.")
         return
 
     names = list(presets.keys())
@@ -292,7 +292,7 @@ def _model_flow_nous(config, current_model="", args=None):
     from hermes_cli.model_switch_providers import _free_tier_nous_row
     tier_row = _free_tier_nous_row({"name": "Nous Portal", "models": []})
     if tier_row is None:
-        print("The Nous free tier is off for this install; sign in with `hermes auth upgrade` to use Nous models.")
+        print("The Nous free tier is off for this install; sign in with `stardust auth upgrade` to use Nous models.")
         return
     if tier_row["models"]:
         # Free-tier identity: the welcome host serves the single pinned model; no Portal catalog,
@@ -365,7 +365,7 @@ def _model_flow_openai_codex(config, current_model=""):
         PROVIDER_REGISTRY["openai-codex"], recheck=lambda: get_codex_auth_status().get("logged_in")):
         return
 
-    # Prefer the credential pool (where `hermes auth` stores device_code tokens),
+    # Prefer the credential pool (where `stardust auth` stores device_code tokens),
     # fall back to legacy provider state.
     _codex_token = None
     with contextlib.suppress(Exception):
@@ -397,7 +397,7 @@ def _model_flow_xai_oauth(_config, current_model="", *, args=None):
         return
 
     # ``resolve_xai_oauth_runtime_credentials`` only reads the auth.json singleton, but
-    # credentials may live only in the pool (``hermes auth add xai-oauth``) — fall back to
+    # credentials may live only in the pool (``stardust auth add xai-oauth``) — fall back to
     # the default base URL so the picker still completes.
     base_url = DEFAULT_XAI_OAUTH_BASE_URL
     with contextlib.suppress(Exception):
@@ -596,7 +596,7 @@ def _model_flow_copilot_acp(config, current_model=""):
     try:
         creds = resolve_external_process_provider_credentials(provider_id)
     except Exception as exc:
-        _say(f"  ⚠ {exc}", "  Set HERMES_COPILOT_ACP_COMMAND or COPILOT_CLI_PATH if Copilot CLI is installed elsewhere.")
+        _say(f"  ⚠ {exc}", "  Set STARDUST_COPILOT_ACP_COMMAND or COPILOT_CLI_PATH if Copilot CLI is installed elsewhere.")
         return
     effective_base = creds.get("base_url") or effective_base
 
@@ -719,7 +719,7 @@ def _model_flow_vertex(config, current_model=""):
         _say("  Vertex credentials: Application Default Credentials (ADC)",
              "    Vertex uses OAuth2, not a static API key. Either:",
              "      • run 'gcloud auth application-default login', or",
-             "      • set VERTEX_CREDENTIALS_PATH in ~/.hermes/.env to a service account JSON")
+             "      • set VERTEX_CREDENTIALS_PATH in ~/.stardust/.env to a service account JSON")
     print()
 
     vertex_cfg = load_config().get("vertex")

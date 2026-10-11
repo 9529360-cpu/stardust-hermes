@@ -44,7 +44,7 @@ _cached: dict[str, str] = {}
 
 
 def _default_home() -> str:
-    """Ambient process HERMES_HOME (env, else the platform default) as a string."""
+    """Ambient process STARDUST_HOME (env, else the platform default) as a string."""
     from hermes_constants import get_process_hermes_home
     return str(get_process_hermes_home())
 
@@ -62,7 +62,7 @@ def _swallow(fn, default):
 
 
 def _hermes_root(home: Path) -> Path:
-    """Root ~/.hermes for both the default profile and named profiles."""
+    """Root ~/.stardust for both the default profile and named profiles."""
     return home.parent.parent if home.parent.name == "profiles" else home
 
 
@@ -144,7 +144,7 @@ def _profile_role(profile_dir: Path) -> str:
 
 
 def _peers(root: Path) -> list[str]:
-    """Registered peer gateway names (``hermes peer``) from config.yaml, read
+    """Registered peer gateway names (``stardust peer``) from config.yaml, read
     directly (no config-loader import; the section is absent on most installs). Never raises."""
     def _names() -> list[str]:
         peers = (_read_yaml_dict(root / "config.yaml", "bot_peers") or {}).get("bot_peers")
@@ -192,7 +192,7 @@ def _peer_paragraph(root: Path) -> str:
         "\n\nTeammates on OTHER machines: this install also has peer gateways "
         f"registered ({listed}). Message an agent on a peer the same way — "
         'message_agent with target "<peer>/<agent-name>" (or "<peer>" alone '
-        "for the peer's main agent). Run `hermes peer list` for the live "
+        "for the peer's main agent). Run `stardust peer list` for the live "
         "peer list."
     )
 
@@ -237,7 +237,7 @@ def _build_section(home: Path) -> str:
 
 def get_bot_mode_protocol_section(home: str | os.PathLike | None = None, *, force_refresh: bool = False) -> str:
     """Cached probe entry point — one filesystem pass per (process, home). ``home`` should be
-    the AGENT'S OWN resolved home (session-db derived), not ambient HERMES_HOME — build threads
+    the AGENT'S OWN resolved home (session-db derived), not ambient STARDUST_HOME — build threads
     can lose the ContextVar override and the env var would then name the wrong profile."""
     resolved = str(_resolve_home(home))
     with _lock:

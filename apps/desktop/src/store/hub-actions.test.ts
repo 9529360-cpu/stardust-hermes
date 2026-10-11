@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // A failed hub action (non-zero subprocess exit) must REJECT so callers toast
-// it — the Aug 2026 report shape was a scan-gated/failed `hermes skills
+// it — the Aug 2026 report shape was a scan-gated/failed `stardust skills
 // install` exiting non-zero with no toast, no list change, and no error
 // anywhere in the UI: the user read it as "install did nothing".
 

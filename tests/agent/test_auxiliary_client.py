@@ -268,7 +268,7 @@ class TestResolveTaskProviderModel:
 class TestMoaAggregatorSharedResolution:
     """The shared MoA→aggregator helper and the layers that consume it.
 
-    Real-config tests: write an actual config.yaml under a temp HERMES_HOME
+    Real-config tests: write an actual config.yaml under a temp STARDUST_HOME
     and exercise the genuine load_config() → resolve_moa_preset() boundary —
     no mocking of the configuration-resolution chain.
     """
@@ -277,7 +277,7 @@ class TestMoaAggregatorSharedResolution:
     def _write_moa_config(tmp_path, monkeypatch, default_preset="opus-gpt"):
         import yaml
 
-        home = tmp_path / ".hermes"
+        home = tmp_path / ".stardust"
         home.mkdir(exist_ok=True)
         (home / "config.yaml").write_text(
             yaml.safe_dump(
@@ -310,7 +310,7 @@ class TestMoaAggregatorSharedResolution:
                 }
             )
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         return home
 
     def test_real_config_explicit_task_provider_moa(self, tmp_path, monkeypatch):
@@ -519,7 +519,7 @@ class TestReadCodexAccessToken:
                 },
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         result = _read_codex_access_token()
         assert result == "tok-123"
 
@@ -550,7 +550,7 @@ class TestReadCodexAccessToken:
                 },
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         with patch("agent.auxiliary_client._select_pool_entry", return_value=(False, None)):
             result = _read_codex_access_token()
         assert result is None, "Expired JWT should return None"
@@ -575,7 +575,7 @@ class TestReadCodexAccessToken:
                 },
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         result = _read_codex_access_token()
         assert result == valid_jwt
 
@@ -585,7 +585,7 @@ class TestResolveXaiOAuthForAux:
     def test_uses_pool_backed_credentials_without_singleton(self, tmp_path, monkeypatch):
         """Auxiliary xAI OAuth must see pool-only credentials.
 
-        ``hermes auth status`` already reports these as logged in; compression
+        ``stardust auth status`` already reports these as logged in; compression
         should not fall through to "no auxiliary provider configured" just
         because the singleton auth-store entry is absent.
         """
@@ -598,8 +598,8 @@ class TestResolveXaiOAuthForAux:
             "version": 1,
             "providers": {},
         }))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-        monkeypatch.delenv("HERMES_XAI_BASE_URL", raising=False)
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
+        monkeypatch.delenv("STARDUST_XAI_BASE_URL", raising=False)
         monkeypatch.delenv("XAI_BASE_URL", raising=False)
 
         pool = load_pool("xai-oauth")
@@ -630,8 +630,8 @@ class TestResolveXaiOAuthForAux:
             "version": 1,
             "providers": {},
         }))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-        monkeypatch.setenv("HERMES_XAI_BASE_URL", "https://example.x.ai/v1/")
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_XAI_BASE_URL", "https://example.x.ai/v1/")
 
         pool = load_pool("xai-oauth")
         pool.add_entry(PooledCredential(
@@ -734,7 +734,7 @@ class TestBuildCodexClient:
             patch("agent.auxiliary_client._select_pool_entry", return_value=(True, entry)),
             patch("agent.auxiliary_client.OpenAI") as mock_openai,
         ):
-            monkeypatch.setenv("HERMES_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
+            monkeypatch.setenv("STARDUST_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
             mock_openai.return_value = MagicMock()
             from agent.auxiliary_client import _build_codex_client
 
@@ -750,7 +750,7 @@ class TestBuildCodexClient:
             patch("agent.auxiliary_client._read_codex_access_token", return_value="codex-auth-token"),
             patch("agent.auxiliary_client.OpenAI") as mock_openai,
         ):
-            monkeypatch.setenv("HERMES_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
+            monkeypatch.setenv("STARDUST_CODEX_BASE_URL", "http://127.0.0.1:8787/v1")
             mock_openai.return_value = MagicMock()
             from agent.auxiliary_client import resolve_provider_client
 
@@ -820,7 +820,7 @@ class TestResolveProviderClientUniversalModelFallback:
 
     Aux tasks (title generation, vision, session search, etc.) routinely
     reach this function without an explicit model — the user's main
-    provider was picked via ``hermes model``, no per-task override is
+    provider was picked via ``stardust model``, no per-task override is
     set, and the expectation is "just use my main model for side tasks
     too."  The resolver fills in ``model`` from a 3-step universal
     fallback before any provider branch runs:
@@ -920,7 +920,7 @@ class TestExpiredCodexFallback:
                 },
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         # Set up Anthropic as fallback
         monkeypatch.setenv("ANTHROPIC_TOKEN", "sk-ant-oat01-test-fallback")
@@ -963,7 +963,7 @@ class TestExpiredCodexFallback:
                 },
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-test-key")
 
         with patch("agent.auxiliary_client.OpenAI") as mock_openai:

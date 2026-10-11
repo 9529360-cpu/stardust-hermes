@@ -33,7 +33,7 @@ def _clean(value: object) -> Optional[str]:
 
 
 def auth_json_path():
-    """Return the Hermes auth store path, respecting HERMES_HOME overrides."""
+    """Return the Hermes auth store path, respecting STARDUST_HOME overrides."""
     return get_hermes_home() / "auth.json"
 
 
@@ -44,7 +44,7 @@ def _read_nous_provider_state() -> Optional[dict]:
 
     Resolves through the same profile-then-global-root fallback every other credential reader
     uses: a profile created with ``share_auth`` has no ``auth.json`` of its own and signs in with
-    the root identity. Reading only ``HERMES_HOME/auth.json`` made that profile look signed out to
+    the root identity. Reading only ``STARDUST_HOME/auth.json`` made that profile look signed out to
     the connector gate alone, so ``manage_connections`` vanished from its tool list."""
     try:
         from hermes_cli.auth import get_provider_auth_state

@@ -428,7 +428,7 @@ def _append_unconfigured_rows(
             warning = (
                 f"Configured provider missing usable credentials; paste {key_env} to reactivate. {tail}"
                 if auth_type == "api_key" and key_env
-                else f"Configured provider is not authenticated; run `hermes model` to reactivate. {tail}"
+                else f"Configured provider is not authenticated; run `stardust model` to reactivate. {tail}"
             )
             extras.append(_canonical_row(
                 entry, cur, models=[saved_model] if saved_model else [], total_models=1 if saved_model else 0,
@@ -512,8 +512,8 @@ def _external_process_signed_in(slug: str) -> bool:
 def _provider_is_keyless(slug: str) -> bool:
     """True when the provider's Hermes overlay declares it keyless."""
     try:
-        from hermes_cli.providers import HERMES_OVERLAYS
-        overlay = HERMES_OVERLAYS.get(slug)
+        from hermes_cli.providers import STARDUST_OVERLAYS
+        overlay = STARDUST_OVERLAYS.get(slug)
         return bool(overlay is not None and getattr(overlay, "keyless", False))
     except Exception:
         return False
@@ -559,7 +559,7 @@ def _apply_picker_hints(rows: list[dict]) -> None:
         row["auth_type"] = auth_type
         row["key_env"] = key_env
         row["warning"] = (f"paste {key_env} to activate" if auth_type == "api_key" and key_env
-                          else f"run `hermes model` to configure ({auth_type})")
+                          else f"run `stardust model` to configure ({auth_type})")
 
 
 def _reorder_canonical(rows: list[dict]) -> list[dict]:

@@ -12,9 +12,9 @@ from hermes_cli.cli_loops_mixin import CLILoopsMixin
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
     from pathlib import Path
-    home = tmp_path / ".hermes"; home.mkdir()
+    home = tmp_path / ".stardust"; home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     goals._DB_CACHE.clear()
     yield home
     goals._DB_CACHE.clear()

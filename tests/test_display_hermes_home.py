@@ -1,11 +1,11 @@
 """display_hermes_home() renders POSIX separators on every platform.
 
-Maintainer catch (#95681 arc): on Windows with a custom HERMES_HOME under
-the user profile (e.g. AppData/Local/hermes), ``"~/" +
+Maintainer catch (#95681 arc): on Windows with a custom STARDUST_HOME under
+the user profile (e.g. AppData/Local/stardust), ``"~/" +
 str(home.relative_to(Path.home()))`` produced the mixed-separator chimera
-``~/AppData\\Local\\hermes`` — which then leaked into every consumer that
+``~/AppData\\Local\\stardust`` — which then leaked into every consumer that
 appends sub-paths (the skill_manage schema showed the agent
-``~/AppData\\Local\\hermes/skills/``). The ``~/`` shorthand implies POSIX
+``~/AppData\\Local\\stardust/skills/``). The ``~/`` shorthand implies POSIX
 rendering; the whole string must be consistent.
 """
 import os
@@ -24,19 +24,19 @@ class TestDisplayHermesHomePosix(unittest.TestCase):
         import hermes_constants as hc
 
         fake_userhome = Path.home()
-        nested = fake_userhome / "AppData" / "Local" / "hermes"
+        nested = fake_userhome / "AppData" / "Local" / "stardust"
         with patch.object(hc, "get_hermes_home", return_value=nested):
             out = hc.display_hermes_home()
-        self.assertEqual(out, "~/AppData/Local/hermes")
+        self.assertEqual(out, "~/AppData/Local/stardust")
         self.assertNotIn("\\", out)
 
     def test_default_home_unchanged(self):
         import hermes_constants as hc
 
         with patch.object(hc, "get_hermes_home",
-                          return_value=Path.home() / ".hermes"):
+                          return_value=Path.home() / ".stardust"):
             out = hc.display_hermes_home()
-        self.assertEqual(out, "~/.hermes")
+        self.assertEqual(out, "~/.stardust")
 
     def test_outside_home_falls_back_to_absolute(self):
         import hermes_constants as hc

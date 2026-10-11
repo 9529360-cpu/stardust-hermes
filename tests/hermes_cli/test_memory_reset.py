@@ -1,4 +1,4 @@
-"""Tests for the `hermes memory reset` CLI command."""
+"""Tests for the `stardust memory reset` CLI command."""
 
 from types import SimpleNamespace
 
@@ -10,12 +10,12 @@ from tools.memory_tool import MemoryStore
 
 @pytest.fixture
 def memory_env(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     memories = hermes_home / "memories"
     memories.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     (memories / "MEMORY.md").write_text(
-        "§\nHermes repo is at ~/.hermes/hermes-agent\n§\nUser prefers dark themes",
+        "§\nHermes repo is at ~/.stardust/hermes-agent\n§\nUser prefers dark themes",
         encoding="utf-8",
     )
     (memories / "USER.md").write_text(
@@ -46,10 +46,10 @@ class TestMemoryReset:
         assert (memories / "USER.md.reset-generation").read_text(encoding="utf-8").strip()
 
     def test_reset_no_files_still_advances_forget_generation(self, tmp_path, monkeypatch, capsys):
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         memories = hermes_home / "memories"
         memories.mkdir(parents=True)
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         _reset("all")
 

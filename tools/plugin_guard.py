@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plugin Guard — ``skills_guard`` engine applied to ``hermes plugins install``/``update``.
+"""Plugin Guard — ``skills_guard`` engine applied to ``stardust plugins install``/``update``.
 
 Plugins run in-process but are *expected* to read their own env keys, call provider APIs
 and spawn subprocesses, so: full pattern set on docs/config files (where prompt-injection
@@ -62,7 +62,7 @@ CODE_EXEMPT_PATTERN_IDS = {
     "agent_config_mod", "agent_config_contract", "encoded_exfil"}
 
 # Severity remaps: a bundled binary is warn-tier (repos occasionally vendor one); a mere
-# ``~/.hermes/.env`` mention is how READMEs say where keys go (READING it still trips
+# ``~/.stardust/.env`` mention is how READMEs say where keys go (READING it still trips
 # ``read_secrets_file``, critical); ``curl | sh`` in READMEs is caution, not a hard block.
 SEVERITY_REMAP = {
     "binary_file": "high", "hermes_env_access": "medium", "curl_pipe_shell": "high"}

@@ -23,7 +23,7 @@ _TIER1_SAMPLE = {
     "TELEGRAM_BOT_TOKEN": "bot-token",
     "SLACK_APP_TOKEN": "xapp-secret",
     "MODAL_TOKEN_SECRET": "modal-secret",
-    "HERMES_DASHBOARD_SESSION_TOKEN": "dash-secret",
+    "STARDUST_DASHBOARD_SESSION_TOKEN": "dash-secret",
 }
 
 _PROVIDER_SAMPLE = {
@@ -158,21 +158,21 @@ class TestDelegatedChildMarker:
             os.environ,
             {
                 **_SAFE_SAMPLE,
-                "HERMES_KANBAN_TASK": "t_parent",
-                "HERMES_KANBAN_RUN_ID": "123",
-                "HERMES_KANBAN_DB": "/tmp/parent-kanban.db",
-                "HERMES_KANBAN_WORKSPACE": "/tmp/parent-workspace",
+                "STARDUST_KANBAN_TASK": "t_parent",
+                "STARDUST_KANBAN_RUN_ID": "123",
+                "STARDUST_KANBAN_DB": "/tmp/parent-kanban.db",
+                "STARDUST_KANBAN_WORKSPACE": "/tmp/parent-workspace",
             },
             clear=True,
         ):
             with delegated_child_context():
                 env = hermes_subprocess_env(inherit_credentials=True)
 
-        assert env["HERMES_DELEGATED_CHILD_CONTEXT"]  # fenced board root (path), not a bare flag
+        assert env["STARDUST_DELEGATED_CHILD_CONTEXT"]  # fenced board root (path), not a bare flag
         # Worker identity is scrubbed; board location and workspace routing survive so the
         # fenced descendant can still read the board it belongs to.
-        assert env["HERMES_KANBAN_DB"] == "/tmp/parent-kanban.db"
-        assert env["HERMES_KANBAN_WORKSPACE"] == "/tmp/parent-workspace"
+        assert env["STARDUST_KANBAN_DB"] == "/tmp/parent-kanban.db"
+        assert env["STARDUST_KANBAN_WORKSPACE"] == "/tmp/parent-workspace"
         assert env["MY_APP_VAR"] == "keep-me"
 
 

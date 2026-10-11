@@ -11,14 +11,14 @@
  *   - reuse an existing desktop-dedicated dashboard via a lockfile + an
  *     AUTHENTICATED /api/status probe (pid liveness alone is insufficient),
  *   - spawn a fresh detached `--isolated --port 0` dashboard and scrape its
- *     `HERMES_DASHBOARD_READY port=<n>` readiness line,
+ *     `STARDUST_DASHBOARD_READY port=<n>` readiness line,
  *   - adopt the token the dashboard actually serves (served-token adoption),
  *   - clean up a stale dashboard only when it is provably ours.
  *
  * No `import 'electron'` so it's unit-testable with `node --test`. main.ts wires
  * the real SshConnection, fetch, adoptServedDashboardToken, and waitForHermes in.
  *
- * The minted HERMES_DASHBOARD_SESSION_TOKEN is the SPAWN credential. After
+ * The minted STARDUST_DASHBOARD_SESSION_TOKEN is the SPAWN credential. After
  * readiness the caller runs served-token adoption against the tunneled baseUrl
  * and the SERVED token's fingerprint is what lands in the lockfile — so the
  * reuse probe checks the credential that actually authenticates /api/ws, not
@@ -37,7 +37,7 @@ const LOCKFILE_SCHEMA_VERSION = 2
 // args, served-token reconciliation). A mismatch forces a clean respawn.
 const PROTOCOL_VERSION = 1
 const READY_RE = READY_IN_MERGED_OUTPUT_RE // the remote log is `>> log 2>&1`: merged, not line-accurate
-const REMOTE_LOCK_DIR = '~/.hermes/desktop-ssh'
+const REMOTE_LOCK_DIR = '~/.stardust/desktop-ssh'
 const SUPPORTED_REMOTE_OS = new Set(['Linux', 'Darwin'])
 const DEFAULT_READY_TIMEOUT_MS = 45_000
 const READY_POLL_INTERVAL_MS = 750
@@ -199,8 +199,8 @@ async function locateHermes(ssh, remoteHermesPath) {
 
     const err: any = new Error(
       `The Hermes path you set is not an executable on the remote host: "${remoteHermesPath}". ` +
-        'Check the path (it must be the full path to the `hermes` binary on the remote, e.g. ' +
-        '~/hermes-agent/.venv/bin/hermes), or clear it to auto-detect.'
+        'Check the path (it must be the full path to the `stardust` binary on the remote, e.g. ' +
+        '~/hermes-agent/.venv/bin/stardust), or clear it to auto-detect.'
     )
 
     err.kind = 'hermes-not-found'
@@ -210,7 +210,7 @@ async function locateHermes(ssh, remoteHermesPath) {
   const candidates: string[] = []
 
   try {
-    const found = (await ssh.exec(`bash -lc ${shq('command -v hermes')}`)).trim()
+    const found = (await ssh.exec(`bash -lc ${shq('command -v stardust')}`)).trim()
 
     if (found) {
       candidates.push(found.split('\n').pop().trim())
@@ -221,9 +221,9 @@ async function locateHermes(ssh, remoteHermesPath) {
 
   // Fallback candidates when the login-shell probe misses: the installer's
   // command locations (scripts/install.sh) — per-user, root/FHS, legacy venv.
-  candidates.push('~/.local/bin/hermes')
-  candidates.push('/usr/local/bin/hermes')
-  candidates.push('~/.hermes/hermes-agent/venv/bin/hermes')
+  candidates.push('~/.local/bin/stardust')
+  candidates.push('/usr/local/bin/stardust')
+  candidates.push('~/.stardust/hermes-agent/venv/bin/stardust')
 
   for (const candidate of candidates) {
     if (!candidate) {
@@ -236,7 +236,7 @@ async function locateHermes(ssh, remoteHermesPath) {
   }
 
   const err: any = new Error(
-    'Stardust is not installed on the remote host (could not find a `hermes` executable). ' +
+    'Stardust is not installed on the remote host (could not find a `stardust` executable). ' +
       'Install it on the remote with:  curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash  ' +
       '— or set the Hermes path explicitly in the SSH connection settings.'
   )
@@ -277,14 +277,14 @@ async function probeRemotePlatform(ssh) {
   return { os: osName, arch }
 }
 
-// The HERMES_HOME the remote dashboard will use (explicit env wins, else
-// ~/.hermes). Recorded in the lockfile so a future reuse can tell it's the same
+// The STARDUST_HOME the remote dashboard will use (explicit env wins, else
+// ~/.stardust). Recorded in the lockfile so a future reuse can tell it's the same
 // state store; best-effort.
 async function probeRemoteHermesHome(ssh) {
   try {
-    const out = (await ssh.exec('echo "${HERMES_HOME:-$HOME/.hermes}"')).trim().split('\n').pop()
+    const out = (await ssh.exec('echo "${STARDUST_HOME:-$HOME/.stardust}"')).trim().split('\n').pop()
 
-    return out || '~/.hermes'
+    return out || '~/.stardust'
   } catch (cause) {
     const error: any = new Error('Could not resolve the remote Hermes home.')
     error.kind = 'transient-transport-error'
@@ -594,12 +594,12 @@ async function pidIsOurDashboard(
       `expected=os.path.expanduser(${shq(hermesPath)})\n` +
       // The installer-facing launcher is intentionally preserved for invocation
       // (#74411), but it may `exec python <install-dir>/hermes`, leaving neither
-      // launcher nor HERMES_HOME-derived entrypoint in argv. The ownership-scoped
+      // launcher nor STARDUST_HOME-derived entrypoint in argv. The ownership-scoped
       // token path + random nonce + exact profile below are the alternative proof.
       `hermes_home=os.path.expanduser(${shq(hermesHome)}) if ${shq(hermesHome)} else ""\n` +
       'expected_entries={expected}\n' +
       'if hermes_home:\n' +
-      ' expected_entries.add(os.path.join(hermes_home,"hermes-agent","venv","bin","hermes"))\n' +
+      ' expected_entries.add(os.path.join(hermes_home,"hermes-agent","venv","bin","stardust"))\n' +
       `expected_token=os.path.expanduser(${shq(ownershipId ? spawnTokenPath(ownershipId, spawnNonce) : '')})\n` +
       `expected_profile=${shq(profile)}\n` +
       `nonce=${shq(spawnNonce)}\n` +
@@ -797,7 +797,7 @@ pid=${pid}
 expected_creation=${py(lock.creationTime)}
 expected_path=os.path.expanduser(${py(lock.hermesPath)})
 hermes_home=os.path.expanduser(${py(lock.hermesHome)})
-expected_entries={expected_path,os.path.join(hermes_home,"hermes-agent","venv","bin","hermes")}
+expected_entries={expected_path,os.path.join(hermes_home,"hermes-agent","venv","bin","stardust")}
 expected_token=os.path.expanduser(${py(expectedToken)})
 expected_profile=${py(lock.profile)}
 nonce=${py(lock.spawnNonce)}
@@ -1048,10 +1048,10 @@ function buildSpawnCommand(hermesPath, profile, opts: any = {}) {
   const tokenArg = tokenFilePath ? ` --ssh-session-token-file ${expandRemotePath(tokenFilePath)}` : ''
   const ownerArg = opts.spawnNonce ? ` --ssh-owner-nonce ${validateSpawnNonce(opts.spawnNonce)}` : ''
   const subCmd = `serve --isolated --host 127.0.0.1 --port 0${tokenArg}${ownerArg}`
-  const marker = expandRemotePath(`${remoteInstallRoot(opts.hermesHome || '~/.hermes')}/.hermes-update-in-progress`)
+  const marker = expandRemotePath(`${remoteInstallRoot(opts.hermesHome || '~/.stardust')}/.hermes-update-in-progress`)
 
   const updateMutex = expandRemotePath(
-    `${remoteInstallRoot(opts.hermesHome || '~/.hermes')}/.hermes-update-in-progress.mutex`
+    `${remoteInstallRoot(opts.hermesHome || '~/.stardust')}/.hermes-update-in-progress.mutex`
   )
 
   // The marker probe, ownership reservation, process creation, and initial
@@ -1067,7 +1067,7 @@ function buildSpawnCommand(hermesPath, profile, opts: any = {}) {
 
   const dashCmd =
     `ulimit -n ${REMOTE_NOFILE_SOFT_LIMIT} 2>/dev/null || true; ` +
-    `exec env HERMES_DESKTOP=1${opts.guestOnboarding === true ? ' HERMES_GUEST_ONBOARDING=1' : ''} ${hermes} ${profileArgs}${subCmd}`
+    `exec env STARDUST_DESKTOP=1${opts.guestOnboarding === true ? ' STARDUST_GUEST_ONBOARDING=1' : ''} ${hermes} ${profileArgs}${subCmd}`
 
   const detachedShell = `eval "exec $1>&-"; ${dashCmd} </dev/null >> ${logPath} 2>&1 & echo $!`
   const detachedSpawn = `child=$("$(command -v setsid || echo nohup)" sh -c ${shq(detachedShell)} hermes-update-child "$1" & echo $!)`
@@ -1181,7 +1181,7 @@ async function spawnRemoteDashboard(
     profile,
     token,
     ownershipId,
-    hermesHome = '~/.hermes',
+    hermesHome = '~/.stardust',
     guestOnboarding = false,
     assertInstallClear = async () => {}
   }
@@ -1420,7 +1420,7 @@ async function connect(deps) {
   const hermesVersion = await probeHermesVersion(ssh, hermesPath)
 
   if (hermesVersion) {
-    log(`remote hermes version: ${hermesVersion}`)
+    log(`remote stardust version: ${hermesVersion}`)
   }
 
   const reuseToken = deps.reuseToken || ''

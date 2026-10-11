@@ -146,7 +146,7 @@ def test_launch_turn_keeps_env_only_ssh_policy_once_multiplexing_is_active(tmp_p
     launch = tmp_path / "launch"
     launch.mkdir()
     (launch / "config.yaml").write_text("{}\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(launch))
+    monkeypatch.setenv("STARDUST_HOME", str(launch))
     monkeypatch.setenv("TERMINAL_ENV", "ssh")
     monkeypatch.setenv("TERMINAL_SSH_HOST", "example.test")
     ltp.activate_multi_profile_hosting()  # multiplex activation: first secondary served
@@ -160,7 +160,7 @@ def test_launch_turn_ignores_ambient_terminal_env_written_after_activation(tmp_p
     launch = tmp_path / "launch"
     launch.mkdir()
     (launch / "config.yaml").write_text("{}\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(launch))
+    monkeypatch.setenv("STARDUST_HOME", str(launch))
     monkeypatch.setenv("TERMINAL_ENV", "ssh")
     monkeypatch.setenv("TERMINAL_SSH_HOST", "example.test")
     ltp.activate_multi_profile_hosting()

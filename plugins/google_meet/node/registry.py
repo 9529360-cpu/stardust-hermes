@@ -1,6 +1,6 @@
 """Local JSON registry of approved remote meet nodes.
 
-``$HERMES_HOME/workspace/meetings/nodes.json``::
+``$STARDUST_HOME/workspace/meetings/nodes.json``::
 
     {"nodes": {"<name>": {"url": "ws://host:port", "token": "...", "added_at": <epoch>}}}
 """

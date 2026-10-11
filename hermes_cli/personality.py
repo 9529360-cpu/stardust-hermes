@@ -117,7 +117,7 @@ def active_personality_name(cfg: Optional[Dict[str, Any]]) -> str:
 
 def resolve_ephemeral_system_prompt(cfg: Optional[Dict[str, Any]]) -> str:
     """Session overlay: ``display.personality`` when it names a known personality, else the
-    user-owned ``agent.system_prompt``. Callers still prefer ``HERMES_EPHEMERAL_SYSTEM_PROMPT``."""
+    user-owned ``agent.system_prompt``. Callers still prefer ``STARDUST_EPHEMERAL_SYSTEM_PROMPT``."""
     name = active_personality_name(cfg)
     if name:
         return render_personality_prompt(available_personalities(cfg)[name])

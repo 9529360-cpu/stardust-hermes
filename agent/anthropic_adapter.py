@@ -346,7 +346,7 @@ def _new_sdk_client(sdk, kwargs: Dict[str, Any], headers: Dict[str, str]):
     """``sdk.Anthropic(**kwargs)`` with ``headers`` attached, sending exactly ONE credential.
 
     The SDK fills whichever of ``api_key`` / ``auth_token`` we left unset from ANTHROPIC_API_KEY /
-    ANTHROPIC_AUTH_TOKEN in the environment (both loaded from ~/.hermes/.env) and then sends dual
+    ANTHROPIC_AUTH_TOKEN in the environment (both loaded from ~/.stardust/.env) and then sends dual
     auth — x-api-key *and* Authorization: Bearer — shipping a foreign credential to Portal / MiniMax
     / OAuth / Entra / third-party endpoints (#26970, #105774). An ``Omit()`` default header is the
     SDK-sanctioned way to drop the other header, and unlike an attribute clear it survives

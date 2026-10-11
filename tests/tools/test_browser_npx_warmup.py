@@ -1,13 +1,13 @@
 """Tests for tools.browser_tool_install.warm_agent_browser_npx_cache (#43564, security
 hardening follow-up on PR #44772 review).
 
-warm_agent_browser_npx_cache() is the fire-and-forget helper `hermes update` /
-`hermes doctor --fix` call to pre-fetch agent-browser via npx so the first real
+warm_agent_browser_npx_cache() is the fire-and-forget helper `stardust update` /
+`stardust doctor --fix` call to pre-fetch agent-browser via npx so the first real
 browser-tool invocation in a session doesn't pay npx's registry-lookup cost.
 It must never raise, must accurately report success/failure via its return
 value, must use a credential-scrubbed and PATH-propagated environment (it
 runs registry-fetched, potentially install-scripted npm code on every
-`hermes update` — not only when a browser tool is actually used), must pass
+`stardust update` — not only when a browser tool is actually used), must pass
 --ignore-scripts (AGENT_BROWSER_NPX_SPEC is a floating ^0.26.0 range, not an
 exact pin), and must kill the whole process tree — not just the top-level
 npx PID — on timeout.
@@ -74,7 +74,7 @@ def test_stdin_is_explicitly_devnull_not_inherited():
 
 
 def test_captures_stdout_and_stderr_instead_of_inheriting_parent_fds():
-    """The npx registry fetch runs on every `hermes update` — its stdout/
+    """The npx registry fetch runs on every `stardust update` — its stdout/
     stderr must not bleed into the caller's own output (and, on POSIX, an
     inherited fd is one more handle a runaway grandchild could hold open)."""
     with patch("tools.browser_tool_install._resolve_npx_bin", return_value="/usr/bin/npx"), \

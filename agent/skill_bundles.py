@@ -1,6 +1,6 @@
 """Skill bundles — aliases that load multiple skills under one slash command.
 
-YAML files in ``<HERMES_HOME>/skill-bundles/`` (``name``, ``description``,
+YAML files in ``<STARDUST_HOME>/skill-bundles/`` (``name``, ``description``,
 ``skills: [...]``, optional ``instruction``; file stem = fallback name).
 ``/<bundle>`` loads every member skill into one user message. If a bundle and a
 skill share a slug, the bundle wins — slash dispatch checks bundles first, on purpose.
@@ -25,8 +25,8 @@ _bundles_cache_mtime: Optional[float] = None
 
 
 def _bundles_dir() -> Path:
-    """Bundles directory: ``HERMES_BUNDLES_DIR`` override (tests) or ``<HERMES_HOME>/skill-bundles``."""
-    override = os.environ.get("HERMES_BUNDLES_DIR")
+    """Bundles directory: ``STARDUST_BUNDLES_DIR`` override (tests) or ``<STARDUST_HOME>/skill-bundles``."""
+    override = os.environ.get("STARDUST_BUNDLES_DIR")
     return Path(override).expanduser() if override else get_hermes_home() / "skill-bundles"
 
 
@@ -160,7 +160,7 @@ def build_bundle_invocation_message(
     return ("\n\n".join([header, *skill_blocks]), loaded_names, missing)
 
 
-# File-level CRUD — used by `hermes bundles`.
+# File-level CRUD — used by `stardust bundles`.
 
 
 def bundle_path_for(name: str) -> Path:

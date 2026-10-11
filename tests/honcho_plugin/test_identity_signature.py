@@ -10,7 +10,7 @@ from plugins.memory.honcho import HonchoMemoryProvider
 
 @pytest.fixture
 def honcho_json(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     path = tmp_path / "honcho.json"
 
     def _write(**values):

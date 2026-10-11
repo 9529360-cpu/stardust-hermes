@@ -1,6 +1,6 @@
 """Honcho client construction and ``HonchoClientConfig`` resolution.
 
-Config file resolution: $HERMES_HOME/honcho.json -> ~/.honcho/config.json -> env vars
+Config file resolution: $STARDUST_HOME/honcho.json -> ~/.honcho/config.json -> env vars
 (HONCHO_API_KEY, HONCHO_ENVIRONMENT). Within a file, host-block fields win over
 flat/global fields, which win over defaults.
 """
@@ -71,11 +71,11 @@ def _host_block(raw: dict, host: str) -> dict:
 
 
 def resolve_active_host() -> str:
-    """Honcho host key: HERMES_HONCHO_HOST (profile-scoped .env), else the active profile. The config's
+    """Honcho host key: STARDUST_HONCHO_HOST (profile-scoped .env), else the active profile. The config's
     ``defaultHost`` is honored only for the default profile so named profiles stay isolated — which is
     also why the override is read through the secret scope: from raw environ it would fold every
     multiplexed profile onto the default profile's host block and peer."""
-    explicit = (get_secret("HERMES_HONCHO_HOST", "") or "").strip()
+    explicit = (get_secret("STARDUST_HONCHO_HOST", "") or "").strip()
     if explicit:
         return explicit
     try:
@@ -104,7 +104,7 @@ def resolve_global_config_path() -> Path:
 
 
 def resolve_config_path() -> Path:
-    """Active Honcho config path: $HERMES_HOME/honcho.json -> default profile's honcho.json
+    """Active Honcho config path: $STARDUST_HOME/honcho.json -> default profile's honcho.json
     (host blocks accumulate there via setup/clone) -> ~/.honcho/config.json (also the
     first-time-setup write target when nothing exists)."""
     local_path = get_hermes_home() / "honcho.json"
@@ -614,7 +614,7 @@ def get_honcho_client(config: HonchoClientConfig | None = None) -> Honcho:
 
     if not config.api_key and not config.base_url:
         raise ValueError("Honcho API key not found. Get your API key at https://app.honcho.dev, "
-                         "then run 'hermes honcho setup' or set HONCHO_API_KEY. "
+                         "then run 'stardust honcho setup' or set HONCHO_API_KEY. "
                          "For local instances, set HONCHO_BASE_URL instead.")
 
     return slot.get(lambda: _build_client(config))
@@ -629,7 +629,7 @@ def _build_client(config: HonchoClientConfig) -> "Honcho":
         from honcho import Honcho
     except ImportError:
         raise ImportError("honcho-ai is required for Honcho integration. Install it with: pip install honcho-ai  "
-                          "(or run `hermes honcho setup` to configure).")
+                          "(or run `stardust honcho setup` to configure).")
 
     # config.yaml honcho.base_url / timeout fill whatever honcho.json left unset.
     base_url, timeout = config.base_url, config.timeout

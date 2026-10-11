@@ -1,6 +1,6 @@
-"""Tests for the stale-dashboard handling run at the end of ``hermes update``.
+"""Tests for the stale-dashboard handling run at the end of ``stardust update``.
 
-``hermes update`` detects ``hermes dashboard`` processes left over from the
+``stardust update`` detects ``stardust dashboard`` processes left over from the
 previous version and kills them (SIGTERM + SIGKILL grace, or ``taskkill /F``
 on Windows).  Without this, the running backend silently serves stale Python
 against a freshly-updated JS bundle, producing 401s / empty data.
@@ -92,13 +92,13 @@ def _write_valid_ssh_backend_lock(tmp_path, monkeypatch) -> int:
         "pid": pid,
         "port": 46369,
         "profile": "default",
-        "hermesPath": "/opt/hermes/bin/hermes",
+        "hermesPath": "/opt/hermes/bin/stardust",
         "hermesHome": str(tmp_path),
         "logPath": f"{tmp_path}/desktop-ssh/{ownership_id}/{spawn_nonce}.log",
         "startedAt": "2026-08-21T15:27:39Z",
     }))
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.delenv("HERMES_DESKTOP_CHILD_PID", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.delenv("STARDUST_DESKTOP_CHILD_PID", raising=False)
     return pid
 
 
@@ -150,7 +150,7 @@ class TestFindStaleDashboardPids:
                 returncode=0,
                 stdout="\n".join([
                     _ps_line(os.getpid(), "python3 -m hermes_cli.main dashboard"),
-                    _ps_line(12345, "hermes dashboard --port 9119"),
+                    _ps_line(12345, "stardust dashboard --port 9119"),
                 ]) + "\n",
                 stderr="",
             )
@@ -323,7 +323,7 @@ class TestDashboardUpdateCleanup:
 
 class TestWindowsWmicEncoding:
     """Regression tests for #17049 — the Windows wmic branch must not crash
-    `hermes update` on non-UTF-8 system locales (e.g. cp936 on zh-CN).
+    `stardust update` on non-UTF-8 system locales (e.g. cp936 on zh-CN).
     """
 
     def test_wmic_routed_through_bounded_probe_run_with_ignore_errors(self):
@@ -410,7 +410,7 @@ class TestSupervisedBackendRestart:
         assert "when you're ready" not in out
 
     def test_already_restarted_unit_is_left_untouched(self):
-        """Review on #83595: hermes update's systemd fleet-restart loop may
+        """Review on #83595: stardust update's systemd fleet-restart loop may
         already have restarted this PID's owning unit directly (e.g. a
         Serve-only install). Passing it via already_restarted_units must
         skip killing/restarting it again here."""
@@ -546,7 +546,7 @@ class TestManualBackendRespawn:
     def test_respawn_adds_no_open_to_dashboard_commands(self, tmp_path, monkeypatch):
         """Respawned `dashboard` argv gains --no-open; `serve` argv untouched."""
         live = self._live()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
         spawned: list[list[str]] = []
 
         class _FakePopen:
@@ -565,7 +565,7 @@ class TestManualBackendRespawn:
 
     def test_respawn_failure_returned(self, tmp_path, monkeypatch, capsys):
         live = self._live()
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / ".hermes"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / ".stardust"))
 
         with patch.object(live.subprocess, "Popen", side_effect=OSError("no such file")):
             failed = live._respawn_dashboard_processes([["hermes", "serve"]])
@@ -587,7 +587,7 @@ class TestFilterDashboardRespawnCandidates:
             "serve", "--host", "127.0.0.1", "--port", "0",
         ]
         assert _filter_dashboard_respawn_candidates([
-            (42, argv, "/home/u/.hermes/profiles/mini-cat"),
+            (42, argv, "/home/u/.stardust/profiles/mini-cat"),
         ]) == []
 
     def test_skips_legacy_dashboard_port_zero(self):
@@ -658,7 +658,7 @@ class TestFilterDashboardRespawnCandidates:
         b = ["hermes", "dashboard", "--port", "8301"]
         out = _filter_dashboard_respawn_candidates([
             (1, a, None),
-            (2, b, "/home/u/.hermes/profiles/coder"),
+            (2, b, "/home/u/.stardust/profiles/coder"),
         ])
         assert out == [a]
 
@@ -667,7 +667,7 @@ class TestFilterDashboardRespawnCandidates:
 
         a = ["hermes", "--profile", "default", "dashboard", "--port", "8300"]
         b = ["hermes", "dashboard", "--port", "8301"]
-        home = "/home/u/.hermes"
+        home = "/home/u/.stardust"
         out = _filter_dashboard_respawn_candidates(
             [
                 (1, a, home),
@@ -678,7 +678,7 @@ class TestFilterDashboardRespawnCandidates:
         assert out == [a]
 
     def test_foreign_home_backend_is_not_replayed(self):
-        """A backend from another HERMES_HOME is never respawned (#94030).
+        """A backend from another STARDUST_HOME is never respawned (#94030).
 
         Its supervisor/user owns its lifecycle; an argv-only replay would
         run on the updating install's home and steal the foreign install's
@@ -691,10 +691,10 @@ class TestFilterDashboardRespawnCandidates:
         b = ["hermes", "dashboard", "--port", "8301"]
         out = _filter_dashboard_respawn_candidates(
             [
-                (1, a, "/home/u/.hermes"),
-                (2, b, "/work/project/.hermes"),
+                (1, a, "/home/u/.stardust"),
+                (2, b, "/work/project/.stardust"),
             ],
-            own_home="/home/u/.hermes",
+            own_home="/home/u/.stardust",
         )
         assert out == [a]
 
@@ -709,7 +709,7 @@ class TestFilterDashboardRespawnCandidates:
         ]
         out = _filter_dashboard_respawn_candidates(
             [(15364, argv, "/Users/u/.hermes-lifeos")],
-            own_home="/Users/u/.hermes",
+            own_home="/Users/u/.stardust",
         )
         assert out == []
 
@@ -718,8 +718,8 @@ class TestFilterDashboardRespawnCandidates:
 
         argv = ["hermes", "serve", "--host", "127.0.0.1", "--port", "9118"]
         out = _filter_dashboard_respawn_candidates(
-            [(15364, argv, "/Users/u/.hermes")],
-            own_home="/Users/u/.hermes",
+            [(15364, argv, "/Users/u/.stardust")],
+            own_home="/Users/u/.stardust",
         )
         assert out == [argv]
 
@@ -742,13 +742,13 @@ class TestFilterDashboardRespawnCandidates:
         assert out == [argv]
 
     def test_unknown_home_stays_eligible(self):
-        """Unreadable HERMES_HOME (env probe failed) keeps pre-#94030 behaviour."""
+        """Unreadable STARDUST_HOME (env probe failed) keeps pre-#94030 behaviour."""
         from hermes_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
         argv = ["hermes", "dashboard", "--port", "8300"]
         out = _filter_dashboard_respawn_candidates(
             [(1, argv, None)],
-            own_home="/home/u/.hermes",
+            own_home="/home/u/.stardust",
         )
         assert out == [argv]
 
@@ -759,7 +759,7 @@ class TestFilterDashboardRespawnCandidates:
         from hermes_cli.dashboard_procs import _filter_dashboard_respawn_candidates
 
         monkeypatch.setattr(
-            hermes_constants, "get_hermes_home", lambda: Path("/home/u/.hermes")
+            hermes_constants, "get_hermes_home", lambda: Path("/home/u/.stardust")
         )
         argv = ["hermes", "serve", "--port", "9118"]
         foreign = _filter_dashboard_respawn_candidates([
@@ -767,7 +767,7 @@ class TestFilterDashboardRespawnCandidates:
         ])
         assert foreign == []
         own = _filter_dashboard_respawn_candidates([
-            (1, argv, "/home/u/.hermes"),
+            (1, argv, "/home/u/.stardust"),
         ])
         assert own == [argv]
 
@@ -829,13 +829,13 @@ class TestCmdlineCapture:
 
         def fake_run(args, *a, **kw):
             assert args == ["ps", "-p", "888", "-o", "command="]
-            return MagicMock(returncode=0, stdout="hermes serve --port 8300\n", stderr="")
+            return MagicMock(returncode=0, stdout="stardust serve --port 8300\n", stderr="")
 
         with patch.object(live.os.path, "exists", return_value=False), \
              patch("subprocess.run", side_effect=fake_run):
             argv = main_dashboard._dashboard_cmdline_for_pid(888)
 
-        assert argv == ["hermes", "serve", "--port", "8300"]
+        assert argv == ["stardust", "serve", "--port", "8300"]
 
     @pytest.mark.windows_only
     def test_returns_none_on_windows(self):
@@ -850,7 +850,7 @@ class TestCmdlineCapture:
 class TestPostUpdateStaleModuleReload:
     """Regression tests for the post-update stale-module ImportError.
 
-    ``hermes update`` runs in the PRE-pull Python process. When the update
+    ``stardust update`` runs in the PRE-pull Python process. When the update
     adds a new symbol to ``hermes_cli._subprocess_compat`` (as #87134 added
     ``bounded_probe_run``), the post-update dashboard cleanup's lazy
     ``from hermes_cli._subprocess_compat import bounded_probe_run`` hits the

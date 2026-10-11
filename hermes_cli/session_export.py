@@ -218,7 +218,7 @@ Formats:
 
 Options:
   filename   optional output name/path (default: auto-named;
-             CLI saves under ~/.hermes/sessions/saved/)
+             CLI saves under ~/.stardust/sessions/saved/)
   redact     scrub API keys, tokens, and credentials before writing
 
 Examples:

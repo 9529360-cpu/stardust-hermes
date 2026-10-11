@@ -1,4 +1,4 @@
-"""Approval ledger behavior against the isolated HERMES_HOME fixture."""
+"""Approval ledger behavior against the isolated STARDUST_HOME fixture."""
 import json
 
 import pytest

@@ -524,7 +524,7 @@ def test_make_tui_argv_exits_with_recovery_hint_when_workspace_unrecoverable(
     tmp_path: Path, main_mod, monkeypatch, capsys
 ) -> None:
     """Missing ui-tui + no git checkout → clean error, never touches node/npm."""
-    monkeypatch.delenv("HERMES_TUI_DIR", raising=False)
+    monkeypatch.delenv("STARDUST_TUI_DIR", raising=False)
     monkeypatch.setattr(main_tui_launch, "_ensure_tui_node", lambda: None)
 
     bundled_entry = tmp_path / "bundled" / "entry.js"
@@ -781,7 +781,7 @@ def test_make_tui_argv_omits_workspace_and_scrubs_esbuild_override(
 
 
 class TestPersistentNpmUserconfig:
-    """$HERMES_HOME/npmrc must reach every npm lifecycle child process (#106373)."""
+    """$STARDUST_HOME/npmrc must reach every npm lifecycle child process (#106373)."""
 
     def test_hermes_home_npmrc_sets_userconfig(self, tmp_path, monkeypatch):
         home = tmp_path / "home"
@@ -790,7 +790,7 @@ class TestPersistentNpmUserconfig:
             "node_get_windows_binary_host_mirror=https://mirror.example/get-windows/\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.delenv("NPM_CONFIG_USERCONFIG", raising=False)
 
         env = main_tui_launch._npm_lifecycle_env()
@@ -800,7 +800,7 @@ class TestPersistentNpmUserconfig:
     def test_explicit_userconfig_wins_and_missing_file_sets_nothing(self, tmp_path, monkeypatch):
         home = tmp_path / "home"
         home.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         monkeypatch.delenv("NPM_CONFIG_USERCONFIG", raising=False)
 
         assert "NPM_CONFIG_USERCONFIG" not in main_tui_launch._npm_lifecycle_env()

@@ -46,7 +46,7 @@ def test_computer_use_rejects_removed_browser_approve_command() -> None:
     result = _run("browser-approve", "--pid", "123")
 
     assert result.returncode == 2
-    assert "'browser-approve' is not a `hermes computer-use` command" in result.stderr
+    assert "'browser-approve' is not a `stardust computer-use` command" in result.stderr
     assert "choose from" not in result.stderr
 
 
@@ -57,7 +57,7 @@ def test_computer_use_status_returns_zero_for_compatible_driver(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\Users\tester\.local\bin\cua-driver.exe"
-    monkeypatch.delenv("HERMES_CUA_DRIVER_CMD", raising=False)
+    monkeypatch.delenv("STARDUST_CUA_DRIVER_CMD", raising=False)
     monkeypatch.setattr(cua_backend_driver, "resolve_cua_driver_cmd", lambda: driver)
     monkeypatch.setattr(
         tools_config,
@@ -97,7 +97,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_standard_driver(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\Users\tester\.local\bin\cua-driver.exe"
-    monkeypatch.delenv("HERMES_CUA_DRIVER_CMD", raising=False)
+    monkeypatch.delenv("STARDUST_CUA_DRIVER_CMD", raising=False)
     monkeypatch.setattr(cua_backend_driver, "resolve_cua_driver_cmd", lambda: driver)
     monkeypatch.setattr(
         tools_config,
@@ -119,7 +119,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_standard_driver(
     assert _invoke(monkeypatch, "status") == 1
     output = capsys.readouterr().out
     assert "Repair required" in output
-    assert "Run: hermes computer-use install" in output
+    assert "Run: stardust computer-use install" in output
 
 
 def test_computer_use_status_returns_nonzero_for_incompatible_custom_driver(
@@ -130,7 +130,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_custom_driver(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\custom\cmd.exe"
-    monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", driver)
+    monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", driver)
     monkeypatch.setattr(cua_backend_driver, "resolve_cua_driver_cmd", lambda: driver)
     monkeypatch.setattr(
         tools_config,
@@ -145,7 +145,7 @@ def test_computer_use_status_returns_nonzero_for_incompatible_custom_driver(
 
     assert _invoke(monkeypatch, "status") == 1
     output = capsys.readouterr().out
-    assert "custom binary from HERMES_CUA_DRIVER_CMD" in output
+    assert "custom binary from STARDUST_CUA_DRIVER_CMD" in output
     assert "unset the override" in output
 
 
@@ -182,7 +182,7 @@ def test_computer_use_install_returns_nonzero_for_unrepairable_custom_override(
     import hermes_cli.tools_config_cua as tools_config_cua
 
     driver = r"C:\custom\cmd.exe"
-    monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", driver)
+    monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", driver)
     install = Mock(return_value=False)
     contract = Mock(side_effect=AssertionError("failed install must short-circuit"))
     monkeypatch.setattr(tools_config, "install_cua_driver", install)

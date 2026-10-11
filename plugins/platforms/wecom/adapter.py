@@ -136,8 +136,8 @@ class WeComAdapter(WeComStreamMixin, WeComMediaMixin, ChatSendQueueMixin, OwnAcc
         self._dedup, self._reply_req_ids = MessageDeduplicator(max_size=DEDUP_MAX_SIZE), {}
         # Text batching (clients split long messages ~4000 chars); attachment-only frames are held
         # for the merge window so the trailing text callback joins the same event (official: 800ms).
-        self._text_batch_delay_seconds = env_float("HERMES_WECOM_TEXT_BATCH_DELAY_SECONDS", 0.6)
-        self._text_batch_split_delay_seconds = env_float("HERMES_WECOM_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0)
+        self._text_batch_delay_seconds = env_float("STARDUST_WECOM_TEXT_BATCH_DELAY_SECONDS", 0.6)
+        self._text_batch_split_delay_seconds = env_float("STARDUST_WECOM_TEXT_BATCH_SPLIT_DELAY_SECONDS", 2.0)
         self._attachment_text_merge_delay_seconds = _extra_float("attachment_text_merge_delay_seconds", 0.8)
         # Stream keep-alive config (see streaming.py STREAM_* constants).
         self._stream_safe_duration_seconds = _extra_float("stream_safe_duration_seconds", STREAM_SAFE_DURATION_SECONDS)
@@ -747,10 +747,10 @@ _MANUAL_SETUP_STEPS = (
 _ACCESS_CHOICES = (
     ("Enable open access (anyone can message the bot)", (("WECOM_DM_POLICY", "open"), ("GATEWAY_ALLOW_ALL_USERS", "true")),
      (("warning", "Open access enabled — anyone can use your bot!"),)),
-    ("Use DM pairing (unknown users request access, you approve with 'hermes pairing approve')", (("WECOM_DM_POLICY", "pairing"),),
-     (("success", "DM pairing mode — users will receive a code to request access."), ("info", "Approve with: hermes pairing approve <platform> <code>"))),
+    ("Use DM pairing (unknown users request access, you approve with 'stardust pairing approve')", (("WECOM_DM_POLICY", "pairing"),),
+     (("success", "DM pairing mode — users will receive a code to request access."), ("info", "Approve with: stardust pairing approve <platform> <code>"))),
     ("Disable direct messages", (("WECOM_DM_POLICY", "disabled"),), (("warning", "Direct messages disabled."),)),
-    ("Skip for now (bot will deny all users until configured)", (), (("info", "Skipped — configure later with 'hermes gateway setup'"),)),
+    ("Skip for now (bot will deny all users until configured)", (), (("info", "Skipped — configure later with 'stardust gateway setup'"),)),
 )
 
 
@@ -829,7 +829,7 @@ def _build_callback_adapter(config):
 
 
 def register(ctx) -> None:
-    common = dict(install_hint="Run `hermes setup` to install WeCom support.", emoji="💼", allow_update_command=True)
+    common = dict(install_hint="Run `stardust setup` to install WeCom support.", emoji="💼", allow_update_command=True)
     ctx.register_platform(
         name="wecom", label="WeCom (Enterprise WeChat)", adapter_factory=WeComAdapter, check_fn=check_wecom_requirements,
         is_connected=_is_connected, validate_config=_is_connected, required_env=["WECOM_BOT_ID", "WECOM_SECRET"],

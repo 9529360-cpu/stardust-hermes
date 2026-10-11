@@ -8,7 +8,7 @@ EXCLUSIVE lock and an in-flight BEGIN IMMEDIATE's RESERVED lock:
 
 Hermes used to byte-probe live databases in several places (kanban's
 post-commit page-count check, the zeroed-state.db detector run on every
-SessionDB construction, backup header verification). Under `hermes sessions
+SessionDB construction, backup header verification). Under `stardust sessions
 optimize` this let an external process write into a database while VACUUM was
 rewriting it, producing "database disk image is malformed".
 
@@ -266,7 +266,7 @@ def test_probe_and_connect_do_not_race(tmp_path, clean_registry, monkeypatch):
 
 def test_session_db_read_only_is_tracked(tmp_path, clean_registry, monkeypatch):
     """End-to-end: a real read-only SessionDB blocks byte-probes."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from hermes_state import SessionDB
 
     db_path = tmp_path / "state.db"

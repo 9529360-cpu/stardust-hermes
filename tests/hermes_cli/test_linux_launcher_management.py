@@ -11,7 +11,7 @@ def test_launcher_optout_preserves_custom_entry_but_creates_missing(tmp_path, mo
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
     monkeypatch.setattr(Path, "home", lambda: home)

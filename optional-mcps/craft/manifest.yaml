@@ -28,5 +28,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Craft (or run `hermes mcp login craft`). Approve access,
+  Craft (or run `stardust mcp login craft`). Approve access,
   then restart the session so tools load.

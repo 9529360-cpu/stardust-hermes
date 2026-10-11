@@ -8,7 +8,7 @@ import pytest
 
 @pytest.mark.no_isolate
 def test_reconcile_tears_down_server_dropped_from_config(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from tools import mcp_tool
     from tools import mcp_tool_config as _config
     from tools import mcp_tool_discovery as disc
@@ -52,7 +52,7 @@ def test_reconcile_tears_down_server_dropped_from_config(monkeypatch, tmp_path):
 
 def test_reconcile_replaces_live_server_when_config_changed(monkeypatch, tmp_path):
     """A same-named live server must not keep its old route/security/policy after config reload."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from types import SimpleNamespace
 
     from tools import mcp_tool
@@ -96,7 +96,7 @@ def test_reconcile_replaces_live_server_when_config_changed(monkeypatch, tmp_pat
 
 def test_reconcile_replaces_lazy_registration_when_config_changed(monkeypatch, tmp_path):
     """A lazy schema registration must not preserve the old config until first use."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from tools import mcp_tool
     from tools import mcp_tool_config as _config
     from tools import mcp_tool_discovery as disc
@@ -136,7 +136,7 @@ def test_reconcile_replaces_lazy_registration_when_config_changed(monkeypatch, t
 
 def test_reconcile_does_not_treat_other_profiles_lazy_server_as_known(monkeypatch, tmp_path):
     """A lazy registration owned by profile A must not suppress profile B's same-named server."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from tools import mcp_tool
     from tools import mcp_tool_config as _config
     from tools import mcp_tool_discovery as disc
@@ -166,7 +166,7 @@ def test_reconcile_does_not_treat_other_profiles_lazy_server_as_known(monkeypatc
 def test_disabled_lazy_and_connecting_entries(monkeypatch, tmp_path):
     """``enabled: false`` counts as dropped; a schema-cache (lazy) registration loses its cached
     tools; a server still mid-connect is reported ``pending`` (torn down on a later pass)."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     from tools import mcp_tool
     from tools import mcp_tool_config as _config
     from tools import mcp_tool_discovery as disc

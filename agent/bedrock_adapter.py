@@ -51,7 +51,7 @@ _AWS_SCOPED_CREDENTIAL_VARS: Tuple[Tuple[str, str], ...] = (
 def scoped_aws_session_kwargs() -> Dict[str, str]:
     """``boto3.session.Session`` kwargs from the routed profile's secret scope, ``{}`` when unscoped.
 
-    Under a HERMES_HOME override the process env holds the LAUNCH profile's ``AWS_*`` (or nothing), so
+    Under a STARDUST_HOME override the process env holds the LAUNCH profile's ``AWS_*`` (or nothing), so
     every Bedrock client for a served profile must be built from that profile's own ``.env`` values.
     """
     from hermes_constants import get_hermes_home_override

@@ -328,7 +328,7 @@ def test_bot_uid_none_processes_channel_message():
 def test_config_bridges_slack_free_response_channels(monkeypatch, tmp_path):
     from gateway.config import load_gateway_config
 
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         "slack:\n"
@@ -339,7 +339,7 @@ def test_config_bridges_slack_free_response_channels(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.delenv("SLACK_REQUIRE_MENTION", raising=False)
     monkeypatch.delenv("SLACK_FREE_RESPONSE_CHANNELS", raising=False)
 
@@ -360,7 +360,7 @@ def test_config_bridges_slack_free_response_channels(monkeypatch, tmp_path):
 def test_top_level_slack_settings_do_not_disable_env_token_setup(monkeypatch, tmp_path):
     from gateway.config import load_gateway_config
 
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         "slack:\n"
@@ -368,7 +368,7 @@ def test_top_level_slack_settings_do_not_disable_env_token_setup(monkeypatch, tm
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
     monkeypatch.delenv("SLACK_REQUIRE_MENTION", raising=False)
 
@@ -384,7 +384,7 @@ def test_top_level_slack_settings_do_not_disable_env_token_setup(monkeypatch, tm
 def test_explicit_platforms_slack_enabled_false_wins_over_env_token(monkeypatch, tmp_path):
     from gateway.config import load_gateway_config
 
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         "platforms:\n"
@@ -395,7 +395,7 @@ def test_explicit_platforms_slack_enabled_false_wins_over_env_token(monkeypatch,
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
 
     config = load_gateway_config()
@@ -410,7 +410,7 @@ def test_explicit_platforms_slack_enabled_false_wins_over_env_token(monkeypatch,
 def test_config_bridges_slack_reply_in_thread(monkeypatch, tmp_path):
     from gateway.config import load_gateway_config
 
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "config.yaml").write_text(
         "slack:\n"
@@ -418,7 +418,7 @@ def test_config_bridges_slack_reply_in_thread(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
 
     config = load_gateway_config()

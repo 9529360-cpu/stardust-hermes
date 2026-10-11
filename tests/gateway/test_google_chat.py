@@ -162,7 +162,7 @@ def adapter(tmp_path):
 
     Redirects the persistent thread-count store to a tmp file so tests
     don't pollute (or read state from) the developer's real
-    ~/.hermes/google_chat_thread_counts.json.
+    ~/.stardust/google_chat_thread_counts.json.
     """
     from plugins.platforms.google_chat.adapter import _ThreadCountStore
     a = GoogleChatAdapter(_base_config())
@@ -174,7 +174,7 @@ def adapter(tmp_path):
     a._subscription_path = "projects/test-project/subscriptions/test-sub"
     a._new_authed_http = MagicMock(return_value=MagicMock())
     a.handle_message = AsyncMock()
-    # Replace the production store (which would write to ~/.hermes/...)
+    # Replace the production store (which would write to ~/.stardust/...)
     # with a tmp-path one so tests can roundtrip without side effects.
     a._thread_count_store = _ThreadCountStore(
         tmp_path / "google_chat_thread_counts.json"
@@ -512,7 +512,7 @@ class TestOnPubsubMessage:
 
 
     def test_membership_created_caches_bot_user_id(self, adapter, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         adapter._bot_user_id = None
         envelope = {
             "chat": {
@@ -1138,7 +1138,7 @@ class TestUserOAuthHelper:
     ):
         """A user who has not authorized has no token file; load returns
         ``None`` and never throws — same contract as the legacy path."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from plugins.platforms.google_chat.oauth import load_user_credentials
         assert load_user_credentials("nobody@example.com") is None
 
@@ -1147,7 +1147,7 @@ class TestUserOAuthHelper:
     ):
         """``list_authorized_emails`` enumerates the per-user dir; the
         legacy file is intentionally excluded (its owner is unknown)."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         users_dir = tmp_path / "google_chat_user_tokens"
         users_dir.mkdir(parents=True)
         (users_dir / "alice@example.com.json").write_text("{}")
@@ -1162,7 +1162,7 @@ class TestUserOAuthHelper:
 
 
     def test_store_client_secret_writes_private_json(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         src = tmp_path / "client_secret.json"
         payload = {"installed": {"client_id": "cid", "client_secret": "secret"}}
         src.write_text(json.dumps(payload), encoding="utf-8")
@@ -1191,7 +1191,7 @@ class TestPerUserAttachmentRouting:
     ):
         """sender_email maps to a per-user file → that user's API client
         is built and used for the upload, NOT the legacy fallback."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         users_dir = tmp_path / "google_chat_user_tokens"
         users_dir.mkdir(parents=True)
         (users_dir / "alice@example.com.json").write_text(json.dumps({
@@ -1243,7 +1243,7 @@ class TestPerUserAttachmentRouting:
         """Per-user revoke clears alice's slot; bob and the legacy
         fallback both keep working. Alice's choice to revoke must not
         knock out unrelated users."""
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         adapter._user_chat_api_by_email["alice@example.com"] = MagicMock()
         adapter._user_creds_by_email["alice@example.com"] = MagicMock()
         adapter._user_chat_api_by_email["bob@example.com"] = MagicMock()

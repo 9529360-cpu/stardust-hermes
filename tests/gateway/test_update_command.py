@@ -122,7 +122,7 @@ class TestHandleUpdateCommand:
 
         with patch("gateway.run._hermes_home", hermes_home), \
              patch("gateway.run.__file__", fake_file), \
-             patch("shutil.which", side_effect=lambda x: "/usr/bin/hermes" if x == "hermes" else "/usr/bin/setsid"), \
+             patch("shutil.which", side_effect=lambda x: "/usr/bin/stardust" if x == "hermes" else "/usr/bin/setsid"), \
              patch("subprocess.Popen"):
             result = await runner._handle_update_command(event)
 
@@ -156,7 +156,7 @@ class TestHandleUpdateCommand:
 
         def which_no_setsid(x):
             if x == "hermes":
-                return "/usr/bin/hermes"
+                return "/usr/bin/stardust"
             if x == "setsid":
                 return None
             return None
@@ -218,7 +218,7 @@ class TestUpdateCommandPlatformGate:
 
         runner = _make_runner()
         event = _make_event(platform=Platform.DISCORD)
-        monkeypatch.setenv("HERMES_MANAGED", "")
+        monkeypatch.setenv("STARDUST_MANAGED", "")
 
         with patch("subprocess.Popen"):
             result = await runner._handle_update_command(event)
@@ -249,7 +249,7 @@ class TestUpdateCommandPlatformGate:
 
         runner = _make_runner()
         event = _make_event(platform=Platform.HOMEASSISTANT)
-        monkeypatch.setenv("HERMES_MANAGED", "")
+        monkeypatch.setenv("STARDUST_MANAGED", "")
 
         with patch("subprocess.Popen"):
             result = await runner._handle_update_command(event)
@@ -512,7 +512,7 @@ class TestSendUpdateNotification:
 
         sent_text = mock_adapter.send.call_args[0][1]
         assert "previous version is still running" in sent_text
-        assert "hermes update" in sent_text and "/update" in sent_text
+        assert "stardust update" in sent_text and "/update" in sent_text
         assert "ERROR: pip failed" in sent_text
         assert len(sent_text) < 1200
         assert "exit code" not in sent_text.lower()

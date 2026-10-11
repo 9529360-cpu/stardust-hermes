@@ -10,8 +10,8 @@ import {
   attachmentPreviewDataUrl,
   type DroppedFile,
   extractDroppedFiles,
-  HERMES_PATHS_MIME,
   partitionDroppedFiles,
+  STARDUST_PATHS_MIME,
   useComposerActions
 } from './use-composer-actions'
 
@@ -159,7 +159,7 @@ function stubTransfer(
   })
 
   return {
-    getData: (mime: string) => (mime === HERMES_PATHS_MIME ? internalRaw : mime === 'text/uri-list' ? uriList : ''),
+    getData: (mime: string) => (mime === STARDUST_PATHS_MIME ? internalRaw : mime === 'text/uri-list' ? uriList : ''),
     files: {
       length: files.length,
       item: (i: number) => files[i] ?? null
@@ -615,7 +615,7 @@ describe('attachImagePath thumbnail separation', () => {
       ...original,
       attachedSessionId: 'session-1',
       label: 'photo.png',
-      path: '/root/.hermes/attachments/photo.png',
+      path: '/root/.stardust/attachments/photo.png',
       uploadState: undefined
     })
 
@@ -627,7 +627,7 @@ describe('attachImagePath thumbnail separation', () => {
 
     expect($composerAttachments.get()[0]).toMatchObject({
       attachedSessionId: 'session-1',
-      path: '/root/.hermes/attachments/photo.png',
+      path: '/root/.stardust/attachments/photo.png',
       thumbnailUrl: expect.stringMatching(/^data:image\/png;base64,/)
     })
   })

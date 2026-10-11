@@ -19,9 +19,9 @@ import hermes_cli.web_server_config as _web_server_config
 
 @pytest.fixture()
 def _hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     import hermes_cli.config as config_mod
 
     importlib.reload(config_mod)

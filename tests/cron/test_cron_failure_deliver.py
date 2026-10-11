@@ -23,15 +23,15 @@ from cron.scheduler import _resolve_delivery_targets
 
 @pytest.fixture
 def cron_env(tmp_path, monkeypatch):
-    """Isolated cron environment with temp HERMES_HOME."""
-    hermes_home = tmp_path / ".hermes"
+    """Isolated cron environment with temp STARDUST_HOME."""
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "cron").mkdir()
     (hermes_home / "cron" / "output").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", hermes_home)
+    monkeypatch.setattr(jobs_mod, "STARDUST_DIR", hermes_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", hermes_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", hermes_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", hermes_home / "cron" / "output")
@@ -53,7 +53,7 @@ def run_env(monkeypatch, tmp_path):
     (home / "config.yaml").write_text(
         "platforms:\n  slack:\n    enabled: true\n    token: xoxb-test\n"
     )
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     send_calls = []
 

@@ -2,7 +2,7 @@
 // can attach the harness (`npm run perf`) or DevTools to it. Ctrl-C tears it
 // down and removes its temp dirs.
 //
-//   npm run perf:serve                 # :9222, temp HERMES_HOME + user-data-dir
+//   npm run perf:serve                 # :9222, temp STARDUST_HOME + user-data-dir
 //   PERF_PORT=9333 npm run perf:serve  # custom CDP port
 //
 // This is the isolation seam: because it uses its own --user-data-dir the

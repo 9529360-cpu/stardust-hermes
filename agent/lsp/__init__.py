@@ -18,7 +18,7 @@ from agent.lsp.manager import LSPService
 logger = logging.getLogger("agent.lsp")
 
 _service: Optional[LSPService] = None
-# Routed multiplex profiles (HERMES_HOME override) each get their own service: ``lsp.*`` config
+# Routed multiplex profiles (STARDUST_HOME override) each get their own service: ``lsp.*`` config
 # (enabled, servers, idle timeout) is per profile, so one process-wide singleton would let the first
 # profile's settings decide whether every other profile gets diagnostics.
 _services_by_home: dict = {}
@@ -42,7 +42,7 @@ def get_service() -> Optional[LSPService]:
     profile override is bound), or None when disabled.
 
     Also registers an :mod:`atexit` hook so a clean exit tears down spawned servers:
-    without it every ``hermes chat`` exit leaks pyright processes for a few seconds
+    without it every ``stardust chat`` exit leaks pyright processes for a few seconds
     while their stdout buffers drain.  (SIGKILL/os._exit skip atexit — fine, the
     kernel reaps the stateless servers with their parent.)
     """

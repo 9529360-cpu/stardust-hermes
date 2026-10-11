@@ -4,7 +4,7 @@ Hosted images keep the plugin tree read-only (EROFS), so, mirroring
 ``resolve_whatsapp_bridge_dir``: (1) ``PHOTON_SIDECAR_DIR`` override as-is; (2) writable
 source dir → run in place; (3) read-only with baked, current ``node_modules`` → in place;
 (4) read-only and deps missing/stale → mirror the source files to
-``$HERMES_HOME/photon/sidecar``. The mirror is refreshed by content compare; ``node_modules``
+``$STARDUST_HOME/photon/sidecar``. The mirror is refreshed by content compare; ``node_modules``
 is left alone so the lockfile-vs-install-marker check triggers ``npm ci`` inside the mirror.
 Resolution never happens at import time (it probes/copies on disk).
 """
@@ -25,7 +25,7 @@ SOURCE_SIDECAR_DIR = Path(__file__).parent / "sidecar"
 _MIRROR_FILES = ("index.mjs", "package.json", "package-lock.json", "patch-spectrum-mixed-attachments.mjs")
 # Tests monkeypatch these module globals directly; the accessors honor a non-None value.
 _SIDECAR_DIR: Optional[Path] = None
-# Written by `hermes photon install-sidecar` on npm failure so check_requirements() can
+# Written by `stardust photon install-sidecar` on npm failure so check_requirements() can
 # surface the root cause later; cleared on success.
 _NPM_ERROR_LOG: Optional[Path] = None
 _NPM_ERROR_LOG_MAX_CHARS = 300

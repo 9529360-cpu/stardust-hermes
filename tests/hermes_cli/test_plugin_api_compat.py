@@ -28,8 +28,8 @@ def test_legacy_plugin_loads_and_ignores_additive_hook_and_manifest_fields(
     empty_bundled = tmp_path / "bundled-plugins"
     empty_bundled.mkdir()
     monkeypatch.setenv("HOME", str(tmp_path / "os-home"))
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
-    monkeypatch.setenv("HERMES_BUNDLED_PLUGINS", str(empty_bundled))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_BUNDLED_PLUGINS", str(empty_bundled))
 
     manager = PluginManager()
     manager.discover_and_load()

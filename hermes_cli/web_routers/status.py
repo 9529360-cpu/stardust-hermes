@@ -183,7 +183,7 @@ def _merge_profile_gateway_platforms(gateway_platforms: dict, profile_platforms:
 # endpoint and /api/messaging/platforms can never disagree about whether the gateway is up (they used to:
 # sidebar "running" while the Channels page rendered "The gateway is not running"). When ?profile=<name> was
 # given, scope PID and state reads to that profile's directory — gateway identity files (PID, lock, runtime
-# status) are written to the per-profile home, not the process-level HERMES_HOME (see issue #69143). Plain
+# status) are written to the per-profile home, not the process-level STARDUST_HOME (see issue #69143). Plain
 # /api/status keeps the exact zero-arg call so its behavior (and cache signature) is unchanged. The
 # module-level probe references are handed to the resolver so the long-standing
 # `monkeypatch.setattr(gateway.status, "get_running_pid_cached", ...)` seam used across the test-suite still
@@ -256,7 +256,7 @@ async def _resolve_gateway_status(profile_dir: Optional[Path], health_url) -> Di
     if liveness.runtime is not None:
         # Served by the multiplexer: its record is this profile's runtime, with the profile's own
         # adapters under ``<profile>:<platform>`` re-keyed to the standalone shape. Unscoped, the
-        # profile is the process's own home (a pooled ``hermes --profile X serve``).
+        # profile is the process's own home (a pooled ``stardust --profile X serve``).
         served_name = profile_dir.name if profile_dir is not None else profile_name_for_home(get_process_hermes_home())
         runtime = {**liveness.runtime,
                    "platforms": profile_platforms_from_multiplexer(liveness.runtime, served_name or "")}

@@ -289,7 +289,7 @@ def test_stored_prompt_cwd_ignores_project_host_decoys(monkeypatch, tmp_path):
     monkeypatch.setenv("TERMINAL_CWD", str(cwd))
     decoy = "# Hermes runtime environment\n\nHost: Example\nUser home directory: /example\nCurrent working directory: /example\n"
     (cwd / "AGENTS.md").write_text(decoy)
-    monkeypatch.setenv("HERMES_ENVIRONMENT_HINT", decoy + "\nModel: decoy\nProvider: decoy\nPlatform: decoy")
+    monkeypatch.setenv("STARDUST_ENVIRONMENT_HINT", decoy + "\nModel: decoy\nProvider: decoy\nPlatform: decoy")
     agent = _make_agent(
         platform="cli", model="test-model", provider="test-provider",
         _memory_enabled=True, _user_profile_enabled=False,
@@ -397,18 +397,18 @@ class TestNamedProfileHintIntegration:
     ``_resolve_active_profile_name`` returns a named profile *only* when the
     active home is already ``<root>/profiles/<name>``, which is exactly why
     appending that suffix again doubled it. Drive it with a real
-    ``HERMES_HOME`` and no resolver mocks.
+    ``STARDUST_HOME`` and no resolver mocks.
     """
 
     def test_real_hermes_home_under_profiles_renders_correct_paths(
         self, tmp_path, monkeypatch
     ):
-        root = tmp_path / ".hermes"
+        root = tmp_path / ".stardust"
         profile_home = root / "profiles" / "coder"
         profile_home.mkdir(parents=True)
 
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         monkeypatch.delenv("TERMINAL_CWD", raising=False)
 
         # Sanity-check the real chain before asserting on the prompt.
@@ -432,12 +432,12 @@ class TestNamedProfileHintIntegration:
         assert f"{profile_home}/skills/" not in prompt
 
     def test_real_default_home_renders_default_branch(self, tmp_path, monkeypatch):
-        """HERMES_HOME at the root resolves to the default profile, unchanged."""
-        root = tmp_path / ".hermes"
+        """STARDUST_HOME at the root resolves to the default profile, unchanged."""
+        root = tmp_path / ".stardust"
         root.mkdir(parents=True)
 
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
-        monkeypatch.setenv("HERMES_HOME", str(root))
+        monkeypatch.setenv("STARDUST_HOME", str(root))
         monkeypatch.delenv("TERMINAL_CWD", raising=False)
 
         from agent.file_safety import _resolve_active_profile_name
@@ -474,8 +474,8 @@ def test_coding_prompt_orders_shared_context_before_workspace(monkeypatch):
         _parallel_tool_call_guidance=False,
     )
     monkeypatch.setattr(system_prompt, "DEFAULT_AGENT_IDENTITY", "IDENTITY")
-    monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE", "HELP")
-    monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
+    monkeypatch.setattr(system_prompt, "STARDUST_AGENT_HELP_GUIDANCE", "HELP")
+    monkeypatch.setattr(system_prompt, "STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
     monkeypatch.setattr(system_prompt, "STEER_CHANNEL_NOTE", "STEER")
     monkeypatch.setattr(system_prompt, "get_hermes_home", lambda: Path("/hermes"))
 
@@ -600,7 +600,7 @@ class TestTelegramRichMessagesHint:
 
     def test_gateway_rich_messages_integration_via_real_config(self, tmp_path, monkeypatch):
         """End-to-end through the real config-resolution chain: a config.yaml
-        under HERMES_HOME with ``gateway.platforms.telegram.extra.rich_messages``
+        under STARDUST_HOME with ``gateway.platforms.telegram.extra.rich_messages``
         must activate the rich hint. ``load_config_readonly`` is NOT mocked here,
         so this guards against the exact path-mismatch bug this PR fixes.
         """
@@ -615,7 +615,7 @@ class TestTelegramRichMessagesHint:
         home.mkdir()
         (home / "config.yaml").write_text(config_yaml)
 
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
         # Point config resolution at the temp file without mocking the loader:
         # mirror the pattern used in test_config_env_expansion.py.
         from hermes_cli import config as _cfgmod
@@ -848,8 +848,8 @@ def test_conversation_start_uses_session_start_not_build_time(monkeypatch):
         session_id="20260101_120000_abc123",
     )
     monkeypatch.setattr(system_prompt, "DEFAULT_AGENT_IDENTITY", "IDENTITY")
-    monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE", "HELP")
-    monkeypatch.setattr(system_prompt, "HERMES_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
+    monkeypatch.setattr(system_prompt, "STARDUST_AGENT_HELP_GUIDANCE", "HELP")
+    monkeypatch.setattr(system_prompt, "STARDUST_AGENT_HELP_GUIDANCE_NO_SKILLS", "HELP")
     monkeypatch.setattr(system_prompt, "STEER_CHANNEL_NOTE", "STEER")
     monkeypatch.setattr(system_prompt, "get_hermes_home", lambda: Path("/hermes"))
 

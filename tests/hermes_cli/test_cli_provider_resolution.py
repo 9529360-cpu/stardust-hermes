@@ -292,7 +292,7 @@ def test_model_flow_nous_does_not_restore_stale_custom_api_key(tmp_path, monkeyp
 
     config_home = tmp_path / "hermes"
     config_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(config_home))
+    monkeypatch.setenv("STARDUST_HOME", str(config_home))
 
     config_path = config_home / "config.yaml"
     config_path.write_text(
@@ -362,7 +362,7 @@ def _seed_stale_custom_model(tmp_path, monkeypatch):
 
     config_home = tmp_path / "hermes"
     config_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(config_home))
+    monkeypatch.setenv("STARDUST_HOME", str(config_home))
     config_path = config_home / "config.yaml"
     config_path.write_text(
         yaml.safe_dump(
@@ -656,11 +656,11 @@ def test_save_custom_provider_references_the_key_instead_of_inlining_it(monkeypa
         "http://localhost:11434/v1",
         api_key="sk-secret",
         name="Ollama",
-        key_env="HERMES_CUSTOM_LOCALHOST_11434_API_KEY",
+        key_env="STARDUST_CUSTOM_LOCALHOST_11434_API_KEY",
     )
 
     entry = saved["custom_providers"][0]
-    assert entry["key_env"] == "HERMES_CUSTOM_LOCALHOST_11434_API_KEY"
+    assert entry["key_env"] == "STARDUST_CUSTOM_LOCALHOST_11434_API_KEY"
     assert "api_key" not in entry
     assert "sk-secret" not in yaml.safe_dump(saved)
 

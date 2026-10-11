@@ -1,4 +1,4 @@
-"""Tests for hermes_cli.agent_import — ``hermes import-agent``.
+"""Tests for hermes_cli.agent_import — ``stardust import-agent``.
 
 Covers: source detection, Claude Code and Codex parsing, mapping into the
 real Hermes stores (memories/MEMORY.md, config.yaml command_allowlist /
@@ -6,7 +6,7 @@ approvals.deny / mcp_servers, skills/), dry-run write-nothing guarantees,
 malformed-input skip reports, and the never-import-secrets rule.
 
 Uses the profile_env fixture pattern from tests/hermes_cli/test_profiles.py:
-Path.home() and HERMES_HOME are redirected to tmp_path so nothing touches
+Path.home() and STARDUST_HOME are redirected to tmp_path so nothing touches
 the real ~/.hermes.
 """
 
@@ -29,22 +29,22 @@ from hermes_cli.agent_import import (
 
 
 # ---------------------------------------------------------------------------
-# Shared fixture: redirect Path.home() and HERMES_HOME (profile_env pattern)
+# Shared fixture: redirect Path.home() and STARDUST_HOME (profile_env pattern)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture()
 def profile_env(tmp_path, monkeypatch):
-    """Isolated environment: Path.home() -> tmp_path, HERMES_HOME -> tmp/.hermes."""
+    """Isolated environment: Path.home() -> tmp_path, STARDUST_HOME -> tmp/.hermes."""
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    default_home = tmp_path / ".hermes"
+    default_home = tmp_path / ".stardust"
     default_home.mkdir(exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(default_home))
+    monkeypatch.setenv("STARDUST_HOME", str(default_home))
     return tmp_path
 
 
 @pytest.fixture()
 def hermes_home(profile_env):
-    return profile_env / ".hermes"
+    return profile_env / ".stardust"
 
 
 # ---------------------------------------------------------------------------
@@ -541,7 +541,7 @@ class TestExistingConfigPreserved:
             assert str(config_path) in reason
             assert "not valid YAML" in reason
             # Points the user at a way out.
-            assert "hermes config edit" in reason
+            assert "stardust config edit" in reason
 
     def test_unreadable_config_is_left_byte_identical(
             self, claude_tree, hermes_home, config_path):

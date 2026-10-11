@@ -812,9 +812,9 @@ class TestRunJobSessionPersistence:
 
         (tmp_path / ".env").write_text("TELEGRAM_HOME_CHANNEL=-2002\n")
         monkeypatch.delenv("TELEGRAM_HOME_CHANNEL", raising=False)
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_PLATFORM", raising=False)
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_CHAT_ID", raising=False)
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_THREAD_ID", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_PLATFORM", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_CHAT_ID", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_THREAD_ID", raising=False)
 
         class FakeAgent:
             def __init__(self, *args, **kwargs):
@@ -822,9 +822,9 @@ class TestRunJobSessionPersistence:
 
             def run_conversation(self, *args, **kwargs):
                 from gateway.session_context import get_session_env
-                seen["platform"] = get_session_env("HERMES_CRON_AUTO_DELIVER_PLATFORM") or None
-                seen["chat_id"] = get_session_env("HERMES_CRON_AUTO_DELIVER_CHAT_ID") or None
-                seen["thread_id"] = get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID") or None
+                seen["platform"] = get_session_env("STARDUST_CRON_AUTO_DELIVER_PLATFORM") or None
+                seen["chat_id"] = get_session_env("STARDUST_CRON_AUTO_DELIVER_CHAT_ID") or None
+                seen["thread_id"] = get_session_env("STARDUST_CRON_AUTO_DELIVER_THREAD_ID") or None
                 return {"final_response": "ok"}
 
         with patch("cron.scheduler._hermes_home", tmp_path), \
@@ -851,9 +851,9 @@ class TestRunJobSessionPersistence:
             "chat_id": "-2002",
             "thread_id": None,
         }
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_PLATFORM") is None
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_CHAT_ID") is None
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_THREAD_ID") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_PLATFORM") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_CHAT_ID") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_THREAD_ID") is None
         fake_db.close.assert_called_once()
 
     def test_run_job_preserves_slack_origin_thread_for_same_explicit_channel(self, tmp_path, monkeypatch):
@@ -871,9 +871,9 @@ class TestRunJobSessionPersistence:
         fake_db = MagicMock()
         seen = {}
 
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_PLATFORM", raising=False)
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_CHAT_ID", raising=False)
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_THREAD_ID", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_PLATFORM", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_CHAT_ID", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_THREAD_ID", raising=False)
 
         class FakeAgent:
             def __init__(self, *args, **kwargs):
@@ -882,9 +882,9 @@ class TestRunJobSessionPersistence:
             def run_conversation(self, *args, **kwargs):
                 from gateway.session_context import get_session_env
 
-                seen["platform"] = get_session_env("HERMES_CRON_AUTO_DELIVER_PLATFORM") or None
-                seen["chat_id"] = get_session_env("HERMES_CRON_AUTO_DELIVER_CHAT_ID") or None
-                seen["thread_id"] = get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID") or None
+                seen["platform"] = get_session_env("STARDUST_CRON_AUTO_DELIVER_PLATFORM") or None
+                seen["chat_id"] = get_session_env("STARDUST_CRON_AUTO_DELIVER_CHAT_ID") or None
+                seen["thread_id"] = get_session_env("STARDUST_CRON_AUTO_DELIVER_THREAD_ID") or None
                 return {"final_response": "ok"}
 
         with patch("cron.scheduler._hermes_home", tmp_path), \
@@ -911,9 +911,9 @@ class TestRunJobSessionPersistence:
             "chat_id": "C0B3KEP3SD6",
             "thread_id": "1778485067.844139",
         }
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_PLATFORM") is None
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_CHAT_ID") is None
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_THREAD_ID") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_PLATFORM") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_CHAT_ID") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_THREAD_ID") is None
         fake_db.close.assert_called_once()
 
     @pytest.mark.parametrize("timeout_value", ["600", "0"])
@@ -949,7 +949,7 @@ class TestRunJobSessionPersistence:
         fake_pool.submit.return_value = fake_future
         wait_results = [(set(), set()), ({fake_future}, set())]
         monotonic_ticks = itertools.count(step=61.0)
-        monkeypatch.setenv("HERMES_CRON_TIMEOUT", timeout_value)
+        monkeypatch.setenv("STARDUST_CRON_TIMEOUT", timeout_value)
 
         with patch("cron.scheduler._hermes_home", tmp_path), \
              patch("cron.scheduler._preflight_job_config", return_value=None), \
@@ -983,7 +983,7 @@ class TestRunJobSessionPersistence:
         instead of leaving the startup .env placeholder in place (#33465).
 
         A bare ``load_dotenv`` re-load can't do this: startup already recorded
-        this HERMES_HOME in ``_APPLIED_HOMES``, so the external-secret pull
+        this STARDUST_HOME in ``_APPLIED_HOMES``, so the external-secret pull
         no-ops and only the placeholder is re-applied. The scheduler must call
         ``reset_secret_source_cache()`` (forcing the re-pull) and route through
         ``load_hermes_dotenv`` (which then re-applies external secret sources).
@@ -1042,9 +1042,9 @@ class TestRunJobSessionPersistence:
         fake_db = MagicMock()
         seen = []
 
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_PLATFORM", raising=False)
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_CHAT_ID", raising=False)
-        monkeypatch.delenv("HERMES_CRON_AUTO_DELIVER_THREAD_ID", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_PLATFORM", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_CHAT_ID", raising=False)
+        monkeypatch.delenv("STARDUST_CRON_AUTO_DELIVER_THREAD_ID", raising=False)
 
         class FakeAgent:
             def __init__(self, *args, **kwargs):
@@ -1055,9 +1055,9 @@ class TestRunJobSessionPersistence:
 
                 seen.append(
                     {
-                        "platform": get_session_env("HERMES_CRON_AUTO_DELIVER_PLATFORM") or None,
-                        "chat_id": get_session_env("HERMES_CRON_AUTO_DELIVER_CHAT_ID") or None,
-                        "thread_id": get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID") or None,
+                        "platform": get_session_env("STARDUST_CRON_AUTO_DELIVER_PLATFORM") or None,
+                        "chat_id": get_session_env("STARDUST_CRON_AUTO_DELIVER_CHAT_ID") or None,
+                        "thread_id": get_session_env("STARDUST_CRON_AUTO_DELIVER_THREAD_ID") or None,
                     }
                 )
                 return {"final_response": "ok"}
@@ -1094,9 +1094,9 @@ class TestRunJobSessionPersistence:
                 "thread_id": None,
             },
         ]
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_PLATFORM") is None
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_CHAT_ID") is None
-        assert os.getenv("HERMES_CRON_AUTO_DELIVER_THREAD_ID") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_PLATFORM") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_CHAT_ID") is None
+        assert os.getenv("STARDUST_CRON_AUTO_DELIVER_THREAD_ID") is None
         assert fake_db.close.call_count == 2
 
 
@@ -1332,7 +1332,7 @@ class TestRunJobModelResolution:
 
     Issue #23979: a cron job created without an explicit model is stored as
     ``model: null``. At fire time the scheduler must:
-      1. fall back to ``HERMES_MODEL`` env if set,
+      1. fall back to ``STARDUST_MODEL`` env if set,
       2. else fall back to config.yaml ``model.default`` if set,
       3. else fail fast with an actionable error — never let an empty string
          reach the provider where it surfaces as an opaque 400.
@@ -1346,9 +1346,9 @@ class TestRunJobModelResolution:
     }
 
     def test_null_job_model_falls_back_to_env(self, tmp_path, monkeypatch):
-        """``model: null`` on the job uses HERMES_MODEL when set."""
+        """``model: null`` on the job uses STARDUST_MODEL when set."""
         (tmp_path / "config.yaml").write_text("")
-        monkeypatch.setenv("HERMES_MODEL", "env-model")
+        monkeypatch.setenv("STARDUST_MODEL", "env-model")
 
         job = {"id": "null-model-job", "name": "null model", "prompt": "hi", "model": None}
         fake_db = MagicMock()
@@ -1374,7 +1374,7 @@ class TestRunJobModelResolution:
     def test_no_model_anywhere_fails_with_actionable_error(self, tmp_path, monkeypatch):
         """All three sources empty → fail fast with a clear message, not an opaque 400."""
         (tmp_path / "config.yaml").write_text("")
-        monkeypatch.delenv("HERMES_MODEL", raising=False)
+        monkeypatch.delenv("STARDUST_MODEL", raising=False)
 
         job = {"id": "no-model-job", "name": "no model anywhere", "prompt": "hi", "model": None}
         fake_db = MagicMock()
@@ -1406,7 +1406,7 @@ class TestRunJobModelResolution:
         cron.
         """
         (tmp_path / "config.yaml").write_text("model:\n  model: alias-key-model\n")
-        monkeypatch.delenv("HERMES_MODEL", raising=False)
+        monkeypatch.delenv("STARDUST_MODEL", raising=False)
 
         job = {"id": "alias-job", "name": "alias", "prompt": "hi", "model": None}
         fake_db = MagicMock()
@@ -1431,7 +1431,7 @@ class TestRunJobModelResolution:
     def test_corrupt_config_yaml_does_not_crash_with_job_model(self, tmp_path, monkeypatch):
         """A malformed config.yaml degrades gracefully when the job has a model."""
         (tmp_path / "config.yaml").write_text("{{{invalid yaml!!!")
-        monkeypatch.delenv("HERMES_MODEL", raising=False)
+        monkeypatch.delenv("STARDUST_MODEL", raising=False)
 
         job = {"id": "corrupt-job", "name": "corrupt", "prompt": "hi", "model": "explicit-model"}
         fake_db = MagicMock()
@@ -1989,8 +1989,8 @@ class TestParallelTick:
             )
             import time
             time.sleep(0.05)  # give other thread time to set its vars
-            platform = get_session_env("HERMES_SESSION_PLATFORM")
-            chat_id = get_session_env("HERMES_SESSION_CHAT_ID")
+            platform = get_session_env("STARDUST_SESSION_PLATFORM")
+            chat_id = get_session_env("STARDUST_SESSION_CHAT_ID")
             seen[job["id"]] = {"platform": platform, "chat_id": chat_id}
             clear_session_vars(tokens)
             return (True, "output", "response", None)
@@ -2015,8 +2015,8 @@ class TestParallelTick:
         assert seen["dc-job"] == {"platform": "discord", "chat_id": "222"}
 
     def test_max_parallel_env_var(self, monkeypatch):
-        """HERMES_CRON_MAX_PARALLEL=1 should restore serial behaviour."""
-        monkeypatch.setenv("HERMES_CRON_MAX_PARALLEL", "1")
+        """STARDUST_CRON_MAX_PARALLEL=1 should restore serial behaviour."""
+        monkeypatch.setenv("STARDUST_CRON_MAX_PARALLEL", "1")
         call_times = []
 
         def mock_run_job(job, *, defer_agent_teardown=None, **_kw):
@@ -2327,7 +2327,7 @@ class TestCronDeliveryTargets:
 class TestHomeTargetEnvVarRegistry:
     """Regression: ``_HOME_TARGET_ENV_VARS`` must include every gateway
     platform that supports cron-driven outbound delivery. Missing an
-    entry means ``hermes cron create --deliver=<platform>`` silently
+    entry means ``stardust cron create --deliver=<platform>`` silently
     fails to route through the platform's home channel."""
 
 
@@ -2929,7 +2929,7 @@ class TestFailureStreakNudge:
         with patch("cron.scheduler.load_config", return_value={}):
             out = _failure_streak_nudge(self._job(2))
         assert "failed 3 runs in a row" in out
-        assert "hermes cron pause scout" in out
+        assert "stardust cron pause scout" in out
 
     def test_silent_below_threshold(self):
         from cron.scheduler import _failure_streak_nudge

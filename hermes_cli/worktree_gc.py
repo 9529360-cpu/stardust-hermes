@@ -1,4 +1,4 @@
-"""On-demand worktree + branch reclaim (``hermes worktree`` / ``/worktree prune``).
+"""On-demand worktree + branch reclaim (``stardust worktree`` / ``/worktree prune``).
 
 The startup pruner (``cli._prune_stale_worktrees``) is conservative and silent — clean, fully
 merged scratch past an age tier only. This module also reclaims trees whose only "dirt" is
@@ -150,7 +150,7 @@ def _classify_tree(_ops, repo_root: str, entry: Path, merge_cache, remote_heads)
 def audit_external_trees(repo_root: str) -> List[ExternalTreeRecord]:
     """List linked worktrees registered OUTSIDE ``.worktrees/``.
 
-    ``hermes -w`` scratch trees all live under ``<repo>/.worktrees/``, but
+    ``stardust -w`` scratch trees all live under ``<repo>/.worktrees/``, but
     ``git worktree list --porcelain`` also knows about trees the user (or
     another tool) registered elsewhere. Those are someone else's state, so
     the reclaim paths never touch them — but hiding them entirely makes the

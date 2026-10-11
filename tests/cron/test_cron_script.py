@@ -4,7 +4,7 @@ Tests cover:
 - Script field in job creation / storage / update
 - Script execution and output injection into prompts
 - Error handling (missing script, timeout, non-zero exit)
-- Path resolution (absolute, relative to HERMES_HOME/scripts/)
+- Path resolution (absolute, relative to STARDUST_HOME/scripts/)
 """
 
 import json
@@ -26,17 +26,17 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 @pytest.fixture
 def cron_env(tmp_path, monkeypatch):
-    """Isolated cron environment with temp HERMES_HOME."""
-    hermes_home = tmp_path / ".hermes"
+    """Isolated cron environment with temp STARDUST_HOME."""
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
     (hermes_home / "cron").mkdir()
     (hermes_home / "cron" / "output").mkdir()
     (hermes_home / "scripts").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     # Clear cached module-level paths
     import cron.jobs as jobs_mod
-    monkeypatch.setattr(jobs_mod, "HERMES_DIR", hermes_home)
+    monkeypatch.setattr(jobs_mod, "STARDUST_DIR", hermes_home)
     monkeypatch.setattr(jobs_mod, "CRON_DIR", hermes_home / "cron")
     monkeypatch.setattr(jobs_mod, "JOBS_FILE", hermes_home / "cron" / "jobs.json")
     monkeypatch.setattr(jobs_mod, "OUTPUT_DIR", hermes_home / "cron" / "output")
@@ -115,7 +115,7 @@ class TestRunJobScript:
         assert success is False
         assert "Script not found" in output
         assert str(cron_env / "scripts") in output and "profile" in output
-        assert "hermes cron edit" in output
+        assert "stardust cron edit" in output
 
 
     def test_script_subprocess_env_sanitized(self, cron_env, monkeypatch):
@@ -458,7 +458,7 @@ class TestCronjobToolScript:
 
 
     def test_clear_script(self, cron_env, monkeypatch):
-        monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+        monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
         from tools.cronjob_tools import cronjob
 
         (cron_env / "scripts" / "some_script.py").write_text("print('hi')\n")
@@ -479,7 +479,7 @@ class TestCronjobToolScript:
         assert "script" not in update_result["job"]
 
     def test_list_shows_script(self, cron_env, monkeypatch):
-        monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+        monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
         from tools.cronjob_tools import cronjob
 
         (cron_env / "scripts" / "data_collector.py").write_text("print('hi')\n")
@@ -505,7 +505,7 @@ class TestScriptPathContainment:
     """
 
     def test_absolute_path_outside_scripts_dir_blocked(self, cron_env):
-        """Absolute paths outside ~/.hermes/scripts/ must be rejected."""
+        """Absolute paths outside ~/.stardust/scripts/ must be rejected."""
         from cron.scheduler_script import _run_job_script
 
         # Create a script outside the scripts dir
@@ -592,7 +592,7 @@ class TestCronjobToolScriptValidation:
 
 
     def test_create_with_traversal_script_rejected(self, cron_env, monkeypatch):
-        monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+        monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
         from tools.cronjob_tools import cronjob
 
         result = json.loads(cronjob(
@@ -612,9 +612,9 @@ class TestRunJobEnvVarCleanup:
         """Origin env vars must be cleaned up even if run_job fails early."""
         # Ensure env vars are clean before test
         for key in (
-            "HERMES_SESSION_PLATFORM",
-            "HERMES_SESSION_CHAT_ID",
-            "HERMES_SESSION_CHAT_NAME",
+            "STARDUST_SESSION_PLATFORM",
+            "STARDUST_SESSION_CHAT_ID",
+            "STARDUST_SESSION_CHAT_NAME",
         ):
             monkeypatch.delenv(key, raising=False)
 
@@ -641,9 +641,9 @@ class TestRunJobEnvVarCleanup:
             pass
 
         # Verify env vars were cleaned up by the finally block
-        assert os.environ.get("HERMES_SESSION_PLATFORM") is None
-        assert os.environ.get("HERMES_SESSION_CHAT_ID") is None
-        assert os.environ.get("HERMES_SESSION_CHAT_NAME") is None
+        assert os.environ.get("STARDUST_SESSION_PLATFORM") is None
+        assert os.environ.get("STARDUST_SESSION_CHAT_ID") is None
+        assert os.environ.get("STARDUST_SESSION_CHAT_NAME") is None
 
 
 class TestScriptTimeoutTreeKill:
@@ -788,7 +788,7 @@ class TestScriptTimeoutTreeKill:
             "time.sleep(30)\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_CRON_SCRIPT_TIMEOUT", "2")
+        monkeypatch.setenv("STARDUST_CRON_SCRIPT_TIMEOUT", "2")
         monkeypatch.setattr(sched, "_SCRIPT_TIMEOUT", sched._DEFAULT_SCRIPT_TIMEOUT)
 
         ok, out = sched_script._run_job_script(

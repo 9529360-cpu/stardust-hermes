@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Skills Sync -- manifest-based seeding and updating of bundled skills. Copies repo skills/ into
-~/.hermes/skills/, tracking each synced skill's origin hash in .bundled_manifest (v2 "name:hash"
+~/.stardust/skills/, tracking each synced skill's origin hash in .bundled_manifest (v2 "name:hash"
 lines; v1 plain names auto-migrate). NEW skills are copied and recorded; EXISTING skills update
 only when bundled changed AND the user copy still matches the origin hash (else user-customized
 -> SKIP); user-DELETED skills are not re-added; upstream-REMOVED ones leave the manifest."""
@@ -32,19 +32,19 @@ from utils import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
-HERMES_HOME = get_hermes_home()
-SKILLS_DIR = HERMES_HOME / "skills"
+STARDUST_HOME = get_hermes_home()
+SKILLS_DIR = STARDUST_HOME / "skills"
 MANIFEST_FILE = SKILLS_DIR / ".bundled_manifest"
 
 # Import-time snapshots backing the call-time accessors: long-lived multi-profile runtimes
-# retarget HERMES_HOME after import, and frozen constants would resolve (and for
+# retarget STARDUST_HOME after import, and frozen constants would resolve (and for
 # reset_bundled_skill() DELETE) against the wrong profile. Accessors honor an explicitly
 # patched module global and otherwise re-resolve on every call.
 # Same bug class and same fix as skills_tool (f8723c478) and skill_manager_tool (c6a3d412d): long-lived
 # multi-profile runtimes (Dashboard console, TUI/Desktop backend, cron, kanban workers) import this module
-# once under the launch HERMES_HOME and later scope requests to a different profile via
+# once under the launch STARDUST_HOME and later scope requests to a different profile via
 # set_hermes_home_override(). See #65828.
-_HERMES_HOME_AT_IMPORT = HERMES_HOME
+_HERMES_HOME_AT_IMPORT = STARDUST_HOME
 _SKILLS_DIR_AT_IMPORT = SKILLS_DIR
 _MANIFEST_FILE_AT_IMPORT = MANIFEST_FILE
 
@@ -55,7 +55,7 @@ def _live(configured, at_import: Path, fallback) -> Path:
 
 
 def _hermes_home() -> Path:
-    return _live(HERMES_HOME, _HERMES_HOME_AT_IMPORT, get_hermes_home)
+    return _live(STARDUST_HOME, _HERMES_HOME_AT_IMPORT, get_hermes_home)
 
 
 def _skills_dir() -> Path:
@@ -66,12 +66,12 @@ def _manifest_file() -> Path:
     return _live(MANIFEST_FILE, _MANIFEST_FILE_AT_IMPORT, lambda: _skills_dir() / ".bundled_manifest")
 
 
-# Written by `hermes profile create --no-skills` / installer `--no-skills`: sync seeds only
+# Written by `stardust profile create --no-skills` / installer `--no-skills`: sync seeds only
 # essential skills. Mirrors hermes_cli.profiles.NO_BUNDLED_SKILLS_MARKER (no CLI import here).
 NO_BUNDLED_SKILLS_MARKER = ".no-bundled-skills"
 
 
-def _get_bundled_dir() -> Path:  # HERMES_BUNDLED_SKILLS env first, then repo-relative
+def _get_bundled_dir() -> Path:  # STARDUST_BUNDLED_SKILLS env first, then repo-relative
     return get_bundled_skills_dir(Path(__file__).parent.parent / "skills")
 
 
@@ -214,7 +214,7 @@ def _recover_renamed_skill(st: "_SyncState", skill_name: str, dest: Path) -> Opt
             st.say(
                 f"  ⚠ {skill_name}: upstream moved this skill to {_rel_skills_posix(dest)}, but your "
                 f"modified copy at {rel} was kept — it will not receive updates. "
-                f"Run `hermes skills reset {skill_name} --restore` to move to the new location.")
+                f"Run `stardust skills reset {skill_name} --restore` to move to the new location.")
             continue
         try:
             _move_dir(candidate, dest)
@@ -284,7 +284,7 @@ def _install_new_skill(st: _SyncState, skill_name: str, skill_src: Path, dest: P
             else:
                 st.say(
                     f"  ⚠ {skill_name}: bundled version shipped but you already have a local skill "
-                    f"by this name — yours was kept. Run `hermes skills reset {skill_name}` to "
+                    f"by this name — yours was kept. Run `stardust skills reset {skill_name}` to "
                     f"replace it with the bundled version.")
         else:
             _copy_dir(skill_src, dest)
@@ -361,7 +361,7 @@ def _seed_category_descriptions(bundled_dir: Path, only_dirs: Optional[Set[Path]
 
 
 def sync_skills(quiet: bool = False) -> dict:
-    """Sync bundled skills into ~/.hermes/skills/ using the manifest; returns the per-category
+    """Sync bundled skills into ~/.stardust/skills/ using the manifest; returns the per-category
     result dict. Opted-out profiles seed ONLY ESSENTIAL_SKILLS (the system prompt always
     points at ``hermes-agent``)."""
     essential_only = (_hermes_home() / NO_BUNDLED_SKILLS_MARKER).exists()
@@ -419,7 +419,7 @@ def sync_skills(quiet: bool = False) -> dict:
 def _rmtree_writable(path: Path) -> None:
     """rmtree that first makes read-only entries writable (Nix/deb/rpm keep r-x dirs; unlinking
     a child needs a writable parent, so chmod both). Scope guard: refuses anything not a STRICT
-    child of the active skills root (bad join / missing HERMES_HOME / malicious manifest entry).
+    child of the active skills root (bad join / missing STARDUST_HOME / malicious manifest entry).
 
     Handles immutable package sources (Nix store, deb/rpm installs) that preserve read-only permissions on
     copied files *and* directories (``r-xr-xr-x``). Removing a child requires write permission on its parent
@@ -440,7 +440,7 @@ def _rmtree_writable(path: Path) -> None:
 
 
 if __name__ == "__main__":
-    print("Syncing bundled skills into ~/.hermes/skills/ ...")
+    print("Syncing bundled skills into ~/.stardust/skills/ ...")
     result = sync_skills(quiet=False)
     parts = [f"{len(result['copied'])} new", f"{len(result['updated'])} updated", f"{result['skipped']} unchanged"]
     if names := result["user_modified"]:

@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover - stripped/scaffold installs only
 
 #: Env twin of ``_STATE_DB_GUARD_BYPASS`` for child processes (a module global
 #: cannot cross a process boundary, and ancestry arms the guard there).
-_STATE_DB_GUARD_BYPASS_ENV = "HERMES_STATE_DB_GUARD_BYPASS"
+_STATE_DB_GUARD_BYPASS_ENV = "STARDUST_STATE_DB_GUARD_BYPASS"
 
 
 def _real_platform_state_root() -> Optional[Path]:
@@ -31,24 +31,24 @@ def _real_platform_state_root() -> Optional[Path]:
         home = Path(os.path.expanduser("~"))
         if sys.platform == "win32":
             base = os.environ.get("LOCALAPPDATA", "").strip()
-            root = Path(base) / "hermes" if base else home / "AppData" / "Local" / "hermes"
+            root = Path(base) / "stardust" if base else home / "AppData" / "Local" / "stardust"
         else:
-            root = home / ".hermes"
+            root = home / ".stardust"
         return root.resolve()
     except Exception:
         return None
 
 
-#: Exported by the hermetic conftest alongside the HERMES_HOME redirect. Unlike
+#: Exported by the hermetic conftest alongside the STARDUST_HOME redirect. Unlike
 #: PYTEST_* it is OURS and inherits by default, so a child carrying it that
 #: resolves a production DB is by definition an isolation escape.
-# : Env marker exported by the hermetic test conftest at the same moment it : redirects ``HERMES_HOME`` to
+# : Env marker exported by the hermetic test conftest at the same moment it : redirects ``STARDUST_HOME`` to
 # the per-session tmp isolation root. Unlike ``PYTEST_*`` (owned by pytest, and : routinely scrubbed by
 # tests that rebuild a child environment), this marker : is OURS: it declares "this process tree is running
 # under Hermes test : isolation", and it inherits into subprocess children by default — so a : child that
-# received the patched ``HERMES_HOME`` also received the marker, : and a child that resolves a production DB
+# received the patched ``STARDUST_HOME`` also received the marker, : and a child that resolves a production DB
 # while carrying it is, by : definition, an isolation escape (#82770).
-_TEST_ISOLATION_MARKER_ENV = "HERMES_TEST_ISOLATION"
+_TEST_ISOLATION_MARKER_ENV = "STARDUST_TEST_ISOLATION"
 
 
 def _running_under_pytest() -> bool:
@@ -88,11 +88,11 @@ def _process_looks_like_pytest(proc: Any) -> bool:
 
 def _has_pytest_ancestor() -> bool:
     """True when an ancestor process is a pytest run: a child spawned with a
-    rebuilt env loses PYTEST_* and the HERMES_HOME redirect together, ancestry
+    rebuilt env loses PYTEST_* and the STARDUST_HOME redirect together, ancestry
     survives that. Fails open without psutil / on walk errors.
 
     ``_running_under_pytest`` reads ``PYTEST_*`` env vars, which a child spawned with a rebuilt environment
-    loses at the same moment it loses the ``HERMES_HOME`` redirect: that child aims at the production DB
+    loses at the same moment it loses the ``STARDUST_HOME`` redirect: that child aims at the production DB
     *and* disarms the guard in one step (#82770). Ancestry is the one test-context signal that survives an
     env rebuild, so it backs the env check up.
     """

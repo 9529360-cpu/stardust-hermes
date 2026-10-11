@@ -53,10 +53,10 @@ _ROTATED_REFRESH = "sk-ant-ort01-borrowed-rotated"
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    """Real on-disk HERMES_HOME so ``load_pool()`` re-reads what it persisted."""
+    """Real on-disk STARDUST_HOME so ``load_pool()`` re-reads what it persisted."""
     home = tmp_path / "hermes"
     home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"):
         monkeypatch.delenv(var, raising=False)
     (home / "auth.json").write_text(

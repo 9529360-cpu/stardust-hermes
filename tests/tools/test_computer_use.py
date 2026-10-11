@@ -24,7 +24,7 @@ def _reset_backend(grant_computer_use_approvals):
     from tools.computer_use.tool import reset_backend_for_tests
     reset_backend_for_tests()
     # Force the noop backend.
-    with patch.dict(os.environ, {"HERMES_COMPUTER_USE_BACKEND": "noop"}, clear=False):
+    with patch.dict(os.environ, {"STARDUST_COMPUTER_USE_BACKEND": "noop"}, clear=False):
         yield
     reset_backend_for_tests()
 
@@ -92,7 +92,7 @@ class TestRegistration:
         driver.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         driver.chmod(0o755)
 
-        monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", str(driver))
+        monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", str(driver))
         monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
         assert cua_backend_driver.resolve_cua_driver_cmd() == str(driver)
@@ -828,7 +828,7 @@ class TestLazyMcpInstall:
                  "cua_driver_runtime_contract_status",
                  return_value=state,
              ), patch("tools.lazy_deps.ensure") as mock_ensure:
-            with pytest.raises(RuntimeError, match="hermes computer-use install"):
+            with pytest.raises(RuntimeError, match="stardust computer-use install"):
                 cua_backend.CuaDriverBackend().start()
 
         mock_ensure.assert_not_called()
@@ -936,7 +936,7 @@ class TestContractAutoRepair:
         from tools.computer_use import cua_backend
 
         monkeypatch.setattr(cua_backend, "_contract_repair_attempted", False)
-        monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", "/opt/custom/cua-driver")
+        monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", "/opt/custom/cua-driver")
         with patch.object(
                  cua_backend,
                  "cua_driver_runtime_contract_status",
@@ -944,7 +944,7 @@ class TestContractAutoRepair:
              ), \
              patch("hermes_cli.tools_config.install_cua_driver") as installer, \
              patch("tools.lazy_deps.ensure"):
-            with pytest.raises(RuntimeError, match="HERMES_CUA_DRIVER_CMD"):
+            with pytest.raises(RuntimeError, match="STARDUST_CUA_DRIVER_CMD"):
                 cua_backend.CuaDriverBackend().start()
         installer.assert_not_called()
 
@@ -2124,7 +2124,7 @@ class TestMcpInvocationResolution:
 
     def test_falls_back_when_manifest_missing_command(self):
         """If the manifest knows the args but not the command, keep our
-        resolved driver path (so HERMES_CUA_DRIVER_CMD still wins)."""
+        resolved driver path (so STARDUST_CUA_DRIVER_CMD still wins)."""
         from unittest.mock import patch
         from tools.computer_use.cua_backend_driver import _resolve_mcp_invocation
 
@@ -2648,7 +2648,7 @@ class TestElementSpillFile:
                              window_title="Discord", png_bytes_len=0)
 
     def test_spill_file_holds_full_untruncated_tree(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from tools.computer_use.tool import _capture_response
 
         out = json.loads(_capture_response(self._dense_capture()))
@@ -2663,7 +2663,7 @@ class TestElementSpillFile:
         assert spill["elements"][119]["label"].startswith("msg 119")
 
     def test_no_spill_when_nothing_dropped(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from tools.computer_use.backend import CaptureResult, UIElement
         from tools.computer_use.tool import _capture_response
 
@@ -2677,7 +2677,7 @@ class TestElementSpillFile:
         assert "elements_file" not in out
 
     def test_spill_pruning_bounds_cache_growth(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from tools.computer_use import tool as cu_tool
 
         cap = self._dense_capture()
@@ -2720,7 +2720,7 @@ class TestCaptureScreenshotPersistence:
     def test_multimodal_capture_exposes_shareable_screenshot(
         self, tmp_path, monkeypatch,
     ):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from tools.computer_use import tool as cu_tool
 
         monkeypatch.setattr(
@@ -2738,7 +2738,7 @@ class TestCaptureScreenshotPersistence:
         from tools.computer_use.backend import UIElement
         from tools.computer_use import tool as cu_tool
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.setattr(cu_tool, "_should_route_through_aux_vision",
                             lambda: pytest.fail("invalid image must not route to auxiliary vision"))
         cap = self._capture()
@@ -2779,7 +2779,7 @@ class TestCaptureScreenshotPersistence:
         assert out["content"][1]["image_url"]["url"].startswith("data:image/png;base64,")
 
     def test_capture_cache_is_bounded(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from tools.computer_use import tool as cu_tool
 
         monkeypatch.setattr(cu_tool, "_MAX_CAPTURE_FILES", 2)
@@ -2792,7 +2792,7 @@ class TestCaptureScreenshotPersistence:
 
 class TestBoundsScaleField:
     def test_scale_reported_when_spaces_diverge(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         from tools.computer_use.backend import CaptureResult, UIElement
         from tools.computer_use.tool import _capture_response
 

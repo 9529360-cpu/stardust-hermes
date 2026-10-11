@@ -4,7 +4,7 @@ We react to the failure rather than predict it: npm states the required range in
 recovery reads the constraint out of the output it just produced (no semver matcher, no probe).
 
 Scope is deliberately narrow: Hermes only upgrades an npm inside its **own** managed Node tree
-(``$HERMES_HOME/node``), installing in place with ``--prefix`` so ``bin/npm`` keeps resolving to
+(``$STARDUST_HOME/node``), installing in place with ``--prefix`` so ``bin/npm`` keeps resolving to
 the upgraded ``lib/node_modules/npm``.
 """
 
@@ -100,7 +100,7 @@ def _repo_npm_range() -> str | None:
 def managed_npm_prefix(npm: str | os.PathLike[str] | None) -> Path | None:
     """Return the Hermes-managed Node root *npm* lives in, else ``None``.
 
-    Symlinks are resolved first: ``~/.local/bin/npm`` → ``$HERMES_HOME/node/bin/npm`` →
+    Symlinks are resolved first: ``~/.local/bin/npm`` → ``$STARDUST_HOME/node/bin/npm`` →
     ``lib/node_modules/npm/bin/npm-cli.js`` are all the managed npm, or the repair silently declines
     to fix the very install it owns.
     """
@@ -131,7 +131,7 @@ def upgrade_managed_npm(npm: str, npm_range: str, *, prefix: Path, quiet: bool =
     """Upgrade the managed npm at *npm* in place to satisfy *npm_range*.
 
     ``--prefix`` targets the managed tree explicitly: a managed install writes ``prefix=~/.local``
-    into ``$HERMES_HOME/node/etc/npmrc`` (so global installs land on PATH), and without the override
+    into ``$STARDUST_HOME/node/etc/npmrc`` (so global installs land on PATH), and without the override
     the "upgrade" would install a second npm elsewhere while the managed one stayed stale.
     """
     if not quiet:
@@ -201,7 +201,7 @@ def _print_manual_fix(npm: str, npm_range: str, actual: str | None) -> None:
 
 
 def _provision_managed_npm(npm_range: str | None, *, quiet: bool = False) -> str | None:
-    """Provision (or reuse) the managed tree under ``$HERMES_HOME/node`` and return a satisfying npm.
+    """Provision (or reuse) the managed tree under ``$STARDUST_HOME/node`` and return a satisfying npm.
 
     Its bundled npm is upgraded to *npm_range* (a fresh Node LTS may bundle an out-of-range npm, and
     the caller's single retry would fail the same way), falling back to the checkout's

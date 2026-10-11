@@ -166,7 +166,7 @@ def _dump_subagent_timeout_diagnostic(
     worker_thread: Optional[threading.Thread], goal: str,
 ) -> Optional[str]:
     """Structured diagnostic for a subagent that timed out before any API call (otherwise "timed out with no
-    response", 0 API calls, nothing to inspect): ``~/.hermes/logs/subagent-timeout-<sid>-<ts>.log`` with the
+    response", 0 API calls, nothing to inspect): ``~/.stardust/logs/subagent-timeout-<sid>-<ts>.log`` with the
     child's config, prompt/schema sizes, activity snapshot and worker stack. Path, or None on failure."""
     try:
         from hermes_constants import get_hermes_home
@@ -299,7 +299,7 @@ def _register_child(
     if owner_session_id is None:
         with _quiet(None):
             from gateway.session_context import get_session_env
-            owner_session_id = get_session_env("HERMES_UI_SESSION_ID", "") or None
+            owner_session_id = get_session_env("STARDUST_UI_SESSION_ID", "") or None
     if owner_session_id and (owner_transport is None or owner_session_record is None):
         owner_transport, owner_session_record = _capture_gateway_steer_authority(owner_session_id)
     _raw_depth = getattr(child, "_delegate_depth", 1)

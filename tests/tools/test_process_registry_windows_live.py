@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture()
 def registry(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes-home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "hermes-home"))
     import tools.process_registry as pr
 
     reg = pr.ProcessRegistry()

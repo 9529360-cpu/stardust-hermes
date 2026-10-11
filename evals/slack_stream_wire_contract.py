@@ -122,8 +122,8 @@ def main():
     ap.add_argument("--repo", required=True)
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
-    os.environ.setdefault("HERMES_HOME", os.path.join(os.path.dirname(a.out), "hermes-home-probe"))
-    os.makedirs(os.environ["HERMES_HOME"], exist_ok=True)
+    os.environ.setdefault("STARDUST_HOME", os.path.join(os.path.dirname(a.out), "hermes-home-probe"))
+    os.makedirs(os.environ["STARDUST_HOME"], exist_ok=True)
     sys.exit(asyncio.run(run(os.path.abspath(a.repo), a.out)))
 
 

@@ -8,7 +8,7 @@ import {
   stopGatewayBeforeUpdate
 } from './gateway-stop-before-update'
 
-const CLI = 'C:\\Users\\x\\hermes\\hermes-agent\\venv\\Scripts\\hermes.exe'
+const CLI = 'C:\\Users\\x\\hermes\\hermes-agent\\venv\\Scripts\\stardust.exe'
 const HOME = 'C:\\Users\\x\\hermes'
 
 function fakeExec(ok: boolean) {

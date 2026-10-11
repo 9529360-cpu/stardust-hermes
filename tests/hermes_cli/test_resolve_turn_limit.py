@@ -73,7 +73,7 @@ class TestAbsentAndDefault:
         assert resolve_turn_limit("   ") == TURN_LIMIT_UNLIMITED
 
     def test_absent_env_var_returns_default(self):
-        """Simulates os.getenv() returning None when HERMES_MAX_ITERATIONS unset."""
+        """Simulates os.getenv() returning None when STARDUST_MAX_ITERATIONS unset."""
         assert resolve_turn_limit(None) == TURN_LIMIT_UNLIMITED
 
 
@@ -101,7 +101,7 @@ class TestSentinelProperties:
         assert TURN_LIMIT_UNLIMITED == sys.maxsize
 
     def test_sentinel_str_int_round_trip(self):
-        """The gateway bridge writes str(value) to HERMES_MAX_ITERATIONS,
+        """The gateway bridge writes str(value) to STARDUST_MAX_ITERATIONS,
         then _current_max_iterations reads it back.  The sentinel must survive."""
         s = str(TURN_LIMIT_UNLIMITED)
         assert int(s) == TURN_LIMIT_UNLIMITED
@@ -140,45 +140,45 @@ class TestGatewayBridgeNullHandling:
     "None", which would resolve to unlimited instead of the default."""
 
     def test_none_value_not_bridged(self, monkeypatch, tmp_path):
-        """YAML ``max_turns: null`` should not set HERMES_MAX_ITERATIONS."""
+        """YAML ``max_turns: null`` should not set STARDUST_MAX_ITERATIONS."""
         import yaml
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text("agent:\n  max_turns: null\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_MAX_ITERATIONS", "stale-120")
+        monkeypatch.setenv("STARDUST_MAX_ITERATIONS", "stale-120")
         # Import here to avoid module-level gateway dependency
         from gateway.run import _bridge_max_turns_from_config
         _bridge_max_turns_from_config(tmp_path)
         # The stale env var should be cleared so downstream resolver
         # applies the default rather than using the stale value.
-        assert "HERMES_MAX_ITERATIONS" not in os.environ
+        assert "STARDUST_MAX_ITERATIONS" not in os.environ
 
     def test_string_none_bridged_correctly(self, monkeypatch, tmp_path):
         """YAML ``max_turns: "none"`` should bridge as the string "none"."""
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text('agent:\n  max_turns: "none"\n', encoding="utf-8")
-        monkeypatch.delenv("HERMES_MAX_ITERATIONS", raising=False)
+        monkeypatch.delenv("STARDUST_MAX_ITERATIONS", raising=False)
         from gateway.run import _bridge_max_turns_from_config
         _bridge_max_turns_from_config(tmp_path)
-        assert os.environ.get("HERMES_MAX_ITERATIONS") == "none"
+        assert os.environ.get("STARDUST_MAX_ITERATIONS") == "none"
 
     def test_int_bridged_correctly(self, monkeypatch, tmp_path):
         """YAML ``max_turns: 120`` should bridge as "120"."""
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text("agent:\n  max_turns: 120\n", encoding="utf-8")
-        monkeypatch.delenv("HERMES_MAX_ITERATIONS", raising=False)
+        monkeypatch.delenv("STARDUST_MAX_ITERATIONS", raising=False)
         from gateway.run import _bridge_max_turns_from_config
         _bridge_max_turns_from_config(tmp_path)
-        assert os.environ.get("HERMES_MAX_ITERATIONS") == "120"
+        assert os.environ.get("STARDUST_MAX_ITERATIONS") == "120"
 
     def test_bare_key_treated_as_null(self, monkeypatch, tmp_path):
         """YAML ``max_turns:`` (bare key, no value) parses as Python None."""
         import yaml
         cfg_file = tmp_path / "config.yaml"
         cfg_file.write_text("agent:\n  max_turns:\n", encoding="utf-8")
-        monkeypatch.setenv("HERMES_MAX_ITERATIONS", "stale-90")
+        monkeypatch.setenv("STARDUST_MAX_ITERATIONS", "stale-90")
         from gateway.run import _bridge_max_turns_from_config
         _bridge_max_turns_from_config(tmp_path)
-        assert "HERMES_MAX_ITERATIONS" not in os.environ
+        assert "STARDUST_MAX_ITERATIONS" not in os.environ
 
 
 class TestTUIResolver:
@@ -212,7 +212,7 @@ class TestTUIResolver:
 
     def test_env_var_override(self, monkeypatch):
         from tui_gateway.server import _cfg_max_turns
-        monkeypatch.setenv("HERMES_TUI_MAX_TURNS", "none")
+        monkeypatch.setenv("STARDUST_TUI_MAX_TURNS", "none")
         cfg = {"agent": {"max_turns": 50}}
         assert _cfg_max_turns(cfg, default=25) == TURN_LIMIT_UNLIMITED
 
@@ -220,7 +220,7 @@ class TestTUIResolver:
         """Old code swallowed 0 via `int(0) > 0` → False. Now it routes
         through resolve_turn_limit which treats 0 as unlimited."""
         from tui_gateway.server import _cfg_max_turns
-        monkeypatch.setenv("HERMES_TUI_MAX_TURNS", "0")
+        monkeypatch.setenv("STARDUST_TUI_MAX_TURNS", "0")
         cfg = {"agent": {"max_turns": 50}}
         assert _cfg_max_turns(cfg, default=25) == TURN_LIMIT_UNLIMITED
 

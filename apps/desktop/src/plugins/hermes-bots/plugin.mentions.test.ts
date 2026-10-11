@@ -373,7 +373,7 @@ describe('the mention middleware', () => {
 
   it('teaches no shellout and forbids forwarding the user’s text verbatim', async () => {
     // The class behind #91397 / #91304 / #91339: the renderer used to compose
-    // a `hermes -p …` handoff, giving the model a second send path and a way
+    // a `stardust -p …` handoff, giving the model a second send path and a way
     // to relay the raw draft.
     const { handler } = await contributions({ focused: 'research', profiles: [{ name: 'research' }, { name: 'ops' }] })
     const result = await handler({ text: 'ask @ops to summarize' })
@@ -387,7 +387,7 @@ describe('the mention middleware', () => {
 
   it('keeps a poisoned bot title inert prose', async () => {
     // Nothing here is a command line, so there is nothing to break out of —
-    // the invariant that matters is that no hermes command is ever emitted.
+    // the invariant that matters is that no stardust command is ever emitted.
     const { handler } = await contributions({
       focused: 'ops',
       profiles: [

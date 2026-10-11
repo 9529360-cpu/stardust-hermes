@@ -43,7 +43,7 @@ function managedUpdater(): ((id: string) => Promise<DesktopManagedConnectionUpda
  *
  * Stardust currently owns installation source but does not yet own a complete
  * stable release/update/rollback lane. The inherited bridge drains live SSH
- * scopes and then invokes `hermes update --yes`; that CLI entrypoint is
+ * scopes and then invokes `stardust update --yes`; that CLI entrypoint is
  * intentionally disabled in the pinned local edition. Exposing the button
  * would therefore start a disruptive transaction that can only fail. Keep it
  * hidden until a Stardust-native updater makes this capability real again.

@@ -23,7 +23,7 @@ Usage:
   python -m evals.postmortem.live_ab.cache_concurrency_probe --repo . --provider nous \
       --workers 20 --calls 6 --out /tmp/probe.jsonl [--wire chat|native] [--model ID] \
       [--pin anthropic] [--settle 2] [--ttl 5m]
-  providers: nous (Portal creds from HERMES_HOME), openrouter (OPENROUTER_API_KEY or --api-key),
+  providers: nous (Portal creds from STARDUST_HOME), openrouter (OPENROUTER_API_KEY or --api-key),
              anthropic (ANTHROPIC_API_KEY or --api-key)
 Cost: ~$50 per 20x6 arm on Fable 5.1 at the 5m tier. Every run starts from the real Hermes request
 path; the only patch is a read-only wrapper on the SDK stream that records usage and headers.
@@ -63,7 +63,7 @@ ARGS = _parse()
 REPO, PROVIDER, N, CALLS, OUT = ARGS.repo, ARGS.provider, ARGS.workers, ARGS.calls, ARGS.out
 SETTLE_S = ARGS.settle
 sys.path.insert(0, os.path.abspath(REPO))
-os.environ.setdefault("HERMES_HOME", os.path.expanduser("~/.hermes"))
+os.environ.setdefault("STARDUST_HOME", os.path.expanduser("~/.stardust"))
 import anthropic
 from anthropic.resources.messages import Messages
 _orig_stream = Messages.stream

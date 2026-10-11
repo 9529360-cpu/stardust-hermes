@@ -667,7 +667,7 @@ function localPrimaryRequestScope(opts: ProfileRouteOptions): boolean | null {
  *  5. A local profile REST request that the primary backend can safely scope
  *     reuses that backend, with `?profile=` when the handler accepts it.
  *  6. Any other local profile gets its own pooled backend, spawned with
- *     `--profile`, so its `HERMES_HOME` scopes it.
+ *     `--profile`, so its `STARDUST_HOME` scopes it.
  *
  * Routing used to be spread across three overlapping predicates that each
  * re-derived part of this table, which is how case 3 ended up registering
@@ -684,7 +684,7 @@ function resolveProfileBackendRoute(profile, opts: ProfileRouteOptions = {}): Pr
   if (scopedProfile === primaryProfile) {
     // A global remote is a multi-profile dashboard, not a backend process
     // launched for this Desktop label. Even its "primary" label must travel on
-    // the wire: the dashboard's process HERMES_HOME can belong to a different
+    // the wire: the dashboard's process STARDUST_HOME can belong to a different
     // launch profile, so a bare request silently reads that profile instead.
     return opts.globalRemote
       ? { backend: 'primary', descriptorProfile: scopedProfile, scopePath: true }

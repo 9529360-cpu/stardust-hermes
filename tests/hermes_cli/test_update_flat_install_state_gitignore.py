@@ -1,7 +1,7 @@
-"""Flat-install runtime state must be gitignored so ``hermes update``'s untracked
+"""Flat-install runtime state must be gitignored so ``stardust update``'s untracked
 autostash cannot sweep the live state.db (#110648).
 
-On a flat install (checkout root == $HERMES_HOME) the profile's runtime files
+On a flat install (checkout root == $STARDUST_HOME) the profile's runtime files
 live inside the repo as untracked paths. ``git stash push --include-untracked``
 (hermes_cli/update_cmd_stash.py) moves the whole untracked set into the stash and
 unlinks it from the working tree under the running gateway, silently stranding
@@ -18,8 +18,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# Runtime state that lives at $HERMES_HOME's root on a flat install, exactly as
-# ``hermes update`` would sweep it: one representative per ignored class. The
+# Runtime state that lives at $STARDUST_HOME's root on a flat install, exactly as
+# ``stardust update`` would sweep it: one representative per ignored class. The
 # sidecar names mirror ``_sqlite_files`` in gateway/platforms/base.py; the
 # credential entries mirror ``_ROOT_CREDENTIAL_PATHS`` there.
 FLAT_INSTALL_RUNTIME_STATE = (
@@ -96,7 +96,7 @@ def _run_git(repo: Path, *args: str) -> subprocess.CompletedProcess:
 def flat_install_repo(tmp_path: Path) -> Path:
     """A real git repo standing in for a flat install, with the tracked .gitignore.
 
-    Built in a subdirectory of tmp_path: the suite-wide HERMES_HOME isolation
+    Built in a subdirectory of tmp_path: the suite-wide STARDUST_HOME isolation
     fixture (tests/conftest.py) materialises its own ``hermes_test/`` tree in
     tmp_path itself, which is not part of this repo's story.
     """
@@ -120,7 +120,7 @@ def flat_install_repo(tmp_path: Path) -> Path:
 
 def test_flat_install_runtime_state_is_ignored(flat_install_repo):
     """`git status --porcelain` must stay empty with the full runtime state present,
-    so `hermes update` never enters its stash step for runtime state alone."""
+    so `stardust update` never enters its stash step for runtime state alone."""
     status = _run_git(
         flat_install_repo, "status", "--porcelain", "--untracked-files=all"
     )

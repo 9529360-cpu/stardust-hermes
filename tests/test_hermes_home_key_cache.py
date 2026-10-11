@@ -110,9 +110,9 @@ class TestHomeChanges:
         first.mkdir()
         second.mkdir()
 
-        monkeypatch.setenv("HERMES_HOME", str(first))
+        monkeypatch.setenv("STARDUST_HOME", str(first))
         key_one = hc.hermes_home_key()
-        monkeypatch.setenv("HERMES_HOME", str(second))
+        monkeypatch.setenv("STARDUST_HOME", str(second))
         key_two = hc.hermes_home_key()
 
         assert key_one != key_two

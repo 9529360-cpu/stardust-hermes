@@ -49,8 +49,8 @@ def _account_state() -> dict:
 @pytest.fixture
 def nous_runner(tmp_path, monkeypatch):
     monkeypatch.setattr(gateway_run, "_hermes_home", tmp_path)
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
-    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    monkeypatch.setenv("STARDUST_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    monkeypatch.setenv("STARDUST_GUEST_ONBOARDING", "1")
     from hermes_cli.config import load_config, save_config
     cfg = load_config()
     cfg.setdefault("nous", {})["guest"] = True

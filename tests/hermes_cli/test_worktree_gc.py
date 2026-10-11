@@ -159,7 +159,7 @@ class TestReclaim:
         profile_home = tmp_path / "root" / "profiles" / "work"
         profile_home.mkdir(parents=True)
         monkeypatch.setattr(Path, "home", lambda: native_home)
-        monkeypatch.setenv("HERMES_HOME", str(profile_home))
+        monkeypatch.setenv("STARDUST_HOME", str(profile_home))
         tree, _ = _add_worktree(repo, "hermes-scratch")
         (tree / "NOTES.md").write_text("important scribbles\n")
         records = worktree_gc.audit_worktrees(str(repo), with_sizes=False)
@@ -168,7 +168,7 @@ class TestReclaim:
         archived = list((profile_home / "archive" / "worktree-prune").rglob("NOTES.md"))
         assert archived, "untracked file must be archived under the profile home, not destroyed"
         assert archived[0].read_text() == "important scribbles\n"
-        assert not (native_home / ".hermes").exists()
+        assert not (native_home / ".stardust").exists()
 
     def test_dry_run_changes_nothing(self, repo):
         tree, _ = _add_worktree(repo, "hermes-clean")

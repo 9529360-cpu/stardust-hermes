@@ -1,9 +1,9 @@
 """Auto-installation of LSP server binaries.
 
-Installs go to a Hermes-owned staging dir, ``<HERMES_HOME>/lsp/bin/``, so the
+Installs go to a Hermes-owned staging dir, ``<STARDUST_HOME>/lsp/bin/``, so the
 user's global toolchain stays untouched.  Strategies: ``auto`` (install with
 the best available package manager), ``manual`` / ``off`` (probe only; a
-missing binary skips the server and ``hermes lsp status`` reports it).
+missing binary skips the server and ``stardust lsp status`` reports it).
 Installs run synchronously the first time a server is needed, serialized
 per-package; every failure path returns ``None`` so the tool layer falls
 back to its in-process syntax checker.
@@ -37,7 +37,7 @@ def _manual(bin_name: str) -> Dict[str, Any]:
 
 
 # Recipe key → {strategy, pkg, bin[, extra_pkgs]}.  After install we look for
-# ``bin`` in ``<HERMES_HOME>/lsp/bin/`` first, then on PATH.  ``extra_pkgs``
+# ``bin`` in ``<STARDUST_HOME>/lsp/bin/`` first, then on PATH.  ``extra_pkgs``
 # are sibling npm packages a server needs in the same node_modules tree.
 INSTALL_RECIPES: Dict[str, Dict[str, Any]] = {
     "pyright": _npm("pyright", "pyright-langserver"),
@@ -58,7 +58,7 @@ INSTALL_RECIPES: Dict[str, Dict[str, Any]] = {
     "clangd": _manual("clangd"),
     "lua-language-server": _manual("lua-language-server"),
     # PowerShellEditorServices is a release-zip bundle driven by pwsh; we probe
-    # the host so `hermes lsp status` reports its presence.
+    # the host so `stardust lsp status` reports its presence.
     "powershell": _manual("pwsh"),
 }
 
@@ -174,13 +174,13 @@ def _link_into_bin(target: Path) -> str:
 
 def _install_npm(pkg: str, bin_name: str, extra_pkgs: Optional[list] = None) -> Optional[str]:
     """``npm install --prefix <staging>`` then link ``node_modules/.bin/<bin_name>`` into ``lsp/bin/``."""
-    # Managed npm first: $HERMES_HOME/node isn't on an arbitrary process's
+    # Managed npm first: $STARDUST_HOME/node isn't on an arbitrary process's
     # PATH, so a bare which() would miss the Node that Hermes installed.
     npm = find_node_executable("npm")
     if npm is None:
         logger.info("[install] cannot install %s: no usable npm found", pkg)
         return None
-    staging = hermes_lsp_bin_dir().parent  # <HERMES_HOME>/lsp/
+    staging = hermes_lsp_bin_dir().parent  # <STARDUST_HOME>/lsp/
     install_targets = [pkg] + list(extra_pkgs or [])
     logger.info("[install] npm install --prefix %s %s", staging, " ".join(install_targets))
     cmd = [npm, "install", "--prefix", str(staging), "--silent", "--no-fund", "--no-audit", *install_targets]
@@ -240,7 +240,7 @@ _INSTALLERS: Dict[str, Callable[[Dict[str, Any], str], Optional[str]]] = {
 
 
 def detect_status(pkg: str) -> str:
-    """Return ``installed``, ``missing``, or ``manual-only`` (for ``hermes lsp status``; spawns nothing)."""
+    """Return ``installed``, ``missing``, or ``manual-only`` (for ``stardust lsp status``; spawns nothing)."""
     recipe = INSTALL_RECIPES.get(pkg)
     if _existing_binary(recipe.get("bin", pkg) if recipe else pkg):
         return "installed"

@@ -133,11 +133,11 @@ class TestRefusalCopy:
         chat = anon_auth.welcome_refusal_copy(refusal, model="gpt-5", in_chat=True)
         assert chat == (
             "gpt-5 isn't on the Nous free tier; it serves nous/welcome only. "
-            "Use /model to choose a configured model, or ask the host operator to run `hermes auth`."
+            "Use /model to choose a configured model, or ask the host operator to run `stardust auth`."
         )
         assert "/login" not in chat
         terminal = anon_auth.welcome_refusal_copy(refusal, model="gpt-5", in_chat=False)
-        assert "`hermes auth add <provider>`" in terminal and "/login" not in terminal
+        assert "`stardust auth add <provider>`" in terminal and "/login" not in terminal
 
     def test_capacity_copy_carries_the_retry(self):
         refusal = anon_auth.parse_welcome_refusal({"reason": "at_capacity", "retry_after": 30})

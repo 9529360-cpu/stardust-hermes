@@ -1,7 +1,7 @@
 """Container-boot reconciliation of per-profile gateway s6 services.
 
 Wired into the image as /etc/cont-init.d/02-reconcile-profiles. Runs as root after
-01-hermes-setup (the stage2 hook) has chowned the volume and seeded $HERMES_HOME, but
+01-hermes-setup (the stage2 hook) has chowned the volume and seeded $STARDUST_HOME, but
 before s6-rc starts user services.
 """
 from __future__ import annotations
@@ -69,10 +69,10 @@ def reconcile_profile_gateways(
     """Recreate s6 service registrations for every persistent profile.
 
     Always registers a ``gateway-default`` slot for the root profile (the implicit profile at
-    the top of ``$HERMES_HOME``): ``hermes_cli.gateway`` maps an empty profile suffix to it,
-    so it is what ``hermes gateway start`` (no ``-p``) targets.
+    the top of ``$STARDUST_HOME``): ``hermes_cli.gateway`` maps an empty profile suffix to it,
+    so it is what ``stardust gateway start`` (no ``-p``) targets.
 
-    Without it, bare ``hermes gateway start`` inside the container would land on ``s6-svc -u
+    Without it, bare ``stardust gateway start`` inside the container would land on ``s6-svc -u
     /run/service/gateway-default`` → uncaught ``CalledProcessError`` → traceback to the user (PR #30136
     review).
     """
@@ -101,7 +101,7 @@ def reconcile_profile_gateways(
     profiles_root = hermes_home / "profiles"
     if profiles_root.is_dir():
         for entry in sorted(profiles_root.iterdir()):
-            # SOUL.md (seeded by `hermes profile create`) is the "real profile" marker.
+            # SOUL.md (seeded by `stardust profile create`) is the "real profile" marker.
             if not entry.is_dir() or not (entry / "SOUL.md").exists():
                 continue
             # "default" is reserved for the root profile slot above.
@@ -128,7 +128,7 @@ def _maybe_migrate_legacy_gateway_run_state(
     state_file = hermes_home / "gateway_state.json"
     if state_file.exists():
         return None
-    if os.environ.get("HERMES_GATEWAY_NO_SUPERVISE", "").lower() in ("1", "true", "yes"):
+    if os.environ.get("STARDUST_GATEWAY_NO_SUPERVISE", "").lower() in ("1", "true", "yes"):
         return None
     argv = tuple(container_argv) if container_argv is not None else _read_container_argv()
     if not _is_legacy_gateway_run_request(argv):
@@ -185,7 +185,7 @@ def _strip_container_argv_prefix(argv: Sequence[str]) -> list[str]:
         args = args[1:]
     if args and args[0].endswith("entrypoint-dispatch.sh"):  # non-PID-1 dispatch shim
         args = args[1:]
-    if args and Path(args[0]).name == "hermes":  # the wrapper re-execs `hermes <subcommand>`
+    if args and Path(args[0]).name in ("hermes", "stardust"):  # the wrapper re-execs `stardust <subcommand>`
         args = args[1:]
     return args
 
@@ -275,7 +275,7 @@ def _register_service(scandir: Path, profile: str, *, start: bool) -> None:
         _write_exec(tmp_dir / "finish", S6ServiceManager._render_finish_script())
         (tmp_dir / "log").mkdir()
         _write_exec(tmp_dir / "log" / "run", S6ServiceManager._render_log_run(profile))
-        if not start:  # `hermes -p <profile> gateway start` brings it up later (s6-svc -u)
+        if not start:  # `stardust -p <profile> gateway start` brings it up later (s6-svc -u)
             (tmp_dir / "down").touch()
         # Pre-create supervise/ with hermes ownership BEFORE publishing so s6-supervise inherits
         # it and runtime s6-svc calls as the hermes user won't EACCES.
@@ -293,7 +293,7 @@ _LOG_ROTATE_BYTES = 256 * 1024
 
 
 def _write_reconcile_log(hermes_home: Path, actions: list[ReconcileAction]) -> None:
-    """Append one line per profile to $HERMES_HOME/logs/container-boot.log (rotated to ``.1``) —
+    """Append one line per profile to $STARDUST_HOME/logs/container-boot.log (rotated to ``.1``) —
     a separate greppable file for "why didn't my profile come back up".
 
     Size-bounded: when the file exceeds ``_LOG_ROTATE_BYTES`` (defaults to 256 KiB ≈ 3000 reconcile lines),
@@ -320,14 +320,14 @@ def _write_reconcile_log(hermes_home: Path, actions: list[ReconcileAction]) -> N
 
 def main() -> int:
     """Entry point invoked from /etc/cont-init.d/02-reconcile-profiles."""
-    # A dashboard-only container must not reconcile: with a shared bind-mounted HERMES_HOME both
+    # A dashboard-only container must not reconcile: with a shared bind-mounted STARDUST_HOME both
     # containers race to flock() the same s6-log files → "Resource busy" restart storm. Detected
     # from PID 1 argv, not an operator flag (a flag can be forgotten in a hand-written manifest).
     if _is_dashboard_container(_read_container_argv()):
         print("reconcile: skipping (dashboard container — does not need per-profile gateways)")
         return 0
 
-    hermes_home = Path(os.environ.get("HERMES_HOME", "/opt/data"))
+    hermes_home = Path(os.environ.get("STARDUST_HOME", "/opt/data"))
     scandir = Path(os.environ.get("S6_PROFILE_GATEWAY_SCANDIR", "/run/service"))
     actions = reconcile_profile_gateways(hermes_home=hermes_home, scandir=scandir)
     for a in actions:

@@ -14,7 +14,7 @@ from agent import auxiliary_client as aux
 def _seed(tmp_path, monkeypatch):
     monkeypatch.setattr(ac.Path, "home", lambda: tmp_path)
     monkeypatch.setattr(ac, "_first_env", lambda *names: "")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     borrowed = tmp_path / ".claude" / ".credentials.json"
     borrowed.parent.mkdir()
     borrowed.write_text(json.dumps({"claudeAiOauth": {

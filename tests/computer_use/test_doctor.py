@@ -3,7 +3,7 @@
 The doctor module drives cua-driver's stable ``health_report`` MCP tool over
 stdio JSON-RPC and renders the structured response. Most of the surface is
 about parsing what cua-driver hands back, plus the exit-code contract
-downstream consumers (CI / `hermes update`) rely on:
+downstream consumers (CI / `stardust update`) rely on:
 
 * Exit 0 when overall == "ok"
 * Exit 1 when overall in ("degraded", "failed") — at least one check
@@ -154,7 +154,7 @@ class TestDoctorExitCodes:
             code = doctor.run_doctor()
         assert code == 2
         err = capsys.readouterr().err
-        assert "Access is denied" in err and "HERMES_CUA_DRIVER_CMD" in err
+        assert "Access is denied" in err and "STARDUST_CUA_DRIVER_CMD" in err
 
     def test_protocol_error_exits_2(self, capsys):
         """An empty stdout response (driver crashed during handshake) is a
@@ -279,7 +279,7 @@ class TestJsonOutput:
         assert parsed["hermes_identity"]["resolved_binary"]
 
 
-# ── HERMES_CUA_DRIVER_CMD resolution ───────────────────────────────────────
+# ── STARDUST_CUA_DRIVER_CMD resolution ───────────────────────────────────────
 
 
 class TestDriverCmdResolution:
@@ -301,7 +301,7 @@ class TestDriverCmdResolution:
     def test_env_var_used_when_no_arg_given(self, monkeypatch):
         from tools.computer_use import doctor
 
-        monkeypatch.setenv("HERMES_CUA_DRIVER_CMD", "/env/path/cua-driver")
+        monkeypatch.setenv("STARDUST_CUA_DRIVER_CMD", "/env/path/cua-driver")
         proc = _fake_proc_with_responses(
             {"jsonrpc": "2.0", "id": 1, "result": {}},
             {"jsonrpc": "2.0", "id": 2, "result": {"structuredContent": _ok_report()}},
@@ -324,7 +324,7 @@ class TestDriverCmdResolution:
         driver.write_text("#!/bin/sh\nexit 0\n")
         driver.chmod(0o755)
 
-        monkeypatch.delenv("HERMES_CUA_DRIVER_CMD", raising=False)
+        monkeypatch.delenv("STARDUST_CUA_DRIVER_CMD", raising=False)
         monkeypatch.setenv("HOME", str(tmp_path))
         monkeypatch.setenv("PATH", "/usr/bin:/bin:/usr/sbin:/sbin")
 

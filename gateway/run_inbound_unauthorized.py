@@ -41,7 +41,7 @@ def pairing_code_reply(platform_name: str, code: str, profile_arg: str = "") -> 
     whether they are the owner or a guest, and that they must message again after approval."""
     hours = max(1, CODE_TTL_SECONDS // 3600)
     validity = f"{hours} hour" if hours == 1 else f"{hours} hours"
-    approve_cmd = f"hermes {profile_arg}pairing approve {platform_name} {code}"
+    approve_cmd = f"stardust {profile_arg}pairing approve {platform_name} {code}"
     return (
         "Hi! I don't recognize you yet, so I can't reply until the person running this bot "
         "approves you.\n\n"
@@ -78,7 +78,7 @@ def unauthorized_owner_hint(
         f"Dropped a message from unrecognized {platform_name} user {who}. If that is you or someone "
         f"you trust, {allowlist}; or set `unauthorized_dm_behavior: pair` for {platform_name} in "
         f"{hermes_home}/config.yaml so unknown senders receive a pairing code you can approve with "
-        f"`hermes pairing approve {platform_name} <code>`."
+        f"`stardust pairing approve {platform_name} <code>`."
     )
 
 

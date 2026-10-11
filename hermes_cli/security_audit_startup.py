@@ -71,7 +71,7 @@ def _in_container() -> bool:
     """Best-effort container detection (Docker / Podman / generic OCI)."""
     if os.path.exists("/.dockerenv"):
         return True
-    if os.environ.get("HERMES_DESKTOP_CHILD_PID"):
+    if os.environ.get("STARDUST_DESKTOP_CHILD_PID"):
         return False  # desktop child, not a server container
     try:
         cgroup = Path("/proc/1/cgroup").read_text(encoding="utf-8", errors="replace")
@@ -115,7 +115,7 @@ def _container_no_volume_mount(hermes_home: Optional[Path]) -> Optional[str]:
         return None
     return (f"Running in a container but the data dir ({hermes_home}) is NOT on a persistent volume mount — "
             "sessions, memory, skills, and API keys are ephemeral and lost on container restart. Mount a host "
-            "volume over the HERMES_HOME data directory.")
+            "volume over the STARDUST_HOME data directory.")
 
 
 def _network_listener_without_auth(config: Optional[dict]) -> list[str]:

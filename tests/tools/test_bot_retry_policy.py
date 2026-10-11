@@ -64,9 +64,9 @@ def test_every_reason_has_a_defined_action():
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    h = tmp_path / ".hermes"
+    h = tmp_path / ".stardust"
     (h / "profiles" / "ops").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(h))
+    monkeypatch.setenv("STARDUST_HOME", str(h))
     return h
 
 
@@ -78,9 +78,9 @@ def _deliver(params):
 
 def _is_hermes_cli(argv) -> bool:
     """Match the delivery CLI by basename — local_delivery_command may
-    resolve the venv-relative hermes next to the interpreter (#93590)."""
+    resolve the venv-relative stardust entrypoint next to the interpreter (#93590)."""
     name = str(argv[0]).rsplit("\\", 1)[-1].rsplit("/", 1)[-1]
-    return name in ("hermes", "hermes.exe")
+    return name.lower() in ("stardust", "stardust.exe")
 
 
 def _transport_calls(calls):

@@ -49,7 +49,7 @@ def catalog_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolate_hermes
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("HERMES_OPTIONAL_MCPS", str(catalog))
+    monkeypatch.setenv("STARDUST_OPTIONAL_MCPS", str(catalog))
     invalidate_env_cache()
     return get_hermes_home()
 
@@ -103,12 +103,12 @@ def test_catalog_cannot_declare_reserved_control_key(
 ):
     import hermes_cli.mcp_catalog as mcp_catalog
 
-    catalog_root = Path(os.environ["HERMES_OPTIONAL_MCPS"])
+    catalog_root = Path(os.environ["STARDUST_OPTIONAL_MCPS"])
     manifest_path = catalog_root / "demo" / "manifest.yaml"
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
     manifest["auth"]["env"].append(
         {
-            "name": "HERMES_YOLO_MODE",
+            "name": "STARDUST_YOLO_MODE",
             "prompt": "Unsafe control",
             "secret": False,
         }
@@ -125,14 +125,14 @@ def test_catalog_cannot_declare_reserved_control_key(
     response = client.post(
         "/api/mcp/catalog/install",
         headers=HEADERS,
-        json={"name": "demo", "env": {"HERMES_YOLO_MODE": "1"}},
+        json={"name": "demo", "env": {"STARDUST_YOLO_MODE": "1"}},
     )
 
     assert response.status_code == 400
     assert "denylist" in response.json()["detail"]
     assert installs == []
     env_path = catalog_env / ".env"
-    assert not env_path.exists() or "HERMES_YOLO_MODE" not in env_path.read_text(
+    assert not env_path.exists() or "STARDUST_YOLO_MODE" not in env_path.read_text(
         encoding="utf-8"
     )
 
@@ -167,10 +167,10 @@ def test_catalog_accepts_declared_credential(
 @pytest.mark.parametrize(
     "protected_key",
     [
-        "HERMES_YOLO_MODE",
-        "HERMES_OPTIONAL_MCPS",
-        "HERMES_COPILOT_ACP_COMMAND",
-        "HERMES_COPILOT_ACP_ARGS",
+        "STARDUST_YOLO_MODE",
+        "STARDUST_OPTIONAL_MCPS",
+        "STARDUST_COPILOT_ACP_COMMAND",
+        "STARDUST_COPILOT_ACP_ARGS",
     ],
 )
 def test_generic_env_endpoint_rejects_protected_key(
@@ -204,14 +204,14 @@ def test_rejected_copilot_controls_do_not_change_live_resolvers(
 ):
     from agent.copilot_acp_client import _resolve_args, _resolve_command
 
-    monkeypatch.setenv("HERMES_COPILOT_ACP_COMMAND", "/opt/trusted/copilot")
-    monkeypatch.setenv("HERMES_COPILOT_ACP_ARGS", "--acp --stdio")
+    monkeypatch.setenv("STARDUST_COPILOT_ACP_COMMAND", "/opt/trusted/copilot")
+    monkeypatch.setenv("STARDUST_COPILOT_ACP_ARGS", "--acp --stdio")
     expected_command = _resolve_command()
     expected_args = _resolve_args()
 
     attempts = {
-        "HERMES_COPILOT_ACP_COMMAND": "/tmp/attacker-command",
-        "HERMES_COPILOT_ACP_ARGS": "--malicious-transport",
+        "STARDUST_COPILOT_ACP_COMMAND": "/tmp/attacker-command",
+        "STARDUST_COPILOT_ACP_ARGS": "--malicious-transport",
     }
     for key, value in attempts.items():
         response = client.put(
@@ -237,11 +237,11 @@ def test_preexisting_copilot_controls_remain_usable(
     from agent.copilot_acp_client import _resolve_args, _resolve_command
     from hermes_cli.env_loader import load_hermes_dotenv
 
-    monkeypatch.setenv("HERMES_COPILOT_ACP_COMMAND", "parent-placeholder")
-    monkeypatch.setenv("HERMES_COPILOT_ACP_ARGS", "--parent-placeholder")
+    monkeypatch.setenv("STARDUST_COPILOT_ACP_COMMAND", "parent-placeholder")
+    monkeypatch.setenv("STARDUST_COPILOT_ACP_ARGS", "--parent-placeholder")
     (catalog_env / ".env").write_text(
-        "HERMES_COPILOT_ACP_COMMAND=/opt/operator/copilot\n"
-        "HERMES_COPILOT_ACP_ARGS=--acp --stdio --operator-mode\n",
+        "STARDUST_COPILOT_ACP_COMMAND=/opt/operator/copilot\n"
+        "STARDUST_COPILOT_ACP_ARGS=--acp --stdio --operator-mode\n",
         encoding="utf-8",
     )
 

@@ -10,7 +10,7 @@ name: Plugin Catalog CI
 #   pinned-source-validate — supply-chain gate: the pinned sha MUST be
 #                            reachable in the entry's repo, and the plugin
 #                            at that exact commit must pass
-#                            `hermes plugins validate`.
+#                            `stardust plugins validate`.
 
 on:
   pull_request:
@@ -187,8 +187,8 @@ jobs:
             fi
 
             # Manifest schema + declared-vs-registered capability check.
-            if ! hermes plugins validate "$PLUGIN_DIR"; then
-              echo "::error file=$entry::hermes plugins validate failed"
+            if ! stardust plugins validate "$PLUGIN_DIR"; then
+              echo "::error file=$entry::stardust plugins validate failed"
               FAILED=1; echo "::endgroup::"; continue
             fi
 

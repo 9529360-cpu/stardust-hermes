@@ -51,14 +51,14 @@ def _ops(_local_env, tmp_path):
 @pytest.fixture
 def shell(_ops, monkeypatch):
     """Pin the shell path even where a native fast path exists."""
-    monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")
+    monkeypatch.setenv("STARDUST_NATIVE_FILE_READ", "0")
     return _ops
 
 
 @pytest.fixture
 def native(_ops, monkeypatch):
     """Same wiring with the native fast path on."""
-    monkeypatch.delenv("HERMES_NATIVE_FILE_READ", raising=False)
+    monkeypatch.delenv("STARDUST_NATIVE_FILE_READ", raising=False)
     return _ops
 
 
@@ -296,7 +296,7 @@ class TestNativeRead:
     def test_kill_switch_routes_to_the_shell(self, native, tmp_path, monkeypatch):
         ops, calls = native
         p = _write(tmp_path, "a.txt", b"one\n")
-        monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")
+        monkeypatch.setenv("STARDUST_NATIVE_FILE_READ", "0")
         ops.read_file(p)
         assert len(calls) == 1 and READ_PROBE_MARK in calls[0]
 
@@ -402,11 +402,11 @@ class TestNativeReadParity:
     def test_shell_and_native_agree(self, native, tmp_path, monkeypatch, name, data, kwargs):
         ops, calls = native
         p = _write(tmp_path, f"{name}.txt", data)
-        monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")
+        monkeypatch.setenv("STARDUST_NATIVE_FILE_READ", "0")
         via_shell = ops.read_file(p, **kwargs).to_dict()
         assert calls and READ_PROBE_MARK in calls[0]
         calls.clear()
-        monkeypatch.delenv("HERMES_NATIVE_FILE_READ")
+        monkeypatch.delenv("STARDUST_NATIVE_FILE_READ")
         via_native = ops.read_file(p, **kwargs).to_dict()
         assert via_native == via_shell
         # The native path touches the shell only for the UTF-16 rescue of binaries.
@@ -428,9 +428,9 @@ class TestNativeReadParity:
             str(tmp_path / "note.txt"),   # missing → similar-file suggestions
             "real.txt",                   # relative to env.cwd
         ):
-            monkeypatch.setenv("HERMES_NATIVE_FILE_READ", "0")
+            monkeypatch.setenv("STARDUST_NATIVE_FILE_READ", "0")
             via_shell = ops.read_file(p).to_dict()
-            monkeypatch.delenv("HERMES_NATIVE_FILE_READ")
+            monkeypatch.delenv("STARDUST_NATIVE_FILE_READ")
             calls.clear()
             via_native = ops.read_file(p).to_dict()
             assert via_native == via_shell, p

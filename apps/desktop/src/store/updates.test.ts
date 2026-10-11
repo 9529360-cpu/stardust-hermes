@@ -254,7 +254,7 @@ describe('checkBackendUpdates', () => {
       behind: 2,
       update_available: true,
       can_apply: true,
-      update_command: 'hermes update',
+      update_command: 'stardust update',
       message: null,
       commits: [{ sha: 'abc1234', summary: 'feat: x', author: 'a', at: 1 }]
     })
@@ -841,12 +841,12 @@ describe('applyUpdates terminal state', () => {
   })
 
   it('keeps the manual command state for CLI installs with no staged updater', async () => {
-    applyMock.mockResolvedValue({ ok: true, manual: true, command: 'hermes update' })
+    applyMock.mockResolvedValue({ ok: true, manual: true, command: 'stardust update' })
 
     await applyUpdates()
 
     expect($updateApply.get().stage).toBe('manual')
-    expect($updateApply.get().command).toBe('hermes update')
+    expect($updateApply.get().command).toBe('stardust update')
     expect($updateOverlayOpen.get()).toBe(true)
     expect(notifySpy).not.toHaveBeenCalled()
   })
@@ -1118,7 +1118,7 @@ describe('applyBackendUpdate recovery', () => {
         install_method: 'git',
         message: 'offline',
         update_available: false,
-        update_command: 'hermes update'
+        update_command: 'stardust update'
       })
       .mockResolvedValueOnce({
         behind: 1,
@@ -1128,7 +1128,7 @@ describe('applyBackendUpdate recovery', () => {
         install_method: 'git',
         message: null,
         update_available: true,
-        update_command: 'hermes update'
+        update_command: 'stardust update'
       })
 
     const promise = applyBackendUpdate()
@@ -1163,7 +1163,7 @@ describe('applyBackendUpdate recovery', () => {
       install_method: 'pip',
       message: null,
       update_available: true,
-      update_command: 'hermes update'
+      update_command: 'stardust update'
     })
 
     const promise = applyBackendUpdate()

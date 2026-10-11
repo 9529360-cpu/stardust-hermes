@@ -4,7 +4,7 @@ anchor (#95759), exercised against the REAL ``posix.sh`` functions.
 The reverted anchor (#95425/#95541) left installs with a real-file
 ``venv/bin/python`` copy, a ``.tcc-anchor-source`` marker, and ``python3*``
 aliases that die at interpreter init (``No module named 'encodings'``).
-``venv/bin/hermes`` execs ``venv/bin/python3``, so the desktop update
+``venv/bin/stardust`` execs ``venv/bin/python3``, so the desktop update
 hand-off — and every other CLI entrypoint, doctor included — dies before any
 Python-side heal can run.  The heal therefore lives in the hand-off shell.
 
@@ -131,7 +131,7 @@ class TestAnchorHeal:
             assert alias.read_text(encoding="utf-8") == GOOD_STUB
         assert (bin_dir / ".tcc-anchor-source").exists()
         assert not list(bin_dir.glob("*tcc-heal*"))
-        assert "invoke=" in out and out.endswith("/venv/bin/hermes")
+        assert "invoke=" in out and out.endswith("/venv/bin/stardust")
 
     def test_full_brick_restored_to_symlinks(self, tmp_path):
         """Anchored copy AND aliases dead, marker source alive: restore the
@@ -214,15 +214,15 @@ class TestUpdateInvokeFallback:
         root = make_venv(tmp_path, python=GOOD_STUB, python3=GOOD_STUB,
                          marker=None)
         out = run_selftest(root)
-        assert out.endswith("/venv/bin/hermes")
+        assert out.endswith("/venv/bin/stardust")
 
 
 @requires_bash
 class TestHandoffSurvivesBrickAB:
-    """A/B analog of the reported loop: `venv/bin/hermes` execs python3."""
+    """A/B analog of the reported loop: `venv/bin/stardust` execs python3."""
 
     def _make_hermes(self, root: Path) -> Path:
-        hermes = root / "venv/bin/hermes"
+        hermes = root / "venv/bin/stardust"
         _write_exe(
             hermes,
             "#!/bin/bash\n"

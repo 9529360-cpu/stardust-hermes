@@ -13,7 +13,7 @@ from hermes_constants import reset_hermes_home_override, set_hermes_home_overrid
 
 @pytest.fixture
 def two_homes(tmp_path, monkeypatch):
-    root = tmp_path / ".hermes"
+    root = tmp_path / ".stardust"
     alpha = root / "profiles" / "alpha"
     for home in (root, alpha):
         (home / "sessions").mkdir(parents=True)
@@ -23,7 +23,7 @@ def two_homes(tmp_path, monkeypatch):
     (alpha / "config.yaml").write_text(
         "sessions:\n  cjk_fts: false\n  search_slow_ms: 50\n", encoding="utf-8")
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     ss.set_multiplex_active(False)
     yield root, alpha
     ss.set_multiplex_active(False)
@@ -34,8 +34,8 @@ def test_served_profile_reads_its_own_sessions_settings(two_homes, monkeypatch):
     from hermes_state_fts import _cjk_fts_config_enabled
     from hermes_state_search import _search_slow_ms
     # The multiplexer bridged the LAUNCH (default) profile's sessions.* into env at import.
-    monkeypatch.setenv("HERMES_CJK_FTS", "true")
-    monkeypatch.setenv("HERMES_SEARCH_SLOW_MS", "1000")
+    monkeypatch.setenv("STARDUST_CJK_FTS", "true")
+    monkeypatch.setenv("STARDUST_SEARCH_SLOW_MS", "1000")
     assert _cjk_fts_config_enabled() is True and _search_slow_ms() == 1000.0  # unscoped = env bridge
     token = set_hermes_home_override(str(alpha))
     try:
@@ -48,11 +48,11 @@ def test_served_profile_reads_its_own_sessions_settings(two_homes, monkeypatch):
 def test_per_turn_sessions_bridge_skips_secondary_scope(two_homes, monkeypatch):
     root, alpha = two_homes
     from gateway import run as gw_run
-    monkeypatch.delenv("HERMES_CJK_FTS", raising=False)
+    monkeypatch.delenv("STARDUST_CJK_FTS", raising=False)
     ss.set_multiplex_active(True)
     with gw_run._profile_runtime_scope(alpha):
         gw_run._bridge_max_turns_from_config(alpha)
-    assert "HERMES_CJK_FTS" not in __import__("os").environ, "secondary scope must not write the process env"
+    assert "STARDUST_CJK_FTS" not in __import__("os").environ, "secondary scope must not write the process env"
 
 
 def test_resolve_proxy_url_reads_routed_profile_scope(two_homes, monkeypatch):

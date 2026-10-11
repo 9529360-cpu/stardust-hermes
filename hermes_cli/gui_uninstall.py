@@ -35,7 +35,7 @@ def desktop_userdata_dir() -> Path:
 
 
 def source_built_gui_artifacts(hermes_home: Path) -> "list[Path]":
-    """GUI build artifacts produced by ``hermes desktop`` inside the checkout (same ``hermes-agent/`` layout
+    """GUI build artifacts produced by ``stardust desktop`` inside the checkout (same ``hermes-agent/`` layout
     install.sh uses). The Python agent runs from source + venv and never needs the Electron build output or
     node_modules (the workspace-root node_modules only carries Electron, ~200MB)."""
     agent_root = hermes_home / "hermes-agent"
@@ -69,7 +69,7 @@ def packaged_gui_app_paths() -> "list[Path]":
 
 
 def agent_is_installed(hermes_home: Path) -> bool:
-    """True when a usable Python agent install exists under HERMES_HOME (gates the desktop UI's options).
+    """True when a usable Python agent install exists under STARDUST_HOME (gates the desktop UI's options).
     Package source or a venv alone is enough — a source checkout without a venv is still "the agent is here"."""
     return any((hermes_home / "hermes-agent" / sub).is_dir() for sub in ("hermes_cli", "venv", ".venv"))
 

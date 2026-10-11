@@ -5,9 +5,9 @@
 // the measurement that the single-instance lock used to prevent:
 //   · its own --user-data-dir  → its own Electron single-instance lock, so it
 //     never collides with (or steals focus from) the user's running `hgui`.
-//   · its own HERMES_HOME      → its own backend + sessions, no shared state.
+//   · its own STARDUST_HOME      → its own backend + sessions, no shared state.
 //   · its own --remote-debugging-port → a private CDP endpoint.
-//   · HERMES_DESKTOP_BOOT_FAKE=1 → deterministic boot overlay.
+//   · STARDUST_DESKTOP_BOOT_FAKE=1 → deterministic boot overlay.
 // The synthetic scenarios drive `$messages` directly, so no LLM credits are
 // spent regardless of the isolated backend.
 
@@ -47,9 +47,9 @@ async function waitFor(fn, { timeoutMs, label }) {
   throw new Error(`timed out after ${timeoutMs}ms waiting for ${label}`)
 }
 
-// Seed an isolated HERMES_HOME with just enough config (NOT sessions) so the
+// Seed an isolated STARDUST_HOME with just enough config (NOT sessions) so the
 // spawned instance reaches an empty chat view instead of the onboarding wizard.
-// A separate HERMES_HOME dir means a separate gateway lock — no collision with
+// A separate STARDUST_HOME dir means a separate gateway lock — no collision with
 // the user's running app, which keeps its own sessions DB and state.
 function seedConfigFrom(sourceHome, targetHome) {
   if (!existsSync(sourceHome)) {
@@ -188,7 +188,7 @@ export async function startIsolatedInstance({
   const devUrl = prod ? null : `http://127.0.0.1:${devPort}`
 
   if (seedConfig && !hermesHome) {
-    seedConfigFrom(join(homedir(), '.hermes'), home)
+    seedConfigFrom(join(homedir(), '.stardust'), home)
   }
 
   const teardown = () => {
@@ -229,15 +229,15 @@ export async function startIsolatedInstance({
     }
 
     // Isolated Electron: own --user-data-dir (single-instance lock scope) + own
-    // HERMES_HOME (backend + sessions). No DEV_SERVER env in prod → dist load.
+    // STARDUST_HOME (backend + sessions). No DEV_SERVER env in prod → dist load.
     const electronBin = require('electron')
-    // NB: do NOT set HERMES_DESKTOP_BOOT_FAKE here — it injects artificial
+    // NB: do NOT set STARDUST_DESKTOP_BOOT_FAKE here — it injects artificial
     // per-phase sleeps into the boot overlay, which inflates cold-start timing
     // (and adds pointless startup latency to the steady-state runs). We want the
     // real boot sequence.
     const env = {
       ...process.env,
-      HERMES_HOME: home,
+      STARDUST_HOME: home,
       // The app's dev-CDP resolver (electron/dev-cdp.ts) appends its own
       // remote-debugging-port switch AFTER argv, so on a non-default --port the
       // Chromium flag below loses and the instance binds 9222 anyway. The env
@@ -346,7 +346,7 @@ export async function coldStartSamples({ runs = 3, port = 9222, devPort = 5174, 
     // runs 1..N are the representative warm samples.
     const home = mkdtempSync(join(tmpdir(), 'hermes-perf-cold-home-'))
     const userDataDir = mkdtempSync(join(tmpdir(), 'hermes-perf-cold-ud-'))
-    seedConfigFrom(join(homedir(), '.hermes'), home)
+    seedConfigFrom(join(homedir(), '.stardust'), home)
 
     try {
       for (let i = 0; i <= runs; i++) {

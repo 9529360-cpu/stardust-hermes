@@ -520,7 +520,7 @@ def test_cli_allow_partial_salvages_rows_across_a_corrupt_leaf(
     assert not rejected_output.exists()
 
     env = os.environ.copy()
-    env["HERMES_HOME"] = str(tmp_path / "isolated-hermes-home")
+    env["STARDUST_HOME"] = str(tmp_path / "isolated-hermes-home")
     result = subprocess.run(
         [
             sys.executable,

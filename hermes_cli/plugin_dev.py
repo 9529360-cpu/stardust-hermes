@@ -1,4 +1,4 @@
-"""Runtime-backed validation behind ``hermes plugins doctor``: every manifest/import/registration
+"""Runtime-backed validation behind ``stardust plugins doctor``: every manifest/import/registration
 check routes through the real runtime contracts instead of a parallel scanner."""
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _doctor_runtime(plugin_path: Path):
     """Load one plugin through the real runtime and restore global state afterwards.
 
     Private Doctor machinery, not a plugin test framework. Registration code runs under a temporary
-    HERMES_HOME with outbound socket connects blocked.
+    STARDUST_HOME with outbound socket connects blocked.
     """
     stack = ExitStack()
     try:
@@ -48,9 +48,9 @@ def _doctor_runtime(plugin_path: Path):
             plugin_path, copied,
             ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "*.pyc"))
         stack.enter_context(patch.dict(os.environ, {
-            "HERMES_HOME": str(home),
-            "HERMES_BUNDLED_PLUGINS": str(bundled),
-            "HERMES_ENABLE_PROJECT_PLUGINS": "0",
+            "STARDUST_HOME": str(home),
+            "STARDUST_BUNDLED_PLUGINS": str(bundled),
+            "STARDUST_ENABLE_PROJECT_PLUGINS": "0",
         }, clear=False))
         stack.enter_context(patch.object(socket, "create_connection", _deny_network))
         stack.enter_context(patch.object(socket.socket, "connect", _deny_network))
@@ -199,7 +199,7 @@ def resolve_plugin_path(target: str | os.PathLike[str] | None = None) -> Path:
             candidates += [bundled / raw, bundled / "platforms" / raw, bundled / "model-providers" / raw]
         except Exception:
             pass
-        candidates.append(Path.cwd() / ".hermes" / "plugins" / raw)
+        candidates.append(Path.cwd() / ".stardust" / "plugins" / raw)
     for candidate in candidates:
         if _holds_plugin(candidate):
             return candidate.resolve()

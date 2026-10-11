@@ -2,7 +2,7 @@
 
 Graceful shutdowns leave forensics (``gateway-exit-diag.log``); an unclean
 death (SIGKILL, kernel OOM, VM death) runs no handler.  A sentinel at
-``<HERMES_HOME>/state/gateway.lifecycle.json`` closes the gap:
+``<STARDUST_HOME>/state/gateway.lifecycle.json`` closes the gap:
 :func:`record_startup` finds ``phase == "running"`` from the previous life →
 unclean death, appended to the exit-diag log as ``gateway.previous_unclean_exit``
 and logged at WARNING; :func:`mark_exited` rewrites ``phase=exited`` on every
@@ -25,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 def _process_hermes_home() -> Path:
-    """HERMES_HOME for process-level identity files (ignore task overrides)."""
+    """STARDUST_HOME for process-level identity files (ignore task overrides)."""
     from hermes_constants import get_hermes_home
 
-    val = os.environ.get("HERMES_HOME", "").strip()
+    val = os.environ.get("STARDUST_HOME", "").strip()
     return Path(val) if val else get_hermes_home()
 
 
@@ -37,7 +37,7 @@ def _home_path(home: Optional[Path], *relative: str) -> Path:
 
 
 def get_lifecycle_sentinel_path(home: Optional[Path] = None) -> Path:
-    """Return ``<HERMES_HOME>/state/gateway.lifecycle.json``."""
+    """Return ``<STARDUST_HOME>/state/gateway.lifecycle.json``."""
     return _home_path(home, "state", "gateway.lifecycle.json")
 
 
@@ -203,7 +203,7 @@ def _report_unclean_exit(evidence: Dict[str, Any], home: Optional[Path]) -> None
     if verdict not in ("ok", "absent"):
         logger.error(
             "state.db FAILED integrity check after an unclean gateway exit: %s — sessions may read as "
-            "missing until it is repaired. Run `hermes doctor`.",
+            "missing until it is repaired. Run `stardust doctor`.",
             verdict,
         )
     _append_exit_diag({"ts": _now_iso(), "tag": "gateway.previous_unclean_exit", "pid": os.getpid(), **evidence}, home)

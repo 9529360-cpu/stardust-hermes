@@ -37,7 +37,7 @@ class _Agent(InterruptControlMixin):
 
 
 def test_redirect_mid_command_yields_it_to_background_without_killing_it(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     agent = _Agent()
     res = {}
 

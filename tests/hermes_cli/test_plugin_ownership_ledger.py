@@ -124,7 +124,7 @@ def test_load_force_reload_and_unload_remove_every_manager_registration(
 
     hermes_home = tmp_path / "hermes"
     _write_plugin(hermes_home)
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     monkeypatch.setattr(
         plugins_mod,
         "get_bundled_plugins_dir",

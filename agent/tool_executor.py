@@ -167,13 +167,13 @@ def _parse_tool_arguments(raw_arguments: Any) -> tuple[dict, Optional[str]]:
 
 def _resolve_concurrent_tool_timeout() -> float | None:
     """Per-batch concurrent deadline: ``timeouts.tools.concurrent_batch`` wins,
-    ``HERMES_CONCURRENT_TOOL_TIMEOUT_S`` is the legacy bridge, ``0``/negative disables."""
+    ``STARDUST_CONCURRENT_TOOL_TIMEOUT_S`` is the legacy bridge, ``0``/negative disables."""
     from agent.deadline import resolve_timeout
 
     return resolve_timeout(
         "tools.concurrent_batch",
         default=_DEFAULT_CONCURRENT_TOOL_TIMEOUT_S,
-        env_var="HERMES_CONCURRENT_TOOL_TIMEOUT_S",
+        env_var="STARDUST_CONCURRENT_TOOL_TIMEOUT_S",
     )
 
 
@@ -561,7 +561,7 @@ class _ConcurrentToolAuthorizationGate:
             # (#65673). Auth failures park here too rather than returning. Returning ends the run task, and
             # with it the only listener on ``_reconnect_event`` — so a 401 on the very first connect left
             # the server unrevivable for the life of the process, even after the user re-authenticated with
-            # ``hermes mcp login``. Parking keeps the task alive so the 300s self-probe (and an explicit
+            # ``stardust mcp login``. Parking keeps the task alive so the 300s self-probe (and an explicit
             # /mcp refresh) can pick up fresh tokens.
             logger.warning(
                 "authorization gate lock not acquired after %.1fs "

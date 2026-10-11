@@ -1,6 +1,6 @@
 """The exam's command line: choosing the model (rehearsal / the user's configured main model / any
 OpenAI-compatible endpoint), selecting scenarios, and a rehearsal run that writes the report and
-returns a meaningful exit code. The configured-model path is checked against a throwaway HERMES_HOME
+returns a meaningful exit code. The configured-model path is checked against a throwaway STARDUST_HOME
 through the canonical runtime resolver, never against the developer's own configuration.
 """
 import json
@@ -47,7 +47,7 @@ def test_from_my_config_uses_the_canonical_resolver(tmp_path):
     code = ("import json\nfrom evals.assistant_scenarios import cli\n"
             "e = cli.resolve_endpoint(cli.parse_args(['--from-my-config']), {})\n"
             "print(json.dumps([e.base_url, e.model, e.api_key, e.api_mode]))")
-    env = {**os.environ, "HERMES_HOME": str(tmp_path), "PYTHONPATH": str(REPO), sandbox.EXAM_KEY_ENV: "sk-mine"}
+    env = {**os.environ, "STARDUST_HOME": str(tmp_path), "PYTHONPATH": str(REPO), sandbox.EXAM_KEY_ENV: "sk-mine"}
     out = subprocess.run([sys.executable, "-c", code], cwd=REPO, env=env, capture_output=True, text=True, check=True)
     assert json.loads(out.stdout.strip().splitlines()[-1]) == ["http://127.0.0.1:9/v1", "mine", "sk-mine", "chat_completions"]
 

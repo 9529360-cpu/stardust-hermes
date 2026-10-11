@@ -61,7 +61,7 @@ describe("fetchJSON error contract", () => {
     expect(err.message).toMatch(/internal error/i);
   });
 
-  it("turns a network failure into the 'is hermes dashboard running' sentence", async () => {
+  it("turns a network failure into the 'is stardust dashboard running' sentence", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>(async () => {

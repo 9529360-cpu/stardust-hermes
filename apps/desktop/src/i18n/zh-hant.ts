@@ -1778,7 +1778,7 @@ export const zhHant = defineLocale({
     edit: '編輯',
     archive: '封存',
     skillArchivedTitle: '技能已封存',
-    skillArchivedMessage: '可透過 hermes curator restore 還原。',
+    skillArchivedMessage: '可透過 stardust curator restore 還原。',
     tabPlugins: '外掛',
     plugins: {
       agentTitle: '智能體外掛',
@@ -2243,7 +2243,7 @@ export const zhHant = defineLocale({
       wecom: '在企業微信新增群機器人，將 webhook key 複製為 WECOM_BOT_ID。僅可傳送；雙向請使用企業微信（應用程式）。',
       wecom_callback: '設定企業微信自建應用程式、公開回呼 URL，並提供 corp ID、secret、agent ID 和 AES key。',
       weixin:
-        '執行 `hermes gateway setup`，選擇 Weixin，再以個人微信帳號掃描並確認 QR 碼。本應用程式會透過騰訊 iLink Bot API 連線並儲存憑證。',
+        '執行 `stardust gateway setup`，選擇 Weixin，再以個人微信帳號掃描並確認 QR 碼。本應用程式會透過騰訊 iLink Bot API 連線並儲存憑證。',
       qqbot: '在 QQ 開放平台（q.qq.com）註冊應用程式，然後複製 App ID 和 Client Secret。',
       api_server: '把助理公開為相容 OpenAI 的 API。設定驗證金鑰，再讓 Open WebUI / LobeChat 等指向 host:port。',
       webhook: '執行 HTTP 伺服器供 GitHub、GitLab 或自訂應用程式 POST，並使用 secret 驗證簽章。'
@@ -3885,7 +3885,7 @@ export const zhHant = defineLocale({
       errorSetUpFallback: '設定備用模型',
       errorSignInAgain: provider => `重新登入 ${provider}`,
       errorOauthExpired: provider =>
-        `您的 ${provider} 登入已過期或被撤銷。請在終端機執行 hermes model，選擇 ${provider} 重新登入；或在「設定 → 模型服務」中改用模型 API。`,
+        `您的 ${provider} 登入已過期或被撤銷。請在終端機執行 stardust model，選擇 ${provider} 重新登入；或在「設定 → 模型服務」中改用模型 API。`,
       errorChooseModel: '選擇模型',
       errorCompressConversation: '壓縮對話',
       errorCompressFailed: '無法壓縮對話',
@@ -3946,7 +3946,7 @@ export const zhHant = defineLocale({
       reject: '拒絕',
       alwaysTitle: '一律允許此指令？',
       alwaysDescription: pattern =>
-        `這會將「${pattern}」模式加入永久允許清單（~/.hermes/config.yaml）。Stardust 對類似指令將不再詢問，包括目前對話和未來對話。`,
+        `這會將「${pattern}」模式加入永久允許清單（~/.stardust/config.yaml）。Stardust 對類似指令將不再詢問，包括目前對話和未來對話。`,
       alwaysAllow: '一律允許'
     },
     clarify: {
@@ -4252,7 +4252,7 @@ export const zhHant = defineLocale({
       success: platform => `已移交到 ${platform}。隨時可在此處恢復。`,
       systemNote: platform => `↻ 已移交到 ${platform} — 隨時可在此處恢復。`,
       failed: error => `移交失敗：${error}`,
-      timedOut: '等待閘道逾時。`hermes gateway` 是否正在執行？'
+      timedOut: '等待閘道逾時。`stardust gateway` 是否正在執行？'
     }
   },
 

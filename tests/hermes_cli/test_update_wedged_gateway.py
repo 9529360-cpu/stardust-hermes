@@ -2,7 +2,7 @@
 
 A gateway whose event loop is stalled cannot process a graceful shutdown, so
 the updater's drain wait used to burn the full 180s budget ("Gateway PID X
-still running after 180.0s — restart may fail") and could deadlock `hermes
+still running after 180.0s — restart may fail") and could deadlock `stardust
 update`. The fix probes the loop-liveness heartbeat file BEFORE draining and,
 only when the loop is provably dead, escalates SIGTERM → SIGKILL bounded to
 seconds. A busy-but-alive gateway (fresh heartbeat) must keep the full drain
@@ -49,7 +49,7 @@ _NEEDS_UNIX_SOCKETS = pytest.mark.skipif(
 def tmp_path():
     """Short-path override for this module (macOS AF_UNIX ~104-byte limit).
 
-    The loop-tick witness tests bind real UNIX sockets under HERMES_HOME.
+    The loop-tick witness tests bind real UNIX sockets under STARDUST_HOME.
     pytest's default tmp_path nests deep enough on macOS that
     ``state/gateway.loop-tick.<pid>.sock`` exceeds the sockaddr_un limit and
     ``bind()`` raises ``OSError: AF_UNIX path too long``. A mkdtemp directly

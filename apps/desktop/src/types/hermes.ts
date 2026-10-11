@@ -170,7 +170,7 @@ export interface EnvVarInfo {
   is_set: boolean
   // Backend-derived provider grouping hints (from the unified provider catalog
   // in hermes_cli/provider_catalog.py). When present, the Keys tab groups by
-  // this provider identity — the SAME one `hermes model` uses — instead of
+  // this provider identity — the SAME one `stardust model` uses — instead of
   // desktop-only env-var prefix guesses. Empty for non-provider env vars.
   provider?: string
   provider_label?: string
@@ -1123,7 +1123,7 @@ export interface ToolProvider {
   post_setup: string | null
   requires_nous_auth: boolean
   /** True when this is the provider currently written to config (mirrors the
-   *  CLI `hermes tools` active-provider detection). */
+   *  CLI `stardust tools` active-provider detection). */
   is_active: boolean
   /** Honest readiness computed server-side (keys ∧ Nous entitlement ∧
    *  post-setup install state). Optional for older backends. */

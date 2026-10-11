@@ -27,7 +27,7 @@ def _fresh_probe_cache():
 
 
 def _managed_home(tmp_path, *, teammates=("researcher",), peers=()) -> Path:
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(exist_ok=True)
     for name in teammates:
         d = home / "profiles" / name
@@ -101,7 +101,7 @@ def test_never_injects_outside_bot_chat(tmp_path, title):
 
 def test_never_injects_on_unmanaged_install(tmp_path):
     """A 'Bot Chat'-titled session on a plain install stays tool-free."""
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     agent = _FakeAgent(home, title="Bot Chat")
     assert bot_mode_dm.ensure_message_agent_tool(agent) is False
@@ -141,7 +141,7 @@ def test_tool_refuses_outside_bot_chat(tmp_path):
 
 
 def test_tool_refuses_on_unmanaged_install(tmp_path):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     agent = _FakeAgent(home, title="Bot Chat")
     result = json.loads(
@@ -246,7 +246,7 @@ def test_local_delivery_command_and_ack(tmp_path, monkeypatch):
     calls = _capture_spawn(monkeypatch)
     # These assertions target the -p/turn-args shape; pin the entrypoint resolution
     # so the test stays hermetic across venvs that do/don't expose a sibling script.
-    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "hermes")
+    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "stardust")
     home = _managed_home(tmp_path, teammates=("researcher",))
     agent = _FakeAgent(home, title="Bot Chat")
 
@@ -275,7 +275,7 @@ def test_local_delivery_command_and_ack(tmp_path, monkeypatch):
     mode, dm_file, transport_argv = _runner_parts(command)
     assert mode == "query-file"
     assert transport_argv == [
-        "hermes",
+        "stardust",
         "-p",
         "researcher",
         "chat",
@@ -302,13 +302,13 @@ def test_peer_delivery_command_pins_registry_profile_for_secondary_bots(
     tmp_path, monkeypatch
 ):
     """A secondary-profile bot's peer DM must run in the registry-owning
-    profile (#93935). `hermes peer` resolves bot_peers through
+    profile (#93935). `stardust peer` resolves bot_peers through
     profile-scoped load_config(); unpinned, the subprocess inherits the
     calling bot's profile and dies with "No peer named" even though the
     tool-side roster (read from the machine-root config) validated the
     target."""
     calls = _capture_spawn(monkeypatch)
-    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "hermes")
+    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "stardust")
     home = _managed_home(tmp_path, peers=("spark",))
     # A reviewer-profile gateway context: the agent's session db lives under
     # that profile's home, so _agent_home() resolves there while the
@@ -325,12 +325,12 @@ def test_peer_delivery_command_pins_registry_profile_for_secondary_bots(
     assert mode == "stdin"
     # The registry the tool validated against is the machine root's — the
     # default profile's home — so the CLI runs there, not in reviewer.
-    assert transport_argv == ["hermes", "-p", "default", "peer", "dm", "spark"]
+    assert transport_argv == ["stardust", "-p", "default", "peer", "dm", "spark"]
 
 
 def test_peer_delivery_command(tmp_path, monkeypatch):
     calls = _capture_spawn(monkeypatch)
-    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "hermes")
+    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "stardust")
     monkeypatch.setattr("socket.gethostname", lambda: "eri-mac.local")
     home = _managed_home(tmp_path, peers=("spark",))
     agent = _FakeAgent(home, title="Bot Chat")
@@ -342,7 +342,7 @@ def test_peer_delivery_command(tmp_path, monkeypatch):
     assert "spark" in result["to"]
     mode, _dm_file, transport_argv = _runner_parts(calls[0]["command"])
     assert mode == "stdin"
-    assert transport_argv == ["hermes", "-p", "default", "peer", "dm", "spark/researcher"]
+    assert transport_argv == ["stardust", "-p", "default", "peer", "dm", "spark/researcher"]
     # the peer child reads the author from its env and forwards it in the request body
     assert _runner_author(calls[0]["command"]) == {
         "id": "bot:eri-mac.local/default", "name": "stardust", "is_bot": True}
@@ -354,17 +354,17 @@ def test_peer_delivery_command(tmp_path, monkeypatch):
     assert result2["status"] == "sent"
     mode, _dm_file, transport_argv = _runner_parts(calls[1]["command"])
     assert mode == "stdin"
-    assert transport_argv == ["hermes", "-p", "default", "peer", "dm", "spark"]
+    assert transport_argv == ["stardust", "-p", "default", "peer", "dm", "spark"]
 
 
 def test_delivery_pins_the_hermes_entrypoint_beside_this_interpreter(tmp_path, monkeypatch):
     """A background delivery must not rely on PATH: the runner's service context
-    lacks the gateway's venv bin dir, so a bare ``hermes`` resolves to a system
+    lacks the gateway's venv bin dir, so a bare ``stardust`` resolves to a system
     install whose shebang picks the wrong interpreter and dies on import (#108628).
     Both transports must invoke the entrypoint beside this interpreter instead."""
     venv_bin = tmp_path / "venv" / ("Scripts" if sys.platform == "win32" else "bin")
     venv_bin.mkdir(parents=True)
-    hermes_entry = venv_bin / ("hermes.exe" if sys.platform == "win32" else "hermes")
+    hermes_entry = venv_bin / ("stardust.exe" if sys.platform == "win32" else "stardust")
     hermes_entry.write_text("#!/bin/sh\n", encoding="utf-8")
     monkeypatch.setattr(sys, "executable", str(venv_bin / "python3"))
 
@@ -473,7 +473,7 @@ def test_live_dm_admitted_before_waiter_failure(tmp_path, monkeypatch):
     owner = dict(profile_home=str(target), session_id="bot", lease_id="lease", live_session_id="live")
     monkeypatch.setattr(live, "find_canonical_live_owner", lambda h: owner if Path(h) == target else None)
     monkeypatch.setattr(bot_mode_dm, "_dm_dir", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "wrong-home"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "wrong-home"))
     import tools.terminal_tool as terminal
     monkeypatch.setattr(terminal, "terminal_tool", lambda *a, **k: json.dumps({"error": "spawn failed"}))
 
@@ -492,7 +492,7 @@ def test_live_dm_runner_retry_never_reexecutes_failed_claim(tmp_path, monkeypatc
 
     home = _managed_home(tmp_path)
     target = home / "profiles" / "researcher"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     owner = dict(profile_home=str(target), session_id="bot", lease_id="lease", live_session_id="live")
     monkeypatch.setattr(live, "find_canonical_live_owner", lambda h: owner)
     monkeypatch.setattr(bot_mode_dm, "_LIVE_WAIT_SECONDS", 0)
@@ -605,7 +605,7 @@ def test_delivery_runner_surfaces_live_owner_refusal(tmp_path, capsys):
 
 
 def test_local_turn_reemits_empty_stdout_for_a_bare_silence_marker(tmp_path, capsys):
-    """#110782: the one-shot ``hermes chat -c "Bot Chat"`` transport applies the gateway's
+    """#110782: the one-shot ``stardust chat -c "Bot Chat"`` transport applies the gateway's
     silence rule — a successful bare marker reaches the sender as "", prose stays verbatim."""
     dm_file = tmp_path / "message.txt"
     dm_file.write_text("thanks, bye", encoding="utf-8")
@@ -656,7 +656,7 @@ def test_query_file_delivery_closes_stdin_for_initial_attempt_and_retry(
     ("query-file", None),
 ], ids=["stdin", "query-file", "no author"])
 def test_delivery_main_child_env_carries_only_the_argv_author(tmp_path, monkeypatch, mode, author):
-    """The ``--author`` payload becomes HERMES_TURN_AUTHOR on the child. Without it the runner drops the
+    """The ``--author`` payload becomes STARDUST_TURN_AUTHOR on the child. Without it the runner drops the
     variable it inherited from the sending bot's own turn instead of passing it on as the recipient's author."""
     from agent.turn_author import TURN_AUTHOR_ENV
 
@@ -669,7 +669,7 @@ def test_delivery_main_child_env_carries_only_the_argv_author(tmp_path, monkeypa
         return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    monkeypatch.setenv("HERMES_DM_TEST_MARKER", "kept")
+    monkeypatch.setenv("STARDUST_DM_TEST_MARKER", "kept")
     monkeypatch.setenv(TURN_AUTHOR_ENV, json.dumps({"id": "bot:previous", "name": "previous", "is_bot": True}))
     author_args = ["--author", json.dumps(author)] if author else []
 
@@ -679,20 +679,20 @@ def test_delivery_main_child_env_carries_only_the_argv_author(tmp_path, monkeypa
     assert returncode == 0
     [(argv, kwargs)] = calls
     assert argv[:3] == ["hermes", "-p", "researcher"]
-    assert kwargs["env"]["HERMES_DM_TEST_MARKER"] == "kept"
+    assert kwargs["env"]["STARDUST_DM_TEST_MARKER"] == "kept"
     assert (json.loads(kwargs["env"][TURN_AUTHOR_ENV]) if TURN_AUTHOR_ENV in kwargs["env"] else None) == author
     assert not dm_file.exists()
 
 
 def test_real_delivery_command_round_trip_carries_author(tmp_path):
-    """Through a real subprocess, the runner argv built by ``_delivery_command`` sets HERMES_TURN_AUTHOR on the child."""
+    """Through a real subprocess, the runner argv built by ``_delivery_command`` sets STARDUST_TURN_AUTHOR on the child."""
     dm_file = tmp_path / "message.txt"
     dm_file.write_text("secret", encoding="utf-8")
     observed = tmp_path / "observed.txt"
     child = tmp_path / "child.py"
     child.write_text(
         "import os, pathlib, sys\n"
-        "pathlib.Path(sys.argv[1]).write_text(os.environ.get('HERMES_TURN_AUTHOR', 'unset'), encoding='utf-8')\n",
+        "pathlib.Path(sys.argv[1]).write_text(os.environ.get('STARDUST_TURN_AUTHOR', 'unset'), encoding='utf-8')\n",
         encoding="utf-8",
     )
     author = {"id": "bot:default", "name": "hermes", "is_bot": True}

@@ -1,10 +1,10 @@
-// Unit tests for the pure Windows `hermes` resolution helpers extracted from
+// Unit tests for the pure Windows `stardust` resolution helpers extracted from
 // main.ts's findOnPath(), handOffWindowsBootstrapRecovery(), and
 // unwrapWindowsVenvHermesCommand(). These pin the two Windows resolution bugs
 // that caused desktop reinstall loops:
 //   1. buildPathExtCandidates() — PATHEXT extensions must be tried BEFORE the
-//      empty extension, or an extensionless Git-Bash `hermes` shim shadows
-//      the real hermes.cmd/hermes.exe.
+//      empty extension, or an extensionless Git-Bash `stardust` shim shadows
+//      the real stardust.cmd/stardust.exe.
 //   2. chooseUpdaterArgs() — must distinguish a runnable updater from stale
 //      install provenance. The bootstrap marker can outlive the venv, and a
 //      partial venv cannot run the updater; those states require --repair.
@@ -106,16 +106,16 @@ function makeDeps(overrides: Partial<Parameters<typeof resolveVenvHermesCommand>
 test('resolveVenvHermesCommand: returns null off Windows', async () => {
   const deps = makeDeps({ isWindows: false })
 
-  assert.equal(await resolveVenvHermesCommand('/root/venv/Scripts/hermes.exe', [], deps), null)
+  assert.equal(await resolveVenvHermesCommand('/root/venv/Scripts/stardust.exe', [], deps), null)
 })
 
 test('resolveVenvHermesCommand: returns null for a .cmd/.bat script command', async () => {
   const deps = makeDeps({ isCommandScript: () => true })
 
-  assert.equal(await resolveVenvHermesCommand('/root/venv/Scripts/hermes.cmd', [], deps), null)
+  assert.equal(await resolveVenvHermesCommand('/root/venv/Scripts/stardust.cmd', [], deps), null)
 })
 
-test('resolveVenvHermesCommand: returns null when the basename is not hermes/hermes.exe', async () => {
+test('resolveVenvHermesCommand: returns null when the basename is not hermes/stardust.exe', async () => {
   const deps = makeDeps()
 
   assert.equal(await resolveVenvHermesCommand('/root/venv/Scripts/python.exe', [], deps), null)
@@ -124,13 +124,13 @@ test('resolveVenvHermesCommand: returns null when the basename is not hermes/her
 test('resolveVenvHermesCommand: returns null when the parent dir is not Scripts', async () => {
   const deps = makeDeps()
 
-  assert.equal(await resolveVenvHermesCommand('/root/venv/bin/hermes.exe', [], deps), null)
+  assert.equal(await resolveVenvHermesCommand('/root/venv/bin/stardust.exe', [], deps), null)
 })
 
 test('resolveVenvHermesCommand: returns null when the venv python does not exist on disk', async () => {
   const deps = makeDeps({ fileExists: () => false })
 
-  assert.equal(await resolveVenvHermesCommand('/root/venv/Scripts/hermes.exe', [], deps), null)
+  assert.equal(await resolveVenvHermesCommand('/root/venv/Scripts/stardust.exe', [], deps), null)
 })
 
 test('resolveVenvHermesCommand: probes the venv python before trusting it (returns null on failed probe)', async () => {
@@ -145,7 +145,7 @@ test('resolveVenvHermesCommand: probes the venv python before trusting it (retur
     }
   })
 
-  const result = await resolveVenvHermesCommand('/root/venv/Scripts/hermes.exe', ['serve'], deps)
+  const result = await resolveVenvHermesCommand('/root/venv/Scripts/stardust.exe', ['serve'], deps)
 
   assert.equal(probed, true, 'must probe the venv interpreter; a broken venv must not be re-selected forever')
   assert.equal(result, null, 'a failed probe must fall through (return null) so the resolver reaches bootstrap')
@@ -153,7 +153,7 @@ test('resolveVenvHermesCommand: probes the venv python before trusting it (retur
 
 test('resolveVenvHermesCommand: returns the resolved python backend descriptor when the probe passes', async () => {
   const deps = makeDeps()
-  const result = await resolveVenvHermesCommand('/root/venv/Scripts/hermes.exe', ['serve', '--port', '0'], deps)
+  const result = await resolveVenvHermesCommand('/root/venv/Scripts/stardust.exe', ['serve', '--port', '0'], deps)
 
   assert.ok(result, 'a passing probe must return a backend descriptor, not null')
   assert.equal(result.command, '/root/venv/Scripts/python.exe')
@@ -164,11 +164,11 @@ test('resolveVenvHermesCommand: returns the resolved python backend descriptor w
   assert.deepEqual(result.env, { FAKE_ENV: '1' })
 })
 
-test('resolveVenvHermesCommand: is case-insensitive on hermes.exe and the Scripts dir name', async () => {
+test('resolveVenvHermesCommand: is case-insensitive on stardust.exe and the Scripts dir name', async () => {
   const deps = makeDeps()
 
   assert.ok(await resolveVenvHermesCommand('/root/venv/Scripts/HERMES.EXE', [], deps))
-  assert.ok(await resolveVenvHermesCommand('/root/venv/SCRIPTS/hermes.exe', [], deps))
+  assert.ok(await resolveVenvHermesCommand('/root/venv/SCRIPTS/stardust.exe', [], deps))
 })
 
 // ── getVenvSitePackagesEntries ─────────────────────────────────────────────

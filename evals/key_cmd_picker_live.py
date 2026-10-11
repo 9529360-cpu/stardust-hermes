@@ -126,7 +126,7 @@ def main():
                 phase = f"{schema}/{surface}"
                 with tempfile.TemporaryDirectory(prefix="hermes-keycmd-live-") as tmp:
                     home = Path(tmp)
-                    state = home / ".hermes"
+                    state = home / ".stardust"
                     state.mkdir()
                     mint_log = home / "helper-invocations"
                     helper = home / "mint.py"
@@ -142,7 +142,7 @@ def main():
                            schema: {slug: entry} if schema == "providers" else [entry]}
                     # JSON is valid YAML; no third-party harness dependencies.
                     (state / "config.yaml").write_text(json.dumps(cfg))
-                    env = {"HOME": str(home), "HERMES_HOME": str(state),
+                    env = {"HOME": str(home), "STARDUST_HOME": str(state),
                            "PATH": "/usr/bin:/bin", "TERM": "xterm-256color", "LANG": "C.UTF-8",
                            "PYTHONPATH": str(repo), "PYTHONUNBUFFERED": "1"}
                     if surface == "cli":

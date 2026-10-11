@@ -7,7 +7,7 @@ finalizing, the executor refused work, SIGKILL — the restarted scan used to se
 ``next_run_at`` and the occurrence vanished: no execution row, no log line. The store now carries a
 ``pending_slot`` stamp across that window and a later scan restores it as the due instant.
 
-Drives the REAL ``tick()`` against a throwaway HERMES_HOME with a ``no_agent`` script job that
+Drives the REAL ``tick()`` against a throwaway STARDUST_HOME with a ``no_agent`` script job that
 appends one line per fire. Process 1 is a real subprocess that dies inside the window, so the
 restarted scan sees a provably dead owner exactly as a gateway restart does.
 """
@@ -34,17 +34,17 @@ S.tick(verbose=False, sync=True)
 
 @pytest.fixture
 def slot_env(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     (home / "cron" / "output").mkdir(parents=True)
     (home / "scripts").mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
-    monkeypatch.delenv("HERMES_MACHINE_ID", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(home))
+    monkeypatch.delenv("STARDUST_MACHINE_ID", raising=False)
 
     import cron.executions as E
     import cron.jobs as J
     import cron.scheduler as S
 
-    monkeypatch.setattr(J, "HERMES_DIR", home)
+    monkeypatch.setattr(J, "STARDUST_DIR", home)
     monkeypatch.setattr(J, "CRON_DIR", home / "cron")
     monkeypatch.setattr(J, "JOBS_FILE", home / "cron" / "jobs.json")
     monkeypatch.setattr(J, "OUTPUT_DIR", home / "cron" / "output")
@@ -70,7 +70,7 @@ def slot_env(tmp_path, monkeypatch):
 
     def crash_before_dispatch() -> None:
         """Process 1: its tick advances the schedule, then it dies before any fire claim."""
-        env = dict(os.environ, HERMES_HOME=str(home))
+        env = dict(os.environ, STARDUST_HOME=str(home))
         proc = subprocess.run([sys.executable, "-c", _CRASH_BEFORE_DISPATCH, str(REPO)],
                               env=env, cwd=str(REPO), capture_output=True, text=True, timeout=120)
         assert proc.returncode == 137, proc.stderr[-2000:]

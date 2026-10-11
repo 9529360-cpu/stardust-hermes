@@ -14,11 +14,11 @@ def test_agent_build_arms_only_consented_profile_policy(tmp_path, monkeypatch):
     from hermes_constants import reset_hermes_home_override, set_hermes_home_override
     from tui_gateway import server
 
-    monkeypatch.setenv('HERMES_HOME', str(tmp_path))
+    monkeypatch.setenv('STARDUST_HOME', str(tmp_path))
     monkeypatch.setenv('HOME', str(tmp_path / 'os-home'))
     monkeypatch.setattr(Path, 'home', lambda: tmp_path / 'os-home')
-    monkeypatch.setenv('HERMES_IGNORE_RULES', '1')
-    monkeypatch.delenv('HERMES_ACCEPT_HOOKS', raising=False)
+    monkeypatch.setenv('STARDUST_IGNORE_RULES', '1')
+    monkeypatch.delenv('STARDUST_ACCEPT_HOOKS', raising=False)
     monkeypatch.setattr(server, '_hermes_home', tmp_path)
     monkeypatch.setattr(server, '_get_db', lambda: None)
     # Only provider resolution is a fixture; registration, agent, hook process,

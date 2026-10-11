@@ -16,7 +16,7 @@ UPGRADE_ALREADY_SIGNED_IN = "Already signed in."
 UPGRADE_DO_NOT_SHARE = "Do not share this code."
 UPGRADE_TIMED_OUT = "Sign-in timed out; run the command again."
 UPGRADE_NOT_COMPLETED = "Sign-in did not complete; run the command again."
-UPGRADE_UNAVAILABLE = "The free tier is not available right now; run `hermes auth add nous` to sign in."
+UPGRADE_UNAVAILABLE = "The free tier is not available right now; run `stardust auth add nous` to sign in."
 UPGRADE_REASON_COPY = {
     "user_declined": "Sign-in was rejected in the browser.",
     "superseded": "A newer sign-in code replaced this one.",
@@ -26,7 +26,7 @@ UPGRADE_REASON_COPY = {
 }
 _RETIRED_REASONS = frozenset({"account_retired", "account_not_anonymous"})
 
-UPGRADE_NO_DEFAULT_TERMINAL = "No default model is set yet; run `hermes model` to pick one."
+UPGRADE_NO_DEFAULT_TERMINAL = "No default model is set yet; run `stardust model` to pick one."
 UPGRADE_NO_DEFAULT_CHAT = "No default model is set yet; run /model to pick one."
 UPGRADE_WAITING = "Waiting for sign-in..."
 UPGRADE_WAITING_UP_TO = "Waiting for sign-in, up to {minutes}."
@@ -54,7 +54,7 @@ def format_wait_line(expires_in: int) -> str:
 #
 # One sign-in composition (:func:`run_sign_in`) yields these; every surface is a renderer over them.
 # Each state carries its own user copy, so no renderer ever maps a reason to a string: ``.copy`` is
-# the in-chat form (never a raw exception, a URL or a ``hermes`` verb) and ``.copy_terminal`` the
+# the in-chat form (never a raw exception, a URL or a ``stardust`` verb) and ``.copy_terminal`` the
 # form a top-level terminal command prints.
 
 

@@ -8,7 +8,7 @@ from cron import jobs
 
 @pytest.mark.parametrize("catch_up", [True, False])
 def test_missed_policy_preserves_grace_and_manual(tmp_path, monkeypatch, catch_up):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     (tmp_path / "config.yaml").write_text(f"cron:\n  catch_up_missed: {str(catch_up).lower()}\n", encoding="utf-8")
     with jobs.use_cron_store(tmp_path / "cron"):
         now = jobs._hermes_now()
@@ -28,7 +28,7 @@ def test_missed_policy_preserves_grace_and_manual(tmp_path, monkeypatch, catch_u
 
 @pytest.mark.parametrize("uncomputable", [False, True])
 def test_default_and_uncomputable_still_catch_up(tmp_path, monkeypatch, uncomputable):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     if uncomputable:
         (tmp_path / "config.yaml").write_text("cron:\n  catch_up_missed: false\n", encoding="utf-8")
     with jobs.use_cron_store(tmp_path / "cron"):

@@ -94,7 +94,7 @@ def _resolve_stt_language(
     provider_key: str, stt_config: Optional[Dict[str, Any]] = None, *, extra_keys: tuple = ()
 ) -> Optional[str]:
     """Language hint for an STT provider, first non-empty wins (never ""): ``stt.<provider>.language``
-    (plus *extra_keys* aliases, e.g. ``language_code``) > ``stt.language`` > ``HERMES_LOCAL_STT_LANGUAGE``
+    (plus *extra_keys* aliases, e.g. ``language_code``) > ``stt.language`` > ``STARDUST_LOCAL_STT_LANGUAGE``
     env > None (provider auto-detects)."""
     if stt_config is None:
         stt_config = _load_stt_config()
@@ -166,7 +166,7 @@ def _resolve_explicit_local() -> str:
     backend = _detect_local_backend()
     if not backend:
         logger.warning("STT provider 'local' configured but unavailable "
-                       "(install faster-whisper or set HERMES_LOCAL_STT_COMMAND)")
+                       "(install faster-whisper or set STARDUST_LOCAL_STT_COMMAND)")
     return backend or "none"
 
 
@@ -487,7 +487,7 @@ def _no_provider_error(provider: str, stt_config: Dict[str, Any]) -> Dict[str, A
     if "provider" in stt_config and provider_key and provider_key not in BUILTIN_STT_PROVIDERS and provider_key != "none":
         return _unregistered_stt_provider_error(provider_key)
     # An explicit openai selection flattened to "none" has a specific reason (e.g. managed gateway down).
-    # Surface it — with its `hermes tools` remediation — instead of the all-provider setup hint (#93045).
+    # Surface it — with its `stardust tools` remediation — instead of the all-provider setup hint (#93045).
     if provider_key == "none" and str(stt_config.get("provider") or "") == "openai" and _HAS_OPENAI:
         reason = _openai_audio_unavailable_reason()
         if reason is not None:

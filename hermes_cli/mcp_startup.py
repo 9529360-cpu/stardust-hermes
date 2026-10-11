@@ -10,7 +10,7 @@ from typing import Dict, Optional, Set
 from hermes_constants import hermes_home_key
 
 _mcp_discovery_lock = threading.Lock()
-# Discovery slot per profile home (``hermes_home_key()`` follows the context-local HERMES_HOME
+# Discovery slot per profile home (``hermes_home_key()`` follows the context-local STARDUST_HOME
 # override): a shared Desktop/dashboard backend serving several profiles runs one discovery per
 # profile instead of the first profile to build an agent claiming the slot for everybody (#67605).
 # A single-profile process has exactly one key, so behaviour is the old single-slot form.
@@ -100,7 +100,7 @@ def start_background_mcp_discovery(*, logger, thread_name: str) -> None:
             return
 
         # Bare threads start from an empty context: run discovery under a copy of the caller's, so
-        # the context-local HERMES_HOME override (multi-profile dashboard/desktop backends, #67605)
+        # the context-local STARDUST_HOME override (multi-profile dashboard/desktop backends, #67605)
         # AND the profile's secret scope reach it. Without the scope a session switched to profile
         # X would discover the LAUNCH profile's mcp_servers, and ``${TOKEN}`` interpolation / the
         # stdio child env would fail closed (multiplex) or resolve the launch profile's value.
@@ -252,7 +252,7 @@ def ensure_mcp_discovery_before_agent_build(
     thread_name: str = "cli-mcp-discovery") -> None:
     """Give configured MCP tools a bounded chance to register before AIAgent.
 
-    Non-interactive first turns (``chat -q``, ``hermes -z``) can construct ``AIAgent`` before any
+    Non-interactive first turns (``chat -q``, ``stardust -z``) can construct ``AIAgent`` before any
     path started discovery, and ``wait_for_mcp_discovery()`` only joins an existing thread — so
     start discovery if needed, then wait up to the configured bound.
     """

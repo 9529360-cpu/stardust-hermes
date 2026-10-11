@@ -97,8 +97,8 @@ def _run_fresh_recovery_process(
     could not run (no systemd-run in gateway mode, OSError, timeout) — the caller fails closed."""
     command = [sys.executable, "-m", "hermes_cli.update_restart_recovery", "--stdin"]
     env = os.environ.copy()
-    env["HERMES_UPDATE_RESTART_RECOVERY"] = "1"
-    for marker in ("_HERMES_GATEWAY", "HERMES_GATEWAY", "HERMES_GATEWAY_MODE"):
+    env["STARDUST_UPDATE_RESTART_RECOVERY"] = "1"
+    for marker in ("_HERMES_GATEWAY", "STARDUST_GATEWAY", "STARDUST_GATEWAY_MODE"):
         env.pop(marker, None)
 
     # A gateway-triggered update may run inside the gateway's systemd cgroup: put the recovery in a
@@ -216,7 +216,7 @@ def _recover_gateway_restart_after_abort(
 
 
 def _warn_stale_serve_runtimes(rows) -> None:
-    """Name the serve/dashboard processes still on pre-update code: ``hermes serve`` hosts
+    """Name the serve/dashboard processes still on pre-update code: ``stardust serve`` hosts
     ``tui_gateway.server``, and an un-restarted unit keeps the pre-pull ``sys.modules`` graph so
     every chat turn fails with an ``ImportError`` no gateway row explains."""
     if not rows:
@@ -230,7 +230,7 @@ def _warn_stale_serve_runtimes(rows) -> None:
             f" (profile {row.get('profile') or 'default'}, {row.get('supervisor') or 'unknown'})")
     print(
         "    Restart them before using Hermes again, e.g. `systemctl --user restart hermes-serve.service`"
-        " or by relaunching `hermes serve` / the Desktop app.")
+        " or by relaunching `stardust serve` / the Desktop app.")
 
 
 def _abort_recovery_is_complete(

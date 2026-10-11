@@ -1,4 +1,4 @@
-"""Tests for ``hermes gui`` desktop launcher wiring."""
+"""Tests for ``stardust gui`` desktop launcher wiring."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def _stable_keychain_detection(monkeypatch):
     """
     monkeypatch.delenv("KDE_SESSION_VERSION", raising=False)
     monkeypatch.delenv("KDE_FULL_SESSION", raising=False)
-    monkeypatch.delenv("HERMES_DESKTOP_PASSWORD_STORE", raising=False)
+    monkeypatch.delenv("STARDUST_DESKTOP_PASSWORD_STORE", raising=False)
     monkeypatch.setenv("GNOME_KEYRING_CONTROL", "/run/user/1000/keyring")
 
 
@@ -199,7 +199,7 @@ def test_gui_install_env_prepends_managed_node_on_bare_path(tmp_path, monkeypatc
     # A managed Node tree on disk so with_hermes_node_path() actually prepends it.
     home = tmp_path / "hermes-home"
     (home / "node" / "bin").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     # Simulate the stripped PATH the desktop updater chain hands us.
     monkeypatch.setenv("PATH", os.pathsep.join(["/usr/bin", "/bin"]))
 
@@ -783,7 +783,7 @@ def test_setup_tcc_identity_non_macos_skips(tmp_path, monkeypatch, capsys):
 
 
 def test_cmd_gui_setup_tcc_identity_exits_before_build(tmp_path, monkeypatch):
-    """`hermes desktop --setup-tcc-identity` calls the setup and exits 0/1
+    """`stardust desktop --setup-tcc-identity` calls the setup and exits 0/1
     without building or launching the app."""
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
@@ -974,7 +974,7 @@ def test_relaunchable_fixup_legacy_adhoc_success_still_verifies_and_never_delete
 
 @pytest.mark.linux_only
 def test_gui_registers_linux_desktop_entry_before_launch(tmp_path, monkeypatch):
-    """`hermes desktop` gives the app a launcher presence on Linux."""
+    """`stardust desktop` gives the app a launcher presence on Linux."""
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     packaged_exe = _make_packaged_executable(root, monkeypatch)
@@ -1143,7 +1143,7 @@ def _clear_keychain_env(monkeypatch):
         "KDE_SESSION_VERSION",
         "KDE_FULL_SESSION",
         "GNOME_KEYRING_CONTROL",
-        "HERMES_DESKTOP_PASSWORD_STORE",
+        "STARDUST_DESKTOP_PASSWORD_STORE",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -1214,7 +1214,7 @@ def test_gui_linux_packaged_launch_bridges_detected_password_store(tmp_path, mon
         cli_main.cmd_gui(_ns())
 
     launch_env = mock_run.call_args_list[1].kwargs["env"]
-    assert launch_env["HERMES_DESKTOP_PASSWORD_STORE"] == "gnome-libsecret"
+    assert launch_env["STARDUST_DESKTOP_PASSWORD_STORE"] == "gnome-libsecret"
 
 
 @pytest.mark.linux_only
@@ -1238,7 +1238,7 @@ def test_gui_linux_source_launch_bridges_detected_password_store(tmp_path, monke
 
     assert mock_run.call_args_list[1].args[0] == ["/usr/bin/npm", "exec", "--", "electron", "."]
     launch_env = mock_run.call_args_list[1].kwargs["env"]
-    assert launch_env["HERMES_DESKTOP_PASSWORD_STORE"] == "kwallet6"
+    assert launch_env["STARDUST_DESKTOP_PASSWORD_STORE"] == "kwallet6"
 
 
 @pytest.mark.linux_only
@@ -1266,13 +1266,13 @@ def test_gui_config_password_store_skips_detection(tmp_path, monkeypatch):
 
     mock_detect.assert_not_called()
     launch_env = mock_run.call_args_list[1].kwargs["env"]
-    assert launch_env["HERMES_DESKTOP_PASSWORD_STORE"] == "kwallet6"
+    assert launch_env["STARDUST_DESKTOP_PASSWORD_STORE"] == "kwallet6"
 
 
 @pytest.mark.linux_only
 def test_gui_explicit_password_store_env_wins_over_config_and_detection(tmp_path, monkeypatch):
     _clear_keychain_env(monkeypatch)
-    monkeypatch.setenv("HERMES_DESKTOP_PASSWORD_STORE", "basic")
+    monkeypatch.setenv("STARDUST_DESKTOP_PASSWORD_STORE", "basic")
     root = _make_desktop_tree(tmp_path)
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
     _make_packaged_executable(root, monkeypatch)
@@ -1295,7 +1295,7 @@ def test_gui_explicit_password_store_env_wins_over_config_and_detection(tmp_path
 
     mock_detect.assert_not_called()
     launch_env = mock_run.call_args_list[1].kwargs["env"]
-    assert launch_env["HERMES_DESKTOP_PASSWORD_STORE"] == "basic"
+    assert launch_env["STARDUST_DESKTOP_PASSWORD_STORE"] == "basic"
 
 
 @pytest.mark.macos_only
@@ -1321,7 +1321,7 @@ def test_gui_password_store_bridge_is_linux_only(tmp_path, monkeypatch):
 
     mock_detect.assert_not_called()
     launch_env = mock_run.call_args_list[1].kwargs["env"]
-    assert "HERMES_DESKTOP_PASSWORD_STORE" not in launch_env
+    assert "STARDUST_DESKTOP_PASSWORD_STORE" not in launch_env
 
 
 # ---------------------------------------------------------------------------

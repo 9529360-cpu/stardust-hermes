@@ -253,7 +253,7 @@ def test_transcription_uses_model_specific_response_formats(monkeypatch, tmp_pat
     whisper_capture = {}
     _install_fake_tools_package()
     _install_fake_openai_module(whisper_capture, transcription_response="hello from whisper")
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     # The managed audio route is the stored "nous" selection (strict model);
     # a stored "openai" selection now means direct credentials only.
     (tmp_path / "config.yaml").write_text("stt:\n  provider: nous\n")

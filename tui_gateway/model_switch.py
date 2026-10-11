@@ -60,7 +60,7 @@ def _launch_profile_scope_needed() -> bool:
 
 
 def _profile_runtime_scope_tokens(profile_home) -> "_TurnScopes | None":
-    """Bind HERMES_HOME + secret + terminal scope for ``profile_home`` (None = launch profile) and
+    """Bind STARDUST_HOME + secret + terminal scope for ``profile_home`` (None = launch profile) and
     return the reset tokens; None when nothing needs binding (unscoped single-profile launch body).
     The launch profile's scope is its ``.env`` over the env frozen at activation (never live
     ``os.environ``: a secondary context may have written to it since, #107422)."""
@@ -278,7 +278,7 @@ def _apply_model_switch(
     if agent:
         _commit_agent_switch(sid, session, agent, result, current_model, restore_snapshot)
     # PER-SESSION override so a rebuild of THIS session (/new, resume) re-derives the model.
-    # Deliberately NOT written to process-global env (HERMES_MODEL & co.): the desktop hosts
+    # Deliberately NOT written to process-global env (STARDUST_MODEL & co.): the desktop hosts
     # every same-profile session in one process, so os.environ would leak the switch to all.
     if pin_session_override and isinstance(session, dict) and not one_turn:
         session["model_override"] = {
@@ -377,7 +377,7 @@ def _sync_agent_model_with_config(sid: str, session: dict) -> None:
     raw = f"{model} --provider {provider}" if provider else model
     try:
         # This sync ADOPTS a config.yaml change; it must never write config back (that is
-        # how `hermes --tui -m` once leaked into config.yaml).
+        # how `stardust --tui -m` once leaked into config.yaml).
         _apply_model_switch(
             sid, session, raw, confirm_expensive_model=True, pin_session_override=False,
             persist_override=False)

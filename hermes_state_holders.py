@@ -30,7 +30,7 @@ def read_only_db_uri(db_path) -> str:
 logger = logging.getLogger(__name__)
 
 _IS_WINDOWS = sys.platform == "win32"
-_HERMES_EXECUTABLES = frozenset({"hermes", "hermes-agent", "hermes-acp"})
+_HERMES_EXECUTABLES = frozenset({"stardust", "hermes", "hermes-agent", "hermes-acp"})
 _HERMES_PYTHON_MODULES = frozenset({"acp_adapter", "hermes_cli.main"})
 _HERMES_PYTHON_SCRIPTS = frozenset({"hermes_cli/main.py", "run_agent.py"})
 _PYTHON_SHORT_OPTIONS_WITH_OPERANDS = frozenset({"Q", "W", "X"})
@@ -134,13 +134,13 @@ def canonical_sqlite_path(path: str) -> str:
 def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
     """Return whether argv proves the process belongs to a DIFFERENT instance.
 
-    ``state.db`` lives at the HERMES_HOME root, so an absolute-path token
-    containing a ``/.hermes`` segment (or naming a ``state.db``/WAL/SHM under
+    ``state.db`` lives at the STARDUST_HOME root, so an absolute-path token
+    containing a ``/.stardust`` segment (or naming a ``state.db``/WAL/SHM under
     some other parent) identifies that token's own Hermes home.  When at least
     one such token exists AND no token references this instance's state.db,
     its sidecars, or its home directory, the process provably works on a
     different generation and must not be counted as an uninspectable holder
-    of ours (issue #92401: a second gateway under /home/demo/.hermes deferred
+    of ours (issue #92401: a second gateway under /home/demo/.stardust deferred
     this instance's stale-FTS rebuild forever despite lsof proving zero open
     handles).  Ambiguous argv without absolute-path tokens returns False and
     keeps the fail-closed suspicion.
@@ -173,7 +173,7 @@ def _argv_scoped_to_other_home(argv: Sequence[str], db_path: Path) -> bool:
             normalized = os.path.normcase(os.path.normpath(path_token))
             if normalized in ours or normalized.startswith(this_home + os.sep):
                 return False
-            if "/.hermes" in normalized or normalized.endswith("/.hermes"):
+            if "/.stardust" in normalized or normalized.endswith("/.stardust"):
                 other_home_seen = True
             elif os.path.basename(normalized) in (
                 "state.db",
@@ -195,7 +195,7 @@ def foreign_state_db_holders(db_path: Path) -> List[Tuple[int, str]]:
         return []
 
     # realpath, not abspath: psutil/libproc report the kernel-resolved pathname, so a symlinked
-    # HERMES_HOME would otherwise make every holder invisible and let maintenance proceed.
+    # STARDUST_HOME would otherwise make every holder invisible and let maintenance proceed.
     db_path_str = os.path.realpath(os.fspath(db_path))
     watched = {
         canonical_sqlite_path(db_path_str),

@@ -22,12 +22,12 @@
 #   added     programs.hermes-agent    the CLI and the desktop application,
 #                                      because Home Manager separates an
 #                                      installation from a daemon
-#   changed   stateDir (+ "/.hermes")  -> hermesHome, set directly
+#   changed   stateDir (+ "/.stardust")  -> hermesHome, set directly
 #
 # To use the module:
 #   imports = [ hermes-agent.homeManagerModules.default ];
 #   programs.hermes-agent = {
-#     enable = true;          # the hermes CLI on your PATH
+#     enable = true;          # the stardust CLI on your PATH
 #     desktop.enable = true;  # the Electron application and a launcher
 #   };
 #   services.hermes-agent = {
@@ -73,19 +73,19 @@
 
       # ── The desktop launcher ───────────────────────────────────────────
       # A GUI launcher reads no shell profile, so home.sessionVariables does
-      # not reach it, and the application would open ~/.hermes while the
+      # not reach it, and the application would open ~/.stardust while the
       # services use hermesHome. Thus the launcher carries the value itself.
       #
-      # HERMES_MANAGED rides along only when the services are enabled. That
+      # STARDUST_MANAGED rides along only when the services are enabled. That
       # variable makes the CLI refuse a configuration change and name the
       # rebuild command. A person who enables `programs.` alone has no
       # activation and no managed configuration, so the application must not
       # claim one and refuse an edit that nothing else owns.
       desktopEnvironment = {
-        HERMES_HOME = cfg.hermesHome;
+        STARDUST_HOME = cfg.hermesHome;
       }
       // lib.optionalAttrs cfg.enable {
-        inherit (processEnvironment) HERMES_MANAGED;
+        inherit (processEnvironment) STARDUST_MANAGED;
       }
       // lib.optionalAttrs desktopUsesService {
         STARDUST_DESKTOP_REMOTE_URL = "http://${cfg.backend.host}:${toString cfg.backend.port}";
@@ -191,7 +191,7 @@
         enable = lib.mkEnableOption ''
           the Hermes Agent command line application.
 
-          This adds `hermes` to home.packages, and exports HERMES_HOME with
+          This adds `stardust` to home.packages, and exports STARDUST_HOME with
           home.sessionVariables. An interactive shell then uses the same
           state as `services.hermes-agent`
         '';
@@ -217,7 +217,7 @@
 
             This adds `hermes-desktop` to home.packages, with an XDG
             launcher entry on Linux. The launcher starts the same Hermes
-            runtime that `package` gives, and reads the HERMES_HOME of
+            runtime that `package` gives, and reads the STARDUST_HOME of
             `services.hermes-agent`. Thus the application, the interactive
             shell and the services share one state directory.
 
@@ -255,16 +255,16 @@
         // {
           hermesHome = lib.mkOption {
             type = lib.types.str;
-            default = "${config.home.homeDirectory}/.hermes";
-            defaultText = lib.literalExpression ''"''${config.home.homeDirectory}/.hermes"'';
+            default = "${config.home.homeDirectory}/.stardust";
+            defaultText = lib.literalExpression ''"''${config.home.homeDirectory}/.stardust"'';
             description = ''
-              The value of HERMES_HOME. This state directory holds
+              The value of STARDUST_HOME. This state directory holds
               config.yaml, .env, auth.json, the sessions, the skills, the
               memory and the cron jobs.
 
-              The NixOS module takes a `stateDir` and adds `/.hermes` to it.
-              This module sets HERMES_HOME directly. Thus an existing
-              ~/.hermes continues to work, and you can give the directory any
+              The NixOS module takes a `stateDir` and adds `/.stardust` to it.
+              This module sets STARDUST_HOME directly. Thus an existing
+              ~/.stardust continues to work, and you can give the directory any
               name.
             '';
             example = "/home/alice/.hermes-work";
@@ -273,7 +273,7 @@
           # `installPackage` moved to `programs.hermes-agent.enable`. The
           # option is dead, but it must not be silent: it defaulted to true,
           # so a person who never named it still got the command line, and a
-          # quiet removal gives them a machine with no `hermes` and no
+          # quiet removal gives them a machine with no `stardust` and no
           # message. mkOption with an assertion, and not
           # mkRemovedOptionModule, because the message must name the exact
           # replacement for the value they set.
@@ -297,13 +297,13 @@
         # daemon at all.
         (lib.mkIf cfgPrograms.enable {
           home.packages = [ cfgPrograms.package ];
-          home.sessionVariables.HERMES_HOME = cfg.hermesHome;
+          home.sessionVariables.STARDUST_HOME = cfg.hermesHome;
         })
 
         # A launcher from the desktop menu reads no shell profile, so the
-        # HERMES_HOME that `programs.enable` exports does not reach it. Home
+        # STARDUST_HOME that `programs.enable` exports does not reach it. Home
         # Manager writes only systemd.user.sessionVariables into
-        # environment.d, and this module does not put HERMES_HOME there,
+        # environment.d, and this module does not put STARDUST_HOME there,
         # because that file applies to each user unit. Thus the launcher
         # carries the value itself. See desktopEnvironment above.
         (lib.mkIf cfgPrograms.desktop.enable {
@@ -315,7 +315,7 @@
             {
               # `installPackage` was removed in favour of the programs/services
               # split. It defaulted to true, so a quiet removal leaves a person
-              # with no `hermes` on the PATH and no message.
+              # with no `stardust` on the PATH and no message.
               assertion = cfg.installPackage == null;
               message = common.installPackageRemovedMessage cfg.installPackage;
             }

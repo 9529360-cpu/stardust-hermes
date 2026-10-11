@@ -1,6 +1,6 @@
 """Multiplex invariant: every memory provider's background thread runs under the spawner's profile.
 
-Profile isolation is a ContextVar-scoped HERMES_HOME override; a plain ``threading.Thread`` starts
+Profile isolation is a ContextVar-scoped STARDUST_HOME override; a plain ``threading.Thread`` starts
 with an EMPTY context, so a provider's prefetch/sync/writer thread would silently resolve the DEFAULT
 profile's home (and fail closed on scoped secrets). Each case drives the provider's real spawn path
 with a fake backend and asserts the thread saw the parent's home.
@@ -96,7 +96,7 @@ _PROVIDERS = {
 
 @pytest.mark.parametrize("name", sorted(_PROVIDERS))
 def test_provider_background_thread_sees_spawner_profile_home(name, tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "default"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "default"))
     profile_home = tmp_path / "profiles" / "b"
     profile_home.mkdir(parents=True)
     seen: dict = {}

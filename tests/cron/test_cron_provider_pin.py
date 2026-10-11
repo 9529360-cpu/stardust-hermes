@@ -14,7 +14,7 @@ Current contract:
     default as before.
 
 These tests exercise the full run_job path (real imports, mocked AIAgent +
-resolve_runtime_provider against a temp HERMES_HOME) and the create_job snapshot capture.
+resolve_runtime_provider against a temp STARDUST_HOME) and the create_job snapshot capture.
 """
 
 import sys
@@ -140,13 +140,13 @@ class TestSnapshotIsTheEffectivePin:
 
     def test_missing_model_guides_to_user_owned_cli(self, tmp_path, monkeypatch):
         """A missing-model failure cannot advertise agent-owned pinning."""
-        monkeypatch.delenv("HERMES_MODEL", raising=False)
+        monkeypatch.delenv("STARDUST_MODEL", raising=False)
         success, error, agent_kwargs, _ = _run(
             _base_job(), tmp_path, current_provider="openrouter", current_model=None)
 
         assert success is False
         assert agent_kwargs is None
-        assert "hermes cron edit pin-test --model <name>" in error
+        assert "stardust cron edit pin-test --model <name>" in error
         assert "cronjob action=update" not in error
 
 

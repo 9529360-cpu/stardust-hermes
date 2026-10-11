@@ -10,9 +10,9 @@ LEGACY = "# Me\n\nBe terse.\n\n## Messaging other agents\n\nold plugin text\n- `
 def test_load_soul_md_drops_legacy_protocol_section(tmp_path, monkeypatch):
     from agent import prompt_builder
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     (home / "SOUL.md").write_text(LEGACY + "\n## Symbols\n\nuse ◆\n", encoding="utf-8")
 
     soul = prompt_builder.load_soul_md(home_override=home)
@@ -29,9 +29,9 @@ def test_load_soul_md_drops_legacy_protocol_section(tmp_path, monkeypatch):
 def test_migration_41_strips_every_profile_soul_once(tmp_path, monkeypatch):
     from hermes_cli.config_migrations import _migrate_to_41
 
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     (home / "profiles" / "worker").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     (home / "SOUL.md").write_text(LEGACY, encoding="utf-8")
     (home / "profiles" / "worker" / "SOUL.md").write_text("# Worker\n\n## Messaging other agents\nx\n", encoding="utf-8")
 

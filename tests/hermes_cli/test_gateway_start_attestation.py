@@ -197,7 +197,7 @@ def test_breakaway_fallback_warns_even_on_success(monkeypatch, attest_home, caps
 
 
 def test_attested_probe_fails_closed_without_a_well_formed_dead_attestation(attest_home):
-    """``hermes update`` uses this probe to override Desktop-owned lifecycle suppression
+    """``stardust update`` uses this probe to override Desktop-owned lifecycle suppression
     (#109538), so only a *detectable* death may read True: no marker, malformed ``pids``,
     a gateway alive now, or a clean ledger exit all read False. The probe must also be
     read-only — consuming the marker here would silence the CLI-start warning that reports

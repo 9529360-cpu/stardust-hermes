@@ -32,7 +32,7 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Klaviyo (or run `hermes mcp login klaviyo`). Approve access,
+  Klaviyo (or run `stardust mcp login klaviyo`). Approve access,
   then restart the session so tools load.
 
   Requires an Owner/Admin/Manager Klaviyo role.

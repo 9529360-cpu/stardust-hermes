@@ -158,7 +158,7 @@ class TestFallbackMirrorEndToEnd:
             "cron:\n  mirror_delivery: true\n"
             "platforms:\n  slack:\n    enabled: true\n    token: xoxb-test\n"
         )
-        monkeypatch.setenv("HERMES_HOME", str(home))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
 
         send_calls = []
 

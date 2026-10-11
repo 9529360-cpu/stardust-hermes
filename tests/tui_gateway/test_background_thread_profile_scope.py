@@ -1,6 +1,6 @@
 """Background threads started from a profile-scoped turn carry that profile's scope.
 
-Under multiplex the HERMES_HOME override and secret scope are contextvars bound per turn; a bare
+Under multiplex the STARDUST_HOME override and secret scope are contextvars bound per turn; a bare
 ``threading.Thread`` / ``Timer`` starts with an EMPTY context and resolves the LAUNCH profile's config
 and credentials (or fails closed on secrets). Two production spawn paths are exercised here through
 their real entry points: the auto-title thread and the ws-orphan reap Timer → session teardown.
@@ -21,12 +21,12 @@ from hermes_constants import get_hermes_home, reset_hermes_home_override, set_he
 
 @pytest.fixture
 def served_home(tmp_path, monkeypatch):
-    a = tmp_path / ".hermes"
+    a = tmp_path / ".stardust"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
     (a / ".env").write_text("TITLE_KEY=a-key\n", encoding="utf-8")
     (b / ".env").write_text("TITLE_KEY=b-key\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(a))
+    monkeypatch.setenv("STARDUST_HOME", str(a))
     monkeypatch.setenv("TITLE_KEY", "a-key")
     set_multiplex_active(True)
     try:

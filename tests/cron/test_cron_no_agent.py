@@ -21,13 +21,13 @@ import pytest
 
 @pytest.fixture
 def hermes_env(tmp_path, monkeypatch):
-    """Isolate HERMES_HOME for each test so jobs/scripts don't leak."""
-    home = tmp_path / ".hermes"
+    """Isolate STARDUST_HOME for each test so jobs/scripts don't leak."""
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "scripts").mkdir()
     (home / "cron").mkdir()
 
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     # Reload modules that cache get_hermes_home() at import time.
     import importlib
@@ -335,7 +335,7 @@ def test_run_job_script_accepts_pathlike_script_path(hermes_env):
 @pytest.mark.parametrize(
     "error",
     [
-        "Script timed out after 900s: /home/u/.hermes/scripts/nightly.sh",
+        "Script timed out after 900s: /home/u/.stardust/scripts/nightly.sh",
         "Script failed: curl returned 429 from api.example.com",
         "Script failed: gpg authentication failed for key",
         "Script failed: ReadTimeout contacting localhost",

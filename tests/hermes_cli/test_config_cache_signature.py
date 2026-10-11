@@ -31,7 +31,7 @@ def test_path_signature_detects_rewrite_even_when_windows_change_time_is_unchang
 
 
 def test_load_config_sees_replacement_with_pinned_mtime_and_size(tmp_path):
-    with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+    with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
         config_mod._LOAD_CONFIG_CACHE.clear()
         config_mod._RAW_CONFIG_CACHE.clear()
         cfg = tmp_path / "config.yaml"
@@ -43,7 +43,7 @@ def test_load_config_sees_replacement_with_pinned_mtime_and_size(tmp_path):
 
 
 def test_read_raw_config_sees_replacement_with_pinned_mtime_and_size(tmp_path):
-    with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+    with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
         config_mod._RAW_CONFIG_CACHE.clear()
         cfg = tmp_path / "config.yaml"
         cfg.write_text("model:\n  default: aaaa-route\n", encoding="utf-8")
@@ -53,7 +53,7 @@ def test_read_raw_config_sees_replacement_with_pinned_mtime_and_size(tmp_path):
 
 
 def test_load_env_sees_replacement_with_pinned_mtime_and_size(tmp_path):
-    with patch.dict(os.environ, {"HERMES_HOME": str(tmp_path)}):
+    with patch.dict(os.environ, {"STARDUST_HOME": str(tmp_path)}):
         config_mod.invalidate_env_cache()
         env = tmp_path / ".env"
         env.write_text("JARVIS_KEY=aaaa\n", encoding="utf-8")

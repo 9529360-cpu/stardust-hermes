@@ -239,7 +239,7 @@ class TestOrgPullIsWiredIn:
             / "main_platform_setup.py"
         ).read_text(encoding="utf-8")
         assert "maybe_pull_org_skills" in main_src, (
-            "`hermes sync pull` must also refresh the org mirror."
+            "`stardust sync pull` must also refresh the org mirror."
         )
 
     def test_sync_status_exposes_org_state(self):
@@ -273,11 +273,11 @@ class TestOrgPullIsWiredIn:
 
 
 class TestSkillSyncIsOneCommand:
-    """Every Skill Sync verb lives under `hermes sync` for launch.
+    """Every Skill Sync verb lives under `stardust sync` for launch.
 
     The surface is deliberately encapsulated: one command to learn, one to
     document, and top-level `sync` stays free of skill-management verbs that
-    belong elsewhere. `propose` in particular used to sit under `hermes
+    belong elsewhere. `propose` in particular used to sit under `stardust
     skills`, which split one feature across two commands.
     """
 
@@ -291,22 +291,22 @@ class TestSkillSyncIsOneCommand:
     def test_propose_is_a_sync_subcommand(self):
         sync_src = self._src("hermes_cli", "subcommands", "sync.py")
         assert '"propose"' in sync_src, (
-            "`propose` must be a `hermes sync` subcommand."
+            "`propose` must be a `stardust sync` subcommand."
         )
 
     def test_propose_is_not_under_skills(self):
         skills_src = self._src("hermes_cli", "subcommands", "skills.py")
         assert '"propose"' not in skills_src, (
-            "`propose` must NOT remain under `hermes skills` — Skill Sync is "
+            "`propose` must NOT remain under `stardust skills` — Skill Sync is "
             "one command for launch."
         )
 
     def test_sync_usage_lists_propose(self):
         main_src = self._src("hermes_cli", "main_platform_setup.py")
-        usage_start = main_src.index("usage: hermes sync ")
+        usage_start = main_src.index("usage: stardust sync ")
         usage_block = main_src[usage_start : usage_start + 1400]
         assert "propose" in usage_block, (
-            "`hermes sync` usage must list the propose verb."
+            "`stardust sync` usage must list the propose verb."
         )
 
 
@@ -375,7 +375,7 @@ class TestLocalEditsSurviveOrgUpdates:
     def test_auto_propose_defaults_off(self, monkeypatch):
         from tools import skills_sync_client as ssc
 
-        monkeypatch.delenv("HERMES_SYNC_ORG_AUTO_PROPOSE", raising=False)
+        monkeypatch.delenv("STARDUST_SYNC_ORG_AUTO_PROPOSE", raising=False)
         monkeypatch.setattr(
             "hermes_cli.config.load_config", lambda: {}, raising=False
         )
@@ -386,5 +386,5 @@ class TestLocalEditsSurviveOrgUpdates:
     def test_auto_propose_can_be_enabled_by_env(self, monkeypatch):
         from tools import skills_sync_client as ssc
 
-        monkeypatch.setenv("HERMES_SYNC_ORG_AUTO_PROPOSE", "1")
+        monkeypatch.setenv("STARDUST_SYNC_ORG_AUTO_PROPOSE", "1")
         assert ssc.sync_org_auto_propose() is True

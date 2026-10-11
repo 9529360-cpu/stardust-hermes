@@ -66,7 +66,7 @@ def _env_disconnect_budget_s() -> float:
     gateway/run.py:_adapter_disconnect_timeout_secs), apportioned by callers
     across go_idle / monitor teardown / drain."""
     budget = 5.0
-    raw = os.getenv("HERMES_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT", "").strip()
+    raw = os.getenv("STARDUST_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT", "").strip()
     if raw:
         with contextlib.suppress(ValueError):
             budget = max(0.0, float(raw))
@@ -222,7 +222,7 @@ def _event_from_wire(raw: Dict[str, Any]) -> MessageEvent:
     if platform_enum == Platform.SLACK:
         # Slack slash text arrives over the relay bypassing the native command
         # callback; normalize at the wire boundary so adapter gates see the real
-        # gateway command rather than the legacy `hermes` parent name.
+        # gateway command rather than the legacy `stardust` parent name.
         text, msg_type = _normalize_slack_parent_command(text, msg_type)
 
     reply_to = raw.get("reply_to") or {}

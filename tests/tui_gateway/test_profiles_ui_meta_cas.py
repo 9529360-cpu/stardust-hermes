@@ -17,9 +17,9 @@ import tui_gateway.server as srv
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     return hermes_home
 
 

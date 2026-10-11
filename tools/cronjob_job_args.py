@@ -12,16 +12,16 @@ logger = logging.getLogger("tools.cronjob_tools")
 
 def _origin_from_env() -> Optional[Dict[str, str]]:
     from gateway.session_context import get_session_env
-    origin_platform = get_session_env("HERMES_SESSION_PLATFORM")
-    origin_chat_id = get_session_env("HERMES_SESSION_CHAT_ID")
+    origin_platform = get_session_env("STARDUST_SESSION_PLATFORM")
+    origin_chat_id = get_session_env("STARDUST_SESSION_CHAT_ID")
     if not (origin_platform and origin_chat_id):
         return None
-    thread_id = get_session_env("HERMES_SESSION_THREAD_ID") or None
+    thread_id = get_session_env("STARDUST_SESSION_THREAD_ID") or None
     # Slack stamps every TOP-LEVEL message's own id as the session thread (a per-message
     # KEY, not a location); persisting it would pin all future deliveries inside an
     # ephemeral thread, so thread == creating message id is synthetic and dropped.
     if thread_id and origin_platform == "slack":
-        message_id = get_session_env("HERMES_SESSION_MESSAGE_ID") or None
+        message_id = get_session_env("STARDUST_SESSION_MESSAGE_ID") or None
         if message_id and str(thread_id) == str(message_id):
             logger.debug(
                 "Cron origin: dropping synthetic per-message Slack "
@@ -33,12 +33,12 @@ def _origin_from_env() -> Optional[Dict[str, str]]:
             thread_id, origin_platform, origin_chat_id)
     return {
         "platform": origin_platform, "chat_id": origin_chat_id,
-        "chat_name": get_session_env("HERMES_SESSION_CHAT_NAME") or None, "thread_id": thread_id,
+        "chat_name": get_session_env("STARDUST_SESSION_CHAT_NAME") or None, "thread_id": thread_id,
         # Lets a delivery mirror resolve the participant's session in per-user-isolated groups.
-        "user_id": get_session_env("HERMES_SESSION_USER_ID") or None,
+        "user_id": get_session_env("STARDUST_SESSION_USER_ID") or None,
         # Workspace/server scope (Slack team, Discord guild...): Slack session keys embed it,
         # so a continuable cron seed built without it would never resolve a scoped reply.
-        "scope_id": get_session_env("HERMES_SESSION_SCOPE_ID") or None,
+        "scope_id": get_session_env("STARDUST_SESSION_SCOPE_ID") or None,
     }
 
 
@@ -207,7 +207,7 @@ def _validate_bot_chat_deliver(deliver: Optional[str]) -> Optional[str]:
             return (
                 f"bot-chat delivery profile '{profile_arg}' not found on this "
                 "gateway's machine. Bot Chat delivery is machine-local — use a "
-                "profile that exists here (hermes profile list), or omit the "
+                "profile that exists here (stardust profile list), or omit the "
                 "name (deliver='bot-chat') for the job's own profile.")
     return None
 
@@ -216,19 +216,19 @@ def _resolve_cron_context_deliver(deliver: Optional[str]) -> Optional[str]:
     """Resolve ``origin`` to a concrete target for creates made FROM a cron run (the creating
     session is ephemeral, so by fire time there is no origin). Non-cron sessions: unchanged.
     Cron sessions: ``origin`` (or omitted) becomes the creating run's ``platform:chat_id[:thread]``
-    from HERMES_CRON_AUTO_DELIVER_*, or ``local`` when it has no concrete target; other
+    from STARDUST_CRON_AUTO_DELIVER_*, or ``local`` when it has no concrete target; other
     elements pass through. Otherwise the scheduler would guess a home channel."""
     from gateway.session_context import get_session_env
     from utils import is_truthy_value
-    if not is_truthy_value(get_session_env("HERMES_CRON_SESSION", "")):
+    if not is_truthy_value(get_session_env("STARDUST_CRON_SESSION", "")):
         return deliver
 
     def _creator_target() -> str:
-        platform = get_session_env("HERMES_CRON_AUTO_DELIVER_PLATFORM", "").strip()
-        chat_id = get_session_env("HERMES_CRON_AUTO_DELIVER_CHAT_ID", "").strip()
+        platform = get_session_env("STARDUST_CRON_AUTO_DELIVER_PLATFORM", "").strip()
+        chat_id = get_session_env("STARDUST_CRON_AUTO_DELIVER_CHAT_ID", "").strip()
         if not platform or not chat_id:
             return "local"
-        thread_id = get_session_env("HERMES_CRON_AUTO_DELIVER_THREAD_ID", "").strip()
+        thread_id = get_session_env("STARDUST_CRON_AUTO_DELIVER_THREAD_ID", "").strip()
         return f"{platform}:{chat_id}:{thread_id}" if thread_id else f"{platform}:{chat_id}"
 
     if deliver is None:
@@ -293,7 +293,7 @@ def _validate_cron_base_url(
 
 
 def _validate_cron_script_path(script: Optional[str]) -> Optional[str]:
-    """Scripts must be relative paths within HERMES_HOME/scripts/ (absolute / ~ / drive-letter
+    """Scripts must be relative paths within STARDUST_HOME/scripts/ (absolute / ~ / drive-letter
     rejected — prompt-injection guard). Error string if blocked, else None; empty = clear."""
     if not script or not script.strip():
         return None
@@ -425,7 +425,7 @@ def _gateway_liveness_notice(plural: bool = False) -> dict:
             "warning": (
                 f"The Hermes gateway is not running — {subject} "
                 "but will NOT fire until the gateway is started "
-                "(hermes gateway install / hermes gateway start). "
+                "(stardust gateway install / stardust gateway start). "
                 "Tell the user the task is scheduled but not active yet."),
         }
     return {"gateway_running": None if _gw is None else True}

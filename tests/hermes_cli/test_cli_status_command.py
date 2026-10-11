@@ -78,13 +78,13 @@ def test_show_session_status_prints_gateway_style_summary():
         "started_at": 1775791440,
     }
 
-    with patch("hermes_constants.display_hermes_home", return_value="~/.hermes"):
+    with patch("hermes_constants.display_hermes_home", return_value="~/.stardust"):
         cli_obj._show_session_status()
 
     printed = "\n".join(str(call.args[0]) for call in cli_obj.console.print.call_args_list)
     assert "Hermes CLI Status" in printed
     assert "Session ID: session-123" in printed
-    assert "Path: ~/.hermes" in printed
+    assert "Path: ~/.stardust" in printed
     assert "Title: My titled session" in printed
     assert "Model: openai/gpt-5.4 (openai)" in printed
     assert "Tokens: 321" in printed
@@ -107,7 +107,7 @@ def test_show_session_status_includes_reasoning_approvals_context():
         "context_tokens": 50000, "context_length": 200000, "context_percent": 25,
     }
 
-    with patch("hermes_constants.display_hermes_home", return_value="~/.hermes"), \
+    with patch("hermes_constants.display_hermes_home", return_value="~/.stardust"), \
          patch("tools.approval_context._get_approval_mode", return_value="manual"), \
          patch("tools.approval.is_approval_bypass_active_for_session", return_value=False):
         cli_obj._show_session_status()
@@ -119,11 +119,11 @@ def test_show_session_status_includes_reasoning_approvals_context():
 
 
 def test_profile_command_reports_custom_root_profile(monkeypatch, tmp_path, capsys):
-    """Profile detection works for custom-root deployments (not under ~/.hermes)."""
+    """Profile detection works for custom-root deployments (not under ~/.stardust)."""
     cli_obj = _make_cli()
     profile_home = tmp_path / "profiles" / "coder"
 
-    monkeypatch.setenv("HERMES_HOME", str(profile_home))
+    monkeypatch.setenv("STARDUST_HOME", str(profile_home))
     monkeypatch.setattr(Path, "home", lambda: tmp_path / "unrelated-home")
 
     cli_obj._handle_profile_command()

@@ -807,7 +807,7 @@ def _resolve_call_client(
                     raise RuntimeError(
                         f"Provider '{_explicit}' is set in config.yaml but no API key was found. "
                         f"Set the {_explicit.upper()}_API_KEY environment variable, or switch to "
-                        f"a different provider with `hermes model`.")
+                        f"a different provider with `stardust model`.")
                 client, final_model = fb_client, fb_model
                 if async_mode:
                     client, final_model = _aux._to_async_client(
@@ -824,7 +824,7 @@ def _resolve_call_client(
                 effective_provider = _aux._effective_provider_for_client(client, "auto")
     if client is None:
         raise RuntimeError(f"No LLM provider configured for task={task} "
-                           f"provider={resolved_provider}. Run: hermes setup")
+                           f"provider={resolved_provider}. Run: stardust setup")
     return _ResolvedAuxRoute(client, final_model, resolved_provider, effective_provider)
 
 

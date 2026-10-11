@@ -7,12 +7,12 @@ import { connectWindowsRemote } from './windows-remote-lifecycle'
 
 // Live test against a real Windows host over SSH. Opt-in: set the env trio to
 // your test rig; skipped everywhere else (CI, other machines).
-//   HERMES_WIN_SSH_HOST   ssh alias/host of the Windows box
-//   HERMES_WIN_SSH_USER   remote user
-//   HERMES_WIN_SSH_HERMES absolute path to the remote hermes.exe under test
-const liveHost = process.env.HERMES_WIN_SSH_HOST || ''
-const liveUser = process.env.HERMES_WIN_SSH_USER || ''
-const configuredHermes = process.env.HERMES_WIN_SSH_HERMES || ''
+//   STARDUST_WIN_SSH_HOST   ssh alias/host of the Windows box
+//   STARDUST_WIN_SSH_USER   remote user
+//   STARDUST_WIN_SSH_HERMES absolute path to the remote stardust.exe under test
+const liveHost = process.env.STARDUST_WIN_SSH_HOST || ''
+const liveUser = process.env.STARDUST_WIN_SSH_USER || ''
+const configuredHermes = process.env.STARDUST_WIN_SSH_HERMES || ''
 const ownershipId = '89abcdef0123456789abcdef01234567'
 
 function fetchJson(url, token, path) {
@@ -81,14 +81,14 @@ test.skipIf(!liveHost || !liveUser || !configuredHermes)(
         await ssh.cancelForward(second.localPort, second.remotePort)
       }
 
-      const runtimeScript = `& '${configuredHermes.replace('hermes.exe', 'python.exe')}' -m hermes_cli.windows_ssh_runtime read-lock '${ownershipId}'`
+      const runtimeScript = `& '${configuredHermes.replace('stardust.exe', 'python.exe')}' -m hermes_cli.windows_ssh_runtime read-lock '${ownershipId}'`
 
       const lock: any = JSON.parse(
         await ssh.exec(`powershell.exe -NoProfile -NonInteractive -Command "${runtimeScript}"`)
       )
 
       if (lock) {
-        const python = configuredHermes.replace('hermes.exe', 'python.exe')
+        const python = configuredHermes.replace('stardust.exe', 'python.exe')
         const terminate = `& '${python}' -m hermes_cli.windows_ssh_runtime terminate '${lock.pid}' '${lock.creationTimeNs}' '${lock.hermesPath}' '${lock.spawnNonce}'`
         await ssh.exec(`powershell.exe -NoProfile -NonInteractive -Command "${terminate}"`)
         await ssh.exec(

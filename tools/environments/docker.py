@@ -207,15 +207,15 @@ def _docker_query(
 
 
 def find_docker() -> Optional[str]:
-    """Locate the docker/podman CLI (cached): ``HERMES_DOCKER_BINARY`` override, ``docker``
+    """Locate the docker/podman CLI (cached): ``STARDUST_DOCKER_BINARY`` override, ``docker``
     on PATH, ``podman`` on PATH, then macOS Docker Desktop locations; ``None`` if absent."""
     global _docker_executable
     if _docker_executable is not None:
         return _docker_executable
 
-    override = os.getenv("HERMES_DOCKER_BINARY")
+    override = os.getenv("STARDUST_DOCKER_BINARY")
     if override and _is_executable(override):
-        logger.info("Using HERMES_DOCKER_BINARY override: %s", override)
+        logger.info("Using STARDUST_DOCKER_BINARY override: %s", override)
         found = override
     elif found := shutil.which("docker"):
         pass
@@ -399,7 +399,7 @@ def _ensure_docker_available() -> None:
             "or known install locations. Install Docker Desktop and ensure the CLI is available.",
             error="Docker executable not found in PATH or known install locations. "
                   "Install Docker and ensure the 'docker' command is available.",
-            hint="Install Docker (or fix PATH) and retry, or run `hermes setup terminal` to switch to Local.")
+            hint="Install Docker (or fix PATH) and retry, or run `stardust setup terminal` to switch to Local.")
     try:
         result = run_capture([docker_exe, "version"], timeout=5)
     except FileNotFoundError:
@@ -414,7 +414,7 @@ def _ensure_docker_available() -> None:
             docker_exe, exc_info=True,
             error="Docker daemon is not responding. Ensure Docker is running and try again.",
             hint="Start Docker (e.g. `systemctl start docker` or launch Docker Desktop), then retry — "
-                 "or run `hermes setup terminal` to switch to Local.")
+                 "or run `stardust setup terminal` to switch to Local.")
     except Exception:
         logger.error("Unexpected error while checking Docker availability.", exc_info=True)
         raise
@@ -424,7 +424,7 @@ def _ensure_docker_available() -> None:
             docker_exe, result.returncode, result.stderr.strip(),
             error="Docker command is available but 'docker version' failed. Check your Docker installation.",
             hint="Start Docker, or add your user to the docker group, then retry — "
-                 "or run `hermes setup terminal` to switch to Local.")
+                 "or run `stardust setup terminal` to switch to Local.")
 
 
 def _name_only_env_args(names) -> list[str]:
@@ -667,7 +667,7 @@ class DockerEnvironment(BaseEnvironment):
 
     def _mount_args(self, volumes, host_cwd, auto_mount_cwd, task_id) -> tuple[list[str], list[str]]:
         """``(volume_args, writable_args)`` for user volumes, host cwd and /workspace,/root.
-        Persistent mode bind-mounts from TERMINAL_SANDBOX_DIR (default ~/.hermes/sandboxes/)."""
+        Persistent mode bind-mounts from TERMINAL_SANDBOX_DIR (default ~/.stardust/sandboxes/)."""
         volume_args: list[str] = []
         for vol in (volumes or []):
             if not isinstance(vol, str):
@@ -969,7 +969,7 @@ class DockerEnvironment(BaseEnvironment):
         """``(container_id, state)`` of an existing container labeled for this task/profile/
         egress posture, or ``None`` on miss or any failure. The egress posture is a label
         FILTER for every posture, "off" included: a container built with egress on must not be
-        reused after ``hermes egress disable`` (baked-in proxy env and CA mounts), and every
+        reused after ``stardust egress disable`` (baked-in proxy env and CA mounts), and every
         container this class creates carries the label. The ``{{.Label "key"}}`` template
         function is Docker-only — podman ps exits 125 on it — so the probe never uses it (#99213)."""
         filters = [

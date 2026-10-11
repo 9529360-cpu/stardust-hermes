@@ -1,5 +1,5 @@
 """Starter bank templates for the Hindsight setup wizard: fetch the Bank Templates
-catalog, filter to the ``hermes`` integration, apply a manifest via
+catalog, filter to the ``stardust`` integration, apply a manifest via
 ``POST /v1/default/banks/{bank}/import`` (creates the bank if missing).
 Catalog source overridable with ``HINDSIGHT_TEMPLATES_URL`` (pin/mirror).
 """
@@ -42,7 +42,7 @@ def _get_json(url: str) -> dict:
 
 
 def fetch_hermes_templates(url: str | None = None) -> list[dict]:
-    """Return catalog entries tagged for the ``hermes`` integration."""
+    """Return catalog entries tagged for the ``stardust`` integration."""
     catalog = _get_json(url or catalog_url())
     entries = catalog.get("templates", []) if isinstance(catalog, dict) else []
     return [e for e in entries if "hermes" in (e.get("integrations") or [])]

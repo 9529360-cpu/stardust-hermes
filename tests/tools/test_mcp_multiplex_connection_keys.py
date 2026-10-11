@@ -316,7 +316,7 @@ def test_parallel_safe_opt_in_is_per_profile(two_profiles):
 
 
 def test_served_profile_without_multiplex_flag_gets_its_own_connection(two_profiles, monkeypatch):
-    """A dashboard/desktop backend serves profiles through the HERMES_HOME override with
+    """A dashboard/desktop backend serves profiles through the STARDUST_HOME override with
     ``gateway.multiplex_profiles`` off; a same-named server with other credentials must still be a
     separate connection there, or profile B calls the server as profile A (#111151). The launch
     profile itself (no override) keeps the bare, unscoped key."""

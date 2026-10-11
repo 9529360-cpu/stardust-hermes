@@ -7,7 +7,7 @@ file, ...) comes from ``secrets.command`` in ``config.yaml`` — NEVER from
 
 Security model: the command string is the USER'S OWN configuration, so it runs
 via ``/bin/sh -c``; the requested key reaches the child ONLY via
-``HERMES_SECRET_KEY`` (never interpolated, so a hostile key name is inert); hard
+``STARDUST_SECRET_KEY`` (never interpolated, so a hostile key name is inert); hard
 timeout (default 3s) + 1 MiB output cap, every failure degrades to "no value";
 failure logs carry ONLY structured fields (exit code / signal / errno), never
 the command, the helper's stderr (captured and DISCARDED) or any value; startup
@@ -61,7 +61,7 @@ def unquote_dotenv_value(raw: str) -> str:
 def _run_helper(command: str, secret_key: str, timeout_seconds: float, max_output_bytes: int) -> Optional[str]:
     """Run the helper via ``/bin/sh -c`` and return its stdout, or None.
 
-    The key travels as DATA in ``HERMES_SECRET_KEY``. stdout/stderr are piped
+    The key travels as DATA in ``STARDUST_SECRET_KEY``. stdout/stderr are piped
     (never inherited); stderr is discarded. Any failure logs structured fields
     only and returns None — never raises.
     """
@@ -72,7 +72,7 @@ def _run_helper(command: str, secret_key: str, timeout_seconds: float, max_outpu
     # The helper legitimately gets the user's shell env (it may need any
     # credential to resolve the secret) — but a multiplex profile only its own.
     env = source_child_env()
-    env["HERMES_SECRET_KEY"] = secret_key
+    env["STARDUST_SECRET_KEY"] = secret_key
 
     try:
         proc = subprocess.Popen(  # noqa: S602 — command is the user's own config

@@ -1,4 +1,4 @@
-// The standalone desktop-plugin root (`<HERMES_HOME>/desktop-plugins`) and the
+// The standalone desktop-plugin root (`<STARDUST_HOME>/desktop-plugins`) and the
 // one-time migrations that make it the ONLY place desktop code loads from.
 //
 // A desktop plugin extends THIS APP — panes, palette commands, themes — not an

@@ -270,21 +270,21 @@ def test_live_session_payload_replays_open_requests(server):
 
 
 def test_disable_flush_env_var_actually_wires_to_module_constant(monkeypatch):
-    """End-to-end: setting `HERMES_TUI_GATEWAY_NO_FLUSH=1` and importing
+    """End-to-end: setting `STARDUST_TUI_GATEWAY_NO_FLUSH=1` and importing
     `tui_gateway.transport` fresh actually flips `_DISABLE_FLUSH` true.
 
     Reloads only the transport module — server.py is untouched so its
     atexit hooks/worker pool stay intact."""
     import importlib
 
-    monkeypatch.setenv("HERMES_TUI_GATEWAY_NO_FLUSH", "1")
+    monkeypatch.setenv("STARDUST_TUI_GATEWAY_NO_FLUSH", "1")
     transport_mod = importlib.reload(importlib.import_module("tui_gateway.transport"))
 
     try:
         assert transport_mod._DISABLE_FLUSH is True
     finally:
         # Restore the env-disabled state so other tests see the default.
-        monkeypatch.delenv("HERMES_TUI_GATEWAY_NO_FLUSH", raising=False)
+        monkeypatch.delenv("STARDUST_TUI_GATEWAY_NO_FLUSH", raising=False)
         importlib.reload(transport_mod)
 
 
@@ -785,7 +785,7 @@ def test_session_resume_rejects_runaway_transcript_before_history_load(
 
     assert response["error"]["code"] == 4130
     assert "limit 20000" in response["error"]["message"]
-    assert "hermes sessions export" in response["error"]["message"]
+    assert "stardust sessions export" in response["error"]["message"]
 
 
 def test_session_resume_deferred_and_omitted_paths_guard_the_tip_only(server, monkeypatch):
@@ -1053,8 +1053,8 @@ def test_idle_reaper_rearms_missing_ws_orphan_timer(server, monkeypatch, tmp_pat
         try_acquire_active_session,
     )
 
-    home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    home = tmp_path / ".stardust"
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     sid = "detached-without-reaper"
     sibling_sid = "live-sibling"
     orphan_lease, message = try_acquire_active_session(
@@ -1113,7 +1113,7 @@ def test_idle_reaper_rearms_missing_ws_orphan_timer(server, monkeypatch, tmp_pat
 
     repo_root = Path(__file__).resolve().parents[2]
     env = os.environ.copy()
-    env["HERMES_HOME"] = str(home)
+    env["STARDUST_HOME"] = str(home)
     env["PYTHONPATH"] = os.pathsep.join(
         part for part in (str(repo_root), env.get("PYTHONPATH", "")) if part
     )
@@ -1142,8 +1142,8 @@ def test_idle_reaper_rearms_missing_ws_orphan_timer(server, monkeypatch, tmp_pat
 def test_sync_session_key_after_compress_reanchors_active_session_lease(
     server, monkeypatch, tmp_path
 ):
-    home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    home = tmp_path / ".stardust"
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     from hermes_cli.active_sessions import (
         active_session_registry_snapshot,
@@ -1263,7 +1263,7 @@ def test_slash_exec_rejects_skill_commands(server):
 
 def test_slash_exec_scopes_skill_lookup_to_session_profile(server, tmp_path):
     """slash.exec must resolve get_skill_commands() against the session's own
-    profile_home rather than the gateway process's ambient HERMES_HOME
+    profile_home rather than the gateway process's ambient STARDUST_HOME
     (#88023). A Desktop session that switches profiles mid-session shares
     the same gateway process, so a skill declared only under the new
     profile's skills.external_dirs must still be recognized here — else the
@@ -1306,7 +1306,7 @@ def test_slash_exec_scopes_skill_lookup_to_session_profile(server, tmp_path):
             "params": {"command": "b-only", "session_id": sid},
         })
 
-    # The gateway's own HERMES_HOME (the test-isolation tempdir, no
+    # The gateway's own STARDUST_HOME (the test-isolation tempdir, no
     # skills.external_dirs) has no "b-only" skill — the only way this
     # resolves is by scoping the lookup to the session's profile_home.
     assert "error" in resp
@@ -1363,7 +1363,7 @@ def test_slash_exec_routes_a_secondary_only_bundle_to_dispatch(server, tmp_path,
     import agent.skill_bundles as sb_mod
     import agent.skill_commands as sc_mod
 
-    monkeypatch.delenv("HERMES_BUNDLES_DIR", raising=False)
+    monkeypatch.delenv("STARDUST_BUNDLES_DIR", raising=False)
     profile_b = tmp_path / "profile_b"
     external_b = tmp_path / "external_b"
     for name in ("one", "two"):
@@ -1481,7 +1481,7 @@ def test_voice_and_wake_handlers_are_pool_routed(voice_or_wake_method, server):
 
 
 def test_skin_live_switch_end_to_end(server, tmp_path, monkeypatch):
-    """Real config + skin files: activating a skin (as `hermes config set` does)
+    """Real config + skin files: activating a skin (as `stardust config set` does)
     makes the per-tool reconcile broadcast skin.changed with the resolved palette.
     Exercises _load_cfg → _skin_sig → resolve_skin → _emit with no mocks in between."""
     import hermes_cli.skin_engine as skin_engine
@@ -1503,7 +1503,7 @@ def test_skin_live_switch_end_to_end(server, tmp_path, monkeypatch):
     server._broadcast_skin_if_changed()
     emitted.clear()
 
-    # Activate midnight, as `hermes config set display.skin midnight` would.
+    # Activate midnight, as `stardust config set display.skin midnight` would.
     time.sleep(0.01)  # ensure the config mtime moves
     (tmp_path / "config.yaml").write_text("display:\n  skin: midnight\n", encoding="utf-8")
     server._broadcast_skin_if_changed()
@@ -1579,7 +1579,7 @@ def test_approval_audit_rpc(server):
 
 def test_work_ledger_rpc(server, monkeypatch, tmp_path):
     from tools import work_ledger
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     item = {"id": "delegation:test", "kind": "delegation", "title": "Research",
             "status": "completed", "started_at": 1.0, "updated_at": 2.0,
             "detail": {"summary": "Done"}}

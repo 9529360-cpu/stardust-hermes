@@ -522,7 +522,7 @@ def _bootstrap_session_db(home: str, done: threading.Event) -> None:
 
 
 def _get_session_db() -> Optional[Any]:
-    """Cached SessionDB per HERMES_HOME (profile switches pick the right DB); None on any failure.
+    """Cached SessionDB per STARDUST_HOME (profile switches pick the right DB); None on any failure.
 
     Never constructs SessionDB on an event-loop thread: a cache miss there kicks a one-shot background
     bootstrap and waits a bounded grace window (the kick call waits ``_DB_BOOTSTRAP_INIT_WAIT_S`` so a
@@ -538,7 +538,7 @@ def _get_session_db() -> Optional[Any]:
 
     cached = _DB_CACHE.get(home)
     if cached is not None and _registry_tore_down(cached):
-        # ``hermes profile delete`` force-closes every handle under the profile home
+        # ``stardust profile delete`` force-closes every handle under the profile home
         # (``hermes_state_registry.close_all_under``) before rmtree; a same-name recreate in this
         # process must acquire a fresh handle, not keep writing into the torn-down one.
         with _DB_BOOTSTRAP_LOCK:
@@ -1060,7 +1060,7 @@ def _decision(status, should_continue: bool, prompt: Optional[str], verdict: str
 
 
 _JUDGE_CONFIG_HINT = (
-    "~/.hermes/config.yaml:\n  auxiliary:\n    goal_judge:\n      provider: {provider}\n      model: {model}\n"
+    "~/.stardust/config.yaml:\n  auxiliary:\n    goal_judge:\n      provider: {provider}\n      model: {model}\n"
     "Then /goal resume to continue."
 )
 

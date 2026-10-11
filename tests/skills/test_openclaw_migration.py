@@ -80,7 +80,7 @@ def test_merge_entries_respects_limit_and_reports_overflow():
 def test_migrator_copies_skill_and_merges_allowlist(tmp_path: Path):
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
 
     (source / "workspace" / "skills" / "demo-skill").mkdir(parents=True)
@@ -127,7 +127,7 @@ def test_migrator_copies_skill_and_merges_allowlist(tmp_path: Path):
 def _allowlist_migrator(mod, tmp_path: Path, existing_config: str):
     """Migrator wired to merge an exec-approvals allowlist into config.yaml."""
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
     source.mkdir(parents=True)
     (source / "exec-approvals.json").write_text(
@@ -228,7 +228,7 @@ def test_absent_config_is_still_created(tmp_path: Path):
     """
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
     source.mkdir()
     (source / "openclaw.json").write_text(
@@ -248,7 +248,7 @@ def test_absent_config_is_still_created(tmp_path: Path):
 
 
 def test_symlinked_config_stays_a_symlink(tmp_path: Path):
-    """Managed deployments symlink ~/.hermes/config.yaml into a dotfiles repo.
+    """Managed deployments symlink ~/.stardust/config.yaml into a dotfiles repo.
 
     A plain ``os.replace`` onto the link would detach it into a regular file;
     ``dump_yaml_file`` resolves the link first, as ``utils.atomic_replace`` does.
@@ -274,7 +274,7 @@ def test_unreadable_config_refused_by_model_config_too(tmp_path: Path):
     """The refusal is at the shared helper, so every config step inherits it."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
     source.mkdir()
     (source / "openclaw.json").write_text(
@@ -298,7 +298,7 @@ def test_unreadable_config_refused_by_model_config_too(tmp_path: Path):
 def test_migrator_optionally_imports_supported_secrets_and_messaging_settings(tmp_path: Path):
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
 
     (source / "credentials").mkdir(parents=True)
     (source / "openclaw.json").write_text(
@@ -344,7 +344,7 @@ def test_source_candidate_finds_files_in_custom_workspace(tmp_path: Path):
     be discovered there as a fallback."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     custom_ws = tmp_path / "my-custom-workspace"
 
     target.mkdir()
@@ -411,7 +411,7 @@ def test_slack_settings_migrated(tmp_path: Path):
     """Slack bot/app tokens and allowlist migrate to .env."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
     source.mkdir()
 
@@ -446,7 +446,7 @@ def test_model_config_migrated(tmp_path: Path):
     """Default model setting migrates to config.yaml."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
     source.mkdir()
 
@@ -477,7 +477,7 @@ def test_shared_skills_migrated(tmp_path: Path):
     """Shared skills from ~/.openclaw/skills/ are migrated."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
 
     # Create a shared skill (not in workspace/skills/)
@@ -501,7 +501,7 @@ def test_daily_memory_merged(tmp_path: Path):
     """Daily memory notes from workspace/memory/*.md are merged into MEMORY.md."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
 
     mem_dir = source / "workspace" / "memory"
@@ -532,7 +532,7 @@ def test_provider_keys_require_migrate_secrets_flag(tmp_path: Path):
     """Provider keys migration is double-gated: needs option + --migrate-secrets."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     target.mkdir()
     source.mkdir()
 
@@ -585,7 +585,7 @@ def test_skill_installs_cleanly_under_skills_guard():
 
     # The migration script's references to agent config files are legitimate:
     # it mentions AGENTS.md to migrate workspace instructions and points the
-    # user at ~/.hermes/config.yaml in its post-migration summary — it never
+    # user at ~/.stardust/config.yaml in its post-migration summary — it never
     # writes to either. Under skills-guard-v2 (#92021) these score as
     # informational _ref findings (the old critical agent_config_mod /
     # hermes_config_mod findings no longer fire for bare mentions), so the
@@ -606,8 +606,8 @@ def test_rebrand_text_replaces_openclaw_variants():
     assert mod.rebrand_text("I told Open Claw to use dark mode") == "I told Hermes to use dark mode"
     assert mod.rebrand_text("Open-Claw config is great") == "Hermes config is great"
     assert mod.rebrand_text("OPENCLAW uses tools well") == "Hermes uses tools well"
-    # All-lowercase matches → lowercase ``hermes``; this preserves the
-    # real filesystem path ``~/.hermes`` (Hermes home) when rebranding
+    # All-lowercase matches → lowercase ``stardust``; this preserves the
+    # real filesystem path ``~/.stardust`` (Hermes home) when rebranding
     # memory entries that reference ``~/.openclaw`` or ``openclaw`` prose.
     assert mod.rebrand_text("openclaw should always respond concisely") == "hermes should always respond concisely"
 
@@ -633,7 +633,7 @@ def _run_model_migration(tmp_path: Path, openclaw_json: dict) -> dict:
 
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     source.mkdir(parents=True)
     target.mkdir(parents=True)
     (source / "openclaw.json").write_text(json.dumps(openclaw_json), encoding="utf-8")
@@ -690,7 +690,7 @@ def test_command_allowlist_handles_invalid_utf8_bytes(tmp_path: Path):
     valid patterns elsewhere in the same file must still be imported."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     source.mkdir()
     target.mkdir()
 
@@ -720,7 +720,7 @@ def test_messaging_settings_handles_invalid_utf8_in_telegram_allowlist(tmp_path:
     valid user IDs elsewhere in the same file must still be imported."""
     mod = load_module()
     source = tmp_path / ".openclaw"
-    target = tmp_path / ".hermes"
+    target = tmp_path / ".stardust"
     source.mkdir()
     target.mkdir()
 

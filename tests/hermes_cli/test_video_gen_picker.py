@@ -87,7 +87,7 @@ class TestReconfigureWritesProvider:
         video_gen.provider via the post-env-vars branch."""
         from hermes_cli import tools_config, tools_config_providers
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         video_gen_registry.register_provider(_FakeVideoProvider("xai_fake"))
 
         # Picker prompts replaced — no TTY in tests.

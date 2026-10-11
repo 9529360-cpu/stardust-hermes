@@ -13,11 +13,11 @@ import pytest
 
 @pytest.fixture
 def isolated_home(tmp_path, monkeypatch):
-    """Isolate HERMES_HOME + reset any module-level catalog cache per test."""
-    home = tmp_path / ".hermes"
+    """Isolate STARDUST_HOME + reset any module-level catalog cache per test."""
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     # Force a fresh catalog module state for each test.
     import importlib
@@ -355,7 +355,7 @@ class TestIntegrationWithModelsModule:
 
     def test_picker_nous_row_uses_curated_list(self, tmp_path, monkeypatch):
         """The /model picker surfaces the curated ``_PROVIDER_MODELS["nous"]``
-        list in curated order — matching the ``hermes model`` CLI — not the live
+        list in curated order — matching the ``stardust model`` CLI — not the live
         ``/v1/models`` catalog or the manifest. Portal free/paid recommendations
         are unioned in when reachable; offline (as here, with the Portal calls
         stubbed out) it's exactly the curated list.
@@ -363,9 +363,9 @@ class TestIntegrationWithModelsModule:
         # We deliberately do NOT use the ``isolated_home`` fixture here:
         # that fixture monkeypatches ``Path.home`` to ``tmp_path``, which
         # trips the auth-store seat-belt in ``_auth_file_path()`` because
-        # ``HERMES_HOME / auth.json`` then resolves to the same path the
+        # ``STARDUST_HOME / auth.json`` then resolves to the same path the
         # seat-belt thinks is the "real" user store. Use the autouse
-        # ``_hermetic_environment`` HERMES_HOME directly instead.
+        # ``_hermetic_environment`` STARDUST_HOME directly instead.
         import importlib
         from hermes_cli import model_catalog
         from hermes_cli.models import get_curated_nous_model_ids
@@ -373,7 +373,7 @@ class TestIntegrationWithModelsModule:
         try:
             from hermes_cli.model_switch_providers import list_picker_providers
 
-            active_home = Path(os.environ["HERMES_HOME"])
+            active_home = Path(os.environ["STARDUST_HOME"])
             (active_home / "auth.json").write_text(
                 json.dumps(
                     {
@@ -423,7 +423,7 @@ class TestIntegrationWithModelsModule:
             from hermes_cli.model_switch import list_authenticated_providers
             from hermes_cli.model_switch_providers import list_picker_providers
 
-            active_home = Path(os.environ["HERMES_HOME"])
+            active_home = Path(os.environ["STARDUST_HOME"])
             (active_home / "auth.json").write_text(
                 json.dumps(
                     {

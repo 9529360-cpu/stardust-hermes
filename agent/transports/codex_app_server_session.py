@@ -160,7 +160,7 @@ class CodexAppServerSession:
         self._codex_bin = codex_bin
         self._codex_home = codex_home
         self._permission_profile = permission_profile or _HERMES_TO_CODEX_PERMISSION_PROFILE.get(
-            os.environ.get("HERMES_TERMINAL_SECURITY_MODE", "auto"), "workspace-write"
+            os.environ.get("STARDUST_TERMINAL_SECURITY_MODE", "auto"), "workspace-write"
         )
         self._approval_callback = approval_callback
         self._on_event = on_event  # Display hook (kawaii spinner ticks etc.)

@@ -13,10 +13,10 @@ GATEWAY_SERVICE_RESTART_EXIT_CODE = 75
 # See #51228.
 GATEWAY_FATAL_CONFIG_EXIT_CODE = 78
 
-# Set by ``hermes gateway run --external-supervisor``. Unlike systemd's INVOCATION_ID
+# Set by ``stardust gateway run --external-supervisor``. Unlike systemd's INVOCATION_ID
 # and launchd's XPC_SERVICE_NAME, this survives wrappers that replace the child
 # environment (e.g. ``sudo env -i``).
-EXTERNAL_GATEWAY_SUPERVISOR_ENV = "HERMES_GATEWAY_EXTERNAL_SUPERVISOR"
+EXTERNAL_GATEWAY_SUPERVISOR_ENV = "STARDUST_GATEWAY_EXTERNAL_SUPERVISOR"
 
 DEFAULT_GATEWAY_RESTART_DRAIN_TIMEOUT = float(DEFAULT_CONFIG["agent"]["restart_drain_timeout"])
 DEFAULT_GATEWAY_SIGNAL_INTERRUPT_GRACE_TIMEOUT = float(DEFAULT_CONFIG["gateway"]["signal_interrupt_grace_timeout"])
@@ -63,7 +63,7 @@ def is_gateway_supervisor_process(environ: Mapping[str, str] | None = None) -> b
     """Return whether this gateway process is owned by a supervisor."""
     env = os.environ if environ is None else environ
     xpc_service = env.get("XPC_SERVICE_NAME", "")
-    return bool(env.get("INVOCATION_ID") or env.get("HERMES_S6_SUPERVISED_CHILD") or (xpc_service and xpc_service != "0")
+    return bool(env.get("INVOCATION_ID") or env.get("STARDUST_S6_SUPERVISED_CHILD") or (xpc_service and xpc_service != "0")
                 or str(env.get(EXTERNAL_GATEWAY_SUPERVISOR_ENV, "")).strip().lower() in _TRUTHY)
 
 

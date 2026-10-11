@@ -65,8 +65,8 @@ def _warn_memory_provider_unavailable(name: str, reason: str = "") -> None:
     logger.warning(
         "Memory provider %r is selected but reports unavailable — external memory "
         "is disabled for this session (built-in memory still works). Check the "
-        "provider's credentials/config with 'hermes memory status'. Note: "
-        "systemd/gateway services do not inherit ~/.hermes/.env automatically; set "
+        "provider's credentials/config with 'stardust memory status'. Note: "
+        "systemd/gateway services do not inherit ~/.stardust/.env automatically; set "
         "any required variables in the service environment.%s",
         name,
         f" {reason}" if reason else "",
@@ -83,8 +83,8 @@ def _provider_default_routes(provider: str) -> set[str]:
             routes.add(route)
 
     with suppress(Exception):
-        from hermes_cli.providers import HERMES_OVERLAYS, get_provider
-        overlay = HERMES_OVERLAYS.get(provider)
+        from hermes_cli.providers import STARDUST_OVERLAYS, get_provider
+        overlay = STARDUST_OVERLAYS.get(provider)
         provider_def = get_provider(provider, allow_network=False)
         add(getattr(overlay, "base_url_override", ""))
         add(getattr(provider_def, "base_url", ""))
@@ -179,7 +179,7 @@ def _build_codex_gpt5_autoraise_notice(
         f"ℹ Codex {model} caps context at {cap}, so auto-compaction was raised "
         f"to {to_pct}% (from {from_pct}%) to use more of the window before "
         f"summarizing.\n"
-        f"  Opt back out: hermes config set compression.codex_gpt55_autoraise false"
+        f"  Opt back out: stardust config set compression.codex_gpt55_autoraise false"
     )
 
 
@@ -203,7 +203,7 @@ def _resolve_compression_threshold(
 
 
 def _codex_gpt55_autoraise_notice_marker():
-    """Per-profile marker path (``$HERMES_HOME`` is profile-scoped; not a config key)."""
+    """Per-profile marker path (``$STARDUST_HOME`` is profile-scoped; not a config key)."""
     return get_hermes_home() / ".codex_gpt55_autoraise_notice"
 
 
@@ -569,7 +569,7 @@ _TURN_STATE: Dict[str, Any] = {
     # a stale rebuild instead of clobbering a newer one.
     "_tool_snapshot_generation": 0,
     "_rate_limit_state": None,  # from x-ratelimit-* headers; read by /usage
-    # Credits tracking (dev-only, HERMES_DEV_CREDITS) from x-nous-credits-* headers; session
+    # Credits tracking (dev-only, STARDUST_DEV_CREDITS) from x-nous-credits-* headers; session
     # start is latched on the first header so cumulative spend can be reported.
     "_credits_state": None,
     "_credits_session_start_micros": None,
@@ -876,11 +876,11 @@ def _routed_client_kwargs(agent, fallback_model, _provider_timeout) -> Dict[str,
         raise RuntimeError(
             f"Provider '{_explicit}' is set in config.yaml but no API key "
             f"was found. Set the {_env_hint} environment "
-            f"variable, or switch to a different provider with `hermes model`."
+            f"variable, or switch to a different provider with `stardust model`."
         )
     raise RuntimeError(
-        "No LLM provider configured. Run `hermes model` to "
-        "select a provider, or run `hermes setup` for first-time "
+        "No LLM provider configured. Run `stardust model` to "
+        "select a provider, or run `stardust setup` for first-time "
         "configuration."
     )
 
@@ -1051,7 +1051,7 @@ def _init_fallback_chain(agent, fallback_model):
 
 
 def _load_tools(agent, enabled_toolsets, disabled_toolsets):
-    # A multiplexed gateway may have switched HERMES_HOME since model_tools was imported;
+    # A multiplexed gateway may have switched STARDUST_HOME since model_tools was imported;
     # make sure this profile's plugins are discovered before the tool snapshot.
     try:
         from hermes_cli.plugins import discover_plugins
@@ -1118,7 +1118,7 @@ def _publish_session_id(session_id: str) -> None:
         except Exception:
             delegated_child = False
         if not delegated_child:
-            os.environ["HERMES_SESSION_ID"] = session_id
+            os.environ["STARDUST_SESSION_ID"] = session_id
 
 
 def _init_session_state(agent, session_id, session_db, parent_session_id, reasoning_config, max_tokens,
@@ -1127,7 +1127,7 @@ def _init_session_state(agent, session_id, session_db, parent_session_id, reason
     agent.session_id = session_id or new_session_id(agent.session_start)
     _publish_session_id(agent.session_id)
 
-    # ~/.hermes/sessions/ — kept unconditionally for request_dump_*.json debug breadcrumbs.
+    # ~/.stardust/sessions/ — kept unconditionally for request_dump_*.json debug breadcrumbs.
     agent.logs_dir = get_hermes_home() / "sessions"
     agent.logs_dir.mkdir(parents=True, exist_ok=True)
     _set_defaults(agent, _SESSION_STATE)
@@ -1153,7 +1153,7 @@ def _init_session_state(agent, session_id, session_db, parent_session_id, reason
         "reasoning_config": reasoning_config,
         "max_tokens": max_tokens,
     }
-    # Process-scoped --yolo is persisted so `hermes --resume` restores the bypass
+    # Process-scoped --yolo is persisted so `stardust --resume` restores the bypass
     # (SessionDB.session_yolo_enabled); session-scoped /yolo toggles persist separately.
     with suppress(Exception):
         from tools.approval import _YOLO_MODE_FROZEN
@@ -2248,7 +2248,7 @@ def init_agent(
       prefill_messages: priming history. Anthropic Sonnet/Opus 4.6+ 400 on a trailing
         assistant message — use structured outputs there instead.
       skip_context_files: skip SOUL.md/.hermes.md/AGENTS.md/CLAUDE.md/.cursorrules injection;
-        load_soul_identity keeps ~/.hermes/SOUL.md as identity regardless.
+        load_soul_identity keeps ~/.stardust/SOUL.md as identity regardless.
     """
     _install_safe_stdio()
 

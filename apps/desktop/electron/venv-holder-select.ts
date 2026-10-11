@@ -5,7 +5,7 @@
  *
  * The pre-update handoff kills Hermes-OWNED venv daemons (the memory plugin's
  * hindsight daemon) so the updater never races a mapped shim. External
- * holders (a user terminal running `hermes`, unrelated scripts) must NOT be
+ * holders (a user terminal running `stardust`, unrelated scripts) must NOT be
  * killed — current design reports them via scanVenvBlockers and ABORTS the
  * handoff instead (main.ts releaseBackendLock / applyUpdates).
  */

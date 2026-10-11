@@ -1,4 +1,4 @@
-"""``hermes auth upgrade``: the free tier signs into a Nous account, keeping its connectors.
+"""``stardust auth upgrade``: the free tier signs into a Nous account, keeping its connectors.
 
 Driven through a fake portal covering the device-code endpoints plus the promotion intent/status
 surface, so the wire contract (both codes in the intent, status-driven outcome, token grant
@@ -97,9 +97,9 @@ class FakePortal:
 def portal(monkeypatch, tmp_path):
     fake = FakePortal()
     monkeypatch.setenv("HERMES_PORTAL_BASE_URL", PORTAL)
-    monkeypatch.setenv("HERMES_ANON_API_SECRET", "test-secret")
-    monkeypatch.setenv("HERMES_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
-    monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    monkeypatch.setenv("STARDUST_ANON_API_SECRET", "test-secret")
+    monkeypatch.setenv("STARDUST_SHARED_AUTH_DIR", str(tmp_path / "shared-store"))
+    monkeypatch.setenv("STARDUST_GUEST_ONBOARDING", "1")
     # Legacy-upgrade tests explicitly opt into the compatibility product that Stardust disables.
     from hermes_cli.config import load_config, save_config
     cfg = load_config()
@@ -244,4 +244,4 @@ class TestSignInCompletionSettlesTheModel:
         assert model_cfg["base_url"] == INFERENCE.rstrip("/")
         out = capsys.readouterr().out
         assert "Default model is now" not in out
-        assert "run `hermes model` to pick one" in out
+        assert "run `stardust model` to pick one" in out

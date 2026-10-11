@@ -11,7 +11,7 @@ import * as ClipboardModule from '../lib/clipboard.js'
 import * as Osc52Module from '../lib/osc52.js'
 import * as TerminalSetupModule from '../lib/terminalSetup.js'
 
-// DASHBOARD_TUI_MODE resolves once at module load from HERMES_TUI_DASHBOARD,
+// DASHBOARD_TUI_MODE resolves once at module load from STARDUST_TUI_DASHBOARD,
 // so toggling process.env in a test body can't move it. Mock just that one
 // export (everything else stays real) and flip the holder per test.
 const envState = { dashboardTuiMode: false }

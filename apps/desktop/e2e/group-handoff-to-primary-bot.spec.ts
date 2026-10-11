@@ -78,8 +78,8 @@ test.afterEach(async ({}, info) => {
       await fixture.app.evaluate(() => ({
         cwd: process.cwd(),
         argv: process.argv,
-        root: process.env.HERMES_DESKTOP_HERMES_ROOT,
-        home: process.env.HERMES_HOME
+        root: process.env.STARDUST_DESKTOP_HERMES_ROOT,
+        home: process.env.STARDUST_HOME
       })),
       null,
       2

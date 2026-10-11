@@ -277,11 +277,11 @@ def _set_yolo(rid, params, key, value, session):
             (enable_session_yolo if enable else disable_session_yolo)(skey)
         _emit_session_info(params.get("session_id", ""), session)
     else:
-        enable = _BOOL_WORDS.get(raw, not is_truthy_value(os.environ.get("HERMES_YOLO_MODE")))
+        enable = _BOOL_WORDS.get(raw, not is_truthy_value(os.environ.get("STARDUST_YOLO_MODE")))
         if enable:
-            os.environ["HERMES_YOLO_MODE"] = "1"
+            os.environ["STARDUST_YOLO_MODE"] = "1"
         else:
-            os.environ.pop("HERMES_YOLO_MODE", None)
+            os.environ.pop("STARDUST_YOLO_MODE", None)
     return _kv(rid, key, "1" if enable else "0", scope=scope if scope == "global" else "session")
 
 

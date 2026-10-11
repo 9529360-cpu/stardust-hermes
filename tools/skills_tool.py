@@ -57,14 +57,14 @@ def _skills_scan_signature(dirs_to_scan, disabled) -> tuple:
     return (tuple(sig), frozenset(disabled), platform)
 
 
-HERMES_HOME = get_hermes_home()  # all skills live in ~/.hermes/skills/ (seeded from bundled)
-SKILLS_DIR = HERMES_HOME / "skills"
+STARDUST_HOME = get_hermes_home()  # all skills live in ~/.stardust/skills/ (seeded from bundled)
+SKILLS_DIR = STARDUST_HOME / "skills"
 _SKILLS_DIR_AT_IMPORT = SKILLS_DIR
 
 
 def _skills_dir() -> Path:
     """Active profile's skills dir at call time: the patched ``SKILLS_DIR`` when a patcher changed
-    it, else live profile-scoped HERMES_HOME (long-lived runtimes may import before profile set)."""
+    it, else live profile-scoped STARDUST_HOME (long-lived runtimes may import before profile set)."""
     configured = Path(SKILLS_DIR)
     return configured if configured != _SKILLS_DIR_AT_IMPORT else get_hermes_home() / "skills"
 
@@ -88,7 +88,7 @@ def _skill_lookup_path_error(name: str) -> Optional[str]:
 
 
 def load_env() -> Dict[str, str]:
-    """Snapshot of HERMES_HOME/.env for the post-skill secret-capture diff (same tokenizer that
+    """Snapshot of STARDUST_HOME/.env for the post-skill secret-capture diff (same tokenizer that
     installs the profile scope, so a captured value never differs from the served one)."""
     from agent.secret_scope import load_env_file
 
@@ -121,7 +121,7 @@ def check_skills_requirements() -> bool:
 
 
 def _get_category_from_path(skill_path: Path) -> Optional[str]:
-    """``~/.hermes/skills/mlops/axolotl/SKILL.md`` -> ``"mlops"``; active profile dir first
+    """``~/.stardust/skills/mlops/axolotl/SKILL.md`` -> ``"mlops"``; active profile dir first
     (respects test monkeypatching), then skills.external_dirs."""
     dirs_to_check = [_skills_dir()]
     with suppress(Exception):
@@ -147,17 +147,17 @@ def _parse_tags(tags_value) -> List[str]:
 
 
 def _is_skill_disabled(name: str, platform: str = None) -> bool:
-    """Disabled in config? Platform precedence: explicit arg, ``HERMES_PLATFORM``, session
-    ``HERMES_SESSION_PLATFORM``. A globally-disabled skill stays disabled on every platform
+    """Disabled in config? Platform precedence: explicit arg, ``STARDUST_PLATFORM``, session
+    ``STARDUST_SESSION_PLATFORM``. A globally-disabled skill stays disabled on every platform
     (keep in sync with agent.skill_utils.get_disabled_skill_names)."""
     try:
         from hermes_cli.config import load_config
         skills_cfg = load_config().get("skills", {})
-        resolved_platform = platform or os.getenv("HERMES_PLATFORM")
+        resolved_platform = platform or os.getenv("STARDUST_PLATFORM")
         if not resolved_platform:
             with suppress(Exception):
                 from gateway.session_context import get_session_env
-                resolved_platform = get_session_env("HERMES_SESSION_PLATFORM") or ""
+                resolved_platform = get_session_env("STARDUST_SESSION_PLATFORM") or ""
         platform_disabled = None
         if resolved_platform:
             platform_disabled = cfg_get(skills_cfg, "platform_disabled", resolved_platform)
@@ -411,7 +411,7 @@ def _org_provenance_header(skill_dir: Path, active_skills_dir: Path):
         "> team — treat it as third-party instructions rather than your own notes.\n"
         "> You MAY improve it in place like any other skill. Your edits are kept locally\n"
         "> and are never overwritten by org updates; share them back with\n"
-        "> `hermes sync propose` (or automatically, if your org enables it).\n\n")
+        "> `stardust sync propose` (or automatically, if your org enables it).\n\n")
     return {"org_id": prov_org, "shared_by": author or None, "as_of": ts or None}, header
 
 
@@ -502,7 +502,7 @@ def _locate_skill(name: str, local_category_name: Optional[str], project_dirs: l
                 f"Project skill '{name}' is quarantined: the security scan flagged its content as "
                 "dangerous. It will not load until the repo's skill content changes and passes a re-scan.",
                 hint="Inspect the skill in the repo checkout, or untrust the repo with "
-                "`hermes skills untrust`."), None, None
+                "`stardust skills untrust`."), None, None
     if not skill_md or not skill_md.exists():
         available = [s["name"] for s in _sort_skills(_find_all_skills())[:20]]
         return _fail(f"Skill '{name}' not found.", available_skills=available,
@@ -518,7 +518,7 @@ def _log_security_warnings(name: str, skill_md: Path, content: str, all_dirs, ac
         trusted_dirs.extend(d.resolve() for d in all_dirs)
     warnings = []
     if not _under_any(skill_md, trusted_dirs):
-        warnings.append(f"skill file is outside the trusted skills directory (~/.hermes/skills/): {skill_md}")
+        warnings.append(f"skill file is outside the trusted skills directory (~/.stardust/skills/): {skill_md}")
     if any(p in content.lower() for p in _INJECTION_PATTERNS):
         warnings.append("skill content contains patterns that may indicate prompt injection")
     if warnings:
@@ -565,7 +565,7 @@ def skill_view(
             if not skill_dir or not _background_review_can_inspect_disabled_skill(
                     resolved_name, skill_dir):
                 return _fail(
-                    f"Skill '{resolved_name}' is disabled. Enable it with `hermes skills` or "
+                    f"Skill '{resolved_name}' is disabled. Enable it with `stardust skills` or "
                     "inspect the files directly on disk.")
             # Disabled still means unavailable to normal sessions. The curator gets a read-only
             # inspection path only because its existing ownership guard already authorizes

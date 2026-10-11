@@ -49,7 +49,7 @@ def test_venv_launcher_bypasses_uv_console_script_that_requires_realpath(tmp_pat
     )
     (install_dir / "hermes").write_text("# source entrypoint\n", encoding="utf-8")
     _make_executable(
-        venv_bin / "hermes",
+        venv_bin / "stardust",
         "#!/bin/sh\n"
         f'PATH="{minimal_path}"\n'
         "'''exec' \"$(dirname -- \"$(realpath -- \"$0\")\")\"/'python3' \"$0\" \"$@\"\n"
@@ -77,7 +77,7 @@ def test_venv_launcher_bypasses_uv_console_script_that_requires_realpath(tmp_pat
     subprocess.run(["/bin/bash", "-c", harness], env=env, check=True)
 
     completed = subprocess.run(
-        [command_dir / "hermes", "--version"],
+        [command_dir / "stardust", "--version"],
         env=os.environ | {"LAUNCH_RESULT": str(result)},
         text=True,
         capture_output=True,

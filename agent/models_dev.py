@@ -1,7 +1,7 @@
 """Models.dev registry integration — primary database for providers and models.
 
 Resolution: in-memory cache (fresh, or stale served while one background daemon
-thread refreshes) → disk cache (~/.hermes/models_dev_cache.json, any age) →
+thread refreshes) → disk cache (~/.stardust/models_dev_cache.json, any age) →
 network only when no cache exists. Failed refreshes back off 5 min process-wide.
 Refreshes use ETag conditional GET when a servable registry is held. Hot paths
 pass ``allow_network=False`` and never do I/O. A corrupt/empty disk cache is

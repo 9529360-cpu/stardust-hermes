@@ -205,7 +205,7 @@ def _model_flow_custom(config):
             _caller_model = {"default": _caller_model} if _caller_model else {}
         _apply_endpoint(_caller_model)
         config["model"] = _caller_model
-        print("Endpoint saved. Use `/model` in chat or `hermes model` to set a model.")
+        print("Endpoint saved. Use `/model` in chat or `stardust model` to set a model.")
 
     # Auto-save to custom_providers so it appears in the menu next time
     _save_custom_provider(effective_url, effective_key, model_name or "", context_length=context_length,

@@ -13,10 +13,10 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _isolated_config_env(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
-    monkeypatch.delenv("HERMES_IGNORE_USER_CONFIG", raising=False)
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
+    monkeypatch.delenv("STARDUST_IGNORE_USER_CONFIG", raising=False)
     yield
-    os.environ.pop("HERMES_IGNORE_USER_CONFIG", None)
+    os.environ.pop("STARDUST_IGNORE_USER_CONFIG", None)
 
 
 def _write_corrupt_config(tmp_path):
@@ -52,7 +52,7 @@ class TestGatewayGuard:
         from gateway.run import _guard_corrupt_user_config
 
         _write_corrupt_config(tmp_path)
-        monkeypatch.setenv("HERMES_IGNORE_USER_CONFIG", "1")
+        monkeypatch.setenv("STARDUST_IGNORE_USER_CONFIG", "1")
         _guard_corrupt_user_config()  # must not raise
 
 
@@ -79,11 +79,11 @@ class TestCronRunJobGuard:
         from cron.scheduler import run_job
 
         _write_corrupt_config(tmp_path)
-        monkeypatch.setenv("HERMES_IGNORE_USER_CONFIG", "1")
+        monkeypatch.setenv("STARDUST_IGNORE_USER_CONFIG", "1")
 
         # With the escape hatch active the guard must not trip. The job then
         # proceeds into normal execution; a missing provider/model in the
-        # empty temp HERMES_HOME may fail later, but never with the guard's
+        # empty temp STARDUST_HOME may fail later, but never with the guard's
         # refusal message.
         success, output_doc, final_response, error = run_job(
             self._job(no_agent=True, script="true", deliver="none")
@@ -103,7 +103,7 @@ class TestCronRunJobGuard:
 
 class TestServeGuard:
     def test_serve_headless_refuses_corrupt_config(self, tmp_path, capsys):
-        """The `hermes serve` headless path fails closed before startup."""
+        """The `stardust serve` headless path fails closed before startup."""
         from argparse import Namespace
 
         from hermes_cli import main as main_mod

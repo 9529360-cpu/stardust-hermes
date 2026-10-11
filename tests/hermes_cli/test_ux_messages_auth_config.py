@@ -30,7 +30,7 @@ class TestConfigParseWarning:
     def test_warning_names_repair_commands_and_line(self, tmp_path, monkeypatch, capsys, fallback):
         from hermes_cli import config as config_mod
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         config_mod._CONFIG_PARSE_WARNED.clear()
         config_path = tmp_path / "config.yaml"
         config_path.write_text("model:\n  default: x\n bad: [unterminated\n", encoding="utf-8")
@@ -40,7 +40,7 @@ class TestConfigParseWarning:
         err = capsys.readouterr().err
         assert "formatting error" in err
         assert "line " in err
-        assert "`hermes config edit`" in err and "`hermes config check`" in err
+        assert "`stardust config edit`" in err and "`stardust config check`" in err
         assert "IGNORED" not in err and "LAST KNOWN GOOD" not in err
         # The raw PyYAML text is demoted to a Details line, never the lead sentence.
         lead = err.strip().splitlines()[0]
@@ -54,7 +54,7 @@ class TestConfigGuardCopy:
     def test_require_parseable_user_config_says_what_happened_and_how_to_fix(self, tmp_path, monkeypatch):
         from hermes_cli import config as config_mod
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         (tmp_path / "config.yaml").write_text("model: [unterminated\n", encoding="utf-8")
 
         with pytest.raises(config_mod.InvalidUserConfigError) as excinfo:
@@ -62,7 +62,7 @@ class TestConfigGuardCopy:
 
         msg = str(excinfo.value)
         assert msg.startswith("Hermes stopped because your settings file")
-        assert "`hermes config edit`" in msg and "--ignore-user-config" in msg
+        assert "`stardust config edit`" in msg and "--ignore-user-config" in msg
         assert "non-interactive" not in msg and "built-in defaults" not in msg
         assert "Details:" in msg
 
@@ -70,7 +70,7 @@ class TestConfigGuardCopy:
         from hermes_cli import config as config_mod
         from hermes_constants import display_hermes_home
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         config_mod._CONFIG_PARSE_WARNED.clear()
         (tmp_path / "config.yaml").write_text("model: [unterminated\n", encoding="utf-8")
 
@@ -79,7 +79,7 @@ class TestConfigGuardCopy:
 
         msg = str(excinfo.value)
         assert "this change was not saved" in msg
-        assert "`hermes config edit`" in msg and "`hermes config check`" in msg
+        assert "`stardust config edit`" in msg and "`stardust config check`" in msg
         assert f"{display_hermes_home()}/backups/config/" in msg
         assert not msg.startswith("Refusing")
 
@@ -91,7 +91,7 @@ def test_no_provider_configured_points_at_model_and_auth_add(monkeypatch, tmp_pa
     from hermes_cli.auth import AuthError, resolve_provider
     from hermes_constants import display_hermes_home
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.setattr("agent.bedrock_adapter.has_aws_credentials", lambda env=None: False)
 
     with pytest.raises(AuthError) as excinfo:
@@ -99,8 +99,8 @@ def test_no_provider_configured_points_at_model_and_auth_add(monkeypatch, tmp_pa
 
     msg = str(excinfo.value)
     assert excinfo.value.code == "no_provider_configured"
-    assert "`hermes model`" in msg and "`hermes auth add <provider>`" in msg
-    assert "~/.hermes/.env" not in msg or display_hermes_home() == "~/.hermes"
+    assert "`stardust model`" in msg and "`stardust auth add <provider>`" in msg
+    assert "~/.stardust/.env" not in msg or display_hermes_home() == "~/.stardust"
     assert f"{display_hermes_home()}/.env" in msg
     assert "inference provider" not in msg
 
@@ -110,8 +110,8 @@ def test_no_provider_configured_points_at_model_and_auth_add(monkeypatch, tmp_pa
 
 class TestSignInFailureCopy:
     @pytest.mark.parametrize("code, pointer", [
-        ("expired_token", "`hermes auth add nous`"),
-        ("access_denied", "`hermes model`"),
+        ("expired_token", "`stardust auth add nous`"),
+        ("access_denied", "`stardust model`"),
     ])
     def test_poll_error_codes_map_to_plain_copy(self, code, pointer):
         from hermes_cli import auth_device_flow
@@ -128,8 +128,8 @@ class TestSignInFailureCopy:
 
         msg = str(excinfo.value)
         assert not msg.startswith(code)
-        assert "`hermes auth add nous`" in msg and pointer in msg
-        assert "`hermes portal`" not in msg
+        assert "`stardust auth add nous`" in msg and pointer in msg
+        assert "`stardust portal`" not in msg
 
     def test_network_failure_names_host_and_retry_command(self):
         from hermes_cli.auth_error_copy import sign_in_failure_lines
@@ -138,8 +138,8 @@ class TestSignInFailureCopy:
                                       service_host="portal.nousresearch.com")
 
         assert lines[0].startswith("Could not sign in")
-        assert "portal.nousresearch.com" in lines[0] and "`hermes auth add nous`" in lines[0]
-        assert "`hermes portal`" not in lines[0]
+        assert "portal.nousresearch.com" in lines[0] and "`stardust auth add nous`" in lines[0]
+        assert "`stardust portal`" not in lines[0]
         assert "Errno" not in lines[0]
         assert any(line.strip().startswith("Details:") for line in lines[1:])
 
@@ -171,8 +171,8 @@ class TestSignInFailureCopy:
 
         assert excinfo.value.code == 1
         out = capsys.readouterr().out
-        assert "Could not sign in" in out and "`hermes auth add nous`" in out
-        assert "`hermes portal`" not in out
+        assert "Could not sign in" in out and "`stardust auth add nous`" in out
+        assert "`stardust portal`" not in out
         assert "Login failed:" not in out
 
 
@@ -190,7 +190,7 @@ class TestAuthCommandsCopy:
         msg = str(excinfo.value)
         assert "Unknown provider 'openai'" in msg
         assert "Did you mean" in msg and "openai-codex" in msg
-        assert "`hermes auth`" in msg and "`hermes model`" in msg
+        assert "`stardust auth`" in msg and "`stardust model`" in msg
 
     def test_refresh_failure_names_relogin_command(self, monkeypatch):
         from hermes_cli import auth_commands
@@ -214,7 +214,7 @@ class TestAuthCommandsCopy:
 
         msg = str(excinfo.value)
         assert "refresh_failed" not in msg and "status now" not in msg
-        assert "`hermes auth add nous --type oauth`" in msg
+        assert "`stardust auth add nous --type oauth`" in msg
 
 
 # ── cli-24: /model onto a provider without credentials ───────────────────────────────────────
@@ -237,7 +237,7 @@ def test_creds_for_target_provider_names_auth_add_and_model(monkeypatch):
     assert result is not None and result.success is False
     msg = result.error_message
     assert msg.startswith("Kimi is not connected")
-    assert "`hermes auth add kimi-coding`" in msg and "/model" in msg
+    assert "`stardust auth add kimi-coding`" in msg and "/model" in msg
     assert "Could not resolve credentials" not in msg
     assert "Details:" in msg
 
@@ -249,7 +249,7 @@ class TestProviderSetupFailureCopy:
     def test_setup_provider_step_reports_reason_and_that_nothing_changed(self, monkeypatch, capsys, tmp_path):
         from hermes_cli import setup as setup_mod
 
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
 
         def _boom(*_a, **_k):
             raise httpx.ConnectError("[Errno -2] Name or service not known")
@@ -264,15 +264,15 @@ class TestProviderSetupFailureCopy:
         assert "Could not finish connecting a provider" in out
         assert "internet" in out
         assert "not changed" in out or "Nothing was saved" in out
-        assert "hermes model" in out
+        assert "stardust model" in out
         assert "encountered an error" not in out and "Errno" not in out.split("Details:")[0]
 
     def test_quick_setup_error_hook_uses_same_copy(self, capsys):
         from hermes_cli.auth_error_copy import provider_setup_failure_lines
 
-        lines = provider_setup_failure_lines(RuntimeError("keyring locked"), retry_command="hermes portal")
+        lines = provider_setup_failure_lines(RuntimeError("keyring locked"), retry_command="stardust portal")
         assert lines[0].startswith("Could not finish connecting a provider")
-        assert "hermes portal" in " ".join(lines)
+        assert "stardust portal" in " ".join(lines)
         assert any(line.strip().startswith("Details:") for line in lines)
 
 
@@ -286,9 +286,9 @@ class TestRunLoginProviderAwareCopy:
 
         assert _run_login(_boom, SimpleNamespace(), PROVIDER_REGISTRY["minimax-oauth"]) is False
         out = capsys.readouterr().out
-        assert "hermes auth add minimax-oauth" in out
-        assert "hermes portal" not in out and "portal.nousresearch.com" not in out
-        assert "hermes login" not in out
+        assert "stardust auth add minimax-oauth" in out
+        assert "stardust portal" not in out and "portal.nousresearch.com" not in out
+        assert "stardust login" not in out
 
     def test_nous_failure_uses_generic_provider_auth_retry(self, capsys):
         from hermes_cli.auth import PROVIDER_REGISTRY
@@ -299,8 +299,8 @@ class TestRunLoginProviderAwareCopy:
 
         assert _run_login(_boom, SimpleNamespace(), PROVIDER_REGISTRY["nous"]) is False
         out = capsys.readouterr().out
-        assert "hermes auth add nous" in out and "portal.nousresearch.com" in out
-        assert "hermes portal" not in out
+        assert "stardust auth add nous" in out and "portal.nousresearch.com" in out
+        assert "stardust portal" not in out
 
     def test_silent_nonzero_system_exit_still_tells_user_how_to_retry(self, capsys):
         from hermes_cli.auth import PROVIDER_REGISTRY
@@ -311,7 +311,7 @@ class TestRunLoginProviderAwareCopy:
 
         assert _run_login(_quiet_exit, SimpleNamespace(), PROVIDER_REGISTRY["openai-codex"]) is False
         out = capsys.readouterr().out
-        assert "Sign-in did not complete" in out and "hermes auth add openai-codex" in out
+        assert "Sign-in did not complete" in out and "stardust auth add openai-codex" in out
 
     def test_system_exit_with_message_surfaces_the_message(self, capsys):
         from hermes_cli.model_setup_flows_common import _run_login
@@ -321,7 +321,7 @@ class TestRunLoginProviderAwareCopy:
 
         assert _run_login(_exit_msg) is False
         out = capsys.readouterr().out
-        assert "token endpoint returned 400" in out and "hermes model" in out
+        assert "token endpoint returned 400" in out and "stardust model" in out
 
     def test_cancel_codes_stay_a_single_cancel_line(self, capsys):
         from hermes_cli.model_setup_flows_common import _run_login

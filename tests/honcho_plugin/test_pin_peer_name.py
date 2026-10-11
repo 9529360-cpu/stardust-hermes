@@ -43,7 +43,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": True,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -59,7 +59,7 @@ class TestPinPeerNameConfigParsing:
                 "hermes": {"pinPeerName": True},
             },
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is True
@@ -72,7 +72,7 @@ class TestPinPeerNameConfigParsing:
             "peerName": "Igor",
             "pinPeerName": False,
         }))
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path / "isolated"))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "isolated"))
 
         config = HonchoClientConfig.from_global_config(config_path=config_file)
         assert config.pin_peer_name is False
@@ -538,7 +538,7 @@ class TestPinTransition:
         from gateway.run_agent_cache import GatewayAgentCacheMixin
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         monkeypatch.setattr(GatewayAgentCacheMixin, "_MEMORY_IDENTITY_PROVIDER_MEMO", {})
 
         cfg_path.write_text(json.dumps({"apiKey": "k", "peerName": "Igor", "pinPeerName": True}))
@@ -557,7 +557,7 @@ class TestPinTransition:
         from plugins.memory.honcho import HonchoMemoryProvider
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "hermes"}
         provider = HonchoMemoryProvider()
 
@@ -569,12 +569,12 @@ class TestPinTransition:
         assert sig_user_only != sig_both
 
     def test_identity_signature_reflects_a_repointed_host_workspace(self, tmp_path, monkeypatch):
-        """``hermes honcho peers map`` can repoint a host block's workspace; the cached agent's manager
+        """``stardust honcho peers map`` can repoint a host block's workspace; the cached agent's manager
         is bound to the old one until the signature changes."""
         from plugins.memory.honcho import HonchoMemoryProvider
 
         cfg_path = tmp_path / "honcho.json"
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         base = {"apiKey": "k", "peerName": "Igor", "aiPeer": "hermes"}
         provider = HonchoMemoryProvider()
 
@@ -590,7 +590,7 @@ class TestProfilePeerUniqueness:
     """Each Hermes profile can pin to its own unique peerName.
 
     Profile cloning copies host blocks, but operators routinely diverge them
-    afterwards (e.g. `hermes -p partner` pinned to a different person's peer).
+    afterwards (e.g. `stardust -p partner` pinned to a different person's peer).
     The resolver must honor host-level ``peerName`` so two profiles in the
     same workspace stay scoped to different Honcho peers.
     """

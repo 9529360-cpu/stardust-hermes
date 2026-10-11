@@ -244,7 +244,7 @@ def _expand_path(entry: str) -> Path:
 
 
 def _home_relative(p: Path) -> Path:
-    """Anchor a relative config path at HERMES_HOME; absolute paths pass through."""
+    """Anchor a relative config path at STARDUST_HOME; absolute paths pass through."""
     from hermes_constants import get_hermes_home
     return p if p.is_absolute() else get_hermes_home() / p
 
@@ -256,12 +256,12 @@ ESSENTIAL_SKILLS: frozenset = frozenset({"hermes-agent"})
 
 def get_disabled_skill_names(platform: str | None = None) -> Set[str]:
     """Disabled skill names from config.yaml: global list ∪ platform list
-    (*platform* defaults to ``HERMES_PLATFORM`` / ``HERMES_SESSION_PLATFORM``)."""
+    (*platform* defaults to ``STARDUST_PLATFORM`` / ``STARDUST_SESSION_PLATFORM``)."""
     skills_cfg = _skills_cfg()
     if skills_cfg is None:
         return set()
     from gateway.session_context import get_session_env
-    resolved_platform = platform or os.getenv("HERMES_PLATFORM") or get_session_env("HERMES_SESSION_PLATFORM")
+    resolved_platform = platform or os.getenv("STARDUST_PLATFORM") or get_session_env("STARDUST_SESSION_PLATFORM")
     disabled = _normalize_string_set(skills_cfg.get("disabled"))
     platform_disabled = (skills_cfg.get("platform_disabled") or {}).get(resolved_platform) if resolved_platform else None
     if platform_disabled is not None:
@@ -271,7 +271,7 @@ def get_disabled_skill_names(platform: str | None = None) -> Set[str]:
 
 def parse_config_string_list(value) -> List[str]:
     """Normalize a config value that may hold a JSON-array string into a list.
-    ``hermes config set`` stores lists as quoted JSON/Python-literal strings;
+    ``stardust config set`` stores lists as quoted JSON/Python-literal strings;
     treating one as a single name would silently filter nothing. A scalar
     string still means one name.
 
@@ -315,7 +315,7 @@ def _config_str_list(raw) -> List[str]:
 
 def get_external_skills_dirs() -> List[Path]:
     """Validated, deduplicated ``skills.external_dirs`` (existing dirs only). Entries
-    are ``~``/``${VAR}`` expanded, relative to HERMES_HOME; the local skills dir is skipped."""
+    are ``~``/``${VAR}`` expanded, relative to STARDUST_HOME; the local skills dir is skipped."""
     config_path = get_config_path()
     if not config_path.exists():
         return []
@@ -344,7 +344,7 @@ def get_external_skills_dirs() -> List[Path]:
 
 def get_skill_create_dir() -> Optional[Path]:
     """Configured ``skills.create_dir`` (need not exist yet), or None when unset;
-    relative to HERMES_HOME; a value equal to the local skills dir counts as unset."""
+    relative to STARDUST_HOME; a value equal to the local skills dir counts as unset."""
     raw = _skills_cfg_get("create_dir")
     entry = str(raw).strip() if raw and isinstance(raw, (str, os.PathLike)) else ""
     if not entry:
@@ -375,7 +375,7 @@ def display_skill_create_dir() -> str:
 
 
 def get_all_skills_dirs() -> List[Path]:
-    """Skill dirs: local ``~/.hermes/skills/`` first, then create_dir, then external.
+    """Skill dirs: local ``~/.stardust/skills/`` first, then create_dir, then external.
     Trusted project dirs are NOT included (higher precedence; see get_project_skills_dirs)."""
     dirs = [get_skills_dir()]
     create_dir = get_skill_create_dir()
@@ -385,13 +385,13 @@ def get_all_skills_dirs() -> List[Path]:
     return dirs
 
 
-# Project-local skills (<root>/.hermes/skills, <root>/.agents/skills; root = nearest
+# Project-local skills (<root>/.stardust/skills, <root>/.agents/skills; root = nearest
 # .git ancestor) are a prompt-injection vector if auto-sourced from any clone, so
 # they load only when the root is in ``skills.trusted_project_dirs``; then they
 # override same-named profile/bundled skills. cwd + trust list are session-fixed
 # so the skills index stays byte-stable.
 
-PROJECT_SKILLS_SUBDIRS = (os.path.join(".hermes", "skills"), os.path.join(".agents", "skills"))
+PROJECT_SKILLS_SUBDIRS = (os.path.join(".stardust", "skills"), os.path.join(".agents", "skills"))
 
 _PROJECT_ROOT_MAX_DEPTH = 64  # walk-up bound for pathological cwds
 
@@ -451,7 +451,7 @@ def is_project_root_trusted(root: Path) -> bool:
 
 def _candidate_project_skills_dirs(root: Path) -> List[Path]:
     """Existing skill dirs under *root*, excluding the profile's own skills dir
-    (HERMES_HOME itself may live inside a git checkout)."""
+    (STARDUST_HOME itself may live inside a git checkout)."""
     local_skills = get_skills_dir().resolve()
     dirs: List[Path] = []
     for cand in (root / sub for sub in PROJECT_SKILLS_SUBDIRS):
@@ -492,10 +492,10 @@ def get_untrusted_project_skills_root() -> Optional[Tuple[Path, int]]:
 # Scan-time injection defense: trust is a repo-level decision made once, but a
 # `git pull` could inject a malicious skill into an already-trusted repo. Every
 # project SKILL.md is scanned with the hub's skills_guard scanner (content-hash
-# cached under HERMES_HOME, never inside the repo); "dangerous" excludes the
+# cached under STARDUST_HOME, never inside the repo); "dangerous" excludes the
 # skill from index, list, view and slash commands ("caution" loads, as on the hub).
 
-# ── Project skill quarantine (scan-time injection defense) ──────────────── Trust (`hermes skills trust`)
+# ── Project skill quarantine (scan-time injection defense) ──────────────── Trust (`stardust skills trust`)
 # is a REPO-level decision made once; the repo's skill content keeps changing underneath it with every pull.
 # The hub install path runs skills_guard on install, but project skills are read straight from a checkout —
 # without this gate a `git pull` could inject a malicious skill into an already-trusted repo with no scan
@@ -503,7 +503,7 @@ def get_untrusted_project_skills_root() -> Optional[Tuple[Path, int]]:
 # hub uses (content-hash cached, so the cost is one scan per skill per content change). A "dangerous"
 # verdict quarantines the skill: it is excluded from the index, skills_list, skill_view, and slash commands.
 # "caution" loads (matches hub behavior for prose-level keyword hits) — the quarantine is for
-# high-confidence findings only. The scan cache lives under HERMES_HOME, never inside the repo (we don't
+# high-confidence findings only. The scan cache lives under STARDUST_HOME, never inside the repo (we don't
 # write artifacts into the user's checkout).
 _PROJECT_SCAN_SOURCE = "project-local"
 _PROJECT_QUARANTINE_CACHE: Dict[str, bool] = {}  # skill_dir -> quarantined
@@ -553,7 +553,7 @@ def normalize_skill_lookup_name(identifier: str) -> str:
         return raw_identifier.lstrip("/")
     # Resolve the primary root via tools.skills_tool at CALL time: tests patch
     # ``tools.skills_tool.SKILLS_DIR`` and skill_view() enforces ``_skills_dir()``
-    # (which follows the live profile-scoped HERMES_HOME), so normalization
+    # (which follows the live profile-scoped STARDUST_HOME), so normalization
     # must agree with that exact root. Import deferred (cycle).
     try:
         # See #67277.
@@ -568,7 +568,7 @@ def normalize_skill_lookup_name(identifier: str) -> str:
         except Exception:
             pass
     # Prefer the lexical path under a trusted root before resolving symlinks:
-    # ~/.hermes/skills/<name> may be a symlink to a checkout elsewhere, and
+    # ~/.stardust/skills/<name> may be a symlink to a checkout elsewhere, and
     # resolving first would turn that trusted path into one skill_view rejects.
     for root in trusted_roots:
         if identifier_path.is_relative_to(root):
@@ -689,7 +689,7 @@ def _expand_skill_config_path(value: str) -> str:
     """Expand ``~`` / ``$HOME`` against the HOME Hermes injects into tool subprocesses.
 
     Skill config defaults describe paths the agent hands to tools, so in a container where the
-    control process HOME (``/opt/data``) differs from the tool HOME (``{HERMES_HOME}/home``) a
+    control process HOME (``/opt/data``) differs from the tool HOME (``{STARDUST_HOME}/home``) a
     plain ``expanduser`` pointed the prompt at a path no tool would ever read (#12260).
     """
     subprocess_home = get_subprocess_home()

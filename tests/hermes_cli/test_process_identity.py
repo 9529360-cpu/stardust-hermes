@@ -4,8 +4,8 @@ ledger, and the updater's ledger-identified reap rung.
 Layer context (Aug 2026, after the 12-minute Windows update hang): reapers
 previously inferred process lineage from PPIDs and cmdline shape. These
 primitives make identity positive instead: spawners stamp children
-(HERMES_SPAWN), long-lived processes self-register (pid, create_time,
-purpose, spawner) in spawn-ledger.json, and `hermes update` reaps holders the
+(STARDUST_SPAWN), long-lived processes self-register (pid, create_time,
+purpose, spawner) in spawn-ledger.json, and `stardust update` reaps holders the
 ledger PROVES are orphaned backends — in any update context, no hand-off
 contract needed.
 
@@ -178,12 +178,12 @@ def test_register_self_inherits_spawn_tag_lineage(tmp_path):
 
 
 def test_register_self_falls_back_to_desktop_parent_env(tmp_path):
-    # Legacy Desktop: no HERMES_SPAWN, but HERMES_PARENT_PID + winms marker.
+    # Legacy Desktop: no STARDUST_SPAWN, but STARDUST_PARENT_PID + winms marker.
     ledger = tmp_path / "spawn-ledger.json"
     fake = _fake_psutil({999: 50.0})
     env = {
-        "HERMES_PARENT_PID": "888",
-        "HERMES_PARENT_START_MARKER": "winms:1755689000123",
+        "STARDUST_PARENT_PID": "888",
+        "STARDUST_PARENT_START_MARKER": "winms:1755689000123",
     }
     with patch.dict(sys.modules, {"psutil": fake}), \
          patch.dict(pi.os.environ, env, clear=False), \

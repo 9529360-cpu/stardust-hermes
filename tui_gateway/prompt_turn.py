@@ -168,7 +168,7 @@ class _TurnScopes:
 
     approval: Any = None
     session_tokens: list = dataclasses.field(default_factory=list)
-    home: Any = None  # per-turn HERMES_HOME override for a resumed remote profile
+    home: Any = None  # per-turn STARDUST_HOME override for a resumed remote profile
     secret: Any = None
     terminal: Any = None
 
@@ -796,7 +796,7 @@ def _finish_turn(sid: str, session: dict, st: _TurnRun) -> None:
     history.clear()
     if isinstance(run_kwargs, dict):
         run_kwargs.clear()
-    try:  # while the profile HERMES_HOME override is still active (session's own config)
+    try:  # while the profile STARDUST_HOME override is still active (session's own config)
         from hermes_cli.mem_trim import trim_memory
         trim_memory(reason="tui turn completion")
     except Exception:

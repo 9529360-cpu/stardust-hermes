@@ -37,8 +37,8 @@ from hermes_startup_watchdog import (
 
 @pytest.fixture(autouse=True)
 def _isolate(tmp_path, monkeypatch):
-    """Every test gets a fresh singleton and its own HERMES_HOME."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Every test gets a fresh singleton and its own STARDUST_HOME."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     monkeypatch.delenv(sw.ENV_STARTUP_WATCHDOG, raising=False)
     monkeypatch.delenv(sw.ENV_STARTUP_WATCHDOG_TIMEOUT_S, raising=False)
     sw._reset_for_tests()
@@ -131,7 +131,7 @@ class TestContracts:
         repo_root = Path(__file__).resolve().parents[2]
         arm_sites = {
             # (file, reason) — each must contain an arm_startup_watchdog call
-            "hermes_cli/main.py": "argv fast-path (standard `hermes gateway run`)",
+            "hermes_cli/main.py": "argv fast-path (standard `stardust gateway run`)",
             "hermes_cli/gateway.py": "run_gateway() config-bridge re-arm",
             "gateway/run.py": "gateway.run.main() backstop arm",
             "cli.py": "legacy `--gateway` entry point",

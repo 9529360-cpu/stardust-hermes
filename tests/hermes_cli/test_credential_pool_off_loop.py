@@ -70,7 +70,7 @@ class TestUrlopenBounded:
 class TestExchangeSingleFlight:
     @pytest.fixture(autouse=True)
     def _clean_caches(self, monkeypatch, tmp_path):
-        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
         copilot_auth._jwt_cache.clear()
         copilot_auth._exchange_failure_cache.clear()
         copilot_auth._exchange_locks.clear()

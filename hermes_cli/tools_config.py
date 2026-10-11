@@ -94,7 +94,7 @@ def gui_toolset_label(label: str) -> str:
 # auto-enables when xAI creds exist (mirrors HASS_TOKEN → homeassistant); its check_fn still gates the schema.
 _DEFAULT_OFF_TOOLSETS = {"homeassistant", "spotify", "discord", "discord_admin", "video", "video_gen", "x_search", "a2a"}
 
-# Config-only capabilities: provider setup in `hermes tools` (TOOL_CATEGORIES) but not model toolsets — zero
+# Config-only capabilities: provider setup in `stardust tools` (TOOL_CATEGORIES) but not model toolsets — zero
 # schemas, own switch (``stt.enabled``), never in ``platform_toolsets`` or the per-platform checklist.
 _CONFIG_ONLY_TOOLSETS = {"stt"}
 
@@ -161,7 +161,7 @@ def _get_plugin_toolset_keys() -> set:
 
 
 def _checklist_toolset_keys(platform: str) -> Set[str]:
-    """Toolset keys the ``hermes tools`` checklist offers for ``platform`` (mirrors ``_prompt_toolset_checklist``);
+    """Toolset keys the ``stardust tools`` checklist offers for ``platform`` (mirrors ``_prompt_toolset_checklist``);
     read-time-resolved toolsets (recovered composites, MCP names) are NOT here."""
     return {
         ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()
@@ -215,8 +215,8 @@ _NOUS = {"requires_nous_auth": True}
 _OPENAI_VOICE_KEY = _key("VOICE_TOOLS_OPENAI_KEY", "OpenAI API key", "https://platform.openai.com/api-keys")
 _ELEVENLABS_KEY = _key("ELEVENLABS_API_KEY", "ElevenLabs API key", "https://elevenlabs.io/app/settings/api-keys")
 _DEEPINFRA_KEY = _key("DEEPINFRA_API_KEY", "DeepInfra API key", "https://deepinfra.com/dash/api_keys")
-_LANGFUSE_PUBLIC = ("HERMES_LANGFUSE_PUBLIC_KEY", "Langfuse public key (pk-lf-...)")
-_LANGFUSE_SECRET = ("HERMES_LANGFUSE_SECRET_KEY", "Langfuse secret key (sk-lf-...)")
+_LANGFUSE_PUBLIC = ("STARDUST_LANGFUSE_PUBLIC_KEY", "Langfuse public key (pk-lf-...)")
+_LANGFUSE_SECRET = ("STARDUST_LANGFUSE_SECRET_KEY", "Langfuse secret key (sk-lf-...)")
 
 TOOL_CATEGORIES = {
     "tts": {
@@ -352,7 +352,7 @@ TOOL_CATEGORIES = {
         "name": "Computer Use (macOS/Windows/Linux)", "icon": "🖱️",
         # Runtime backends ship for macOS, Windows, Linux (X11; Wayland via XWayland). Gaps surface via `computer-use doctor`.
         "platform_gate": ["darwin", "win32", "linux"],
-        # cua-driver reads HOME/TMPDIR from the process env; HERMES_CUA_DRIVER_CMD selects a specific
+        # cua-driver reads HOME/TMPDIR from the process env; STARDUST_CUA_DRIVER_CMD selects a specific
         # binary (e.g. a local build). There is no version-pin env var.
         "providers": [
             _row("cua-driver (background)", "★ recommended · free · local",
@@ -367,7 +367,7 @@ TOOL_CATEGORIES = {
                  env_vars=[_key(*_LANGFUSE_PUBLIC, "https://cloud.langfuse.com"), _key(*_LANGFUSE_SECRET, "https://cloud.langfuse.com")]),
             _row("Langfuse Self-Hosted", tag="Self-hosted Langfuse instance", post_setup="langfuse",
                  env_vars=[_key(*_LANGFUSE_PUBLIC), _key(*_LANGFUSE_SECRET),
-                           _key("HERMES_LANGFUSE_BASE_URL", "Langfuse server URL (e.g. http://localhost:3000)", default="http://localhost:3000")]),
+                           _key("STARDUST_LANGFUSE_BASE_URL", "Langfuse server URL (e.g. http://localhost:3000)", default="http://localhost:3000")]),
         ],
     },
 }
@@ -554,7 +554,7 @@ def _get_platform_tools(config: dict, platform: str, *, include_default_mcp_serv
     enabled_toolsets |= _merge_mcp_servers(config, toolset_names, explicit_passthrough, include_default_mcp_servers)
 
     # agent.disabled_toolsets is a global suppression list (#86661) and runs LAST so it overrides everything
-    # above. It may arrive as a JSON-array string ("['memory']") from `hermes config set` or a JSON-mode editor.
+    # above. It may arrive as a JSON-array string ("['memory']") from `stardust config set` or a JSON-mode editor.
     disabled_toolsets = (config.get("agent") or {}).get("disabled_toolsets")
     if disabled_toolsets:
         from agent.skill_utils import parse_config_string_list
@@ -571,7 +571,7 @@ def _prune_toolsets_stripped_by_disabled(enabled_toolsets: Set[str], disabled_na
 
     The agent subtracts ``agent.disabled_toolsets`` at TOOL granularity (``model_tools._select_tool_names``),
     so disabling a composite like ``debugging`` removes the terminal/web/file tools even though those names
-    never appear in the list. A name-only subtraction here left inspection surfaces (``hermes tools
+    never appear in the list. A name-only subtraction here left inspection surfaces (``stardust tools
     --summary``, banner, ``/tools``) showing toolsets as enabled that no session could call (#97015).
     Passthrough entries (MCP server names) and toolsets with no static tools (``context_engine``) are kept.
     """
@@ -625,7 +625,7 @@ def _merge_mcp_servers(
 
 
 def _warn_all_invalid_platform_toolsets(platform: str, explicit: list) -> None:
-    """Warn once when an explicit platform list has only invalid names (``hermes`` for ``hermes-cli`` → no
+    """Warn once when an explicit platform list has only invalid names (``stardust`` for ``hermes-cli`` → no
     native tools), at session tool resolution rather than only in update/doctor."""
     from toolsets import validate_toolset
 
@@ -634,7 +634,7 @@ def _warn_all_invalid_platform_toolsets(platform: str, explicit: list) -> None:
         _warned_invalid_platform_toolsets.add(platform)
         logger.warning(
             "platform '%s' has no valid toolsets configured (unknown "
-            "name(s): %s) - tools will be unavailable. Run `hermes tools` "
+            "name(s): %s) - tools will be unavailable. Run `stardust tools` "
             "to reconfigure. See issue #38798.",
             platform, ", ".join(named))
 
@@ -882,7 +882,7 @@ def _platform_menu_label(config: dict, pkey: str) -> str:
 
 
 def _print_tools_summary(config: dict, enabled_platforms: List[str]) -> None:
-    """``hermes tools --summary``: enabled toolsets per platform, non-interactive."""
+    """``stardust tools --summary``: enabled toolsets per platform, non-interactive."""
     total = len(_get_effective_configurable_toolsets())
     print(color("☤ Tool Summary", Colors.CYAN, Colors.BOLD))
     print()
@@ -977,7 +977,7 @@ def _configure_platforms(config: dict, platform_keys: List[str], *, all_platform
 
 
 def tools_command(args=None, first_install: bool = False, config: dict = None):
-    """Entry point for `hermes tools` / `hermes setup tools`. ``first_install`` skips the menu (checklist + key
+    """Entry point for `stardust tools` / `stardust setup tools`. ``first_install`` skips the menu (checklist + key
     prompts); a wizard-passed ``config`` receives platform_toolsets so its final save_config() keeps them."""
     if config is None:
         config = load_config()
@@ -1035,5 +1035,5 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     print()
     from hermes_constants import display_hermes_home
     print(color(f"  Tool configuration saved to {display_hermes_home()}/config.yaml", Colors.DIM))
-    print(color("  Changes take effect on next 'hermes' or gateway restart.", Colors.DIM))
+    print(color("  Changes take effect on next 'stardust' or gateway restart.", Colors.DIM))
     print()

@@ -16,12 +16,12 @@ import pytest
 
 @pytest.fixture
 def hermes_env(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     (home / "scripts").mkdir()
     (home / "cron").mkdir()
     (home / "scripts" / "watch.sh").write_text("#!/bin/bash\necho alert\n")
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
 
     import importlib
     import hermes_constants

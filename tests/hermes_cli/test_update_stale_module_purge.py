@@ -1,7 +1,7 @@
 """Tests for _purge_stale_hermes_modules — the class fix for stale
-sys.modules breaking the gateway auto-restart after `hermes update`.
+sys.modules breaking the gateway auto-restart after `stardust update`.
 
-Field failure (2026-08-20, Teknium's Linux box): `hermes update` pulled a
+Field failure (2026-08-20, Teknium's Linux box): `stardust update` pulled a
 checkout where hermes_cli/gateway.py newly imports `line_input` from
 hermes_cli.cli_output, but the updater process had cli_output cached from
 before that symbol existed. The function-level `from hermes_cli.gateway

@@ -100,7 +100,7 @@ def test_room_grant_secret_stays_gateway_owned_on_named_profile(
 
     adapter = api_server.APIServerAdapter.__new__(api_server.APIServerAdapter)
     adapter._api_key = "gateway-api-key-1234567890"
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     profile_token = api_server._api_request_profile.set("reviewer")
     try:
         assert adapter._room_grant_secret() == gateway_room_grant_secret()
@@ -115,7 +115,7 @@ def test_superseded_room_authority_cannot_reuse_its_grant(tmp_path, monkeypatch)
         issue_room_grant,
     )
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     secret = gateway_room_grant_secret()
     now = time.time()
     common = {

@@ -1,4 +1,4 @@
-"""Windows gateway lifecycle for ``hermes update``: pause/resume/cold-start the service, sweep venv holders, reap orphaned backends.
+"""Windows gateway lifecycle for ``stardust update``: pause/resume/cold-start the service, sweep venv holders, reap orphaned backends.
 
 Split out of ``update_cmd.py``; names are re-imported there so ``hermes_cli.update_cmd.<name>`` still resolves/monkeypatches.
 Origin helpers are imported lazily per function (no cycle; test patches on the origin stay effective).
@@ -87,7 +87,7 @@ def _self_and_non_gateway_ancestor_pids(psutil) -> set[int]:
     gracefully; a detached child survives on Windows); interactive ancestry is never a blocker."""
     _is_gw = None
     with suppress(Exception):
-        # Never return ourselves or our own ancestry: a CLI ``hermes update`` runs from the venv python and
+        # Never return ourselves or our own ancestry: a CLI ``stardust update`` runs from the venv python and
         # would otherwise nominate itself. Same #87594 carve-out as _detect_venv_python_processes: a GATEWAY
         # ancestor is not "our own ancestry" in the interactive sense — it is the process the pause
         # machinery must see (the /update-from-gateway topology makes the updater the gateway's child).
@@ -136,7 +136,7 @@ def _parent_is_live(proc) -> bool:
 def _detect_venv_python_processes(*, exclude_pids: set[int] | None = None) -> list[tuple[int, str, str]]:
     """Live processes running from the project venv's interpreter as ``(pid, name, cmdline)``; never raises.
 
-    The hermes.exe shim guard misses the Desktop backend and anything off ``venv\\Scripts\\python(w).exe``;
+    The stardust.exe shim guard misses the Desktop backend and anything off ``venv\\Scripts\\python(w).exe``;
     they keep ``.pyd`` files mapped so a mid-update dependency sync dies half-way. Empty off-Windows / without
     psutil; self + non-gateway ancestors excluded. cmdline/cwd are expensive per process on Windows (500+
     procs can blow the Desktop preflight watchdog), so they are fetched lazily for plausible candidates only.
@@ -170,7 +170,7 @@ def _detect_venv_python_processes(*, exclude_pids: set[int] | None = None) -> li
         in_venv = exe_norm.startswith(venv_prefix)
         name = str(info.get("name") or Path(exe).name)
         name_low = name.lower()
-        if not (in_venv or name_low.startswith(("python", "pypy")) or name_low in {"uv.exe", "uvx.exe", "hermes.exe"}):
+        if not (in_venv or name_low.startswith(("python", "pypy")) or name_low in {"uv.exe", "uvx.exe", "stardust.exe"}):
             continue
         cmdline_raw = _cmdline_or_empty(proc)
         cmdline_low = cmdline_raw.lower()
@@ -242,7 +242,7 @@ def _hermes_holder_subcommand(cmdline: str) -> str | None:
     def _is_entry(i: int, token: str) -> bool:
         low = token.lower().strip('"')
         return (low.endswith("hermes_cli.main") and i > 0 and tokens[i - 1] == "-m") or (
-            low.rsplit("\\", 1)[-1].rsplit("/", 1)[-1] in ("hermes", "hermes.exe"))
+            low.rsplit("\\", 1)[-1].rsplit("/", 1)[-1] in ("hermes", "hermes.exe", "stardust", "stardust.exe"))
 
     entry_idx = next((i for i, token in enumerate(tokens) if _is_entry(i, token)), None)
     if entry_idx is None:
@@ -263,14 +263,14 @@ def _hermes_holder_subcommand(cmdline: str) -> str | None:
 def _format_venv_python_holders_message(matches: list[tuple[int, str, str]]) -> str:
     """Explain which venv processes block the update and how to clear them.
 
-    Labels come from the parsed SUBCOMMAND, never substring: a standalone ``hermes dashboard`` must not be
+    Labels come from the parsed SUBCOMMAND, never substring: a standalone ``stardust dashboard`` must not be
     called the Desktop backend, ``--preserve-cache`` must not match "serve". Unknown argv gets no hint.
 
     See #90778.
     """
     hint_by_subcommand = {
         "serve": "  ← Hermes backend (if the Desktop app is open, close it)",
-        "dashboard": "  ← hermes dashboard (stop it: hermes dashboard stop, or close that terminal)",
+        "dashboard": "  ← stardust dashboard (stop it: stardust dashboard stop, or close that terminal)",
         "gateway": "  ← gateway",
     }
     lines = ["✗ Other Hermes processes are running from this install's venv:"]
@@ -282,8 +282,8 @@ def _format_venv_python_holders_message(matches: list[tuple[int, str, str]]) -> 
     lines.append(
         "\n  On Windows these keep native extension files (.pyd) locked, so the\n"
         "  dependency update would fail partway and leave a broken install.\n"
-        "  Close the Hermes desktop app / other Hermes terminals, then re-run:\n    hermes update\n"
-        "  (or use `hermes update --force-venv` to proceed anyway at your own risk)"
+        "  Close the Hermes desktop app / other Hermes terminals, then re-run:\n    stardust update\n"
+        "  (or use `stardust update --force-venv` to proceed anyway at your own risk)"
     )
     return "\n".join(lines)
 
@@ -333,7 +333,7 @@ def _leftover_pausable_gateway_pids(matches: list[tuple[int, str, str]]) -> list
 
 
 def _refuse_gateway_ancestor_tree_kill(pids: list[int], *, gateway_mode: bool) -> bool:
-    """Refuse a plain Windows update that would tree-kill its own ancestry (a chat agent's ``hermes update`` is
+    """Refuse a plain Windows update that would tree-kill its own ancestry (a chat agent's ``stardust update`` is
     a gateway child; ``taskkill /T /F`` kills the updater first). ``--gateway`` is exempt (detached delivery).
     Refuse only when a nominated gateway is positively an ancestor; unknown ancestry keeps existing recovery.
 
@@ -353,7 +353,7 @@ def _refuse_gateway_ancestor_tree_kill(pids: list[int], *, gateway_mode: bool) -
         "✗ Refusing to stop the gateway process tree because this updater "
         f"is running inside it (gateway PID(s): {', '.join(str(pid) for pid in ancestors)}).\n"
         "  On Windows, taskkill /T would terminate the updater before the update can run.\n"
-        "  From a chat platform, use `/update` instead.\n  Otherwise, run `hermes update` from a separate terminal."
+        "  From a chat platform, use `/update` instead.\n  Otherwise, run `stardust update` from a separate terminal."
     )
     return True
 
@@ -380,11 +380,11 @@ def _serve_relaunch_commands(entries: list[dict]) -> list[list[str]]:
     """Rebuild launch commands for stopped serves from ledger host/port/profile — never argv parsing
     (joined argv cannot round-trip Windows paths with spaces). Entries without a port are skipped."""
     from hermes_cli.update_cmd import _m
-    hermes = "hermes"
+    hermes = "stardust"
     with suppress(Exception):
         scripts_dir = _m()._venv_scripts_dir()
         if scripts_dir is not None:
-            hermes = next((str(scripts_dir / n) for n in ("hermes.exe", "hermes") if (scripts_dir / n).is_file()), hermes)
+            hermes = next((str(scripts_dir / n) for n in ("stardust.exe", "stardust") if (scripts_dir / n).is_file()), hermes)
     commands: list[list[str]] = []
     for entry in entries:
         port = entry.get("port")
@@ -416,7 +416,7 @@ def _relaunch_stopped_serves(token: dict) -> None:
         print("  ⟲ Relaunching stopped serve/dashboard backend(s)")
         failed = _m()._respawn_dashboard_processes(commands)
     if skipped or failed:
-        print("  ⚠ Some stopped backends could not be relaunched automatically; restart them manually (hermes serve --host <ip> --port <port>).")
+        print("  ⚠ Some stopped backends could not be relaunched automatically; restart them manually (stardust serve --host <ip> --port <port>).")
     _record_update_step(
         "serve_relaunch", not failed and not skipped,
         f"relaunched={len(commands) - len(failed)} failed={len(failed)} skipped={skipped}",
@@ -428,7 +428,7 @@ def _is_backend_argv(argv_low: str) -> bool:
 
     Same predicate as ``_looks_like_desktop_control_plane``: ``-m hermes_cli.main`` entry shape (the
     Desktop's only spawn shape, ``apps/desktop/electron/main.ts``) AND the canonical holder classifier says
-    ``serve``/``dashboard``. A user-launched ``hermes.exe serve`` / ``hermes dashboard`` is NOT the
+    ``serve``/``dashboard``. A user-launched ``stardust.exe serve`` / ``stardust dashboard`` is NOT the
     Desktop's: the guard refuses on it, never reaps it.
     """
     return _looks_like_desktop_control_plane(argv_low)
@@ -537,7 +537,7 @@ def _handoff_reapable_backend_pids(matches: list[tuple[int, str, str]]) -> list[
     """Backend PIDs safe to tree-reap during a GUI-updater hand-off, INCLUDING ones with a live parent; never raises.
 
     The orphan-only rung bails on ANY live parent (mid-teardown Electron, launcher->worker chain) and hung a
-    hand-off. Inside the hand-off gate (marker + ``--gateway`` + no live ``hermes.exe`` shim) nothing legitimate
+    hand-off. Inside the hand-off gate (marker + ``--gateway`` + no live ``stardust.exe`` shim) nothing legitimate
     supervises a ``serve`` from this venv, so survivors are leaks. Any non-backend holder or no psutil ->
     ``None``. The CALLER must have confirmed the gate; outside it the stricter orphan-only path stands.
 
@@ -586,7 +586,7 @@ def _stop_process_trees(pids: list[int] | list[tuple[int, int]]) -> None:
 
 
 def _looks_like_desktop_control_plane(cmdline: str) -> bool:
-    """True for this-install ``hermes serve`` / ``hermes dashboard`` argv (Desktop control plane).
+    """True for this-install ``stardust serve`` / ``stardust dashboard`` argv (Desktop control plane).
 
     Not the messaging gateway — don't feed into ``looks_like_gateway_command_line``. Token-based via the
     parser-derived classifier, never substring (``kanban --preserve-cache``, ``-m dashboard chat``).
@@ -752,7 +752,7 @@ def _windows_cold_start_plan() -> dict | None:
     (#109538) — the dead attestation is the only surviving "a gateway was up" evidence, and the Desktop
     does not restart the messaging gateway itself. Keep the plan, and record the attestation
     *generation* that authorized it on the token: the marker is a mutable one-shot that any concurrent
-    ``hermes gateway status``/``start`` consumes, so execution authorizes the spawn from the token and
+    ``stardust gateway status``/``start`` consumes, so execution authorizes the spawn from the token and
     consumes only that generation (#110020 review)."""
     from hermes_cli.update_cmd import _desktop_owns_gateway_lifecycle
     from hermes_cli import gateway_windows
@@ -876,7 +876,7 @@ def _gateway_drain_timeout(socket_acks: list[dict]) -> float:
 def _pause_windows_gateways_for_update() -> dict | None:
     """Stop running Windows gateways before mutating the checkout or venv.
 
-    Scheduled/startup gateways run via pythonw.exe, invisible to the hermes.exe instance guard, yet keep files
+    Scheduled/startup gateways run via pythonw.exe, invisible to the stardust.exe instance guard, yet keep files
     locked during ``git``/``uv``. Stop only PIDs the gateway discovery code identifies."""
     from hermes_cli.update_cmd import _m
     if not _m()._is_windows():
@@ -921,7 +921,7 @@ def _pause_windows_gateways_for_update() -> dict | None:
     if unmapped_pids:
         print(f"  → Stopped {len(unmapped_pids)} gateway process(es) without profile mapping")
         if any(not u.get("argv") for u in unmapped):  # no recoverable cmdline (psutil missing, denied, gone)
-            print("    Restart manually after update: hermes gateway run")
+            print("    Restart manually after update: stardust gateway run")
     token = {"resume_needed": True, "profiles": profiles, "unmapped_pids": unmapped_pids, "unmapped": unmapped}
     # Every profile with ANY live gateway at discovery counts as running: service-supervised ones skip the
     # socket pause (absent from ``profiles``) but the SCM restart brings them back, not a cold-start.
@@ -957,7 +957,7 @@ def _record_attested_cold_start_profiles(token: dict, running_profiles: set) -> 
 
 
 def _cold_start_attested_profiles(token: dict) -> None:
-    """Spawn each ``cold_start_profiles`` entry under its own HERMES_HOME and consume exactly the
+    """Spawn each ``cold_start_profiles`` entry under its own STARDUST_HOME and consume exactly the
     generation that authorized it; one profile's failure never aborts the others (#110959)."""
     from hermes_cli import gateway_windows
     from hermes_cli.profiles import get_profile_dir
@@ -1004,7 +1004,7 @@ def _cold_start_windows_gateway_after_update(token: dict | None = None) -> bool:
     attested gateway that died without a clean exit is restored even then (#109538) — the Desktop does
     not restart the messaging gateway itself. That authority is the ``attested_generation`` the plan
     recorded on ``token``, not the marker on disk: the marker is a mutable one-shot a concurrent
-    ``hermes gateway status``/``start`` consumes, which would otherwise skip this spawn and clear the
+    ``stardust gateway status``/``start`` consumes, which would otherwise skip this spawn and clear the
     token (#110020 review). Only that generation is consumed afterwards — never a newer marker.
     """
     from hermes_cli.update_cmd import _desktop_owns_gateway_lifecycle, _m
@@ -1052,7 +1052,7 @@ def _refresh_windows_gateway_launchers() -> None:
     None`` death). The task's /TR points at a stable path, so rewriting in place retargets it without UAC.
 
     The Scheduled Task / Startup-folder launchers (``gateway.cmd`` + ``gateway.vbs``) are persistence
-    artifacts written once at install time — ``hermes update`` never touched them, so installs created
+    artifacts written once at install time — ``stardust update`` never touched them, so installs created
     before the hidden-console rework (aa2ae36c3f) kept launching the gateway through ``pythonw.exe``
     forever: every descendant spawn flashed a conhost (#54220/#56747) and, since #70344, the console-less
     gateway died at startup with ``RuntimeError: sys.stderr is None`` (#71671).
@@ -1068,7 +1068,7 @@ def _refresh_windows_gateway_launchers() -> None:
 
 
 def _refresh_bootstrap_cache_scripts(branch: str = "main") -> None:
-    """Overwrite ``$HERMES_HOME/bootstrap-cache/install-<ref>.{ps1,sh}`` for *branch* from the fresh checkout.
+    """Overwrite ``$STARDUST_HOME/bootstrap-cache/install-<ref>.{ps1,sh}`` for *branch* from the fresh checkout.
 
     Old ``hermes-setup.exe`` builds NEVER re-download a cached branch-ref script, so a stale one runs
     months-old code forever. Guards mirror ``install_script.rs``: only the sanitized *branch* key is rewritten;
@@ -1078,7 +1078,7 @@ def _refresh_bootstrap_cache_scripts(branch: str = "main") -> None:
     cached branch-ref script — ``install-main.ps1`` cached at install time is reused forever, executing
     months-stale code with long-fixed bugs (the 2026-08-09 incident: a June 4 cached script's venv stage
     lacked the 81327 process-tree sweep and died on ``Access denied``). The binary has no self-update path,
-    so the poisoned cache outlives every ``hermes update``.
+    so the poisoned cache outlives every ``stardust update``.
     Overwriting the cached script for *branch* with the freshly pulled ``scripts/install.ps1`` /
     ``scripts/install.sh`` on every update turns the stale binary's unconditional reuse into a feature: it
     "reuses" a file this function keeps permanently current. Post-#67193 installers re-download on each run
@@ -1196,7 +1196,7 @@ def _verify_relaunched_gateways_alive(token: dict, profiles: dict, unmapped: lis
         print(
             "\n  ⚠ Windows gateway restart could not be verified — no stable gateway process appeared after relaunch.\n"
             "    (The respawned gateway may have been killed by a parent Job Object during updater teardown, #48820.)\n"
-            "    Recover with: hermes gateway restart"
+            "    Recover with: stardust gateway restart"
         )
         raise RuntimeError("Windows gateway relaunch after update was not verified alive")
     with suppress(Exception):
@@ -1295,7 +1295,7 @@ def _terminate_leftover_gateways(pids) -> None:
 
 
 def _in_handoff_without_live_shim(args) -> bool:
-    """GUI hand-off gate: ``--gateway`` + update-incomplete marker AND no live ``hermes.exe`` shim.
+    """GUI hand-off gate: ``--gateway`` + update-incomplete marker AND no live ``stardust.exe`` shim.
 
     Fail closed: unverifiable marker or shim state reads as "not a hand-off" / "live shim"."""
     from hermes_cli.update_cmd import _m
@@ -1339,7 +1339,7 @@ def _clear_windows_venv_holders_or_exit(args, gateway_mode: bool, _windows_gatew
     ):
         if holders and (backends := classifier(holders)):
             holders = _reap_and_rescan(f"  ⚠ {len(backends)} {message}; stopping their trees", backends)
-    # Manual serve/dashboard rung (e.g. `hermes serve --host <ip>` for a REMOTE Desktop): ledger identity
+    # Manual serve/dashboard rung (e.g. `stardust serve --host <ip>` for a REMOTE Desktop): ledger identity
     # only (spawner dead; Desktop-owned keep the refusal). Stop and register an idempotent atexit relaunch
     # on the SAME host/port/profile — success or failure.
     if holders and (serve_entries := _m()._ledger_manual_serve_holders(holders)):

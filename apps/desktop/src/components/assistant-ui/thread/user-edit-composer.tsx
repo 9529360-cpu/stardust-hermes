@@ -50,9 +50,9 @@ import { isRedoShortcut, isUndoShortcut } from '@/app/chat/composer/undo-history
 import { chipTypedUrlOnSpace, linkifyUrls } from '@/app/chat/composer/url-refs'
 import {
   extractDroppedFiles,
-  HERMES_PATHS_MIME,
   isImagePath,
-  partitionDroppedFiles
+  partitionDroppedFiles,
+  STARDUST_PATHS_MIME
 } from '@/app/chat/hooks/use-composer-actions'
 import { uploadComposerAttachment } from '@/app/session/hooks/use-prompt-actions'
 import { hermesDirectiveFormatter } from '@/components/assistant-ui/directive-text'
@@ -491,7 +491,7 @@ export const UserEditComposer: FC<UserEditComposerProps> = ({ cwd, gateway, sess
   }, [])
 
   const handleDragEnter = (event: ReactDragEvent<HTMLElement>) => {
-    if (!dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+    if (!dragHasAttachments(event.dataTransfer, STARDUST_PATHS_MIME)) {
       return
     }
 
@@ -504,7 +504,7 @@ export const UserEditComposer: FC<UserEditComposerProps> = ({ cwd, gateway, sess
   }
 
   const handleDragOver = (event: ReactDragEvent<HTMLElement>) => {
-    if (!dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+    if (!dragHasAttachments(event.dataTransfer, STARDUST_PATHS_MIME)) {
       return
     }
 
@@ -522,7 +522,7 @@ export const UserEditComposer: FC<UserEditComposerProps> = ({ cwd, gateway, sess
   }
 
   const handleDrop = (event: ReactDragEvent<HTMLElement>) => {
-    if (!dragHasAttachments(event.dataTransfer, HERMES_PATHS_MIME)) {
+    if (!dragHasAttachments(event.dataTransfer, STARDUST_PATHS_MIME)) {
       return
     }
 

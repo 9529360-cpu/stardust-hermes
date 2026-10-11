@@ -1306,7 +1306,7 @@ def dump_api_request_debug(
         _redacted_payload = json.loads(redact_sensitive_text(_serialized, force=True))
         atomic_json_write(dump_file, _redacted_payload, default=str)
         agent._vprint(f"{agent.log_prefix}🧾 Request debug dump written to: {dump_file}")
-        if env_var_enabled("HERMES_DUMP_REQUEST_STDOUT"):
+        if env_var_enabled("STARDUST_DUMP_REQUEST_STDOUT"):
             print(json.dumps(_redacted_payload, ensure_ascii=False, indent=2, default=str))
         return dump_file
     except Exception as dump_error:
@@ -1727,7 +1727,7 @@ def create_openai_client(agent, client_kwargs: dict, *, reason: str, shared: boo
     _validate_base_url(client_kwargs.get("base_url"))
     # Provider-supplied client (registration seam): a provider whose wire protocol is not
     # OpenAI-over-HTTP supplies its own client from ProviderProfile.create_client(). Consulted
-    # before the built-in ladder so a profile registered from ~/.hermes/plugins/ or a pip entry
+    # before the built-in ladder so a profile registered from ~/.stardust/plugins/ or a pip entry
     # point can ship a transport without editing this function (what makes an out-of-tree ACP
     # provider possible). None (the default) falls through, so existing providers are unaffected.
     provider_client = _provider_supplied_client(agent, client_kwargs)
@@ -2516,7 +2516,7 @@ def _log_empty_non_final_heal(healed: int) -> None:
                     "⚠️ Your session transcript required repeated repair "
                     f"({total_events} heal passes so far). Replies keep "
                     "working, but a corrupted turn is stuck in this "
-                    "session's history — run /debug share or `hermes "
+                    "session's history — run /debug share or `stardust "
                     "doctor` to capture diagnostics, or /new to start a clean session."
                 )
     if escalate:
@@ -3090,7 +3090,7 @@ def _iter_pool_sockets(client: Any):
         return
     if not pools:
         return
-    from agent.process_bootstrap import HERMES_TRANSPORT_OWNER_EXT
+    from agent.process_bootstrap import STARDUST_TRANSPORT_OWNER_EXT
     seen: set[int] = set()
     for pool, owner in pools:
         # ``is None``, not falsiness: an empty ``_connections`` must still let us walk in-flight ``_requests``.
@@ -3104,7 +3104,7 @@ def _iter_pool_sockets(client: Any):
         for pool_req in list(getattr(pool, "_requests", None) or []):
             if owner is not None:
                 exts = getattr(getattr(pool_req, "request", None), "extensions", None) or {}
-                if exts.get(HERMES_TRANSPORT_OWNER_EXT) != owner:
+                if exts.get(STARDUST_TRANSPORT_OWNER_EXT) != owner:
                     continue
             conn = getattr(pool_req, "connection", None)
             if conn is not None:

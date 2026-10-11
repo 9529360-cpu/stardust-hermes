@@ -112,7 +112,7 @@ def test_unreadable_status_still_serves_a_running_state(progress):
 
 # ── posix.sh: the stages it publishes at its own gates ─────────────────────
 
-# Stands in for `hermes update`, and reports the stage that was on screen
+# Stands in for `stardust update`, and reports the stage that was on screen
 # while it ran -- the update child is the only thing that can observe the
 # window's state at the exact moment of the longest wait in the hand-off.
 FAKE_HERMES = """#!/bin/bash
@@ -120,13 +120,13 @@ FAKE_HERMES = """#!/bin/bash
 # real update call; answer it without consuming a counted call so the
 # exits.N mapping below still refers to actual update attempts.
 case "$*" in *--help*) echo "--keep-stash"; exit 0 ;; esac
-n="$(cat "$HERMES_TEST_CALLS" 2>/dev/null || echo 0)"; n=$((n + 1))
-printf '%s' "$n" > "$HERMES_TEST_CALLS"
+n="$(cat "$STARDUST_TEST_CALLS" 2>/dev/null || echo 0)"; n=$((n + 1))
+printf '%s' "$n" > "$STARDUST_TEST_CALLS"
 for f in "$TMPDIR"/hermes-update-status.[0-9]*; do
   case "$f" in *.tmp) continue ;; esac
-  cp "$f" "$HERMES_TEST_CAPTURE.$n" 2>/dev/null
+  cp "$f" "$STARDUST_TEST_CAPTURE.$n" 2>/dev/null
 done
-exit "$(cat "$HERMES_TEST_EXITS.$n" 2>/dev/null || echo 0)"
+exit "$(cat "$STARDUST_TEST_EXITS.$n" 2>/dev/null || echo 0)"
 """
 
 
@@ -134,7 +134,7 @@ def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
     """Run the real hand-off end to end; return the stage seen at each call."""
     install_root = tmp_path / "hermes-agent"
     (install_root / "venv" / "bin").mkdir(parents=True)
-    hermes = install_root / "venv" / "bin" / "hermes"
+    hermes = install_root / "venv" / "bin" / "stardust"
     hermes.write_text(FAKE_HERMES)
     hermes.chmod(0o755)
 
@@ -146,9 +146,9 @@ def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
     env = {
         **os.environ,
         "TMPDIR": str(tmp_path),
-        "HERMES_TEST_CAPTURE": str(capture),
-        "HERMES_TEST_CALLS": str(calls),
-        "HERMES_TEST_EXITS": str(tmp_path / "exits"),
+        "STARDUST_TEST_CAPTURE": str(capture),
+        "STARDUST_TEST_CALLS": str(calls),
+        "STARDUST_TEST_EXITS": str(tmp_path / "exits"),
     }
     # The hand-off daemonizes and the launcher exits immediately; the result
     # file is the orchestrator's own completion signal.
@@ -178,7 +178,7 @@ def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
 
 @requires_posix_handoff
 def test_update_gate_publishes_its_stage_before_running(tmp_path):
-    """`hermes update` is the longest wait in the hand-off and the one the
+    """`stardust update` is the longest wait in the hand-off and the one the
     Discord report sat through; the window must name it while it happens."""
     stages = _run_handoff(tmp_path, {1: 0})
 

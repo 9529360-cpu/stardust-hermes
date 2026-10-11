@@ -20,7 +20,7 @@ from hermes_state import SessionDB
 def hermes_root(tmp_path, monkeypatch):
     root = tmp_path / "hermes"
     (root / "profiles" / "workprof").mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     # get_default_hermes_root memoizes on (native_home, env) — the env change
     # invalidates the memo by itself, but re-point DEFAULT_DB_PATH so any
     # default-constructed SessionDB in the module under test stays sandboxed.

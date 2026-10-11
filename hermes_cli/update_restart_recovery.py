@@ -26,12 +26,12 @@ covers both and an abort can strand either one (#92145):
 - **gateway profiles**, relaunched through the existing per-profile
   ``hermes_cli.main -p <profile> gateway restart`` command; and
 - **``hermes-serve*`` systemd units**, restarted directly through
-  ``systemctl``.  ``hermes serve`` is not a gateway profile and has no
+  ``systemctl``.  ``stardust serve`` is not a gateway profile and has no
   per-profile relaunch command, but it is the runtime that hosts
   ``tui_gateway.server``: the process the original report saw answering every
   chat turn with an ``ImportError`` for a symbol that existed on disk.  The
   unit family is enumerated from systemd itself rather than from the update
-  inventory, so a manually launched or Desktop-owned ``hermes serve`` — which
+  inventory, so a manually launched or Desktop-owned ``stardust serve`` — which
   has no relaunch authority — can never enter this path.
 
 Serve-unit identity is always ``<scope>/<unit>`` (``user/hermes-serve``,
@@ -56,8 +56,8 @@ import time
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
-_RECOVERY_ENV = "HERMES_UPDATE_RESTART_RECOVERY"
-_GATEWAY_MARKERS = ("_HERMES_GATEWAY", "HERMES_GATEWAY", "HERMES_GATEWAY_MODE")
+_RECOVERY_ENV = "STARDUST_UPDATE_RESTART_RECOVERY"
+_GATEWAY_MARKERS = ("_HERMES_GATEWAY", "STARDUST_GATEWAY", "STARDUST_GATEWAY_MODE")
 _PROFILE_RESTART_TIMEOUT = 90
 _VERIFY_TIMEOUT = 15
 _PROFILE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
@@ -245,7 +245,7 @@ def restart_serve_units(
     """Restart every active ``hermes-serve*`` systemd unit from this process.
 
     Units are enumerated from systemd, never from the update inventory, so a manually launched or
-    Desktop-owned ``hermes serve`` (no unit) structurally cannot be touched here.
+    Desktop-owned ``stardust serve`` (no unit) structurally cannot be touched here.
     """
     skipped_qualified, skipped_legacy = _normalized_skips(skip_units)
     # (scope, base unit) -> replaced?  The same unit name in the user and the system

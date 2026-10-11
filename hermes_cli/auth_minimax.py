@@ -159,7 +159,7 @@ def _minimax_poll_token(
 
 
 def _minimax_save_auth_state(auth_state: Dict[str, Any]) -> None:
-    """Persist MiniMax OAuth state to Hermes auth store (~/.hermes/auth.json)."""
+    """Persist MiniMax OAuth state to Hermes auth store (~/.stardust/auth.json)."""
     from hermes_cli.auth import _save_active_provider_state
     _save_active_provider_state("minimax-oauth", auth_state)
 
@@ -283,7 +283,7 @@ def _minimax_fresh_state() -> Dict[str, Any]:
     state = get_provider_auth_state("minimax-oauth")
     if not state or not state.get("access_token"):
         raise _minimax_err(
-            "Not logged into MiniMax OAuth. Run `hermes model` and select MiniMax (OAuth).", "not_logged_in", relogin=True,
+            "Not logged into MiniMax OAuth. Run `stardust model` and select MiniMax (OAuth).", "not_logged_in", relogin=True,
         )
     try:
         return _refresh_minimax_oauth_state(state)
@@ -311,7 +311,7 @@ def resolve_minimax_oauth_runtime_credentials(
     *, min_token_ttl_seconds: int = MINIMAX_OAUTH_REFRESH_SKEW_SECONDS,
     as_token_provider: bool = False,
 ) -> Dict[str, Any]:
-    """Return {provider, api_key, base_url, source}; string ``api_key`` by default (``hermes status`` contract)."""
+    """Return {provider, api_key, base_url, source}; string ``api_key`` by default (``stardust status`` contract)."""
     state = _minimax_fresh_state()
     return {
         "provider": "minimax-oauth",

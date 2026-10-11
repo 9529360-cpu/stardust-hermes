@@ -21,7 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def _run_background_review(tmp_path):
     """One quiet one-shot CLI turn that starts a ``notify`` background child; only the LLM is local.
 
-    This is the kanban worker shape (``hermes chat -q ... -Q``): the turn ends, the CLI lingers for
+    This is the kanban worker shape (``stardust chat -q ... -Q``): the turn ends, the CLI lingers for
     the child's completion, injects it as a follow-up turn, then exits.
     """
     home = tmp_path / "profile"
@@ -113,7 +113,7 @@ def _run_background_review(tmp_path):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     url = f"http://127.0.0.1:{server.server_port}/v1"
-    env = {**os.environ, "HERMES_HOME": str(home), "HOME": str(tmp_path),
+    env = {**os.environ, "STARDUST_HOME": str(home), "HOME": str(tmp_path),
            "USERPROFILE": str(tmp_path), "TERMINAL_CWD": str(tmp_path),
            "OPENAI_BASE_URL": url, "OPENAI_API_KEY": "local-test-only",
            "PYTHONPATH": str(REPO_ROOT)}
@@ -169,14 +169,14 @@ def test_headless_terminal_result_survives_cli_exit(tmp_path):
     ''')
     def read_result(profile):
         result = subprocess.run([sys.executable, "-c", consumer, process_id],
-                                cwd=tmp_path, env={**env, "HERMES_HOME": str(profile)},
+                                cwd=tmp_path, env={**env, "STARDUST_HOME": str(profile)},
                                 check=True, stdin=subprocess.DEVNULL, capture_output=True,
                                 text=True, encoding="utf-8", timeout=30)
         return json.loads(result.stdout)
 
     receipt = json.loads((home / "logs" / "process-results" / f"{process_id}.json").read_text(encoding="utf-8"))
     assert receipt["parent_session_id"]  # CLI owner must be stamped before its reader starts.
-    env["HERMES_SESSION_ID"] = receipt["parent_session_id"]
+    env["STARDUST_SESSION_ID"] = receipt["parent_session_id"]
     recovered = read_result(home)
     assert recovered["result"]["status"] == "exited", recovered
     assert recovered["status"]["exit_code"] == 7, recovered
@@ -217,7 +217,7 @@ def test_receipts_are_bounded_redacted_and_session_scoped(tmp_path, monkeypatch)
     secret = "sk-" + "aB2cD3eF4gH5iJ6kL7mN8pQ9rS0tU1vW2xY3zA4bC5dE6fG7"
     from gateway.session_context import scoped_current_session_id
     from tools.process_registry_results import load_completed_results
-    monkeypatch.setenv("HERMES_SESSION_ID", "owner-session")
+    monkeypatch.setenv("STARDUST_SESSION_ID", "owner-session")
     sessions = []
     registry = ProcessRegistry()
     for index in range(3):

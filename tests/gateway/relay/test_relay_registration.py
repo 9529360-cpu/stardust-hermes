@@ -59,7 +59,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
         from agent import secret_scope as ss
         from gateway.config import Platform, load_gateway_config
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "gateway:\n"
@@ -69,7 +69,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
         monkeypatch.setenv("GATEWAY_RELAY_URL", "wss://deploy.example/relay")
 
         profile_dir = tmp_path / "profile-a"
@@ -106,7 +106,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
         from agent import secret_scope as ss
         from gateway.config import Platform, load_gateway_config
 
-        hermes_home = tmp_path / ".hermes"
+        hermes_home = tmp_path / ".stardust"
         hermes_home.mkdir()
         (hermes_home / "config.yaml").write_text(
             "gateway:\n"
@@ -116,7 +116,7 @@ class TestConfigRegistrationAgreementUnderMultiplexScope:
             "      bot_token: '123:abc'\n",
             encoding="utf-8",
         )
-        monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+        monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
         profile_dir = tmp_path / "profile-a"
         profile_dir.mkdir()

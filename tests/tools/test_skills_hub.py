@@ -16,7 +16,7 @@ from tools.skills_hub_install import (
 from tools.skills_hub_models import SkillBundle, SkillMeta, SkillSource, _referenced_support_paths
 from tools.skills_hub_official import OptionalSkillSource
 from tools.skills_hub_search import (
-    HERMES_INDEX_TTL, _load_hermes_index, create_source_router, parallel_search_sources, unified_search,
+    STARDUST_INDEX_TTL, _load_hermes_index, create_source_router, parallel_search_sources, unified_search,
 )
 from tools.skills_hub_skillssh import SkillsShSource
 from tools.skills_hub_sources import LobeHubSource, UrlSource, WellKnownSkillSource
@@ -172,7 +172,7 @@ class TestTrustLevelFor:
             assert repo in tap_repos, (
                 f"Trusted repo {repo!r} is in TRUSTED_REPOS but missing "
                 "from GitHubSource.DEFAULT_TAPS — its skills will not be "
-                "browsable via `hermes skills browse`."
+                "browsable via `stardust skills browse`."
             )
 
 
@@ -961,7 +961,7 @@ class TestOptionalSkillSourceBinaryAssets:
 
 class TestOptionalSkillSourceLiveRepoFallback:
     """Skills merged to main after the local install was cut must still be
-    searchable and installable without `hermes update` (live-repo fallback)."""
+    searchable and installable without `stardust update` (live-repo fallback)."""
 
     def _make_source(self, tmp_path, remote_dirs):
         optional_root = tmp_path / "optional-skills"
@@ -1447,7 +1447,7 @@ class TestInstallPathSafety:
         """Installing a skill whose name matches an existing category directory
         that contains other skills must NOT silently wipe that entire directory.
 
-        Regression test for GitHub issue #75983: ``hermes skills install … --name
+        Regression test for GitHub issue #75983: ``stardust skills install … --name
         research`` deleted the whole ``skills/research/`` category bucket,
         destroying 16 unrelated skills.
         """
@@ -1911,7 +1911,7 @@ class TestLoadHermesIndex:
         cache_file = self._isolate_cache(monkeypatch, tmp_path)
         cache_file.write_text(json.dumps({"skills": [{"name": "stale"}]}))
         # Force the cache to look expired so the network path runs.
-        old = time.time() - (HERMES_INDEX_TTL + 100)
+        old = time.time() - (STARDUST_INDEX_TTL + 100)
         import os
 
         os.utime(cache_file, (old, old))

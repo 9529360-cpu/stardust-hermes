@@ -32,9 +32,9 @@ GUARD_MESSAGE = "CONTRIBUTOR TIER: this model may train on your data."
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    hermes_home = tmp_path / ".hermes"
+    hermes_home = tmp_path / ".stardust"
     hermes_home.mkdir()
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
     # The profile write now validates through ``switch_model`` (catalog + credentials); these
     # tests pin the guard handshake, so echo the pick back as an accepted route.
     from hermes_cli.model_switch import ModelSwitchResult

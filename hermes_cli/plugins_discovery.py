@@ -151,12 +151,12 @@ def collect_directory_manifests() -> List[PluginManifest]:
     user_dir = get_hermes_home() / "plugins"
     logger.debug("Scanning user plugins: %s", user_dir)
     _scan("user", user_dir, "user")
-    if _origin._env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
-        project_dir = Path.cwd() / ".hermes" / "plugins"
+    if _origin._env_enabled("STARDUST_ENABLE_PROJECT_PLUGINS"):
+        project_dir = Path.cwd() / ".stardust" / "plugins"
         logger.debug("Scanning project plugins: %s", project_dir)
         _scan("project", project_dir, "project")
     else:
-        logger.debug("Project plugins disabled (set HERMES_ENABLE_PROJECT_PLUGINS=1 to enable)")
+        logger.debug("Project plugins disabled (set STARDUST_ENABLE_PROJECT_PLUGINS=1 to enable)")
     return manifests
 
 
@@ -206,13 +206,13 @@ def gate_manifest(
         # Bundled backends auto-load; selection among them is ``<category>.provider`` config.
         if manifest.kind == "backend":
             return ManifestGate("load_now")
-        # Bundled platforms register LAZILY: eagerly importing ~20 heavy SDKs added seconds to every `hermes`
+        # Bundled platforms register LAZILY: eagerly importing ~20 heavy SDKs added seconds to every `stardust`
         # invocation. A deferred loader keeps every platform available on first use.
         if manifest.kind == "platform":
             return ManifestGate("defer")
     if enabled is None or not names & enabled:
         return _placeholder(
-            f"not enabled in config (run `hermes plugins enable {lookup_key}` to activate)", logging.DEBUG,
+            f"not enabled in config (run `stardust plugins enable {lookup_key}` to activate)", logging.DEBUG,
             "Skipping '%s' (not in plugins.enabled)",
         )
     return ManifestGate("load")

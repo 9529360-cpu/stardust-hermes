@@ -679,7 +679,7 @@ class TestValidateRequestedModelNousPortalRecommendations:
     other messaging-platform /model validation, since they all share
     validate_requested_model()) rejected models that are live Nous Portal
     recommendations (/api/nous/recommended-models) but not yet in the
-    hardcoded curated catalog -- even though `hermes chat` already accepts
+    hardcoded curated catalog -- even though `stardust chat` already accepts
     these via union_with_portal_free/paid_recommendations() at model-list
     build time. The per-message validation path now checks the same Portal
     feed as a fallback tier before rejecting, so Telegram/CLI agree.

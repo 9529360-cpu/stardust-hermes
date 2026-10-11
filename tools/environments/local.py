@@ -36,7 +36,7 @@ _IS_WINDOWS = platform.system() == "Windows"
 logger = logging.getLogger(__name__)
 
 # --- Terminal temp-cache pruning ---
-# get_temp_dir() defaults to HERMES_HOME/cache/terminal (real storage, not tmpfs), so
+# get_temp_dir() defaults to STARDUST_HOME/cache/terminal (real storage, not tmpfs), so
 # stale artifacts don't vanish on reboot: the gateway housekeeping loop prunes hourly
 # and a once-per-process sweep covers CLI-only installs.
 TERMINAL_TEMP_MAX_AGE_HOURS = 72
@@ -49,7 +49,7 @@ _BG_GROUP_RE = re.compile(r"^(hermes_bg_[A-Za-z0-9_-]+)\.(log|pid|exit)$")
 
 
 def _default_terminal_temp_dir() -> "Path | None":
-    """Return HERMES_HOME/cache/terminal, or None if unresolvable."""
+    """Return STARDUST_HOME/cache/terminal, or None if unresolvable."""
     try:
         from hermes_constants import get_hermes_home
         return get_hermes_home() / "cache" / "terminal"
@@ -203,18 +203,18 @@ def _resolve_safe_cwd(cwd: str) -> str:
 
 # --- Child-process environment construction ---
 def _apply_profile_home(env: dict) -> None:
-    """Bridge the context-local HERMES_HOME override, then the subprocess HOME contract."""
+    """Bridge the context-local STARDUST_HOME override, then the subprocess HOME contract."""
     from hermes_constants import apply_subprocess_home_env, get_hermes_home_override
     try:
         if value := get_hermes_home_override():
-            env["HERMES_HOME"] = value
+            env["STARDUST_HOME"] = value
     except Exception:
         pass
     apply_subprocess_home_env(env)
 
 
 def _inject_session_context_env(env: dict) -> None:
-    """Bridge gateway session ContextVars (HERMES_SESSION_*) into a child env.
+    """Bridge gateway session ContextVars (STARDUST_SESSION_*) into a child env.
     Cross-session leak guard: the vars' last-writer-wins ``os.environ`` mirror may
     belong to another turn on a concurrent multi-session host, so once the session
     context is engaged ContextVars are authoritative — a bound value (incl. "") wins
@@ -278,13 +278,13 @@ def _finalize_child_env(env: dict) -> dict:
 
 def _scrubbed_env(parts, plugin_strip: frozenset, fix_path) -> dict:
     """Filter each ``(items, unwrap_force)`` in *parts* into one env, rewrite PATH via
-    *fix_path* (always prepending the hermes install dir so bare ``hermes`` resolves
+    *fix_path* (always prepending the hermes install dir so bare ``stardust`` resolves
     for children of a systemd/cron-launched gateway), then apply the shared guards."""
     out: dict[str, str] = {}
     for items, unwrap_force in parts:
         _filter_secret_env(items, out, unwrap_force=unwrap_force, plugin_strip=plugin_strip)
     path_key = _path_env_key(out)
-    # Keep bare ``hermes`` invocations available to child jobs even when the gateway was launched by a
+    # Keep bare ``stardust`` invocations available to child jobs even when the gateway was launched by a
     # service manager or cron without the console script's directory on PATH. The terminal environment
     # already applies this invariant; Cron scripts use this sanitizer directly (#92998).
     if path_key is not None:
@@ -325,7 +325,7 @@ def build_subprocess_env(
     ``scrub_secrets=True`` -> :func:`_sanitize_subprocess_env` (profile home inherent,
     ``inherit_profile_home`` ignored). ``scrub_secrets=False`` keeps the base
     byte-for-byte (git credential flows, ``bws``/``op``); ``inherit_profile_home``
-    bridges HERMES_HOME + HOME and ``extra`` is applied last so caller overrides win."""
+    bridges STARDUST_HOME + HOME and ``extra`` is applied last so caller overrides win."""
     env: dict[str, str] = dict(base) if base is not None else os.environ.copy()
     if scrub_secrets:
         return _sanitize_subprocess_env(env, dict(extra) if extra else None)
@@ -341,13 +341,13 @@ def served_profile_child_env(
     base: "Mapping[str, str] | None" = None, *, target_home: "str | Path | None" = None,
     inherit_credentials: bool = False,
 ) -> dict[str, str]:
-    """Child env for a process that acts FOR the active (possibly served) profile: ``hermes -p X``
+    """Child env for a process that acts FOR the active (possibly served) profile: ``stardust -p X``
     workers, ``key_cmd`` helpers, browser drivers. The process env is the LAUNCH profile's, so its
     ``.env`` residue and bridged ``TERMINAL_*`` are dropped (``strip_launch_profile_env``; no-op
     outside multiplex) and the target home is pinned. ``inherit_credentials=True`` is for children
     that legitimately run with the profile's credentials (they run the agent or mint its token): the
     target profile's own secrets (its ``.env`` + hydrated sources, i.e. what a standalone
-    ``hermes -p X`` loads itself) are overlaid — never a sibling profile's. ``False`` keeps the
+    ``stardust -p X`` loads itself) are overlaid — never a sibling profile's. ``False`` keeps the
     provider scrub; the caller re-adds the few keys the child needs via ``get_secret``.
     ``target_home`` defaults to the active override; ``base`` replaces the ``hermes_subprocess_env``
     snapshot."""
@@ -356,7 +356,7 @@ def served_profile_child_env(
     env = dict(base) if base is not None else hermes_subprocess_env(inherit_credentials=inherit_credentials)
     target = str(target_home or get_hermes_home_override() or "")
     if target:
-        env["HERMES_HOME"] = target
+        env["STARDUST_HOME"] = target
         strip_launch_profile_env(env, target)
     if inherit_credentials:
         secrets = build_profile_secret_scope(Path(target)) if target else (current_secret_scope() or {})
@@ -367,8 +367,8 @@ def served_profile_child_env(
 def strip_launch_profile_env(env: dict, target_home: "str | Path | None" = None) -> dict:
     """Drop the LAUNCH profile's residue from a child env built for another served profile.
     ``os.environ`` holds the default profile's ``.env`` and its bridged ``TERMINAL_*`` settings;
-    the secret scrub removes credentials but not settings (``HERMES_MODEL``, ``TERMINAL_ENV``,
-    ``HERMES_LANGUAGE``...), so a standalone ``hermes -p X`` worker and a served one saw different
+    the secret scrub removes credentials but not settings (``STARDUST_MODEL``, ``TERMINAL_ENV``,
+    ``STARDUST_LANGUAGE``...), so a standalone ``stardust -p X`` worker and a served one saw different
     envs. The child re-loads X's own ``.env`` and bridges X's config itself. ``target_home``
     defaults to the active home override; no-op outside multiplex or when the target IS the
     launch profile."""
@@ -389,15 +389,15 @@ def strip_launch_profile_env(env: dict, target_home: "str | Path | None" = None)
 
 # --- Shell discovery ---
 def _windows_bash_candidates(custom: "str | None") -> list[str]:
-    """Ordered bash.exe candidates on Windows: HERMES_GIT_BASH_PATH, our portable Git
-    under %LOCALAPPDATA%\\hermes\\git (PortableGit ``bin`` and MinGit ``usr\\bin``),
+    """Ordered bash.exe candidates on Windows: STARDUST_GIT_BASH_PATH, our portable Git
+    under %LOCALAPPDATA%\\stardust\\git (PortableGit ``bin`` and MinGit ``usr\\bin``),
     known Git-for-Windows dirs, then PATH last — ``shutil.which`` may return WSL's
     bash, which fails silently on Windows paths."""
     getenv = os.environ.get
     lad = getenv("LOCALAPPDATA", "")
     roots = [
-        lad and os.path.join(lad, "hermes", "git", "bin"),
-        lad and os.path.join(lad, "hermes", "git", "usr", "bin"),
+        lad and os.path.join(lad, "stardust", "git", "bin"),
+        lad and os.path.join(lad, "stardust", "git", "usr", "bin"),
         os.path.join(getenv("ProgramFiles", r"C:\Program Files"), "Git", "bin"),
         os.path.join(getenv("ProgramFiles(x86)", r"C:\Program Files (x86)"), "Git", "bin"),
         lad and os.path.join(lad, "Programs", "Git", "bin"),
@@ -416,15 +416,15 @@ def _find_bash() -> str:
         return (shutil.which("bash")
                 or next((p for p in ("/usr/bin/bash", "/bin/bash") if os.path.isfile(p)), None)
                 or os.environ.get("SHELL") or "/bin/sh")
-    custom = os.environ.get("HERMES_GIT_BASH_PATH")
+    custom = os.environ.get("STARDUST_GIT_BASH_PATH")
     candidates = _windows_bash_candidates(custom)
-    # First candidate that can actually start wins: a stale HERMES_GIT_BASH_PATH
+    # First candidate that can actually start wins: a stale STARDUST_GIT_BASH_PATH
     # pointing at a broken install must not beat a healthy portable Git.
     for candidate in candidates:
         if _bash_starts(candidate):
             if candidate != custom and custom and os.path.isfile(custom):
                 logger.warning(
-                    "HERMES_GIT_BASH_PATH=%s fails to start; using %s instead", custom, candidate)
+                    "STARDUST_GIT_BASH_PATH=%s fails to start; using %s instead", custom, candidate)
             return candidate
     if candidates:
         probe_details = "\n".join(
@@ -437,7 +437,7 @@ def _find_bash() -> str:
     raise RuntimeError(
         "Git Bash not found. Hermes Agent requires Git for Windows on Windows.\n"
         "Install it from: https://git-scm.com/download/win\n"
-        "Or set HERMES_GIT_BASH_PATH to your bash.exe location.")
+        "Or set STARDUST_GIT_BASH_PATH to your bash.exe location.")
 
 
 _git_bash_bin_dirs_cache: "list[str] | None" = None
@@ -505,28 +505,28 @@ def _find_shell() -> str:
 _SANE_PATH = ("/opt/homebrew/bin:/opt/homebrew/sbin:"
               "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")
 
-# Cached directory containing the ``hermes`` console-script.
+# Cached directory containing the ``stardust`` console-script.
 # ``_SENTINEL`` distinguishes "not resolved yet" from a resolved ``None``.
 _SENTINEL = object()
 _HERMES_BIN_DIR: "str | None | object" = _SENTINEL
 
 
 def _resolve_hermes_bin_dir() -> str | None:
-    """Directory holding the ``hermes`` console-script, or None (cached). A gateway
+    """Directory holding the ``stardust`` console-script, or None (cached). A gateway
     launched by systemd/cron/a desktop launcher lacks the install dir on PATH and bare
-    ``hermes`` exits 127. Order: ``which``; absolute ``sys.argv[0]`` naming a real
+    ``stardust`` exits 127. Order: ``which``; absolute ``sys.argv[0]`` naming a real
     hermes executable; ``sys.executable``'s dir if it holds the shim."""
     global _HERMES_BIN_DIR
     if _HERMES_BIN_DIR is not _SENTINEL:
         return _HERMES_BIN_DIR  # type: ignore[return-value]
-    which = shutil.which("hermes")
+    which = shutil.which("stardust")
     argv0 = sys.argv[0] if sys.argv else ""
     base = os.path.basename(argv0).lower()
     exe_dir = os.path.dirname(sys.executable) if sys.executable else ""
-    shim = "hermes.exe" if _IS_WINDOWS else "hermes"
+    shim = "stardust.exe" if _IS_WINDOWS else "stardust"
     if which:
         candidate = os.path.dirname(which)
-    elif (os.path.isabs(argv0) and (base == "hermes" or base.startswith("hermes."))
+    elif (os.path.isabs(argv0) and (base in ("hermes", "stardust") or base.startswith(("hermes.", "stardust.")))
             and os.path.isfile(argv0)):
         candidate = os.path.dirname(argv0)
     else:
@@ -542,8 +542,8 @@ def _prepend_hermes_bin_dir(existing_path: str) -> str:
 
 
 def _managed_runtime_path_entries() -> list[str]:
-    """Existing Hermes-managed runtime dirs: ``$HERMES_HOME/node`` (+``/bin``) and
-    ``$HERMES_HOME/bin`` (managed ``uv``). Per call, not cached: home is
+    """Existing Hermes-managed runtime dirs: ``$STARDUST_HOME/node`` (+``/bin``) and
+    ``$STARDUST_HOME/bin`` (managed ``uv``). Per call, not cached: home is
     profile-scoped and a managed tree can appear mid-process."""
     try:
         from hermes_constants import get_hermes_home, iter_hermes_node_dirs
@@ -600,7 +600,7 @@ def _make_run_env(env: dict) -> dict:
 # The Electron app prepends the repo root to PYTHONPATH so the backend can ``import
 # tools``; other subprocesses must not inherit it. Aliases: launchers may emit other
 # spellings — the Windows gateway launcher renders Hermes-owned paths under the
-# configured HERMES_HOME spelling (possibly a junction to another drive).
+# configured STARDUST_HOME spelling (possibly a junction to another drive).
 _hermes_repo_root: Path = Path(__file__).resolve().parents[2]
 _hermes_repo_root_aliases: tuple[Path, ...] = _build_hermes_repo_root_aliases(
     _hermes_repo_root, Path(__file__).absolute().parents[2], get_process_hermes_home())
@@ -760,11 +760,11 @@ class LocalEnvironment(BaseEnvironment):
 
     def get_temp_dir(self) -> str:
         """Shell-safe writable temp dir. Precedence: ``TERMINAL_TEMP_DIR``, TMPDIR/TMP/TEMP
-        (Termux has no /tmp), ``HERMES_HOME/cache/terminal`` (real storage: tmpfs /tmp
+        (Termux has no /tmp), ``STARDUST_HOME/cache/terminal`` (real storage: tmpfs /tmp
         fills under Hermes load; pruned by ``cleanup_terminal_temp_cache``), /tmp,
         ``tempfile.gettempdir()``; backend env before process env so terminal.env
         overrides work. Windows: ``%TEMP%`` often has spaces that break unquoted bash,
-        so always the HERMES_HOME cache dir with forward slashes (bash- and Python-valid)."""
+        so always the STARDUST_HOME cache dir with forward slashes (bash- and Python-valid)."""
         if _IS_WINDOWS:
             cache_dir = (_default_terminal_temp_dir()
                          or Path(tempfile.gettempdir()) / "hermes_terminal")

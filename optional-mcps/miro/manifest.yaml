@@ -40,5 +40,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Miro (or run `hermes mcp login miro`). Approve access,
+  Miro (or run `stardust mcp login miro`). Approve access,
   then restart the session so tools load.

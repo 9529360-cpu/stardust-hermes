@@ -123,7 +123,7 @@ class GatewayAdapterLifecycleMixin:
     def _adapter_disconnect_timeout_secs(self) -> float:
         """Return the per-adapter disconnect timeout used during shutdown."""
         from gateway.run import _ADAPTER_DISCONNECT_TIMEOUT_SECS_DEFAULT
-        override = self._env_timeout_override("HERMES_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT")
+        override = self._env_timeout_override("STARDUST_GATEWAY_ADAPTER_DISCONNECT_TIMEOUT")
         return _ADAPTER_DISCONNECT_TIMEOUT_SECS_DEFAULT if override is None else override
 
     def _platform_connect_timeout_secs(self, platform=None, *, initial: bool = False) -> float:
@@ -138,7 +138,7 @@ class GatewayAdapterLifecycleMixin:
             _PLATFORM_CONNECT_TIMEOUT_SECS_DEFAULT, _TELEGRAM_CONNECT_TIMEOUT_SECS_DEFAULT,
             _TELEGRAM_INITIAL_CONNECT_TIMEOUT_SECS_DEFAULT,
         )
-        override = self._env_timeout_override("HERMES_GATEWAY_PLATFORM_CONNECT_TIMEOUT")
+        override = self._env_timeout_override("STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT")
         if override is not None:
             return override
         if platform != Platform.TELEGRAM:
@@ -661,7 +661,7 @@ class GatewayAdapterLifecycleMixin:
         logger.warning(
             "%s has been failing/reconnecting continuously for %.1f hours (%d attempts) — flagging "
             "NEEDS_ATTENTION. Retries continue, but this usually means a permanent problem (revoked "
-            "credentials, missing intents, broken sidecar). Check `hermes status` / `/platform list`.",
+            "credentials, missing intents, broken sidecar). Check `stardust status` / `/platform list`.",
             platform.value, queued_for / 3600.0, info.get("attempts", 0),
         )
         self._update_platform_runtime_status(
@@ -824,13 +824,13 @@ class GatewayAdapterLifecycleMixin:
 
     async def _start_secondary_profile_adapters(self) -> int:
         """Bring up adapters for every non-active profile (multiplex only); returns connected count.
-        Each profile connects under its own HERMES_HOME + secret scope; credential/listener collisions
+        Each profile connects under its own STARDUST_HOME + secret scope; credential/listener collisions
         are refused here — the only point seeing every profile's credentials together."""
         from gateway.run import MultiplexConfigError, _multiplex_profile_homes
         from gateway.run_profile_reconcile import profile_serve_signature
         if not self._multiplex_on():
             # ``write_runtime_status`` re-stamps the previous writer's record in place, so a multiplexer's
-            # ``served_profiles`` would outlive it into this single-profile run and `hermes -p X ...`
+            # ``served_profiles`` would outlive it into this single-profile run and `stardust -p X ...`
             # would keep refusing (exit 78) / reporting "served" for profiles nobody serves.
             with _log_suppressed(logging.DEBUG, "could not clear served_profiles", exc_info=True):
                 from gateway.status import write_runtime_status
@@ -878,7 +878,7 @@ class GatewayAdapterLifecycleMixin:
 
     def _record_served_profiles(self, active: str, profile_homes) -> None:
         """Record the served set (eligible for routing/HTTP prefixes/cron/runtime scope — broader
-        than "has a connected adapter") for `hermes status`; seed per-profile PairingStores."""
+        than "has a connected adapter") for `stardust status`; seed per-profile PairingStores."""
         with _log_suppressed(logging.DEBUG, "could not record served_profiles", exc_info=True):
             from gateway.status import write_runtime_status
             from gateway.pairing import PairingStore
@@ -958,7 +958,7 @@ class GatewayAdapterLifecycleMixin:
     def _note_unserved_secondary_platform(self, profile_name: str, platform: Platform) -> None:
         """A secondary enabled a shared-ingress platform (Relay, WhatsApp) the multiplexer only runs on
         the default profile. Log the reason + remedy once per (profile, platform) and stamp a
-        ``<profile>:<platform>`` status entry so ``hermes gateway status --profile X`` and the
+        ``<profile>:<platform>`` status entry so ``stardust gateway status --profile X`` and the
         dashboard show *why* the channel is dead instead of nothing at all."""
         noted = getattr(self, "_unserved_secondary_platforms", None)
         if noted is None:

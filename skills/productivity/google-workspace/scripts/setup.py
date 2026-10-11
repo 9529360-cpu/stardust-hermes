@@ -39,10 +39,10 @@ if _SCRIPTS_DIR not in sys.path:
 
 from _hermes_home import display_hermes_home, get_hermes_home
 
-HERMES_HOME = get_hermes_home()
-TOKEN_PATH = HERMES_HOME / "google_token.json"
-CLIENT_SECRET_PATH = HERMES_HOME / "google_client_secret.json"
-PENDING_AUTH_PATH = HERMES_HOME / "google_oauth_pending.json"
+STARDUST_HOME = get_hermes_home()
+TOKEN_PATH = STARDUST_HOME / "google_token.json"
+CLIENT_SECRET_PATH = STARDUST_HOME / "google_client_secret.json"
+PENDING_AUTH_PATH = STARDUST_HOME / "google_oauth_pending.json"
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -178,7 +178,7 @@ def install_deps():
         "On environments without pip (e.g. Nix, or the Hermes Docker image's "
         "uv-managed venv), install the optional extra instead:"
     )
-    print("  hermes setup")
+    print("  stardust setup")
     print(f"Or manually: {sys.executable} -m pip install {' '.join(REQUIRED_PACKAGES)}")
     return False
 

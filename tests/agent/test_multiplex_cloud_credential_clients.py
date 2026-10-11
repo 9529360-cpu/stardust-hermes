@@ -16,10 +16,10 @@ from hermes_constants import reset_hermes_home_override, set_hermes_home_overrid
 
 @pytest.fixture
 def two_profiles(tmp_path, monkeypatch):
-    a = tmp_path / ".hermes"
+    a = tmp_path / ".stardust"
     b = a / "profiles" / "b"
     b.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(a))
+    monkeypatch.setenv("STARDUST_HOME", str(a))
     for var in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE",
                 "AZURE_TENANT_ID", "AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET"):
         monkeypatch.delenv(var, raising=False)

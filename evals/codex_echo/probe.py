@@ -12,7 +12,7 @@ import threading
 
 def main():
     with tempfile.TemporaryDirectory(prefix="hermes-echo-") as tmp:
-        os.environ.update(HOME=tmp, HERMES_HOME=tmp, CODEX_HOME=tmp, HERMES_DISABLE_PLUGINS="1")
+        os.environ.update(HOME=tmp, STARDUST_HOME=tmp, CODEX_HOME=tmp, STARDUST_DISABLE_PLUGINS="1")
         from agent import codex_runtime
         from agent.message_metadata import append_message
         from agent.session_persistence import SessionPersistenceMixin

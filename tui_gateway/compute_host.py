@@ -76,7 +76,7 @@ class ComputeHost:
         self._transport = _HostTransport(self.emit)
         self._heartbeat_secs = (
             float(heartbeat_secs) if heartbeat_secs is not None
-            else float(os.environ.get("HERMES_COMPUTE_HOST_HEARTBEAT_SECS") or "15"))
+            else float(os.environ.get("STARDUST_COMPUTE_HOST_HEARTBEAT_SECS") or "15"))
         if self._heartbeat_secs > 0:
             for target, name in (
                 (self._heartbeat_loop, "compute-host-heartbeat"),
@@ -528,7 +528,7 @@ def _rss_mb(pid: int) -> float:
 
 def _default_workers() -> int:
     try:
-        return max(2, int(os.environ.get("HERMES_TUI_RPC_POOL_WORKERS") or "8"))
+        return max(2, int(os.environ.get("STARDUST_TUI_RPC_POOL_WORKERS") or "8"))
     except (TypeError, ValueError):
         return 8
 
@@ -557,7 +557,7 @@ def _iter_control_lines(stdin: Any):
 
 
 def run_host(stdin: Any = None, stdout: Any = None) -> None:
-    os.environ["HERMES_COMPUTE_HOST_CHILD"] = "1"
+    os.environ["STARDUST_COMPUTE_HOST_CHILD"] = "1"
     stdin = stdin or sys.stdin
     host = ComputeHost(stdout=stdout or sys.stdout)
     shutting_down = threading.Event()
@@ -574,7 +574,7 @@ def run_host(stdin: Any = None, stdout: Any = None) -> None:
     host.emit({
         "type": "hello", "host_pid": os.getpid(), "boot_id": host._boot_id,
         "build_sha": _build_sha(), "cwd": os.getcwd(),
-        "hermes_home": os.environ.get("HERMES_HOME", "")})
+        "hermes_home": os.environ.get("STARDUST_HOME", "")})
 
     def _reader() -> None:
         for raw in _iter_control_lines(stdin):

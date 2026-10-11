@@ -32,8 +32,8 @@ from tools.environments.base_wait import _WaitTrace
 logger = logging.getLogger(__name__)
 
 # Opt-in debug tracing for the interrupt/activity/poll machinery
-# (HERMES_DEBUG_INTERRUPT=1). Off by default to avoid flooding gateway logs.
-_DEBUG_INTERRUPT = bool(os.getenv("HERMES_DEBUG_INTERRUPT"))
+# (STARDUST_DEBUG_INTERRUPT=1). Off by default to avoid flooding gateway logs.
+_DEBUG_INTERRUPT = bool(os.getenv("STARDUST_DEBUG_INTERRUPT"))
 
 # Extra seconds the ``run_bounded_sync`` backstop waits past the inner ``_wait_for_process``
 # deadline: the inner loop returns partial output + 124; the outer bound only fires when that
@@ -109,7 +109,7 @@ def touch_activity_if_due(state: dict, label: str) -> None:
 
 def get_sandbox_dir() -> Path:
     """Host-side root for all sandbox storage (Docker workspaces, Singularity
-    overlays/SIF cache). ``TERMINAL_SANDBOX_DIR`` overrides ``{HERMES_HOME}/sandboxes``."""
+    overlays/SIF cache). ``TERMINAL_SANDBOX_DIR`` overrides ``{STARDUST_HOME}/sandboxes``."""
     custom = os.getenv("TERMINAL_SANDBOX_DIR")
     p = Path(custom) if custom else get_hermes_home() / "sandboxes"
     p.mkdir(parents=True, exist_ok=True)
@@ -335,7 +335,7 @@ class BaseEnvironment(ABC):
     @staticmethod
     def _embed_stdin_heredoc(command: str, stdin_data: str) -> str:
         """Append stdin_data as a shell heredoc to the command string (SDK backends)."""
-        delimiter = f"HERMES_STDIN_{uuid.uuid4().hex[:12]}"
+        delimiter = f"STARDUST_STDIN_{uuid.uuid4().hex[:12]}"
         return f"{command} << '{delimiter}'\n{stdin_data}\n{delimiter}"
 
     # --- Process lifecycle ---

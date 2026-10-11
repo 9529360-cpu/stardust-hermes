@@ -2,14 +2,14 @@
 #
 # WHY THIS EXISTS (the frozen-binary problem): the Desktop's Update button
 # used to hand off exclusively to the staged Tauri binary
-# (%HERMES_HOME%\hermes-setup.exe). That binary has no self-update path --
+# (%STARDUST_HOME%\hermes-setup.exe). That binary has no self-update path --
 # copy_self_to_hermes_home deliberately no-ops during --update -- so every
 # updater-side fix (cache refresh #67369, marker self-adopt #74782, straggler
 # handling) only reaches users when a new installer is built, signed, and
 # published. In practice binaries go months stale and users hit long-fixed
 # bugs on every update (the 2026-08-09 incident chain).
 #
-# This script lives in the repo checkout, so EVERY `hermes update` refreshes
+# This script lives in the repo checkout, so EVERY `stardust update` refreshes
 # the very code that drives the next update. The Desktop spawns it through a
 # `cmd start` wrapper (see wrapHandoffForDetachedConsole in
 # apps/desktop/electron/updater-process.ts -- a bare detached+hidden
@@ -19,7 +19,7 @@
 # CONTRACT (keep in sync with apps/desktop/electron/main.ts):
 #   cmd /d /s /c start "" /min powershell -NoProfile -ExecutionPolicy Bypass
 #     -File scripts\desktop-update\windows.ps1
-#     -InstallRoot <path>   repo checkout (HERMES_HOME\hermes-agent)
+#     -InstallRoot <path>   repo checkout (STARDUST_HOME\hermes-agent)
 #     -Branch <ref>         branch to update against
 #     -DesktopPid <pid>     the Electron main process to wait out
 #     [-RelaunchExe <path>] Stardust.exe to start when done (omit = no relaunch)
@@ -33,11 +33,11 @@
 # .hermes-update-result.json for the relaunched Desktop to surface, and
 # relaunches the Desktop so the user is never left stranded.
 #
-# Marker: we claim HERMES_HOME\.hermes-update-in-progress with OUR pid as
+# Marker: we claim STARDUST_HOME\.hermes-update-in-progress with OUR pid as
 # step 0 (the wrapper cmd.exe pid the Desktop saw is useless -- it exits
-# immediately), retaining HERMES_UPDATE_STARTED_AT from the Desktop hand-off.
+# immediately), retaining STARDUST_UPDATE_STARTED_AT from the Desktop hand-off.
 # hermes_cli/update_lock.py's ancestry rule lets our
-# `hermes update` child adopt the claim; electron/update-marker.ts parks a
+# `stardust update` child adopt the claim; electron/update-marker.ts parks a
 # relaunched Desktop on it. Cleanup only removes the marker while WE still
 # own it (a handoff partner that rewrote it keeps its claim).
 
@@ -465,7 +465,7 @@ function Show-ProgressWindow {
 
 function Show-ErrorFinale([string]$Message) {
     # Terse by design: a title + the debug-share pointer. No error text, no
-    # log tail -- `hermes debug share` uploads the real evidence and the
+    # log tail -- `stardust debug share` uploads the real evidence and the
     # relaunched Desktop surfaces the result message.
     if ($script:UiServer) {
         # The shim renders the error state itself; leave the window up for
@@ -481,7 +481,7 @@ function Show-ErrorFinale([string]$Message) {
         if ($ui.Timer) { $ui.Timer.Stop() }
         $ui.Bar.Visible = $false
         $ui.Title.Text = "Failed to update"
-        $ui.Sub.Text = "Run `"hermes debug share`" in a terminal to send a report."
+        $ui.Sub.Text = "Run `"stardust debug share`" in a terminal to send a report."
         $close = New-Object System.Windows.Forms.Button
         $close.Text = "Close"
         $close.SetBounds(100, 252, 80, 28)
@@ -751,7 +751,7 @@ function Start-DesktopRelaunch {
 # write end of a redirected pipe to the child as an INHERITABLE handle, so
 # every descendant that is spawned without its own redirection gets a
 # duplicate -- and the read side does not see EOF until the last of them
-# closes it. `hermes update` deliberately runs its build steps with stdout
+# closes it. `stardust update` deliberately runs its build steps with stdout
 # inherited (hermes_cli/main.py, the tee-stderr runner), so the tree under a
 # step is arbitrarily deep and not something this script can enumerate. When
 # one of those descendants is a resident gateway, the pipe stays open for the
@@ -760,9 +760,9 @@ function Start-DesktopRelaunch {
 # Overridable so the pipe-drain self-test does not have to sit out the real
 # grace; not documented as a user knob.
 $script:StepDrainGraceSeconds = 20
-if ($env:HERMES_UPDATE_PIPE_DRAIN_SECONDS) {
+if ($env:STARDUST_UPDATE_PIPE_DRAIN_SECONDS) {
     $parsedGrace = 0
-    if ([int]::TryParse($env:HERMES_UPDATE_PIPE_DRAIN_SECONDS, [ref]$parsedGrace) -and $parsedGrace -ge 0) {
+    if ([int]::TryParse($env:STARDUST_UPDATE_PIPE_DRAIN_SECONDS, [ref]$parsedGrace) -and $parsedGrace -ge 0) {
         $script:StepDrainGraceSeconds = $parsedGrace
     }
 }
@@ -774,14 +774,14 @@ if ($env:HERMES_UPDATE_PIPE_DRAIN_SECONDS) {
 # every step is assigned to a private, non-breakaway Windows job and a timed-out
 # step is retryable only after that job reports zero active processes.
 $script:StepIdleTimeoutSeconds = 600
-if ($env:HERMES_UPDATE_STEP_IDLE_SECONDS) {
+if ($env:STARDUST_UPDATE_STEP_IDLE_SECONDS) {
     $parsedIdle = 0
-    if ([int]::TryParse($env:HERMES_UPDATE_STEP_IDLE_SECONDS, [ref]$parsedIdle) -and $parsedIdle -gt 0) {
+    if ([int]::TryParse($env:STARDUST_UPDATE_STEP_IDLE_SECONDS, [ref]$parsedIdle) -and $parsedIdle -gt 0) {
         $script:StepIdleTimeoutSeconds = $parsedIdle
     }
 }
 
-# Silence on the pipes is NOT silence in the update. `hermes update` captures
+# Silence on the pipes is NOT silence in the update. `stardust update` captures
 # the (very loud) Electron/vite build into logs/update.log instead of its own
 # stdout (hermes_cli/update_cmd.py, the update-log tee), so a real update is
 # routinely stdout-silent for 40+ minutes while demonstrably progressing. An
@@ -791,8 +791,8 @@ if ($env:HERMES_UPDATE_STEP_IDLE_SECONDS) {
 # Overridable so the pipe-drain self-test can point it at its own file; not
 # documented as a user knob.
 $script:StepProgressLogPath = Join-Path $LogDir "update.log"
-if ($env:HERMES_UPDATE_PROGRESS_LOG) {
-    $script:StepProgressLogPath = $env:HERMES_UPDATE_PROGRESS_LOG
+if ($env:STARDUST_UPDATE_PROGRESS_LOG) {
+    $script:StepProgressLogPath = $env:STARDUST_UPDATE_PROGRESS_LOG
 }
 
 function Get-StepProgressLogStamp {
@@ -1037,7 +1037,7 @@ function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
     # DoEvents loop keeps the marquee animating through long silent
     # stretches (pip installs) -- the old EndOfStream pump blocked on quiet
     # children and froze it. Full output still lands in the hand-off log
-    # afterwards, where `hermes debug share` picks it up.
+    # afterwards, where `stardust debug share` picks it up.
     #
     # The drain is bounded once the step exits (#90455). Waiting for pipe EOF
     # is waiting on the step's whole surviving descendant tree, and this
@@ -1104,7 +1104,7 @@ function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
                 break
             }
         } elseif (-not $stalled -and $job -ne [IntPtr]::Zero -and ((Get-Date) - $lastProgressAt).TotalSeconds -ge $script:StepIdleTimeoutSeconds) {
-            # Quiet pipes are how a healthy `hermes update` looks for 40+
+            # Quiet pipes are how a healthy `stardust update` looks for 40+
             # minutes: its build output streams to logs/update.log, not the
             # child's stdout. Growth of that file is progress -- reset the
             # clock instead of cancelling. Stat'd only once the ceiling is
@@ -1193,8 +1193,8 @@ $script:TreeSafeToFinalize = $true
 # Manual QA for the Edge shell without a checkout or a real update. Exits
 # before the marker/desktop/venv machinery — touches nothing. Off Windows
 # (or without Edge) the loopback server still starts and the URL prints, so
-# the page can be QA'd in any browser; HERMES_SELFTEST_FAIL=1 exercises the
-# error state, HERMES_SELFTEST_HOLD_SECONDS delays the terminal event.
+# the page can be QA'd in any browser; STARDUST_SELFTEST_FAIL=1 exercises the
+# error state, STARDUST_SELFTEST_HOLD_SECONDS delays the terminal event.
 if ($SelfTestUi) {
     New-Item -ItemType Directory -Path $LogDir -Force -ErrorAction SilentlyContinue | Out-Null
     Show-ProgressWindow
@@ -1209,10 +1209,10 @@ if ($SelfTestUi) {
     }
     Write-HandoffLog "SELF-TEST: shim simulation (no update will run)"
     $hold = 6
-    if ($env:HERMES_SELFTEST_HOLD_SECONDS) { $hold = [int]$env:HERMES_SELFTEST_HOLD_SECONDS }
+    if ($env:STARDUST_SELFTEST_HOLD_SECONDS) { $hold = [int]$env:STARDUST_SELFTEST_HOLD_SECONDS }
     Publish-UiProgress "Testing quiet update"
     Start-Sleep -Seconds $hold
-    if ($env:HERMES_SELFTEST_FAIL) {
+    if ($env:STARDUST_SELFTEST_FAIL) {
         Show-ErrorFinale "self-test error state"
     } else {
         Close-ProgressWindow
@@ -1240,16 +1240,16 @@ if ($SelfTestUi) {
 #            output. Guards #95589: the hand-off must terminate it and reach its
 #            retry/finally recovery rather than strand the Desktop.
 #   logstall -- a step that is silent on its pipes but keeps growing the
-#            update log, the shape of every real `hermes update` build (output
+#            update log, the shape of every real `stardust update` build (output
 #            goes to logs/update.log, not stdout, for 40+ minutes). Guards the
 #            watchdog's other cliff: the idle ceiling must count update.log
 #            growth as progress and must NOT kill the healthy step.
 if ($SelfTestPipeDrain) {
     New-Item -ItemType Directory -Path $LogDir -Force -ErrorAction SilentlyContinue | Out-Null
     $hold = 60
-    if ($env:HERMES_SELFTEST_HOLD_SECONDS) { $hold = [int]$env:HERMES_SELFTEST_HOLD_SECONDS }
+    if ($env:STARDUST_SELFTEST_HOLD_SECONDS) { $hold = [int]$env:STARDUST_SELFTEST_HOLD_SECONDS }
     $floodKb = 8192
-    if ($env:HERMES_SELFTEST_FLOOD_KB) { $floodKb = [int]$env:HERMES_SELFTEST_FLOOD_KB }
+    if ($env:STARDUST_SELFTEST_FLOOD_KB) { $floodKb = [int]$env:STARDUST_SELFTEST_FLOOD_KB }
     # $PSHOME is this interpreter's own directory -- no hardcoded system path.
     $powershell = Join-Path $PSHOME "powershell.exe"
     $stamp = [Guid]::NewGuid().ToString("N")
@@ -1279,7 +1279,7 @@ Write-Output "pipe-drain step output"
 exit 7
 '@
     # Writes straight to the console stream, holding nothing: a step that is
-    # merely loud. `hermes update` is this shape -- the Electron/vite build
+    # merely loud. `stardust update` is this shape -- the Electron/vite build
     # alone is megabytes. Few large lines rather than many small ones on
     # purpose: Write-HandoffLog is one Add-Content per line and runs inside the
     # measured window, so line-heavy output would time the logger instead of
@@ -1433,7 +1433,7 @@ try {
     try {
         $epoch = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
         $startedAt = 0L
-        $hasStartedAt = [int64]::TryParse($env:HERMES_UPDATE_STARTED_AT, [ref]$startedAt)
+        $hasStartedAt = [int64]::TryParse($env:STARDUST_UPDATE_STARTED_AT, [ref]$startedAt)
         if (-not $hasStartedAt -or $startedAt -gt $epoch -or ($epoch - $startedAt) -gt 1200) {
             $startedAt = $epoch
         }
@@ -1453,7 +1453,7 @@ try {
 
     # StartAssigned passes a null CreateProcess currentDirectory, so children
     # inherit the hand-off process directory rather than PowerShell's $PWD.
-    # Desktop launches us from HERMES_HOME; pin the process directory to the
+    # Desktop launches us from STARDUST_HOME; pin the process directory to the
     # checkout before any update child can resolve files against the wrong tree.
     try {
         $resolvedInstallRoot = Set-InstallRootCurrentDirectory $InstallRoot
@@ -1514,7 +1514,7 @@ try {
 
     # -- 2. Wait for the venv shim to unlock (FAIL CLOSED) ------------------
     Publish-UiProgress "Preparing Hermes files"
-    $shim = Join-Path $InstallRoot "venv\Scripts\hermes.exe"
+    $shim = Join-Path $InstallRoot "venv\Scripts\stardust.exe"
     if (Test-Path -LiteralPath $shim) {
         $unlocked = $false
         $deadline = (Get-Date).AddSeconds(20)
@@ -1533,7 +1533,7 @@ try {
             # Something still maps the venv. --force-ing past it guarantees a
             # half-updated venv (the exact 2026-08-09 Access-denied brick).
             $finalCode = 5
-            $finalMsg = "Update aborted: another process is still holding the Hermes install open (venv\Scripts\hermes.exe locked after 20s). Nothing was changed. Close other Hermes windows/terminals and try again."
+            $finalMsg = "Update aborted: another process is still holding the Hermes install open (venv\Scripts\stardust.exe locked after 20s). Nothing was changed. Close other Hermes windows/terminals and try again."
             Write-HandoffLog $finalMsg
             exit $finalCode
         }
@@ -1541,16 +1541,16 @@ try {
     }
 
     # -- 3. Run the update from the CURRENT checkout ------------------------
-    # --force skips only the hermes.exe shim guard, which step 2 just PROVED
+    # --force skips only the stardust.exe shim guard, which step 2 just PROVED
     # is unlocked; the venv-python holder guard (orphan reap included) stays
     # active. Our marker claim is adopted by the child via update_lock.py's
     # process-ancestry rule.
     #
-    # DRIVE THE UPDATE THROUGH venv\Scripts\python.exe, NOT venv\Scripts\hermes.exe.
+    # DRIVE THE UPDATE THROUGH venv\Scripts\python.exe, NOT venv\Scripts\stardust.exe.
     # `uv pip install -e .` has to replace the console-script shims, so
-    # _quarantine_running_hermes_exe must first rename the running hermes.exe
+    # _quarantine_running_hermes_exe must first rename the running stardust.exe
     # out of the way. On Windows that rename fails whenever ANY child process
-    # spawned from that hermes.exe is still alive: a child inherits a handle on
+    # spawned from that stardust.exe is still alive: a child inherits a handle on
     # the parent image, and the resulting sharing violation is indistinguishable
     # from a user leaving a second Hermes window open. It is the inherited
     # handle, not the trampoline itself, that pins the file -- killing the child
@@ -1580,7 +1580,7 @@ try {
     $pythonExe = Join-Path $InstallRoot "venv\Scripts\python.exe"
     if (-not (Test-Path -LiteralPath $pythonExe)) {
         $finalCode = 3
-        $finalMsg = "Update aborted: $pythonExe is missing. The install needs repair (run the Hermes installer or `hermes doctor`)."
+        $finalMsg = "Update aborted: $pythonExe is missing. The install needs repair (run the Hermes installer or `stardust doctor`)."
         Write-HandoffLog $finalMsg
         exit $finalCode
     }
@@ -1602,7 +1602,7 @@ try {
     Write-HandoffLog ("running: python " + ($updateArgs -join " "))
     Publish-UiProgress "Updating code and dependencies"
     $res = Invoke-HermesStep $pythonExe $updateArgs "update"
-    Write-HandoffLog "hermes update exit code: $($res.Code)"
+    Write-HandoffLog "stardust update exit code: $($res.Code)"
 
     $retryPolicyPath = Join-Path $PSScriptRoot "retry-policy.ps1"
     if (Test-Path -LiteralPath $retryPolicyPath) {
@@ -1629,13 +1629,13 @@ try {
     }
 
     # -- 4. Truthful completion: don't trust exit 0 -------------------------
-    # `hermes update` treats a Desktop GUI build failure as NON-fatal (prints
+    # `stardust update` treats a Desktop GUI build failure as NON-fatal (prints
     # a one-line warning, exits 0). For a Desktop-DRIVEN update that warning
     # is fatal: we would relaunch the old exe and call it success. Detect it,
     # retry the build once, and propagate honestly.
     $desktopBuildFailed = $false
     if ($res.Code -eq 0 -and $res.Output -match "Desktop build failed") {
-        Write-HandoffLog "hermes update reported a desktop build failure (non-fatal there, fatal here); retrying build"
+        Write-HandoffLog "stardust update reported a desktop build failure (non-fatal there, fatal here); retrying build"
         Publish-UiProgress "Rebuilding Desktop"
         $rebuild = Invoke-HermesStep $pythonExe @("-m", "hermes_cli.main", "desktop", "--force-build", "--build-only") "rebuild"
         Write-HandoffLog "desktop rebuild exit code: $($rebuild.Code)"
@@ -1659,10 +1659,10 @@ try {
         $finalMsg = "Update complete."
     } elseif ($desktopBuildFailed) {
         $finalCode = 6
-        $finalMsg = "Code and dependencies updated, but the Desktop app REBUILD FAILED - you are running the previous build. Run `hermes desktop --force-build` from a terminal to retry."
+        $finalMsg = "Code and dependencies updated, but the Desktop app REBUILD FAILED - you are running the previous build. Run `stardust desktop --force-build` from a terminal to retry."
     } else {
         $finalCode = $res.Code
-        $finalMsg = "Update failed (exit $($res.Code)). Run `hermes debug share` in a terminal to send a report."
+        $finalMsg = "Update failed (exit $($res.Code)). Run `stardust debug share` in a terminal to send a report."
     }
     exit $finalCode
 } finally {

@@ -261,7 +261,7 @@ import textwrap
 
 
 def _managed_home(tmp_path, *, legacy_soul=False):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir(exist_ok=True)
     d = home / "profiles" / "researcher"
     d.mkdir(parents=True, exist_ok=True)
@@ -410,7 +410,7 @@ def test_cleanup_bot_relay_artifacts_sweeps_stale_plaintext(tmp_path, monkeypatc
     import os as _os
     import time as _time
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     target = {"profile": "scout", "handle": "scout", "connection_id": "cloud-1",
               "connection_label": "", "title": "", "description": ""}
     stale_env = bot_relay.enqueue_envelope(
@@ -436,7 +436,7 @@ def test_cleanup_bot_relay_artifacts_sweeps_stale_plaintext(tmp_path, monkeypatc
 
 
 def test_cleanup_bot_relay_artifacts_missing_dir_is_zero(tmp_path, monkeypatch):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "nope"))
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path / "nope"))
     assert bot_relay.cleanup_bot_relay_artifacts() == 0
 
 
@@ -588,7 +588,7 @@ def test_message_agent_surfaces_runtime_offline_refusal(tmp_path, monkeypatch):
     assert bot_relay.claim_pending_envelopes(home) == []
 
 
-# ── delivery turn author (HERMES_TURN_AUTHOR on the recipient turn) ──────────
+# ── delivery turn author (STARDUST_TURN_AUTHOR on the recipient turn) ──────────
 
 
 def test_delivery_turn_author_from_envelope_sender_fields():
@@ -611,24 +611,24 @@ def test_delivery_turn_author_qualifies_a_remote_sender_by_its_connection():
 
 
 def test_delivery_env_carries_only_the_given_author(monkeypatch):
-    """The dispatcher's own HERMES_TURN_AUTHOR never reaches the child: dropped without an author, replaced with one."""
+    """The dispatcher's own STARDUST_TURN_AUTHOR never reaches the child: dropped without an author, replaced with one."""
     from agent.turn_author import TURN_AUTHOR_ENV
 
-    monkeypatch.setenv("HERMES_RELAY_TEST_MARKER", "kept")
+    monkeypatch.setenv("STARDUST_RELAY_TEST_MARKER", "kept")
     monkeypatch.setenv(TURN_AUTHOR_ENV, json.dumps({"id": "bot:previous", "name": "previous", "is_bot": True}))
-    monkeypatch.setenv("HERMES_SESSION_KEY", "session-A")
-    monkeypatch.setenv("HERMES_UI_SESSION_ID", "ui-A")
-    monkeypatch.setenv("HERMES_SESSION_ID", "session-A")
-    monkeypatch.setenv("HERMES_SESSION_PROFILE", "profile-A")
+    monkeypatch.setenv("STARDUST_SESSION_KEY", "session-A")
+    monkeypatch.setenv("STARDUST_UI_SESSION_ID", "ui-A")
+    monkeypatch.setenv("STARDUST_SESSION_ID", "session-A")
+    monkeypatch.setenv("STARDUST_SESSION_PROFILE", "profile-A")
     # A session-* knob, not identity: stripping it would break the child's watcher tuning.
-    monkeypatch.setenv("HERMES_SESSION_STALL_TIMEOUT", "97")
+    monkeypatch.setenv("STARDUST_SESSION_STALL_TIMEOUT", "97")
 
     assert TURN_AUTHOR_ENV not in bot_relay.delivery_env(None)
     env = bot_relay.delivery_env(bot_relay.delivery_turn_author("ops", "ops"))
     assert json.loads(env[TURN_AUTHOR_ENV]) == {"id": "bot:ops", "name": "ops", "is_bot": True}
-    assert env["HERMES_RELAY_TEST_MARKER"] == "kept"
-    assert "HERMES_SESSION_KEY" not in env
-    assert "HERMES_UI_SESSION_ID" not in env
-    assert "HERMES_SESSION_ID" not in env
-    assert "HERMES_SESSION_PROFILE" not in env
-    assert env["HERMES_SESSION_STALL_TIMEOUT"] == "97"
+    assert env["STARDUST_RELAY_TEST_MARKER"] == "kept"
+    assert "STARDUST_SESSION_KEY" not in env
+    assert "STARDUST_UI_SESSION_ID" not in env
+    assert "STARDUST_SESSION_ID" not in env
+    assert "STARDUST_SESSION_PROFILE" not in env
+    assert env["STARDUST_SESSION_STALL_TIMEOUT"] == "97"

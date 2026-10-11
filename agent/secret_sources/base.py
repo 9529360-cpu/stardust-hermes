@@ -1,10 +1,10 @@
 """Secret-source contract: the ABC every secret backend implements.
 
 A *secret source* resolves credentials from an external secret manager into
-env-var-shaped values at process startup, AFTER ``~/.hermes/.env`` has loaded
+env-var-shaped values at process startup, AFTER ``~/.stardust/.env`` has loaded
 and BEFORE the rest of Hermes reads ``os.environ``. The contract is deliberately
 narrow: read-only; startup-time and synchronous (one ``fetch()`` per process per
-HERMES_HOME, under a registry-enforced wall-clock timeout, no background
+STARDUST_HOME, under a registry-enforced wall-clock timeout, no background
 refreshers); never raises, never prompts (errors go in ``FetchResult.error``
 with an :class:`ErrorKind`; interactive auth belongs in the CLI ``setup`` flow);
 sources fetch, the orchestrator (``registry.apply_all``) applies.
@@ -124,10 +124,10 @@ class FetchResult:
 
 
 _GENERIC_REMEDIATION = {
-    ErrorKind.NOT_CONFIGURED: "Run `hermes secrets {name} setup` to finish configuration.",
-    ErrorKind.BINARY_MISSING: "Run `hermes secrets {name} setup` to install the helper CLI.",
-    ErrorKind.AUTH_FAILED: "Credentials rejected — run `hermes secrets {name} setup` to re-authenticate.",
-    ErrorKind.AUTH_EXPIRED: "Credentials expired — run `hermes secrets {name} setup` to re-authenticate.",
+    ErrorKind.NOT_CONFIGURED: "Run `stardust secrets {name} setup` to finish configuration.",
+    ErrorKind.BINARY_MISSING: "Run `stardust secrets {name} setup` to install the helper CLI.",
+    ErrorKind.AUTH_FAILED: "Credentials rejected — run `stardust secrets {name} setup` to re-authenticate.",
+    ErrorKind.AUTH_EXPIRED: "Credentials expired — run `stardust secrets {name} setup` to re-authenticate.",
     ErrorKind.NETWORK: "Network problem reaching the secrets backend — check connectivity and retry.",
     ErrorKind.TIMEOUT: "Backend was slow — raise secrets.{name}.timeout_seconds if this recurs.",
 }

@@ -155,7 +155,7 @@ The one-shot recipe does not scale to a whole-codebase pass. What did:
    conflicted files by directory to workers editing ONE merge worktree with
    no commits, then the parent commits the merge once. CI never runs on a
    conflicted PR, so re-merge main before every push.
-10. Live QA is its own wave: one squad per surface, isolated `HERMES_HOME`,
+10. Live QA is its own wave: one squad per surface, isolated `STARDUST_HOME`,
     expectation written before the check, evidence on disk, report only, and a
     PR-vs-main difference is the only thing that counts as a regression. Green
     unit tests missed the one P0 (a logged-in code path no test exercised).

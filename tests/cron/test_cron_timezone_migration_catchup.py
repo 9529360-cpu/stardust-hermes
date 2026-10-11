@@ -13,7 +13,7 @@ The fix classifies the mismatch instead of assuming an edit: an instant whose
 own wall clock is a legal occurrence, and which only left the lattice because
 normalization changed its offset, is a representation migration and fires.
 
-These exercise the real store against a temp ``HERMES_HOME`` (no mocks) per
+These exercise the real store against a temp ``STARDUST_HOME`` (no mocks) per
 the E2E-over-mocks discipline for file-touching code.
 """
 
@@ -26,8 +26,8 @@ import pytest
 
 @pytest.fixture
 def temp_home(tmp_path, monkeypatch):
-    """Isolated HERMES_HOME so jobs.json doesn't touch the real store."""
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    """Isolated STARDUST_HOME so jobs.json doesn't touch the real store."""
+    monkeypatch.setenv("STARDUST_HOME", str(tmp_path))
     yield tmp_path
 
 

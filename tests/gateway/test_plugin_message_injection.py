@@ -85,7 +85,7 @@ async def test_plugin_context_routes_through_live_gateway_to_existing_session(
             "plugins": {"entries": {"notify-plugin": {"allow_gateway_injection": True}}}
         })
     )
-    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("STARDUST_HOME", str(hermes_home))
 
     store = SessionStore(sessions_dir=tmp_path / "sessions", config=GatewayConfig())
     source = _entry().origin

@@ -36,5 +36,5 @@ suggest:
 
 post_install: |
   On first connection Hermes opens a browser to authorize with
-  Dropbox (or run `hermes mcp login dropbox`). Approve access,
+  Dropbox (or run `stardust mcp login dropbox`). Approve access,
   then restart the session so tools load.

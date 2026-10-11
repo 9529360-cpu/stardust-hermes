@@ -224,7 +224,7 @@ _USER_SKIPPED_SENTINEL = "__hermes_user_skipped__"
 
 
 def _get_token_dir(hermes_home: str | Path | None = None) -> Path:
-    """``HERMES_HOME/mcp-tokens/`` — per-profile token directory."""
+    """``STARDUST_HOME/mcp-tokens/`` — per-profile token directory."""
     from hermes_constants import get_hermes_home
 
     return Path(hermes_home if hermes_home is not None else get_hermes_home()) / "mcp-tokens"
@@ -332,13 +332,13 @@ def _is_interactive() -> bool:
 def _raise_if_non_interactive(lead: str) -> None:
     """Raise ``OAuthNonInteractiveError`` unless interactive; *lead* is the boundary-specific first sentence.
 
-    ``lead`` is the boundary-specific first sentence; this helper appends the shared, actionable ``hermes
+    ``lead`` is the boundary-specific first sentence; this helper appends the shared, actionable ``stardust
     mcp login`` next-step so the guidance wording lives in one place across every non-interactive OAuth
     boundary (#57836).
     """
     if not _is_interactive():
         raise OAuthNonInteractiveError(
-            f"{lead} Run `hermes mcp login <server>` interactively to (re)authorize, then restart or reload the gateway."
+            f"{lead} Run `stardust mcp login <server>` interactively to (re)authorize, then restart or reload the gateway."
         )
 
 
@@ -397,7 +397,7 @@ def _model_json(model: Any) -> dict:
 
 
 class HermesTokenStorage:
-    """Persist OAuth state as ``HERMES_HOME/mcp-tokens/<server_name>`` + ``.json`` (tokens),
+    """Persist OAuth state as ``STARDUST_HOME/mcp-tokens/<server_name>`` + ``.json`` (tokens),
     ``.client.json`` (client info), ``.meta.json`` (server metadata), ``.cimd-off`` (CIMD refused)."""
 
     def __init__(self, server_name: str, *, hermes_home: str | Path | None = None):
@@ -680,7 +680,7 @@ def _paste_callback_reader(result: dict) -> None:
     if line.lower() in _SKIP_TOKENS:
         result["error"] = _USER_SKIPPED_SENTINEL
         print(
-            "  OAuth skipped. Run `hermes mcp login <server>` later to authenticate, "
+            "  OAuth skipped. Run `stardust mcp login <server>` later to authenticate, "
             "or set ``enabled: false`` on that server in config.yaml to disable persistently.",
             file=sys.stderr)
         return
@@ -1103,7 +1103,7 @@ def _invalidate_tokens_on_client_change(
     if removed:
         logger.warning(
             "MCP OAuth '%s': configured OAuth client changed (client_id %r -> %r); discarded tokens minted under "
-            "the previous client. Re-authorize with: hermes mcp login %s",
+            "the previous client. Re-authorize with: stardust mcp login %s",
             storage._server_name, old_client_id, new_client_id, storage._server_name)
 
 
@@ -1143,7 +1143,7 @@ def humanize_oauth_registration_error(
             f"'{server_name}' is Figma's remote MCP — DCR is allowlisted by exact client_name "
             f"(\"{_FIGMA_DCR_CLIENT_NAME}\" and \"Codex\" work; most other names 403). Hermes defaults to "
             f"client_name: {_FIGMA_DCR_CLIENT_NAME!r} automatically. If you set oauth.client_name yourself, "
-            f"change it to one of those, or clear it and re-run:\n  hermes mcp login {server_name}")
+            f"change it to one of those, or clear it and re-run:\n  stardust mcp login {server_name}")
     return (
         f"'{server_name}' only allows pre-approved OAuth clients — it rejected client registration (403), so no "
         "browser flow can start. Options: set oauth.client_name to a name the provider allowlists, add a "
@@ -1164,7 +1164,7 @@ def build_oauth_auth(server_name: str, server_url: str, oauth_config: dict | Non
     if not _is_interactive() and not storage.has_cached_tokens():
         raise OAuthNonInteractiveError(
             f"MCP OAuth for '{server_name}': non-interactive environment and no cached tokens found. The OAuth flow "
-            f"requires browser authorization. Run `hermes mcp login {server_name}` interactively first to complete "
+            f"requires browser authorization. Run `stardust mcp login {server_name}` interactively first to complete "
             "initial authorization, then cached tokens will be reused.")
     kwargs = build_provider_kwargs(cfg, storage, ssh_proxy_hint=True)
     if HermesOAuthClientProvider is None:

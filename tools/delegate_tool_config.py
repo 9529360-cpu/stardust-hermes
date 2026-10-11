@@ -344,7 +344,7 @@ def _runtime_provider_credentials(v: dict, explicit_request_overrides) -> dict:
     if not api_key:
         raise ValueError(
             f"Delegation provider '{configured_provider}' resolved but has no API key. "
-            f"Set the appropriate environment variable or run 'hermes auth'."
+            f"Set the appropriate environment variable or run 'stardust auth'."
         )
     # A pinned ACP transport command must exist — refuse the spawn loudly rather than letting the child
     # silently fall back to another transport (#80450).
@@ -385,10 +385,10 @@ def _resolve_delegation_credentials(cfg: dict, parent_agent) -> dict:
 
 def _load_config() -> dict:
     """The ``delegation`` config section (read-only — do NOT mutate). Prefers the shared ``load_config_readonly()``
-    (follows HERMES_HOME/profile; no deepcopy, since this runs on every get_definitions() rebuild) over the legacy
-    ``cli.CLI_CONFIG``, which can hide user-set keys — except that ``HERMES_IGNORE_USER_CONFIG=1`` is only honored
+    (follows STARDUST_HOME/profile; no deepcopy, since this runs on every get_definitions() rebuild) over the legacy
+    ``cli.CLI_CONFIG``, which can hide user-set keys — except that ``STARDUST_IGNORE_USER_CONFIG=1`` is only honored
     by the legacy loader, so it stays authoritative when that flag is set."""
-    if os.environ.get("HERMES_IGNORE_USER_CONFIG") != "1":
+    if os.environ.get("STARDUST_IGNORE_USER_CONFIG") != "1":
         try:
             from hermes_cli.config import load_config_readonly
             cfg = load_config_readonly().get("delegation") or {}

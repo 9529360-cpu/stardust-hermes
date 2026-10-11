@@ -385,7 +385,7 @@ describe('expired OAuth grant recovery', () => {
     // real way back instead of promising a sign-in the card cannot start.
     expect(
       screen.getByText(
-        'Your Nous Portal sign-in has expired or was revoked. Run hermes model in a terminal and choose Nous Portal to sign in again, or switch to a model API in Settings → Model services.'
+        'Your Nous Portal sign-in has expired or was revoked. Run stardust model in a terminal and choose Nous Portal to sign in again, or switch to a model API in Settings → Model services.'
       )
     ).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()

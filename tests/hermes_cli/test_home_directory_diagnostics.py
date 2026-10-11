@@ -72,7 +72,7 @@ def test_initialization_preserves_external_directory_modes(tmp_path, monkeypatch
 def test_symlinked_parent_above_home_is_not_an_operator_home_link(
     tmp_path, monkeypatch, existing
 ):
-    """A link above HERMES_HOME is not an operator-owned home link.
+    """A link above STARDUST_HOME is not an operator-owned home link.
 
     macOS aliases ``/tmp`` -> ``/private/tmp`` and ``/var`` -> ``/private/var``, so a home
     under the default temp root arrives with a symlinked parent; the same happens for any

@@ -7,7 +7,7 @@ from contextvars import ContextVar
 from typing import Iterator, Mapping, MutableMapping, overload
 
 _DELEGATED_CHILD_CONTEXT: ContextVar[bool] = ContextVar("hermes_delegated_child_context", default=False)
-DELEGATED_CHILD_ENV_MARKER = "HERMES_DELEGATED_CHILD_CONTEXT"
+DELEGATED_CHILD_ENV_MARKER = "STARDUST_DELEGATED_CHILD_CONTEXT"
 
 @contextmanager
 def delegated_child_context(session_id: str | None = None) -> Iterator[None]:

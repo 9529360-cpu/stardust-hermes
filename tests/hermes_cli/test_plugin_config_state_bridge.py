@@ -167,7 +167,7 @@ ctx = PluginContext(PluginManifest(name='fixture-plugin'), PluginManager())
 for i in range(int(sys.argv[1]), int(sys.argv[2])):
     ctx.set_config(f'process_{i}', i)
 """
-    env = dict(os.environ, HERMES_HOME=str(isolated_home))
+    env = dict(os.environ, STARDUST_HOME=str(isolated_home))
     processes = [
         subprocess.Popen(
             [sys.executable, "-c", script, str(start), str(start + 20)],
@@ -238,7 +238,7 @@ ctx = PluginContext(PluginManifest(name='fixture-plugin'), PluginManager())
 for i in range(int(sys.argv[1]), int(sys.argv[2])):
     ctx.state.set(f'process_{i}', i)
 """
-    env = dict(os.environ, HERMES_HOME=str(isolated_home))
+    env = dict(os.environ, STARDUST_HOME=str(isolated_home))
     processes = [
         subprocess.Popen(
             [sys.executable, "-c", script, str(start), str(start + 20)],

@@ -11,7 +11,7 @@ Network-marked (skipped in hermetic CI unless explicitly enabled) — this is
 the test that catches wrong repo names (the Nemotron 401) and moved files.
 Run before any catalog commit:
 
-    HERMES_TEST_NETWORK=1 scripts/run_tests.sh tests/hermes_cli/test_catalog_reachability.py
+    STARDUST_TEST_NETWORK=1 scripts/run_tests.sh tests/hermes_cli/test_catalog_reachability.py
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ import urllib.request
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("HERMES_TEST_NETWORK"),
-    reason="network test; set HERMES_TEST_NETWORK=1 to run",
+    not os.environ.get("STARDUST_TEST_NETWORK"),
+    reason="network test; set STARDUST_TEST_NETWORK=1 to run",
 )
 
 

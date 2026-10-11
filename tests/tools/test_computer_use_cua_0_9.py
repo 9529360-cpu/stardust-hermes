@@ -362,7 +362,7 @@ def test_persistent_focus_has_a_separate_approval_scope(monkeypatch):
         seen.append(action)
         return "once" if action == "click" else "deny"
 
-    monkeypatch.setenv("HERMES_INTERACTIVE", "1")
+    monkeypatch.setenv("STARDUST_INTERACTIVE", "1")
     computer_use.set_approval_callback(approve)
     try:
         result = json.loads(

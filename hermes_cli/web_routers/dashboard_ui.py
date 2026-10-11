@@ -47,7 +47,7 @@ def _set_dashboard_key(key: str, value) -> None:
 async def get_dashboard_themes():
     """Available themes + the active one. Built-ins ship name/label/description only
     (the frontend owns their definitions in `web/src/themes/presets.ts`); user themes
-    from `~/.hermes/dashboard-themes/*.yaml` ship their normalised `definition`."""
+    from `~/.stardust/dashboard-themes/*.yaml` ship their normalised `definition`."""
     def _run():
         config = load_config()
         active = cfg_get(config, "dashboard", "theme", default="default")

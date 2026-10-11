@@ -17,8 +17,8 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger("tools.computer_use.cua_backend")
 
 # No version *pin* knob on purpose: the upstream installer always fetches the latest release, so a pin
-# var would only LOOK like it pinned. Point HERMES_CUA_DRIVER_CMD at a specific binary instead.
-_CUA_DRIVER_CMD_ENV = "HERMES_CUA_DRIVER_CMD"
+# var would only LOOK like it pinned. Point STARDUST_CUA_DRIVER_CMD at a specific binary instead.
+_CUA_DRIVER_CMD_ENV = "STARDUST_CUA_DRIVER_CMD"
 _CUA_DRIVER_DEFAULT_CMD = "cua-driver"
 _CUA_DRIVER_ARGS = ["mcp"]  # stdio MCP; fallback when the driver has no `manifest` verb
 _CUA_DRIVER_RUNTIME_CONTRACT_MIN = (0, 20, 0)
@@ -74,7 +74,7 @@ def _wsl_windows_path_to_posix(path: str) -> str:
     return os.path.join("/mnt", drive, *(str(part) for part in win.parts[1:])) if wsl and drive else path
 
 def _candidate_cua_driver_commands(override: Optional[str] = None) -> List[str]:
-    """Candidate commands in resolution order. ``override`` / a non-empty ``HERMES_CUA_DRIVER_CMD`` is authoritative
+    """Candidate commands in resolution order. ``override`` / a non-empty ``STARDUST_CUA_DRIVER_CMD`` is authoritative
     (if wrong, report the driver missing rather than silently picking another binary). Otherwise PATH, then
     canonical installer locations — Finder/Dock-launched apps inherit a narrow PATH without ``~/.local/bin``;
     fresh Windows sessions inherit a stale one."""
@@ -104,9 +104,9 @@ def cua_driver_binary_available() -> bool:
 def cua_driver_install_hint() -> str:
     installer = (f"  irm {_UPSTREAM_SCRIPTS}/install.ps1 | iex" if sys.platform == "win32"
                  else f'  /bin/bash -c "$(curl -fsSL {_UPSTREAM_SCRIPTS}/install.sh)"')
-    return ("cua-driver is not installed. Install with one of:\n  hermes computer-use install\n"
+    return ("cua-driver is not installed. Install with one of:\n  stardust computer-use install\n"
             f"Or run the upstream installer directly:\n{installer}\n"
-            "Or run `hermes tools` and enable the Computer Use toolset to install it automatically.")
+            "Or run `stardust tools` and enable the Computer Use toolset to install it automatically.")
 
 def _mcp_args_with_overlay_flag(args: List[str], driver_cmd: str = _CUA_DRIVER_DEFAULT_CMD) -> List[str]:
     """Return *args* with ``--no-overlay`` appended when configured and supported."""
@@ -212,4 +212,4 @@ def cua_driver_update_nudge() -> Optional[str]:
     if not state or not state.get("update_available"):
         return None
     return (f"cua-driver {state.get('latest_version') or '?'} is available "
-            f"(you have {state.get('current_version') or '?'}); update with `hermes computer-use install --upgrade`.")
+            f"(you have {state.get('current_version') or '?'}); update with `stardust computer-use install --upgrade`.")

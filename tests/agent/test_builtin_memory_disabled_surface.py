@@ -9,7 +9,7 @@ Mem0, …) paid for both on every API call with no way to drop them — listing
 ``memory`` under ``disabled_toolsets`` takes the provider's tools down too.
 
 These tests exercise the real resolution chain (config on disk → check_fn →
-``get_tool_definitions``) against a temp ``HERMES_HOME``, not mocks.
+``get_tool_definitions``) against a temp ``STARDUST_HOME``, not mocks.
 """
 
 import json
@@ -44,8 +44,8 @@ def _write_memory_config(home, **memory_section):
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    home = tmp_path / ".stardust"
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     return home
 
 

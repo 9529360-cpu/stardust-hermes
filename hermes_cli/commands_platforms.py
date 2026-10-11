@@ -312,7 +312,7 @@ def discord_skill_commands_by_category(
 
     Scan roots include the local ``SKILLS_DIR`` **and** any configured ``skills.external_dirs`` — matching
     the widened filter applied to the flat ``discord_skill_commands()`` collector in #18741. Without this
-    parity, external-dir skills are visible via ``hermes skills list`` and the agent's ``/skill-name``
+    parity, external-dir skills are visible via ``stardust skills list`` and the agent's ``/skill-name``
     dispatch but silently absent from Discord's ``/skill`` autocomplete.
     The legacy 25-group × 25-subcommand caps (from the old nested ``/skill <cat> <name>`` layout) are
     **not** applied — the live caller (``_register_skill_group`` in ``gateway/platforms/discord.py``,
@@ -402,8 +402,8 @@ def slack_native_slashes() -> list[tuple[str, str, str]]:
     wanted += [(name, desc, hint or "") for name, desc, hint in _iter_plugin_command_entries()]
 
     entries: list[tuple[str, str, str]] = [
-        ("hermes", "Talk to Hermes or run a subcommand", "[subcommand] [args]")]
-    seen = {"hermes"}
+        ("stardust", "Talk to Hermes or run a subcommand", "[subcommand] [args]")]
+    seen = {"stardust"}
     for name, desc, hint in wanted:
         slack_name = _sanitize_slack_name(name)
         if (not slack_name or slack_name in seen or slack_name in _SLACK_RESERVED_COMMANDS

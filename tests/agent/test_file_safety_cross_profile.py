@@ -79,7 +79,7 @@ class TestResolveActiveProfileName:
 
 
     def test_falls_back_to_default_on_resolution_failure(self, fake_hermes, monkeypatch):
-        """If HERMES_HOME resolution raises, return 'default' rather than crashing the tool."""
+        """If STARDUST_HOME resolution raises, return 'default' rather than crashing the tool."""
         import agent.file_safety as fs
 
         def _boom():

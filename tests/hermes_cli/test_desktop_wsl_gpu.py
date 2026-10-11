@@ -1,4 +1,4 @@
-"""``hermes gui`` under WSLg selects the installed Mesa D3D12 driver before Electron spawns
+"""``stardust gui`` under WSLg selects the installed Mesa D3D12 driver before Electron spawns
 its GPU process (#106117) — and never overrides an explicit Mesa choice or fires off-WSL."""
 
 import argparse
@@ -34,7 +34,7 @@ def test_wslg_with_dxg_and_installed_d3d12_driver_selects_gpu_mesa_backend(monke
     env = _launch_env(monkeypatch, tmp_path, wsl=True, dxg=True, driver=True)
 
     assert env["GALLIUM_DRIVER"] == "d3d12"
-    assert Path(env["HERMES_DESKTOP_CWD"]) == tmp_path.resolve()  # the rest of the env still builds
+    assert Path(env["STARDUST_DESKTOP_CWD"]) == tmp_path.resolve()  # the rest of the env still builds
 
 
 def test_explicit_mesa_choice_and_non_wsl_hosts_are_left_alone(monkeypatch, tmp_path):

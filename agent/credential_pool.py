@@ -102,7 +102,7 @@ _TERMINAL_AUTH_REASONS = frozenset({
 CREDENTIAL_PERSIST_FAILED_REASON = "credential_persist_failed"
 
 # DEAD ``manual:*`` entries are pruned after this quiet window — they have no
-# singleton to re-seed from and the user can re-add via ``hermes auth add``.
+# singleton to re-seed from and the user can re-add via ``stardust auth add``.
 # Singleton-seeded entries (device_code, claude_code) are NOT pruned because
 # ``_seed_from_singletons`` would re-create them from the same stale tokens.
 DEAD_MANUAL_PRUNE_TTL_SECONDS = 24 * 60 * 60
@@ -471,7 +471,7 @@ def custom_provider_pool_key_candidates(
 ) -> List[str]:
     """Return pool keys to try for a custom endpoint.
 
-    ``hermes auth add <key>`` stores ``providers.<key>`` credentials under the
+    ``stardust auth add <key>`` stores ``providers.<key>`` credentials under the
     durable config slug; older rows and legacy ``custom_providers:`` entries
     live under ``custom:<display-name>``. Try the slug first, then the legacy
     namespace, so a populated pool is not skipped in favour of the
@@ -679,7 +679,7 @@ def _guarded_global_root(global_path: Optional[Path]) -> Optional[Path]:
     """Apply the pytest seat belt to a resolved global-root auth.json path.
 
     ``None`` means classic mode (profile == root) or "refuse": under pytest,
-    never write the real user's ``~/.hermes/auth.json`` even when HERMES_HOME
+    never write the real user's ``~/.stardust/auth.json`` even when STARDUST_HOME
     points at a profile path (mirrors the read-side guard in
     ``_load_global_auth_store``). Uses the unmodified HOME env, not
     ``Path.home()`` which fixtures may monkeypatch.
@@ -689,7 +689,7 @@ def _guarded_global_root(global_path: Optional[Path]) -> Optional[Path]:
     if os.environ.get("PYTEST_CURRENT_TEST"):
         real_home_env = os.environ.get("HOME", "")
         if real_home_env:
-            real_root = Path(real_home_env) / ".hermes" / "auth.json"
+            real_root = Path(real_home_env) / ".stardust" / "auth.json"
             try:
                 if global_path.resolve(strict=False) == real_root.resolve(strict=False):
                     return None
@@ -868,8 +868,8 @@ REFRESHABLE_OAUTH_PROVIDERS = frozenset({"anthropic", "nous", *_TOKENS_SINGLETON
 _SINGLE_USE_REFRESH_PROVIDERS = ("openai-codex", "xai-oauth", "anthropic")
 
 _REFRESH_TIMEOUT_ENV_VARS = {
-    "openai-codex": "HERMES_CODEX_REFRESH_TIMEOUT_SECONDS",
-    "xai-oauth": "HERMES_XAI_REFRESH_TIMEOUT_SECONDS",
+    "openai-codex": "STARDUST_CODEX_REFRESH_TIMEOUT_SECONDS",
+    "xai-oauth": "STARDUST_XAI_REFRESH_TIMEOUT_SECONDS",
 }
 
 # Singleton-seeded source whose exhausted/DEAD pool row may be revived by a
@@ -1190,7 +1190,7 @@ class CredentialPool(CredentialPoolAdminMixin):
     def _sync_entry_from_auth_store(self, entry: PooledCredential) -> PooledCredential:
         """Sync a Codex / xAI device_code entry from auth.json ``providers.<id>.tokens``.
 
-        A fresh ``hermes model`` / ``hermes auth`` login writes new tokens
+        A fresh ``stardust model`` / ``stardust auth`` login writes new tokens
         under ``_auth_store_lock`` while the pool entry may sit frozen behind
         a ``last_error_reset_at`` hours in the future; without this sync every
         request fails with "no available entries" despite fresh credentials on
@@ -1460,7 +1460,7 @@ class CredentialPool(CredentialPoolAdminMixin):
 
     def _single_use_refresh_lock_timeout(self) -> float:
         """Configured refresh POST timeout plus margin, so a slow token endpoint cannot starve the flock."""
-        env_var = _REFRESH_TIMEOUT_ENV_VARS.get(self.provider, "HERMES_ANTHROPIC_REFRESH_TIMEOUT_SECONDS")
+        env_var = _REFRESH_TIMEOUT_ENV_VARS.get(self.provider, "STARDUST_ANTHROPIC_REFRESH_TIMEOUT_SECONDS")
         refresh_timeout_seconds = auth_mod.env_float(env_var, 20)
         return max(float(auth_mod.AUTH_LOCK_TIMEOUT_SECONDS), float(refresh_timeout_seconds) + 5.0)
 
@@ -1470,7 +1470,7 @@ class CredentialPool(CredentialPoolAdminMixin):
         """Write a rotated Anthropic pair to its authoritative singleton, or fail closed.
 
         claude_code -> ~/.claude/.credentials.json (so the fallback resolver
-        and other profiles see it). hermes_pkce -> ~/.hermes/.anthropic_oauth.json
+        and other profiles see it). hermes_pkce -> ~/.stardust/.anthropic_oauth.json
         (``_seed_from_singletons`` re-seeds it every load; a borrowed row commits
         to the ROOT's file, never a new profile-local copy, #100339). Not
         ``endswith``: manual:hermes_pkce is pool-owned and a singleton for it
@@ -1479,7 +1479,7 @@ class CredentialPool(CredentialPoolAdminMixin):
         if entry.source == "claude_code":
             store = "~/.claude/.credentials.json"
         elif entry.source == "hermes_pkce":
-            store = "~/.hermes/.anthropic_oauth.json"
+            store = "~/.stardust/.anthropic_oauth.json"
         else:
             return
         try:
@@ -1782,7 +1782,7 @@ class CredentialPool(CredentialPoolAdminMixin):
     def _resync_stale_entry(self, entry: PooledCredential) -> PooledCredential:
         """Re-read an exhausted/DEAD singleton-seeded entry from its token authority.
 
-        The user may have re-authed (``hermes model`` / ``hermes auth``, the
+        The user may have re-authed (``stardust model`` / ``stardust auth``, the
         Claude Code CLI, another profile) leaving fresh tokens on disk while
         the pool entry is frozen behind ``last_error_reset_at``.
         """
@@ -1832,7 +1832,7 @@ class CredentialPool(CredentialPoolAdminMixin):
                     if dead_at and now - dead_at > DEAD_MANUAL_PRUNE_TTL_SECONDS:
                         logger.warning(
                             "credential pool: pruning DEAD manual entry %s "
-                            "(reason=%s, age=%.1fh) — re-add via `hermes auth add %s`",
+                            "(reason=%s, age=%.1fh) — re-add via `stardust auth add %s`",
                             entry.label or entry.id[:8],
                             entry.last_error_reason or "unknown",
                             (now - dead_at) / 3600.0,
@@ -2256,7 +2256,7 @@ class _Seeder:
         self.is_suppressed = _is_source_suppressed_fn()
 
     def upsert(self, source: str, payload: Dict[str, Any]) -> bool:
-        """Upsert unless suppressed (``hermes auth remove`` must stay stable across loads)."""
+        """Upsert unless suppressed (``stardust auth remove`` must stay stable across loads)."""
         if self.is_suppressed(self.provider, source):
             return False
         self.active_sources.add(source)
@@ -2280,13 +2280,13 @@ def _seed_anthropic_singletons(seed: _Seeder) -> None:
     except ImportError:
         pass
 
-    # API-key vs OAuth is a user-visible choice at `hermes setup`. The API-key
+    # API-key vs OAuth is a user-visible choice at `stardust setup`. The API-key
     # signal is ANTHROPIC_API_KEY set AND no OAuth env vars (the save_* helpers
     # zero the other side). Then we MUST NOT seed autodiscovered OAuth tokens:
     # rotation on a 401/429 would silently flip the session onto OAuth, which
     # forces the Claude Code identity injection, `mcp_` tool-name rewrite and
     # claude-cli User-Agent the user explicitly opted out of. Prefer
-    # ~/.hermes/.env over os.environ, as `_seed_from_env` does.
+    # ~/.stardust/.env over os.environ, as `_seed_from_env` does.
     _env_file = load_env()
 
     def _env_val(key: str) -> str:
@@ -2466,7 +2466,7 @@ def _seed_tokens_singleton(seed: _Seeder, auth_store: Dict[str, Any]) -> None:
     Hermes owns its own Codex auth state and does NOT auto-import
     ~/.codex/auth.json: refresh tokens are single-use, so sharing them with
     Codex CLI / VS Code causes refresh_token_reused races. Adoption is an
-    explicit one-time prompt via `hermes auth openai-codex`.
+    explicit one-time prompt via `stardust auth openai-codex`.
     """
     state = _load_provider_state(auth_store, seed.provider)
     tokens = state.get("tokens") if isinstance(state, dict) else None
@@ -2502,7 +2502,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
     elif provider == "minimax-oauth":
         _seed_minimax_singleton(seed)
     elif provider in _TOKENS_SINGLETON_PROVIDERS:
-        # `hermes auth remove openai-codex` suppresses device_code; without
+        # `stardust auth remove openai-codex` suppresses device_code; without
         # this gate the removal is undone on the next load_pool().
         if provider == "openai-codex" and seed.is_suppressed(provider, "device_code"):
             return seed.result
@@ -2511,7 +2511,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
 
 
 def get_env_prefer_dotenv(key: str) -> str:
-    """Resolve a credential env var, preferring ~/.hermes/.env over os.environ.
+    """Resolve a credential env var, preferring ~/.stardust/.env over os.environ.
 
     The user's config file is authoritative; stale env vars from parent
     processes (Codex CLI, test scripts) must not override deliberate .env
@@ -2547,7 +2547,7 @@ def _warn_env_ingestion_once(provider: str, env_var: str) -> None:
     logger.warning(
         "Ingested %s from environment into the %s credential pool — this "
         "enables %s spend. Remove the key or run "
-        "hermes auth remove %s <n> to suppress.",
+        "stardust auth remove %s <n> to suppress.",
         env_var,
         provider,
         "OpenRouter" if provider == "openrouter" else provider,
@@ -2632,7 +2632,7 @@ def _prune_stale_seeded_entries(
         # ``env:*`` entries are persisted references re-hydrated on every load.
         # A process that merely lacks the env var must NOT delete the on-disk
         # entry for every other process (#9331); prune only when explicitly
-        # requested (an `hermes auth` command that confirmed the source is gone).
+        # requested (an `stardust auth` command that confirmed the source is gone).
         if entry.source.startswith("env:"):
             return prune_env_sources
         # File-backed singletons and Hermes PKCE disappear when their backing file is gone.

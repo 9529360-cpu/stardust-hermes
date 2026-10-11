@@ -14,7 +14,7 @@ the platform.
 
 #65176 — a live gateway token conflict may attempt one-shot takeover only
 during the initial connect of an explicit ``gateway run --replace`` startup.
-``gateway run --replace`` only kills same-HERMES_HOME PID-file holders.
+``gateway run --replace`` only kills same-STARDUST_HOME PID-file holders.
 A normal start or reconnect must retain the retryable conflict behavior and
 must never evict the active holder.
 """
@@ -130,7 +130,7 @@ def test_lock_conflict_names_owning_profile(adapter):
         "Telegram bot token already in use by the "
         "'lead-gen-outreach' profile gateway (PID 559). "
         "Stop that gateway first "
-        "(hermes --profile lead-gen-outreach gateway stop)."
+        "(stardust --profile lead-gen-outreach gateway stop)."
     )
     assert adapter._fatal_error_retryable is True
     assert adapter._fatal_error_code == "telegram-bot-token_lock"

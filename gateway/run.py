@@ -7,7 +7,7 @@ Run via ``python -m gateway.run`` or ``python cli.py --gateway``."""
 try:
     import hermes_bootstrap  # noqa: F401
 except ModuleNotFoundError:
-    pass  # a partial ``hermes update`` can leave the bootstrap unregistered; only Windows UTF-8 stdio suffers
+    pass  # a partial ``stardust update`` can leave the bootstrap unregistered; only Windows UTF-8 stdio suffers
 
 import asyncio
 import concurrent.futures
@@ -190,14 +190,14 @@ def hygiene_compaction_recovered(
 def _hygiene_compression_timeout_message(
     *, total_exhausted: bool, elapsed: float, idle_timeout: float, progress_observed: bool) -> str:
     """Describe the host timeout that actually ended hygiene compression. Chat users cannot edit
-    model config, so the copy names /compress, /new and `hermes doctor`, never a config key or the
+    model config, so the copy names /compress, /new and `stardust doctor`, never a config key or the
     raw second counts (those stay in the gateway log)."""
     lead = (
         "⚠️ Shortening the conversation history took too long, so I skipped it and kept "
         "everything as-is. Run /compress to try again or /new to start fresh.")
     if total_exhausted:
         return lead
-    return lead + " If this keeps happening, run `hermes doctor` on the host."
+    return lead + " If this keeps happening, run `stardust doctor` on the host."
 
 
 def _cached_agent_for_hygiene(gateway, session_key: str):
@@ -245,7 +245,7 @@ async def run_codex_hygiene_compaction(
 
     compressor = getattr(agent, "context_compressor", None)
     count_before = getattr(compressor, "compression_count", 0)
-    # copy_context carries profile secret scope / HERMES_HOME override (executors don't propagate ContextVars).
+    # copy_context carries profile secret scope / STARDUST_HOME override (executors don't propagate ContextVars).
     worker_future = asyncio.get_running_loop().run_in_executor(
         None, copy_context().run, lambda: agent._compress_context(history, "", approx_tokens=approx_tokens))
     track_worker = getattr(gateway, "_track_deferred_agent_worker", None)
@@ -580,17 +580,17 @@ def _format_exec_approval_fallback(
         + format_approval_deadline_line(approval_timeout_seconds()))
 
 # Ordered: auth beats policy beats rate-limit beats connection; first match wins. Copy names the
-# slash command the chat user can run; raw provider text stays in the gateway log (`hermes logs`).
+# slash command the chat user can run; raw provider text stays in the gateway log (`stardust logs`).
 _PROVIDER_ERROR_REPLIES = (
     (_GATEWAY_AUTH_ERROR_RE, "⚠️ Authentication to the AI model service failed. Use /model to choose "
                              "a configured model, or ask whoever runs this bot to run "
-                             "`hermes auth` on the host."),
+                             "`stardust auth` on the host."),
     (_GATEWAY_PROVIDER_POLICY_RE, "⚠️ The AI model service rejected this request. Try rephrasing your "
                                   "message, or use /model to switch models."),
     (_GATEWAY_RATE_LIMIT_RE, "⏱️ The AI model service is rate-limiting requests. Wait a moment, then use /retry."),
     (_GATEWAY_CONNECTION_ERROR_RE, "⚠️ The AI model service isn't reachable right now — the configured model "
                                    "endpoint is not running or is unreachable. Wait a moment and use /retry; "
-                                   "if it persists, run `hermes doctor` on the host."))
+                                   "if it persists, run `stardust doctor` on the host."))
 
 
 # Shared by the failed-turn normalizer and ``run_turn._hmwa_agent_error_reply``; canonical
@@ -607,7 +607,7 @@ def _gateway_provider_error_reply(text: str) -> str:
             return reply
     return (
         "⚠️ The AI model service kept failing. Use /retry to try again, or /model to switch "
-        "models. Details are in the gateway log (`hermes logs`).")
+        "models. Details are in the gateway log (`stardust logs`).")
 
 
 # Provider/API failure envelope preambles (not ordinary assistant prose), anchored at line start.
@@ -931,14 +931,14 @@ def _startup_restore_drain_timeout_secs() -> float:
 
     Duplicate-agent safety does NOT depend on it: ``_schedule_resume_pending_sessions`` claims SYNCHRONOUSLY.
     """
-    return _float_env("HERMES_STARTUP_RESTORE_DRAIN_TIMEOUT", _STARTUP_RESTORE_DRAIN_TIMEOUT_SECS_DEFAULT)
+    return _float_env("STARDUST_STARTUP_RESTORE_DRAIN_TIMEOUT", _STARTUP_RESTORE_DRAIN_TIMEOUT_SECS_DEFAULT)
 
 
 def _startup_warmup_timeout_secs() -> float:
     """Max seconds the boot warm-up (``_warm_turn_prerequisites``) may hold the inbound gate shut.
 
     On timeout the gate opens and the warm-up finishes in the background. Non-positive disables it."""
-    return _float_env("HERMES_STARTUP_WARMUP_TIMEOUT", _STARTUP_WARMUP_TIMEOUT_SECS_DEFAULT)
+    return _float_env("STARDUST_STARTUP_WARMUP_TIMEOUT", _STARTUP_WARMUP_TIMEOUT_SECS_DEFAULT)
 
 
 def _warm_turn_machinery_sync() -> int:
@@ -1570,7 +1570,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from hermes_constants import get_hermes_home, get_hermes_home_override
 _hermes_home = get_hermes_home()
 
-# Load ~/.hermes/.env first: user-managed env files must override stale shell exports on restart.
+# Load ~/.stardust/.env first: user-managed env files must override stale shell exports on restart.
 from hermes_cli.env_loader import load_hermes_dotenv
 _env_path = _hermes_home / '.env'
 load_hermes_dotenv(hermes_home=_hermes_home, project_env=Path(__file__).resolve().parents[1] / '.env')
@@ -1578,7 +1578,7 @@ load_hermes_dotenv(hermes_home=_hermes_home, project_env=Path(__file__).resolve(
 
 def _reload_runtime_env_preserving_config_authority() -> None:
     """Reload .env per turn for rotated keys while config.yaml stays authoritative for budgets (else a
-    stale HERMES_MAX_ITERATIONS wins). Multiplex never reloads .env globally: secrets come from the
+    stale STARDUST_MAX_ITERATIONS wins). Multiplex never reloads .env globally: secrets come from the
     per-turn ``set_secret_scope`` and mutating ``os.environ`` would leak the default profile's keys to
     every profile; it still honors the max_turns bridge."""
     from agent.secret_scope import is_multiplex_active
@@ -1609,8 +1609,8 @@ def _bridge_max_turns_from_config(home: "Path") -> None:
 def _current_max_iterations() -> int:
     """Return the per-turn iteration budget after runtime env refresh; ``resolve_turn_limit`` maps
     ``agent.max_turns: none``/``unlimited`` (bridged as a string) to the unlimited sentinel, not an
-    ``int()`` crash. A routed profile (HERMES_HOME override, multiplexed turns) reads ITS
-    ``agent.max_turns`` straight from config: the ``HERMES_MAX_ITERATIONS`` bridge is one process-wide
+    ``int()`` crash. A routed profile (STARDUST_HOME override, multiplexed turns) reads ITS
+    ``agent.max_turns`` straight from config: the ``STARDUST_MAX_ITERATIONS`` bridge is one process-wide
     slot holding the launch profile's value, so every secondary would inherit the default's budget."""
     _reload_runtime_env_preserving_config_authority()
     from hermes_cli.config import resolve_turn_limit as _resolve_turn_limit
@@ -1623,7 +1623,7 @@ def _current_max_iterations() -> int:
             cfg = {}
         agent_cfg = cfg.get("agent")
         return _resolve_turn_limit(agent_cfg.get("max_turns") if isinstance(agent_cfg, dict) else None)
-    return _resolve_turn_limit(os.getenv("HERMES_MAX_ITERATIONS"))
+    return _resolve_turn_limit(os.getenv("STARDUST_MAX_ITERATIONS"))
 
 
 from contextlib import asynccontextmanager as _asynccontextmanager, contextmanager as _contextmanager, suppress
@@ -1649,7 +1649,7 @@ def _cron_tick_profile_homes(config: object) -> list[tuple[str, "Path"]]:
     """Profile homes the in-process ticker visits under multiplex: the served set PLUS the
     process-active profile: ``profiles_to_serve`` lists default + every live named profile, but a
     ``--profile <name>`` multiplexer's own profile may sit outside ``profiles/`` (custom
-    HERMES_HOME). Adapter startup already skips ``active``."""
+    STARDUST_HOME). Adapter startup already skips ``active``."""
     from hermes_cli.profiles import get_active_profile_name, get_profile_dir
 
     homes = _multiplex_profile_homes(config)
@@ -1819,7 +1819,7 @@ async def _discover_gateway_mcp_tools(config: object) -> None:
     No gateway run can complete a browser OAuth flow (nobody watches its stdout; on Windows its
     DEVNULL stdin even passes ``isatty``), so discovery runs with interactive OAuth suppressed — the
     same gate the CLI's background discovery uses. An expired token then parks the server with an
-    actionable ``hermes mcp login`` warning instead of opening an authorize tab.
+    actionable ``stardust mcp login`` warning instead of opening an authorize tab.
     """
     from tools.mcp_oauth import suppress_interactive_oauth
     from tools.mcp_tool_discovery import discover_mcp_tools
@@ -1853,7 +1853,7 @@ def _platform_has_bot_credential(platform: "Platform", platform_config: "Platfor
     # transient failure — after which it stays down until the gateway is restarted by hand. Mirror the
     # adapter's own gate: homeserver + user_id + password. Read ONLY from extra, never os.getenv:
     # build_config() already copies all three env vars onto extra, and importing this module loads
-    # ~/.hermes/.env, so an env fallback would report "has credential" for every Matrix config on the box —
+    # ~/.stardust/.env, so an env fallback would report "has credential" for every Matrix config on the box —
     # including the empty-primary multiplex case (#64674) this check exists to evict.
     if platform is not Platform.MATRIX:
         return False
@@ -1867,29 +1867,29 @@ _DOCKER_MEDIA_OUTPUT_CONTAINER_PATHS = {"/output", "/outputs"}
 # Internal bridge, not a config source: seed from the canonical default after dotenv so an ambient
 # process/.env value can never control lease safety.
 from hermes_cli.config_defaults import DEFAULT_CONFIG as _DEFAULT_CONFIG
-os.environ["HERMES_TURN_LEASE_TIMEOUT"] = str(_DEFAULT_CONFIG["agent"]["gateway_turn_lease_timeout"])
+os.environ["STARDUST_TURN_LEASE_TIMEOUT"] = str(_DEFAULT_CONFIG["agent"]["gateway_turn_lease_timeout"])
 
 # Bridge config.yaml values into env so os.getenv() picks them up. config.yaml unconditionally wins
 # over .env for these keys; a `not in os.environ` guard would let stale .env entries shadow config.
 _AGENT_ENV_BRIDGE = {
-    "gateway_timeout": "HERMES_AGENT_TIMEOUT",
-    "gateway_turn_lease_timeout": "HERMES_TURN_LEASE_TIMEOUT",
-    "gateway_timeout_warning": "HERMES_AGENT_TIMEOUT_WARNING",
-    "gateway_notify_interval": "HERMES_AGENT_NOTIFY_INTERVAL",
-    "session_stall_timeout": "HERMES_SESSION_STALL_TIMEOUT",
+    "gateway_timeout": "STARDUST_AGENT_TIMEOUT",
+    "gateway_turn_lease_timeout": "STARDUST_TURN_LEASE_TIMEOUT",
+    "gateway_timeout_warning": "STARDUST_AGENT_TIMEOUT_WARNING",
+    "gateway_notify_interval": "STARDUST_AGENT_NOTIFY_INTERVAL",
+    "session_stall_timeout": "STARDUST_SESSION_STALL_TIMEOUT",
     # Internal bridge only — config.yaml (agent.reconnect_attention_after) is the documented setting.
-    "reconnect_attention_after": "HERMES_RECONNECT_ATTENTION_AFTER_SECONDS",
-    "restart_drain_timeout": "HERMES_RESTART_DRAIN_TIMEOUT",
-    "cron_drain_timeout": "HERMES_CRON_DRAIN_TIMEOUT",
-    "gateway_auto_continue_freshness": "HERMES_AUTO_CONTINUE_FRESHNESS",
-    "gateway_startup_restore_drain_timeout": "HERMES_STARTUP_RESTORE_DRAIN_TIMEOUT",
-    "gateway_startup_warmup_timeout": "HERMES_STARTUP_WARMUP_TIMEOUT"}
+    "reconnect_attention_after": "STARDUST_RECONNECT_ATTENTION_AFTER_SECONDS",
+    "restart_drain_timeout": "STARDUST_RESTART_DRAIN_TIMEOUT",
+    "cron_drain_timeout": "STARDUST_CRON_DRAIN_TIMEOUT",
+    "gateway_auto_continue_freshness": "STARDUST_AUTO_CONTINUE_FRESHNESS",
+    "gateway_startup_restore_drain_timeout": "STARDUST_STARTUP_RESTORE_DRAIN_TIMEOUT",
+    "gateway_startup_warmup_timeout": "STARDUST_STARTUP_WARMUP_TIMEOUT"}
 # config-authoritative knobs for the session-search index (env stays the cross-process carrier).
-_SESSIONS_ENV_BRIDGE = {"cjk_fts": "HERMES_CJK_FTS", "search_slow_ms": "HERMES_SEARCH_SLOW_MS"}
+_SESSIONS_ENV_BRIDGE = {"cjk_fts": "STARDUST_CJK_FTS", "search_slow_ms": "STARDUST_SEARCH_SLOW_MS"}
 _DISPLAY_ENV_BRIDGE = {
-    "busy_input_mode": "HERMES_GATEWAY_BUSY_INPUT_MODE",
-    "busy_text_mode": "HERMES_GATEWAY_BUSY_TEXT_MODE",
-    "busy_ack_enabled": "HERMES_GATEWAY_BUSY_ACK_ENABLED"}
+    "busy_input_mode": "STARDUST_GATEWAY_BUSY_INPUT_MODE",
+    "busy_text_mode": "STARDUST_GATEWAY_BUSY_TEXT_MODE",
+    "busy_ack_enabled": "STARDUST_GATEWAY_BUSY_ACK_ENABLED"}
 
 
 def _bridge_section_to_env(section: Any, mapping: Dict[str, str]) -> None:
@@ -1908,9 +1908,9 @@ def _bridge_max_turns_to_env(agent_cfg: Any) -> None:
         return
     raw = agent_cfg["max_turns"]
     if raw is not None:
-        os.environ["HERMES_MAX_ITERATIONS"] = str(raw)
-    elif "HERMES_MAX_ITERATIONS" in os.environ:
-        del os.environ["HERMES_MAX_ITERATIONS"]
+        os.environ["STARDUST_MAX_ITERATIONS"] = str(raw)
+    elif "STARDUST_MAX_ITERATIONS" in os.environ:
+        del os.environ["STARDUST_MAX_ITERATIONS"]
 
 
 def _bridge_terminal_config_to_env(_terminal_cfg: dict) -> None:
@@ -2002,7 +2002,7 @@ def _bridge_config_to_env(_cfg: dict) -> None:
         _bridge_auxiliary_config_to_env(_auxiliary_cfg)
     # config.yaml is the documented, authoritative source for these settings — it unconditionally wins over
     # .env values. Previously the guards below read `if X not in os.environ` and let stale .env entries
-    # (e.g. HERMES_MAX_ITERATIONS=60 written by an old `hermes setup` run) silently shadow the user's
+    # (e.g. STARDUST_MAX_ITERATIONS=60 written by an old `stardust setup` run) silently shadow the user's
     # current config. See PR #18413 / the 60-vs-500 max_turns incident.
     _agent_cfg = _cfg.get("agent", {})
     _bridge_max_turns_to_env(_agent_cfg)
@@ -2012,26 +2012,26 @@ def _bridge_config_to_env(_cfg: dict) -> None:
     _bridge_section_to_env(_display_cfg, _DISPLAY_ENV_BRIDGE)
     # Documented service-manager override: env wins when set (other display bridges stay config-first).
     if (isinstance(_display_cfg, dict) and "busy_steer_ack_enabled" in _display_cfg
-            and "HERMES_GATEWAY_BUSY_STEER_ACK_ENABLED" not in os.environ):
-        os.environ["HERMES_GATEWAY_BUSY_STEER_ACK_ENABLED"] = str(_display_cfg["busy_steer_ack_enabled"])
+            and "STARDUST_GATEWAY_BUSY_STEER_ACK_ENABLED" not in os.environ):
+        os.environ["STARDUST_GATEWAY_BUSY_STEER_ACK_ENABLED"] = str(_display_cfg["busy_steer_ack_enabled"])
     _tz_cfg = _cfg.get("timezone", "")
     if _tz_cfg and isinstance(_tz_cfg, str):
-        os.environ["HERMES_TIMEZONE"] = _tz_cfg.strip()
+        os.environ["STARDUST_TIMEZONE"] = _tz_cfg.strip()
     _security_cfg = _cfg.get("security", {})
     if isinstance(_security_cfg, dict) and _security_cfg.get("redact_secrets") is not None:
-        os.environ["HERMES_REDACT_SECRETS"] = str(_security_cfg["redact_secrets"]).lower()
-    # Media policy uses the shared bridge so standalone entrypoints (`hermes cron run`) match.
+        os.environ["STARDUST_REDACT_SECRETS"] = str(_security_cfg["redact_secrets"]).lower()
+    # Media policy uses the shared bridge so standalone entrypoints (`stardust cron run`) match.
     _gateway_cfg = _cfg.get("gateway", {})
     if isinstance(_gateway_cfg, dict):
         from gateway.media_policy import apply_media_policy_env
         apply_media_policy_env(_cfg)
         _trust_recent_seconds = _gateway_cfg.get("trust_recent_files_seconds")
         if _trust_recent_seconds is not None:
-            os.environ["HERMES_MEDIA_TRUST_RECENT_SECONDS"] = str(_trust_recent_seconds)
+            os.environ["STARDUST_MEDIA_TRUST_RECENT_SECONDS"] = str(_trust_recent_seconds)
         # platform_connect_timeout is an escape hatch, unlike the bridges above: env WINS if already set.
         if ("platform_connect_timeout" in _gateway_cfg
-                and not os.environ.get("HERMES_GATEWAY_PLATFORM_CONNECT_TIMEOUT", "").strip()):
-            os.environ["HERMES_GATEWAY_PLATFORM_CONNECT_TIMEOUT"] = str(_gateway_cfg["platform_connect_timeout"])
+                and not os.environ.get("STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT", "").strip()):
+            os.environ["STARDUST_GATEWAY_PLATFORM_CONNECT_TIMEOUT"] = str(_gateway_cfg["platform_connect_timeout"])
 
 
 def _load_bridge_config(config_path: Path) -> dict:
@@ -2054,7 +2054,7 @@ if _config_path.exists():
             file=sys.stderr)
         print(
             "  Gateway will fall back to .env values, which may not match "
-            "your current config.yaml. Run `hermes doctor` to investigate.",
+            "your current config.yaml. Run `stardust doctor` to investigate.",
             file=sys.stderr)
 
 # IPv4 preference must apply before any HTTP clients are created.
@@ -2078,9 +2078,9 @@ try:
 except Exception as _bootstrap_exc:
     print(f"  Warning: deprecation check failed: {_bootstrap_exc}", file=sys.stderr)
 
-os.environ["HERMES_QUIET"] = "1"  # gateway runs quiet: no debug output, cwd used directly
+os.environ["STARDUST_QUIET"] = "1"  # gateway runs quiet: no debug output, cwd used directly
 
-# HERMES_EXEC_ASK is set in start_gateway(), NOT at import: CLI tools importing this module must not
+# STARDUST_EXEC_ASK is set in start_gateway(), NOT at import: CLI tools importing this module must not
 # flip interactive sessions into ask-mode (approval prompts would become silent pending_approval).
 
 # Terminal cwd: config.yaml terminal.cwd is canonical (bridged above); MESSAGING_CWD is legacy fallback.
@@ -2756,7 +2756,7 @@ def _check_unavailable_skill(command_name: str) -> str | None:
                 if slug == normalized and declared_name in disabled:
                     return (
                         f"The **{command_name}** skill is installed but disabled.\n"
-                        f"Enable it with: `hermes skills config`")
+                        f"Enable it with: `stardust skills config`")
 
         # Check optional skills (shipped with repo but not installed)
         from hermes_constants import get_optional_skills_dir
@@ -2774,7 +2774,7 @@ def _check_unavailable_skill(command_name: str) -> str | None:
                 install_path = f"official/{'/'.join(rel.parts)}"
                 return (
                     f"The **{command_name}** skill is available but not installed.\n"
-                    f"Install it with: `hermes skills install {install_path}`")
+                    f"Install it with: `stardust skills install {install_path}`")
     except Exception:
         pass
     return None
@@ -2867,9 +2867,9 @@ def _get_channel_override(
 
 
 def _resolve_hermes_bin() -> Optional[list[str]]:
-    """Hermes update command argv: ``hermes`` on PATH, else ``python -m hermes_cli.main``, else None."""
+    """Hermes update command argv: ``stardust`` on PATH, else ``python -m hermes_cli.main``, else None."""
     import shutil
-    hermes_bin = shutil.which("hermes")
+    hermes_bin = shutil.which("stardust")
     if hermes_bin:
         return [hermes_bin]
     try:
@@ -3052,7 +3052,7 @@ def _normalize_empty_agent_response(
         return (
             "⚠️ Something went wrong and I couldn't finish this reply. Use /retry to try again, "
             "or /new to start a fresh conversation. Technical details are in the gateway log "
-            "(`hermes logs`).")
+            "(`stardust logs`).")
 
     api_calls = int(agent_result.get("api_calls", 0) or 0)
     if agent_result.get("interrupted"):
@@ -3184,7 +3184,7 @@ _RECONNECT_BACKOFF_CAP = 300
 
 # Seconds continuously in the reconnect queue before NEEDS_ATTENTION. Retrying never stops (transient
 # outages must self-heal); this only makes a permanently-failing loop loud. 0 disables.
-_RECONNECT_ATTENTION_AFTER_SECONDS = _float_env("HERMES_RECONNECT_ATTENTION_AFTER_SECONDS", 7200)
+_RECONNECT_ATTENTION_AFTER_SECONDS = _float_env("STARDUST_RECONNECT_ATTENTION_AFTER_SECONDS", 7200)
 
 
 def _reconnect_backoff(attempt: int) -> int:
@@ -3592,7 +3592,7 @@ class GatewayRunner(
         try:
             self._open_session_db_for_active_scope(raise_on_error=True)
         except Exception as e:
-            # WARNING (not DEBUG) so it lands in errors.log; else an NFS HERMES_HOME silently loses /resume etc.
+            # WARNING (not DEBUG) so it lands in errors.log; else an NFS STARDUST_HOME silently loses /resume etc.
             logger.warning("SQLite session store not available: %s", e)
             self._session_db_init_error = str(e)  # surfaced on the home channel(s) once connected
 
@@ -3629,7 +3629,7 @@ class GatewayRunner(
             if _ckpt_cfg.get("auto_prune", False):
                 from tools.checkpoint_manager import maybe_auto_prune_checkpoints
                 # delete_orphans never honoured unattended: a missing workdir is ambiguous (deleted vs.
-                # unmounted share); orphan cleanup is only via explicit `hermes checkpoints prune`.
+                # unmounted share); orphan cleanup is only via explicit `stardust checkpoints prune`.
                 maybe_auto_prune_checkpoints(
                     retention_days=int(_ckpt_cfg.get("retention_days", 7)),
                     min_interval_hours=int(_ckpt_cfg.get("min_interval_hours", 24)),
@@ -3670,11 +3670,11 @@ class GatewayRunner(
 
     def _open_session_db_for_active_scope(self, raise_on_error: bool = False) -> Any:
         """AsyncSessionDB for the active profile scope, resolved per access (not in ``__init__``) since
-        ``SessionDB()`` reads the context-local HERMES_HOME; one handle cached per path. Construction
+        ``SessionDB()`` reads the context-local STARDUST_HOME; one handle cached per path. Construction
         failure enters bounded backoff; ``raise_on_error=True`` (priming) propagates it.
 
         Same per-path cache as ``SessionStore._open_session_db_for_active_scope`` (#88532): ``SessionDB()``
-        resolves ``_default_db_path()`` at call time through the context-local HERMES_HOME override
+        resolves ``_default_db_path()`` at call time through the context-local STARDUST_HOME override
         installed by ``_profile_runtime_scope``, so resolving per access — instead of once in ``__init__`` —
         is what lets /resume, /title, /history and session search on a multiplexed gateway read the *serving
         profile's* store rather than the root one.
@@ -3812,7 +3812,7 @@ class GatewayRunner(
                 return
         logger.warning(
             "Docker backend is enabled for the messaging gateway but no explicit host-visible "
-            "output mount (for example '/home/user/.hermes/cache/documents:/output') is configured. "
+            "output mount (for example '/home/user/.stardust/cache/documents:/output') is configured. "
             "This is fine if the model already emits host-visible paths, but MEDIA file delivery can fail "
             "for container-local paths like '/workspace/...' or '/output/...'.")
 
@@ -4331,7 +4331,7 @@ class GatewayRunner(
         return None
 
     def _resolve_profile_home_for_source(self, source: SessionSource) -> "Path":
-        """Resolve which profile's HERMES_HOME serves this source: ``source.profile``, then
+        """Resolve which profile's STARDUST_HOME serves this source: ``source.profile``, then
         ``_profile_name_for_source`` (sources bypassing ``build_source``), then the active profile."""
         from gateway.profile_routing import ProfileRouteRejected
         from hermes_cli.profiles import get_active_profile_name, get_profile_dir, profile_exists
@@ -4346,7 +4346,7 @@ class GatewayRunner(
             if explicit_profile and not profile_exists(name):
                 logger.warning(
                     "Profile %r does not exist for source %s/%s (guild_id=%s), "
-                    "falling back to global HERMES_HOME",
+                    "falling back to global STARDUST_HOME",
                     explicit_profile, source.platform.value, source.chat_id,
                     getattr(source, "guild_id", None))
                 return get_hermes_home()
@@ -4356,7 +4356,7 @@ class GatewayRunner(
         except Exception:
             logger.warning(
                 "Failed to resolve profile directory for source %s/%s (guild_id=%s), "
-                "falling back to global HERMES_HOME: %s",
+                "falling back to global STARDUST_HOME: %s",
                 source.platform.value, source.chat_id, getattr(source, "guild_id", None),
                 explicit_profile or "(no profile)", exc_info=True)
             return get_hermes_home()
@@ -4401,11 +4401,11 @@ def _run_planned_stop_watcher(
     stop_event: threading.Event, runner, loop: asyncio.AbstractEventLoop, shutdown_handler, *,
     poll_interval: float = 0.5) -> None:
     """Poll for the planned-stop marker and trigger graceful shutdown (Windows lacks
-    ``add_signal_handler``, so ``hermes gateway stop`` would never drain). Runs everywhere; on POSIX
+    ``add_signal_handler``, so ``stardust gateway stop`` would never drain). Runs everywhere; on POSIX
     the signal handler consumes the marker first and ``_running``/``_draining`` guard re-triggers.
 
     On Windows, ``asyncio.add_signal_handler`` raises NotImplementedError for SIGTERM/SIGINT, so the
-    standard signal-driven shutdown path never runs when ``hermes gateway stop`` signals the gateway. The
+    standard signal-driven shutdown path never runs when ``stardust gateway stop`` signals the gateway. The
     consequence is that the drain loop is skipped — in-flight agent sessions are killed mid-turn and
     ``resume_pending`` is never set, so the next gateway boot has no idea those sessions need to be
     auto-resumed (issue #33778, v0.13.0 session-resume feature broken on native Windows).
@@ -4716,7 +4716,7 @@ def _replace_target_belongs_to_other_profile(existing_pid: int) -> bool:
     """Return True when ``--replace`` must refuse to signal ``existing_pid``.
     A poisoned/stale PID record can point at another profile's LIVE gateway (cross-profile SIGTERM
     restart loop). Ownership is decided by the persisted identity record ALONE, bound to the live target
-    by exact PID + start-time; live argv can never PROVE ownership (no HERMES_HOME), it is only a
+    by exact PID + start-time; live argv can never PROVE ownership (no STARDUST_HOME), it is only a
     consistency check. Missing, legacy, conflicting or unprovable identity → refuse (fail closed)."""
     # On Windows there is no systemd/launchd service query at all (_get_service_pids() returns an empty
     # set), so a gateway supervised by a Scheduled Task / Startup VBS looks like an unsupervised orphan to
@@ -4728,7 +4728,7 @@ def _replace_target_belongs_to_other_profile(existing_pid: int) -> bool:
     # Exclusion evidence comes from the RAW registration record, not the liveness-validated probe.
     # ``get_running_pid`` (any flags) returns None whenever a record fails validation — start-time mismatch
     # after PID-reuse checks, argv drift, lock hiccups — which is exactly when a healthy standalone gateway
-    # (no service supervisor — e.g. `hermes gateway run` on Windows) is at risk: its PID never joins the
+    # (no service supervisor — e.g. `stardust gateway run` on Windows) is at risk: its PID never joins the
     # exclusion set and the sweep hard-kills it. On Windows SIGTERM is TerminateProcess, so the gateway's
     # planned-stop watcher never gets a chance to drain. Reading the raw pidfile + lock records (no
     # validation, no unlink side effects) is strictly safer for a KILL exclusion list: a stale recorded PID
@@ -4763,14 +4763,14 @@ def _replace_target_belongs_to_other_profile(existing_pid: int) -> bool:
             return refuse("pid record predates hermes_home stampings; ownership of PID %s unprovable.",
                           existing_pid)
         if not _same_hermes_home(recorded_home, our_home):
-            return refuse("pid record belongs to a different HERMES_HOME (%s, ours %s). Remove the stale PID "
+            return refuse("pid record belongs to a different STARDUST_HOME (%s, ours %s). Remove the stale PID "
                           "record or stop the owning profile explicitly.", recorded_home, our_home,
                           level=logging.ERROR)
-        # Argv never proves ownership; an explicit contradicting --profile / HERMES_HOME= still refuses.
+        # Argv never proves ownership; an explicit contradicting --profile / STARDUST_HOME= still refuses.
         live_cmdline = _best_effort(lambda: _read_process_cmdline(existing_pid))
         if live_cmdline and _looks_like_profile_conflict_from_cmdline(live_cmdline, our_home):
             return refuse("target PID %s command line explicitly advertises a different profile than "
-                          "HERMES_HOME %s.", existing_pid, our_home, level=logging.ERROR)
+                          "STARDUST_HOME %s.", existing_pid, our_home, level=logging.ERROR)
         return False
     except Exception:
         # Destructive action + unknown ownership => fail closed.
@@ -4806,8 +4806,8 @@ def _looks_like_profile_conflict_from_cmdline(command: str, our_home) -> bool:
         return values[-1] if values else None
 
     def _env_home_value() -> Optional[str]:
-        """HERMES_HOME=<path> env-style assignment on the argv, token-exact."""
-        prefix = "HERMES_HOME="
+        """STARDUST_HOME=<path> env-style assignment on the argv, token-exact."""
+        prefix = "STARDUST_HOME="
         for tok in reversed(tokens):
             if tok.startswith(prefix):
                 return tok[len(prefix):]
@@ -4849,20 +4849,20 @@ async def _wait_for_pid_exit(pid: int, attempts: int, delay: float) -> bool:
 
 
 async def _start_gateway_replace_existing_instance(existing_pid: int, replace: bool) -> bool:
-    """Handle a live gateway PID under this HERMES_HOME: replace it (``--replace``) or refuse.
+    """Handle a live gateway PID under this STARDUST_HOME: replace it (``--replace``) or refuse.
     Returns False when startup must abort (refused, permission denied, target still alive)."""
     from gateway.status import get_process_start_time, remove_pid_file, terminate_pid
     if not replace:
         hermes_home = str(get_hermes_home())
         logger.error(
-            "Another gateway instance is already running (PID %d, HERMES_HOME=%s). "
-            "Use 'hermes gateway restart' to replace it, or 'hermes gateway stop' first.",
+            "Another gateway instance is already running (PID %d, STARDUST_HOME=%s). "
+            "Use 'stardust gateway restart' to replace it, or 'stardust gateway stop' first.",
             existing_pid, hermes_home)
         print(
             f"\n❌ Gateway already running (PID {existing_pid}).\n"
-            f"   Use 'hermes gateway restart' to replace it,\n"
-            f"   or 'hermes gateway stop' to kill it first.\n"
-            f"   Or use 'hermes gateway run --replace' to auto-replace.\n")
+            f"   Use 'stardust gateway restart' to replace it,\n"
+            f"   or 'stardust gateway stop' to kill it first.\n"
+            f"   Or use 'stardust gateway run --replace' to auto-replace.\n")
         return False
 
     # Never signal a process not provably ours (a poisoned PID record → cross-profile restart loop).
@@ -4870,7 +4870,7 @@ async def _start_gateway_replace_existing_instance(existing_pid: int, replace: b
         from gateway.status import _get_process_hermes_home
         logger.error(
             "Refusing --replace: PID %d cannot be proven to belong "
-            "to this profile's gateway (HERMES_HOME %s). Remove the "
+            "to this profile's gateway (STARDUST_HOME %s). Remove the "
             "stale PID record or stop the owning profile explicitly.",
             existing_pid, _get_process_hermes_home())
         return False
@@ -5056,7 +5056,7 @@ async def _start_gateway_start_control_socket(runner):
     _control_server = None
     try:
         # Started immediately after the PID-file claim: winning that O_EXCL race is the moment this process
-        # becomes the authoritative gateway for its HERMES_HOME, so from here on "does a socket answer?" is
+        # becomes the authoritative gateway for its STARDUST_HOME, so from here on "does a socket answer?" is
         # a truthful liveness/identity query for updater and fleet consumers. Strictly non-fatal: a bind
         # failure only means consumers fall back to the process-scan/state-file layer, exactly as before
         # this feature. See #92091.
@@ -5092,7 +5092,7 @@ async def _start_gateway_start_control_socket(runner):
                 "pid": os.getpid(), "drain_timeout": _drain}
 
         def _rescan_profiles_handler() -> dict:
-            """``hermes profile create/delete`` asks the multiplexer to reconcile ``profiles/`` now
+            """``stardust profile create/delete`` asks the multiplexer to reconcile ``profiles/`` now
             (the watcher also rescans periodically). Runs on the socket executor: marshal onto the loop
             and wait briefly so the caller learns whether the profile is served."""
             if not getattr(runner.config, "multiplex_profiles", False):
@@ -5176,7 +5176,7 @@ def _start_gateway_start_cron_and_housekeeping(runner):
                 "loopback HTTP and will all fail (jobs only run when "
                 "triggered manually). Most common cause: API_SERVER_KEY is "
                 "missing from this gateway process's environment. Restart "
-                "the gateway through its supervisor (`hermes gateway "
+                "the gateway through its supervisor (`stardust gateway "
                 "restart`) so the profile env loads.",
                 getattr(cron_provider, "name", "external"))
 
@@ -5240,7 +5240,7 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
     """Start the gateway and run until interrupted; False if it failed to start (non-zero exit so
     systemd can auto-restart). ``replace`` kills any existing instance first (avoids restart-loop deadlocks)."""
     # Set here (not at import) so incidental gateway.run imports from CLI code don't poison it.
-    os.environ["HERMES_EXEC_ASK"] = "1"
+    os.environ["STARDUST_EXEC_ASK"] = "1"
 
     from hermes_cli.resource_limits import apply_nofile_soft_limit
     apply_nofile_soft_limit()
@@ -5249,7 +5249,7 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
     from gateway.code_skew import record_boot_fingerprint
     record_boot_fingerprint()
 
-    # Duplicate-instance guard scoped to HERMES_HOME; distinct-home multi-profile setups coexist.
+    # Duplicate-instance guard scoped to STARDUST_HOME; distinct-home multi-profile setups coexist.
     from gateway.status import get_running_pid
     existing_pid = get_running_pid()
     if (existing_pid is not None and existing_pid != os.getpid()
@@ -5298,9 +5298,9 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
     else:
         logger.info("Skipping signal handlers (not running in main thread).")
 
-    # Windows has no add_signal_handler, so `hermes gateway stop`'s SIGTERM would never drain; poll the
+    # Windows has no add_signal_handler, so `stardust gateway stop`'s SIGTERM would never drain; poll the
     # planned-stop marker (written BEFORE the kill) instead. Runs everywhere so masked-SIGTERM drains.
-    # Windows fallback: asyncio.add_signal_handler raises NotImplementedError on Windows, so `hermes gateway
+    # Windows fallback: asyncio.add_signal_handler raises NotImplementedError on Windows, so `stardust gateway
     # stop`'s SIGTERM (which Python maps to TerminateProcess on Windows) never invokes
     # shutdown_signal_handler. That means the drain loop never runs, mark_resume_pending never fires, and
     # sessions are silently lost across restarts (issue #33778). The fix is a marker-polling thread: `hermes
@@ -5396,7 +5396,7 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
 def _guard_corrupt_user_config() -> None:
     """Fail closed when the active profile's config.yaml cannot be parsed: nobody can repair it on this
     surface, and defaults would let provider auto-detection adopt ``.env`` credentials the config never
-    named. Same policy and escape hatch (``HERMES_IGNORE_USER_CONFIG=1``) as ``hermes_cli/main.py``."""
+    named. Same policy and escape hatch (``STARDUST_IGNORE_USER_CONFIG=1``) as ``hermes_cli/main.py``."""
     from hermes_cli.config import InvalidUserConfigError, require_parseable_user_config
 
     try:
@@ -5414,7 +5414,7 @@ def main():
     # Advertise the harness to children (mirrors _advertise_agent_env in hermes_cli/main.py, inlined to
     # avoid its startup side effects). Value must equal registry id ``hermes-agent`` exactly.
     os.environ.setdefault("AI_AGENT", "hermes-agent")
-    os.environ.setdefault("HERMES_AGENT", "true")
+    os.environ.setdefault("STARDUST_AGENT", "true")
 
     def _register_identity() -> None:
         # Ledger registration + Windows job-object attach so update-time reapers can identify this gateway.

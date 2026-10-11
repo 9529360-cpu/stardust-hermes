@@ -1,6 +1,6 @@
 """Gateway enroll: secondary-multiplex-profile warning for relay routing stamps.
 
-``hermes gateway enroll --connector-url/--wake-url`` persists GATEWAY_RELAY_URL /
+``stardust gateway enroll --connector-url/--wake-url`` persists GATEWAY_RELAY_URL /
 GATEWAY_RELAY_WAKE_URL into the active profile's .env. Those are process-global
 deployment stamps (agent/secret_scope.py): a multiplexed gateway reads them from
 the process environment only, never from a secondary profile's isolated secret
@@ -48,7 +48,7 @@ def test_fires_for_secondary_when_default_root_has_multiplex_on(topology, monkey
     (topology / "config.yaml").write_text(
         "gateway:\n  multiplex_profiles: true\n", encoding="utf-8"
     )
-    monkeypatch.setenv("HERMES_HOME", str(topology / "profiles" / "alice"))
+    monkeypatch.setenv("STARDUST_HOME", str(topology / "profiles" / "alice"))
 
     fired, out = _run()
 
@@ -60,7 +60,7 @@ def test_silent_when_multiplex_off_in_default_root(topology, monkeypatch):
     (topology / "config.yaml").write_text(
         "gateway:\n  multiplex_profiles: false\n", encoding="utf-8"
     )
-    monkeypatch.setenv("HERMES_HOME", str(topology / "profiles" / "alice"))
+    monkeypatch.setenv("STARDUST_HOME", str(topology / "profiles" / "alice"))
 
     fired, out = _run()
 
@@ -72,7 +72,7 @@ def test_silent_for_default_profile_even_with_multiplex_on(topology, monkeypatch
     (topology / "config.yaml").write_text(
         "gateway:\n  multiplex_profiles: true\n", encoding="utf-8"
     )
-    monkeypatch.setenv("HERMES_HOME", str(topology))
+    monkeypatch.setenv("STARDUST_HOME", str(topology))
 
     fired, _ = _run()
 
@@ -81,7 +81,7 @@ def test_silent_for_default_profile_even_with_multiplex_on(topology, monkeypatch
 
 def test_env_override_forces_multiplex_on_without_config_flag(topology, monkeypatch):
     (topology / "config.yaml").write_text("{}\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(topology / "profiles" / "alice"))
+    monkeypatch.setenv("STARDUST_HOME", str(topology / "profiles" / "alice"))
     monkeypatch.setenv("GATEWAY_MULTIPLEX_PROFILES", "true")
 
     fired, _ = _run()
@@ -93,7 +93,7 @@ def test_env_override_off_wins_over_config_flag(topology, monkeypatch):
     (topology / "config.yaml").write_text(
         "gateway:\n  multiplex_profiles: true\n", encoding="utf-8"
     )
-    monkeypatch.setenv("HERMES_HOME", str(topology / "profiles" / "alice"))
+    monkeypatch.setenv("STARDUST_HOME", str(topology / "profiles" / "alice"))
     monkeypatch.setenv("GATEWAY_MULTIPLEX_PROFILES", "false")
 
     fired, _ = _run()
@@ -110,7 +110,7 @@ def test_silent_for_unrelated_dir_named_profiles(topology, tmp_path, monkeypatch
     )
     other = tmp_path / "elsewhere" / "profiles" / "x"
     other.mkdir(parents=True)
-    monkeypatch.setenv("HERMES_HOME", str(other))
+    monkeypatch.setenv("STARDUST_HOME", str(other))
 
     fired, _ = _run()
 

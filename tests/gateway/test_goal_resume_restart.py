@@ -30,10 +30,10 @@ from hermes_cli import goals
 
 @pytest.fixture
 def hermes_home(tmp_path, monkeypatch):
-    home = tmp_path / ".hermes"
+    home = tmp_path / ".stardust"
     home.mkdir()
     monkeypatch.setattr(Path, "home", lambda: tmp_path)
-    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setenv("STARDUST_HOME", str(home))
     # get_hermes_home() prefers the context-local override over the env
     # var, so a set_hermes_home_override() leaked by ANY earlier test in
     # this xdist worker would silently point the goals DB at a dead tmp

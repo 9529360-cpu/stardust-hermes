@@ -48,7 +48,7 @@ def hermes_root(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     (lokaj / ".env").write_text(f"API_SERVER_KEY={LOKAJ_KEY}\n", encoding="utf-8")
-    monkeypatch.setenv("HERMES_HOME", str(root))
+    monkeypatch.setenv("STARDUST_HOME", str(root))
     # get_default_hermes_root memoizes per (native_home, env_home) pair, so
     # the env change alone re-keys it; no cache reset needed.
     return root
@@ -148,7 +148,7 @@ class TestMultiplexOffPrefixFailsClosed:
     def test_own_named_profile_prefix_falls_through(self, hermes_root, monkeypatch):
         """A gateway launched FOR profile lokaj accepts /p/lokaj/…"""
         monkeypatch.setenv(
-            "HERMES_HOME", str(hermes_root / "profiles" / "lokaj")
+            "STARDUST_HOME", str(hermes_root / "profiles" / "lokaj")
         )
         adapter = _make_adapter(multiplex=False)
 

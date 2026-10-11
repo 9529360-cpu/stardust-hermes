@@ -3,7 +3,7 @@
 Management calls hit ``https://app.photon.codes/api/...`` (OAuth 2.0 device flow, Bearer)
 like the official CLI. The dashboard project ``id`` *is* the Spectrum Cloud project id and
 Spectrum is always provisioned at create-time; the sidecar authenticates with
-``(id, projectSecret)``. Storage: runtime SDK creds -> ``~/.hermes/.env``; management
+``(id, projectSecret)``. Storage: runtime SDK creds -> ``~/.stardust/.env``; management
 metadata -> ``auth.json`` under ``credential_pool.photon`` (device token), ``photon_project``
 (ids + secret for offline status) and ``photon_user`` (numbers).
 """
@@ -200,7 +200,7 @@ def store_user_numbers(
 
 
 def _persist_runtime_env(spectrum_project_id: str, project_secret: str) -> None:
-    """Write the SDK creds to ``~/.hermes/.env`` (secret never bound to a printable local
+    """Write the SDK creds to ``~/.stardust/.env`` (secret never bound to a printable local
     in a caller — CodeQL clean flow)."""
     try:
         from hermes_cli.config import save_env_value
@@ -704,9 +704,9 @@ def print_credential_summary(emit: Any = print) -> None:
         "Photon iMessage status",
         "──────────────────────",
         "  device token        : " + (
-            "✓ stored" if load_photon_token() else "✗ missing (run `hermes photon setup`)"),
+            "✓ stored" if load_photon_token() else "✗ missing (run `stardust photon setup`)"),
         "  project id          : " + (sid if sid else "✗ missing"),
         "  project secret      : " + ("✓ stored" if sec else "✗ missing"),
-        "  my number           : " + (phone if phone else "✗ missing (run `hermes photon setup --phone ...`)"),
-        "  assigned number     : " + (assigned if assigned else "✗ missing (run `hermes photon setup`)")]
+        "  my number           : " + (phone if phone else "✗ missing (run `stardust photon setup --phone ...`)"),
+        "  assigned number     : " + (assigned if assigned else "✗ missing (run `stardust photon setup`)")]
     emit("\n".join(rows))

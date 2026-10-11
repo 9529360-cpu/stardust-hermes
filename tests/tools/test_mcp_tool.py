@@ -184,8 +184,8 @@ class TestLoadMCPConfig:
         )
         bundled = tmp_path / "bundled"
         bundled.mkdir()
-        monkeypatch.setenv("HERMES_HOME", str(home))
-        monkeypatch.setenv("HERMES_BUNDLED_PLUGINS", str(bundled))
+        monkeypatch.setenv("STARDUST_HOME", str(home))
+        monkeypatch.setenv("STARDUST_BUNDLED_PLUGINS", str(bundled))
         monkeypatch.setattr(plugins_mod, "_plugin_manager", None)
 
         from tools.mcp_tool_config import _load_mcp_config
