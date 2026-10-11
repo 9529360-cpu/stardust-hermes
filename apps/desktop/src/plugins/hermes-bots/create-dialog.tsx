@@ -66,7 +66,13 @@ import type {
   ProfileConfigurePayload,
   ProfileDescribeResponse
 } from './profile-config'
-import { CheckList, SkillsView, skillsViewRoutesConnections } from './profile-config'
+import {
+  CheckList,
+  enabledToolsetsPayload,
+  isToolsetRow,
+  SkillsView,
+  skillsViewRoutesConnections
+} from './profile-config'
 import { deleteBot } from './profile-ops'
 import { botRosterMeta } from './routing'
 import { getPluginCtx } from './shared'
@@ -425,8 +431,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
         }
 
         if (dirtyCaps.toolsets && caps) {
-          const en = caps.toolsets.filter(t => t.enabled)
-          capPayload.enabled_toolsets = en.length === caps.toolsets.length || en.length === 0 ? [] : en.map(t => t.name)
+          capPayload.enabled_toolsets = enabledToolsetsPayload(caps.toolsets)
         }
 
         if (dirtyCaps.mcp && caps) {
@@ -955,7 +960,7 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                   >
                     <CheckList
                       columns={2}
-                      items={caps.toolsets}
+                      items={caps.toolsets.filter(isToolsetRow)}
                       onToggle={(name, enabled) => toggleCap('toolsets', name, enabled)}
                     />
                   </div>
