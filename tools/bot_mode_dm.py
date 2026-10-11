@@ -8,8 +8,8 @@ notification (fire-and-forget). Containment: the schema is injected ONLY into a
 bot's canonical "Bot Chat" session on a Bot-Mode-managed install (same gate as
 ``tools/bot_mode_probe.py``; never in the registry or any toolset), and dispatch
 re-checks that gate so a forged call returns a structured error. Transports:
-local → ``hermes -p <name> chat --in ~ -c "Bot Chat" --create-if-missing -Q
---query-file <tmp>``; peer → ``hermes peer dm <peer>[/<name>] < <tmp>``; both via
+local → ``stardust -p <name> chat --in ~ -c "Bot Chat" --create-if-missing -Q
+--query-file <tmp>``; peer → ``stardust peer dm <peer>[/<name>] < <tmp>``; both via
 ``terminal_tool(background=True, notify_on_complete=True)``.
 """
 
@@ -50,6 +50,9 @@ _LIVE_WAIT_SECONDS = 300
 _PEER_TARGET_RE = re.compile(r"^([a-z0-9][a-z0-9_-]{0,63})/([a-zA-Z0-9][a-zA-Z0-9_-]{0,63})$")
 # Same shape as ``tools.bot_relay._HANDLE_RE`` (kept local: see import note above).
 _LOCAL_TARGET_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
+# argv[0] basenames of the delivery CLI: the console command, plus the legacy ``hermes`` name
+# an older argv may still carry. Matched by basename, never by substring.
+_DELIVERY_CLI_BASENAMES = ("stardust", "stardust.exe", "hermes", "hermes.exe")
 
 
 def _default_home() -> str:
@@ -156,9 +159,12 @@ def ensure_message_agent_tool(agent: Any) -> bool:
 
 
 def _resolve_local_name(target: str, roster: list[str]) -> Optional[str]:
-    """Map a target handle to a profile name ('hermes' → 'default')."""
+    """Map a target handle to a profile name: the primary's names ('stardust', and the legacy
+    'hermes') map to 'default'."""
+    from tools.bot_mode_probe import PRIMARY_HANDLE_ALIASES
+
     want = target.strip().lower()
-    if want == "hermes":
+    if want in PRIMARY_HANDLE_ALIASES:
         return "default" if "default" in roster else None
     return next((name for name in roster if name.lower() == want), None) if want else None
 
@@ -366,7 +372,7 @@ def _delivery_lock(argv: list[str], *, stdin_file: bool):
     # (service contexts lack PATH) and carries .exe on Windows; split on both separators.
     # Split on both separators so the shape matches regardless of which platform built the argv. See #93590.
     cli = (argv[0] if argv else "").rsplit("\\", 1)[-1].rsplit("/", 1)[-1]
-    if stdin_file or len(argv) < 3 or cli not in ("hermes", "hermes.exe") or argv[1] != "-p":
+    if stdin_file or len(argv) < 3 or cli not in _DELIVERY_CLI_BASENAMES or argv[1] != "-p":
         return contextlib.nullcontext()
     from tools.bot_mode_probe import _hermes_root
     from tools.bot_relay import acquire_turn_lock
@@ -486,7 +492,7 @@ def _wait_live_dm(home: str, delivery_id: str, *, dm_file: "str | os.PathLike | 
 
 def _local_delivery_home(argv: list[str]) -> Path | None:
     cli = (argv[0] if argv else "").rsplit("\\", 1)[-1].rsplit("/", 1)[-1]
-    if len(argv) < 3 or cli not in ("hermes", "hermes.exe") or argv[1] != "-p":
+    if len(argv) < 3 or cli not in _DELIVERY_CLI_BASENAMES or argv[1] != "-p":
         return None
     from tools.bot_mode_probe import _hermes_root, _roster
 

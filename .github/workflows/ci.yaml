@@ -134,14 +134,15 @@ jobs:
     # Tests-only PRs (~17% of commits) skip this 5-minute job — the longest
     # single job in the workflow — while still running the full pytest lanes.
     #
-    # Re-disabled (Sep 2026): the Sep 1 re-enable is still incredibly flaky.
-    # Keep this a bare `if: false`. The earlier
+    # Report-only (Oct 2026, owner decision B): the lane runs on every desktop
+    # or Python change, but all-checks-pass does not wait for it, so a red run
+    # does not block merges. The suite has known failures: see the PR thread
+    # before re-adding it to all-checks-pass. Keep the plain `${{ ... }}` form
+    # below. The earlier
     # `${{ false && (... || ...) }}` form on this reusable-workflow job made
     # GitHub's workflow parser fail at startup ("An unexpected error has
-    # occurred") — every ci.yaml run repo-wide dispatched 0 jobs from
-    # 24f5a60ed1 until this line changed. To re-enable, restore:
-    #   if: ${{ needs.detect.outputs.python_prod == 'true' || needs.detect.outputs.frontend == 'true' }}
-    if: false
+    # occurred") and dispatched 0 jobs repo-wide from 24f5a60ed1.
+    if: ${{ needs.detect.outputs.python_prod == 'true' || needs.detect.outputs.frontend == 'true' }}
     uses: ./.github/workflows/e2e-desktop.yml
 
   docs-site:
@@ -232,6 +233,8 @@ jobs:
   #
   # Branch protection should require ONLY this check.
   #
+  # Desktop E2E is report-only and is deliberately not in the needs list below.
+  #
   # Outputs ``needs-json`` — a compact ``{job_name: result}`` dict — so
   # the live comment poller can list failed jobs in the PR comment.
   # ─────────────────────────────────────────────────────────────────────
@@ -246,7 +249,6 @@ jobs:
       - installer-tests
       - rust-tests
       - stardust-visual-smoke
-      - e2e-desktop
       - docs-site
       - history-check
       - contributor-check

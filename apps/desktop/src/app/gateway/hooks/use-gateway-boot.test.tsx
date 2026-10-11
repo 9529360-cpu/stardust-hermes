@@ -444,7 +444,7 @@ describe('primary failure foreground isolation', () => {
           connectionId: foregroundId,
           profile: 'default',
           mode: primaryMode === 'local' ? 'remote' : 'local',
-          remoteKind: primaryMode === 'local' ? 'cloud' : undefined,
+          remoteKind: primaryMode === 'local' ? 'url' : undefined,
           authMode: primaryMode === 'local' ? 'oauth' : 'token'
         }))
       })
@@ -481,13 +481,13 @@ describe('primary failure foreground isolation', () => {
       const cloud = {
         ...primaryConn,
         mode: 'remote' as const,
-        remoteKind: 'cloud' as const,
+        remoteKind: 'url' as const,
         authMode: 'oauth' as const
       }
 
       const desktop = Object.assign(fakeDesktop(), {
         getRecentLogs: vi.fn(async () => ({ lines: [] })),
-        getConnectionConfig: vi.fn(async () => ({ mode: 'cloud', remoteAuthMode: 'oauth', remoteUrl: cloud.baseUrl })),
+        getConnectionConfig: vi.fn(async () => ({ mode: 'remote', remoteAuthMode: 'oauth', remoteUrl: cloud.baseUrl })),
         getConnectionFor: vi.fn(async () => ({
           ...coderConn,
           connectionId: 'local',

@@ -20,11 +20,7 @@ import { ManagedUpdatesSection } from './managed-updates-section'
 import { EmptyState, ListRow, Pill, SettingsContent, SettingsSkeleton, ToggleRow } from './primitives'
 import { enrichSelectedSshHost, selectSshHost } from './ssh-host-selection'
 
-// 'cloud' is retained here only so the type matches what an existing install's
-// saved connection.json (DesktopConnectionConfig) can still contain — Settings
-// no longer offers a way to select it; normalizeGatewaySettingsState maps any
-// saved 'cloud' mode to 'remote' before it ever reaches render state.
-type Mode = 'local' | 'remote' | 'cloud' | 'ssh'
+type Mode = 'local' | 'remote' | 'ssh'
 type AuthMode = 'oauth' | 'token'
 type ProbeStatus = 'idle' | 'probing' | 'done' | 'error'
 
@@ -78,15 +74,6 @@ export function normalizeGatewaySettingsState(
   }
 
   const defined = Object.fromEntries(Object.entries(config).filter(([, value]) => value != null))
-
-  // A connection saved under the retired built-in "Hermes Cloud" mode is
-  // remote-shaped already (a gateway URL + OAuth) — Settings now renders it
-  // as an ordinary remote connection rather than presenting Nous Portal
-  // discovery/login as a first-class mode. The underlying saved connection
-  // (and its registry entry) is untouched; only how Settings displays it.
-  if (defined.mode === 'cloud') {
-    defined.mode = 'remote'
-  }
 
   return { ...EMPTY_STATE, ...defined }
 }

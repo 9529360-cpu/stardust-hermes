@@ -22,7 +22,6 @@ import { deriveRemoteAuthProviderShape } from '@/lib/desktop-remote-auth'
 import { triggerHaptic } from '@/lib/haptics'
 import {
   Check,
-  Cloud,
   Globe,
   Loader2,
   LogIn,
@@ -42,7 +41,6 @@ import { notify, notifyError } from '@/store/notifications'
 import { EmptyState, ListRow, Pill, SectionHeading, ToggleRow } from './primitives'
 
 const KIND_ICONS: Record<DesktopConnectionKind, typeof Globe> = {
-  cloud: Cloud,
   local: Monitor,
   remote: Globe,
   ssh: Terminal
@@ -104,7 +102,7 @@ function emptyEditor(kind: DesktopConnectionKind): EditorState {
   }
 }
 
-/** Dedupe key for a remote/cloud gateway URL: trim, drop trailing slashes, lowercase. */
+/** Dedupe key for a remote gateway URL: trim, drop trailing slashes, lowercase. */
 export function normalizeGatewayUrl(url: string): string {
   return url.trim().replace(/\/+$/, '').toLowerCase()
 }
@@ -139,7 +137,7 @@ export function sshCompositeKey(composite: string): string {
  * The renderer-side duplicate rule, mirrored by the main process
  * (normalizeConnectionInput enforces the same keys in the save path):
  *  - at most ONE local entry, ever;
- *  - remote/cloud entries are duplicates when their normalized URLs match;
+ *  - remote entries are duplicates when their normalized URLs match;
  *  - ssh entries are duplicates on user@host:port + remote profile.
  * Returns the existing entry the candidate collides with, or null.
  */
@@ -151,7 +149,7 @@ export function findDuplicateConnection(
     return connections.find(c => c.kind === 'local' && c.id !== editor.id) ?? null
   }
 
-  if (editor.kind === 'remote' || editor.kind === 'cloud') {
+  if (editor.kind === 'remote') {
     const key = normalizeGatewayUrl(editor.url)
 
     if (!key) {
@@ -159,10 +157,8 @@ export function findDuplicateConnection(
     }
 
     return (
-      connections.find(
-        c =>
-          (c.kind === 'remote' || c.kind === 'cloud') && c.id !== editor.id && normalizeGatewayUrl(c.url || '') === key
-      ) ?? null
+      connections.find(c => c.kind === 'remote' && c.id !== editor.id && normalizeGatewayUrl(c.url || '') === key) ??
+      null
     )
   }
 
@@ -232,8 +228,8 @@ function scrollableAncestor(element: HTMLElement): HTMLElement | null {
 
 /**
  * The connections registry section of Settings → Gateways: manage the named
- * agent sources (local runtime + any number of remote gateways / Hermes Cloud
- * instances / SSH hosts). Storage-level management — the active/primary
+ * agent sources (local runtime + any number of remote gateways
+ * SSH hosts). Storage-level management — the active/primary
  * switchover UX is the connection-mode controls above this section.
  */
 export function ConnectionsRegistrySection() {
@@ -427,7 +423,7 @@ export function ConnectionsRegistrySection() {
           payload.id = editor.id
         }
 
-        if (editor.kind === 'remote' || editor.kind === 'cloud') {
+        if (editor.kind === 'remote') {
           payload.url = editor.url
           payload.authMode = editor.authMode
 
@@ -588,8 +584,6 @@ export function ConnectionsRegistrySection() {
       for (const row of results) {
         if (row.ok) {
           notify({ title: row.label, message: row.detail || s.updateAllDone })
-        } else if (row.skipped && row.reason === 'cloud-managed') {
-          notify({ title: row.label, message: s.updateSkippedCloud })
         } else {
           notifyError(new Error(row.error || row.detail || row.reason || row.label), s.updateAllFailed)
         }
@@ -599,10 +593,9 @@ export function ConnectionsRegistrySection() {
     } finally {
       setUpdatingAll(false)
     }
-  }, [bridge, s.updateAllDone, s.updateAllFailed, s.updateSkippedCloud])
+  }, [bridge, s.updateAllDone, s.updateAllFailed])
 
   const kindMeta: Record<DesktopConnectionKind, { label: string; desc: string }> = {
-    cloud: { desc: s.kindCloudDesc, label: s.kindCloud },
     local: { desc: s.kindLocalDesc, label: s.kindLocal },
     remote: { desc: s.kindRemoteDesc, label: s.kindRemote },
     ssh: { desc: s.kindSshDesc, label: s.kindSsh }
@@ -783,7 +776,7 @@ export function ConnectionsRegistrySection() {
             {/* Kind is fixed once created (buttons disable on edit). On create
                 every kind is offered; Local is disabled while the managed
                 local entry exists (the registry holds at most one). */}
-            {(editor.id ? ([editor.kind] as const) : (['local', 'cloud', 'remote', 'ssh'] as const)).map(kind => (
+            {(editor.id ? ([editor.kind] as const) : (['local', 'remote', 'ssh'] as const)).map(kind => (
               <Button
                 disabled={Boolean(editor.id) || (kind === 'local' && hasLocal)}
                 key={kind}
@@ -800,9 +793,6 @@ export function ConnectionsRegistrySection() {
           </div>
           <p className="text-xs text-muted-foreground">{kindMeta[editor.kind].desc}</p>
           {!editor.id && hasLocal ? <p className="text-xs text-muted-foreground">{s.localAddHint}</p> : null}
-          {!editor.id && editor.kind === 'cloud' ? (
-            <p className="text-xs text-muted-foreground">{s.cloudAddHint}</p>
-          ) : null}
 
           <ListRow
             action={
@@ -816,7 +806,7 @@ export function ConnectionsRegistrySection() {
             title={s.labelTitle}
           />
 
-          {(editor.kind === 'remote' || editor.kind === 'cloud') && (
+          {editor.kind === 'remote' && (
             <ListRow
               action={
                 <Input
@@ -896,7 +886,7 @@ export function ConnectionsRegistrySection() {
             </>
           )}
 
-          {(editor.kind === 'remote' || editor.kind === 'cloud') && (
+          {editor.kind === 'remote' && (
             <div className="grid gap-2">
               <div>
                 <div className="text-sm font-medium">{s.headersTitle}</div>

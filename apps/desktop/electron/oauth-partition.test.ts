@@ -74,16 +74,6 @@ describe('resolveOauthPartition (#92183 per-connection cookie jars)', () => {
     )
   })
 
-  it('keeps cloud connections on the legacy partition (silent portal cascade needs the shared jar)', () => {
-    const reg = registry('local', [
-      { id: 'cloud-1', kind: 'cloud', url: 'https://agent.nousresearch.com', authMode: 'oauth' }
-    ])
-
-    expect(resolveOauthPartition('https://agent.nousresearch.com/api/status', { registry: reg })).toBe(
-      LEGACY_OAUTH_PARTITION
-    )
-  })
-
   it('keeps token-auth registry remotes on the legacy partition (no cookies involved)', () => {
     const reg = registry('local', [remote('tok-1', 'https://gw-t.example.com', { authMode: 'token' })])
 
@@ -93,7 +83,7 @@ describe('resolveOauthPartition (#92183 per-connection cookie jars)', () => {
   it('falls back to the legacy partition for unmatched, portal, and malformed inputs', () => {
     const reg = registry('local', [remote('conn-a', 'https://gw-a.example.com')])
 
-    expect(resolveOauthPartition('https://portal.nousresearch.com/api/agents', { registry: reg })).toBe(
+    expect(resolveOauthPartition('https://portal.example.com/api/agents', { registry: reg })).toBe(
       LEGACY_OAUTH_PARTITION
     )
     expect(resolveOauthPartition('not a url', { registry: reg })).toBe(LEGACY_OAUTH_PARTITION)

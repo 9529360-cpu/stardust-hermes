@@ -1,13 +1,5 @@
 import { useStore } from '@nanostores/react'
-import {
-  memo,
-  type ReactNode,
-  type PointerEvent as ReactPointerEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react'
+import { memo, type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { Button } from '@/components/ui/button'
@@ -42,7 +34,6 @@ import {
   updateAgentPlugin
 } from '@/store/agent-plugins'
 import { notify, notifyError } from '@/store/notifications'
-import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 import { openPluginInstallRequest } from '@/store/plugin-install-request'
 
 import { PanelEmpty } from '../overlays/panel'
@@ -50,37 +41,6 @@ import { Pill } from '../settings/primitives'
 import { useDeepLinkHighlight } from '../settings/use-deep-link-highlight'
 
 import { mergePluginPackages, type PackageKind, type PluginPackage } from './plugin-packages'
-
-// The REAL Plugin Catalog page (docs site) embedded as a one-click picker —
-// the same pattern as the Skills tab's EmbeddedHubPicker. `?embed=picker`
-// hides the docs chrome and adds "+ Add to this Agent" per card, which posts
-//   { type: 'hermes-plugin-pick', name, repo, sha, subdir, tier, installCmd }
-// to the parent window. We validate the origin and open the shared
-// dual-target install modal (agent half → catalog-pinned install into the
-// scoped profile; desktop half → this app), so unified packages install both
-// halves in one flow.
-const CATALOG_ORIGIN = 'https://hermes-agent.nousresearch.com'
-const CATALOG_PICKER_URL = `${CATALOG_ORIGIN}/docs/plugins?embed=picker`
-
-// Catalog viewport: persisted through the shared pane store, dragged from the
-// section's TOP edge ("pull the catalog up"), clamped so neither the catalog
-// nor the plugin list above can vanish. Same contract as EmbeddedHubPicker.
-const CATALOG_PANE_ID = 'capabilities-plugin-catalog'
-const CATALOG_DEFAULT_PX = 380
-const CATALOG_MIN_PX = 120
-const CATALOG_MAX_VH = 0.75
-const CATALOG_COLLAPSED_PX = 4
-const CATALOG_LIST_RESERVED_PX = 176
-
-interface PluginPickMessage {
-  installCmd?: string
-  name?: string
-  repo?: string
-  sha?: string
-  subdir?: string
-  tier?: string
-  type?: string
-}
 
 /** Deep-link anchor for a package row (`/skills?tab=plugins&plugin=<key>`).
  *  Accepts the agent key, the agent name, or the desktop record id. */
@@ -202,7 +162,11 @@ function ProvenancePill({ pkg }: { pkg: PluginPackage }) {
       <Tip label={label}>
         <span>
           <Pill>
-            {shortSha ? <span className="font-mono">{p.pinnedBadge(shortSha)}</span> : t.settings.plugins.kinds[pkg.desktop.kind]}
+            {shortSha ? (
+              <span className="font-mono">{p.pinnedBadge(shortSha)}</span>
+            ) : (
+              t.settings.plugins.kinds[pkg.desktop.kind]
+            )}
           </Pill>
         </span>
       </Tip>
@@ -500,8 +464,8 @@ function PackageRow({
 
 /** THE plugins surface: one row per package. Each row shows its Desktop half
  *  (this app — the same for every profile, gateway, or machine) and its Agent
- *  half (the selected profile's backend). Discovery sits underneath: the live
- *  catalog picker plus Install from Git for anything not in the catalog. */
+ *  half (the selected profile's backend). Install from Git adds anything that
+ *  is not already listed. */
 export const PluginsTab = memo(function PluginsTab({
   profile,
   scopeSelector,
@@ -538,84 +502,6 @@ export const PluginsTab = memo(function PluginsTab({
   )
 
   useDeepLinkHighlight({ param: 'plugin', ready: () => true, elementId: pluginElementId })
-
-  // Catalog picker viewport (persisted height, collapse toggle, top-edge sash).
-  const heightOverride = useStore($paneHeightOverride(CATALOG_PANE_ID))
-  const height = heightOverride ?? 0
-  const open = height > CATALOG_COLLAPSED_PX
-  const [pickerMounted, setPickerMounted] = useState(open)
-  const [dragging, setDragging] = useState(false)
-  const sectionRef = useRef<HTMLElement>(null)
-
-  if (open && !pickerMounted) {
-    setPickerMounted(true)
-  }
-
-  const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) {
-      return
-    }
-
-    event.preventDefault()
-    const startY = event.clientY
-    const startHeight = height
-    const column = sectionRef.current?.parentElement
-    const columnMax = column ? column.clientHeight - CATALOG_LIST_RESERVED_PX : Number.POSITIVE_INFINITY
-    const max = Math.max(CATALOG_MIN_PX, Math.round(Math.min(window.innerHeight * CATALOG_MAX_VH, columnMax)))
-    setDragging(true)
-
-    const onMove = (move: globalThis.PointerEvent) => {
-      setPaneHeightOverride(
-        CATALOG_PANE_ID,
-        Math.round(Math.min(max, Math.max(CATALOG_MIN_PX, startHeight + (startY - move.clientY))))
-      )
-    }
-
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      setDragging(false)
-    }
-
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp, { once: true })
-  }
-
-  useEffect(() => {
-    if (!open) {
-      return undefined
-    }
-
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== CATALOG_ORIGIN) {
-        return
-      }
-
-      const data = event.data as null | PluginPickMessage
-
-      if (!data || data.type !== 'hermes-plugin-pick' || !data.name || !data.repo) {
-        return
-      }
-
-      const existing = $agentPlugins.get().find(row => row.catalog_name === data.name || row.name === data.name)
-
-      if (existing && !existing.update_available) {
-        notify({ kind: 'success', message: p.alreadyInstalled(String(data.name)) })
-
-        return
-      }
-
-      openPluginInstallRequest({
-        catalogName: String(data.name),
-        profile: scope,
-        repo: data.subdir ? `${String(data.repo)}#${String(data.subdir)}` : String(data.repo),
-        sha: data.sha ? String(data.sha) : undefined
-      })
-    }
-
-    window.addEventListener('message', onMessage)
-
-    return () => window.removeEventListener('message', onMessage)
-  }, [open, p, scope])
 
   const agentBusy = (row: AgentPluginRow) => busyKey === (row.key ?? row.name) || busyKey === row.name
 
@@ -728,66 +614,6 @@ export const PluginsTab = memo(function PluginsTab({
           </div>
         )}
       </div>
-
-      <section
-        className="relative flex min-h-9 flex-col overflow-hidden border-t border-(--ui-stroke-secondary)"
-        ref={sectionRef}
-      >
-        <div
-          className="group/catsash absolute inset-x-0 top-0 z-10 h-1 -translate-y-1/2 cursor-row-resize"
-          data-testid="plugin-catalog-sash"
-          onDoubleClick={() => setPaneHeightOverride(CATALOG_PANE_ID, CATALOG_DEFAULT_PX)}
-          onPointerDown={startDrag}
-        >
-          <div
-            className={cn(
-              'absolute inset-x-0 top-1/2 h-px -translate-y-1/2 transition-colors',
-              dragging ? 'bg-(--ui-stroke-secondary)' : 'group-hover/catsash:bg-(--ui-stroke-secondary)'
-            )}
-          />
-        </div>
-        <div className="flex shrink-0 items-center justify-between px-3 py-1.5">
-          <span className="text-[0.62rem] font-medium tracking-wide uppercase text-(--ui-text-quaternary)">
-            {p.catalogTitle}
-          </span>
-          <Button onClick={() => setPaneHeightOverride(CATALOG_PANE_ID, open ? 0 : CATALOG_DEFAULT_PX)} size="xs" variant="text">
-            {open ? p.catalogHide : p.catalogBrowse}
-          </Button>
-        </div>
-        {pickerMounted && (
-          <div className={cn('flex min-h-0 flex-col gap-1 px-3 pb-2', !open && 'hidden')}>
-            <div
-              style={{
-                border: '1px solid var(--ui-stroke-secondary)',
-                borderRadius: 8,
-                flex: `0 1 ${height}px`,
-                maxWidth: '100%',
-                minHeight: 0,
-                minWidth: 320,
-                overflow: 'hidden',
-                position: 'relative',
-                width: '100%'
-              }}
-            >
-              <iframe
-                sandbox="allow-scripts allow-same-origin"
-                src={CATALOG_PICKER_URL}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  height: '133.34%',
-                  pointerEvents: dragging ? 'none' : 'auto',
-                  transform: 'scale(0.75)',
-                  transformOrigin: 'top left',
-                  width: '133.34%'
-                }}
-                title={p.catalogTitle}
-              />
-            </div>
-            <p className="shrink-0 px-1 text-[0.65rem] leading-4 text-(--ui-text-quaternary)">{p.catalogHint}</p>
-          </div>
-        )}
-      </section>
     </div>
   )
 })

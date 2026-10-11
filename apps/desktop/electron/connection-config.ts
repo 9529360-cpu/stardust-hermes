@@ -39,28 +39,6 @@ import { readStatusCode } from './api-transport'
 const AT_COOKIE_VARIANTS = ['__Host-hermes_session_at', '__Secure-hermes_session_at', 'hermes_session_at']
 const RT_COOKIE_VARIANTS = ['__Host-hermes_session_rt', '__Secure-hermes_session_rt', 'hermes_session_rt']
 
-// The Nous portal (NAS) does NOT use Hermes gateway session cookies — it is a
-// Privy-authed Next.js app. NAS `auth()` (src/server/auth/session.ts) reads the
-// `privy-token` access-token cookie (with `privy-id-token` alongside), which is
-// also exactly what the `/api/agents` cookie-auth path validates. So portal
-// sign-in / discovery liveness must look for the Privy cookie, NOT the gateway
-// cookies above. `privy-token` is the access token (the required signal);
-// variants cover the secured-prefix forms and the older `privy-session` name.
-const PRIVY_SESSION_COOKIE_VARIANTS = [
-  '__Host-privy-token',
-  '__Secure-privy-token',
-  'privy-token',
-  'privy-session',
-  'privy-refresh-token'
-]
-
-// The short-lived Privy ACCESS token only — the credential `/api/agents`
-// actually validates. `privy-session` / `privy-refresh-token` are long-lived
-// renewal material: their presence means the session is RENEWABLE (signed in,
-// no interactive login needed), but discovery still 401s until a fresh
-// `privy-token` is minted. Distinguishing the two is what lets a cold start
-// silently renew instead of demanding a re-login (#73495).
-const PRIVY_ACCESS_COOKIE_VARIANTS = ['__Host-privy-token', '__Secure-privy-token', 'privy-token']
 // Keep this aligned with hermes_cli.profiles.validate_profile_name(). `default`
 // is the built-in root alias; these names cannot be created as profiles.
 const RESERVED_REMOTE_PROFILES = new Set(['hermes', 'test', 'tmp', 'root', 'sudo'])
@@ -146,8 +124,8 @@ function gatewayTicketFailure(error, authMessage, transportMessage) {
   }
 
   // Preserve structured HTTP context when the source error carried an integer
-  // statusCode (the fetch layer attaches err.statusCode). Downstream Cloud
-  // classification (isServerSideHttpError / makeNousCloudBackendDownError) and
+  // statusCode (the fetch layer attaches err.statusCode). Downstream status
+  // classification (isServerSideHttpError) and
   // the renderer overlay depend on it surviving the ticket-error wrapper. Auth
   // semantics are unchanged: 401/403 route to reauth, 5xx stays a transport
   // failure, everything else keeps current behavior.
@@ -377,15 +355,11 @@ function remoteRequestMatchesBaseUrl(requestUrl, baseUrl) {
   }
 }
 
-// True for connection modes that resolve to a REMOTE backend. 'cloud' is a
-// Hermes Cloud connection (cloud-auto-discovery Q3/Q6): it carries a
-// remote-shaped block and reuses the entire remote connect/probe/reconnect
-// path, so every resolution site treats it exactly like 'remote'. The only
-// places that distinguish cloud from remote are the settings UI (which card to
-// show) and config persistence (remembering the provenance). Centralized here
-// so no resolution site forgets the third arm.
+// True for the connection mode that resolves to a REMOTE backend. Centralized
+// here so every resolution site uses the same test. The retired Hermes Cloud
+// mode is not remote-like: a saved 'cloud' mode resolves to the local runtime.
 function modeIsRemoteLike(mode) {
-  return mode === 'remote' || mode === 'cloud'
+  return mode === 'remote'
 }
 
 function normalizeSshConfig(entry) {
@@ -527,7 +501,7 @@ function hostLabelFromBaseUrl(baseUrl) {
  * when it has none (so the caller falls back to env → global remote → local).
  *
  * The config may carry a `profiles` map keyed by name; an entry counts as an
- * override only with a remote-like `mode` (remote or cloud) and a non-empty
+ * override only with a remote-like `mode` (remote) and a non-empty
  * `url`. Pure: `token` and `headers` are raw stored secrets; main.ts decrypts
  * them. Returns `{ url, authMode, token, headers } | null`.
  */
@@ -1008,38 +982,6 @@ function cookiesHaveLiveSession(cookies) {
   return cookies.some(c => c && c.value && (AT_COOKIE_VARIANTS.includes(c.name) || RT_COOKIE_VARIANTS.includes(c.name)))
 }
 
-/**
- * True if the cookie jar holds a live Nous PORTAL (Privy) session — a non-empty
- * `privy-token` (access-token) cookie, or a variant. This is the portal
- * analogue of `cookiesHaveLiveSession`: the portal authenticates via Privy, not
- * the Hermes gateway session cookies, so cloud sign-in / discovery liveness
- * must check THIS, not the gateway helpers. (NAS `auth()` and the `/api/agents`
- * cookie path both key off `privy-token`.)
- */
-function cookiesHavePrivySession(cookies) {
-  if (!Array.isArray(cookies)) {
-    return false
-  }
-
-  return cookies.some(c => c && c.value && PRIVY_SESSION_COOKIE_VARIANTS.includes(c.name))
-}
-
-/**
- * True only when the short-lived Privy ACCESS token (`privy-token`) is present
- * — the exact cookie `/api/agents` validates. A jar can satisfy
- * `cookiesHavePrivySession` (renewable session: `privy-session` /
- * `privy-refresh-token`) while failing this check; that gap is the cold-start
- * "Signed in" + "No agents found" contradiction, and the signal that a silent
- * renewal (not an interactive re-login) is the right recovery (#73495).
- */
-function cookiesHavePrivyAccessToken(cookies) {
-  if (!Array.isArray(cookies)) {
-    return false
-  }
-
-  return cookies.some(c => c && c.value && PRIVY_ACCESS_COOKIE_VARIANTS.includes(c.name))
-}
-
 export {
   apiRequestRegistryConnectionId,
   AT_COOKIE_VARIANTS,
@@ -1048,8 +990,6 @@ export {
   buildGatewayWsUrlWithTicket,
   connectionScopeKey,
   cookiesHaveLiveSession,
-  cookiesHavePrivyAccessToken,
-  cookiesHavePrivySession,
   cookiesHaveSession,
   gatewayTicketFailure,
   gatewayWsUrlIpcResult,
@@ -1064,8 +1004,6 @@ export {
   pathForRegistryBackendRequest,
   pathWithGlobalRemoteProfile,
   pathWithProfileScope,
-  PRIVY_ACCESS_COOKIE_VARIANTS,
-  PRIVY_SESSION_COOKIE_VARIANTS,
   profileHasRemoteConnection,
   profileRemoteOverride,
   profileSshOverride,

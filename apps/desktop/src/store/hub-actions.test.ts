@@ -11,8 +11,7 @@ const installSkillFromHub = vi.fn()
 vi.mock('@/hermes', () => ({
   getActionStatus: (...args: unknown[]) => getActionStatus(...args),
   installSkillFromHub: (...args: unknown[]) => installSkillFromHub(...args),
-  uninstallSkillFromHub: vi.fn(),
-  updateSkillsFromHub: vi.fn()
+  uninstallSkillFromHub: vi.fn()
 }))
 
 vi.mock('@/lib/query-client', () => ({

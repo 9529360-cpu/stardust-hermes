@@ -18,12 +18,13 @@ Two failures on a Windows desktop install talking to a remote gateway:
    resolves the CLI next to this gateway's own interpreter (the venv
    bin/Scripts sibling), falling back to the bare name. The #93091
    turn-lock recognition in bot_mode_dm matches the CLI element by
-   basename so resolved absolute paths (and ``hermes.exe``) still take
+   basename so resolved absolute paths (and ``stardust.exe``) still take
    the per-profile lock.
 """
 
 import ast
 import shlex
+import sys
 from pathlib import Path
 
 import tools.bot_mode_dm as bot_mode_dm
@@ -91,7 +92,7 @@ def test_waiter_raw_prefix_keeps_injection_defense():
 def test_local_delivery_resolves_sibling_hermes(tmp_path, monkeypatch):
     bin_dir = tmp_path / "venv" / "bin"
     bin_dir.mkdir(parents=True)
-    sibling = bin_dir / "hermes"
+    sibling = bin_dir / ("stardust.exe" if sys.platform == "win32" else "stardust")
     sibling.touch()
     sibling.chmod(0o755)
     monkeypatch.setattr("sys.executable", str(bin_dir / "python"))
@@ -108,9 +109,9 @@ def test_local_delivery_uses_shutil_which_when_no_sibling(tmp_path, monkeypatch)
     empty = tmp_path / "nowhere"
     empty.mkdir(parents=True)
     monkeypatch.setattr("sys.executable", str(empty / "python"))
-    which_hit = str(tmp_path / "usr-local-bin" / "hermes")
+    which_hit = str(tmp_path / "usr-local-bin" / "stardust")
     monkeypatch.setattr(
-        bot_relay.shutil, "which", lambda name: which_hit if name == "hermes" else None
+        bot_relay.shutil, "which", lambda name: which_hit if name == "stardust" else None
     )
 
     argv = bot_relay.local_delivery_command("ops", "query.json")
@@ -124,7 +125,7 @@ def test_local_delivery_falls_back_to_bare_name(tmp_path, monkeypatch):
     monkeypatch.setattr(bot_relay.shutil, "which", lambda name: None)
 
     argv = bot_relay.local_delivery_command("ops", "query.json")
-    assert argv[0] == "hermes"
+    assert argv[0] == "stardust"
     assert argv[1:3] == ["-p", "ops"]
 
 
@@ -157,7 +158,13 @@ def test_delivery_lock_recognizes_resolved_cli_paths(tmp_path, monkeypatch):
         pass
     assert acquired == ["locked", "locked", "locked"]
 
+    # The console command is the primary name; each resolved stardust argv locks too.
+    for cli in (str(tmp_path / "venv" / "bin" / "stardust"), "stardust", "C:\\venv\\Scripts\\stardust.exe"):
+        with bot_mode_dm._delivery_lock([cli, "-p", "ops", "chat"], stdin_file=False):
+            pass
+    assert acquired == ["locked"] * 6
+
     # Unrelated argvs still bypass the lock entirely.
     with bot_mode_dm._delivery_lock(["python", "-m", "whatever"], stdin_file=False):
         pass
-    assert acquired == ["locked", "locked", "locked"]
+    assert acquired == ["locked"] * 6

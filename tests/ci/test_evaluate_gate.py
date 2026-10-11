@@ -72,7 +72,7 @@ def test_frontend_change_requires_successful_desktop_runtime_proof():
     )
     assert compact[DESKTOP_RUNTIME_PROOF_LANE] == "skipped"
     assert blocking == [DESKTOP_RUNTIME_PROOF_LANE]
-    assert disabled == ["e2e-desktop"]
+    assert disabled == []
 
 
 def test_python_runtime_change_requires_successful_desktop_runtime_proof():
@@ -82,19 +82,19 @@ def test_python_runtime_change_requires_successful_desktop_runtime_proof():
     assert blocking == [DESKTOP_RUNTIME_PROOF_LANE]
 
 
-def test_desktop_change_passes_with_visual_smoke_while_full_e2e_is_quarantined():
+def test_desktop_change_passes_with_successful_visual_smoke():
     compact, blocking, disabled = evaluate(
         _desktop_needs(frontend="true", smoke="success")
     )
     assert compact[DESKTOP_RUNTIME_PROOF_LANE] == "success"
     assert blocking == []
-    assert disabled == ["e2e-desktop"]
+    assert disabled == []
 
 
 def test_non_desktop_change_may_legitimately_skip_visual_smoke():
     _compact, blocking, disabled = evaluate(_desktop_needs(smoke="skipped"))
     assert blocking == []
-    assert disabled == ["e2e-desktop"]
+    assert disabled == []
 
 
 def test_unknown_desktop_classifier_outputs_fail_closed_to_runtime_proof():
@@ -114,22 +114,24 @@ def test_render_marks_required_skipped_runtime_proof_as_failure():
     assert "::error::1 required job(s) did not complete successfully" in out
 
 
-def test_hard_disabled_lane_skipped_passes_the_gate_but_is_flagged():
-    """e2e-desktop's ci.yaml `if: false` makes it report `skipped` on every run — that
+def test_hard_disabled_lane_skipped_passes_the_gate_but_is_flagged(monkeypatch):
+    """A quarantined lane's ci.yaml `if: false` makes it report `skipped` on every run — that
     must still not block the gate (this isn't about forcing a flaky suite back on),
     but it must be visibly distinguished from an ordinary irrelevant-to-this-PR skip."""
+    monkeypatch.setitem(HARD_DISABLED_LANES, "quarantined-lane", "test quarantine")
     compact, blocking, disabled = evaluate(
-        _needs(detect="success", **{"e2e-desktop": "skipped"})
+        _needs(detect="success", **{"quarantined-lane": "skipped"})
     )
     assert blocking == []
-    assert disabled == ["e2e-desktop"]
+    assert disabled == ["quarantined-lane"]
 
 
-def test_hard_disabled_lane_that_actually_ran_is_not_flagged():
-    """If e2e-desktop is ever re-enabled and genuinely runs, its real result (success/
-    failure) is reported normally — the disabled-flag only fires on a bare skip."""
+def test_hard_disabled_lane_that_actually_ran_is_not_flagged(monkeypatch):
+    """A quarantined lane that genuinely runs reports its real result (success/failure);
+    the disabled-flag only fires on a bare skip."""
+    monkeypatch.setitem(HARD_DISABLED_LANES, "quarantined-lane", "test quarantine")
     compact, blocking, disabled = evaluate(
-        _needs(detect="success", **{"e2e-desktop": "success"})
+        _needs(detect="success", **{"quarantined-lane": "success"})
     )
     assert blocking == []
     assert disabled == []
@@ -145,14 +147,15 @@ def test_cancelled_blocks_the_gate():
     assert blocking == ["tests"]
 
 
-def test_render_marks_hard_disabled_lane_distinctly_from_pass_and_fail():
+def test_render_marks_hard_disabled_lane_distinctly_from_pass_and_fail(monkeypatch):
+    monkeypatch.setitem(HARD_DISABLED_LANES, "quarantined-lane", "test quarantine")
     compact, blocking, disabled = evaluate(
-        _needs(detect="success", **{"e2e-desktop": "skipped"})
+        _needs(detect="success", **{"quarantined-lane": "skipped"})
     )
     out = render(compact, blocking, disabled)
-    assert "e2e-desktop: skipped" in out
+    assert "quarantined-lane: skipped" in out
     assert "HARD-DISABLED" in out
-    assert "✅ e2e-desktop" not in out
+    assert "✅ quarantined-lane" not in out
     assert "All required checks passed" in out
 
 

@@ -5,7 +5,7 @@
  */
 import { host } from '@stardust/plugin-sdk'
 
-import { botFriendlyNames, botHandle, mentionNameForms } from './data'
+import { botFriendlyNames, botHandle, claimsPrimaryAlias, mentionNameForms, PRIMARY_ALIASES } from './data'
 import { recordGroupActivity } from './group-activity'
 import {
   $groupChats,
@@ -49,17 +49,26 @@ import type { Attachment, GroupMember, GroupMessage } from './types'
 
 /** Deterministic @mention parse. Handles @name, @"two words" via display
  *  titles, and @everyone/@all. Names match case-insensitively against member
- *  profile names, display titles, and collapsed no-space forms. */
+ *  profile names, display titles, and collapsed no-space forms. The primary
+ *  aliases @stardust and @hermes name the primary member, and only it. */
 export function parseGroupChatMentions(text: unknown, members: GroupMember[]) {
   const source = String(text || '')
   const mentioned = new Set<string>()
   let everyone = false
   const handles = new Map<string, string>()
+  // Keys of the members that answer to the primary aliases.
+  const primaryKeys = new Set<string>()
 
   for (const member of members) {
     const title = String(member.title || '').trim()
+    const key = groupMemberKey(member)
+
+    if (claimsPrimaryAlias(member)) {
+      primaryKeys.add(key)
+    }
+
     // Normalize legacy "default" handles without aliasing device-qualified
-    // defaults to @hermes: that would retarget the primary tag by roster order.
+    // defaults to @stardust: that would retarget the primary tag by roster order.
     const handle = String(botHandle(member.name, member) || '').trim()
 
     const forms = new Set([
@@ -81,11 +90,15 @@ export function parseGroupChatMentions(text: unknown, members: GroupMember[]) {
     }
 
     for (const form of forms) {
-      if (form) {
-        handles.set(form, groupMemberKey(member))
+      // The aliases resolve through primaryKeys below, never through a member's own form.
+      if (form && !PRIMARY_ALIASES.includes(form)) {
+        handles.set(form, key)
       }
     }
   }
+
+  // The primary alias names one member: with none, or several, claiming it, it names no one.
+  const primaryKey = primaryKeys.size === 1 ? [...primaryKeys][0] : undefined
 
   for (const match of source.matchAll(/@([a-z0-9][a-z0-9._-]*)/gi)) {
     const handle = match[1].toLowerCase()
@@ -100,7 +113,8 @@ export function parseGroupChatMentions(text: unknown, members: GroupMember[]) {
       continue
     }
 
-    const resolved = handles.get(handle) || handles.get(handle.replace(/[._-]+/g, ''))
+    const collapsed = handle.replace(/[._-]+/g, '')
+    const resolved = PRIMARY_ALIASES.includes(collapsed) ? primaryKey : handles.get(handle) || handles.get(collapsed)
 
     if (resolved) {
       mentioned.add(resolved)

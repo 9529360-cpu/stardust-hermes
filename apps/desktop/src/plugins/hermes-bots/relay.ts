@@ -9,12 +9,12 @@
 
 import { host, LruCache } from '@stardust/plugin-sdk'
 
-import { botHandle, clearBotAttention, noteBotAttention } from './data'
+import { agentTargetHandle, clearBotAttention, noteBotAttention } from './data'
 import type { ProfileRoute, RosterRow } from './types'
 
 // ── cross-connection bot relay ────────────────────────────────────────────
 // Connections ARE the peer set: every gateway this Desktop holds a socket
-// to (local, remote URL, SSH, Hermes Cloud, docker) must be able to find
+// to (local, remote URL, SSH, docker) must be able to find
 // every other connection's agents and message them via message_agent. The
 // Desktop is the relay — it owns every socket. Two loops:
 //  - roster loop: pushes each gateway the union roster of agents on the
@@ -228,7 +228,9 @@ async function relayAgentsOn(connection: RelayConnection): Promise<RelayAgentRow
     return profiles
       .map(profile => ({
         profile: String(profile?.name || ''),
-        handle: botHandle(profile?.name, profile),
+        // The backend matches a target by this handle or the profile name, and
+        // resolves the primary only by its legacy alias.
+        handle: agentTargetHandle(profile?.name, profile),
         connection_id: connection.id,
         connection_label: label,
         title: String(profile?.ui_meta?.['hermes-bots']?.title || profile?.display_name || ''),

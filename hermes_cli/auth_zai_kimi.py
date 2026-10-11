@@ -62,9 +62,11 @@ def _probe_single_zai_endpoint(api_key: str, endpoint: tuple, timeout: float) ->
 
 def detect_zai_endpoint(api_key: str, timeout: float = 8.0) -> Optional[Dict[str, str]]:
     """Probe z.ai endpoints in parallel; first working one in ZAI_ENDPOINTS priority order, or None."""
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    # No `with`: it would join ALL probes on exit, defeating the early return below.
-    pool = ThreadPoolExecutor(max_workers=len(ZAI_ENDPOINTS))
+    from concurrent.futures import as_completed
+    from tools.daemon_pool import DaemonThreadPoolExecutor
+    # No `with`: it would join ALL probes on exit, defeating the early return below. Daemon workers
+    # also keep a probe still in flight after that return from holding interpreter exit.
+    pool = DaemonThreadPoolExecutor(max_workers=len(ZAI_ENDPOINTS))
     try:
         futures = {pool.submit(_probe_single_zai_endpoint, api_key, ep, timeout): ep[0] for ep in ZAI_ENDPOINTS}
         by_id = {ep_id: f for f, ep_id in futures.items()}

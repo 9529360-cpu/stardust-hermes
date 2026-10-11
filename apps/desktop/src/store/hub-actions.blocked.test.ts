@@ -4,8 +4,7 @@ vi.mock('@/hermes', () => ({
   getActionStatus: vi.fn(),
   installSkillFromHub: vi.fn(),
   scanSkillHub: vi.fn(),
-  uninstallSkillFromHub: vi.fn(),
-  updateSkillsFromHub: vi.fn()
+  uninstallSkillFromHub: vi.fn()
 }))
 vi.mock('@/lib/query-client', () => ({ queryClient: { invalidateQueries: vi.fn() } }))
 vi.mock('@/lib/slash-completion-cache', () => ({ invalidateSlashCompletions: vi.fn() }))

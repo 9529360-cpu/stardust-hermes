@@ -220,11 +220,12 @@ def _fetch_with_timeout(source: SecretSource, cfg: dict, home_path: Path,
     """Run source.fetch() under a wall-clock budget; never raises.
 
     A worker thread enforces the budget: a source that blows it is reported as
-    TIMEOUT and its eventual result discarded (the thread may linger until
-    process exit — acceptable for a startup-only path).
+    TIMEOUT and its eventual result discarded. The worker is a daemon thread, so
+    a fetch that is still running at that point never holds interpreter exit.
     """
+    from tools.daemon_pool import DaemonThreadPoolExecutor
     timeout = source.fetch_timeout_seconds(cfg)
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix=f"secret-src-{source.name}")
+    executor = DaemonThreadPoolExecutor(max_workers=1, thread_name_prefix=f"secret-src-{source.name}")
     try:
         def _fetch() -> FetchResult:
             token = set_source_environment(environ)

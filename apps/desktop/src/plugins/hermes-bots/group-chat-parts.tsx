@@ -13,7 +13,7 @@ import type { ClipboardEvent } from 'react'
 import { useRef, useState } from 'react'
 
 import { $imagenAvailable, normalizeAvatarImage, pickImageFromDevice, probeImagen } from './avatar-image'
-import { $botMeta, botHandle, botMentionTag } from './data'
+import { $botMeta, botHandle, botMentionTag, claimsPrimaryAlias, PRIMARY_ALIASES } from './data'
 import { appendGroupChatEntry } from './group-chat'
 import { groupMemberKey } from './group-membership'
 import { answerGroupClarify } from './group-turns'
@@ -202,11 +202,13 @@ export function GroupMentionInput({ members, onChange, onSubmitDraft, value, ...
         continue
       }
 
+      // The primary also completes on its legacy alias, inserted under its Stardust handle.
       if (
         token.query &&
         !tag.toLowerCase().startsWith(token.query) &&
         !(handle && handle.toLowerCase().startsWith(token.query)) &&
-        !display.toLowerCase().startsWith(token.query)
+        !display.toLowerCase().startsWith(token.query) &&
+        !(claimsPrimaryAlias(member) && PRIMARY_ALIASES.some(alias => alias.startsWith(token.query)))
       ) {
         continue
       }

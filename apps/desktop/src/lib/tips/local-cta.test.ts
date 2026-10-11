@@ -32,8 +32,8 @@ describe('localSetupEligible', () => {
     expect(localSetupEligible('local', status(), [fittingModel()])).toBe(true)
   })
 
-  it('never promises local privacy on a remote or cloud backend', () => {
-    for (const mode of ['remote', 'cloud', 'ssh', null]) {
+  it('never promises local privacy on a remote backend', () => {
+    for (const mode of ['remote', 'ssh', null]) {
       expect(localSetupEligible(mode, status(), [fittingModel()])).toBe(false)
     }
   })

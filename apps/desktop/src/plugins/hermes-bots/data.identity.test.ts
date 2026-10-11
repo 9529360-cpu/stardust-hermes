@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   $botAttention,
   $botMeta,
+  agentTargetHandle,
   botActivitySession,
   botFriendlyNames,
   botHandle,
@@ -71,13 +72,29 @@ beforeEach(() => {
 })
 
 describe('the @handle a bot answers to', () => {
-  it('presents the primary profile as @hermes — "default" never surfaces in the UI', () => {
-    expect(botHandle('default')).toBe('hermes')
+  it('presents the primary profile as @stardust — "default" never surfaces in the UI', () => {
+    expect(botHandle('default')).toBe('stardust')
     expect(botHandle('ops')).toBe('ops')
+  })
+
+  it('presents a persisted legacy @hermes handle on the primary as @stardust', () => {
+    // Group rooms saved before the rename carry handle 'hermes' on the primary descriptor.
+    expect(botHandle('default', row({ handle: 'hermes', name: 'default' }))).toBe('stardust')
+  })
+
+  it('keeps a user bot that is literally named hermes on its own handle', () => {
+    expect(botHandle('hermes')).toBe('hermes')
   })
 
   it('prefers a precomputed multi-source handle over the bare name', () => {
     expect(botHandle('default', row({ handle: 'default-vera', name: 'default' }))).toBe('default-vera')
+  })
+
+  it('hands the backend the target it resolves: the primary stays on the legacy alias', () => {
+    // message_agent and the relay roster resolve only 'hermes' for the primary today.
+    expect(agentTargetHandle('default')).toBe('hermes')
+    expect(agentTargetHandle('ops')).toBe('ops')
+    expect(agentTargetHandle('default', row({ handle: 'default-vera', name: 'default' }))).toBe('default-vera')
   })
 })
 
@@ -91,7 +108,9 @@ describe('renamed bots stay taggable', () => {
   })
 
   it('drops reserved tokens so a rename cannot hijack a built-in tag', () => {
+    // 'hermes' stays reserved: it is the primary's legacy alias. 'stardust' is its handle now.
     expect(mentionNameForms('Hermes')).toEqual([])
+    expect(mentionNameForms('Stardust')).toEqual([])
     expect(mentionNameForms('@everyone')).toEqual([])
     expect(mentionNameForms('')).toEqual([])
   })
@@ -101,7 +120,7 @@ describe('renamed bots stay taggable', () => {
 
     expect(botMentionTag(row({ name: 'writer' }))).toBe('research-buddy')
     expect(botMentionTag(row({ name: 'ops' }))).toBe('ops')
-    expect(botMentionTag(row({ name: 'default' }))).toBe('hermes')
+    expect(botMentionTag(row({ name: 'default' }))).toBe('stardust')
     // display_name (`stardust profile rename`) drives the tag too.
     expect(botMentionTag(row({ display_name: 'Deal Finder', name: 'scout' }))).toBe('deal-finder')
   })
@@ -144,6 +163,40 @@ describe('resolving @mentions against the roster', () => {
     expect(
       resolveRosterMentions('@hermes do it', roster, { connectionId: 'mac-mini', name: 'dixie' }).map(bot => bot.name)
     ).toEqual(['default'])
+  })
+
+  it('reaches the primary by its @stardust handle and by the legacy @hermes alias', () => {
+    const fromDixie = { connectionId: 'mac-mini', name: 'dixie' }
+
+    for (const tag of ['@stardust', '@hermes']) {
+      expect(resolveRosterMentions(`${tag} do it`, roster, fromDixie).map(bot => bot.name)).toEqual(['default'])
+    }
+
+    // Own chat: neither form is a handoff to yourself.
+    for (const tag of ['@stardust', '@hermes']) {
+      expect(resolveRosterMentions(`${tag} do it`, roster, { connectionId: 'local', name: 'default' })).toEqual([])
+    }
+  })
+
+  it('keeps a user bot literally named hermes a normal bot without taking the primary alias', () => {
+    // The backend rejects 'hermes' as a profile name, so this only exists from an older or hand-made profile.
+    const withShadow = [...roster, row({ connectionId: 'local', name: 'hermes' })]
+    const fromDixie = { connectionId: 'mac-mini', name: 'dixie' }
+
+    expect(resolveRosterMentions('@hermes do it', withShadow, fromDixie).map(bot => bot.name)).toEqual(['default'])
+    expect(resolveRosterMentions('@stardust do it', withShadow, fromDixie).map(bot => bot.name)).toEqual(['default'])
+    // It is still on the roster and in search, under its own name.
+    expect(filterBots(withShadow, {}, 'hermes').map(bot => bot.name)).toEqual(['default', 'hermes'])
+  })
+
+  it('refuses a bare name that three bots claim, however many of them there are', () => {
+    const triple = [
+      row({ connectionId: 'a', handle: 'ops-a', name: 'ops', remoteSource: true }),
+      row({ connectionId: 'b', handle: 'ops-b', name: 'ops', remoteSource: true }),
+      row({ connectionId: 'c', handle: 'ops-c', name: 'ops', remoteSource: true })
+    ]
+
+    expect(resolveRosterMentions('@ops ping', triple, { connectionId: 'local', name: 'default' })).toEqual([])
   })
 
   it('ignores tags inside code spans and fences', () => {
@@ -251,6 +304,7 @@ describe('roster search narrows without re-ranking', () => {
       'agency-ai-engineer'
     ])
     expect(filterBots(roster, meta, '@hermes').map(bot => bot.name)).toEqual(['default'])
+    expect(filterBots(roster, meta, '@stardust').map(bot => bot.name)).toEqual(['default'])
     expect(filterBots(roster, meta, 'default').map(bot => bot.name)).toEqual(['default'])
   })
 

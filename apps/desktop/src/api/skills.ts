@@ -162,12 +162,3 @@ export function uninstallSkillFromHub(name: string, profile?: ProfileScope): Pro
     body: { name }
   })
 }
-
-export function updateSkillsFromHub(profile?: ProfileScope): Promise<ActionResponse> {
-  return window.stardustDesktop.api<ActionResponse>({
-    ...capabilityScoped(profile),
-    path: '/api/skills/hub/update',
-    method: 'POST',
-    body: {}
-  })
-}

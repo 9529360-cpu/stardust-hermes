@@ -16,7 +16,6 @@ const applyConnectionConfig = vi.fn()
 const list = vi.fn()
 
 const localScope = {
-  cloudOrg: '',
   envOverride: false,
   mode: 'local',
   profile: 'work',

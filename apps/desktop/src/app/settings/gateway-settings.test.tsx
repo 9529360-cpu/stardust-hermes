@@ -56,23 +56,6 @@ afterEach(() => {
 })
 
 describe('GatewaySettings', () => {
-  // Stardust no longer ships a built-in "Hermes Cloud" (Nous Portal
-  // discovery/login) mode. A connection an older install saved under
-  // mode: 'cloud' is remote-shaped already (a gateway URL + OAuth), so
-  // Settings renders it as an ordinary Remote connection — no first-party
-  // Nous discovery/sign-in UI, and no `desktop.cloud` bridge call.
-  it('renders a saved Cloud connection as Remote, with no built-in Nous discovery UI', async () => {
-    getConnectionConfig.mockResolvedValue({ ...localConnection, mode: 'cloud', remoteUrl: 'https://a.example' })
-    registry.value = null
-    render(<GatewaySettings embedded />)
-
-    const remoteCard = (await screen.findByText('Remote gateway')).closest('button')!
-
-    expect(remoteCard.className).toContain('border-primary')
-    expect(screen.queryByText('Hermes Cloud')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Connect', exact: true })).toBeNull()
-    expect((window.stardustDesktop as any).cloud).toBeUndefined()
-  })
   it('does not offer a Cloud mode tile', async () => {
     render(<GatewaySettings embedded />)
     await screen.findByText('Local gateway')

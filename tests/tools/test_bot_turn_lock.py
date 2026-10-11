@@ -257,7 +257,7 @@ def test_local_delivery_command_never_reenters_the_lock():
 
     argv = bot_relay.local_delivery_command("ops", "/tmp/q.txt")
     assert argv[1:3] == ["-p", "ops"]
-    assert Path(argv[0]).name in ("hermes", "stardust.exe")
+    assert Path(argv[0]).name in ("stardust", "stardust.exe")
     assert "--run-delivery" not in argv
     assert not any("bot_mode_dm" in part for part in argv)
 

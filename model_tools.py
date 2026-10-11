@@ -192,7 +192,10 @@ def _run_async(coro):
                     pass
                 worker_loop.close()
 
-        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        # Daemon worker: a stdlib pool joins its workers at interpreter exit, so a
+        # coroutine the caller has given up on would hold the process open.
+        from tools.daemon_pool import DaemonThreadPoolExecutor
+        pool = DaemonThreadPoolExecutor(max_workers=1)
         # Carry profile + approval/sudo context so get_hermes_home() resolves correctly.
         from tools.thread_context import propagate_context_to_thread
         future = pool.submit(propagate_context_to_thread(_run_in_worker))

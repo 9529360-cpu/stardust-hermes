@@ -173,6 +173,16 @@ def test_cannot_message_self(tmp_path):
     assert "yourself" in result["error"]
 
 
+def test_cannot_message_self_by_the_stardust_handle(tmp_path):
+    home = _managed_home(tmp_path)
+    agent = _FakeAgent(home, title="Bot Chat")  # default profile
+    result = json.loads(
+        bot_mode_dm.message_agent_tool(target="stardust", message="hi", agent=agent)
+    )
+    assert "error" in result
+    assert "yourself" in result["error"]
+
+
 def test_empty_and_oversized_message_rejected(tmp_path):
     home = _managed_home(tmp_path)
     agent = _FakeAgent(home, title="Bot Chat")
@@ -236,7 +246,7 @@ def test_local_delivery_command_and_ack(tmp_path, monkeypatch):
     calls = _capture_spawn(monkeypatch)
     # These assertions target the -p/turn-args shape; pin the entrypoint resolution
     # so the test stays hermetic across venvs that do/don't expose a sibling script.
-    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "hermes")
+    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "stardust")
     home = _managed_home(tmp_path, teammates=("researcher",))
     agent = _FakeAgent(home, title="Bot Chat")
 
@@ -265,7 +275,7 @@ def test_local_delivery_command_and_ack(tmp_path, monkeypatch):
     mode, dm_file, transport_argv = _runner_parts(command)
     assert mode == "query-file"
     assert transport_argv == [
-        "hermes",
+        "stardust",
         "-p",
         "researcher",
         "chat",
@@ -280,11 +290,11 @@ def test_local_delivery_command_and_ack(tmp_path, monkeypatch):
     assert "PAYLOAD_SENTINEL_7A91" not in command
     assert "$(" not in command
     # the sender rides the runner argv as a stable id plus display handle
-    assert _runner_author(command) == {"id": "bot:default", "name": "hermes", "is_bot": True}
+    assert _runner_author(command) == {"id": "bot:default", "name": "stardust", "is_bot": True}
 
     # attribution prefix applied server-side; body verbatim inside the file
     content = Path(dm_file).read_text(encoding="utf-8")
-    assert content.startswith("Message from 🤖 hermes (@hermes): ")
+    assert content.startswith("Message from 🤖 stardust (@stardust): ")
     assert '$(and this is not shell)' in content
 
 
@@ -298,7 +308,7 @@ def test_peer_delivery_command_pins_registry_profile_for_secondary_bots(
     tool-side roster (read from the machine-root config) validated the
     target."""
     calls = _capture_spawn(monkeypatch)
-    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "hermes")
+    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "stardust")
     home = _managed_home(tmp_path, peers=("spark",))
     # A reviewer-profile gateway context: the agent's session db lives under
     # that profile's home, so _agent_home() resolves there while the
@@ -315,12 +325,12 @@ def test_peer_delivery_command_pins_registry_profile_for_secondary_bots(
     assert mode == "stdin"
     # The registry the tool validated against is the machine root's — the
     # default profile's home — so the CLI runs there, not in reviewer.
-    assert transport_argv == ["hermes", "-p", "default", "peer", "dm", "spark"]
+    assert transport_argv == ["stardust", "-p", "default", "peer", "dm", "spark"]
 
 
 def test_peer_delivery_command(tmp_path, monkeypatch):
     calls = _capture_spawn(monkeypatch)
-    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "hermes")
+    monkeypatch.setattr(bot_relay, "_hermes_cli", lambda: "stardust")
     monkeypatch.setattr("socket.gethostname", lambda: "eri-mac.local")
     home = _managed_home(tmp_path, peers=("spark",))
     agent = _FakeAgent(home, title="Bot Chat")
@@ -332,9 +342,10 @@ def test_peer_delivery_command(tmp_path, monkeypatch):
     assert "spark" in result["to"]
     mode, _dm_file, transport_argv = _runner_parts(calls[0]["command"])
     assert mode == "stdin"
-    assert transport_argv == ["hermes", "-p", "default", "peer", "dm", "spark/researcher"]
+    assert transport_argv == ["stardust", "-p", "default", "peer", "dm", "spark/researcher"]
     # the peer child reads the author from its env and forwards it in the request body
-    assert _runner_author(calls[0]["command"]) == {"id": "bot:eri-mac.local/default", "name": "hermes", "is_bot": True}
+    assert _runner_author(calls[0]["command"]) == {
+        "id": "bot:eri-mac.local/default", "name": "stardust", "is_bot": True}
 
     # bare peer name targets the peer's main agent
     result2 = json.loads(
@@ -343,7 +354,7 @@ def test_peer_delivery_command(tmp_path, monkeypatch):
     assert result2["status"] == "sent"
     mode, _dm_file, transport_argv = _runner_parts(calls[1]["command"])
     assert mode == "stdin"
-    assert transport_argv == ["hermes", "-p", "default", "peer", "dm", "spark"]
+    assert transport_argv == ["stardust", "-p", "default", "peer", "dm", "spark"]
 
 
 def test_delivery_pins_the_hermes_entrypoint_beside_this_interpreter(tmp_path, monkeypatch):
@@ -353,7 +364,7 @@ def test_delivery_pins_the_hermes_entrypoint_beside_this_interpreter(tmp_path, m
     Both transports must invoke the entrypoint beside this interpreter instead."""
     venv_bin = tmp_path / "venv" / ("Scripts" if sys.platform == "win32" else "bin")
     venv_bin.mkdir(parents=True)
-    hermes_entry = venv_bin / ("stardust.exe" if sys.platform == "win32" else "hermes")
+    hermes_entry = venv_bin / ("stardust.exe" if sys.platform == "win32" else "stardust")
     hermes_entry.write_text("#!/bin/sh\n", encoding="utf-8")
     monkeypatch.setattr(sys, "executable", str(venv_bin / "python3"))
 
@@ -396,7 +407,7 @@ def test_peer_delivery_author_carries_the_sender_hostname_and_local_stays_bare(t
 
 
 def test_named_profile_sender_prefix(tmp_path, monkeypatch):
-    """A named-profile bot signs with its own handle, not @hermes."""
+    """A named-profile bot signs with its own handle, not @stardust."""
     calls = _capture_spawn(monkeypatch)
     home = _managed_home(tmp_path, teammates=("researcher", "coder"))
     profile_home = home / "profiles" / "coder"
@@ -471,8 +482,8 @@ def test_live_dm_admitted_before_waiter_failure(tmp_path, monkeypatch):
     record = live.read_delivery_result(target, result["delivery_id"])
     assert record is not None
     assert record["owner"] == owner
-    assert record["message"] == "Message from 🤖 hermes (@hermes): hello"
-    assert record["author"] == {"id": "bot:default", "name": "hermes", "is_bot": True}
+    assert record["message"] == "Message from 🤖 stardust (@stardust): hello"
+    assert record["author"] == {"id": "bot:default", "name": "stardust", "is_bot": True}
     assert "notification_error" in result
 
 

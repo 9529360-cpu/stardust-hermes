@@ -113,6 +113,24 @@ _DEFAULT_FILE_RETRIES = 1
 # CI jobs by estimated total time, so no one job gets all the slow files.
 _DURATIONS_FILE = "test_durations.json"
 
+# Teardown watchdog: each per-file child loads this plugin, which writes a stack dump if the child
+# is still alive long after pytest's summary (a hang in interpreter exit). The dump never changes
+# the child's result; see scripts/teardown_watchdog/hermes_teardown_watchdog.py.
+_TEARDOWN_WATCHDOG_PLUGIN = "hermes_teardown_watchdog"
+_TEARDOWN_WATCHDOG_DIR = Path(__file__).resolve().parent / "teardown_watchdog"
+_TEARDOWN_DUMP_FILE_ENV = "STARDUST_TEST_TEARDOWN_DUMP_FILE"
+
+
+def _read_teardown_dump(path: str) -> str:
+    """Return the stack dump a child wrote to *path* (empty when it wrote none), then remove it."""
+    dump_path = Path(path)
+    try:
+        return dump_path.read_text(encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        return ""
+    finally:
+        dump_path.unlink(missing_ok=True)
+
 
 def _split_pathspec(value: str) -> List[str]:
     """Split a separator-joined path list (``--paths``/``--files``/
@@ -461,6 +479,8 @@ def _run_one_file(
 # failing assertion is only a filename, which forces another expensive full
 # run to rediscover the race.
 _FLAKY_RESULTS: List[Tuple[Path, str]] = []
+# Files whose child was still alive long after pytest's summary, with its stack dump (see above).
+_TEARDOWN_DUMPS: List[Tuple[Path, str]] = []
 _flaky_lock = threading.Lock()
 
 # Parent for per-file temp roots when there is no usable OS temp location and tempfile has
@@ -516,6 +536,18 @@ def _run_one_file_once(
     env = os.environ.copy()
     temproot, temp_env = _make_file_temproot(repo_root)
     env.update(temp_env)
+    # Load the teardown watchdog through the environment, not argv: hermes_cli.main reads `-p <profile>`
+    # from sys.argv when it is imported, so a `-p` naming the plugin would exit that import. The child
+    # also gets a file of its own for a stack dump (read back below, after the child has exited).
+    env["PYTHONPATH"] = os.pathsep.join(
+        p for p in (str(_TEARDOWN_WATCHDOG_DIR), env.get("PYTHONPATH", "")) if p
+    )
+    plugins = [p.strip() for p in env.get("PYTEST_PLUGINS", "").split(",") if p.strip()]
+    env["PYTEST_PLUGINS"] = ",".join(dict.fromkeys([*plugins, _TEARDOWN_WATCHDOG_PLUGIN]))
+    dump_fd, dump_path = tempfile.mkstemp(prefix="teardown-dump-", suffix=".txt")
+    os.close(dump_fd)
+    env[_TEARDOWN_DUMP_FILE_ENV] = dump_path
+    dump = ""
 
     subproc_start = time.monotonic()
     # Spawn + registration are one cancellation-critical section. The signal
@@ -568,10 +600,18 @@ def _run_one_file_once(
         output +=  "\n"
     finally:
         _unregister_active_process(proc)
+        # Read the child's teardown stack dump (if it hung in exit) before the attempt's files go.
+        dump = _read_teardown_dump(dump_path)
         # Delete the temp root for this attempt. Nothing reads it after the
         # subprocess exits. More than 3000 of them fill the disk of the
         # runner over one suite.
         shutil.rmtree(temproot, ignore_errors=True)
+
+    if dump:
+        # Reported with this file's output and in the end-of-run summary. Pass/fail is not affected:
+        # rc above is the child's own result (or the timeout kill), exactly as without the watchdog.
+        output += "\n--- teardown stack dump: still alive after pytest's summary ---\n" + dump
+        _TEARDOWN_DUMPS.append((file, dump))
 
     if rc == 5:
         # No tests collected in THIS file — legitimate per-file: a
@@ -1320,6 +1360,15 @@ def main() -> int:
         for f, output in _FLAKY_RESULTS:
             print(f"  {_format_file(f, repo_root)}")
             print(output.rstrip())
+
+    # Teardown dumps: a child stayed alive after pytest's summary. The file's own result is already
+    # reported above; this lists the stacks so the blocking call can be identified.
+    if _TEARDOWN_DUMPS:
+        print()
+        print(f"=== ⚠ {len(_TEARDOWN_DUMPS)} file{'s' if len(_TEARDOWN_DUMPS) != 1 else ''} still alive after pytest's summary (stack dump per file) ===")
+        for f, dump_text in _TEARDOWN_DUMPS:
+            print(f"  {_format_file(f, repo_root)}")
+            print(dump_text.rstrip())
 
     # Save durations for future runs (LPT slicing and the per-file timeout
     # scaler, see _effective_file_timeout). _save_durations merges with any

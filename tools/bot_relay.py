@@ -26,7 +26,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-from tools.bot_mode_probe import _default_home, _hermes_root
+from tools.bot_mode_probe import PRIMARY_HANDLE, PRIMARY_HANDLE_ALIASES, _default_home, _hermes_root
 from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ def _normalize_roster_row(row: Any) -> Optional[dict]:
     if not isinstance(row, dict):
         return None
     profile = str(row.get("profile") or "").strip()
-    handle = str(row.get("handle") or "").strip().lstrip("@") or ("hermes" if profile == "default" else profile)
+    handle = str(row.get("handle") or "").strip().lstrip("@") or (PRIMARY_HANDLE if profile == "default" else profile)
     connection_id = str(row.get("connection_id") or "").strip()
     if not profile or not connection_id or not all(_HANDLE_RE.match(v) for v in (handle, profile, connection_id)):
         return None
@@ -153,24 +153,48 @@ def read_remote_roster(root: Path | str) -> list[dict]:
         return []
 
 
+def _is_primary_row(row: dict) -> bool:
+    """Whether a roster row is a connection's primary profile ('default')."""
+    return row["profile"].lower() == "default"
+
+
+def _row_answers_to(row: dict, want: str) -> bool:
+    """Whether ``want`` (lower-case) names this row: its handle, its profile name, or, for the
+    primary profile, either of its names whatever handle the row carries."""
+    if want in (row["handle"].lower(), row["profile"].lower()):
+        return True
+    return _is_primary_row(row) and want in PRIMARY_HANDLE_ALIASES
+
+
 def resolve_remote_target(raw_target: str, roster: list[dict]) -> Any:
     """Matched row for a bare handle/profile (unique across connections) or
-    ``<handle|profile>@<connection-id>``; ``"ambiguous"`` for a bare form on several connections; None otherwise."""
+    ``<handle|profile>@<connection-id>``; ``"ambiguous"`` for a bare form on several connections; None otherwise.
+    The primary profile answers to both of its names (``stardust``, and the legacy ``hermes``); when a
+    connection's primary matches, a user profile of the same name does not take the target."""
     want, at, conn = (p.strip() for p in str(raw_target or "").strip().lstrip("@").partition("@"))
     if not want or (at and not conn):
         return None
-    matches = [row for row in roster if want.lower() in (row["handle"].lower(), row["profile"].lower())
-               and (not conn or row["connection_id"].lower() == conn.lower())]
+    want = want.lower()
+    matches = [row for row in roster
+               if (not conn or row["connection_id"].lower() == conn.lower()) and _row_answers_to(row, want)]
+    if want in PRIMARY_HANDLE_ALIASES:
+        matches = [row for row in matches if _is_primary_row(row)] or matches
     if not matches:
         return None
     return matches[0] if len(matches) == 1 else "ambiguous"
 
 
+def _display_handle(row: dict) -> str:
+    """The handle a teammate is shown by: the primary profile's legacy alias reads as PRIMARY_HANDLE."""
+    handle = row["handle"]
+    return PRIMARY_HANDLE if _is_primary_row(row) and handle.lower() in PRIMARY_HANDLE_ALIASES else handle
+
+
 def remote_target_forms(roster: list[dict]) -> list[str]:
     """Target strings: bare handle when unique across connections, else
     ``handle@connection`` (mirrors ``resolve_remote_target``)."""
-    handles = [row["handle"].lower() for row in roster]
-    return [f"{row['handle']}@{row['connection_id']}" if handles.count(h) > 1 else row["handle"]
+    handles = [_display_handle(row).lower() for row in roster]
+    return [f"{_display_handle(row)}@{row['connection_id']}" if handles.count(h) > 1 else _display_handle(row)
             for row, h in zip(roster, handles)]
 
 
@@ -354,18 +378,18 @@ def waiter_command(root: Path | str, envelope: dict) -> str:
 
 
 def _hermes_cli() -> str:
-    """hermes CLI beside this interpreter, then ``shutil.which``, then the bare name
-    (service contexts lack PATH, so a bare "hermes" died with ENOENT).
+    """stardust CLI beside this interpreter, then ``shutil.which``, then the bare name
+    (service contexts lack PATH, so a bare "stardust" died with ENOENT).
 
     The deliver RPC runs on the target gateway, whose process is the venv python — its bin/Scripts directory
-    holds the matching ``hermes`` entrypoint. A bare ``"hermes"`` relies on PATH, which is exactly what
+    holds the matching ``stardust`` entrypoint. A bare ``"stardust"`` relies on PATH, which is exactly what
     service contexts (systemd units, desktop launchers, non-login SSH shells) do not provide, so delivery
     died with ENOENT there (#93590). When no sibling exists (e.g. running from a source tree without an
     installed script), a ``shutil.which`` lookup runs next — it honors whatever PATH the process does have —
     before falling back to the bare name, preserving today's behavior for interactive shells.
     """
-    sibling = Path(sys.executable or "").parent / ("hermes.exe" if sys.platform == "win32" else "hermes")
-    return str(sibling) if sibling.is_file() else shutil.which("hermes") or "hermes"
+    sibling = Path(sys.executable or "").parent / ("stardust.exe" if sys.platform == "win32" else "stardust")
+    return str(sibling) if sibling.is_file() else shutil.which("stardust") or "stardust"
 
 
 def local_delivery_command(profile: str, query_file: str) -> list[str]:

@@ -45,7 +45,6 @@ export function connectionMatchesQuery(
     connection.host,
     connection.user,
     connection.port == null ? null : String(connection.port),
-    connection.org,
     connection.remoteProfile,
     ...aliases
   ]

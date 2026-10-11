@@ -300,6 +300,26 @@ test('locateHermes falls back to the login-shell command -v probe', async () => 
   assert.equal(await locateHermes(ssh, ''), '/home/u/.local/bin/stardust')
 })
 
+test('locateHermes names the Stardust installer when no hermes is installed on the remote', async () => {
+  const ssh = fakeSsh([])
+
+  await assert.rejects(
+    () => locateHermes(ssh, ''),
+    (err: any) => {
+      assert.equal(err.kind, 'hermes-not-found')
+      assert.ok(
+        err.message.includes(
+          'curl -fsSL https://raw.githubusercontent.com/9529360-cpu/stardust-hermes/main/scripts/install-stardust.sh | bash'
+        ),
+        err.message
+      )
+      assert.ok(!err.message.includes('hermes-agent.nousresearch.com'), err.message)
+
+      return true
+    }
+  )
+})
+
 test('locateHermes preserves an installer wrapper instead of resolving its interpreter', async () => {
   // install.sh venv mode writes: exec "$STARDUST_BIN" "$STARDUST_ENTRYPOINT" "$@",
   // where $STARDUST_BIN is the venv python. The old canonicalization returned

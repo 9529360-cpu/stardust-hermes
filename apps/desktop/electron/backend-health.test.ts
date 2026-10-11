@@ -7,10 +7,8 @@ import {
   isAuthRejectionError,
   isGatedMissingHealthError,
   isMissingHealthEndpointError,
-  isNousCloudAgentUrl,
   isReauthRequiredError,
   isServerSideHttpError,
-  makeNousCloudBackendDownError,
   makeUnsignedOauthError,
   waitForHermesReady
 } from './backend-health'
@@ -410,58 +408,7 @@ test('isServerSideHttpError detects 502/503/504', () => {
   assert.equal(isServerSideHttpError('503: something'), null) // not an Error
 })
 
-test('isNousCloudAgentUrl detects cloud agent hosts', () => {
-  // Positive cases
-  assert.equal(isNousCloudAgentUrl('https://ares-3009.agents.nousresearch.com'), true)
-  assert.equal(isNousCloudAgentUrl('https://ares-3009.agents.nousresearch.com/api/health'), true)
-  assert.equal(isNousCloudAgentUrl('http://test.agents.nousresearch.com'), true)
-
-  // Negative cases
-  assert.equal(isNousCloudAgentUrl('http://127.0.0.1:9000'), false)
-  assert.equal(isNousCloudAgentUrl('https://gateway.example.com'), false)
-  assert.equal(isNousCloudAgentUrl('https://nousresearch.com'), false)
-  assert.equal(isNousCloudAgentUrl('not-a-url'), false)
-})
-
-test('waitForHermesReady surfaces actionable error for cloud agent 503', async () => {
-  let attempts = 0
-  const currentTime = { value: 0 }
-
-  try {
-    await waitForHermesReady('https://ares-3009.agents.nousresearch.com', {
-      fetchPublicJson: async () => {
-        attempts++
-        // Always return 503
-        throw new Error('503: Service Unavailable')
-      },
-      fetchJson: async () => {
-        throw new Error('503: Service Unavailable')
-      },
-      sleep: async () => {},
-      // Advance the mock clock per poll — a frozen now() never crosses the
-      // deadline and the readiness loop spins forever (hung the whole vitest
-      // electron project for 20m in CI).
-      now: () => {
-        currentTime.value += 20
-
-        return currentTime.value
-      },
-      timeoutMs: 100,
-      pollMs: 1
-    })
-    assert.fail('should have thrown')
-  } catch (error: any) {
-    assert.ok(error.message.includes('Nous Cloud agent'), `unexpected message: ${error.message}`)
-    assert.ok(error.message.includes('503'), `should mention status code: ${error.message}`)
-    assert.ok(error.message.includes('portal.nousresearch.com'), `should mention portal: ${error.message}`)
-    assert.ok(error.message.includes('discord.gg/NousResearch'), `should mention Discord: ${error.message}`)
-    assert.equal(error.isCloudBackendDown, true)
-    assert.equal(error.statusCode, 503)
-    assert.ok(attempts > 1, 'should have retried before failing')
-  }
-})
-
-test('waitForHermesReady does not cloud-wrap non-cloud 503 errors', async () => {
+test('waitForHermesReady reports the generic not-ready error for a 503', async () => {
   const currentTime = { value: 0 }
 
   try {
@@ -484,9 +431,8 @@ test('waitForHermesReady does not cloud-wrap non-cloud 503 errors', async () => 
     })
     assert.fail('should have thrown')
   } catch (error: any) {
-    // Non-cloud URLs get the generic message
+    // A 503 from any backend gets the generic message
     assert.ok(error.message.includes('did not become ready'), `unexpected message: ${error.message}`)
-    assert.equal(error.isCloudBackendDown, undefined)
   }
 })
 
@@ -523,39 +469,4 @@ test('isServerSideHttpError structured path excludes 500/401/403/404/429 even wh
     err.statusCode = code
     assert.equal(isServerSideHttpError(err), null, `should reject statusCode ${code}`)
   }
-})
-
-test('makeNousCloudBackendDownError produces the Cloud shape and preserves cause', () => {
-  const err = new Error('upstream unavailable') as any
-  err.statusCode = 503
-  const result = makeNousCloudBackendDownError('https://ares-3009.agents.nousresearch.com', err)
-  assert.ok(result)
-  assert.equal((result as any).isCloudBackendDown, true)
-  assert.equal((result as any).statusCode, 503)
-  assert.equal((result as any).cause, err)
-  assert.ok(result?.message.includes('Nous Cloud agent ares-3009.agents.nousresearch.com is down'))
-})
-
-test('makeNousCloudBackendDownError returns null for a Cloud 401 (routes to reauth)', () => {
-  const err = new Error('Unauthorized') as any
-  err.statusCode = 401
-  assert.equal(makeNousCloudBackendDownError('https://ares-3009.agents.nousresearch.com', err), null)
-})
-
-test('makeNousCloudBackendDownError returns null for a non-Cloud 503 (generic remote failure)', () => {
-  const err = new Error('Service Unavailable') as any
-  err.statusCode = 503
-  assert.equal(makeNousCloudBackendDownError('https://gateway.example.com', err), null)
-  assert.equal(makeNousCloudBackendDownError('http://127.0.0.1:9000', err), null)
-})
-
-test('makeNousCloudBackendDownError preserves legacy string-prefix compatibility', () => {
-  const result = makeNousCloudBackendDownError(
-    'https://ares-3009.agents.nousresearch.com',
-    new Error('503: Service Unavailable')
-  )
-
-  assert.ok(result)
-  assert.equal((result as any).isCloudBackendDown, true)
-  assert.equal((result as any).statusCode, 503)
 })

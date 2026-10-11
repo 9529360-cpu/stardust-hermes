@@ -981,25 +981,67 @@ function mergeMultiSourceRoster(
   }
 }
 
-/** The @handle users tag a bot with. Multi-source rosters precompute the
- *  handle (bare name, or name-device when the profile exists on several
- *  registered sources) — prefer it when present. The primary profile's
- *  callable alias is 'hermes' — the mention middleware resolves it back to
- *  'default' — so the word 'default' never surfaces in the UI. */
+/** The primary profile ('default' on the backend) presents as Stardust: its handle is @stardust. */
+const PRIMARY_HANDLE = 'stardust'
+
+/** The primary profile's pre-rename handle. Chats and saved group rooms still type it, so it keeps
+ *  resolving to the primary. */
+const LEGACY_PRIMARY_HANDLE = 'hermes'
+
+/** The bare forms that always name the primary profile. */
+export const PRIMARY_ALIASES: readonly string[] = [PRIMARY_HANDLE, LEGACY_PRIMARY_HANDLE]
+
+function isPrimaryProfileName(name: null | string | undefined): boolean {
+  return (
+    String(name || '')
+      .trim()
+      .toLowerCase() === 'default'
+  )
+}
+
+/** Whether a row or member answers to the primary aliases. Only the primary profile under its bare
+ *  handle does: a device-qualified 'default-vera' is another machine's primary, and no other profile
+ *  takes an alias, even one literally named hermes. */
+export function claimsPrimaryAlias(bot: null | undefined | { handle?: null | string; name?: null | string }): boolean {
+  if (!isPrimaryProfileName(bot?.name)) {
+    return false
+  }
+
+  const handle = String(bot?.handle || '')
+    .trim()
+    .toLowerCase()
+
+  return !handle || handle === 'default' || PRIMARY_ALIASES.includes(handle)
+}
+
+/** The @handle users tag a bot with. Multi-source rosters precompute the handle (bare name, or
+ *  name-device when the profile exists on several registered sources) — prefer it when present.
+ *  The primary profile is @stardust, so the word 'default' never surfaces in the UI; a legacy
+ *  'hermes' stored on the primary (a room saved before the rename) presents as @stardust too. */
 export function botHandle(name: string, bot?: Partial<RosterRow> | null): string {
-  if (bot?.handle && bot.handle !== name) {
+  const primary = isPrimaryProfileName(name)
+
+  if (bot?.handle && bot.handle !== name && !(primary && bot.handle === LEGACY_PRIMARY_HANDLE)) {
     return bot.handle
   }
 
-  return (name || '').trim().toLowerCase() === 'default' ? 'hermes' : name
+  return primary ? PRIMARY_HANDLE : name
 }
 
-/** Taggable @-forms derived from a bot's friendly names — the core profile
- *  display name (`stardust profile rename`) and the Bot Mode title. Free text
- *  reduces to the mention charset two ways: slugified ("Research Buddy" →
- *  research-buddy, the form autocomplete inserts) and collapsed
- *  (researchbuddy). Reserved tokens are dropped so a bot renamed "Hermes"
- *  can never hijack the primary profile's @hermes alias. */
+/** The handle message_agent and the relay roster hand the backend. The backend resolves the primary
+ *  only by its legacy alias, so the primary keeps that form on this path until the backend also
+ *  resolves PRIMARY_HANDLE. */
+export function agentTargetHandle(name: string, bot?: Partial<RosterRow> | null): string {
+  const handle = botHandle(name, bot)
+
+  return isPrimaryProfileName(name) && handle === PRIMARY_HANDLE ? LEGACY_PRIMARY_HANDLE : handle
+}
+
+/** Taggable @-forms derived from a bot's friendly names — the core profile display name
+ *  (`stardust profile rename`) and the Bot Mode title. Free text reduces to the mention charset two
+ *  ways: slugified ("Research Buddy" → research-buddy, the form autocomplete inserts) and collapsed
+ *  (researchbuddy). Reserved tokens are dropped so a bot renamed "Stardust" or "Hermes" can never
+ *  take the primary profile's handle or its legacy alias. */
 export function mentionNameForms(value: null | string | undefined): string[] {
   const name = String(value || '')
     .trim()
@@ -1013,7 +1055,8 @@ export function mentionNameForms(value: null | string | undefined): string[] {
   const collapsed = name.replace(/[^a-z0-9_-]+/g, '')
 
   return [...new Set([slug, collapsed])].filter(
-    form => /^[a-z0-9][a-z0-9_-]*$/.test(form) && !['all', 'everyone', 'user', 'default', 'hermes'].includes(form)
+    form =>
+      /^[a-z0-9][a-z0-9_-]*$/.test(form) && !['all', 'everyone', 'user', 'default', 'hermes', 'stardust'].includes(form)
   )
 }
 
@@ -1138,9 +1181,20 @@ export function newBotChat(bot: RosterRow) {
   })
 }
 
+/** Records that `bot` answers to `form`. A form two bots claim is ambiguous: it stays null, and no
+ *  later claimant revives it. */
+function claimMentionForm(byForm: Map<string, RosterRow | null>, form: string, bot: RosterRow) {
+  if (!byForm.has(form)) {
+    byForm.set(form, bot)
+  } else if (byForm.get(form) !== bot) {
+    byForm.set(form, null)
+  }
+}
+
 /** Resolve @handles in prose against the Bot Mode roster (local + Connections).
  *  Skips the bot already speaking in this chat. Unique bare names match;
- *  duplicate names require the @name-device handle. */
+ *  duplicate names require the @name-device handle. The primary aliases
+ *  @stardust and @hermes always name the primary profile. */
 export function resolveRosterMentions(
   text: null | string | undefined,
   roster: RosterRow[] | null | undefined,
@@ -1176,21 +1230,18 @@ export function resolveRosterMentions(
       }
     }
 
+    // The primary aliases name the primary profile alone: only it claims them.
+    const claimsAlias = claimsPrimaryAlias(bot)
+
+    if (claimsAlias) {
+      for (const alias of PRIMARY_ALIASES) {
+        forms.add(alias)
+      }
+    }
+
     for (const form of forms) {
-      if (!form) {
-        continue
-      }
-
-      const existing = byForm.get(form)
-
-      if (existing && existing !== bot) {
-        byForm.set(form, null)
-
-        continue
-      }
-
-      if (!existing) {
-        byForm.set(form, bot)
+      if (form && (claimsAlias || !PRIMARY_ALIASES.includes(form))) {
+        claimMentionForm(byForm, form, bot)
       }
     }
   }
@@ -1199,13 +1250,7 @@ export function resolveRosterMentions(
   const seen = new Set<string>()
 
   for (const match of prose.matchAll(/(^|\s)@([a-z0-9][a-z0-9_-]*)/gi)) {
-    let token = match[2].toLowerCase()
-
-    if (token === 'hermes') {
-      token = byForm.has('hermes') ? 'hermes' : token
-    }
-
-    const bot = byForm.get(token)
+    const bot = byForm.get(match[2].toLowerCase())
 
     if (!bot) {
       continue
@@ -1418,10 +1463,13 @@ export function filterBots(roster: RosterRow[], metaByName: Record<string, BotMe
     const role = `${meta?.description || ''} ${bot.description || ''}`.toLowerCase()
     const preview = String(botActivitySession(bot)?.preview || '').toLowerCase()
 
+    // The primary also answers to its legacy alias, so searching @hermes still finds it.
+    const handles = claimsPrimaryAlias(bot) ? [handle, ...PRIMARY_ALIASES] : [handle]
+
     return (
       display.includes(needle) ||
       profile.includes(needle) ||
-      handle.includes(needle) ||
+      handles.some(form => form.includes(needle)) ||
       sourceLabel.includes(needle) ||
       role.includes(needle) ||
       preview.includes(needle)

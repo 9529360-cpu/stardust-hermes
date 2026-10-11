@@ -8,11 +8,8 @@ describe('resolveRemoteOauthTicket', () => {
   it('reserves a larger bounded roster dial budget only for OAuth remote sources', () => {
     const defaultBudget = rosterSourceEnumerationTimeoutMs({ kind: 'local' })
 
-    for (const kind of ['remote', 'cloud']) {
-      expect(rosterSourceEnumerationTimeoutMs({ kind, authMode: 'oauth' })).toBeGreaterThan(defaultBudget)
-      expect(rosterSourceEnumerationTimeoutMs({ kind, authMode: 'token' })).toBe(defaultBudget)
-    }
-
+    expect(rosterSourceEnumerationTimeoutMs({ kind: 'remote', authMode: 'oauth' })).toBeGreaterThan(defaultBudget)
+    expect(rosterSourceEnumerationTimeoutMs({ kind: 'remote', authMode: 'token' })).toBe(defaultBudget)
     expect(rosterSourceEnumerationTimeoutMs({ kind: 'ssh', authMode: 'oauth' })).toBe(defaultBudget)
     expect(rosterSourceEnumerationTimeoutMs({ kind: 'remote', authMode: 'oauth' })).toBeLessThanOrEqual(30_000)
     expect(defaultBudget).toBeGreaterThan(0)
@@ -38,7 +35,7 @@ describe('resolveRemoteOauthTicket', () => {
   })
 
   it('classifies only confirmed auth rejection as reauth and retains the pre-mint session copy', async () => {
-    for (const baseUrl of ['https://gateway.example.com', 'https://lab.agents.nousresearch.com']) {
+    for (const baseUrl of ['https://gateway.example.com']) {
       for (const hadNativeSession of [false, true]) {
         for (const statusCode of [401, 403, 500, 502, 503, 504, undefined]) {
           let nativeSession = hadNativeSession
@@ -54,7 +51,7 @@ describe('resolveRemoteOauthTicket', () => {
                 throw cause
               }
             }
-          ).catch((failure: Error & { isCloudBackendDown?: boolean; statusCode?: number }) => failure)
+          ).catch((failure: Error & { statusCode?: number }) => failure)
 
           expect(error).toBeInstanceOf(Error)
 
@@ -66,10 +63,6 @@ describe('resolveRemoteOauthTicket', () => {
           expect(error.statusCode).toBe(statusCode)
           const authRejected = statusCode === 401 || statusCode === 403
           expect(isReauthRequiredError(error)).toBe(authRejected)
-          expect(error.isCloudBackendDown === true).toBe(
-            baseUrl.includes('.agents.nousresearch.com') && [502, 503, 504].includes(statusCode ?? 0)
-          )
-
           if (authRejected) {
             expect(error.message).toBe(oauthTicketFailureAuthMessage(hadNativeSession))
           }
