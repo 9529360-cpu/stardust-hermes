@@ -4656,14 +4656,37 @@ export const en: Translations = {
         runningTool: action => `Running ${action.toLowerCase()}`
       },
       cron: {
+        actionOnly: action => `Cron ${action.toLowerCase()}`,
+        actions: {
+          create: 'Create',
+          update: 'Update',
+          pause: 'Pause',
+          resume: 'Resume',
+          remove: 'Remove',
+          run: 'Run',
+          list: 'List',
+          refresh: 'Refresh',
+          manage: 'Manage'
+        },
+        delivery: 'Delivery',
+        deliveryAll: 'All connected channels',
+        deliveryCurrentChat: 'Current chat',
+        deliverySaveOnly: 'Save only',
+        jobCount: count => `${count} cron job${count === 1 ? '' : 's'}`,
+        nextRun: 'Next run',
+        nextRuns: 'Next runs',
+        noJobs: 'No cron jobs',
+        noJobsScheduled: 'No cron jobs scheduled',
+        notSaved: 'Not saved',
         preview: 'Cron job preview',
         previewWithSchedule: schedule => `Cron job preview · ${schedule}`,
         previousSchedule: 'Previous schedule',
-        nextRuns: 'Next runs',
-        delivery: 'Delivery',
-        deliveryCurrentChat: 'Current chat',
-        deliverySaveOnly: 'Save only',
-        notSaved: 'Not saved'
+        repeat: 'Repeat',
+        repeatForever: 'forever',
+        repeatOnce: 'once',
+        repeatTimes: times => `${times} times`,
+        schedule: 'Schedule',
+        untitledJob: 'job'
       },
       titles: {
         browser_click: { done: 'Clicked page element', pending: 'Clicking page element', pendingAction: 'Clicking' },

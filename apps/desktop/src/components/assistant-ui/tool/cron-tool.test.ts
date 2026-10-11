@@ -152,7 +152,7 @@ describe('cron real result', () => {
 
     expect(view.subtitle).toBe("Cron job 'Morning digest' created.")
     expect(view.detail).toContain('Schedule: every day 09:00')
-    expect(view.detail).toContain('Delivery: origin')
+    expect(view.detail).toContain('Delivery: Current chat')
     expect(view.detail).not.toContain('Not saved')
   })
 })
@@ -171,5 +171,161 @@ describe('cron preview copy per locale', () => {
     COPY_KEYS.forEach((key, index) => {
       expect(translated[index], key).not.toBe(english[index])
     })
+  })
+})
+
+// The backend's English sentence for a routine that saves its output locally (the desktop default).
+const LOCAL_RETURN =
+  'This job saves its output locally and its non-silent completion will return to the Desktop/TUI conversation that created it as a durable background result.'
+
+const savedJob = {
+  job_id: 'job_1',
+  name: 'Morning digest',
+  schedule: 'every day 09:00',
+  repeat: 'forever',
+  deliver: 'origin',
+  next_run_at: '2026-10-12T09:00:00+08:00',
+  state: 'scheduled',
+  enabled: true
+}
+
+describe('cron result in Chinese', () => {
+  it('shows a saved routine in Chinese: the title and labelled rows, with no English left', () => {
+    setRuntimeI18nLocale('zh')
+
+    const view = buildToolView(
+      part({
+        args: { action: 'create', name: 'Morning digest' },
+        result: { ...realCreate, message: `Cron job 'Morning digest' created. ${LOCAL_RETURN}` }
+      }),
+      ''
+    )
+
+    expect(view.title).toBe('定时任务')
+    expect(view.detail).toContain('排程: every day 09:00')
+    expect(view.detail).toContain('重复: 永久')
+    expect(view.detail).toContain('投递: 当前对话')
+    expect(view.detail).toContain('下次运行: ')
+    expect(view.detail).not.toMatch(/Schedule:|Repeat:|Delivery:|Next run:|forever|origin/)
+  })
+
+  it('shows a removed routine and a refreshed one with the same Chinese labels', () => {
+    setRuntimeI18nLocale('zh')
+
+    const removed = buildToolView(
+      part({
+        args: { action: 'remove', job_id: 'job_1' },
+        result: {
+          success: true,
+          message: "Cron job 'Morning digest' removed.",
+          removed_job: { id: 'job_1', name: 'Morning digest', schedule: 'every day 09:00' }
+        }
+      }),
+      ''
+    )
+
+    expect(removed.title).toBe('定时任务')
+    expect(removed.detail).toBe('排程: every day 09:00')
+
+    const refreshed = buildToolView(
+      part({
+        args: { action: 'resnap', job_id: 'job_1' },
+        result: { success: true, message: 'Cron job refreshed.', job: savedJob }
+      }),
+      ''
+    )
+
+    expect(refreshed.detail).toContain('排程: every day 09:00')
+    expect(refreshed.detail).toContain('投递: 当前对话')
+    expect(refreshed.detail).not.toMatch(/Schedule|Delivery/)
+  })
+
+  it('shows the empty states of a list in Chinese', () => {
+    setRuntimeI18nLocale('zh')
+
+    const list = (jobs: unknown[]) =>
+      buildToolView(part({ args: { action: 'list' }, result: { success: true, count: jobs.length, jobs } }), '')
+
+    expect(list([savedJob, { ...savedJob, job_id: 'job_2', name: 'Weekly' }]).subtitle).toBe('2 个定时任务')
+    expect(list([savedJob]).detail).toBe('- Morning digest · every day 09:00')
+    expect(list([]).subtitle).toBe('没有定时任务')
+    expect(list([]).detail).toBe('没有已安排的定时任务')
+  })
+
+  it('names the action and reads the nested job for an update in Chinese', () => {
+    setRuntimeI18nLocale('zh')
+
+    const view = buildToolView(
+      part({ args: { action: 'update', job_id: 'job_1' }, result: { success: true, job: savedJob } }),
+      ''
+    )
+
+    expect(view.subtitle).toBe('更新 Morning digest')
+    expect(view.detail).toContain('排程: every day 09:00')
+    expect(view.detail).toContain('投递: 当前对话')
+    expect(view.detail).not.toMatch(/Success|Enabled|State|Job/)
+  })
+
+  it('reads the nested job for a pause in English too, with no raw JSON key as a label', () => {
+    const view = buildToolView(
+      part({ args: { action: 'pause', job_id: 'job_1' }, result: { success: true, job: savedJob } }),
+      ''
+    )
+
+    expect(view.subtitle).toBe('Pause Morning digest')
+    expect(view.detail).toContain('Schedule: every day 09:00')
+    expect(view.detail).toContain('Delivery: Current chat')
+    expect(view.detail).not.toMatch(/Success|Enabled|State|Job/)
+  })
+})
+
+// Every string the cron card reads, with sample arguments for the ones that take them.
+const CRON_COPY: readonly { args?: unknown[]; key: string }[] = [
+  { args: ['Pause'], key: 'assistant.tool.cron.actionOnly' },
+  { key: 'assistant.tool.cron.actions.create' },
+  { key: 'assistant.tool.cron.actions.update' },
+  { key: 'assistant.tool.cron.actions.pause' },
+  { key: 'assistant.tool.cron.actions.resume' },
+  { key: 'assistant.tool.cron.actions.remove' },
+  { key: 'assistant.tool.cron.actions.run' },
+  { key: 'assistant.tool.cron.actions.list' },
+  { key: 'assistant.tool.cron.actions.refresh' },
+  { key: 'assistant.tool.cron.actions.manage' },
+  { key: 'assistant.tool.cron.deliveryAll' },
+  { args: [2], key: 'assistant.tool.cron.jobCount' },
+  { key: 'assistant.tool.cron.nextRun' },
+  { key: 'assistant.tool.cron.noJobs' },
+  { key: 'assistant.tool.cron.noJobsScheduled' },
+  { key: 'assistant.tool.cron.repeat' },
+  { key: 'assistant.tool.cron.repeatForever' },
+  { key: 'assistant.tool.cron.repeatOnce' },
+  { args: [3], key: 'assistant.tool.cron.repeatTimes' },
+  { key: 'assistant.tool.cron.schedule' },
+  { key: 'assistant.tool.cron.untitledJob' },
+  { key: 'assistant.tool.titles.cronjob.done' },
+  { key: 'assistant.tool.titles.cronjob.pending' },
+  { key: 'assistant.tool.titles.cronjob.pendingAction' }
+]
+
+describe('cron copy in every locale', () => {
+  it.each(['zh', 'zh-hant', 'ja', 'ru', 'ar'] as const)('translates every cron string for %s', locale => {
+    for (const { args = [], key } of CRON_COPY) {
+      setRuntimeI18nLocale('en')
+      const english = translateNow(key, ...args)
+
+      setRuntimeI18nLocale(locale)
+      const translated = translateNow(key, ...args)
+
+      expect(translated, key).not.toBe(key)
+      expect(translated, key).not.toBe(english)
+    }
+  })
+
+  it.each(['zh', 'zh-hant'] as const)('writes every cron string in Chinese for %s', locale => {
+    setRuntimeI18nLocale(locale)
+
+    for (const { args = [], key } of CRON_COPY) {
+      expect(translateNow(key, ...args), key).toMatch(/[一-鿿]/)
+    }
   })
 })

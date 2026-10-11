@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { setRuntimeI18nLocale } from '@/i18n'
 import { fmtDayTime } from '@/lib/time'
 
 vi.mock('@assistant-ui/react', async importOriginal => ({
@@ -29,11 +30,11 @@ const dryRunCreate = {
   message: 'Preview only, nothing was saved.'
 }
 
-function renderCronRow(result: unknown) {
+function renderCronRow(result: unknown, toolCallId = 'call-cron') {
   const props = {
     args: { action: 'create', name: 'Morning digest', schedule: 'every day 09:00' },
     result,
-    toolCallId: 'call-cron',
+    toolCallId,
     toolName: 'cronjob_manage'
   } as unknown as ComponentProps<typeof ToolFallback>
 
@@ -79,5 +80,59 @@ describe('cron tool card', () => {
 
     expect(screen.getByText('Cron job')).toBeTruthy()
     expect(container.textContent).not.toContain('preview')
+  })
+})
+
+// A saved routine from the desktop: the backend's own result, including the sentence it
+// writes when the routine saves its output locally (the desktop default).
+const SAVED_ROUTINE = {
+  success: true,
+  job_id: 'job_2',
+  name: '晨间摘要',
+  skill: null,
+  skills: [],
+  schedule: '0 9 * * *',
+  repeat: 'forever',
+  deliver: 'origin',
+  next_run_at: '2026-10-12T09:00:00+08:00',
+  job: {
+    job_id: 'job_2',
+    name: '晨间摘要',
+    schedule: '0 9 * * *',
+    repeat: 'forever',
+    deliver: 'origin',
+    next_run_at: '2026-10-12T09:00:00+08:00',
+    enabled: true,
+    state: 'scheduled'
+  },
+  message:
+    "Cron job '晨间摘要' created. This job saves its output locally and its non-silent completion will return to the Desktop/TUI conversation that created it as a durable background result."
+}
+
+describe('cron tool card in Chinese', () => {
+  afterEach(() => {
+    setRuntimeI18nLocale('en')
+  })
+
+  it('shows a saved routine with no English label left', () => {
+    setRuntimeI18nLocale('zh')
+
+    // Own tool-call id: disclosure state is keyed by it and outlives each test.
+    const { container } = renderCronRow(SAVED_ROUTINE, 'call-cron-zh')
+    const row = container.querySelector('[data-slot="tool-block"]') as HTMLElement
+
+    fireEvent.click(within(row).getByText('定时任务'))
+
+    expect(row.textContent).toContain('定时任务')
+    expect(row.textContent).toContain('排程: 0 9 * * *')
+    expect(row.textContent).toContain('重复: 永久')
+    expect(row.textContent).toContain('投递: 当前对话')
+    // The next-run value follows the OS locale (a separate, disclosed follow-up), so the
+    // labelled fields before it must hold no English. The next-run label itself must be Chinese.
+    expect(row.textContent).toContain('下次运行: ')
+
+    const fields = (row.textContent ?? '').split(' · 下次运行')[0]
+
+    expect(fields).not.toMatch(/[A-Za-z]/)
   })
 })
