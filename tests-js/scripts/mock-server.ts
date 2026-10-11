@@ -52,6 +52,8 @@ verificationWritePath?: string
  * handle's `path` to let the test decide when the process exits.
  */
 backgroundReleasePath?: string
+/** Scripts for the desktop auto-show E2E, keyed by the name in `E2E_AUTO_SHOW(<name>)`. */
+autoShowScripts?: Record<string, ScriptedTurn[]>
 }
 
 export interface MockServer {
@@ -89,6 +91,8 @@ export interface ScriptedTurn {
     name: string
     args: Record<string, unknown>
   }>
+  /** Prefix for this turn's tool-call ids. Defaults to the script index. */
+  callIdPrefix?: string
 }
 
 export const WORK_PROGRESS_TRIGGER = 'E2E_WORK_PROGRESS_TRIGGER'
@@ -499,6 +503,39 @@ function includesBlockingClarifyTrigger(value: unknown): boolean {
 }
 
 /**
+ * Auto-show E2E scripts. A user message containing `E2E_AUTO_SHOW(<name>)` runs
+ * `autoShowScripts[<name>]`. The step is the number of assistant replies since
+ * that message, so each such message starts its script again and no counter is
+ * shared between tests. Ids carry the message position, so they stay unique.
+ */
+const AUTO_SHOW_TRIGGER = /E2E_AUTO_SHOW\(([a-z0-9-]+)\)/
+
+function autoShowTurnFor(messages: any[], scripts: Record<string, ScriptedTurn[]>): ScriptedTurn | null {
+  let start = -1
+  let name = ''
+
+  messages.forEach((message, index) => {
+    const match =
+      message?.role === 'user' && typeof message.content === 'string' ? AUTO_SHOW_TRIGGER.exec(message.content) : null
+
+    if (match) {
+      start = index
+      name = match[1]
+    }
+  })
+
+  const script = start < 0 ? undefined : scripts[name]
+
+  if (!script?.length) {
+    return null
+  }
+
+  const step = messages.slice(start + 1).filter(message => message?.role === 'assistant').length
+
+  return { ...(script[step] ?? script[script.length - 1]), callIdPrefix: `call_auto_${start}_${step}` }
+}
+
+/**
  * Start the mock server on an ephemeral port.
  *
  * @returns a handle with `port`, `url`, received user prompts, and `close()`.
@@ -628,6 +665,28 @@ export function startMockServer(options: MockServerOptions = {}): Promise<MockSe
           const isCorrectionSwitchTrigger = messages.some(
             message => typeof message?.content === 'string' && message.content.includes(CORRECTION_SWITCH_TRIGGER),
           )
+
+          const autoShowTurn = options.autoShowScripts ? autoShowTurnFor(messages, options.autoShowScripts) : null
+
+          if (autoShowTurn) {
+            const respond = () => {
+              if (stream) {
+                streamScriptedTurn(res, model, autoShowTurn)
+              } else {
+                nonStreamingScriptedTurn(res, model, autoShowTurn)
+              }
+            }
+
+            if (holdThisCompletion) {
+              heldCompletionCount++
+              resolveHeldStreamStarted?.()
+              void heldStreamReleased.then(respond)
+            } else {
+              respond()
+            }
+
+            return
+          }
 
           if (isTaskPanelResumeTrigger) {
             const turn =
@@ -988,6 +1047,11 @@ function nonStreamingTextResponse(res: ServerResponse, model: string, text: stri
   )
 }
 
+/** Tool-call id for a scripted turn. Read when the chunk is written, as the ids always were. */
+function scriptedCallId(turn: ScriptedTurn, idx: number): string {
+  return `${turn.callIdPrefix ?? `call_e2e_${_scriptIndex}`}_${idx}`
+}
+
 /**
  * Stream a single scripted turn: first the text content (word by word),
  * then a chunk carrying the tool_calls (if any), with the appropriate
@@ -1018,7 +1082,7 @@ function streamScriptedTurn(
         sseChunk(model, {
           tool_calls: turn.toolCalls!.map((tc, idx) => ({
             index: idx,
-            id: `call_e2e_${_scriptIndex}_${idx}`,
+            id: scriptedCallId(turn, idx),
             type: 'function',
             function: { name: tc.name, arguments: JSON.stringify(tc.args) },
           })),
@@ -1046,7 +1110,7 @@ function streamScriptedTurn(
           sseChunk(model, {
             tool_calls: turn.toolCalls!.map((tc, idx) => ({
               index: idx,
-              id: `call_e2e_${_scriptIndex}_${idx}`,
+              id: scriptedCallId(turn, idx),
               type: 'function',
               function: { name: tc.name, arguments: JSON.stringify(tc.args) },
             })),
@@ -1088,7 +1152,7 @@ function nonStreamingScriptedTurn(
 
   if (hasToolCalls) {
     message.tool_calls = turn.toolCalls!.map((tc, idx) => ({
-      id: `call_e2e_${_scriptIndex}_${idx}`,
+      id: scriptedCallId(turn, idx),
       type: 'function',
       function: { name: tc.name, arguments: JSON.stringify(tc.args) },
     }))
