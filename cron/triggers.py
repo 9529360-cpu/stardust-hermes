@@ -248,8 +248,9 @@ def normalize_trigger(raw: Any) -> Optional[Dict[str, Any]]:
 
 
 def list_watch_folder(watch_dir: str, pattern: str) -> List[Dict[str, Any]]:
-    """Metadata of the regular files in ``watch_dir`` that match ``pattern``. File contents are never
-    opened. Raises OSError when the folder itself cannot be listed."""
+    """Metadata of the regular files in ``watch_dir`` that match ``pattern``: size, modified time and
+    change time (the creation time on Windows, the inode change time on POSIX). File contents are
+    never opened. Raises OSError when the folder itself cannot be listed."""
     entries: List[Dict[str, Any]] = []
     with os.scandir(watch_dir) as listing:
         for entry in listing:
@@ -265,6 +266,7 @@ def list_watch_folder(watch_dir: str, pattern: str) -> List[Dict[str, Any]]:
                 "name": entry.name,
                 "size": int(stat.st_size),
                 "mtime": float(stat.st_mtime),
+                "ctime": float(stat.st_ctime),
                 "path": os.path.join(watch_dir, entry.name),
             })
     return entries
@@ -275,21 +277,36 @@ def poll_due(state: Dict[str, Any], poll_seconds: int, now: float) -> bool:
     return last is None or now - float(last) >= poll_seconds
 
 
+def arrival_time(entry: Dict[str, Any]) -> float:
+    """When a listed file arrived in its folder: the later of its modified time and its change time.
+
+    A copy, or a move from another volume, makes a new file. Its change time (the creation time on
+    Windows) is then the arrival, even when the copy keeps the source's old modified time, as Explorer
+    does."""
+    return max(float(entry["mtime"]), float(entry["ctime"]))
+
+
 def observe_folder(
     state: Dict[str, Any], entries: List[Dict[str, Any]], now: float,
 ) -> List[Dict[str, Any]]:
     """Advance one folder watch by one poll and return the entries that just became new.
 
-    ``state`` holds ``floor`` (files modified before it are old), ``seen`` (``[name, size, mtime]``
-    for files already handled, oldest first, capped at SEEN_CAP) and ``pending`` (files whose size
-    is still changing). A file is new when its (name, size) pair is not in ``seen`` and it was
-    modified at or after the floor. It is returned once its size has stayed the same for
-    STABLE_POLLS consecutive polls, so a file still being written is not picked up early.
+    ``state`` holds ``floor`` (files that arrived at or before it are old), ``seen``
+    (``[name, size, arrival]`` for files already handled, oldest first, capped at SEEN_CAP) and
+    ``pending`` (files whose size is still changing). A file is new when its (name, size) pair is
+    not in ``seen`` and it arrived after the floor (see ``arrival_time``). It is returned once its
+    size has stayed the same for STABLE_POLLS consecutive polls, so a file still being written is
+    not picked up early.
 
-    When an entry is evicted from ``seen``, the floor rises to that entry's mtime (never past
-    ``now``). An evicted file therefore cannot look new again, even in a folder that holds more
-    files than SEEN_CAP. The cost is that a file moved in with an mtime older than the floor is
-    not treated as new.
+    Limits of the arrival rule. On NTFS a file renamed within the same volume keeps its old creation
+    time, so it still needs a new modified time to count. On POSIX the change time also moves on a
+    rename or a chmod, so an old file that is moved in or touched can count. The seen set stops a
+    repeat while the file is remembered, and the hourly budget bounds the runs either way.
+
+    When an entry is evicted from ``seen``, the floor rises to that entry's arrival (never past
+    ``now``). An evicted file therefore cannot look new again from the time it arrived, even in a
+    folder that holds more files than SEEN_CAP. A later metadata change on POSIX is the one way back,
+    as noted above.
     """
     seen: List[List[Any]] = state.setdefault("seen", [])
     pending: Dict[str, Dict[str, Any]] = state.setdefault("pending", {})
@@ -297,10 +314,10 @@ def observe_folder(
     seen_keys = {(name, size) for name, size, _ in seen}
     present = set()
     ready: List[Dict[str, Any]] = []
-    for entry in sorted(entries, key=lambda item: (item["mtime"], item["name"])):
-        name, size, mtime = entry["name"], entry["size"], entry["mtime"]
+    for entry in sorted(entries, key=lambda item: (arrival_time(item), item["name"])):
+        name, size, arrival = entry["name"], entry["size"], arrival_time(entry)
         present.add(name)
-        if (name, size) in seen_keys or mtime <= floor:
+        if (name, size) in seen_keys or arrival <= floor:
             pending.pop(name, None)
             continue
         current = pending.get(name)
@@ -314,11 +331,11 @@ def observe_folder(
             continue
         pending.pop(name, None)
         ready.append(entry)
-        seen.append([name, size, mtime])
+        seen.append([name, size, arrival])
         seen_keys.add((name, size))
         while len(seen) > SEEN_CAP:
-            _, _, evicted_mtime = seen.pop(0)
-            floor = max(floor, min(float(evicted_mtime), float(now)))
+            _, _, evicted_arrival = seen.pop(0)
+            floor = max(floor, min(float(evicted_arrival), float(now)))
     for name in [key for key in pending if key not in present]:
         pending.pop(name, None)
     state["floor"] = floor
