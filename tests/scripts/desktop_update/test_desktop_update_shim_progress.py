@@ -134,7 +134,7 @@ def _run_handoff(tmp_path, exits: dict[int, int]) -> list[dict]:
     """Run the real hand-off end to end; return the stage seen at each call."""
     install_root = tmp_path / "hermes-agent"
     (install_root / "venv" / "bin").mkdir(parents=True)
-    hermes = install_root / "venv" / "bin" / "hermes"
+    hermes = install_root / "venv" / "bin" / "stardust"
     hermes.write_text(FAKE_HERMES)
     hermes.chmod(0o755)
 

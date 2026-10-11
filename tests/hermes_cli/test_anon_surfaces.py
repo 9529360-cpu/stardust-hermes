@@ -194,7 +194,7 @@ def test_no_chat_copy_of_any_sign_in_state_leaks_a_terminal_verb_or_a_forbidden_
         "detail": "private detail",
     }
     forbidden = re.compile(r"claim|nous portal|anonymous|guest", re.IGNORECASE)
-    terminal_or_url = re.compile(r"hermes |https?://", re.IGNORECASE)
+    terminal_or_url = re.compile(r"(?:stardust|hermes) |https?://", re.IGNORECASE)
 
     for state_type in anon_auth.SignInState.__subclasses__():
         kwargs = {field.name: placeholders[field.name] for field in dataclasses.fields(state_type)}
@@ -205,14 +205,14 @@ def test_no_chat_copy_of_any_sign_in_state_leaks_a_terminal_verb_or_a_forbidden_
 
 
 def test_terminal_only_strings_keep_the_terminal_verb(monkeypatch, capsys):
-    assert "hermes " in nous_account.FREE_TIER_NEEDS_ACCOUNT
-    assert "hermes " in anon_auth.UPGRADE_UNAVAILABLE
-    assert "hermes " in anon_auth.FREE_TIER_NOT_SIGNED_IN
+    assert "stardust " in nous_account.FREE_TIER_NEEDS_ACCOUNT
+    assert "stardust " in anon_auth.UPGRADE_UNAVAILABLE
+    assert "stardust " in anon_auth.FREE_TIER_NOT_SIGNED_IN
 
     monkeypatch.setattr("hermes_cli.auth.get_provider_auth_state", lambda _provider: {"access_token": "token"})
     monkeypatch.setattr("hermes_cli.model_switch_providers._free_tier_nous_row", lambda _provider: None)
     model_setup_flows._model_flow_nous({})
-    assert "hermes " in capsys.readouterr().out
+    assert "stardust " in capsys.readouterr().out
 
 
 def test_the_paid_tool_notice_switches_wording_inside_a_chat():

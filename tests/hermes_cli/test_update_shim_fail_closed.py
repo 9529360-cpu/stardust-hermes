@@ -28,7 +28,7 @@ import hermes_cli._install_repair as ir
 import hermes_cli.update_cmd as update_cmd
 
 
-def _make_shims(scripts_dir: Path, names=("hermes", "hermes-gateway")) -> list[Path]:
+def _make_shims(scripts_dir: Path, names=("stardust", "hermes-gateway")) -> list[Path]:
     scripts_dir.mkdir(parents=True, exist_ok=True)
     shims = []
     for name in names:
@@ -85,7 +85,7 @@ def test_strict_quarantine_refuses_before_install(windows, tmp_path, monkeypatch
 
 def test_non_strict_keeps_warn_and_try(windows, tmp_path, monkeypatch):
     scripts = tmp_path / "venv" / "Scripts"
-    shims = _make_shims(scripts, names=("hermes",))
+    shims = _make_shims(scripts, names=("stardust",))
     monkeypatch.setattr(
         Path, "rename",
         mock.Mock(side_effect=PermissionError(13, "held open")),
@@ -149,7 +149,7 @@ def test_update_sync_installs_are_strict(windows, tmp_path, monkeypatch):
 def test_recovery_install_cmd_fail_closed(windows, tmp_path, monkeypatch):
     root = tmp_path
     scripts = root / "venv" / "Scripts"
-    _make_shims(scripts, names=("hermes",))
+    _make_shims(scripts, names=("stardust",))
 
     monkeypatch.setattr(ir, "_venv_scripts_dir", lambda r: scripts)
     monkeypatch.setattr(
@@ -170,7 +170,7 @@ def test_recovery_install_cmd_fail_closed(windows, tmp_path, monkeypatch):
 def test_recovery_install_cmd_ok_when_uncontended(windows, tmp_path, monkeypatch):
     root = tmp_path
     scripts = root / "venv" / "Scripts"
-    _make_shims(scripts, names=("hermes",))
+    _make_shims(scripts, names=("stardust",))
     monkeypatch.setattr(ir, "_venv_scripts_dir", lambda r: scripts)
 
     run_calls = []

@@ -11,7 +11,7 @@ def test_windows_native_install_path_docs_match_installer() -> None:
     # the checkout (which `stardust update`'s autostash swept off disk).
     assert "%LOCALAPPDATA%\\stardust\\bin" in doc
     assert (
-        "Get-Command hermes        # should print "
+        "Get-Command stardust        # should print "
         "C:\\Users\\<you>\\AppData\\Local\\stardust\\bin\\stardust.exe"
     ) in doc
     # Installer exposes $HermesHome\bin, and must copy the launchers into it.

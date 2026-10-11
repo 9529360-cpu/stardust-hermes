@@ -48,7 +48,7 @@ class TestGetHermesHome:
                     if local_appdata
                     else Path.home() / "AppData" / "Local"
                 )
-                assert home == base / "hermes"
+                assert home == base / "stardust"
             else:
                 assert home == Path.home() / ".stardust"
 
@@ -1507,10 +1507,10 @@ class TestEnvWriteDenylist:
         ("key", "expected"),
         [
             ("Path", "PATH"),
-            ("Hermes_Yolo_Mode", "STARDUST_YOLO_MODE"),
-            ("Hermes_Optional_Mcps", "STARDUST_OPTIONAL_MCPS"),
-            ("Hermes_Copilot_Acp_Command", "STARDUST_COPILOT_ACP_COMMAND"),
-            ("Hermes_Copilot_Acp_Args", "STARDUST_COPILOT_ACP_ARGS"),
+            ("Stardust_Yolo_Mode", "STARDUST_YOLO_MODE"),
+            ("Stardust_Optional_Mcps", "STARDUST_OPTIONAL_MCPS"),
+            ("Stardust_Copilot_Acp_Command", "STARDUST_COPILOT_ACP_COMMAND"),
+            ("Stardust_Copilot_Acp_Args", "STARDUST_COPILOT_ACP_ARGS"),
         ],
     )
     def test_windows_policy_names_are_case_insensitive(self, key, expected):
@@ -1535,10 +1535,10 @@ class TestEnvWriteDenylist:
     @pytest.mark.parametrize(
         "protected_key",
         [
-            "Hermes_Yolo_Mode",
-            "Hermes_Optional_Mcps",
-            "Hermes_Copilot_Acp_Command",
-            "Hermes_Copilot_Acp_Args",
+            "Stardust_Yolo_Mode",
+            "Stardust_Optional_Mcps",
+            "Stardust_Copilot_Acp_Command",
+            "Stardust_Copilot_Acp_Args",
         ],
     )
     def test_windows_writer_rejects_mixed_case_protected_name(self, protected_key):

@@ -835,7 +835,7 @@ class TestCmdlineCapture:
              patch("subprocess.run", side_effect=fake_run):
             argv = main_dashboard._dashboard_cmdline_for_pid(888)
 
-        assert argv == ["hermes", "serve", "--port", "8300"]
+        assert argv == ["stardust", "serve", "--port", "8300"]
 
     @pytest.mark.windows_only
     def test_returns_none_on_windows(self):

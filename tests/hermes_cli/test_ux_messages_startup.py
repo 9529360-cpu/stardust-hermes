@@ -53,7 +53,7 @@ def test_nested_group_typo_names_the_group_and_suggests():
 
 def test_non_choice_errors_keep_argparse_usage_line():
     text = _parse_error(["--no-such-flag"])
-    assert text.startswith("usage: hermes")
+    assert text.startswith("usage: stardust")
     assert "--no-such-flag" in text
 
 

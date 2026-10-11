@@ -26,6 +26,8 @@ describe('known install failures', () => {
     expect(matchKnownFailure(base)?.id).toBe('windows-launcher-self-lock')
     expect(matchKnownFailure({ ...base, logs: { update: lockedLog.replaceAll('stardust.exe', 'other.exe') } })).toBeNull()
     expect(matchKnownFailure({ ...base, logs: { update: lockedLog.replace('(os error 5)', '(os error 32)') } })).toBeNull()
+    // Released builds from before the rename logged the launcher as hermes.exe; the same self-lock still matches.
+    expect(matchKnownFailure({ ...base, logs: { update: lockedLog.replaceAll('stardust.exe', 'hermes.exe') } })?.id).toBe('windows-launcher-self-lock')
   })
 
   it.each([

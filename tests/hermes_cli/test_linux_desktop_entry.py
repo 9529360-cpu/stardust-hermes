@@ -44,7 +44,7 @@ def _png_ihdr(width: int, height: int) -> bytes:
 
 
 def _stub_install(tmp_path, monkeypatch) -> None:
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir(exist_ok=True)
     hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
@@ -66,7 +66,7 @@ def test_install_writes_entry_with_absolute_exec_and_icon(
     tmp_path, xdg_home, monkeypatch
 ):
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir()
     hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
@@ -101,7 +101,7 @@ def test_install_prefers_themed_icon_from_hicolor(tmp_path, xdg_home, monkeypatc
     fixed for).
     """
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir()
     hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
@@ -127,7 +127,7 @@ def test_install_icon_copy_failure_falls_back_to_absolute(
 ):
     """An impossible icon copy keeps the absolute path (never breaks)."""
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir()
     hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(
@@ -186,7 +186,7 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
     import sys
 
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir()
     hermes_bin.write_text(
         "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
@@ -208,7 +208,7 @@ def test_exec_prefixes_interpreter_for_env_shebang_python_script(
 
 def test_exec_leaves_shell_wrapper_launchers_alone(tmp_path, xdg_home, monkeypatch):
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir()
     hermes_bin.write_text(
         '#!/bin/bash\nexec /opt/hermes/venv/bin/python "$@"\n', encoding="utf-8"
@@ -230,7 +230,7 @@ def test_exec_leaves_venv_shebang_scripts_alone(tmp_path, xdg_home, monkeypatch)
     import sys
 
     root = _make_project(tmp_path)
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir()
     interpreter = os.path.abspath(sys.executable)
     hermes_bin.write_text(f"#!{interpreter}\nimport hermes_cli\n", encoding="utf-8")
@@ -276,7 +276,7 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
         "#!/usr/bin/env python3\nimport hermes_cli\n", encoding="utf-8"
     )
     repo_script.chmod(0o755)
-    wrapper = tmp_path / "installed" / "bin" / "hermes"
+    wrapper = tmp_path / "installed" / "bin" / "stardust"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text(f'#!/bin/bash\nexec {sys.executable} "$@"\n', encoding="utf-8")
     wrapper.chmod(0o755)
@@ -284,7 +284,7 @@ def test_exec_converges_from_repo_script_argv0_to_installed_wrapper(
     # argv[0] = repo script; PATH lookup finds the installed wrapper.
     _argv0_context(monkeypatch, str(repo_script))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
+        "shutil.which", lambda name: str(wrapper) if name == "stardust" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -304,7 +304,7 @@ def test_exec_never_persists_a_bare_interpreter_command(
     import sys
 
     root = _make_project(tmp_path)
-    wrapper = tmp_path / "installed" / "bin" / "hermes"
+    wrapper = tmp_path / "installed" / "bin" / "stardust"
     wrapper.parent.mkdir(parents=True)
     wrapper.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
     wrapper.chmod(0o755)
@@ -317,7 +317,7 @@ def test_exec_never_persists_a_bare_interpreter_command(
     # argv[0] IS the interpreter (python -m context); PATH has the wrapper.
     _argv0_context(monkeypatch, str(interpreter))
     monkeypatch.setattr(
-        "shutil.which", lambda name: str(wrapper) if name == "hermes" else None
+        "shutil.which", lambda name: str(wrapper) if name == "stardust" else None
     )
     monkeypatch.setattr(lde, "refresh_desktop_databases", lambda _dir: [])
 
@@ -396,7 +396,7 @@ def test_exec_uses_known_wrapper_when_path_lookup_misses(
     # Realistic installer shim: execs this checkout's venv python on the
     # checkout's hermes script (the aidiyet check requires it to target
     # the writing checkout).
-    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "known-home" / ".local" / "bin" / "stardust"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
         f'#!/bin/bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
@@ -439,7 +439,7 @@ def test_exec_finds_known_wrapper_when_resolver_has_no_candidate(
     """
     root = _make_project(tmp_path)
 
-    known_wrapper = tmp_path / "cold-home" / ".local" / "bin" / "hermes"
+    known_wrapper = tmp_path / "cold-home" / ".local" / "bin" / "stardust"
     known_wrapper.parent.mkdir(parents=True)
     known_wrapper.write_text(
         f'#!/bin/bash\nexec {root / "venv" / "bin" / "python"} {root / "hermes"} "$@"\n',
@@ -492,7 +492,7 @@ def test_exec_rejects_known_wrapper_from_another_checkout(
     # A shim belonging to a DIFFERENT checkout.
     other_root = tmp_path / "other-install"
     other_root.mkdir()
-    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "hermes"
+    foreign_wrapper = tmp_path / "known-home" / ".local" / "bin" / "stardust"
     foreign_wrapper.parent.mkdir(parents=True)
     foreign_wrapper.write_text(
         f"#!/bin/bash\nexec {other_root / 'venv' / 'bin' / 'python'} "
@@ -853,7 +853,7 @@ def test_wrapper_ownership_accepts_shim_via_symlinked_home(tmp_path, monkeypatch
     lexical_checkout = home_link / "hermes-agent"
     (home_real / "hermes-agent").mkdir()
 
-    shim = home_link / ".local" / "bin" / "hermes"
+    shim = home_link / ".local" / "bin" / "stardust"
     shim.parent.mkdir(parents=True)
     shim.write_text(
         f"#!/bin/bash\n"
@@ -891,7 +891,7 @@ def test_needs_interpreter_case_insensitive_match(tmp_path, monkeypatch):
     interpreter = venv_bin / "python"
     interpreter.write_text("", encoding="utf-8")
 
-    console_script = venv_bin / "hermes"
+    console_script = venv_bin / "stardust"
     console_script.write_text(f"#!{interpreter}\nimport hermes_cli\n", encoding="utf-8")
     monkeypatch.setattr(lde.sys, "executable", str(interpreter))
 
@@ -977,7 +977,7 @@ def test_probe_skips_wrapper_with_escaping_python_shebang(
     repo_script.chmod(0o755)
 
     # A wrapper that targets this checkout but cannot run itself.
-    broken_wrapper = xdg_home / ".local" / "bin" / "hermes"
+    broken_wrapper = xdg_home / ".local" / "bin" / "stardust"
     broken_wrapper.parent.mkdir(parents=True)
     broken_wrapper.write_text(
         f"#!/usr/bin/env python3\n# launcher for {root}\nimport hermes_cli\n",
@@ -1010,7 +1010,7 @@ def test_probe_accepts_shell_launcher_wrapper(tmp_path, xdg_home, monkeypatch):
     )
     repo_script.chmod(0o755)
 
-    good_wrapper = xdg_home / ".local" / "bin" / "hermes"
+    good_wrapper = xdg_home / ".local" / "bin" / "stardust"
     good_wrapper.parent.mkdir(parents=True)
     good_wrapper.write_text(
         f"#!/bin/bash\nexec {root / 'venv' / 'bin' / 'python'} "
@@ -1042,7 +1042,7 @@ def test_install_icon_handles_truncated_png_header(tmp_path, xdg_home, monkeypat
     icon.write_bytes(
         b"\x89PNG\r\n\x1a\n\x00\x00\x00\x0dIHDR\x00\x00"  # 22 bytes
     )
-    hermes_bin = tmp_path / "bin" / "hermes"
+    hermes_bin = tmp_path / "bin" / "stardust"
     hermes_bin.parent.mkdir()
     hermes_bin.write_text("", encoding="utf-8")
     monkeypatch.setattr(

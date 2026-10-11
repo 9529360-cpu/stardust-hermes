@@ -152,9 +152,9 @@ def test_serve_relaunch_commands_built_from_structured_identity(monkeypatch):
         _ledger_entry(pid=7000, purpose="dashboard", host="0.0.0.0", port=9300),
     ]
     cmds = update_cmd._serve_relaunch_commands(entries)
-    assert ["hermes", "serve", "--host", "100.94.65.93", "--port", "9119"] in cmds
-    assert ["hermes", "--profile", "work", "serve", "--port", "9200"] in cmds
-    assert ["hermes", "dashboard", "--host", "0.0.0.0", "--port", "9300"] in cmds
+    assert ["stardust", "serve", "--host", "100.94.65.93", "--port", "9119"] in cmds
+    assert ["stardust", "--profile", "work", "serve", "--port", "9200"] in cmds
+    assert ["stardust", "dashboard", "--host", "0.0.0.0", "--port", "9300"] in cmds
     assert len(cmds) == 3  # the port-less entry is skipped
 
 

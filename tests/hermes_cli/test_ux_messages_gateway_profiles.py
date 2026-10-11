@@ -86,7 +86,7 @@ def test_invalid_profile_name_explains_rule_in_words_with_example():
     assert "Must match" not in msg and "[a-z0-9]" not in msg
     assert "lowercase" in msg
     assert "my-work" in msg
-    assert "hermes profile create my-work" in msg
+    assert "stardust profile create my-work" in msg
 
 
 def test_existing_profile_error_offers_use_and_list(tmp_path, monkeypatch):
