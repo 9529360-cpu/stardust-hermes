@@ -3375,6 +3375,7 @@ export const zh = defineLocale({
       home: '主页',
       autoDiscovered: '自动发现',
       newButton: '新建项目',
+      emptyTitle: '暂无项目',
       createTitle: '新建项目',
       createDesc: '为工作区命名并添加一个或多个文件夹。',
       renameTitle: '重命名项目',
@@ -4244,10 +4245,12 @@ export const zh = defineLocale({
       smart: '智能',
       smartDescription: '自动评估操作，并在需要时询问',
       off: '关闭',
-      offDescription: '不显示审批提示，直接运行'
+      offDescription: '不显示审批提示，直接运行',
+      unknown: '未知'
     },
     statusbar: {
       unknown: '未知',
+      reading: '读取中',
       restart: '重启',
       update: '更新',
       updateInProgress: '正在更新',

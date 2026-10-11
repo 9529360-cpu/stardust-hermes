@@ -946,6 +946,7 @@ export function CronView({
               searchPlaceholder={c.search}
               searchValue={query}
             >
+              <PanelAddButton label={c.newCron} labeled onClick={() => setEditor({ mode: 'create' })} />
               {runningRuns.length > 0 && (
                 <>
                   <PanelSectionLabel className="px-2">{c.recentRuns.runningTitle}</PanelSectionLabel>
@@ -986,7 +987,6 @@ export function CronView({
                   {query.trim() ? c.emptyTitleSearch : c.emptyTitleNew}
                 </p>
               )}
-              <PanelAddButton label={c.newCron} onClick={() => setEditor({ mode: 'create' })} />
               {finishedRuns.length === 0 && visibleJobs.length > 0 && (
                 <>
                   <PanelSectionLabel className="mt-3 px-2">{c.recentRuns.recentTitle}</PanelSectionLabel>

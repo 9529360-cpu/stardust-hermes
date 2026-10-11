@@ -17,9 +17,8 @@ test('the bottom usage entry opens without restoring the retired right overview'
   const page = fixture!.page
   const statusbar = page.locator('[data-slot="statusbar"]')
   await expect(statusbar).toBeVisible()
-  await statusbar.locator('[data-statusbar-item="context-usage"]').click()
-  await expect(page.locator('[data-slot="session-token-usage"]')).toBeVisible()
-  await page.keyboard.press('Escape')
+  // A fresh draft has no usage to report, so the bottom entry is not rendered until a turn has run (below).
+  await expect(statusbar.locator('[data-statusbar-item="context-usage"]')).toHaveCount(0)
 
   const toggle = page.locator('[data-tour="right-pane-toggle"]')
   await toggle.click()

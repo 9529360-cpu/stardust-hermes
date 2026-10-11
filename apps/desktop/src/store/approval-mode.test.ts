@@ -13,8 +13,8 @@ import {
 describe('profile-scoped approval mode cache', () => {
   beforeEach(() => $approvalModes.set({}))
 
-  it('labels an unread profile Smart by default and adopts backend truth', async () => {
-    expect(approvalModeForProfile('default')).toBe('smart')
+  it('has no mode for an unread profile, so no default can be shown for it', async () => {
+    expect(approvalModeForProfile('default')).toBeUndefined()
 
     const request = vi.fn(async () => ({ value: 'manual' }))
     await syncApprovalModeForProfile(request, 'default')
@@ -35,7 +35,60 @@ describe('profile-scoped approval mode cache', () => {
 
     expect(approvalModeForProfile('work')).toBe('manual')
     expect(approvalModeForProfile('personal')).toBe('off')
-    expect(approvalModeForProfile('default')).toBe('smart')
+    expect(approvalModeForProfile('default')).toBeUndefined()
+  })
+
+  it('reads a profile whose first load failed as unknown rather than a default', async () => {
+    const request = vi.fn(async () => {
+      throw new Error('gateway unavailable')
+    })
+
+    await expect(syncApprovalModeForProfile(request, 'first-load-fails')).rejects.toThrow('gateway unavailable')
+    expect(approvalModeForProfile('first-load-fails')).toBe('unknown')
+  })
+
+  it('keeps the last confirmed mode when a later read fails', async () => {
+    await syncApprovalModeForProfile(
+      vi.fn(async () => ({ value: 'off' })),
+      'default'
+    )
+
+    await expect(
+      syncApprovalModeForProfile(
+        vi.fn(async () => {
+          throw new Error('request timed out')
+        }),
+        'default'
+      )
+    ).rejects.toThrow('request timed out')
+
+    expect(approvalModeForProfile('default')).toBe('off')
+  })
+
+  it('does not read a response without a recognizable mode as manual', async () => {
+    await expect(syncApprovalModeForProfile(vi.fn(async () => ({})), 'no-mode-read')).rejects.toThrow()
+
+    expect(approvalModeForProfile('no-mode-read')).toBe('unknown')
+  })
+
+  it('shows unknown, not a default, when the first write fails before anything is confirmed', async () => {
+    await expect(
+      setApprovalModeForProfile(
+        vi.fn(async () => {
+          throw new Error('write refused')
+        }),
+        'first-write-fails',
+        'off'
+      )
+    ).rejects.toThrow('write refused')
+
+    expect(approvalModeForProfile('first-write-fails')).toBe('unknown')
+  })
+
+  it('keeps the mode the user chose when the write response carries no mode', async () => {
+    await expect(setApprovalModeForProfile(vi.fn(async () => ({})), 'echo-less-write', 'off')).resolves.toBe('off')
+
+    expect(approvalModeForProfile('echo-less-write')).toBe('off')
   })
 
   it('rolls consecutive failed writes back to the last authoritative value', async () => {

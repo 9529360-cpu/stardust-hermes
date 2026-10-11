@@ -13,23 +13,31 @@ import { Shield, ShieldOff } from '@/lib/icons'
 import {
   $approvalModes,
   type ApprovalMode,
+  type ApprovalModeReading,
   type ApprovalModeRequester,
   setApprovalModeForProfile,
   syncApprovalModeForProfile
 } from '@/store/approval-mode'
 
-export function useApprovalModeStatusbarItem(profile: string, requestGateway: ApprovalModeRequester): StatusbarItem {
+/** The approvals item. It reads the same mode wherever the status bar shows: a profile's
+ *  mode is read once the gateway is open, shown as a reading label until then, and shown as
+ *  unknown when the read fails. It never shows a default mode the user did not set. */
+export function useApprovalModeStatusbarItem(
+  profile: string,
+  requestGateway: ApprovalModeRequester,
+  gatewayOpen: boolean
+): StatusbarItem {
   const { t } = useI18n()
   const copy = t.shell.approvalMode
   // The bar names the subject, then shows the mode beside it, the way the gateway
   // item does. A bare mode name such as "Off" reads as an action, not a state.
   const subject = t.shell.statusbar.toggleApprovalMode
   const modes = useStore($approvalModes)
-  const mode = modes[profile.trim() || 'default'] ?? 'smart'
+  const reading: ApprovalModeReading | undefined = modes[profile.trim() || 'default']
 
-  const labels = useMemo<Record<ApprovalMode, string>>(
-    () => ({ manual: copy.manual, smart: copy.smart, off: copy.off }),
-    [copy.manual, copy.off, copy.smart]
+  const labels = useMemo<Record<ApprovalModeReading, string>>(
+    () => ({ manual: copy.manual, smart: copy.smart, off: copy.off, unknown: copy.unknown }),
+    [copy.manual, copy.off, copy.smart, copy.unknown]
   )
 
   const descriptions = useMemo<Record<ApprovalMode, string>>(
@@ -41,14 +49,22 @@ export function useApprovalModeStatusbarItem(profile: string, requestGateway: Ap
     [copy.manualDescription, copy.offDescription, copy.smartDescription]
   )
 
+  // Reads wait for the gateway: a read sent while it connects fails and would leave
+  // the item unknown until the next profile switch.
   useEffect(() => {
+    if (!gatewayOpen) {
+      return
+    }
+
     void syncApprovalModeForProfile(requestGateway, profile).catch(() => undefined)
-  }, [profile, requestGateway])
+  }, [gatewayOpen, profile, requestGateway])
+
+  const detail = reading === undefined ? t.shell.statusbar.reading : labels[reading]
 
   return {
-    className: mode === 'off' ? 'bg-(--chrome-action-hover) text-foreground' : undefined,
-    detail: labels[mode],
-    icon: mode === 'off' ? <ShieldOff className="size-3.5" /> : <Shield className="size-3.5 opacity-70" />,
+    className: reading === 'off' ? 'bg-(--chrome-action-hover) text-foreground' : undefined,
+    detail,
+    icon: reading === 'off' ? <ShieldOff className="size-3.5" /> : <Shield className="size-3.5 opacity-70" />,
     id: 'approval-mode',
     label: subject,
     menuAlign: 'end',
@@ -61,7 +77,7 @@ export function useApprovalModeStatusbarItem(profile: string, requestGateway: Ap
           onValueChange={value => {
             void setApprovalModeForProfile(requestGateway, profile, value as ApprovalMode).catch(() => undefined)
           }}
-          value={mode}
+          value={reading === 'unknown' || reading === undefined ? '' : reading}
         >
           {(['manual', 'smart', 'off'] as const).map(value => (
             <DropdownMenuRadioItem className="items-start gap-2" key={value} value={value}>
@@ -74,7 +90,7 @@ export function useApprovalModeStatusbarItem(profile: string, requestGateway: Ap
         </DropdownMenuRadioGroup>
       </>
     ),
-    title: copy.ariaLabel(labels[mode]),
+    title: copy.ariaLabel(detail),
     variant: 'menu'
   }
 }

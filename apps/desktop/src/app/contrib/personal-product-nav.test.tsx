@@ -8,7 +8,14 @@ import { $layoutTree, noteActiveTreeGroup, revealTreePane } from '@/components/p
 import { I18nProvider } from '@/i18n'
 import { $sidebarGrouping, dismissNarrowSidebar, setSidebarAgentsGrouped } from '@/store/layout'
 import { $newChatProfile } from '@/store/profile'
-import { $projectScope, $projectTree, ALL_PROJECTS, deleteProject, fetchProjectSessions } from '@/store/projects'
+import {
+  $projectScope,
+  $projectsRpcAvailable,
+  $projectTree,
+  ALL_PROJECTS,
+  deleteProject,
+  fetchProjectSessions
+} from '@/store/projects'
 import { $currentCwd } from '@/store/session'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -47,6 +54,7 @@ afterEach(() => {
   vi.mocked(fetchProjectSessions).mockResolvedValue(null)
   $newChatProfile.set(null)
   $projectTree.set([])
+  $projectsRpcAvailable.set(null)
   $projectScope.set(ALL_PROJECTS)
   $currentCwd.set('')
   setSidebarAgentsGrouped(false)
@@ -254,6 +262,28 @@ describe('PersonalProductNav', () => {
     fireEvent.click(conversation)
     expect(onResumeSession).toHaveBeenCalledWith('chat-1', session)
     expect($sidebarGrouping.get()).not.toBe('project')
+  })
+
+  it('says there are no projects, above the new-project control, once the tree has been read', () => {
+    $projectTree.set([])
+    $projectsRpcAvailable.set(true)
+    renderNav('chat')
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+
+    const empty = screen.getByText('暂无项目')
+    const create = screen.getByRole('button', { name: /新建项目/ })
+    expect(empty.compareDocumentPosition(create) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('does not claim there are no projects before the tree has been read', () => {
+    $projectTree.set([])
+    renderNav('chat')
+
+    fireEvent.click(screen.getByRole('button', { name: '项目' }))
+
+    expect(screen.queryByText('暂无项目')).toBeNull()
+    expect(screen.getByRole('button', { name: /新建项目/ })).toBeTruthy()
   })
 
   it('marks exactly the page that owns the current route', () => {
