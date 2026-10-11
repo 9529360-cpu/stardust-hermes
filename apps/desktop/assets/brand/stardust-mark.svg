@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
+  <title>Stardust</title>
+  <defs>
+    <linearGradient id="stardust-tile" gradientUnits="userSpaceOnUse" x1="6.4" y1="-4.5" x2="57.6" y2="68.5">
+      <stop offset="0" stop-color="#6f8cff"/>
+      <stop offset="0.54" stop-color="#7d62ef"/>
+      <stop offset="1" stop-color="#263f8f"/>
+    </linearGradient>
+    <radialGradient id="stardust-glow" gradientUnits="userSpaceOnUse" cx="19.2" cy="12.8" r="23">
+      <stop offset="0" stop-color="#74d3ff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#74d3ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="stardust-halo" gradientUnits="userSpaceOnUse" cx="32" cy="32" r="24">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#stardust-tile)"/>
+  <rect width="64" height="64" rx="14" fill="url(#stardust-glow)"/>
+  <circle cx="32" cy="32" r="24" fill="url(#stardust-halo)"/>
+  <path fill="#ffffff" d="M32 11Q33 31 53 32Q33 33 32 53Q31 33 11 32Q31 31 32 11Z"/>
+  <path fill="#ffffff" fill-opacity="0.78" d="M50 9Q50.3 14.7 56 15Q50.3 15.3 50 21Q49.7 15.3 44 15Q49.7 14.7 50 9Z"/>
+</svg>
