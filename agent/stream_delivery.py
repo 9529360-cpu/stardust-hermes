@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 from agent.memory_manager import sanitize_context
 from agent.message_content import flatten_message_text
 from agent.redact import redact_sensitive_text
+from agent.reasoning_timing import answer_event_stamp, event_stamped, reasoning_event_stamp
 
 # Same logger name as the origin module so log records / caplog filters are unchanged.
 logger = logging.getLogger("run_agent")
@@ -310,7 +311,8 @@ class StreamDeliveryMixin:
                 text = text.lstrip("\n")
         if not text:
             return
-        delivered = self._deliver_to_stream_callbacks(text)
+        with event_stamped(answer_event_stamp(self)):
+            delivered = self._deliver_to_stream_callbacks(text)
         self._enqueue_stream_hook("on_stream_delta", delta=text, kind="text")
         if delivered:
             self._record_streamed_assistant_text(text)
@@ -322,7 +324,8 @@ class StreamDeliveryMixin:
             # content deltas.
             self._note_dropped_stream_writer("_fire_reasoning_delta")
             return
-        self._call_quietly(self.reasoning_callback, text)
+        with event_stamped(reasoning_event_stamp(self)):
+            self._call_quietly(self.reasoning_callback, text)
         try:
             from agent.plugin_stream_hooks import stream_reasoning_deltas_enabled
 

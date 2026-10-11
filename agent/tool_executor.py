@@ -30,6 +30,7 @@ from agent.display import (
     _detect_tool_failure,
 )
 from agent.message_sanitization import coalesce_tool_call_id
+from agent.reasoning_timing import event_stamped, tool_event_stamp
 from agent.tool_result_classification import tool_may_have_side_effect
 from agent.inline_tool_executors import (
     INLINE_TOOL_EXECUTORS,
@@ -996,7 +997,8 @@ def _begin_tool_execution(agent, ref: _ToolCallRef, display_index: int | None) -
             logging.debug("Tool progress callback error: %s", callback_error)
         else:
             _safe_callback(agent.tool_progress_callback, "Tool progress", "tool.started", function_name, preview, display_args)
-    _safe_callback(agent.tool_start_callback, "Tool start", tool_call_id, function_name, display_args)
+    with event_stamped(tool_event_stamp(agent)):
+        _safe_callback(agent.tool_start_callback, "Tool start", tool_call_id, function_name, display_args)
 
     if not agent._checkpoint_mgr.enabled:
         return

@@ -13,6 +13,7 @@ from contextlib import suppress
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, List
 
+from agent.reasoning_timing import event_stamped, tool_event_stamp
 from agent.stream_single_writer import claim_stream_writer, stream_writer_is_current
 from agent.usage_anchor import set_usage_anchor
 
@@ -301,8 +302,9 @@ def make_codex_app_server_event_bridge(agent) -> Callable[[dict], None]:
         agent_cb("tool_progress_callback", "tool_progress_callback raised on tool.started for %s", name,
                  args=("tool.started", name, _codex_item_to_preview(item), args))
         # Stable-ID tool card (TUI/desktop) fires alongside the progress bubble.
-        agent_cb("tool_start_callback", "tool_start_callback raised for %s", name,
-                 args=(_stable_call_id(item, name), name, args))
+        with event_stamped(tool_event_stamp(agent)):
+            agent_cb("tool_start_callback", "tool_start_callback raised for %s", name,
+                     args=(_stable_call_id(item, name), name, args))
 
     def _fire_tool_completed(item: dict) -> None:
         name = _codex_item_to_tool_name(item)

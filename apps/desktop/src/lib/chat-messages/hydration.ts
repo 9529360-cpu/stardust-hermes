@@ -164,6 +164,33 @@ function timelineDisplayText(metadata: SessionMessage['display_metadata']): stri
   return typeof text === 'string' && text.trim() ? text : undefined
 }
 
+// The reasoning block's span as the agent stamped it on the row, in Unix seconds from the backend clock, so
+// it reads the same as the live block did. Rows written before the span was kept have none.
+function storedReasoningTiming(
+  metadata: SessionMessage['display_metadata']
+): null | { completedAt: number; startedAt: number } {
+  const timing = parseDisplayMetadata(metadata)?.reasoning_timing
+
+  if (!timing || typeof timing !== 'object') {
+    return null
+  }
+
+  const { completed_at: completedAt, started_at: startedAt } = timing as Record<string, unknown>
+
+  if (
+    typeof startedAt !== 'number' ||
+    typeof completedAt !== 'number' ||
+    !Number.isFinite(startedAt) ||
+    !Number.isFinite(completedAt) ||
+    startedAt <= 0 ||
+    completedAt < startedAt
+  ) {
+    return null
+  }
+
+  return { completedAt, startedAt }
+}
+
 function messageReactions(metadata: SessionMessage['display_metadata']): MessageReaction[] {
   const reactions = parseDisplayMetadata(metadata)?.reactions
 
@@ -353,7 +380,13 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       (typeof message.reasoning_details === 'string' ? message.reasoning_details : '')
 
     if (reasoning && message.role === 'assistant') {
-      parts.push(reasoningPart(reasoning, message.timestamp))
+      const timing = storedReasoningTiming(message.display_metadata)
+
+      parts.push(
+        timing
+          ? ({ ...reasoningPart(reasoning, timing.startedAt), completedAt: timing.completedAt } as ChatMessagePart)
+          : reasoningPart(reasoning, message.timestamp)
+      )
     }
 
     if (displayContent) {

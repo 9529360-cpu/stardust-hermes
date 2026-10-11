@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 
 from agent.error_classifier import FailoverReason
 from agent.message_metadata import append_message
+from agent.reasoning_timing import begin_response_timing
 from agent.turn_failure_copy import site_copy, stamp_failure
 
 logger = logging.getLogger("agent.conversation_loop")
@@ -67,6 +68,7 @@ def perform_api_call(
     interrupted: Any,
 ) -> ApiCallVerdict:
     """Issue the request (see ``_should_stream`` for the streaming decision)."""
+    begin_response_timing(agent)
     response = None
 
     def _verdict(action: str) -> ApiCallVerdict:

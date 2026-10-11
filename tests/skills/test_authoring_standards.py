@@ -9,6 +9,7 @@ Pre-existing violations that need non-trivial content work are grandfathered
 in the GRANDFATHER dict below. Do NOT add new entries for new skills — fix
 the skill instead. Remove entries as the debt is paid down.
 """
+import os
 import re
 from pathlib import Path
 
@@ -31,10 +32,16 @@ GRANDFATHER: dict[str, set[str]] = {
 
 
 def _skill_paths():
-    return sorted(
-        list(REPO.glob("skills/**/SKILL.md"))
-        + list(REPO.glob("optional-skills/**/SKILL.md"))
-    )
+    # os.walk, not Path.glob: the glob descends into __pycache__ and raises
+    # FileNotFoundError when a parallel worker removes a cache directory mid-walk.
+    # os.walk skips a vanished directory, and a skill tree has no cache to walk.
+    found = []
+    for tree in ("skills", "optional-skills"):
+        for dirpath, dirnames, filenames in os.walk(REPO / tree):
+            dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+            if "SKILL.md" in filenames:
+                found.append(Path(dirpath, "SKILL.md"))
+    return sorted(found)
 
 
 def _rel(p: Path) -> str:
