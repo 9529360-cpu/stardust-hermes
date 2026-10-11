@@ -123,8 +123,8 @@ describe('PersonalProductNav', () => {
       '新建对话',
       '智能体空间',
       '任务',
+      '消息平台',
       '工具',
-      '插件',
       '项目'
     ])
     expect(screen.queryByRole('button', { name: '对话' })).toBeNull()
@@ -145,7 +145,7 @@ describe('PersonalProductNav', () => {
     vi.mocked(dismissNarrowSidebar).mockClear()
     renderNav('chat')
 
-    for (const name of ['新建对话', '智能体空间', '任务', '工具', '插件']) {
+    for (const name of ['新建对话', '智能体空间', '任务', '消息平台', '工具']) {
       fireEvent.click(screen.getByRole('button', { name }))
     }
 
@@ -155,7 +155,7 @@ describe('PersonalProductNav', () => {
     expect(dismissNarrowSidebar).toHaveBeenCalledTimes(5)
   })
 
-  it('routes new chat, tasks, tools, and plugins through their existing owners', () => {
+  it('routes new chat, tasks, messaging, and tools through their existing owners', () => {
     const onNavigate = renderNav('chat')
 
     fireEvent.click(screen.getByRole('button', { name: '新建对话' }))
@@ -164,14 +164,12 @@ describe('PersonalProductNav', () => {
     fireEvent.click(screen.getByRole('button', { name: '任务' }))
     expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'cron', route: '/cron' }))
 
+    fireEvent.click(screen.getByRole('button', { name: '消息平台' }))
+    expect(onNavigate).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'messaging', route: '/messaging' }))
+
     fireEvent.click(screen.getByRole('button', { name: '工具' }))
     expect(onNavigate).toHaveBeenLastCalledWith(
       expect.objectContaining({ id: 'skills', route: '/skills?tab=toolsets' })
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: '插件' }))
-    expect(onNavigate).toHaveBeenLastCalledWith(
-      expect.objectContaining({ id: 'plugins', route: '/skills?tab=plugins' })
     )
   })
 
@@ -336,7 +334,11 @@ describe('PersonalProductNav', () => {
     cleanup()
 
     renderNav('skills', '/skills?tab=plugins')
-    expect(currentButtons()).toEqual(['插件'])
+    expect(currentButtons()).toEqual(['工具'])
+    cleanup()
+
+    renderNav('chat', '/messaging')
+    expect(currentButtons()).toEqual(['消息平台'])
     cleanup()
 
     renderNav('chat')
