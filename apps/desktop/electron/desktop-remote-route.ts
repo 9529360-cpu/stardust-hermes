@@ -26,8 +26,7 @@ export type DesktopRemoteRoute =
       authMode: 'oauth' | 'token'
       connectionId?: string
       headers?: Record<string, unknown>
-      kind: 'cloud' | 'remote'
-      org?: string
+      kind: 'remote'
       source: RouteSource
       token?: unknown
       url: string
@@ -100,7 +99,7 @@ export function resolveDesktopRemoteRoute({
   const override = profileRemoteOverride(config, profile)
 
   if (override) {
-    const kind = profileConfig?.mode === 'cloud' ? 'cloud' : 'remote'
+    const kind = 'remote' as const
     const authMode = override.authMode === 'oauth' ? 'oauth' : 'token'
     const route = { ...profileConfig, kind } as StoredRoute
 
@@ -109,7 +108,6 @@ export function resolveDesktopRemoteRoute({
         authMode,
         headers: override.headers,
         kind,
-        org: kind === 'cloud' ? String(profileConfig?.org || '').trim() || undefined : undefined,
         source: 'profile' as const,
         token: override.token,
         url: override.url
@@ -126,7 +124,7 @@ export function resolveDesktopRemoteRoute({
     if (!envToken) {
       throw new Error(
         'STARDUST_DESKTOP_REMOTE_URL is set but STARDUST_DESKTOP_REMOTE_TOKEN is not. ' +
-          'Both must be provided to connect to a remote Hermes backend.'
+          'Both must be provided to connect to a remote Stardust backend.'
       )
     }
 
@@ -159,7 +157,7 @@ export function resolveDesktopRemoteRoute({
     return resolveRegistryPrimaryRoute(registry)
   }
 
-  const kind = config.mode === 'cloud' ? 'cloud' : 'remote'
+  const kind = 'remote' as const
   const authMode = normAuthMode(config.remote?.authMode)
   const route = { ...config.remote, kind } as StoredRoute
 
@@ -168,7 +166,6 @@ export function resolveDesktopRemoteRoute({
       authMode,
       headers: config.remote?.headers,
       kind,
-      org: kind === 'cloud' ? String(config.remote?.org || '').trim() || undefined : undefined,
       source: 'settings' as const,
       token: config.remote?.token,
       url: String(config.remote?.url || '')
@@ -205,7 +202,7 @@ function resolveRegistryPrimaryRoute(registry: ConnectionRegistry): DesktopRemot
     return { connectionId: entry.id, kind: 'ssh', source: 'registry', ssh, token: entry.token }
   }
 
-  if (entry.kind !== 'remote' && entry.kind !== 'cloud') {
+  if (entry.kind !== 'remote') {
     return null
   }
 
@@ -220,7 +217,6 @@ function resolveRegistryPrimaryRoute(registry: ConnectionRegistry): DesktopRemot
     connectionId: entry.id,
     headers: entry.headers,
     kind: entry.kind,
-    org: entry.kind === 'cloud' ? String(entry.org || '').trim() || undefined : undefined,
     source: 'registry',
     token: entry.token,
     url

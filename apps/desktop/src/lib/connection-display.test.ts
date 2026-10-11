@@ -40,7 +40,6 @@ describe('connection display helpers', () => {
     const gateway: DesktopRegistryConnection = {
       ...connection('studio', 'Studio Genève', 'ssh'),
       host: 'studio.example.test',
-      org: 'Editorial',
       port: 2222,
       remoteProfile: 'production',
       user: 'hermes'
@@ -52,7 +51,7 @@ describe('connection display helpers', () => {
     expect(connectionMatchesQuery(gateway, 'ssh')).toBe(true)
     expect(connectionMatchesQuery(gateway, 'example.test')).toBe(true)
     expect(connectionMatchesQuery(gateway, '2222')).toBe(true)
-    expect(connectionMatchesQuery(gateway, 'editorial production')).toBe(true)
+    expect(connectionMatchesQuery(gateway, 'production')).toBe(true)
     expect(connectionMatchesQuery(gateway, 'distant', ['Passerelle distante'])).toBe(true)
     expect(connectionMatchesQuery(gateway, 'homelab')).toBe(false)
   })

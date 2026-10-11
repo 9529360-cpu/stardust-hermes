@@ -212,7 +212,7 @@ declare global {
       getSecretStorageEncryption: () => Promise<{ on: boolean }>
       setSecretStorageEncryption: (on: boolean) => Promise<{ on: boolean }>
       // v2 multi-connection registry: named agent sources, all persisted
-      // together (local + any number of remote/cloud/ssh instances).
+      // together (local + any number of remote/ssh instances).
       connections: {
         list: () => Promise<DesktopConnectionsRegistry>
         save: (
@@ -226,10 +226,10 @@ declare global {
         setLastUsed?: (id: string) => Promise<{ ok: boolean; registry: DesktopConnectionsRegistry }>
         test: (id: string) => Promise<DesktopConnectionTestResult>
         // Drain/update/restore one Desktop-managed SSH install. External URL
-        // and cloud sources are refused without touching their processes.
+        // and remote sources are refused without touching their processes.
         updateManaged?: (id: string) => Promise<DesktopManagedConnectionUpdateResult>
         // Fan out `hermes update` to every eligible registered connection;
-        // cloud entries are skipped (platform-managed), each row independent.
+        // each row independent.
         // excludeIds skips connections the caller updates through another
         // path (the everything-update flow's active backend + local client).
         updateAll?: (options?: {
@@ -815,14 +815,12 @@ export interface HermesConnection {
   baseUrl: string
   darwinMajor?: number
   isFullscreen: boolean
-  // The live, RESOLVED connection mode. Only ever 'local' or 'remote' — a
-  // 'cloud' saved-config entry resolves to a 'remote' connection under the hood
-  // (cloud-auto-discovery Q3/Q6), so this never carries 'cloud'.
+  // The live, RESOLVED connection mode: 'local' or 'remote'.
   mode?: 'local' | 'remote'
   authMode?: 'oauth' | 'token'
   remoteHost?: string
   remoteIdentity?: string
-  remoteKind?: 'cloud' | 'ssh' | 'url'
+  remoteKind?: 'ssh' | 'url'
   remoteHermesVersion?: string
   nativeOverlayWidth: number
   source?: 'env' | 'local' | 'settings'
@@ -844,7 +842,7 @@ export interface HermesConnection {
   // A pooled backend also carries `profile`, so presence alone cannot identify
   // the shared-primary routing case.
   sharedPrimary?: boolean
-  // True when `profile` is a request scope on a SHARED registry remote/cloud
+  // True when `profile` is a request scope on a SHARED registry remote
   // backend (one host, many profiles) — the registry analogue of sharedPrimary.
   sharedRemote?: boolean
   windowButtonPosition: { x: number; y: number } | null
@@ -878,12 +876,8 @@ export interface DesktopActiveProfile {
 
 export interface DesktopConnectionConfig {
   envOverride: boolean
-  // The saved connection mode. 'cloud' is a Hermes Cloud connection: it carries
-  // a remote-shaped block (remoteUrl = the selected agent's dashboardUrl,
-  // remoteAuthMode 'oauth') but is remembered as cloud so settings reopens into
-  // the cloud picker. Resolution treats cloud exactly as remote
-  // (cloud-auto-discovery Q3/Q6).
-  mode: 'local' | 'remote' | 'cloud' | 'ssh'
+  // The saved connection mode.
+  mode: 'local' | 'remote' | 'ssh'
   // The profile this config describes, or null for the global/default
   // connection. Per-profile entries let a profile point at its own backend.
   profile: null | string
@@ -900,10 +894,6 @@ export interface DesktopConnectionConfig {
   // the user opted in on a machine without secure storage.
   remoteTokenPlainText: boolean
   remoteUrl: string
-  // For a 'cloud' connection: the persisted Hermes Cloud org (slug or id) the
-  // connected instance was discovered under, so Settings → Gateway can reopen
-  // into that org. Empty string for remote/local.
-  cloudOrg: string
   sshHost: string
   sshUser: string
   sshPort: number | null
@@ -913,7 +903,7 @@ export interface DesktopConnectionConfig {
 }
 
 export interface DesktopConnectionConfigInput {
-  mode: 'local' | 'remote' | 'cloud' | 'ssh'
+  mode: 'local' | 'remote' | 'ssh'
   // When set, the save/apply/test targets this profile's per-profile remote
   // override instead of the global connection.
   profile?: null | string
@@ -924,10 +914,6 @@ export interface DesktopConnectionConfigInput {
   // user opt-in from the renderer.
   allowPlainTextToken?: boolean
   remoteUrl?: string
-  // For a 'cloud' connection: the selected Hermes Cloud org (slug or id) to
-  // persist so Settings can reopen into it. Ignored for remote/local modes.
-  cloudOrg?: string
-  cloudName?: string
   sshHost?: string
   sshUser?: string
   sshPort?: number | null
@@ -960,7 +946,7 @@ export interface DesktopConnectionTestResult {
 
 // ── v2 multi-connection registry (named agent sources) ─────────────────────
 
-export type DesktopConnectionKind = 'cloud' | 'local' | 'remote' | 'ssh'
+export type DesktopConnectionKind = 'local' | 'remote' | 'ssh'
 
 // A registered agent source as the renderer sees it: token bytes never cross
 // the IPC boundary (preview + set flag instead, like DesktopConnectionConfig).
@@ -971,7 +957,6 @@ export interface DesktopRegistryConnection {
   label: string
   url?: string
   authMode?: 'oauth' | 'token'
-  org?: string
   host?: string
   user?: string
   port?: number
@@ -1017,12 +1002,12 @@ export interface DesktopRegistryConnectionInput {
   // Plaintext token to store (encrypted at rest); omit to keep the saved one.
   token?: string
   allowPlainTextToken?: boolean
-  // Extra gateway headers for remote/cloud entries (access proxies such as
+  // Extra gateway headers for remote entries (access proxies such as
   // Cloudflare Access). The map is authoritative when present: name → new
   // plaintext value (encrypted at rest), or null to keep the stored secret
   // for that name. Omit the field entirely to keep the saved set unchanged.
   headers?: Record<string, null | string>
-  org?: string
+
   host?: string
   user?: string
   port?: null | number
@@ -1142,8 +1127,6 @@ export interface DesktopOauthLogoutResult {
 export interface DesktopBootProgress {
   error: string | null
   fakeMode: boolean
-  /** True when the boot failure is a Nous Cloud agent that is down (HTTP 502/503/504). */
-  isCloudBackendDown?: boolean
   message: string
   phase: string
   progress: number

@@ -40,7 +40,6 @@ import {
   shouldDeferLocalEnumeration,
   shouldRetrySshInventory,
   uniqueLabel,
-  updateEligibility,
   upsertConnection
 } from './connection-registry'
 
@@ -48,68 +47,30 @@ function emptyRegistry(): ConnectionRegistry {
   return normalizeRegistry(null)
 }
 
-test('Cloud apply upgrades only host labels without changing connection identity', () => {
-  const url = 'https://agent.example.com'
-  const name = 'Research cloud'
-
-  const first = reconcileAppliedGlobalConnection(emptyRegistry(), {
-    mode: 'cloud',
-    remote: { url, authMode: 'oauth' }
+test('a saved Hermes Cloud entry is dropped on load instead of kept or quarantined', () => {
+  const registry = normalizeRegistry({
+    version: 2,
+    primary: 'cloud-1',
+    launchMode: 'primary',
+    lastUsed: 'cloud-1',
+    connections: [
+      { id: 'local', kind: 'local', label: 'This device' },
+      {
+        id: 'cloud-1',
+        kind: 'cloud',
+        label: 'Hermes Cloud',
+        url: 'https://agent-1.agents.nousresearch.com',
+        authMode: 'oauth'
+      }
+    ]
   })
 
-  const named = reconcileAppliedGlobalConnection(first, {
-    mode: 'cloud',
-    remote: { url, authMode: 'oauth', name }
-  })
-
-  assert.equal(named.primary, first.primary)
-  assert.equal(named.connections.find(c => c.id === named.primary)?.label, name)
-  const restored = normalizeRegistry(JSON.parse(JSON.stringify(named)))
-  assert.equal(restored.connections.find(c => c.id === named.primary)?.name, name)
-
-  const custom = upsertConnection(restored, {
-    ...restored.connections.find(c => c.id === named.primary)!,
-    label: 'My device'
-  })
-
-  const reapplied = reconcileAppliedGlobalConnection(custom, {
-    mode: 'cloud',
-    remote: { url, authMode: 'oauth', name: 'New portal name' }
-  })
-
-  assert.equal(reapplied.primary, first.primary)
-  assert.equal(reapplied.connections.find(c => c.id === first.primary)?.label, 'My device')
-
-  const other = reconcileAppliedGlobalConnection(reapplied, {
-    mode: 'cloud',
-    remote: { url: 'https://other.example.com', authMode: 'oauth' }
-  })
-
-  assert.notEqual(other.primary, first.primary)
-  assert.equal(other.connections.find(c => c.id === other.primary)?.name, undefined)
-})
-
-test('Cloud name survives partial edits but never inherits across gateway URLs', () => {
-  const registry = reconcileAppliedGlobalConnection(emptyRegistry(), {
-    mode: 'cloud',
-    remote: { url: 'https://agent.example.com', authMode: 'oauth', name: 'Research cloud' }
-  })
-
-  const existing = registry.connections.find(c => c.id === registry.primary)!
-
-  const renamed = normalizeConnectionInput(
-    mergeConnectionInput({ id: existing.id, kind: 'cloud', label: 'Mine' }, existing),
-    registry
+  assert.deepEqual(
+    registry.connections.map(connection => connection.kind),
+    ['local']
   )
-
-  assert.equal(renamed.name, 'Research cloud')
-
-  const retargeted = normalizeConnectionInput(
-    mergeConnectionInput({ id: existing.id, kind: 'cloud', label: 'Mine', url: 'https://other.example.com' }, existing),
-    registry
-  )
-
-  assert.equal(retargeted.name, undefined)
+  assert.equal(registry.primary, 'local')
+  assert.equal(registry.quarantined, undefined)
 })
 
 // --- labels, slugs, handles ---
@@ -454,138 +415,6 @@ test('resolvedConnectionId accepts only a current exact descriptor id and never 
     'remote-b'
   )
   assert.equal(resolvedConnectionId(reordered, { ...inferableRemoteA, connectionId: 'retired-source' }), null)
-})
-
-test('resolvedConnectionId reuses the exact URL envelope and rejects weak or duplicate matches', () => {
-  const sharedUrl = 'https://shared.example/gateway'
-
-  const registry: ConnectionRegistry = {
-    version: REGISTRY_VERSION,
-    primary: 'remote-token',
-    launchMode: 'primary',
-    lastUsed: 'remote-token',
-    connections: [
-      { id: LOCAL_CONNECTION_ID, kind: 'local', label: 'This device' },
-      {
-        id: 'remote-token',
-        kind: 'remote',
-        label: 'Token remote',
-        url: sharedUrl,
-        authMode: 'token',
-        token: { encoding: 'safeStorage', value: 'token-a' },
-        headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-a' } }
-      },
-      {
-        id: 'remote-oauth',
-        kind: 'remote',
-        label: 'OAuth remote',
-        url: `${sharedUrl}/`,
-        authMode: 'oauth',
-        headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-b' } }
-      },
-      {
-        id: 'cloud-nous',
-        kind: 'cloud',
-        label: 'Nous cloud',
-        url: sharedUrl,
-        authMode: 'oauth',
-        headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-cloud' } },
-        org: 'nous'
-      },
-      {
-        id: 'cloud-labs',
-        kind: 'cloud',
-        label: 'Labs cloud',
-        url: sharedUrl,
-        authMode: 'oauth',
-        headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-cloud' } },
-        org: 'labs'
-      }
-    ]
-  }
-
-  assert.equal(
-    resolvedConnectionId(registry, {
-      authMode: 'token',
-      baseUrl: sharedUrl,
-      headers: { 'cf-access-client-id': { encoding: 'safeStorage', value: 'header-a' } },
-      mode: 'remote',
-      remoteKind: 'url',
-      token: { encoding: 'safeStorage', value: 'token-a' }
-    }),
-    'remote-token'
-  )
-  assert.equal(
-    resolvedConnectionId(registry, {
-      authMode: 'oauth',
-      baseUrl: sharedUrl,
-      headers: { 'CF-ACCESS-CLIENT-ID': { encoding: 'safeStorage', value: 'header-b' } },
-      mode: 'remote',
-      remoteKind: 'url'
-    }),
-    'remote-oauth'
-  )
-  assert.equal(
-    resolvedConnectionId(registry, {
-      authMode: 'oauth',
-      baseUrl: sharedUrl,
-      headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-cloud' } },
-      mode: 'remote',
-      org: 'nous',
-      remoteKind: 'cloud'
-    }),
-    'cloud-nous'
-  )
-  assert.equal(
-    resolvedConnectionId(registry, {
-      authMode: 'oauth',
-      baseUrl: sharedUrl,
-      headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-cloud' } },
-      mode: 'remote',
-      org: 'labs',
-      remoteKind: 'cloud'
-    }),
-    'cloud-labs'
-  )
-
-  // Post-dial URL-only shapes do not contain enough proof to choose a source.
-  assert.equal(resolvedConnectionId(registry, { baseUrl: sharedUrl, mode: 'remote', remoteKind: 'url' }), null)
-  assert.equal(resolvedConnectionId(registry, { baseUrl: sharedUrl, mode: 'remote', remoteKind: 'cloud' }), null)
-
-  // Even a complete envelope fails closed when two registrations are exact twins.
-  const duplicate: ConnectionRegistry = {
-    ...registry,
-    connections: [
-      ...registry.connections,
-      { ...registry.connections.find(connection => connection.id === 'remote-token')!, id: 'remote-token-copy' }
-    ]
-  }
-
-  assert.equal(
-    resolvedConnectionId(duplicate, {
-      authMode: 'token',
-      baseUrl: sharedUrl,
-      headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-a' } },
-      mode: 'remote',
-      remoteKind: 'url',
-      token: { encoding: 'safeStorage', value: 'token-a' }
-    }),
-    null
-  )
-  assert.equal(
-    resolvedConnectionId(
-      { ...duplicate, connections: [...duplicate.connections].reverse() },
-      {
-        authMode: 'token',
-        baseUrl: sharedUrl,
-        headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-a' } },
-        mode: 'remote',
-        remoteKind: 'url',
-        token: { encoding: 'safeStorage', value: 'token-a' }
-      }
-    ),
-    null
-  )
 })
 
 test('resolvedConnectionId keeps same-host SSH routes distinct by port, key, path, and profile', () => {
@@ -962,6 +791,83 @@ test('roster: two connections with the same install_id collapse to one row per p
   assert.deepEqual(roster.map(agent => agent.handle).sort(), ['default', 'research'])
 })
 
+test('resolvedConnectionId matches only the exact remote envelope and fails closed on twins', () => {
+  const sharedUrl = 'https://shared.example/gateway'
+
+  const registry: ConnectionRegistry = {
+    version: REGISTRY_VERSION,
+    primary: 'remote-token',
+    launchMode: 'primary',
+    lastUsed: 'remote-token',
+    connections: [
+      { id: LOCAL_CONNECTION_ID, kind: 'local', label: 'This device' },
+      {
+        id: 'remote-token',
+        kind: 'remote',
+        label: 'Token remote',
+        url: sharedUrl,
+        authMode: 'token',
+        token: { encoding: 'safeStorage', value: 'token-a' },
+        headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-a' } }
+      },
+      {
+        id: 'remote-oauth',
+        kind: 'remote',
+        label: 'OAuth remote',
+        url: `${sharedUrl}/`,
+        authMode: 'oauth',
+        headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-b' } }
+      }
+    ]
+  }
+
+  assert.equal(
+    resolvedConnectionId(registry, {
+      authMode: 'token',
+      baseUrl: sharedUrl,
+      headers: { 'cf-access-client-id': { encoding: 'safeStorage', value: 'header-a' } },
+      mode: 'remote',
+      remoteKind: 'url',
+      token: { encoding: 'safeStorage', value: 'token-a' }
+    }),
+    'remote-token'
+  )
+  assert.equal(
+    resolvedConnectionId(registry, {
+      authMode: 'oauth',
+      baseUrl: sharedUrl,
+      headers: { 'CF-ACCESS-CLIENT-ID': { encoding: 'safeStorage', value: 'header-b' } },
+      mode: 'remote',
+      remoteKind: 'url'
+    }),
+    'remote-oauth'
+  )
+
+  // Post-dial URL-only shapes do not contain enough proof to choose a source.
+  assert.equal(resolvedConnectionId(registry, { baseUrl: sharedUrl, mode: 'remote', remoteKind: 'url' }), null)
+
+  // Even a complete envelope fails closed when two registrations are exact twins.
+  const duplicate: ConnectionRegistry = {
+    ...registry,
+    connections: [
+      ...registry.connections,
+      { ...registry.connections.find(connection => connection.id === 'remote-token')!, id: 'remote-token-copy' }
+    ]
+  }
+
+  assert.equal(
+    resolvedConnectionId(duplicate, {
+      authMode: 'token',
+      baseUrl: sharedUrl,
+      headers: { 'CF-Access-Client-Id': { encoding: 'safeStorage', value: 'header-a' } },
+      mode: 'remote',
+      remoteKind: 'url',
+      token: { encoding: 'safeStorage', value: 'token-a' }
+    }),
+    null
+  )
+})
+
 test('roster: collapse prefers the active (primary) connection', () => {
   const hostname = { id: 'spark', kind: 'remote' as const, label: 'Spark', url: 'http://spark:8642' }
   const tailscale = { id: 'spark-ts', kind: 'remote' as const, label: 'Spark TS', url: 'http://100.1.2.3:8642' }
@@ -976,43 +882,6 @@ test('roster: collapse prefers the active (primary) connection', () => {
 
   assert.equal(roster.length, 1)
   assert.equal(roster[0].connectionId, 'spark-ts')
-})
-
-test('roster: collapse pick order is local > ssh > remote > cloud, then registration order', () => {
-  const local = { id: 'local', kind: 'local' as const, label: 'This device' }
-  const remote = { id: 'loop', kind: 'remote' as const, label: 'Loopback', url: 'http://127.0.0.1:8642' }
-  const cloud = { id: 'cl', kind: 'cloud' as const, label: 'Cloud twin', url: 'http://cl:1' }
-  const ssh = { id: 'tun', kind: 'ssh' as const, label: 'Tunnel', host: 'box' }
-
-  // Same box registered four ways; primary is NOT one of them (unset).
-  const roster = buildAgentRoster([
-    { connection: cloud, profiles: ['default'], installId: 'aaa' },
-    { connection: remote, profiles: ['default'], installId: 'aaa' },
-    { connection: ssh, profiles: ['default'], installId: 'aaa' },
-    { connection: local, profiles: ['default'], installId: 'aaa' }
-  ])
-
-  assert.equal(roster.length, 1)
-  assert.equal(roster[0].connectionId, 'local')
-
-  // Without the local candidate, ssh wins over remote/cloud.
-  const noLocal = buildAgentRoster([
-    { connection: cloud, profiles: ['default'], installId: 'aaa' },
-    { connection: remote, profiles: ['default'], installId: 'aaa' },
-    { connection: ssh, profiles: ['default'], installId: 'aaa' }
-  ])
-
-  assert.equal(noLocal[0].connectionId, 'tun')
-
-  // Same kind → earliest-registered (enumeration order) wins.
-  const twin = { id: 'loop2', kind: 'remote' as const, label: 'Loopback 2', url: 'http://[::1]:8642' }
-
-  const sameKind = buildAgentRoster([
-    { connection: remote, profiles: ['default'], installId: 'aaa' },
-    { connection: twin, profiles: ['default'], installId: 'aaa' }
-  ])
-
-  assert.equal(sameKind[0].connectionId, 'loop')
 })
 
 test('roster: missing install_id bypasses the collapse (older backends keep current behavior)', () => {
@@ -1071,18 +940,6 @@ test('roster: collapse also folds a third same-box connection from a per-profile
   ])
 })
 
-// --- updateEligibility ---
-
-test('update fan-out: cloud is platform-managed, everything else eligible', () => {
-  assert.deepEqual(updateEligibility({ id: 'c', kind: 'cloud', label: 'Cloud' }), {
-    eligible: false,
-    reason: 'cloud-managed'
-  })
-  assert.equal(updateEligibility({ id: 'local', kind: 'local', label: 'x' }).eligible, true)
-  assert.equal(updateEligibility({ id: 'r', kind: 'remote', label: 'x' }).eligible, true)
-  assert.equal(updateEligibility({ id: 's', kind: 'ssh', label: 'x' }).eligible, true)
-})
-
 // --- normalizeConnectionInput ---
 
 test('save rejects the reserved "local" id on non-local kinds', () => {
@@ -1093,7 +950,7 @@ test('save rejects the reserved "local" id on non-local kinds', () => {
   )
 })
 
-test('token only persists on token-auth remotes; oauth/cloud drop it', () => {
+test('token only persists on token-auth remotes; oauth drops it', () => {
   const registry = emptyRegistry()
 
   const tokenAuth = normalizeConnectionInput(
@@ -1109,13 +966,6 @@ test('token only persists on token-auth remotes; oauth/cloud drop it', () => {
   )
 
   assert.equal(oauth.token, undefined)
-
-  const cloud = normalizeConnectionInput(
-    { kind: 'cloud', label: 'C', url: 'https://c.hermes.cloud', authMode: 'oauth', token: { enc: 'x' } },
-    registry
-  )
-
-  assert.equal(cloud.token, undefined)
 })
 
 test('an ssh entry keeps its session token through a label rename', () => {
@@ -1147,20 +997,7 @@ test('an ssh entry keeps its session token through a label rename', () => {
 
 // --- mergeConnectionInput (edit inheritance) ---
 
-test('merge preserves fields the editor does not carry (org, ssh extras)', () => {
-  const cloud = {
-    authMode: 'oauth' as const,
-    id: 'c',
-    kind: 'cloud' as const,
-    label: 'Cloud',
-    org: 'nous',
-    url: 'https://a.cloud'
-  }
-
-  const renamed = mergeConnectionInput({ id: 'c', kind: 'cloud', label: 'Renamed', url: 'https://a.cloud' }, cloud)
-
-  assert.equal(renamed.org, 'nous')
-
+test('merge preserves fields the editor does not carry (ssh extras)', () => {
   const ssh = {
     host: 'homelab.lan',
     id: 's',
@@ -1231,33 +1068,6 @@ test('editing an entry does not collide with its own label', () => {
   assert.equal(edited.url, 'http://10.0.0.6:9119')
 })
 
-test('duplicate gateway URLs are rejected across remote and cloud kinds', () => {
-  let registry = emptyRegistry()
-  registry = upsertConnection(
-    registry,
-    normalizeConnectionInput({ kind: 'remote', label: 'Homelab', url: 'http://10.0.0.5:9119' }, registry)
-  )
-
-  // Same URL modulo trailing slash → dupe, even as a different kind.
-  assert.throws(
-    () => normalizeConnectionInput({ kind: 'remote', label: 'Twin', url: 'http://10.0.0.5:9119/' }, registry),
-    /already exists/
-  )
-  assert.throws(
-    () => normalizeConnectionInput({ kind: 'cloud', label: 'Cloud twin', url: 'http://10.0.0.5:9119' }, registry),
-    /already exists/
-  )
-  // Editing the entry itself keeps its own URL without self-colliding.
-  const existing = registry.connections.find(c => c.kind === 'remote')!
-
-  const edited = normalizeConnectionInput(
-    { id: existing.id, kind: 'remote', label: 'Homelab', url: 'http://10.0.0.5:9119' },
-    registry
-  )
-
-  assert.equal(edited.id, existing.id)
-})
-
 test('duplicate ssh targets are rejected on user@host:port + remote profile', () => {
   let registry = emptyRegistry()
   registry = upsertConnection(
@@ -1283,7 +1093,7 @@ test('duplicate ssh targets are rejected on user@host:port + remote profile', ()
   assert.equal(otherProfile.kind, 'ssh')
 })
 
-test('remote input normalizes URL and auth mode; cloud keeps org', () => {
+test('remote input normalizes URL and auth mode', () => {
   const registry = emptyRegistry()
 
   const remote = normalizeConnectionInput(
@@ -1293,15 +1103,17 @@ test('remote input normalizes URL and auth mode; cloud keeps org', () => {
 
   assert.equal(remote.url, 'http://10.0.0.5:9119')
   assert.equal(remote.authMode, 'token')
+})
 
-  const cloud = normalizeConnectionInput(
-    { kind: 'cloud', label: 'Cloud', url: 'https://foo.hermes.cloud', authMode: 'oauth', org: 'nous' },
-    registry
+test('the retired cloud kind is not a valid connection kind on save', () => {
+  assert.throws(
+    () =>
+      normalizeConnectionInput(
+        { kind: 'cloud' as any, label: 'Cloud', url: 'https://foo.example', authMode: 'oauth' },
+        emptyRegistry()
+      ),
+    /Unknown connection kind/
   )
-
-  assert.equal(cloud.kind, 'cloud')
-  assert.equal(cloud.org, 'nous')
-  assert.equal(cloud.authMode, 'oauth')
 })
 
 test('ssh input requires a host; local input only carries the label', () => {
@@ -1374,14 +1186,6 @@ test('normalizeRegistry round-trips a valid registry unchanged in shape', () => 
         authMode: 'token',
         token: { v: 1 }
       },
-      {
-        id: 'cloud-1',
-        kind: 'cloud',
-        label: 'Hermes Cloud',
-        url: 'https://a.hermes.cloud',
-        authMode: 'oauth',
-        org: 'nous'
-      },
       { id: 'spark', kind: 'ssh', label: 'Spark', host: 'spark1', user: 'tek', port: 2222 }
     ]
   }
@@ -1391,13 +1195,13 @@ test('normalizeRegistry round-trips a valid registry unchanged in shape', () => 
   assert.equal(registry.primary, 'homelab')
   assert.equal(registry.launchMode, 'last-used')
   assert.equal(registry.lastUsed, 'homelab')
-  assert.equal(registry.connections.length, 4)
+  assert.equal(registry.connections.length, 3)
   assert.deepEqual(
     registry.connections.map(c => c.id),
-    ['local', 'homelab', 'cloud-1', 'spark']
+    ['local', 'homelab', 'spark']
   )
   assert.deepEqual(registry.connections[1].token, { v: 1 })
-  assert.equal(registry.connections[3].port, 2222)
+  assert.equal(registry.connections[2].port, 2222)
 })
 
 test('normalizeRegistry falls back to Primary when the last-used source is missing', () => {
@@ -1477,19 +1281,6 @@ test('migrate: v1 global remote becomes a labeled entry and the primary', () => 
   assert.equal(registry.primary, remote.id)
   assert.equal(remote.label, 'homelab.lan:9119')
   assert.deepEqual(remote.token, { enc: 'x' })
-})
-
-test('migrate: v1 cloud keeps cloud provenance + org', () => {
-  const registry = migrateV1ToRegistry({
-    mode: 'cloud',
-    remote: { url: 'https://a.hermes.cloud', authMode: 'oauth', org: 'nous' }
-  })
-
-  const cloud = registry.connections.find(c => c.kind === 'cloud')
-
-  assert.ok(cloud)
-  assert.equal(registry.primary, cloud.id)
-  assert.equal(cloud.org, 'nous')
 })
 
 test('migrate: per-profile overrides become extra sources, deduped by URL', () => {
@@ -1915,7 +1706,7 @@ test('connectionDialFieldsChanged: ssh routing fields recycle, kind change recyc
 
 // --- remote gateway headers (Cloudflare Access etc., #74466 / PR #74468) ---
 
-test('normalizeConnectionInput keeps filtered headers on remote/cloud, drops them elsewhere', () => {
+test('normalizeConnectionInput keeps filtered headers on remote, drops them elsewhere', () => {
   const registry = emptyRegistry()
 
   const remote = normalizeConnectionInput(

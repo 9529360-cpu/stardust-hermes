@@ -57,8 +57,7 @@ describe('refreshProfileRemoteOverrides', () => {
     await refreshProfileRemoteOverrides(['work', 'cloudy', 'home'])
 
     expect($profileRemoteOverrides.get()).toEqual({
-      work: { host: 'work.example.com', url: 'https://work.example.com' },
-      cloudy: { host: 'cloud.example.com:8443', url: 'https://cloud.example.com:8443' }
+      work: { host: 'work.example.com', url: 'https://work.example.com' }
     })
   })
 

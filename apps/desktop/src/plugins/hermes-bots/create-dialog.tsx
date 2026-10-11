@@ -76,7 +76,6 @@ import {
 import { deleteBot } from './profile-ops'
 import { botRosterMeta } from './routing'
 import { getPluginCtx } from './shared'
-import { HubSkillsSection } from './skills-hub'
 import { composeSoul } from './soul'
 import type { BotMeta, ConnectionRow, RosterRow } from './types'
 
@@ -929,25 +928,6 @@ export function CreateAgentDialog({ open, onClose, roster }: CreateAgentDialogPr
                       />
                     </div>
                     <div className="text-[0.65rem] leading-4 text-(--ui-text-quaternary)">{`Catalog from ${caps.source} — unchecked skills are disabled after creation.`}</div>
-                    <HubSkillsSection
-                      forProfile={null}
-                      onInstalled={name =>
-                        setCaps(prev =>
-                          !prev || prev.skills.some(s => s.name === name)
-                            ? prev
-                            : {
-                                ...prev,
-                                skills: [
-                                  ...prev.skills,
-                                  {
-                                    name,
-                                    enabled: true
-                                  }
-                                ]
-                              }
-                        )
-                      }
-                    />
                   </div>
                 )
               ) : advTab === 'toolsets' ? (

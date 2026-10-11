@@ -363,10 +363,7 @@ export async function selectConnection(connectionId: string, options: SelectConn
       return
     }
 
-    if (
-      targetConnection.authMode === 'oauth' &&
-      (targetConnection.kind === 'remote' || targetConnection.kind === 'cloud')
-    ) {
+    if (targetConnection.authMode === 'oauth' && targetConnection.kind === 'remote') {
       // Retained sockets can outlive cookie/native OAuth REST auth. Prove the
       // cheapest protected read the target always serves before wiping. Keep
       // the exact failure for caller UX (network failures are not sign-in errors).
