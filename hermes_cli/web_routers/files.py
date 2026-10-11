@@ -650,7 +650,7 @@ async def fs_read_text(path: str):
 async def fs_write_text(payload: FsWriteText):
     """Overwrite (or create) a UTF-8 text file for the in-app spot editor.
 
-    Mirrors the Electron ``hermes:fs:writeText`` hardening: path validated by
+    Mirrors the Electron ``stardust:fs:writeText`` hardening: path validated by
     ``_fs_path``, the parent must already exist (never build trees), only
     regular files may be replaced, payload size-capped, staged to a sibling
     temp file and ``os.replace``-d so a crash can't truncate the original.

@@ -55,7 +55,7 @@ def _renderer_bundle_dir(desktop_dir: Path, *, source_mode: bool) -> Optional[Pa
     if executable is None:
         return None
 
-    # macOS: …/Hermes.app/Contents/MacOS/Hermes → …/Contents/Resources
+    # macOS: …/Stardust.app/Contents/MacOS/Stardust → …/Contents/Resources
     resources = (
         executable.parent.parent / "Resources" if sys.platform == "darwin" else executable.parent / "resources"
     )
@@ -133,14 +133,14 @@ def _desktop_packaged_executable_in(release_dir: Path) -> Optional[Path]:
     stage-and-swap staging dir (#86443).
     """
     if sys.platform == "darwin":
-        candidates = list(release_dir.glob("mac*/Hermes.app/Contents/MacOS/Hermes"))
+        candidates = list(release_dir.glob("mac*/Stardust.app/Contents/MacOS/Stardust"))
     elif sys.platform == "win32":
         candidates = [
-            release_dir / d / "Hermes.exe" for d in ("win-unpacked", "win-ia32-unpacked", "win-arm64-unpacked")
+            release_dir / d / "Stardust.exe" for d in ("win-unpacked", "win-ia32-unpacked", "win-arm64-unpacked")
         ]
     else:
         candidates = [
-            release_dir / d / n for d in ("linux-unpacked", "linux-arm64-unpacked") for n in ("hermes", "Hermes")
+            release_dir / d / n for d in ("linux-unpacked", "linux-arm64-unpacked") for n in ("Stardust",)
         ]
 
     existing = [p for p in candidates if p.exists()]
@@ -148,11 +148,11 @@ def _desktop_packaged_executable_in(release_dir: Path) -> Optional[Path]:
         return None
     if sys.platform == "win32" and len(existing) > 1:
         # A stale win-arm64-unpacked next to the real win-unpacked: picking by
-        # mtime can hand a wrong-architecture Hermes.exe to the launcher. Prefer
+        # mtime can hand a wrong-architecture Stardust.exe to the launcher. Prefer
         # candidates whose PE machine matches the host; mtime when none parse.
         # Multiple unpacked trees can coexist (e.g. a stale win-arm64-unpacked left behind by a cross-arch
         # experiment next to the real win-unpacked). Picking purely by mtime can then hand a
-        # wrong-architecture Hermes.exe to the launcher, which Windows rejects with "This app can't run on
+        # wrong-architecture Stardust.exe to the launcher, which Windows rejects with "This app can't run on
         # your computer" (#69179).
         expected = _expected_windows_pe_machines()
         matching = [p for p in existing if _pe_machine_or_none(p) in expected]
@@ -162,7 +162,7 @@ def _desktop_packaged_executable_in(release_dir: Path) -> Optional[Path]:
 
 
 # ─── Desktop stage-and-swap pack (#86443) ─────────────────────────────────── electron-builder packs IN
-# PLACE: before-pack.mjs wipes ``release/<platform>- unpacked`` (or the mac ``Hermes.app``) and the Electron
+# PLACE: before-pack.mjs wipes ``release/<platform>- unpacked`` (or the mac ``Stardust.app``) and the Electron
 # unpack + asar + rename then rebuild it. Any failure after that wipe — corrupt cached zip, blocked
 # download, missing dep, disk full — leaves the user with NO app, and ``hermes update`` used to report
 # "partially complete" over an empty release/. Fix the class, not the predicate: build into a STAGING output
@@ -234,12 +234,12 @@ def _discard_desktop_staging(staging_dir: Path) -> None:
 
 # ─── Desktop exe integrity gate (#69179) ──────────────────────────────────── The desktop self-update chain
 # (Desktop → hermes-setup --update → `hermes update` → `hermes desktop --build-only` → relaunch) rebuilds
-# Hermes.exe on the end user's machine and used to verify only that the file EXISTS before declaring
+# Stardust.exe on the end user's machine and used to verify only that the file EXISTS before declaring
 # success. A corrupt cached Electron zip whose extraction produced a truncated electron.exe, an interrupted
 # rcedit resource rewrite, a disk-full pack, or a wrong-arch unpacked tree therefore shipped a broken binary
 # that Windows refuses to load ("This app can't run on your computer" / 此应用无法在你的电脑上运行). These helpers parse
 # the PE header — no signature infrastructure required — so a structurally broken or wrong-architecture
-# Hermes.exe is caught BEFORE the updater replaces the working app, and the previous build can be restored
+# Stardust.exe is caught BEFORE the updater replaces the working app, and the previous build can be restored
 # from the .bak tree that apps/desktop/scripts/before-pack.mjs now preserves.
 _PE_MACHINE_I386 = 0x014C
 _PE_MACHINE_AMD64 = 0x8664
@@ -269,7 +269,7 @@ def _windows_native_machine_from_iswow64() -> Optional[str]:
     ``(HANDLE)-1`` is truncated to ``0xFFFFFFFF`` and zero-extended into a 64-bit invalid handle. On Win64
     that makes ``IsWow64Process2`` fail with ``ERROR_INVALID_HANDLE`` (6), which is exactly the residual
     Windows-on-ARM failure after #71218: the gate fell through to ``PROCESSOR_ARCHITECTURE=AMD64`` (the
-    emulated process arch) and rejected a correctly-built ARM64 ``Hermes.exe``. Binding
+    emulated process arch) and rejected a correctly-built ARM64 ``Stardust.exe``. Binding
     ``restype``/``argtypes`` to ``wintypes.HANDLE`` keeps the full ``0xFFFFFFFFFFFFFFFF`` pseudo-handle.
     """
     import ctypes
@@ -464,7 +464,7 @@ def _ensure_desktop_exe_launchable(desktop_dir: Path, packaged_executable: Optio
     if error is None:
         return packaged_executable, False
 
-    print(f"✗ The built Hermes.exe failed its integrity check: {error}\n    at: {packaged_executable}")
+    print(f"✗ The built Stardust.exe failed its integrity check: {error}\n    at: {packaged_executable}")
 
     # Only the exe's OWN output dir is purged (a staging dir), never the live
     # release/ tree that still holds the last working app.
@@ -477,7 +477,7 @@ def _ensure_desktop_exe_launchable(desktop_dir: Path, packaged_executable: Optio
 
     restored = _rollback_desktop_from_backup(packaged_executable)
     if restored is not None:
-        print("  ↩ Update aborted — restored the previous working Hermes.exe from backup.")
+        print("  ↩ Update aborted — restored the previous working Stardust.exe from backup.")
         print("    Your existing version was kept and still works. Run `hermes desktop`")
         print("    (or the in-app update) again to retry with a fresh Electron download.")
         return restored, True
@@ -782,7 +782,7 @@ def _desktop_macos_local_codesign(app: Path, *, desktop_dir: Path, identity: str
 
     # 1) Standalone Mach-O files (native modules, dylibs, crashpad handler),
     #    compared relative to the app root — the absolute path always contains
-    #    the outer Hermes.app component.
+    #    the outer Stardust.app component.
     contents = app / "Contents"
     standalone: list[Path] = []
     for root, _dirs, files in os.walk(contents):
@@ -866,7 +866,7 @@ def _desktop_macos_relaunchable_fixup(
     exe = _desktop_packaged_executable_in(release_dir or (desktop_dir / "release"))
     if exe is None:
         return True
-    # exe = .../Hermes.app/Contents/MacOS/Hermes  ->  app bundle = .../Hermes.app
+    # exe = .../Stardust.app/Contents/MacOS/Stardust  ->  app bundle = .../Stardust.app
     app = exe.parents[2]
     if not str(app).endswith(".app") or not app.is_dir():
         return True
@@ -1042,7 +1042,7 @@ def _desktop_macos_setup_tcc_identity(identity: str = "Hermes Local Signing") ->
     print(
         "\n  Note: macOS will re-prompt for permissions ONE final time (the identity "
         "changed). Grant them and they persist from then on. If a permission gets "
-        "stuck, reset it with:  tccutil reset All com.nousresearch.hermes"
+        "stuck, reset it with:  tccutil reset All com.stardust.desktop"
     )
     return True
 
@@ -1304,7 +1304,7 @@ def _run_desktop_pack_with_recovery(
             print("  ⚠ Desktop build failed; refreshed the Electron download and retrying once...")
             for p in purged:
                 print(f"    - {p}")
-            # The purge can't remove a win-unpacked tree whose Hermes.exe is
+            # The purge can't remove a win-unpacked tree whose Stardust.exe is
             # still locked by a running instance; stop it before retry.
             _stop_desktop_processes_locking_build(desktop_dir)
             build_result = _pack(npm_build_env)
@@ -1333,7 +1333,7 @@ def _promote_staged_desktop_app(desktop_dir: Path, staging_dir: Path) -> Path:
     _desktop_macos_relaunchable_fixup(desktop_dir, release_dir=staging_dir)
 
     # Windows integrity gate: never declare the rebuild a success on a
-    # Hermes.exe Windows cannot load. Verified on the STAGED exe, so a failure
+    # Stardust.exe Windows cannot load. Verified on the STAGED exe, so a failure
     # simply discards staging and fails loudly for the updater's retry-once.
     verified_executable, rolled_back = _ensure_desktop_exe_launchable(desktop_dir, staged_executable)
     if staged_executable is None or rolled_back or verified_executable is None:
@@ -1373,7 +1373,7 @@ def _build_desktop_app(desktop_dir: Path, *, source_mode: bool, npm: str, env: d
     if not source_mode:
         staging_dir = _desktop_staging_dir(desktop_dir)
         build_cmd += ["--", f"-c.directories.output={staging_dir}"]
-        # A running desktop instance holds Hermes.exe locked on Windows, so the
+        # A running desktop instance holds Stardust.exe locked on Windows, so the
         # pack can't replace it ("Access is denied"). Stop it first.
         stopped = _stop_desktop_processes_locking_build(desktop_dir)
         if stopped:
@@ -1388,7 +1388,7 @@ def _build_desktop_app(desktop_dir: Path, *, source_mode: bool, npm: str, env: d
                 print(_PREVIOUS_APP_KEPT)
         print(f"  Run manually:  cd apps/desktop && npm run {build_script}")
         if sys.platform == "win32":
-            print("  If this says \"Access is denied\" on Hermes.exe, close any")
+            print("  If this says \"Access is denied\" on Stardust.exe, close any")
             print("  running Hermes desktop window and retry.")
         print("  If the log shows Electron download retries, rebuild via a mirror:")
         print("    ELECTRON_MIRROR=<mirror-base-url> hermes desktop --force-build")

@@ -1572,7 +1572,7 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
         doctor_platform.check_macos_tcc_grants()
         assert capsys.readouterr().out == ""
@@ -1590,12 +1590,12 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
         monkeypatch.setattr(
             doctor_platform,
             "_macos_desktop_dr",
-            lambda app: 'designated => identifier "com.nousresearch.hermes" and cdhash H"97e692f3890f781fa0ad5ad6cb9d769cfaf42628"',
+            lambda app: 'designated => identifier "com.stardust.desktop" and cdhash H"97e692f3890f781fa0ad5ad6cb9d769cfaf42628"',
         )
         doctor_platform.check_macos_tcc_grants()
         out = capsys.readouterr().out
@@ -1609,12 +1609,12 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
         monkeypatch.setattr(
             doctor_platform,
             "_macos_desktop_dr",
-            lambda app: 'designated => identifier "com.nousresearch.hermes"',
+            lambda app: 'designated => identifier "com.stardust.desktop"',
         )
         doctor_platform.check_macos_tcc_grants()
         out = capsys.readouterr().out
@@ -1623,7 +1623,7 @@ class TestMacOSTCCGrants:
         # Identifier-pinned is stable but not the strongest anchor — the check
         # should point at the cert-anchored upgrade path.
         assert "--setup-tcc-identity" in out
-        assert "tccutil reset ScreenCapture com.nousresearch.hermes" in out
+        assert "tccutil reset ScreenCapture com.stardust.desktop" in out
         assert "toggle" in out
         assert "relaunch" in out
 
@@ -1635,19 +1635,19 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
         monkeypatch.setattr(
             doctor_platform,
             "_macos_desktop_dr",
-            lambda app: 'designated => identifier "com.nousresearch.hermes" and certificate root = H"aabbcc"',
+            lambda app: 'designated => identifier "com.stardust.desktop" and certificate root = H"aabbcc"',
         )
         doctor_platform.check_macos_tcc_grants()
         out = capsys.readouterr().out
         assert "TCC signing identity is stable" in out
         assert "certificate-anchored" in out
         assert "--setup-tcc-identity" not in out
-        assert "tccutil reset ScreenCapture com.nousresearch.hermes" in out
+        assert "tccutil reset ScreenCapture com.stardust.desktop" in out
 
     def test_warns_when_dr_unreadable(self, monkeypatch, capsys, tmp_path):
         """codesign failure → warn, never crash."""
@@ -1655,7 +1655,7 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
         monkeypatch.setattr(doctor_platform, "_macos_desktop_dr", lambda app: None)
         doctor_platform.check_macos_tcc_grants()
@@ -1668,7 +1668,7 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
         monkeypatch.setattr(doctor_platform, "_macos_desktop_dr", lambda app: "")
         doctor_platform.check_macos_tcc_grants()
@@ -1682,7 +1682,7 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
 
         def _timeout(*args, **kwargs):
@@ -1700,7 +1700,7 @@ class TestMacOSTCCGrants:
         monkeypatch.setattr(
             doctor_platform,
             "_desktop_app_bundle",
-            lambda: tmp_path / "Hermes.app",
+            lambda: tmp_path / "Stardust.app",
         )
         monkeypatch.setattr(shutil, "which", lambda _name: None)
         doctor_platform.check_macos_tcc_grants()

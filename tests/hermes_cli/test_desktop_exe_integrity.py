@@ -2,7 +2,7 @@
 
 The desktop self-update chain (Desktop → hermes-setup --update →
 ``hermes update`` → ``hermes desktop --build-only`` → relaunch) rebuilds
-Hermes.exe on the end user's machine. Before this gate, "build succeeded" was
+Stardust.exe on the end user's machine. Before this gate, "build succeeded" was
 just "the file exists", so a truncated PE (corrupt cached Electron zip), a
 non-PE file, or a wrong-architecture tree shipped as the new app — Windows
 then refuses to launch it with "This app can't run on your computer"
@@ -205,14 +205,14 @@ def test_expected_machines_prefers_user_runnable_api_over_arch_name(monkeypatch)
 
 def _win_tree(tmp_path: Path) -> tuple[Path, Path]:
     desktop_dir = tmp_path / "apps" / "desktop"
-    exe = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
+    exe = desktop_dir / "release" / "win-unpacked" / "Stardust.exe"
     return desktop_dir, exe
 
 
 def test_rollback_restores_backup_and_keeps_corrupt_copy(tmp_path):
     desktop_dir, exe = _win_tree(tmp_path)
     make_pe(exe, PE_AMD64, truncate_to=0x300)  # corrupt new build
-    backup_exe = desktop_dir / "release" / "win-unpacked.bak" / "Hermes.exe"
+    backup_exe = desktop_dir / "release" / "win-unpacked.bak" / "Stardust.exe"
     make_pe(backup_exe, PE_AMD64)  # valid old build
 
     with patch("hermes_cli.main_desktop._windows_native_machine", return_value="AMD64"):
@@ -223,7 +223,7 @@ def test_rollback_restores_backup_and_keeps_corrupt_copy(tmp_path):
     assert main_desktop._parse_pe_machine(exe) == PE_AMD64
     assert exe.stat().st_size == 0x400
     # Corrupt tree preserved for diagnostics; backup consumed.
-    assert (desktop_dir / "release" / "win-unpacked.corrupt" / "Hermes.exe").exists()
+    assert (desktop_dir / "release" / "win-unpacked.corrupt" / "Stardust.exe").exists()
     assert not backup_exe.exists()
 
 
@@ -277,7 +277,7 @@ def _ns(**kw):
 
 @pytest.mark.windows_only
 def test_build_only_fails_when_pack_produces_corrupt_exe(tmp_path, monkeypatch, capsys):
-    """The updater chain's contract: a rebuild whose Hermes.exe cannot launch
+    """The updater chain's contract: a rebuild whose Stardust.exe cannot launch
     must exit nonzero (so hermes-setup's retry-once kicks in) and must leave
     the previous working build in place instead of installing the corrupt one.
 
@@ -295,7 +295,7 @@ def test_build_only_fails_when_pack_produces_corrupt_exe(tmp_path, monkeypatch, 
     (desktop_dir / "package.json").write_text("{}", encoding="utf-8")
     monkeypatch.setattr(cli_main, "PROJECT_ROOT", root)
 
-    live_exe = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
+    live_exe = desktop_dir / "release" / "win-unpacked" / "Stardust.exe"
     make_pe(live_exe, PE_AMD64)  # the previous, working app
     live_bytes = live_exe.read_bytes()
 
@@ -307,7 +307,7 @@ def test_build_only_fails_when_pack_produces_corrupt_exe(tmp_path, monkeypatch, 
         out_flag = next((a for a in cmd if str(a).startswith("-c.directories.output=")), None)
         assert out_flag is not None, "pack must be redirected into a staging dir"
         staging = Path(str(out_flag).split("=", 1)[1])
-        make_pe(staging / "win-unpacked" / "Hermes.exe", PE_AMD64, truncate_to=0x300)
+        make_pe(staging / "win-unpacked" / "Stardust.exe", PE_AMD64, truncate_to=0x300)
         return subprocess.CompletedProcess(list(cmd), 0)
 
     with patch("hermes_cli.main_desktop.shutil.which", return_value="/usr/bin/npm"), \
